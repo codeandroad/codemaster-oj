@@ -215,8 +215,10 @@ function WorkspaceBody({ problem, user, original }: { problem: ProductionProblem
   return <WorkspaceThemeProvider theme={resolvedPageTheme}><div ref={rootRef} style={{colorScheme:resolvedPageTheme}} className={`${styles.root} ${resolvedPageTheme==="dark"?"dark":""}`} data-od-id="production-workspace">
     <header className={`${styles.toolbar} ${timedPracticeId?styles.timedToolbar:""}`} data-od-id="workspace-navigation">
       <div className={styles.brand}>
-        <button type="button" onClick={()=>navigateWorkspace("/")} className={`${styles.back} ${styles.homeLink}`} title="回首页" aria-label="回首页" data-od-id="workspace-home"><House size={18}/><span>首页</span></button>
-        <button type="button" onClick={()=>setProblemListOpen(true)} className={`${styles.back} ${styles.problemList}`} title="打开题目列表" aria-label="打开题目列表" aria-haspopup="dialog" aria-expanded={problemListOpen} data-od-id="back-to-problem-list"><List size={18}/><span>{learningPathId?"本章练习":"题目列表"}</span></button>
+        <div className={styles.navigationStart}>
+          <button type="button" onClick={()=>navigateWorkspace("/")} className={`${styles.back} ${styles.homeLink}`} title="回首页" aria-label="回首页" data-od-id="workspace-home"><House size={18}/></button>
+          <button type="button" onClick={()=>setProblemListOpen(true)} className={`${styles.back} ${styles.problemList}`} title="打开题目列表" aria-label="打开题目列表" aria-haspopup="dialog" aria-expanded={problemListOpen} data-od-id="back-to-problem-list"><List size={18}/><span>{learningPathId?"本章练习":"题目列表"}</span></button>
+        </div>
         <span className={styles.navigationDivider}/>
         <div className={styles.problemNavigation} aria-label="切换题目">
           <button type="button" className={styles.tool} title={navigation.previous?`上一题：${navigation.previous.title??""}`:"没有上一题"} aria-label="上一题" disabled={pending||navigationLoading||Boolean(navigationError)||!navigation.previous} onClick={()=>switchProblem(navigation.previous)} data-od-id="previous-problem"><ChevronLeft size={20}/></button>

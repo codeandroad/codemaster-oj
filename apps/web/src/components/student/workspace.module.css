@@ -1,4 +1,4 @@
-.root { display:flex;flex-direction:column;height:100dvh;min-height:420px;overflow:hidden;background:var(--background);color:var(--foreground); }
+.root { position:relative;display:flex;flex-direction:column;height:100dvh;min-height:420px;overflow:hidden;background:var(--background);color:var(--foreground); }
 .toolbar { display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:54px;padding:7px 14px;flex-shrink:0; }
 .brand { display:flex;align-items:center;gap:12px;min-width:0; }
 .back { display:flex;align-items:center;gap:7px;padding:8px;border-radius:6px;font-size:13px;font-weight:600;min-width:0; }
@@ -68,17 +68,14 @@
 .maximized .maxPanel { display:flex;height:100%; }
 .maximized .right { height:100%;display:block; }
 .statementMax > .right { display:none; }
-.footer { min-height:34px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 13px;font-size:11px;color:var(--muted-foreground); }
-.footer button { padding:5px 8px;border-radius:4px; }
-.tray { display:flex;flex-wrap:wrap;gap:5px; }
-.restore { border:1px solid var(--border);background:var(--surface);color:var(--foreground); }
+.notice { position:absolute;z-index:40;bottom:12px;left:50%;width:max-content;max-width:min(420px,calc(100% - 24px));transform:translateX(-50%);pointer-events:none;border-radius:6px;background:var(--foreground);color:var(--background);padding:8px 12px;box-shadow:0 4px 20px oklch(0% 0 0 / .2);font-size:12px;line-height:1.5;text-align:center; }
 .warning { color:var(--destructive); }
 .layoutMenu { width:min(440px,95vw); }
 .layoutMenu button { width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;border:1px solid var(--border);border-radius:6px;margin-top:8px;padding:8px 12px; }
 .root :is(button,select,textarea):focus-visible { outline:2px solid var(--ring);outline-offset:2px; }
 @media(max-width:1100px) and (min-width:761px) { .title{max-width:150px}.toolbar{gap:6px;padding:7px 10px}.tab{font-size:12px;padding:0 5px;gap:4px}.panelControls button{width:23px}.panelBody{padding:20px}.back span{max-width:90px}.brand{gap:6px} }
 @media(max-width:760px) {
- .root{min-height:0}.toolbar{gap:5px;padding:5px 8px;flex-wrap:wrap}.title{max-width:100px}.brand{gap:2px}.back span{display:none}.tools{gap:0}.tool{width:44px;height:44px}.actions{gap:3px}.actions button{min-height:44px;white-space:nowrap;padding-left:10px;padding-right:10px}.timer{display:block}.timer [role="dialog"]{position:fixed;top:60px;right:12px;width:min(288px,calc(100vw - 24px))}.timer button{width:44px;height:44px;padding:0;justify-content:center}.toolbar>.tools>button:last-child{display:none}.mobileTabs{display:flex;gap:4px;padding:0 8px;height:44px;flex-shrink:0}.mobileTabs button{flex:1;min-height:44px;border-radius:6px;font-size:13px}.mobileTabs button[aria-pressed="true"]{background:var(--surface);font-weight:650}.main{display:block;min-height:0}.separator{display:none}.panelControls{display:none}.main>.statement,.main>.right,.right>.panel{height:100%}.right{display:block}.main[data-mobile="statement"]>.right{display:none}.main:not([data-mobile="statement"])>.statement{display:none}.main[data-mobile="editor"] .testing,.main[data-mobile="testing"] .editor{display:none}.main[data-mobile="editor"] .editor,.main[data-mobile="testing"] .testing,.main[data-mobile="statement"]>.statement{display:flex}.panelHeader{min-height:44px;height:44px}.editorToolbar{height:44px}.editorToolbar select{min-height:40px}.editorToolbar .tools button{width:44px;height:44px}.tab{height:44px}.panelBody{padding:22px 18px}.resultBody{padding:18px}.footer{flex-wrap:wrap;gap:4px}.footerCaption{display:none}.caseTab{min-height:44px}.sampleValue{font-size:12px}.main.onlyStatement>.right{display:none}
+ .root{min-height:0}.toolbar{gap:5px;padding:5px 8px;flex-wrap:wrap}.title{max-width:100px}.brand{gap:2px}.back span{display:none}.homeLink,.problemList{min-width:44px;min-height:44px;justify-content:center}.tools{gap:0}.tool{width:44px;height:44px}.actions{gap:3px}.actions button{min-height:44px;white-space:nowrap;padding-left:10px;padding-right:10px}.timer{display:block}.timer [role="dialog"]{position:fixed;top:60px;right:12px;width:min(288px,calc(100vw - 24px))}.timer button{width:44px;height:44px;padding:0;justify-content:center}.toolbar>.tools>button:last-child{display:none}.mobileTabs{display:flex;gap:4px;padding:0 8px;height:44px;flex-shrink:0}.mobileTabs button{flex:1;min-height:44px;border-radius:6px;font-size:13px}.mobileTabs button[aria-pressed="true"]{background:var(--surface);font-weight:650}.main{display:block;min-height:0}.separator{display:none}.panelControls{display:none}.main>.statement,.main>.right,.right>.panel{height:100%}.right{display:block}.main[data-mobile="statement"]>.right{display:none}.main:not([data-mobile="statement"])>.statement{display:none}.main[data-mobile="editor"] .testing,.main[data-mobile="testing"] .editor{display:none}.main[data-mobile="editor"] .editor,.main[data-mobile="testing"] .testing,.main[data-mobile="statement"]>.statement{display:flex}.panelHeader{min-height:44px;height:44px}.editorToolbar{height:44px}.editorToolbar select{min-height:40px}.editorToolbar .tools button{width:44px;height:44px}.tab{height:44px}.panelBody{padding:22px 18px}.resultBody{padding:18px}.caseTab{min-height:44px}.sampleValue{font-size:12px}.main.onlyStatement>.right{display:none}
 }
 @media(prefers-reduced-motion:no-preference) { .root button{transition:background-color .12s,color .12s} }
 
@@ -86,6 +83,7 @@
 .editor:has([data-od-id="production-code-input"]:focus-visible) { outline:2px solid var(--border-strong);outline-offset:-1px; }
 
 .problemList { padding:8px;font-size:14px; }
+.homeLink { color:var(--muted-foreground); }
 .navigationDivider { width:1px;height:21px;background:var(--border); }
 .problemNavigation { display:flex;gap:2px;align-items:center; }
 .problemNavigation button:disabled { opacity:.35;cursor:not-allowed; }

@@ -9,6 +9,19 @@ import { applyResponse } from '../domain.response.js';
 export class CommunityController {
  constructor(private readonly domain: DomainService) {}
 
+ @Get('student-notifications')
+ async notifications(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
+  return applyResponse(response,await this.domain.execute('community',request.domainContext));
+ }
+ @Post('student-notifications/read-all')
+ async readAllNotifications(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
+  return applyResponse(response,await this.domain.execute('community',request.domainContext));
+ }
+ @Post('student-notifications/:notificationId/read')
+ async readNotification(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
+  return applyResponse(response,await this.domain.execute('community',request.domainContext));
+ }
+
  @Get('profile-message-reports')
  async allReports(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));

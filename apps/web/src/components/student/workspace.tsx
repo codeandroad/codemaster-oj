@@ -5,7 +5,7 @@ import { AppLink, useNavigationBlocker } from "@/components/navigation";
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, Shuffle, List, Code2, FileText, HelpCircle, History, LayoutPanelLeft, Maximize2, Play, RotateCcw, Send, Settings, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, Shuffle, List, House, Code2, FileText, HelpCircle, History, LayoutPanelLeft, Maximize2, Play, RotateCcw, Send, Settings, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { StatusPill } from "@/components/page-chrome";
@@ -73,7 +73,7 @@ function WorkspaceBody({ problem, user, original }: { problem: ProductionProblem
   const [draftSaved,setDraftSaved]=useState(false);
   const action = useMutation(), polling = useSubmission(submissionId), keys = useRef(new Map<string, string>()), timedSession = useStudentTimedSession(timedPracticeId);
   const [problemListOpen,setProblemListOpen]=useState(false);
-  const library=useData<{items:ProductionProblem[]}>((!learningPathId&&!assignmentId&&!timedPracticeId)||(!learningPathId&&problemListOpen)?"problems":""),assignment=useData<Assignment>(assignmentId?`assignments/${encodeURIComponent(assignmentId)}`:"");
+  const library=useData<{items:ProductionProblem[]}>(!learningPathId&&!assignmentId&&!timedPracticeId?"problems":""),assignment=useData<Assignment>(assignmentId?`assignments/${encodeURIComponent(assignmentId)}`:"");
   const historyQuery = new URLSearchParams({ identityId: user.identityId, problemId: problem.id, kind: "submit,correction", ...(assignmentId ? { assignmentId } : {}), ...(timedPracticeId ? { timedPracticeId } : {}) });
   const submissions = useData<{ items: Submission[] }>(`submissions?${historyQuery}`), dirty = code !== receivedCode;
   const anyDirty = dirty || supportedLanguages.some(other => { if (other === language) return false; const draft = readDraft(draftKey(user.id, problem.id, problem.versionId ?? "current", context, other)); return draft?.code !== draft?.receivedCode && Boolean(draft?.code.trim()); });
@@ -81,6 +81,7 @@ function WorkspaceBody({ problem, user, original }: { problem: ProductionProblem
   const pending = action.busy || Boolean(submissionId && !polling.result && !polling.error) || Boolean(polling.result && isPending(polling.result.status));
   const unavailable = Boolean(timedPracticeId && !timedSession.active);
   useEffect(() => { setDraftSaved(saveDraft(storageKey, { code, receivedCode, updatedAt: new Date().toISOString() })); }, [storageKey, code, receivedCode]);
+  useEffect(() => { if (!layoutMessage) return; const timeout = window.setTimeout(() => setLayoutMessage(""), 4000); return () => window.clearTimeout(timeout); }, [layoutMessage]);
   useEffect(() => {
     const selected = readDraftLanguage(user.id, problem.id, problem.versionId ?? "current", context);
     if (!selected || selected === language) return;
@@ -195,11 +196,11 @@ function WorkspaceBody({ problem, user, original }: { problem: ProductionProblem
     return <PanelControls panel={panel} collapsed={layout.panels[panel] === "collapsed"} maximized={layout.maximized === panel}
       onCollapse={() => dispatch({ type: "toggle-collapse", panel })} onMaximize={() => dispatch({ type: "toggle-maximize", panel })}/>;
   }
-  function restorePanels() { dispatch({ type: "reset" }); reset(); setLayoutMessage("已恢复默认布局"); }
   const navigationItems: NavigationProblem[]=learningPathId?(courseValid?courseChapter?.problems??[]:[]):assignmentId?(assignment.data?.problems??[]):timedPracticeId?(timedSession.data?.problems??[]):(library.data?.items??[]).map(item=>({problemId:item.id,versionId:item.versionId,title:item.title}));
   const navigation=problemNavigation(navigationItems,problem.id);
   const navigationLoading=learningPathId?course.loading:assignmentId?assignment.loading:timedPracticeId?timedSession.loading:library.loading;
   const navigationError=learningPathId?(course.error||(!course.loading&&!courseValid?"当前题目不属于此课程章节":"")):assignmentId?assignment.error:timedPracticeId?timedSession.error:library.error;
+  const scopedProblemList=Boolean(learningPathId||assignmentId||timedPracticeId);
   function navigateWorkspace(destination:string){
     saveDraft(storageKey,{code,receivedCode,updatedAt:new Date().toISOString()});
     if(anyDirty){setPendingDestination(destination);setConfirm("leave");}else router.push(destination);
@@ -214,6 +215,7 @@ function WorkspaceBody({ problem, user, original }: { problem: ProductionProblem
   return <WorkspaceThemeProvider theme={resolvedPageTheme}><div ref={rootRef} style={{colorScheme:resolvedPageTheme}} className={`${styles.root} ${resolvedPageTheme==="dark"?"dark":""}`} data-od-id="production-workspace">
     <header className={`${styles.toolbar} ${timedPracticeId?styles.timedToolbar:""}`} data-od-id="workspace-navigation">
       <div className={styles.brand}>
+        <button type="button" onClick={()=>navigateWorkspace("/")} className={`${styles.back} ${styles.homeLink}`} title="回首页" aria-label="回首页" data-od-id="workspace-home"><House size={18}/><span>首页</span></button>
         <button type="button" onClick={()=>setProblemListOpen(true)} className={`${styles.back} ${styles.problemList}`} title="打开题目列表" aria-label="打开题目列表" aria-haspopup="dialog" aria-expanded={problemListOpen} data-od-id="back-to-problem-list"><List size={18}/><span>{learningPathId?"本章练习":"题目列表"}</span></button>
         <span className={styles.navigationDivider}/>
         <div className={styles.problemNavigation} aria-label="切换题目">
@@ -243,7 +245,7 @@ function WorkspaceBody({ problem, user, original }: { problem: ProductionProblem
         </div>
       </section>
       <div role="separator" aria-label="调整题目与代码区域宽度" aria-orientation="vertical" aria-valuemin={25} aria-valuemax={70} aria-valuenow={settings.panelPercent} tabIndex={0} onPointerDown={resizeStart} onPointerMove={resizeMove} onPointerUp={resizeEnd} onPointerCancel={resizeEnd} onLostPointerCapture={resizeEnd} onKeyDown={event => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); update({ panelPercent: settings.panelPercent + (event.key === "ArrowLeft" ? -2 : 2) }); } }} className={styles.separator} data-od-id="workspace-width-resizer"/>
-      {previewPercent != null && <div aria-hidden style={{ position:"absolute",left:`${previewPercent}%`,top:54,bottom:34,width:2,background:"var(--primary)",pointerEvents:"none",zIndex:20 }}/>}
+      {previewPercent != null && <div aria-hidden style={{ position:"absolute",left:`${previewPercent}%`,top:54,bottom:0,width:2,background:"var(--primary)",pointerEvents:"none",zIndex:20 }}/>}
       <div ref={rightRef} className={rightClass} style={{ "--workspace-editor-height": `${layout.editorPercent}%` } as CSSProperties}>
         <section className={panelClass("editor")} data-od-id="editor-panel" onMouseEnter={()=>setActivePanel("editor")} onFocusCapture={()=>setActivePanel("editor")}>
           <header className={styles.panelHeader}><span className={styles.panelTitle}><Code2 size={16} className="text-muted-foreground"/>代码</span>{panelActions("editor")}</header>
@@ -269,12 +271,13 @@ function WorkspaceBody({ problem, user, original }: { problem: ProductionProblem
       </div>
     </main>
 
-    <footer className={styles.footer}><div className={styles.tray}>{panelIds.filter(panel => layout.panels[panel] !== "open").map(panel => <button type="button" key={panel} className={styles.restore} onClick={() => dispatch({ type:"show",panel })} data-od-id={`restore-${panel}`}>{panelNames[panel]} · {layout.panels[panel] === "hidden" ? "显示" : "展开"}</button>)}</div><span className={styles.footerCaption} role="status">{navigationError?`题目列表加载失败：${navigationError}`:layoutMessage || (originalId ? "订正保留原活动成绩" : "公开自测不计入正式成绩")}</span><button type="button" onClick={restorePanels}>恢复默认布局</button></footer>
+    {layoutMessage&&<div className={styles.notice} role="status">{layoutMessage}</div>}
+    {navigationError&&<span className="sr-only" role="status">题目列表加载失败：{navigationError}</span>}
 
-    <Dialog open={layoutOpen} onOpenChange={setLayoutOpen}><DialogContent className={styles.layoutMenu}><DialogTitle>布局与面板</DialogTitle><DialogDescription>分别显示、折叠或最大化各操作区域。</DialogDescription>{panelIds.map(panel => <button key={panel} type="button" onClick={() => dispatch({ type:"show",panel })}>{panelNames[panel]}<span className="text-xs text-muted-foreground">{layout.panels[panel] === "open" ? "已显示" : "恢复显示"}</span></button>)}<button type="button" onClick={() => { restorePanels();setLayoutOpen(false); }}>恢复默认布局<RotateCcw size={15}/></button><button type="button" onClick={() => { void toggleFullscreen();setLayoutOpen(false); }}>浏览器全屏<Maximize2 size={15}/></button></DialogContent></Dialog>
+    <Dialog open={layoutOpen} onOpenChange={setLayoutOpen}><DialogContent className={styles.layoutMenu}><DialogTitle>布局与面板</DialogTitle><DialogDescription>分别显示、折叠或最大化各操作区域。</DialogDescription>{panelIds.map(panel => <button key={panel} type="button" onClick={() => dispatch({ type:"show",panel })}>{panelNames[panel]}<span className="text-xs text-muted-foreground">{layout.panels[panel] === "open" ? "已显示" : "恢复显示"}</span></button>)}<button type="button" onClick={() => { void toggleFullscreen();setLayoutOpen(false); }}>浏览器全屏<Maximize2 size={15}/></button></DialogContent></Dialog>
     <Dialog open={confirm !== null} onOpenChange={open => { if (!open) setConfirm(null); }}><DialogContent><DialogTitle>{confirm === "leave" ? "离开答题页面？" : confirm === "reset" ? "重置初始代码？" : "答题帮助"}</DialogTitle><DialogDescription>{confirm === "leave" ? "草稿保留在当前浏览器会话中，但尚未正式提交，离开不会自动交卷。" : confirm === "reset" ? "当前草稿将替换为题目初始代码；服务器已接收的提交仍保留。" : "运行仅测试公开样例；自定义输入只运行程序，不判断正确性；提交才创建正式记录。Ctrl / ⌘ + 单引号运行样例，Ctrl / ⌘ + Enter 正式提交，Ctrl / ⌘ + S 保存草稿，Esc 退出面板最大化。"}</DialogDescription><DialogFooter><Button variant="secondary" onClick={() => setConfirm(null)}>{confirm === "leave" ? "继续编辑" : "关闭"}</Button>{confirm === "leave" && <Button variant="danger" onClick={() => { const destination=pendingDestination??returnTo;setConfirm(null);router.push(destination); }}>离开，不提交</Button>}{confirm === "reset" && <Button onClick={() => { setCode(starterFor(problem,language));setConfirm(null); }}>重置代码</Button>}</DialogFooter></DialogContent></Dialog>
 
-    <ProblemListDrawer open={problemListOpen} onOpenChange={setProblemListOpen} title={learningPathId?"本章练习":"题目列表"} description={learningPathId?`${course.data?.title??"课程"} › ${courseChapter?.title??"加载章节…"}`:undefined} items={learningPathId?navigationItems.map(p=>({id:p.problemId,title:p.title??"练习"})):library.data?.items??[]} currentId={problem.id} loading={learningPathId?navigationLoading:library.loading} error={learningPathId?navigationError:library.error} onRetry={learningPathId?course.reload:library.reload} onSelect={target=>{setProblemListOpen(false);if(target.id!==problem.id){if(learningPathId)switchProblem(navigationItems.find(p=>p.problemId===target.id)??null);else navigateWorkspace(`/student/problems/${encodeURIComponent(target.id)}`);}}}/>
+    <ProblemListDrawer open={problemListOpen} onOpenChange={setProblemListOpen} title={learningPathId?"本章练习":assignmentId?"作业题目":timedPracticeId?"训练题目":"题目列表"} description={learningPathId?`${course.data?.title??"课程"} › ${courseChapter?.title??"加载章节…"}`:undefined} items={scopedProblemList?navigationItems.map(p=>({id:p.problemId,title:p.title??"练习"})):library.data?.items??[]} currentId={problem.id} loading={scopedProblemList?navigationLoading:library.loading} error={scopedProblemList?navigationError:library.error} onRetry={learningPathId?course.reload:assignmentId?assignment.reload:timedPracticeId?timedSession.reload:library.reload} onSelect={target=>{setProblemListOpen(false);if(target.id!==problem.id){if(scopedProblemList)switchProblem(navigationItems.find(p=>p.problemId===target.id)??null);else navigateWorkspace(`/student/problems/${encodeURIComponent(target.id)}`);}}}/>
 
     <WorkspaceSettingsDialog key={settingsScope} editorOnly={settingsScope==="editor"} initialSection={settingsScope==="editor"?"editor":"layout"} open={settingsOpen} onOpenChange={setSettingsOpen} settings={settings} update={update} reset={reset}/>
   </div></WorkspaceThemeProvider>;

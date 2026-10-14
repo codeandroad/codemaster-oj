@@ -1,5 +1,6 @@
 import { transaction } from './db.mjs';
 import { enumValue, fail, field, integer, uuid } from './security.mjs';
+import { avatarForIdentity } from './avatars.mjs';
 
 const response = (body, status = 200) => ({status, body});
 const student = user => user.roles.includes('student');
@@ -34,18 +35,9 @@ async function visibleProfile(db, user, identityId) {
  fail(403,'FORBIDDEN','无权查看学生主页');
 }
 
-async function canModerate(db, user, identityId) {
- if (admin(user)) return true;
- if (!user.roles.includes('teacher')) return false;
- return (await db.query(`SELECT 1 FROM teacher_classes tc
-  JOIN class_members cm ON cm.class_id=tc.class_id
-  JOIN classes c ON c.id=tc.class_id
-  WHERE tc.account_id=$1 AND cm.identity_id=$2 AND c.archived_at IS NULL LIMIT 1`,
-  [user.id, identityId])).rowCount > 0;
-}
-
 function authorShape(row) {
- return {id:row.author_identity_id,nickname:row.author_nickname,avatar:row.author_avatar};
+ return {id:row.author_identity_id,nickname:row.author_nickname,
+  avatar:avatarForIdentity(row.author_avatar,row.author_identity_id)};
 }
 
 function messageShape(row, user, targetIdentityId, moderator) {
@@ -71,7 +63,7 @@ async function profile(ctx, identityId) {
   FROM point_ledger WHERE identity_id=$1`, [identityId])).rows[0];
  const rankPoints=(await ctx.pool.query(`SELECT COALESCE(sum(points),0)::int points
   FROM school_rank_ledger WHERE identity_id=$1`,[identityId])).rows[0].points;
- return response({profile:{id:p.id,nickname:p.nickname,avatar:p.avatar,bio:p.bio,
+ return response({profile:{id:p.id,nickname:p.nickname,avatar:avatarForIdentity(p.avatar,p.id),bio:p.bio,
   points:totals.points,rankPoints,solvedProblems:totals.solved_problems,isSelf:ctx.user.identityId===p.id}});
 }
 
@@ -114,7 +106,7 @@ async function listMessages(ctx, identityId) {
   a.avatar author_avatar ${visibleMessageSql}
   ORDER BY m.created_at DESC,m.id DESC LIMIT $4 OFFSET $5`,
   [...params,pageSize,(page-1)*pageSize])).rows;
- const moderator=await canModerate(ctx.pool,ctx.user,identityId);
+ const moderator=admin(ctx.user);
  return response({items:rows.map(r=>messageShape(r,ctx.user,identityId,moderator)),total,page,pageSize});
 }
 
@@ -139,6 +131,8 @@ async function createMessage(ctx, identityId) {
   const m=(await db.query(`INSERT INTO student_guestbook_messages(profile_identity_id,author_account_id,body)
    VALUES($1,$2,$3) RETURNING id,body,created_at,author_account_id`,
    [identityId,ctx.user.id,body])).rows[0];
+  await db.query(`INSERT INTO student_guestbook_notifications(recipient_identity_id,message_id)
+   VALUES($1,$2)`,[identityId,m.id]);
   await ctx.helpers.audit(db,ctx.user.id,'profile.message_create','student_guestbook_message',m.id,
    {profileIdentityId:identityId});
   return m;
@@ -156,10 +150,11 @@ async function deleteMessage(ctx, identityId, messageId) {
   if(!admin(ctx.user)) await visibleProfile(db,ctx.user,identityId);
   const m=(await db.query(`SELECT id,author_account_id,deleted_at FROM student_guestbook_messages
    WHERE id=$1 AND profile_identity_id=$2 FOR UPDATE`,[messageId,identityId])).rows[0];
-  if(!m || m.deleted_at) fail(404,'NOT_FOUND','留言不存在');
-  const moderator=await canModerate(db,ctx.user,identityId);
+  if(!m) fail(404,'NOT_FOUND','留言不存在');
+  const moderator=admin(ctx.user);
   if(m.author_account_id!==ctx.user.id && identityId!==ctx.user.identityId && !moderator)
    fail(403,'FORBIDDEN','无权删除该留言');
+  if(m.deleted_at) return;
   const deleted=(await db.query(`UPDATE student_guestbook_messages
    SET deleted_at=clock_timestamp(),deleted_by_account_id=$1
    WHERE id=$2 RETURNING deleted_at`,[ctx.user.id,messageId])).rows[0];
@@ -198,8 +193,7 @@ async function reportMessage(ctx, identityId, messageId) {
 }
 
 async function reports(ctx, identityId) {
- await activeStudent(ctx.pool,identityId);
- if(!await canModerate(ctx.pool,ctx.user,identityId)) fail(403,'FORBIDDEN','无权查看举报');
+ if(!admin(ctx.user)) fail(403,'FORBIDDEN','需要管理员权限');
  const {page,pageSize}=paging(ctx.url);
  const status=reportFilter(ctx.url);
  const base=`FROM student_guestbook_reports r
@@ -272,6 +266,7 @@ async function dismissReport(ctx, reportId) {
   if(!message) fail(404,'NOT_FOUND','举报不存在');
   const report=(await db.query(`SELECT id,resolution FROM student_guestbook_reports
    WHERE id=$1 FOR UPDATE`,[reportId])).rows[0];
+  if(report.resolution==='dismiss') return;
   if(message.deleted_at || report.resolution) fail(409,'ALREADY_RESOLVED','举报已处理');
   await db.query(`UPDATE student_guestbook_reports
    SET resolution='dismiss',resolved_at=now(),resolved_by_account_id=$1
@@ -283,7 +278,58 @@ async function dismissReport(ctx, reportId) {
  return response({ok:true,status:'dismissed'});
 }
 
+const visibleNotificationSql=`FROM student_guestbook_notifications n
+ JOIN student_guestbook_messages m ON m.id=n.message_id AND m.deleted_at IS NULL
+ JOIN accounts a ON a.id=m.author_account_id
+  AND a.disabled_at IS NULL AND a.binding_released_at IS NULL
+ JOIN identities i ON i.id=a.identity_id AND i.archived_at IS NULL
+ WHERE n.recipient_identity_id=$1`;
+
+async function notifications(ctx) {
+ if(!student(ctx.user)) fail(403,'FORBIDDEN','只有学生可以查看通知');
+ const {page,pageSize}=paging(ctx.url);
+ const total=(await ctx.pool.query(`SELECT count(*)::int total,
+  count(*) FILTER (WHERE n.read_at IS NULL)::int unread ${visibleNotificationSql}`,
+  [ctx.user.identityId])).rows[0];
+ const rows=(await ctx.pool.query(`SELECT n.id,n.message_id,n.recipient_identity_id,n.created_at,n.read_at,m.body,
+  COALESCE(NULLIF(btrim(a.nickname),''),'同学') author_nickname
+  ${visibleNotificationSql}
+  ORDER BY n.created_at DESC,n.id DESC LIMIT $2 OFFSET $3`,
+  [ctx.user.identityId,pageSize,(page-1)*pageSize])).rows;
+ return response({items:rows.map(r=>({id:r.id,messageId:r.message_id,body:r.body,
+  profileIdentityId:r.recipient_identity_id,
+  authorNickname:r.author_nickname,createdAt:r.created_at,readAt:r.read_at})),
+  total:total.total,unreadCount:total.unread,page,pageSize});
+}
+
+async function readNotification(ctx, notificationId) {
+ if(!student(ctx.user)) fail(403,'FORBIDDEN','只有学生可以处理通知');
+ const row=(await ctx.pool.query(`UPDATE student_guestbook_notifications
+  SET read_at=COALESCE(read_at,clock_timestamp())
+  WHERE id=$1 AND recipient_identity_id=$2
+  RETURNING read_at`,[notificationId,ctx.user.identityId])).rows[0];
+ if(!row) fail(404,'NOT_FOUND','通知不存在');
+ return response({ok:true,readAt:row.read_at});
+}
+
+async function readAllNotifications(ctx) {
+ if(!student(ctx.user)) fail(403,'FORBIDDEN','只有学生可以处理通知');
+ await ctx.pool.query(`UPDATE student_guestbook_notifications n
+  SET read_at=clock_timestamp()
+  FROM student_guestbook_messages m
+  WHERE n.message_id=m.id AND n.recipient_identity_id=$1
+   AND n.read_at IS NULL AND m.deleted_at IS NULL`,[ctx.user.identityId]);
+ return response({ok:true});
+}
+
 export async function handleCommunity(ctx) {
+ if(ctx.route==='/student-notifications') {
+  if(ctx.method==='GET') return notifications(ctx);
+  return null;
+ }
+ if(ctx.route==='/student-notifications/read-all' && ctx.method==='POST') return readAllNotifications(ctx);
+ const notificationAction=ctx.route.match(/^\/student-notifications\/([^/]+)\/read$/);
+ if(notificationAction && ctx.method==='POST') return readNotification(ctx,uuid(notificationAction[1],'通知 ID'));
  if(ctx.route==='/profile-message-reports' && ctx.method==='GET') return allReports(ctx);
  const reportAction=ctx.route.match(/^\/profile-message-reports\/([^/]+)\/dismiss$/);
  if(reportAction && ctx.method==='POST') return dismissReport(ctx,uuid(reportAction[1],'举报 ID'));

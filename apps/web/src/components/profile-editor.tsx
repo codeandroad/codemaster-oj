@@ -4,6 +4,7 @@ import { Camera, Pencil, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Button } from "./ui/button";
 import { ProfileAvatar, ProfileHero } from "./profile-hero";
+import { defaultAvatarPath, randomDefaultAvatarPath } from "@/lib/default-avatars";
 import { genderLabel, genderOptions } from "@/lib/gender";
 import { apiMessage, productionApi, type AuthResponse, type CampusGender, type CampusUser } from "@/lib/production-api";
 
@@ -15,7 +16,7 @@ function currentGender(user: CampusUser): CampusGender | "" {
 }
 
 function Detail({ label, children }: { label: string; children: ReactNode }) {
-  return <div className="grid gap-1 border-b border-border py-4 last:border-b-0 sm:grid-cols-[135px_minmax(0,1fr)] sm:gap-5">
+  return <div className="grid gap-0.5 border-b border-border py-2.5 last:border-b-0 sm:grid-cols-[135px_minmax(0,1fr)] sm:gap-5">
     <dt className="text-sm font-medium text-muted-foreground">{label}</dt>
     <dd className="min-w-0 break-words text-sm font-medium">{children}</dd>
   </div>;
@@ -95,8 +96,9 @@ export function ProfileEditor({ user, onSaved }: { user: CampusUser; onSaved?: (
         <div className="flex flex-wrap items-center gap-4">
           <ProfileAvatar avatar={avatar} nickname={displayName} large/>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="relative inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-md border border-border-strong bg-surface px-3.5 text-sm font-semibold hover:bg-muted focus-within:ring-2 focus-within:ring-ring"><Camera size={15}/>更换头像<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={event => { loadAvatar(event.target.files?.[0]); event.target.value = ""; }}/></label>
-            {avatar && <Button type="button" variant="ghost" size="sm" onClick={() => setAvatar("")}>使用默认头像</Button>}
+            <label className="relative inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-md border border-border-strong bg-surface px-3.5 text-sm font-semibold hover:bg-muted focus-within:ring-2 focus-within:ring-ring"><Camera size={15}/>上传头像<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={event => { loadAvatar(event.target.files?.[0]); event.target.value = ""; }}/></label>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setAvatar(randomDefaultAvatarPath(avatar))}>换一个预设头像</Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setAvatar(defaultAvatarPath(user.identityId))}>使用默认头像</Button>
           </div>
           <p className="w-full text-xs text-muted-foreground">支持 JPEG、PNG、WebP，最大 5 MB；图片会裁剪为正方形。</p>
         </div>
@@ -107,8 +109,8 @@ export function ProfileEditor({ user, onSaved }: { user: CampusUser; onSaved?: (
       <p className="mt-3 text-xs leading-5 text-muted-foreground">姓名和身份编号由管理员维护；性别仅显示在你的身份资料中。</p>
       {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
       <div className="mt-5 flex flex-wrap items-center gap-3"><Button type="submit" disabled={busy}>{busy ? "正在保存…" : "保存修改"}</Button><Button type="button" variant="secondary" disabled={busy} onClick={resetDraft}>取消</Button></div>
-    </form> : <section className="rounded-xl border border-border bg-surface px-5 py-5 sm:px-7" aria-labelledby="profile-details-heading">
-      <div className="border-b border-border pb-4"><h3 id="profile-details-heading" className="text-lg font-bold">资料详情</h3><p className="mt-1 text-sm text-muted-foreground">账号与身份信息仅供本人查看。</p></div>
+    </form> : <section className="rounded-xl border border-border bg-surface px-5 py-4 sm:px-7" aria-labelledby="profile-details-heading">
+      <div className="border-b border-border pb-3"><h3 id="profile-details-heading" className="text-lg font-bold">资料详情</h3><p className="mt-1 text-sm text-muted-foreground">账号与身份信息仅供本人查看。</p></div>
       <dl>
         <Detail label="真实姓名">{user.name}</Detail>
         <Detail label="身份">{roleName}</Detail>

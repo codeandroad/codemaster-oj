@@ -4,6 +4,7 @@ import {randomBytes,randomUUID} from 'node:crypto';
 import {createPool} from '../src/db.mjs';
 import {migrate} from '../src/migrate.mjs';
 import {handleCommunity} from '../src/community.mjs';
+import {defaultAvatarPath} from '../src/avatars.mjs';
 
 test('community validates identity, text, and student-only posting before database writes',async()=>{
  const id='11111111-1111-4111-8111-111111111111';
@@ -96,7 +97,7 @@ test('later deletion migration corrects previously dismissed report timestamps',
   }
  });
 
-test('school-wide profiles, first-AC activity and guestbook keep class-scoped moderation',
+test('school-wide profiles, first-AC activity and guestbook keep administrator moderation',
  {skip:!process.env.TEST_DATABASE_URL,timeout:60000},async()=>{
   const manager=createPool(process.env.TEST_DATABASE_URL);
   const schema=`community_${randomBytes(6).toString('hex')}`;
@@ -179,21 +180,46 @@ test('school-wide profiles, first-AC activity and guestbook keep class-scoped mo
    const messageRoute=`/profiles/${alpha.identityId}/messages`;
    const posted=(await call(beta,messageRoute,'POST',{body:'做得好！'})).body;
    assert.equal(posted.body,'做得好！');
-   assert.deepEqual(posted.author,{id:beta.identityId,nickname:'Beta',avatar:''});
+   assert.equal(posted.author.id,beta.identityId);
+   assert.equal(posted.author.nickname,'Beta');
+   assert.equal(posted.author.avatar,defaultAvatarPath(beta.identityId));
    assert.equal(posted.canDelete,true);
    assert.equal(posted.canReport,false);
+   const notificationRoute='/student-notifications';
+   const inbox=(await call(alpha,notificationRoute)).body;
+   assert.equal(inbox.total,1);
+   assert.equal(inbox.unreadCount,1);
+   assert.equal(inbox.items[0].messageId,posted.id);
+   assert.equal(inbox.items[0].profileIdentityId,alpha.identityId);
+   assert.equal(inbox.items[0].authorNickname,'Beta');
+   assert.equal(inbox.items[0].body,'做得好！');
+   assert.equal((await call(beta,notificationRoute)).body.total,0,'author sees no target notification');
+   await assert.rejects(call(teacher,notificationRoute),e=>e.status===403);
+   const notificationId=inbox.items[0].id;
+   await assert.rejects(call(beta,`${notificationRoute}/${notificationId}/read`,'POST'),e=>e.status===404);
+   const firstRead=(await call(alpha,`${notificationRoute}/${notificationId}/read`,'POST')).body;
+   const repeatedRead=(await call(alpha,`${notificationRoute}/${notificationId}/read`,'POST')).body;
+   assert.equal(firstRead.readAt.getTime(),repeatedRead.readAt.getTime(),'read is idempotent');
+   assert.equal((await call(alpha,notificationRoute)).body.unreadCount,0);
    await assert.rejects(pool.query('UPDATE student_guestbook_messages SET body=$1 WHERE id=$2',
     ['changed after publication',posted.id]),/guestbook message content is immutable/);
    const ownPost=(await call(alpha,`/profiles/${beta.identityId}/messages`,'POST',
     {body:'谢谢！'})).body;
+   assert.equal((await call(beta,notificationRoute)).body.unreadCount,1);
+   assert.deepEqual((await call(beta,`${notificationRoute}/read-all`,'POST')).body,{ok:true});
+   assert.deepEqual((await call(beta,`${notificationRoute}/read-all`,'POST')).body,{ok:true});
+   assert.equal((await call(beta,notificationRoute)).body.unreadCount,0);
    assert.deepEqual((await call(alpha,`/profiles/${beta.identityId}/messages/${ownPost.id}`,'DELETE')).body,
     {ok:true},'authors can remove their own message');
+   assert.equal((await call(beta,notificationRoute)).body.total,0,'deleted source notification is hidden');
    await assert.rejects(call(beta,messageRoute,'POST',{body:'Second'}),e=>e.status===429);
    await assert.rejects(call(alpha,messageRoute,'POST',{body:'Own'}),e=>e.status===400);
    await assert.rejects(call(teacher,messageRoute,'POST',{body:'Teacher'}),e=>e.status===403);
    const list=(await call(alpha,messageRoute)).body;
    assert.equal(list.total,1);
    assert.equal(list.items[0].canDelete,true,'profile owner can remove a visitor message');
+   assert.equal((await call(teacher,messageRoute)).body.items[0].canDelete,false,
+    'class teachers cannot moderate guestbook messages');
    assert.equal((await call(outsider,messageRoute)).body.total,1);
 
    const reportRoute=`${messageRoute}/${posted.id}/report`;
@@ -206,9 +232,10 @@ test('school-wide profiles, first-AC activity and guestbook keep class-scoped mo
    assert.equal(reportedOwnerView.items[0].canDelete,true);
    assert.equal(reportedOwnerView.items[0].canReport,false);
    assert.equal((await call(beta,messageRoute)).body.total,1,'other users still see it pending moderation');
-   const reportList=(await call(teacher,`/profiles/${alpha.identityId}/message-reports`)).body;
+   const reportList=(await call(admin,`/profiles/${alpha.identityId}/message-reports`)).body;
    assert.equal(reportList.total,1);
    assert.equal(reportList.items[0].reason,'abuse');
+   await assert.rejects(call(teacher,`/profiles/${alpha.identityId}/message-reports`),e=>e.status===403);
    await assert.rejects(call(otherTeacher,`/profiles/${alpha.identityId}/message-reports`),e=>e.status===403);
    await assert.rejects(call(teacher,'/profile-message-reports'),e=>e.status===403);
    await assert.rejects(call(alpha,'/profile-message-reports'),e=>e.status===403);
@@ -226,7 +253,9 @@ test('school-wide profiles, first-AC activity and guestbook keep class-scoped mo
    await assert.rejects(call(admin,'/profile-message-reports','GET',{},'?pageSize=51'),e=>e.status===400);
    await assert.rejects(call(outsider,`${messageRoute}/${posted.id}`,'DELETE'),e=>e.status===403);
    assert.deepEqual((await call(alpha,`${messageRoute}/${posted.id}`,'DELETE')).body,{ok:true});
+   assert.deepEqual((await call(alpha,`${messageRoute}/${posted.id}`,'DELETE')).body,{ok:true},'repeat deletion is idempotent');
    assert.equal((await call(beta,messageRoute)).body.total,0);
+   assert.equal((await call(alpha,notificationRoute)).body.total,0);
    assert.equal((await call(admin,'/profile-message-reports')).body.total,0);
    const deletedReports=(await call(admin,'/profile-message-reports','GET',{},'?status=deleted')).body;
    assert.equal(deletedReports.total,1);
@@ -244,8 +273,8 @@ test('school-wide profiles, first-AC activity and guestbook keep class-scoped mo
     e=>e.status===403);
    assert.deepEqual((await call(admin,`/profile-message-reports/${secondReport.id}/dismiss`,'POST')).body,
     {ok:true,status:'dismissed'});
-   await assert.rejects(call(admin,`/profile-message-reports/${secondReport.id}/dismiss`,'POST'),
-    e=>e.status===409);
+   assert.deepEqual((await call(admin,`/profile-message-reports/${secondReport.id}/dismiss`,'POST')).body,
+    {ok:true,status:'dismissed'},'repeated dismissal is idempotent');
    assert.equal((await call(admin,'/profile-message-reports')).body.total,0);
    const dismissed=(await call(admin,'/profile-message-reports','GET',{},'?status=dismissed')).body;
    assert.equal(dismissed.total,1);
@@ -255,7 +284,8 @@ test('school-wide profiles, first-AC activity and guestbook keep class-scoped mo
    assert.equal(ownerAfterDismiss.reportedByMe,true);
    assert.equal(ownerAfterDismiss.canDelete,true);
    assert.equal(ownerAfterDismiss.canReport,false);
-   assert.deepEqual((await call(teacher,`${messageRoute}/${second.id}`,'DELETE')).body,{ok:true});
+   await assert.rejects(call(teacher,`${messageRoute}/${second.id}`,'DELETE'),e=>e.status===403);
+   assert.deepEqual((await call(admin,`${messageRoute}/${second.id}`,'DELETE')).body,{ok:true});
    assert.equal((await call(admin,'/profile-message-reports','GET',{},'?status=deleted')).body.total,2);
    const finalDecision=(await pool.query(`SELECT r.resolution,r.resolved_at,
     r.resolved_by_account_id,m.deleted_at FROM student_guestbook_reports r
@@ -263,7 +293,7 @@ test('school-wide profiles, first-AC activity and guestbook keep class-scoped mo
     [secondReport.id])).rows[0];
    assert.equal(finalDecision.resolution,'delete');
    assert.equal(finalDecision.resolved_at.getTime(),finalDecision.deleted_at.getTime());
-   assert.equal(finalDecision.resolved_by_account_id,teacher.id);
+   assert.equal(finalDecision.resolved_by_account_id,admin.id);
    assert.equal((await pool.query(`SELECT count(*)::int n FROM audit_events
     WHERE action='profile.message_report_dismiss' AND resource_id=$1`,
     [secondReport.id])).rows[0].n,1,'earlier dismissal remains in the audit trail');

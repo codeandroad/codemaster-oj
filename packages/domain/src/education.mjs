@@ -3,6 +3,7 @@ import {validateLearningDocument} from './learning-document.mjs';
 import { transaction } from './db.mjs';
 import { fail, field, uuid, bytes, integer,enumValue } from './security.mjs';
 import { getTimedPracticeResult } from './timed.mjs';
+import { avatarForIdentity } from './avatars.mjs';
 
 const staff = user => user.roles.includes('teacher') || user.roles.includes('admin');
 const administrator = user => user.roles.includes('admin');
@@ -267,7 +268,7 @@ async function pointsLeaderboard(ctx) {
   ORDER BY s.in_page DESC NULLS LAST,s.points DESC,s.id`, [period,page,pageSize,meId,requestedClassId])).rows;
  const redact = !staff(ctx.user);
  const shape = ({id,name,avatar,points,solved_problems,attempts,assessed,accepted,rank}) => ({
-  id,name,avatar,points,rank,
+  id,name,avatar:avatarForIdentity(avatar,id),points,rank,
   ...(!redact || contexts.visibleFields.solvedProblems ? {solvedProblems:solved_problems} : {}),
   ...(!redact || contexts.visibleFields.attempts ? {attempts} : {}),
   ...(!redact || contexts.visibleFields.acRate ? {acRate:assessed ? Math.round(accepted * 1000 / assessed) / 10 : null} : {}),

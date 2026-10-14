@@ -28,6 +28,11 @@ test('prototype flows persist identity claims, imports, drafts, favorites, setti
   await teacher('/auth/profile',{gender:'invalid'},'PATCH',400);
   await teacher('/auth/verify-identity',{kind:'teacher',number:'T1',name:'教师',activationCode:ti.activationCode},'POST',400);
   const si=await admin('/people',{kind:'student',number:'S1',name:'学生',gender:'male',classIds:[cls.id]},'POST',201);await student('/auth/register',{kind:'student',number:'S1',name:'学生',activationCode:si.activationCode,username:'alignment-student',password:'Alignment-student-2026!'},'POST',201);
+  const initialAvatar=(await student('/auth/me')).user.avatar;
+  assert.match(initialAvatar,/^\/avatars\/oj-(?:0[1-9]|1[0-4])\.(?:jpg|png)$/);
+  assert.equal((await student('/auth/profile',{avatar:'/avatars/oj-02.jpg'},'PATCH')).user.avatar,'/avatars/oj-02.jpg');
+  await student('/auth/profile',{avatar:'https://example.test/unapproved.jpg'},'PATCH',400);
+  assert.equal((await student('/auth/profile',{avatar:''},'PATCH')).user.avatar,initialAvatar);
   assert.equal((await student('/auth/me')).user.gender,'male');assert.equal((await student('/auth/profile',{gender:null},'PATCH')).user.gender,null);
   await student(`/people/${si.person.id}`,{gender:'female'},'PATCH',403);
   await admin(`/people/${si.person.id}`,{gender:'other'},'PATCH');assert.equal((await student('/auth/me')).user.gender,'other');

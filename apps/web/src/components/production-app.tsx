@@ -1,0 +1,293 @@
+"use client";
+import {ProfileEditor} from "./profile-editor";
+import {PointsPage} from "./points-page";
+
+import { AppLink } from "@/components/navigation";
+import { isCampusRoute } from "@/lib/campus-routes";
+
+import { useEffect, useState, type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { BarChart3, BookOpen, BookOpenCheck, ClipboardList, Clock3, Code2, Database, FileClock, Gauge, Home, LayoutDashboard, Library, Menu, NotebookPen, Settings, Users, UserRound, X } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {NotificationDropdown} from "@/components/student/notification-dropdown";
+import { AccountMenu } from "@/components/account-menu";
+import { BrandLogo } from "@/components/brand-logo";
+import { PageHeader } from "@/components/page-chrome";
+import { ProductionLoginPage } from "@/components/auth/login-page";
+import { ProductionRegisterPage } from "@/components/auth/register-page";
+import { AdminAccountsPage, AdminPeoplePage } from "@/components/admin/accounts-people";
+import { AdminImportPage } from "@/components/admin/import-page";
+import { AdminJudgePage, AdminSettingsPage } from "@/components/admin/system-pages";
+import { Feedback, Loading, panelClass as panel, useData as useResource, useMutation as useAction } from "@/components/admin/common";
+import { StudentPages, AlignedProfile } from "@/components/student/pages";
+import {useWorkspaceSettings} from "@/components/student/workspace-settings";
+import {WorkspaceThemeProvider} from "@/components/ui/theme-context";
+import { TeacherPages } from "@/components/teacher/teacher-pages";
+import { ApiError, apiMessage, clearProductionSession, productionApi, roleHome, type AuthResponse, type CampusRole, type CampusUser, type Person, type SchoolClass } from "@/lib/production-api";
+
+export function ProductionApp() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const [user, setUser] = useState<CampusUser | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [check, setCheck] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    productionApi<AuthResponse>("auth/me", { signal: controller.signal })
+      .then((response) => {
+        setUser(response.user);
+        setError("");
+      })
+      .catch((reason) => {
+        if (!controller.signal.aborted && !(reason instanceof ApiError && reason.status === 401))
+          setError(apiMessage(reason));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [check]);
+  const loggedIn = (next: CampusUser) => {
+    setUser(next);
+    router.replace(roleHome(next));
+  };
+  if (!isCampusRoute(pathname)) return null;
+  if (loading)
+    return (
+      <main className="grid min-h-screen place-items-center bg-background">
+        <p role="status">正在连接校内服务…</p>
+      </main>
+    );
+  if (error)
+    return (
+      <main className="mx-auto max-w-lg p-8">
+        <h1 className="text-xl font-bold">暂时无法连接服务</h1>
+        <p role="alert" className="mt-3 text-sm text-destructive">
+          {error}
+        </p>
+        <Button
+          className="mt-5"
+          onClick={() => {
+            setLoading(true);
+            setError("");
+            setCheck((value) => value + 1);
+          }}
+        >
+          重试
+        </Button>
+      </main>
+    );
+  if (pathname === "/register") return <ProductionRegisterPage />;
+  if (!user) return <ProductionLoginPage onLogin={loggedIn} />;
+  if (pathname === "/login") return <ProductionLoginPage onLogin={loggedIn} />;
+  const requestedRole: CampusRole = pathname.startsWith("/admin")
+    ? "admin"
+    : pathname.startsWith("/teacher")
+      ? "teacher"
+      : "student";
+  const role =
+    pathname === "/" && !user.roles.includes("student")
+      ? user.roles.includes("admin")
+        ? "admin"
+        : "teacher"
+      : requestedRole;
+  const allowed = user.roles.includes(role) || (role === "teacher" && user.roles.includes("admin"));
+  if (allowed && /^\/student\/problems\/[^/]+$/.test(pathname)) return <StudentPages pathname={pathname} user={user}/>;
+  return (
+    <ProductionShell
+      user={user}
+      role={role}
+      pathname={pathname}
+      onLogout={() => {
+        setUser(null);
+        clearProductionSession();
+        router.replace("/login");
+      }}
+    >
+      {allowed ? (
+        <ProductionView key={pathname} pathname={pathname} role={role} user={user} />
+      ) : (
+        <div className={panel}>
+          <h1 className="text-xl font-bold">没有访问权限</h1>
+          <p className="mt-3 text-sm text-muted-foreground">你的学校账号没有此页面需要的角色。</p>
+          <AppLink href={roleHome(user)} className={`${buttonVariants()} mt-5`}>
+            返回工作台
+          </AppLink>
+        </div>
+      )}
+    </ProductionShell>
+  );
+}
+
+const navigation: Record<CampusRole, { label: string; path: string; icon: typeof Home }[]> = {
+  student: [
+    { label: "Dashboard", path: "/", icon: Home },
+    { label: "Problems", path: "/student/problems", icon: Code2 },
+    { label: "Learning Paths", path: "/student/learning-paths", icon: BookOpen },
+    { label: "Assignments", path: "/student/assignments", icon: Library },
+    { label: "Timed Practice", path: "/student/timed-practice", icon: FileClock },
+    { label: "Submissions", path: "/student/submissions", icon: FileClock },
+    { label: "Review Notebook", path: "/student/review-notebook", icon: NotebookPen },
+  ],
+  teacher: [
+    { label: "Teacher Dashboard", path: "/teacher", icon: LayoutDashboard },
+    { label: "Classes & Students", path: "/teacher/classes", icon: Users },
+    { label: "Problem Banks", path: "/teacher/problems", icon: BookOpenCheck },
+    { label: "Learning Content", path: "/teacher/learning", icon: BookOpen },
+    { label: "Assignment Management", path: "/teacher/assignments", icon: ClipboardList },
+    { label: "Timed Practice", path: "/teacher/timed-practice", icon: Clock3 },
+    { label: "Teaching Reports", path: "/teacher/reports", icon: BarChart3 },
+    { label: "Import Center", path: "/teacher/imports", icon: Database },
+  ],
+  admin: [
+    { label: "Admin Dashboard", path: "/admin", icon: Home },
+    { label: "Accounts & Roles", path: "/admin/accounts", icon: Users },
+    { label: "People & Identities", path: "/admin/people", icon: UserRound },
+    { label: "Import Center", path: "/admin/imports", icon: Database },
+    { label: "Judge Service", path: "/admin/judge-service", icon: Gauge },
+    { label: "System Settings", path: "/admin/settings", icon: Settings },
+  ],
+};
+function ProductionShell({
+  user,
+  role,
+  pathname,
+  onLogout,
+  children,
+}: {
+  user: CampusUser;
+  role: CampusRole;
+  pathname: string;
+  onLogout: () => void;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const {settings,update,resolvedPageTheme}=useWorkspaceSettings(user.id);
+  const shellTheme=role==="teacher"?resolvedPageTheme:"light";
+  const site = useResource<{siteName:string;schoolName:string}>("site-info");
+  const action = useAction();
+  const activePath = (path: string) =>
+    ["/", "/teacher", "/admin"].includes(path)
+      ? pathname === path
+      : pathname === path || pathname.startsWith(`${path}/`);
+  const links = (
+    <nav className="space-y-1 p-3" aria-label="工作区导航">
+      {navigation[role].map((item) =>
+        item.path ? (
+          <AppLink
+            key={item.label}
+            href={item.path}
+            onNavigate={() => setOpen(false)}
+            aria-current={activePath(item.path) ? "page" : undefined}
+            className={`flex h-10 items-center gap-3 rounded-md px-3 text-sm ${activePath(item.path) ? "bg-accent font-semibold text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+          >
+            <item.icon size={17} />
+            <span className="min-w-0 truncate" title={item.label}>{item.label}</span>
+          </AppLink>
+        ) : (
+          <div
+            key={item.label}
+            aria-disabled="true"
+            title="后续版本"
+            className="flex min-h-11 items-center gap-3 px-3 text-sm text-muted-foreground/60"
+          >
+            <item.icon size={17} />
+            <span>{item.label}</span>
+            <span className="ml-auto text-[10px]">后续版本</span>
+          </div>
+        ),
+      )}
+    </nav>
+  );
+  return (
+    <WorkspaceThemeProvider theme={shellTheme}><div data-od-id="production-shell" style={{colorScheme:shellTheme}} className={`production-shell min-h-screen bg-background text-foreground ${shellTheme==="dark"?"dark":""}`}>
+      <div className={`grid min-h-screen ${role==="student"?"md:grid-cols-[224px_minmax(0,1fr)]":"md:grid-cols-[236px_minmax(0,1fr)]"}`}>
+        <aside className="production-sidebar hidden flex-col border-r border-border bg-surface md:flex">
+          <div className="flex h-16 flex-col justify-center border-b border-border px-4">
+            <BrandLogo className="h-auto w-[170px] max-w-full" />
+            <p className="mt-1 truncate text-[10px] text-muted-foreground">{role==="admin"?"Local administration":role==="teacher"?"Teacher tools":site.data?.schoolName??"校内学习平台"}</p>
+          </div>
+          {links}
+
+        </aside>
+        <div className="min-w-0">
+          <header className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-4 sm:px-6">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden"
+                aria-label="打开导航"
+                aria-expanded={open}
+                onClick={() => setOpen(true)}
+              >
+                <Menu size={18} />
+              </Button>
+              <span className="truncate text-sm text-muted-foreground">
+                {role==="admin"?({"/admin/accounts":"账号与角色","/admin/people":"身份档案","/admin/imports":"导入中心","/admin/judge-service":"判题服务","/admin/settings":"系统设置"}[pathname]??"管理工作区"):role==="teacher"?"Teacher workspace":"学生工作区"}
+              </span>
+            </div>
+            <div className="flex shrink-0 items-center gap-3">
+              {role==="teacher"&&<label className="flex items-center gap-2 text-xs text-muted-foreground"><span className="sr-only">教师页面主题</span><select aria-label="教师页面主题" data-od-id="teacher-page-theme" value={settings.pageTheme} onChange={e=>update({pageTheme:e.target.value as "light"|"dark"|"system"})} className="min-h-9 rounded-md border border-border bg-surface-subtle px-2 text-foreground"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>}
+              {role==="student"&&<NotificationDropdown/>}
+              <AccountMenu user={user} role={role} busy={action.busy} onLogout={() => action.run(async () => {
+                try { await productionApi("auth/logout", {method:"POST"}); }
+                catch(reason) { if (!(reason instanceof ApiError && reason.status===401)) throw reason; }
+                onLogout();
+              })}/>
+            </div>
+          </header>
+          <div className="px-4">
+            <Feedback action={action} />
+          </div>
+          <main className="mx-auto max-w-[1500px] space-y-5 p-4 sm:p-6">{children}</main>
+        </div>
+      </div>
+      {open && (
+        <div className="fixed inset-0 z-50 bg-foreground/30 md:hidden">
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label="工作区导航"
+            className="h-full w-[min(85vw,300px)] overflow-auto bg-surface"
+          >
+            <div className="flex items-center justify-between border-b border-border p-4">
+              <BrandLogo className="h-auto w-[185px] max-w-full" />
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="关闭导航"
+                onClick={() => setOpen(false)}
+              >
+                <X size={18} />
+              </Button>
+            </div>
+            {links}
+          </aside>
+        </div>
+      )}
+    </div></WorkspaceThemeProvider>
+  );
+}
+
+function ProductionView({pathname,role,user}:{pathname:string;role:CampusRole;user:CampusUser}) {
+  if(pathname.endsWith("/points"))return <PointsPage user={user} student={role==="student"}/>;
+  if(pathname.endsWith("/profile"))return <><PageHeader title="个人资料" description="修改头像、昵称和个人介绍。"/><ProfileEditor user={user}/></>;
+  if(pathname==="/student/settings"||pathname==="/teacher/settings")return <AlignedProfile user={user} teacher={role==="teacher"}/>;
+  if (role==="student") return <StudentPages pathname={pathname} user={user}/>;
+  if (pathname==="/teacher/profile") return <AlignedProfile user={user} teacher/>;
+  if (role==="teacher") return <TeacherPages pathname={pathname} user={user}/>;
+  if (pathname==="/admin" || pathname==="/") return <AdminDashboard/>;
+  if (pathname==="/admin/accounts") return <AdminAccountsPage currentAccountId={user.id}/>;
+  if (pathname==="/admin/people") return <AdminPeoplePage/>;
+  if (pathname==="/admin/imports") return <AdminImportPage/>;
+  if (pathname==="/admin/judge-service") return <AdminJudgePage/>;
+  if (pathname==="/admin/settings") return <AdminSettingsPage/>;
+  return <div className={`${panel} p-5`}><h1 className="text-xl font-bold">页面不存在</h1><AppLink href={roleHome(user)} className={`${buttonVariants()} mt-4`}>返回工作台</AppLink></div>;
+}
+
+function AdminDashboard() {
+  const people=useResource<{items:Person[]}>("people"),classes=useResource<{items:SchoolClass[]}>("classes");
+  return <><PageHeader eyebrow="ADMIN DASHBOARD" title="管理工作台" description="维护学校身份与账号，查看导入、判题服务和系统设置。"/><div className="mt-5 grid gap-4 sm:grid-cols-3">{navigation.admin.slice(1,4).map(item=><AppLink key={item.path} href={item.path} className={`${panel} flex items-center gap-4 p-5 hover:border-primary`}><item.icon className="text-primary"/><span className="font-bold">{item.label}</span></AppLink>)}</div><div className="mt-6 grid gap-4 md:grid-cols-2"><section className={panel}><div className="flex justify-between border-b border-border p-4"><h2 className="font-bold">身份档案</h2><AppLink href="/admin/people" className="text-sm font-semibold text-primary">查看全部</AppLink></div><Loading resource={people}><div className="divide-y divide-border">{people.data?.items.slice(0,8).map(p=><div key={p.id} className="flex justify-between gap-3 p-4 text-sm"><b>{p.name}</b><span className="font-mono text-xs text-muted-foreground">{p.number}</span></div>)}{!people.data?.items.length&&<p className="p-5 text-sm text-muted-foreground">暂无身份，请先建立档案或导入名单。</p>}</div></Loading></section><section className={panel}><div className="border-b border-border p-4"><h2 className="font-bold">学校班级</h2></div><Loading resource={classes}><div className="divide-y divide-border">{classes.data?.items.map(c=><div key={c.id} className="flex justify-between gap-3 p-4 text-sm"><b>{c.name}</b><span className="text-muted-foreground">{c.studentIds.length} 位学生</span></div>)}{!classes.data?.items.length&&<p className="p-5 text-sm text-muted-foreground">暂无班级，可在教学工作区建立。</p>}</div></Loading></section></div></>;
+}

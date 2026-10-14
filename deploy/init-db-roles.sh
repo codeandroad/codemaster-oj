@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+psql --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" \
+  -v ON_ERROR_STOP=1 -v app_password="$APP_DB_PASSWORD" -v worker_password="$WORKER_DB_PASSWORD" <<'SQL'
+CREATE ROLE campus_app LOGIN PASSWORD :'app_password' NOSUPERUSER NOCREATEDB NOCREATEROLE;
+CREATE ROLE campus_worker LOGIN PASSWORD :'worker_password' NOSUPERUSER NOCREATEDB NOCREATEROLE;
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+SQL

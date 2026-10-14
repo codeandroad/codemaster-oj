@@ -1,0 +1,254 @@
+{
+  "checkedAt": "2026-10-11T19:47:22.471Z",
+  "scope": "Independent production implementation compared with preserved myoj prototype and final design; real production data replaces prototype examples",
+  "localOrigin": "http://127.0.0.1:3000",
+  "prototype": {
+    "checked": true,
+    "clean": true,
+    "trackedFiles": 169,
+    "head": "e92b0df06f96442276e45f980cf260c8033cfbfe",
+    "trackedTreeContentSha256": "b538f5188b46afaad952516f3a5be47a86799b7e24f7a1bdf2594effc03f0172",
+    "baselineMatches": true
+  },
+  "separation": {
+    "passed": true,
+    "productionSourceFiles": 105
+  },
+  "automated": {
+    "domain": {
+      "tests": 80,
+      "passed": 80,
+      "failed": 0,
+      "skipped": 0
+    },
+    "nestHttp": {
+      "tests": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    "webImportAndWeights": {
+      "tests": 18,
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0
+    },
+    "typecheck": true,
+    "eslintMaxWarnings": 0,
+    "productionDockerBuild": true,
+    "execution": "Actual PostgreSQL and Linux go-judge; no skipped integration tests"
+  },
+  "browser": {
+    "engine": "Chromium",
+    "version": "151.0.7922.34",
+    "desktopWidth": 1440,
+    "mobileWidth": 390,
+    "pageChecks": 92,
+    "pageErrors": 0,
+    "horizontalOverflow": 0,
+    "passed": true
+  },
+  "isolatedBrowserWorkflows": {
+    "checks": 17,
+    "passed": true,
+    "pageErrors": 0,
+    "steps": [
+      "administrator identity creation with genuine activation receipt",
+      "three-step identity verification and self-created account",
+      "account table search, status filters and disable/enable confirmations",
+      "account role editing and genuine one-time password recovery",
+      "persisted site settings and real maintenance admission control",
+      "teacher class creation with existing student selection",
+      "teacher unified problem editor, sample/hidden testcase drawers and saved draft",
+      "real reference validation and immutable problem publication",
+      "assignment five-tab editor, fixed roster, saved draft and publication",
+      "student real public samples, custom execution and formal WA",
+      "review notebook notes and independent AC correction preserve original grade",
+      "teacher learning path/chapter/checkpoint/reference publication and student reading",
+      "teacher timed editor draft, description, selected roster and publication",
+      "student timed rules/start, real submission embargo and explicit finish",
+      "teacher explicit activity end, separate result release and student published score",
+      "released credential linking preserves source history and isolates target identity",
+      "administrator audit records contain persisted UI business mutations"
+    ],
+    "originalGradePreserved": true,
+    "realJudgeVerdicts": [
+      "AC samples",
+      "Executed custom/no score",
+      "WA formal",
+      "AC correction/separate score",
+      "AC timed/embargoed until release"
+    ]
+  },
+  "isolatedImportAndHistory": {
+    "checks": 5,
+    "passed": true,
+    "pageErrors": 0,
+    "steps": [
+      "standard no-JSON ZIP with two packages: optional config, optional reference, paired data and import preview",
+      "imported editor preview and test drawers; three enabled cases save with exact four-decimal score",
+      "optional-reference draft completed in editor; three enabled plus one disabled case save and real validation excludes disabled case",
+      "synthetic 53-formal/205-self-test history fixtures exercise next/previous and server filters without first-200 truncation",
+      "old real submission and review-notebook comparison remain directly accessible after more than 200 newer self-tests"
+    ],
+    "zipPackages": {
+      "jsonManifest": false,
+      "pid": false,
+      "packages": 2,
+      "configless": true,
+      "yamlConfig": true,
+      "optionalReference": true,
+      "samplesPerPackage": 1,
+      "formalTestsPerPackage": 3,
+      "automaticallyPublished": 0
+    },
+    "threeEnabled": {
+      "enabledWeights": [
+        33.3334,
+        33.3333,
+        33.3333
+      ],
+      "disabledWeights": []
+    },
+    "disabledCase": {
+      "enabledWeights": [
+        33.3334,
+        33.3333,
+        33.3333
+      ],
+      "disabledWeights": [
+        1
+      ],
+      "actualReferenceValidation": "AC"
+    },
+    "publicSamples": {
+      "teacherPreservedNames": true,
+      "teacherVisible": 2,
+      "studentVisible": 1,
+      "disabledExcludedFromReference": true,
+      "disabledExcludedFromStudentExecution": true,
+      "actualSampleVerdict": "AC"
+    },
+    "historyPagination": {
+      "firstPage": 50,
+      "secondPage": 3,
+      "distinctFormal": 53,
+      "waFilter": 33,
+      "acFilter": 20,
+      "filterResetsPage": true,
+      "selfTestsExcluded": 205
+    },
+    "oldRealHistory": {
+      "originalVerdict": "WA",
+      "originalScore": 75,
+      "correctionScore": 100,
+      "directNotebookAccessible": true
+    },
+    "syntheticHistory": {
+      "formal": 53,
+      "selfTests": 205,
+      "judged": false
+    },
+    "cleanup": {
+      "temporaryDatabases": 0,
+      "temporaryWorkerRoles": 0,
+      "proxyStopped": true,
+      "confirmedAt": "2026-10-11T19:22:59.131Z"
+    },
+    "historyFixtureNote": "Only history-pagination fixtures are synthetic; reference validation and sample execution use the actual Python executor"
+  },
+  "studentReadOnlyHistory": {
+    "passed": true,
+    "checks": [
+      "authoritative problem progress retains original WA / 75 and excludes correction100",
+      "problem table uses authoritative progress",
+      "verdict filter accepted: Waiting (0)",
+      "verdict filter accepted: Judging (0)",
+      "verdict filter accepted: Executed (0)",
+      "verdict filter accepted: AC (1)",
+      "verdict filter accepted: WA (1)",
+      "verdict filter accepted: CE (0)",
+      "verdict filter accepted: RE (0)",
+      "verdict filter accepted: TLE (0)",
+      "verdict filter accepted: MLE (0)",
+      "verdict filter accepted: OLE (0)",
+      "verdict filter accepted: System Error (0)",
+      "context filter accepted: assignment (1)",
+      "context filter accepted: timed (0)",
+      "context filter accepted: correction (1)",
+      "context filter accepted: practice (0)",
+      "all 2 problem filters accepted",
+      "real signed keyset cursor returns distinct second formal record",
+      "workspace scoped problem history keeps original and correction",
+      "fresh assignment context does not inherit other activity formal records",
+      "direct notebook chain and stable saved-note labels unchanged"
+    ],
+    "pageErrors": 0,
+    "apiErrors": 0,
+    "horizontalOverflow": 0
+  },
+  "retainedData": {
+    "passed": true,
+    "appliedMigrations": [
+      "001_core.sql",
+      "002_result_and_immutability.sql",
+      "003_timed.sql",
+      "004_library.sql",
+      "005_learning.sql",
+      "006_problem_import.sql",
+      "007_member_import.sql",
+      "008_class_names.sql",
+      "009_prototype_alignment.sql",
+      "010_activity_descriptions.sql",
+      "011_credential_relink.sql",
+      "012_formal_history_indexes.sql"
+    ],
+    "originalGrade": 75,
+    "correctionGrade": 100,
+    "freshAssignmentFormalSubmissions": 0,
+    "seedTimedAttempts": 0,
+    "seedAccountsRolesAndAvailabilityPreserved": true,
+    "stableJudgeNode": {
+      "id": "judge-node-01",
+      "concurrency": 2,
+      "ready": true,
+      "heartbeatCurrent": true
+    }
+  },
+  "backupRestore": {
+    "passed": true,
+    "format": "PostgreSQL custom PGDMP",
+    "bytes": 145873,
+    "restoredTableCount": 10,
+    "isolatedRestore": true,
+    "originalAndCorrectionGradesPreserved": true,
+    "schoolHostVerification": false
+  },
+  "dependencyAudit": {
+    "scope": "Web manifest; final standalone runtime absence checked",
+    "runtime": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "includingDevelopment": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 5,
+      "critical": 0,
+      "total": 5
+    },
+    "knownDevelopmentAdvisory": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
+    "note": "Five development dependency entries in the braces/ESLint chain; npm reports no available fix. braces and ESLint are absent from the standalone web runtime. Audit is a registry snapshot, not a guarantee of future security."
+  },
+  "limits": [
+    "Local Docker/Chromium verification; no new school-host deployment or classroom load run in this alignment round",
+    "Firefox and Safari not verified in this round",
+    "Backup UI stores plans and real evidence; host scheduling and restoration remain explicit server-script operations",
+    "Displayed rows, times, scores and node availability are real data and differ from prototype examples"
+  ]
+}

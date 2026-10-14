@@ -1,0 +1,19 @@
+FROM node:24.14.0-bookworm-slim AS build
+WORKDIR /app
+COPY packages/domain/package*.json ./packages/domain/
+RUN npm --prefix packages/domain ci --omit=dev
+COPY apps/api/package*.json ./apps/api/
+RUN npm --prefix apps/api ci
+COPY packages/domain/ ./packages/domain/
+COPY apps/api/ ./apps/api/
+RUN npm --prefix apps/api run build
+RUN npm --prefix apps/api prune --omit=dev
+
+FROM node:24.14.0-bookworm-slim
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=build --chown=node:node /app/packages/domain ./packages/domain
+COPY --from=build --chown=node:node /app/apps/api ./apps/api
+USER node
+EXPOSE 3001
+CMD ["node", "apps/api/dist/main.js"]

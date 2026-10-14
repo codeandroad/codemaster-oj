@@ -1,0 +1,125 @@
+{
+  "date": "2026-10-12",
+  "scope": "Independent production project after Next.js/NestJS migration",
+  "frameworks": {
+    "web": "Next.js 16.4.0 / React 19.3.0 / Tailwind CSS 4.3.3 / TypeScript 6.0.3",
+    "api": "NestJS 12.1.2 / Express 5.3.0 / TypeScript 6.0.3",
+    "database": "PostgreSQL 17",
+    "judge": "go-judge v1.13.2 / Python 3.12"
+  },
+  "separation": {
+    "ok": true,
+    "sourceFiles": 76,
+    "applications": {
+      "apps/web": {
+        "framework": "Next.js",
+        "separateManifest": true,
+        "separateLock": true,
+        "entry": true,
+        "installedLocally": true
+      },
+      "apps/api": {
+        "framework": "NestJS",
+        "separateManifest": true,
+        "separateLock": true,
+        "entry": true,
+        "installedLocally": true
+      },
+      "packages/domain": {
+        "framework": "shared domain",
+        "separateManifest": true,
+        "separateLock": true,
+        "entry": true,
+        "installedLocally": true
+      }
+    },
+    "prototype": {
+      "checked": true,
+      "clean": true,
+      "trackedFiles": 169,
+      "head": "e92b0df06f96442276e45f980cf260c8033cfbfe",
+      "trackedTreeContentSha256": "b538f5188b46afaad952516f3a5be47a86799b7e24f7a1bdf2594effc03f0172",
+      "baselineMatches": true
+    },
+    "issues": []
+  },
+  "checks": {
+    "domainTests": {
+      "passed": 68,
+      "failed": 0,
+      "skipped": 0,
+      "usesRealPostgreSQLAndJudge": true
+    },
+    "nestHttpTests": {
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "scope": "Actual HTTP sessions, CSRF, roles, body limits and JSON errors"
+    },
+    "typecheck": "passed for both apps",
+    "frontendLint": "passed with zero warnings",
+    "build": "passed for Next standalone, NestJS and Docker images",
+    "cleanInstall": "passed on macOS and Linux Node 24.14.0",
+    "runtimeDependencyAudit": {
+      "web": 0,
+      "api": 0,
+      "domain": 0
+    },
+    "nestFullFlowSmoke": {
+      "passed": true,
+      "isolatedDatabase": true,
+      "apiRole": "campus_app",
+      "workerRole": "temporary role with campus_worker-equivalent least privileges",
+      "realJudgeTasks": 10,
+      "verdicts": {
+        "AC": 8,
+        "Executed": 1,
+        "WA": 1
+      },
+      "temporaryDatabaseAndRoleRemoved": true
+    },
+    "browser": {
+      "browser": "151.0.7922.34",
+      "checks": [
+        "student native login and dashboard",
+        "fresh assignment preserved for user",
+        "published learning path and chapters",
+        "30-minute practice available and unstarted",
+        "built production UI -> API -> real worker: samples passed",
+        "teacher native login and dashboard",
+        "teacher class and actual 75-point original grade report",
+        "teacher reads actual AC correction",
+        "admin native login and dashboard",
+        "admin identities and real judge service",
+        "390px student assignment without page overflow"
+      ],
+      "pageErrors": [],
+      "passed": true
+    }
+  },
+  "localDeployment": {
+    "url": "http://127.0.0.1:3000/login",
+    "composeProject": "campus-judge-local",
+    "retainedDatabase": "campus_demo",
+    "retainedVolume": "campus-judge-local_database",
+    "retainedAccounts": [
+      "demo.admin",
+      "demo.teacher",
+      "demo.student"
+    ],
+    "initialPasswordsAndDataPreserved": true,
+    "webCommand": [
+      "node",
+      "server.js"
+    ],
+    "apiCommand": [
+      "node",
+      "apps/api/dist/main.js"
+    ]
+  },
+  "limits": [
+    "Chromium 1440x900 and 390x844 checked; other browsers and widths not rerun.",
+    "Earlier 50-student load and backup-restore results are historical; not rerun on this framework migration.",
+    "No school-server deployment or campus HTTPS verification in this run."
+  ]
+}

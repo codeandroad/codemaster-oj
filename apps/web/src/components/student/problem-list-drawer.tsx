@@ -1,0 +1,13 @@
+"use client";
+import {useState} from "react";
+import {Dialog,DialogContent,DialogTitle,DialogDescription} from "@/components/ui/dialog";
+import type {ProductionProblem} from "@/lib/production-api";
+
+export function ProblemListDrawer({open,onOpenChange,items,currentId,loading,error,onRetry,onSelect,title="题目列表",description="浏览你有权访问的题目，选择题目继续作答。"}:{open:boolean;onOpenChange:(open:boolean)=>void;items:Pick<ProductionProblem,"id"|"title">[];currentId:string;loading:boolean;error:string;onRetry:()=>void;onSelect:(problem:Pick<ProductionProblem,"id"|"title">)=>void;title?:string;description?:string}) {
+ const [query,setQuery]=useState("");const filtered=items.filter(p=>p.title.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
+ return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent data-od-id="problem-list-drawer" style={{left:0,top:0,transform:"none",translate:"none",width:"min(420px,100vw)",maxWidth:"none",height:"100dvh",borderRadius:0}} className="flex flex-col gap-0 p-0">
+ <header className="border-b border-border px-5 py-5 pr-12"><DialogTitle>{title}</DialogTitle><DialogDescription className="mt-2">{description}</DialogDescription></header>
+ <div className="border-b border-border p-4"><label htmlFor="workspace-problem-search" className="sr-only">搜索题目</label><input id="workspace-problem-search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜索题目名称" className="min-h-11 w-full rounded-md border border-border bg-surface-subtle px-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-primary"/><p className="mt-2 text-xs text-muted-foreground">{filtered.length} 道题目</p></div>
+ <div className="min-h-0 flex-1 overflow-y-auto p-2">{loading?<p role="status" className="p-4 text-sm text-muted-foreground">正在加载题目…</p>:error?<div role="alert" className="p-4"><p className="text-sm text-destructive">{error}</p><button type="button" onClick={onRetry} className="mt-3 min-h-11 rounded border border-border px-4 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary">重新加载</button></div>:<nav aria-label="可访问题目">{filtered.map(p=><button key={p.id} type="button" aria-current={p.id===currentId?"page":undefined} onClick={()=>onSelect(p)} className={`flex min-h-14 w-full items-center justify-between gap-3 rounded-md px-3 py-3 text-left text-sm text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary ${p.id===currentId?"bg-muted font-semibold":""}`}><span className="min-w-0 break-words">{p.title}</span>{p.id===currentId&&<span className="shrink-0 text-xs">当前题目</span>}</button>)}{!filtered.length&&<p className="p-4 text-sm text-muted-foreground">{query?"没有匹配的题目。":"暂无可访问的题目。"}</p>}</nav>}</div>
+ </DialogContent></Dialog>;
+}

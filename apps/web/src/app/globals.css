@@ -1,0 +1,198 @@
+@import "tailwindcss" source(none);
+@source "../";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design system definition.
+ *
+ * The @theme inline block maps CSS custom properties to Tailwind utility
+ * classes (e.g. --color-primary -> bg-primary, text-primary).
+ *
+ * The :root and .dark blocks define the actual color values using oklch.
+ * All colors MUST use oklch format.
+ *
+ * To add a new semantic color:
+ * 1. Add the variable to :root (light value) and .dark (dark value)
+ * 2. Register it in @theme inline as --color-<name>: var(--<name>)
+ */
+
+@theme inline {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", system-ui, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-surface: var(--surface);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-primary-hover: var(--primary-hover);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-code: var(--code);
+  --color-code-foreground: var(--code-foreground);
+  --color-code-muted: var(--code-muted);
+  --color-info-soft: var(--info-soft);
+}
+
+:root {
+  --radius: .5rem;
+  --background: oklch(96.5% .002 240);
+  --foreground: oklch(18% .012 250);
+  --surface: oklch(100% 0 0);
+  --surface-subtle: oklch(99% .002 240);
+  --card: var(--surface); --card-foreground: var(--foreground);
+  --popover: var(--surface); --popover-foreground: var(--foreground);
+  --primary: oklch(50% .17 255); --primary-hover: oklch(42% .17 255);
+  --primary-foreground: oklch(100% 0 0);
+  --secondary: oklch(94% .003 240); --secondary-foreground: var(--foreground);
+  --muted: oklch(92% .003 240); --muted-foreground: oklch(54% .012 250);
+  --accent: oklch(94% .015 250); --accent-foreground: var(--foreground);
+  --destructive: oklch(46% .17 25); --destructive-hover:oklch(38% .17 25); --destructive-foreground: oklch(100% 0 0);
+  --border: oklch(92% .005 250); --border-strong: oklch(80% .008 250);
+  --input: oklch(82% .008 250); --ring: oklch(50% .17 255);
+  --success: oklch(42% .115 155); --success-soft: oklch(94% .035 155);
+  --warning: oklch(43% .095 70); --warning-soft: oklch(96% .045 80);
+  --info-soft: oklch(95% .025 250);
+  --code: var(--surface); --code-foreground: var(--foreground); --code-muted: var(--muted-foreground);
+  --sidebar: var(--surface); --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary); --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent); --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border); --sidebar-ring: var(--ring);
+  --chart-1: oklch(.50 .17 255); --chart-2: oklch(.49 .13 155);
+  --chart-3: oklch(.48 .12 70); --chart-4: oklch(.51 .10 200); --chart-5: oklch(.52 .14 25);
+  --workspace-submit-hover: oklch(88% .045 155);
+  --syntax-comment: oklch(47% .03 150); --syntax-string: oklch(41% .11 155);
+  --syntax-keyword: oklch(44% .13 290); --syntax-number: oklch(44% .13 250); --syntax-builtin: oklch(42% .095 220);
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", system-ui, sans-serif;
+}
+.dark {
+  --card:var(--surface); --card-foreground:var(--foreground); --popover:var(--surface); --popover-foreground:var(--foreground);
+  --code:var(--surface); --code-foreground:var(--foreground); --code-muted:var(--muted-foreground);
+  --sidebar:var(--surface); --sidebar-foreground:var(--foreground); --sidebar-primary:var(--primary); --sidebar-primary-foreground:var(--primary-foreground); --sidebar-accent:var(--accent); --sidebar-accent-foreground:var(--foreground); --sidebar-border:var(--border); --sidebar-ring:var(--ring);
+  --background: oklch(19% .005 250); --foreground: oklch(94% .003 250);
+  --surface: oklch(23% .005 250); --surface-subtle: oklch(25% .005 250);
+  --primary: oklch(77% .11 250); --primary-hover: oklch(86% .08 250);
+  --primary-foreground: oklch(18% .012 250);
+  --secondary: oklch(30% .005 250); --secondary-foreground: var(--foreground);
+  --muted: oklch(32% .005 250); --muted-foreground: oklch(73% .006 250);
+  --accent: oklch(30% .015 250); --accent-foreground: var(--foreground);
+  --destructive: oklch(78% .11 25); --destructive-hover:oklch(86% .08 25); --destructive-foreground: oklch(18% .012 250);
+  --border: oklch(33% .005 250); --border-strong: oklch(49% .008 250); --input: oklch(48% .008 250); --ring: var(--primary);
+  --success: oklch(77% .13 155); --success-soft: oklch(30% .035 155);
+  --warning: oklch(82% .10 70); --warning-soft: oklch(30% .035 70); --info-soft: oklch(29% .03 250);
+  --workspace-submit-hover: oklch(24% .035 155);
+  --syntax-comment: oklch(73% .025 150); --syntax-string: oklch(77% .09 155);
+  --syntax-keyword: oklch(78% .12 290); --syntax-number: oklch(79% .10 250); --syntax-builtin: oklch(79% .08 220);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    letter-spacing: 0;
+    margin: 0;
+    min-width: 320px;
+  }
+
+  button, input, select, textarea { font: inherit; }
+  button { cursor: pointer; }
+  h1, h2 { font-family:var(--font-display);letter-spacing:-.02em;text-wrap:balance; }
+  p { text-wrap:pretty; }
+  :is(button, a, input, select, textarea, summary, [tabindex]):focus-visible { outline:2px solid var(--ring);outline-offset:2px; }
+  :is(input,select,textarea):disabled { cursor:not-allowed; }
+  table { font-variant-numeric:tabular-nums; }
+  th { font-weight:550; }
+  td,th { vertical-align:top; }
+  button { touch-action:manipulation; }
+  ::selection { background: var(--accent); }
+}
+
+@utility thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+@utility panel-shadow {
+  box-shadow: 0 1px 2px oklch(0.2 0.02 255 / 0.06);
+}
+
+@media (min-width: 1024px) {
+  .workspace-grid { grid-template-columns: var(--workspace-left, 44%) minmax(0, 1fr); }
+}
+
+/* Shared production chrome: all roles inherit the same neutral panel language. */
+.production-shell { color:var(--foreground); }
+.production-sidebar { position:sticky;top:0;height:100dvh; }
+.production-page-header { background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:22px 24px; }
+.production-shell nav a { transition:background-color .12s,color .12s; }
+.production-shell nav a[aria-current="page"] { color:var(--foreground);background:var(--background); }
+.production-shell :where(table) { background:var(--surface); }
+.production-shell :where(thead) { background:var(--surface-subtle); }
+.production-shell :where(tbody tr):hover { background:var(--surface-subtle); }
+@media(max-width:760px) {
+  .production-page-header { padding:18px; }
+  :where(button,select,[role="button"]) { min-height:44px; }
+}
+@media(prefers-reduced-motion:reduce) { .production-shell nav a { transition:none; } }
+
+/* Keep the supplied brand artwork legible in both light and dark themes. */
+.production-brand-logo { object-fit:contain;height:auto;background:#fff; }
+
+/* Consistent product density across dashboard, teaching and administration. */
+.production-page-header { align-items:center;gap:20px; }
+.production-shell :where(thead th) { padding-top:14px;padding-bottom:14px; }
+.production-shell :where(tbody td) { line-height:1.6;vertical-align:middle; }
+.production-shell :where(input:not([type=checkbox]):not([type=radio]),select,textarea) { border-radius:6px; }
+.production-shell :where(button,a) { text-underline-offset:3px; }
+.production-shell :where(button,a):focus-visible { outline:2px solid var(--ring);outline-offset:3px; }
+@media(max-width:640px) {
+ .production-page-header { align-items:flex-start; }
+ .production-page-header > div:first-child { flex-basis:100%; }
+ .production-page-header h1 { font-size:24px;line-height:1.3; }
+}

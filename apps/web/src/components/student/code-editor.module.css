@@ -1,0 +1,27 @@
+.surface { display:grid;grid-template-columns:52px minmax(0,1fr);min-height:0;overflow:hidden;background:var(--code);color:var(--code-foreground);position:relative; }
+.numbers { user-select:none;overflow:hidden;padding:14px 12px 14px 0;text-align:right;color:var(--code-muted);font-family:inherit; }
+.numbers div { min-height:24px; }
+.activeNumber { color:var(--code-foreground);font-weight:600; }
+.textSurface { position:relative;min-width:0;min-height:0; }
+.highlight,.input { position:absolute;inset:0;width:100%;height:100%;margin:0;padding:14px 14px 28px 10px;border:0;font:inherit;line-height:24px;letter-spacing:0;tab-size:inherit;white-space:pre;overflow:auto; }
+.highlight { pointer-events:none;overflow:hidden;z-index:2;background:transparent; }
+.input { resize:none;z-index:3;color:transparent;background:transparent;caret-color:var(--code-foreground);border-radius:0; }
+.input:focus,.input:focus-visible { outline:none!important;box-shadow:none!important; }
+.input::selection { background:var(--accent);color:var(--code-foreground); }
+.wrap { white-space:pre-wrap;overflow-wrap:break-word; }
+.wrappedInput { color:var(--code-foreground); }
+.wrappedInput::selection { color:var(--code-foreground); }
+.hiddenHighlight { display:none; }
+.mirror { position:absolute;left:10px;top:14px;width:calc(100% - 24px);visibility:hidden;pointer-events:none;line-height:24px;white-space:pre-wrap;overflow-wrap:break-word; }
+.currentLine { position:absolute;left:0;right:0;pointer-events:none;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface-subtle);z-index:0; }
+.guides { position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:1; }
+.guideRow { position:absolute;left:10px;height:24px; }
+.guide { position:absolute;top:0;bottom:0;border-left:1px solid var(--border-strong); }
+.matchedBracket { background:var(--muted);outline:1px solid var(--border-strong);border-radius:1px; }
+.status { display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 12px;border-top:1px solid var(--border);font-size:11px;color:var(--muted-foreground);flex-shrink:0; }
+.status span { min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.container { background:var(--code);color:var(--code-foreground);display:flex;flex-direction:column;min-height:0;min-width:0; }
+.container > .surface { flex:1; }
+
+
+@media(max-width:480px){.status{flex-wrap:wrap}.status>div{margin-left:auto}.status button{min-height:40px}}

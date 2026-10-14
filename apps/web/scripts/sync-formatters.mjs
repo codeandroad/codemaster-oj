@@ -1,0 +1,3 @@
+import {createRequire} from 'node:module';import {mkdir,copyFile} from 'node:fs/promises';import path from 'node:path';import {fileURLToPath} from 'node:url';
+const require=createRequire(import.meta.url),root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),out=path.join(root,'public/formatters');await mkdir(out,{recursive:true});
+for(const [pkg,file,name] of [['@wasm-fmt/ruff_fmt','ruff_fmt_bg.wasm','python.wasm'],['@wasm-fmt/clang-format','clang-format.wasm','cpp.wasm']]){const directory=path.dirname(require.resolve(pkg+'/package.json'));await copyFile(path.join(directory,file),path.join(out,name));await copyFile(path.join(directory,'LICENSE'),path.join(out,pkg.split('/')[1]+'-LICENSE'));}

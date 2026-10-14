@@ -1,0 +1,19 @@
+{
+  "name": "@campus-judge/domain",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24.14.0"
+  },
+  "scripts": {
+    "migrate": "node src/migrate.mjs",
+    "bootstrap": "node src/bootstrap.mjs",
+    "worker": "node worker.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "argon2": "0.44.0",
+    "pg": "8.16.3"
+  }
+}

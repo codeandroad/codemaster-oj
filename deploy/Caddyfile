@@ -1,0 +1,13 @@
+{$CAMPUS_HOST} {
+  encode zstd gzip
+  header {
+    X-Content-Type-Options nosniff
+    Referrer-Policy same-origin
+    X-Frame-Options DENY
+    Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    -Server
+  }
+  @api path /api/*
+  reverse_proxy @api api:3001
+  reverse_proxy web:3000
+}

@@ -1,0 +1,9 @@
+Derived from criyle/go-judge v1.13.2 seccomp/moby.yaml:
+https://github.com/criyle/go-judge/blob/v1.13.2/seccomp/moby.yaml
+
+Upstream source is Moby's default seccomp profile:
+https://github.com/moby/profiles/blob/main/seccomp/default.json
+License: Apache License 2.0 (see judge-seccomp.LICENSE).
+
+Campus Judge modification: allow ARM64 fstatat (syscall 79) for Python 3.12's
+dynamic linker. All other upstream policy rules are preserved.

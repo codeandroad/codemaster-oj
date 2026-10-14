@@ -1,0 +1,144 @@
+{
+  "verifiedAt": "2026-10-12",
+  "environment": {
+    "database": "PostgreSQL 17 in disposable local Linux container",
+    "executor": "go-judge 1.13.2 / Python 3.12 in Linux container",
+    "apiRole": "campus_app",
+    "workerRole": "campus_worker",
+    "workerConcurrency": 2,
+    "schoolHostVerified": false
+  },
+  "backendTests": {
+    "passed": 68,
+    "failed": 0,
+    "skipped": 0
+  },
+  "liveSmoke": {
+    "passed": true,
+    "checks": [
+      "identity claim/consumed code",
+      "scoped teacher student import/idempotence/activation",
+      "administrator config/audit permissions",
+      "reference validation/immutable publish/hidden tests",
+      "samples/custom/WA/AC/formal idempotence",
+      "correction grade separation/teacher feedback",
+      "learning publication/progress",
+      "private banks/groups/partial JSON import",
+      "scoped assignment/timed reports",
+      "private timed start/end/feedback embargo/results",
+      "candidate rejudge confirmation",
+      "identity reclaim retains grades/code/progress"
+    ]
+  },
+  "classroom": {
+    "scenario": "local_exploratory_50_student_classroom",
+    "syntheticStudents": 50,
+    "authenticatedSessions": 50,
+    "successfulReads": 200,
+    "acceptedSubmissions": 50,
+    "completedSubmissions": 50,
+    "unfinishedSubmissions": 0,
+    "verdicts": {
+      "AC": 50
+    },
+    "fullScores": 50,
+    "loginMs": {
+      "count": 50,
+      "p50": 771.98,
+      "p95": 1322.71,
+      "max": 1418.24
+    },
+    "readMs": {
+      "count": 200,
+      "p50": 12.95,
+      "p95": 36.3,
+      "max": 38.51
+    },
+    "receiptMs": {
+      "count": 50,
+      "p50": 92.43,
+      "p95": 163.33,
+      "max": 169.54
+    },
+    "completionObservedMs": {
+      "count": 50,
+      "p50": 5178.81,
+      "p95": 9154.95,
+      "max": 10150.78
+    },
+    "elapsedSeconds": 12.03,
+    "timeoutSeconds": 300,
+    "errors": [],
+    "schoolHardwareCapacityVerified": false,
+    "apiUsesRestrictedDatabaseRole": true
+  },
+  "backupRestore": {
+    "comparedTables": 19,
+    "identicalCountsAndContents": true,
+    "migrations": 8,
+    "acceptedFullScoreSubmissions": 18,
+    "schoolHostVerified": false,
+    "backupFilePermissions": "0600",
+    "restoredLoginAndHistoricalGradeReads": true,
+    "backupScriptRealDumpAndPrivateFileCheck": true,
+    "backupScriptComposeRoutingVerifiedOnSchoolHost": false
+  },
+  "dependencyAudit": {
+    "frontendKnownVulnerabilities": 0,
+    "backendKnownVulnerabilities": 0
+  },
+  "browserVerification": {
+    "previousIab": {
+      "viewports": [
+        "1440x900",
+        "390x844"
+      ],
+      "checks": [
+        "native student/teacher login/logout",
+        "real sample run and formal AC",
+        "44/56 independent workspace scroll and pinned buttons",
+        "teacher grade matrix -> actual code detail",
+        "private bank creation",
+        "mobile workspace/custom input/correction/notebook/navigation"
+      ]
+    },
+    "headlessLatest": {
+      "browser": "Chromium",
+      "version": "151.0.7922.34",
+      "viewports": [
+        "1440x900",
+        "390x844"
+      ],
+      "checks": [
+        "teacher native login",
+        "teacher CSV real file parser -> preview -> confirmation -> genuine created student",
+        "school bank contribution option after async load",
+        "teacher learning content actual data",
+        "teacher timed practices actual data",
+        "teacher actual report data",
+        "admin real configuration/job budgets/recent scoped member import audit",
+        "system settings mobile layout no document horizontal overflow",
+        "student import native form mobile layout no document horizontal overflow"
+      ],
+      "pageErrors": [],
+      "passed": true
+    },
+    "notVerified": [
+      "Firefox",
+      "Safari",
+      "768px viewport",
+      "1280px viewport"
+    ]
+  },
+  "builds": {
+    "typeScript": true,
+    "changedUiEslint": true,
+    "prototypeBuild": true,
+    "productionNodeBuild": true,
+    "linuxWebImage": true,
+    "linuxApiImage": true,
+    "nonRootWebRuntime": true,
+    "nonRootApiRuntime": true,
+    "productionSecureSessionCookie": true
+  }
+}

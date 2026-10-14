@@ -1,0 +1,16 @@
+.editor { min-width:0; }
+.editor :global(.production-page-header) { padding:16px 18px;gap:12px; }
+.editor :global(.production-page-header h1) { font-size:22px; }
+.editor :global(.production-page-header > div > p:first-child) { display:none; }
+.toolbar { margin:12px 0;display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:13px; }
+.body { min-width:0;margin-top:12px;padding:16px; }
+.body fieldset { min-width:0;border:0;padding:0;margin:0; }
+.body :global(.gap-5) { gap:16px; }
+.body input,.body select,.body textarea { font-weight:400; }
+.body textarea { resize:vertical; }
+.code { height:272px;min-width:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--code); }
+.code > div { height:100%; }
+.summary { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:12px;border:1px solid var(--border);border-radius:6px;background:var(--surface-subtle); }
+.summary strong { display:block;font-size:18px;color:var(--foreground); }
+.summary span { font-size:12px;color:var(--muted-foreground); }
+@media(max-width:640px){.body {padding:12px}.editor :global(.production-page-header){padding:12px}.summary{grid-template-columns:1fr}.code{height:240px}}

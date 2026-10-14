@@ -1,0 +1,17 @@
+:8080 {
+	encode zstd gzip
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy same-origin
+		X-Frame-Options DENY
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+	@api path /api/* /healthz
+	reverse_proxy @api api:3001 {
+		header_up X-Forwarded-Proto https
+	}
+	reverse_proxy web:3000 {
+		header_up X-Forwarded-Proto https
+	}
+}

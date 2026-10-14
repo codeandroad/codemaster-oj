@@ -3,13 +3,16 @@ import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import express, {type Request, type Response, type NextFunction} from 'express';
 import { AppModule } from './app.module.js';
+import { configureTrustedProxies } from './client-ip.js';
 import { DomainExceptionFilter } from './domain.filter.js';
 import type { RuntimeOptions } from './domain.service.js';
 
 export async function createApiApplication(options: RuntimeOptions = {}): Promise<NestExpressApplication> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule.register(options),
     {bodyParser: false, logger: options.logger});
-  app.getHttpAdapter().getInstance().disable('x-powered-by');
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.disable('x-powered-by');
+  configureTrustedProxies(expressApp);
   const parser = express.raw({type: () => true, limit: 2_097_152, inflate: false});
   app.use((request: Request, response: Response, next: NextFunction) => {
     response.setHeader('Cache-Control', 'no-store');

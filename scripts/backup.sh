@@ -17,7 +17,7 @@ test -s "$campus_backup_temp"
 # including when two scheduled/manual runs start in the same second.
 ln "$campus_backup_temp" "$campus_backup_file"
 docker compose --env-file "$campus_root/deploy/.env" -f "$campus_root/deploy/compose.yaml" \
-  run --rm --no-deps -T --entrypoint node \
+  run --rm --no-deps -T --user 0 --entrypoint node \
   --env "BACKUP_HOST_KIND=${BACKUP_HOST_KIND:-unknown}" \
   --volume "$campus_backup_file:/backup/${campus_backup_file##*/}:ro" \
   migrate record-backup.mjs --created "/backup/${campus_backup_file##*/}"

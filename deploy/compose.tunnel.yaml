@@ -1,0 +1,10 @@
+# Layer over compose.yaml when HTTPS is terminated by Slim. Compose 2.24.4+
+# is required for !override, which removes the default 80/443 bindings.
+services:
+  gateway:
+    ports: !override
+      - '127.0.0.1:${SLIM_GATEWAY_PORT:-18080}:8080'
+    volumes: !override
+      - ./Caddyfile.tunnel:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config

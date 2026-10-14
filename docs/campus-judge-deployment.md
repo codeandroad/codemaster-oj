@@ -4,7 +4,7 @@
 
 `WORKER_NODE_ID` 为持久节点标识，默认 `judge-node-01`，容器重建后继续更新同一节点的心跳。扩展多个 worker 时，每个实例必须配置不同的标识；旧节点心跳过期显示不可用，保留其历史任务归属。
 
-本文记录 2026-10-12 的首期生产实现；自 2026-10-14 起，生产代码直接位于本仓库根目录，所有启动模式均连接真实 API。原型保存在相邻的独立 `../myoj-prototype/` 仓库。此前本地验收记录保留在下文，学校服务器尚未部署。
+本文记录 2026-10-12 的首期生产实现；自 2026-10-14 起，生产代码直接位于本仓库根目录，所有启动模式均连接真实 API。原型保存在相邻的独立 `../myoj-prototype/` 仓库。此前本地验收记录保留在下文，学校服务器尚未部署；家庭内网主机 `rslab` 的临时公网验收方式见下文。
 
 ## 已实现范围
 
@@ -24,7 +24,7 @@
 
 `Caddy HTTPS → Next.js / React 页面 + NestJS API → PostgreSQL`；独立 worker 从 PostgreSQL 领取任务后请求 go-judge。PostgreSQL 同时存储身份、会话、题面版本、测试与代码快照，首期不启用额外对象存储。API 和 worker 使用独立非超级用户，worker 无权读取账号密码、身份、会话或修改教学名单。
 
-go-judge 是需要 Linux namespace/cgroup 权限的可信控制器，官方容器使用 privileged；子沙箱以非 root 用户运行，使用独立网络/进程/挂载空间和系统调用过滤。compose 不发布判题/数据库/API 端口，不挂 Docker socket、宿主目录或数据库卷到判题控制器；只开放网关 80/443。执行器不能加入数据库网络。[go-judge 官方配置](https://docs.goj.ac/configuration)
+go-judge 是需要 Linux namespace/cgroup 权限的可信控制器，官方容器使用 privileged；子沙箱以非 root 用户运行，使用独立网络/进程/挂载空间和系统调用过滤。正式 Compose 默认不发布判题/数据库/API 端口，不挂 Docker socket、宿主目录或数据库卷到判题控制器；只开放网关 80/443。下文的 Slim 临时模式将网关改为仅监听宿主回环地址。执行器不能加入数据库网络。[go-judge 官方配置](https://docs.goj.ac/configuration)
 
 运行镜像使用 go-judge v1.13.2、Python 3.12、Debian 13 的 Clang 19/GCC 14 libstdc++，以及 Node.js 22。启动探测在子沙箱内核对编译器宏、运行时版本、非 root 身份与禁网；不满足则停止 worker，不降级执行。C++ 编译在子沙箱内受单独 CPU/时间/内存限制，产物在任务结束时从执行器缓存删除。ARM64 测试发现上游过滤器缺少 fstatat，保留上游规则并仅补此项，来源和许可见 deploy/judge-seccomp.NOTICE。启动检查仍要求 Linux、cgroup v2 cpu/memory/pids 控制器和 seccomp。更换镜像需要重新运行隔离与资源集成测试。
 
@@ -54,6 +54,41 @@ docker compose --env-file deploy/.env -f deploy/compose.yaml run --rm migrate no
 ```
 
 CLI 仅允许首次创建；后续管理员通过管理端身份邀请认领。初始生产库为空；管理员建立教师/学生身份并向本人发放一次性激活码，教师认领后配置班级与题目。管理员不会代建学生账号。
+
+## rslab 临时公网验收（Slim）
+
+2026-10-15 勘查时，`rslab` 实际为 Ubuntu 22.04 / x86_64、8 逻辑线程、约 15 GiB 内存、约 62 GiB 可用磁盘，Docker Engine 20.10.17；宿主的 80/443 端口已有其他服务监听，还运行着 18 个其他容器，包括处理敏感数据的服务。原本缺少的 Compose 插件已安装为 v2.39.4；隧道叠加文件使用 Compose 2.24.4 起支持的 `!override`，将网关从 80/443 改为仅监听 `rslab` 的 `127.0.0.1:18080`。这与上文规划的 Ubuntu 26.04 学校专用主机不同，不应覆盖原有服务或数据。
+
+临时链路是 `公网 HTTPS → Slim → 本机 Mac 的 127.0.0.1:18180 → SSH 转发 → rslab 的 127.0.0.1:18080 → Caddy → Web/API`。Mac 的 18080 已被其他服务占用，所以本机使用 18180；`rslab` 网关仍只监听 18080。在 `rslab` 运行应用容器，在已安装 Slim 的 Mac 运行 [Slim 的 `share` 命令](https://github.com/nilbuild/slim#internet-sharing)。`deploy/compose.tunnel.yaml` 与 `deploy/Caddyfile.tunnel` 只用于这条链路：Slim 终止公网 TLS，内部网关转发请求，API 仍使用 `COOKIE_SECURE=true`。数据库、API 和执行器均不直接发布宿主端口。
+
+登录等敏感接口保留每账号限流，入口 IP 聚合限流为每分钟 180 次，以容纳同一课堂网络。API 默认不信任客户端提供的转发头；只有验证了紧邻 API 的代理地址后，才可在 `deploy/.env` 设置 `TRUSTED_PROXY_CIDRS` 使用可信代理链解析真实客户端 IP。此次 Slim 临时链路保持该值为空，课堂峰值仍需实测。
+
+此次临时试运行已启动数据库、API、worker、判题器、Web 和网关六个服务。公网验收地址为 [https://fine-goat.slim.show/login](https://fine-goat.slim.show/login)；这是 1 小时临时 URL，过期后需要重新建立隧道并更新来源配置。通过公网入口请求 `/healthz` 与 `/login` 均返回 HTTP 200；基于合成身份和题目的真实教学流程烟测全部通过，真实沙箱集成测试 8/8 通过，覆盖 Python、C++23 和 JavaScript。这些结果只证明本次试运行的对应流程，不代表已经完成正式上线验收。
+
+同次试运行生成了权限为 600 的 PostgreSQL 备份，并在无宿主端口、独立临时实例中恢复；15 张核心表计数与原库一致，主要关联没有孤儿记录。审计仅标记为 `local|verified`，不代表学校主机或独立存储的备份恢复目标已经验收。
+
+先在 Mac 保持两个终端会话。第一个建立 SSH 转发；第二个完成 `slim login` 后分享本机转发端口，并记录命令返回的**实际** `https://…slim.show` 地址：
+
+```sh
+ssh -N -L 127.0.0.1:18180:127.0.0.1:18080 rslab
+```
+
+```sh
+slim share --port 18180 --ttl 1h
+```
+
+在 `rslab` 的本仓库根目录准备被 Git 忽略且权限为 600 的 `deploy/.env`；五个 secret 分别生成，不能复用或提交。将 `CAMPUS_HOST` 设为这次 Slim 地址的主机名，将 `APP_ORIGIN` 设为完全相同的 HTTPS 来源（不含路径和末尾斜线）。`rslab` 自带的 Node.js 版本不足以运行预检脚本，因此在本仓库根目录用只读挂载的 Node 24 容器检查配置，再启动叠加部署：
+
+```sh
+docker run --rm -v "$PWD:/app:ro" -w /app node:24.14.0-bookworm-slim \
+  node scripts/check-deployment.mjs deploy/.env
+docker compose --env-file deploy/.env -f deploy/compose.yaml -f deploy/compose.tunnel.yaml config >/dev/null
+docker compose --env-file deploy/.env -f deploy/compose.yaml -f deploy/compose.tunnel.yaml up -d --build
+```
+
+访问所获公网地址的 `/healthz`，并用浏览器实际检查登录、角色权限、学生提交与判题结果；`/healthz` 只证明 API 和数据库可读，不能代替判题验收。随机子域名可能先显示 [Slim 的一次性浏览器提示](https://slim.sh/)，这不是本站页面。免费隧道最长 1 小时；上述命令设置为 1 小时。隧道会话或 Mac/SSH 连接中断时公网入口即失效。每次 URL 变化，先更新 `CAMPUS_HOST` 和 `APP_ORIGIN` 并重新创建 API，再使用新链接登录；旧域名的 Cookie 不会迁移。
+
+Slim 官方将公网分享定位为临时开发演示入口，因此此模式仅供使用合成身份与题目的功能验收，不能作为学生正式使用入口。go-judge 控制器需要特权容器；`rslab` 是共享宿主，缺少把真实学生代码与既有敏感服务隔开的专用主机或虚拟机边界，在完成更强隔离前不可让真实学生提交代码。正式开放前仍需稳定的受信任 HTTPS 域名与无需 Mac 保持在线的入口、专用主机或虚拟机隔离、30–50 人课堂负载测试、浏览器验收和独立备份恢复演练。保留数据库卷并先备份再升级；不要向正式数据运行本地 Smoke 或演示账号初始化。
 
 ## 开发与验证
 
@@ -103,7 +138,7 @@ BACKUP_HOST_KIND=school sh scripts/backup.sh /学校管理员设置的私有备�
 ```sh
 campus_verified_archive=/学校管理员设置的私有备份目录/实际备份文件.dump
 docker compose --env-file deploy/.env -f deploy/compose.yaml run --rm --no-deps -T \
-  --entrypoint node --env BACKUP_HOST_KIND=school \
+  --user 0 --entrypoint node --env BACKUP_HOST_KIND=school \
   --volume "$campus_verified_archive:/backup/verified.dump:ro" \
   migrate record-backup.mjs --verified /backup/verified.dump
 ```

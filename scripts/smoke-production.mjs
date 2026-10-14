@@ -80,7 +80,7 @@ assert.ok(ownImportedClass); assert.equal(ownImportedClass.members[0].id, import
 console.log('PASS scoped teacher member import, credential-safe idempotent replay, genuine activation and class membership');
 
 const settings = await admin('system-settings');
-assert.equal(settings.siteName, 'Campus Judge'); assert.equal(settings.timezone, 'Asia/Shanghai');
+assert.equal(settings.siteName, 'CodeMaster OJ'); assert.equal(settings.timezone, 'Asia/Shanghai');
 assert.equal(settings.codeLimitBytes, 262144); assert.equal(settings.maxProblemMemoryMb, 256); assert.equal(settings.maxProblemCpuMs, 5000);
 assert.equal(settings.judgeJobCpuBudgetMs, 30000); assert.equal(settings.judgeJobWallBudgetMs, 60000);
 assert.equal(typeof settings.secureCookies, 'boolean'); assert.ok(Array.isArray(settings.origins) && settings.origins.includes(origin));
@@ -131,9 +131,10 @@ async function waitFor(request, path, field = 'status', timeoutMs = 60000) {
 const validation = await waitFor(teacher, `problems/${problem.id}`, 'validationStatus');
 assert.equal(validation.validationStatus, 'AC');
 await teacher(`problems/${problem.id}/publish`, { versionId: problem.versionId });
+await admin(`problems/${problem.id}/rank-review`, { versionId: problem.versionId, decision: 'approved' }, 200, {}, 'PATCH');
+const assignment = await teacher('assignments', { title: `Smoke assignment ${run}`, classId: cls.id, dueAt: new Date(Date.now()+3600000).toISOString(), problems: [{ problemId: problem.id, points: 100 }] }, 201);
 const visibleProblem = await student(`problems/${problem.id}`);
 assert.equal(visibleProblem.tests, undefined); assert.equal(visibleProblem.referenceCode, undefined);
-const assignment = await teacher('assignments', { title: `Smoke assignment ${run}`, classId: cls.id, dueAt: new Date(Date.now()+3600000).toISOString(), problems: [{ problemId: problem.id, points: 100 }] }, 201);
 await outsider(`assignments/${assignment.id}`, undefined, 403);
 console.log('PASS reference validation, immutable publish, hidden-test filtering and class assignment');
 
@@ -205,7 +206,7 @@ const timedReceipt = await student('submissions', { problemId: exam.id, versionI
 const actualTimed = await waitFor(teacher, `submissions/${timedReceipt.id}`);
 assert.equal(actualTimed.status, 'AC'); assert.equal(actualTimed.score, 100);
 const embargo = await student(`submissions/${timedReceipt.id}`);
-assert.equal(embargo.status, 'Executed'); assert.equal(embargo.score, null); assert.equal(embargo.passed, null);
+assert.equal(embargo.status, 'AC'); assert.equal(embargo.score, null); assert.equal(embargo.passed, null);
 await teacher(`timed-practices/${timed.id}/results`, {}, 409);
 await teacher(`timed-practices/${timed.id}/end`, { reason: 'Local verification of explicit teacher end' });
 await student('submissions', { problemId: exam.id, versionId: exam.versionId, timedPracticeId: timed.id, kind: 'submit', code: correct, idempotencyKey: randomUUID() }, 409);

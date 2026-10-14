@@ -40,7 +40,9 @@ export function loadConfig(env=process.env) {
 }
 
 export async function createDomainServices(pool,config) {
- const authLimiter=new RateLimiter({max:10,windowMs:60000}), ipLimiter=new RateLimiter({max:60,windowMs:60000}), submitLimiter=new RateLimiter({max:20,windowMs:60000});
+ // A classroom may share one NAT address. Keep a generous aggregate ceiling
+ // while the independent 10/min username and identity limits block guessing.
+ const authLimiter=new RateLimiter({max:10,windowMs:60000}), ipLimiter=new RateLimiter({max:180,windowMs:60000}), submitLimiter=new RateLimiter({max:20,windowMs:60000});
  const dummyHash=await hashPassword(randomToken());
  const timed=createTimedService(pool);
  async function audit(db,actor,action,type,id,metadata={}) { await db.query('INSERT INTO audit_events(actor_account_id,action,resource_type,resource_id,metadata) VALUES($1,$2,$3,$4,$5)',[actor,action,type,String(id),metadata]); }

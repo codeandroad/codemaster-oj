@@ -1,7 +1,8 @@
 "use client";
 
 import { AppLink as Link } from "@/components/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ArrowRight, CircleAlert, ClipboardList } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
@@ -37,6 +38,10 @@ export type TeacherAssignment = Assignment & {
   averagePercent?: number | null;
   className?: string;
   published?: boolean;
+  hasSubmissions?: boolean;
+  hasActivity?: boolean;
+  protectedParticipantIds?: string[];
+  editRevision?: number;
 };
 export function TeacherDashboard() {
   const classes = useData<{ items: SchoolClass[] }>("classes"),
@@ -185,11 +190,13 @@ export function TeacherDashboard() {
 }
 
 export function TeacherClasses({ user }: { user: CampusUser }) {
+  const search = useSearchParams();
   const classes = useData<{ items: SchoolClass[] }>("classes"),
     people = useData<{ items: Person[] }>("people"),
     assignments = useData<{ items: TeacherAssignment[] }>("assignments");
-  const [activeId, setActiveId] = useState(""),
+  const [activeId, setActiveId] = useState(search.get("classId") ?? ""),
     [dialog, setDialog] = useState<"new" | "members" | "edit" | null>(null);
+  useEffect(() => { const classId = search.get("classId"); if (classId) setActiveId(classId); }, [search]);
   const current =
     classes.data?.items.find((x) => x.id === activeId) ??
     classes.data?.items[0];
@@ -307,8 +314,11 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
                     <td className="font-mono text-xs">
                       {student?.number ?? "—"}
                     </td>
-                    <td className="font-semibold">
-                      {student?.name ?? "加载中"}
+                    <td>
+                      {student ? <Link
+                        href={`/teacher/reports?${new URLSearchParams({ classId: current.id, studentId: id, studentName: student.name })}`}
+                        className="font-semibold text-primary hover:underline focus-visible:underline"
+                      >{student.name}</Link> : "加载中"}
                     </td>
                     <td className="text-muted-foreground">—</td>
                     <td>

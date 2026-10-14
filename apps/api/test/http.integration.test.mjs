@@ -100,7 +100,7 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
     const javascript=await request('/api/v1/submissions',{method:'POST',body:{problemId:problem.id,kind:'submit',language:'javascript',code:'console.log(1)',idempotencyKey:'nest-js-key'},auth:student});
     assert.equal(javascript.status,201);assert.equal(javascript.data.language,'javascript');
     assert.equal((await request(`/api/v1/submissions/${javascript.data.id}`,{auth:student})).data.language,'javascript');
-    assert.equal((await request('/api/v1/site-info',{auth:student})).data.siteName,'Campus Judge');
+    assert.equal((await request('/api/v1/site-info',{auth:student})).data.siteName,'CodeMaster OJ');
     assert.equal((await request('/api/v1/problem-favorites',{auth:student})).status,200);
     assert.equal((await request('/api/v1/problem-favorites/invalid',{method:'PUT',body:{favorite:true},auth:student})).data.error.code,'VALIDATION');
     assert.equal((await request('/api/v1/system-settings',{method:'PATCH',body:{siteName:'New site'},auth:student})).status,403);

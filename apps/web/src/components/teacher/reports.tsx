@@ -83,7 +83,11 @@ export function TeacherReports() {
       type: "metric" | "problem" | "student";
       id: string;
       title: string;
-    } | null>(null),
+    } | null>(search.get("studentId") ? {
+      type: "student",
+      id: search.get("studentId")!,
+      title: search.get("studentName") ?? "学生详情",
+    } : null),
     [submission, setSubmission] = useState<string | null>(
       search.get("submissionId"),
     ),

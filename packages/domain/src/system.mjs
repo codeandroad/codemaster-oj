@@ -1,7 +1,7 @@
 import { transaction } from './db.mjs';
 import { fail,field,uuid,integer,enumValue } from './security.mjs';
 import { JOB_CPU_BUDGET_NS, JOB_WALL_BUDGET_MS } from '../judge.mjs';
-const SAFE_METADATA_KEYS = new Set(['created','failed','skipped','total','count','participants','revision','studentCount','teacherCount','added','alreadyMembers','disabled','roles','reason','visibility','archived','permission','exempt','identityId','previousIdentityId','previousAccountId','accountId','sourceAccountId','taskId','runId','classId','problemId','versionId','assignmentId','timedPracticeId','attemptId','previousDueAt','dueAt','previousDeadline','deadlineAt','endedAt','oldStatus','oldScore','newStatus','newScore','summary','enabled','fields','backupId','name','scope','sizeBytes','sha256','status','verifiedAt','hostKind']);
+const SAFE_METADATA_KEYS = new Set(['created','failed','skipped','total','count','participants','revision','studentCount','teacherCount','added','alreadyMembers','disabled','roles','reason','visibility','archived','permission','exempt','identityId','previousIdentityId','previousAccountId','accountId','sourceAccountId','taskId','runId','classId','problemId','versionId','previousVersionId','assignmentId','timedPracticeId','attemptId','previousDueAt','dueAt','previousDeadline','deadlineAt','endedAt','oldStatus','oldScore','newStatus','newScore','summary','enabled','fields','backupId','name','scope','sizeBytes','sha256','status','verifiedAt','hostKind']);
 const SENSITIVE_KEY=/password|activation|reset|token|secret|code|hidden|input|output|reference|credential/i;
 export function sanitizeAuditMetadata(metadata,depth=0){
  if(!metadata||typeof metadata!=='object'||Array.isArray(metadata)||depth>4)return {};

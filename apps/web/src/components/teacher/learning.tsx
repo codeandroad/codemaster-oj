@@ -152,7 +152,7 @@ export function TeacherLearning() {
               {resources.data?.items.map((r) => (
                 <tr key={r.id}>
                   <td>{r.type}</td>
-                  <td className="font-semibold">{r.title}</td>
+                  <td><button type="button" className="font-semibold text-primary hover:underline focus-visible:underline" onClick={() => setEditing(r)}>{r.title}</button></td>
                   <td>
                     {paths.data?.items.find((x) => x.id === r.pathId)?.title ??
                       "独立资料"}

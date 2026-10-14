@@ -282,7 +282,12 @@ export function TeacherBankDetail({ id }: { id: string }) {
                         />
                       </td>
                       <td className="px-4 py-3">
-                        <b>{p.title}</b>
+                        <Link
+                          href={`/teacher/problems/${p.id}/edit?returnTo=${encodeURIComponent(`/teacher/problems/banks/${id}`)}`}
+                          className="font-semibold text-primary hover:underline focus-visible:underline"
+                        >
+                          {p.title}
+                        </Link>
                         <p className="mt-1 font-mono text-xs text-muted-foreground">
                           {p.id.slice(0, 8)}
                         </p>

@@ -72,6 +72,7 @@ export function TeacherProblemImports() {
     [filename, setFilename] = useState(""),
     [files, setFiles] = useState<string[]>([]),
     [editing, setEditing] = useState<number | null>(null),
+    [selectedRecord, setSelectedRecord] = useState<ImportRecord | null>(null),
     [result, setResult] = useState<ImportResult | null>(null),
     [key, setKey] = useState(productionId),
     [targetBank, setTargetBank] = useState(""),
@@ -667,10 +668,9 @@ export function TeacherProblemImports() {
             {records.data?.items.map((r) => (
               <tr key={r.id}>
                 <td>{date(r.createdAt)}</td>
-                <td>{r.fileName || "JSON 清单"}</td>
+                <td><button type="button" className="font-semibold text-primary hover:underline focus-visible:underline" onClick={() => setSelectedRecord(r)}>{r.fileName || "JSON 清单"}</button></td>
                 <td>
-                  {banks.data?.items.find((x) => x.id === r.bankId)?.name ??
-                    r.bankId.slice(0, 8)}
+                  <Link href={`/teacher/problems/banks/${r.bankId}`} className="text-primary hover:underline focus-visible:underline">{banks.data?.items.find((x) => x.id === r.bankId)?.name ?? r.bankId.slice(0, 8)}</Link>
                 </td>
                 <td>{r.summary.total}</td>
                 <td>
@@ -684,6 +684,14 @@ export function TeacherProblemImports() {
           </Table>
         </section>
       )}
+      {selectedRecord && <Drawer title={selectedRecord.fileName || "JSON 清单"} onClose={() => setSelectedRecord(null)}>
+        <dl className="space-y-3 text-sm">
+          <div><dt className="text-muted-foreground">导入时间</dt><dd>{date(selectedRecord.createdAt)}</dd></div>
+          <div><dt className="text-muted-foreground">来源文件</dt><dd className="break-all">{selectedRecord.fileName || "JSON 清单"}</dd></div>
+          <div><dt className="text-muted-foreground">导入结果</dt><dd>共 {selectedRecord.summary.total} 道 · 成功 {selectedRecord.summary.created} 道 · 失败 {selectedRecord.summary.failed} 道</dd></div>
+        </dl>
+        <Link href={`/teacher/problems/banks/${selectedRecord.bankId}`} className={`${buttonVariants({variant:"secondary"})} mt-5`}>打开目标题库</Link>
+      </Drawer>}
       {editing !== null && rows[editing] && (
         <CandidateEditor
           initial={rows[editing]!}

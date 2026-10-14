@@ -30,15 +30,24 @@ export async function problemPermissions(db,user,problem,version) {
  const grant=(await db.query('SELECT permission FROM bank_permissions WHERE bank_id=$1 AND account_id=$2',[bank.id,user.id])).rows[0]?.permission;
  const bankOwner=isStaff(user)&&bank.owner_account_id===user.id;
  const staffRead=isStaff(user)&&(bankOwner||['read','edit'].includes(grant));
- const canEdit=own||(isStaff(user)&&(bankOwner||grant==='edit'));
- const schoolRead=!!version.published_at&&bank.visibility==='school'&&!bank.archived_at;
+ const canEdit=!problem.archived_at&&(own||(isStaff(user)&&(bankOwner||grant==='edit')));
+ const schoolRead=!!version.published_at&&bank.visibility==='school'&&!bank.archived_at&&!problem.archived_at;
  if(own||(!bank.archived_at&&staffRead)||schoolRead)return {canRead:true,canEdit:canEdit&&!bank.archived_at,canRunFree:true};
+ // A teacher who currently manages the class can still inspect the exact
+ // selected version after private-bank access changes, including in a draft.
+ // This does not grant access to other versions or authoring-only material.
+ const assignmentTeacherRead=user.roles.includes('teacher')&&!!version.published_at&&!!(await db.query(`
+  SELECT 1 FROM assignment_problems ap
+  JOIN assignments a ON a.id=ap.assignment_id
+  JOIN classes c ON c.id=a.class_id AND c.archived_at IS NULL
+  JOIN teacher_classes tc ON tc.class_id=c.id AND tc.account_id=$2
+  WHERE ap.problem_id=$1 AND ap.version_id=$3 LIMIT 1`,[problem.id,user.id,version.id])).rowCount;
  const assignmentRead=user.roles.includes('student')&&!!version.published_at&&!!(await db.query('SELECT 1 FROM assignment_problems ap JOIN assignments assignment ON assignment.id=ap.assignment_id AND assignment.state=\'Published\' JOIN assignment_participants part ON part.assignment_id=ap.assignment_id WHERE ap.version_id=$1 AND part.identity_id=$2 AND NOT part.exempt LIMIT 1',[version.id,user.identityId])).rowCount;
  let timedRead=false,timedReleased=false;
  if(user.roles.includes('student')&&version.published_at&&(await db.query("SELECT to_regclass('timed_practice_problems') existing")).rows[0].existing) {
   const permitted=(await db.query("SELECT practice.results_published_at FROM timed_practice_problems tp JOIN timed_practices practice ON practice.id=tp.practice_id JOIN timed_practice_participants part ON part.practice_id=tp.practice_id LEFT JOIN timed_attempts attempt ON attempt.practice_id=tp.practice_id AND attempt.identity_id=part.identity_id WHERE tp.version_id=$1 AND part.identity_id=$2 AND NOT part.exempt AND (practice.results_published_at IS NOT NULL OR attempt.id IS NOT NULL) ORDER BY practice.results_published_at DESC NULLS LAST LIMIT 1",[version.id,user.identityId])).rows[0];timedRead=!!permitted;timedReleased=!!permitted?.results_published_at;
  }
- return {canRead:own||(!bank.archived_at&&staffRead)||schoolRead||assignmentRead||timedRead,canEdit:canEdit&&!bank.archived_at,canRunFree:assignmentRead||timedReleased};
+ return {canRead:own||(!bank.archived_at&&staffRead)||schoolRead||assignmentTeacherRead||assignmentRead||timedRead,canEdit:canEdit&&!bank.archived_at,canRunFree:assignmentRead||timedReleased};
 }
 
 export async function restoreIdentityBindings(db,identityId,newAccountId,{restoreRoles=true,restoreEmail=true}={}) {

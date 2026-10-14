@@ -18,8 +18,11 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
 import {
   productionApi,
+  apiMessage,
+  ApiError,
   type Assignment,
   type Person,
+  type ProductionProblem,
   type SchoolClass,
   type Submission,
 } from "@/lib/production-api";
@@ -68,16 +71,34 @@ export function TeacherAssignments() {
           headers={[
             "Assignment",
             "Classes",
-            "Applicable",
-            "Exempt",
+            "已布置 / 全班",
+            "未布置 / 豁免",
             "Average / Status",
             "Actions",
           ]}
         >
-          {assignments.data?.items.map((item) => (
-            <tr key={item.id}>
+          {assignments.data?.items.map((item) => {
+            const assigned = item.applicableCount ?? item.participants?.length ??
+              item.participantDetails?.filter((person) => !person.exempt).length ?? 0;
+            const exempt = item.exemptCount ??
+              item.participantDetails?.filter((person) => person.exempt).length ?? 0;
+            const schoolClass = classes.data?.items.find((schoolClass) =>
+              schoolClass.id === item.classId,
+            );
+            const historicalCount = item.participantDetails?.filter((person) =>
+              !schoolClass?.studentIds.includes(person.identityId),
+            ).length ?? 0;
+            const rosterSize = schoolClass
+              ? schoolClass.studentIds.length + historicalCount
+              : assigned + exempt;
+            return <tr key={item.id}>
               <td>
-                <b>{item.title}</b>
+                <Link
+                  href={`/teacher/assignments/${item.id}/edit`}
+                  className={`${link} font-semibold`}
+                >
+                  {item.title}
+                </Link>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Due {date(item.dueAt)}
                 </p>
@@ -88,19 +109,11 @@ export function TeacherAssignments() {
               </td>
               <td>
                 <b>
-                  {item.applicableCount ??
-                    item.participantDetails?.filter((x) => !x.exempt).length ??
-                    item.participants?.length ??
-                    "—"}
-                  /
-                  {item.participantDetails?.length ??
-                    (item.participants?.length ?? 0) + (item.exemptCount ?? 0)}
+                  {assigned} / {rosterSize}
                 </b>
               </td>
               <td>
-                {item.exemptCount ??
-                  item.participantDetails?.filter((x) => x.exempt).length ??
-                  0}
+                {Math.max(0, rosterSize - assigned - exempt)} / {exempt}
               </td>
               <td>
                 <StatusPill
@@ -120,7 +133,7 @@ export function TeacherAssignments() {
                     href={`/teacher/assignments/${item.id}/edit`}
                     className={link}
                   >
-                    {item.state === "Draft" ? "编辑" : "查看"}
+                    {item.state === "Draft" ? "编辑" : "查看 / 编辑"}
                   </Link>
                   <Link
                     href={`/teacher/assignments/${item.id}/progress`}
@@ -130,8 +143,8 @@ export function TeacherAssignments() {
                   </Link>
                 </div>
               </td>
-            </tr>
-          ))}
+            </tr>;
+          })}
           {!assignments.loading && !assignments.data?.items.length && (
             <Empty columns={6}>暂无作业。点击 New assignment 开始布置。</Empty>
           )}
@@ -146,6 +159,10 @@ interface SelectedProblem {
   points: number;
   mode?: string;
   versionId?: string;
+}
+interface LatestProblemVersion {
+  versionId: string;
+  title: string;
 }
 const assignmentTabs = [
   "Basic information",
@@ -164,18 +181,20 @@ export function TeacherAssignmentEditor({ id,userId }: { id: string;userId:strin
       {(id === "new" || (!resource.loading && resource.data?.id === id)) && (
         <AssignmentEditorForm
           userId={userId}
-          key={id}
+          key={`${id}:${resource.data?.editRevision ?? 0}`}
           initial={id === "new" ? null : resource.data}
+          onReload={resource.reload}
         />
       )}
     </>
   );
 }
 function AssignmentEditorForm({
-  initial,userId,
+  initial,userId,onReload,
 }: {
   userId:string;
   initial: TeacherAssignment | null;
+  onReload: () => void;
 }) {
   const router = useRouter(),
     classes = useData<{ items: SchoolClass[] }>("classes"),
@@ -200,65 +219,197 @@ function AssignmentEditorForm({
     [query, setQuery] = useState(""),
     [picker, setPicker] = useState(false),
     [publish, setPublish] = useState(false),
+    [confirmUpdate, setConfirmUpdate] = useState(false),
+    [changeReason, setChangeReason] = useState(""),
+    [latestVersions, setLatestVersions] = useState<Record<string, LatestProblemVersion | null>>({}),
+    [checkingVersion, setCheckingVersion] = useState<string | null>(null),
+    [versionError, setVersionError] = useState(""),
+    [stale, setStale] = useState(false),
     action = useAction();
   const published = saved?.state !== "Draft" && Boolean(saved),
+    hasActivity = Boolean(saved?.hasActivity || saved?.hasSubmissions),
+    hasSubmissions = Boolean(saved?.hasSubmissions || saved?.grades?.some(
+      (grade) => grade.problems.some((problem) => problem.submissionId),
+    )),
+    protectedStudentIds = new Set(
+      saved?.protectedParticipantIds ??
+        saved?.participantDetails?.filter((person) => person.hasActivity)
+          .map((person) => person.identityId) ??
+          saved?.grades?.filter((grade) =>
+          grade.problems.some((problem) => problem.submissionId),
+        ).map((grade) => grade.identityId) ?? [],
+    ),
+    exemptStudentIds = new Set(
+      saved?.participantDetails?.filter((person) => person.exempt)
+        .map((person) => person.identityId) ?? [],
+    ),
+    canEditProblems = !published || !hasSubmissions,
     classroom = classes.data?.items.find((x) => x.id === classId),
     students =
       people.data?.items.filter(
         (x) => x.kind === "student" && classroom?.studentIds.includes(x.id),
       ) ?? [],
+    historicalParticipants = classroom
+      ? saved?.participantDetails?.filter((person) =>
+          !classroom.studentIds.includes(person.identityId),
+        ) ?? []
+      : [],
+    rosterTotal = classroom
+      ? students.length + historicalParticipants.length
+      : Math.max(students.length, participants.length + exemptStudentIds.size),
+    historicalStudentIds = new Set(
+      historicalParticipants.map((person) => person.identityId),
+    ),
     shown = students.filter((x) =>
       `${x.name} ${x.number}`.toLowerCase().includes(query.toLowerCase()),
     );
   const total = selected.reduce((sum, x) => sum + x.points, 0);
-  const draft=useActivityDraft({storageKey:`campus-judge:activity-draft:v1:${userId}:assignment:${initial?.id??"new"}`,editable:!published,snapshot:{title,description,course,classId,due,problems:selected,participants},onRestore:v=>{setTitle(v.title);setDescription(v.description);setCourse(v.course);setClassId(v.classId);setDue(v.due);setSelected(v.problems);setParticipants(v.participants);}});
-  useDirty(
-    !published &&
-      (title !== (saved?.title ?? "") ||
-        course !== (saved?.course ?? "Python") ||
-        description !== (saved?.description ?? "") ||
-        classId !== (saved?.classId ?? "") ||
-        due !== localInput(saved?.dueAt) ||
-        JSON.stringify(
-          selected.map((x) => ({ problemId: x.problemId, points: x.points })),
-        ) !==
-          JSON.stringify(
-            (saved?.problems ?? []).map((x) => ({
-              problemId: x.problemId,
-              points: x.points,
-            })),
-          ) ||
-        JSON.stringify([...participants].sort()) !==
-          JSON.stringify(activeParticipants(saved?.participantDetails,saved?.participants ?? []).sort())),
+  const checkLatestVersion = async (problemId: string) => {
+    setCheckingVersion(problemId);
+    setVersionError("");
+    try {
+      const problem = await productionApi<ProductionProblem>(`problems/${problemId}`);
+      const published = problem.publishedVersionId
+        ? await productionApi<ProductionProblem>(
+            `problems/${problemId}?versionId=${encodeURIComponent(problem.publishedVersionId)}`,
+          )
+        : null;
+      setLatestVersions((current) => ({
+        ...current,
+        [problemId]: published && problem.publishedVersionId
+          ? {
+              versionId: problem.publishedVersionId,
+              title: published.title,
+            }
+          : null,
+      }));
+    } catch (error) {
+      setVersionError(apiMessage(error));
+    } finally {
+      setCheckingVersion(null);
+    }
+  };
+  const problemEditorHref = (problem: SelectedProblem) => {
+    const query = new URLSearchParams({
+      returnTo: saved
+        ? `/teacher/assignments/${saved.id}/edit`
+        : "/teacher/assignments/new/edit",
+    });
+    if (problem.versionId) query.set("versionId", problem.versionId);
+    return `/teacher/problems/${problem.problemId}/edit?${query.toString()}`;
+  };
+  const draft=useActivityDraft({storageKey:`campus-judge:activity-draft:v1:${userId}:assignment:${initial?.id??"new"}`,editable:true,noticeText:published?"改动已临时保存在当前浏览器；点击“保存修改”并填写原因后才会更新已发布作业。":undefined,snapshot:{title,description,course,classId,due,problems:selected,participants},onRestore:v=>{setTitle(v.title);setDescription(v.description);setCourse(v.course);setClassId(v.classId);setDue(v.due);setSelected(v.problems);setParticipants(v.participants);}});
+  const changedProblems = JSON.stringify(
+    selected.map((x) => ({ problemId: x.problemId, points: x.points, versionId: x.versionId })),
+  ) !== JSON.stringify(
+    (saved?.problems ?? []).map((x) => ({
+      problemId: x.problemId,
+      points: x.points,
+      versionId: x.versionId,
+    })),
   );
-  const save = async () => {
-    if (published)
-      throw new Error(
-        "已发布作业题目与分值已固定，请新建草稿。延期和豁免在进度页处理。",
-      );
+  const changedParticipants = JSON.stringify([...participants].sort()) !==
+    JSON.stringify(activeParticipants(saved?.participantDetails,saved?.participants ?? []).sort());
+  const changedTitle = title !== (saved?.title ?? "");
+  const changedDescription = description !== (saved?.description ?? "");
+  const changedCourse = course !== (saved?.course ?? "Python");
+  const changedClass = classId !== (saved?.classId ?? "");
+  const changedDue = due !== localInput(saved?.dueAt);
+  const changedPinnedVersions = selected.some((problem) => {
+    const original = saved?.problems.find((item) => item.problemId === problem.problemId);
+    return original && original.versionId !== problem.versionId;
+  });
+  const hasChanges = changedTitle || changedDescription || changedCourse ||
+    changedClass || changedDue || changedProblems || changedParticipants;
+  useDirty(hasChanges);
+  const save = async (reason?: string) => {
+    if (published && !hasChanges)
+      throw new Error("没有需要保存的修改。");
     validateActivity({title,classId,problems:selected,participants});
+    if (published && !selected.length)
+      throw new Error("已发布作业须保留至少一道题目。");
+    if (published && !participants.length && (saved?.participants?.length ?? 0) > 0)
+      throw new Error("已发布作业须保留至少一名适用学生；需豁免时请到进度页操作。");
+    const previouslyAssigned = new Set(activeParticipants(
+      saved?.participantDetails,
+      saved?.participants ?? [],
+    ));
+    if (published && changedParticipants && [...protectedStudentIds].some((identityId) =>
+      previouslyAssigned.has(identityId) && !participants.includes(identityId),
+    ))
+      throw new Error("有运行或提交记录的学生不能移出作业，请在进度页使用豁免操作。");
+    if (published && participants.some((identityId) => exemptStudentIds.has(identityId)))
+      throw new Error("恢复已豁免学生请在作业进度页操作。");
+    if (published && classId !== saved?.classId)
+      throw new Error("已发布作业不能更换班级。请在原班级内选择适用学生。");
+    if (published && hasSubmissions && changedProblems)
+      throw new Error("已有正式提交，题目、分值和顺序不能修改。可修改说明、截止时间或适用学生。");
+    if (published && hasActivity && changedPinnedVersions)
+      throw new Error("已有运行或提交记录，不能切换作业题目的固定版本。");
     const dueAt=activityDate(due,'截止时间');
-    const result = await productionApi<TeacherAssignment>(
-      saved ? `assignments/${saved.id}` : "assignments",
-      {
-        method: saved ? "PATCH" : "POST",
-        body: {
+    if (published && changedParticipants && Date.parse(dueAt) <= Date.now())
+      throw new Error("作业已截止。调整学生名单前，请先将截止时间延至未来。");
+    if (published && changedDue) {
+      if (Date.parse(dueAt) <= Date.parse(saved!.dueAt))
+        throw new Error("已发布作业只能延长截止时间，不能提前截止。");
+      if (Date.parse(dueAt) <= Date.now())
+        throw new Error("新的截止时间须晚于当前时间。");
+    }
+    if (published && !reason?.trim())
+      throw new Error("请填写本次修改原因。");
+    if (published && saved?.editRevision === undefined)
+      throw new Error("作业版本信息缺失，请重新加载后再修改。");
+    const problemPayload = selected.map((problem) => ({
+      problemId: problem.problemId,
+      points: problem.points,
+      ...(published && problem.versionId ? { versionId: problem.versionId } : {}),
+    }));
+    const body = published
+      ? {
+          reason: reason?.trim(),
+          expectedRevision: saved?.editRevision,
+          ...(changedTitle ? { title } : {}),
+          ...(changedDescription ? { description } : {}),
+          ...(changedCourse ? { course } : {}),
+          ...(changedDue ? { dueAt } : {}),
+          ...(changedProblems ? { problems: problemPayload } : {}),
+          ...(changedParticipants ? { participants } : {}),
+        }
+      : {
           state: "Draft",
+          ...(saved?.editRevision !== undefined
+            ? { expectedRevision: saved.editRevision }
+            : {}),
           title,
           classId,
           dueAt,
           description,
           course,
-          problems: selected.map((x) => ({
-            problemId: x.problemId,
-            points: x.points,
-          })),
+          problems: problemPayload,
           participants,
+        };
+    let result: TeacherAssignment;
+    try {
+      result = await productionApi<TeacherAssignment>(
+        saved ? `assignments/${saved.id}` : "assignments",
+        {
+          method: saved ? "PATCH" : "POST",
+          body,
         },
-      },
-    );
+      );
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "ASSIGNMENT_REVISION_CONFLICT")
+        setStale(true);
+      throw error;
+    }
     draft.clear();
     setSaved(result);
+    setSelected(result.problems.map((problem) => ({
+      ...problem,
+      title: problem.title ?? selected.find((item) => item.problemId === problem.problemId)?.title ?? "题目",
+      mode: selected.find((item) => item.problemId === problem.problemId)?.mode,
+    })));
+    setChangeReason("");
     if (!saved) router.replace(`/teacher/assignments/${result.id}/edit`);
     return result;
   };
@@ -273,28 +424,41 @@ function AssignmentEditorForm({
       <PageHeader
         eyebrow="作业编辑"
         title={saved?.title ?? "New assignment"}
-        description="基本信息、题目与分值、明确适用名单、规则与学生预览。"
+        description="基本信息、题目与分值、指定学生名单、规则与学生预览。"
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               variant="secondary"
-              disabled={action.busy || published}
-              onClick={() =>
+              disabled={action.busy || (published && !hasChanges)}
+              onClick={() => {
+                if (published) {
+                  setConfirmUpdate(true);
+                  return;
+                }
                 void action.run(async () => {
                   await save();
                   return "作业草稿已保存。";
-                })
-              }
+                });
+              }}
             >
-              保存草稿
+              {published ? "保存修改" : "保存草稿"}
             </Button>
-            <Button
-              disabled={action.busy || published}
-              onClick={() => setPublish(true)}
-            >
-              <Send size={15} />
-              {published ? "已发布" : "发布作业"}
-            </Button>
+            {published ? (
+              <Link
+                href={`/teacher/assignments/${saved?.id}/progress`}
+                className={buttonVariants({ variant: "secondary" })}
+              >
+                查看进度
+              </Link>
+            ) : (
+              <Button
+                disabled={action.busy}
+                onClick={() => setPublish(true)}
+              >
+                <Send size={15} />
+                发布作业
+              </Button>
+            )}
           </div>
         }
       />
@@ -302,12 +466,18 @@ function AssignmentEditorForm({
       {draft.notice}
       {published && (
         <p className="mt-3 border border-info-soft bg-info-soft p-3 text-sm">
-          作业已发布，题目版本与分值固定。
+          作业已发布。可以修改标题、说明、截止时间和指定学生；截止时间只能延后。
+          {hasSubmissions
+            ? "已有正式提交，题目、分值和顺序已固定。"
+            : "尚无正式提交，可以调整题目、分值和顺序。"}
+          {hasActivity
+            ? "已有运行或提交记录，题目固定版本不可替换；有记录的学生不能从名单中移除。"
+            : "尚无运行记录，可在检查后明确选择题库的新发布版本。"}
           <Link
             className={`${link} ml-2`}
             href={`/teacher/assignments/${saved?.id}/progress`}
           >
-            维护延期与学生豁免
+            管理单人延期与豁免
           </Link>
         </p>
       )}
@@ -330,7 +500,7 @@ function AssignmentEditorForm({
                 <input
                   required
                   value={title}
-                  disabled={published || action.busy}
+                  disabled={action.busy}
                   onChange={(e) => setTitle(e.target.value)}
                   className={input}
                 />
@@ -338,7 +508,7 @@ function AssignmentEditorForm({
               <Field label="Course">
                 <input
                   value={course}
-                  disabled={published || action.busy}
+                  disabled={action.busy}
                   onChange={(e) => setCourse(e.target.value)}
                   className={input}
                 />
@@ -369,15 +539,36 @@ function AssignmentEditorForm({
                 <input
                   required
                   type="datetime-local"
-                  disabled={published || action.busy}
+                  min={published ? localInput(saved?.dueAt) : undefined}
+                  disabled={action.busy}
                   value={due}
                   onChange={(e) => setDue(e.target.value)}
                   className={input}
                 />
+                {published && (
+                  <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                    已发布作业仅可延期；原截止时间 {date(saved?.dueAt)}。
+                  </span>
+                )}
               </Field>
+              <div className="col-span-2 flex flex-wrap items-center justify-between gap-3 border border-border bg-surface-subtle p-3 text-sm max-md:col-span-1">
+                <div>
+                  <b>发布对象</b>
+                  <p className="mt-1 text-muted-foreground">
+                    已选 {participants.length} / {rosterTotal} 名学生；只有选中的学生可见。
+                  </p>
+                </div>
+                <Button
+                  variant="secondary"
+                  disabled={!classId || action.busy}
+                  onClick={() => setTab("Applicable list")}
+                >
+                  {published ? "调整学生名单" : "选择部分学生"}
+                </Button>
+              </div>
               <Field label="Teacher note">
                 <textarea
-                  disabled={published || action.busy}
+                  disabled={action.busy}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={5}
@@ -396,9 +587,19 @@ function AssignmentEditorForm({
                     {selected.length} problems · {total} pts total. Reorder,
                     edit points, or open the unified editor.
                   </p>
+                  {published && hasSubmissions && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      已有正式提交，不能调整本作业的题目、分值或顺序。
+                    </p>
+                  )}
+                  {published && hasActivity && !hasSubmissions && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      已有运行记录，可调整题目和分值，但不能替换已固定的题目版本。
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-2">
-                  <Button disabled={published || action.busy} onClick={() => setPicker(true)}>
+                  <Button disabled={!canEditProblems || action.busy} onClick={() => setPicker(true)}>
                     <Plus size={15} />
                     从题库与分组选择
                   </Button>
@@ -411,13 +612,77 @@ function AssignmentEditorForm({
                   </Link>
                 </div>
               </div>
+              {versionError && (
+                <p role="alert" className="mb-3 text-sm text-destructive">
+                  {versionError}
+                </p>
+              )}
               <Table headers={["顺序", "题目", "接口", "分值", "操作"]}>
                 {selected.map((p, i) => (
                   <tr key={p.problemId}>
                     <td>{i + 1}</td>
-                    <td className="font-semibold">{p.title}</td>
                     <td>
-                      {p.mode === "function" ? "Function" : "Standard I/O"}
+                      <Link
+                        className={`${link} font-semibold`}
+                        href={problemEditorHref(p)}
+                      >
+                        {p.title}
+                      </Link>
+                      {published && (
+                        <div className="mt-1 space-y-1 text-xs text-muted-foreground">
+                          <p>本作业固定版本：{p.versionId?.slice(0, 8) ?? "未知"}</p>
+                          <button
+                            type="button"
+                            className={link}
+                            disabled={checkingVersion !== null}
+                            onClick={() => void checkLatestVersion(p.problemId)}
+                          >
+                            {checkingVersion === p.problemId ? "正在检查…" : "检查题库最新版"}
+                          </button>
+                          {latestVersions[p.problemId] === null && (
+                            <p>题库中没有可用的已发布版本。</p>
+                          )}
+                          {latestVersions[p.problemId] && (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span>
+                                题库最新发布：{latestVersions[p.problemId]!.title} ·
+                                {" "}{latestVersions[p.problemId]!.versionId.slice(0, 8)}
+                              </span>
+                              {latestVersions[p.problemId]!.versionId !== p.versionId ? (
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  disabled={hasActivity || action.busy}
+                                  onClick={() => setSelected((current) => current.map((item) =>
+                                    item.problemId === p.problemId
+                                      ? {
+                                          ...item,
+                                          versionId: latestVersions[p.problemId]!.versionId,
+                                          title: latestVersions[p.problemId]!.title,
+                                        }
+                                      : item,
+                                  ))}
+                                >
+                                  使用最新发布版本
+                                </Button>
+                              ) : (
+                                <span>
+                                  {saved?.problems.find((item) => item.problemId === p.problemId)?.versionId === p.versionId
+                                    ? "已是最新版本"
+                                    : "已选最新版，保存修改后生效"}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      {p.mode === "function"
+                        ? "Function"
+                        : p.mode === "stdio"
+                          ? "Standard I/O"
+                          : "—"}
                     </td>
                     <td>
                       <input
@@ -426,7 +691,7 @@ function AssignmentEditorForm({
                         step="0.01"
                         min={0.01}
                         max={1000}
-                        disabled={published || action.busy}
+                        disabled={!canEditProblems || action.busy}
                         className={`${input} w-24`}
                         value={p.points}
                         onChange={(e) =>
@@ -446,7 +711,7 @@ function AssignmentEditorForm({
                           variant="ghost"
                           size="icon"
                           title="上移"
-                          disabled={published || action.busy || i === 0}
+                          disabled={!canEditProblems || action.busy || i === 0}
                           onClick={() => setSelected(move(selected, i, -1))}
                         >
                           <ArrowUp size={15} />
@@ -455,14 +720,14 @@ function AssignmentEditorForm({
                           variant="ghost"
                           size="icon"
                           title="下移"
-                          disabled={published || action.busy || i === selected.length - 1}
+                          disabled={!canEditProblems || action.busy || i === selected.length - 1}
                           onClick={() => setSelected(move(selected, i, 1))}
                         >
                           <ArrowDown size={15} />
                         </Button>
                         <Link
                           className={`${link} mx-2`}
-                          href={`/teacher/problems/${p.problemId}/edit?returnTo=${encodeURIComponent(saved ? `/teacher/assignments/${saved.id}/edit` : "/teacher/assignments/new/edit")}`}
+                          href={problemEditorHref(p)}
                         >
                           <Pencil size={15} />
                         </Link>
@@ -470,7 +735,7 @@ function AssignmentEditorForm({
                           variant="ghost"
                           size="icon"
                           title="移除引用"
-                          disabled={published || action.busy}
+                          disabled={!canEditProblems || action.busy}
                           onClick={() =>
                             setSelected((x) =>
                               x.filter(
@@ -495,27 +760,46 @@ function AssignmentEditorForm({
             <>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <b>Applicable students</b>
+                  <b>作业发布对象</b>
                   <p className="text-xs text-muted-foreground">
-                    Applicable {participants.length} · Exempt{" "}
-                    {students.length - participants.length} · Total{" "}
-                    {students.length}
+                    已布置 {participants.length} 人 · 未布置{" "}
+                    {Math.max(0, rosterTotal - participants.length - exemptStudentIds.size)} 人
+                    {exemptStudentIds.size > 0 && ` · 已豁免 ${exemptStudentIds.size} 人`}
+                    {" "}· 名单共 {rosterTotal} 人
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    仅勾选的学生会看到作业；未勾选的学生不会收到本次作业。
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button
                     variant="secondary"
-                    disabled={published || action.busy}
-                    onClick={() => setParticipants(students.map((x) => x.id))}
+                    disabled={action.busy || !students.length || (published && !saved?.protectedParticipantIds)}
+                    onClick={() => setParticipants((current) => [...new Set([
+                      ...current.filter((id) => protectedStudentIds.has(id) || historicalStudentIds.has(id)),
+                      ...students.filter((student) => !exemptStudentIds.has(student.id)).map((student) => student.id),
+                    ])])}
                   >
-                    选择全部
+                    {exemptStudentIds.size ? "布置给全部可选学生" : "布置给全班"}
                   </Button>
+                  {query.trim() && (
+                    <Button
+                      variant="secondary"
+                      disabled={action.busy || (published && !saved?.protectedParticipantIds) || !shown.some((student) => !exemptStudentIds.has(student.id))}
+                      onClick={() => setParticipants((current) => [...new Set([
+                        ...current.filter((id) => protectedStudentIds.has(id) || historicalStudentIds.has(id)),
+                        ...shown.filter((student) => !exemptStudentIds.has(student.id)).map((student) => student.id),
+                      ])])}
+                    >
+                      仅布置给搜索结果
+                    </Button>
+                  )}
                   <Button
                     variant="secondary"
-                    disabled={published || action.busy}
-                    onClick={() => setParticipants([])}
+                    disabled={action.busy || (published && !saved?.protectedParticipantIds) || !participants.some((id) => !protectedStudentIds.has(id))}
+                    onClick={() => setParticipants((current) => current.filter((id) => protectedStudentIds.has(id)))}
                   >
-                    清空选择
+                    {protectedStudentIds.size ? "仅保留已有记录学生" : "清空名单"}
                   </Button>
                 </div>
               </div>
@@ -536,7 +820,7 @@ function AssignmentEditorForm({
                     <input
                       className="mt-1"
                       type="checkbox"
-                      disabled={published || action.busy}
+                      disabled={action.busy || exemptStudentIds.has(student.id) || (published && participants.includes(student.id) && (!saved?.protectedParticipantIds || protectedStudentIds.has(student.id)))}
                       checked={participants.includes(student.id)}
                       onChange={(e) =>
                         setParticipants((x) =>
@@ -551,12 +835,24 @@ function AssignmentEditorForm({
                       <p className="mt-1 text-xs text-muted-foreground">
                         {student.number} · {classroom?.name}
                       </p>
+                      {protectedStudentIds.has(student.id) && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          已有运行或提交记录，不能从名单中移除
+                        </p>
+                      )}
+                      {exemptStudentIds.has(student.id) && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          已豁免，请在进度页恢复
+                        </p>
+                      )}
                       <span className="mt-2 inline-block">
                         <StatusPill
                           status={
-                            participants.includes(student.id)
-                              ? "Applicable"
-                              : "Exempt"
+                            exemptStudentIds.has(student.id)
+                              ? "已豁免"
+                              : participants.includes(student.id)
+                              ? "已布置"
+                              : "未布置"
                           }
                         />
                       </span>
@@ -564,9 +860,51 @@ function AssignmentEditorForm({
                   </label>
                 ))}
               </div>
+              {historicalParticipants.length > 0 && (
+                <section className="mt-5 border-t border-border pt-4">
+                  <b className="text-sm">历史名单成员</b>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    这些学生已不在当前班级名单中。批量选择会保留其原有分配；如需移除无记录的学生，可逐个取消。
+                  </p>
+                  <div className="mt-3 grid grid-cols-3 gap-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
+                    {historicalParticipants
+                      .filter((person) => `${person.name} ${person.identityId}`.toLowerCase().includes(query.toLowerCase()))
+                      .map((person) => (
+                        <label key={person.identityId} className="flex items-start gap-3 border border-border p-3 text-sm">
+                          <input
+                            type="checkbox"
+                            className="mt-1"
+                            checked={participants.includes(person.identityId)}
+                            disabled={action.busy || person.exempt || protectedStudentIds.has(person.identityId)}
+                            onChange={(event) => setParticipants((current) =>
+                              event.target.checked
+                                ? [...current, person.identityId]
+                                : current.filter((id) => id !== person.identityId),
+                            )}
+                          />
+                          <span>
+                            <b>{person.name}</b>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {person.exempt
+                                ? "已豁免，请在进度页恢复"
+                                : protectedStudentIds.has(person.identityId)
+                                  ? "已有运行或提交记录，不能移出"
+                                  : "不在当前班级名单"}
+                            </p>
+                          </span>
+                        </label>
+                      ))}
+                  </div>
+                </section>
+              )}
               {!classId && (
                 <p className="mt-4 text-sm text-muted-foreground">
                   先在 Basic information 中选择班级。
+                </p>
+              )}
+              {classId && !participants.length && (
+                <p className="mt-4 text-sm text-destructive" role="alert">
+                  请至少勾选一名学生后再发布或保存修改。
                 </p>
               )}
             </>
@@ -595,20 +933,24 @@ function AssignmentEditorForm({
                 {title || "未命名作业"}
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                {classroom?.name} · {participants.length} applicable students ·
+                {classroom?.name} · 向 {participants.length} 名学生布置 ·
                 Due {due || "尚未设置"}
               </p>
               <p className="mt-4 whitespace-pre-wrap text-sm">{description}</p>
               <Table headers={["题目", "分值"]} min={400}>
                 {selected.map((p) => (
                   <tr key={p.problemId}>
-                    <td>{p.title}</td>
+                    <td>
+                      <Link href={problemEditorHref(p)} className={link}>
+                        {p.title}
+                      </Link>
+                    </td>
                     <td>{p.points}</td>
                   </tr>
                 ))}
               </Table>
               <p className="mt-4 text-xs text-muted-foreground">
-                学生看到自己的适用作业、截止时间和进度；公开样例运行不会改变作业成绩。
+                只有已勾选的学生看到作业、截止时间和进度；公开样例运行不会改变作业成绩。
               </p>
             </div>
           )}
@@ -626,6 +968,7 @@ function AssignmentEditorForm({
                 title: p.publishedTitle ?? p.title,
                 points: 100,
                 mode: p.mode,
+                versionId: p.publishedVersionId ?? undefined,
               })),
             ]);
             setPicker(false);
@@ -637,7 +980,7 @@ function AssignmentEditorForm({
           <p className="text-sm leading-6">
             向 {classroom?.name ?? "未选择班级"} 的 {participants.length}{" "}
             名适用学生发布 {selected.length} 道题，总分 {total}
-            。发布时固定题目版本，豁免学生看不到该作业。
+            。发布时固定题目版本；未勾选的学生不会看到该作业。
           </p>
           <Feedback action={action} />
           <div className="mt-5 flex justify-end gap-2">
@@ -660,6 +1003,7 @@ function AssignmentEditorForm({
                   const result = await save();
                   await productionApi(`assignments/${result.id}/publish`, {
                     method: "POST",
+                    body: { expectedRevision: result.editRevision },
                   });
                   setPublish(false);
                   router.push(`/teacher/assignments/${result.id}/progress`);
@@ -668,6 +1012,60 @@ function AssignmentEditorForm({
               }
             >
               确认发布
+            </Button>
+          </div>
+        </Modal>
+      )}
+      {confirmUpdate && published && (
+        <Modal title="确认修改已发布作业" onClose={() => setConfirmUpdate(false)}>
+          <p className="text-sm leading-6">
+            修改将立即影响已布置给 {participants.length} 名学生的作业。
+            {changedProblems && "题目、分值或顺序有变更。"}
+            {changedParticipants && "学生名单有变更，未勾选学生将看不到作业。"}
+            {due !== localInput(saved?.dueAt) && "截止时间将延后。"}
+            已有提交和历史成绩会保留。
+          </p>
+          <Field label="修改原因">
+            <textarea
+              className={area}
+              value={changeReason}
+              maxLength={2000}
+              rows={3}
+              required
+              placeholder="例如：延长截止时间，供学生完成新增题目"
+              onChange={(event) => setChangeReason(event.target.value)}
+            />
+          </Field>
+          <Feedback action={action} />
+          {stale && (
+            <div className="mt-4 border border-warning/30 bg-warning/5 p-3 text-sm">
+              作业已被其他教师更新。重新加载后核对最新内容，再保存修改。
+              <Button
+                variant="secondary"
+                className="mt-3"
+                onClick={() => {
+                  draft.clear();
+                  setConfirmUpdate(false);
+                  onReload();
+                }}
+              >
+                重新加载最新作业
+              </Button>
+            </div>
+          )}
+          <div className="mt-5 flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setConfirmUpdate(false)}>
+              取消
+            </Button>
+            <Button
+              disabled={action.busy || stale || !changeReason.trim()}
+              onClick={() => void action.run(async () => {
+                await save(changeReason);
+                setConfirmUpdate(false);
+                return "已发布作业已更新。";
+              })}
+            >
+              确认保存修改
             </Button>
           </div>
         </Modal>
@@ -767,7 +1165,15 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
                         key={p.problemId}
                         className="min-w-36 px-3 py-3 text-center"
                       >
-                        {p.title ?? p.problemId.slice(0, 8)}
+                        <Link
+                          className={link}
+                          href={`/teacher/problems/${p.problemId}/edit?${new URLSearchParams({
+                            returnTo: `/teacher/assignments/${id}/progress`,
+                            ...(p.versionId ? { versionId: p.versionId } : {}),
+                          }).toString()}`}
+                        >
+                          {p.title ?? p.problemId.slice(0, 8)}
+                        </Link>
                         <p className="mt-1 font-normal">{p.points} pts</p>
                       </th>
                     ))}

@@ -73,7 +73,7 @@ export interface Assignment {
   dueAt: string;
   problems: { problemId: string; points: number; title?: string; versionId?: string }[];
   participants: string[];
-  participantDetails?: { identityId: string; name: string; exempt: boolean }[];
+  participantDetails?: { identityId: string; name: string; exempt: boolean; hasActivity?: boolean }[];
   grades?: {
     identityId: string;
     name: string;

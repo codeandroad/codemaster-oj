@@ -2,8 +2,8 @@
 
 import { AppLink } from "@/components/navigation";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Ban, KeyRound, Link2, Pencil, Plus, Unlink } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
@@ -52,9 +52,20 @@ function AccountDrawer({account,editing,classes,onClose,onEdit,onSaved,onConfirm
 }
 
 export function AdminPeoplePage() {
+  const search=useSearchParams();
   const people=useData<{items:AdminPerson[]}>("people"),classes=useData<{items:SchoolClass[]}>("classes"),accounts=useData<{items:AdminAccount[]}>("accounts");
   const [kind,setKind]=useState<"student"|"teacher">("student"),[query,setQuery]=useState(""),[status,setStatus]=useState("all"),[selected,setSelected]=useState<AdminPerson|null>(null),[creating,setCreating]=useState(false);
   const [credential,setCredential]=useState<{person:AdminPerson;activationCode:string}|null>(null);
+  const personId=search.get("personId");
+  useEffect(()=>{
+    if(!personId||!people.data)return;
+    const url=new URL(window.location.href);
+    if(url.searchParams.get("personId")!==personId)return;
+    const person=people.data.items.find(p=>p.id===personId);
+    if(person){setKind(person.kind);setSelected(person);}
+    url.searchParams.delete("personId");
+    window.history.replaceState(null,"",`${url.pathname}${url.search}${url.hash}`);
+  },[personId,people.data]);
   const visible=(people.data?.items??[]).filter(p=>p.kind===kind&&`${p.number} ${p.name} ${p.username??""}`.toLowerCase().includes(query.toLowerCase())&&(status==="all"||(status==="active"?p.activated:!p.activated)));
   const refresh=()=>{people.reload();classes.reload();accounts.reload();};
   return <><PageHeader eyebrow="PEOPLE" title="身份档案" description="学生与教师身份独立于登录账号维护。可先建档、入班或负责班级，之后再由本人用激活码认领，或由管理员关联已有账号。" action={<div className="flex gap-2"><AppLink href="/admin/imports" className={buttonVariants({variant:"secondary"})}>导入名单</AppLink><Button onClick={()=>setCreating(true)}><Plus size={15}/>新建{kind==="student"?"学生":"教师"}身份</Button></div>}/><div className="mt-5 flex gap-2">{(["student","teacher"]as const).map(k=><Button key={k} size="sm" variant={kind===k?"primary":"secondary"} onClick={()=>setKind(k)}>{k==="student"?"学生":"教师"} · {people.data?.items.filter(p=>p.kind===k).length??0}</Button>)}</div><section className={`${panelClass} mt-4 p-4`}><div className="grid grid-cols-[minmax(220px,1fr)_180px] gap-3 max-sm:grid-cols-1"><SearchInput value={query} onChange={setQuery} placeholder="搜索编号、姓名或账号"/><select aria-label="身份状态筛选" value={status} onChange={e=>setStatus(e.target.value)} className={inputClass}><option value="all">全部状态</option><option value="active">已激活</option><option value="pending">待激活</option></select></div></section><Loading resource={people}><section className={`${panelClass} mt-4 overflow-x-auto`}><table className="w-full min-w-[860px] text-left text-sm"><thead className="bg-surface-subtle text-xs text-muted-foreground"><tr>{[kind==="student"?"学号":"工号","姓名",kind==="student"?"所在班级":"负责班级","绑定账号","状态","操作"].map(h=><th key={h} className="px-4 py-3">{h}</th>)}</tr></thead><tbody>{visible.map(p=><tr key={p.id} className="border-t border-border hover:bg-surface-subtle"><td className="px-4 py-3 font-mono text-xs">{p.number}</td><td className="px-4 py-3"><button className="font-semibold text-primary" onClick={()=>setSelected(p)}>{p.name}</button></td><td className="px-4 py-3">{p.classes?.map(c=>c.name).join("、")||<span className="text-muted-foreground">未分配</span>}</td><td className="px-4 py-3 font-mono text-xs">{p.username??accounts.data?.items.find(a=>a.identityId===p.id&&!a.bindingReleased)?.username??"—"}</td><td className="px-4 py-3"><IdentityBadge activated={p.activated}/></td><td className="px-4 py-3"><Button size="sm" variant="ghost" onClick={()=>setSelected(p)}>查看</Button></td></tr>)}{!visible.length&&<tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">没有符合条件的{kind==="student"?"学生":"教师"}身份。</td></tr>}</tbody></table></section></Loading>

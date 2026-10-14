@@ -113,7 +113,9 @@ export function TeacherTimedList() {
         >
           {practices.data?.items.map((p) => (
             <tr key={p.id}>
-              <td className="font-semibold">{p.title}</td>
+              <td>
+                <Link href={`/teacher/timed-practice/${p.id}/edit`} className="font-semibold text-primary hover:underline focus-visible:underline">{p.title}</Link>
+              </td>
               <td>
                 {p.className ??
                   classes.data?.items.find((x) => x.id === p.classId)?.name}
@@ -779,7 +781,10 @@ export function TeacherTimedProgress({ id }: { id: string }) {
                 return (
                   <tr key={p.identityId}>
                     <td>
-                      <b>{p.name}</b>
+                      <Link
+                        href={`/teacher/reports?${new URLSearchParams({ classId: practice.classId, activity: `timed:${id}`, studentId: p.identityId, studentName: p.name })}`}
+                        className="font-semibold text-primary hover:underline focus-visible:underline"
+                      >{p.name}</Link>
                       <p className="text-xs text-muted-foreground">
                         {p.number}
                       </p>

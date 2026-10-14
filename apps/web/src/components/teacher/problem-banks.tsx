@@ -165,7 +165,7 @@ export function TeacherBanks({ bankId }: { bankId?: string | undefined }) {
             {banks.data?.items.map((item) => (
               <tr key={item.id}>
                 <td>
-                  <b>{item.name}</b>
+                  <Link href={`/teacher/problems/banks/${item.id}`} className="font-semibold text-primary hover:underline focus-visible:underline">{item.name}</Link>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {item.description}
                   </p>
@@ -330,7 +330,12 @@ export function TeacherBanks({ bankId }: { bankId?: string | undefined }) {
                     />
                   </td>
                   <td>
-                    <b>{problem.title}</b>
+                    <Link
+                      href={`/teacher/problems/${problem.id}/edit?returnTo=${encodeURIComponent(bankId ? `/teacher/problems/banks/${bankId}` : "/teacher/problems?tab=all")}`}
+                      className="font-semibold text-primary hover:underline focus-visible:underline"
+                    >
+                      {problem.title}
+                    </Link>
                     <p className="mt-1 font-mono text-xs text-muted-foreground">
                       {problem.id.slice(0, 8)}
                     </p>

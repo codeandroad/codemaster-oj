@@ -20,6 +20,7 @@ import { AdminImportPage } from "@/components/admin/import-page";
 import { AdminJudgePage, AdminSettingsPage } from "@/components/admin/system-pages";
 import { Feedback, Loading, panelClass as panel, useData as useResource, useMutation as useAction } from "@/components/admin/common";
 import { StudentPages, AlignedProfile } from "@/components/student/pages";
+import { StudentPublicProfile } from "@/components/student/public-profile";
 import {useWorkspaceSettings} from "@/components/student/workspace-settings";
 import {WorkspaceThemeProvider} from "@/components/ui/theme-context";
 import { TeacherPages } from "@/components/teacher/teacher-pages";
@@ -32,6 +33,7 @@ export function ProductionApp() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [check, setCheck] = useState(0);
+  const [profileVersion, setProfileVersion] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
     productionApi<AuthResponse>("auth/me", { signal: controller.signal })
@@ -106,7 +108,7 @@ export function ProductionApp() {
       }}
     >
       {allowed ? (
-        <ProductionView key={pathname} pathname={pathname} role={role} user={user} />
+        <ProductionView key={pathname} pathname={pathname} role={role} user={user} profileVersion={profileVersion} onProfileSaved={(next) => { setUser(next); setProfileVersion(value => value + 1); }} />
       ) : (
         <div className={panel}>
           <h1 className="text-xl font-bold">没有访问权限</h1>
@@ -272,9 +274,11 @@ function ProductionShell({
   );
 }
 
-function ProductionView({pathname,role,user}:{pathname:string;role:CampusRole;user:CampusUser}) {
-  if(pathname.endsWith("/points"))return <PointsPage user={user} student={role==="student"}/>;
-  if(pathname.endsWith("/profile"))return <><PageHeader title="个人资料" description="修改头像、昵称和个人介绍。"/><ProfileEditor user={user}/></>;
+function ProductionView({pathname,role,user,profileVersion,onProfileSaved}:{pathname:string;role:CampusRole;user:CampusUser;profileVersion:number;onProfileSaved:(next:CampusUser)=>void}) {
+  if(pathname.endsWith("/points"))return <PointsPage user={user} student={role==="student"} workspace={role}/>;
+  if(/^\/(student|teacher|admin)\/people\/[^/]+$/.test(pathname))return <StudentPublicProfile identityId={pathname.split("/")[3]} viewer={user} workspace={role}/>;
+  if(pathname==="/student/profile")return <><PageHeader title="个人资料" description="维护公开资料，查看解题动态和主页留言。"/><ProfileEditor user={user} onSaved={onProfileSaved}/><StudentPublicProfile key={profileVersion} identityId={user.identityId} viewer={user} embedded/></>;
+  if(pathname.endsWith("/profile"))return <><PageHeader title="个人资料" description="修改头像、昵称和个人介绍。"/><ProfileEditor user={user} onSaved={onProfileSaved}/></>;
   if(pathname==="/student/settings"||pathname==="/teacher/settings")return <AlignedProfile user={user} teacher={role==="teacher"}/>;
   if (role==="student") return <StudentPages pathname={pathname} user={user}/>;
   if (pathname==="/teacher/profile") return <AlignedProfile user={user} teacher/>;

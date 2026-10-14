@@ -35,7 +35,7 @@ export function useMutation() {
     setBusy(true); setError(""); setMessage("");
     try { await operation(); } catch (reason) { setError(apiMessage(reason)); } finally { setBusy(false); }
   }
-  return { busy, error, message, run, success: setMessage };
+  return { busy, error, message, run, success: setMessage, reset: () => { setError(""); setMessage(""); } };
 }
 export function Feedback({ action }: { action: ReturnType<typeof useMutation> }) {
   return <>{action.error && <p role="alert" className="mt-3 border border-destructive/25 bg-destructive/5 p-3 text-sm text-destructive">{action.error}</p>}{action.message && <p role="status" className="mt-3 text-sm text-success">{action.message}</p>}</>;

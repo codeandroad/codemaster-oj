@@ -10,6 +10,17 @@ function leaderboard(pool, user, query = '') {
  return handleEducation({ pool, user, method: 'GET', route: '/points/leaderboard', url });
 }
 
+function contexts(pool, user) {
+ return handleEducation({pool,user,method:'GET',route:'/points/leaderboard/contexts'});
+}
+
+function updateContext(pool,user,classId,visibleFields) {
+ return handleEducation({pool,user,method:'PATCH',route:`/points/leaderboard/contexts/${classId}`,
+  body:{visibleFields},helpers:{audit:async(db,actor,action,type,id,metadata)=>db.query(
+   'INSERT INTO audit_events(actor_account_id,action,resource_type,resource_id,metadata) VALUES($1,$2,$3,$4,$5)',
+   [actor,action,type,id,metadata])}});
+}
+
 test('leaderboard rejects invalid period and pagination before querying', async () => {
  const pool = { query: () => { throw new Error('invalid query reached database'); } };
  const user = { roles: ['student'], identityId: randomUUID() };
@@ -40,6 +51,13 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
    const charlie = await account('student', 'Charlie');
    const newcomer = await account('student', 'Newcomer');
    await pool.query("UPDATE accounts SET nickname='贝塔' WHERE id=$1", [beta.id]);
+   const classId = (await pool.query("INSERT INTO classes(name,owner_account_id) VALUES('Leaderboard class',$1) RETURNING id", [teacher.id])).rows[0].id;
+   await pool.query('INSERT INTO teacher_classes(class_id,account_id) VALUES($1,$2)',[classId,teacher.id]);
+   for(const student of [alpha,beta,charlie,newcomer])
+    await pool.query('INSERT INTO class_members(class_id,identity_id) VALUES($1,$2)',[classId,student.identityId]);
+   const otherClassId=(await pool.query("INSERT INTO classes(name,owner_account_id) VALUES('Other class',$1) RETURNING id",[teacher.id])).rows[0].id;
+   const outsider=await account('student','Outsider');
+   await pool.query('INSERT INTO class_members(class_id,identity_id) VALUES($1,$2)',[otherClassId,outsider.identityId]);
    async function problem() {
     const id = (await pool.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id', [teacher.id])).rows[0].id;
     const versionId = (await pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code,validation_status,published_at)
@@ -71,7 +89,6 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
    await submission(charlie, first, 'submit', 'AC');
    await submission(charlie, second, 'submit', 'AC');
 
-   const classId = (await pool.query("INSERT INTO classes(name,owner_account_id) VALUES('Leaderboard class',$1) RETURNING id", [teacher.id])).rows[0].id;
    const practiceId = (await pool.query(`INSERT INTO timed_practices(title,class_id,owner_account_id,starts_at,ends_at,duration_minutes,state)
     VALUES('Unreleased practice',$1,$2,now()-interval '1 minute',now()+interval '1 hour',30,'Draft') RETURNING id`, [classId, teacher.id])).rows[0].id;
    await pool.query('INSERT INTO timed_practice_participants(practice_id,identity_id) VALUES($1,$2)', [practiceId, alpha.identityId]);
@@ -81,6 +98,20 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
    await submission(alpha, hidden, 'submit', 'AC', new Date(), timedAttemptId);
    assert.equal((await pool.query("SELECT count(*)::int n FROM point_ledger WHERE identity_id=$1 AND problem_id=$2", [alpha.identityId, hidden.id])).rows[0].n, 0);
 
+   assert.deepEqual((await contexts(pool,alpha)).body.items.map(item=>item.id),[classId]);
+   assert.deepEqual((await contexts(pool,teacher)).body.items.map(item=>item.id),[classId]);
+   const hiddenByDefault=(await leaderboard(pool,alpha,`?classId=${classId}`)).body;
+   assert.deepEqual(hiddenByDefault.visibleFields,{solvedProblems:true,attempts:false,acRate:true});
+   assert.equal(Object.hasOwn(hiddenByDefault.me,'attempts'),false,'hidden student fields must be redacted by the API');
+   assert.equal(Object.hasOwn(hiddenByDefault.me,'publicTag'),false);
+   assert.equal((await leaderboard(pool,teacher,`?classId=${classId}`)).body.items.find(item=>item.id===alpha.identityId).attempts,4,'teachers retain full metrics');
+   await assert.rejects(leaderboard(pool,alpha,`?classId=${otherClassId}`),error=>error.status===403);
+   await assert.rejects(leaderboard(pool,teacher,`?classId=${otherClassId}`),error=>error.status===403);
+   await assert.rejects(updateContext(pool,alpha,classId,{solvedProblems:true,attempts:true,acRate:true}),error=>error.status===403);
+   await assert.rejects(updateContext(pool,teacher,otherClassId,{solvedProblems:true,attempts:true,acRate:true}),error=>error.status===403);
+   await updateContext(pool,teacher,classId,{solvedProblems:true,attempts:true,acRate:true});
+   assert.equal((await contexts(pool,alpha)).body.items[0].visibleFields.attempts,true);
+
    const all = (await leaderboard(pool, alpha, '?period=all&pageSize=1&page=1')).body;
    assert.equal(all.total, 3);
    assert.equal(all.items.length, 1);
@@ -88,7 +119,7 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
    assert.equal(all.items[0].rank, 1);
    assert.equal(all.me.id, alpha.identityId);
    assert.equal(all.me.name, '同学', 'public leaderboard must not fall back to legal names');
-   assert.equal(all.me.publicTag, alpha.identityId.replaceAll('-', '').slice(0, 8).toUpperCase());
+   assert.equal(Object.hasOwn(all.me,'publicTag'),false);
    assert.equal(all.me.points, 20);
    assert.equal(all.me.solvedProblems, 2);
    assert.equal(all.me.attempts, 4);
@@ -138,6 +169,11 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
     assert.equal(current.me.acRate, 66.7);
     assert.deepEqual(current.items.slice(1).map(item => item.rank), [2, 2]);
    }
+   await updateContext(pool,teacher,classId,{solvedProblems:false,attempts:false,acRate:false});
+   const privateMetrics=(await leaderboard(pool,beta,`?classId=${classId}`)).body;
+   for(const item of [...privateMetrics.items,privateMetrics.me])
+    for(const key of ['solvedProblems','attempts','acRate'])assert.equal(Object.hasOwn(item,key),false);
+   assert.equal((await leaderboard(pool,teacher,`?classId=${classId}`)).body.items.find(item=>item.id===alpha.identityId).solvedProblems,2);
   } finally {
    await pool.end();
    await manager.query(`DROP SCHEMA ${schema} CASCADE`);

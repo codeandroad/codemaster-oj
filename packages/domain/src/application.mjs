@@ -3,6 +3,7 @@ import { transaction } from './db.mjs';
 import { parseFunctionInput, parseJsonValue } from './function-input.mjs';
 import { handleLibrary, bankAccess, problemPermissions, restoreIdentityBindings, canReviewActivitySubmission, SCHOOL_BANK } from './library.mjs';
 import { handleEducation } from './education.mjs';
+import { handleCommunity } from './community.mjs';
 import { createTimedService } from './timed.mjs';
 import { handleMemberImport } from './member-import.mjs';
 import { handleSystem, assertJudgeAdmission, getSettings } from './system.mjs';
@@ -427,7 +428,7 @@ export async function createDomainServices(pool,config) {
   return null;
  }
 
- const operations={auth:authOperation,people:peopleOperation,classes:classesOperation,library:libraryOperation,assignments:assignmentsOperation,submissions:submissionsOperation,education:educationOperation,system:systemOperation};
+ const operations={auth:authOperation,people:peopleOperation,classes:classesOperation,library:libraryOperation,assignments:assignmentsOperation,submissions:submissionsOperation,education:educationOperation,community:handleCommunity,system:systemOperation};
  const helpers={audit,classAccess,versionAccess,submissionAccess,assignmentAccess,assignmentResult,problemResult,problemInput,insertVersion,issueActivation,personShape,maskSubmission:timed.maskSubmission};
  async function prepareRequest({url:rawUrl,method,headers={},body={},ip='unknown'}) {
   const url=new URL(rawUrl,'http://api.local'),path=url.pathname.replace(/\/$/,'');
@@ -458,6 +459,7 @@ export function resourceArea(route) {
  if(/^\/assignments(?:\/|$)/.test(route))return 'assignments';
  if(/^\/(submissions|review-notebook)(?:\/|$)/.test(route))return 'submissions';
  if(/^\/(learning-paths|learning-resources|chapters|reports|timed-practices|points)(?:\/|$)/.test(route))return 'education';
+ if(/^\/(profiles|profile-message-reports)(?:\/|$)/.test(route))return 'community';
  if(/^\/(site-info|system-settings|audit-events|judge-status|judge-maintenance|judge-tasks)(?:\/|$)/.test(route))return 'system';
  return null;
 }

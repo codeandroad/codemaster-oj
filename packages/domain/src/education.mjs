@@ -145,10 +145,67 @@ function leaderboardNumber(value, name, min, max) {
  return integer(Number(value), min, max, name);
 }
 
+function leaderboardFields(row) {
+ return {
+  solvedProblems: row?.show_solved_problems ?? true,
+  attempts: row?.show_attempts ?? false,
+  acRate: row?.show_ac_rate ?? true,
+ };
+}
+
+async function leaderboardContexts(pool, user) {
+ const rows = (await pool.query(`SELECT c.id,c.name,
+  ($1::boolean OR ($2::boolean AND EXISTS(
+   SELECT 1 FROM teacher_classes tc WHERE tc.class_id=c.id AND tc.account_id=$3))) can_manage,
+  s.show_solved_problems,s.show_attempts,s.show_ac_rate
+  FROM classes c LEFT JOIN class_leaderboard_settings s ON s.class_id=c.id
+  WHERE c.archived_at IS NULL AND (
+   $1::boolean OR ($2::boolean AND EXISTS(
+    SELECT 1 FROM teacher_classes tc WHERE tc.class_id=c.id AND tc.account_id=$3))
+   OR ($4::boolean AND EXISTS(
+    SELECT 1 FROM class_members cm WHERE cm.class_id=c.id AND cm.identity_id=$5)))
+  ORDER BY c.name,c.id`, [administrator(user),user.roles.includes('teacher'),user.id,user.roles.includes('student'),user.identityId])).rows;
+ return rows.map(row => ({ id:row.id,name:row.name,canManage:row.can_manage,visibleFields:leaderboardFields(row) }));
+}
+
+async function updateLeaderboardContext(ctx, classId) {
+ requireStaff(ctx.user);
+ const id = uuid(classId, '班级 ID');
+ const fields = ctx.body?.visibleFields;
+ const keys = ['solvedProblems','attempts','acRate'];
+ if (!fields || typeof fields !== 'object' || Array.isArray(fields)
+  || Object.keys(fields).length !== keys.length
+  || keys.some(key => typeof fields[key] !== 'boolean'))
+  fail(400,'VALIDATION','请选择要显示的积分榜字段');
+ return transaction(ctx.pool, async db => {
+  const cls = exists(await db.query('SELECT id FROM classes WHERE id=$1 AND archived_at IS NULL FOR UPDATE',[id]));
+  if (!administrator(ctx.user) && !(await db.query(
+   'SELECT 1 FROM teacher_classes WHERE class_id=$1 AND account_id=$2',[id,ctx.user.id])).rowCount)
+   fail(403,'FORBIDDEN','无权设置该班级积分榜');
+  await db.query(`INSERT INTO class_leaderboard_settings
+   (class_id,show_solved_problems,show_attempts,show_ac_rate,updated_by)
+   VALUES($1,$2,$3,$4,$5)
+   ON CONFLICT(class_id) DO UPDATE SET
+    show_solved_problems=EXCLUDED.show_solved_problems,
+    show_attempts=EXCLUDED.show_attempts,
+    show_ac_rate=EXCLUDED.show_ac_rate,
+    updated_by=EXCLUDED.updated_by,updated_at=now()`,
+   [id,fields.solvedProblems,fields.attempts,fields.acRate,ctx.user.id]);
+  await ctx.helpers.audit(db,ctx.user.id,'leaderboard.fields_update','class',cls.id,{visibleFields:fields});
+  return {id,visibleFields:fields};
+ });
+}
+
 async function pointsLeaderboard(ctx) {
  const period = enumValue(ctx.url.searchParams.get('period') ?? 'all', ['all', 'month', 'week'], '排行榜时间范围');
  const page = leaderboardNumber(ctx.url.searchParams.get('page') ?? '1', '页码', 1, 10000);
  const pageSize = leaderboardNumber(ctx.url.searchParams.get('pageSize') ?? '10', '每页人数', 1, 50);
+ const requestedClassId = ctx.url.searchParams.get('classId');
+ if (requestedClassId) uuid(requestedClassId,'班级 ID');
+ const contexts = await leaderboardContexts(ctx.pool,ctx.user);
+ const selected = requestedClassId ? contexts.find(cls => cls.id === requestedClassId) : contexts[0];
+ if (requestedClassId && !selected) fail(403,'FORBIDDEN','无权查看该班级积分榜');
+ if (!selected) return {items:[],total:0,page,pageSize,me:null,classId:null,visibleFields:leaderboardFields()};
  const meId = ctx.user.roles.includes('student') ? ctx.user.identityId : null;
  const rows = (await ctx.pool.query(`
   WITH bounds AS (
@@ -177,7 +234,8 @@ async function pointsLeaderboard(ctx) {
    COALESCE(e.points,0)::int points, COALESCE(e.solved_problems,0)::int solved_problems,
    COALESCE(t.attempts,0)::int attempts,
    COALESCE(t.assessed,0)::int assessed, COALESCE(t.accepted,0)::int accepted
-  FROM identities i LEFT JOIN earned e ON e.identity_id=i.id
+  FROM identities i JOIN class_members cm ON cm.identity_id=i.id AND cm.class_id=$5::uuid
+  LEFT JOIN earned e ON e.identity_id=i.id
   JOIN accounts a ON a.identity_id=i.id AND a.disabled_at IS NULL AND a.binding_released_at IS NULL
   LEFT JOIN attempts t ON t.identity_id=i.id
   WHERE i.kind='student' AND i.archived_at IS NULL
@@ -196,26 +254,33 @@ async function pointsLeaderboard(ctx) {
    WHERE (r.points>0 AND r.row_num>(($2::int-1)*$3::int)
     AND r.row_num<=$2::int*$3::int) OR r.id=$4::uuid
   )
-  SELECT s.id,s.name,upper(left(replace(s.id::text,'-',''),8)) public_tag,
+  SELECT s.id,s.name,
    a.avatar,s.points,s.solved_problems,s.attempts,s.assessed,s.accepted,s.rank,s.in_page,t.total
   FROM totals t LEFT JOIN selected s ON TRUE
   LEFT JOIN accounts a ON a.id=s.account_id
-  ORDER BY s.in_page DESC NULLS LAST,s.points DESC,s.id`, [period,page,pageSize,meId])).rows;
- const shape = ({id,name,public_tag,avatar,points,solved_problems,attempts,assessed,accepted,rank}) => ({
-  id,name,publicTag:public_tag,avatar,points,solvedProblems:solved_problems,attempts,rank,
-  acRate: assessed ? Math.round(accepted * 1000 / assessed) / 10 : null,
+  ORDER BY s.in_page DESC NULLS LAST,s.points DESC,s.id`, [period,page,pageSize,meId,selected.id])).rows;
+ const redact = !staff(ctx.user);
+ const shape = ({id,name,avatar,points,solved_problems,attempts,assessed,accepted,rank}) => ({
+  id,name,avatar,points,rank,
+  ...(!redact || selected.visibleFields.solvedProblems ? {solvedProblems:solved_problems} : {}),
+  ...(!redact || selected.visibleFields.attempts ? {attempts} : {}),
+  ...(!redact || selected.visibleFields.acRate ? {acRate:assessed ? Math.round(accepted * 1000 / assessed) / 10 : null} : {}),
  });
  const own = meId ? rows.find(row => row.id === meId) : null;
  return {
   items: rows.filter(row => row.in_page).map(shape),
   total: rows[0]?.total ?? 0, page, pageSize,
   me: own ? shape(own) : null,
+  classId:selected.id,visibleFields:selected.visibleFields,
  };
 }
 
 export async function handleEducation(ctx) {
  const { pool, user, route, method, body, helpers } = ctx;
  if(route==='/points/me'&&method==='GET'){if(!user.roles.includes('student'))fail(403,'FORBIDDEN','积分仅适用于学生');const total=(await pool.query('SELECT COALESCE(sum(points),0)::int points FROM point_ledger WHERE identity_id=$1',[user.identityId])).rows[0].points;return result({points:total});}
+ if(route==='/points/leaderboard/contexts'&&method==='GET')return result({items:await leaderboardContexts(pool,user)});
+ const leaderboardContextMatch=route.match(/^\/points\/leaderboard\/contexts\/([^/]+)$/);
+ if(leaderboardContextMatch&&method==='PATCH')return result(await updateLeaderboardContext(ctx,leaderboardContextMatch[1]));
  if(route==='/points/leaderboard'&&method==='GET')return result(await pointsLeaderboard(ctx));
  if(route==='/points/rewards'&&method==='GET'){requireStaff(user);const items=(await pool.query('SELECT r.problem_id,r.assignment_id,r.points FROM point_rewards r JOIN problems p ON p.id=r.problem_id LEFT JOIN assignments a ON a.id=r.assignment_id WHERE ($1::boolean OR (r.assignment_id IS NULL AND p.owner_account_id=$2) OR a.owner_account_id=$2)',[administrator(user),user.id])).rows;return result({items:items.map(r=>({problemId:r.problem_id,assignmentId:r.assignment_id,points:r.points}))});}
  if(route==='/points/rewards'&&method==='POST'){

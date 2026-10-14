@@ -17,6 +17,7 @@ const detailPages = [
   /^\/teacher\/(learning|timed-practice)\/[^/]+$/,
   /^\/student\/learning-paths\/[^/]+\/chapters\/[^/]+$/,
   /^\/student\/review-notebook\/[^/]+$/,
+  /^\/(student|teacher|admin)\/people\/[^/]+$/,
   /^\/student\/(problems|assignments|submissions|learning-paths|timed-practice)\/[^/]+$/,
 ];
 

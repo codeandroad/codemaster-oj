@@ -13,6 +13,10 @@ export class EducationController {
   async pointsMe(@Req() request: DomainRequest,@Res({passthrough:true}) response:Response){return applyResponse(response,await this.domain.execute('education',request.domainContext));}
   @Get('points/leaderboard')
   async leaderboard(@Req() request: DomainRequest,@Res({passthrough:true}) response:Response){return applyResponse(response,await this.domain.execute('education',request.domainContext));}
+  @Get('points/leaderboard/contexts')
+  async leaderboardContexts(@Req() request: DomainRequest,@Res({passthrough:true}) response:Response){return applyResponse(response,await this.domain.execute('education',request.domainContext));}
+  @Patch('points/leaderboard/contexts/:id')
+  async updateLeaderboardContext(@Req() request: DomainRequest,@Res({passthrough:true}) response:Response){return applyResponse(response,await this.domain.execute('education',request.domainContext));}
   @Get('points/rewards')
   async rewardList(@Req() request: DomainRequest,@Res({passthrough:true}) response:Response){return applyResponse(response,await this.domain.execute('education',request.domainContext));}
   @Post('points/rewards')

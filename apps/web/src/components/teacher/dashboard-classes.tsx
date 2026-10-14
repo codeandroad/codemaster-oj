@@ -278,15 +278,20 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
                 {current.studentIds.length} students ·{" "}
                 {currentAssignment?.title ?? "尚未布置作业"}
               </span>
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={!canManage}
-                onClick={() => setDialog("edit")}
-                data-od-id="edit-class"
-              >
-                编辑班级
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Link className={buttonVariants({ variant: "secondary", size: "sm" })} href={`/teacher/points?classId=${encodeURIComponent(current.id)}`}>
+                  排行榜设置
+                </Link>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={!canManage}
+                  onClick={() => setDialog("edit")}
+                  data-od-id="edit-class"
+                >
+                  编辑班级
+                </Button>
+              </div>
             </div>
             <State resource={detail} />
             <Table

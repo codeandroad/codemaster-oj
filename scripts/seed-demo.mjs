@@ -3,9 +3,11 @@
 import assert from "node:assert/strict";
 import { randomBytes, randomUUID } from "node:crypto";
 import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
-import { createPool } from "../packages/domain/src/db.mjs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { createPool, transaction } from "../packages/domain/src/db.mjs";
 import { bootstrap } from "../packages/domain/src/bootstrap.mjs";
+import { hashPassword } from "../packages/domain/src/security.mjs";
 
 const databaseUrl = process.env.CAMPUS_DEMO_DATABASE_URL;
 if (!databaseUrl) throw new Error("CAMPUS_DEMO_DATABASE_URL is required.");
@@ -22,7 +24,9 @@ for (const endpoint of [base, origin]) {
   if (!["127.0.0.1", "localhost"].includes(new URL(endpoint).hostname))
     throw new Error("Demo endpoints must be local.");
 }
-const output = process.env.CAMPUS_DEMO_OUTPUT ?? "/private/tmp/campus-demo-credentials.json";
+const output = fileURLToPath(new URL("../.campus-local/test-accounts.json", import.meta.url));
+if (process.env.CAMPUS_DEMO_OUTPUT && resolve(process.env.CAMPUS_DEMO_OUTPUT) !== output)
+  throw new Error("Demo credentials must stay in the ignored local test-accounts file.");
 const pool = createPool(databaseUrl);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 let state;
@@ -55,7 +59,8 @@ state ??= {
   fixtures: {},
 };
 async function persist() {
-  await mkdir(dirname(output), { recursive: true });
+  await mkdir(dirname(output), { recursive: true, mode: 0o700 });
+  await chmod(dirname(output), 0o700);
   const temporary = `${output}.${process.pid}.tmp`;
   await writeFile(temporary, JSON.stringify(state, null, 2), { mode: 0o600 });
   await chmod(temporary, 0o600);
@@ -107,6 +112,164 @@ async function keep(key, create) {
   return state.fixtures[key];
 }
 
+// Add a second student to older demo installations without using (or resetting)
+// the administrator's initial password. This is restricted to the disposable
+// local campus_demo database above; ordinary account creation still uses the API.
+async function ensurePeerStudent() {
+  let peerSpecifiedNow = false;
+  if (!state.accounts.peer) {
+    state.accounts.peer = {
+      kind: "student",
+      username: "demo.student2",
+      password: `DemoStudent-${randomBytes(6).toString("hex")}!`,
+      name: "周同学（演示）",
+      number: "DEMO-S002",
+    };
+    state.fixtures.peerSubmissionPending = true;
+    state.fixtures.peerSubmissionKey ??= randomUUID();
+    await persist();
+    peerSpecifiedNow = true;
+  }
+  const peer = state.accounts.peer;
+  const existing = (
+    await pool.query(
+      `SELECT a.id,a.identity_id,a.disabled_at,a.binding_released_at,
+              i.kind,i.number,i.archived_at
+       FROM accounts a JOIN identities i ON i.id=a.identity_id
+       WHERE a.username=$1`,
+      [peer.username],
+    )
+  ).rows[0];
+  if (existing) {
+    assert.ok(!peerSpecifiedNow, "Demo peer username is already used; no account will be changed.");
+    const seeded = (
+      await pool.query(
+        "SELECT 1 FROM audit_events WHERE action='demo.peer_seed' AND actor_account_id=$1 AND resource_id=$2 LIMIT 1",
+        [existing.id, existing.identity_id],
+      )
+    ).rowCount;
+    assert.ok(seeded, "Demo peer username belongs to another account; no account will be changed.");
+    if (state.fixtures.peerAccountId)
+      assert.equal(existing.id, state.fixtures.peerAccountId, "Demo peer account identity changed; no account will be changed.");
+  }
+  let account = existing;
+  let created = false;
+  if (!account) {
+    const passwordHash = await hashPassword(peer.password);
+    account = await transaction(pool, async (db) => {
+      await db.query("SELECT pg_advisory_xact_lock(hashtextextended('campus-demo-peer-student',0))");
+      const classId = state.fixtures.class?.id;
+      const cls = (
+        await db.query("SELECT id FROM classes WHERE id=$1 AND archived_at IS NULL", [classId])
+      ).rows[0];
+      assert.ok(cls, "Missing demo class; existing classroom data will not be reset.");
+      const conflicting = (
+        await db.query(
+          "SELECT id FROM identities WHERE kind='student' AND number=$1",
+          [peer.number],
+        )
+      ).rows[0];
+      assert.ok(!conflicting, "Demo peer student number is already used; no identity will be changed.");
+      const duplicate = (
+        await db.query("SELECT id FROM accounts WHERE username=$1", [peer.username])
+      ).rows[0];
+      assert.ok(!duplicate, "Demo peer username is already used; no account will be changed.");
+      const identity = (
+        await db.query(
+          "INSERT INTO identities(kind,number,name) VALUES('student',$1,$2) RETURNING id",
+          [peer.number, peer.name],
+        )
+      ).rows[0];
+      const result = (
+        await db.query(
+          "INSERT INTO accounts(identity_id,username,password_hash,nickname) VALUES($1,$2,$3,$4) RETURNING id",
+          [identity.id, peer.username, passwordHash, "小周"],
+        )
+      ).rows[0];
+      await db.query("INSERT INTO account_roles(account_id,role) VALUES($1,'student')", [result.id]);
+      await db.query(
+        "INSERT INTO class_members(class_id,identity_id) VALUES($1,$2)",
+        [classId, identity.id],
+      );
+      await db.query(
+        "INSERT INTO audit_events(actor_account_id,action,resource_type,resource_id) VALUES($1,'demo.peer_seed','identity',$2)",
+        [result.id, identity.id],
+      );
+      created = true;
+      return { id: result.id, identity_id: identity.id, kind: "student", number: peer.number };
+    });
+  }
+  assert.equal(account.kind, "student", "Demo peer account has the wrong identity kind.");
+  if (state.fixtures.peerIdentityId)
+    assert.equal(account.identity_id, state.fixtures.peerIdentityId, "Demo peer identity changed; no account will be changed.");
+  state.fixtures.peerAccountId = account.id;
+  state.fixtures.peerIdentityId = account.identity_id;
+  await persist();
+
+  // Retrying this one submission after interruption is safe because its key
+  // is stable. An existing peer's other attempts and scores are never changed.
+  if (created || state.fixtures.peerSubmissionPending) {
+    const key = state.fixtures.peerSubmissionKey ??= randomUUID();
+    state.fixtures.peerSubmissionPending = true;
+    await persist();
+    let submitted = (
+      await pool.query(
+        "SELECT id,status FROM submissions WHERE account_id=$1 AND idempotency_key=$2",
+        [account.id, key],
+      )
+    ).rows[0];
+    if (!submitted) {
+      const student = client();
+      try {
+        await student("auth/login", peer);
+      } catch (error) {
+        if (!created && /auth\/login: HTTP 401 \(LOGIN_FAILED\)/.test(error.message)) {
+          console.warn(
+            "Demo peer account was changed after creation; its initial password will not be restored. Its pending demonstration submission can be completed by signing in manually.",
+          );
+          return false;
+        }
+        throw error;
+      }
+      const receipt = await student(
+        "submissions",
+        {
+          problemId: state.fixtures.addition.id,
+          versionId: state.fixtures.addition.versionId,
+          kind: "submit",
+          language: "python",
+          code: "a, b = map(int, input().split())\nprint(a + b)\n",
+          idempotencyKey: key,
+        },
+        201,
+      );
+      submitted = { id: Number(String(receipt.id).replace(/^SUB/, "")) };
+    }
+    const deadline = Date.now() + 120000;
+    let judged;
+    do {
+      judged = (
+        await pool.query("SELECT status,score FROM submissions WHERE id=$1", [submitted.id])
+      ).rows[0];
+      if (judged && !["Waiting", "Judging"].includes(judged.status)) break;
+      await sleep(300);
+    } while (Date.now() < deadline);
+    assert.equal(judged?.status, "AC", "Demo peer submission must pass the real judge.");
+    assert.equal(Number(judged.score), 100, "Demo peer submission must score 100.");
+    const points = (
+      await pool.query(
+        "SELECT COALESCE(sum(points),0)::int AS points FROM point_ledger WHERE identity_id=$1 AND reason='first_ac' AND submission_id=$2",
+        [account.identity_id, submitted.id],
+      )
+    ).rows[0].points;
+    assert.ok(points > 0, "Demo peer AC did not produce first-AC points.");
+    state.fixtures.peerSubmission = `SUB${submitted.id}`;
+    state.fixtures.peerSubmissionPending = false;
+    await persist();
+  }
+  return created;
+}
+
 try {
   // The owner URL is used only to check this disposable installation and run
   // the one-time administrator bootstrap. Other identities use invitation.
@@ -134,7 +297,8 @@ try {
     // A normal restart must also work after the user changes a password.
     // Check non-secret database identities and retained fixtures, without
     // logging in with an initial password or modifying any account.
-    for (const [role, account] of Object.entries(state.accounts)) {
+    for (const role of ["admin", "teacher", "student"]) {
+      const account = state.accounts[role];
       const person = (
         await pool.query(
           "SELECT i.id,i.kind,i.number,i.name FROM accounts a JOIN identities i ON i.id=a.identity_id WHERE a.username=$1",
@@ -170,10 +334,6 @@ try {
       "Demo classroom data is incomplete; existing user data will not be reset.",
     );
     await persist();
-    console.log(
-      "Existing local demo is ready; accounts and classroom data retained. Password changes are preserved; the credential file contains initial passwords.",
-    );
-    console.log(`Credential file: ${output}`);
   } else {
     if (!existingAdmin)
       await bootstrap(pool, { ...state.accounts.admin, username: state.accounts.admin.username });
@@ -436,11 +596,14 @@ try {
     state.complete = true;
     state.completedAt = new Date().toISOString();
     await persist();
-    console.log(
-      "Local demo ready: administrator, teacher and student; two genuinely validated Python problems; fresh assignment; published lessons; unopened 30-minute training; real WA 75 / correction AC 100 report.",
-    );
-    console.log(`Credential file: ${output}`);
   }
+  const peerCreated = await ensurePeerStudent();
+  console.log(
+    peerCreated
+      ? "Local demo peer student added with a real judged AC and first-AC points. Existing accounts and classroom data were retained."
+      : "Existing local demo is ready; accounts, password changes, classroom data and peer student were retained.",
+  );
+  console.log(`Credential file: ${output}`);
 } finally {
   await pool.end();
 }

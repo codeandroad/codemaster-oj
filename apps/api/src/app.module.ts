@@ -8,6 +8,7 @@ import {LibraryModule} from './modules/library.module.js';
 import {AssignmentsModule} from './modules/assignments.module.js';
 import {SubmissionsModule} from './modules/submissions.module.js';
 import {EducationModule} from './modules/education.module.js';
+import {CommunityModule} from './modules/community.module.js';
 import {SystemModule} from './modules/system.module.js';
 
 @Controller()
@@ -19,7 +20,7 @@ class HealthController {
 export class AppModule {
   static register(options: RuntimeOptions): DynamicModule {
     return {module: AppModule,
-      imports: [CoreModule.register(options), AuthModule, PeopleModule, ClassesModule, LibraryModule, AssignmentsModule, SubmissionsModule, EducationModule, SystemModule],
+      imports: [CoreModule.register(options), AuthModule, PeopleModule, ClassesModule, LibraryModule, AssignmentsModule, SubmissionsModule, EducationModule, CommunityModule, SystemModule],
       controllers: [HealthController]};
   }
 }

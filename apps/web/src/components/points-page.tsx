@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { AppLink as Link } from "./navigation";
 import { PageHeader } from "./page-chrome";
 import { Button } from "./ui/button";
 import {
+  apiMessage,
   productionApi,
   type Assignment,
+  type CampusRole,
   type CampusUser,
   type ProductionProblem,
 } from "@/lib/production-api";
@@ -17,22 +20,41 @@ interface RankedStudent {
   id: string;
   name: string;
   avatar?: string;
-  publicTag: string;
   points: number;
   rank: number;
-  solvedProblems: number;
-  attempts: number;
-  acRate: number | null;
+  solvedProblems?: number;
+  attempts?: number;
+  acRate?: number | null;
 }
 
 type RankingPeriod = "all" | "month" | "week";
+type OptionalField = "solvedProblems" | "attempts" | "acRate";
+type VisibleFields = Record<OptionalField, boolean>;
+interface LeaderboardContext {
+  id: string;
+  name: string;
+  canManage: boolean;
+  visibleFields: VisibleFields;
+}
+interface LeaderboardContextsResponse {
+  items: LeaderboardContext[];
+}
 interface LeaderboardResponse {
   items: RankedStudent[];
   total: number;
   page: number;
   pageSize: number;
   me?: RankedStudent | null;
+  classId: string;
+  visibleFields: VisibleFields;
 }
+
+const allFieldsVisible: VisibleFields = { solvedProblems: true, attempts: true, acRate: true };
+const fieldLabels: { field: OptionalField; label: string }[] = [
+  { field: "solvedProblems", label: "解题数" },
+  { field: "attempts", label: "提交次数" },
+  { field: "acRate", label: "AC 率" },
+];
 
 const rankingPeriods: { value: RankingPeriod; label: string }[] = [
   { value: "all", label: "全部时间" },
@@ -52,14 +74,17 @@ function pageNumbers(current: number, last: number): (number | "…")[] {
   });
 }
 
-function LeaderboardRow({ person, current }: { person: RankedStudent; current: boolean }) {
+function LeaderboardRow({ person, current, visibleFields, workspace, classId }: { person: RankedStudent; current: boolean; visibleFields: VisibleFields; workspace: CampusRole; classId: string }) {
   return (
     <tr className={`border-t border-border ${current ? "bg-primary/6 hover:!bg-primary/10" : ""}`}>
       <td className={`px-5 py-4 font-semibold tabular-nums ${person.rank <= 3 ? "text-primary" : "text-muted-foreground"}`}>
         {rankNumber.format(person.rank)}
       </td>
       <td className="px-4 py-4">
-        <span className="flex min-w-40 items-center gap-3">
+        <Link
+          href={`/${workspace}/people/${encodeURIComponent(person.id)}?${new URLSearchParams({ from: "points", classId })}`}
+          className="inline-flex min-w-36 items-center gap-3 rounded-md text-foreground hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        >
           {person.avatar ? (
             <Image src={person.avatar} unoptimized width={38} height={38} alt="" className="size-9 shrink-0 rounded-full object-cover" />
           ) : (
@@ -67,39 +92,73 @@ function LeaderboardRow({ person, current }: { person: RankedStudent; current: b
               {person.name.trim().slice(0, 1) || "学"}
             </span>
           )}
-          <span className="min-w-0">
-            <span className="block font-medium text-foreground">{person.name}{current && <span className="ml-2 text-xs font-semibold text-primary">（我）</span>}</span>
-            <span className="block text-xs text-muted-foreground">#{person.publicTag}</span>
+          <span className="min-w-0 font-medium">
+            {person.name}{current && <span className="ml-2 text-xs font-semibold text-primary">（我）</span>}
           </span>
-        </span>
+        </Link>
       </td>
       <td className="px-4 py-4 text-right font-semibold tabular-nums">{rankNumber.format(person.points)}</td>
-      <td className="px-4 py-4 text-right tabular-nums">{rankNumber.format(person.solvedProblems)}</td>
-      <td className="px-4 py-4 text-right tabular-nums">{rankNumber.format(person.attempts)}</td>
-      <td className="px-5 py-4 text-right tabular-nums">{person.acRate === null ? "—" : `${Number.isInteger(person.acRate) ? person.acRate : person.acRate.toFixed(1)}%`}</td>
+      {visibleFields.solvedProblems && <td className="px-4 py-4 text-right tabular-nums">{person.solvedProblems == null ? "—" : rankNumber.format(person.solvedProblems)}</td>}
+      {visibleFields.attempts && <td className="px-4 py-4 text-right tabular-nums">{person.attempts == null ? "—" : rankNumber.format(person.attempts)}</td>}
+      {visibleFields.acRate && <td className="px-5 py-4 text-right tabular-nums">{person.acRate == null ? "—" : `${Number.isInteger(person.acRate) ? person.acRate : person.acRate.toFixed(1)}%`}</td>}
     </tr>
   );
 }
 
-function Leaderboard({ user }: { user: CampusUser }) {
+function LeaderboardForClass({
+  user, context, staff, workspace, onContextUpdated,
+}: {
+  user: CampusUser;
+  context: LeaderboardContext;
+  staff: boolean;
+  workspace: CampusRole;
+  onContextUpdated: () => void;
+}) {
   const [period, setPeriod] = useState<RankingPeriod>("all");
   const [page, setPage] = useState(1);
+  const [draftFields, setDraftFields] = useState<VisibleFields>(context.visibleFields);
+  const [savedFields, setSavedFields] = useState<VisibleFields>(context.visibleFields);
+  const [saving, setSaving] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState("");
+  const [settingsError, setSettingsError] = useState(false);
   const pageSize = 10;
-  const ranking = useData<LeaderboardResponse>(`points/leaderboard?period=${period}&page=${page}&pageSize=${pageSize}`);
+  const ranking = useData<LeaderboardResponse>(`points/leaderboard?classId=${encodeURIComponent(context.id)}&period=${period}&page=${page}&pageSize=${pageSize}`);
   const total = ranking.data?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const start = total ? (page - 1) * pageSize + 1 : 0;
   const end = Math.min(page * pageSize, total);
   const me = ranking.data?.me;
   const showMe = me && !ranking.data?.items.some((person) => person.id === me.id);
+  const visibleFields = staff ? allFieldsVisible : ranking.data?.visibleFields ?? context.visibleFields;
+  const optionalCount = fieldLabels.filter(({ field }) => visibleFields[field]).length;
+  const tableWidth = optionalCount === 3 ? "min-w-[700px]" : optionalCount === 2 ? "min-w-[580px]" : optionalCount === 1 ? "min-w-[500px]" : "min-w-[420px]";
+  const dirtySettings = fieldLabels.some(({ field }) => draftFields[field] !== savedFields[field]);
+
+  async function saveVisibleFields() {
+    setSaving(true);
+    setSettingsMessage("");
+    setSettingsError(false);
+    try {
+      await productionApi(`points/leaderboard/contexts/${encodeURIComponent(context.id)}`, {
+        method: "PATCH",
+        body: { visibleFields: draftFields },
+      });
+      setSavedFields({ ...draftFields });
+      setSettingsMessage("此班级的学生端排行榜字段已更新。");
+      onContextUpdated();
+      ranking.reload();
+    } catch (error) {
+      setSettingsMessage(apiMessage(error));
+      setSettingsError(true);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
-    <section className="mt-5 overflow-hidden rounded-lg border border-border bg-surface" aria-labelledby="leaderboard-heading">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border px-5 py-5">
-        <div>
-          <h2 id="leaderboard-heading" className="text-lg font-semibold">学生积分榜</h2>
-          <p className="mt-1 text-sm text-muted-foreground">按所选时间段入账积分排名，同分并列。</p>
-        </div>
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3">
+        <p className="text-sm text-muted-foreground">按所选时间段入账积分排名，同分并列。</p>
         <div role="group" aria-label="排行榜时间范围" className="inline-flex rounded-md border border-border bg-surface-subtle p-1">
           {rankingPeriods.map((option) => (
             <button
@@ -114,32 +173,60 @@ function Leaderboard({ user }: { user: CampusUser }) {
           ))}
         </div>
       </div>
-      <p className="border-b border-border px-5 py-3 text-xs leading-5 text-muted-foreground">
-        解题数为本时段首次 AC 的不同题目数；提交次数包含重复正式提交，不含样例运行、订正和未公布的限时训练提交。
-        AC 率 = AC 的正式提交数 ÷ 已有有效判题结果的正式提交数；待评测和系统错误不计入比率。
-      </p>
+      {staff && context.canManage && (
+        <fieldset className="border-b border-border bg-surface-subtle px-5 py-4">
+          <legend className="sr-only">{context.name}学生端排行榜字段</legend>
+          <p className="text-sm font-semibold">学生端显示字段</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">仅影响此班级的学生视图；排名、昵称和积分始终显示。教师查看时保留全部统计。</p>
+          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3">
+            {fieldLabels.map(({ field, label }) => (
+              <label key={field} className="inline-flex min-h-9 cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  disabled={saving}
+                  checked={draftFields[field]}
+                  onChange={(event) => { setDraftFields((value) => ({ ...value, [field]: event.target.checked })); setSettingsMessage(""); setSettingsError(false); }}
+                  className="size-4 accent-primary"
+                />
+                {label}
+              </label>
+            ))}
+            <Button type="button" size="sm" disabled={saving || !dirtySettings} onClick={() => void saveVisibleFields()}>
+              {saving ? "正在保存…" : "保存显示设置"}
+            </Button>
+          </div>
+          {settingsMessage && <p role={settingsError ? "alert" : "status"} className={`mt-2 text-sm ${settingsError ? "text-destructive" : "text-muted-foreground"}`}>{settingsMessage}</p>}
+        </fieldset>
+      )}
+      {optionalCount > 0 && (
+        <p className="border-b border-border px-5 py-3 text-xs leading-5 text-muted-foreground">
+          {visibleFields.solvedProblems && "解题数为本时段首次 AC 的不同题目数。"}
+          {visibleFields.attempts && "提交次数包含重复正式提交，不含样例运行、订正和未公布的限时训练提交。"}
+          {visibleFields.acRate && "AC 率 = AC 的正式提交数 ÷ 已有有效判题结果的正式提交数；待评测和系统错误不计入比率。"}
+        </p>
+      )}
       <State data={ranking}>
         {ranking.loading ? (
           <p role="status" className="px-5 py-10 text-center text-sm text-muted-foreground">正在更新排行榜…</p>
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[710px] text-left text-sm">
+              <table className={`w-full ${tableWidth} text-left text-sm`}>
                 <thead className="text-xs text-muted-foreground">
                   <tr>
                     <th scope="col" className="px-5 py-3">排名</th>
                     <th scope="col" className="px-4 py-3">学生</th>
                     <th scope="col" className="px-4 py-3 text-right">积分</th>
-                    <th scope="col" className="px-4 py-3 text-right">解题数</th>
-                    <th scope="col" className="px-4 py-3 text-right">提交次数</th>
-                    <th scope="col" className="px-5 py-3 text-right">
+                    {visibleFields.solvedProblems && <th scope="col" className="px-4 py-3 text-right">解题数</th>}
+                    {visibleFields.attempts && <th scope="col" className="px-4 py-3 text-right">提交次数</th>}
+                    {visibleFields.acRate && <th scope="col" className="px-5 py-3 text-right">
                       <abbr title="AC 的正式提交数 ÷ 已有有效判题结果的正式提交数" className="cursor-help no-underline">AC 率 ⓘ</abbr>
-                    </th>
+                    </th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {ranking.data?.items.map((person) => <LeaderboardRow key={person.id} person={person} current={person.id === user.identityId} />)}
-                  {showMe && <LeaderboardRow person={me} current />}
+                  {ranking.data?.items.map((person) => <LeaderboardRow key={person.id} person={person} current={person.id === user.identityId} visibleFields={visibleFields} workspace={workspace} classId={context.id} />)}
+                  {showMe && <LeaderboardRow person={me} current visibleFields={visibleFields} workspace={workspace} classId={context.id} />}
                 </tbody>
               </table>
               {!ranking.data?.items.length && !showMe && <p className="px-5 py-8 text-center text-sm text-muted-foreground">此时间段暂无积分记录。</p>}
@@ -168,6 +255,54 @@ function Leaderboard({ user }: { user: CampusUser }) {
           </>
         )}
       </State>
+    </>
+  );
+}
+
+function Leaderboard({ user, staff, workspace }: { user: CampusUser; staff: boolean; workspace: CampusRole }) {
+  const contexts = useData<LeaderboardContextsResponse>("points/leaderboard/contexts");
+  const searchParams = useSearchParams();
+  const requestedClassId = searchParams.get("classId");
+  const [selectedClassId, setSelectedClassId] = useState(requestedClassId ?? "");
+  useEffect(() => { setSelectedClassId(requestedClassId ?? ""); }, [requestedClassId]);
+  const classes = contexts.data?.items ?? [];
+  const selectedClass = classes.find((item) => item.id === selectedClassId) ?? classes[0];
+  const selectClass = (id: string) => {
+    setSelectedClassId(id);
+    const next = new URLSearchParams(searchParams.toString());
+    next.set("classId", id);
+    window.history.replaceState(null, "", `?${next.toString()}`);
+  };
+
+  return (
+    <section className="mt-5 w-full overflow-hidden rounded-lg border border-border bg-surface xl:w-3/5" aria-labelledby="leaderboard-heading">
+      <div className="border-b border-border px-5 py-5">
+        <h2 id="leaderboard-heading" className="text-lg font-semibold">学生积分榜</h2>
+        <p className="mt-1 text-sm text-muted-foreground">以全站积分在班级内排名；各班级可分别设置学生看到的统计字段。</p>
+      </div>
+      <State data={contexts}>
+        {!selectedClass ? (
+          <p className="px-5 py-8 text-sm text-muted-foreground">暂无可查看的班级排行榜。请联系教师确认班级成员身份。</p>
+        ) : (
+          <>
+            <div className="border-b border-border px-5 py-3">
+              {classes.length > 1 ? (
+                <label className="inline-flex flex-wrap items-center gap-2 text-sm font-medium">
+                  班级
+                  <select
+                    value={selectedClass.id}
+                    onChange={(event) => selectClass(event.target.value)}
+                    className="min-h-9 max-w-full rounded-md border border-border bg-surface px-3 text-sm focus-visible:outline-2 focus-visible:outline-primary"
+                  >
+                    {classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                  </select>
+                </label>
+              ) : <p className="text-sm font-medium">班级：{selectedClass.name}</p>}
+            </div>
+            <LeaderboardForClass key={selectedClass.id} user={user} context={selectedClass} staff={staff} workspace={workspace} onContextUpdated={contexts.reload} />
+          </>
+        )}
+      </State>
     </section>
   );
 }
@@ -180,7 +315,7 @@ function assignmentProblemHref(assignmentId: string, problem: Assignment["proble
   return `/teacher/problems/${problem.problemId}/edit?${query.toString()}`;
 }
 
-export function PointsPage({ user, student = true }: { user: CampusUser; student?: boolean }) {
+export function PointsPage({ user, student = true, workspace = "student" }: { user: CampusUser; student?: boolean; workspace?: CampusRole }) {
   const me = useData<{ points: number }>(student ? "points/me" : "");
   const staff = user.roles.some((role) => role === "teacher" || role === "admin");
   const admin = user.roles.includes("admin");
@@ -201,7 +336,7 @@ export function PointsPage({ user, student = true }: { user: CampusUser; student
       <p className="mt-2 text-sm text-muted-foreground">
         默认每题首次 AC 10 分。重复提交和样例运行不计分；作业和限时训练可设置额外奖励。未公开计时成绩公布后计分。
       </p>
-      <Leaderboard user={user} />
+      <Leaderboard user={user} staff={!student} workspace={workspace} />
       {staff && (
         <section className="mt-6 rounded border border-border bg-surface p-5">
           <h2 className="font-semibold">作业额外奖励</h2>

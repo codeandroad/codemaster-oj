@@ -1,5 +1,7 @@
-# Layer over compose.yaml when HTTPS is terminated by Slim. Compose 2.24.4+
-# is required for !override, which removes the default 80/443 bindings.
+# Layer over compose.yaml when HTTPS is terminated by a host-side tunnel such
+# as Tailscale Funnel. Compose 2.24.4+ is required for !override, which removes
+# the default 80/443 bindings. SLIM_GATEWAY_PORT is a legacy variable name kept
+# to preserve compatibility with existing deployments.
 services:
   gateway:
     ports: !override

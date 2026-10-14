@@ -88,13 +88,26 @@ function restore(value: unknown): WorkspaceSettings {
 
 export function useWorkspaceSettings(userId: string) {
   const [settings, setSettings] = useState(defaultWorkspaceSettings);
-  const [loaded, setLoaded] = useState(false);
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const loaded = loadedFor === userId;
   const [systemDark,setSystemDark]=useState(false);
   useEffect(()=>{const query=window.matchMedia("(prefers-color-scheme: dark)");const sync=()=>setSystemDark(query.matches);sync();query.addEventListener("change",sync);return()=>query.removeEventListener("change",sync);},[]);
   useEffect(() => {
     try { setSettings(restore(JSON.parse(localStorage.getItem(keyFor(userId)) ?? "null"))); }
     catch { setSettings(defaultWorkspaceSettings); }
-    setLoaded(true);
+    setLoadedFor(userId);
+  }, [userId]);
+  useEffect(() => {
+    const sync = (event: StorageEvent) => {
+      if (event.key !== keyFor(userId)) return;
+      try {
+        const next = restore(JSON.parse(event.newValue ?? "null"));
+        setSettings(current => JSON.stringify(current) === JSON.stringify(next) ? current : next);
+      }
+      catch { setSettings(current => JSON.stringify(current) === JSON.stringify(defaultWorkspaceSettings) ? current : defaultWorkspaceSettings); }
+    };
+    window.addEventListener("storage", sync);
+    return () => window.removeEventListener("storage", sync);
   }, [userId]);
   useEffect(() => {
     if (!loaded) return;
@@ -106,9 +119,8 @@ export function useWorkspaceSettings(userId: string) {
   return { settings, update, reset, loaded, resolvedPageTheme:(settings.pageTheme==="system"?(systemDark?"dark":"light"):settings.pageTheme) as "light"|"dark" };
 }
 
-type Section = "appearance" | "layout" | "editor" | "shortcuts" | "advanced" | "timer";
+type Section = "layout" | "editor" | "shortcuts" | "advanced" | "timer";
 const sections: { id: Section; label: string; icon: typeof Code2 }[] = [
-  { id:"appearance",label:"页面外观",icon:Code2 },
   { id: "layout", label: "页面布局", icon: LayoutPanelLeft },
   { id: "editor", label: "代码编辑器", icon: Code2 },
   { id: "shortcuts", label: "快捷键", icon: Keyboard },
@@ -124,12 +136,11 @@ function SelectRow<T extends string | number>({ label, value, choices, onChange 
   return <label className="flex items-center justify-between gap-4 py-3 text-sm"><span className="font-semibold">{label}</span><select aria-label={label} value={value} onChange={event => onChange(choices.find(choice => String(choice.value) === event.target.value)!.value)} className="min-h-9 rounded-md border border-border bg-surface-subtle px-3 text-sm text-foreground">{choices.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}</select></label>;
 }
 
-export function WorkspaceSettingsDialog({ open, onOpenChange, settings, update, reset,editorOnly=false,initialSection="appearance" }: { open: boolean; onOpenChange: (open: boolean) => void; settings: WorkspaceSettings; update: (patch: Partial<WorkspaceSettings>) => void; reset: () => void;editorOnly?:boolean;initialSection?:Section }) {
+export function WorkspaceSettingsDialog({ open, onOpenChange, settings, update, reset,editorOnly=false,initialSection="layout" }: { open: boolean; onOpenChange: (open: boolean) => void; settings: WorkspaceSettings; update: (patch: Partial<WorkspaceSettings>) => void; reset: () => void;editorOnly?:boolean;initialSection?:Section }) {
   const [section, setSection] = useState<Section>(initialSection);
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className={`grid h-[min(88dvh,720px)] w-[min(96vw,1000px)] max-w-none grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden rounded-2xl border-border p-0 sm:grid-cols-[220px_minmax(0,1fr)] sm:grid-rows-1`}>
-    <div className="min-w-0 border-b border-border bg-surface-subtle px-4 py-5 sm:border-b-0 sm:border-r sm:px-5"><DialogTitle className="mb-4 text-2xl sm:mb-7">{editorOnly?"代码编辑器设置":"工作区设置"}</DialogTitle><DialogDescription className="sr-only">设置当前答题页面或代码编辑器的外观与行为。</DialogDescription><nav aria-label="设置类别" className="flex gap-1 overflow-x-auto sm:flex-col">{sections.filter(item=>editorOnly?(item.id==="editor"||item.id==="shortcuts"):item.id!=="editor").map(item => { const Icon = item.icon; return <button type="button" key={item.id} aria-current={section === item.id ? "page" : undefined} onClick={() => setSection(item.id)} className={`flex min-h-10 shrink-0 items-center gap-3 rounded-lg px-3 text-left text-sm font-semibold transition-colors sm:w-full ${section === item.id ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"}`}><Icon size={17}/>{item.label}</button>; })}</nav></div>
+    <div className="min-w-0 border-b border-border bg-surface-subtle px-4 py-5 sm:border-b-0 sm:border-r sm:px-5"><DialogTitle className="mb-4 text-2xl sm:mb-7">{editorOnly?"代码编辑器设置":"工作区设置"}</DialogTitle><DialogDescription className="sr-only">设置当前答题页面或代码编辑器的布局与行为。</DialogDescription><nav aria-label="设置类别" className="flex gap-1 overflow-x-auto sm:flex-col">{sections.filter(item=>editorOnly?(item.id==="editor"||item.id==="shortcuts"):item.id!=="editor").map(item => { const Icon = item.icon; return <button type="button" key={item.id} aria-current={section === item.id ? "page" : undefined} onClick={() => setSection(item.id)} className={`flex min-h-10 shrink-0 items-center gap-3 rounded-lg px-3 text-left text-sm font-semibold transition-colors sm:w-full ${section === item.id ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"}`}><Icon size={17}/>{item.label}</button>; })}</nav></div>
     <div className="min-h-0 overflow-y-auto p-5 pr-12 sm:p-8 sm:pr-12">
-      {section==="appearance"&&<div><h3 className="mb-4 text-base font-bold">页面外观</h3><SelectRow label="页面主题" value={settings.pageTheme} choices={[{value:"system",label:"跟随系统"},{value:"light",label:"浅色"},{value:"dark",label:"深色"}]} onChange={pageTheme=>update({pageTheme})}/><p className="mt-3 text-xs text-muted-foreground">应用于整页导航、题面与测试面板；代码编辑器主题独立设置。</p></div>}
       {section === "layout" && <div className="space-y-7"><div className="flex items-center justify-between gap-3"><h3 className="text-base font-bold">默认布局</h3><button type="button" onClick={reset} className="flex min-h-9 items-center gap-1 rounded-md border border-border px-3 text-sm font-semibold hover:bg-muted"><RotateCcw size={14}/>重置</button></div><fieldset><legend className="mb-3 text-sm font-semibold">运行和提交按钮的位置</legend><div className="grid gap-3 sm:grid-cols-2">{(["toolbar", "editor"] as const).map(value => <label key={value} className={`cursor-pointer rounded-xl border-2 p-4 text-center ${settings.actionPlacement === value ? "border-primary bg-info-soft" : "border-border hover:bg-muted/50"}`}><input type="radio" name="action-placement" value={value} checked={settings.actionPlacement === value} onChange={() => update({ actionPlacement: value })} className="sr-only"/><span aria-hidden className="mb-3 block h-16 rounded-md border border-border bg-surface p-2"><span className={`block h-2 w-24 rounded ${value === "toolbar" ? "bg-primary" : "bg-muted"}`}/><span className={`mt-7 block h-2 w-16 rounded ${value === "editor" ? "bg-primary" : "bg-muted"}`}/></span><span className="font-semibold">{value === "toolbar" ? "页面工具栏" : "代码区"}</span></label>)}</div></fieldset><label className="block text-sm font-semibold">题目区宽度 <span className="float-right font-normal text-muted-foreground">{settings.panelPercent}%</span><input type="range" min="25" max="70" value={settings.panelPercent} onChange={event => update({ panelPercent: Number(event.target.value) })} className="mt-3 w-full accent-primary"/></label><p className="text-xs leading-5 text-muted-foreground">桌面端还可以拖动题目与编辑器之间的分隔线。</p></div>}
       {section === "editor" && <div className="divide-y divide-border"><SelectRow label="编辑器主题（仅代码区）" value={settings.theme} choices={editorThemes.map(theme=>({value:theme.id,label:theme.label}))} onChange={theme => update({theme})}/><EditorThemePreview theme={settings.theme}/><SelectRow label="字体" value={settings.fontFamily} choices={[{ value: "default", label: "默认" }, { value: "consolas", label: "Consolas" }, { value: "monaco", label: "Monaco" }, { value: "courier", label: "Courier New" }]} onChange={fontFamily => update({ fontFamily })}/><SelectRow label="字号" value={settings.fontSize} choices={Array.from({ length: 13 }, (_, index) => ({ value: 12 + index, label: `${12 + index}px` }))} onChange={fontSize => update({ fontSize })}/><Toggle label="字体连字" checked={settings.ligatures} onChange={ligatures => update({ ligatures })}/><SelectRow label="键位绑定" value={settings.keyBinding} choices={[{ value: "standard", label: "标准" }, { value: "emacs", label: "Emacs (Ctrl+A/E)" }]} onChange={keyBinding => update({ keyBinding })}/><SelectRow label="缩进宽度" value={settings.tabSize} choices={[{ value: 2, label: "2 个空格" }, { value: 4, label: "4 个空格" }, { value: 8, label: "8 个空格" }]} onChange={tabSize => update({ tabSize })}/><Toggle label="自动缩进" checked={settings.autoIndent} onChange={autoIndent => update({autoIndent})}/><Toggle label="括号与引号补全" checked={settings.autoClose} onChange={autoClose => update({autoClose})}/><Toggle label="自动换行" checked={settings.wordWrap} onChange={wordWrap => update({ wordWrap })}/><Toggle label="相对行号" checked={settings.relativeLineNumbers} onChange={relativeLineNumbers => update({ relativeLineNumbers })}/></div>}
       {section === "shortcuts" && (editorOnly?<div><h3 className="mb-4 text-base font-bold">代码编辑器快捷键</h3><EditorShortcutSettings bindings={settings.editorKeymap} onChange={editorKeymap=>update({editorKeymap})}/><p className="mt-4 text-xs text-muted-foreground">仅在代码输入框激活时生效。运行与提交的开关位于页面设置。</p></div>:<div><h3 className="mb-3 text-base font-bold">常规操作 · General</h3><div className="divide-y divide-border"><Toggle label="运行公开样例" description="Ctrl / ⌘ + '" checked={settings.runShortcut} onChange={runShortcut=>update({runShortcut})}/><Toggle label="正式提交" description="Ctrl / ⌘ + Enter" checked={settings.submitShortcut} onChange={submitShortcut=>update({submitShortcut})}/></div><dl className="mt-5 divide-y divide-border text-sm">{workspaceShortcuts.map(([name,key])=><div className="flex justify-between gap-3 py-3" key={name}><dt>{name}</dt><dd className="text-right font-mono text-xs">{key}</dd></div>)}</dl><p className="mt-4 text-xs text-muted-foreground">在答题页任意面板中可用；弹窗打开时暂停运行和提交。关闭答题页会保留草稿，并对未提交修改请求确认。</p><h3 className="mb-2 mt-6 text-base font-bold">调试操作 · Debug</h3><p className="mb-3 text-xs leading-5 text-muted-foreground">当前系统尚未启用隔离调试服务，以下操作暂不可用。</p><dl aria-disabled="true" className="divide-y divide-border text-xs">{debugShortcuts.map(([name,key])=><div key={name} className="flex flex-wrap justify-between gap-2 py-2"><dt>{name} <span className="text-muted-foreground">· 未启用</span></dt><dd className="font-mono">{key}</dd></div>)}</dl></div>)}

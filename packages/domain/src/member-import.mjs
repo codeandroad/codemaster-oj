@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, createHmac, randomBytes } from 'node:crypto';
 import { transaction } from './db.mjs';
-import { HttpError, fail, field, uuid, canonicalHash } from './security.mjs';
+import { HttpError, fail, field, uuid, genderValue, canonicalHash } from './security.mjs';
 
 // Batch retries must recover the same newly issued activation codes. Store the
 // response encrypted rather than adding plaintext credentials to the database.
@@ -38,13 +38,13 @@ export async function handleMemberImport({pool,user,route,method,body,config,hel
   for(let index=0;index<body.rows.length;index++){
    await db.query('SAVEPOINT member_import_row');
    try{
-    const entry=body.rows[index],number=field(entry?.number,'学号'),name=field(entry?.name,'姓名');
-    const created=(await db.query("INSERT INTO identities(kind,number,name) VALUES('student',$1,$2) ON CONFLICT(kind,number) DO NOTHING RETURNING *",[number,name])).rows[0];
+    const entry=body.rows[index],number=field(entry?.number,'学号'),name=field(entry?.name,'姓名'),gender=entry?.gender===undefined||entry.gender===''?null:genderValue(entry.gender);
+    const created=(await db.query("INSERT INTO identities(kind,number,name,gender) VALUES('student',$1,$2,$3) ON CONFLICT(kind,number) DO NOTHING RETURNING *",[number,name,gender])).rows[0];
     let person=created,issued;
     if(!person){
      person=(await db.query("SELECT i.*,EXISTS(SELECT 1 FROM accounts a WHERE a.identity_id=i.id AND a.binding_released_at IS NULL) activated FROM identities i WHERE i.kind='student' AND i.number=$1 FOR UPDATE",[number])).rows[0];
      const inScope=isAdmin||!!(await db.query('SELECT 1 FROM class_members cm JOIN teacher_classes tc ON tc.class_id=cm.class_id JOIN classes c ON c.id=cm.class_id WHERE cm.identity_id=$1 AND tc.account_id=$2 AND c.archived_at IS NULL',[person?.id,user.id])).rowCount;
-     if(!person||!inScope||person.archived_at||person.name!==name)fail(400,'IMPORT_CONFLICT','该学号无法自动加入，请联系管理员核对身份与班级授权');
+     if(!person||!inScope||person.archived_at||person.name!==name||(gender!==null&&person.gender!==gender))fail(400,'IMPORT_CONFLICT','该学号资料不一致或无班级授权，请联系管理员核对');
     }
     const added=(await db.query('INSERT INTO class_members(class_id,identity_id) VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING identity_id',[classId,person.id])).rowCount;
     const status=created?'created':added?'added':'skipped';

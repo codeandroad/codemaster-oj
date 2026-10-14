@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { ArrowRight, CircleAlert, ClipboardList } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
+import { genderLabel } from "@/lib/gender";
 import {
   productionApi,
   type Assignment,
@@ -295,13 +296,14 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
               headers={[
                 "Student ID",
                 "Name",
+                "性别",
                 "Group",
                 "Account",
                 "Assignment status",
                 "Score",
                 "Progress",
               ]}
-              min={780}
+              min={840}
             >
               {current.studentIds.map((id) => {
                 const student = people.data?.items.find((x) => x.id === id),
@@ -322,6 +324,7 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
                         className="font-semibold text-primary hover:underline focus-visible:underline"
                       >{student.name}</Link> : "加载中"}
                     </td>
+                    <td className="text-muted-foreground">{genderLabel(student?.gender)}</td>
                     <td className="text-muted-foreground">—</td>
                     <td>
                       {student?.activated ? (
@@ -383,7 +386,7 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
                 );
               })}
               {!current.studentIds.length && (
-                <Empty columns={7}>
+                <Empty columns={8}>
                   该班级暂无学生。通过 Import members
                   导入名单，无账号的学生将建档并显示待激活。
                 </Empty>

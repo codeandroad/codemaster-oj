@@ -1,5 +1,5 @@
 const availablePages = new Set([
-  "/student/settings", "/teacher/settings",
+  "/student/settings", "/teacher/settings", "/admin/personal-settings",
   "/student/points", "/teacher/points", "/admin/points", "/admin/profile",
   "/", "/login", "/register", "/admin", "/teacher",
   "/admin/people", "/admin/accounts", "/admin/imports", "/admin/judge-service", "/admin/settings",

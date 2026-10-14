@@ -276,6 +276,6 @@ function WorkspaceBody({ problem, user, original }: { problem: ProductionProblem
 
     <ProblemListDrawer open={problemListOpen} onOpenChange={setProblemListOpen} title={learningPathId?"本章练习":"题目列表"} description={learningPathId?`${course.data?.title??"课程"} › ${courseChapter?.title??"加载章节…"}`:undefined} items={learningPathId?navigationItems.map(p=>({id:p.problemId,title:p.title??"练习"})):library.data?.items??[]} currentId={problem.id} loading={learningPathId?navigationLoading:library.loading} error={learningPathId?navigationError:library.error} onRetry={learningPathId?course.reload:library.reload} onSelect={target=>{setProblemListOpen(false);if(target.id!==problem.id){if(learningPathId)switchProblem(navigationItems.find(p=>p.problemId===target.id)??null);else navigateWorkspace(`/student/problems/${encodeURIComponent(target.id)}`);}}}/>
 
-    <WorkspaceSettingsDialog key={settingsScope} editorOnly={settingsScope==="editor"} initialSection={settingsScope==="editor"?"editor":"appearance"} open={settingsOpen} onOpenChange={setSettingsOpen} settings={settings} update={update} reset={reset}/>
+    <WorkspaceSettingsDialog key={settingsScope} editorOnly={settingsScope==="editor"} initialSection={settingsScope==="editor"?"editor":"layout"} open={settingsOpen} onOpenChange={setSettingsOpen} settings={settings} update={update} reset={reset}/>
   </div></WorkspaceThemeProvider>;
 }

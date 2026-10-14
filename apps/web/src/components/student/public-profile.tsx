@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Award, Flag, MessageCircle, Trash2 } from "lucide-react";
 import { AppLink } from "@/components/navigation";
-import { PageHeader } from "@/components/page-chrome";
+import { ProfileHero } from "@/components/profile-hero";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { productionApi, type CampusRole, type CampusUser } from "@/lib/production-api";
@@ -106,22 +106,17 @@ export function StudentPublicProfile({ identityId, viewer, embedded = false, wor
   return <div className={embedded ? "mt-6 space-y-5" : "space-y-5"}>
     {embedded ? (
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><h2 className="text-lg font-bold">我的公开主页</h2><p className="mt-1 text-sm text-muted-foreground">校内同学可看到你的昵称、公开题目的解题动态和留言。</p></div>
+        <div><h2 className="text-lg font-bold">解题动态与留言</h2><p className="mt-1 text-sm text-muted-foreground">在公开主页展示解题进步，与同学交流。</p></div>
         <AppLink href={`${publicHref}?from=profile`} className={buttonVariants({ variant: "secondary" })}>查看公开主页</AppLink>
       </div>
     ) : (
-      <><AppLink href={back.href} className="inline-flex min-h-9 items-center text-sm font-semibold text-primary hover:underline">← {back.label}</AppLink><PageHeader eyebrow="Student profile" title="学生主页" description={workspace === "student" ? "记录公开的解题进步，与同学交流。" : "查看学生的公开解题动态与主页留言。"} /></>
+      <><AppLink href={back.href} className="inline-flex min-h-9 items-center text-sm font-semibold text-primary hover:underline">← {back.label}</AppLink><h1 className="sr-only">学生主页</h1></>
     )}
 
     <State data={profile}>
-      {person && <section className={`${panel} flex flex-wrap items-start gap-5`} aria-label={`${person.nickname}的公开资料`}>
-        <Avatar avatar={person.avatar} nickname={person.nickname} size={72} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2"><h3 className="break-words text-xl font-bold">{person.nickname}</h3>{person.isSelf && <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-primary">我</span>}</div>
-          <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">{person.bio?.trim() || "这位同学还没有填写个人介绍。"}</p>
-          <dl className="mt-4 flex flex-wrap gap-5 border-t border-border pt-4 text-sm"><div><dt className="text-muted-foreground">个人累计积分</dt><dd className="mt-0.5 font-semibold tabular-nums">{person.points}</dd></div><div><dt className="text-muted-foreground">全校榜积分</dt><dd className="mt-0.5 font-semibold tabular-nums">{person.rankPoints}</dd></div><div><dt className="text-muted-foreground">已解题目</dt><dd className="mt-0.5 font-semibold tabular-nums">{person.solvedProblems}</dd></div></dl>
-        </div>
-      </section>}
+      {person && !embedded && <ProfileHero avatar={person.avatar} nickname={person.nickname} bio={person.bio} self={person.isSelf} actions={person.isSelf ? <AppLink href={`/${workspace}/profile`} className={buttonVariants({ variant: "outline" })}>编辑个人资料</AppLink> : undefined}>
+        <dl className="mt-5 grid max-w-xl grid-cols-3 gap-3 border-t border-border pt-4 text-sm"><div><dt className="text-xs text-muted-foreground">累计积分</dt><dd className="mt-1 text-lg font-bold tabular-nums">{person.points}</dd></div><div><dt className="text-xs text-muted-foreground">排行榜积分</dt><dd className="mt-1 text-lg font-bold tabular-nums">{person.rankPoints}</dd></div><div><dt className="text-xs text-muted-foreground">已解题目</dt><dd className="mt-1 text-lg font-bold tabular-nums">{person.solvedProblems}</dd></div></dl>
+      </ProfileHero>}
     </State>
 
     {person && <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">

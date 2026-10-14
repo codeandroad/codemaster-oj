@@ -1,9 +1,11 @@
 export type CampusRole = "student" | "teacher" | "admin";
+export type CampusGender = "male" | "female" | "other" | "undisclosed";
 export interface CampusUser {
   id: string;
   nickname?:string;bio?:string;avatar?:string;
   identityId: string;
   name: string;
+  gender: CampusGender | null;
   username: string;
   roles: CampusRole[];
   number: string;
@@ -14,6 +16,7 @@ export interface Person {
   kind: "student" | "teacher";
   number: string;
   name: string;
+  gender?: CampusGender | null;
   activated?: boolean;
   accountId?: string | null;
 }
@@ -30,6 +33,7 @@ export interface CampusAccount {
   identityId: string;
   name: string;
   number: string;
+  gender?: CampusGender | null;
   username: string;
   roles: CampusRole[];
   disabled: boolean;

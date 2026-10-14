@@ -108,10 +108,12 @@ function LeaderboardRow({ person, current, visibleFields, workspace, classId }: 
 }
 
 function LeaderboardTable({
-  user, classId, configuredFields, canManage, staff, workspace, onSettingsUpdated,
+  user, classId, classes, onClassChange, configuredFields, canManage, staff, workspace, onSettingsUpdated,
 }: {
   user: CampusUser;
   classId: string;
+  classes: LeaderboardContext[];
+  onClassChange: (classId: string) => void;
   configuredFields: VisibleFields;
   canManage: boolean;
   staff: boolean;
@@ -125,6 +127,8 @@ function LeaderboardTable({
   const [saving, setSaving] = useState(false);
   const [settingsMessage, setSettingsMessage] = useState("");
   const [settingsError, setSettingsError] = useState(false);
+  const [showRules, setShowRules] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const pageSize = 10;
   const ranking = useData<LeaderboardResponse>(`points/leaderboard?${new URLSearchParams({ ...(classId ? { classId } : {}), period, page: String(page), pageSize: String(pageSize) })}`);
   const total = ranking.data?.total ?? 0;
@@ -161,28 +165,47 @@ function LeaderboardTable({
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3">
-        <p className="text-sm text-muted-foreground">按所选时间段获得的校级积分排名，同分并列。</p>
-        <div role="group" aria-label="排行榜时间范围" className="inline-flex rounded-md border border-border bg-surface-subtle p-1">
+      <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3 sm:px-5">
+        <label className="inline-flex items-center gap-2 text-sm font-medium">
+          范围
+          <select
+            value={classId}
+            onChange={(event) => onClassChange(event.target.value)}
+            className="min-h-9 max-w-48 rounded-md border border-border bg-surface px-3 text-sm focus-visible:outline-2 focus-visible:outline-primary"
+          >
+            <option value="">全校学生</option>
+            {classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </select>
+        </label>
+        <div role="group" aria-label="排行榜时间范围" className="inline-flex rounded-md border border-border bg-surface-subtle p-0.5">
           {rankingPeriods.map((option) => (
             <button
               key={option.value}
               type="button"
               aria-pressed={period === option.value}
               onClick={() => { setPeriod(option.value); setPage(1); }}
-              className={`rounded px-3 py-2 text-sm font-medium ${period === option.value ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              className={`rounded px-3 py-1.5 text-sm font-medium ${period === option.value ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
             >
               {option.label}
             </button>
           ))}
         </div>
+        <div className="ml-auto flex items-center gap-2">
+          <button type="button" aria-expanded={showRules} aria-controls="leaderboard-rules" onClick={() => setShowRules((value) => !value)} className="rounded-md px-2 py-2 text-sm text-muted-foreground hover:bg-surface-subtle hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary">积分规则</button>
+          {canManage && <button type="button" aria-expanded={showSettings} aria-controls="leaderboard-fields" onClick={() => setShowSettings((value) => !value)} className="rounded-md px-2 py-2 text-sm font-medium text-primary hover:bg-accent focus-visible:outline-2 focus-visible:outline-primary">显示字段</button>}
+        </div>
       </div>
-      {canManage && (
-        <fieldset className="border-b border-border bg-surface-subtle px-5 py-4">
+      {showRules && (
+        <div id="leaderboard-rules" className="border-b border-border bg-surface-subtle px-5 py-3 text-xs leading-5 text-muted-foreground">
+          <p>榜单积分仅来自管理员审核公开题目的首次有效 AC；作业和训练奖励计入个人积分。按积分排名，同分并列。</p>
+          {optionalCount > 0 && <p className="mt-1">解题数为首次 AC 的不同题目数；提交次数包含重复正式提交；AC 率按有效判题的正式提交计算。</p>}
+        </div>
+      )}
+      {canManage && showSettings && (
+        <fieldset id="leaderboard-fields" className="border-b border-border bg-surface-subtle px-5 py-4">
           <legend className="sr-only">全校学生端排行榜字段</legend>
-          <p className="text-sm font-semibold">学生端显示字段</p>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">管理员统一设置全校学生视图；排名、昵称和积分始终显示。教师与管理员查看时保留全部统计。</p>
-          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3">
+          <p className="text-sm font-semibold">学生端显示字段 <span className="ml-2 text-xs font-normal text-muted-foreground">排名、昵称和积分始终显示</span></p>
+          <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-3">
             {fieldLabels.map(({ field, label }) => (
               <label key={field} className="inline-flex min-h-9 cursor-pointer items-center gap-2 text-sm">
                 <input
@@ -202,13 +225,6 @@ function LeaderboardTable({
           {settingsMessage && <p role={settingsError ? "alert" : "status"} className={`mt-2 text-sm ${settingsError ? "text-destructive" : "text-muted-foreground"}`}>{settingsMessage}</p>}
         </fieldset>
       )}
-      {optionalCount > 0 && (
-        <p className="border-b border-border px-5 py-3 text-xs leading-5 text-muted-foreground">
-          {visibleFields.solvedProblems && "解题数为本时段首次 AC 的不同题目数。"}
-          {visibleFields.attempts && "提交次数包含重复正式提交，不含样例运行、订正和未公布的限时训练提交。"}
-          {visibleFields.acRate && "AC 率 = AC 的正式提交数 ÷ 已有有效判题结果的正式提交数；待评测和系统错误不计入比率。"}
-        </p>
-      )}
       <State data={ranking}>
         {ranking.loading ? (
           <p role="status" className="px-5 py-10 text-center text-sm text-muted-foreground">正在更新排行榜…</p>
@@ -220,7 +236,7 @@ function LeaderboardTable({
                   <tr>
                     <th scope="col" className="px-5 py-3">排名</th>
                     <th scope="col" className="px-4 py-3">学生</th>
-                    <th scope="col" className="px-4 py-3 text-right">校级积分</th>
+                    <th scope="col" className="px-4 py-3 text-right">积分</th>
                     {visibleFields.solvedProblems && <th scope="col" className="px-4 py-3 text-right">解题数</th>}
                     {visibleFields.attempts && <th scope="col" className="px-4 py-3 text-right">提交次数</th>}
                     {visibleFields.acRate && <th scope="col" className="px-5 py-3 text-right">
@@ -281,29 +297,11 @@ function Leaderboard({ user, staff, workspace }: { user: CampusUser; staff: bool
   };
 
   return (
-    <section className="mt-5 w-full overflow-hidden rounded-lg border border-border bg-surface" aria-labelledby="leaderboard-heading">
-      <div className="border-b border-border px-5 py-5">
-        <h2 id="leaderboard-heading" className="text-lg font-semibold">积分排行榜</h2>
-        <p className="mt-1 text-sm text-muted-foreground">默认展示全校学生，可筛选班级。校级积分只来自管理员审核公开题目后的首次有效 AC；学生端显示字段由管理员统一设置。</p>
-      </div>
+    <section className="mt-4 w-full overflow-hidden rounded-lg border border-border bg-surface" aria-labelledby="leaderboard-heading">
+      <h2 id="leaderboard-heading" className="sr-only">积分排行榜列表</h2>
       <State data={contexts}>
         {contexts.data && (
-          <>
-            <div className="border-b border-border px-5 py-3">
-              <label className="inline-flex flex-wrap items-center gap-2 text-sm font-medium">
-                范围
-                <select
-                  value={effectiveClassId}
-                  onChange={(event) => selectClass(event.target.value)}
-                  className="min-h-9 max-w-full rounded-md border border-border bg-surface px-3 text-sm focus-visible:outline-2 focus-visible:outline-primary"
-                >
-                  <option value="">全校学生</option>
-                  {classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </select>
-              </label>
-            </div>
-            <LeaderboardTable key={effectiveClassId || "school"} user={user} classId={effectiveClassId} configuredFields={contexts.data.visibleFields} canManage={contexts.data.canManage} staff={staff} workspace={workspace} onSettingsUpdated={contexts.reload} />
-          </>
+          <LeaderboardTable key={effectiveClassId || "school"} user={user} classId={effectiveClassId} classes={classes} onClassChange={selectClass} configuredFields={contexts.data.visibleFields} canManage={workspace === "admin" && contexts.data.canManage} staff={staff} workspace={workspace} onSettingsUpdated={contexts.reload} />
         )}
       </State>
     </section>
@@ -320,8 +318,8 @@ function assignmentProblemHref(assignmentId: string, problem: Assignment["proble
 
 export function PointsPage({ user, student = true, workspace = "student" }: { user: CampusUser; student?: boolean; workspace?: CampusRole }) {
   const me = useData<{ points: number; rankPoints: number }>(student ? "points/me" : "");
-  const staff = user.roles.some((role) => role === "teacher" || role === "admin");
-  const admin = user.roles.includes("admin");
+  const staff = !student && (workspace === "teacher" || workspace === "admin") && user.roles.some((role) => role === "teacher" || role === "admin");
+  const admin = workspace === "admin" && user.roles.includes("admin");
   const problems = useData<{ items: ProductionProblem[] }>(admin ? "problems" : "");
   const assignments = useData<{ items: Assignment[] }>(staff ? "assignments" : "");
   const [assignmentId, setAssignmentId] = useState("");
@@ -334,11 +332,7 @@ export function PointsPage({ user, student = true, workspace = "student" }: { us
 
   return (
     <>
-      <PageHeader title="积分与奖励" description="记录解题进步与活动奖励。" />
-      {student && <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm"><p>个人累计积分：<strong>{me.data?.points ?? "…"}</strong></p><p>全校榜积分：<strong>{me.data?.rankPoints ?? "…"}</strong></p></div>}
-      <p className="mt-2 text-sm text-muted-foreground">
-        每题首次 AC 默认获得 10 分个人积分，管理员可逐题调整。作业、限时训练奖励计入个人积分；只有管理员审核公开后的有效正式 AC 计入全校榜，审核前的成绩不追溯。限时训练待成绩公布后结算。
-      </p>
+      <PageHeader title="积分排行榜" action={student ? <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-muted-foreground"><span>个人积分 <strong className="ml-1 text-foreground tabular-nums">{me.data?.points ?? "…"}</strong></span><span>排行积分 <strong className="ml-1 text-foreground tabular-nums">{me.data?.rankPoints ?? "…"}</strong></span></div> : undefined} />
       <Leaderboard user={user} staff={!student} workspace={workspace} />
       {staff && (
         <section className="mt-6 rounded border border-border bg-surface p-5">

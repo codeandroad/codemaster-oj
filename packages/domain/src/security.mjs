@@ -21,6 +21,7 @@ export const password = value => field(value,'密码',{min:8,max:128,trim:false}
 export const uuid = (value,name='ID') => { if(typeof value!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) fail(400,'VALIDATION',`${name}格式无效`); return value; };
 export function submissionId(value) { const s=String(value).replace(/^SUB/i,''); if(!/^[1-9]\d{0,17}$/.test(s)) fail(400,'VALIDATION','提交编号无效');return s; }
 export function enumValue(value,values,name) { if(!values.includes(value)) fail(400,'VALIDATION',`${name}无效`);return value; }
+export function genderValue(value) { return value===null?null:enumValue(value,['male','female','other','undisclosed'],'性别'); }
 export function integer(value,min,max,name) { if(!Number.isInteger(value)||value<min||value>max) fail(400,'VALIDATION',`${name}须为 ${min}–${max} 的整数`);return value; }
 export function bytes(value,name,max=262144) { const text=field(value,name,{min:0,max,trim:false});if(Buffer.byteLength(text)>max) fail(413,'TOO_LARGE',`${name}超过大小限制`);return text; }
 export function hashPassword(value) { return argon2.hash(password(value),{type:argon2.argon2id,memoryCost:65536,timeCost:3,parallelism:1}); }

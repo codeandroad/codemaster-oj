@@ -23,6 +23,7 @@ import { StudentPages, AlignedProfile } from "@/components/student/pages";
 import { StudentPublicProfile } from "@/components/student/public-profile";
 import {useWorkspaceSettings} from "@/components/student/workspace-settings";
 import {WorkspaceThemeProvider} from "@/components/ui/theme-context";
+import {PersonalAppearanceProvider, PersonalAppearanceSettings} from "@/components/personal-appearance-settings";
 import { TeacherPages } from "@/components/teacher/teacher-pages";
 import { ApiError, apiMessage, clearProductionSession, productionApi, roleHome, type AuthResponse, type CampusRole, type CampusUser, type Person, type SchoolClass } from "@/lib/production-api";
 
@@ -166,7 +167,7 @@ function ProductionShell({
 }) {
   const [open, setOpen] = useState(false);
   const {settings,update,resolvedPageTheme}=useWorkspaceSettings(user.id);
-  const shellTheme=role==="teacher"?resolvedPageTheme:"light";
+  const shellTheme=resolvedPageTheme;
   const site = useResource<{siteName:string;schoolName:string}>("site-info");
   const action = useAction();
   const activePath = (path: string) =>
@@ -203,7 +204,7 @@ function ProductionShell({
     </nav>
   );
   return (
-    <WorkspaceThemeProvider theme={shellTheme}><div data-od-id="production-shell" style={{colorScheme:shellTheme}} className={`production-shell min-h-screen bg-background text-foreground ${shellTheme==="dark"?"dark":""}`}>
+    <WorkspaceThemeProvider theme={shellTheme}><PersonalAppearanceProvider pageTheme={settings.pageTheme} updatePageTheme={pageTheme=>update({pageTheme})}><div data-od-id="production-shell" style={{colorScheme:shellTheme}} className={`production-shell min-h-screen bg-background text-foreground ${shellTheme==="dark"?"dark":""}`}>
       <div className={`grid min-h-screen ${role==="student"?"md:grid-cols-[224px_minmax(0,1fr)]":"md:grid-cols-[236px_minmax(0,1fr)]"}`}>
         <aside className="production-sidebar hidden flex-col border-r border-border bg-surface md:flex">
           <div className="flex h-16 flex-col justify-center border-b border-border px-4">
@@ -227,12 +228,8 @@ function ProductionShell({
                 <Menu size={18} />
               </Button>
               <BrandLogo className="h-auto w-[130px] max-w-full md:hidden" />
-              <span className="sr-only md:not-sr-only md:truncate md:text-sm md:text-muted-foreground">
-                {role==="admin"?({"/admin/accounts":"账号与角色","/admin/people":"身份档案","/admin/imports":"导入中心","/admin/judge-service":"判题服务","/admin/settings":"系统设置"}[pathname]??"管理工作区"):role==="teacher"?"Teacher workspace":"学生工作区"}
-              </span>
             </div>
             <div className="flex shrink-0 items-center gap-3">
-              {role==="teacher"&&<label className="flex items-center gap-2 text-xs text-muted-foreground"><span className="sr-only">教师页面主题</span><select aria-label="教师页面主题" data-od-id="teacher-page-theme" value={settings.pageTheme} onChange={e=>update({pageTheme:e.target.value as "light"|"dark"|"system"})} className="min-h-9 rounded-md border border-border bg-surface-subtle px-2 text-foreground"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>}
               {role==="student"&&<NotificationDropdown/>}
               <AccountMenu user={user} role={role} busy={action.busy} onLogout={() => action.run(async () => {
                 try { await productionApi("auth/logout", {method:"POST"}); }
@@ -270,16 +267,16 @@ function ProductionShell({
           </aside>
         </div>
       )}
-    </div></WorkspaceThemeProvider>
+    </div></PersonalAppearanceProvider></WorkspaceThemeProvider>
   );
 }
 
 function ProductionView({pathname,role,user,profileVersion,onProfileSaved}:{pathname:string;role:CampusRole;user:CampusUser;profileVersion:number;onProfileSaved:(next:CampusUser)=>void}) {
   if(pathname.endsWith("/points"))return <PointsPage user={user} student={role==="student"} workspace={role}/>;
   if(/^\/(student|teacher|admin)\/people\/[^/]+$/.test(pathname))return <StudentPublicProfile identityId={pathname.split("/")[3]} viewer={user} workspace={role}/>;
-  if(pathname==="/student/profile")return <><PageHeader title="个人资料" description="维护公开资料，查看解题动态和主页留言。"/><ProfileEditor user={user} onSaved={onProfileSaved}/><StudentPublicProfile key={profileVersion} identityId={user.identityId} viewer={user} embedded/></>;
-  if(pathname.endsWith("/profile"))return <><PageHeader title="个人资料" description="修改头像、昵称和个人介绍。"/><ProfileEditor user={user} onSaved={onProfileSaved}/></>;
-  if(pathname==="/student/settings"||pathname==="/teacher/settings")return <AlignedProfile user={user} teacher={role==="teacher"}/>;
+  if(pathname==="/student/profile")return <><ProfileEditor user={user} onSaved={onProfileSaved}/><StudentPublicProfile key={profileVersion} identityId={user.identityId} viewer={user} embedded/></>;
+  if(pathname.endsWith("/profile"))return <ProfileEditor user={user} onSaved={onProfileSaved}/>;
+  if(pathname==="/student/settings"||pathname==="/teacher/settings"||pathname==="/admin/personal-settings")return <><AlignedProfile user={user} teacher={role==="teacher"} admin={role==="admin"}/><PersonalAppearanceSettings/></>;
   if (role==="student") return <StudentPages pathname={pathname} user={user}/>;
   if (pathname==="/teacher/profile") return <AlignedProfile user={user} teacher/>;
   if (role==="teacher") return <TeacherPages pathname={pathname} user={user}/>;

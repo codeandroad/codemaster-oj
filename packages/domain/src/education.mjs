@@ -140,10 +140,83 @@ async function teachingReport(ctx) {
   submissions:recent.map(s=>({id:`SUB${s.id}`,identityId:s.identity_id,kind:s.kind,originalSubmissionId:s.original_submission_id?`SUB${s.original_submission_id}`:null,problemId:s.problem_id,studentName:s.student_name,status:s.status,score:s.score===null?null:Number(s.score),createdAt:s.created_at,assignmentId:s.assignment_id,timedPracticeId:s.practice_id})) };
 }
 
+function leaderboardNumber(value, name, min, max) {
+ if (!/^[1-9]\d{0,4}$/.test(value)) fail(400, 'VALIDATION', `${name}无效`);
+ return integer(Number(value), min, max, name);
+}
+
+async function pointsLeaderboard(ctx) {
+ const period = enumValue(ctx.url.searchParams.get('period') ?? 'all', ['all', 'month', 'week'], '排行榜时间范围');
+ const page = leaderboardNumber(ctx.url.searchParams.get('page') ?? '1', '页码', 1, 10000);
+ const pageSize = leaderboardNumber(ctx.url.searchParams.get('pageSize') ?? '10', '每页人数', 1, 50);
+ const meId = ctx.user.roles.includes('student') ? ctx.user.identityId : null;
+ const rows = (await ctx.pool.query(`
+  WITH bounds AS (
+   SELECT CASE $1::text
+    WHEN 'week' THEN date_trunc('week', now() AT TIME ZONE 'Asia/Shanghai') AT TIME ZONE 'Asia/Shanghai'
+    WHEN 'month' THEN date_trunc('month', now() AT TIME ZONE 'Asia/Shanghai') AT TIME ZONE 'Asia/Shanghai'
+    ELSE NULL::timestamptz END since_at
+  ), earned AS (
+   SELECT l.identity_id, sum(l.points)::int points,
+    count(DISTINCT l.problem_id) FILTER (WHERE l.reason='first_ac')::int solved_problems
+   FROM point_ledger l CROSS JOIN bounds b
+   WHERE b.since_at IS NULL OR l.created_at>=b.since_at
+   GROUP BY l.identity_id
+  ), attempts AS (
+   SELECT s.identity_id, count(*)::int attempts,
+    count(*) FILTER (WHERE s.status IN ('AC','WA','CE','RE','TLE','MLE','OLE'))::int assessed,
+    count(*) FILTER (WHERE s.status='AC')::int accepted
+   FROM submissions s CROSS JOIN bounds b
+   WHERE s.kind='submit' AND (b.since_at IS NULL OR s.created_at>=b.since_at)
+    AND (s.timed_attempt_id IS NULL OR EXISTS (
+     SELECT 1 FROM timed_attempts ta JOIN timed_practices tp ON tp.id=ta.practice_id
+     WHERE ta.id=s.timed_attempt_id AND tp.results_published_at IS NOT NULL))
+   GROUP BY s.identity_id
+  ), eligible AS (
+  SELECT i.id, a.id account_id, COALESCE(NULLIF(btrim(a.nickname),''),'同学') name,
+   COALESCE(e.points,0)::int points, COALESCE(e.solved_problems,0)::int solved_problems,
+   COALESCE(t.attempts,0)::int attempts,
+   COALESCE(t.assessed,0)::int assessed, COALESCE(t.accepted,0)::int accepted
+  FROM identities i LEFT JOIN earned e ON e.identity_id=i.id
+  JOIN accounts a ON a.identity_id=i.id AND a.disabled_at IS NULL AND a.binding_released_at IS NULL
+  LEFT JOIN attempts t ON t.identity_id=i.id
+  WHERE i.kind='student' AND i.archived_at IS NULL
+   AND EXISTS (SELECT 1 FROM account_roles ar WHERE ar.account_id=a.id AND ar.role='student')
+  ), ranked AS (
+   SELECT eligible.*,
+    rank() OVER (ORDER BY points DESC)::int rank,
+    row_number() OVER (ORDER BY points DESC,id)::int row_num
+   FROM eligible
+  ), totals AS (
+   SELECT count(*)::int total FROM ranked WHERE points>0
+  ), selected AS (
+   SELECT r.*, (r.points>0 AND r.row_num>(($2::int-1)*$3::int)
+    AND r.row_num<=$2::int*$3::int) in_page
+   FROM ranked r
+   WHERE (r.points>0 AND r.row_num>(($2::int-1)*$3::int)
+    AND r.row_num<=$2::int*$3::int) OR r.id=$4::uuid
+  )
+  SELECT s.id,s.name,upper(left(replace(s.id::text,'-',''),8)) public_tag,
+   a.avatar,s.points,s.solved_problems,s.attempts,s.assessed,s.accepted,s.rank,s.in_page,t.total
+  FROM totals t LEFT JOIN selected s ON TRUE
+  LEFT JOIN accounts a ON a.id=s.account_id
+  ORDER BY s.in_page DESC NULLS LAST,s.points DESC,s.id`, [period,page,pageSize,meId])).rows;
+ const shape = ({id,name,public_tag,avatar,points,solved_problems,attempts,assessed,accepted,rank}) => ({
+  id,name,publicTag:public_tag,avatar,points,solvedProblems:solved_problems,attempts,rank,
+  acRate: assessed ? Math.round(accepted * 1000 / assessed) / 10 : null,
+ });
+ const own = meId ? rows.find(row => row.id === meId) : null;
+ return {
+  items: rows.filter(row => row.in_page).map(shape),
+  total: rows[0]?.total ?? 0, page, pageSize,
+  me: own ? shape(own) : null,
+ };
+}
+
 export async function handleEducation(ctx) {
  const { pool, user, route, method, body, helpers } = ctx;
  if(route==='/points/me'&&method==='GET'){if(!user.roles.includes('student'))fail(403,'FORBIDDEN','积分仅适用于学生');const total=(await pool.query('SELECT COALESCE(sum(points),0)::int points FROM point_ledger WHERE identity_id=$1',[user.identityId])).rows[0].points;return result({points:total});}
- if(route==='/points/leaderboard'&&method==='GET'){const items=(await pool.query("SELECT i.id,COALESCE(NULLIF(a.nickname,''),i.name) name,a.avatar,sum(l.points)::int points FROM point_ledger l JOIN identities i ON i.id=l.identity_id JOIN accounts a ON a.identity_id=i.id AND a.disabled_at IS NULL AND a.binding_released_at IS NULL WHERE i.kind='student' AND i.archived_at IS NULL GROUP BY i.id,a.nickname,a.avatar HAVING sum(l.points)>0 ORDER BY points DESC,i.id LIMIT 100")).rows;return result({items:items.map((x,index)=>({...x,rank:1+items.findIndex(y=>y.points===x.points)}))});}
+ if(route==='/points/leaderboard'&&method==='GET')return result(await pointsLeaderboard(ctx));
  if(route==='/points/rewards'&&method==='GET'){requireStaff(user);const items=(await pool.query('SELECT r.problem_id,r.assignment_id,r.points FROM point_rewards r JOIN problems p ON p.id=r.problem_id LEFT JOIN assignments a ON a.id=r.assignment_id WHERE ($1::boolean OR (r.assignment_id IS NULL AND p.owner_account_id=$2) OR a.owner_account_id=$2)',[administrator(user),user.id])).rows;return result({items:items.map(r=>({problemId:r.problem_id,assignmentId:r.assignment_id,points:r.points}))});}
  if(route==='/points/rewards'&&method==='POST'){
  requireStaff(user);const problemId=uuid(body.problemId),assignmentId=body.assignmentId?uuid(body.assignmentId):null;

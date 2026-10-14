@@ -44,6 +44,33 @@ interface TimedAttempt {
   finishedAt?: string | null;
   serverNow: string;
 }
+interface TimedProblem {
+  problemId: string;
+  versionId: string;
+  title: string;
+  points: number;
+  firstAcPoints?: number;
+  rewardPoints?: number;
+  speedBonusPoints?: number;
+  attemptBonusPoints?: number;
+}
+const rewardFields = ["rewardPoints", "speedBonusPoints", "attemptBonusPoints"] as const;
+const rewardColumns = [
+  { field: "rewardPoints", title: "训练 AC 奖励" },
+  { field: "speedBonusPoints", title: "速度上限" },
+  { field: "attemptBonusPoints", title: "尝试上限" },
+] as const;
+function rewardCap(problem: TimedProblem) {
+  return (problem.rewardPoints ?? 0) + (problem.speedBonusPoints ?? 0) + (problem.attemptBonusPoints ?? 0);
+}
+function validateTimedRewards(problems: TimedProblem[]) {
+  if (problems.some((problem) => rewardFields.some((field) => !Number.isInteger(problem[field] ?? 0) || (problem[field] ?? 0) < 0 || (problem[field] ?? 0) > 20))) {
+    throw new Error("每题的固定、速度和尝试奖励上限都须为 0–20 的整数积分。");
+  }
+  if (problems.reduce((sum, problem) => sum + rewardCap(problem), 0) > 100) {
+    throw new Error("本次训练全部题目的奖励上限合计最多 100 积分。");
+  }
+}
 interface Practice {
   id: string;
   title: string;
@@ -59,12 +86,7 @@ interface Practice {
   forcedEndedAt?:string|null;
   resultsRevision?: number | null;
   serverNow: string;
-  problems: {
-    problemId: string;
-    versionId: string;
-    title: string;
-    points: number;
-  }[];
+  problems: TimedProblem[];
   participants?: {
     identityId: string;
     name: string;
@@ -83,6 +105,12 @@ interface Practice {
       submissionId: string | null;
       score: number | null;
       status: string;
+      rewardPoints?: number;
+      speedBonusPointsEarned?: number;
+      attemptBonusPointsEarned?: number;
+      totalRewardPoints?: number;
+      elapsedSeconds?: number | null;
+      formalAttempts?: number;
     }[];
   }[];
 }
@@ -190,7 +218,15 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
     [endsAt, setEnds] = useState(localInput(initial?.endsAt)),
     [duration, setDuration] = useState(initial?.durationMinutes ?? 60),
     [showVerdict, setShowVerdict] = useState(initial?.showVerdict ?? false),
-    [problems, setProblems] = useState(initial?.problems ?? []),
+    [problems, setProblems] = useState<TimedProblem[]>(
+      initial?.problems.map((problem) => ({
+        ...problem,
+        firstAcPoints: problem.firstAcPoints ?? 10,
+        rewardPoints: problem.rewardPoints ?? 0,
+        speedBonusPoints: problem.speedBonusPoints ?? 0,
+        attemptBonusPoints: problem.attemptBonusPoints ?? 0,
+      })) ?? [],
+    ),
     [picker, setPicker] = useState(false),
     [modal, setModal] = useState<"preview" | "publish" | null>(null),
     action = useAction();
@@ -200,6 +236,7 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
         throw new Error(
           "已发布训练的题目与时长已固定，请在进行情况页维护延期。",
         );
+      validateTimedRewards(problems);
       validateActivity({title,classId,problems,participants,timed:true});
       const {start,end}=validateTimedDates(startsAt,endsAt,duration,0,true);
       const result = await productionApi<Practice>(
@@ -218,6 +255,9 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
             problems: problems.map((p) => ({
               problemId: p.problemId,
               points: p.points,
+              rewardPoints: p.rewardPoints ?? 0,
+              speedBonusPoints: p.speedBonusPoints ?? 0,
+              attemptBonusPoints: p.attemptBonusPoints ?? 0,
               ...(p.versionId ? {versionId:p.versionId}:{}),
             })),
           },
@@ -228,7 +268,7 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
       if (!saved) router.replace(`/teacher/timed-practice/${result.id}/edit`);
       return result;
     };
-  const draft=useActivityDraft({storageKey:`campus-judge:activity-draft:v1:${userId}:timed:${initial?.id??"new"}`,editable:!published,snapshot:{title,description,classId,startsAt,endsAt,duration,showVerdict,problems,participants},onRestore:v=>{setTitle(v.title);setDescription(v.description);setClassId(v.classId);setStarts(v.startsAt);setEnds(v.endsAt);setDuration(v.duration);setShowVerdict(v.showVerdict);setProblems(v.problems);setParticipants(v.participants);}});
+  const draft=useActivityDraft({storageKey:`campus-judge:activity-draft:v1:${userId}:timed:${initial?.id??"new"}`,editable:!published,snapshot:{title,description,classId,startsAt,endsAt,duration,showVerdict,problems,participants},onRestore:v=>{setTitle(v.title);setDescription(v.description);setClassId(v.classId);setStarts(v.startsAt);setEnds(v.endsAt);setDuration(v.duration);setShowVerdict(v.showVerdict);setProblems(v.problems.map(problem=>({...problem,firstAcPoints:problem.firstAcPoints??10,rewardPoints:problem.rewardPoints??0,speedBonusPoints:problem.speedBonusPoints??0,attemptBonusPoints:problem.attemptBonusPoints??0})));setParticipants(v.participants);}});
   useDirty(
     !published &&
       (title !== (saved?.title ?? "") ||
@@ -239,12 +279,15 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
         duration !== (saved?.durationMinutes ?? 60) ||
         showVerdict !== (saved?.showVerdict ?? false) ||
         JSON.stringify(
-          problems.map((p) => ({ problemId: p.problemId, points: p.points })),
+          problems.map((p) => ({ problemId: p.problemId, points: p.points, rewardPoints: p.rewardPoints ?? 0, speedBonusPoints: p.speedBonusPoints ?? 0, attemptBonusPoints: p.attemptBonusPoints ?? 0 })),
         ) !==
           JSON.stringify(
             (saved?.problems ?? []).map((p) => ({
               problemId: p.problemId,
               points: p.points,
+              rewardPoints: p.rewardPoints ?? 0,
+              speedBonusPoints: p.speedBonusPoints ?? 0,
+              attemptBonusPoints: p.attemptBonusPoints ?? 0,
             })),
           ) ||
         JSON.stringify([...participants].sort()) !==
@@ -361,12 +404,16 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
               <Button disabled={published || action.busy} onClick={() => setPicker(true)}>
                 从题库与分组选择
               </Button>
-              <b className="text-sm">
-                {problems.length} 题 ·{" "}
-                {problems.reduce((n, p) => n + p.points, 0)} 分
-              </b>
+              <div className="text-right text-sm">
+                <b>{problems.length} 题 · {problems.reduce((n, p) => n + p.points, 0)} 分</b>
+                <p className="mt-1 text-xs text-muted-foreground">训练奖励上限 +{problems.reduce((sum, p) => sum + rewardCap(p), 0)} / 100 积分</p>
+              </div>
             </div>
-            <Table headers={["顺序", "题目", "分值", "操作"]} min={600}>
+            <div className="mb-4 rounded-md border border-primary/20 bg-primary/5 p-4 text-sm leading-6">
+              <p className="font-semibold">限时训练积分规则</p>
+              <p className="mt-1 text-muted-foreground">每题首次 AC 积分是全站一次性奖励，已在别处领取则不会重复；本训练的奖励仅在个人截止前 AC 且首次发布成绩时结算。训练奖励 = 固定 AC 奖励 + ⌊速度上限 × max(0, 预设训练时长 − 实际用时) ÷ 预设训练时长⌋ + ⌊尝试上限 ÷ 本题正式提交次数⌋。实际用时从服务器记录的训练开始到最终计分的有效 AC 提交接收计算，不使用截止倒计时余量；提交次数包括这次 AC。未 AC 不得训练奖励。三项上限跨全部题合计最多 100 积分，和训练成绩分值分开。</p>
+            </div>
+            <Table headers={["顺序", "题目", "分值", "首次 AC", "训练 AC 奖励", "速度上限", "尝试上限", "操作"]} min={1100}>
               {problems.map((p, i) => (
                 <tr key={p.problemId}>
                   <td>{i + 1}</td>
@@ -399,6 +446,22 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                       className={`${input} w-24`}
                     />
                   </td>
+                  <td className="whitespace-nowrap text-sm font-medium">+{p.firstAcPoints ?? 10}</td>
+                  {rewardColumns.map(({ field, title }) => (
+                    <td key={field}>
+                      <input
+                        aria-label={`${p.title} ${title}积分`}
+                        disabled={published || action.busy}
+                        type="number"
+                        step={1}
+                        min={0}
+                        max={20}
+                        value={p[field] ?? 0}
+                        onChange={(event) => setProblems((current) => current.map((problem) => problem.problemId === p.problemId ? { ...problem, [field]: Number(event.target.value) } : problem))}
+                        className={`${input} w-20`}
+                      />
+                    </td>
+                  ))}
                   <td>
                     <div className="flex gap-1">
                       <Button
@@ -437,7 +500,7 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                 </tr>
               ))}
               {!problems.length && (
-                <Empty columns={4}>请选择已发布题目。</Empty>
+                <Empty columns={8}>请选择已发布题目。</Empty>
               )}
             </Table>
           </>
@@ -600,6 +663,10 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                 versionId: p.publishedVersionId ?? p.versionId ?? "",
                 title: p.publishedTitle ?? p.title,
                 points: 100,
+                firstAcPoints: p.firstAcPoints ?? 10,
+                rewardPoints: 0,
+                speedBonusPoints: 0,
+                attemptBonusPoints: 0,
               })),
             ]);
             setPicker(false);
@@ -634,9 +701,16 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
               <dt className="text-muted-foreground">取分</dt>
               <dd>最后一次正式接收提交</dd>
             </div>
+            <div>
+              <dt className="text-muted-foreground">训练奖励上限</dt>
+              <dd>+{problems.reduce((sum, problem) => sum + rewardCap(problem), 0)} 积分（首次 AC 奖励另计）</dd>
+            </div>
           </dl>
+          <div className="mt-4 border-t border-border pt-3 text-sm">
+            {problems.map((problem) => <p key={problem.problemId} className="py-1">{problem.title}：首次 AC +{problem.firstAcPoints ?? 10}（全站一次）；训练固定 +{problem.rewardPoints ?? 0}、速度最多 +{problem.speedBonusPoints ?? 0}、少尝试最多 +{problem.attemptBonusPoints ?? 0}</p>)}
+          </div>
           <p className="mt-4 text-sm leading-6 text-muted-foreground">
-            确认开始后固定个人截止时间，统一窗口与个人时长中先到的时间为准。草稿和自测不会计分，成绩由教师另行发布。
+            确认开始后固定个人截止时间，统一窗口与预设训练时长中先到的时间为准。草稿和自测不会计分。只有个人截止前最终计分的有效 AC 才能在首次发布成绩时领取训练奖励：固定积分 + ⌊速度上限 × max(0, 预设训练时长 − 实际用时) ÷ 预设训练时长⌋ + ⌊尝试上限 ÷ 本题正式提交次数⌋。实际用时按服务器开始到 AC 接收计算，不使用截止倒计时余量。首次 AC 积分全站只领取一次；成绩由教师另行发布。
           </p>
           <Feedback action={action} />
           <div className="mt-5 flex justify-end gap-2">
@@ -655,6 +729,7 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                 }
                 onClick={() =>
                   void action.run(async () => {
+                    validateTimedRewards(problems);
                     validateActivity({title,classId,problems,participants,publish:true,timed:true});
                     validateTimedDates(startsAt,endsAt,duration);
                     const result = await save();
@@ -770,6 +845,7 @@ export function TeacherTimedProgress({ id }: { id: string }) {
                 "活动状态",
                 "已接收提交",
                 "最后正式接收时间",
+                "训练奖励积分",
                 "需要处理",
               ]}
               min={900}
@@ -862,6 +938,9 @@ export function TeacherTimedProgress({ id }: { id: string }) {
                           )
                         : "—"}
                     </td>
+                    <td className="text-sm">
+                      {grade?.pending ? "待有效判题" : grade ? `${practice.resultsPublished ? "已结算" : "预计"} +${grade.problems.reduce((sum, problem) => sum + (problem.totalRewardPoints ?? 0), 0)}` : "—"}
+                    </td>
                     <td>
                       {grade?.problems.some((x) => x.status === "System Error")
                         ? "System Error · 不计为答错"
@@ -873,7 +952,7 @@ export function TeacherTimedProgress({ id }: { id: string }) {
                 );
               })}
               {!participants.length && (
-                <Empty columns={5}>暂无活动学生。</Empty>
+                <Empty columns={6}>暂无活动学生。</Empty>
               )}
             </Table>
           </section>

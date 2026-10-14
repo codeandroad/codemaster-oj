@@ -17,8 +17,159 @@ interface RankedStudent {
   id: string;
   name: string;
   avatar?: string;
+  publicTag: string;
   points: number;
   rank: number;
+  solvedProblems: number;
+  attempts: number;
+  acRate: number | null;
+}
+
+type RankingPeriod = "all" | "month" | "week";
+interface LeaderboardResponse {
+  items: RankedStudent[];
+  total: number;
+  page: number;
+  pageSize: number;
+  me?: RankedStudent | null;
+}
+
+const rankingPeriods: { value: RankingPeriod; label: string }[] = [
+  { value: "all", label: "全部时间" },
+  { value: "month", label: "本月" },
+  { value: "week", label: "本周" },
+];
+const rankNumber = new Intl.NumberFormat("zh-CN");
+
+function pageNumbers(current: number, last: number): (number | "…")[] {
+  const visible = [...new Set([1, last, current - 1, current, current + 1])]
+    .filter((value) => value >= 1 && value <= last)
+    .sort((a, b) => a - b);
+  return visible.flatMap((value, index) => {
+    if (index === 0) return [value];
+    const gap = value - visible[index - 1];
+    return gap === 2 ? [value - 1, value] : gap > 2 ? ["…" as const, value] : [value];
+  });
+}
+
+function LeaderboardRow({ person, current }: { person: RankedStudent; current: boolean }) {
+  return (
+    <tr className={`border-t border-border ${current ? "bg-primary/6 hover:!bg-primary/10" : ""}`}>
+      <td className={`px-5 py-4 font-semibold tabular-nums ${person.rank <= 3 ? "text-primary" : "text-muted-foreground"}`}>
+        {rankNumber.format(person.rank)}
+      </td>
+      <td className="px-4 py-4">
+        <span className="flex min-w-40 items-center gap-3">
+          {person.avatar ? (
+            <Image src={person.avatar} unoptimized width={38} height={38} alt="" className="size-9 shrink-0 rounded-full object-cover" />
+          ) : (
+            <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-full bg-accent font-semibold text-primary">
+              {person.name.trim().slice(0, 1) || "学"}
+            </span>
+          )}
+          <span className="min-w-0">
+            <span className="block font-medium text-foreground">{person.name}{current && <span className="ml-2 text-xs font-semibold text-primary">（我）</span>}</span>
+            <span className="block text-xs text-muted-foreground">#{person.publicTag}</span>
+          </span>
+        </span>
+      </td>
+      <td className="px-4 py-4 text-right font-semibold tabular-nums">{rankNumber.format(person.points)}</td>
+      <td className="px-4 py-4 text-right tabular-nums">{rankNumber.format(person.solvedProblems)}</td>
+      <td className="px-4 py-4 text-right tabular-nums">{rankNumber.format(person.attempts)}</td>
+      <td className="px-5 py-4 text-right tabular-nums">{person.acRate === null ? "—" : `${Number.isInteger(person.acRate) ? person.acRate : person.acRate.toFixed(1)}%`}</td>
+    </tr>
+  );
+}
+
+function Leaderboard({ user }: { user: CampusUser }) {
+  const [period, setPeriod] = useState<RankingPeriod>("all");
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+  const ranking = useData<LeaderboardResponse>(`points/leaderboard?period=${period}&page=${page}&pageSize=${pageSize}`);
+  const total = ranking.data?.total ?? 0;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const start = total ? (page - 1) * pageSize + 1 : 0;
+  const end = Math.min(page * pageSize, total);
+  const me = ranking.data?.me;
+  const showMe = me && !ranking.data?.items.some((person) => person.id === me.id);
+
+  return (
+    <section className="mt-5 overflow-hidden rounded-lg border border-border bg-surface" aria-labelledby="leaderboard-heading">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border px-5 py-5">
+        <div>
+          <h2 id="leaderboard-heading" className="text-lg font-semibold">学生积分榜</h2>
+          <p className="mt-1 text-sm text-muted-foreground">按所选时间段入账积分排名，同分并列。</p>
+        </div>
+        <div role="group" aria-label="排行榜时间范围" className="inline-flex rounded-md border border-border bg-surface-subtle p-1">
+          {rankingPeriods.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={period === option.value}
+              onClick={() => { setPeriod(option.value); setPage(1); }}
+              className={`rounded px-3 py-2 text-sm font-medium ${period === option.value ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="border-b border-border px-5 py-3 text-xs leading-5 text-muted-foreground">
+        解题数为本时段首次 AC 的不同题目数；提交次数包含重复正式提交，不含样例运行、订正和未公布的限时训练提交。
+        AC 率 = AC 的正式提交数 ÷ 已有有效判题结果的正式提交数；待评测和系统错误不计入比率。
+      </p>
+      <State data={ranking}>
+        {ranking.loading ? (
+          <p role="status" className="px-5 py-10 text-center text-sm text-muted-foreground">正在更新排行榜…</p>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[710px] text-left text-sm">
+                <thead className="text-xs text-muted-foreground">
+                  <tr>
+                    <th scope="col" className="px-5 py-3">排名</th>
+                    <th scope="col" className="px-4 py-3">学生</th>
+                    <th scope="col" className="px-4 py-3 text-right">积分</th>
+                    <th scope="col" className="px-4 py-3 text-right">解题数</th>
+                    <th scope="col" className="px-4 py-3 text-right">提交次数</th>
+                    <th scope="col" className="px-5 py-3 text-right">
+                      <abbr title="AC 的正式提交数 ÷ 已有有效判题结果的正式提交数" className="cursor-help no-underline">AC 率 ⓘ</abbr>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ranking.data?.items.map((person) => <LeaderboardRow key={person.id} person={person} current={person.id === user.identityId} />)}
+                  {showMe && <LeaderboardRow person={me} current />}
+                </tbody>
+              </table>
+              {!ranking.data?.items.length && !showMe && <p className="px-5 py-8 text-center text-sm text-muted-foreground">此时间段暂无积分记录。</p>}
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3 text-sm text-muted-foreground">
+              <span>{total ? `显示 ${start}–${end} / ${rankNumber.format(total)} 名已获积分学生` : "暂无已获积分学生"}{showMe ? " · 我的数据单独显示" : ""}</span>
+              <nav aria-label="排行榜分页" className="flex items-center gap-2">
+                <button type="button" aria-label="上一页" disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className="rounded border border-border px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-50">‹</button>
+                {pageNumbers(page, pages).map((number, index) => number === "…" ? (
+                  <span key={`gap-${index}`} aria-hidden="true" className="px-1">…</span>
+                ) : (
+                  <button
+                    key={number}
+                    type="button"
+                    aria-label={`第 ${number} 页`}
+                    aria-current={page === number ? "page" : undefined}
+                    onClick={() => setPage(number)}
+                    className={`min-w-9 rounded px-2 py-1.5 tabular-nums ${page === number ? "bg-accent font-semibold text-foreground" : "hover:bg-surface-subtle"}`}
+                  >
+                    {number}
+                  </button>
+                ))}
+                <button type="button" aria-label="下一页" disabled={page >= pages} onClick={() => setPage((value) => value + 1)} className="rounded border border-border px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-50">›</button>
+              </nav>
+            </div>
+          </>
+        )}
+      </State>
+    </section>
+  );
 }
 
 function assignmentProblemHref(assignmentId: string, problem: Assignment["problems"][number]) {
@@ -30,7 +181,6 @@ function assignmentProblemHref(assignmentId: string, problem: Assignment["proble
 }
 
 export function PointsPage({ user, student = true }: { user: CampusUser; student?: boolean }) {
-  const ranking = useData<{ items: RankedStudent[] }>("points/leaderboard");
   const me = useData<{ points: number }>(student ? "points/me" : "");
   const staff = user.roles.some((role) => role === "teacher" || role === "admin");
   const admin = user.roles.includes("admin");
@@ -46,33 +196,12 @@ export function PointsPage({ user, student = true }: { user: CampusUser; student
 
   return (
     <>
-      <PageHeader title="积分排行榜" description="首次正式通过题目获得积分；努力有记录，进步有回响。" />
+      <PageHeader title="积分与奖励" description="首次正式通过题目获得积分；努力有记录，进步有回响。" />
       {student && <p className="mt-4">我的积分：<strong>{me.data?.points ?? "…"}</strong></p>}
       <p className="mt-2 text-sm text-muted-foreground">
-        默认每题首次 AC 10 分。重复提交和样例运行不计分；作业可设置额外奖励。未公开计时成绩公布后计分。仅展示学生前 100 名，同分并列。
+        默认每题首次 AC 10 分。重复提交和样例运行不计分；作业和限时训练可设置额外奖励。未公开计时成绩公布后计分。
       </p>
-      <State data={ranking}>
-        <div className="mt-5 overflow-x-auto rounded border border-border bg-surface">
-          <table className="w-full text-left text-sm">
-            <thead><tr><th className="p-4">排名</th><th>学生</th><th>积分</th></tr></thead>
-            <tbody>
-              {ranking.data?.items.map((person) => (
-                <tr key={person.id} className="border-t border-border">
-                  <td className="p-4">{person.rank}</td>
-                  <td>
-                    <span className="flex items-center gap-2">
-                      {person.avatar && <Image src={person.avatar} unoptimized width={32} height={32} alt="" className="rounded-full" />}
-                      {person.name}{person.id === user.identityId ? "（我）" : ""}
-                    </span>
-                  </td>
-                  <td>{person.points}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!ranking.data?.items.length && <p className="p-4 text-muted-foreground">暂无积分记录，完成一道题开始积累。</p>}
-        </div>
-      </State>
+      <Leaderboard user={user} />
       {staff && (
         <section className="mt-6 rounded border border-border bg-surface p-5">
           <h2 className="font-semibold">作业额外奖励</h2>

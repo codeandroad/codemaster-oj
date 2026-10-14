@@ -8,6 +8,42 @@ const staff = (user) => { if (!isStaff(user)) fail(403, 'FORBIDDEN', '需要教�
 const date = (value, name) => { const parsed = new Date(value); if (typeof value !== 'string' || !Number.isFinite(parsed.getTime())) fail(400, 'VALIDATION', `${name}无效`); return parsed; };
 const now = async (db) => row(await db.query('SELECT clock_timestamp() AS time')).time;
 const audit = (db, user, action, id, metadata = {}) => db.query('INSERT INTO audit_events(actor_account_id,action,resource_type,resource_id,metadata) VALUES($1,$2,$3,$4,$5)', [user.id, action, 'timed_practice', id, metadata]);
+const BONUS_FIELDS = [
+  ['rewardPoints', 'reward_points', '固定奖励积分'],
+  ['speedBonusPoints', 'speed_bonus_points', '用时奖励上限'],
+  ['attemptBonusPoints', 'attempt_bonus_points', '尝试奖励上限']
+];
+function rewardCaps(entry, previous = {}) {
+  return Object.fromEntries(BONUS_FIELDS.map(([api, column, label]) =>
+    [api, integer(entry[api] ?? entry[column] ?? previous[api] ?? previous[column] ?? 0, 0, 20, label)]));
+}
+function rewardBudget(problems) {
+  const budget = problems.reduce((total, problem) => total + problem.rewardPoints + problem.speedBonusPoints + problem.attemptBonusPoints, 0);
+  if (budget > 100) fail(400, 'REWARD_BUDGET', '每场训练的额外奖励上限总和最多 100 分');
+}
+function rewardForSubmission(problem, practice, submission, startedAt, formalAttempts) {
+  if (submission?.status !== 'AC' || !Number.isInteger(formalAttempts) || formalAttempts < 1 || !startedAt) {
+    return { rewardPoints: 0, speedBonusPointsEarned: 0, attemptBonusPointsEarned: 0,
+      totalRewardPoints: 0, elapsedSeconds: null, formalAttempts };
+  }
+  const elapsedSeconds = Math.max(0, Math.ceil((new Date(submission.created_at).getTime() - new Date(startedAt).getTime()) / 1000));
+  const durationSeconds = practice.duration_minutes * 60;
+  const rewardPoints = Number(problem.reward_points);
+  const speedBonusPointsEarned = Math.floor(Number(problem.speed_bonus_points) * Math.max(0, (durationSeconds - elapsedSeconds) / durationSeconds));
+  const attemptBonusPointsEarned = Math.floor(Number(problem.attempt_bonus_points) / formalAttempts);
+  return { rewardPoints, speedBonusPointsEarned, attemptBonusPointsEarned,
+    totalRewardPoints: rewardPoints + speedBonusPointsEarned + attemptBonusPointsEarned,
+    elapsedSeconds, formalAttempts };
+}
+
+async function settleTimedRewards(db, practice, grades) {
+  for (const grade of grades) for (const problem of grade.problems) {
+    if (problem.status !== 'AC' || !problem.submissionId || problem.totalRewardPoints <= 0) continue;
+    await db.query(`INSERT INTO point_ledger(identity_id,problem_id,submission_id,timed_practice_id,reason,points)
+      VALUES($1,$2,$3,$4,'timed',$5) ON CONFLICT DO NOTHING`,
+    [grade.identityId, problem.problemId, problem.submissionId.slice(3), practice.id, problem.totalRewardPoints]);
+  }
+}
 
 function practiceStatus(practice, serverNow) {
   if (practice.state !== 'Published') return practice.state;
@@ -38,14 +74,21 @@ async function practiceAccess(db, user, id, { lock = false, share = false } = {}
 }
 
 async function calculateGrades(db, practice) {
-  const grades = await db.query(`SELECT part.identity_id,i.name,ap.problem_id,ap.points,s.id submission_id,s.score,s.status
+  const grades = await db.query(`SELECT part.identity_id,i.name,ap.problem_id,ap.points,
+      ap.reward_points,ap.speed_bonus_points,ap.attempt_bonus_points,
+      attempt.started_at,s.id submission_id,s.score,s.status,s.created_at,
+      COALESCE(tries.formal_attempts,0)::int formal_attempts
     FROM timed_practice_participants part JOIN identities i ON i.id=part.identity_id
     JOIN timed_practice_problems ap ON ap.practice_id=part.practice_id
     LEFT JOIN timed_attempts attempt ON attempt.practice_id=part.practice_id AND attempt.identity_id=part.identity_id
-    LEFT JOIN LATERAL (SELECT id,score,status FROM submissions
+    LEFT JOIN LATERAL (SELECT id,score,status,created_at FROM submissions
       WHERE timed_attempt_id=attempt.id AND problem_id=ap.problem_id AND kind='submit'
+        AND created_at>=attempt.started_at
         AND created_at<=LEAST(attempt.deadline_at,COALESCE(attempt.finished_at,attempt.deadline_at))
       ORDER BY created_at DESC,id DESC LIMIT 1) s ON true
+    LEFT JOIN LATERAL (SELECT count(*) formal_attempts FROM submissions sub
+      WHERE sub.timed_attempt_id=attempt.id AND sub.problem_id=ap.problem_id AND sub.kind='submit'
+        AND sub.created_at>=attempt.started_at AND sub.created_at<=s.created_at) tries ON true
     WHERE part.practice_id=$1 AND NOT part.exempt ORDER BY i.name,part.identity_id,ap.position`, [practice.id]);
   const byStudent = new Map();
   for (const grade of grades.rows) {
@@ -55,8 +98,11 @@ async function calculateGrades(db, practice) {
     const score = pending ? null : grade.submission_id ? Number(grade.score) : 0;
     student.maxScore += Number(grade.points); student.pending ||= pending;
     if (score !== null) student.score += score * Number(grade.points) / 100;
+    const reward = rewardForSubmission(grade, practice,
+      grade.submission_id ? { status: grade.status, created_at: grade.created_at } : null,
+      grade.started_at, grade.submission_id ? Number(grade.formal_attempts) : 0);
     student.problems.push({ problemId: grade.problem_id, submissionId: grade.submission_id ? `SUB${grade.submission_id}` : null,
-      score, status: grade.status ?? 'NotSubmitted' });
+      score, status: grade.status ?? 'NotSubmitted', ...reward });
   }
   return [...byStudent.values()].map((grade) => ({ ...grade, score: grade.pending ? null : Math.round(grade.score * 100) / 100 }));
 }
@@ -70,12 +116,19 @@ async function results(db, practice) {
 async function practiceResult(db, user, id) {
   const practice = await practiceAccess(db, user, id);
   const serverNow = await now(db);
-  const problems = (await db.query('SELECT ap.problem_id,ap.version_id,ap.points,v.title FROM timed_practice_problems ap JOIN problem_versions v ON v.id=ap.version_id WHERE ap.practice_id=$1 ORDER BY ap.position', [id])).rows;
+  const problems = (await db.query(`SELECT ap.problem_id,ap.version_id,ap.points,v.title,
+    ap.reward_points,ap.speed_bonus_points,ap.attempt_bonus_points,
+    COALESCE(global_reward.points,10) first_ac_points
+    FROM timed_practice_problems ap JOIN problem_versions v ON v.id=ap.version_id
+    LEFT JOIN point_rewards global_reward ON global_reward.problem_id=ap.problem_id AND global_reward.assignment_id IS NULL
+    WHERE ap.practice_id=$1 ORDER BY ap.position`, [id])).rows;
   const attempt = (await db.query('SELECT * FROM timed_attempts WHERE practice_id=$1 AND identity_id=$2', [id, user.identityId])).rows[0];
   const result = { id: practice.id, title: practice.title,description:practice.description,className:(await db.query('SELECT name FROM classes WHERE id=$1',[practice.class_id])).rows[0]?.name,createdAt:practice.created_at, classId: practice.class_id, startsAt: practice.starts_at, endsAt: practice.ends_at,
     durationMinutes: practice.duration_minutes, status: practiceStatus(practice, serverNow), showVerdict: practice.show_verdict,
     resultsPublished: !!practice.results_published_at, forcedEndedAt: practice.forced_ended_at, serverNow, preview: practice.canManage, attempt: practice.canManage ? null : attemptShape(attempt, serverNow),
-    problems: problems.map((p) => ({ problemId: p.problem_id, versionId: p.version_id, title: p.title, points: Number(p.points) })) };
+    problems: problems.map((p) => ({ problemId: p.problem_id, versionId: p.version_id, title: p.title, points: Number(p.points),
+      firstAcPoints: Number(p.first_ac_points), rewardPoints: Number(p.reward_points),
+      speedBonusPoints: Number(p.speed_bonus_points), attemptBonusPoints: Number(p.attempt_bonus_points) })) };
   if (practice.current_result_revision_id) result.resultsRevision = row(await db.query('SELECT revision FROM timed_result_revisions WHERE id=$1', [practice.current_result_revision_id])).revision;
   if (practice.canManage) {
     result.participants = (await db.query('SELECT part.identity_id,part.exempt,i.name,i.number,a.id attempt_id,a.state,a.started_at,a.deadline_at,a.finished_at FROM timed_practice_participants part JOIN identities i ON i.id=part.identity_id LEFT JOIN timed_attempts a ON a.practice_id=part.practice_id AND a.identity_id=part.identity_id WHERE part.practice_id=$1 ORDER BY i.name,part.identity_id', [id])).rows.map((entry) => ({ identityId: entry.identity_id, name: entry.name, number: entry.number, exempt: entry.exempt, attempt: attemptShape(entry.attempt_id ? { ...entry, id: entry.attempt_id } : null, serverNow) }));
@@ -139,15 +192,24 @@ export function createTimedService(pool) {
           const participants = body.participants ?? (await db.query("SELECT cm.identity_id FROM class_members cm JOIN identities i ON i.id=cm.identity_id WHERE cm.class_id=$1 AND i.archived_at IS NULL AND i.kind='student'", [classId])).rows.map((entry) => entry.identity_id);
           if (!Array.isArray(participants) || !participants.length || participants.length > 500) fail(400, 'VALIDATION', '请选择 1–500 名学生');
           const practice = row(await db.query('INSERT INTO timed_practices(title,class_id,owner_account_id,starts_at,ends_at,duration_minutes,show_verdict,description) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *', [title, classId, user.id, startsAt, endsAt, durationMinutes, body.showVerdict ?? true,field(body.description??'','训练说明',{min:0,max:10000})]));
+          const configuredRewards = [], seenProblems = new Set();
           for (let index = 0; index < body.problems.length; index++) {
             const entry = body.problems[index], problemId = uuid(entry.problemId), points = Number(entry.points);
+            if (seenProblems.has(problemId)) fail(400, 'VALIDATION', '同题不能重复选择');
+            seenProblems.add(problemId);
             if (!Number.isFinite(points) || points <= 0 || points > 1000) fail(400, 'VALIDATION', '题目分值须在 0–1000 之间');
+            const reward = rewardCaps(entry);
+            configuredRewards.push(reward);
             const current = row(await db.query('SELECT current_version_id FROM problems WHERE id=$1 AND archived_at IS NULL', [problemId]), '题目不存在');
             const versionId = entry.versionId ? uuid(entry.versionId) : current.current_version_id;
             const version = row(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND problem_id=$2 AND published_at IS NOT NULL', [versionId, problemId]), '只能选择已发布题目');
             if (helpers.versionAccess) await helpers.versionAccess(db, user, problemId, version.id);
-            await db.query('INSERT INTO timed_practice_problems(practice_id,problem_id,version_id,points,position) VALUES($1,$2,$3,$4,$5)', [practice.id, problemId, version.id, points, index]);
+            await db.query(`INSERT INTO timed_practice_problems(
+              practice_id,problem_id,version_id,points,position,reward_points,speed_bonus_points,attempt_bonus_points)
+              VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+            [practice.id, problemId, version.id, points, index, reward.rewardPoints, reward.speedBonusPoints, reward.attemptBonusPoints]);
           }
+          rewardBudget(configuredRewards);
           for (const identity of new Set(participants)) {
             if (!(await db.query("SELECT 1 FROM class_members cm JOIN identities i ON i.id=cm.identity_id WHERE cm.class_id=$1 AND cm.identity_id=$2 AND i.kind='student' AND i.archived_at IS NULL", [classId, uuid(identity)])).rowCount) fail(400, 'VALIDATION', '训练成员须为本班有效学生');
             await db.query('INSERT INTO timed_practice_participants(practice_id,identity_id) VALUES($1,$2)', [practice.id, identity]);
@@ -169,9 +231,34 @@ export function createTimedService(pool) {
       const id = uuid(match[1]), action = match[2];
       if(!action&&method==='PATCH'){
         staff(user);await transaction(pool,async db=>{const practice=await practiceAccess(db,user,id,{lock:true});if(!practice.canManage)fail(403,'FORBIDDEN','无权编辑此训练');if(practice.state!=='Draft')fail(409,'IMMUTABLE','已发布训练的题目与规则固定，请使用延期或豁免等独立操作');const classId=body.classId===undefined?practice.class_id:uuid(body.classId);await classAccess(db,user,classId);const title=body.title===undefined?practice.title:field(body.title,'训练名称'),startsAt=body.startsAt===undefined?practice.starts_at:date(body.startsAt,'开始时间'),endsAt=body.endsAt===undefined?practice.ends_at:date(body.endsAt,'结束时间'),duration=body.durationMinutes===undefined?practice.duration_minutes:integer(body.durationMinutes,1,240,'个人时长');if(endsAt<=startsAt)fail(400,'VALIDATION','结束时间须晚于开始时间');if(body.showVerdict!==undefined&&typeof body.showVerdict!=='boolean')fail(400,'VALIDATION','反馈设置无效');
-         const problems=body.problems??(await db.query('SELECT problem_id AS "problemId",version_id AS "versionId",points FROM timed_practice_problems WHERE practice_id=$1 ORDER BY position',[id])).rows;if(!Array.isArray(problems)||problems.length>50)fail(400,'VALIDATION','训练最多 50 题');const selected=[],seen=new Set();for(const e of problems){const problemId=uuid(e.problemId),points=Number(e.points);if(seen.has(problemId))fail(400,'VALIDATION','同题不能重复选择');seen.add(problemId);if(!Number.isFinite(points)||points<=0||points>1000)fail(400,'VALIDATION','题目分值无效');const current=row(await db.query('SELECT current_version_id FROM problems WHERE id=$1 AND archived_at IS NULL',[problemId]));const version=row(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND problem_id=$2 AND published_at IS NOT NULL',[e.versionId?uuid(e.versionId):current.current_version_id,problemId]));if(helpers.versionAccess)await helpers.versionAccess(db,user,problemId,version.id);selected.push({problemId,versionId:version.id,points});}
+         const problems=body.problems??(await db.query(`SELECT problem_id AS "problemId",version_id AS "versionId",points,
+           reward_points AS "rewardPoints",speed_bonus_points AS "speedBonusPoints",attempt_bonus_points AS "attemptBonusPoints"
+           FROM timed_practice_problems WHERE practice_id=$1 ORDER BY position`,[id])).rows;
+         if(!Array.isArray(problems)||problems.length>50)fail(400,'VALIDATION','训练最多 50 题');
+         const previousRewards=new Map((await db.query(`SELECT problem_id,reward_points,speed_bonus_points,attempt_bonus_points
+           FROM timed_practice_problems WHERE practice_id=$1`,[id])).rows.map(p=>[p.problem_id,p]));
+         const selected=[],seen=new Set();
+         for(const e of problems){
+           const problemId=uuid(e.problemId),points=Number(e.points);
+           if(seen.has(problemId))fail(400,'VALIDATION','同题不能重复选择');
+           seen.add(problemId);
+           if(!Number.isFinite(points)||points<=0||points>1000)fail(400,'VALIDATION','题目分值无效');
+           const current=row(await db.query('SELECT current_version_id FROM problems WHERE id=$1 AND archived_at IS NULL',[problemId]));
+           const version=row(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND problem_id=$2 AND published_at IS NOT NULL',[e.versionId?uuid(e.versionId):current.current_version_id,problemId]));
+           if(helpers.versionAccess)await helpers.versionAccess(db,user,problemId,version.id);
+           selected.push({problemId,versionId:version.id,points,...rewardCaps(e,previousRewards.get(problemId))});
+         }
+         rewardBudget(selected);
          const participants=body.participants??(await db.query('SELECT identity_id FROM timed_practice_participants WHERE practice_id=$1 AND NOT exempt',[id])).rows.map(p=>p.identity_id);if(!Array.isArray(participants)||participants.length>500)fail(400,'VALIDATION','训练最多 500 名学生');for(const identityId of new Set(participants))if(!(await db.query("SELECT 1 FROM class_members cm JOIN identities i ON i.id=cm.identity_id WHERE cm.class_id=$1 AND cm.identity_id=$2 AND i.kind='student' AND i.archived_at IS NULL",[classId,uuid(identityId)])).rowCount)fail(400,'VALIDATION','训练成员须为本班有效学生');
-         await db.query('UPDATE timed_practices SET title=$1,class_id=$2,starts_at=$3,ends_at=$4,duration_minutes=$5,show_verdict=$6,description=$8 WHERE id=$7',[title,classId,startsAt,endsAt,duration,body.showVerdict??practice.show_verdict,id,body.description===undefined?practice.description:field(body.description,'训练说明',{min:0,max:10000})]);await db.query('DELETE FROM timed_practice_problems WHERE practice_id=$1',[id]);await db.query('DELETE FROM timed_practice_participants WHERE practice_id=$1',[id]);for(const[position,p]of selected.entries())await db.query('INSERT INTO timed_practice_problems(practice_id,problem_id,version_id,points,position) VALUES($1,$2,$3,$4,$5)',[id,p.problemId,p.versionId,p.points,position]);for(const identityId of new Set(participants))await db.query('INSERT INTO timed_practice_participants(practice_id,identity_id) VALUES($1,$2)',[id,identityId]);await audit(db,user,'timed.draft_edit',id);
+         await db.query('UPDATE timed_practices SET title=$1,class_id=$2,starts_at=$3,ends_at=$4,duration_minutes=$5,show_verdict=$6,description=$8 WHERE id=$7',[title,classId,startsAt,endsAt,duration,body.showVerdict??practice.show_verdict,id,body.description===undefined?practice.description:field(body.description,'训练说明',{min:0,max:10000})]);
+         await db.query('DELETE FROM timed_practice_problems WHERE practice_id=$1',[id]);
+         await db.query('DELETE FROM timed_practice_participants WHERE practice_id=$1',[id]);
+         for(const[position,p]of selected.entries())await db.query(`INSERT INTO timed_practice_problems(
+           practice_id,problem_id,version_id,points,position,reward_points,speed_bonus_points,attempt_bonus_points)
+           VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+           [id,p.problemId,p.versionId,p.points,position,p.rewardPoints,p.speedBonusPoints,p.attemptBonusPoints]);
+         for(const identityId of new Set(participants))await db.query('INSERT INTO timed_practice_participants(practice_id,identity_id) VALUES($1,$2)',[id,identityId]);
+         await audit(db,user,'timed.draft_edit',id);
         });return {status:200,body:await practiceResult(pool,user,id)};
       }
       if (!action && method === 'GET') return { status: 200, body: await practiceResult(pool, user, id) };
@@ -213,6 +300,7 @@ export function createTimedService(pool) {
           if(!(await db.query('SELECT 1 FROM timed_practice_problems WHERE practice_id=$1',[id])).rowCount||!(await db.query('SELECT 1 FROM timed_practice_participants WHERE practice_id=$1 AND NOT exempt',[id])).rowCount)fail(409,'INCOMPLETE','发布训练前须选择题目和适用学生');
           if (practice.state === 'Published') return;
           if (practice.state !== 'Draft') fail(409, 'INVALID_STATE', '当前训练不能发布');
+          rewardBudget((await db.query('SELECT reward_points,speed_bonus_points,attempt_bonus_points FROM timed_practice_problems WHERE practice_id=$1',[id])).rows.map((entry)=>rewardCaps(entry)));
           if (serverNow >= practice.ends_at) fail(409, 'INVALID_STATE', '结束窗口已过期，发布前请将结束时间设置为晚于当前时间');
           await db.query("UPDATE timed_practices SET state='Published' WHERE id=$1", [id]);
           await audit(db, user, 'timed.publish', id);
@@ -243,12 +331,56 @@ export function createTimedService(pool) {
           const active = await db.query(`SELECT 1 FROM timed_practice_participants part LEFT JOIN timed_attempts a ON a.practice_id=part.practice_id AND a.identity_id=part.identity_id
             WHERE part.practice_id=$1 AND NOT part.exempt AND ((a.id IS NULL AND NOT $4 AND $2::timestamptz<$3::timestamptz) OR (a.state='Active' AND a.finished_at IS NULL AND a.deadline_at>$2)) LIMIT 1`, [id, serverNow, practice.ends_at, !!practice.forced_ended_at]);
           if (active.rowCount) fail(409, 'TRAINING_ACTIVE', '仍有学生可以开始或正在答题，不能发布成绩');
+          // Workers may still finalize verdicts after the personal attempt has
+          // ended. Hold every existing practice submission stable while grades,
+          // first-AC candidates and reward entries are frozen in this transaction.
+          await db.query(`SELECT sub.id FROM submissions sub
+            JOIN timed_attempts attempt ON attempt.id=sub.timed_attempt_id
+            WHERE attempt.practice_id=$1 ORDER BY sub.id FOR SHARE OF sub`, [id]);
+          const unresolved = await db.query(`SELECT 1 FROM submissions sub
+            JOIN timed_attempts attempt ON attempt.id=sub.timed_attempt_id
+            JOIN timed_practice_participants participant ON participant.practice_id=attempt.practice_id
+              AND participant.identity_id=attempt.identity_id AND NOT participant.exempt
+            WHERE attempt.practice_id=$1 AND sub.kind='submit'
+              AND sub.created_at>=attempt.started_at
+              AND sub.created_at<=LEAST(attempt.deadline_at,COALESCE(attempt.finished_at,attempt.deadline_at))
+              AND (sub.status IN ('Waiting','Judging','System Error') OR sub.score IS NULL)
+            LIMIT 1`, [id]);
+          if (unresolved.rowCount) fail(409, 'INCOMPLETE_RESULTS', '仍有正式提交待评测或出现系统错误，请处理后再发布');
           const grades = await calculateGrades(db, practice);
           if (grades.some((grade) => grade.pending)) fail(409, 'INCOMPLETE_RESULTS', '最后一次正式提交仍待评测或出现系统错误，请处理后再发布');
-          if (!practice.results_published_at) for (const grade of grades) await db.query('INSERT INTO timed_result_snapshots(practice_id,identity_id,grade) VALUES($1,$2,$3)', [id, grade.identityId, grade]);
+          if (practice.results_published_at) {
+            const firstRelease = new Map((await db.query('SELECT identity_id,grade FROM timed_result_snapshots WHERE practice_id=$1', [id]))
+              .rows.map((entry) => [entry.identity_id, entry.grade]));
+            // Scores may be corrected later, but points were paid only at the
+            // first release. Keep the visible reward breakdown pinned to it.
+            for (const grade of grades) {
+              const original = new Map((firstRelease.get(grade.identityId)?.problems ?? [])
+                .map((problem) => [problem.problemId, problem]));
+              for (const problem of grade.problems) {
+                const paid = original.get(problem.problemId);
+                for (const key of ['rewardPoints','speedBonusPointsEarned','attemptBonusPointsEarned','totalRewardPoints','elapsedSeconds','formalAttempts'])
+                  problem[key] = paid?.[key] ?? (key === 'elapsedSeconds' ? null : 0);
+              }
+            }
+          }
+          if (!practice.results_published_at) {
+            await db.query(`INSERT INTO timed_first_ac_candidates(submission_id,practice_id)
+              SELECT sub.id,$1 FROM timed_attempts attempt
+              JOIN timed_practice_participants participant ON participant.practice_id=attempt.practice_id
+                AND participant.identity_id=attempt.identity_id AND NOT participant.exempt
+              JOIN submissions sub ON sub.timed_attempt_id=attempt.id AND sub.identity_id=attempt.identity_id
+              JOIN timed_practice_problems problem ON problem.practice_id=attempt.practice_id
+                AND problem.problem_id=sub.problem_id AND problem.version_id=sub.version_id
+              WHERE attempt.practice_id=$1 AND sub.kind='submit' AND sub.status='AC'
+                AND sub.created_at>=attempt.started_at
+                AND sub.created_at<=LEAST(attempt.deadline_at,COALESCE(attempt.finished_at,attempt.deadline_at))`, [id]);
+            for (const grade of grades) await db.query('INSERT INTO timed_result_snapshots(practice_id,identity_id,grade) VALUES($1,$2,$3)', [id, grade.identityId, grade]);
+          }
           const revisionNumber = Number((await db.query('SELECT COALESCE(max(revision),0)+1 AS next FROM timed_result_revisions WHERE practice_id=$1', [id])).rows[0].next);
           const revision = row(await db.query('INSERT INTO timed_result_revisions(practice_id,revision,grades,reason,actor_account_id) VALUES($1,$2,$3::jsonb,$4,$5) RETURNING id', [id, revisionNumber, JSON.stringify(grades), reason, user.id]));
           await db.query("UPDATE timed_practices SET state='ResultsPublished',results_published_at=COALESCE(results_published_at,$2),current_result_revision_id=$3 WHERE id=$1", [id, serverNow, revision.id]);
+          if (!practice.results_published_at) await settleTimedRewards(db, practice, grades);
           await audit(db, user, practice.results_published_at ? 'timed.results_revise' : 'timed.results_publish', id, { participants: grades.length, revision: revisionNumber, reason });
         } else if (action === 'archive') {
           if (practice.state === 'Archived') return;

@@ -412,6 +412,7 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
             <div className="mb-4 rounded-md border border-primary/20 bg-primary/5 p-4 text-sm leading-6">
               <p className="font-semibold">限时训练积分规则</p>
               <p className="mt-1 text-muted-foreground">每题首次 AC 积分是全站一次性奖励，已在别处领取则不会重复；本训练的奖励仅在个人截止前 AC 且首次发布成绩时结算。训练奖励 = 固定 AC 奖励 + ⌊速度上限 × max(0, 预设训练时长 − 实际用时) ÷ 预设训练时长⌋ + ⌊尝试上限 ÷ 本题正式提交次数⌋。实际用时从服务器记录的训练开始到最终计分的有效 AC 提交接收计算，不使用截止倒计时余量；提交次数包括这次 AC。未 AC 不得训练奖励。三项上限跨全部题合计最多 100 积分，和训练成绩分值分开。</p>
+              <p className="mt-1 text-muted-foreground">训练固定、速度及少尝试奖励只计个人积分；校级排名积分只来自管理员审核公开题的有效首次正式 AC，训练成绩公布后才结算。</p>
             </div>
             <Table headers={["顺序", "题目", "分值", "首次 AC", "训练 AC 奖励", "速度上限", "尝试上限", "操作"]} min={1100}>
               {problems.map((p, i) => (
@@ -712,6 +713,7 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
           <p className="mt-4 text-sm leading-6 text-muted-foreground">
             确认开始后固定个人截止时间，统一窗口与预设训练时长中先到的时间为准。草稿和自测不会计分。只有个人截止前最终计分的有效 AC 才能在首次发布成绩时领取训练奖励：固定积分 + ⌊速度上限 × max(0, 预设训练时长 − 实际用时) ÷ 预设训练时长⌋ + ⌊尝试上限 ÷ 本题正式提交次数⌋。实际用时按服务器开始到 AC 接收计算，不使用截止倒计时余量。首次 AC 积分全站只领取一次；成绩由教师另行发布。
           </p>
+          <p className="mt-2 text-sm text-muted-foreground">上述训练额外奖励只进入个人积分，不计入校级积分排行榜。</p>
           <Feedback action={action} />
           <div className="mt-5 flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setModal(null)}>

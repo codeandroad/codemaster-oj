@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
-import { productionApi, type ProductionProblem } from "@/lib/production-api";
+import { productionApi, type CampusUser, type ProductionProblem } from "@/lib/production-api";
 import {
   area,
   Drawer,
@@ -52,7 +52,16 @@ export interface Group {
   problemIds: string[];
   canEdit: boolean;
 }
-export function TeacherBanks({ bankId }: { bankId?: string | undefined }) {
+export function reviewVisibilityLabel(problem: ProductionProblem, bankVisibility?: "school" | "private") {
+  if (!problem.published) return problem.publishedVersionId ? "当前草稿未开放 · 旧版保持原范围" : "草稿未向学生开放";
+  const visibility = problem.bankVisibility ?? bankVisibility;
+  if (visibility !== "school") return "仅指定活动学生可见";
+  if (problem.schoolVisibleAt) return problem.rankReviewStatus === "approved" ? "全校可见 · 参与积分榜" : "全校可见 · 未纳入积分榜";
+  if (problem.rankReviewStatus === "revoked") return "已撤下 · 仅指定活动学生可见";
+  return problem.rankReviewStatus === "rejected" ? "审核未通过 · 仅指定活动学生可见" : "待管理员审核 · 仅指定活动学生可见";
+}
+
+export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; user: CampusUser }) {
   const router = useRouter(),
     search = useSearchParams(),
     banks = useData<{ items: Bank[] }>("problem-banks"),
@@ -122,7 +131,7 @@ export function TeacherBanks({ bankId }: { bankId?: string | undefined }) {
           bankId
             ? bank?.description ||
               "题库内可使用分组整理题目，分组不会改变访问权限与成绩。"
-            : "组织课程题目，创建练习，维护题面和测试数据。"
+            : "组织课程题目，创建练习，维护题面和测试数据。教师发布题目后，校内公开与积分资格仍须管理员逐版审核。"
         }
         action={
           <div className="flex gap-2">
@@ -150,6 +159,9 @@ export function TeacherBanks({ bankId }: { bankId?: string | undefined }) {
           </div>
         }
       />
+      <p className="mt-3 rounded-md border border-border bg-surface-subtle px-4 py-3 text-sm leading-6 text-muted-foreground">
+        教师新建题库默认为私有；如需让题目对全校学生开放，请联系管理员将题库纳入校内审核。发布到校内题库的新版本在审核通过前仅负责教师和指定活动学生可见，不计入积分排行榜。
+      </p>
       <State resource={banks} />
       <State resource={problems} />
       <State resource={groups} />
@@ -180,7 +192,7 @@ export function TeacherBanks({ bankId }: { bankId?: string | undefined }) {
                 </td>
                 <td>
                   {item.visibility === "school"
-                    ? "全校学生（已发布）"
+                    ? "校内题库（题目逐版审核）"
                     : "维护教师 / 获授教师"}
                 </td>
                 <td className="text-muted-foreground">
@@ -370,6 +382,7 @@ export function TeacherBanks({ bankId }: { bankId?: string | undefined }) {
                           : (problem.validationStatus ?? "Draft")
                       }
                     />
+                    <p className="mt-1 max-w-52 text-xs leading-5 text-muted-foreground">{reviewVisibilityLabel(problem, banks.data?.items.find((x) => x.id === problem.bankId)?.visibility)}</p>
                   </td>
                   <td>
                     <Link
@@ -398,6 +411,7 @@ export function TeacherBanks({ bankId }: { bankId?: string | undefined }) {
       )}
       {create && (
         <CreateBank
+          allowSchool={user.roles.includes("admin")}
           onClose={() => setCreate(false)}
           onCreated={(id) => {
             router.push(`/teacher/problems/banks/${id}`);
@@ -515,9 +529,11 @@ export function GroupTags({
   );
 }
 export function CreateBank({
+  allowSchool,
   onClose,
   onCreated,
 }: {
+  allowSchool: boolean;
   onClose: () => void;
   onCreated: (id: string) => void;
 }) {
@@ -558,12 +574,13 @@ export function CreateBank({
             </select>
           </Field>
           <Field label="可见范围">
-            <select name="visibility" className={input}>
-              <option value="private">仅维护教师 / 共享教师</option>
-              <option value="school">全校学生（仅已发布题）</option>
-            </select>
+            {allowSchool ? <select name="visibility" className={input}>
+              <option value="private">教师私有</option>
+              <option value="school">校内题库（题目逐版审核）</option>
+            </select> : <><input type="hidden" name="visibility" value="private" /><p className={`${input} flex items-center bg-surface-subtle text-muted-foreground`}>教师私有</p></>}
           </Field>
         </div>
+        <p className="text-xs leading-5 text-muted-foreground">{allowSchool ? "校内题库仅代表题目可以提交审核；管理员逐版通过前，不会全校公开或计入积分榜。" : "如需全校可见，请联系管理员将题库纳入校内审核；审核通过前，题目仅向指定活动学生开放。"}</p>
         <Feedback action={action} />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>

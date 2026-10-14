@@ -22,7 +22,7 @@ const row=(result,message='资源不存在')=>{if(!result.rowCount) fail(404,'NO
 const identityIds=(value,name,max=500)=>{if(value===undefined)return [];if(!Array.isArray(value)||value.length>max)fail(400,'VALIDATION',`${name}须为最多 ${max} 项的 ID 数组`);return [...new Set(value.map(id=>uuid(id,name)))];};
 const userShape=r=>({id:r.id,identityId:r.identity_id,name:r.name,number:r.number,username:r.username,email:r.email||null,nickname:r.nickname,bio:r.bio,avatar:r.avatar,roles:r.roles,activatedAt:r.created_at});
 const personShape=r=>({id:r.id,kind:r.kind,number:r.number,name:r.name,classes:r.classes||[],activated:!!r.activated});
-const problemShape=(r,{includeDisabledSamples=false}={})=>({...Object.fromEntries(Object.entries(r.metadata||{}).filter(([key])=>!['editorial','hints'].includes(key))),id:r.problem_id,title:r.title,mode:r.mode,statement:r.statement,functionName:r.function_name,starterCode:r.starter_code,starterCodes:starterCodesFor(r),supportedLanguages:LANGUAGES,languageLimits:languageLimitsFor(r),referenceLanguage:r.reference_language||'python',samples:(r.samples||[]).filter(sample=>includeDisabledSamples||sample.enabled!==false),timeLimitMs:r.time_limit_ms,memoryLimitMb:r.memory_limit_mb,comparator:r.comparator,tags:r.tags||[],source:r.source||'',versionId:r.id,publishedVersionId:r.published_version_id||(r.published_at?r.id:null),publishedTitle:r.published_title||(r.published_at?r.title:null),published:!!r.published_at,validationStatus:r.validation_status,validationMessage:r.validation_message||null,formalTestCount:r.formal_test_count===undefined?undefined:Number(r.formal_test_count),canPublish:r.validation_status==='AC'&&!r.published_at});
+const problemShape=(r,{includeDisabledSamples=false}={})=>({...Object.fromEntries(Object.entries(r.metadata||{}).filter(([key])=>!['editorial','hints'].includes(key))),id:r.problem_id,title:r.title,mode:r.mode,statement:r.statement,functionName:r.function_name,starterCode:r.starter_code,starterCodes:starterCodesFor(r),supportedLanguages:LANGUAGES,languageLimits:languageLimitsFor(r),referenceLanguage:r.reference_language||'python',samples:(r.samples||[]).filter(sample=>includeDisabledSamples||sample.enabled!==false),timeLimitMs:r.time_limit_ms,memoryLimitMb:r.memory_limit_mb,comparator:r.comparator,tags:r.tags||[],source:r.source||'',versionId:r.id,publishedVersionId:r.published_version_id||(r.published_at?r.id:null),publishedTitle:r.published_title||(r.published_at?r.title:null),published:!!r.published_at,schoolVisibleAt:r.school_visible_at??null,rankReviewStatus:r.rank_review_status??'pending',rankApprovedAt:r.rank_approved_at??null,bankVisibility:r.bank_visibility,validationStatus:r.validation_status,validationMessage:r.validation_message||null,formalTestCount:r.formal_test_count===undefined?undefined:Number(r.formal_test_count),canPublish:r.validation_status==='AC'&&!r.published_at});
 const submissionShape=r=>({id:`SUB${r.id}`,identityId:r.identity_id,problemId:r.problem_id,problemTitle:r.problem_title,versionId:r.version_id,kind:r.kind,language:r.language||'python',status:r.status,score:r.score===null?null:Number(r.score),passed:r.passed,total:r.total,createdAt:r.created_at,code:r.code,publicOutput:r.public_output||null,message:r.public_message||null,assignmentId:r.assignment_id||null,timedPracticeId:r.timed_practice_id||null,timedAttemptId:r.timed_attempt_id||null,originalSubmissionId:r.original_submission_id?`SUB${r.original_submission_id}`:null,studentName:r.student_name});
 const reviewEntryShape=r=>({id:r.id,note:r.note,createdAt:r.created_at,submissionId:`SUB${r.submission_id}`,problemTitle:r.problem_title,problemId:r.problem_id,versionId:r.version_id,timedPracticeId:r.timed_practice_id||null,timedAttemptId:r.timed_attempt_id||null,originalSubmissionId:r.original_submission_id?`SUB${r.original_submission_id}`:null,status:r.status,authorName:r.author_name,authorIdentityId:r.author_identity_id});
 const reviewEntryQuery='SELECT r.id,r.note,r.created_at,s.id submission_id,s.problem_id,s.version_id,s.original_submission_id,s.status,s.identity_id,s.timed_attempt_id,v.title problem_title,i.id author_identity_id,i.name author_name FROM review_entries r JOIN submissions s ON s.id=r.submission_id JOIN problem_versions v ON v.id=s.version_id JOIN accounts a ON a.id=r.author_account_id JOIN identities i ON i.id=a.identity_id';
@@ -81,12 +81,20 @@ export async function createDomainServices(pool,config) {
   }
   const own=isStaff(user)&&(p.owner_account_id===user.id||rolesInclude(user,'admin'));let bankRead=false;
   if(isStaff(user)){try{bankRead=(await bankAccess(db,user,p.bank_id)).canRead;}catch(error){if(!['FORBIDDEN','NOT_FOUND'].includes(error.code))throw error;}}
-  const r=versionId?await db.query('SELECT * FROM problem_versions WHERE id=$1 AND problem_id=$2',[versionId,problemId]):own||bankRead?await db.query('SELECT * FROM problem_versions WHERE problem_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1',[problemId]):await db.query('SELECT * FROM problem_versions WHERE id=$1',[p.current_version_id]);
+  if(!versionId&&!own&&!bankRead){
+   // A pending replacement must not displace the latest approved public
+   // version. Assigned students can still reach an exact pending version.
+   const candidates=(await db.query(`SELECT * FROM problem_versions WHERE problem_id=$1 AND published_at IS NOT NULL
+    ORDER BY (school_visible_at IS NOT NULL) DESC,published_at DESC,created_at DESC,id DESC`,[problemId])).rows;
+   for(const candidate of candidates){const permissions=await problemPermissions(db,user,p,candidate);if(permissions.canRead)return {p,v:candidate,owner:permissions.canEdit,permissions};}
+   fail(404,'NOT_FOUND','题目不存在');
+  }
+  const r=versionId?await db.query('SELECT * FROM problem_versions WHERE id=$1 AND problem_id=$2',[versionId,problemId]):await db.query('SELECT * FROM problem_versions WHERE problem_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1',[problemId]);
   const v=row(r);
   const permissions=await problemPermissions(db,user,p,v);if(!permissions.canRead)fail(404,'NOT_FOUND','题目不存在');return {p,v,owner:permissions.canEdit,permissions};
  }
  async function problemResult(db,user,problemId,versionId) {
-  const {p,v,owner,permissions}=await versionAccess(db,user,problemId,versionId);const result=problemShape(v,{includeDisabledSamples:owner});result.publishedVersionId=p.current_version_id;result.bankId=p.bank_id;result.canEdit=owner;result.canPublish=owner&&result.canPublish;
+  const {p,v,owner,permissions}=await versionAccess(db,user,problemId,versionId);const result=problemShape(v,{includeDisabledSamples:owner});result.publishedVersionId=owner?p.current_version_id:v.id;result.publishedTitle=owner?result.publishedTitle:v.title;result.bankId=p.bank_id;result.bankVisibility=(await db.query('SELECT visibility FROM problem_banks WHERE id=$1',[p.bank_id])).rows[0]?.visibility;result.canEdit=owner;result.canPublish=owner&&result.canPublish;
   result.firstAcPoints=(await db.query('SELECT COALESCE((SELECT points FROM point_rewards WHERE problem_id=$1 AND assignment_id IS NULL),10) first_ac_points',[problemId])).rows[0].first_ac_points;
   if(owner){Object.assign(result,v.metadata||{});result.referenceCode=v.reference_code;result.tests=(await db.query('SELECT input,expected,weight,name,enabled FROM test_cases WHERE version_id=$1 ORDER BY position',[v.id])).rows.map(t=>({...t,weight:Number(t.weight)}));result.formalTestCount=result.tests.filter(t=>t.enabled).length;}else {const metadata=v.metadata||{},hasAC=!!(await db.query("SELECT 1 FROM submissions WHERE identity_id=$1 AND version_id=$2 AND kind IN ('submit','correction') AND status='AC' AND timed_attempt_id IS NULL LIMIT 1",[user.identityId,v.id])).rowCount;const allow=permissions.canRunFree&&(metadata.hintPolicy==='always'||metadata.hintPolicy!=='never'&&hasAC);if(allow){result.editorial=metadata.editorial||'';result.hints=metadata.hints||[];}else {result.editorial='';result.hints=[];}}return result;
  }
@@ -284,7 +292,41 @@ export async function createDomainServices(pool,config) {
   let m;
   for (const handler of [handleFavorites,handleLibrary]) { const result=await handler(context); if(result)return result; }
    if(route==='/problems'&&method==='GET'){
-    const rows=(await pool.query(`SELECT v.*,(SELECT count(*) FROM test_cases tc WHERE tc.version_id=v.id AND tc.enabled) formal_test_count,p.bank_id,p.current_version_id published_version_id,pv.title published_title,($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission='edit')) can_edit FROM problems p JOIN problem_banks bank ON bank.id=p.bank_id LEFT JOIN bank_permissions bp ON bp.bank_id=bank.id AND bp.account_id=$1 JOIN LATERAL (SELECT * FROM problem_versions v WHERE v.problem_id=p.id AND ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit')) OR v.id=p.current_version_id AND v.published_at IS NOT NULL) ORDER BY v.created_at DESC,v.id DESC LIMIT 1) v ON true LEFT JOIN problem_versions pv ON pv.id=p.current_version_id AND pv.published_at IS NOT NULL WHERE p.archived_at IS NULL AND bank.archived_at IS NULL AND ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit')) OR v.published_at IS NOT NULL AND bank.visibility='school' OR $5 AND EXISTS(SELECT 1 FROM assignment_problems ap JOIN assignments assignment ON assignment.id=ap.assignment_id AND assignment.state='Published' JOIN assignment_participants part ON part.assignment_id=ap.assignment_id WHERE ap.version_id=v.id AND part.identity_id=$4 AND NOT part.exempt) OR $5 AND EXISTS(SELECT 1 FROM timed_practice_problems tp JOIN timed_practices practice ON practice.id=tp.practice_id JOIN timed_practice_participants part ON part.practice_id=tp.practice_id LEFT JOIN timed_attempts attempt ON attempt.practice_id=tp.practice_id AND attempt.identity_id=part.identity_id WHERE tp.version_id=v.id AND part.identity_id=$4 AND NOT part.exempt AND (practice.results_published_at IS NOT NULL OR attempt.id IS NOT NULL))) AND ($6::uuid IS NULL OR bank.id=$6) ORDER BY p.created_at DESC LIMIT 500`,[user.id,rolesInclude(user,'admin'),rolesInclude(user,'teacher'),user.identityId,rolesInclude(user,'student'),url.searchParams.get('bankId')?uuid(url.searchParams.get('bankId')):null])).rows;
+    const rows=(await pool.query(`SELECT v.*,
+     (SELECT count(*) FROM test_cases tc WHERE tc.version_id=v.id AND tc.enabled) formal_test_count,
+     p.bank_id,bank.visibility bank_visibility,
+     CASE WHEN $2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit'))
+      THEN p.current_version_id ELSE v.id END published_version_id,
+     CASE WHEN $2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit'))
+      THEN pv.title ELSE v.title END published_title,
+     ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission='edit')) can_edit
+    FROM problems p JOIN problem_banks bank ON bank.id=p.bank_id
+    LEFT JOIN bank_permissions bp ON bp.bank_id=bank.id AND bp.account_id=$1
+    JOIN LATERAL (
+     SELECT * FROM problem_versions v WHERE v.problem_id=p.id AND (
+      $2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit'))
+      OR v.published_at IS NOT NULL AND bank.visibility='school' AND v.school_visible_at IS NOT NULL
+      OR $5 AND v.published_at IS NOT NULL AND EXISTS (
+       SELECT 1 FROM assignment_problems ap JOIN assignments assignment
+        ON assignment.id=ap.assignment_id AND assignment.state='Published'
+       JOIN assignment_participants part ON part.assignment_id=ap.assignment_id
+       WHERE ap.version_id=v.id AND part.identity_id=$4 AND NOT part.exempt)
+      OR $5 AND v.published_at IS NOT NULL AND EXISTS (
+       SELECT 1 FROM timed_practice_problems tp JOIN timed_practices practice ON practice.id=tp.practice_id
+       JOIN timed_practice_participants part ON part.practice_id=tp.practice_id
+       LEFT JOIN timed_attempts attempt ON attempt.practice_id=tp.practice_id AND attempt.identity_id=part.identity_id
+       WHERE tp.version_id=v.id AND part.identity_id=$4 AND NOT part.exempt
+        AND (practice.results_published_at IS NOT NULL OR attempt.id IS NOT NULL))
+     ) ORDER BY
+      CASE WHEN $2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit'))
+        THEN 0 WHEN bank.visibility='school' AND v.school_visible_at IS NOT NULL THEN 1 ELSE 2 END,
+      CASE WHEN $2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit'))
+       THEN v.created_at ELSE v.published_at END DESC NULLS LAST,v.created_at DESC,v.id DESC LIMIT 1
+    ) v ON true
+    LEFT JOIN problem_versions pv ON pv.id=p.current_version_id AND pv.published_at IS NOT NULL
+    WHERE p.archived_at IS NULL AND bank.archived_at IS NULL
+     AND ($6::uuid IS NULL OR bank.id=$6)
+    ORDER BY p.created_at DESC LIMIT 500`,[user.id,rolesInclude(user,'admin'),rolesInclude(user,'teacher'),user.identityId,rolesInclude(user,'student'),url.searchParams.get('bankId')?uuid(url.searchParams.get('bankId')):null])).rows;
     const problemIds=rows.map(r=>r.problem_id),ownProgress=await problemOwnProgress(pool,user,problemIds);
     const configured=(await pool.query('SELECT problem_id,points FROM point_rewards WHERE assignment_id IS NULL AND problem_id=ANY($1::uuid[])',[problemIds])).rows;
     const firstAcPoints=new Map(configured.map(reward=>[reward.problem_id,reward.points]));
@@ -368,8 +410,11 @@ export async function createDomainServices(pool,config) {
      }
      if(!resolvedVersion&&timedPracticeId)resolvedVersion=row(await db.query('SELECT version_id FROM timed_practice_problems WHERE practice_id=$1 AND problem_id=$2',[timedPracticeId,problemId])).version_id;
      if(!resolvedVersion&&originalId)resolvedVersion=(await submissionAccess(db,user,originalId)).version_id;
-     const {p,permissions}=await versionAccess(db,user,problemId,resolvedVersion);
-     let v=row(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND published_at IS NOT NULL',[resolvedVersion||p.current_version_id]),'学生运行需要已发布题目');
+     const {p,v:accessibleVersion,permissions}=await versionAccess(db,user,problemId,resolvedVersion);
+     // A student may still see an older approved version while a replacement
+     // awaits review. Submit exactly the version that access checked.
+     const submissionVersion=resolvedVersion||(permissions.canEdit||!accessibleVersion.published_at?p.current_version_id:accessibleVersion.id);
+     let v=row(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND published_at IS NOT NULL',[submissionVersion]),'学生运行需要已发布题目');
      let acceptedAt=row(await db.query('SELECT clock_timestamp() AS accepted_at')).accepted_at;
      if(assignment&&kind==='submit'){
       const time=row(await db.query('SELECT clock_timestamp() AS accepted_at,clock_timestamp() <= $1 AS allowed',[assignment.due_at]));

@@ -64,7 +64,7 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
     assert.equal(forbidden.status,403);assert.equal(forbidden.data.error.code,'FORBIDDEN');
     assert.equal((await request('/api/v1/classes',{auth:student})).status,200);
     const problem=(await pool.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id',[adminId])).rows[0];
-    const version=(await pool.query("INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code,validation_status,published_at) VALUES($1,'笔记测试题','stdio','输出一',1000,64,'print(1)','AC',now()) RETURNING id",[problem.id])).rows[0];
+    const version=(await pool.query("INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code,validation_status,published_at,school_visible_at) VALUES($1,'笔记测试题','stdio','输出一',1000,64,'print(1)','AC',now(),now()) RETURNING id",[problem.id])).rows[0];
     await pool.query('UPDATE problems SET current_version_id=$1 WHERE id=$2',[version.id,problem.id]);
     const historical=await request(`/api/v1/problems/${problem.id}`,{auth:student});
     assert.equal(historical.status,200);assert.equal(historical.data.referenceLanguage,'python');
@@ -114,6 +114,7 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
     assert.equal((await request('/api/v1/problems/import',{auth:admin})).status,200);
     const sampleDraft=await request('/api/v1/problems',{method:'POST',auth:admin,body:{saveDraft:true,title:'样例启用状态',mode:'stdio',statement:'输出一',referenceCode:'console.log(1)',referenceLanguage:'javascript',starterCodes:{javascript:'console.log(1)',cpp:'#include <iostream>\nint main(){std::cout<<1;}'},samples:[{input:'',expected:'1',name:'公开样例',enabled:true},{input:'disabled-private-sample',expected:'wrong',name:'停用样例',enabled:false}],tests:[{input:'',expected:'1',weight:100}]}});assert.equal(sampleDraft.status,201);assert.equal(sampleDraft.data.samples[1].name,'停用样例');assert.equal(sampleDraft.data.samples[1].enabled,false);assert.equal(sampleDraft.data.referenceLanguage,'javascript');assert.equal(sampleDraft.data.starterCodes.javascript,'console.log(1)');
     await pool.query("UPDATE problem_versions SET validation_status='AC' WHERE id=$1",[sampleDraft.data.versionId]);assert.equal((await request(`/api/v1/problems/${sampleDraft.data.id}/publish`,{method:'POST',auth:admin,body:{versionId:sampleDraft.data.versionId}})).status,200);
+    assert.equal((await request(`/api/v1/problems/${sampleDraft.data.id}/rank-review`,{method:'PATCH',auth:admin,body:{versionId:sampleDraft.data.versionId,decision:'approved'}})).status,200);
     const ownerSamples=await request(`/api/v1/problems/${sampleDraft.data.id}`,{auth:admin});assert.equal(ownerSamples.data.samples.length,2);
     const studentSamples=await request(`/api/v1/problems/${sampleDraft.data.id}`,{auth:student});assert.equal(studentSamples.data.samples.length,1);assert.equal(studentSamples.data.samples[0].name,'公开样例');
     assert.equal(JSON.stringify((await request('/api/v1/problems',{auth:student})).data).includes('disabled-private-sample'),false);

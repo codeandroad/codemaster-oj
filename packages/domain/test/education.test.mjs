@@ -58,6 +58,7 @@ test('learning and reports: real persistence, publication, progress isolation an
   });
   const problem=await teacher('/problems',{title:'Report Sum',mode:'stdio',statement:'Print 3',samples:[{input:'',expected:'3'}],tests:[{input:'',expected:'3',weight:100}],referenceCode:'print(3)',starterCode:''},'POST',201);
   await pool.query("UPDATE problem_versions SET validation_status='AC' WHERE id=$1",[problem.versionId]);await teacher(`/problems/${problem.id}/publish`,{versionId:problem.versionId});
+  await admin(`/problems/${problem.id}/rank-review`,{versionId:problem.versionId,decision:'approved'},'PATCH');
   await teacher(`/chapters/${chapter.id}`,{problemIds:[problem.id]},'PATCH');
   assert.equal((await student(`/learning-paths/${draft.id}`)).chapters[0].problems[0].versionId,problem.versionId);
   await t.test('published lessons cannot grant private-bank access',async()=>{

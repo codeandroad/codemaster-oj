@@ -58,13 +58,13 @@ test('Nest profile routes preserve authentication, class access and CSRF for gue
    assert.equal(visible.status,200);
    assert.equal(visible.data.profile.nickname,'Alpha');
    assert.equal(JSON.stringify(visible.data).includes('LEGAL-alpha'),false);
-   assert.equal((await request(profile,{auth:o})).status,404);
+   assert.equal((await request(profile,{auth:o})).status,200,'active students may open public profiles across classes');
    assert.equal((await request(profile,{auth:admin})).status,200);
    assert.equal((await request(`${profile}/activity`,{auth:b})).status,200);
    const messages=`${profile}/messages`;
    assert.equal((await request(messages,{auth:b})).status,200);
    assert.equal((await request(messages,{method:'POST',body:{body:'Hi'},auth:b,csrf:false})).status,403);
-   assert.equal((await request(messages,{method:'POST',body:{body:'Hi'},auth:o})).status,404);
+   assert.equal((await request(messages,{method:'POST',body:{body:'Hi'},auth:o})).status,201,'active students may leave cross-class messages');
    const posted=await request(messages,{method:'POST',body:{body:'Great work'},auth:b});
    assert.equal(posted.status,201,JSON.stringify(posted.data));
    assert.equal(posted.data.author.nickname,'Beta');

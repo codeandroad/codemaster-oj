@@ -33,11 +33,11 @@ type VisibleFields = Record<OptionalField, boolean>;
 interface LeaderboardContext {
   id: string;
   name: string;
-  canManage: boolean;
-  visibleFields: VisibleFields;
 }
 interface LeaderboardContextsResponse {
   items: LeaderboardContext[];
+  visibleFields: VisibleFields;
+  canManage: boolean;
 }
 interface LeaderboardResponse {
   items: RankedStudent[];
@@ -45,7 +45,7 @@ interface LeaderboardResponse {
   page: number;
   pageSize: number;
   me?: RankedStudent | null;
-  classId: string;
+  classId: string | null;
   visibleFields: VisibleFields;
 }
 
@@ -75,6 +75,8 @@ function pageNumbers(current: number, last: number): (number | "…")[] {
 }
 
 function LeaderboardRow({ person, current, visibleFields, workspace, classId }: { person: RankedStudent; current: boolean; visibleFields: VisibleFields; workspace: CampusRole; classId: string }) {
+  const profileQuery = new URLSearchParams({ from: "points" });
+  if (classId) profileQuery.set("classId", classId);
   return (
     <tr className={`border-t border-border ${current ? "bg-primary/6 hover:!bg-primary/10" : ""}`}>
       <td className={`px-5 py-4 font-semibold tabular-nums ${person.rank <= 3 ? "text-primary" : "text-muted-foreground"}`}>
@@ -82,7 +84,7 @@ function LeaderboardRow({ person, current, visibleFields, workspace, classId }: 
       </td>
       <td className="px-4 py-4">
         <Link
-          href={`/${workspace}/people/${encodeURIComponent(person.id)}?${new URLSearchParams({ from: "points", classId })}`}
+          href={`/${workspace}/people/${encodeURIComponent(person.id)}?${profileQuery}`}
           className="inline-flex min-w-36 items-center gap-3 rounded-md text-foreground hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           {person.avatar ? (
@@ -105,31 +107,33 @@ function LeaderboardRow({ person, current, visibleFields, workspace, classId }: 
   );
 }
 
-function LeaderboardForClass({
-  user, context, staff, workspace, onContextUpdated,
+function LeaderboardTable({
+  user, classId, configuredFields, canManage, staff, workspace, onSettingsUpdated,
 }: {
   user: CampusUser;
-  context: LeaderboardContext;
+  classId: string;
+  configuredFields: VisibleFields;
+  canManage: boolean;
   staff: boolean;
   workspace: CampusRole;
-  onContextUpdated: () => void;
+  onSettingsUpdated: () => void;
 }) {
   const [period, setPeriod] = useState<RankingPeriod>("all");
   const [page, setPage] = useState(1);
-  const [draftFields, setDraftFields] = useState<VisibleFields>(context.visibleFields);
-  const [savedFields, setSavedFields] = useState<VisibleFields>(context.visibleFields);
+  const [draftFields, setDraftFields] = useState<VisibleFields>(configuredFields);
+  const [savedFields, setSavedFields] = useState<VisibleFields>(configuredFields);
   const [saving, setSaving] = useState(false);
   const [settingsMessage, setSettingsMessage] = useState("");
   const [settingsError, setSettingsError] = useState(false);
   const pageSize = 10;
-  const ranking = useData<LeaderboardResponse>(`points/leaderboard?classId=${encodeURIComponent(context.id)}&period=${period}&page=${page}&pageSize=${pageSize}`);
+  const ranking = useData<LeaderboardResponse>(`points/leaderboard?${new URLSearchParams({ ...(classId ? { classId } : {}), period, page: String(page), pageSize: String(pageSize) })}`);
   const total = ranking.data?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const start = total ? (page - 1) * pageSize + 1 : 0;
   const end = Math.min(page * pageSize, total);
   const me = ranking.data?.me;
   const showMe = me && !ranking.data?.items.some((person) => person.id === me.id);
-  const visibleFields = staff ? allFieldsVisible : ranking.data?.visibleFields ?? context.visibleFields;
+  const visibleFields = staff ? allFieldsVisible : ranking.data?.visibleFields ?? configuredFields;
   const optionalCount = fieldLabels.filter(({ field }) => visibleFields[field]).length;
   const tableWidth = optionalCount === 3 ? "min-w-[700px]" : optionalCount === 2 ? "min-w-[580px]" : optionalCount === 1 ? "min-w-[500px]" : "min-w-[420px]";
   const dirtySettings = fieldLabels.some(({ field }) => draftFields[field] !== savedFields[field]);
@@ -139,13 +143,13 @@ function LeaderboardForClass({
     setSettingsMessage("");
     setSettingsError(false);
     try {
-      await productionApi(`points/leaderboard/contexts/${encodeURIComponent(context.id)}`, {
+      await productionApi("points/leaderboard/settings", {
         method: "PATCH",
         body: { visibleFields: draftFields },
       });
       setSavedFields({ ...draftFields });
-      setSettingsMessage("此班级的学生端排行榜字段已更新。");
-      onContextUpdated();
+      setSettingsMessage("全校学生端排行榜字段已更新。");
+      onSettingsUpdated();
       ranking.reload();
     } catch (error) {
       setSettingsMessage(apiMessage(error));
@@ -158,7 +162,7 @@ function LeaderboardForClass({
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3">
-        <p className="text-sm text-muted-foreground">按所选时间段入账积分排名，同分并列。</p>
+        <p className="text-sm text-muted-foreground">按所选时间段获得的校级积分排名，同分并列。</p>
         <div role="group" aria-label="排行榜时间范围" className="inline-flex rounded-md border border-border bg-surface-subtle p-1">
           {rankingPeriods.map((option) => (
             <button
@@ -173,11 +177,11 @@ function LeaderboardForClass({
           ))}
         </div>
       </div>
-      {staff && context.canManage && (
+      {canManage && (
         <fieldset className="border-b border-border bg-surface-subtle px-5 py-4">
-          <legend className="sr-only">{context.name}学生端排行榜字段</legend>
+          <legend className="sr-only">全校学生端排行榜字段</legend>
           <p className="text-sm font-semibold">学生端显示字段</p>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">仅影响此班级的学生视图；排名、昵称和积分始终显示。教师查看时保留全部统计。</p>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">管理员统一设置全校学生视图；排名、昵称和积分始终显示。教师与管理员查看时保留全部统计。</p>
           <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3">
             {fieldLabels.map(({ field, label }) => (
               <label key={field} className="inline-flex min-h-9 cursor-pointer items-center gap-2 text-sm">
@@ -216,7 +220,7 @@ function LeaderboardForClass({
                   <tr>
                     <th scope="col" className="px-5 py-3">排名</th>
                     <th scope="col" className="px-4 py-3">学生</th>
-                    <th scope="col" className="px-4 py-3 text-right">积分</th>
+                    <th scope="col" className="px-4 py-3 text-right">校级积分</th>
                     {visibleFields.solvedProblems && <th scope="col" className="px-4 py-3 text-right">解题数</th>}
                     {visibleFields.attempts && <th scope="col" className="px-4 py-3 text-right">提交次数</th>}
                     {visibleFields.acRate && <th scope="col" className="px-5 py-3 text-right">
@@ -225,14 +229,14 @@ function LeaderboardForClass({
                   </tr>
                 </thead>
                 <tbody>
-                  {ranking.data?.items.map((person) => <LeaderboardRow key={person.id} person={person} current={person.id === user.identityId} visibleFields={visibleFields} workspace={workspace} classId={context.id} />)}
-                  {showMe && <LeaderboardRow person={me} current visibleFields={visibleFields} workspace={workspace} classId={context.id} />}
+                  {ranking.data?.items.map((person) => <LeaderboardRow key={person.id} person={person} current={person.id === user.identityId} visibleFields={visibleFields} workspace={workspace} classId={classId} />)}
+                  {showMe && <LeaderboardRow person={me} current visibleFields={visibleFields} workspace={workspace} classId={classId} />}
                 </tbody>
               </table>
-              {!ranking.data?.items.length && !showMe && <p className="px-5 py-8 text-center text-sm text-muted-foreground">此时间段暂无积分记录。</p>}
+              {!ranking.data?.items.length && !showMe && <p className="px-5 py-8 text-center text-sm text-muted-foreground">当前范围暂无学生。</p>}
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3 text-sm text-muted-foreground">
-              <span>{total ? `显示 ${start}–${end} / ${rankNumber.format(total)} 名已获积分学生` : "暂无已获积分学生"}{showMe ? " · 我的数据单独显示" : ""}</span>
+              <span>{total ? `显示 ${start}–${end} / ${rankNumber.format(total)} 名学生` : "暂无学生"}{showMe ? " · 我的数据单独显示" : ""}</span>
               <nav aria-label="排行榜分页" className="flex items-center gap-2">
                 <button type="button" aria-label="上一页" disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className="rounded border border-border px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-50">‹</button>
                 {pageNumbers(page, pages).map((number, index) => number === "…" ? (
@@ -266,40 +270,39 @@ function Leaderboard({ user, staff, workspace }: { user: CampusUser; staff: bool
   const [selectedClassId, setSelectedClassId] = useState(requestedClassId ?? "");
   useEffect(() => { setSelectedClassId(requestedClassId ?? ""); }, [requestedClassId]);
   const classes = contexts.data?.items ?? [];
-  const selectedClass = classes.find((item) => item.id === selectedClassId) ?? classes[0];
+  const selectedClass = classes.find((item) => item.id === selectedClassId);
+  const effectiveClassId = selectedClass?.id ?? "";
   const selectClass = (id: string) => {
     setSelectedClassId(id);
     const next = new URLSearchParams(searchParams.toString());
-    next.set("classId", id);
-    window.history.replaceState(null, "", `?${next.toString()}`);
+    if (id) next.set("classId", id);
+    else next.delete("classId");
+    window.history.replaceState(null, "", `${window.location.pathname}${next.size ? `?${next}` : ""}`);
   };
 
   return (
-    <section className="mt-5 w-full overflow-hidden rounded-lg border border-border bg-surface xl:w-3/5" aria-labelledby="leaderboard-heading">
+    <section className="mt-5 w-full overflow-hidden rounded-lg border border-border bg-surface" aria-labelledby="leaderboard-heading">
       <div className="border-b border-border px-5 py-5">
-        <h2 id="leaderboard-heading" className="text-lg font-semibold">学生积分榜</h2>
-        <p className="mt-1 text-sm text-muted-foreground">以全站积分在班级内排名；各班级可分别设置学生看到的统计字段。</p>
+        <h2 id="leaderboard-heading" className="text-lg font-semibold">积分排行榜</h2>
+        <p className="mt-1 text-sm text-muted-foreground">默认展示全校学生，可筛选班级。校级积分只来自管理员审核公开题目后的首次有效 AC；学生端显示字段由管理员统一设置。</p>
       </div>
       <State data={contexts}>
-        {!selectedClass ? (
-          <p className="px-5 py-8 text-sm text-muted-foreground">暂无可查看的班级排行榜。请联系教师确认班级成员身份。</p>
-        ) : (
+        {contexts.data && (
           <>
             <div className="border-b border-border px-5 py-3">
-              {classes.length > 1 ? (
-                <label className="inline-flex flex-wrap items-center gap-2 text-sm font-medium">
-                  班级
-                  <select
-                    value={selectedClass.id}
-                    onChange={(event) => selectClass(event.target.value)}
-                    className="min-h-9 max-w-full rounded-md border border-border bg-surface px-3 text-sm focus-visible:outline-2 focus-visible:outline-primary"
-                  >
-                    {classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                  </select>
-                </label>
-              ) : <p className="text-sm font-medium">班级：{selectedClass.name}</p>}
+              <label className="inline-flex flex-wrap items-center gap-2 text-sm font-medium">
+                范围
+                <select
+                  value={effectiveClassId}
+                  onChange={(event) => selectClass(event.target.value)}
+                  className="min-h-9 max-w-full rounded-md border border-border bg-surface px-3 text-sm focus-visible:outline-2 focus-visible:outline-primary"
+                >
+                  <option value="">全校学生</option>
+                  {classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+              </label>
             </div>
-            <LeaderboardForClass key={selectedClass.id} user={user} context={selectedClass} staff={staff} workspace={workspace} onContextUpdated={contexts.reload} />
+            <LeaderboardTable key={effectiveClassId || "school"} user={user} classId={effectiveClassId} configuredFields={contexts.data.visibleFields} canManage={contexts.data.canManage} staff={staff} workspace={workspace} onSettingsUpdated={contexts.reload} />
           </>
         )}
       </State>
@@ -316,7 +319,7 @@ function assignmentProblemHref(assignmentId: string, problem: Assignment["proble
 }
 
 export function PointsPage({ user, student = true, workspace = "student" }: { user: CampusUser; student?: boolean; workspace?: CampusRole }) {
-  const me = useData<{ points: number }>(student ? "points/me" : "");
+  const me = useData<{ points: number; rankPoints: number }>(student ? "points/me" : "");
   const staff = user.roles.some((role) => role === "teacher" || role === "admin");
   const admin = user.roles.includes("admin");
   const problems = useData<{ items: ProductionProblem[] }>(admin ? "problems" : "");
@@ -331,10 +334,10 @@ export function PointsPage({ user, student = true, workspace = "student" }: { us
 
   return (
     <>
-      <PageHeader title="积分与奖励" description="首次正式通过题目获得积分；努力有记录，进步有回响。" />
-      {student && <p className="mt-4">我的积分：<strong>{me.data?.points ?? "…"}</strong></p>}
+      <PageHeader title="积分与奖励" description="记录解题进步与活动奖励。" />
+      {student && <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm"><p>个人累计积分：<strong>{me.data?.points ?? "…"}</strong></p><p>全校榜积分：<strong>{me.data?.rankPoints ?? "…"}</strong></p></div>}
       <p className="mt-2 text-sm text-muted-foreground">
-        默认每题首次 AC 10 分。重复提交和样例运行不计分；作业和限时训练可设置额外奖励。未公开计时成绩公布后计分。
+        每题首次 AC 默认获得 10 分个人积分，管理员可逐题调整。作业、限时训练奖励计入个人积分；只有管理员审核公开后的有效正式 AC 计入全校榜，审核前的成绩不追溯。限时训练待成绩公布后结算。
       </p>
       <Leaderboard user={user} staff={!student} workspace={workspace} />
       {staff && (

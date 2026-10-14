@@ -31,7 +31,7 @@ export async function problemPermissions(db,user,problem,version) {
  const bankOwner=isStaff(user)&&bank.owner_account_id===user.id;
  const staffRead=isStaff(user)&&(bankOwner||['read','edit'].includes(grant));
  const canEdit=!problem.archived_at&&(own||(isStaff(user)&&(bankOwner||grant==='edit')));
- const schoolRead=!!version.published_at&&bank.visibility==='school'&&!bank.archived_at&&!problem.archived_at;
+ const schoolRead=!!version.published_at&&!!version.school_visible_at&&bank.visibility==='school'&&!bank.archived_at&&!problem.archived_at;
  if(own||(!bank.archived_at&&staffRead)||schoolRead)return {canRead:true,canEdit:canEdit&&!bank.archived_at,canRunFree:true};
  // A teacher who currently manages the class can still inspect the exact
  // selected version after private-bank access changes, including in a draft.
@@ -71,6 +71,60 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
  const {audit,versionAccess,submissionAccess}=helpers;
  const result=body=>({status:200,body});
  const bankShape=a=>({id:a.bank.id,name:a.bank.name,description:a.bank.description,course:a.bank.course,updatedAt:a.bank.updated_at,createdAt:a.bank.created_at,problemCount:a.bank.problemCount??0,visibility:a.bank.visibility,permission:a.permission,canEdit:a.canEdit,canContribute:a.canContribute,isSystem:a.bank.is_system});
+ const reviewShape=r=>({problemId:r.problem_id,versionId:r.version_id,title:r.title,bankId:r.bank_id,bankName:r.bank_name,bankVisibility:r.bank_visibility,ownerName:r.owner_name,publishedAt:r.published_at,schoolVisibleAt:r.school_visible_at,rankReviewStatus:r.rank_review_status,rankApprovedAt:r.rank_approved_at,rankReviewReason:r.rank_review_reason,priorAcCount:Number(r.prior_ac_count),isCurrent:r.is_current});
+ if(route==='/problems/rank-review'&&method==='GET'){
+  if(!isAdmin(user))fail(403,'FORBIDDEN','仅管理员可审核校内公开题');
+  const rows=(await pool.query(`SELECT p.id problem_id,v.id version_id,v.title,b.id bank_id,b.name bank_name,
+    b.visibility bank_visibility,COALESCE(i.name,'管理员') owner_name,v.published_at,
+    v.school_visible_at,v.rank_review_status,v.rank_approved_at,v.rank_review_reason,
+    (v.id=p.current_version_id) is_current,
+    (SELECT count(DISTINCT s.identity_id)::int FROM submissions s
+     WHERE s.version_id=v.id AND s.status='AC' AND s.kind IN ('submit','correction')) prior_ac_count
+   FROM problems p JOIN problem_banks b ON b.id=p.bank_id
+   JOIN problem_versions v ON v.problem_id=p.id AND v.published_at IS NOT NULL
+   LEFT JOIN accounts a ON a.id=p.owner_account_id LEFT JOIN identities i ON i.id=a.identity_id
+   WHERE p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school'
+   ORDER BY CASE WHEN v.id=p.current_version_id AND v.rank_review_status='pending' THEN 0
+    WHEN v.rank_review_status='rejected' THEN 1 WHEN v.school_visible_at IS NOT NULL THEN 2 ELSE 3 END,
+    v.published_at DESC,p.id LIMIT 500`)).rows;
+  return result({items:rows.map(reviewShape)});
+ }
+ let reviewMatch=route.match(/^\/problems\/([^/]+)\/rank-review$/);
+ if(reviewMatch&&method==='PATCH'){
+  if(!isAdmin(user))fail(403,'FORBIDDEN','仅管理员可审核校内公开题');
+  const problemId=uuid(reviewMatch[1],'题目 ID'),versionId=uuid(body.versionId,'版本 ID');
+  const decision=enumValue(body.decision,['approved','rejected','revoked'],'审核决定');
+  const reason=decision==='rejected'||decision==='revoked'?field(body.reason,decision==='revoked'?'撤下原因':'驳回原因',{max:1000}):null;
+  return result(await transaction(pool,async db=>{
+   const p=required(await db.query(`SELECT p.id,p.current_version_id,p.archived_at,b.id bank_id,b.name bank_name,
+    b.visibility bank_visibility,b.archived_at bank_archived_at,i.name owner_name
+    FROM problems p JOIN problem_banks b ON b.id=p.bank_id
+    LEFT JOIN accounts a ON a.id=p.owner_account_id LEFT JOIN identities i ON i.id=a.identity_id
+    WHERE p.id=$1 FOR UPDATE OF p,b`,[problemId]));
+   if(p.archived_at||p.bank_archived_at||p.bank_visibility!=='school')fail(409,'NOT_SCHOOL_PUBLIC','仅能审核校内题库中未归档题目');
+   const v=required(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND problem_id=$2 FOR UPDATE',[versionId,problemId]));
+   if(!v.published_at)fail(409,'UNPUBLISHED','只能审核已发布题目版本');
+   if(v.rank_review_status==='revoked')fail(409,'REVIEW_TERMINAL','已撤下版本不能恢复；请发布新版本');
+   if(decision==='revoked'){
+    if(!v.school_visible_at)fail(409,'NOT_SCHOOL_VISIBLE','只有已经校内公开的版本可撤下');
+   }else{
+    if(p.current_version_id!==versionId)fail(409,'VERSION_CHANGED','只能审核当前已发布版本');
+    if(v.rank_review_status==='approved')fail(409,'APPROVAL_IMMUTABLE','已批准版本不可重复审核，可通过撤下操作停止公开');
+   }
+   await db.query(`UPDATE problem_versions SET rank_review_status=$1,
+    rank_reviewed_at=clock_timestamp(),rank_reviewed_by=$2,rank_review_reason=$3,
+    school_visible_at=CASE WHEN $1='approved' THEN COALESCE(school_visible_at,clock_timestamp()) ELSE NULL END,
+    rank_approved_at=CASE WHEN $1='approved' THEN clock_timestamp() ELSE rank_approved_at END
+    WHERE id=$4`,[decision,user.id,reason,versionId]);
+   await audit(db,user.id,decision==='approved'?'problem.school_approve':decision==='rejected'?'problem.school_reject':'problem.school_revoke','problem_version',versionId,{problemId,versionId,reason});
+   const reviewed=required(await db.query(`SELECT v.id version_id,v.title,v.published_at,v.school_visible_at,
+    v.rank_review_status,v.rank_approved_at,v.rank_review_reason,
+    (SELECT count(DISTINCT s.identity_id)::int FROM submissions s WHERE s.version_id=v.id
+     AND s.status='AC' AND s.kind IN ('submit','correction')) prior_ac_count
+    FROM problem_versions v WHERE v.id=$1`,[versionId]));
+   return reviewShape({...reviewed,problem_id:problemId,bank_id:p.bank_id,bank_name:p.bank_name,bank_visibility:p.bank_visibility,owner_name:p.owner_name,is_current:p.current_version_id===versionId});
+  }));
+ }
  if(route==='/teachers'&&method==='GET') {
   if(!isStaff(user))fail(403,'FORBIDDEN','需要教师权限');const items=(await pool.query("SELECT i.id,i.name,i.number FROM identities i JOIN accounts a ON a.identity_id=i.id JOIN account_roles r ON r.account_id=a.id WHERE r.role='teacher' AND a.disabled_at IS NULL AND a.binding_released_at IS NULL AND i.archived_at IS NULL ORDER BY i.name")).rows;return result({items});
  }
@@ -87,15 +141,45 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
  }
  if(route==='/problem-banks'&&method==='GET') {
   const banks=(await pool.query('SELECT * FROM problem_banks WHERE archived_at IS NULL ORDER BY is_system DESC,created_at')).rows;
-  const items=[];for(const bank of banks){try{const access=await bankAccess(pool,user,bank.id);access.bank.problemCount=Number((await pool.query('SELECT count(*) FROM problems WHERE bank_id=$1 AND archived_at IS NULL AND ($2 OR current_version_id IS NOT NULL)',[bank.id,access.canRead])).rows[0].count);items.push(bankShape(access));}catch(error){if(error.code!=='FORBIDDEN')throw error;}}return result({items});
+  const items=[];for(const bank of banks){try{const access=await bankAccess(pool,user,bank.id);access.bank.problemCount=Number((await pool.query(`SELECT count(*) FROM problems p
+   WHERE p.bank_id=$1 AND p.archived_at IS NULL
+    AND ($2::boolean OR p.owner_account_id=$3 OR
+     $4::boolean AND EXISTS (SELECT 1 FROM problem_versions v WHERE v.problem_id=p.id
+       AND v.published_at IS NOT NULL AND v.school_visible_at IS NOT NULL))`,
+   [bank.id,access.canRead||isAdmin(user),user.id,bank.visibility==='school'])).rows[0].count);items.push(bankShape(access));}catch(error){if(error.code!=='FORBIDDEN')throw error;}}return result({items});
  }
  if(route==='/problem-banks'&&method==='POST') {
   if(!isStaff(user))fail(403,'FORBIDDEN','需要教师权限');const name=field(body.name,'题库名称'),description=field(body.description??'','题库简介',{min:0,max:4000}),course=field(body.course??'Python','课程标签',{max:100}),visibility=enumValue(body.visibility??'private',['private','school'],'题库范围');
+  if(visibility==='school'&&!isAdmin(user))fail(403,'FORBIDDEN','校内公开题库须由管理员创建');
   const bank=await transaction(pool,async db=>{const bank=required(await db.query('INSERT INTO problem_banks(name,visibility,owner_account_id,description,course) VALUES($1,$2,$3,$4,$5) RETURNING *',[name,visibility,user.id,description,course]));await audit(db,user.id,'bank.create','problem_bank',bank.id,{visibility});return bank;});return {status:201,body:bankShape({bank,permission:'owner',canEdit:true,canContribute:true})};
  }
  let m=route.match(/^\/problem-banks\/([^/]+)$/);
  if(m&&method==='PATCH') {
-  const bank=await transaction(pool,async db=>{const access=await bankAccess(db,user,m[1]);if(!access.owner)fail(403,'FORBIDDEN','只有题库所有者可以修改权限范围');if(access.bank.is_system)fail(409,'SYSTEM_BANK','系统校内题库不能修改或归档');const name=body.name===undefined?access.bank.name:field(body.name,'题库名称'),visibility=body.visibility===undefined?access.bank.visibility:enumValue(body.visibility,['private','school'],'题库范围');if(body.archived!==undefined&&typeof body.archived!=='boolean')fail(400,'VALIDATION','归档状态无效');const description=body.description===undefined?access.bank.description:field(body.description,'题库简介',{min:0,max:4000}),course=body.course===undefined?access.bank.course:field(body.course,'课程标签',{max:100});const updated=required(await db.query('UPDATE problem_banks SET name=$1,visibility=$2,archived_at=CASE WHEN $3 THEN now() ELSE NULL END,description=$5,course=$6,updated_at=now() WHERE id=$4 RETURNING *',[name,visibility,body.archived??false,m[1],description,course]));await audit(db,user.id,'bank.update','problem_bank',m[1],{visibility,archived:!!body.archived});return updated;});return result(bankShape({bank,permission:'owner',canEdit:true,canContribute:true}));
+  const bank=await transaction(pool,async db=>{
+   const access=await bankAccess(db,user,m[1]);
+   if(!access.owner)fail(403,'FORBIDDEN','只有题库所有者可以修改权限范围');
+   if(access.bank.is_system)fail(409,'SYSTEM_BANK','系统校内题库不能修改或归档');
+   const name=body.name===undefined?access.bank.name:field(body.name,'题库名称');
+   const visibility=body.visibility===undefined?access.bank.visibility:enumValue(body.visibility,['private','school'],'题库范围');
+   if(visibility!==access.bank.visibility&&!isAdmin(user))fail(403,'FORBIDDEN','题库校内可见性只能由管理员调整');
+   if(body.archived!==undefined&&typeof body.archived!=='boolean')fail(400,'VALIDATION','归档状态无效');
+   if(body.archived&&access.bank.visibility==='school'&&!isAdmin(user))fail(403,'FORBIDDEN','校内公开题库只能由管理员归档');
+   // Serialize bank demotion with per-version review. Otherwise an approved
+   // public version could become private without a revocation timestamp, and
+   // its historical submission statistics would silently disappear.
+   await db.query('SELECT id FROM problem_banks WHERE id=$1 FOR UPDATE',[access.bank.id]);
+   if(access.bank.visibility==='school'&&(visibility==='private'||body.archived)){
+    const visible=await db.query(`SELECT 1 FROM problems p JOIN problem_versions v ON v.problem_id=p.id
+     WHERE p.bank_id=$1 AND p.archived_at IS NULL AND v.school_visible_at IS NOT NULL LIMIT 1`,[access.bank.id]);
+    if(visible.rowCount)fail(409,'REVOKE_PUBLIC_VERSIONS','请先在题目审核中撤下该题库所有已公开版本');
+   }
+   const description=body.description===undefined?access.bank.description:field(body.description,'题库简介',{min:0,max:4000});
+   const course=body.course===undefined?access.bank.course:field(body.course,'课程标签',{max:100});
+   const updated=required(await db.query('UPDATE problem_banks SET name=$1,visibility=$2,archived_at=CASE WHEN $3 THEN now() ELSE NULL END,description=$5,course=$6,updated_at=now() WHERE id=$4 RETURNING *',[name,visibility,body.archived??false,m[1],description,course]));
+   await audit(db,user.id,'bank.update','problem_bank',m[1],{visibility,archived:!!body.archived});
+   return updated;
+  });
+  return result(bankShape({bank,permission:'owner',canEdit:true,canContribute:true}));
  }
  m=route.match(/^\/problem-banks\/([^/]+)\/permissions(?:\/([^/]+))?$/);
  if(m) {

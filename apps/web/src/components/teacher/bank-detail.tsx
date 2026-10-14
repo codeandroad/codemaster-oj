@@ -12,7 +12,7 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
 import { productionApi, type ProductionProblem } from "@/lib/production-api";
-import { Bank, Group, GroupTags, ManageGroups } from "./problem-banks";
+import { Bank, Group, GroupTags, ManageGroups, reviewVisibilityLabel } from "./problem-banks";
 import {
   Drawer,
   Feedback,
@@ -124,6 +124,9 @@ export function TeacherBankDetail({ id }: { id: string }) {
           </div>
         }
       />
+      <p className="mt-3 rounded-md border border-border bg-surface-subtle px-4 py-3 text-sm leading-6 text-muted-foreground">
+        {bank?.visibility === "school" ? "今后发布的新版本需管理员逐版审核；审核前仅指定活动学生可见，审核通过后才开放全校自由练习并参与后续积分排名。" : "教师私有题库不会直接对全校公开。如需开放，请联系管理员纳入校内审核；已发布题目仍需逐版审核。"}
+      </p>
       <State resource={banks} />
       <State resource={problems} />
       <State resource={groups} />
@@ -328,6 +331,7 @@ export function TeacherBankDetail({ id }: { id: string }) {
                               : (p.validationStatus ?? "Draft")
                           }
                         />
+                        <p className="mt-1 max-w-52 text-xs leading-5 text-muted-foreground">{reviewVisibilityLabel(p, bank?.visibility)}</p>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">

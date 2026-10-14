@@ -582,6 +582,7 @@ function AssignmentEditorForm({
                   <p className="mt-1 text-xs text-muted-foreground">
                     每题首次正式 AC 默认奖励 10 积分（管理员可调整）；本作业额外奖励在此逐题设置，只有首次通过该作业题目时追加。
                   </p>
+                  <p className="mt-1 text-xs text-muted-foreground">作业额外奖励只计个人积分；校级排名积分只来自管理员审核公开题的有效首次正式 AC。</p>
                   {rewardTotal > 100 && (
                     <p role="alert" className="mt-1 text-xs text-destructive">
                       本作业额外奖励合计最多 100 积分，请减少逐题奖励。
@@ -971,6 +972,7 @@ function AssignmentEditorForm({
                   </tr>
                 ))}
               </Table>
+              <p className="mt-2 text-xs text-muted-foreground">作业额外奖励计入个人积分，不计入校级积分排行榜。</p>
               <p className="mt-4 text-xs text-muted-foreground">
                 只有已勾选的学生看到作业、截止时间和进度；公开样例运行不会改变作业成绩。
               </p>

@@ -7,6 +7,7 @@ try {
     GRANT USAGE ON SCHEMA public TO campus_app, campus_worker;
     GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO campus_app;
     GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO campus_app;
+    REVOKE INSERT, UPDATE, DELETE ON school_rank_ledger FROM campus_app, campus_worker;
     REVOKE ALL ON schema_migrations FROM campus_app;
     GRANT SELECT ON schema_migrations TO campus_app;
     GRANT SELECT, UPDATE ON judge_tasks TO campus_worker;

@@ -40,6 +40,16 @@ export class LibraryController {
     return applyResponse(response, await this.domain.execute('library', request.domainContext));
   }
 
+  @Get('problems/rank-review')
+  async rankReviewQueue(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('library', request.domainContext));
+  }
+
+  @Patch('problems/:id/rank-review')
+  async reviewRankedProblem(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('library', request.domainContext));
+  }
+
   @Get('problems/:id')
   async problem(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('library', request.domainContext));

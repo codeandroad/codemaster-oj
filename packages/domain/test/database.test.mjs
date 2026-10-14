@@ -68,11 +68,73 @@ test('real PostgreSQL + HTTP: atomic identities, permissions, immutable versions
    assert.equal((await request(`/problems/${draft.data.id}/publish`,'POST',{versionId:draft.data.versionId},teacher)).status,409);
    await pool.query("UPDATE problem_versions SET validation_status='AC' WHERE id=$1",[draft.data.versionId]);
    assert.equal((await request(`/problems/${draft.data.id}/publish`,'POST',{versionId:draft.data.versionId},teacher)).status,200);
+   assert.equal((await request(`/problems/${draft.data.id}`,'GET',null,student)).status,404);
+   assert.equal((await request(`/problems/${draft.data.id}/rank-review`,'PATCH',{versionId:draft.data.versionId,decision:'approved'},admin)).status,200);
    const publicProblem=await request(`/problems/${draft.data.id}`,'GET',null,student);assert.equal(publicProblem.status,200);assert(!('tests'in publicProblem.data));assert(!('referenceCode'in publicProblem.data));assert(!JSON.stringify(publicProblem.data).includes('secret'));
    await assert.rejects(()=>pool.query('UPDATE test_cases SET expected=$1 WHERE version_id=$2',['modified',draft.data.versionId]),/immutable/);
    await assert.rejects(()=>pool.query('UPDATE problem_versions SET statement=$1 WHERE id=$2',['modified',draft.data.versionId]),/immutable/);
   });
   const a=await request('/assignments','POST',{title:'练习一',classId:cls.data.id,dueAt:new Date(Date.now()+60000).toISOString(),problems:[{problemId:draft.data.id,points:50}],participants:[p.person.id]},teacher);assert.equal(a.status,201,JSON.stringify(a.data));
+  await t.test('school visibility requires per-version administrator review without blocking assigned private work',async()=>{
+   assert.equal((await request('/problem-banks','POST',{name:'教师不能直接建校内库',visibility:'school'},teacher)).status,403);
+   const bank=await request('/problem-banks','POST',{name:'待审核题库',visibility:'private'},teacher);assert.equal(bank.status,201);
+   assert.equal((await request(`/problem-banks/${bank.data.id}`,'PATCH',{visibility:'school'},teacher)).status,403);
+   assert.equal((await request(`/problem-banks/${bank.data.id}`,'PATCH',{visibility:'school'},admin)).status,200);
+   const created=await request('/problems','POST',{...input,bankId:bank.data.id,title:'未审核题'},teacher);assert.equal(created.status,201);
+   await pool.query("UPDATE problem_versions SET validation_status='AC' WHERE id=$1",[created.data.versionId]);
+   assert.equal((await request(`/problems/${created.data.id}/publish`,'POST',{versionId:created.data.versionId},teacher)).status,200);
+   assert.equal((await request(`/problems/${created.data.id}`,'GET',null,student)).status,404);
+   assert.equal((await request('/problems','GET',null,student)).data.items.some(problem=>problem.id===created.data.id),false);
+   assert.equal((await request('/problems/rank-review','GET',null,teacher)).status,403);
+   assert.equal((await request(`/problems/${created.data.id}/rank-review`,'PATCH',{versionId:created.data.versionId,decision:'approved'},teacher)).status,403);
+   const pending=(await request('/problems/rank-review','GET',null,admin)).data.items.find(problem=>problem.problemId===created.data.id);
+   assert.equal(pending.rankReviewStatus,'pending');assert.equal(pending.schoolVisibleAt,null);
+   const assigned=await request('/assignments','POST',{title:'指定学生私有题',classId:cls.data.id,dueAt:new Date(Date.now()+60000).toISOString(),problems:[{problemId:created.data.id,points:100}],participants:[p.person.id]},teacher);
+   assert.equal(assigned.status,201);assert.equal((await request(`/problems/${created.data.id}?versionId=${created.data.versionId}`,'GET',null,student)).status,200);
+   assert.equal((await request(`/problems/${created.data.id}/rank-review`,'PATCH',{versionId:created.data.versionId,decision:'rejected',reason:'题面仍需复核'},admin)).status,200);
+   assert.equal((await request(`/problems/${created.data.id}/rank-review`,'PATCH',{versionId:created.data.versionId,decision:'approved'},admin)).status,200);
+   const publicProblem=await request(`/problems/${created.data.id}`,'GET',null,student);assert.equal(publicProblem.status,200);assert.equal(publicProblem.data.rankReviewStatus,'approved');
+   const revision=await request(`/problems/${created.data.id}/versions`,'POST',{...input,bankId:bank.data.id,title:'未审新版'},teacher);assert.equal(revision.status,201);
+   assert.equal((await request('/problems','GET',null,teacher)).data.items.find(problem=>problem.id===created.data.id)?.versionId,revision.data.versionId);
+   await pool.query("UPDATE problem_versions SET validation_status='AC' WHERE id=$1",[revision.data.versionId]);
+   assert.equal((await request(`/problems/${created.data.id}/publish`,'POST',{versionId:revision.data.versionId},teacher)).status,200);
+   assert.equal((await request(`/problems/${created.data.id}?versionId=${revision.data.versionId}`,'GET',null,student)).status,404);
+   assert.equal((await request(`/problems/${created.data.id}/rank-review`,'PATCH',{versionId:created.data.versionId,decision:'approved'},admin)).status,409);
+   assert.equal((await request(`/problems/${created.data.id}?versionId=${created.data.versionId}`,'GET',null,student)).status,200);
+   const priorDefault=await request(`/problems/${created.data.id}`,'GET',null,other);
+   assert.equal(priorDefault.status,200);assert.equal(priorDefault.data.versionId,created.data.versionId);
+   const priorSubmission=await request('/submissions','POST',{kind:'samples',problemId:created.data.id,code:'print(3)',idempotencyKey:randomUUID()},other);
+   assert.equal(priorSubmission.status,201,JSON.stringify(priorSubmission.data));
+   assert.equal(priorSubmission.data.versionId,created.data.versionId,'submission without versionId must use the same public version shown to the student');
+   assert.equal((await request('/problems','GET',null,other)).data.items.find(problem=>problem.id===created.data.id)?.versionId,created.data.versionId);
+   assert.equal((await request('/problem-banks','GET',null,other)).data.items.find(item=>item.id===bank.data.id)?.problemCount,1);
+   const older=(await request('/problems/rank-review','GET',null,admin)).data.items.find(item=>item.versionId===created.data.versionId);
+   assert.equal(older.isCurrent,false);
+   // Legacy public versions can still have pending review after migration.
+   await pool.query('UPDATE problem_versions SET school_visible_at=clock_timestamp() WHERE id=$1',[revision.data.versionId]);
+   assert.equal((await request(`/problems/${created.data.id}`,'GET',null,other)).data.versionId,revision.data.versionId);
+   const rejected=await request(`/problems/${created.data.id}/rank-review`,'PATCH',{versionId:revision.data.versionId,decision:'rejected',reason:'历史公开版题面不应公开'},admin);
+   assert.equal(rejected.status,200);assert.equal(rejected.data.schoolVisibleAt,null);
+   assert.equal((await request(`/problems/${created.data.id}`,'GET',null,other)).data.versionId,created.data.versionId);
+   assert.equal((await request(`/problems/${created.data.id}/rank-review`,'PATCH',{versionId:created.data.versionId,decision:'revoked',reason:'撤下待复核题面'},teacher)).status,403);
+   const revoked=await request(`/problems/${created.data.id}/rank-review`,'PATCH',{versionId:created.data.versionId,decision:'revoked',reason:'撤下待复核题面'},admin);
+   assert.equal(revoked.status,200);assert.equal(revoked.data.isCurrent,false);
+   assert.equal(revoked.data.rankReviewStatus,'revoked');assert.equal(revoked.data.schoolVisibleAt,null);
+   assert.equal(revoked.data.rankApprovedAt,older.rankApprovedAt);
+   assert.equal((await request(`/problems/${created.data.id}`,'GET',null,other)).status,404);
+   assert.equal((await request('/problems','GET',null,other)).data.items.some(problem=>problem.id===created.data.id),false);
+   assert.equal((await request('/problem-banks','GET',null,other)).data.items.find(item=>item.id===bank.data.id)?.problemCount,0);
+   assert.equal((await request(`/problems/${created.data.id}?versionId=${created.data.versionId}`,'GET',null,student)).status,200);
+   assert.equal((await request(`/problems/${created.data.id}/rank-review`,'PATCH',{versionId:created.data.versionId,decision:'approved'},admin)).status,409);
+   const legacy=await request(`/problems/${created.data.id}/versions`,'POST',{...input,bankId:bank.data.id,title:'历史公开待审版'},teacher);
+   assert.equal(legacy.status,201);await pool.query("UPDATE problem_versions SET validation_status='AC' WHERE id=$1",[legacy.data.versionId]);
+   assert.equal((await request(`/problems/${created.data.id}/publish`,'POST',{versionId:legacy.data.versionId},teacher)).status,200);
+   await pool.query('UPDATE problem_versions SET school_visible_at=clock_timestamp() WHERE id=$1',[legacy.data.versionId]);
+   assert.equal((await request(`/problems/${created.data.id}`,'GET',null,other)).data.versionId,legacy.data.versionId);
+   const emergency=await request(`/problems/${created.data.id}/rank-review`,'PATCH',{versionId:legacy.data.versionId,decision:'revoked',reason:'历史版本应急撤下'},admin);
+   assert.equal(emergency.status,200);assert.equal(emergency.data.rankReviewStatus,'revoked');assert.equal(emergency.data.rankApprovedAt,null);
+   assert.equal((await request(`/problems/${created.data.id}`,'GET',null,other)).status,404);
+  });
   const subBody={problemId:draft.data.id,assignmentId:a.data.id,kind:'submit',code:'print(3)',idempotencyKey:randomUUID()};
   const sub=await request('/submissions','POST',subBody,student);assert.equal(sub.status,201,JSON.stringify(sub.data));
   await t.test('admission is idempotent and permissions/CSRF prevent forged operations',async()=>{
@@ -114,7 +176,7 @@ test('real PostgreSQL + HTTP: atomic identities, permissions, immutable versions
   await t.test('function protocol errors are rejected before a submission or judge task is created',async()=>{
    const fnInput={...input,title:'函数求和',mode:'function',functionName:'add',samples:[{input:'[1,2]',expected:'3'}],tests:[{input:'[2,3]',expected:'5',weight:100}],referenceCode:'def add(a,b):\n    return a+b'};
    assert.equal((await request('/problems','POST',{...fnInput,samples:[{input:'{"args":[],"kwargs":null}',expected:'3'}]},teacher)).status,400);
-   const fn=await request('/problems','POST',fnInput,teacher);assert.equal(fn.status,201);await pool.query("UPDATE problem_versions SET validation_status='AC' WHERE id=$1",[fn.data.versionId]);assert.equal((await request(`/problems/${fn.data.id}/publish`,'POST',{versionId:fn.data.versionId},teacher)).status,200);
+   const fn=await request('/problems','POST',fnInput,teacher);assert.equal(fn.status,201);await pool.query("UPDATE problem_versions SET validation_status='AC' WHERE id=$1",[fn.data.versionId]);assert.equal((await request(`/problems/${fn.data.id}/publish`,'POST',{versionId:fn.data.versionId},teacher)).status,200);assert.equal((await request(`/problems/${fn.data.id}/rank-review`,'PATCH',{versionId:fn.data.versionId,decision:'approved'},admin)).status,200);
    const count=(await pool.query('SELECT count(*)::int n FROM submissions')).rows[0].n;
    for(const customInput of ['broken','{"args":[],"kwargs":[]}','{"args":[],"other":1}']){const invalid=await request('/submissions','POST',{problemId:fn.data.id,versionId:fn.data.versionId,kind:'custom',customInput,code:'def add(a,b): return a+b',idempotencyKey:randomUUID()},student);assert.equal(invalid.status,400,JSON.stringify(invalid.data));}
    assert.equal((await pool.query('SELECT count(*)::int n FROM submissions')).rows[0].n,count);
@@ -200,8 +262,11 @@ test('real PostgreSQL + HTTP: atomic identities, permissions, immutable versions
    assert.equal((await request('/problems/import','POST',{...body,rows:[{...input,title:'不同内容'}]},teacher)).status,409);assert(!first.data.items[0].problem.published);assert.equal(first.data.items[0].problem.validationStatus,'Waiting');
   });
   await t.test('private timed questions cannot bypass feedback embargo through free practice, corrections or notebook status',async()=>{
-   const learner=await login(student.data.user.username,'Concurrent-reset-pass-2026');const bank=await request('/problem-banks','POST',{name:'训练前曾公开的题库',visibility:'school'},teacher);assert.equal(bank.status,201);const created=await request('/problems','POST',{...input,bankId:bank.data.id,title:'私有计时专用题'},teacher);assert.equal(created.status,201);await pool.query("UPDATE problem_versions SET validation_status='AC' WHERE id=$1",[created.data.versionId]);await request(`/problems/${created.data.id}/publish`,'POST',{versionId:created.data.versionId},teacher);
-   const historical=await request('/submissions','POST',{problemId:created.data.id,versionId:created.data.versionId,kind:'submit',code:'print(3)',idempotencyKey:randomUUID()},learner);assert.equal(historical.status,201);await pool.query("UPDATE submissions SET status='WA',score=0,passed=0,total=1 WHERE id=$1",[historical.data.id.slice(3)]);await pool.query("UPDATE judge_tasks SET state='completed' WHERE submission_id=$1",[historical.data.id.slice(3)]);assert.equal((await request(`/problem-banks/${bank.data.id}`,'PATCH',{visibility:'private'},teacher)).status,200);
+   const learner=await login(student.data.user.username,'Concurrent-reset-pass-2026');const bank=await request('/problem-banks','POST',{name:'训练前曾公开的题库',visibility:'school'},admin);assert.equal(bank.status,201);assert.equal((await request(`/problem-banks/${bank.data.id}/permissions`,'POST',{identityId:teacherPerson.person.id,permission:'edit'},admin)).status,200);const created=await request('/problems','POST',{...input,bankId:bank.data.id,title:'私有计时专用题'},teacher);assert.equal(created.status,201);await pool.query("UPDATE problem_versions SET validation_status='AC' WHERE id=$1",[created.data.versionId]);await request(`/problems/${created.data.id}/publish`,'POST',{versionId:created.data.versionId},teacher);assert.equal((await request(`/problems/${created.data.id}/rank-review`,'PATCH',{versionId:created.data.versionId,decision:'approved'},admin)).status,200);
+   const historical=await request('/submissions','POST',{problemId:created.data.id,versionId:created.data.versionId,kind:'submit',code:'print(3)',idempotencyKey:randomUUID()},learner);assert.equal(historical.status,201);await pool.query("UPDATE submissions SET status='WA',score=0,passed=0,total=1 WHERE id=$1",[historical.data.id.slice(3)]);await pool.query("UPDATE judge_tasks SET state='completed' WHERE submission_id=$1",[historical.data.id.slice(3)]);
+   const blockedDemotion=await request(`/problem-banks/${bank.data.id}`,'PATCH',{visibility:'private'},admin);assert.equal(blockedDemotion.status,409);assert.equal(blockedDemotion.data.error.code,'REVOKE_PUBLIC_VERSIONS');
+   assert.equal((await request(`/problems/${created.data.id}/rank-review`,'PATCH',{versionId:created.data.versionId,decision:'revoked',reason:'训练改为私有前撤下公开版'},admin)).status,200);
+   assert.equal((await request(`/problem-banks/${bank.data.id}`,'PATCH',{visibility:'private'},admin)).status,200);
    assert.equal((await request(`/classes/${cls.data.id}/members`,'POST',{identityIds:[otherPerson.person.id]},admin)).status,200);const unstarted=await login('student-other');
    const practice=await request('/timed-practices','POST',{title:'隐藏反馈训练',classId:cls.data.id,startsAt:new Date(Date.now()-1000).toISOString(),endsAt:new Date(Date.now()+120000).toISOString(),durationMinutes:1,showVerdict:false,problems:[{problemId:created.data.id,points:100}],participants:[p.person.id,otherPerson.person.id]},teacher);assert.equal(practice.status,201,JSON.stringify(practice.data));assert.equal((await request(`/timed-practices/${practice.data.id}/publish`,'POST',{},teacher)).status,200);
    assert.equal((await request(`/problems/${created.data.id}?versionId=${created.data.versionId}`,'GET',null,learner)).status,404);

@@ -71,9 +71,9 @@ await persist();
 function client() {
   let cookie = "",
     csrfToken = "";
-  return async function request(path, body, expectedStatus = 200) {
+  return async function request(path, body, expectedStatus = 200, method) {
     const response = await fetch(`${base}/api/v1/${path}`, {
-      method: body === undefined ? "GET" : "POST",
+      method: method ?? (body === undefined ? "GET" : "POST"),
       headers: {
         Origin: origin,
         ...(cookie ? { Cookie: cookie } : {}),
@@ -453,6 +453,13 @@ try {
       assert.equal(validation.validationStatus, "AC", `${key} reference must pass the real judge.`);
       if (!validation.published)
         await teacher(`problems/${problem.id}/publish`, { versionId: problem.versionId });
+      // Only disposable demo fixtures are approved automatically by the demo
+      // administrator. Real teacher contributions always require manual review.
+      const review=(await pool.query('SELECT rank_review_status FROM problem_versions WHERE id=$1',
+        [problem.versionId])).rows[0];
+      if(review?.rank_review_status!=='approved')
+        await admin(`problems/${problem.id}/rank-review`,
+          {versionId:problem.versionId,decision:'approved'},200,'PATCH');
     }
     const problems = ["addition", "rowSums"].map((key) => ({
       problemId: state.fixtures[key].id,

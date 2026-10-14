@@ -28,7 +28,7 @@ async function taskStats(db,user,ids) {
  const rows=(await db.query(`SELECT c.path_id,count(DISTINCT cp.version_id)::int task_count,
  count(DISTINCT cp.version_id) FILTER(WHERE EXISTS(SELECT 1 FROM submissions s WHERE s.identity_id=$2 AND s.version_id=cp.version_id AND s.kind IN ('submit','correction') AND s.status='AC' AND (s.timed_attempt_id IS NULL OR EXISTS(SELECT 1 FROM timed_attempts ta JOIN timed_practices tp ON tp.id=ta.practice_id WHERE ta.id=s.timed_attempt_id AND tp.results_published_at IS NOT NULL))))::int completed_tasks
  FROM learning_chapters c JOIN chapter_problems cp ON cp.chapter_id=c.id JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id JOIN problem_versions v ON v.id=cp.version_id
- WHERE c.path_id=ANY($1::uuid[]) AND c.archived_at IS NULL AND p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school' AND v.published_at IS NOT NULL GROUP BY c.path_id`,[ids,user.identityId])).rows;
+ WHERE c.path_id=ANY($1::uuid[]) AND c.archived_at IS NULL AND p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school' AND v.published_at IS NOT NULL AND v.school_visible_at IS NOT NULL GROUP BY c.path_id`,[ids,user.identityId])).rows;
  return new Map(rows.map(r=>[r.path_id,r]));
 }
 async function pathResult(ctx, id, db = ctx.pool) {
@@ -36,7 +36,7 @@ async function pathResult(ctx, id, db = ctx.pool) {
  const chapters = (await db.query(`SELECT c.*, COALESCE(pr.completed,false) completed FROM learning_chapters c
   LEFT JOIN learning_progress pr ON pr.chapter_id=c.id AND pr.identity_id=$2 WHERE c.path_id=$1 AND c.archived_at IS NULL ORDER BY c.position,c.created_at,c.id`, [id, ctx.user.identityId])).rows;
  const links = chapters.length ? (await db.query(`SELECT cp.*,v.title FROM chapter_problems cp JOIN problems p ON p.id=cp.problem_id
-  JOIN problem_versions v ON v.id=cp.version_id WHERE cp.chapter_id=ANY($1::uuid[]) AND p.archived_at IS NULL ORDER BY cp.position`, [chapters.map(c => c.id)])).rows : [];
+  JOIN problem_versions v ON v.id=cp.version_id WHERE cp.chapter_id=ANY($1::uuid[]) AND p.archived_at IS NULL AND v.school_visible_at IS NOT NULL ORDER BY cp.position`, [chapters.map(c => c.id)])).rows : [];
  const visible = new Map();
  for (const link of links) {
   // A lesson never grants access to a private bank. Re-check every linked
@@ -66,7 +66,7 @@ async function setLinks(ctx, db, chapterId, problemIds) {
   if(!bank || bank.visibility!=='school' || bank.archived_at)fail(409,'PRIVATE_LESSON_PROBLEM','校内学习章节须关联校内公开题库中的已发布题目');
   if (!p.current_version_id) fail(409, 'NOT_PUBLISHED', '章节练习只能关联已发布题目');
   const { v } = await ctx.helpers.versionAccess(db, ctx.user, id, p.current_version_id);
-  if (!v.published_at) fail(409, 'NOT_PUBLISHED', '章节练习只能关联已发布题目');
+  if (!v.published_at || !v.school_visible_at) fail(409, 'NOT_PUBLISHED', '章节练习只能关联已审核的校内公开题目');
   links.push({ problemId: id, versionId: v.id });
  }
  await db.query('DELETE FROM chapter_problems WHERE chapter_id=$1', [chapterId]);
@@ -153,24 +153,26 @@ function leaderboardFields(row) {
  };
 }
 
-async function leaderboardContexts(pool, user) {
- const rows = (await pool.query(`SELECT c.id,c.name,
-  ($1::boolean OR ($2::boolean AND EXISTS(
-   SELECT 1 FROM teacher_classes tc WHERE tc.class_id=c.id AND tc.account_id=$3))) can_manage,
-  s.show_solved_problems,s.show_attempts,s.show_ac_rate
-  FROM classes c LEFT JOIN class_leaderboard_settings s ON s.class_id=c.id
-  WHERE c.archived_at IS NULL AND (
-   $1::boolean OR ($2::boolean AND EXISTS(
-    SELECT 1 FROM teacher_classes tc WHERE tc.class_id=c.id AND tc.account_id=$3))
-   OR ($4::boolean AND EXISTS(
-    SELECT 1 FROM class_members cm WHERE cm.class_id=c.id AND cm.identity_id=$5)))
-  ORDER BY c.name,c.id`, [administrator(user),user.roles.includes('teacher'),user.id,user.roles.includes('student'),user.identityId])).rows;
- return rows.map(row => ({ id:row.id,name:row.name,canManage:row.can_manage,visibleFields:leaderboardFields(row) }));
+async function leaderboardVisibility(pool) {
+ const row = (await pool.query('SELECT show_solved_problems,show_attempts,show_ac_rate FROM leaderboard_settings WHERE id=true')).rows[0];
+ return leaderboardFields(row);
 }
 
-async function updateLeaderboardContext(ctx, classId) {
- requireStaff(ctx.user);
- const id = uuid(classId, '班级 ID');
+const rankingPolicy = Object.freeze({
+ scope:'approved_school_first_ac',
+ bonusIncluded:false,
+ retroactive:false,
+ description:'排名积分只计题目经管理员审核并向全校开放后收到的首次有效 AC；作业与计时训练额外奖励只计入个人总积分。',
+});
+
+async function leaderboardContexts(pool, user) {
+ const rows = (await pool.query(`SELECT c.id,c.name FROM classes c
+  WHERE c.archived_at IS NULL ORDER BY c.name,c.id`)).rows;
+ return {items:rows.map(row => ({id:row.id,name:row.name})),visibleFields:await leaderboardVisibility(pool),canManage:administrator(user)};
+}
+
+async function updateLeaderboardVisibility(ctx) {
+ if (!administrator(ctx.user)) fail(403,'FORBIDDEN','只有管理员可以设置学生端积分榜字段');
  const fields = ctx.body?.visibleFields;
  const keys = ['solvedProblems','attempts','acRate'];
  if (!fields || typeof fields !== 'object' || Array.isArray(fields)
@@ -178,21 +180,12 @@ async function updateLeaderboardContext(ctx, classId) {
   || keys.some(key => typeof fields[key] !== 'boolean'))
   fail(400,'VALIDATION','请选择要显示的积分榜字段');
  return transaction(ctx.pool, async db => {
-  const cls = exists(await db.query('SELECT id FROM classes WHERE id=$1 AND archived_at IS NULL FOR UPDATE',[id]));
-  if (!administrator(ctx.user) && !(await db.query(
-   'SELECT 1 FROM teacher_classes WHERE class_id=$1 AND account_id=$2',[id,ctx.user.id])).rowCount)
-   fail(403,'FORBIDDEN','无权设置该班级积分榜');
-  await db.query(`INSERT INTO class_leaderboard_settings
-   (class_id,show_solved_problems,show_attempts,show_ac_rate,updated_by)
-   VALUES($1,$2,$3,$4,$5)
-   ON CONFLICT(class_id) DO UPDATE SET
-    show_solved_problems=EXCLUDED.show_solved_problems,
-    show_attempts=EXCLUDED.show_attempts,
-    show_ac_rate=EXCLUDED.show_ac_rate,
-    updated_by=EXCLUDED.updated_by,updated_at=now()`,
-   [id,fields.solvedProblems,fields.attempts,fields.acRate,ctx.user.id]);
-  await ctx.helpers.audit(db,ctx.user.id,'leaderboard.fields_update','class',cls.id,{visibleFields:fields});
-  return {id,visibleFields:fields};
+  await db.query(`UPDATE leaderboard_settings SET
+   show_solved_problems=$1,show_attempts=$2,show_ac_rate=$3,
+   updated_by=$4,updated_at=now() WHERE id=true`,
+   [fields.solvedProblems,fields.attempts,fields.acRate,ctx.user.id]);
+  await ctx.helpers.audit(db,ctx.user.id,'leaderboard.fields_update','system','leaderboard',{visibleFields:fields});
+  return {visibleFields:fields};
  });
 }
 
@@ -200,12 +193,10 @@ async function pointsLeaderboard(ctx) {
  const period = enumValue(ctx.url.searchParams.get('period') ?? 'all', ['all', 'month', 'week'], '排行榜时间范围');
  const page = leaderboardNumber(ctx.url.searchParams.get('page') ?? '1', '页码', 1, 10000);
  const pageSize = leaderboardNumber(ctx.url.searchParams.get('pageSize') ?? '10', '每页人数', 1, 50);
- const requestedClassId = ctx.url.searchParams.get('classId');
- if (requestedClassId) uuid(requestedClassId,'班级 ID');
+ const classFilter = ctx.url.searchParams.get('classId');
+ const requestedClassId = classFilter === null ? null : uuid(classFilter,'班级 ID').toLowerCase();
  const contexts = await leaderboardContexts(ctx.pool,ctx.user);
- const selected = requestedClassId ? contexts.find(cls => cls.id === requestedClassId) : contexts[0];
- if (requestedClassId && !selected) fail(403,'FORBIDDEN','无权查看该班级积分榜');
- if (!selected) return {items:[],total:0,page,pageSize,me:null,classId:null,visibleFields:leaderboardFields()};
+ if (requestedClassId !== null && !contexts.items.some(cls => cls.id === requestedClassId)) fail(404,'NOT_FOUND','班级不存在');
  const meId = ctx.user.roles.includes('student') ? ctx.user.identityId : null;
  const rows = (await ctx.pool.query(`
   WITH bounds AS (
@@ -215,16 +206,29 @@ async function pointsLeaderboard(ctx) {
     ELSE NULL::timestamptz END since_at
   ), earned AS (
    SELECT l.identity_id, sum(l.points)::int points,
-    count(DISTINCT l.problem_id) FILTER (WHERE l.reason='first_ac')::int solved_problems
-   FROM point_ledger l CROSS JOIN bounds b
+    count(DISTINCT l.problem_id)::int solved_problems
+   FROM school_rank_ledger l CROSS JOIN bounds b
    WHERE b.since_at IS NULL OR l.created_at>=b.since_at
    GROUP BY l.identity_id
   ), attempts AS (
    SELECT s.identity_id, count(*)::int attempts,
     count(*) FILTER (WHERE s.status IN ('AC','WA','CE','RE','TLE','MLE','OLE'))::int assessed,
     count(*) FILTER (WHERE s.status='AC')::int accepted
-   FROM submissions s CROSS JOIN bounds b
+   FROM submissions s
+   JOIN problem_versions v ON v.id=s.version_id AND v.problem_id=s.problem_id
+   JOIN problems p ON p.id=s.problem_id
+   JOIN problem_banks bank ON bank.id=p.bank_id
+   CROSS JOIN bounds b
    WHERE s.kind='submit' AND (b.since_at IS NULL OR s.created_at>=b.since_at)
+    AND v.published_at IS NOT NULL AND v.rank_approved_at IS NOT NULL
+    AND s.created_at>=v.rank_approved_at
+    AND (
+     (v.rank_review_status='approved' AND v.school_visible_at IS NOT NULL
+      AND s.created_at>=v.school_visible_at AND p.archived_at IS NULL
+      AND bank.archived_at IS NULL AND bank.visibility='school')
+     OR (v.rank_review_status='revoked' AND v.rank_reviewed_at IS NOT NULL
+      AND s.created_at<v.rank_reviewed_at)
+    )
     AND (s.timed_attempt_id IS NULL OR EXISTS (
      SELECT 1 FROM timed_attempts ta JOIN timed_practices tp ON tp.id=ta.practice_id
      WHERE ta.id=s.timed_attempt_id AND tp.results_published_at IS NOT NULL))
@@ -234,11 +238,13 @@ async function pointsLeaderboard(ctx) {
    COALESCE(e.points,0)::int points, COALESCE(e.solved_problems,0)::int solved_problems,
    COALESCE(t.attempts,0)::int attempts,
    COALESCE(t.assessed,0)::int assessed, COALESCE(t.accepted,0)::int accepted
-  FROM identities i JOIN class_members cm ON cm.identity_id=i.id AND cm.class_id=$5::uuid
+  FROM identities i
   LEFT JOIN earned e ON e.identity_id=i.id
   JOIN accounts a ON a.identity_id=i.id AND a.disabled_at IS NULL AND a.binding_released_at IS NULL
   LEFT JOIN attempts t ON t.identity_id=i.id
   WHERE i.kind='student' AND i.archived_at IS NULL
+   AND ($5::uuid IS NULL OR EXISTS (
+    SELECT 1 FROM class_members cm WHERE cm.identity_id=i.id AND cm.class_id=$5::uuid))
    AND EXISTS (SELECT 1 FROM account_roles ar WHERE ar.account_id=a.id AND ar.role='student')
   ), ranked AS (
    SELECT eligible.*,
@@ -246,41 +252,47 @@ async function pointsLeaderboard(ctx) {
     row_number() OVER (ORDER BY points DESC,id)::int row_num
    FROM eligible
   ), totals AS (
-   SELECT count(*)::int total FROM ranked WHERE points>0
+   SELECT count(*)::int total FROM ranked
   ), selected AS (
-   SELECT r.*, (r.points>0 AND r.row_num>(($2::int-1)*$3::int)
+   SELECT r.*, (r.row_num>(($2::int-1)*$3::int)
     AND r.row_num<=$2::int*$3::int) in_page
    FROM ranked r
-   WHERE (r.points>0 AND r.row_num>(($2::int-1)*$3::int)
+   WHERE (r.row_num>(($2::int-1)*$3::int)
     AND r.row_num<=$2::int*$3::int) OR r.id=$4::uuid
   )
   SELECT s.id,s.name,
    a.avatar,s.points,s.solved_problems,s.attempts,s.assessed,s.accepted,s.rank,s.in_page,t.total
   FROM totals t LEFT JOIN selected s ON TRUE
   LEFT JOIN accounts a ON a.id=s.account_id
-  ORDER BY s.in_page DESC NULLS LAST,s.points DESC,s.id`, [period,page,pageSize,meId,selected.id])).rows;
+  ORDER BY s.in_page DESC NULLS LAST,s.points DESC,s.id`, [period,page,pageSize,meId,requestedClassId])).rows;
  const redact = !staff(ctx.user);
  const shape = ({id,name,avatar,points,solved_problems,attempts,assessed,accepted,rank}) => ({
   id,name,avatar,points,rank,
-  ...(!redact || selected.visibleFields.solvedProblems ? {solvedProblems:solved_problems} : {}),
-  ...(!redact || selected.visibleFields.attempts ? {attempts} : {}),
-  ...(!redact || selected.visibleFields.acRate ? {acRate:assessed ? Math.round(accepted * 1000 / assessed) / 10 : null} : {}),
+  ...(!redact || contexts.visibleFields.solvedProblems ? {solvedProblems:solved_problems} : {}),
+  ...(!redact || contexts.visibleFields.attempts ? {attempts} : {}),
+  ...(!redact || contexts.visibleFields.acRate ? {acRate:assessed ? Math.round(accepted * 1000 / assessed) / 10 : null} : {}),
  });
  const own = meId ? rows.find(row => row.id === meId) : null;
  return {
   items: rows.filter(row => row.in_page).map(shape),
   total: rows[0]?.total ?? 0, page, pageSize,
   me: own ? shape(own) : null,
-  classId:selected.id,visibleFields:selected.visibleFields,
+  classId:requestedClassId,visibleFields:contexts.visibleFields,rankingPolicy,
  };
 }
 
 export async function handleEducation(ctx) {
  const { pool, user, route, method, body, helpers } = ctx;
- if(route==='/points/me'&&method==='GET'){if(!user.roles.includes('student'))fail(403,'FORBIDDEN','积分仅适用于学生');const total=(await pool.query('SELECT COALESCE(sum(points),0)::int points FROM point_ledger WHERE identity_id=$1',[user.identityId])).rows[0].points;return result({points:total});}
- if(route==='/points/leaderboard/contexts'&&method==='GET')return result({items:await leaderboardContexts(pool,user)});
- const leaderboardContextMatch=route.match(/^\/points\/leaderboard\/contexts\/([^/]+)$/);
- if(leaderboardContextMatch&&method==='PATCH')return result(await updateLeaderboardContext(ctx,leaderboardContextMatch[1]));
+ if(route==='/points/me'&&method==='GET'){
+  if(!user.roles.includes('student'))fail(403,'FORBIDDEN','积分仅适用于学生');
+  const totals=(await pool.query(`SELECT
+   (SELECT COALESCE(sum(points),0)::int FROM point_ledger WHERE identity_id=$1) points,
+   (SELECT COALESCE(sum(points),0)::int FROM school_rank_ledger WHERE identity_id=$1) rank_points`,[user.identityId])).rows[0];
+  return result({points:totals.points,rankPoints:totals.rank_points,rankingPolicy});
+ }
+ if(route==='/points/leaderboard/contexts'&&method==='GET')return result(await leaderboardContexts(pool,user));
+ if(route==='/points/leaderboard/settings'&&method==='GET')return result({visibleFields:await leaderboardVisibility(pool)});
+ if(route==='/points/leaderboard/settings'&&method==='PATCH')return result(await updateLeaderboardVisibility(ctx));
  if(route==='/points/leaderboard'&&method==='GET')return result(await pointsLeaderboard(ctx));
  if(route==='/points/rewards'&&method==='GET'){requireStaff(user);const items=(await pool.query('SELECT r.problem_id,r.assignment_id,r.points FROM point_rewards r JOIN problems p ON p.id=r.problem_id LEFT JOIN assignments a ON a.id=r.assignment_id WHERE ($1::boolean OR (r.assignment_id IS NULL AND p.owner_account_id=$2) OR a.owner_account_id=$2)',[administrator(user),user.id])).rows;return result({items:items.map(r=>({problemId:r.problem_id,assignmentId:r.assignment_id,points:r.points}))});}
  if(route==='/points/rewards'&&method==='POST'){
@@ -374,7 +386,7 @@ export async function handleEducation(ctx) {
   const chapterCount=(await pool.query('SELECT count(*)::int n FROM learning_chapters WHERE path_id=$1 AND archived_at IS NULL',[path.id])).rows[0].n;
   const students=(await pool.query(`SELECT i.id,i.name,i.number,
    (SELECT count(*)::int FROM learning_progress pr JOIN learning_chapters c ON c.id=pr.chapter_id WHERE c.path_id=$1 AND c.archived_at IS NULL AND pr.identity_id=i.id AND pr.completed) completed_chapters,
-   (SELECT count(DISTINCT cp.version_id)::int FROM chapter_problems cp JOIN learning_chapters c ON c.id=cp.chapter_id JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id JOIN problem_versions v ON v.id=cp.version_id WHERE c.path_id=$1 AND c.archived_at IS NULL AND p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school' AND v.published_at IS NOT NULL AND EXISTS(SELECT 1 FROM submissions s WHERE s.identity_id=i.id AND s.version_id=cp.version_id AND s.kind IN ('submit','correction') AND s.status='AC' AND (s.timed_attempt_id IS NULL OR EXISTS(SELECT 1 FROM timed_attempts ta JOIN timed_practices tp ON tp.id=ta.practice_id WHERE ta.id=s.timed_attempt_id AND tp.results_published_at IS NOT NULL)))) completed_tasks
+   (SELECT count(DISTINCT cp.version_id)::int FROM chapter_problems cp JOIN learning_chapters c ON c.id=cp.chapter_id JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id JOIN problem_versions v ON v.id=cp.version_id WHERE c.path_id=$1 AND c.archived_at IS NULL AND p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school' AND v.published_at IS NOT NULL AND v.school_visible_at IS NOT NULL AND EXISTS(SELECT 1 FROM submissions s WHERE s.identity_id=i.id AND s.version_id=cp.version_id AND s.kind IN ('submit','correction') AND s.status='AC' AND (s.timed_attempt_id IS NULL OR EXISTS(SELECT 1 FROM timed_attempts ta JOIN timed_practices tp ON tp.id=ta.practice_id WHERE ta.id=s.timed_attempt_id AND tp.results_published_at IS NOT NULL)))) completed_tasks
    FROM identities i WHERE i.kind='student' AND i.archived_at IS NULL AND ($2::boolean OR EXISTS(SELECT 1 FROM class_members cm JOIN teacher_classes tc ON tc.class_id=cm.class_id JOIN classes cl ON cl.id=cm.class_id WHERE cm.identity_id=i.id AND tc.account_id=$3 AND cl.archived_at IS NULL)) ORDER BY i.number,i.id`,[path.id,administrator(user),user.id])).rows;
   return result({chapterCount,taskCount:counts.get(path.id)?.task_count??0,items:students.map(s=>({id:s.id,name:s.name,number:s.number,completedChapters:Number(s.completed_chapters),completedTasks:Number(s.completed_tasks)}))});
  }

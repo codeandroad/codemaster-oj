@@ -32,7 +32,7 @@ import {TestDrawer,BatchTests,type EditorCase} from "./test-data-editor";
 import { equalCaseWeights } from "./case-weights";
 import {MathEditor} from "./math-editor";
 import {MathContent} from "@/components/math-content";
-import { Bank, Group, GroupTags, ManageGroups } from "./problem-banks";
+import { Bank, Group, GroupTags, ManageGroups, reviewVisibilityLabel } from "./problem-banks";
 import {
   area,
   Empty,
@@ -185,6 +185,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
       (problem.bankId
         ? `/teacher/problems/banks/${problem.bankId}`
         : "/teacher/problems");
+  const bankVisibility = banks.data?.items.find((bank) => bank.id === problem.bankId)?.visibility ?? saved?.bankVisibility;
   const draft=useTeacherDraft({storageKey:teacherDraftKey(user.id,initial?.id??"new",search.get("versionId")??"current",search.get("bankId")??""),baseline:editableSnapshot(initial??{...blank,bankId:search.get("bankId")??""}),snapshot:editableSnapshot(problem),baseVersion:initial?.versionId??"new",dirty,editable,onRestore:snapshot=>{const recovered=JSON.parse(snapshot);setProblem(current=>({...current,...recovered}));}});
   useNavigationBlocker(dirty);
   useEffect(() => {
@@ -322,6 +323,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
               : (saved?.validationStatus ?? "Draft")
           }
         />
+        {saved && <span className="text-xs text-muted-foreground">{reviewVisibilityLabel(saved, bankVisibility)}</span>}
         {dirty && <span className="text-xs text-warning">有未保存修改</span>}
       </div>
       {!saved?.id&&<p className="text-xs text-muted-foreground">整理分组时先保存题目草稿；没有分组可在弹窗中直接新建。</p>}
@@ -700,6 +702,8 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                 <p className="mt-2 text-sm text-muted-foreground">
                   保存草稿与发布分别进行。已发布题目的修改不会覆盖历史作业仍在使用的旧版本。
                 </p>
+                <p className="mt-2 text-sm text-muted-foreground">{bankVisibility === "school" ? "发布到校内题库后自动进入管理员审核；审核通过前，仅负责教师及指定作业或训练学生可见，不计入积分排行榜。" : "当前为教师私有题库。题目发布后可用于指定作业或训练；如需全校开放，请联系管理员纳入校内审核。"}</p>
+                {saved && <p className="mt-2 text-sm font-medium">当前状态：{reviewVisibilityLabel(saved, bankVisibility)}</p>}
                 <p className="mt-3 font-mono text-xs">
                   {saved?.versionId ?? "尚未保存"}
                 </p>
@@ -824,7 +828,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
       {publish && saved && (
         <Modal title="确认发布题目版本" onClose={() => setPublish(false)}>
           <p className="text-sm leading-6">
-            发布“{saved.title}”的已验证版本。历史活动与提交保留原版本。
+            发布“{saved.title}”的已验证版本。历史活动与提交保留原版本。{bankVisibility === "school" ? "本版本将进入管理员审核；通过前仅指定活动学生可见，也不会计入全校排名积分。" : "当前题库为教师私有，仅指定活动学生可见；如需全校开放，须由管理员调整题库范围并审核该版本。"}
           </p>
           <Feedback action={action} />
           <div className="mt-5 flex justify-end gap-2">
@@ -842,7 +846,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                   setSaved(result);
                   setProblem(result);
                   setPublish(false);
-                  return "题目版本已发布。";
+                  return "题目版本已发布；全校开放和积分资格须经管理员审核。";
                 })
               }
             >

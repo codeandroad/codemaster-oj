@@ -66,6 +66,10 @@ export interface ProductionProblem {
   source?: string;
   canEdit?: boolean;
   firstAcPoints?: number;
+  bankVisibility?: "school" | "private";
+  schoolVisibleAt?: string | null;
+  rankReviewStatus?: "pending" | "approved" | "rejected" | "revoked" | null;
+  rankApprovedAt?: string | null;
 }
 export interface Assignment {
   id: string;

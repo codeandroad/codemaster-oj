@@ -279,9 +279,6 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
                 {currentAssignment?.title ?? "尚未布置作业"}
               </span>
               <div className="flex flex-wrap gap-2">
-                <Link className={buttonVariants({ variant: "secondary", size: "sm" })} href={`/teacher/points?classId=${encodeURIComponent(current.id)}`}>
-                  排行榜设置
-                </Link>
                 <Button
                   size="sm"
                   variant="secondary"

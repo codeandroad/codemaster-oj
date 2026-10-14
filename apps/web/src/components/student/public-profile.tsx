@@ -17,6 +17,7 @@ interface PublicProfile {
   avatar: string | null;
   bio: string | null;
   points: number;
+  rankPoints: number;
   solvedProblems: number;
   isSelf: boolean;
 }
@@ -105,7 +106,7 @@ export function StudentPublicProfile({ identityId, viewer, embedded = false, wor
   return <div className={embedded ? "mt-6 space-y-5" : "space-y-5"}>
     {embedded ? (
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><h2 className="text-lg font-bold">我的公开主页</h2><p className="mt-1 text-sm text-muted-foreground">同班同学可看到你的昵称、公开题目的解题动态和留言。</p></div>
+        <div><h2 className="text-lg font-bold">我的公开主页</h2><p className="mt-1 text-sm text-muted-foreground">校内同学可看到你的昵称、公开题目的解题动态和留言。</p></div>
         <AppLink href={`${publicHref}?from=profile`} className={buttonVariants({ variant: "secondary" })}>查看公开主页</AppLink>
       </div>
     ) : (
@@ -118,7 +119,7 @@ export function StudentPublicProfile({ identityId, viewer, embedded = false, wor
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2"><h3 className="break-words text-xl font-bold">{person.nickname}</h3>{person.isSelf && <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-primary">我</span>}</div>
           <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">{person.bio?.trim() || "这位同学还没有填写个人介绍。"}</p>
-          <dl className="mt-4 flex flex-wrap gap-5 border-t border-border pt-4 text-sm"><div><dt className="text-muted-foreground">累计积分</dt><dd className="mt-0.5 font-semibold tabular-nums">{person.points}</dd></div><div><dt className="text-muted-foreground">已解题目</dt><dd className="mt-0.5 font-semibold tabular-nums">{person.solvedProblems}</dd></div></dl>
+          <dl className="mt-4 flex flex-wrap gap-5 border-t border-border pt-4 text-sm"><div><dt className="text-muted-foreground">个人累计积分</dt><dd className="mt-0.5 font-semibold tabular-nums">{person.points}</dd></div><div><dt className="text-muted-foreground">全校榜积分</dt><dd className="mt-0.5 font-semibold tabular-nums">{person.rankPoints}</dd></div><div><dt className="text-muted-foreground">已解题目</dt><dd className="mt-0.5 font-semibold tabular-nums">{person.solvedProblems}</dd></div></dl>
         </div>
       </section>}
     </State>

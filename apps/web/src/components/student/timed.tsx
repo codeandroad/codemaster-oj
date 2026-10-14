@@ -39,7 +39,7 @@ function TimedRewardRules({ practice }: { practice: TimedPractice }) {
   return <div className="mt-4 rounded-md border border-primary/20 bg-primary/5 p-4 text-sm leading-6">
     <h3 className="font-semibold">积分奖励 · 本训练上限 +{cap}</h3>
     <p className="mt-1 text-muted-foreground">最终计分提交须在个人截止前 AC。首次发布成绩时，训练奖励按每题计算：固定 AC 奖励 + ⌊速度上限 × max(0, 预设训练时长 − 实际用时) ÷ 预设训练时长⌋ + ⌊尝试上限 ÷ 本题正式提交次数⌋。实际用时从服务器记录的训练开始到最终计分的有效 AC 提交接收计算，不使用截止倒计时余量；提交次数包含这次 AC。越早完成、尝试越少，奖励越多；未 AC 无训练奖励。</p>
-    <p className="mt-1 text-muted-foreground">每题还有全站首次 AC 奖励；已经在其他活动领取过不会重复。</p>
+    <p className="mt-1 text-muted-foreground">每题还有全站首次 AC 个人积分，已领取的不重复。训练额外奖励只进个人积分，不计入校级榜；管理员审核公开题的有效首次正式 AC 才有排名积分。</p>
     <div className="mt-3 divide-y divide-border border-t border-border">
       {practice.problems.map(problem => <div key={problem.problemId} className="flex flex-wrap justify-between gap-x-4 py-2"><span className="font-medium">{problem.title}</span><span>首次 AC +{problem.firstAcPoints ?? 10}（全站一次） · 训练固定 +{problem.rewardPoints ?? 0} · 速度最多 +{problem.speedBonusPoints ?? 0} · 少尝试最多 +{problem.attemptBonusPoints ?? 0}</span></div>)}
     </div>
@@ -52,7 +52,7 @@ function TimedRewardResults({ practice }: { practice: TimedPractice }) {
   const total = rows.reduce((sum, row) => sum + (row.reward?.totalRewardPoints ?? 0), 0);
   return <section className="mt-5 rounded-md border border-border bg-surface-subtle p-4 text-sm">
     <h2 className="font-semibold">本次训练获得积分：+{total}</h2>
-    <p className="mt-1 text-xs text-muted-foreground">仅显示本次训练的固定、速度和少尝试奖励；全站首次 AC 积分另计，已领过的不会再次发放。</p>
+    <p className="mt-1 text-xs text-muted-foreground">这里只显示本次训练的个人额外奖励，不计入校级榜；每题首次 AC 个人积分另计，已领过的不重复。</p>
     <div className="mt-3 divide-y divide-border">
       {rows.map(({ problem, reward }) => <div key={problem.problemId} className="grid gap-1 py-3 sm:grid-cols-[minmax(0,1fr)_auto]">
         <b>{problem.title}</b>

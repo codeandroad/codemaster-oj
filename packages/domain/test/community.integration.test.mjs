@@ -96,7 +96,7 @@ test('later deletion migration corrects previously dismissed report timestamps',
   }
  });
 
-test('school profiles, first-AC activity, guestbook, reporting and moderation respect class boundaries',
+test('school-wide profiles, first-AC activity and guestbook keep class-scoped moderation',
  {skip:!process.env.TEST_DATABASE_URL,timeout:60000},async()=>{
   const manager=createPool(process.env.TEST_DATABASE_URL);
   const schema=`community_${randomBytes(6).toString('hex')}`;
@@ -136,14 +136,14 @@ test('school profiles, first-AC activity, guestbook, reporting and moderation re
    const read=(viewer,target)=>call(viewer,`/profiles/${target.identityId}`);
    const publicProfile=(await read(beta,alpha)).body.profile;
    assert.deepEqual(Object.keys(publicProfile).sort(),
-    ['avatar','bio','id','isSelf','nickname','points','solvedProblems'].sort());
+    ['avatar','bio','id','isSelf','nickname','points','rankPoints','solvedProblems'].sort());
    assert.equal(publicProfile.nickname,'Alpha');
    assert.equal(publicProfile.isSelf,false);
    assert.equal((await read(alpha,alpha)).body.profile.isSelf,true);
    assert.equal((await read(teacher,alpha)).body.profile.id,alpha.identityId);
    assert.equal((await read(admin,alpha)).body.profile.id,alpha.identityId);
-   await assert.rejects(read(outsider,alpha),e=>e.status===404);
-   await assert.rejects(read(otherTeacher,alpha),e=>e.status===404);
+   assert.equal((await read(outsider,alpha)).body.profile.id,alpha.identityId);
+   assert.equal((await read(otherTeacher,alpha)).body.profile.id,alpha.identityId);
    assert.ok(!JSON.stringify(publicProfile).includes('ALPHA-LEGAL-NAME'));
 
    async function problem(visibility,title) {
@@ -155,6 +155,8 @@ test('school profiles, first-AC activity, guestbook, reporting and moderation re
      time_limit_ms,memory_limit_mb,reference_code,validation_status,published_at)
      VALUES($1,$2,'stdio','Task',500,64,'print(1)','AC',now()) RETURNING id`,
      [id,title])).rows[0].id;
+    if(visibility==='school')
+     await pool.query('UPDATE problem_versions SET school_visible_at=now() WHERE id=$1',[versionId]);
     await pool.query('UPDATE problems SET current_version_id=$1 WHERE id=$2',[versionId,id]);
     return {id,versionId};
    }
@@ -172,7 +174,7 @@ test('school profiles, first-AC activity, guestbook, reporting and moderation re
    const ownActivity=(await call(alpha,`/profiles/${alpha.identityId}/activity`)).body;
    assert.equal(ownActivity.total,2);
    assert.equal((await read(beta,alpha)).body.profile.solvedProblems,2);
-   await assert.rejects(call(outsider,`/profiles/${alpha.identityId}/activity`),e=>e.status===404);
+   assert.equal((await call(outsider,`/profiles/${alpha.identityId}/activity`)).body.total,1);
 
    const messageRoute=`/profiles/${alpha.identityId}/messages`;
    const posted=(await call(beta,messageRoute,'POST',{body:'做得好！'})).body;
@@ -188,12 +190,11 @@ test('school profiles, first-AC activity, guestbook, reporting and moderation re
     {ok:true},'authors can remove their own message');
    await assert.rejects(call(beta,messageRoute,'POST',{body:'Second'}),e=>e.status===429);
    await assert.rejects(call(alpha,messageRoute,'POST',{body:'Own'}),e=>e.status===400);
-   await assert.rejects(call(outsider,messageRoute,'POST',{body:'Other class'}),e=>e.status===404);
    await assert.rejects(call(teacher,messageRoute,'POST',{body:'Teacher'}),e=>e.status===403);
    const list=(await call(alpha,messageRoute)).body;
    assert.equal(list.total,1);
    assert.equal(list.items[0].canDelete,true,'profile owner can remove a visitor message');
-   await assert.rejects(call(outsider,messageRoute),e=>e.status===404);
+   assert.equal((await call(outsider,messageRoute)).body.total,1);
 
    const reportRoute=`${messageRoute}/${posted.id}/report`;
    await assert.rejects(call(beta,reportRoute,'POST',{reason:'abuse'}),e=>e.status===400);
@@ -223,7 +224,7 @@ test('school profiles, first-AC activity, guestbook, reporting and moderation re
    assert.deepEqual(allReports.counts,{pending:1,deleted:0,dismissed:0});
    assert.ok(!JSON.stringify(allReports).includes('LEGAL-NAME'));
    await assert.rejects(call(admin,'/profile-message-reports','GET',{},'?pageSize=51'),e=>e.status===400);
-   await assert.rejects(call(outsider,`${messageRoute}/${posted.id}`,'DELETE'),e=>e.status===404);
+   await assert.rejects(call(outsider,`${messageRoute}/${posted.id}`,'DELETE'),e=>e.status===403);
    assert.deepEqual((await call(alpha,`${messageRoute}/${posted.id}`,'DELETE')).body,{ok:true});
    assert.equal((await call(beta,messageRoute)).body.total,0);
    assert.equal((await call(admin,'/profile-message-reports')).body.total,0);
@@ -269,6 +270,15 @@ test('school profiles, first-AC activity, guestbook, reporting and moderation re
    assert.equal((await pool.query(`SELECT count(*)::int n FROM audit_events
     WHERE action IN ('profile.message_create','profile.message_report','profile.message_delete',
      'profile.message_report_dismiss')`)).rows[0].n,9);
+
+   const schoolwideNote=(await call(outsider,`/profiles/${beta.identityId}/messages`,'POST',
+    {body:'跨班也能互相鼓励'})).body;
+   assert.equal(schoolwideNote.author.id,outsider.identityId);
+   assert.equal((await call(beta,`/profiles/${beta.identityId}/messages`)).body.total,1);
+   await assert.rejects(call(otherTeacher,`/profiles/${beta.identityId}/messages/${schoolwideNote.id}`,'DELETE'),
+    e=>e.status===403,'unrelated teachers cannot moderate a class member');
+   assert.deepEqual((await call(beta,`/profiles/${beta.identityId}/messages/${schoolwideNote.id}`,'DELETE')).body,
+    {ok:true},'profile owner can remove a schoolwide visitor message');
 
    for(const [kind,column,table] of [
     ['disabled','disabled_at','accounts'],

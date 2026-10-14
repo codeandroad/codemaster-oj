@@ -28,18 +28,10 @@ async function activeStudent(db, identityId) {
 
 async function visibleProfile(db, user, identityId) {
  const p=await activeStudent(db,identityId);
- if(admin(user) || user.identityId===identityId) return p;
- if(user.roles.includes('teacher') && await canModerate(db,user,identityId)) return p;
- if(student(user)) {
-  const sameClass=await db.query(`SELECT 1 FROM class_members mine
-   JOIN class_members theirs ON theirs.class_id=mine.class_id
-   JOIN classes c ON c.id=mine.class_id
-   WHERE mine.identity_id=$1 AND theirs.identity_id=$2 AND c.archived_at IS NULL LIMIT 1`,
-   [user.identityId,identityId]);
-  if(sameClass.rowCount) return p;
- }
- // Do not reveal whether an ID belongs to a student in another class.
- fail(404,'NOT_FOUND','学生主页不存在');
+ // The school-wide leaderboard links to every active student's profile.
+ // Keep the audience inside authenticated school accounts.
+ if(admin(user) || student(user) || user.roles.includes('teacher')) return p;
+ fail(403,'FORBIDDEN','无权查看学生主页');
 }
 
 async function canModerate(db, user, identityId) {
@@ -77,8 +69,10 @@ async function profile(ctx, identityId) {
   COALESCE(sum(points),0)::int points,
   count(DISTINCT problem_id) FILTER (WHERE reason='first_ac')::int solved_problems
   FROM point_ledger WHERE identity_id=$1`, [identityId])).rows[0];
+ const rankPoints=(await ctx.pool.query(`SELECT COALESCE(sum(points),0)::int points
+  FROM school_rank_ledger WHERE identity_id=$1`,[identityId])).rows[0].points;
  return response({profile:{id:p.id,nickname:p.nickname,avatar:p.avatar,bio:p.bio,
-  points:totals.points,solvedProblems:totals.solved_problems,isSelf:ctx.user.identityId===p.id}});
+  points:totals.points,rankPoints,solvedProblems:totals.solved_problems,isSelf:ctx.user.identityId===p.id}});
 }
 
 async function activity(ctx, identityId) {
@@ -94,7 +88,8 @@ async function activity(ctx, identityId) {
   JOIN problem_versions v ON v.id=s.version_id
   WHERE l.identity_id=$1 AND l.reason='first_ac'
    AND ($2::boolean OR (b.visibility='school' AND b.archived_at IS NULL
-    AND p.archived_at IS NULL AND v.published_at IS NOT NULL))
+   AND p.archived_at IS NULL AND v.published_at IS NOT NULL
+   AND v.school_visible_at IS NOT NULL))
    AND (s.timed_attempt_id IS NULL OR EXISTS (
     SELECT 1 FROM timed_attempts ta JOIN timed_practices tp ON tp.id=ta.practice_id
     WHERE ta.id=s.timed_attempt_id AND tp.results_published_at IS NOT NULL))`;

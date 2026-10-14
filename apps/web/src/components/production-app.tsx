@@ -224,7 +224,8 @@ function ProductionShell({
               >
                 <Menu size={18} />
               </Button>
-              <span className="truncate text-sm text-muted-foreground">
+              <BrandLogo className="h-auto w-[130px] max-w-full md:hidden" />
+              <span className="sr-only md:not-sr-only md:truncate md:text-sm md:text-muted-foreground">
                 {role==="admin"?({"/admin/accounts":"账号与角色","/admin/people":"身份档案","/admin/imports":"导入中心","/admin/judge-service":"判题服务","/admin/settings":"系统设置"}[pathname]??"管理工作区"):role==="teacher"?"Teacher workspace":"学生工作区"}
               </span>
             </div>

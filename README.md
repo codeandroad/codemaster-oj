@@ -1,4 +1,4 @@
-# Campus Judge · Production
+# CodeMaster OJ · Production
 
 独立的校内教学 OJ。前端采用 Next.js 16 / React / TypeScript，API 采用 NestJS 12 / TypeScript，业务数据使用 PostgreSQL 17。Python 3.12、C++23 和 JavaScript 代码由独立 worker 和 Linux go-judge 沙箱评测；C++ 使用 Clang 19 与 GCC 14 libstdc++。这个项目可以单独复制、安装、构建和部署，不依赖相邻的原型仓库。
 

@@ -8,7 +8,7 @@ export function sanitizeAuditMetadata(metadata,depth=0){
  const clean={};const value=(entry,level)=>{if(level>4)return undefined;if(entry===null||typeof entry==='boolean')return entry;if(typeof entry==='number')return Number.isFinite(entry)?entry:undefined;if(typeof entry==='string')return entry.slice(0,2000);if(Array.isArray(entry))return entry.slice(0,50).map(item=>value(item,level+1)).filter(item=>item!==undefined);if(entry&&typeof entry==='object')return sanitizeAuditMetadata(entry,level);};
  for(const[key,entry]of Object.entries(metadata)){if(!SAFE_METADATA_KEYS.has(key)||SENSITIVE_KEY.test(key))continue;const safe=value(entry,depth+1);if(safe!==undefined)clean[key]=safe;}return clean;
 }
-const defaults={siteName:'Campus Judge',schoolName:'天行创世纪国际部',defaultLanguage:'English + 简体中文',timezone:'Asia/Shanghai',announcement:'',runtime:{workerConcurrency:2,maxQueued:1000,maxProblemCpuMs:5000,maxProblemMemoryMb:256},backupPlan:{enabled:true,frequency:'daily',retentionDays:14,window:'02:00',rpoHours:24,rtoHours:4}};
+const defaults={siteName:'CodeMaster OJ',schoolName:'天行创世纪国际部',defaultLanguage:'English + 简体中文',timezone:'Asia/Shanghai',announcement:'',runtime:{workerConcurrency:2,maxQueued:1000,maxProblemCpuMs:5000,maxProblemMemoryMb:256},backupPlan:{enabled:true,frequency:'daily',retentionDays:14,window:'02:00',rpoHours:24,rtoHours:4}};
 export async function getSettings(pool){const settings=(await pool.query('SELECT settings FROM site_settings WHERE id=true')).rows[0]?.settings??{};return {...defaults,...settings,runtime:{...defaults.runtime,...settings.runtime},backupPlan:{...defaults.backupPlan,...settings.backupPlan}};}
 export async function assertJudgeAdmission(db){
  await db.query('SELECT pg_advisory_xact_lock(798945)');

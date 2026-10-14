@@ -1,7 +1,7 @@
 # Campus Judge 高保真原型 · 设计总结文档
 
 > 记录截至 2026-10-14 的设计轮次、功能范围、关键决策与技术边界。
-> **生产与原型已分离，三角色逐页对齐与本地验收完成**：原型历史与限制继续保留；2026-10-11 用户确认真实校内 OJ 目标，生产设计见 [campus-judge-production-design.md](campus-judge-production-design.md)，范围变更见 [D23](#decision-d23)，首期实现见 [D24](#decision-d24)，逐页验收见 [D27](#decision-d27)，页面切换修复见 [D28](#decision-d28)，多语言判题与工作区设置见 [D29](#decision-d29)，品牌图替换见 [D30](#decision-d30)，当前仓库布局见 [D31](#decision-d31)。
+> **生产与原型已分离，三角色逐页对齐与本地验收完成**：原型历史与限制继续保留；2026-10-11 用户确认真实校内 OJ 目标，生产设计见 [campus-judge-production-design.md](campus-judge-production-design.md)，范围变更见 [D23](#decision-d23)，首期实现见 [D24](#decision-d24)，逐页验收见 [D27](#decision-d27)，页面切换修复见 [D28](#decision-d28)，多语言判题与工作区设置见 [D29](#decision-d29)，历史品牌图替换见 [D30](#decision-d30)，当前仓库布局见 [D31](#decision-d31)，现行品牌资源见 [D32](#decision-d32)。
 > 原型模式性质：**纯前端可点击原型**——无后端、无数据库、无真实鉴权、无判题、无持久化；所有数据为固定示例，刷新即重置。以下各原型轮次仍按这一历史边界记录；生产模式以新增文档为准。
 
 ---
@@ -21,7 +21,7 @@
 - [决策时间线](#decision-timeline)：[第 1 轮](#decisions-r1) · [第 2 轮及补丁](#decisions-r2) · [第 3 轮](#decisions-r3) · [第 4 轮及后续修复](#decisions-r4)
 - [技术边界](#technical-boundaries)：[允许范围](#boundary-allowed) · [禁止范围](#boundary-prohibited) · [文件导入例外](#boundary-files) · [状态与安全语义](#boundary-state) · [技术栈](#boundary-stack)
 - [验证记录与限制](#verification)
-- [生产范围变更](#decision-d23) · [首期生产实现与本地验收](#decision-d24) · [本机完整体验](#decision-d25) · [生产与原型分离](#decision-d26) · [三角色页面与流程逐页对齐](#decision-d27) · [页面切换消除整屏闪烁](#decision-d28) · [编程工作区设置与三语言](#decision-d29) · [品牌图替换](#decision-d30) · [生产仓库根目录迁移](#decision-d31)
+- [生产范围变更](#decision-d23) · [首期生产实现与本地验收](#decision-d24) · [本机完整体验](#decision-d25) · [生产与原型分离](#decision-d26) · [三角色页面与流程逐页对齐](#decision-d27) · [页面切换消除整屏闪烁](#decision-d28) · [编程工作区设置与三语言](#decision-d29) · [历史品牌图替换](#decision-d30) · [生产仓库根目录迁移](#decision-d31) · [现行品牌资源](#decision-d32)
 
 ### 常用页面
 
@@ -675,5 +675,13 @@ Problem import / Member import 可双向切换；题目导入四阶段；成员�
 - **背景**：用户要求项目根目录直接承载生产系统，原型移出当前目录；生产代码需使用独立 Git 仓库，主分支为 `master`，并以当前页面和业务流程完成新一轮检查后本地部署。
 - **结论**：将原 `production/` 的应用、业务包、部署、脚本与文档移至本仓库根目录；原型作为独立 Git 仓库保存在相邻的 `../myoj-prototype/`。新生产仓库以 `master` 为主分支，目标远端为 `codeandroad/codemaster-oj`；原型提交历史不作为生产仓库历史导入。运行、构建和部署均只使用本仓库文件。
 - **影响**：D26 的 `production/` 与 `myoj/` 路径仅表示当时的目录布局，生产与原型隔离原则继续有效。启动和验收命令从本仓库根目录运行，保留数据库卷、私有凭据和已有用户数据；新一轮检查与本地部署结果见 [根目录迁移验收](campus-judge-root-migration-verification.md)，不沿用先前验收结论。
+
+<a id="decision-d32"></a>
+
+#### D32 · 校正生产站点品牌素材（2026-10-14，第 6 阶段后续）
+
+- **背景**：用户明确指出 D30 所用的 `codemasterAI.png` 不是最终品牌图，真正的品牌资源位于新提供的 `brand.zip` 的 `assets/brand` 图标集。
+- **结论**：生产页采用该图标集的 `codemaster-oj-light-v2.svg` 与 `codemaster-oj-dark-v2.svg` 作为浅色／深色横向品牌图，浏览器标签页采用原文件 `codemaster-oj-favicon-v2.svg`；移除先前误用的 PNG。原始 SVG 保持字节不变，不重新绘制。
+- **影响**：D30 对先前 PNG 和徽章 favicon 的选择已被本决定取代；只更新品牌资源与展示，不改原型、账号、成绩及判题逻辑。资源来源见 README。
 
 [返回目录](#contents)

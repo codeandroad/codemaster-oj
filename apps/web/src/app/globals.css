@@ -181,8 +181,8 @@
 }
 @media(prefers-reduced-motion:reduce) { .production-shell nav a { transition:none; } }
 
-/* Keep the supplied brand artwork legible in both light and dark themes. */
-.production-brand-logo { object-fit:contain;height:auto;background:#fff; }
+/* Preserve the supplied vector wordmark's proportions in both themes. */
+.production-brand-logo { vertical-align:middle;line-height:0; }
 
 /* Consistent product density across dashboard, teaching and administration. */
 .production-page-header { align-items:center;gap:20px; }

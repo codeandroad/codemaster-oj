@@ -15,6 +15,8 @@ docs/             生产设计、设计审查与部署记录
 
 应用与业务包各有独立的 `package.json` 和锁文件，不共享原型依赖。业务核心保留经验证的 SQL、会话与判题规则，API 的 HTTP 接入由 NestJS 管理。
 
+站点品牌资源来自用户提供的 `brand.zip`：浅色与深色页面分别使用其中的 `codemaster-oj-light-v2.svg`、`codemaster-oj-dark-v2.svg`，浏览器标签页使用 `codemaster-oj-favicon-v2.svg`。生产副本位于 `apps/web/public/brand/` 和 `apps/web/src/app/icon.svg`。
+
 本仓库根目录即生产项目；原型独立保存在相邻的 `../myoj-prototype/`，不参与生产构建。生产仓库使用 `master` 主分支。
 
 ## 本地体验

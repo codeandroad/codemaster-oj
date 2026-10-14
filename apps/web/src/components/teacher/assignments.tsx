@@ -4,7 +4,7 @@ import { AppLink as Link } from "@/components/navigation";
 import { useEffect, useState } from "react";
 import {activityDate,validateActivity,activeParticipants} from "./activity-validation";
 import {useActivityDraft} from "./use-activity-draft";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowDown,
   ArrowUp,
@@ -157,6 +157,8 @@ interface SelectedProblem {
   problemId: string;
   title: string;
   points: number;
+  firstAcPoints: number;
+  rewardPoints: number;
   mode?: string;
   versionId?: string;
 }
@@ -197,9 +199,10 @@ function AssignmentEditorForm({
   onReload: () => void;
 }) {
   const router = useRouter(),
+    searchParams = useSearchParams(),
     classes = useData<{ items: SchoolClass[] }>("classes"),
     people = useData<{ items: Person[] }>("people"),
-    [tab, setTab] = useState(assignmentTabs[0]!),
+    [tab, setTab] = useState(searchParams.get("tab") === "problems" ? "Problems" : assignmentTabs[0]!),
     [saved, setSaved] = useState(initial),
     [title, setTitle] = useState(initial?.title ?? ""),
     [description, setDescription] = useState(initial?.description ?? ""),
@@ -207,7 +210,12 @@ function AssignmentEditorForm({
     [classId, setClassId] = useState(initial?.classId ?? ""),
     [due, setDue] = useState(localInput(initial?.dueAt)),
     [selected, setSelected] = useState<SelectedProblem[]>(
-      initial?.problems.map((x) => ({ ...x, title: x.title ?? "题目" })) ?? [],
+      initial?.problems.map((x) => ({
+        ...x,
+        title: x.title ?? "题目",
+        firstAcPoints: x.firstAcPoints ?? 10,
+        rewardPoints: x.rewardPoints ?? 0,
+      })) ?? [],
     ),
     [participants, setParticipants] = useState(
       initial?.participantDetails
@@ -220,7 +228,6 @@ function AssignmentEditorForm({
     [picker, setPicker] = useState(false),
     [publish, setPublish] = useState(false),
     [confirmUpdate, setConfirmUpdate] = useState(false),
-    [changeReason, setChangeReason] = useState(""),
     [latestVersions, setLatestVersions] = useState<Record<string, LatestProblemVersion | null>>({}),
     [checkingVersion, setCheckingVersion] = useState<string | null>(null),
     [versionError, setVersionError] = useState(""),
@@ -264,6 +271,7 @@ function AssignmentEditorForm({
       `${x.name} ${x.number}`.toLowerCase().includes(query.toLowerCase()),
     );
   const total = selected.reduce((sum, x) => sum + x.points, 0);
+  const rewardTotal = selected.reduce((sum, x) => sum + x.rewardPoints, 0);
   const checkLatestVersion = async (problemId: string) => {
     setCheckingVersion(problemId);
     setVersionError("");
@@ -298,14 +306,15 @@ function AssignmentEditorForm({
     if (problem.versionId) query.set("versionId", problem.versionId);
     return `/teacher/problems/${problem.problemId}/edit?${query.toString()}`;
   };
-  const draft=useActivityDraft({storageKey:`campus-judge:activity-draft:v1:${userId}:assignment:${initial?.id??"new"}`,editable:true,noticeText:published?"改动已临时保存在当前浏览器；点击“保存修改”并填写原因后才会更新已发布作业。":undefined,snapshot:{title,description,course,classId,due,problems:selected,participants},onRestore:v=>{setTitle(v.title);setDescription(v.description);setCourse(v.course);setClassId(v.classId);setDue(v.due);setSelected(v.problems);setParticipants(v.participants);}});
+  const draft=useActivityDraft({storageKey:`campus-judge:activity-draft:v1:${userId}:assignment:${initial?.id??"new"}`,editable:true,noticeText:published?"改动已临时保存在当前浏览器；点击“保存修改”后才会更新已发布作业。":undefined,snapshot:{title,description,course,classId,due,problems:selected,participants},onRestore:v=>{setTitle(v.title);setDescription(v.description);setCourse(v.course);setClassId(v.classId);setDue(v.due);setSelected(v.problems.map(problem=>({...problem,firstAcPoints:initial?.problems.find(item=>item.problemId===problem.problemId)?.firstAcPoints??problem.firstAcPoints??10,rewardPoints:problem.rewardPoints??initial?.problems.find(item=>item.problemId===problem.problemId)?.rewardPoints??0})));setParticipants(v.participants);}});
   const changedProblems = JSON.stringify(
-    selected.map((x) => ({ problemId: x.problemId, points: x.points, versionId: x.versionId })),
+    selected.map((x) => ({ problemId: x.problemId, points: x.points, versionId: x.versionId, rewardPoints: x.rewardPoints })),
   ) !== JSON.stringify(
     (saved?.problems ?? []).map((x) => ({
       problemId: x.problemId,
       points: x.points,
       versionId: x.versionId,
+      rewardPoints: x.rewardPoints ?? 0,
     })),
   );
   const changedParticipants = JSON.stringify([...participants].sort()) !==
@@ -322,7 +331,7 @@ function AssignmentEditorForm({
   const hasChanges = changedTitle || changedDescription || changedCourse ||
     changedClass || changedDue || changedProblems || changedParticipants;
   useDirty(hasChanges);
-  const save = async (reason?: string) => {
+  const save = async () => {
     if (published && !hasChanges)
       throw new Error("没有需要保存的修改。");
     validateActivity({title,classId,problems:selected,participants});
@@ -343,7 +352,7 @@ function AssignmentEditorForm({
     if (published && classId !== saved?.classId)
       throw new Error("已发布作业不能更换班级。请在原班级内选择适用学生。");
     if (published && hasSubmissions && changedProblems)
-      throw new Error("已有正式提交，题目、分值和顺序不能修改。可修改说明、截止时间或适用学生。");
+      throw new Error("已有正式提交，题目、分值、顺序和奖励积分不能修改。可修改说明、截止时间或适用学生。");
     if (published && hasActivity && changedPinnedVersions)
       throw new Error("已有运行或提交记录，不能切换作业题目的固定版本。");
     const dueAt=activityDate(due,'截止时间');
@@ -355,18 +364,16 @@ function AssignmentEditorForm({
       if (Date.parse(dueAt) <= Date.now())
         throw new Error("新的截止时间须晚于当前时间。");
     }
-    if (published && !reason?.trim())
-      throw new Error("请填写本次修改原因。");
     if (published && saved?.editRevision === undefined)
       throw new Error("作业版本信息缺失，请重新加载后再修改。");
     const problemPayload = selected.map((problem) => ({
       problemId: problem.problemId,
       points: problem.points,
+      rewardPoints: problem.rewardPoints,
       ...(published && problem.versionId ? { versionId: problem.versionId } : {}),
     }));
     const body = published
       ? {
-          reason: reason?.trim(),
           expectedRevision: saved?.editRevision,
           ...(changedTitle ? { title } : {}),
           ...(changedDescription ? { description } : {}),
@@ -407,9 +414,10 @@ function AssignmentEditorForm({
     setSelected(result.problems.map((problem) => ({
       ...problem,
       title: problem.title ?? selected.find((item) => item.problemId === problem.problemId)?.title ?? "题目",
+      firstAcPoints: problem.firstAcPoints ?? selected.find((item) => item.problemId === problem.problemId)?.firstAcPoints ?? 10,
+      rewardPoints: problem.rewardPoints ?? selected.find((item) => item.problemId === problem.problemId)?.rewardPoints ?? 0,
       mode: selected.find((item) => item.problemId === problem.problemId)?.mode,
     })));
-    setChangeReason("");
     if (!saved) router.replace(`/teacher/assignments/${result.id}/edit`);
     return result;
   };
@@ -468,8 +476,8 @@ function AssignmentEditorForm({
         <p className="mt-3 border border-info-soft bg-info-soft p-3 text-sm">
           作业已发布。可以修改标题、说明、截止时间和指定学生；截止时间只能延后。
           {hasSubmissions
-            ? "已有正式提交，题目、分值和顺序已固定。"
-            : "尚无正式提交，可以调整题目、分值和顺序。"}
+            ? "已有正式提交，题目、分值、顺序和奖励积分已固定。"
+            : "尚无正式提交，可以调整题目、分值、顺序和奖励积分。"}
           {hasActivity
             ? "已有运行或提交记录，题目固定版本不可替换；有记录的学生不能从名单中移除。"
             : "尚无运行记录，可在检查后明确选择题库的新发布版本。"}
@@ -551,21 +559,6 @@ function AssignmentEditorForm({
                   </span>
                 )}
               </Field>
-              <div className="col-span-2 flex flex-wrap items-center justify-between gap-3 border border-border bg-surface-subtle p-3 text-sm max-md:col-span-1">
-                <div>
-                  <b>发布对象</b>
-                  <p className="mt-1 text-muted-foreground">
-                    已选 {participants.length} / {rosterTotal} 名学生；只有选中的学生可见。
-                  </p>
-                </div>
-                <Button
-                  variant="secondary"
-                  disabled={!classId || action.busy}
-                  onClick={() => setTab("Applicable list")}
-                >
-                  {published ? "调整学生名单" : "选择部分学生"}
-                </Button>
-              </div>
               <Field label="Teacher note">
                 <textarea
                   disabled={action.busy}
@@ -584,17 +577,24 @@ function AssignmentEditorForm({
                 <div>
                   <b className="text-sm">Selected problems</b>
                   <p className="text-xs text-muted-foreground">
-                    {selected.length} problems · {total} pts total. Reorder,
-                    edit points, or open the unified editor.
+                    {selected.length} 道题 · 作业总分 {total} 分 · 本作业额外奖励 {rewardTotal} / 100 积分。
                   </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    每题首次正式 AC 默认奖励 10 积分（管理员可调整）；本作业额外奖励在此逐题设置，只有首次通过该作业题目时追加。
+                  </p>
+                  {rewardTotal > 100 && (
+                    <p role="alert" className="mt-1 text-xs text-destructive">
+                      本作业额外奖励合计最多 100 积分，请减少逐题奖励。
+                    </p>
+                  )}
                   {published && hasSubmissions && (
                     <p className="mt-1 text-xs text-muted-foreground">
-                      已有正式提交，不能调整本作业的题目、分值或顺序。
+                      已有正式提交，不能调整本作业的题目、分值、顺序或奖励积分。
                     </p>
                   )}
                   {published && hasActivity && !hasSubmissions && (
                     <p className="mt-1 text-xs text-muted-foreground">
-                      已有运行记录，可调整题目和分值，但不能替换已固定的题目版本。
+                      已有运行记录，可调整题目、分值和奖励积分，但不能替换已固定的题目版本。
                     </p>
                   )}
                 </div>
@@ -617,7 +617,7 @@ function AssignmentEditorForm({
                   {versionError}
                 </p>
               )}
-              <Table headers={["顺序", "题目", "接口", "分值", "操作"]}>
+              <Table headers={["顺序", "题目", "接口", "作业分值", "首次 AC 积分", "本作业额外奖励", "操作"]}>
                 {selected.map((p, i) => (
                   <tr key={p.problemId}>
                     <td>{i + 1}</td>
@@ -706,6 +706,26 @@ function AssignmentEditorForm({
                       />
                     </td>
                     <td>
+                      <span className="font-medium">+{p.firstAcPoints}</span>
+                    </td>
+                    <td>
+                      <input
+                        aria-label={`${p.title} 本作业额外奖励积分`}
+                        type="number"
+                        step={1}
+                        min={0}
+                        max={20}
+                        disabled={!canEditProblems || action.busy}
+                        className={`${input} w-24`}
+                        value={p.rewardPoints}
+                        onChange={(event) => setSelected((current) =>
+                          current.map((item) => item.problemId === p.problemId
+                            ? { ...item, rewardPoints: Number(event.target.value) }
+                            : item),
+                        )}
+                      />
+                    </td>
+                    <td>
                       <div className="flex items-center gap-1">
                         <Button
                           variant="ghost"
@@ -751,7 +771,7 @@ function AssignmentEditorForm({
                   </tr>
                 ))}
                 {!selected.length && (
-                  <Empty columns={5}>从题库与分组选择已发布题目。</Empty>
+                  <Empty columns={7}>从题库与分组选择已发布题目。</Empty>
                 )}
               </Table>
             </>
@@ -937,7 +957,7 @@ function AssignmentEditorForm({
                 Due {due || "尚未设置"}
               </p>
               <p className="mt-4 whitespace-pre-wrap text-sm">{description}</p>
-              <Table headers={["题目", "分值"]} min={400}>
+              <Table headers={["题目", "作业分值", "首次 AC 积分", "本作业额外奖励"]} min={400}>
                 {selected.map((p) => (
                   <tr key={p.problemId}>
                     <td>
@@ -946,6 +966,8 @@ function AssignmentEditorForm({
                       </Link>
                     </td>
                     <td>{p.points}</td>
+                    <td>+{p.firstAcPoints}</td>
+                    <td>+{p.rewardPoints}</td>
                   </tr>
                 ))}
               </Table>
@@ -967,6 +989,8 @@ function AssignmentEditorForm({
                 problemId: p.id,
                 title: p.publishedTitle ?? p.title,
                 points: 100,
+                firstAcPoints: p.firstAcPoints ?? 10,
+                rewardPoints: 0,
                 mode: p.mode,
                 versionId: p.publishedVersionId ?? undefined,
               })),
@@ -979,8 +1003,8 @@ function AssignmentEditorForm({
         <Modal title="确认发布作业" onClose={() => setPublish(false)}>
           <p className="text-sm leading-6">
             向 {classroom?.name ?? "未选择班级"} 的 {participants.length}{" "}
-            名适用学生发布 {selected.length} 道题，总分 {total}
-            。发布时固定题目版本；未勾选的学生不会看到该作业。
+            名适用学生发布 {selected.length} 道题，总分 {total} 分、额外奖励上限 {rewardTotal} 积分。
+            发布时固定题目版本；未勾选的学生不会看到该作业。
           </p>
           <Feedback action={action} />
           <div className="mt-5 flex justify-end gap-2">
@@ -1020,22 +1044,11 @@ function AssignmentEditorForm({
         <Modal title="确认修改已发布作业" onClose={() => setConfirmUpdate(false)}>
           <p className="text-sm leading-6">
             修改将立即影响已布置给 {participants.length} 名学生的作业。
-            {changedProblems && "题目、分值或顺序有变更。"}
+            {changedProblems && "题目、分值、顺序或奖励积分有变更。"}
             {changedParticipants && "学生名单有变更，未勾选学生将看不到作业。"}
             {due !== localInput(saved?.dueAt) && "截止时间将延后。"}
             已有提交和历史成绩会保留。
           </p>
-          <Field label="修改原因">
-            <textarea
-              className={area}
-              value={changeReason}
-              maxLength={2000}
-              rows={3}
-              required
-              placeholder="例如：延长截止时间，供学生完成新增题目"
-              onChange={(event) => setChangeReason(event.target.value)}
-            />
-          </Field>
           <Feedback action={action} />
           {stale && (
             <div className="mt-4 border border-warning/30 bg-warning/5 p-3 text-sm">
@@ -1058,9 +1071,9 @@ function AssignmentEditorForm({
               取消
             </Button>
             <Button
-              disabled={action.busy || stale || !changeReason.trim()}
+              disabled={action.busy || stale}
               onClick={() => void action.run(async () => {
-                await save(changeReason);
+                await save();
                 setConfirmUpdate(false);
                 return "已发布作业已更新。";
               })}

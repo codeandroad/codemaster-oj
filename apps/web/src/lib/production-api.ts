@@ -65,13 +65,14 @@ export interface ProductionProblem {
   difficulty?: string;
   source?: string;
   canEdit?: boolean;
+  firstAcPoints?: number;
 }
 export interface Assignment {
   id: string;
   title: string;
   classId: string;
   dueAt: string;
-  problems: { problemId: string; points: number; title?: string; versionId?: string }[];
+  problems: { problemId: string; points: number; title?: string; versionId?: string; firstAcPoints?: number; rewardPoints?: number }[];
   participants: string[];
   participantDetails?: { identityId: string; name: string; exempt: boolean; hasActivity?: boolean }[];
   grades?: {

@@ -195,7 +195,7 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
     people = useData<{ items: Person[] }>("people"),
     assignments = useData<{ items: TeacherAssignment[] }>("assignments");
   const [activeId, setActiveId] = useState(search.get("classId") ?? ""),
-    [dialog, setDialog] = useState<"new" | "members" | "edit" | null>(null);
+    [dialog, setDialog] = useState<"new" | "edit" | null>(null);
   useEffect(() => { const classId = search.get("classId"); if (classId) setActiveId(classId); }, [search]);
   const current =
     classes.data?.items.find((x) => x.id === activeId) ??
@@ -278,14 +278,14 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
                 {current.studentIds.length} students ·{" "}
                 {currentAssignment?.title ?? "尚未布置作业"}
               </span>
-              <Button size="sm" variant="secondary" disabled={!canManage} onClick={()=>setDialog("edit")} data-od-id="edit-class">编辑班级</Button>
               <Button
                 size="sm"
                 variant="secondary"
                 disabled={!canManage}
-                onClick={() => setDialog("members")}
+                onClick={() => setDialog("edit")}
+                data-od-id="edit-class"
               >
-                维护名单
+                编辑班级
               </Button>
             </div>
             <State resource={detail} />
@@ -395,7 +395,7 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
           existing={classes.data?.items ?? []}
           people={people.data?.items ?? []}
           user={user}
-          current={dialog !== "new" ? current : undefined}
+          current={dialog === "edit" ? current : undefined}
           mode={dialog}
           onClose={() => setDialog(null)}
           onSaved={(id) => {
@@ -440,7 +440,7 @@ function ClassDialog({
   onClose,
   onSaved,
 }: {
-  mode:"new"|"members"|"edit";
+  mode: "new" | "edit";
   existing: SchoolClass[];
   people: Person[];
   user: CampusUser;
@@ -463,7 +463,7 @@ function ClassDialog({
   );
   return (
     <Modal
-      title={mode==="edit"?`编辑班级 · ${current?.name}`:current ? `维护 ${current.name}` : "新建班级 / 学生集合"}
+      title={mode === "edit" ? `编辑班级与名单 · ${current?.name}` : "新建班级 / 学生集合"}
       onClose={onClose}
     >
       <form
@@ -478,6 +478,10 @@ function ClassDialog({
               )
             )
               throw new Error("已存在同名班级。");
+            const membershipChanged =
+              !current ||
+              selected.length !== current.studentIds.length ||
+              selected.some((id) => !current.studentIds.includes(id));
             const result = await productionApi<SchoolClass>(
               current ? `classes/${current.id}` : "classes",
               {
@@ -486,7 +490,7 @@ function ClassDialog({
                   name: name.trim(),
                   description,
                   type,
-                  ...(mode!=="edit"?{studentIds:selected}:{}),
+                  ...(membershipChanged ? { studentIds: selected } : {}),
                   ...(!current && user.roles.includes("teacher") ? { teacherIds: [user.identityId] } : {}),
                 },
               },
@@ -513,7 +517,7 @@ function ClassDialog({
           />
         </Field>
         <Field label="班级类型"><select aria-label="班级类型" value={type} onChange={e=>setType(e.target.value)} className={input}><option value="training">训练班</option><option value="administrative">行政班</option></select></Field>
-        {mode!=="edit"&&<div>
+        <div>
           <div className="flex justify-between text-sm">
             <b>从已有学生中选择（可选）</b>
             <span className="text-xs text-muted-foreground">
@@ -553,14 +557,14 @@ function ClassDialog({
             学生仍保留在原班级。名单里没有账号的学生可通过 Import members
             先建档入班。
           </p>
-        </div>}
+        </div>
         <Feedback action={action} />
         <div className="flex justify-end gap-2 border-t border-border pt-4">
           <Button variant="secondary" type="button" onClick={onClose}>
             取消
           </Button>
           <Button type="submit" disabled={action.busy}>
-            {mode==="edit"?"保存班级信息":current ? "保存名单" : "创建班级"}
+            {mode === "edit" ? "保存班级与名单" : "创建班级"}
           </Button>
         </div>
       </form>

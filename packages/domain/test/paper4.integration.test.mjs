@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { randomBytes, randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { createPool } from '../src/db.mjs';
 import { migrate } from '../src/migrate.mjs';
 import { bootstrap } from '../src/bootstrap.mjs';
@@ -40,27 +41,72 @@ test('Paper 4 practice has isolated drafts, immutable stages, class authorizatio
    }
    const cls=await admin('/classes',{name:'Paper4 practice',teacherIds:[identities.teacher.id],studentIds:[identities.student.id]},'POST',201);
    const questions=[
-    {key:'Q1',title:'Circular structure',statement:'Implement a circular structure.',starterCode:'# Q1\n',stages:[{id:'Q1a',title:'Initialize',maxMarks:20}]},
-    {key:'Q2',title:'Text files',statement:'Read an input file.',starterCode:'# Q2\n',initialFiles:{'TheData.txt':'2,Blue\n'},outputFiles:['Blue.txt'],stages:[{id:'Q2a',title:'Read and write',maxMarks:25}]},
-    {key:'Q3',title:'Binary tree',statement:'Build a tree.',starterCode:'# Q3\n',stages:[{id:'Q3a',title:'Tree',maxMarks:30}]},
+    {key:'Q1',title:'Circular structure',statement:'Implement a circular structure.',starterCode:'# Q1\n',stages:[{id:'Q1a',title:'Initialize',maxMarks:20,judgeMode:'auto'}]},
+    {key:'Q2',title:'Text files',statement:'Read an input file.',starterCode:'# Q2\n',initialFiles:{'TheData.txt':'2,Blue\n'},outputFiles:['Blue.txt'],stages:[{id:'Q2a',title:'Read and write',maxMarks:25,judgeMode:'auto'}]},
+    {key:'Q3',title:'Binary tree',statement:'Build a tree.',starterCode:'# Q3\n',stages:[{id:'Q3a',title:'Tree',maxMarks:30,judgeMode:'auto'}]},
    ];
-   const runnerCases={Q2:[{id:'public1',stdin:'',expectedStdout:'',expectedFiles:{'Blue.txt':'2\n'},public:true}]};
+   const runnerCases={Q1a:[{id:'one',expectedStdout:'1\n',public:true,driverCode:'print("private-driver")'},
+     {id:'hidden',expectedStdout:'1\n',public:false,driverCode:'print("hidden-driver")'}],
+    Q2a:[{id:'public1',stdin:'',expectedStdout:'',expectedFiles:{'Blue.txt':'2\n'},public:true}],
+    Q3a:[{id:'tree',expectedStdout:'2\n',public:false}]};
+   const referenceSolutions={Q1:'print(1)',Q2:"open('Blue.txt','w').write('2\\n')",Q3:'print(2)'};
+   async function validateReferences(paperId){
+    for(const question of questions){
+     const queued=await teacher(`/paper4/papers/${paperId}/reference-runs`,{questionKey:question.key},'POST',201);
+     for(const task of queued.items){
+      const snapshotId=(await pool.query('SELECT reference_snapshot_id FROM paper4_run_tasks WHERE id=$1',[task.id])).rows[0].reference_snapshot_id;
+      assert.ok(snapshotId);
+      await pool.query("UPDATE paper4_run_tasks SET state='completed' WHERE id=$1",[task.id]);
+      const cases=runnerCases[task.stageId];
+      await pool.query(`INSERT INTO paper4_runs(task_id,lease_id,reference_snapshot_id,status,public_output,public_message,private_results,environment_version)
+       VALUES($1,$2,$3,'AC','','Validated',$4::jsonb,'test')`,
+      [task.id,randomUUID(),snapshotId,JSON.stringify(cases.map(c=>({stageId:task.stageId,caseId:c.id,public:c.public===true,status:'AC',checks:[{kind:'stdout',passed:true}]})))]);
+     }
+    }
+   }
    await otherTeacher('/paper4/papers',{title:'Forbidden',classId:cls.id,questions},'POST',403);
-   await teacher('/paper4/papers',{title:'Missing class',questions},'POST',403);
-   const paper=await teacher('/paper4/papers',{title:'Paper 4 practice',classId:cls.id,questions,runnerCases},'POST',201);
+   const packageBytes=await readFile(new URL('../../../examples/paper4-english-practice/paper4-english-practice.json',import.meta.url));
+   const importRequest={filename:'paper4-english-practice.json',contentBase64:packageBytes.toString('base64')};
+   await student('/paper4/imports/preview',importRequest,'POST',403);
+   const beforePreview=(await pool.query('SELECT count(*)::int n FROM paper4_papers')).rows[0].n;
+   const preview=await teacher('/paper4/imports/preview',importRequest);
+   assert.equal(preview.preview.questionCount,3);
+   assert.equal(preview.createBody.classId,null);
+   assert.equal(preview.createBody.referenceSolutions.Q3.length>0,true);
+   assert.equal((await pool.query('SELECT count(*)::int n FROM paper4_papers')).rows[0].n,beforePreview);
+   const unassigned=await teacher('/paper4/papers',{title:'Unassigned draft',questions,runnerCases,referenceSolutions},'POST',201);
+   await teacher(`/paper4/papers/${unassigned.id}/publish`,{},'POST',409);
+   const manualOnly=await teacher('/paper4/papers',{title:'Manual-only draft',classId:cls.id,
+    questions:[{key:'Q1',title:'Unverified question',statement:'Teacher review only',stages:[
+     {id:'Q1a',title:'Review',maxMarks:75,judgeMode:'manual'}]}]},'POST',201);
+   await teacher(`/paper4/papers/${manualOnly.id}/publish`,{},'POST',409);
+   const paper=await teacher('/paper4/papers',{title:'Paper 4 practice',classId:cls.id,questions,runnerCases,referenceSolutions},'POST',201);
    assert.equal(paper.totalMarks,75);
    await student(`/paper4/papers/${paper.id}`,undefined,'GET',404);
    await outsider(`/paper4/papers/${paper.id}`,undefined,'GET',404);
    await teacher(`/paper4/papers/${paper.id}`,{description:'Draft updated'},'PATCH');
+   await teacher(`/paper4/papers/${paper.id}/publish`,{},'POST',409);
+   await validateReferences(paper.id);
+   assert.equal((await teacher(`/paper4/papers/${paper.id}?view=draft`)).referenceValidation.Q1a.status,'AC');
+   await pool.query(`UPDATE paper4_runs SET private_results='[]'::jsonb WHERE task_id=(
+    SELECT t.id FROM paper4_run_tasks t JOIN paper4_reference_snapshots rs ON rs.id=t.reference_snapshot_id
+    WHERE rs.version_id=$1 AND rs.stage_key='Q1a' ORDER BY rs.created_at DESC LIMIT 1)`,[paper.versionId]);
+   assert.equal((await teacher(`/paper4/papers/${paper.id}?view=draft`)).referenceValidation.Q1a.status,'error');
+   await teacher(`/paper4/papers/${paper.id}/publish`,{},'POST',409);
+   await validateReferences(paper.id);
    await teacher(`/paper4/papers/${paper.id}/publish`,{});
    await teacher(`/paper4/papers/${paper.id}`,{description:'Cannot rewrite published version'},'PATCH',409);
    const published=await student(`/paper4/papers/${paper.id}`);
    assert.equal(published.runnerCases,undefined);
+   assert.equal(published.referenceSolutions,undefined);
+   assert.equal(JSON.stringify(published).includes('private-driver'),false);
    assert.deepEqual(published.questions[1].outputFiles,['Blue.txt']);
    await outsider(`/paper4/papers/${paper.id}`,undefined,'GET',403);
    await outsider(`/paper4/papers/${paper.id}/attempt`,{},'POST',403);
    const attempt=await student(`/paper4/papers/${paper.id}/attempt`,{},'POST',201);
    assert.equal(attempt.files.length,3);
+   assert.equal(JSON.stringify(attempt).includes('private-driver'),false);
+   assert.equal(JSON.stringify(attempt).includes('referenceSolutions'),false);
    assert.equal((await student(`/paper4/papers/${paper.id}/attempt`,{},'POST')).id,attempt.id);
    assert.equal((await student(`/paper4/papers/${paper.id}/attempt`)).id,attempt.id);
    await outsider(`/paper4/attempts/${attempt.id}`,undefined,'GET',403);
@@ -71,7 +117,7 @@ test('Paper 4 practice has isolated drafts, immutable stages, class authorizatio
    const checkpoint=await student(`/paper4/attempts/${attempt.id}/checkpoints`,{stageId:'Q2a'},'POST',201);
    assert.equal(checkpoint.revision,1);
    assert.equal(checkpoint.sourceCode,saved.content);
-   await student(`/paper4/attempts/${attempt.id}/runs`,{fileKey:'Q1'},'POST',201);
+   const leaking=await student(`/paper4/attempts/${attempt.id}/runs`,{fileKey:'Q1'},'POST',201);
    const run=await student(`/paper4/attempts/${attempt.id}/runs`,{fileKey:'Q2'},'POST',201);
    assert.equal((await student(`/paper4/runs/${run.id}`)).state,'queued');
    await outsider(`/paper4/runs/${run.id}`,undefined,'GET',403);
@@ -79,13 +125,43 @@ test('Paper 4 practice has isolated drafts, immutable stages, class authorizatio
    await pool.query("UPDATE paper4_run_tasks SET state='completed' WHERE id=$1",[run.id]);
    await pool.query(`INSERT INTO paper4_runs(task_id,lease_id,snapshot_id,status,public_output,public_message,private_results,environment_version)
     VALUES($1,$2,$3,'Executed','3','Run complete',$4::jsonb,'test')`,[run.id,randomUUID(),snapshotId,JSON.stringify([
-    {caseId:'public1',public:true,status:'Executed',stdout:'3',stderr:'',generatedFiles:{'Blue.txt':'2\n'},checks:[{kind:'file',name:'Blue.txt',passed:true}]},
-    {caseId:'hidden1',public:false,status:'NeedsReview',secretExpected:'never expose this secret',checks:[{kind:'stdout',passed:false}]},
+    {stageId:'Q2a',caseId:'public1',public:true,status:'AC',stdout:'3',stderr:'',generatedFiles:{'Blue.txt':'2\n'},checks:[{kind:'file',name:'Blue.txt',passed:true}]},
+    {stageId:'Q2a',caseId:'hidden1',public:false,status:'WA',secretExpected:'never expose this secret',checks:[{kind:'stdout',passed:false}]},
    ])]);
    const displayed=await student(`/paper4/runs/${run.id}`);
    assert.equal(displayed.result.publicResults[0].generatedFiles['Blue.txt'],'2\n');
    assert.equal(displayed.result.publicResults.length,1);
+   assert.equal(displayed.result.publicResults[0].stdout,'3');
+   assert.equal(displayed.result.publicOutput,'3');
+   assert.equal(displayed.result.questionStatus,'NotPassed');
    assert.equal(JSON.stringify(displayed).includes('never expose this secret'),false);
+   assert.equal(JSON.stringify(displayed).includes('private-driver'),false);
+   const leakingSnapshot=(await pool.query('SELECT snapshot_id FROM paper4_run_tasks WHERE id=$1',[leaking.id])).rows[0].snapshot_id;
+   await pool.query("UPDATE paper4_run_tasks SET state='completed' WHERE id=$1",[leaking.id]);
+   await pool.query(`INSERT INTO paper4_runs(task_id,lease_id,snapshot_id,status,public_output,public_message,private_results,environment_version)
+    VALUES($1,$2,$3,'RE',$4,$4,$5::jsonb,'test')`,[leaking.id,randomUUID(),leakingSnapshot,
+    'Traceback /w/driver.py: print(sum(results))',JSON.stringify([
+     {stageId:'Q1a',caseId:'one',public:true,status:'RE',stdout:'teacher driver secret',
+      stderr:'Traceback /w/driver.py: print(sum(results))',generatedFiles:{'Blue.txt':'secret file'},checks:[]},
+     {stageId:'Q1a',caseId:'hidden',public:false,status:'WA',secretExpected:'hidden answer',checks:[]},
+    ])]);
+   const safe=await student(`/paper4/runs/${leaking.id}`);
+   assert.equal(safe.result.status,'NotPassed');
+   assert.equal(safe.result.questionStatus,'NotPassed');
+   assert.deepEqual(safe.result.stageResults,[{stageId:'Q1a',status:'NotPassed'}]);
+   assert.equal(safe.result.publicResults[0].status,'NotPassed');
+   assert.equal(safe.result.publicResults[0].stdout,'');
+   assert.equal(safe.result.publicResults[0].stderr,'');
+   assert.deepEqual(safe.result.publicResults[0].generatedFiles,{});
+   assert.equal(safe.result.publicOutput,'');
+   assert.equal(JSON.stringify(safe).includes('/w/driver.py'),false);
+   assert.equal(JSON.stringify(safe).includes('print(sum(results))'),false);
+   assert.equal(JSON.stringify(safe).includes('teacher driver secret'),false);
+   assert.equal(JSON.stringify(safe).includes('hidden answer'),false);
+   assert.equal(safe.result.reviewResults,undefined);
+   const teacherDiagnostics=await teacher(`/paper4/runs/${leaking.id}`);
+   assert.equal(teacherDiagnostics.result.publicResults[0].stderr.includes('/w/driver.py'),true);
+   assert.equal(teacherDiagnostics.result.reviewResults.length,2);
    await teacher(`/paper4/attempts/${attempt.id}/marks`,{stageId:'Q2a',marks:25},'PATCH',409);
    await student(`/paper4/attempts/${attempt.id}/submit`,{});
    await student(`/paper4/attempts/${attempt.id}/files/Q2`,{content:'late',revision:1},'PATCH',409);
@@ -103,11 +179,76 @@ test('Paper 4 practice has isolated drafts, immutable stages, class authorizatio
    await teacher(`/paper4/attempts/${attempt.id}/marks`,{stageId:'Q3a',marks:30},'PATCH',409);
    assert.equal((await pool.query('SELECT count(*)::int n FROM submissions')).rows[0].n,0);
    assert.equal((await pool.query('SELECT count(*)::int n FROM judge_tasks')).rows[0].n,0);
-   assert.equal((await pool.query('SELECT count(*)::int n FROM paper4_run_tasks')).rows[0].n,2);
+   assert.equal((await pool.query('SELECT count(*)::int n FROM paper4_run_tasks WHERE snapshot_id IS NOT NULL')).rows[0].n,2);
    assert.equal((await pool.query('SELECT count(*)::int n FROM paper4_snapshots WHERE attempt_id=$1 AND stage_key=$2',[attempt.id,'Q2a'])).rows[0].n,1);
 
+   // Revisions are prepared privately; both the reference validation and
+   // each student attempt stay pinned to one immutable published version.
+   const originalVersion=paper.versionId;
+   const draft=await teacher(`/paper4/papers/${paper.id}/draft`,{},'POST',201);
+   assert.equal(draft.versionNumber,2);
+   assert.equal(draft.status,'draft');
+   assert.equal(draft.referenceSolutions.Q1,referenceSolutions.Q1);
+   assert.equal((await teacher(`/paper4/papers/${paper.id}`)).versionId,originalVersion);
+   assert.equal((await student(`/paper4/papers/${paper.id}`)).versionId,originalVersion);
+   await validateReferences(paper.id);
+   assert.equal((await teacher(`/paper4/papers/${paper.id}?view=draft`)).referenceValidation.Q1a.status,'AC');
+   const changed=await teacher(`/paper4/papers/${paper.id}`,{description:'Revised practice'},'PATCH');
+   assert.equal(changed.referenceValidation.Q1a.status,'unverified');
+   assert.equal((await student(`/paper4/papers/${paper.id}`)).description,'Draft updated');
+   await teacher(`/paper4/papers/${paper.id}/publish`,{},'POST',409);
+   await validateReferences(paper.id);
+   const revised=await teacher(`/paper4/papers/${paper.id}/publish`,{});
+   assert.equal(revised.versionNumber,2);
+   assert.notEqual(revised.versionId,originalVersion);
+   assert.equal((await student(`/paper4/papers/${paper.id}`)).description,'Revised practice');
+   const newAttempt=await student(`/paper4/papers/${paper.id}/attempt`,{},'POST',201);
+   assert.notEqual(newAttempt.id,attempt.id);
+   assert.equal(newAttempt.versionId,revised.versionId);
+   assert.equal(newAttempt.paper.versionNumber,2);
+   assert.equal((await student(`/paper4/papers/${paper.id}/attempt`)).id,newAttempt.id);
+   const pinned=await student(`/paper4/attempts/${attempt.id}`);
+   assert.equal(pinned.versionId,originalVersion);
+   assert.equal(pinned.paper.versionNumber,1);
+   assert.equal(pinned.score,60);
+   const versionRows=(await pool.query('SELECT id,published_at FROM paper4_versions WHERE paper_id=$1 ORDER BY version_number',[paper.id])).rows;
+   assert.deepEqual(versionRows.map(v=>v.id),[originalVersion,revised.versionId]);
+   assert.ok(versionRows.every(v=>v.published_at));
+   const attemptRows=await teacher(`/paper4/attempts?paperId=${paper.id}`);
+   assert.deepEqual(new Set(attemptRows.items.map(a=>a.versionNumber)),new Set([1,2]));
+   assert.equal((await pool.query('SELECT count(*)::int n FROM submissions')).rows[0].n,0);
+   assert.equal((await pool.query('SELECT count(*)::int n FROM point_ledger')).rows[0].n,0);
+   assert.equal((await pool.query('SELECT count(*)::int n FROM school_rank_ledger')).rows[0].n,0);
+
+   // A manual code review or historical screenshot stage still contributes to
+   // the 75-point teacher rubric, while AC depends on final-program tests.
+   const mixedQuestions=structuredClone(questions);
+   mixedQuestions[0].stages=[{...mixedQuestions[0].stages[0],maxMarks:10},
+    {id:'Q1b',title:'Inspect implementation',maxMarks:10,judgeMode:'manual'}];
+   mixedQuestions[1].stages=[{...mixedQuestions[1].stages[0],maxMarks:20},
+    {id:'Q2b',title:'Record observed output',maxMarks:5,judgeMode:'evidence'}];
+   const mixed=await teacher('/paper4/papers',{title:'Mixed rubric',classId:cls.id,
+    questions:mixedQuestions,runnerCases,referenceSolutions},'POST',201);
+   await validateReferences(mixed.id);
+   await teacher(`/paper4/papers/${mixed.id}/publish`,{});
+   const mixedAttempt=await student(`/paper4/papers/${mixed.id}/attempt`,{},'POST',201);
+   for(const [questionKey,stageId] of [['Q1','Q1a'],['Q2','Q2a']]){
+    const queued=await student(`/paper4/attempts/${mixedAttempt.id}/runs`,{fileKey:questionKey},'POST',201);
+    const source=(await pool.query('SELECT snapshot_id FROM paper4_run_tasks WHERE id=$1',[queued.id])).rows[0].snapshot_id;
+    await pool.query("UPDATE paper4_run_tasks SET state='completed' WHERE id=$1",[queued.id]);
+    await pool.query(`INSERT INTO paper4_runs(task_id,lease_id,snapshot_id,status,public_output,public_message,private_results,environment_version)
+     VALUES($1,$2,$3,'AC','','All required tests passed',$4::jsonb,'test')`,
+    [queued.id,randomUUID(),source,JSON.stringify(runnerCases[stageId].map(c=>({stageId,caseId:c.id,public:c.public===true,status:'AC',checks:[]})))]);
+    const outcome=await student(`/paper4/runs/${queued.id}`);
+    assert.equal(outcome.result.questionStatus,'AC');
+    assert.deepEqual(outcome.result.stageResults,[{stageId,status:'AC'}]);
+    assert.deepEqual(outcome.result.pendingManualStageIds,questionKey==='Q1'?['Q1b']:[]);
+    assert.deepEqual(outcome.result.evidenceStageIds,questionKey==='Q2'?['Q2b']:[]);
+   }
+
    const scheduled=await teacher('/paper4/papers',{title:'Scheduled mock',classId:cls.id,
-    startsAt:new Date(Date.now()+3600000).toISOString(),endsAt:new Date(Date.now()+7200000).toISOString(),questions},'POST',201);
+    startsAt:new Date(Date.now()+3600000).toISOString(),endsAt:new Date(Date.now()+7200000).toISOString(),questions,runnerCases,referenceSolutions},'POST',201);
+   await validateReferences(scheduled.id);
    await teacher(`/paper4/papers/${scheduled.id}/publish`,{});
    const listing=await student('/paper4/papers');
    const summary=listing.items.find(item=>item.id===scheduled.id);
@@ -117,11 +258,14 @@ test('Paper 4 practice has isolated drafts, immutable stages, class authorizatio
    await student(`/paper4/papers/${scheduled.id}/attempt`,{},'POST',409);
 
    const timedPaper=await teacher('/paper4/papers',{title:'Deadline freeze',classId:cls.id,
-    endsAt:new Date(Date.now()+3600000).toISOString(),questions},'POST',201);
+    endsAt:new Date(Date.now()+3600000).toISOString(),questions,runnerCases,referenceSolutions},'POST',201);
+   await validateReferences(timedPaper.id);
    await teacher(`/paper4/papers/${timedPaper.id}/publish`,{});
    const expiring=await student(`/paper4/papers/${timedPaper.id}/attempt`,{},'POST',201);
    await student(`/paper4/attempts/${expiring.id}/files/Q1`,{content:'print(7)',revision:0},'PATCH');
-   await pool.query("UPDATE paper4_papers SET ends_at=clock_timestamp()-interval '1 second' WHERE id=$1",[timedPaper.id]);
+   await pool.query('ALTER TABLE paper4_versions DISABLE TRIGGER paper4_version_immutable');
+   await pool.query("UPDATE paper4_versions SET ends_at=clock_timestamp()-interval '1 second' WHERE id=$1",[expiring.versionId]);
+   await pool.query('ALTER TABLE paper4_versions ENABLE TRIGGER paper4_version_immutable');
    const [firstRead,secondRead]=await Promise.all([
     student(`/paper4/attempts/${expiring.id}`),student(`/paper4/attempts/${expiring.id}`),
    ]);

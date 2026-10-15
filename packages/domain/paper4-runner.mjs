@@ -11,7 +11,8 @@ const STDIN_BYTES = 64 * 1024;
 const STDOUT_BYTES = 64 * 1024;
 const STDERR_BYTES = 16 * 1024;
 const MAX_FILES = 16;
-const MAX_CASES = 12;
+const MAX_CASES = 50;
+const DRIVER_BYTES = 16 * 1024;
 const CASE_CPU_NS = 2_000_000_000;
 const CASE_WALL_NS = 5_000_000_000;
 const JOB_CPU_NS = 30_000_000_000;
@@ -35,9 +36,10 @@ work = '/tmp/paper4'
 os.mkdir(work)
 inputs = json.loads(sys.argv[1])
 outputs = json.loads(sys.argv[2])
+program = sys.argv[3]
 for name in inputs:
     shutil.copyfile('/w/' + name, work + '/' + name)
-completed = subprocess.run([sys.executable, '-I', '-S', '/w/main.py'], cwd=work)
+completed = subprocess.run([sys.executable, '-I', '-S', program], cwd=work)
 for name in outputs:
     path = work + '/' + name
     try:
@@ -103,7 +105,13 @@ function validateCases(runnerCases) {
     const inputFiles = fileMap(entry.inputFiles, 'case input files');
     const expectedFiles = fileMap(entry.expectedFiles, 'expected files');
     const expectedStdout = entry.expectedStdout === undefined ? undefined : boundedText(entry.expectedStdout, STDOUT_BYTES, 'expected output');
-    return { id, stdin, inputFiles, expectedFiles, expectedStdout, public: entry.public === true };
+    const stageId = entry.stageId === undefined ? null : boundedText(entry.stageId, 40, 'stage ID');
+    if (stageId !== null && !/^[A-Za-z][A-Za-z0-9_-]{0,39}$/.test(stageId))
+      throw new InfrastructureError('Invalid Paper 4 stage ID.');
+    const driverCode = entry.driverCode === undefined ? undefined : boundedText(entry.driverCode, DRIVER_BYTES, 'driver code');
+    if (stageId !== null && expectedStdout === undefined && !Object.keys(expectedFiles).length)
+      throw new InfrastructureError('An automatically judged Paper 4 case needs an expected result.');
+    return { id, stageId, stdin, inputFiles, expectedFiles, expectedStdout, driverCode, public: entry.public === true };
   });
 }
 
@@ -180,8 +188,9 @@ function commandForCase(judge, sourceCode, initialFiles, outputFiles, testCase, 
   fileMap(seeded, 'merged sandbox files');
   const command = judge.command({ code: sourceCode, input: testCase.stdin, version: VERSION, language: 'python' });
   command.args = [judge.python, '-I', '-S', '-c', FILE_WORKSPACE,
-    JSON.stringify(Object.keys(seeded)), JSON.stringify(outputNames)];
+    JSON.stringify(Object.keys(seeded)), JSON.stringify(outputNames), testCase.driverCode === undefined ? '/w/main.py' : '/w/driver.py'];
   command.copyIn = { ...command.copyIn, ...Object.fromEntries(Object.entries(seeded).map(([name, content]) => [name, { content }])) };
+  if (testCase.driverCode !== undefined) command.copyIn['driver.py'] = { content: testCase.driverCode };
   command.files[1].max = STDOUT_BYTES;
   command.files[2].max = STDERR_BYTES;
   // go-judge's '?' suffix makes a missing student output a check failure,
@@ -226,14 +235,12 @@ export async function runPaper4Snapshot({ sourceCode, question, runnerCases }, j
   }
   const privateResults = [];
   let publicOutput = '';
-  let publicVerdict = 'Executed';
   let firstPublic = true;
   for (const testCase of cases) {
     if (signal?.aborted) throw new InfrastructureError('Paper 4 worker lease was lost.');
     const left = remaining();
     if (wallSignal.aborted || left.cpu <= 0 || left.wall <= 0) {
-      privateResults.push({ caseId: testCase.id, public: testCase.public, status: 'NotRun', checks: [] });
-      if (testCase.public && firstPublic) publicVerdict = 'TLE';
+      privateResults.push({ stageId: testCase.stageId, caseId: testCase.id, public: testCase.public, status: 'TLE', checks: [] });
       continue;
     }
     const { command, outputNames } = commandForCase(judge, sourceCode, initialFiles, outputFiles, testCase, left.cpu, left.wall);
@@ -247,8 +254,7 @@ export async function runPaper4Snapshot({ sourceCode, question, runnerCases }, j
       raw = result[0];
     } catch (error) {
       if (!signal?.aborted && wallSignal.aborted) {
-        privateResults.push({ caseId: testCase.id, public: testCase.public, status: 'TLE', checks: [] });
-        if (testCase.public && firstPublic) publicVerdict = 'TLE';
+        privateResults.push({ stageId: testCase.stageId, caseId: testCase.id, public: testCase.public, status: 'TLE', checks: [] });
         continue;
       }
       throw error;
@@ -256,23 +262,30 @@ export async function runPaper4Snapshot({ sourceCode, question, runnerCases }, j
     const { verdict, files } = classifyRawResult(raw, outputNames);
     spentCpu += raw.time;
     const checks = verdict === 'Executed' ? caseChecks(testCase, files) : [];
-    const status = verdict === 'Executed' && checks.some(check => !check.passed) ? 'NeedsReview' : verdict;
+    const status = verdict === 'Executed' && checks.length
+      ? (checks.every(check => check.passed) ? (testCase.stageId ? 'AC' : 'Executed') : (testCase.stageId ? 'WA' : 'NeedsReview'))
+      : verdict;
     if (testCase.public) {
       const generatedFiles = Object.fromEntries(outputNames.flatMap(name => {
         const content = files[name] ?? files[`${name}?`];
         return content === undefined ? [] : [[name, content]];
       }));
-      privateResults.push({ caseId: testCase.id, public: true, status,
+      privateResults.push({ stageId: testCase.stageId, caseId: testCase.id, public: true, status,
         stdout: clipped(files.stdout, STDOUT_BYTES), stderr: clipped(files.stderr, STDERR_BYTES), generatedFiles, checks });
-      if (firstPublic) { publicOutput = clipped(files.stdout, STDOUT_BYTES); publicVerdict = verdict; firstPublic = false; }
+      if (firstPublic) { publicOutput = clipped(files.stdout, STDOUT_BYTES); firstPublic = false; }
     } else {
       // Hidden data is deliberately not persisted with the student's public
       // output. Teacher-only checks can be reviewed without input leakage.
-      privateResults.push({ caseId: testCase.id, public: false, status,
+      privateResults.push({ stageId: testCase.stageId, caseId: testCase.id, public: false, status,
         checks: checks.map(check => ({ kind: check.kind, passed: check.passed })) });
     }
   }
-  return { status: publicVerdict, publicOutput,
-    publicMessage: publicVerdict === 'Executed' ? '运行完成；自动检查仅供参考，不计入正式成绩。' : '运行未完成，请检查程序或资源限制。',
+  const stageCases = privateResults.filter(entry => entry.stageId !== null);
+  const failed = privateResults.find(entry => !['AC', 'Executed', 'NeedsReview'].includes(entry.status));
+  const overall = failed?.status ?? (stageCases.length && stageCases.every(entry => entry.status === 'AC') ? 'AC' : 'Executed');
+  return { status: overall, publicOutput,
+    publicMessage: overall === 'AC' ? '自动测试全部通过；课程评分仍需教师审核人工阶段。'
+      : ['Executed', 'NeedsReview'].includes(overall) ? '运行完成；自动检查仅供参考，不计入正式成绩。'
+        : '运行未通过，请检查测试反馈或资源限制。',
     privateResults, environmentVersion };
 }

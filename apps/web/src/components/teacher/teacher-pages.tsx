@@ -42,7 +42,7 @@ export function TeacherPages({
   let paper4Match = path.match(/^\/teacher\/paper4\/([^/]+)\/review\/([^/]+)$/);
   if (paper4Match) return <TeacherPaper4Review paperId={paper4Match[1]!} attemptId={paper4Match[2]!} />;
   paper4Match = path.match(/^\/teacher\/paper4\/([^/]+)$/);
-  if (paper4Match) return <TeacherPaper4Editor id={paper4Match[1]!} />;
+  if (paper4Match) return <TeacherPaper4Editor id={paper4Match[1]!} user={user} />;
   if (path === "/teacher/classes") return <TeacherClasses user={user} />;
   if (path === "/teacher/problems") return <TeacherBanks user={user} />;
   let match = path.match(/^\/teacher\/problems\/banks\/([^/]+)$/);

@@ -16,9 +16,9 @@ function systemResult(environmentVersion) {
 }
 
 async function saveRun(client, task, result) {
-  const saved = await client.query(`INSERT INTO paper4_runs(task_id,lease_id,snapshot_id,status,public_output,public_message,private_results,environment_version)
-    VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,$8) ON CONFLICT(lease_id) DO NOTHING RETURNING id`,
-  [task.id, task.lease_id, task.snapshot_id, result.status, result.publicOutput, result.publicMessage,
+  const saved = await client.query(`INSERT INTO paper4_runs(task_id,lease_id,snapshot_id,reference_snapshot_id,status,public_output,public_message,private_results,environment_version)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9) ON CONFLICT(lease_id) DO NOTHING RETURNING id`,
+  [task.id, task.lease_id, task.snapshot_id, task.reference_snapshot_id, result.status, result.publicOutput, result.publicMessage,
     JSON.stringify(result.privateResults), result.environmentVersion]);
   return saved.rows[0]?.id ?? (await client.query('SELECT id FROM paper4_runs WHERE lease_id=$1', [task.lease_id])).rows[0]?.id;
 }
@@ -65,14 +65,35 @@ export async function renewPaper4Lease(pool, task, leaseSeconds = DEFAULT_LEASE_
 }
 
 export async function loadPaper4Task(pool, task) {
-  const row = (await pool.query(`SELECT s.source_code,s.question_key,v.definition,v.runner_cases
+  if (task.reference_snapshot_id) {
+    const row = (await pool.query(`SELECT source_code,question,runner_cases,stage_key
+      FROM paper4_reference_snapshots WHERE id=$1`, [task.reference_snapshot_id])).rows[0];
+    if (!row || !row.question || !Array.isArray(row.runner_cases) || !row.stage_key || !row.runner_cases.length)
+      throw new InfrastructureError('Paper 4 reference snapshot is invalid.');
+    return { sourceCode: row.source_code, question: row.question,
+      runnerCases: row.runner_cases.map(testCase => ({ ...testCase, stageId: row.stage_key })) };
+  }
+  const row = (await pool.query(`SELECT s.source_code,s.question_key,s.stage_key,v.definition,v.runner_cases
     FROM paper4_snapshots s JOIN paper4_attempts a ON a.id=s.attempt_id
     JOIN paper4_versions v ON v.id=a.version_id WHERE s.id=$1`, [task.snapshot_id])).rows[0];
   if (!row) throw new InfrastructureError('Paper 4 snapshot is missing.');
   const question = row.definition?.questions?.find(candidate => candidate.key === row.question_key);
   if (!question) throw new InfrastructureError('Paper 4 question is missing.');
-  const runnerCases = row.runner_cases?.[row.question_key] ?? [];
-  if (!Array.isArray(runnerCases)) throw new InfrastructureError('Paper 4 cases are invalid.');
+  const autoStages = (question.stages ?? []).filter(stage => stage.judgeMode === 'auto' &&
+    (!row.stage_key || stage.id === row.stage_key));
+  if (row.stage_key && !autoStages.length) throw new InfrastructureError('Paper 4 automatic stage is missing.');
+  let runnerCases = autoStages.flatMap(stage => {
+    const cases = row.runner_cases?.[stage.id];
+    if (!Array.isArray(cases) || !cases.length) throw new InfrastructureError('Paper 4 automatic stage cases are invalid.');
+    return cases.map(testCase => ({ ...testCase, stageId: stage.id }));
+  });
+  // Versions created before stage-level judging remain manually reviewed.
+  // Preserve their old per-question functional hints without awarding AC.
+  if (!autoStages.length && !row.stage_key && (question.stages ?? []).every(stage => !stage.judgeMode)) {
+    const legacy = row.runner_cases?.[question.key] ?? [];
+    if (!Array.isArray(legacy)) throw new InfrastructureError('Legacy Paper 4 cases are invalid.');
+    runnerCases = legacy;
+  }
   return { sourceCode: row.source_code, question, runnerCases };
 }
 

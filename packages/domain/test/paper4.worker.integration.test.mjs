@@ -28,11 +28,11 @@ test.before(async () => {
   ordinaryVersionId = (await pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code)
     VALUES($1,'Ordinary','stdio','Ordinary',500,64,'print(1)') RETURNING id`, [problemId])).rows[0].id;
   paperId = (await pool.query("INSERT INTO paper4_papers(owner_account_id,title) VALUES($1,'Paper 4 Worker') RETURNING id", [accountId])).rows[0].id;
-  paperVersionId = (await pool.query(`INSERT INTO paper4_versions(paper_id,definition,runner_cases)
-    VALUES($1,$2::jsonb,$3::jsonb) RETURNING id`, [paperId,
+  paperVersionId = (await pool.query(`INSERT INTO paper4_versions(paper_id,title,description,definition,runner_cases)
+    VALUES($1,'Paper 4 Worker','', $2::jsonb,$3::jsonb) RETURNING id`, [paperId,
     JSON.stringify({ language: 'python', totalMarks: 75, questions: [{ key: 'Q2', title: 'Files',
-      initialFiles: { 'TheData.txt': '1,Blue\n', 'Blue.txt': '' }, outputFiles: ['Blue.txt'], stages: [{ id: 's1', maxMarks: 75 }] }] }),
-    JSON.stringify({ Q2: [{ id: 'sample', public: true, stdin: '', expectedFiles: { 'Blue.txt': '1\n' } }] })])).rows[0].id;
+      initialFiles: { 'TheData.txt': '1,Blue\n', 'Blue.txt': '' }, outputFiles: ['Blue.txt'], stages: [{ id: 's1', maxMarks: 75, judgeMode: 'auto' }] }] }),
+    JSON.stringify({ s1: [{ id: 'sample', public: true, stdin: '', expectedFiles: { 'Blue.txt': '1\n' } }] })])).rows[0].id;
   await pool.query('UPDATE paper4_papers SET current_version_id=$2 WHERE id=$1', [paperId, paperVersionId]);
   attemptId = (await pool.query('INSERT INTO paper4_attempts(paper_id,version_id,identity_id,account_id) VALUES($1,$2,$3,$4) RETURNING id',
     [paperId, paperVersionId, identityId, accountId])).rows[0].id;
@@ -68,6 +68,7 @@ test('Paper 4 claim first consumes shared node capacity; ordinary can claim afte
   assert.equal(await renewPaper4Lease(pool, leased), true);
   const loaded = await loadPaper4Task(pool, leased);
   assert.equal(loaded.question.key, 'Q2');
+  assert.equal(loaded.runnerCases[0].stageId, 's1');
   assert.equal(loaded.runnerCases[0].expectedFiles['Blue.txt'], '1\n');
   assert.equal(await completePaper4Task(pool, leased, result), true);
   assert.equal(await completePaper4Task(pool, leased, result), false);
@@ -76,6 +77,26 @@ test('Paper 4 claim first consumes shared node capacity; ordinary can claim afte
   await completeTask(pool, ordinary, ordinaryResult);
   assert.equal((await pool.query('SELECT count(*) FROM paper4_runs WHERE task_id=$1', [paper.id])).rows[0].count, '1');
   assert.equal((await pool.query('SELECT count(*) FROM school_rank_ledger')).rows[0].count, '0');
+});
+
+test('reference tasks load frozen source and stage cases and persist only their own result source', { skip: !enabled }, async () => {
+  const frozen = (await pool.query(`INSERT INTO paper4_reference_snapshots
+    (version_id,question_key,stage_key,source_code,question,runner_cases,draft_revision)
+    VALUES($1,'Q2','s1','print("reference")',$2::jsonb,$3::jsonb,0) RETURNING id`,
+  [paperVersionId, JSON.stringify({ key: 'Q2', initialFiles: {}, outputFiles: [] }),
+    JSON.stringify([{ id: 'reference', public: false, expectedStdout: 'reference\n' }])])).rows[0];
+  const queued = (await pool.query('INSERT INTO paper4_run_tasks(reference_snapshot_id) VALUES($1) RETURNING *', [frozen.id])).rows[0];
+  const leased = await claimPaper4Task(pool);
+  assert.equal(leased.id, queued.id);
+  const loaded = await loadPaper4Task(pool, leased);
+  assert.equal(loaded.sourceCode, 'print("reference")');
+  assert.equal(loaded.runnerCases[0].stageId, 's1');
+  assert.equal(loaded.runnerCases[0].expectedStdout, 'reference\n');
+  assert.equal(await completePaper4Task(pool, leased, { ...result, status: 'AC' }), true);
+  const saved = (await pool.query('SELECT snapshot_id,reference_snapshot_id,status FROM paper4_runs WHERE task_id=$1', [queued.id])).rows[0];
+  assert.equal(saved.snapshot_id, null);
+  assert.equal(saved.reference_snapshot_id, frozen.id);
+  assert.equal(saved.status, 'AC');
 });
 
 test('ordinary claim first consumes shared capacity; Paper 4 can claim after it completes', { skip: !enabled }, async () => {

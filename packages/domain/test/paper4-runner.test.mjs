@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { GoJudge, InfrastructureError } from '../judge.mjs';
 import { runPaper4Snapshot, validatePaper4Filename } from '../paper4-runner.mjs';
 
@@ -88,6 +89,24 @@ test('unsafe names, excessive files and executor errors fail closed before scori
     runnerCases: [{ id: 'sample', public: true, expectedStdout: '' }] }, broken.judge), InfrastructureError);
 });
 
+test('stage-tagged checks produce AC or WA and keep teacher drivers in the sandbox', async () => {
+  const passing = executor([raw(), raw({ stdout: '1\n' })]);
+  const yes = await runPaper4Snapshot({ sourceCode: 'x = 1', question: { initialFiles: {}, outputFiles: [] },
+    runnerCases: [{ id: 'api', stageId: 'Q3_insert', public: false, driverCode: 'print(1)', expectedStdout: '1\n' }] }, passing.judge);
+  assert.equal(yes.status, 'AC');
+  assert.equal(yes.privateResults[0].stageId, 'Q3_insert');
+  assert.equal(yes.privateResults[0].status, 'AC');
+  assert.equal(yes.privateResults[0].stdout, undefined);
+  assert.equal(passing.calls[1].command.copyIn['driver.py'].content, 'print(1)');
+  assert.equal(passing.calls[1].command.args.at(-1), '/w/driver.py');
+  const failing = executor([raw(), raw({ stdout: 'wrong\n' })]);
+  const no = await runPaper4Snapshot({ sourceCode: 'pass', question: { initialFiles: {}, outputFiles: [] },
+    runnerCases: [{ id: 'api', stageId: 'Q3_insert', public: false, expectedStdout: 'right\n' }] }, failing.judge);
+  assert.equal(no.status, 'WA');
+  assert.equal(no.privateResults[0].status, 'WA');
+  assert.equal(JSON.stringify(no).includes('wrong'), false);
+});
+
 test('real go-judge: a student can delete and recreate files without carrying append data between cases',
   { skip: !(process.env.GO_JUDGE_TEST_URL && process.env.GO_JUDGE_TEST_TOKEN), timeout: 90000 }, async () => {
     const judge = new GoJudge({ url: process.env.GO_JUDGE_TEST_URL, token: process.env.GO_JUDGE_TEST_TOKEN,
@@ -103,4 +122,36 @@ test('real go-judge: a student can delete and recreate files without carrying ap
     assert.deepEqual(actual.privateResults.map(entry => entry.status), ['Executed', 'Executed']);
     assert.equal(actual.privateResults[0].generatedFiles['Blue.txt'], '1\n');
     assert.equal(actual.privateResults[1].generatedFiles, undefined);
+  });
+
+test('real go-judge: all original English sample reference programs pass their automatic stages',
+  { skip: !(process.env.GO_JUDGE_TEST_URL && process.env.GO_JUDGE_TEST_TOKEN), timeout: 120000 }, async () => {
+    const manifest = JSON.parse(await readFile(new URL('../../../examples/paper4-english-practice/paper4-english-practice.json', import.meta.url), 'utf8'));
+    const judge = new GoJudge({ url: process.env.GO_JUDGE_TEST_URL, token: process.env.GO_JUDGE_TEST_TOKEN,
+      environmentVersion: 'paper4-reference-test' });
+    await judge.ready();
+    for (const question of manifest.questions) {
+      for (const stage of question.stages.filter(candidate => candidate.judgeMode === 'auto')) {
+        const runnerCases = manifest.runnerCases[stage.id].map(candidate => ({ ...candidate, stageId: stage.id }));
+        const result = await runPaper4Snapshot({ sourceCode: manifest.referenceSolutions[question.key], question, runnerCases }, judge);
+        assert.equal(result.status, 'AC', `${question.key}/${stage.id}: ${result.publicMessage} ${JSON.stringify(result.privateResults)}`);
+        assert.ok(result.privateResults.every(candidate => candidate.status === 'AC'));
+      }
+    }
+  });
+
+test('real go-judge: unfinished English sample APIs fail checks without crashing the teacher driver',
+  { skip: !(process.env.GO_JUDGE_TEST_URL && process.env.GO_JUDGE_TEST_TOKEN), timeout: 90000 }, async () => {
+    const manifest = JSON.parse(await readFile(new URL('../../../examples/paper4-english-practice/paper4-english-practice.json', import.meta.url), 'utf8'));
+    const judge = new GoJudge({ url: process.env.GO_JUDGE_TEST_URL, token: process.env.GO_JUDGE_TEST_TOKEN,
+      environmentVersion: 'paper4-starter-test' });
+    await judge.ready();
+    for (const stageId of ['Q1_enqueue', 'Q3_insert']) {
+      const question = manifest.questions.find(item => item.stages.some(stage => stage.id === stageId));
+      const runnerCases = manifest.runnerCases[stageId].map(candidate => ({ ...candidate, stageId }));
+      const result = await runPaper4Snapshot({ sourceCode: question.starterCode, question, runnerCases }, judge);
+      assert.equal(result.status, 'WA', `${stageId}: ${result.publicMessage}`);
+      assert.ok(result.privateResults.every(candidate => candidate.status === 'WA'));
+      assert.equal(JSON.stringify(result).includes('Traceback'), false);
+    }
   });

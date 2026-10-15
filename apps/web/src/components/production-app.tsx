@@ -99,7 +99,7 @@ export function ProductionApp() {
       : requestedRole;
   const allowed = user.roles.includes(role) || (role === "teacher" && user.roles.includes("admin"));
   return (
-    allowed && /^\/student\/problems\/[^/]+$/.test(pathname) ? <StudentPages pathname={pathname} user={user}/> :
+    allowed && (/^\/student\/problems\/[^/]+$/.test(pathname) || /^\/student\/paper4\/[^/]+$/.test(pathname)) ? <StudentPages pathname={pathname} user={user}/> :
     <ProductionShell
       user={user}
       role={role}

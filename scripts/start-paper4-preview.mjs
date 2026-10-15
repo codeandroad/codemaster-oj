@@ -71,6 +71,6 @@ await run(process.execPath, [resolve(root, 'scripts/seed-demo.mjs')], {
   CAMPUS_DEMO_ORIGIN: origin,
   CAMPUS_DEMO_OUTPUT: accountPath,
 });
-await run(process.execPath, [resolve(root, 'scripts/seed-paper4-preview.mjs')]);
+await run(process.execPath, [resolve(root, 'scripts/seed-paper4-english.mjs')]);
 console.log(`Paper 4 local preview ready: ${origin}/login`);
 console.log(`Test account details saved privately: ${accountPath}`);

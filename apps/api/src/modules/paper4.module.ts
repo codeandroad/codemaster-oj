@@ -14,6 +14,11 @@ export class Paper4Controller {
       .then((result) => applyResponse(response, result));
   }
 
+  @Post('imports/preview')
+  previewImport(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
+    return this.handle(request, response);
+  }
+
   @Get('papers')
   listPapers(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
     return this.handle(request, response);
@@ -31,6 +36,16 @@ export class Paper4Controller {
 
   @Patch('papers/:id')
   updatePaper(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
+    return this.handle(request, response);
+  }
+
+  @Post('papers/:id/draft')
+  createDraftRevision(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
+    return this.handle(request, response);
+  }
+
+  @Post('papers/:id/reference-runs')
+  runReference(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
     return this.handle(request, response);
   }
 

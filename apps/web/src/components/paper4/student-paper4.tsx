@@ -1,20 +1,30 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, CheckCircle2, Clock3, FileCode2, FileText, Play, RefreshCw, Save, Send } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Code2, Download, FileCode2, FileText, HelpCircle, House, LayoutPanelLeft, Maximize2, Play, RefreshCw, RotateCcw, Send, Settings } from "lucide-react";
 import { AppLink, useNavigationBlocker } from "@/components/navigation";
 import { useLocale } from "@/components/locale-context";
 import { PageHeader } from "@/components/page-chrome";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
-import { CodeEditor } from "@/components/student/code-editor";
-import { useWorkspaceSettings } from "@/components/student/workspace-settings";
+import { WorkspaceThemeProvider } from "@/components/ui/theme-context";
+import { CodeEditor, type CodeEditorHandle } from "@/components/student/code-editor";
+import { useWorkspaceSettings, WorkspaceSettingsDialog } from "@/components/student/workspace-settings";
+import { useWorkspaceLayout, PanelControls } from "@/components/student/workspace-panels";
+import { panelIds, type WorkspacePanel } from "@/components/student/workspace-layout-model";
+import { formatCode, downloadCode } from "@/components/student/code-format";
+import { FormatCodeIcon } from "@/components/student/format-code-icon";
+import { EditorShortcutsHint } from "@/components/student/editor-shortcuts";
+import { displayBinding } from "@/components/student/editor-keymap";
+import { NotificationDropdown } from "@/components/student/notification-dropdown";
+import { AccountMenu } from "@/components/account-menu";
+import styles from "@/components/student/workspace.module.css";
 import { Empty, LessonContent, State, useData } from "@/components/student/shared";
-import { ApiError, apiMessage, productionApi, type CampusUser } from "@/lib/production-api";
+import { ApiError, apiMessage, clearProductionSession, productionApi, type CampusUser } from "@/lib/production-api";
 import { paper4Date, paper4Status, type Paper4Attempt, type Paper4File, type Paper4Paper, type Paper4PaperSummary, type Paper4Run } from "./model";
 
 const surface = "min-w-0 rounded-lg border border-border bg-surface panel-shadow";
-const smallButton = "min-h-10 rounded-md px-3 text-left text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary";
 
 export function StudentPaper4List() {
   const { locale } = useLocale();
@@ -49,7 +59,7 @@ export function StudentPaper4Detail({ paperId, user }: { paperId: string; user: 
     return () => controller.abort();
   }, [paperId]);
   if (attempt) return <Paper4Workspace key={attempt.id} attempt={attempt} user={user}/>;
-  return <>
+  return <main className="min-h-screen bg-background p-4 text-foreground sm:p-6">
     <AppLink href="/student/paper4" className="mb-4 inline-flex min-h-9 items-center gap-2 text-sm font-semibold text-primary"><ArrowLeft size={16}/>{tx("返回练习列表", "Back to practice list")}</AppLink>
     <State data={paper}>{paper.data && <div className={`${surface} p-5 sm:p-6`}>
       <PageHeader eyebrow={tx("编程实践卷 · Python", "Practical paper · Python")} title={paper.data.title} description={paper.data.description}/>
@@ -64,11 +74,12 @@ export function StudentPaper4Detail({ paperId, user }: { paperId: string; user: 
       {checking && <p role="status" className="mt-3 text-sm text-muted-foreground">{tx("正在检查作答记录…", "Checking your attempt…")}</p>}
       {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
     </div>}</State>
-  </>;
+  </main>;
 }
 
 function Paper4Workspace({ attempt: initialAttempt, user }: { attempt: Paper4Attempt; user: CampusUser }) {
   const { locale } = useLocale();
+  const router = useRouter();
   const tx = useCallback((zh: string, en: string) => locale === "en" ? en : zh, [locale]);
   const [attempt, setAttempt] = useState(initialAttempt);
   const questions = attempt.paper.questions;
@@ -81,7 +92,21 @@ function Paper4Workspace({ attempt: initialAttempt, user }: { attempt: Paper4Att
   const [busy, setBusy] = useState(false);
   const [run, setRun] = useState<Paper4Run | null>(null);
   const [submitOpen, setSubmitOpen] = useState(false);
-  const { settings } = useWorkspaceSettings(user.id);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsScope, setSettingsScope] = useState<"workspace" | "editor">("workspace");
+  const [layoutOpen, setLayoutOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [formatting, setFormatting] = useState(false);
+  const [notice, setNotice] = useState("");
+  const editorRef = useRef<CodeEditorHandle>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const rightRef = useRef<HTMLDivElement>(null);
+  const widthDrag = useRef<{ left: number; width: number; next: number } | null>(null);
+  const heightDrag = useRef<{ top: number; height: number; next: number } | null>(null);
+  const { settings, update, reset, resolvedPageTheme } = useWorkspaceSettings(user.id);
+  const { layout, dispatch } = useWorkspaceLayout(user.id);
   const current = questions.find(question => question.key === questionKey) ?? questions[0];
   const stage = current?.stages.find(item => item.id === stageId) ?? current?.stages[0];
   const frozen = attempt.canEdit === false || ["submitted", "reviewed", "released"].includes(attempt.status.toLowerCase());
@@ -151,39 +176,145 @@ function Paper4Workspace({ attempt: initialAttempt, user }: { attempt: Paper4Att
     if (!next) return;
     setQuestionKey(key); setStageId(next.stages[0]?.id ?? ""); setRun(null);
   }
+  const questionIndex = questions.findIndex(question => question.key === current?.key);
+  const runCurrent = (stageToRun?: string) => void mutate(async () => {
+    if (!current) return;
+    await saveFile(current.key);
+    setRun(await productionApi<Paper4Run>(`paper4/attempts/${encodeURIComponent(attempt.id)}/runs`, { method: "POST", body: { fileKey: current.key, ...(stageToRun ? { stageId: stageToRun } : {}) } }));
+    dispatch({ type: "show", panel: "testing" });
+  });
+  const formatCurrent = () => {
+    if (formatting || frozen || !currentCode.trim()) return;
+    setFormatting(true);
+    void formatCode(currentCode, "python", settings.tabSize)
+      .then(formatted => { editorRef.current?.replaceCode(formatted); setNotice(tx("代码已格式化，可使用撤销恢复。", "Code formatted. Use Undo to restore it.")); })
+      .catch(reason => setError(apiMessage(reason)))
+      .finally(() => setFormatting(false));
+  };
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(""), 4000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+  useEffect(() => {
+    function shortcut(event: globalThis.KeyboardEvent) {
+      if (event.defaultPrevented || event.isComposing || settingsOpen || layoutOpen || helpOpen || resetOpen || submitOpen) return;
+      if (event.key === "Escape") { dispatch({ type: "exit-maximize" }); return; }
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+      const key = event.key.toLowerCase();
+      if (key === "s") { event.preventDefault(); if (!frozen) void mutate(async () => { await saveAll(); setNotice(tx("代码已保存到服务器。", "Code saved to server.")); }); }
+      else if (key === "'" && settings.runShortcut && !busy && !frozen) { event.preventDefault(); runCurrent(); }
+      else if (key === "enter" && settings.submitShortcut && !busy && !frozen && !dirty) { event.preventDefault(); setSubmitOpen(true); }
+    }
+    window.addEventListener("keydown", shortcut);
+    return () => window.removeEventListener("keydown", shortcut);
+  });
   if (!current) return <div role="alert" className={`${surface} p-5 text-sm text-destructive`}>{tx("试卷没有可作答的大题。", "This paper has no questions.")}</div>;
   const latestSnapshot = stage && [...attempt.snapshots].reverse().find(item => item.stageId === stage.id);
-  return <>
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <AppLink href="/student/paper4" className="inline-flex min-h-9 items-center gap-2 text-sm font-semibold text-primary"><ArrowLeft size={16}/>{tx("练习列表", "Practice list")}</AppLink>
-      <div className="flex flex-wrap items-center gap-2"><span className="rounded-full border border-border px-3 py-1 text-xs font-semibold">{paper4Status(attempt.status, locale)}</span><span role="status" className={`text-xs ${saveStatus === "error" ? "text-destructive" : "text-muted-foreground"}`}>{saveStatus === "saving" ? tx("正在保存到服务器…", "Saving to server…") : saveStatus === "error" ? tx("保存失败，请重试", "Save failed; retry") : tx("代码已保存", "Code saved")}</span></div>
-    </div>
-    <div className="mt-2 flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-xl font-bold">{attempt.paper.title}</h1><p className="mt-1 text-xs text-muted-foreground">{attempt.paper.totalMarks} {tx("分", "marks")} · {tx("截止", "Ends")} {paper4Date(attempt.paper.endsAt, locale)} · {tx("最终得分由教师确认", "Final marks are teacher-confirmed")}</p></div><div className="flex flex-wrap gap-2">{frozen && !attempt.releasedAt && <Button variant="secondary" disabled={busy} onClick={() => void mutate(async () => { const refreshed = await productionApi<Paper4Attempt>(`paper4/attempts/${encodeURIComponent(attempt.id)}`); setAttempt(refreshed); setMessage(refreshed.releasedAt ? tx("成绩已公布。", "Marks released.") : tx("教师尚未公布成绩。", "Teacher marks are not released yet.")); })}><RefreshCw size={15}/>{tx("刷新成绩", "Refresh marks")}</Button>}<Button variant="secondary" disabled={frozen || busy || !dirty} onClick={() => void mutate(async () => { await saveAll(); setMessage(tx("所有代码已保存。", "All code saved.")); })}><Save size={15}/>{tx("保存", "Save")}</Button><Button disabled={frozen || busy || dirty || saveStatus === "error"} onClick={() => setSubmitOpen(true)}><Send size={15}/>{tx("交卷", "Submit paper")}</Button></div></div>
-    {attempt.releasedAt && <section aria-label={tx("公布成绩", "Released marks")} className={`${surface} mt-4 p-4`}><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold text-success">{tx("教师评分已公布", "Teacher marks released")}</h2><strong className="text-lg">{attempt.score ?? "—"} / {attempt.totalMarks}</strong></div><div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{questions.flatMap(question => question.stages.map(item => { const mark = attempt.marks.find(value => value.stageId === item.id); return <div key={item.id} className="rounded-md border border-border p-3 text-sm"><div className="flex justify-between gap-2"><span className="font-semibold">{question.key} · {item.title}</span><strong>{mark?.marks ?? "—"} / {item.maxMarks}</strong></div>{mark?.note && <p className="mt-2 whitespace-pre-wrap text-muted-foreground">{mark.note}</p>}</div>; }))}</div></section>}
-    {error && <div role="alert" className="mt-3 flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"><span>{error}</span><Button variant="secondary" size="sm" onClick={() => void mutate(async () => { await saveAll(); setMessage(tx("保存已恢复。", "Save recovered.")); })}><RefreshCw size={14}/>{tx("重试保存", "Retry save")}</Button></div>}
-    {message && <p role="status" className="mt-3 text-sm text-success">{message}</p>}
-    <div className="mt-4 grid gap-3 lg:min-h-[620px] lg:grid-cols-[180px_minmax(0,1fr)] lg:grid-rows-[minmax(190px,27vh)_minmax(390px,1fr)] xl:grid-cols-[190px_minmax(270px,0.85fr)_minmax(390px,1.15fr)] xl:grid-rows-1">
-      <nav aria-label={tx("试卷大题与阶段", "Paper questions and stages")} className={`${surface} max-h-[220px] self-start overflow-y-auto p-3 lg:row-span-2 lg:max-h-[calc(100vh-190px)] xl:row-span-1`}>
-        <p className="px-2 pb-2 text-xs font-semibold uppercase text-muted-foreground">{tx("试卷导航", "Paper navigation")}</p>
-        {questions.map((question, index) => <div key={question.key} className="mb-2"><button type="button" aria-current={question.key === current.key ? "page" : undefined} className={`${smallButton} flex w-full items-center gap-2 font-semibold ${question.key === current.key ? "bg-info-soft text-primary" : "hover:bg-muted"}`} onClick={() => changeQuestion(question.key)}><FileCode2 size={15} className="shrink-0"/><span className="min-w-0 truncate">{index + 1}. {question.title}</span></button>{question.key === current.key && <div className="mt-1 space-y-0.5 border-l border-border pl-3">{question.stages.map(item => <button type="button" key={item.id} aria-current={item.id === stage?.id ? "step" : undefined} onClick={() => setStageId(item.id)} className={`${smallButton} flex w-full items-center justify-between gap-2 ${item.id === stage?.id ? "font-semibold text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}><span className="truncate">{item.title}</span>{attempt.snapshots.some(snapshot => snapshot.stageId === item.id) && <Check size={15} className="shrink-0 text-success"/>}</button>)}</div>}</div>)}
-      </nav>
-      <section aria-labelledby="paper4-question-heading" className={`${surface} flex min-h-[260px] flex-col overflow-hidden lg:col-start-2 lg:row-start-1 lg:min-h-0 xl:col-start-2 xl:row-start-1 xl:min-h-[540px]`}><div className="border-b border-border px-4 py-3"><p className="text-xs font-semibold text-primary">{current.key} · {stage?.maxMarks ?? 0} {tx("分", "marks")}</p><h2 id="paper4-question-heading" className="mt-1 text-lg font-bold">{stage?.title || current.title}</h2></div><div className="min-h-0 flex-1 overflow-y-auto p-4"><LessonContent content={current.statement}/>{stage?.description && <div className="mt-5 border-t border-border pt-4"><h3 className="text-sm font-bold">{tx("本阶段要求", "Stage task")}</h3><LessonContent content={stage.description}/></div>}</div><div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3"><span className="text-xs text-muted-foreground">{latestSnapshot ? tx(`已保存检查点 · ${paper4Date(latestSnapshot.createdAt, locale)}`, `Checkpoint saved · ${paper4Date(latestSnapshot.createdAt, locale)}`) : tx("尚未保存阶段检查点", "No checkpoint saved yet")}</span><Button size="sm" variant="secondary" disabled={frozen || busy || saveStatus === "error" || !stage} onClick={() => void mutate(async () => { await saveFile(current.key); await productionApi(`paper4/attempts/${encodeURIComponent(attempt.id)}/checkpoints`, { method: "POST", body: { stageId: stage!.id } }); setAttempt(await productionApi<Paper4Attempt>(`paper4/attempts/${encodeURIComponent(attempt.id)}`)); setMessage(tx("阶段检查点已保存，原记录不会被覆盖。", "Checkpoint saved without overwriting earlier evidence.")); })}><CheckCircle2 size={15}/>{tx("保存检查点", "Save checkpoint")}</Button></div></section>
-      <section aria-labelledby="paper4-editor-heading" className="flex min-h-[560px] min-w-0 flex-col gap-3 lg:col-start-2 lg:row-start-2 lg:min-h-[390px] xl:col-start-3 xl:row-start-1 xl:min-h-[620px]"><div className={`${surface} flex min-h-[320px] flex-1 flex-col overflow-hidden lg:min-h-[230px] xl:min-h-[380px]`}><div className="flex items-center justify-between border-b border-border px-4 py-2"><h2 id="paper4-editor-heading" className="text-sm font-bold">{current.key}.py · Python 3</h2><Button size="sm" disabled={busy || frozen || saveStatus === "error"} onClick={() => void mutate(async () => { await saveFile(current.key); setRun(await productionApi<Paper4Run>(`paper4/attempts/${encodeURIComponent(attempt.id)}/runs`, { method: "POST", body: { fileKey: current.key } })); })}><Play size={14}/>{tx("运行代码", "Run code")}</Button></div><div className="min-h-[250px] flex-1 lg:min-h-[180px] xl:min-h-[330px]"><CodeEditor code={currentCode} language="python" settings={settings} idPrefix="paper4" readOnly={frozen} inputLabel={tx(`${current.title} Python 代码`, `${current.title} Python code`)} status={tx("服务端自动保存", "Server autosave")} onChange={value => { latest.current[current.key] = value; setCodes(existing => ({ ...existing, [current.key]: value })); setSaveStatus("saving"); }}/></div></div><RunPanel run={run} initialFiles={current.initialFiles} locale={locale}/></section>
-    </div>
+  const mainClass = [styles.main, layout.panels.statement === "hidden" ? styles.leftHidden : layout.panels.statement === "collapsed" ? styles.leftCollapsed : "", layout.panels.editor === "hidden" && layout.panels.testing === "hidden" ? styles.onlyStatement : "", layout.maximized ? styles.maximized : "", layout.maximized === "statement" ? styles.statementMax : ""].join(" ");
+  const rightClass = [styles.right, layout.panels.editor === "hidden" ? styles.editorHidden : layout.panels.editor === "collapsed" ? styles.editorCollapsed : "", layout.panels.testing === "hidden" ? styles.testingHidden : layout.panels.testing === "collapsed" ? styles.testingCollapsed : ""].join(" ");
+  const panelClass = (panel: WorkspacePanel) => [styles.panel, styles[panel], layout.panels[panel] === "collapsed" ? styles.collapsed : "", layout.maximized === panel ? styles.maxPanel : ""].join(" ");
+  const panelActions = (panel: WorkspacePanel) => <PanelControls panel={panel} collapsed={layout.panels[panel] === "collapsed"} maximized={layout.maximized === panel} onCollapse={() => dispatch({ type: "toggle-collapse", panel })} onMaximize={() => dispatch({ type: "toggle-maximize", panel })}/>;
+  const runButtons = <><Button size="sm" variant="secondary" disabled={frozen || busy || saveStatus === "error" || !currentCode.trim()} onClick={() => runCurrent()}><Play size={14}/>{tx("运行", "Run")}</Button><Button size="sm" disabled={frozen || busy || dirty || saveStatus === "error"} onClick={() => setSubmitOpen(true)}><Send size={14}/>{tx("交卷", "Submit")}</Button></>;
+  function widthStart(event: PointerEvent<HTMLDivElement>) { if (!mainRef.current) return; const rect = mainRef.current.getBoundingClientRect(); widthDrag.current = { left: rect.left, width: rect.width, next: settings.panelPercent }; event.currentTarget.setPointerCapture(event.pointerId); event.preventDefault(); }
+  function widthMove(event: PointerEvent<HTMLDivElement>) { if (!widthDrag.current) return; const next = Math.max(25, Math.min(70, Math.round((event.clientX - widthDrag.current.left) / widthDrag.current.width * 100))); widthDrag.current.next = next; mainRef.current?.style.setProperty("--workspace-left", `${next}%`); }
+  function widthEnd(event: PointerEvent<HTMLDivElement>) { if (!widthDrag.current) return; update({ panelPercent: widthDrag.current.next }); widthDrag.current = null; if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); }
+  function heightStart(event: PointerEvent<HTMLDivElement>) { if (!rightRef.current) return; const rect = rightRef.current.getBoundingClientRect(); heightDrag.current = { top: rect.top, height: rect.height, next: layout.editorPercent }; event.currentTarget.setPointerCapture(event.pointerId); event.preventDefault(); }
+  function heightMove(event: PointerEvent<HTMLDivElement>) { if (!heightDrag.current) return; const next = Math.max(20, Math.min(85, Math.round((event.clientY - heightDrag.current.top) / heightDrag.current.height * 100))); heightDrag.current.next = next; rightRef.current?.style.setProperty("--workspace-editor-height", `${next}%`); }
+  function heightEnd(event: PointerEvent<HTMLDivElement>) { if (!heightDrag.current) return; dispatch({ type: "resize", percent: heightDrag.current.next }); heightDrag.current = null; if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); }
+  return <WorkspaceThemeProvider theme={resolvedPageTheme}><div ref={rootRef} style={{ colorScheme: resolvedPageTheme }} className={`${styles.root} ${resolvedPageTheme === "dark" ? "dark" : ""}`} data-od-id="paper4-workspace">
+    <header className={styles.toolbar}>
+      <div className={styles.brand}>
+        <AppLink href="/" className={`${styles.back} ${styles.homeLink}`} title={tx("回首页", "Go home")} aria-label={tx("回首页", "Go home")}><House size={18}/></AppLink>
+        <AppLink href="/student/paper4" className={styles.back}><FileCode2 size={16}/><span>{tx("试卷列表", "Paper list")}</span></AppLink>
+        <span className={styles.navigationDivider}/>
+        <div className={styles.problemNavigation} aria-label={tx("切换大题", "Switch questions")}>
+          <button type="button" className={styles.tool} disabled={questionIndex <= 0} title={tx("上一题", "Previous question")} aria-label={tx("上一题", "Previous question")} onClick={() => changeQuestion(questions[questionIndex - 1]!.key)}><ChevronLeft size={20}/></button>
+          <button type="button" className={styles.tool} disabled={questionIndex >= questions.length - 1} title={tx("下一题", "Next question")} aria-label={tx("下一题", "Next question")} onClick={() => changeQuestion(questions[questionIndex + 1]!.key)}><ChevronRight size={20}/></button>
+        </div>
+        <span className={styles.title} title={attempt.paper.title}>{attempt.paper.title}</span>
+      </div>
+      {settings.actionPlacement === "toolbar" && <div className={styles.actions}>{runButtons}</div>}
+      <div className={styles.tools}>
+        <span role="status" className={`hidden text-xs sm:inline ${saveStatus === "error" ? "text-destructive" : "text-muted-foreground"}`}>{saveStatus === "saving" ? tx("保存中…", "Saving…") : saveStatus === "error" ? tx("保存失败", "Save failed") : tx("已保存", "Saved")}</span>
+        <button type="button" className={styles.tool} title={tx("布局与面板", "Layout and panels")} aria-label={tx("布局与面板", "Layout and panels")} onClick={() => setLayoutOpen(true)}><LayoutPanelLeft size={17}/></button>
+        <button type="button" className={styles.tool} title={tx("工作区设置", "Workspace settings")} aria-label={tx("工作区设置", "Workspace settings")} onClick={() => { setSettingsScope("workspace"); setSettingsOpen(true); }}><Settings size={18}/></button>
+        <button type="button" className={styles.tool} title={tx("帮助与快捷键", "Help and shortcuts")} aria-label={tx("帮助与快捷键", "Help and shortcuts")} onClick={() => setHelpOpen(true)}><HelpCircle size={17}/></button>
+        <NotificationDropdown/>
+        <AccountMenu user={user} role="student" busy={busy} onLogout={() => { if (dirty && !window.confirm(tx("代码仍有未保存修改，确定退出？", "There are unsaved edits. Sign out?"))) return; void mutate(async () => { try { await productionApi("auth/logout", { method: "POST" }); } catch (reason) { if (!(reason instanceof ApiError && reason.status === 401)) throw reason; } clearProductionSession(); router.replace("/login"); }); }}/>
+      </div>
+    </header>
+    <nav className={styles.mobileTabs} aria-label={tx("答题分区", "Workspace panels")}>{panelIds.map(panel => <button key={panel} type="button" aria-pressed={layout.mobilePanel === panel} onClick={() => dispatch({ type: "mobile", panel })}>{panel === "statement" ? tx("题目", "Problem") : panel === "editor" ? tx("代码", "Code") : tx("测试", "Tests")}</button>)}</nav>
+    <main ref={mainRef} className={mainClass} data-mobile={layout.mobilePanel} style={{ "--workspace-left": `${settings.panelPercent}%` } as CSSProperties}>
+      <section className={panelClass("statement")}>
+        <header className={styles.panelHeader}><span className={styles.panelTitle}><FileText size={16}/>{tx("题目描述", "Problem")}</span>{panelActions("statement")}</header>
+        <div className={styles.panelBody}>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+            <label className="flex items-center gap-2 font-semibold">{tx("大题", "Question")}<select aria-label={tx("选择大题", "Select question")} className="min-h-9 max-w-[260px] rounded-md border border-border bg-surface px-2 text-foreground" value={current.key} onChange={event => changeQuestion(event.target.value)}>{questions.map((question, index) => <option key={question.key} value={question.key}>{index + 1}. {question.title}</option>)}</select></label>
+            <span>{paper4Status(attempt.status, locale)} · {paper4Date(attempt.paper.endsAt, locale)}</span>
+          </div>
+          <h1 className="mb-3 text-2xl font-bold">{current.title}</h1>
+          <nav aria-label={tx("评分阶段", "Marking stages")} className="mb-5 flex flex-wrap gap-1.5">{current.stages.map((item, index) => <button type="button" key={item.id} aria-current={item.id === stage?.id ? "step" : undefined} onClick={() => setStageId(item.id)} className={`inline-flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-primary ${item.id === stage?.id ? "border-primary bg-info-soft text-primary" : "border-border text-muted-foreground hover:bg-muted"}`}>{index + 1}. {item.title}{attempt.snapshots.some(snapshot => snapshot.stageId === item.id) && <Check size={13} className="text-success"/>}</button>)}</nav>
+          <div className="text-sm leading-7"><LessonContent content={current.statement}/></div>
+          {stage?.description && <section className="mt-6 border-t border-border pt-4"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold">{stage.title} · {stage.maxMarks} {tx("分", "marks")}</h2>{stage.judgeMode === "auto" && <Button size="sm" variant="secondary" disabled={frozen || busy || saveStatus === "error" || !currentCode.trim()} onClick={() => runCurrent(stage.id)}><Play size={13}/>{tx("运行本阶段", "Run this stage")}</Button>}</div><LessonContent content={stage.description}/></section>}
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4"><span className="text-xs text-muted-foreground">{latestSnapshot ? tx(`检查点已保存 · ${paper4Date(latestSnapshot.createdAt, locale)}`, `Checkpoint saved · ${paper4Date(latestSnapshot.createdAt, locale)}`) : tx("本阶段尚无检查点", "No checkpoint for this stage")}</span><Button size="sm" variant="secondary" disabled={frozen || busy || saveStatus === "error" || !stage} onClick={() => void mutate(async () => { await saveFile(current.key); await productionApi(`paper4/attempts/${encodeURIComponent(attempt.id)}/checkpoints`, { method: "POST", body: { stageId: stage!.id } }); setAttempt(await productionApi<Paper4Attempt>(`paper4/attempts/${encodeURIComponent(attempt.id)}`)); setMessage(tx("阶段检查点已保存。", "Stage checkpoint saved.")); })}><CheckCircle2 size={15}/>{tx("保存检查点", "Save checkpoint")}</Button></div>
+        </div>
+      </section>
+      <div role="separator" aria-label={tx("调整题目与代码区域宽度", "Resize problem and code panels")} aria-orientation="vertical" aria-valuemin={25} aria-valuemax={70} aria-valuenow={settings.panelPercent} tabIndex={0} onPointerDown={widthStart} onPointerMove={widthMove} onPointerUp={widthEnd} onPointerCancel={widthEnd} onLostPointerCapture={widthEnd} onKeyDown={event => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); update({ panelPercent: settings.panelPercent + (event.key === "ArrowLeft" ? -2 : 2) }); } }} className={styles.separator}/>
+      <div ref={rightRef} className={rightClass} style={{ "--workspace-editor-height": `${layout.editorPercent}%` } as CSSProperties}>
+        <section className={panelClass("editor")}>
+          <header className={styles.panelHeader}><span className={styles.panelTitle}><Code2 size={16}/>{tx("代码", "Code")}</span>{panelActions("editor")}</header>
+          <div className={styles.editorToolbar}>
+            <div className="flex min-w-0 items-center gap-2"><span className="font-mono font-semibold">{current.key}.py</span><span className="hidden text-muted-foreground sm:inline">Python 3</span></div>
+            <div className={styles.tools}>
+              <button type="button" className={styles.tool} title={tx("下载代码", "Download code")} aria-label={tx("下载代码", "Download code")} onClick={() => downloadCode(currentCode, `${current.key}.py`)}><Download size={14}/></button>
+              <button type="button" className={styles.tool} title={`${tx("格式化代码", "Format code")} · ${displayBinding(settings.editorKeymap.format)}`} aria-label={tx("格式化代码", "Format code")} disabled={frozen || formatting || !currentCode.trim()} onClick={formatCurrent}><FormatCodeIcon/></button>
+              <button type="button" className={styles.tool} title={tx("重置起始代码", "Reset starter code")} aria-label={tx("重置起始代码", "Reset starter code")} disabled={frozen || busy} onClick={() => setResetOpen(true)}><RotateCcw size={14}/></button>
+              <EditorShortcutsHint bindings={settings.editorKeymap}/>
+              <button type="button" className={styles.tool} title={tx("代码编辑器设置", "Code editor settings")} aria-label={tx("代码编辑器设置", "Code editor settings")} onClick={() => { setSettingsScope("editor"); setSettingsOpen(true); }}><Settings size={16}/></button>
+              <button type="button" className={styles.tool} title={tx("最大化代码区", "Maximize code panel")} aria-label={tx("最大化代码区", "Maximize code panel")} onClick={() => dispatch({ type: "toggle-maximize", panel: "editor" })}><Maximize2 size={14}/></button>
+            </div>
+          </div>
+          <div className={styles.editorBody}><CodeEditor editorRef={editorRef} code={currentCode} language="python" settings={settings} idPrefix="paper4" readOnly={frozen || formatting} inputLabel={tx(`${current.title} Python 代码`, `${current.title} Python code`)} status={saveStatus === "saved" ? tx("已保存到服务器", "Saved to server") : saveStatus === "saving" ? tx("正在保存…", "Saving…") : tx("保存失败", "Save failed")} actions={settings.actionPlacement === "editor" ? runButtons : undefined} onFormat={formatCurrent} onChange={value => { latest.current[current.key] = value; setCodes(existing => ({ ...existing, [current.key]: value })); setSaveStatus("saving"); }}/></div>
+        </section>
+        <div role="separator" aria-label={tx("调整代码与测试区域高度", "Resize code and test panels")} aria-orientation="horizontal" aria-valuemin={20} aria-valuemax={85} aria-valuenow={layout.editorPercent} tabIndex={0} onPointerDown={heightStart} onPointerMove={heightMove} onPointerUp={heightEnd} onPointerCancel={heightEnd} onLostPointerCapture={heightEnd} onKeyDown={event => { if (event.key === "ArrowUp" || event.key === "ArrowDown") { event.preventDefault(); dispatch({ type: "resize", percent: layout.editorPercent + (event.key === "ArrowUp" ? -2 : 2) }); } }} className={`${styles.separator} ${styles.horizontal}`}/>
+        <section className={panelClass("testing")}>
+          <header className={styles.panelHeader}><span className={styles.panelTitle}><Play size={15}/>{tx("测试结果与文件", "Results and files")}</span>{panelActions("testing")}</header>
+          <div className={styles.resultBody}>
+            {error && <div role="alert" className="mb-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error} <button type="button" className="ml-2 font-semibold underline" onClick={() => void mutate(saveAll)}>{tx("重试保存", "Retry save")}</button></div>}
+            {message && <p role="status" className="mb-3 text-sm text-success">{message}</p>}
+            <RunPanel run={run} initialFiles={current.initialFiles} locale={locale}/>
+            {frozen && !attempt.releasedAt && <Button variant="secondary" size="sm" className="mt-3" disabled={busy} onClick={() => void mutate(async () => { const refreshed = await productionApi<Paper4Attempt>(`paper4/attempts/${encodeURIComponent(attempt.id)}`); setAttempt(refreshed); setMessage(refreshed.releasedAt ? tx("成绩已公布。", "Marks released.") : tx("教师尚未公布成绩。", "Teacher marks are not released yet.")); })}><RefreshCw size={14}/>{tx("刷新成绩", "Refresh marks")}</Button>}
+            {attempt.releasedAt && <section className="mt-4 border-t border-border pt-3 text-sm"><div className="flex items-center justify-between gap-2"><strong className="text-success">{tx("教师评分已公布", "Teacher marks released")}</strong><strong>{attempt.score ?? "—"} / {attempt.totalMarks}</strong></div><div className="mt-2 space-y-2">{questions.flatMap(question => question.stages.map(item => { const mark = attempt.marks.find(value => value.stageId === item.id); return <div key={item.id} className="flex justify-between gap-3 border-t border-border pt-2"><span>{question.key} · {item.title}{mark?.note && <small className="block whitespace-pre-wrap text-muted-foreground">{mark.note}</small>}</span><strong>{mark?.marks ?? "—"} / {item.maxMarks}</strong></div>; }))}</div></section>}
+          </div>
+        </section>
+      </div>
+    </main>
+    {notice && <div role="status" className={styles.notice}>{notice}</div>}
+    <Dialog open={layoutOpen} onOpenChange={setLayoutOpen}><DialogContent className={styles.layoutMenu}><DialogTitle>{tx("布局与面板", "Layout and panels")}</DialogTitle><DialogDescription>{tx("展开、折叠或最大化作答区域。", "Show, collapse or maximize workspace panels.")}</DialogDescription>{panelIds.map(panel => <button key={panel} type="button" onClick={() => { dispatch({ type: "show", panel }); setLayoutOpen(false); }}>{panel === "statement" ? tx("题目描述", "Problem") : panel === "editor" ? tx("代码编辑器", "Code editor") : tx("测试结果", "Results")}<span className="text-xs text-muted-foreground">{layout.panels[panel] === "open" ? tx("已显示", "Shown") : tx("显示", "Show")}</span></button>)}<button type="button" onClick={() => { if (document.fullscreenElement) void document.exitFullscreen(); else void rootRef.current?.requestFullscreen(); setLayoutOpen(false); }}>{tx("浏览器全屏", "Browser full screen")}<Maximize2 size={15}/></button></DialogContent></Dialog>
+    <Dialog open={helpOpen} onOpenChange={setHelpOpen}><DialogContent><DialogTitle>{tx("快捷键与保存", "Shortcuts and saving")}</DialogTitle><DialogDescription>{tx("代码自动保存到服务器。Ctrl / ⌘ + S 手动保存；Ctrl / ⌘ + 单引号运行；Ctrl / ⌘ + Enter 交卷；Esc 退出最大化。自动判题会显示各阶段 AC 状态，75 分成绩由教师评定。", "Code autosaves to the server. Ctrl / ⌘ + S saves now, Ctrl / ⌘ + apostrophe runs, Ctrl / ⌘ + Enter submits, and Esc exits maximize. Auto judging reports stage AC status; teachers award marks out of 75.")}</DialogDescription><DialogFooter><Button onClick={() => setHelpOpen(false)}>{tx("知道了", "Close")}</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={resetOpen} onOpenChange={setResetOpen}><DialogContent><DialogTitle>{tx("恢复起始代码？", "Restore starter code?")}</DialogTitle><DialogDescription>{tx("仅替换当前大题的编辑器内容；已有检查点仍保留。", "Only the current question's editor content changes. Existing checkpoints remain.")}</DialogDescription><DialogFooter><Button variant="secondary" onClick={() => setResetOpen(false)}>{tx("取消", "Cancel")}</Button><Button onClick={() => { latest.current[current.key] = current.starterCode; setCodes(existing => ({ ...existing, [current.key]: current.starterCode })); setSaveStatus("saving"); setResetOpen(false); }}>{tx("恢复代码", "Restore code")}</Button></DialogFooter></DialogContent></Dialog>
     <Dialog open={submitOpen} onOpenChange={setSubmitOpen}><DialogContent><DialogTitle>{tx("确认交卷", "Submit paper")}</DialogTitle><DialogDescription>{tx("交卷后代码与检查点将冻结，教师复核后才会公布分数。", "Submission freezes your code and checkpoints. Marks appear after teacher review.")}</DialogDescription><DialogFooter><Button variant="secondary" onClick={() => setSubmitOpen(false)}>{tx("继续作答", "Keep working")}</Button><Button disabled={busy} onClick={() => void mutate(async () => { await saveAll(); const updated = await productionApi<Paper4Attempt>(`paper4/attempts/${encodeURIComponent(attempt.id)}/submit`, { method: "POST" }); setAttempt(updated); setSubmitOpen(false); setMessage(tx("已交卷。请等待教师复核。", "Submitted. Await teacher review.")); })}>{tx("确认交卷", "Submit")}</Button></DialogFooter></DialogContent></Dialog>
-  </>;
+    <WorkspaceSettingsDialog key={settingsScope} editorOnly={settingsScope === "editor"} initialSection={settingsScope === "editor" ? "editor" : "layout"} open={settingsOpen} onOpenChange={setSettingsOpen} settings={settings} update={update} reset={reset}/>
+  </div></WorkspaceThemeProvider>;
 }
 
 function RunPanel({ run, initialFiles, locale }: { run: Paper4Run | null; initialFiles: Record<string, string>; locale: "zh" | "en" }) {
   const tx = (zh: string, en: string) => locale === "en" ? en : zh;
+  const statusLabel = (status: string | null | undefined) => status === "NotPassed" ? tx("未通过", "Not passed") : status ?? "";
   const results = run?.result?.publicResults ?? [];
   const [selectedCase, setSelectedCase] = useState(0);
   const [selectedFile, setSelectedFile] = useState("");
   const caseResult = results[Math.min(selectedCase, results.length - 1)];
   const files = { ...initialFiles, ...(caseResult?.generatedFiles ?? {}) };
   const fileName = selectedFile in files ? selectedFile : Object.keys(files)[0] ?? "";
-  return <div className={`${surface} min-h-[210px] overflow-hidden`}><div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2"><h2 className="text-sm font-bold">{tx("运行结果与工作文件", "Run results and files")}</h2>{run && <span role="status" className="text-xs font-semibold text-muted-foreground">{paper4Status(run.state, locale)}{run.result?.status ? ` · ${run.result.status}` : ""}</span>}</div>
-    <div className="p-3"><p className="text-xs text-muted-foreground">{run?.result?.publicMessage ?? (run ? tx("运行结果不等于教师确认的分数。", "Run results are not teacher-confirmed marks.") : tx("运行代码可查看标准输出和生成文件。", "Run code to inspect stdout and generated files."))}</p>{results.length > 1 && <div className="mt-2 flex flex-wrap gap-1" aria-label={tx("公开用例", "Public cases")}>{results.map((item, index) => <button type="button" key={item.caseId} aria-pressed={selectedCase === index} className={`rounded-md border px-2 py-1 text-xs focus-visible:outline-2 focus-visible:outline-primary ${selectedCase === index ? "border-primary text-primary" : "border-border"}`} onClick={() => { setSelectedCase(index); setSelectedFile(""); }}>{item.caseId}</button>)}</div>}
+  const questionStatus = run?.result?.questionStatus;
+  return <div className="min-w-0"><div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2"><h2 className="text-sm font-bold">{tx("运行结果与工作文件", "Run results and files")}</h2>{run && <span role="status" className={`text-xs font-semibold ${questionStatus === "AC" || run.stageId && run.result?.stageResults?.every(item => item.status === "AC") ? "text-success" : questionStatus === "NeedsReview" && !run.stageId ? "text-warning" : "text-muted-foreground"}`}>{paper4Status(run.state, locale)}{run.stageId ? ` · ${tx("仅本阶段运行", "This stage only")}${run.result?.stageResults?.[0]?.status ? ` · ${statusLabel(run.result.stageResults[0].status)}` : ""}` : questionStatus ? ` · ${questionStatus === "AC" ? tx("自动 AC", "Auto AC") : questionStatus === "NeedsReview" ? tx("待教师复核", "Needs teacher review") : statusLabel(questionStatus)}` : run.result?.status ? ` · ${statusLabel(run.result.status)}` : ""}</span>}</div>
+    <div className="pt-3"><p className="text-xs text-muted-foreground">{run?.result?.publicMessage ?? (run ? tx("自动判题状态与教师评定的 75 分成绩分开；人工阶段仍由教师复核。", "Auto-judge status is separate from teacher-assigned marks out of 75. Manual stages still require review.") : tx("运行代码可查看自动阶段结果、标准输出和生成文件。", "Run code to inspect auto-stage results, stdout and generated files."))}</p>
+      {Boolean(run?.result?.stageResults?.length) && <div className="mt-2 flex flex-wrap gap-1.5" aria-label={tx("阶段自动判题结果", "Auto stage results")}>{run!.result!.stageResults!.map(item => <span key={item.stageId} className={`rounded-md border px-2 py-1 text-xs font-semibold ${item.status === "AC" ? "border-success text-success" : "border-destructive text-destructive"}`}>{item.stageId}: {statusLabel(item.status)}</span>)}</div>}
+      {Boolean(run?.result?.pendingManualStageIds?.length) && <p className="mt-2 text-xs text-warning">{tx("待教师复核的代码阶段", "Code stages awaiting teacher review")}: {run!.result!.pendingManualStageIds!.join(", ")}</p>}
+      {Boolean(run?.result?.evidenceStageIds?.length) && <p className="mt-1 text-xs text-muted-foreground">{tx("教师评定的过程/证据分", "Teacher-awarded process/evidence marks")}: {run!.result!.evidenceStageIds!.join(", ")}</p>}
+      {results.length > 1 && <div className="mt-2 flex flex-wrap gap-1" aria-label={tx("公开用例", "Public cases")}>{results.map((item, index) => <button type="button" key={`${item.stageId ?? "stage"}:${item.caseId}:${index}`} aria-pressed={selectedCase === index} className={`rounded-md border px-2 py-1 text-xs focus-visible:outline-2 focus-visible:outline-primary ${selectedCase === index ? "border-primary text-primary" : "border-border"}`} onClick={() => { setSelectedCase(index); setSelectedFile(""); }}>{item.stageId ? `${item.stageId} · ` : ""}{item.caseId} · {statusLabel(item.status)}</button>)}</div>}
       <div className="mt-2 grid gap-2 md:grid-cols-2"><div><h3 className="mb-1 flex items-center gap-1 text-xs font-semibold"><FileText size={13}/>{tx("标准输出", "Standard output")}</h3><pre className="max-h-32 min-h-16 overflow-auto whitespace-pre-wrap break-words rounded-md bg-surface-subtle p-2 text-xs">{caseResult?.stdout ?? run?.result?.publicOutput ?? "—"}</pre>{caseResult?.stderr && <p className="mt-1 whitespace-pre-wrap break-words text-xs text-destructive">{caseResult.stderr}</p>}</div><div><h3 className="mb-1 text-xs font-semibold">{tx("工作文件", "Work files")}</h3>{fileName ? <><select aria-label={tx("选择工作文件", "Select work file")} className="mb-1 w-full rounded-md border border-border bg-background px-2 py-1 text-xs" value={fileName} onChange={event => setSelectedFile(event.target.value)}>{Object.keys(files).map(name => <option key={name}>{name}</option>)}</select><pre className="max-h-24 min-h-12 overflow-auto whitespace-pre-wrap break-words rounded-md bg-surface-subtle p-2 text-xs">{files[fileName]}</pre></> : <p className="text-xs text-muted-foreground">{tx("本题没有工作文件。", "No work files for this question.")}</p>}</div></div>
       {caseResult?.checks && <p className="mt-2 text-xs text-muted-foreground">{caseResult.checks.map(check => `${check.passed ? "✓" : "×"} ${check.name}`).join(" · ")}</p>}
     </div>

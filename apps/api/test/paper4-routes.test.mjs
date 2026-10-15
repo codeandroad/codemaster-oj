@@ -10,10 +10,14 @@ import { DomainGuard } from '../dist/domain.guard.js';
 test('Paper 4 Nest routes preserve the method, body, and route for the domain authorization boundary', async () => {
   const id = '11111111-1111-4111-8111-111111111111';
   const cases = [
+    ['POST', '/paper4/imports/preview', { filename: 'paper4.json', contentBase64: 'e30=' }],
     ['GET', '/paper4/papers'],
     ['POST', '/paper4/papers', { title: 'Practice' }],
     ['GET', `/paper4/papers/${id}`],
+    ['GET', `/paper4/papers/${id}?view=draft`],
     ['PATCH', `/paper4/papers/${id}`, { title: 'Revised practice' }],
+    ['POST', `/paper4/papers/${id}/draft`, {}],
+    ['POST', `/paper4/papers/${id}/reference-runs`, { questionKey: 'Q1' }],
     ['POST', `/paper4/papers/${id}/publish`, {}],
     ['POST', `/paper4/papers/${id}/attempt`, {}],
     ['GET', `/paper4/papers/${id}/attempt`],

@@ -3,6 +3,7 @@ export interface Paper4Stage {
   title: string;
   description: string;
   maxMarks: number;
+  judgeMode?: "auto" | "manual" | "evidence";
 }
 
 export interface Paper4Question {
@@ -22,6 +23,7 @@ export interface Paper4RunnerCase {
   expectedStdout: string;
   expectedFiles: Record<string, string>;
   public: boolean;
+  driverCode?: string;
 }
 
 export interface Paper4Paper {
@@ -35,6 +37,11 @@ export interface Paper4Paper {
   totalMarks: number;
   questions: Paper4Question[];
   runnerCases?: Record<string, Paper4RunnerCase[]>;
+  referenceSolutions?: Record<string, string>;
+  referenceValidation?: Record<string, { status: "unverified" | "queued" | "AC" | "WA" | "error"; taskId?: string | null }>;
+  hasDraft?: boolean;
+  versionId?: string;
+  versionNumber?: number;
 }
 
 export type Paper4PaperSummary = Omit<Paper4Paper, "questions" | "runnerCases"> & {
@@ -90,23 +97,31 @@ export interface Paper4AttemptSummary {
   score?: number | null;
   submittedAt?: string | null;
   releasedAt?: string | null;
+  versionNumber?: number;
+  versionId?: string;
 }
 
 export interface Paper4Run {
   id: string;
   state: string;
+  stageId?: string | null;
   result?: {
     status: string;
     publicOutput?: string;
     publicMessage?: string;
     publicResults?: Array<{
       caseId: string;
+      stageId?: string;
       status: string;
       stdout?: string;
       stderr?: string;
       generatedFiles?: Record<string, string>;
       checks?: Array<{ kind: string; name: string; passed: boolean }>;
     }>;
+    stageResults?: Array<{ stageId: string; status: string }>;
+    pendingManualStageIds?: string[];
+    evidenceStageIds?: string[];
+    questionStatus?: "AC" | "NeedsReview" | string;
   } | null;
 }
 

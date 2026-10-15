@@ -78,7 +78,13 @@ export interface ProductionProblem {
 export interface Assignment {
   id: string;
   title: string;
+  archived?: boolean;
+  className?: string;
   classId: string;
+  course?: string;
+  coursePathId?: string | null;
+  courseTitle?: string | null;
+  courseAvailable?: boolean;
   dueAt: string;
   problems: { problemId: string; points: number; title?: string; versionId?: string; firstAcPoints?: number; rewardPoints?: number }[];
   participants: string[];

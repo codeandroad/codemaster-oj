@@ -91,6 +91,11 @@ export class EducationController {
     return applyResponse(response, await this.domain.execute('education', request.domainContext));
   }
 
+  @Post('learning-paths/:id/restore')
+  async restorePath(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('education', request.domainContext));
+  }
+
   @Post('learning-paths/:id/publish')
   async publishPath(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('education', request.domainContext));
@@ -178,6 +183,11 @@ export class EducationController {
 
   @Post('timed-practices/:id/archive')
   async archivePractice(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('education', request.domainContext));
+  }
+
+  @Post('timed-practices/:id/restore')
+  async restorePractice(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('education', request.domainContext));
   }
 }

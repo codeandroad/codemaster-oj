@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState,useImperativeHandle, type ReactNode, type Ref, type CSSProperties, type KeyboardEvent } from "react";
 import type { SubmissionLanguage } from "@/lib/production-api";
+import { useLocale } from "@/components/locale-context";
 import { languageInfo } from "./languages";
 import type { WorkspaceSettings } from "./workspace-settings";
 import {editKey,matchingBrackets,editorCommand,moveEditorLines,type EditSnapshot} from "./editor-behavior";
@@ -38,6 +39,7 @@ const fontFamily: Record<WorkspaceSettings["fontFamily"], string> = {
 };
 
 export function CodeEditor({ code, onChange, language, settings, status,idPrefix="production",inputLabel,readOnly=false,editorRef,onFormat,actions }: { code: string; onChange: (code: string) => void; language: SubmissionLanguage; settings: WorkspaceSettings; status?: string;idPrefix?:string;inputLabel?:string;readOnly?:boolean;editorRef?:Ref<CodeEditorHandle>;onFormat?:()=>void;actions?:ReactNode }) {
+  const {locale}=useLocale();const tx=(zh:string,en:string)=>locale==='en'?en:zh;
   const highlight=useRef<HTMLPreElement>(null),numbers=useRef<HTMLDivElement>(null),fieldRef=useRef<HTMLTextAreaElement>(null),textSurface=useRef<HTMLDivElement>(null),mirror=useRef<HTMLDivElement>(null);
   const [cursor,setCursor]=useState({start:0,end:0,line:1,column:1}),[focused,setFocused]=useState(false),[scroll,setScroll]=useState({top:0,left:0}),[lineHeights,setLineHeights]=useState<number[]>([]),[viewportHeight,setViewportHeight]=useState(900);
   const historyLanguage=useRef(language);
@@ -103,7 +105,7 @@ export function CodeEditor({ code, onChange, language, settings, status,idPrefix
         <div aria-hidden className={styles.guides}>{visibleGuides.map(row=><div key={row.i} className={styles.guideRow} style={{top:row.top}}>{Array.from({length:row.depth},(_,i)=><span key={i} className={styles.guide} style={{left:`calc(${i*settings.tabSize}ch - ${scroll.left}px)`}}/>)}</div>)}</div>
         <pre ref={highlight} aria-hidden className={`${styles.highlight} ${settings.wordWrap?styles.hiddenHighlight:''}`} style={editorStyle}><CodeTokens code={code+"\n"} language={language} matches={matches}/></pre>
         {settings.wordWrap&&<div ref={mirror} aria-hidden className={styles.mirror} style={editorStyle}>{lines.map((line,index)=><div key={index}>{line||"\u200b"}</div>)}</div>}
-        <textarea readOnly={readOnly} ref={fieldRef} aria-label={inputLabel??`${languageInfo[language].name} code editor`} data-od-id={`${idPrefix}-code-input`} value={code}
+        <textarea readOnly={readOnly} ref={fieldRef} aria-label={inputLabel??`${languageInfo[language].name} ${tx('代码编辑器','code editor')}`} data-od-id={`${idPrefix}-code-input`} value={code}
           onChange={event=>{const field=event.target;apply({value:field.value,start:field.selectionStart,end:field.selectionEnd},false);selection(field);}}
           onFocus={event=>{setFocused(true);selection(event.currentTarget);}} onBlur={()=>setFocused(false)} onSelect={event=>selection(event.currentTarget)} onKeyDown={onKeyDown} onKeyUp={event=>selection(event.currentTarget)} onClick={event=>selection(event.currentTarget)}
           onCompositionEnd={event=>selection(event.currentTarget)}
@@ -111,6 +113,6 @@ export function CodeEditor({ code, onChange, language, settings, status,idPrefix
           spellCheck={false} autoCapitalize="none" autoComplete="off" wrap={settings.wordWrap?"soft":"off"} className={`${styles.input} ${settings.wordWrap?styles.wrappedInput+' '+styles.wrap:''}`} style={editorStyle}/>
       </div>
     </div>
-    <div className={styles.status}><span className="flex flex-wrap items-center gap-3"><span aria-live="off">行 {cursor.line}，列 {cursor.column}</span><span>{status??"草稿保存在当前浏览器会话"}</span></span>{actions&&<div className="flex shrink-0 items-center gap-2" data-od-id="editor-run-actions">{actions}</div>}</div>
+    <div className={styles.status}><span className="flex flex-wrap items-center gap-3"><span aria-live="off">{locale==='en'?`Line ${cursor.line}, column ${cursor.column}`:`行 ${cursor.line}，列 ${cursor.column}`}</span><span>{status??tx('草稿保存在当前浏览器会话','Draft saved in this browser session')}</span></span>{actions&&<div className="flex shrink-0 items-center gap-2" data-od-id="editor-run-actions">{actions}</div>}</div>
   </div>;
 }

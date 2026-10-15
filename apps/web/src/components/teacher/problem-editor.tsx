@@ -32,7 +32,8 @@ import {TestDrawer,BatchTests,type EditorCase} from "./test-data-editor";
 import { equalCaseWeights } from "./case-weights";
 import {MathEditor} from "./math-editor";
 import {MathContent} from "@/components/math-content";
-import { Bank, Group, GroupTags, ManageGroups, reviewVisibilityLabel } from "./problem-banks";
+import { Bank, Group, GroupTags, ManageGroups, reviewVisibilityLabel, validationStatusLabel } from "./problem-banks";
+import { useLocale } from "@/components/locale-context";
 import {
   area,
   Empty,
@@ -73,6 +74,7 @@ const tabs = [
   "解答与提示",
   "版本与发布",
 ];
+const englishTabs: Record<string,string> = { "题面":"Statement", "接口与模板":"Interface and templates", "测试数据":"Test data", "判题设置":"Judge settings", "解答与提示":"Solution and hints", "版本与发布":"Versions and publication" };
 const blank: EditorProblem = {
   id: "new",
   title: "",
@@ -152,6 +154,8 @@ export function TeacherProblemEditor({ id,user }: { id: string;user:CampusUser }
   );
 }
 function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;user:CampusUser }) {
+  const { locale } = useLocale();
+  const tr = (zh:string,en:string) => locale === "zh" ? zh : en;
   const search = useSearchParams(),
     router = useRouter(),
     banks = useData<{ items: Bank[] }>("problem-banks"),
@@ -255,33 +259,33 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
       <button
         className={`${link} mb-3 text-sm`}
         onClick={() => {
-          if (!dirty || window.confirm("有未保存修改，确认离开编辑器？"))
+          if (!dirty || window.confirm(tr("有未保存修改，确认离开编辑器？", "You have unsaved changes. Leave the editor?")))
             router.push(back);
         }}
       >
-        ← 返回题库与题目
+        ← {tr("返回题库与题目", "Back to problem banks")}
       </button>
       <PageHeader
-        eyebrow="Problem editor"
-        title={problem.title || "新建题目"}
-        description={`${banks.data?.items.find((x) => x.id === problem.bankId)?.name ?? "尚未选择题库"} · 草稿保存与发布分别进行，已发布版本及历史成绩保留。`}
+        eyebrow={tr("题目编辑", "Problem editor")}
+        title={problem.title || tr("新建题目", "New problem")}
+        description={`${banks.data?.items.find((x) => x.id === problem.bankId)?.name ?? tr("尚未选择题库", "No bank selected")} · ${tr("草稿保存与发布分别进行，已发布版本及历史成绩保留。", "Saving a draft and publishing are separate. Published versions and past results remain.")}`}
         action={
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => setPreview(true)}>
               <Eye size={15} />
-              学生预览
+              {tr("学生预览", "Student preview")}
             </Button>
             <Button
               disabled={action.busy || !editable}
               onClick={() =>
                 void action.run(async () => {
                   await save();
-                  return "草稿已保存，参考解验证结果在版本与发布页查看。";
+                  return tr("草稿已保存，参考解验证结果在版本与发布页查看。", "Draft saved. Check reference validation under Versions and publication.");
                 })
               }
             >
               <Save size={15} />
-              保存草稿
+              {tr("保存草稿", "Save draft")}
             </Button>
             <Button
               variant="secondary"
@@ -289,17 +293,17 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
               onClick={() => setPublish(true)}
             >
               <Send size={15} />
-              发布
+              {tr("发布", "Publish")}
             </Button>
           </div>
         }
       />
       <Feedback action={action} />
-      {draft.recovery&&<section className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface-subtle px-3 py-2 text-sm" data-od-id="teacher-draft-recovery"><p>发现本机未保存草稿 · {new Date(draft.recovery.updatedAt).toLocaleString('zh-CN')} {draft.recovery.baseVersion!==(initial?.versionId??"new")&&"（服务器版本已变化，请核对后保存）"}</p><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={!editable} onClick={draft.restore}>恢复草稿</Button><Button size="sm" variant="ghost" onClick={draft.discard}>忽略草稿</Button></div></section>}
+      {draft.recovery&&<section className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface-subtle px-3 py-2 text-sm" data-od-id="teacher-draft-recovery"><p>{tr("发现本机未保存草稿", "Unsaved local draft found")} · {new Date(draft.recovery.updatedAt).toLocaleString(locale === "zh" ? "zh-CN" : "en-US")} {draft.recovery.baseVersion!==(initial?.versionId??"new")&&tr("（服务器版本已变化，请核对后保存）", "(The server version changed; review before saving)")}</p><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={!editable} onClick={draft.restore}>{tr("恢复草稿", "Restore draft")}</Button><Button size="sm" variant="ghost" onClick={draft.discard}>{tr("忽略草稿", "Discard draft")}</Button></div></section>}
       {draft.status&&<p className="mt-2 text-xs text-muted-foreground" role="status" data-od-id="teacher-autosave-status">{draft.status}</p>}
 
       <div className={styles.toolbar}>
-        <span className="text-muted-foreground">分组</span>
+        <span className="text-muted-foreground">{tr("分组", "Groups")}</span>
         <GroupTags
           onClick={saved?.id && editable ? () => setManage(true) : undefined}
           groups={
@@ -314,26 +318,26 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
           disabled={!editable || action.busy}
           onClick={() => {if(saved?.id && saved.bankId===problem.bankId)setManage(true);else void action.run(async()=>{await save(false);setManage(true);return "草稿已保存，可选择分组。";});}}
         >
-          整理分组
+          {tr("整理分组", "Organize groups")}
         </Button>
         <StatusPill
           status={
             saved?.published
-              ? "Published"
-              : (saved?.validationStatus ?? "Draft")
+              ? tr("已发布", "Published")
+              : validationStatusLabel(saved?.validationStatus ?? "Draft", locale)
           }
         />
-        {saved && <span className="text-xs text-muted-foreground">{reviewVisibilityLabel(saved, bankVisibility)}</span>}
-        {dirty && <span className="text-xs text-warning">有未保存修改</span>}
+        {saved && <span className="text-xs text-muted-foreground">{reviewVisibilityLabel(saved, bankVisibility, locale)}</span>}
+        {dirty && <span className="text-xs text-warning">{tr("有未保存修改", "Unsaved changes")}</span>}
       </div>
-      {!saved?.id&&<p className="text-xs text-muted-foreground">整理分组时先保存题目草稿；没有分组可在弹窗中直接新建。</p>}
+      {!saved?.id&&<p className="text-xs text-muted-foreground">{tr("整理分组时先保存题目草稿；没有分组可在弹窗中直接新建。", "Save the problem draft before organizing groups. You can create a group in the dialog.")}</p>}
       <State resource={groups}/>
-      <Tabs value={tab} onChange={setTab} items={tabs} />
+      <Tabs value={tr(tab, englishTabs[tab] ?? tab)} onChange={value => setTab(tabs.find(item => tr(item, englishTabs[item] ?? item) === value) ?? tabs[0]!)} items={tabs.map(item => tr(item, englishTabs[item] ?? item))} />
       <section className={`${panel} ${styles.body}`} data-od-id="teacher-editor-tab-content"><fieldset disabled={!editable || action.busy}>
         {tab === "题面" && (
           <div className="grid grid-cols-[minmax(0,1fr)_260px] gap-5 max-lg:grid-cols-1">
             <div className="space-y-4">
-              <Field label="题目标题">
+              <Field label={tr("题目标题", "Problem title")}>
                 <input
                   autoFocus
                   value={problem.title}
@@ -342,18 +346,18 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                   className={input}
                 />
               </Field>
-              <MathEditor fieldName="statement" label="题面 / Markdown 与 LaTeX" value={problem.statement} disabled={!editable} onChange={value=>update("statement",value)} rows={10} initialPreview/>
+              <MathEditor fieldName="statement" label={tr("题面 / Markdown 与 LaTeX", "Statement / Markdown and LaTeX")} value={problem.statement} disabled={!editable} onChange={value=>update("statement",value)} rows={10} initialPreview/>
 
             </div>
             <aside className="space-y-4">
-              <Field label="所属题库">
+              <Field label={tr("所属题库", "Problem bank")}>
                 <select
                   value={problem.bankId ?? ""}
                   disabled={!!saved || !editable}
                   onChange={(e) => update("bankId", e.target.value)}
                   className={input}
                 >
-                  <option value="">请选择题库</option>
+                  <option value="">{tr("请选择题库", "Choose a bank")}</option>
                   {banks.data?.items
                     .filter(
                       (x) =>
@@ -369,7 +373,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                     ))}
                 </select>
               </Field>
-              <Field label="主题标签">
+              <Field label={tr("主题标签", "Topic tags")}>
                 <input
                   value={problem.tags?.join(", ") ?? ""}
                   disabled={!editable}
@@ -385,18 +389,18 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                   className={input}
                 />
               </Field>
-              <Field label="难度">
+              <Field label={tr("难度", "Difficulty")}>
                 <select
                   value={problem.difficulty ?? "基础"}
                   onChange={(e) => update("difficulty", e.target.value)}
                   className={input}
                 >
                   {["基础", "中等", "进阶"].map((x) => (
-                    <option key={x}>{x}</option>
+                    <option key={x} value={x}>{tr(x, ({"基础":"Basic","中等":"Intermediate","进阶":"Advanced"} as Record<string,string>)[x] ?? x)}</option>
                   ))}
                 </select>
               </Field>
-              <Field label="题目来源">
+              <Field label={tr("题目来源", "Source")}>
                 <input
                   value={problem.source ?? ""}
                   onChange={(e) => update("source", e.target.value)}
@@ -404,8 +408,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                 />
               </Field>
               <section className="border border-border bg-surface-subtle p-4 text-xs leading-6 text-muted-foreground">
-                题面支持普通文本与
-                Markdown。图片链接应来自可访问的课程资料；正式测试与参考代码只向维护教师开放。
+                {tr("题面支持普通文本与 Markdown。图片链接应来自可访问的课程资料；正式测试与参考代码只向维护教师开放。", "Statements support plain text and Markdown. Image links should point to accessible course material. Formal tests and reference code are visible only to maintaining teachers.")}
               </section>
             </aside>
           </div>
@@ -414,7 +417,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
           <div className="space-y-5">
             <div>
               <p className="text-xs font-semibold text-muted-foreground">
-                接口类型
+                {tr("接口类型", "Interface type")}
               </p>
               <div className="mt-2 flex gap-2">
                 {(["stdio", "function"] as const).map((mode) => (
@@ -424,24 +427,24 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                     disabled={!editable}
                     onClick={() => update("mode", mode)}
                   >
-                    {mode === "stdio" ? "标准输入输出" : "函数题"}
+                    {mode === "stdio" ? tr("标准输入输出", "Standard I/O") : tr("函数题", "Function")}
                   </Button>
                 ))}
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                切换接口保留测试内容；请在测试数据页检查参数与期望返回值格式。
+                {tr("切换接口保留测试内容；请在测试数据页检查参数与期望返回值格式。", "Changing the interface retains tests. Check parameter and expected-return formats under Test data.")}
               </p>
             </div>
             {problem.mode === "function" ? (
               <div className="grid grid-cols-3 gap-4 max-md:grid-cols-1">
-                <Field label="函数名">
+                <Field label={tr("函数名", "Function name")}>
                   <input
                     value={problem.functionName ?? ""}
                     onChange={(e) => update("functionName", e.target.value)}
                     className={input}
                   />
                 </Field>
-                <Field label="参数说明">
+                <Field label={tr("参数说明", "Parameter description")}>
                   <input
                     value={metadataText(problem.parameters).replaceAll(
                       "\n",
@@ -459,7 +462,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                     className={input}
                   />
                 </Field>
-                <Field label="返回类型">
+                <Field label={tr("返回类型", "Return type")}>
                   <input
                     value={problem.returnType ?? ""}
                     onChange={(e) => update("returnType", e.target.value)}
@@ -469,13 +472,13 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-4 max-md:grid-cols-1">
-                <MathEditor fieldName="input-description" label="输入说明" value={problem.inputDescription ?? ""} disabled={!editable} onChange={value=>update("inputDescription",value)} rows={4}/>
-                <MathEditor fieldName="output-description" label="输出说明" value={problem.outputDescription ?? ""} disabled={!editable} onChange={value=>update("outputDescription",value)} rows={4}/>
+                <MathEditor fieldName="input-description" label={tr("输入说明", "Input description")} value={problem.inputDescription ?? ""} disabled={!editable} onChange={value=>update("inputDescription",value)} rows={4}/>
+                <MathEditor fieldName="output-description" label={tr("输出说明", "Output description")} value={problem.outputDescription ?? ""} disabled={!editable} onChange={value=>update("outputDescription",value)} rows={4}/>
               </div>
             )}
             <div className="grid grid-cols-2 gap-4 max-lg:grid-cols-1">
-              <section className="min-w-0 space-y-3"><Field label="学生模板语言"><select aria-label="学生模板语言" value={templateLanguage} onChange={e=>setTemplateLanguage(e.target.value as SubmissionLanguage)} className={input}><option value="python">Python</option><option value="cpp">C++</option><option value="javascript">JavaScript</option></select></Field><CodeField language={templateLanguage} label="学生起始模板" value={templateLanguage==="python"?problem.starterCode:problem.starterCodes?.[templateLanguage]??""} onChange={value=>templateLanguage==="python"?update("starterCode",value):update("starterCodes",{...problem.starterCodes,[templateLanguage]:value})}/><p className="text-xs text-muted-foreground">各语言模板独立保存，留空时由系统生成。</p></section>
-              <section className="min-w-0 space-y-3"><Field label="参考解答语言"><select aria-label="参考解答语言" value={problem.referenceLanguage??"python"} onChange={e=>update("referenceLanguage",e.target.value as SubmissionLanguage)} className={input}><option value="python">Python</option><option value="cpp">C++</option><option value="javascript">JavaScript</option></select></Field><CodeField language={problem.referenceLanguage??"python"} label="教师参考答案（不会显示给学生）" value={problem.referenceCode??""} onChange={value=>update("referenceCode",value)}/><p className="text-xs text-muted-foreground">切换语言只更改验证运行时，不会转换参考代码。</p></section>
+              <section className="min-w-0 space-y-3"><Field label={tr("学生模板语言", "Student template language")}><select aria-label={tr("学生模板语言", "Student template language")} value={templateLanguage} onChange={e=>setTemplateLanguage(e.target.value as SubmissionLanguage)} className={input}><option value="python">Python</option><option value="cpp">C++</option><option value="javascript">JavaScript</option></select></Field><CodeField language={templateLanguage} label={tr("学生起始模板", "Student starter template")} value={templateLanguage==="python"?problem.starterCode:problem.starterCodes?.[templateLanguage]??""} onChange={value=>templateLanguage==="python"?update("starterCode",value):update("starterCodes",{...problem.starterCodes,[templateLanguage]:value})}/><p className="text-xs text-muted-foreground">{tr("各语言模板独立保存，留空时由系统生成。", "Templates are saved per language; empty templates are generated by the system.")}</p></section>
+              <section className="min-w-0 space-y-3"><Field label={tr("参考解答语言", "Reference solution language")}><select aria-label={tr("参考解答语言", "Reference solution language")} value={problem.referenceLanguage??"python"} onChange={e=>update("referenceLanguage",e.target.value as SubmissionLanguage)} className={input}><option value="python">Python</option><option value="cpp">C++</option><option value="javascript">JavaScript</option></select></Field><CodeField language={problem.referenceLanguage??"python"} label={tr("教师参考答案（不会显示给学生）", "Teacher reference solution (hidden from students)")} value={problem.referenceCode??""} onChange={value=>update("referenceCode",value)}/><p className="text-xs text-muted-foreground">{tr("切换语言只更改验证运行时，不会转换参考代码。", "Changing language changes the validation runtime; it does not convert reference code.")}</p></section>
             </div>
             {problem.mode==="function"&&<p className="text-xs text-muted-foreground">C++ 接口：<code className="font-mono">nlohmann::json {problem.functionName||"solve"}(json&amp; args, json&amp; kwargs)</code></p>}
 
@@ -488,13 +491,13 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                 <div className="flex flex-wrap items-center justify-between gap-3 bg-surface-subtle px-4 py-3">
                   <div>
                     <h3 className="font-bold">
-                      {kind === "samples" ? "公开样例" : "正式测试"} ·{" "}
+                      {kind === "samples" ? tr("公开样例", "Public samples") : tr("正式测试", "Formal tests")} ·{" "}
                       {list(kind).length}
                     </h3>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {kind === "samples"
-                        ? "学生可见，不计入正式得分。"
-                        : "一个输入与一个期望结果构成一个测试点；隐藏输入与期望答案不会显示给学生。"}
+                        ? tr("学生可见，不计入正式得分。", "Visible to students; excluded from formal scoring.")
+                        : tr("一个输入与一个期望结果构成一个测试点；隐藏输入与期望答案不会显示给学生。", "One input and one expected result form a test case. Hidden inputs and answers are not shown to students.")}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -506,7 +509,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                         onClick={() => setBatch(true)}
                       >
                         <FileUp size={14} />
-                        批量导入
+                        {tr("批量导入", "Bulk import")}
                       </Button>
                     )}
                     <Button
@@ -515,17 +518,17 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                       onClick={() => setTest({ kind, index: null })}
                     >
                       <Plus size={14} />
-                      添加
+                      {tr("添加", "Add")}
                     </Button>
                   </div>
                 </div>
                 <Table
                   headers={[
-                    "编号 / 名称",
-                    problem.mode === "function" ? "参数" : "输入",
-                    problem.mode === "function" ? "期望返回值" : "期望输出",
-                    "启用",
-                    "操作",
+                    tr("编号 / 名称", "ID / name"),
+                    problem.mode === "function" ? tr("参数", "Parameters") : tr("输入", "Input"),
+                    problem.mode === "function" ? tr("期望返回值", "Expected return") : tr("期望输出", "Expected output"),
+                    tr("启用", "Enabled"),
+                    tr("操作", "Actions"),
                   ]}
                   min={760}
                 >
@@ -538,17 +541,17 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                         </span>
                         <p className="font-semibold">
                           {item.name ??
-                            `${kind === "samples" ? "Sample" : "Test"} ${i + 1}`}
+                            `${kind === "samples" ? tr("样例", "Sample") : tr("测试", "Test")} ${i + 1}`}
                         </p>
                       </td>
                       <td className="max-w-52">
                         <pre className="truncate font-mono text-xs">
-                          {item.input || "合法空输入"}
+                          {item.input || tr("合法空输入", "Valid empty input")}
                         </pre>
                       </td>
                       <td className="max-w-52">
                         <pre className="truncate font-mono text-xs">
-                          {item.expected || "合法空输出"}
+                          {item.expected || tr("合法空输出", "Valid empty output")}
                         </pre>
                       </td>
                       <td>
@@ -566,7 +569,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                             )
                           }
                         >
-                          {item.enabled !== false ? "启用" : "停用"}
+                          {item.enabled !== false ? tr("启用", "Enabled") : tr("停用", "Disabled")}
                         </button>
                       </td>
                       <td>
@@ -574,7 +577,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                           <Button
                             size="icon"
                             variant="ghost"
-                            title="编辑测试"
+                            title={tr("编辑测试", "Edit test")}
                             disabled={!editable}
                             onClick={() => setTest({ kind, index: i })}
                           >
@@ -583,7 +586,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                           <Button
                             size="icon"
                             variant="ghost"
-                            title="复制测试"
+                            title={tr("复制测试", "Copy test")}
                             disabled={!editable}
                             onClick={() =>
                               update(kind, [
@@ -601,12 +604,12 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                           <Button
                             size="icon"
                             variant="ghost"
-                            title="删除测试"
+                            title={tr("删除测试", "Delete test")}
                             disabled={!editable}
                             onClick={() => {
                               if (
                                 window.confirm(
-                                  "从当前草稿删除这条测试？已发布版本保留。",
+                                  tr("从当前草稿删除这条测试？已发布版本保留。", "Delete this test from the current draft? Published versions remain."),
                                 )
                               )
                                 update(
@@ -623,8 +626,8 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                   ))}
                   {!list(kind).length && (
                     <Empty columns={5}>
-                      尚无{kind === "samples" ? "公开样例" : "正式测试"}
-                      。点击“添加”创建第一条。
+                      {tr("尚无", "No")} {kind === "samples" ? tr("公开样例", "public samples") : tr("正式测试", "formal tests")}
+                      {tr("。点击“添加”创建第一条。", ". Click Add to create the first one.")}
                     </Empty>
                   )}
                 </Table>
@@ -634,14 +637,14 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
         )}
         {tab === "判题设置" && (
           <div className="space-y-4">
-            <div className={styles.summary}><div><strong>{problem.mode==="function"?"函数题":"标准输入输出"}</strong><span>题目接口</span></div><div><strong>{(problem.tests??[]).filter(x=>x.enabled!==false).length} / {(problem.tests??[]).length}</strong><span>启用 / 全部正式测试</span></div><div><strong>Python · C++ · JavaScript</strong><span>学生可用语言，参考解验证使用所选语言</span></div></div>
+            <div className={styles.summary}><div><strong>{problem.mode==="function"?tr("函数题","Function"):tr("标准输入输出","Standard I/O")}</strong><span>{tr("题目接口","Problem interface")}</span></div><div><strong>{(problem.tests??[]).filter(x=>x.enabled!==false).length} / {(problem.tests??[]).length}</strong><span>{tr("启用 / 全部正式测试","Enabled / all formal tests")}</span></div><div><strong>Python · C++ · JavaScript</strong><span>{tr("学生可用语言，参考解验证使用所选语言","Student languages; reference validation uses the selected language")}</span></div></div>
             <div className="grid grid-cols-3 gap-4 max-md:grid-cols-1">
-              <Field label="参考解验证语言"><select className={input} value={problem.referenceLanguage??"python"} onChange={e=>update("referenceLanguage",e.target.value as SubmissionLanguage)}><option value="python">Python</option><option value="cpp">C++</option><option value="javascript">JavaScript</option></select></Field>
-              <Field label="时间限制（ms）"><input type="number" step={1} min={100} max={5000} value={problem.timeLimitMs} onChange={e=>update("timeLimitMs",Number(e.target.value))} className={input}/><p className="mt-1 text-xs text-muted-foreground">100–5000 ms，亦受运行环境上限约束。</p></Field>
-              <Field label="内存限制（MB）"><input type="number" step={1} min={32} max={256} value={problem.memoryLimitMb} onChange={e=>update("memoryLimitMb",Number(e.target.value))} className={input}/><p className="mt-1 text-xs text-muted-foreground">32–256 MB；JavaScript 最低按 128 MB 执行。</p></Field>
-              <Field label="输出比较方式"><select aria-label="输出比较方式" disabled={problem.mode==="function"} className={input} value={problem.mode==="function"?"json":problem.comparator==="exact"?"exact":"tokens"} onChange={e=>update("comparator",e.target.value as EditorProblem["comparator"])}>{problem.mode==="function"?<option value="json">JSON 返回值比较</option>:<><option value="tokens">按 token 比较（忽略空白差异）</option><option value="exact">精确文本比较</option></>}</select><p className="mt-1 text-xs text-muted-foreground">函数题由系统固定使用 JSON 比较。</p></Field>
-              <Field label="测试计分"><div className="rounded-md border border-border px-3 py-2 text-sm">启用的正式测试点等权计分</div><p className="mt-1 text-xs text-muted-foreground">公开样例不计分，活动得分按作业或训练规则计算。</p></Field>
-              <div className="flex flex-wrap items-start gap-2"><Button variant="secondary" onClick={()=>setTab("测试数据")}>管理测试数据</Button><Button variant="secondary" disabled={!editable||action.busy} onClick={()=>void action.run(async()=>{await save();setTab("版本与发布");return "草稿已保存，请查看参考解验证结果。";})}>验证参考解</Button></div>
+              <Field label={tr("参考解验证语言","Reference validation language")}><select className={input} value={problem.referenceLanguage??"python"} onChange={e=>update("referenceLanguage",e.target.value as SubmissionLanguage)}><option value="python">Python</option><option value="cpp">C++</option><option value="javascript">JavaScript</option></select></Field>
+              <Field label={tr("时间限制（ms）","Time limit (ms)")}><input type="number" step={1} min={100} max={5000} value={problem.timeLimitMs} onChange={e=>update("timeLimitMs",Number(e.target.value))} className={input}/><p className="mt-1 text-xs text-muted-foreground">{tr("100–5000 ms，亦受运行环境上限约束。","100–5000 ms, subject to runtime limits.")}</p></Field>
+              <Field label={tr("内存限制（MB）","Memory limit (MB)")}><input type="number" step={1} min={32} max={256} value={problem.memoryLimitMb} onChange={e=>update("memoryLimitMb",Number(e.target.value))} className={input}/><p className="mt-1 text-xs text-muted-foreground">{tr("32–256 MB；JavaScript 最低按 128 MB 执行。","32–256 MB; JavaScript uses at least 128 MB.")}</p></Field>
+              <Field label={tr("输出比较方式","Output comparison")}><select aria-label={tr("输出比较方式","Output comparison")} disabled={problem.mode==="function"} className={input} value={problem.mode==="function"?"json":problem.comparator==="exact"?"exact":"tokens"} onChange={e=>update("comparator",e.target.value as EditorProblem["comparator"])}>{problem.mode==="function"?<option value="json">{tr("JSON 返回值比较","JSON return-value comparison")}</option>:<><option value="tokens">{tr("按 token 比较（忽略空白差异）","Token comparison (ignore whitespace)")}</option><option value="exact">{tr("精确文本比较","Exact text comparison")}</option></>}</select><p className="mt-1 text-xs text-muted-foreground">{tr("函数题由系统固定使用 JSON 比较。","Function problems always use JSON comparison.")}</p></Field>
+              <Field label={tr("测试计分","Test scoring")}><div className="rounded-md border border-border px-3 py-2 text-sm">{tr("启用的正式测试点等权计分","Enabled formal test cases have equal weight")}</div><p className="mt-1 text-xs text-muted-foreground">{tr("公开样例不计分，活动得分按作业或训练规则计算。","Public samples do not score. Activity points follow assignment or practice rules.")}</p></Field>
+              <div className="flex flex-wrap items-start gap-2"><Button variant="secondary" onClick={()=>setTab("测试数据")}>{tr("管理测试数据","Manage test data")}</Button><Button variant="secondary" disabled={!editable||action.busy} onClick={()=>void action.run(async()=>{await save();setTab("版本与发布");return tr("草稿已保存，请查看参考解验证结果。","Draft saved. Check reference validation results.");})}>{tr("验证参考解","Validate reference solution")}</Button></div>
             </div>
           </div>
         )}
@@ -650,14 +653,14 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
             <div className="space-y-4">
               <CodeField
                 language={problem.referenceLanguage ?? "python"}
-                label="参考代码"
+                label={tr("参考代码", "Reference code")}
                 value={problem.referenceCode ?? ""}
                 onChange={(v) => update("referenceCode", v)}
               />
-              <MathEditor fieldName="editorial" label="题解" value={problem.editorial ?? ""} disabled={!editable} onChange={value=>update("editorial",value)} rows={5}/>
+              <MathEditor fieldName="editorial" label={tr("题解", "Solution")} value={problem.editorial ?? ""} disabled={!editable} onChange={value=>update("editorial",value)} rows={5}/>
             </div>
             <aside className="space-y-4">
-              <Field label="分级提示">
+              <Field label={tr("分级提示", "Progressive hints")}>
                 <textarea
                   value={metadataText(problem.hints)}
                   onChange={(e) =>
@@ -667,15 +670,15 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                   className={area}
                 />
               </Field>
-              <Field label="开放策略">
+              <Field label={tr("开放策略", "Release policy")}>
                 <select
                   value={problem.hintPolicy ?? "afterAC"}
                   onChange={(e) => update("hintPolicy", e.target.value)}
                   className={input}
                 >
-                  <option value="afterAC">通过正式提交后开放</option>
-                  <option value="always">始终可见</option>
-                  <option value="never">不开放</option>
+                  <option value="afterAC">{tr("通过正式提交后开放", "After a formal AC")}</option>
+                  <option value="always">{tr("始终可见", "Always visible")}</option>
+                  <option value="never">{tr("不开放", "Never visible")}</option>
                 </select>
               </Field>
               <Button
@@ -684,12 +687,12 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                   void action.run(async () => {
                     await save();
                     setTab("版本与发布");
-                    return "参考解验证任务已提交。";
+                    return tr("参考解验证任务已提交。", "Reference validation job submitted.");
                   })
                 }
               >
                 <Send size={15} />
-                检查参考解答
+                {tr("检查参考解答", "Check reference solution")}
               </Button>
             </aside>
           </div>
@@ -698,19 +701,19 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
           <div className="grid grid-cols-[minmax(0,1fr)_340px] gap-5 max-lg:grid-cols-1">
             <section className="space-y-4">
               <div className="border border-border p-4">
-                <h3 className="font-bold">当前草稿版本</h3>
+                <h3 className="font-bold">{tr("当前草稿版本", "Current draft version")}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  保存草稿与发布分别进行。已发布题目的修改不会覆盖历史作业仍在使用的旧版本。
+                  {tr("保存草稿与发布分别进行。已发布题目的修改不会覆盖历史作业仍在使用的旧版本。", "Draft saving and publication are separate. Changes to published problems do not overwrite versions used by past assignments.")}
                 </p>
-                <p className="mt-2 text-sm text-muted-foreground">{bankVisibility === "school" ? "发布到校内题库后自动进入管理员审核；审核通过前，仅负责教师及指定作业或训练学生可见，不计入积分排行榜。" : "当前为教师私有题库。题目发布后可用于指定作业或训练；如需全校开放，请联系管理员纳入校内审核。"}</p>
-                {saved && <p className="mt-2 text-sm font-medium">当前状态：{reviewVisibilityLabel(saved, bankVisibility)}</p>}
+                <p className="mt-2 text-sm text-muted-foreground">{bankVisibility === "school" ? tr("发布到校内题库后自动进入管理员审核；审核通过前，仅负责教师及指定作业或训练学生可见，不计入积分排行榜。", "Publishing to a school bank starts admin review. Until approval, only the responsible teacher and assigned students can access it; it earns no leaderboard points.") : tr("当前为教师私有题库。题目发布后可用于指定作业或训练；如需全校开放，请联系管理员纳入校内审核。", "This is a private teacher bank. Published problems can be used in assigned activities. Ask an administrator for school-wide review.")}</p>
+                {saved && <p className="mt-2 text-sm font-medium">{tr("当前状态", "Current status")}: {reviewVisibilityLabel(saved, bankVisibility, locale)}</p>}
                 <p className="mt-3 font-mono text-xs">
-                  {saved?.versionId ?? "尚未保存"}
+                  {saved?.versionId ?? tr("尚未保存", "Not saved")}
                 </p>
               </div>
               <div className="border border-border">
                 <div className="bg-surface-subtle px-4 py-3 font-bold">
-                  发布检查
+                  {tr("发布检查", "Publication checklist")}
                 </div>
                 {[
                   ["题面", Boolean(problem.title && problem.statement)],
@@ -728,9 +731,9 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                     key={String(label)}
                     className="flex justify-between border-t border-border px-4 py-3 text-sm"
                   >
-                    <span>{label}</span>
+                    <span>{tr(String(label), ({"题面":"Statement","接口":"Interface","正式测试":"Formal tests","参考解验证":"Reference validation"} as Record<string,string>)[String(label)] ?? String(label))}</span>
                     <span className={ok ? "text-success" : "text-warning"}>
-                      {ok ? "完整" : "待完善"}
+                      {ok ? tr("完整", "Complete") : tr("待完善", "Incomplete")}
                     </span>
                   </div>
                 ))}
@@ -742,9 +745,9 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
               )}
             </section>
             <aside className="space-y-3">
-              <StatusPill status={saved?.validationStatus ?? "Draft"} />
+              <StatusPill status={validationStatusLabel(saved?.validationStatus ?? "Draft", locale)} />
               <Button variant="secondary" onClick={() => setImpact(true)}>
-                查看版本影响
+                {tr("查看版本影响", "View version impact")}
               </Button>
               <Button
                 variant="secondary"
@@ -755,18 +758,18 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                       `problems/${saved?.id}?versionId=${saved?.versionId}`,
                     );
                     setSaved(result);
-                    return "验证结果已刷新。";
+                    return tr("验证结果已刷新。", "Validation result refreshed.");
                   })
                 }
               >
-                刷新验证结果
+                {tr("刷新验证结果", "Refresh validation")}
               </Button>
               <Button
                 variant="secondary"
                 disabled={!editable || !saved?.canPublish || dirty || action.busy}
                 onClick={() => setPublish(true)}
               >
-                发布
+                {tr("发布", "Publish")}
               </Button>
             </aside>
           </div>
@@ -819,21 +822,21 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
         />
       )}
       {impact && (
-        <Modal title="版本影响" onClose={() => setImpact(false)}>
+        <Modal title={tr("版本影响", "Version impact")} onClose={() => setImpact(false)}>
           <p className="text-sm leading-7">
-            发布后，新练习使用新的已发布版本。作业、计时训练、原提交和订正继续使用各自固定的版本。重判、发布成绩与版本发布分别进行。
+            {tr("发布后，新练习使用新的已发布版本。作业、计时训练、原提交和订正继续使用各自固定的版本。重判、发布成绩与版本发布分别进行。", "After publishing, new practice uses the new version. Assignments, timed practices, original submissions, and corrections keep their fixed versions. Rejudging, result publication, and version publication are separate actions.")}
           </p>
         </Modal>
       )}
       {publish && saved && (
-        <Modal title="确认发布题目版本" onClose={() => setPublish(false)}>
+        <Modal title={tr("确认发布题目版本", "Publish problem version?")} onClose={() => setPublish(false)}>
           <p className="text-sm leading-6">
-            发布“{saved.title}”的已验证版本。历史活动与提交保留原版本。{bankVisibility === "school" ? "本版本将进入管理员审核；通过前仅指定活动学生可见，也不会计入全校排名积分。" : "当前题库为教师私有，仅指定活动学生可见；如需全校开放，须由管理员调整题库范围并审核该版本。"}
+            {tr("发布", "Publish")} “{saved.title}” {tr("的已验证版本。历史活动与提交保留原版本。", "as a validated version. Past activities and submissions keep the earlier version.")} {bankVisibility === "school" ? tr("本版本将进入管理员审核；通过前仅指定活动学生可见，也不会计入全校排名积分。", "This version enters admin review. Until approved, it is visible only to assigned activity students and earns no leaderboard points.") : tr("当前题库为教师私有，仅指定活动学生可见；如需全校开放，须由管理员调整题库范围并审核该版本。", "This bank is teacher-private and visible only to assigned activity students. An administrator must adjust the bank scope and approve this version for school-wide access.")}
           </p>
           <Feedback action={action} />
           <div className="mt-5 flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setPublish(false)}>
-              取消
+              {tr("取消", "Cancel")}
             </Button>
             <Button
               disabled={action.busy}
@@ -846,11 +849,11 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                   setSaved(result);
                   setProblem(result);
                   setPublish(false);
-                  return "题目版本已发布；全校开放和积分资格须经管理员审核。";
+                  return tr("题目版本已发布；全校开放和积分资格须经管理员审核。", "Problem version published. School-wide access and point eligibility require admin review.");
                 })
               }
             >
-              确认发布
+              {tr("确认发布", "Confirm publish")}
             </Button>
           </div>
         </Modal>
@@ -863,7 +866,9 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
 }
 function CodeField({label,value,onChange,language="python"}:{label:string;value:string;onChange:(value:string)=>void;language?:SubmissionLanguage}){
  const pageTheme=useWorkspaceTheme();
- return <Field label={label}><div className={styles.code} data-od-id={`teacher-code-${label.includes("参考")?"reference":language}`}><CodeEditor idPrefix={`teacher-${label.includes("参考")?"reference":language}`} inputLabel={label} status="修改后需保存草稿" code={value} onChange={onChange} language={language} settings={{...defaultWorkspaceSettings,theme:pageTheme==="dark"?"vs_dark":"vs",fontSize:13}}/></div></Field>;
+ const {locale}=useLocale();
+ const isReference=label.includes("参考")||label.toLowerCase().includes("reference");
+ return <Field label={label}><div className={styles.code} data-od-id={`teacher-code-${isReference?"reference":language}`}><CodeEditor idPrefix={`teacher-${isReference?"reference":language}`} inputLabel={label} status={locale==="zh"?"修改后需保存草稿":"Save draft after editing"} code={value} onChange={onChange} language={language} settings={{...defaultWorkspaceSettings,theme:pageTheme==="dark"?"vs_dark":"vs",fontSize:13}}/></div></Field>;
 }
 function ProblemPreview({
   problem,
@@ -872,17 +877,19 @@ function ProblemPreview({
   problem: EditorProblem;
   onClose: () => void;
 }) {
+  const {locale}=useLocale();
+  const tr=(zh:string,en:string)=>locale==="zh"?zh:en;
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-background">
       <div className="sticky top-0 flex justify-between border-b border-border bg-surface p-4">
         <div>
-          <b>学生预览 · {problem.title || "未命名题目"}</b>
+          <b>{tr("学生预览", "Student preview")} · {problem.title || tr("未命名题目", "Untitled problem")}</b>
           <p className="text-xs text-muted-foreground">
-            仅展示题面、公开样例与学生模板
+            {tr("仅展示题面、公开样例与学生模板", "Shows only the statement, public samples, and student template")}
           </p>
         </div>
         <Button variant="secondary" onClick={onClose}>
-          ← 返回编辑
+          ← {tr("返回编辑", "Back to editor")}
         </Button>
       </div>
       <div className="mx-auto grid max-w-[1400px] grid-cols-[44%_56%] max-md:grid-cols-1">
@@ -893,11 +900,11 @@ function ProblemPreview({
             .filter((x) => x.enabled !== false)
             .map((sample, i) => (
               <section key={i} className="mt-6">
-                <h2 className="font-bold">Sample {i + 1}</h2>
+                <h2 className="font-bold">{tr("样例", "Sample")} {i + 1}</h2>
                 <pre className="mt-3 whitespace-pre-wrap rounded bg-code p-3 text-xs text-code-foreground">
-                  Input / Parameters{"\n"}
+                  {tr("输入 / 参数", "Input / Parameters")}{"\n"}
                   {sample.input}
-                  {"\n\n"}Output / Return{"\n"}
+                  {"\n\n"}{tr("输出 / 返回值", "Output / Return")}{"\n"}
                   {sample.expected}
                 </pre>
               </section>

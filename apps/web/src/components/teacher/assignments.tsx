@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
+import { useLocale, type AppLocale } from "@/components/locale-context";
 import {
   productionApi,
   apiMessage,
@@ -49,32 +50,47 @@ import {
   useDirty,
 } from "./shared";
 
+const ui = (locale: AppLocale, zh: string, en: string) => locale === "zh" ? zh : en;
+const assignmentTabLabel: Record<string, [string, string]> = {
+  "Basic information": ["基本信息", "Basic information"],
+  Problems: ["题目与分值", "Problems"],
+  "Applicable list": ["发布名单", "Applicable list"],
+  Rules: ["规则", "Rules"],
+  Preview: ["学生预览", "Preview"],
+};
+
 export function TeacherAssignments() {
-  const assignments = useData<{ items: TeacherAssignment[] }>("assignments"),
+  const { locale } = useLocale();
+  const [showArchived,setShowArchived]=useState(false);
+  const [confirm,setConfirm]=useState<TeacherAssignment|null>(null);
+  const action=useAction();
+  const assignments = useData<{ items: TeacherAssignment[] }>(showArchived?"assignments?archived=true":"assignments"),
     classes = useData<{ items: SchoolClass[] }>("classes");
   return (
     <>
       <PageHeader
         eyebrow="作业管理"
-        title="Assignment Management"
-        description="跨班级管理作业，维护明确的适用名单，并查看学生进度。"
+        title={ui(locale, "作业管理", "Assignment Management")}
+        description={ui(locale, "跨班级管理作业，维护适用学生名单，并查看学习进度。", "Manage assignments across classes, select students, and view progress.")}
         action={
           <Link href="/teacher/assignments/new/edit" className={buttonVariants()}>
             <Plus size={15} />
-            New assignment
+            {ui(locale, "新建作业", "New assignment")}
           </Link>
         }
       />
+      <div className="mt-5 flex gap-2"><Button variant={showArchived?"secondary":"default"} aria-pressed={!showArchived} onClick={()=>setShowArchived(false)}>{ui(locale,"使用中","Active")}</Button><Button variant={showArchived?"default":"secondary"} aria-pressed={showArchived} onClick={()=>setShowArchived(true)}>{ui(locale,"已归档","Archived")}</Button></div>
       <State resource={assignments} />
-      <section className={`${panel} mt-5`}>
+      <Feedback action={action}/>
+      <section className={`${panel} mt-4`}>
         <Table
           headers={[
-            "Assignment",
-            "Classes",
-            "已布置 / 全班",
-            "未布置 / 豁免",
-            "Average / Status",
-            "Actions",
+            ui(locale, "作业", "Assignment"),
+            ui(locale, "班级", "Class"),
+            ui(locale, "已布置 / 全班", "Assigned / class"),
+            ui(locale, "未布置 / 豁免", "Unassigned / exempt"),
+            ui(locale, "平均分 / 状态", "Average / status"),
+            ui(locale, "操作", "Actions"),
           ]}
         >
           {assignments.data?.items.map((item) => {
@@ -100,8 +116,9 @@ export function TeacherAssignments() {
                   {item.title}
                 </Link>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Due {date(item.dueAt)}
+                  {ui(locale, "截止", "Due")} {date(item.dueAt)}
                 </p>
+                {item.courseTitle && <p className="mt-1 text-xs text-muted-foreground">{ui(locale, "关联课程", "Course")}: {item.courseTitle}{!item.courseAvailable && ui(locale, "（已归档）", " (archived)")}</p>}
               </td>
               <td className="text-muted-foreground">
                 {item.className ??
@@ -119,10 +136,10 @@ export function TeacherAssignments() {
                 <StatusPill
                   status={
                     item.state === "Draft"
-                      ? "Draft"
+                      ? ui(locale, "草稿", "Draft")
                       : item.averagePercent === null ||
                           item.averagePercent === undefined
-                        ? "Not started"
+                        ? ui(locale, "未开始", "Not started")
                         : `${item.averagePercent.toFixed(1)}%`
                   }
                 />
@@ -133,23 +150,28 @@ export function TeacherAssignments() {
                     href={`/teacher/assignments/${item.id}/edit`}
                     className={link}
                   >
-                    {item.state === "Draft" ? "编辑" : "查看 / 编辑"}
+                    {item.state === "Draft" ? ui(locale, "编辑", "Edit") : ui(locale, "查看 / 编辑", "View / edit")}
                   </Link>
                   <Link
                     href={`/teacher/assignments/${item.id}/progress`}
                     className={link}
                   >
-                    Matrix →
+                    {ui(locale, "进度", "Progress")} →
                   </Link>
+                  <Button size="sm" variant="ghost" disabled={action.busy} onClick={()=>setConfirm(item)}>{showArchived?ui(locale,"恢复","Restore"):ui(locale,"归档","Archive")}</Button>
                 </div>
               </td>
             </tr>;
           })}
           {!assignments.loading && !assignments.data?.items.length && (
-            <Empty columns={6}>暂无作业。点击 New assignment 开始布置。</Empty>
+            <Empty columns={6}>{showArchived?ui(locale,"暂无已归档作业。","No archived assignments."):ui(locale, "暂无作业。点击“新建作业”开始布置。", "No assignments yet. Select New assignment to begin.")}</Empty>
           )}
         </Table>
       </section>
+      {confirm&&<Modal title={showArchived?ui(locale,"恢复作业","Restore assignment"):ui(locale,"归档作业","Archive assignment")} onClose={()=>setConfirm(null)}>
+        <p className="text-sm text-muted-foreground">{showArchived?ui(locale,`恢复「${confirm.title}」后，它会回到使用中列表。`,`Restore “${confirm.title}” to the active list.`):ui(locale,`归档「${confirm.title}」后，学生无法继续正式提交；已有成绩和提交记录保留。进行中的作业须等截止且判题完成。`,`Archive “${confirm.title}” after its deadline and pending judgments. Existing grades and submissions remain available.`)}</p>
+        <div className="mt-5 flex justify-end gap-2"><Button variant="secondary" onClick={()=>setConfirm(null)}>{ui(locale,"取消","Cancel")}</Button><Button disabled={action.busy} onClick={()=>void action.run(async()=>{await productionApi(`assignments/${confirm.id}/${showArchived?"restore":"archive"}`,{method:"POST",body:{}});setConfirm(null);assignments.reload();return showArchived?ui(locale,"作业已恢复。","Assignment restored."):ui(locale,"作业已归档。","Assignment archived.");})}>{showArchived?ui(locale,"恢复","Restore"):ui(locale,"归档","Archive")}</Button></div>
+      </Modal>}
     </>
   );
 }
@@ -198,15 +220,18 @@ function AssignmentEditorForm({
   initial: TeacherAssignment | null;
   onReload: () => void;
 }) {
+  const { locale } = useLocale();
   const router = useRouter(),
     searchParams = useSearchParams(),
     classes = useData<{ items: SchoolClass[] }>("classes"),
+    courses = useData<{ items: { id: string; title: string; published: boolean; canEdit: boolean }[] }>("learning-paths"),
     people = useData<{ items: Person[] }>("people"),
     [tab, setTab] = useState(searchParams.get("tab") === "problems" ? "Problems" : assignmentTabs[0]!),
     [saved, setSaved] = useState(initial),
     [title, setTitle] = useState(initial?.title ?? ""),
     [description, setDescription] = useState(initial?.description ?? ""),
     [course, setCourse] = useState(initial?.course ?? "Python"),
+    [coursePathId, setCoursePathId] = useState(initial?.coursePathId ?? ""),
     [classId, setClassId] = useState(initial?.classId ?? ""),
     [due, setDue] = useState(localInput(initial?.dueAt)),
     [selected, setSelected] = useState<SelectedProblem[]>(
@@ -306,7 +331,7 @@ function AssignmentEditorForm({
     if (problem.versionId) query.set("versionId", problem.versionId);
     return `/teacher/problems/${problem.problemId}/edit?${query.toString()}`;
   };
-  const draft=useActivityDraft({storageKey:`campus-judge:activity-draft:v1:${userId}:assignment:${initial?.id??"new"}`,editable:true,noticeText:published?"改动已临时保存在当前浏览器；点击“保存修改”后才会更新已发布作业。":undefined,snapshot:{title,description,course,classId,due,problems:selected,participants},onRestore:v=>{setTitle(v.title);setDescription(v.description);setCourse(v.course);setClassId(v.classId);setDue(v.due);setSelected(v.problems.map(problem=>({...problem,firstAcPoints:initial?.problems.find(item=>item.problemId===problem.problemId)?.firstAcPoints??problem.firstAcPoints??10,rewardPoints:problem.rewardPoints??initial?.problems.find(item=>item.problemId===problem.problemId)?.rewardPoints??0})));setParticipants(v.participants);}});
+  const draft=useActivityDraft({storageKey:`campus-judge:activity-draft:v1:${userId}:assignment:${initial?.id??"new"}`,editable:true,noticeText:published?"改动已临时保存在当前浏览器；点击“保存修改”后才会更新已发布作业。":undefined,snapshot:{title,description,course,coursePathId,classId,due,problems:selected,participants},recoveryDefaults:{coursePathId:""},onRestore:v=>{setTitle(v.title);setDescription(v.description);setCourse(v.course);setCoursePathId(v.coursePathId??"");setClassId(v.classId);setDue(v.due);setSelected(v.problems.map(problem=>({...problem,firstAcPoints:initial?.problems.find(item=>item.problemId===problem.problemId)?.firstAcPoints??problem.firstAcPoints??10,rewardPoints:problem.rewardPoints??initial?.problems.find(item=>item.problemId===problem.problemId)?.rewardPoints??0})));setParticipants(v.participants);}});
   const changedProblems = JSON.stringify(
     selected.map((x) => ({ problemId: x.problemId, points: x.points, versionId: x.versionId, rewardPoints: x.rewardPoints })),
   ) !== JSON.stringify(
@@ -322,13 +347,14 @@ function AssignmentEditorForm({
   const changedTitle = title !== (saved?.title ?? "");
   const changedDescription = description !== (saved?.description ?? "");
   const changedCourse = course !== (saved?.course ?? "Python");
+  const changedCoursePath = coursePathId !== (saved?.coursePathId ?? "");
   const changedClass = classId !== (saved?.classId ?? "");
   const changedDue = due !== localInput(saved?.dueAt);
   const changedPinnedVersions = selected.some((problem) => {
     const original = saved?.problems.find((item) => item.problemId === problem.problemId);
     return original && original.versionId !== problem.versionId;
   });
-  const hasChanges = changedTitle || changedDescription || changedCourse ||
+  const hasChanges = changedTitle || changedDescription || changedCourse || changedCoursePath ||
     changedClass || changedDue || changedProblems || changedParticipants;
   useDirty(hasChanges);
   const save = async () => {
@@ -378,6 +404,7 @@ function AssignmentEditorForm({
           ...(changedTitle ? { title } : {}),
           ...(changedDescription ? { description } : {}),
           ...(changedCourse ? { course } : {}),
+          ...(changedCoursePath ? { coursePathId: coursePathId || null } : {}),
           ...(changedDue ? { dueAt } : {}),
           ...(changedProblems ? { problems: problemPayload } : {}),
           ...(changedParticipants ? { participants } : {}),
@@ -392,6 +419,7 @@ function AssignmentEditorForm({
           dueAt,
           description,
           course,
+          coursePathId: coursePathId || null,
           problems: problemPayload,
           participants,
         };
@@ -427,12 +455,12 @@ function AssignmentEditorForm({
         className={`${link} mb-4 inline-block text-sm`}
         href="/teacher/assignments"
       >
-        ← Assignment list
+        ← {ui(locale, "作业列表", "Assignment list")}
       </Link>
       <PageHeader
         eyebrow="作业编辑"
-        title={saved?.title ?? "New assignment"}
-        description="基本信息、题目与分值、指定学生名单、规则与学生预览。"
+        title={saved?.title ?? ui(locale, "新建作业", "New assignment")}
+        description={ui(locale, "基本信息、题目与分值、指定学生名单、规则与学生预览。", "Basic information, problems and scores, selected students, rules, and student preview.")}
         action={
           <div className="flex flex-wrap gap-2">
             <Button
@@ -497,14 +525,14 @@ function AssignmentEditorForm({
               onClick={() => setTab(item)}
               className={`h-10 shrink-0 rounded-t-md border-x border-t px-4 text-sm font-semibold ${tab === item ? "border-border bg-surface text-primary" : "border-transparent text-muted-foreground hover:bg-muted"}`}
             >
-              {item}
+              {assignmentTabLabel[item] ? ui(locale, ...assignmentTabLabel[item]!) : item}
             </button>
           ))}
         </div>
         <div className="min-h-[520px] p-5">
           {tab === "Basic information" && (
             <div className="grid grid-cols-2 gap-5 max-md:grid-cols-1">
-              <Field label="Title">
+              <Field label={ui(locale, "标题", "Title")}>
                 <input
                   required
                   value={title}
@@ -513,7 +541,7 @@ function AssignmentEditorForm({
                   className={input}
                 />
               </Field>
-              <Field label="Course">
+              <Field label={ui(locale, "学科标签", "Subject label")}>
                 <input
                   value={course}
                   disabled={action.busy}
@@ -521,7 +549,15 @@ function AssignmentEditorForm({
                   className={input}
                 />
               </Field>
-              <Field label="Classes">
+              <Field label={ui(locale, "关联课程（可选）", "Linked course (optional)")}>
+                <select value={coursePathId} disabled={action.busy || courses.loading} onChange={(e) => setCoursePathId(e.target.value)} className={input}>
+                  <option value="">{ui(locale, "不关联课程", "No linked course")}</option>
+                  {initial?.coursePathId && !courses.data?.items.some((item) => item.id === initial.coursePathId && item.published) && <option value={initial.coursePathId} disabled>{initial.courseTitle ?? ui(locale, "原关联课程", "Previous course")}{ui(locale, "（当前不可用）", " (unavailable)")}</option>}
+                  {courses.data?.items.filter((item) => item.published).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+                </select>
+                <p className="mt-1 text-xs text-muted-foreground">{ui(locale, "仅显示已发布课程；学生可从作业进入所关联的课程。", "Only published courses are shown. Students can open the linked course from their assignment.")}</p>
+              </Field>
+              <Field label={ui(locale, "班级", "Class")}>
                 <select
                   required
                   value={classId}
@@ -543,7 +579,7 @@ function AssignmentEditorForm({
                   ))}
                 </select>
               </Field>
-              <Field label="Due time">
+              <Field label={ui(locale, "截止时间", "Due time")}>
                 <input
                   required
                   type="datetime-local"
@@ -559,7 +595,7 @@ function AssignmentEditorForm({
                   </span>
                 )}
               </Field>
-              <Field label="Teacher note">
+              <Field label={ui(locale, "教师说明", "Teacher note")}>
                 <textarea
                   disabled={action.busy}
                   value={description}
@@ -575,7 +611,7 @@ function AssignmentEditorForm({
             <>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <b className="text-sm">Selected problems</b>
+                  <b className="text-sm">{ui(locale, "已选题目", "Selected problems")}</b>
                   <p className="text-xs text-muted-foreground">
                     {selected.length} 道题 · 作业总分 {total} 分 · 本作业额外奖励 {rewardTotal} / 100 积分。
                   </p>
@@ -680,9 +716,9 @@ function AssignmentEditorForm({
                     </td>
                     <td>
                       {p.mode === "function"
-                        ? "Function"
+                        ? ui(locale, "函数题", "Function")
                         : p.mode === "stdio"
-                          ? "Standard I/O"
+                          ? ui(locale, "标准输入输出", "Standard I/O")
                           : "—"}
                     </td>
                     <td>
@@ -920,7 +956,7 @@ function AssignmentEditorForm({
               )}
               {!classId && (
                 <p className="mt-4 text-sm text-muted-foreground">
-                  先在 Basic information 中选择班级。
+                  {ui(locale, "请先在“基本信息”中选择班级。", "Select a class in Basic information first.")}
                 </p>
               )}
               {classId && !participants.length && (
@@ -934,12 +970,12 @@ function AssignmentEditorForm({
           {tab === "Rules" && (
             <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
               {[
-                ["Formal scoring", "Best score per assigned problem"],
-                ["Corrections", "Shown separately"],
-                ["Samples", "Do not affect score"],
-                ["Hidden tests", "No raw input or answer shown"],
-                ["System Error", "Not counted as zero"],
-                ["Deadline", "以服务端正式接收时间为准"],
+                [ui(locale, "正式计分", "Formal scoring"), ui(locale, "每道作业题取最佳成绩", "Best score per assigned problem")],
+                [ui(locale, "订正", "Corrections"), ui(locale, "单独显示", "Shown separately")],
+                [ui(locale, "样例运行", "Samples"), ui(locale, "不影响成绩", "Do not affect score")],
+                [ui(locale, "隐藏测试", "Hidden tests"), ui(locale, "不显示原始输入或答案", "No raw input or answer shown")],
+                [ui(locale, "系统错误", "System Error"), ui(locale, "不计为零分", "Not counted as zero")],
+                [ui(locale, "截止时间", "Deadline"), ui(locale, "以服务端正式接收时间为准", "Based on server receipt time")],
               ].map(([label, value]) => (
                 <Metric key={label} label={label!} value={value} />
               ))}
@@ -948,15 +984,16 @@ function AssignmentEditorForm({
           {tab === "Preview" && (
             <div className="border border-border bg-surface-subtle p-5">
               <p className="text-xs font-semibold text-primary">
-                Student preview
+                {ui(locale, "学生预览", "Student preview")}
               </p>
               <h2 className="mt-1 text-xl font-bold">
                 {title || "未命名作业"}
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 {classroom?.name} · 向 {participants.length} 名学生布置 ·
-                Due {due || "尚未设置"}
+                {ui(locale, "截止", "Due")} {due || ui(locale, "尚未设置", "Not set")}
               </p>
+              {coursePathId && <p className="mt-2 text-sm text-primary">{ui(locale, "关联课程：", "Linked course: ")}{courses.data?.items.find(item => item.id === coursePathId)?.title ?? initial?.courseTitle ?? ui(locale, "课程不可用", "Course unavailable")}</p>}
               <p className="mt-4 whitespace-pre-wrap text-sm">{description}</p>
               <Table headers={["题目", "作业分值", "首次 AC 积分", "本作业额外奖励"]} min={400}>
                 {selected.map((p) => (
@@ -1091,6 +1128,7 @@ function AssignmentEditorForm({
 
 type Grade = NonNullable<Assignment["grades"]>[number];
 export function TeacherAssignmentProgress({ id }: { id: string }) {
+  const { locale } = useLocale();
   const [now,setNow] = useState(() => Date.now());
   useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer);},[]);
   const resource = useData<TeacherAssignment>(`assignments/${id}`),
@@ -1117,15 +1155,15 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
         href="/teacher/assignments"
         className={`${link} mb-4 inline-block text-sm`}
       >
-        ← Assignment list
+        ← {ui(locale, "作业列表", "Assignment list")}
       </Link>
       <PageHeader
         eyebrow="作业进度"
-        title={`${assignment?.title ?? "作业"} · Progress Matrix`}
+        title={`${assignment?.title ?? ui(locale, "作业", "Assignment")} · ${ui(locale, "进度", "Progress Matrix")}`}
         description={
           assignment
-            ? `${grades.length} applicable students · Due ${date(assignment.dueAt)}. 订正记录不会覆盖作业原成绩。`
-            : "正在读取学生进度。"
+            ? ui(locale, `${grades.length} 名适用学生 · 截止 ${date(assignment.dueAt)}。订正记录不会覆盖作业原成绩。`, `${grades.length} applicable students · Due ${date(assignment.dueAt)}. Corrections do not overwrite the original grade.`)
+            : ui(locale, "正在读取学生进度。", "Loading student progress.")
         }
         action={
           <div className="flex gap-2">
@@ -1136,7 +1174,7 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
               href={`/teacher/assignments/${id}/edit`}
               className={buttonVariants({ variant: "secondary" })}
             >
-              Edit assignment
+              {ui(locale, "编辑作业", "Edit assignment")}
             </Link>
           </div>
         }
@@ -1146,19 +1184,19 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
         <>
           <div className="mt-5 grid grid-cols-6 gap-3 max-lg:grid-cols-3 max-sm:grid-cols-2">
             {[
-              ["Complete", complete],
-              ["In progress", started - complete],
-              ["Not started", grades.length - started],
-              ["Applicable", grades.length],
-              ["Exempt", exempt],
-              ["Problems", assignment.problems.length],
+              [ui(locale, "已完成", "Complete"), complete],
+              [ui(locale, "进行中", "In progress"), started - complete],
+              [ui(locale, "未开始", "Not started"), grades.length - started],
+              [ui(locale, "适用学生", "Applicable"), grades.length],
+              [ui(locale, "已豁免", "Exempt"), exempt],
+              [ui(locale, "题目", "Problems"), assignment.problems.length],
             ].map(([label, value]) => (
               <Metric key={label} label={String(label)} value={value} />
             ))}
           </div>
           <section className={`${panel} mt-5 overflow-hidden`}>
             <div className="border-b border-border px-4 py-3">
-              <h2 className="font-bold">Student progress matrix</h2>
+              <h2 className="font-bold">{ui(locale, "学生进度矩阵", "Student progress matrix")}</h2>
               <p className="mt-1 text-xs text-muted-foreground">
                 固定学生列，横向滚动题目。成绩取截止前正式提交最高分；系统错误不记为学生答错。
               </p>
@@ -1171,10 +1209,10 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
                 <thead className="bg-surface-subtle text-xs text-muted-foreground">
                   <tr>
                     <th className="sticky left-0 z-10 min-w-52 border-r border-border bg-surface-subtle px-4 py-3">
-                      Student
+                      {ui(locale, "学生", "Student")}
                     </th>
-                    <th className="px-3 py-3">Status</th>
-                    <th className="px-3 py-3">Score</th>
+                    <th className="px-3 py-3">{ui(locale, "状态", "Status")}</th>
+                    <th className="px-3 py-3">{ui(locale, "分数", "Score")}</th>
                     {assignment.problems.map((p) => (
                       <th
                         key={p.problemId}
@@ -1189,7 +1227,7 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
                         >
                           {p.title ?? p.problemId.slice(0, 8)}
                         </Link>
-                        <p className="mt-1 font-normal">{p.points} pts</p>
+                        <p className="mt-1 font-normal">{p.points} {ui(locale, "分", "pts")}</p>
                       </th>
                     ))}
                   </tr>
@@ -1210,10 +1248,10 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
                         <StatusPill
                           status={
                             student.problems.every((p) => p.status === "AC")
-                              ? "Complete"
+                              ? ui(locale, "完成", "Complete")
                               : student.problems.some((p) => p.submissionId)
-                                ? "In progress"
-                                : "Not started"
+                                ? ui(locale, "进行中", "In progress")
+                                : ui(locale, "未开始", "Not started")
                           }
                         />
                       </td>
@@ -1386,6 +1424,7 @@ export function TeacherSubmissionDrawer({
   problemId?: string | undefined;
   onClose: () => void;
 }) {
+  const { locale } = useLocale();
   const submission = useData<SubmissionDetail>(id ? `submissions/${id}` : null),
     resolvedStudent = studentId ?? submission.data?.identityId,
     history = useData<{ items: Submission[] }>(
@@ -1406,7 +1445,7 @@ export function TeacherSubmissionDrawer({
   return (
     <Drawer title={title} onClose={onClose}>
       <p className="text-xs font-semibold text-primary">
-        Code, correction & feedback
+        {ui(locale, "代码、订正与反馈", "Code, correction & feedback")}
       </p>
       <State resource={submission} />
       {original ? (
@@ -1431,7 +1470,7 @@ export function TeacherSubmissionDrawer({
           <p className="mt-4 text-xs text-muted-foreground">
             {original.id} · {date(original.createdAt)} · {original.kind}
           </p>
-          <h3 className="mt-5 font-bold">Student note / Teacher feedback</h3>
+          <h3 className="mt-5 font-bold">{ui(locale, "学生笔记 / 教师反馈", "Student note / Teacher feedback")}</h3>
           <div className="mt-3 space-y-3">
             {original.reviews?.map((review) => (
               <article
@@ -1465,7 +1504,7 @@ export function TeacherSubmissionDrawer({
               });
             }}
           >
-            <Field label="Teacher feedback">
+            <Field label={ui(locale, "教师反馈", "Teacher feedback")}>
               <textarea
                 name="note"
                 required
@@ -1558,7 +1597,7 @@ export function TeacherSubmissionDrawer({
               <Feedback action={action} />
             </section>
           )}
-          <h3 className="mt-5 font-bold">Formal code</h3>
+          <h3 className="mt-5 font-bold">{ui(locale, "正式提交代码", "Formal code")}</h3>
           <pre className="mt-3 max-h-96 overflow-auto rounded bg-code p-4 font-mono text-sm leading-6 text-code-foreground">
             {original.code}
           </pre>
@@ -1568,7 +1607,7 @@ export function TeacherSubmissionDrawer({
           该学生尚无这道题的正式提交。
         </p>
       )}
-      <h3 className="mt-5 font-bold">Corrections</h3>
+      <h3 className="mt-5 font-bold">{ui(locale, "订正记录", "Corrections")}</h3>
       {corrections.map((item) => (
         <details key={item.id} className="mt-3 border border-border p-3">
           <summary className="cursor-pointer text-sm">

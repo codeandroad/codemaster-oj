@@ -19,6 +19,16 @@ export class AssignmentsController {
     return applyResponse(response, await this.domain.execute('assignments', request.domainContext));
   }
 
+  @Post('assignments/:id/archive')
+  async archive(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('assignments', request.domainContext));
+  }
+
+  @Post('assignments/:id/restore')
+  async restore(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('assignments', request.domainContext));
+  }
+
 
   @Get('assignments')
   async list(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {

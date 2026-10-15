@@ -12,6 +12,7 @@ import {
 } from "@/lib/production-api";
 import type { TeacherAssignment } from "./dashboard-classes";
 import { TeacherSubmissionDrawer } from "./assignments";
+import { useLocale } from "@/components/locale-context";
 import {
   date,
   Drawer,
@@ -28,7 +29,7 @@ import {
 } from "./shared";
 
 interface Report {
-  classes: SchoolClass[];
+  classes: (SchoolClass & { archived?: boolean })[];
   assignments: TeacherAssignment[];
   timedPractices?: { id: string; title: string; classId: string }[];
   summary: {
@@ -75,6 +76,9 @@ interface Report {
   submissions: (Submission & { identityId?: string })[];
 }
 export function TeacherReports() {
+  const { locale } = useLocale();
+  const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
+  const statusLabel = (status: string) => locale === "en" ? status : ({"System Error":"系统错误", Submitted:"已提交", Waiting:"排队中", Judging:"评测中"} as Record<string,string>)[status] ?? status;
   const search = useSearchParams(),
     [classId, setClass] = useState(search.get("classId") ?? ""),
     [activity, setActivity] = useState(search.get("activity") ?? ""),
@@ -124,28 +128,28 @@ export function TeacherReports() {
       ).length;
   const metrics = [
     {
-      label: "未开始",
+      label: tr("未开始", "Not started"),
       value: notStarted,
       id: "notStarted",
-      note: "适用学生，排除豁免",
+      note: tr("适用学生，排除豁免", "Eligible students, excluding exemptions"),
     },
     {
-      label: "未全部完成",
+      label: tr("未全部完成", "Incomplete"),
       value: incomplete,
       id: "incomplete",
-      note: "未完成当前活动全部题目",
+      note: tr("未完成当前活动全部题目", "Not all activity problems completed"),
     },
     {
-      label: "反复未通过",
+      label: tr("反复未通过", "Repeated failures"),
       value: report?.metrics?.repeatedFailures,
       id: "repeatedFailures",
-      note: "同题至少 2 次有效非 AC",
+      note: tr("同题至少 2 次有效非 AC", "At least two valid non-AC attempts on one problem"),
     },
     {
-      label: "等待教师反馈",
+      label: tr("等待教师反馈", "Awaiting teacher feedback"),
       value: report?.metrics?.waitingFeedback,
       id: "waitingFeedback",
-      note: "订正笔记尚未收到教师反馈",
+      note: tr("订正笔记尚未收到教师反馈", "Correction notes awaiting teacher feedback"),
     },
   ];
   const drillStudents = students.filter((s) =>
@@ -172,9 +176,9 @@ export function TeacherReports() {
   return (
     <>
       <PageHeader
-        eyebrow="Teaching Reports"
-        title="教学报告"
-        description="每项指标对应当前班级、活动与明确分母；平台错误单独展示。"
+        eyebrow={tr("教学报告", "Teaching Reports")}
+        title={tr("教学报告", "Teaching reports")}
+        description={tr("每项指标对应当前班级、活动与明确分母；平台错误单独展示。", "Metrics use the selected class, activity, and a defined denominator. Platform errors are shown separately.")}
         action={
           <Button
             variant="secondary"
@@ -207,11 +211,11 @@ export function TeacherReports() {
                 a.download = "campus-judge-report.csv";
                 a.click();
                 setTimeout(() => URL.revokeObjectURL(url), 1000);
-                return "报告 CSV 已生成。";
+                return tr("报告 CSV 已生成。", "Report CSV generated.");
               })
             }
           >
-            导出 CSV
+            {tr("导出 CSV", "Export CSV")}
           </Button>
         }
       />
@@ -219,7 +223,7 @@ export function TeacherReports() {
       <div
         className={`${panel} mt-5 grid grid-cols-3 gap-3 p-4 max-md:grid-cols-1`}
       >
-        <Field label="班级">
+        <Field label={tr("班级", "Class")}>
           <select
             value={classId}
             onChange={(e) => {
@@ -228,34 +232,34 @@ export function TeacherReports() {
             }}
             className={input}
           >
-            <option value="">全部负责班级</option>
+            <option value="">{tr("全部使用中班级", "All active classes")}</option>
             {report?.classes.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name}
+                {c.name}{c.archived ? tr("（已归档）", " (archived)") : ""}
               </option>
             ))}
           </select>
         </Field>
-        <Field label="活动">
+        <Field label={tr("活动", "Activity")}>
           <select
             value={activity}
             onChange={(e) => setActivity(e.target.value)}
             className={input}
           >
-            <option value="">全部活动</option>
+            <option value="">{tr("全部活动", "All activities")}</option>
             {report?.assignments.map((a) => (
               <option key={a.id} value={`assignment:${a.id}`}>
-                {a.title}（作业）
+                {a.title} {tr("（作业）", "(assignment)")}
               </option>
             ))}
             {report?.timedPractices?.map((t) => (
               <option key={t.id} value={`timed:${t.id}`}>
-                {t.title}（计时训练）
+                {t.title} {tr("（计时训练）", "(timed practice)")}
               </option>
             ))}
           </select>
         </Field>
-        <Field label="活动创建时间">
+        <Field label={tr("活动创建时间", "Activity created")}>
           <select
             value={range}
             onChange={(e) => {
@@ -265,7 +269,7 @@ export function TeacherReports() {
             className={input}
           >
             {["全部时间", "最近 7 天", "最近 30 天"].map((x) => (
-              <option key={x}>{x}</option>
+              <option key={x} value={x}>{tr(x, x === "全部时间" ? "All time" : x === "最近 7 天" ? "Last 7 days" : "Last 30 days")}</option>
             ))}
           </select>
         </Field>
@@ -290,17 +294,17 @@ export function TeacherReports() {
           </button>
         ))}
       </div>
-      <div className="mt-5 grid grid-cols-[minmax(0,1fr)_360px] gap-5 max-lg:grid-cols-1">
-        <section className={panel}>
+      <div className="mt-5 grid grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-5 max-[1600px]:grid-cols-1">
+        <section className={`${panel} min-w-0 [&_td]:px-3 [&_th]:px-3`}>
           <Table
             headers={[
-              "学生",
-              "活动状态",
-              "已正式提交",
-              "反复未通过题",
-              "原结果 / 订正",
+              tr("学生", "Student"),
+              tr("活动状态", "Activity status"),
+              tr("已正式提交", "Formal submissions"),
+              tr("反复未通过题", "Repeated failures"),
+              tr("原结果 / 订正", "Original result / correction"),
             ]}
-            min={760}
+            min={720}
           >
             {students.map((s) => {
               const problems = s.assignments.flatMap((a) => a.problems),
@@ -329,10 +333,10 @@ export function TeacherReports() {
                     <StatusPill
                       status={
                         solved === problems.length && problems.length
-                          ? "Complete"
+                          ? tr("完成", "Complete")
                           : submitted
-                            ? "In progress"
-                            : "Not started"
+                            ? tr("进行中", "In progress")
+                            : tr("未开始", "Not started")
                       }
                     />
                   </td>
@@ -360,7 +364,7 @@ export function TeacherReports() {
                         >
                           {a.title} ·{" "}
                           {a.score === null
-                            ? "待有效评测"
+                            ? tr("待有效评测", "Awaiting valid evaluation")
                             : `${a.score} / ${a.maxScore}`}
                         </button>
                       ))}
@@ -371,15 +375,15 @@ export function TeacherReports() {
             })}
             {!students.length && !resource.loading && (
               <Empty columns={5}>
-                当前筛选暂无适用学生。可调整班级或活动。
+                {tr("当前筛选暂无适用学生。可调整班级或活动。", "No eligible students match these filters. Try another class or activity.")}
               </Empty>
             )}
           </Table>
         </section>
-        <section className={`${panel} self-start p-5`}>
-          <h2 className="font-bold">题目维度</h2>
+        <section className={`${panel} min-w-0 self-start p-5`}>
+          <h2 className="font-bold">{tr("题目维度", "Problem breakdown")}</h2>
           <p className="mt-2 text-xs text-muted-foreground">
-            分母为当前范围内明确分配的人次。
+            {tr("分母为当前范围内明确分配的人次。", "The denominator counts assigned students in the selected scope.")}
           </p>
           {report?.problems.map((p) => (
             <button
@@ -389,11 +393,11 @@ export function TeacherReports() {
                 setDrill({ type: "problem", id: p.problemId, title: p.title })
               }
             >
-              <b>{p.title}</b>
+              <b className="min-w-0 break-words">{p.title}</b>
               <span className="shrink-0 text-xs text-muted-foreground">
-                {p.attempted} / {p.denominator} 已尝试
+                {p.attempted} / {p.denominator} {tr("已尝试", "attempted")}
                 <br />
-                均分率{" "}
+                {tr("均分率", "Average score")} {" "}
                 {p.averagePercent === null
                   ? "—"
                   : `${p.averagePercent.toFixed(1)}%`}
@@ -401,24 +405,24 @@ export function TeacherReports() {
             </button>
           ))}
           <p className="mt-4 text-xs text-muted-foreground">
-            平台错误不算学生答错；没有能力分或运行速度排名。
+            {tr("平台错误不算学生答错；没有能力分或运行速度排名。", "Platform errors do not count as student mistakes. There is no skill rating or runtime ranking.")}
           </p>
         </section>
       </div>
       {drill && (
         <Drawer
-          title={`报告下钻 · ${drill.title}`}
+          title={`${tr("报告详情", "Report details")} · ${drill.title}`}
           onClose={() => setDrill(null)}
         >
           <p className="text-sm text-muted-foreground">
-            筛选保持：
+            {tr("当前筛选：", "Filters: ")}
             {report?.classes.find((x) => x.id === classId)?.name ??
-              "全部负责班级"}{" "}
+              tr("全部负责班级", "All assigned classes")}{" "}
             ·{" "}
             {report?.assignments.find((x) => x.id === id)?.title ??
               report?.timedPractices?.find((x) => x.id === id)?.title ??
-              "全部活动"}{" "}
-            · {range}
+              tr("全部活动", "All activities")}{" "}
+            · {tr(range, range === "全部时间" ? "All time" : range === "最近 7 天" ? "Last 7 days" : "Last 30 days")}
           </p>
           <div className="mt-5 space-y-3">
             {drillStudents.map((s) => (
@@ -457,8 +461,8 @@ export function TeacherReports() {
                             )?.title ?? p.problemId.slice(0, 8)}
                           </span>
                           <span>
-                            {p.status} ·{" "}
-                            {p.score === null ? "待评测" : `${p.score}%`}
+                            {statusLabel(p.status)} ·{" "}
+                            {p.score === null ? tr("待评测", "Pending") : `${p.score}%`}
                           </span>
                         </button>
                       ))}
@@ -469,10 +473,10 @@ export function TeacherReports() {
           </div>
           {!drillStudents.length && (
             <p className="mt-5 text-sm text-muted-foreground">
-              当前指标没有匹配记录。
+              {tr("当前指标没有匹配记录。", "No matching records for this metric.")}
             </p>
           )}
-          <h3 className="mt-5 font-bold">相关正式提交</h3>
+          <h3 className="mt-5 font-bold">{tr("相关正式提交", "Related formal submissions")}</h3>
           {report?.submissions
             .filter(
               (s) =>
@@ -495,7 +499,7 @@ export function TeacherReports() {
                     {date(s.createdAt)}
                   </p>
                 </span>
-                <StatusPill status={s.status} />
+                <StatusPill status={statusLabel(s.status)} />
               </button>
             ))}
           <Button
@@ -503,14 +507,14 @@ export function TeacherReports() {
             variant="secondary"
             onClick={() => setDrill(null)}
           >
-            返回报告筛选
+            {tr("返回报告筛选", "Back to report filters")}
           </Button>
         </Drawer>
       )}
       {submission && (
         <TeacherSubmissionDrawer
           id={submission}
-          title="学生提交 · 代码 / 订正 / 反馈"
+          title={tr("学生提交 · 代码 / 订正 / 反馈", "Student submission · Code / correction / feedback")}
           onClose={() => setSubmission(null)}
         />
       )}

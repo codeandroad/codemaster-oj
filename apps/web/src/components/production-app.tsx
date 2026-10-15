@@ -17,6 +17,7 @@ import { ProductionLoginPage } from "@/components/auth/login-page";
 import { ProductionRegisterPage } from "@/components/auth/register-page";
 import { AdminAccountsPage, AdminPeoplePage } from "@/components/admin/accounts-people";
 import { AdminImportPage } from "@/components/admin/import-page";
+import { AdminProblemBanks } from "@/components/admin/problem-banks";
 import { AdminJudgePage, AdminSettingsPage } from "@/components/admin/system-pages";
 import { Feedback, Loading, panelClass as panel, useData as useResource, useMutation as useAction } from "@/components/admin/common";
 import { StudentPages, AlignedProfile } from "@/components/student/pages";
@@ -24,6 +25,7 @@ import { StudentPublicProfile } from "@/components/student/public-profile";
 import {useWorkspaceSettings} from "@/components/student/workspace-settings";
 import {WorkspaceThemeProvider} from "@/components/ui/theme-context";
 import {PersonalAppearanceProvider, PersonalAppearanceSettings} from "@/components/personal-appearance-settings";
+import {useLocale} from "@/components/locale-context";
 import { TeacherPages } from "@/components/teacher/teacher-pages";
 import { ApiError, apiMessage, clearProductionSession, productionApi, roleHome, type AuthResponse, type CampusRole, type CampusUser, type Person, type SchoolClass } from "@/lib/production-api";
 
@@ -96,8 +98,8 @@ export function ProductionApp() {
         : "teacher"
       : requestedRole;
   const allowed = user.roles.includes(role) || (role === "teacher" && user.roles.includes("admin"));
-  if (allowed && /^\/student\/problems\/[^/]+$/.test(pathname)) return <StudentPages pathname={pathname} user={user}/>;
   return (
+    allowed && /^\/student\/problems\/[^/]+$/.test(pathname) ? <StudentPages pathname={pathname} user={user}/> :
     <ProductionShell
       user={user}
       role={role}
@@ -109,7 +111,7 @@ export function ProductionApp() {
       }}
     >
       {allowed ? (
-        <ProductionView key={pathname} pathname={pathname} role={role} user={user} profileVersion={profileVersion} onProfileSaved={(next) => { setUser(next); setProfileVersion(value => value + 1); }} />
+        <ProductionView key={viewKey(pathname)} pathname={pathname} role={role} user={user} profileVersion={profileVersion} onProfileSaved={(next) => { setUser(next); setProfileVersion(value => value + 1); }} />
       ) : (
         <div className={panel}>
           <h1 className="text-xl font-bold">没有访问权限</h1>
@@ -123,33 +125,39 @@ export function ProductionApp() {
   );
 }
 
+function viewKey(pathname: string) {
+  // Keep a course mounted while only its selected chapter changes.
+  return pathname.replace(/^(\/student\/learning-paths\/[^/]+)\/chapters\/[^/]+$/, "$1");
+}
+
 const navigation: Record<CampusRole, { label: string; path: string; icon: typeof Home }[]> = {
   student: [
-    { label: "Dashboard", path: "/", icon: Home },
-    { label: "Problems", path: "/student/problems", icon: Code2 },
-    { label: "Learning Paths", path: "/student/learning-paths", icon: BookOpen },
-    { label: "Assignments", path: "/student/assignments", icon: Library },
-    { label: "Timed Practice", path: "/student/timed-practice", icon: FileClock },
-    { label: "Submissions", path: "/student/submissions", icon: FileClock },
-    { label: "Review Notebook", path: "/student/review-notebook", icon: NotebookPen },
+    { label: "首页", path: "/", icon: Home },
+    { label: "题目", path: "/student/problems", icon: Code2 },
+    { label: "课程", path: "/student/learning-paths", icon: BookOpen },
+    { label: "作业", path: "/student/assignments", icon: Library },
+    { label: "限时训练", path: "/student/timed-practice", icon: FileClock },
+    { label: "提交记录", path: "/student/submissions", icon: FileClock },
+    { label: "订正本", path: "/student/review-notebook", icon: NotebookPen },
   ],
   teacher: [
-    { label: "Teacher Dashboard", path: "/teacher", icon: LayoutDashboard },
-    { label: "Classes & Students", path: "/teacher/classes", icon: Users },
-    { label: "Problem Banks", path: "/teacher/problems", icon: BookOpenCheck },
-    { label: "Learning Content", path: "/teacher/learning", icon: BookOpen },
-    { label: "Assignment Management", path: "/teacher/assignments", icon: ClipboardList },
-    { label: "Timed Practice", path: "/teacher/timed-practice", icon: Clock3 },
-    { label: "Teaching Reports", path: "/teacher/reports", icon: BarChart3 },
-    { label: "Import Center", path: "/teacher/imports", icon: Database },
+    { label: "教师首页", path: "/teacher", icon: LayoutDashboard },
+    { label: "班级与学生", path: "/teacher/classes", icon: Users },
+    { label: "题库", path: "/teacher/problems", icon: BookOpenCheck },
+    { label: "课程", path: "/teacher/courses", icon: BookOpen },
+    { label: "作业管理", path: "/teacher/assignments", icon: ClipboardList },
+    { label: "限时训练", path: "/teacher/timed-practice", icon: Clock3 },
+    { label: "教学报告", path: "/teacher/reports", icon: BarChart3 },
+    { label: "导入中心", path: "/teacher/imports", icon: Database },
   ],
   admin: [
-    { label: "Admin Dashboard", path: "/admin", icon: Home },
-    { label: "Accounts & Roles", path: "/admin/accounts", icon: Users },
-    { label: "People & Identities", path: "/admin/people", icon: UserRound },
-    { label: "Import Center", path: "/admin/imports", icon: Database },
-    { label: "Judge Service", path: "/admin/judge-service", icon: Gauge },
-    { label: "System Settings", path: "/admin/settings", icon: Settings },
+    { label: "管理员首页", path: "/admin", icon: Home },
+    { label: "账号与角色", path: "/admin/accounts", icon: Users },
+    { label: "身份档案", path: "/admin/people", icon: UserRound },
+    { label: "导入中心", path: "/admin/imports", icon: Database },
+    { label: "题库管理", path: "/admin/problem-banks", icon: BookOpenCheck },
+    { label: "判题服务", path: "/admin/judge-service", icon: Gauge },
+    { label: "系统设置", path: "/admin/settings", icon: Settings },
   ],
 };
 function ProductionShell({
@@ -166,6 +174,7 @@ function ProductionShell({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const {locale,t}=useLocale();
   const {settings,update,resolvedPageTheme}=useWorkspaceSettings(user.id);
   const shellTheme=resolvedPageTheme;
   const site = useResource<{siteName:string;schoolName:string}>("site-info");
@@ -175,7 +184,7 @@ function ProductionShell({
       ? pathname === path
       : pathname === path || pathname.startsWith(`${path}/`);
   const links = (
-    <nav className="space-y-1 p-3" aria-label="工作区导航">
+    <nav className="space-y-1 p-3" aria-label={t("工作区导航")}>
       {navigation[role].map((item) =>
         item.path ? (
           <AppLink
@@ -186,18 +195,18 @@ function ProductionShell({
             className={`flex h-10 items-center gap-3 rounded-md px-3 text-sm ${activePath(item.path) ? "bg-accent font-semibold text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
           >
             <item.icon size={17} />
-            <span className="min-w-0 truncate" title={item.label}>{item.label}</span>
+            <span className="min-w-0 truncate" title={t(item.label)}>{t(item.label)}</span>
           </AppLink>
         ) : (
           <div
             key={item.label}
             aria-disabled="true"
-            title="后续版本"
+            title={t("后续版本")}
             className="flex min-h-11 items-center gap-3 px-3 text-sm text-muted-foreground/60"
           >
             <item.icon size={17} />
-            <span>{item.label}</span>
-            <span className="ml-auto text-[10px]">后续版本</span>
+            <span>{t(item.label)}</span>
+            <span className="ml-auto text-[10px]">{t("后续版本")}</span>
           </div>
         ),
       )}
@@ -209,7 +218,7 @@ function ProductionShell({
         <aside className="production-sidebar hidden flex-col border-r border-border bg-surface md:flex">
           <div className="flex h-16 flex-col justify-center border-b border-border px-4">
             <BrandLogo className="h-auto w-[170px] max-w-full" />
-            <p className="mt-1 truncate text-[10px] text-muted-foreground">{role==="admin"?"Local administration":role==="teacher"?"Teacher tools":site.data?.schoolName??"校内学习平台"}</p>
+            <p className="mt-1 truncate text-[10px] text-muted-foreground">{role==="admin"?t("本地管理"):role==="teacher"?t("教学工具"):site.data?.schoolName??t("校内学习平台")}</p>
           </div>
           {links}
 
@@ -221,13 +230,14 @@ function ProductionShell({
                 variant="ghost"
                 size="icon"
                 className="md:hidden"
-                aria-label="打开导航"
+                aria-label={t("打开导航")}
                 aria-expanded={open}
                 onClick={() => setOpen(true)}
               >
                 <Menu size={18} />
               </Button>
               <BrandLogo className="h-auto w-[130px] max-w-full md:hidden" />
+              <HeaderDate locale={locale}/>
             </div>
             <div className="flex shrink-0 items-center gap-3">
               {role==="student"&&<NotificationDropdown/>}
@@ -249,7 +259,7 @@ function ProductionShell({
           <aside
             role="dialog"
             aria-modal="true"
-            aria-label="工作区导航"
+            aria-label={t("工作区导航")}
             className="h-full w-[min(85vw,300px)] overflow-auto bg-surface"
           >
             <div className="flex items-center justify-between border-b border-border p-4">
@@ -257,7 +267,7 @@ function ProductionShell({
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label="关闭导航"
+                aria-label={t("关闭导航")}
                 onClick={() => setOpen(false)}
               >
                 <X size={18} />
@@ -269,6 +279,19 @@ function ProductionShell({
       )}
     </div></PersonalAppearanceProvider></WorkspaceThemeProvider>
   );
+}
+
+function HeaderDate({locale}:{locale:"zh"|"en"}) {
+  const [now,setNow]=useState(()=>new Date());
+  useEffect(()=>{
+    const timer=window.setInterval(()=>setNow(new Date()),30_000);
+    return ()=>window.clearInterval(timer);
+  },[]);
+  const parts=new Intl.DateTimeFormat("zh-CN",{timeZone:"Asia/Shanghai",year:"numeric",month:"2-digit",day:"2-digit",weekday:"long"}).formatToParts(now);
+  const part=(type:string)=>parts.find(value=>value.type===type)?.value??"";
+  const iso=`${part("year")}-${part("month")}-${part("day")}`;
+  const label=locale==="zh"?`${iso} ${part("weekday").replace("星期","周")}`:new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Shanghai",dateStyle:"full"}).format(now);
+  return <time dateTime={iso} suppressHydrationWarning className="min-w-0 truncate text-xs font-medium text-muted-foreground sm:text-sm">{label}</time>;
 }
 
 function ProductionView({pathname,role,user,profileVersion,onProfileSaved}:{pathname:string;role:CampusRole;user:CampusUser;profileVersion:number;onProfileSaved:(next:CampusUser)=>void}) {
@@ -284,12 +307,14 @@ function ProductionView({pathname,role,user,profileVersion,onProfileSaved}:{path
   if (pathname==="/admin/accounts") return <AdminAccountsPage currentAccountId={user.id}/>;
   if (pathname==="/admin/people") return <AdminPeoplePage/>;
   if (pathname==="/admin/imports") return <AdminImportPage/>;
+  if (pathname==="/admin/problem-banks") return <AdminProblemBanks/>;
   if (pathname==="/admin/judge-service") return <AdminJudgePage/>;
   if (pathname==="/admin/settings") return <AdminSettingsPage/>;
   return <div className={`${panel} p-5`}><h1 className="text-xl font-bold">页面不存在</h1><AppLink href={roleHome(user)} className={`${buttonVariants()} mt-4`}>返回工作台</AppLink></div>;
 }
 
 function AdminDashboard() {
+  const {t}=useLocale();
   const people=useResource<{items:Person[]}>("people"),classes=useResource<{items:SchoolClass[]}>("classes");
-  return <><PageHeader eyebrow="ADMIN DASHBOARD" title="管理工作台" description="维护学校身份与账号，查看导入、判题服务和系统设置。"/><div className="mt-5 grid gap-4 sm:grid-cols-3">{navigation.admin.slice(1,4).map(item=><AppLink key={item.path} href={item.path} className={`${panel} flex items-center gap-4 p-5 hover:border-primary`}><item.icon className="text-primary"/><span className="font-bold">{item.label}</span></AppLink>)}</div><div className="mt-6 grid gap-4 md:grid-cols-2"><section className={panel}><div className="flex justify-between border-b border-border p-4"><h2 className="font-bold">身份档案</h2><AppLink href="/admin/people" className="text-sm font-semibold text-primary">查看全部</AppLink></div><Loading resource={people}><div className="divide-y divide-border">{people.data?.items.slice(0,8).map(p=><div key={p.id} className="flex justify-between gap-3 p-4 text-sm"><AppLink href={`/admin/people?personId=${encodeURIComponent(p.id)}`} className="font-semibold text-primary hover:underline focus-visible:underline">{p.name}</AppLink><span className="font-mono text-xs text-muted-foreground">{p.number}</span></div>)}{!people.data?.items.length&&<p className="p-5 text-sm text-muted-foreground">暂无身份，请先建立档案或导入名单。</p>}</div></Loading></section><section className={panel}><div className="border-b border-border p-4"><h2 className="font-bold">学校班级</h2></div><Loading resource={classes}><div className="divide-y divide-border">{classes.data?.items.map(c=><div key={c.id} className="flex justify-between gap-3 p-4 text-sm"><AppLink href={`/teacher/classes?classId=${encodeURIComponent(c.id)}`} className="font-semibold text-primary hover:underline focus-visible:underline">{c.name}</AppLink><span className="text-muted-foreground">{c.studentIds.length} 位学生</span></div>)}{!classes.data?.items.length&&<p className="p-5 text-sm text-muted-foreground">暂无班级，可在教学工作区建立。</p>}</div></Loading></section></div></>;
+  return <><PageHeader eyebrow={t("管理员首页")} title={t("管理工作台")} description={t("维护学校身份与账号，查看导入、判题服务和系统设置。")}/><div className="mt-5 grid gap-4 sm:grid-cols-3">{navigation.admin.slice(1,4).map(item=><AppLink key={item.path} href={item.path} className={`${panel} flex items-center gap-4 p-5 hover:border-primary`}><item.icon className="text-primary"/><span className="font-bold">{t(item.label)}</span></AppLink>)}</div><div className="mt-6 grid gap-4 md:grid-cols-2"><section className={panel}><div className="flex justify-between border-b border-border p-4"><h2 className="font-bold">{t("身份档案")}</h2><AppLink href="/admin/people" className="text-sm font-semibold text-primary">{t("查看全部")}</AppLink></div><Loading resource={people}><div className="divide-y divide-border">{people.data?.items.slice(0,8).map(p=><div key={p.id} className="flex justify-between gap-3 p-4 text-sm"><AppLink href={`/admin/people?personId=${encodeURIComponent(p.id)}`} className="font-semibold text-primary hover:underline focus-visible:underline">{p.name}</AppLink><span className="font-mono text-xs text-muted-foreground">{p.number}</span></div>)}{!people.data?.items.length&&<p className="p-5 text-sm text-muted-foreground">{t("暂无身份，请先建立档案或导入名单。")}</p>}</div></Loading></section><section className={panel}><div className="border-b border-border p-4"><h2 className="font-bold">{t("学校班级")}</h2></div><Loading resource={classes}><div className="divide-y divide-border">{classes.data?.items.map(c=><div key={c.id} className="flex justify-between gap-3 p-4 text-sm"><AppLink href={`/admin/people?classId=${encodeURIComponent(c.id)}`} className="font-semibold text-primary hover:underline focus-visible:underline">{c.name}</AppLink><span className="text-muted-foreground">{c.studentIds.length} 位学生</span></div>)}{!classes.data?.items.length&&<p className="p-5 text-sm text-muted-foreground">{t("暂无班级，可在教学工作区建立。")}</p>}</div></Loading></section></div></>;
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useNavigationBlocker } from "@/components/navigation";
+import { useLocale } from "@/components/locale-context";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { apiMessage, productionApi } from "@/lib/production-api";
@@ -46,13 +47,14 @@ export function useData<T>(path: string | null) {
   };
 }
 export function useAction() {
+  const { locale } = useLocale();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [message, setMessage] = useState("");
   return {
     busy,
     error,
-    message,
+    message: message === "已保存。" && locale === "en" ? "Saved." : message,
     clear:()=>{setError("");setMessage("");},
     run: async (action: () => Promise<string | void>) => {
       if (busy) return;
@@ -74,9 +76,10 @@ export function State({
 }: {
   resource: { loading: boolean; error: string; reload: () => void };
 }) {
+  const { locale } = useLocale();
   return resource.loading ? (
     <p role="status" className="mt-4 text-sm text-muted-foreground">
-      正在加载…
+      {locale === "en" ? "Loading…" : "正在加载…"}
     </p>
   ) : resource.error ? (
     <div
@@ -90,7 +93,7 @@ export function State({
         className="ml-3"
         onClick={resource.reload}
       >
-        重试
+        {locale === "en" ? "Retry" : "重试"}
       </Button>
     </div>
   ) : null;
@@ -138,6 +141,8 @@ export function Tabs({
   onChange: (value: string) => void;
   items: string[];
 }) {
+  const { locale, t } = useLocale();
+  const englishLabels: Record<string, string> = { "题目导入": "Problem import", "补充测试数据": "Add test data", "导入记录": "Import history" };
   return (
     <div
       className="mt-5 flex overflow-x-auto border-b border-border"
@@ -152,7 +157,7 @@ export function Tabs({
           onClick={() => onChange(item)}
           className={`h-11 shrink-0 border-b-2 px-5 text-sm font-semibold ${value === item ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
         >
-          {item}
+          {locale === "en" ? englishLabels[item] ?? t(item) : t(item)}
         </button>
       ))}
     </div>

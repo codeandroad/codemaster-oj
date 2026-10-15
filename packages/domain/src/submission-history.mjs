@@ -39,8 +39,8 @@ export async function submissionHistory(ctx){
    (${maskedCondition}) masked,to_char(s.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') cursor_created_at
   FROM submissions s JOIN problem_versions v ON v.id=s.version_id JOIN identities i ON i.id=s.identity_id
   LEFT JOIN timed_attempts attempt ON attempt.id=s.timed_attempt_id LEFT JOIN timed_practices practice ON practice.id=attempt.practice_id
-  WHERE (s.identity_id=$6 OR $2 OR $3 AND EXISTS(SELECT 1 FROM teacher_classes tc JOIN classes c ON c.id=tc.class_id WHERE tc.account_id=$1 AND c.archived_at IS NULL AND
-   (EXISTS(SELECT 1 FROM class_members cm WHERE cm.class_id=c.id AND cm.identity_id=s.identity_id) OR EXISTS(SELECT 1 FROM assignments a WHERE a.id=s.assignment_id AND a.class_id=c.id) OR practice.class_id=c.id)))
+  WHERE (s.identity_id=$6 OR $2 OR $3 AND EXISTS(SELECT 1 FROM teacher_classes tc JOIN classes c ON c.id=tc.class_id WHERE tc.account_id=$1 AND
+   ((c.archived_at IS NULL AND EXISTS(SELECT 1 FROM class_members cm WHERE cm.class_id=c.id AND cm.identity_id=s.identity_id)) OR EXISTS(SELECT 1 FROM assignments a WHERE a.id=s.assignment_id AND a.class_id=c.id) OR practice.class_id=c.id)))
    AND ($4::uuid IS NULL OR s.identity_id=$4) AND ($5::uuid IS NULL OR s.assignment_id=$5) AND ($7::uuid IS NULL OR s.problem_id=$7)
    AND ($8::uuid IS NULL OR attempt.practice_id=$8) AND ($9::text[] IS NULL OR s.kind=ANY($9))
  ), visible AS(SELECT scoped.*,${maskedFields} FROM scoped)

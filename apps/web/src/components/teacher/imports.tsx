@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Pencil, Upload } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-chrome";
+import { useLocale } from "@/components/locale-context";
 import {
   productionApi,
   productionId,
@@ -51,6 +52,7 @@ interface ImportRecord {
 }
 const steps = ["1 选择文件与去向", "2 预览题目", "3 确认导入"];
 export function TeacherProblemImports() {
+  const { t } = useLocale();
   const search = useSearchParams(),
     banks = useData<{ items: Bank[] }>("problem-banks"),
     groups = useData<{ items: Group[] }>("problem-groups"),
@@ -156,21 +158,10 @@ export function TeacherProblemImports() {
   return (
     <>
       <PageHeader
-        eyebrow="Import Center"
-        title="导入中心"
-        description="题目与名单共用分步骤导入；测试补充回到统一题目编辑器。"
+        eyebrow={t("题目与测试")}
+        title={t("题目导入")}
+        description={t("导入题目草稿与测试数据，并在题目编辑器中完成校验。")}
       />
-      <div className="mt-5 flex gap-2">
-        <Link className={buttonVariants()} href="/teacher/imports?kind=problems">
-          题目 / 测试
-        </Link>
-        <Link
-          className={buttonVariants({ variant: "secondary" })}
-          href="/teacher/imports?kind=members"
-        >
-          班级成员
-        </Link>
-      </div>
       <Tabs
         value={section}
         onChange={setSection}

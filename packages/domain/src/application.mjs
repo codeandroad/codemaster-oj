@@ -69,18 +69,32 @@ export async function createDomainServices(pool,config) {
   uuid(problemId,'题目 ID');if(versionId) uuid(versionId,'版本 ID');
   const p=row(await db.query('SELECT * FROM problems WHERE id=$1',[problemId]));
   if(p.archived_at){
-   // Archiving removes a problem from the library, but an already-selected
-   // version remains available through its exact assignment deep link.
+   // Archive hides the library entry, while students keep access to the
+   // immutable version they were assigned in work or timed practice.
    if(!versionId)fail(404,'NOT_FOUND','题目不存在');
    const selected=await db.query(`SELECT 1 FROM assignment_problems ap
     JOIN assignments a ON a.id=ap.assignment_id
     LEFT JOIN classes c ON c.id=a.class_id
     WHERE ap.problem_id=$1 AND ap.version_id=$2 AND (
      $3::boolean
-     OR $4::boolean AND c.archived_at IS NULL AND EXISTS(SELECT 1 FROM teacher_classes tc WHERE tc.class_id=a.class_id AND tc.account_id=$6)
+     OR $4::boolean AND EXISTS(SELECT 1 FROM teacher_classes tc WHERE tc.class_id=a.class_id AND tc.account_id=$6)
      OR $5::boolean AND a.state='Published' AND EXISTS(SELECT 1 FROM assignment_participants part WHERE part.assignment_id=a.id AND part.identity_id=$7 AND NOT part.exempt)
     ) LIMIT 1`,[problemId,versionId,rolesInclude(user,'admin'),rolesInclude(user,'teacher'),rolesInclude(user,'student'),user.id,user.identityId]);
-   if(!selected.rowCount)fail(404,'NOT_FOUND','题目不存在');
+   if(!selected.rowCount){
+    const timed=await db.query(`SELECT 1 FROM timed_practice_problems tpp
+     JOIN timed_practices tp ON tp.id=tpp.practice_id
+     WHERE tpp.problem_id=$1 AND tpp.version_id=$2 AND (
+      $3::boolean
+      OR $4::boolean AND EXISTS(SELECT 1 FROM teacher_classes tc WHERE tc.class_id=tp.class_id AND tc.account_id=$6)
+      OR $5::boolean AND (tp.state IN ('Published','ResultsPublished')
+       OR tp.state='Archived' AND tp.results_published_at IS NOT NULL) AND EXISTS(
+       SELECT 1 FROM timed_practice_participants part
+       LEFT JOIN timed_attempts attempt ON attempt.practice_id=part.practice_id AND attempt.identity_id=part.identity_id
+       WHERE part.practice_id=tp.id AND part.identity_id=$7 AND NOT part.exempt
+       AND (tp.results_published_at IS NOT NULL OR attempt.id IS NOT NULL))
+     ) LIMIT 1`,[problemId,versionId,rolesInclude(user,'admin'),rolesInclude(user,'teacher'),rolesInclude(user,'student'),user.id,user.identityId]);
+    if(!timed.rowCount)fail(404,'NOT_FOUND','题目不存在');
+   }
   }
   const own=isStaff(user)&&(p.owner_account_id===user.id||rolesInclude(user,'admin'));let bankRead=false;
   if(isStaff(user)){try{bankRead=(await bankAccess(db,user,p.bank_id)).canRead;}catch(error){if(!['FORBIDDEN','NOT_FOUND'].includes(error.code))throw error;}}
@@ -104,7 +118,7 @@ export async function createDomainServices(pool,config) {
  async function submissionAccess(db,user,id) {
   const s=row(await db.query('SELECT s.*,v.title problem_title,i.name student_name FROM submissions s JOIN problem_versions v ON v.id=s.version_id JOIN identities i ON i.id=s.identity_id WHERE s.id=$1',[submissionId(id)]));
   if(s.identity_id!==user.identityId&&!rolesInclude(user,'admin')) {
-   if(!rolesInclude(user,'teacher')||!(await db.query('SELECT 1 FROM teacher_classes tc JOIN classes c ON c.id=tc.class_id WHERE tc.account_id=$2 AND c.archived_at IS NULL AND (EXISTS(SELECT 1 FROM class_members cm WHERE cm.class_id=c.id AND cm.identity_id=$1) OR EXISTS(SELECT 1 FROM assignments a WHERE a.id=$3 AND a.class_id=c.id) OR EXISTS(SELECT 1 FROM timed_attempts attempt JOIN timed_practices practice ON practice.id=attempt.practice_id WHERE attempt.id=$4 AND practice.class_id=c.id))',[s.identity_id,user.id,s.assignment_id,s.timed_attempt_id])).rowCount) fail(403,'FORBIDDEN','无权访问该提交');
+   if(!rolesInclude(user,'teacher')||!(await db.query('SELECT 1 FROM teacher_classes tc JOIN classes c ON c.id=tc.class_id WHERE tc.account_id=$2 AND ((c.archived_at IS NULL AND EXISTS(SELECT 1 FROM class_members cm WHERE cm.class_id=c.id AND cm.identity_id=$1)) OR EXISTS(SELECT 1 FROM assignments a WHERE a.id=$3 AND a.class_id=c.id) OR EXISTS(SELECT 1 FROM timed_attempts attempt JOIN timed_practices practice ON practice.id=attempt.practice_id WHERE attempt.id=$4 AND practice.class_id=c.id))',[s.identity_id,user.id,s.assignment_id,s.timed_attempt_id])).rowCount) fail(403,'FORBIDDEN','无权访问该提交');
   }
   if(rolesInclude(user,'admin')&&s.identity_id!==user.identityId) await audit(db,user.id,'submission.admin_read','submission',s.id);
   return s;
@@ -112,13 +126,17 @@ export async function createDomainServices(pool,config) {
  async function assignmentAccess(db,user,id) {
   const a=row(await db.query('SELECT * FROM assignments WHERE id=$1',[uuid(id,'作业 ID')]));
   const isParticipant=rolesInclude(user,'student')&&!!(await db.query('SELECT 1 FROM assignment_participants WHERE assignment_id=$1 AND identity_id=$2 AND NOT exempt',[id,user.identityId])).rowCount;
-  const canManage=rolesInclude(user,'admin')||(rolesInclude(user,'teacher')&&!!(await db.query('SELECT 1 FROM teacher_classes tc JOIN classes c ON c.id=tc.class_id WHERE tc.class_id=$1 AND tc.account_id=$2 AND c.archived_at IS NULL',[a.class_id,user.id])).rowCount);
+  // Former class teachers retain historical access after a class is archived.
+  // Every mutation of an archived assignment is rejected separately below.
+  const canManage=rolesInclude(user,'admin')||(rolesInclude(user,'teacher')&&!!(await db.query('SELECT 1 FROM teacher_classes tc WHERE tc.class_id=$1 AND tc.account_id=$2',[a.class_id,user.id])).rowCount);
   if(a.state==='Draft'&&!canManage)fail(404,'NOT_FOUND','作业尚未发布');if(!isParticipant&&!canManage)fail(403,'FORBIDDEN','未分配该作业或无权管理');if(a.state==='Draft'&&!canManage)fail(404,'NOT_FOUND','作业尚未发布');return {...a,isParticipant:isParticipant&&a.state==='Published',canManage};
  }
  async function assignmentResult(db,user,id) {
   const a=await assignmentAccess(db,user,id);
   const ps=(await db.query('SELECT ap.problem_id,ap.version_id,ap.points,v.title,COALESCE(global_reward.points,10) first_ac_points,COALESCE(assignment_reward.points,0) reward_points FROM assignment_problems ap JOIN problem_versions v ON v.id=ap.version_id LEFT JOIN point_rewards global_reward ON global_reward.problem_id=ap.problem_id AND global_reward.assignment_id IS NULL LEFT JOIN point_rewards assignment_reward ON assignment_reward.problem_id=ap.problem_id AND assignment_reward.assignment_id=ap.assignment_id WHERE ap.assignment_id=$1 ORDER BY ap.position',[id])).rows;
-  const result={id:a.id,title:a.title,classId:a.class_id,className:(await db.query('SELECT name FROM classes WHERE id=$1',[a.class_id])).rows[0]?.name,state:a.state,description:a.description,course:a.course,published:a.state==='Published',publishedAt:a.published_at,createdAt:a.created_at,dueAt:a.due_at,editRevision:a.edit_revision,problems:ps.map(p=>({problemId:p.problem_id,versionId:p.version_id,title:p.title,points:Number(p.points),firstAcPoints:Number(p.first_ac_points),rewardPoints:Number(p.reward_points)}))};
+  const linkedCourse=a.course_path_id?(await db.query('SELECT id,title,published_at,archived_at FROM learning_paths WHERE id=$1',[a.course_path_id])).rows[0]:null;
+  const visibleCourse=Boolean(linkedCourse?.published_at&&!linkedCourse.archived_at);
+  const result={id:a.id,title:a.title,classId:a.class_id,className:(await db.query('SELECT name FROM classes WHERE id=$1',[a.class_id])).rows[0]?.name,state:a.state,archived:!!a.archived_at,description:a.description,course:a.course,coursePathId:a.canManage?a.course_path_id:visibleCourse?a.course_path_id:null,courseTitle:a.canManage?linkedCourse?.title??null:visibleCourse?linkedCourse.title:null,courseAvailable:visibleCourse,published:a.state==='Published',publishedAt:a.published_at,createdAt:a.created_at,dueAt:a.due_at,editRevision:a.edit_revision,problems:ps.map(p=>({problemId:p.problem_id,versionId:p.version_id,title:p.title,points:Number(p.points),firstAcPoints:Number(p.first_ac_points),rewardPoints:Number(p.reward_points)}))};
   {
    const protectedParticipantIds=a.canManage?(await db.query('SELECT DISTINCT identity_id FROM submissions WHERE assignment_id=$1',[id])).rows.map(person=>person.identity_id):[];
    if(a.canManage)result.protectedParticipantIds=protectedParticipantIds;
@@ -165,9 +183,11 @@ export async function createDomainServices(pool,config) {
    if(route==='/auth/me'&&method==='GET'){if(!user)fail(401,'UNAUTHENTICATED','请先登录');return respond(200,{user,csrfToken:sess.csrf_token});}
    if(route==='/auth/login'&&method==='POST') {
     ipLimiter.check(`login:${ip}`);const login=username(body.username),secret=password(body.password);authLimiter.check(`login:${login}`);
-    const a=(await pool.query('SELECT a.* FROM accounts a JOIN identities i ON i.id=a.identity_id WHERE a.username=$1 AND a.disabled_at IS NULL AND a.binding_released_at IS NULL AND i.archived_at IS NULL',[login])).rows[0];
+    // Verify the secret before disclosing a disabled account. Released bindings
+    // and archived identities stay indistinguishable from unknown usernames.
+    const a=(await pool.query('SELECT a.* FROM accounts a JOIN identities i ON i.id=a.identity_id WHERE a.username=$1 AND a.binding_released_at IS NULL AND i.archived_at IS NULL',[login])).rows[0];
     const valid=await verifyPassword(a?.password_hash||dummyHash,secret);if(!a||!valid)fail(401,'LOGIN_FAILED','用户名或密码不正确');
-    const result=await transaction(pool,async db=>{const locked=(await db.query('SELECT * FROM accounts WHERE id=$1 AND disabled_at IS NULL FOR UPDATE',[a.id])).rows[0];if(!locked||!safeEqual(locked.password_hash,a.password_hash)||!await findUser(db,a.id))fail(401,'LOGIN_FAILED','用户名或密码不正确');if(sess)await db.query('DELETE FROM sessions WHERE token_hash=$1',[sess.token_hash]);await db.query('UPDATE accounts SET last_login_at=now() WHERE id=$1',[a.id]);await audit(db,a.id,'auth.login','account',a.id);return session(db,a.id);});return respond(200,result.body,result.cookie);
+    const result=await transaction(pool,async db=>{const locked=(await db.query('SELECT * FROM accounts WHERE id=$1 AND binding_released_at IS NULL FOR UPDATE',[a.id])).rows[0];if(!locked||!safeEqual(locked.password_hash,a.password_hash))fail(401,'LOGIN_FAILED','用户名或密码不正确');if(locked.disabled_at)fail(403,'ACCOUNT_DISABLED','账号已禁用');if(!await findUser(db,a.id))fail(401,'LOGIN_FAILED','用户名或密码不正确');if(sess)await db.query('DELETE FROM sessions WHERE token_hash=$1',[sess.token_hash]);await db.query('UPDATE accounts SET last_login_at=now() WHERE id=$1',[a.id]);await audit(db,a.id,'auth.login','account',a.id);return session(db,a.id);});return respond(200,result.body,result.cookie);
    }
    if(route==='/auth/verify-identity'&&method==='POST') {
     ipLimiter.check(`claim:${ip}`);const kind=enumValue(body.kind,['student','teacher'],'身份类型'),number=field(body.number,'编号'),name=field(body.name,'姓名'),code=field(body.activationCode,'激活码',{max:100});authLimiter.check(`claim:${kind}:${number}`);
@@ -272,13 +292,32 @@ export async function createDomainServices(pool,config) {
   let m;
   for (const handler of [handleMemberImport]) { const result=await handler(context); if(result)return result; }
    if(route==='/classes'&&method==='GET'){
-    const rows=(await pool.query(`SELECT c.*,($1 OR $2 AND EXISTS(SELECT 1 FROM teacher_classes tc WHERE tc.class_id=c.id AND tc.account_id=$3)) can_manage FROM classes c WHERE c.archived_at IS NULL AND ($1 OR $2 AND EXISTS(SELECT 1 FROM teacher_classes tc WHERE tc.class_id=c.id AND tc.account_id=$3) OR EXISTS(SELECT 1 FROM class_members cm WHERE cm.class_id=c.id AND cm.identity_id=$4)) ORDER BY c.created_at DESC`,[rolesInclude(user,'admin'),rolesInclude(user,'teacher'),user.id,user.identityId])).rows;
-    const items=[];for(const c of rows){const members=(await pool.query('SELECT i.id,i.name,i.number,i.kind,i.gender,a.username,(a.id IS NOT NULL) activated FROM class_members cm JOIN identities i ON i.id=cm.identity_id LEFT JOIN accounts a ON a.identity_id=i.id AND a.binding_released_at IS NULL WHERE cm.class_id=$1 AND i.archived_at IS NULL ORDER BY i.number',[c.id])).rows;const visible=c.can_manage?members:members.filter(i=>i.id===user.identityId);const teachers=(await pool.query('SELECT a.identity_id FROM teacher_classes tc JOIN accounts a ON a.id=tc.account_id WHERE tc.class_id=$1',[c.id])).rows;items.push({id:c.id,name:c.name,type:c.type,description:c.description,members:visible,studentIds:visible.filter(i=>i.kind==='student').map(i=>i.id),teacherIds:teachers.map(t=>t.identity_id),memberCount:members.length});}return respond(200,{items});
+    const archived=url.searchParams.get('archived')==='true';if(archived)staff(user);
+    const rows=(await pool.query(`SELECT c.*,($1 OR $2 AND EXISTS(SELECT 1 FROM teacher_classes tc WHERE tc.class_id=c.id AND tc.account_id=$3)) can_manage FROM classes c WHERE (c.archived_at IS NOT NULL)=$5 AND ($1 OR $2 AND EXISTS(SELECT 1 FROM teacher_classes tc WHERE tc.class_id=c.id AND tc.account_id=$3) OR NOT $5 AND EXISTS(SELECT 1 FROM class_members cm WHERE cm.class_id=c.id AND cm.identity_id=$4)) ORDER BY c.created_at DESC`,[rolesInclude(user,'admin'),rolesInclude(user,'teacher'),user.id,user.identityId,archived])).rows;
+    const items=[];for(const c of rows){const members=(await pool.query('SELECT i.id,i.name,i.number,i.kind,i.gender,a.username,(a.id IS NOT NULL) activated FROM class_members cm JOIN identities i ON i.id=cm.identity_id LEFT JOIN accounts a ON a.identity_id=i.id AND a.binding_released_at IS NULL WHERE cm.class_id=$1 AND i.archived_at IS NULL ORDER BY i.number',[c.id])).rows;const visible=c.can_manage?members:members.filter(i=>i.id===user.identityId);const teachers=(await pool.query('SELECT a.identity_id FROM teacher_classes tc JOIN accounts a ON a.id=tc.account_id WHERE tc.class_id=$1',[c.id])).rows;items.push({id:c.id,name:c.name,type:c.type,description:c.description,archived:!!c.archived_at,members:visible,studentIds:visible.filter(i=>i.kind==='student').map(i=>i.id),teacherIds:teachers.map(t=>t.identity_id),memberCount:members.length});}return respond(200,{items});
    }
    if(route==='/classes'&&method==='POST'){
     staff(user);const name=field(body.name,'班级名称'),description=field(body.description??'','班级说明',{min:0,max:4000}),type=enumValue(body.type||'training',['administrative','training'],'班级类型'),studentIds=identityIds(body.studentIds,'学生'),teacherIds=identityIds(body.teacherIds,'教师',50);const c=await transaction(pool,async db=>{const c=row(await db.query('INSERT INTO classes(name,type,owner_account_id,description) VALUES($1,$2,$3,$4) RETURNING *',[name,type,user.id,description]));await db.query('INSERT INTO teacher_classes(class_id,account_id) VALUES($1,$2)',[c.id,user.id]);for(const id of studentIds){const i=await studentRosterAccess(db,user,id);await db.query('INSERT INTO class_members(class_id,identity_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[c.id,i.id]);}for(const id of teacherIds){if(!rolesInclude(user,'admin')&&id!==user.identityId)fail(403,'FORBIDDEN','教师只能为自己创建班级');const a=row(await db.query("SELECT a.id FROM accounts a JOIN account_roles r ON r.account_id=a.id WHERE a.identity_id=$1 AND r.role IN ('teacher','admin') AND a.disabled_at IS NULL AND a.binding_released_at IS NULL",[uuid(id)]));await db.query('INSERT INTO teacher_classes(class_id,account_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[c.id,a.id]);}await audit(db,user.id,'class.create','class',c.id);return c;});return respond(201,{id:c.id,name:c.name,type:c.type,description:c.description,members:[],studentIds,teacherIds:teacherIds.length?teacherIds:[user.identityId],memberCount:studentIds.length});
    }
    const classMatch=route.match(/^\/classes\/([^/]+)$/);
+   m=route.match(/^\/classes\/([^/]+)\/(archive|restore)$/);
+   if(m&&method==='POST'){
+    staff(user);const id=uuid(m[1],'班级 ID'),action=m[2];
+    await transaction(pool,async db=>{
+     const cls=row(await db.query('SELECT id,archived_at FROM classes WHERE id=$1 FOR UPDATE',[id]));
+     if(!rolesInclude(user,'admin')&&!(await db.query('SELECT 1 FROM teacher_classes WHERE class_id=$1 AND account_id=$2',[id,user.id])).rowCount)fail(403,'FORBIDDEN','无权归档该班级');
+     if(action==='archive'){
+      if(cls.archived_at)return;
+      const pending=(await db.query('SELECT EXISTS(SELECT 1 FROM assignments WHERE class_id=$1 AND archived_at IS NULL) OR EXISTS(SELECT 1 FROM timed_practices WHERE class_id=$1 AND archived_at IS NULL) active',[id])).rows[0].active;
+      if(pending)fail(409,'CLASS_HAS_ACTIVITIES','请先归档该班级的作业和限时训练，再归档班级');
+      await db.query('UPDATE classes SET archived_at=clock_timestamp() WHERE id=$1',[id]);
+     }else{
+      if(!cls.archived_at)return;
+      await db.query('UPDATE classes SET archived_at=NULL WHERE id=$1',[id]);
+     }
+     await audit(db,user.id,`class.${action}`,'class',id);
+    });return respond(200,{ok:true});
+   }
    if(classMatch&&method==='PATCH') {
     staff(user);const id=uuid(classMatch[1]),studentIds=body.studentIds===undefined?null:identityIds(body.studentIds,'学生'),teacherIds=body.teacherIds===undefined?null:identityIds(body.teacherIds,'教师',50);if(teacherIds&&!rolesInclude(user,'admin'))fail(403,'FORBIDDEN','教师任课授权须由管理员配置');
     const output=await transaction(pool,async db=>{const cls=await classAccess(db,user,id);await db.query('SELECT id FROM classes WHERE id=$1 FOR UPDATE',[id]);const name=body.name===undefined?cls.name:field(body.name,'班级名称'),type=body.type===undefined?cls.type:enumValue(body.type,['administrative','training'],'班级类型');const description=body.description===undefined?cls.description:field(body.description,'班级说明',{min:0,max:4000});await db.query('UPDATE classes SET name=$1,type=$2,description=$4 WHERE id=$3',[name,type,id,description]);if(studentIds){for(const identity of studentIds)await studentRosterAccess(db,user,identity);await db.query('DELETE FROM class_members WHERE class_id=$1',[id]);for(const identity of studentIds)await db.query('INSERT INTO class_members(class_id,identity_id) VALUES($1,$2)',[id,identity]);}if(teacherIds){const accountIds=[];for(const identity of teacherIds){const a=row(await db.query("SELECT a.id FROM accounts a JOIN account_roles r ON r.account_id=a.id WHERE a.identity_id=$1 AND a.binding_released_at IS NULL AND a.disabled_at IS NULL AND r.role IN ('teacher','admin')",[identity]));accountIds.push(a.id);}await db.query('DELETE FROM teacher_classes WHERE class_id=$1',[id]);for(const account of accountIds)await db.query('INSERT INTO teacher_classes(class_id,account_id) VALUES($1,$2)',[id,account]);}await audit(db,user.id,'class.update','class',id,{studentCount:studentIds?.length,teacherCount:teacherIds?.length});return {id,name,type,description,studentIds:studentIds||(await db.query('SELECT identity_id FROM class_members WHERE class_id=$1',[id])).rows.map(m=>m.identity_id),teacherIds:teacherIds||(await db.query('SELECT a.identity_id FROM teacher_classes tc JOIN accounts a ON a.id=tc.account_id WHERE tc.class_id=$1',[id])).rows.map(m=>m.identity_id)};});return respond(200,output);
@@ -338,6 +377,36 @@ export async function createDomainServices(pool,config) {
    if(route==='/problems'&&method==='POST'){
     staff(user);const input=problemInput(body);const v=await transaction(pool,async db=>{const access=await bankAccess(db,user,input.bankId);if(!access.canContribute)fail(403,'FORBIDDEN','无权向该题库添加题目');const p=row(await db.query('INSERT INTO problems(owner_account_id,bank_id) VALUES($1,$2) RETURNING id',[user.id,input.bankId]));return insertVersion(db,user,p.id,input);});return respond(201,await problemResult(pool,user,v.problem_id,v.id));
    }
+   if(route==='/problems/publish-batch'&&method==='POST'){
+    staff(user);
+    if(!Array.isArray(body.items)||body.items.length<1||body.items.length>100)fail(400,'VALIDATION','请选择 1–100 道题目批量发布');
+    const items=body.items.map(item=>({problemId:uuid(item?.problemId,'题目 ID').toLowerCase(),versionId:uuid(item?.versionId,'版本 ID').toLowerCase()}));
+    if(new Set(items.map(item=>item.problemId)).size!==items.length||new Set(items.map(item=>item.versionId)).size!==items.length)fail(400,'VALIDATION','同一题目或版本不能重复选择');
+    // Lock parent problems before versions, matching the administrator review
+    // route; sort by problem ID to keep concurrent batches ordered.
+    const published=await transaction(pool,async db=>{
+     const checked=[];
+     for(const item of [...items].sort((a,b)=>a.problemId.localeCompare(b.problemId))){
+      const p=row(await db.query('SELECT * FROM problems WHERE id=$1 FOR UPDATE',[item.problemId]));
+      const version=row(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND problem_id=$2 FOR UPDATE',[item.versionId,item.problemId]));
+      if(p.archived_at)fail(409,'ARCHIVED','已归档题目不能发布');
+      const {owner}=await versionAccess(db,user,item.problemId,item.versionId);
+      if(!owner)fail(403,'FORBIDDEN','无权发布所选题目');
+      if(version.published_at)fail(409,'ALREADY_PUBLISHED',`「${version.title}」已发布，不能再次提交发布；如需修改，请创建新版本`);
+      const latest=row(await db.query('SELECT id FROM problem_versions WHERE problem_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1',[item.problemId]));
+      if(latest.id!==item.versionId)fail(409,'VERSION_CHANGED',`「${version.title}」已有更新版本，请刷新列表后重新选择`);
+      if(version.validation_status!=='AC')fail(409,'NOT_VALIDATED',`「${version.title}」的参考解答尚未通过全部正式测试`);
+      checked.push({problemId:p.id,versionId:version.id,title:version.title});
+     }
+     for(const item of checked){
+      await db.query('UPDATE problem_versions SET published_at=now() WHERE id=$1',[item.versionId]);
+      await db.query('UPDATE problems SET current_version_id=$1 WHERE id=$2',[item.versionId,item.problemId]);
+      await audit(db,user.id,'problem.publish','problem_version',item.versionId,{batch:true,problemId:item.problemId});
+     }
+     return checked;
+    });
+    return respond(200,{publishedCount:published.length,items:published.map(({problemId,versionId,title})=>({problemId,versionId,title,alreadyPublished:false}))});
+   }
    m=route.match(/^\/problems\/([^/]+)$/);
    if(m&&method==='GET')return respond(200,await problemResult(pool,user,m[1],url.searchParams.get('versionId')));
    m=route.match(/^\/problems\/([^/]+)\/versions$/);
@@ -346,7 +415,32 @@ export async function createDomainServices(pool,config) {
    }
    m=route.match(/^\/problems\/([^/]+)\/(publish|validate)$/);
    if(m&&method==='POST'){
-    staff(user);const result=await transaction(pool,async db=>{const {v,owner}=await versionAccess(db,user,m[1],uuid(body.versionId,'版本 ID'));if(!owner)fail(403,'FORBIDDEN','无权发布该题');await db.query('SELECT id FROM problem_versions WHERE id=$1 FOR UPDATE',[v.id]);const fresh=row(await db.query('SELECT * FROM problem_versions WHERE id=$1',[v.id]));if(m[2]==='publish'){if(fresh.validation_status!=='AC')fail(409,'NOT_VALIDATED','参考解答须通过全部正式测试后才能发布');if(!fresh.published_at)await db.query('UPDATE problem_versions SET published_at=now() WHERE id=$1',[v.id]);await db.query('UPDATE problems SET current_version_id=$1 WHERE id=$2',[v.id,m[1]]);await audit(db,user.id,'problem.publish','problem_version',v.id);return problemResult(db,user,m[1],v.id);}if(fresh.published_at)fail(409,'IMMUTABLE','已发布版本不能重新验证，请创建新版本');if(fresh.validation_status==='Incomplete')fail(409,'INCOMPLETE','请补齐题面、参考解答、样例与正式测试并保存新版本后验证');if(!['Waiting','Judging'].includes(fresh.validation_status)){await assertJudgeAdmission(db);await db.query("UPDATE problem_versions SET validation_status='Waiting',validation_message=NULL WHERE id=$1",[v.id]);await db.query("INSERT INTO judge_tasks(version_id,purpose) VALUES($1,'validation')",[v.id]);}return {versionId:v.id,validationStatus:'Waiting'};});return respond(200,result);
+    staff(user);const problemId=uuid(m[1],'题目 ID'),versionId=uuid(body.versionId,'版本 ID');
+    const result=await transaction(pool,async db=>{
+     const p=row(await db.query('SELECT * FROM problems WHERE id=$1 FOR UPDATE',[problemId]));
+     const fresh=row(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND problem_id=$2 FOR UPDATE',[versionId,problemId]));
+     if(p.archived_at)fail(409,'ARCHIVED','已归档题目不能发布或验证');
+     const {owner}=await versionAccess(db,user,problemId,versionId);
+     if(!owner)fail(403,'FORBIDDEN','无权发布该题');
+     if(m[2]==='publish'){
+      if(fresh.published_at)fail(409,'ALREADY_PUBLISHED','此题目版本已发布，不能再次提交发布；如需修改，请创建新版本');
+      const latest=row(await db.query('SELECT id FROM problem_versions WHERE problem_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1',[problemId]));
+      if(latest.id!==versionId)fail(409,'VERSION_CHANGED','题目已有更新版本，请刷新后发布最新版本');
+      if(fresh.validation_status!=='AC')fail(409,'NOT_VALIDATED','参考解答须通过全部正式测试后才能发布');
+      await db.query('UPDATE problem_versions SET published_at=now() WHERE id=$1',[versionId]);
+      await db.query('UPDATE problems SET current_version_id=$1 WHERE id=$2',[versionId,problemId]);
+      await audit(db,user.id,'problem.publish','problem_version',versionId);
+      return problemResult(db,user,problemId,versionId);
+     }
+     if(fresh.published_at)fail(409,'IMMUTABLE','已发布版本不能重新验证，请创建新版本');
+     if(fresh.validation_status==='Incomplete')fail(409,'INCOMPLETE','请补齐题面、参考解答、样例与正式测试并保存新版本后验证');
+     if(!['Waiting','Judging'].includes(fresh.validation_status)){
+      await assertJudgeAdmission(db);
+      await db.query("UPDATE problem_versions SET validation_status='Waiting',validation_message=NULL WHERE id=$1",[versionId]);
+      await db.query("INSERT INTO judge_tasks(version_id,purpose) VALUES($1,'validation')",[versionId]);
+     }
+     return {versionId,validationStatus:'Waiting'};
+    });return respond(200,result);
    }
   return null;
  }
@@ -356,7 +450,8 @@ export async function createDomainServices(pool,config) {
   const {route,method,body,url,user,sess,ip}=context;
   let m;
    if(route==='/assignments'&&method==='GET'){
-    const rows=(await pool.query(`SELECT a.* FROM assignments a WHERE $1 OR $2 AND EXISTS(SELECT 1 FROM teacher_classes tc JOIN classes c ON c.id=tc.class_id WHERE tc.class_id=a.class_id AND tc.account_id=$3 AND c.archived_at IS NULL) OR $4 AND a.state='Published' AND EXISTS(SELECT 1 FROM assignment_participants p WHERE p.assignment_id=a.id AND p.identity_id=$5 AND NOT p.exempt) ORDER BY a.created_at DESC LIMIT 200`,[rolesInclude(user,'admin'),rolesInclude(user,'teacher'),user.id,rolesInclude(user,'student'),user.identityId])).rows;const items=[];for(const a of rows)items.push(await assignmentResult(pool,user,a.id));return respond(200,{items,serverNow:row(await pool.query('SELECT clock_timestamp() AS server_now')).server_now});
+    const archived=url.searchParams.get('archived')==='true';
+    const rows=(await pool.query(`SELECT a.* FROM assignments a WHERE (a.archived_at IS NOT NULL)=$6 AND ($1 OR $2 AND EXISTS(SELECT 1 FROM teacher_classes tc WHERE tc.class_id=a.class_id AND tc.account_id=$3) OR $4 AND a.state='Published' AND EXISTS(SELECT 1 FROM assignment_participants p WHERE p.assignment_id=a.id AND p.identity_id=$5 AND NOT p.exempt)) ORDER BY a.created_at DESC LIMIT 200`,[rolesInclude(user,'admin'),rolesInclude(user,'teacher'),user.id,rolesInclude(user,'student'),user.identityId,archived])).rows;const items=[];for(const a of rows)items.push(await assignmentResult(pool,user,a.id));return respond(200,{items,serverNow:row(await pool.query('SELECT clock_timestamp() AS server_now')).server_now});
    }
    if(route==='/assignments'&&method==='POST'){
     staff(user);const title=field(body.title,'作业标题'),classId=uuid(body.classId,'班级 ID'),dueAt=new Date(body.dueAt);if(!Number.isFinite(dueAt.getTime())||dueAt<=new Date())fail(400,'VALIDATION','截止时间须晚于现在');if(!Array.isArray(body.problems)||body.problems.length<1||body.problems.length>50)fail(400,'VALIDATION','作业须包含 1–50 题');
@@ -364,15 +459,44 @@ export async function createDomainServices(pool,config) {
    }
    m=route.match(/^\/assignments\/([^/]+)$/);
    if(m&&method==='GET')return respond(200,await assignmentResult(pool,user,m[1]));
+   m=route.match(/^\/assignments\/([^/]+)\/(archive|restore)$/);
+   if(m&&method==='POST'){
+    staff(user);const id=uuid(m[1],'作业 ID'),action=m[2];
+    await transaction(pool,async db=>{
+     await db.query('SELECT id FROM assignments WHERE id=$1 FOR UPDATE',[id]);
+     const assignment=await assignmentAccess(db,user,id);
+     if(!assignment.canManage)fail(403,'FORBIDDEN','无权管理该作业');
+     if(action==='archive'){
+      if(assignment.archived_at)return;
+      if(assignment.state==='Published'&&assignment.due_at>new Date())fail(409,'ASSIGNMENT_IN_PROGRESS','作业尚未截止，请在截止后归档，以免影响学生提交');
+      if((await db.query("SELECT 1 FROM submissions WHERE assignment_id=$1 AND status IN ('Waiting','Judging') LIMIT 1",[id])).rowCount)fail(409,'PENDING_JUDGMENT','仍有待判题提交，请等待判题完成');
+      await db.query('UPDATE assignments SET archived_at=clock_timestamp() WHERE id=$1',[id]);
+     }else{
+      if(!assignment.archived_at)return;
+      if(!(await db.query('SELECT 1 FROM classes WHERE id=$1 AND archived_at IS NULL',[assignment.class_id])).rowCount)fail(409,'CLASS_ARCHIVED','请先恢复班级，再恢复作业');
+      if(assignment.state==='Published'){
+       const linked=(await db.query(`SELECT ap.problem_id,p.archived_at problem_archived_at,
+        b.archived_at bank_archived_at,v.problem_id version_problem_id,v.published_at
+        FROM assignment_problems ap JOIN problems p ON p.id=ap.problem_id
+        JOIN problem_banks b ON b.id=p.bank_id JOIN problem_versions v ON v.id=ap.version_id
+        WHERE ap.assignment_id=$1 FOR SHARE OF p,b,v`,[id])).rows;
+       if(linked.some(x=>x.problem_archived_at||x.bank_archived_at||x.version_problem_id!==x.problem_id||!x.published_at))
+        fail(409,'UNAVAILABLE_PROBLEM','作业包含已归档或未发布的题目版本，不能恢复为可编辑状态');
+      }
+      await db.query('UPDATE assignments SET archived_at=NULL WHERE id=$1',[id]);
+     }
+     await audit(db,user.id,`assignment.${action}`,'assignment',id);
+    });return respond(200,await assignmentResult(pool,user,id));
+   }
    m=route.match(/^\/assignments\/([^/]+)\/participants\/([^/]+)$/);
    if(m&&method==='PATCH') {
     staff(user);if(typeof body.exempt!=='boolean')fail(400,'VALIDATION','豁免状态无效');const assignmentId=uuid(m[1]),identityId=uuid(m[2]),reason=field(body.reason,'豁免原因',{max:2000});
-    await transaction(pool,async db=>{await db.query('SELECT id FROM assignments WHERE id=$1 FOR UPDATE',[assignmentId]);const a=await assignmentAccess(db,user,assignmentId);if(!a.canManage)fail(403,'FORBIDDEN','无权管理该作业');if(!(await db.query('SELECT clock_timestamp()<=$1 allowed',[a.due_at])).rows[0].allowed)fail(409,'DEADLINE_PASSED','截止后变更名单须先明确延期并审计');row(await db.query('UPDATE assignment_participants SET exempt=$1 WHERE assignment_id=$2 AND identity_id=$3 RETURNING identity_id',[body.exempt,assignmentId,identityId]));await db.query('UPDATE assignments SET edit_revision=edit_revision+1 WHERE id=$1',[assignmentId]);await audit(db,user.id,'assignment.participant_exempt','assignment',assignmentId,{identityId,exempt:body.exempt,reason});});return respond(200,await assignmentResult(pool,user,assignmentId));
+    await transaction(pool,async db=>{await db.query('SELECT id FROM assignments WHERE id=$1 FOR UPDATE',[assignmentId]);const a=await assignmentAccess(db,user,assignmentId);if(!a.canManage)fail(403,'FORBIDDEN','无权管理该作业');if(a.archived_at)fail(409,'ARCHIVED','已归档作业不能修改，请先恢复');if(!(await db.query('SELECT clock_timestamp()<=$1 allowed',[a.due_at])).rows[0].allowed)fail(409,'DEADLINE_PASSED','截止后变更名单须先明确延期并审计');row(await db.query('UPDATE assignment_participants SET exempt=$1 WHERE assignment_id=$2 AND identity_id=$3 RETURNING identity_id',[body.exempt,assignmentId,identityId]));await db.query('UPDATE assignments SET edit_revision=edit_revision+1 WHERE id=$1',[assignmentId]);await audit(db,user.id,'assignment.participant_exempt','assignment',assignmentId,{identityId,exempt:body.exempt,reason});});return respond(200,await assignmentResult(pool,user,assignmentId));
    }
    m=route.match(/^\/assignments\/([^/]+)\/extend$/);
    if(m&&method==='POST') {
     staff(user);const assignmentId=uuid(m[1]),reason=field(body.reason,'延期原因',{max:2000}),dueAt=new Date(body.dueAt);if(!Number.isFinite(dueAt.getTime())||dueAt<=new Date())fail(400,'VALIDATION','新截止时间须晚于现在');
-    await transaction(pool,async db=>{await db.query('SELECT id FROM assignments WHERE id=$1 FOR UPDATE',[assignmentId]);const a=await assignmentAccess(db,user,assignmentId);if(!a.canManage)fail(403,'FORBIDDEN','无权管理该作业');if(dueAt<=new Date(a.due_at))fail(400,'VALIDATION','延期须晚于原截止时间');await db.query('UPDATE assignments SET due_at=$1,edit_revision=edit_revision+1 WHERE id=$2',[dueAt,assignmentId]);await audit(db,user.id,'assignment.extend','assignment',assignmentId,{previousDueAt:a.due_at,dueAt:dueAt.toISOString(),reason});});return respond(200,await assignmentResult(pool,user,assignmentId));
+    await transaction(pool,async db=>{await db.query('SELECT id FROM assignments WHERE id=$1 FOR UPDATE',[assignmentId]);const a=await assignmentAccess(db,user,assignmentId);if(!a.canManage)fail(403,'FORBIDDEN','无权管理该作业');if(a.archived_at)fail(409,'ARCHIVED','已归档作业不能修改，请先恢复');if(dueAt<=new Date(a.due_at))fail(400,'VALIDATION','延期须晚于原截止时间');await db.query('UPDATE assignments SET due_at=$1,edit_revision=edit_revision+1 WHERE id=$2',[dueAt,assignmentId]);await audit(db,user.id,'assignment.extend','assignment',assignmentId,{previousDueAt:a.due_at,dueAt:dueAt.toISOString(),reason});});return respond(200,await assignmentResult(pool,user,assignmentId));
    }
   return null;
  }
@@ -407,6 +531,7 @@ export async function createDomainServices(pool,config) {
       await db.query('SELECT id FROM assignments WHERE id=$1 FOR SHARE',[assignmentId]);
       assignment=await assignmentAccess(db,user,assignmentId);
       if(!assignment.isParticipant)fail(403,'FORBIDDEN','只能作为被分配的学生提交作业，教师请使用练习预览');
+      if(assignment.archived_at)fail(409,'ASSIGNMENT_ARCHIVED','作业已归档，不能在此作业中继续运行或提交；可从题库独立练习');
       const pinned=row(await db.query('SELECT version_id FROM assignment_problems WHERE assignment_id=$1 AND problem_id=$2',[assignmentId,problemId]));
       if(requestedVersion&&requestedVersion!==pinned.version_id)fail(409,'VERSION_MISMATCH','提交版本与作业固定版本不同，请刷新作业');
       resolvedVersion=pinned.version_id;
@@ -430,7 +555,7 @@ export async function createDomainServices(pool,config) {
     });return respond(201,submissionShape(await timed.maskSubmission(pool,user,result)));
    }
    m=route.match(/^\/submissions\/([^/]+)$/);
-   if(m&&method==='GET'){const sub=await submissionAccess(pool,user,m[1]);const reviews=(await pool.query('SELECT r.id,r.note,r.created_at,i.id author_identity_id,i.name author_name FROM review_entries r JOIN accounts a ON a.id=r.author_account_id JOIN identities i ON i.id=a.identity_id WHERE submission_id=$1 ORDER BY r.created_at',[sub.id])).rows.map(r=>({id:r.id,note:r.note,createdAt:r.created_at,authorName:r.author_name,authorIdentityId:r.author_identity_id}));let pendingRejudge=null;if(sub.pending_judge_run_id){pendingRejudge={runId:sub.pending_judge_run_id};if(await canReviewActivitySubmission(pool,user,sub)){const candidate=(await pool.query('SELECT r.status,r.score,r.passed,r.total,r.created_at,t.reason FROM judge_runs r JOIN judge_tasks t ON t.id=r.task_id WHERE r.id=$1',[sub.pending_judge_run_id])).rows[0];if(candidate)pendingRejudge={...pendingRejudge,status:candidate.status,score:candidate.score===null?null:Number(candidate.score),passed:candidate.passed,total:candidate.total,createdAt:candidate.created_at,reason:candidate.reason};}}const masked=await timed.maskSubmission(pool,user,sub);let testResults=[];if(masked.score!==null&&masked.status!== 'Submitted'){const run=(await pool.query('SELECT r.private_results FROM judge_runs r JOIN judge_tasks t ON t.id=r.task_id WHERE r.submission_id=$1 AND r.id IS DISTINCT FROM $2::uuid AND r.status=$3 AND r.score IS NOT DISTINCT FROM $4::numeric AND (NOT t.rejudge OR EXISTS(SELECT 1 FROM audit_events e WHERE e.action=\'submission.rejudge_confirm\' AND e.resource_id=$1::text AND e.metadata->>\'runId\'=r.id::text)) ORDER BY r.created_at DESC LIMIT 1',[sub.id,sub.pending_judge_run_id||null,sub.status,sub.score])).rows[0];testResults=(run?.private_results||[]).map((r,index)=>({position:Number.isInteger(r.position)?r.position:index+1,status:typeof r.status==='string'?r.status:'NotRun',...(Number.isFinite(r.cpuMs)?{timeMs:r.cpuMs}:{}),...(Number.isFinite(r.memoryBytes)?{memoryKb:Math.ceil(r.memoryBytes/1024)}:{})}));}return respond(200,{...submissionShape(masked),reviews,pendingRejudge,testResults});}
+   if(m&&method==='GET'){const sub=await submissionAccess(pool,user,m[1]);const reviews=(await pool.query('SELECT r.id,r.note,r.created_at,i.id author_identity_id,i.name author_name FROM review_entries r JOIN accounts a ON a.id=r.author_account_id JOIN identities i ON i.id=a.identity_id WHERE submission_id=$1 ORDER BY r.created_at',[sub.id])).rows.map(r=>({id:r.id,note:r.note,createdAt:r.created_at,authorName:r.author_name,authorIdentityId:r.author_identity_id}));let pendingRejudge=null;if(sub.pending_judge_run_id){pendingRejudge={runId:sub.pending_judge_run_id};if(await canReviewActivitySubmission(pool,user,sub,{readOnly:true})){const candidate=(await pool.query('SELECT r.status,r.score,r.passed,r.total,r.created_at,t.reason FROM judge_runs r JOIN judge_tasks t ON t.id=r.task_id WHERE r.id=$1',[sub.pending_judge_run_id])).rows[0];if(candidate)pendingRejudge={...pendingRejudge,status:candidate.status,score:candidate.score===null?null:Number(candidate.score),passed:candidate.passed,total:candidate.total,createdAt:candidate.created_at,reason:candidate.reason};}}const masked=await timed.maskSubmission(pool,user,sub);let testResults=[];if(masked.score!==null&&masked.status!== 'Submitted'){const run=(await pool.query('SELECT r.private_results FROM judge_runs r JOIN judge_tasks t ON t.id=r.task_id WHERE r.submission_id=$1 AND r.id IS DISTINCT FROM $2::uuid AND r.status=$3 AND r.score IS NOT DISTINCT FROM $4::numeric AND (NOT t.rejudge OR EXISTS(SELECT 1 FROM audit_events e WHERE e.action=\'submission.rejudge_confirm\' AND e.resource_id=$1::text AND e.metadata->>\'runId\'=r.id::text)) ORDER BY r.created_at DESC LIMIT 1',[sub.id,sub.pending_judge_run_id||null,sub.status,sub.score])).rows[0];testResults=(run?.private_results||[]).map((r,index)=>({position:Number.isInteger(r.position)?r.position:index+1,status:typeof r.status==='string'?r.status:'NotRun',...(Number.isFinite(r.cpuMs)?{timeMs:r.cpuMs}:{}),...(Number.isFinite(r.memoryBytes)?{memoryKb:Math.ceil(r.memoryBytes/1024)}:{})}));}return respond(200,{...submissionShape(masked),reviews,pendingRejudge,testResults});}
    m=route.match(/^\/review-notebook\/([^/]+)$/);
    if(m&&method==='GET'){
     const entry=row(await pool.query(`${reviewEntryQuery} WHERE r.id=$1`,[uuid(m[1],'笔记 ID')]));
@@ -503,7 +628,8 @@ export function resourceArea(route) {
  if(route.startsWith('/auth/'))return 'auth';
  if(/^\/(accounts|people|teachers)(?:\/|$)/.test(route))return 'people';
  if(/^\/classes(?:\/|$)/.test(route))return 'classes';
- if(/^\/(problems|problem-banks|problem-groups|problem-favorites)(?:\/|$)/.test(route))return 'library';
+ if(/^\/(problems|problem-banks|problem-groups|problem-favorites)(?:\/|$)/.test(route)
+  || /^\/admin\/(problem-banks|problems)(?:\/|$)/.test(route))return 'library';
  if(/^\/assignments(?:\/|$)/.test(route))return 'assignments';
  if(/^\/(submissions|review-notebook)(?:\/|$)/.test(route))return 'submissions';
  if(/^\/(learning-paths|learning-resources|chapters|reports|timed-practices|points)(?:\/|$)/.test(route))return 'education';

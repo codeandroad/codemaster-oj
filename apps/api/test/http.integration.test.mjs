@@ -16,12 +16,14 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
   const connection=new URL(process.env.TEST_DATABASE_URL);
   connection.searchParams.set('options',`-csearch_path=${schema}`);
   const pool=createPool(connection.toString());
+  const adminPassword=randomBytes(24).toString('base64url');
+  const studentPassword=randomBytes(24).toString('base64url');
   let app;
   try {
     await migrate(pool);
-    const adminId=await bootstrap(pool,{name:'Nest管理员',number:'ADMIN',username:'nest-admin',password:'Nest-integration-2026!'});
+    const adminId=await bootstrap(pool,{name:'Nest管理员',number:'ADMIN',username:'nest-admin',password:adminPassword});
     app=await createApiApplication({databaseUrl:connection.toString(),logger:false,
-      config:loadConfig({SESSION_SECRET:'nest-integration-secret-at-least-32-bytes',APP_ORIGIN:'http://school.test',COOKIE_SECURE:'false'})});
+      config:loadConfig({SESSION_SECRET:randomBytes(32).toString('base64url'),APP_ORIGIN:'http://school.test',COOKIE_SECURE:'false'})});
     await app.listen(0,'127.0.0.1');
     const base=await app.getUrl();
     const request=async(path,{method='GET',body,auth,headers={},raw}={})=>{
@@ -45,7 +47,7 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
     assert.equal((await request('/api/v1/auth/login',{method:'POST',raw:'hello',headers:{'Content-Type':'text/plain'}})).status,415);
     const oversize=await request('/api/v1/auth/login',{method:'POST',raw:JSON.stringify({padding:'x'.repeat(2097152)})});
     assert.equal(oversize.status,413);assert.equal(oversize.data.error.code,'TOO_LARGE');
-    const credentials={username:'nest-admin',password:'Nest-integration-2026!'};
+    const credentials={username:'nest-admin',password:adminPassword};
     assert.equal((await request('/api/v1/auth/login',{method:'POST',body:credentials,headers:{Origin:'http://attacker.test'}})).data.error.code,'ORIGIN');
     const admin=await request('/api/v1/auth/login',{method:'POST',body:credentials});
     assert.equal(admin.status,200);assert.equal(admin.data.user.id,adminId);
@@ -58,7 +60,7 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
     assert.equal(person.status,201);
     const verified=await request('/api/v1/auth/verify-identity',{method:'POST',body:{kind:'student',number:'STUDENT',name:'Nest学生',activationCode:person.data.activationCode}});assert.equal(verified.status,200);assert.equal(verified.data.person.number,'STUDENT');
     const student=await request('/api/v1/auth/register',{method:'POST',body:{kind:'student',number:'STUDENT',name:'Nest学生',
-      username:'nest-student',password:'Nest-student-2026!',activationCode:person.data.activationCode}});
+      username:'nest-student',password:studentPassword,activationCode:person.data.activationCode}});
     assert.equal(student.status,201);
     const forbidden=await request('/api/v1/accounts',{auth:student});
     assert.equal(forbidden.status,403);assert.equal(forbidden.data.error.code,'FORBIDDEN');
@@ -131,6 +133,11 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
     const afterGroups=(await request('/api/v1/problem-groups',{auth:admin})).data.items;assert(!afterGroups.find(g=>g.id===groups[0].id).problemIds.includes(sampleDraft.data.id));assert(afterGroups.find(g=>g.id===groups[1].id).problemIds.includes(sampleDraft.data.id));
     const unknown=await request('/api/v1/does-not-exist',{auth:admin});
     assert.equal(unknown.status,404);assert.equal(unknown.data.error.code,'NOT_FOUND');
+    assert.equal((await request(`/api/v1/accounts/${student.data.user.id}`,{method:'PATCH',body:{disabled:true},auth:admin})).status,200);
+    const disabledLogin=await request('/api/v1/auth/login',{method:'POST',body:{username:'nest-student',password:studentPassword}});
+    assert.equal(disabledLogin.status,403);assert.deepEqual(disabledLogin.data.error,{code:'ACCOUNT_DISABLED',message:'账号已禁用'});
+    const wrongDisabledLogin=await request('/api/v1/auth/login',{method:'POST',body:{username:'nest-student',password:randomBytes(24).toString('base64url')}});
+    assert.equal(wrongDisabledLogin.status,401);assert.equal(wrongDisabledLogin.data.error.code,'LOGIN_FAILED');
     assert.equal((await request('/api/v1/auth/logout',{method:'POST',body:{},auth:admin})).status,200);
     assert.equal((await request('/api/v1/auth/me',{auth:admin})).status,401);
   } finally {

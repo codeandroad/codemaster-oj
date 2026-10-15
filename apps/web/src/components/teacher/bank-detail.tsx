@@ -3,6 +3,7 @@
 import { AppLink as Link } from "@/components/navigation";
 import { useState } from "react";
 import {
+  CheckSquare2,
   FilePlus2,
   FolderPlus,
   MoreHorizontal,
@@ -12,7 +13,8 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
 import { productionApi, type ProductionProblem } from "@/lib/production-api";
-import { Bank, Group, GroupTags, ManageGroups, reviewVisibilityLabel } from "./problem-banks";
+import { Bank, Group, GroupTags, ManageGroups, MAX_BATCH_PUBLISH, publishEligibilityReason, reviewVisibilityLabel, validationStatusLabel } from "./problem-banks";
+import { useLocale } from "@/components/locale-context";
 import {
   Drawer,
   Feedback,
@@ -27,6 +29,8 @@ import {
 } from "./shared";
 
 export function TeacherBankDetail({ id }: { id: string }) {
+  const { locale } = useLocale();
+  const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
   const banks = useData<{ items: Bank[] }>("problem-banks"),
     problems = useData<{
       items: (ProductionProblem & { formalTestCount?: number })[];
@@ -35,6 +39,7 @@ export function TeacherBankDetail({ id }: { id: string }) {
     bank = banks.data?.items.find((x) => x.id === id),
     [view, setView] = useState("all"),
     [checked, setChecked] = useState<string[]>([]),
+    [confirmPublish, setConfirmPublish] = useState(false),
     [manage, setManage] = useState<{
       ids: string[];
       mode?: string;
@@ -70,6 +75,18 @@ export function TeacherBankDetail({ id }: { id: string }) {
       bank?.canContribute ||
       bank?.canEdit ||
       ["owner", "edit"].includes(bank?.permission ?? "");
+  const selectedProblems = rows.filter((problem) => selected.includes(problem.id));
+  const publishableSelection = selectedProblems.filter((problem) => !publishEligibilityReason(problem, locale));
+  const excludedSelection = selectedProblems.filter((problem) => publishEligibilityReason(problem, locale));
+  const publishableScope = rows.filter((problem) => !publishEligibilityReason(problem, locale));
+  const selectableScope = publishableScope.slice(0, MAX_BATCH_PUBLISH);
+  const allPublishableScopeSelected = selectableScope.length > 0 && selectableScope.every((problem) => selected.includes(problem.id));
+  const togglePublishableScope = () => {
+    const scopeIds = new Set(selectableScope.map((problem) => problem.id));
+    setChecked((ids) => allPublishableScopeSelected
+      ? ids.filter((problemId) => !scopeIds.has(problemId))
+      : [...new Set([...ids, ...scopeIds])]);
+  };
   const options = [
     { id: "all", name: "全部题目", count: all.length },
     {
@@ -91,12 +108,12 @@ export function TeacherBankDetail({ id }: { id: string }) {
         className={`${link} mb-4 inline-block text-sm`}
         href="/teacher/problems"
       >
-        ← 返回题库
+        ← {tr("返回题库", "Back to banks")}
       </Link>
       <PageHeader
-        eyebrow="题库"
-        title={bank?.name ?? "题库详情"}
-        description={bank?.description || "教师创建的课程练习题库"}
+        eyebrow={tr("题库", "Problem bank")}
+        title={bank?.name ?? tr("题库详情", "Bank details")}
+        description={bank?.description || tr("教师创建的课程练习题库", "A teacher-created course practice bank")}
         action={
           <div className="flex flex-wrap gap-2">
             <Button
@@ -105,27 +122,27 @@ export function TeacherBankDetail({ id }: { id: string }) {
               onClick={() => setAdding(true)}
             >
               <Search size={15} />
-              从已有题目添加
+              {tr("从已有题目添加", "Add existing problems")}
             </Button>
             <Link
               className={buttonVariants({ variant: "secondary" })}
               href={`/teacher/imports?bankId=${id}`}
             >
               <Upload size={15} />
-              导入题目
+              {tr("导入题目", "Import problems")}
             </Link>
             <Link
               className={buttonVariants()}
               href={`/teacher/problems/new/edit?bankId=${id}&returnTo=${encodeURIComponent(`/teacher/problems/banks/${id}`)}`}
             >
               <FilePlus2 size={15} />
-              新建题目
+              {tr("新建题目", "New problem")}
             </Link>
           </div>
         }
       />
       <p className="mt-3 rounded-md border border-border bg-surface-subtle px-4 py-3 text-sm leading-6 text-muted-foreground">
-        {bank?.visibility === "school" ? "今后发布的新版本需管理员逐版审核；审核前仅指定活动学生可见，审核通过后才开放全校自由练习并参与后续积分排名。" : "教师私有题库不会直接对全校公开。如需开放，请联系管理员纳入校内审核；已发布题目仍需逐版审核。"}
+        {bank?.visibility === "school" ? tr("今后发布的新版本需管理员逐版审核；审核前仅指定活动学生可见，审核通过后才开放全校自由练习并参与后续积分排名。", "New versions require admin review. Before approval they are visible only to assigned activity students; after approval they are available school-wide and eligible for future leaderboard points.") : tr("教师私有题库不会直接对全校公开。如需开放，请联系管理员纳入校内审核；已发布题目仍需逐版审核。", "Private teacher banks are not public school-wide. Ask an administrator to enable review; published problems still require review per version.")}
       </p>
       <State resource={banks} />
       <State resource={problems} />
@@ -134,57 +151,74 @@ export function TeacherBankDetail({ id }: { id: string }) {
       <div className="mt-5 grid grid-cols-[230px_minmax(0,1fr)] gap-5 max-md:grid-cols-1">
         <aside className={`${panel} self-start`}>
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <h2 className="text-sm font-bold">分组</h2>
+            <h2 className="text-sm font-bold">{tr("分组", "Groups")}</h2>
             <button
               className="inline-flex items-center gap-1 text-xs font-semibold text-primary"
               onClick={() => setGroupAdmin(true)}
             >
               <FolderPlus size={15} />
-              分组管理
+              {tr("分组管理", "Manage groups")}
             </button>
           </div>
           <div className="p-3 md:hidden">
             <select
-              aria-label="题库分组"
+              aria-label={tr("题库分组", "Bank groups")}
               value={view}
               onChange={(e) => setView(e.target.value)}
               className={input}
             >
               {options.map((g) => (
                 <option key={g.id} value={g.id}>
-                  {g.name}（{g.count}）
+                  {g.id === "all" ? tr("全部题目", "All problems") : g.id === "none" ? tr("未分组", "Ungrouped") : g.name}（{g.count}）
                 </option>
               ))}
             </select>
           </div>
-          <nav className="hidden p-2 md:block" aria-label="题库分组">
+          <nav className="hidden p-2 md:block" aria-label={tr("题库分组", "Bank groups")}>
             {options.map((g) => (
               <button
                 key={g.id}
                 onClick={() => setView(g.id)}
                 className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm ${view === g.id ? "bg-accent font-semibold text-primary" : "text-muted-foreground hover:bg-muted"}`}
               >
-                <span className="truncate">{g.name}</span>
+                <span className="truncate">{g.id === "all" ? tr("全部题目", "All problems") : g.id === "none" ? tr("未分组", "Ungrouped") : g.name}</span>
                 <span>{g.count}</span>
               </button>
             ))}
           </nav>
           <p className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
-            一道题可属于多个分组；各分组题数之和可大于题库总题数 {all.length}。
+            {tr("一道题可属于多个分组；各分组题数之和可大于题库总题数", "A problem may belong to multiple groups; summed group counts may exceed the bank total of")} {all.length}{locale === "zh" ? "。" : "."}
           </p>
         </aside>
         <section className={`${panel} min-w-0`}>
-          <div className="border-b border-border px-4 py-3">
-            <h2 className="font-bold">{label}</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {rows.length} 道题 · 导入题与手工题统一归类
-            </p>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+            <div>
+              <h2 className="font-bold">{view === "all" ? tr("全部题目", "All problems") : view === "none" ? tr("未分组", "Ungrouped") : label}</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {rows.length} {tr("道题 · 导入题与手工题统一归类", "problems · imported and manually created problems are grouped together")}
+              </p>
+            </div>
+            <Button size="sm" variant="secondary" disabled={!publishableScope.length || action.busy} onClick={togglePublishableScope}>
+              <CheckSquare2 size={15} />
+              {allPublishableScopeSelected
+                ? tr("取消可发布题目选择", "Deselect publishable")
+                : publishableScope.length > MAX_BATCH_PUBLISH
+                  ? tr(`选择前 ${MAX_BATCH_PUBLISH} 道可发布题`, `Select first ${MAX_BATCH_PUBLISH} publishable`)
+                  : `${tr("选择可发布题目", "Select publishable")} (${publishableScope.length})`}
+            </Button>
           </div>
           {selected.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface-subtle px-4 py-3 text-sm">
-              <b>已选 {selected.length} 道</b>
+              <b>{tr("已选", "Selected")} {selected.length} {tr("道", "problems")}</b>
+              <Button
+                size="sm"
+                disabled={!publishableSelection.length || publishableSelection.length > MAX_BATCH_PUBLISH || action.busy}
+                onClick={() => { action.clear(); setConfirmPublish(true); }}
+              >
+                {tr("批量发布", "Publish selected")} ({publishableSelection.length})
+              </Button>
               <Button size="sm" onClick={() => setManage({ ids: selected })}>
-                {view === "none" ? "分配分组" : "添加到分组"}
+                {view === "none" ? tr("分配分组", "Assign group") : tr("添加到分组", "Add to group")}
               </Button>
               <Button
                 size="sm"
@@ -197,7 +231,7 @@ export function TeacherBankDetail({ id }: { id: string }) {
                   })
                 }
               >
-                移动到分组
+                {tr("移动到分组", "Move to group")}
               </Button>
               {currentGroup && (
                 <Button
@@ -228,12 +262,24 @@ export function TeacherBankDetail({ id }: { id: string }) {
                       });
                   }}
                 >
-                  从本分组移除
+                  {tr("从本分组移除", "Remove from this group")}
                 </Button>
               )}
               <Button size="sm" variant="ghost" onClick={() => setChecked([])}>
-                取消选择
+                {tr("取消选择", "Clear selection")}
               </Button>
+              {publishableSelection.length > MAX_BATCH_PUBLISH && (
+                <p role="status" className="w-full text-xs text-muted-foreground">
+                  {tr(`单次最多发布 ${MAX_BATCH_PUBLISH} 道题，请分批选择。`, `Publish at most ${MAX_BATCH_PUBLISH} problems per batch. Narrow your selection.`)}
+                </p>
+              )}
+              {excludedSelection.length > 0 && (
+                <p role="status" className="w-full text-xs leading-5 text-muted-foreground">
+                  {tr("未纳入发布", "Excluded from publishing")} ({excludedSelection.length})：
+                  {excludedSelection.slice(0, 3).map((problem) => `${problem.title}（${publishEligibilityReason(problem, locale)}）`).join("、")}
+                  {excludedSelection.length > 3 ? tr("等", " and more") : ""}
+                </p>
+              )}
             </div>
           )}
           {rows.length ? (
@@ -244,7 +290,7 @@ export function TeacherBankDetail({ id }: { id: string }) {
                     <th className="px-4 py-3">
                       <input
                         type="checkbox"
-                        aria-label="全选题库题目"
+                        aria-label={tr("全选题库题目", "Select all bank problems")}
                         checked={selected.length === rows.length}
                         onChange={(e) =>
                           setChecked(
@@ -262,7 +308,7 @@ export function TeacherBankDetail({ id }: { id: string }) {
                       "操作",
                     ].map((x) => (
                       <th className="px-4 py-3" key={x}>
-                        {x}
+                        {tr(x, ({"题号与标题":"ID and title","分组":"Group","接口":"Interface","正式测试":"Formal tests","状态":"Status","操作":"Actions"} as Record<string,string>)[x] ?? x)}
                       </th>
                     ))}
                   </tr>
@@ -272,7 +318,7 @@ export function TeacherBankDetail({ id }: { id: string }) {
                     <tr key={p.id} className="border-t border-border">
                       <td className="px-4 py-3">
                         <input
-                          aria-label={`选择 ${p.title}`}
+                          aria-label={`${tr("选择", "Select")} ${p.title}`}
                           type="checkbox"
                           checked={checked.includes(p.id)}
                           onChange={(e) =>
@@ -308,12 +354,12 @@ export function TeacherBankDetail({ id }: { id: string }) {
                           g.problemIds.includes(p.id),
                         ) && (
                           <span className="text-xs text-muted-foreground">
-                            未分组
+                            {tr("未分组", "Ungrouped")}
                           </span>
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        {p.mode === "function" ? "Function" : "Standard I/O"}
+                        {p.mode === "function" ? tr("函数模式", "Function") : tr("标准输入输出", "Standard I/O")}
                       </td>
                       <td className="px-4 py-3">
                         {p.formalTestCount ??
@@ -321,17 +367,17 @@ export function TeacherBankDetail({ id }: { id: string }) {
                             (x) =>
                               (x as { enabled?: boolean }).enabled !== false,
                           ).length ??
-                          "按版本查看"}
+                          tr("按版本查看", "View by version")}
                       </td>
                       <td className="px-4 py-3">
                         <StatusPill
                           status={
                             p.published
-                              ? "Published"
-                              : (p.validationStatus ?? "Draft")
+                              ? tr("已发布", "Published")
+                              : validationStatusLabel(p.validationStatus ?? "Draft", locale)
                           }
                         />
-                        <p className="mt-1 max-w-52 text-xs leading-5 text-muted-foreground">{reviewVisibilityLabel(p, bank?.visibility)}</p>
+                        <p className="mt-1 max-w-52 text-xs leading-5 text-muted-foreground">{reviewVisibilityLabel(p, bank?.visibility, locale)}</p>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -339,11 +385,11 @@ export function TeacherBankDetail({ id }: { id: string }) {
                             className={link}
                             href={`/teacher/problems/${p.id}/edit?returnTo=${encodeURIComponent(`/teacher/problems/banks/${id}`)}`}
                           >
-                            编辑
+                            {tr("编辑", "Edit")}
                           </Link>
                           <button
                             className="text-muted-foreground"
-                            title="整理分组"
+                            title={tr("整理分组", "Organize groups")}
                             onClick={() => setManage({ ids: [p.id] })}
                           >
                             <MoreHorizontal size={18} />
@@ -362,28 +408,28 @@ export function TeacherBankDetail({ id }: { id: string }) {
                   <FilePlus2 />
                 </div>
                 <h3 className="mt-4 text-lg font-bold">
-                  {view === "all" ? "题库还是空的" : `“${label}”暂无题目`}
+                  {view === "all" ? tr("题库还是空的", "This bank is empty") : `${tr("分组", "Group")} “${label}” ${tr("暂无题目", "has no problems")}`}
                 </h3>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {view === "all"
-                    ? "先手工创建一道题，或导入现有题目资料。"
-                    : "从已有题目添加，或从其他分组添加到这里。"}
+                    ? tr("先手工创建一道题，或导入现有题目资料。", "Create a problem or import existing material to get started.")
+                    : tr("从已有题目添加，或从其他分组添加到这里。", "Add an existing problem or one from another group.")}
                 </p>
                 <div className="mt-5 flex flex-wrap justify-center gap-2">
                   <Button variant="secondary" onClick={() => setAdding(true)}>
-                    添加题目
+                    {tr("添加题目", "Add problems")}
                   </Button>
                   <Link
                     className={buttonVariants()}
                     href={`/teacher/problems/new/edit?bankId=${id}`}
                   >
-                    新建题目
+                    {tr("新建题目", "New problem")}
                   </Link>
                   <Link
                     className={buttonVariants({ variant: "secondary" })}
                     href={`/teacher/imports?bankId=${id}`}
                   >
-                    导入题目
+                    {tr("导入题目", "Import problems")}
                   </Link>
                 </div>
               </div>
@@ -391,6 +437,35 @@ export function TeacherBankDetail({ id }: { id: string }) {
           )}
         </section>
       </div>
+      {confirmPublish && (
+        <Modal title={tr("确认批量发布题目", "Confirm batch publication")} onClose={() => { if (!action.busy) setConfirmPublish(false); }}>
+          <div className="space-y-4 text-sm">
+            <p>{tr(`即将发布 ${publishableSelection.length} 道已通过参考解验证的题目。`, `You are about to publish ${publishableSelection.length} validated problems.`)}</p>
+            <ul className="max-h-52 space-y-1 overflow-y-auto rounded-md border border-border bg-surface-subtle px-4 py-3" aria-label={tr("待发布题目", "Problems to publish")}>
+              {publishableSelection.map((problem) => <li key={problem.id} className="leading-6">{problem.title}</li>)}
+            </ul>
+            {excludedSelection.length > 0 && <p className="text-muted-foreground">{tr(`另外 ${excludedSelection.length} 道不符合发布条件的已选题目将保持原状。`, `${excludedSelection.length} other selected problems are ineligible and will remain unchanged.`)}</p>}
+            <p className="text-muted-foreground">{tr("发布后该版本固定。校内公开与积分资格仍须管理员逐版审核；关联课程不会因此自动发布。", "Published versions are fixed. School-wide visibility and leaderboard points still require admin review; linked courses will not publish automatically.")}</p>
+            <Feedback action={action} />
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setConfirmPublish(false)} disabled={action.busy}>{tr("取消", "Cancel")}</Button>
+              <Button
+                disabled={action.busy || publishableSelection.length < 1 || publishableSelection.length > MAX_BATCH_PUBLISH}
+                onClick={() => void action.run(async () => {
+                  const items = publishableSelection.map((problem) => ({ problemId: problem.id, versionId: problem.versionId! }));
+                  const result = await productionApi<{ publishedCount: number }>("problems/publish-batch", { method: "POST", body: { items } });
+                  setChecked((ids) => ids.filter((problemId) => !items.some((item) => item.problemId === problemId)));
+                  setConfirmPublish(false);
+                  problems.reload();
+                  return tr(`已发布 ${result.publishedCount} 道题目。校内公开与积分资格仍待管理员审核。`, `${result.publishedCount} problems published. School-wide visibility and points await admin review.`);
+                })}
+              >
+                {tr("确认发布", "Publish now")}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
       {manage && (
         <ManageGroups
           bankId={id}
@@ -406,7 +481,7 @@ export function TeacherBankDetail({ id }: { id: string }) {
         />
       )}
       {groupAdmin && (
-        <Modal title="分组管理" onClose={() => setGroupAdmin(false)}>
+        <Modal title={tr("分组管理", "Manage groups")} onClose={() => setGroupAdmin(false)}>
           <form
             className="flex gap-2"
             onSubmit={(e) => {
@@ -425,13 +500,13 @@ export function TeacherBankDetail({ id }: { id: string }) {
             }}
           >
             <input
-              aria-label="新分组名称"
+              aria-label={tr("新分组名称", "New group name")}
               name="name"
               required
               className={input}
-              placeholder="新分组名称"
+              placeholder={tr("新分组名称", "New group name")}
             />
-            <Button disabled={action.busy || !canContribute}>新建</Button>
+            <Button disabled={action.busy || !canContribute}>{tr("新建", "Create")}</Button>
           </form>
           <div className="mt-4 divide-y divide-border">
             {groups.data?.items.map((g) => (
@@ -440,7 +515,7 @@ export function TeacherBankDetail({ id }: { id: string }) {
                 className="flex justify-between gap-2 py-3 text-sm"
               >
                 <b>
-                  {g.name} · {g.problemIds.length} 题
+                  {g.name} · {g.problemIds.length} {tr("题", "problems")}
                 </b>
                 <Button
                   variant="ghost"
@@ -448,14 +523,14 @@ export function TeacherBankDetail({ id }: { id: string }) {
                   disabled={!g.canEdit}
                   onClick={() => setEditGroup(g)}
                 >
-                  改名 / 解散
+                  {tr("改名 / 解散", "Rename / delete")}
                 </Button>
               </div>
             ))}
           </div>
           <Feedback action={action} />
           <p className="mt-3 text-xs text-muted-foreground">
-            解散分组只删除分组关系，题目、学习章节与历史活动保留。
+            {tr("解散分组只删除分组关系，题目、学习章节与历史活动保留。", "Deleting a group removes only its relationships. Problems, course chapters, and past activities remain.")}
           </p>
         </Modal>
       )}
@@ -494,9 +569,11 @@ function GroupEditor({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { locale } = useLocale();
+  const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
   const action = useAction();
   return (
-    <Modal title={`分组 · ${group.name}`} onClose={onClose}>
+    <Modal title={`${tr("分组", "Group")} · ${group.name}`} onClose={onClose}>
       <form
         className="space-y-4"
         onSubmit={(e) => {
@@ -511,7 +588,7 @@ function GroupEditor({
           });
         }}
       >
-        <Field label="名称">
+        <Field label={tr("名称", "Name")}>
           <input
             name="name"
             required
@@ -520,7 +597,7 @@ function GroupEditor({
           />
         </Field>
         <p className="text-sm text-muted-foreground">
-          解散后保留 {group.problemIds.length} 道题及全部其他分组。
+          {tr("解散后保留", "Deleting this group keeps")} {group.problemIds.length} {tr("道题及全部其他分组。", "problems and all other groups.")}
         </p>
         <Feedback action={action} />
         <div className="flex justify-between">
@@ -529,7 +606,7 @@ function GroupEditor({
             variant="danger"
             disabled={action.busy}
             onClick={() => {
-              if (window.confirm(`解散“${group.name}”？保留全部题目。`))
+              if (window.confirm(`${tr("解散", "Delete")} “${group.name}”? ${tr("保留全部题目。", "All problems will remain.")}`))
                 void action.run(async () => {
                   await productionApi(`problem-groups/${group.id}`, {
                     method: "DELETE",
@@ -538,9 +615,9 @@ function GroupEditor({
                 });
             }}
           >
-            解散分组
+            {tr("解散分组", "Delete group")}
           </Button>
-          <Button disabled={action.busy}>保存名称</Button>
+          <Button disabled={action.busy}>{tr("保存名称", "Save name")}</Button>
         </div>
       </form>
     </Modal>
@@ -559,6 +636,8 @@ function AddExisting({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { locale } = useLocale();
+  const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
   const problems = useData<{ items: ProductionProblem[] }>("problems"),
     banks = useData<{ items: Bank[] }>("problem-banks"),
     [source, setSource] = useState(""),
@@ -572,18 +651,18 @@ function AddExisting({
           p.title.toLowerCase().includes(query.toLowerCase()),
       ) ?? [];
   return (
-    <Drawer title="从已有题目添加" onClose={onClose}>
+    <Drawer title={tr("从已有题目添加", "Add existing problems")} onClose={onClose}>
       <p className="text-sm text-muted-foreground">
-        同一题库的题目添加分组引用。跨题库复制为新草稿，保留来源，原题与已发布版本保持。
+        {tr("同一题库的题目添加分组引用。跨题库复制为新草稿，保留来源，原题与已发布版本保持。", "Problems in this bank are linked to the group. Cross-bank copies become new drafts; the source and published versions remain unchanged.")}
       </p>
       <div className="mt-4 grid grid-cols-2 gap-3">
         <select
-          aria-label="来源题库"
+          aria-label={tr("来源题库", "Source bank")}
           value={source}
           onChange={(e) => setSource(e.target.value)}
           className={input}
         >
-          <option value="">全部有权限题库</option>
+          <option value="">{tr("全部有权限题库", "All accessible banks")}</option>
           {banks.data?.items.map((b) => (
             <option key={b.id} value={b.id}>
               {b.name}
@@ -592,8 +671,8 @@ function AddExisting({
         </select>
         <input
           className={input}
-          aria-label="搜索已有题目"
-          placeholder="搜索标题"
+          aria-label={tr("搜索已有题目", "Search existing problems")}
+          placeholder={tr("搜索标题", "Search titles")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -623,12 +702,12 @@ function AddExisting({
                 <b>{p.title}</b>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {already
-                    ? "已添加"
+                    ? tr("已添加", "Added")
                     : p.bankId === bankId
-                      ? "本题库题目 · 添加引用"
+                      ? tr("本题库题目 · 添加引用", "In this bank · add reference")
                       : copyable
-                        ? "复制到目标题库为新草稿"
-                        : "仅阅读权限 · 不能复制正式测试"}
+                        ? tr("复制到目标题库为新草稿", "Copy to target bank as a new draft")
+                        : tr("仅阅读权限 · 不能复制正式测试", "Read-only · cannot copy formal tests")}
                 </p>
               </span>
             </label>
@@ -638,7 +717,7 @@ function AddExisting({
       <Feedback action={action} />
       <div className="mt-5 flex justify-end gap-2">
         <Button variant="secondary" onClick={onClose}>
-          取消
+          {tr("取消", "Cancel")}
         </Button>
         <Button
           disabled={!picked.length || action.busy}
@@ -687,7 +766,7 @@ function AddExisting({
             })
           }
         >
-          确认添加 {picked.length} 题
+          {tr("确认添加", "Add")} {picked.length} {tr("题", "problems")}
         </Button>
       </div>
     </Drawer>

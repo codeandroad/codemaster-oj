@@ -62,13 +62,15 @@ async function classAccess(db, user, classId) {
   return cls;
 }
 async function canManagePractice(db, user, practice) {
-  return isAdmin(user) || user.roles.includes('teacher') && !!(await db.query('SELECT 1 FROM teacher_classes tc JOIN classes c ON c.id=tc.class_id WHERE tc.class_id=$1 AND tc.account_id=$2 AND c.archived_at IS NULL', [practice.class_id, user.id])).rowCount;
+  // Archived activities remain readable by their former class teachers.
+  return isAdmin(user) || user.roles.includes('teacher') && !!(await db.query('SELECT 1 FROM teacher_classes tc WHERE tc.class_id=$1 AND tc.account_id=$2', [practice.class_id, user.id])).rowCount;
 }
 async function practiceAccess(db, user, id, { lock = false, share = false } = {}) {
   const practice = row(await db.query(`SELECT * FROM timed_practices WHERE id=$1${lock ? ' FOR UPDATE' : share ? ' FOR SHARE' : ''}`, [uuid(id, '计时训练 ID')]));
   const canManage = await canManagePractice(db, user, practice);
   const isParticipant = user.roles.includes('student') && !!(await db.query('SELECT 1 FROM timed_practice_participants WHERE practice_id=$1 AND identity_id=$2 AND NOT exempt', [id, user.identityId])).rowCount;
-  if (!canManage && practice.state === 'Draft') fail(404, 'NOT_FOUND', '计时训练不存在');
+  // Archiving a draft changes its state to Archived, but never publishes it.
+  if (!canManage && (practice.state === 'Draft' || (practice.state === 'Archived' && !practice.results_published_at))) fail(404, 'NOT_FOUND', '计时训练不存在');
   if (!canManage && !isParticipant) fail(403, 'FORBIDDEN', '未分配该计时训练');
   return { ...practice, canManage, isParticipant };
 }
@@ -172,10 +174,11 @@ export function createTimedService(pool) {
       if (!route.startsWith('/timed-practices')) return null;
       if (!user) fail(401, 'UNAUTHENTICATED', '请先登录');
       if (route === '/timed-practices' && method === 'GET') {
-        const list = await pool.query(isAdmin(user) ? 'SELECT id FROM timed_practices ORDER BY created_at DESC LIMIT 200'
-          : `SELECT p.id FROM timed_practices p WHERE ($3 AND EXISTS(SELECT 1 FROM teacher_classes tc JOIN classes c ON c.id=tc.class_id WHERE tc.class_id=p.class_id AND tc.account_id=$1 AND c.archived_at IS NULL))
-            OR ($4 AND p.state<>'Draft' AND EXISTS(SELECT 1 FROM timed_practice_participants part WHERE part.practice_id=p.id AND part.identity_id=$2 AND NOT part.exempt)) ORDER BY p.created_at DESC LIMIT 200`,
-        isAdmin(user) ? [] : [user.id, user.identityId, user.roles.includes('teacher'), user.roles.includes('student')]);
+        const archived=url.searchParams.get('archived')==='true';
+        const list = await pool.query(isAdmin(user) ? 'SELECT id FROM timed_practices WHERE (archived_at IS NOT NULL)=$1 ORDER BY created_at DESC LIMIT 200'
+          : `SELECT p.id FROM timed_practices p WHERE (p.archived_at IS NOT NULL)=$5 AND (($3 AND EXISTS(SELECT 1 FROM teacher_classes tc WHERE tc.class_id=p.class_id AND tc.account_id=$1))
+            OR ($4 AND (p.state<>'Draft' AND (p.state<>'Archived' OR p.results_published_at IS NOT NULL)) AND EXISTS(SELECT 1 FROM timed_practice_participants part WHERE part.practice_id=p.id AND part.identity_id=$2 AND NOT part.exempt))) ORDER BY p.created_at DESC LIMIT 200`,
+        isAdmin(user) ? [archived] : [user.id, user.identityId, user.roles.includes('teacher'), user.roles.includes('student'),archived]);
         const items = [];
         for (const practice of list.rows) items.push(await practiceResult(pool, user, practice.id));
         return { status: 200, body: { items } };
@@ -226,7 +229,7 @@ export function createTimedService(pool) {
         const items = (await pool.query('SELECT r.id,r.revision,r.reason,r.created_at,r.grades,i.name author_name FROM timed_result_revisions r JOIN accounts a ON a.id=r.actor_account_id JOIN identities i ON i.id=a.identity_id WHERE r.practice_id=$1 ORDER BY r.revision DESC', [practice.id])).rows.map((revision) => ({ id: revision.id, revision: revision.revision, reason: revision.reason, createdAt: revision.created_at, authorName: revision.author_name, grades: revision.grades }));
         return { status: 200, body: { items } };
       }
-      const match = route.match(/^\/timed-practices\/([^/]+)(?:\/(publish|start|finish|end|results|extend|exempt|archive))?$/);
+      const match = route.match(/^\/timed-practices\/([^/]+)(?:\/(publish|start|finish|end|results|extend|exempt|archive|restore))?$/);
       if (!match) return null;
       const id = uuid(match[1]), action = match[2];
       if(!action&&method==='PATCH'){
@@ -300,6 +303,14 @@ export function createTimedService(pool) {
           if(!(await db.query('SELECT 1 FROM timed_practice_problems WHERE practice_id=$1',[id])).rowCount||!(await db.query('SELECT 1 FROM timed_practice_participants WHERE practice_id=$1 AND NOT exempt',[id])).rowCount)fail(409,'INCOMPLETE','发布训练前须选择题目和适用学生');
           if (practice.state === 'Published') return;
           if (practice.state !== 'Draft') fail(409, 'INVALID_STATE', '当前训练不能发布');
+          const linked=(await db.query(`SELECT tpp.problem_id,tpp.version_id,p.archived_at problem_archived_at,
+            b.archived_at bank_archived_at,v.problem_id version_problem_id,v.published_at
+            FROM timed_practice_problems tpp JOIN problems p ON p.id=tpp.problem_id
+            JOIN problem_banks b ON b.id=p.bank_id JOIN problem_versions v ON v.id=tpp.version_id
+            WHERE tpp.practice_id=$1 FOR SHARE OF p,b,v`,[id])).rows;
+          if(linked.some(x=>x.problem_archived_at||x.bank_archived_at||x.version_problem_id!==x.problem_id||!x.published_at))
+            fail(409,'UNAVAILABLE_PROBLEM','训练包含已归档或未发布的题目版本，请先在草稿中替换');
+          for(const selected of linked)if(helpers.versionAccess)await helpers.versionAccess(db,user,selected.problem_id,selected.version_id);
           rewardBudget((await db.query('SELECT reward_points,speed_bonus_points,attempt_bonus_points FROM timed_practice_problems WHERE practice_id=$1',[id])).rows.map((entry)=>rewardCaps(entry)));
           if (serverNow >= practice.ends_at) fail(409, 'INVALID_STATE', '结束窗口已过期，发布前请将结束时间设置为晚于当前时间');
           await db.query("UPDATE timed_practices SET state='Published' WHERE id=$1", [id]);
@@ -387,6 +398,11 @@ export function createTimedService(pool) {
           if (!practice.results_published_at && practice.state !== 'Draft') fail(409, 'INVALID_STATE', '请先完成并发布训练成绩');
           await db.query("UPDATE timed_practices SET state='Archived',archived_at=$2 WHERE id=$1", [id, serverNow]);
           await audit(db, user, 'timed.archive', id);
+        } else if (action === 'restore') {
+          if (practice.state !== 'Archived') return;
+          if (!(await db.query('SELECT 1 FROM classes WHERE id=$1 AND archived_at IS NULL',[practice.class_id])).rowCount) fail(409,'CLASS_ARCHIVED','请先恢复班级，再恢复限时训练');
+          await db.query("UPDATE timed_practices SET state=$2,archived_at=NULL WHERE id=$1",[id,practice.results_published_at?'ResultsPublished':'Draft']);
+          await audit(db,user,'timed.restore',id);
         }
       });
       return { status: 200, body: await practiceResult(pool, user, id) };

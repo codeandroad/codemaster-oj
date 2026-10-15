@@ -40,13 +40,48 @@ export class LibraryController {
     return applyResponse(response, await this.domain.execute('library', request.domainContext));
   }
 
+  @Post('problems/publish-batch')
+  async publishProblemsBatch(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('library', request.domainContext));
+  }
+
   @Get('problems/rank-review')
   async rankReviewQueue(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('library', request.domainContext));
   }
 
+  @Post('problems/rank-review/approve-batch')
+  async approveRankedProblemsBatch(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('library', request.domainContext));
+  }
+
   @Patch('problems/:id/rank-review')
   async reviewRankedProblem(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('library', request.domainContext));
+  }
+
+  @Get('admin/problem-banks')
+  async adminBanks(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('library', request.domainContext));
+  }
+
+  @Get('admin/problem-banks/:id/problems')
+  async adminBankProblems(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('library', request.domainContext));
+  }
+
+  @Patch('admin/problem-banks/:id')
+  async adminUpdateBank(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('library', request.domainContext));
+  }
+
+  @Patch('admin/problems/:id')
+  async adminUpdateProblem(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('library', request.domainContext));
+  }
+
+  @Get('admin/problems/:id')
+  async adminProblemHistory(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('library', request.domainContext));
   }
 

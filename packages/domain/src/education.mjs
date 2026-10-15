@@ -11,63 +11,93 @@ const result = (body, status = 200) => ({ status, body });
 const requireStaff = user => { if (!staff(user)) fail(403, 'FORBIDDEN', '需要教师权限'); };
 const exists = query => { if (!query.rowCount) fail(404, 'NOT_FOUND', '内容不存在'); return query.rows[0]; };
 
-async function pathAccess(db, user, id, edit = false, lock = false) {
- const path = exists(await db.query(`SELECT * FROM learning_paths WHERE id=$1 AND archived_at IS NULL ${lock ? 'FOR UPDATE' : ''}`, [uuid(id)]));
+async function pathAccess(db, user, id, edit = false, lock = false, allowArchived = false) {
+ const path = exists(await db.query(`SELECT * FROM learning_paths WHERE id=$1 AND (archived_at IS NULL OR $2) ${lock ? 'FOR UPDATE' : ''}`, [uuid(id),allowArchived]));
  const canEdit = staff(user) && (administrator(user) || path.owner_account_id === user.id);
+ if(path.archived_at&&(!allowArchived||!canEdit))fail(404,'NOT_FOUND','内容不存在');
  if (edit && !canEdit) fail(403, 'FORBIDDEN', '只能维护本人负责的学习内容');
  if (!canEdit && !path.published_at) fail(404, 'NOT_FOUND', '内容不存在');
  return { ...path, canEdit };
 }
 
 function pathShape(p) {
- return { id: p.id, title: p.title,estimatedMinutes:p.estimated_minutes,updatedAt:p.updated_at,createdAt:p.created_at, description: p.description, category: p.category, published: !!p.published_at,
+ return { id: p.id, title: p.title,estimatedMinutes:p.estimated_minutes,updatedAt:p.updated_at,createdAt:p.created_at, description: p.description, category: p.category, published: !!p.published_at,archived:!!p.archived_at,
   difficulty:p.difficulty??'beginner',coverKey:p.cover_key??'general',taskCount:Number(p.task_count??0),completedTasks:Number(p.completed_tasks??0),chapterCount: Number(p.chapter_count ?? 0), completedChapters: Number(p.completed_chapters ?? 0), canEdit: p.canEdit ?? false };
 }
 
-async function taskStats(db,user,ids) {
+async function taskStats(db,user,ids,draftIds=[]) {
  if(!ids.length)return new Map();
  const rows=(await db.query(`SELECT c.path_id,count(DISTINCT cp.version_id)::int task_count,
  count(DISTINCT cp.version_id) FILTER(WHERE EXISTS(SELECT 1 FROM submissions s WHERE s.identity_id=$2 AND s.version_id=cp.version_id AND s.kind IN ('submit','correction') AND s.status='AC' AND (s.timed_attempt_id IS NULL OR EXISTS(SELECT 1 FROM timed_attempts ta JOIN timed_practices tp ON tp.id=ta.practice_id WHERE ta.id=s.timed_attempt_id AND tp.results_published_at IS NOT NULL))))::int completed_tasks
  FROM learning_chapters c JOIN chapter_problems cp ON cp.chapter_id=c.id JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id JOIN problem_versions v ON v.id=cp.version_id
  WHERE c.path_id=ANY($1::uuid[]) AND c.archived_at IS NULL AND p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school' AND v.published_at IS NOT NULL AND v.school_visible_at IS NOT NULL GROUP BY c.path_id`,[ids,user.identityId])).rows;
- return new Map(rows.map(r=>[r.path_id,r]));
+ const stats=new Map(rows.map(r=>[r.path_id,r]));
+ if(draftIds.length){
+  const drafts=(await db.query(`SELECT c.path_id,count(DISTINCT cp.version_id)::int task_count
+   FROM learning_chapters c JOIN chapter_problems cp ON cp.chapter_id=c.id
+   JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id
+   JOIN problem_versions v ON v.id=cp.version_id AND v.problem_id=cp.problem_id
+   WHERE c.path_id=ANY($1::uuid[]) AND c.archived_at IS NULL AND p.archived_at IS NULL
+    AND b.archived_at IS NULL AND b.visibility='school' GROUP BY c.path_id`,[draftIds])).rows;
+  for(const draft of drafts)stats.set(draft.path_id,{...draft,completed_tasks:0});
+ }
+ return stats;
 }
-async function pathResult(ctx, id, db = ctx.pool) {
- const p = await pathAccess(db, ctx.user, id);
+async function pathResult(ctx, id, db = ctx.pool, allowArchived = false) {
+ const p = await pathAccess(db, ctx.user, id, false, false, allowArchived);
  const chapters = (await db.query(`SELECT c.*, COALESCE(pr.completed,false) completed FROM learning_chapters c
   LEFT JOIN learning_progress pr ON pr.chapter_id=c.id AND pr.identity_id=$2 WHERE c.path_id=$1 AND c.archived_at IS NULL ORDER BY c.position,c.created_at,c.id`, [id, ctx.user.identityId])).rows;
- const links = chapters.length ? (await db.query(`SELECT cp.*,v.title FROM chapter_problems cp JOIN problems p ON p.id=cp.problem_id
-  JOIN problem_versions v ON v.id=cp.version_id WHERE cp.chapter_id=ANY($1::uuid[]) AND p.archived_at IS NULL AND v.school_visible_at IS NOT NULL ORDER BY cp.position`, [chapters.map(c => c.id)])).rows : [];
+ const links = chapters.length ? (await db.query(`SELECT cp.*,v.title,v.published_at,v.school_visible_at,v.rank_review_status,b.name bank_name,b.visibility bank_visibility,b.archived_at bank_archived_at,p.archived_at problem_archived_at
+  FROM chapter_problems cp JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id
+  JOIN problem_versions v ON v.id=cp.version_id AND v.problem_id=cp.problem_id
+  WHERE cp.chapter_id=ANY($1::uuid[]) ORDER BY cp.position`, [chapters.map(c => c.id)])).rows : [];
  const visible = new Map();
  for (const link of links) {
-  // A lesson never grants access to a private bank. Re-check every linked
-  // version on reads, including after the teacher changes library visibility.
+  const publicForStudents=link.bank_visibility==='school'&&!link.bank_archived_at&&!link.problem_archived_at&&!!link.published_at&&!!link.school_visible_at;
+  const readyForCourse=publicForStudents&&link.rank_review_status==='approved';
+  if (!p.canEdit && !publicForStudents) continue;
+  // A published lesson never grants student access to a private or nonpublic
+  // version. Editors may inspect a draft link to repair it before publication.
   try { await ctx.helpers.versionAccess(db, ctx.user, link.problem_id, link.version_id); }
   catch (error) { if ([403,404].includes(error.status)) continue; throw error; }
   if (!visible.has(link.chapter_id)) visible.set(link.chapter_id, []);
-  visible.get(link.chapter_id).push({ problemId: link.problem_id, title: link.title, versionId: link.version_id });
+  visible.get(link.chapter_id).push({ problemId: link.problem_id, title: link.title, versionId: link.version_id,
+   bankName:link.bank_name,published:!!link.published_at,schoolVisibleAt:link.school_visible_at??null,rankReviewStatus:link.rank_review_status??'pending',readyForCourse });
  }
  const versions=[...new Set([...visible.values()].flat().map(l=>l.versionId))];
  const solved=new Set(versions.length?(await db.query("SELECT DISTINCT version_id FROM submissions WHERE identity_id=$1 AND version_id=ANY($2::uuid[]) AND kind IN ('submit','correction') AND status='AC' AND (timed_attempt_id IS NULL OR EXISTS(SELECT 1 FROM timed_attempts ta JOIN timed_practices tp ON tp.id=ta.practice_id WHERE ta.id=submissions.timed_attempt_id AND tp.results_published_at IS NOT NULL))",[ctx.user.identityId,versions])).rows.map(r=>r.version_id):[]);
  const bundle=Array.isArray(p.practice_bundle)?p.practice_bundle:[];
  const state=p.canEdit&&bundle.length?(await db.query('SELECT id,validation_status,published_at FROM problem_versions WHERE id=ANY($1::uuid[])',[bundle.map(x=>x.versionId)])).rows:[];
  const status=new Map(state.map(v=>[v.id,v]));
+ const linkedAssignments=p.published_at&&ctx.user.roles.includes('student')?(await db.query(`SELECT a.id,a.title,a.due_at FROM assignments a WHERE a.course_path_id=$1 AND a.state='Published' AND a.archived_at IS NULL AND EXISTS(SELECT 1 FROM assignment_participants ap WHERE ap.assignment_id=a.id AND ap.identity_id=$2 AND NOT ap.exempt) ORDER BY a.due_at DESC,a.created_at DESC`,[id,ctx.user.identityId])).rows:[];
  return { ...pathShape({ ...p, task_count:versions.length,completed_tasks:solved.size,chapter_count: chapters.length, completed_chapters: chapters.filter(c => c.completed).length }),
+  assignments:linkedAssignments.map(a=>({id:a.id,title:a.title,dueAt:a.due_at})),
   practiceBundle:p.canEdit?bundle.map(x=>({...x,validationStatus:status.get(x.versionId)?.validation_status??'Unknown',published:!!status.get(x.versionId)?.published_at})):undefined,
   chapters: chapters.map(c => ({ id: c.id, title: c.title, content: c.content, position: c.position, completed: c.completed,objective:c.objective,checkpoint:c.checkpoint,checkpointAnswer:c.checkpoint_answer, taskCount:(visible.get(c.id)??[]).length,completedTasks:(visible.get(c.id)??[]).filter(l=>solved.has(l.versionId)).length,problems: (visible.get(c.id) ?? []).map(l=>({...l,completed:solved.has(l.versionId)})) })) };
 }
 
-async function setLinks(ctx, db, chapterId, problemIds) {
+async function setLinks(ctx, db, path, chapterId, problemIds) {
  if (!Array.isArray(problemIds) || problemIds.length > 100) fail(400, 'VALIDATION', '练习题须为最多 100 项的 ID 数组');
  const ids = [...new Set(problemIds.map(id => uuid(id, '练习题 ID')))];
+ const existing=new Map((await db.query('SELECT problem_id,version_id FROM chapter_problems WHERE chapter_id=$1',[chapterId])).rows.map(link=>[link.problem_id,link.version_id]));
  const links = [];
  for (const id of ids) {
-  const { p } = await ctx.helpers.versionAccess(db, ctx.user, id);
-  const bank=(await db.query('SELECT visibility,archived_at FROM problem_banks WHERE id=$1',[p.bank_id])).rows[0];
-  if(!bank || bank.visibility!=='school' || bank.archived_at)fail(409,'PRIVATE_LESSON_PROBLEM','校内学习章节须关联校内公开题库中的已发布题目');
-  if (!p.current_version_id) fail(409, 'NOT_PUBLISHED', '章节练习只能关联已发布题目');
-  const { v } = await ctx.helpers.versionAccess(db, ctx.user, id, p.current_version_id);
-  if (!v.published_at || !v.school_visible_at) fail(409, 'NOT_PUBLISHED', '章节练习只能关联已审核的校内公开题目');
+  const selected=await ctx.helpers.versionAccess(db,ctx.user,id,existing.get(id));
+  const {p}=selected;
+  const lockedProblem=path.published_at?exists(await db.query('SELECT current_version_id,archived_at,bank_id FROM problems WHERE id=$1 FOR SHARE',[id])):p;
+  if(lockedProblem.archived_at)fail(409,'ARCHIVED_LESSON_PROBLEM','已归档题目不能关联学习章节');
+  const bank=(await db.query(`SELECT visibility,archived_at FROM problem_banks WHERE id=$1 ${path.published_at?'FOR SHARE':''}`,[lockedProblem.bank_id])).rows[0];
+  if(!bank || bank.visibility!=='school' || bank.archived_at)fail(409,'PRIVATE_LESSON_PROBLEM','校内学习章节须关联校内题库中的题目');
+  let resolved=selected;
+  if(path.published_at&&!existing.has(id)){
+   if(!lockedProblem.current_version_id)fail(409,'UNAPPROVED_LESSON_PROBLEM','已发布课程只能关联通过管理员校内公开审核的题目');
+   resolved=await ctx.helpers.versionAccess(db,ctx.user,id,lockedProblem.current_version_id);
+  }
+  const {v,owner}=resolved;
+  const checked=path.published_at?exists(await db.query('SELECT problem_id,published_at,school_visible_at,rank_review_status FROM problem_versions WHERE id=$1 FOR SHARE',[v.id])):v;
+  const approved=checked.problem_id===id&&!!checked.published_at&&!!checked.school_visible_at&&checked.rank_review_status==='approved';
+  if(path.published_at&&!approved)fail(409,'UNAPPROVED_LESSON_PROBLEM','已发布课程只能关联通过管理员校内公开审核的题目');
+  if(!path.published_at&&!approved&&!owner)fail(403,'FORBIDDEN','未公开题目只能由有编辑权限的教师关联至课程草稿');
   links.push({ problemId: id, versionId: v.id });
  }
  await db.query('DELETE FROM chapter_problems WHERE chapter_id=$1', [chapterId]);
@@ -87,14 +117,17 @@ async function teachingReport(ctx) {
  const timedPracticeId = ctx.url.searchParams.get('timedPracticeId');
  if (classId) uuid(classId); if (assignmentId) uuid(assignmentId); if(timedPracticeId)uuid(timedPracticeId);
  if(assignmentId&&timedPracticeId)fail(400,'VALIDATION','请分别选择作业或计时训练');
- const classes = (await ctx.pool.query(`SELECT c.id,c.name FROM classes c WHERE c.archived_at IS NULL AND ($1::boolean OR EXISTS
-  (SELECT 1 FROM teacher_classes tc WHERE tc.class_id=c.id AND tc.account_id=$2)) ORDER BY c.name,c.id`, [administrator(ctx.user),ctx.user.id])).rows;
+ const classes = (await ctx.pool.query(`SELECT c.id,c.name,(c.archived_at IS NOT NULL) archived FROM classes c WHERE ($1::boolean OR EXISTS
+  (SELECT 1 FROM teacher_classes tc WHERE tc.class_id=c.id AND tc.account_id=$2)) ORDER BY c.archived_at IS NOT NULL,c.name,c.id`, [administrator(ctx.user),ctx.user.id])).rows;
  if (classId && !classes.some(c => c.id === classId)) fail(403, 'FORBIDDEN', '无权查看该班级报告');
- const classIds = classId ? [classId] : classes.map(c => c.id);
+ const activityClassId=!classId&&assignmentId?(await ctx.pool.query('SELECT class_id FROM assignments WHERE id=$1',[assignmentId])).rows[0]?.class_id:
+  !classId&&timedPracticeId?(await ctx.pool.query('SELECT class_id FROM timed_practices WHERE id=$1',[timedPracticeId])).rows[0]?.class_id:null;
+ if(activityClassId&&!classes.some(c=>c.id===activityClassId))fail(403,'FORBIDDEN','无权查看该活动报告');
+ const classIds = classId ? [classId] : activityClassId?[activityClassId]:classes.filter(c=>!c.archived).map(c => c.id);
  const sinceRaw=ctx.url.searchParams.get('since'),untilRaw=ctx.url.searchParams.get('until');const since=sinceRaw?new Date(sinceRaw):null,until=untilRaw?new Date(untilRaw):null;if(since&&!Number.isFinite(since.getTime())||until&&!Number.isFinite(until.getTime())||since&&until&&until<since)fail(400,'VALIDATION','时间范围无效');
  const assignments = (await ctx.pool.query("SELECT id,title,class_id,due_at FROM assignments WHERE class_id=ANY($1::uuid[]) AND state='Published' AND ($2::timestamptz IS NULL OR created_at>=$2) AND ($3::timestamptz IS NULL OR created_at<=$3) ORDER BY created_at DESC,id", [classIds,since,until])).rows;
  if (assignmentId && !assignments.some(a => a.id === assignmentId)) fail(403, 'FORBIDDEN', '无权查看该作业报告');
- const timedPractices=(await ctx.pool.query("SELECT id,title,class_id,ends_at FROM timed_practices WHERE class_id=ANY($1::uuid[]) AND state<>'Draft' AND ($2::timestamptz IS NULL OR created_at>=$2) AND ($3::timestamptz IS NULL OR created_at<=$3) ORDER BY created_at DESC,id",[classIds,since,until])).rows;
+ const timedPractices=(await ctx.pool.query("SELECT id,title,class_id,ends_at FROM timed_practices WHERE class_id=ANY($1::uuid[]) AND state<>'Draft' AND (state<>'Archived' OR results_published_at IS NOT NULL) AND ($2::timestamptz IS NULL OR created_at>=$2) AND ($3::timestamptz IS NULL OR created_at<=$3) ORDER BY created_at DESC,id",[classIds,since,until])).rows;
  if(timedPracticeId&&!timedPractices.some(p=>p.id===timedPracticeId))fail(403,'FORBIDDEN','无权查看该训练报告');
  const chosen = timedPracticeId?[]:assignmentId ? assignments.filter(a => a.id === assignmentId) : assignments;
  const chosenTimed=assignmentId?[]:timedPracticeId?timedPractices.filter(p=>p.id===timedPracticeId):timedPractices;
@@ -325,11 +358,13 @@ export async function handleEducation(ctx) {
   return result({ columns:['Identity ID','Student','Assignment','Score','Maximum','State'], rows });
  }
  if (route === '/learning-paths' && method === 'GET') {
+  const archived=ctx.url.searchParams.get('archived')==='true';
+  if(archived)requireStaff(user);
   const paths = (await pool.query(`SELECT p.*,(SELECT count(*) FROM learning_chapters c WHERE c.path_id=p.id AND c.archived_at IS NULL) chapter_count,
    (SELECT count(*) FROM learning_progress pr JOIN learning_chapters c ON c.id=pr.chapter_id WHERE c.path_id=p.id AND c.archived_at IS NULL AND pr.identity_id=$2 AND pr.completed) completed_chapters
-   FROM learning_paths p WHERE p.archived_at IS NULL AND (p.published_at IS NOT NULL OR ($3::boolean AND (p.owner_account_id=$1 OR $4::boolean))) ORDER BY p.updated_at DESC,p.id`, [user.id,user.identityId,staff(user),administrator(user)])).rows;
-  const stats=await taskStats(pool,user,paths.map(p=>p.id));
-  return result({ items:paths.map(p=>pathShape({...p,...stats.get(p.id),canEdit:staff(user)&&(administrator(user)||p.owner_account_id===user.id)})) });
+   FROM learning_paths p WHERE (p.archived_at IS NOT NULL)=$5 AND (NOT $5 AND p.published_at IS NOT NULL OR ($3::boolean AND (p.owner_account_id=$1 OR $4::boolean))) ORDER BY p.updated_at DESC,p.id`, [user.id,user.identityId,staff(user),administrator(user),archived])).rows;
+  const stats=await taskStats(pool,user,paths.map(p=>p.id),paths.filter(p=>!p.published_at).map(p=>p.id));
+  return result({ items:paths.map(p=>({...pathShape({...p,...stats.get(p.id),canEdit:staff(user)&&(administrator(user)||p.owner_account_id===user.id)}),archived:!!p.archived_at})) });
  }
  if (route === '/learning-paths/import' && method === 'POST') {
   requireStaff(user);const doc=validateLearningDocument(body);
@@ -337,7 +372,7 @@ export async function handleEducation(ctx) {
    const p=exists(await db.query('INSERT INTO learning_paths(owner_account_id,title,description,category,estimated_minutes,difficulty,cover_key) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *',[user.id,doc.title,doc.description,doc.category,doc.estimatedMinutes,doc.difficulty,doc.coverKey]));
    for(let position=0;position<doc.chapters.length;position++){
     const c=doc.chapters[position];const chapter=exists(await db.query('INSERT INTO learning_chapters(path_id,title,content,position,objective,checkpoint,checkpoint_answer) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *',[p.id,c.title,c.content,position,c.objective,c.checkpoint,c.checkpointAnswer]));
-    await setLinks(ctx,db,chapter.id,c.problemIds);
+    await setLinks(ctx,db,p,chapter.id,c.problemIds);
    }
    await helpers.audit(db,user.id,'learning.import','learning_path',p.id,{chapterCount:doc.chapters.length});return p;
   });return result(pathShape({...path,chapter_count:doc.chapters.length,canEdit:true}),201);
@@ -363,7 +398,7 @@ export async function handleEducation(ctx) {
     if(versions.length!==bundle.length||versions.some(v=>v.validation_status!=='AC'))fail(409,'NOT_VALIDATED','全部参考答案须经真实判题通过后才能发布配套练习');
     for(const v of versions){await db.query('UPDATE problem_versions SET published_at=COALESCE(published_at,now()) WHERE id=$1',[v.id]);await db.query('UPDATE problems SET current_version_id=$1 WHERE id=$2',[v.id,v.problem_id]);}
     const live=(await db.query('SELECT id FROM learning_chapters WHERE path_id=$1 AND archived_at IS NULL',[id])).rows;
-    for(const item of bundle){if(!live.some(c=>c.id===item.chapterId))fail(409,'CONFLICT','配套章节已移除，请恢复章节或手动整理题库引用');const old=(await db.query('SELECT problem_id FROM chapter_problems WHERE chapter_id=$1 ORDER BY position',[item.chapterId])).rows;await setLinks(ctx,db,item.chapterId,[...old.map(x=>x.problem_id),item.problemId]);}
+    for(const item of bundle){if(!live.some(c=>c.id===item.chapterId))fail(409,'CONFLICT','配套章节已移除，请恢复章节或手动整理题库引用');if(!path.published_at){const old=(await db.query('SELECT problem_id FROM chapter_problems WHERE chapter_id=$1 ORDER BY position',[item.chapterId])).rows;await setLinks(ctx,db,path,item.chapterId,[...old.map(x=>x.problem_id),item.problemId]);}}
     await helpers.audit(db,user.id,'learning.practice_publish','learning_path',id,{count:bundle.length});
    }else if(bundle.length && body.document!==undefined){
     fail(409,'CONFLICT','此课程已有配套题目，请在题库编辑现有练习，避免重复导入');
@@ -383,7 +418,7 @@ export async function handleEducation(ctx) {
  courseMatch=route.match(/^\/learning-paths\/([^/]+)\/progress$/);
  if(courseMatch&&method==='GET'){
   requireStaff(user);const path=await pathAccess(pool,user,courseMatch[1],true);
-  const counts=await taskStats(pool,user,[path.id]);
+  const counts=await taskStats(pool,user,[path.id],path.published_at?[]:[path.id]);
   const chapterCount=(await pool.query('SELECT count(*)::int n FROM learning_chapters WHERE path_id=$1 AND archived_at IS NULL',[path.id])).rows[0].n;
   const students=(await pool.query(`SELECT i.id,i.name,i.number,
    (SELECT count(*)::int FROM learning_progress pr JOIN learning_chapters c ON c.id=pr.chapter_id WHERE c.path_id=$1 AND c.archived_at IS NULL AND pr.identity_id=i.id AND pr.completed) completed_chapters,
@@ -392,7 +427,29 @@ export async function handleEducation(ctx) {
   return result({chapterCount,taskCount:counts.get(path.id)?.task_count??0,items:students.map(s=>({id:s.id,name:s.name,number:s.number,completedChapters:Number(s.completed_chapters),completedTasks:Number(s.completed_tasks)}))});
  }
  let match=route.match(/^\/learning-paths\/([^/]+)$/);
- if (match && method === 'GET') return result(await pathResult(ctx,match[1]));
+ if (match && method === 'GET') return result(await pathResult(ctx,match[1],pool,true));
+ const restoreMatch=route.match(/^\/learning-paths\/([^/]+)\/restore$/);
+ if(restoreMatch&&method==='POST'){
+  requireStaff(user);const id=uuid(restoreMatch[1]);
+  await transaction(pool,async db=>{
+   const path=exists(await db.query('SELECT id,owner_account_id,archived_at,published_at FROM learning_paths WHERE id=$1 FOR UPDATE',[id]));
+   if(!administrator(user)&&path.owner_account_id!==user.id)fail(403,'FORBIDDEN','只能恢复本人课程');
+   if(!path.archived_at)return;
+   if(path.published_at){
+    const links=(await db.query(`SELECT cp.problem_id,v.problem_id version_problem_id,
+      p.archived_at problem_archived_at,b.archived_at bank_archived_at,b.visibility bank_visibility,
+      v.published_at,v.school_visible_at,v.rank_review_status
+      FROM chapter_problems cp JOIN learning_chapters c ON c.id=cp.chapter_id
+      JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id
+      JOIN problem_versions v ON v.id=cp.version_id
+      WHERE c.path_id=$1 AND c.archived_at IS NULL FOR SHARE OF p,b,v`,[id])).rows;
+    if(links.some(link=>link.problem_id!==link.version_problem_id||link.problem_archived_at||link.bank_archived_at||link.bank_visibility!=='school'||!link.published_at||!link.school_visible_at||link.rank_review_status!=='approved'))
+     fail(409,'UNAPPROVED_LESSON_PROBLEM','课程存在未通过审核的关联题目，无法恢复公开课程');
+   }
+   await db.query('UPDATE learning_paths SET archived_at=NULL,updated_at=clock_timestamp() WHERE id=$1',[id]);
+   await helpers.audit(db,user.id,'learning.restore','learning_path',id);
+  });return result(await pathResult(ctx,id));
+ }
  if (match && method === 'PATCH') {
   requireStaff(user);
   const p=await transaction(pool,async db=>{
@@ -401,6 +458,11 @@ export async function handleEducation(ctx) {
    const description=body.description===undefined?path.description:field(body.description,'描述',{min:0,max:4000});
    const category=body.category===undefined?path.category:field(body.category,'分类',{max:100});
    if (body.archived!==undefined && typeof body.archived!=='boolean') fail(400,'VALIDATION','归档状态无效');
+   if(body.archived===true){
+    const active=(await db.query(`SELECT 1 FROM assignments WHERE course_path_id=$1 AND archived_at IS NULL
+      AND state='Published' AND due_at>clock_timestamp() LIMIT 1`,[path.id])).rowCount;
+    if(active)fail(409,'COURSE_HAS_ACTIVE_ASSIGNMENTS','课程仍关联进行中的作业，请先等待作业截止并归档，或保留课程');
+   }
    const p=exists(await db.query('UPDATE learning_paths SET title=$1,description=$2,category=$3,archived_at=CASE WHEN $4 THEN now() ELSE archived_at END,updated_at=now(),estimated_minutes=$6,difficulty=$7,cover_key=$8 WHERE id=$5 RETURNING *',[title,description,category,body.archived===true,path.id,body.estimatedMinutes===undefined?path.estimated_minutes:integer(body.estimatedMinutes,1,10080,'预计学习时长'),enumValue(body.difficulty??path.difficulty,['beginner','intermediate','advanced'],'难度'),enumValue(body.coverKey??path.cover_key,['python','algorithms','general'],'封面')]));
    await helpers.audit(db,user.id,body.archived?'learning.archive':'learning.edit','learning_path',path.id);return p;
   });
@@ -413,6 +475,16 @@ export async function handleEducation(ctx) {
    const path=await pathAccess(db,user,match[1],true,true);
    const chapters=(await db.query('SELECT * FROM learning_chapters WHERE path_id=$1 AND archived_at IS NULL',[path.id])).rows;
    if (!chapters.length||chapters.some(c=>!c.content.trim())) fail(409,'INCOMPLETE','发布前需要至少一个有正文的章节');
+   // Hold the bank, problem and version rows through publication so an
+   // administrator cannot revoke public approval between check and commit.
+   const linked=(await db.query(`SELECT cp.problem_id,p.archived_at problem_archived_at,b.visibility bank_visibility,b.archived_at bank_archived_at,
+    v.problem_id version_problem_id,v.published_at,v.school_visible_at,v.rank_review_status
+    FROM chapter_problems cp JOIN learning_chapters c ON c.id=cp.chapter_id
+    JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id
+    JOIN problem_versions v ON v.id=cp.version_id
+    WHERE c.path_id=$1 AND c.archived_at IS NULL FOR SHARE OF p,b,v`,[path.id])).rows;
+   if(linked.some(link=>link.problem_archived_at||link.bank_archived_at||link.bank_visibility!=='school'||link.version_problem_id!==link.problem_id||!link.published_at||!link.school_visible_at||link.rank_review_status!=='approved'))
+    fail(409,'UNAPPROVED_LESSON_PROBLEM','章节练习须先发布并通过管理员校内公开审核，课程才能发布');
    await db.query('UPDATE learning_paths SET published_at=COALESCE(published_at,now()),updated_at=now() WHERE id=$1',[path.id]);
    await helpers.audit(db,user.id,'learning.publish','learning_path',path.id);
   });
@@ -426,7 +498,7 @@ export async function handleEducation(ctx) {
    const path=await pathAccess(db,user,match[1],true,true);
    if(path.published_at&&!content.trim())fail(409,'INCOMPLETE','已发布路径新增章节必须有正文');
    const c=exists(await db.query('INSERT INTO learning_chapters(path_id,title,content,position,objective,checkpoint,checkpoint_answer) VALUES($1,$2,$3,(SELECT COALESCE(max(position),-1)+1 FROM learning_chapters WHERE path_id=$1),$4,$5,$6) RETURNING *',[path.id,title,content,field(body.objective??'','学习目标',{min:0,max:4000}),field(body.checkpoint??'','检查点',{min:0,max:10000}),field(body.checkpointAnswer??'','检查点答案',{min:0,max:10000})]));
-   await setLinks(ctx,db,c.id,body.problemIds??[]);
+   await setLinks(ctx,db,path,c.id,body.problemIds??[]);
    await db.query('UPDATE learning_paths SET updated_at=now() WHERE id=$1',[path.id]);
    await helpers.audit(db,user.id,'learning.chapter_create','learning_chapter',c.id);return c;
   });
@@ -449,7 +521,7 @@ export async function handleEducation(ctx) {
     if(position<chapter.position)await db.query('UPDATE learning_chapters SET position=position+1 WHERE path_id=$1 AND archived_at IS NULL AND id<>$2 AND position >= $3 AND position < $4',[path.id,chapter.id,position,chapter.position]);
     if(position>chapter.position)await db.query('UPDATE learning_chapters SET position=position-1 WHERE path_id=$1 AND archived_at IS NULL AND id<>$2 AND position > $3 AND position <= $4',[path.id,chapter.id,chapter.position,position]);
     await db.query('UPDATE learning_chapters SET title=$1,content=$2,position=$3,updated_at=now(),objective=$5,checkpoint=$6,checkpoint_answer=$7 WHERE id=$4',[title,content,position,chapter.id,body.objective===undefined?chapter.objective:field(body.objective,'学习目标',{min:0,max:4000}),body.checkpoint===undefined?chapter.checkpoint:field(body.checkpoint,'检查点',{min:0,max:10000}),body.checkpointAnswer===undefined?chapter.checkpoint_answer:field(body.checkpointAnswer,'检查点答案',{min:0,max:10000})]);
-    if (body.problemIds!==undefined) await setLinks(ctx,db,chapter.id,body.problemIds);
+    if (body.problemIds!==undefined) await setLinks(ctx,db,path,chapter.id,body.problemIds);
    }
    await db.query('UPDATE learning_paths SET updated_at=now() WHERE id=$1',[path.id]);
    await helpers.audit(db,user.id,method==='DELETE'?'learning.chapter_archive':'learning.chapter_edit','learning_chapter',chapter.id);

@@ -1,0 +1,1644 @@
+[
+  {
+    "chapterNumber": 1,
+    "chapterTitle": "1. 基础语法 | Basics",
+    "title": "语法速成 01 · 自我介绍",
+    "mode": "stdio",
+    "statement": "## 任务\n\n读取姓名和年龄，用 `print()` 输出一行自我介绍。\n\n## 输入\n\n第一行是姓名，第二行是非负整数年龄。姓名可以包含空格或中文。\n\n## 输出\n\n输出 `My name is NAME, and I am AGE years old.`，其中 NAME、AGE 替换为输入值，标点与大小写保持一致。\n\n## 数据范围与约定\n\n姓名长度 1–40；年龄 0–120。\n\n只输出规定的答案，不输出输入提示或调试信息。",
+    "objective": "读取姓名和年龄，用 `print()` 输出一行自我介绍。",
+    "inputDescription": "第一行是姓名，第二行是非负整数年龄。姓名可以包含空格或中文。",
+    "outputDescription": "输出 `My name is NAME, and I am AGE years old.`，其中 NAME、AGE 替换为输入值，标点与大小写保持一致。",
+    "difficulty": "入门",
+    "referenceLanguage": "python",
+    "referenceCode": "name=input()\nage=int(input())\nprint(f\"My name is {name}, and I am {age} years old.\")\n",
+    "starterCode": "# 从标准输入读取数据，按题意输出答案。\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "Python",
+      "语法速成",
+      "第1章"
+    ],
+    "source": "用户提供的《Python 编程语言 | Python Syntax Crash Course》教学练习改编",
+    "samples": [
+      {
+        "name": "样例 1",
+        "input": "Alice\n25\n",
+        "expected": "My name is Alice, and I am 25 years old.\n",
+        "enabled": true
+      },
+      {
+        "name": "样例 2",
+        "input": "小明\n12\n",
+        "expected": "My name is 小明, and I am 12 years old.\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "正式测试 1",
+        "input": "Bob\n0\n",
+        "expected": "My name is Bob, and I am 0 years old.\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 2",
+        "input": "李雷\n16\n",
+        "expected": "My name is 李雷, and I am 16 years old.\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 3",
+        "input": "A\n1\n",
+        "expected": "My name is A, and I am 1 years old.\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 4",
+        "input": "Code Master\n18\n",
+        "expected": "My name is Code Master, and I am 18 years old.\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 5",
+        "input": "张三\n100\n",
+        "expected": "My name is 张三, and I am 100 years old.\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 2,
+    "chapterTitle": "2. 变量与数据类型 | Variables & Data Types",
+    "title": "语法速成 02 · 价格转整数",
+    "mode": "stdio",
+    "statement": "## 任务\n\n模仿 `int(price)`，将十进制价格向零截断为整数。\n\n## 输入\n\n输入一行十进制数，可带负号和小数部分。\n\n## 输出\n\n输出截断后的整数，不输出其他文字。\n\n## 数据范围与约定\n\n数值绝对值不超过 1,000,000；小数部分最多 6 位。截断不是四舍五入，例如 -2.7 输出 -2。\n\n只输出规定的答案，不输出输入提示或调试信息。",
+    "objective": "模仿 `int(price)`，将十进制价格向零截断为整数。",
+    "inputDescription": "输入一行十进制数，可带负号和小数部分。",
+    "outputDescription": "输出截断后的整数，不输出其他文字。",
+    "difficulty": "入门",
+    "referenceLanguage": "python",
+    "referenceCode": "from decimal import Decimal\nprice=Decimal(input().strip())\nprint(int(price))\n",
+    "starterCode": "# 从标准输入读取数据，按题意输出答案。\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "Python",
+      "语法速成",
+      "第2章"
+    ],
+    "source": "用户提供的《Python 编程语言 | Python Syntax Crash Course》教学练习改编",
+    "samples": [
+      {
+        "name": "样例 1",
+        "input": "19.99\n",
+        "expected": "19\n",
+        "enabled": true
+      },
+      {
+        "name": "样例 2",
+        "input": "-2.7\n",
+        "expected": "-2\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "正式测试 1",
+        "input": "0.00\n",
+        "expected": "0\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 2",
+        "input": "999999.999999\n",
+        "expected": "999999\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 3",
+        "input": "-0.9\n",
+        "expected": "0\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 4",
+        "input": "42\n",
+        "expected": "42\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 5",
+        "input": "-123.456\n",
+        "expected": "-123\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 3,
+    "chapterTitle": "3. 运算符 | Operators",
+    "title": "语法速成 03 · 圆的面积",
+    "mode": "stdio",
+    "statement": "## 任务\n\n使用平方运算，计算半径为 `r` 的圆面积。取 π = 3.14159。\n\n## 输入\n\n一行输入整数半径 `r`。\n\n## 输出\n\n输出面积，固定保留 5 位小数。\n\n## 数据范围与约定\n\n0 ≤ r ≤ 1000；例如 r=5 时输出 78.53975。\n\n只输出规定的答案，不输出输入提示或调试信息。",
+    "objective": "使用平方运算，计算半径为 `r` 的圆面积。取 π = 3.14159。",
+    "inputDescription": "一行输入整数半径 `r`。",
+    "outputDescription": "输出面积，固定保留 5 位小数。",
+    "difficulty": "入门",
+    "referenceLanguage": "python",
+    "referenceCode": "from decimal import Decimal\nr=int(input())\narea=Decimal(\"3.14159\")*r**2\nprint(f\"{area:.5f}\")\n",
+    "starterCode": "# 从标准输入读取数据，按题意输出答案。\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "Python",
+      "语法速成",
+      "第3章"
+    ],
+    "source": "用户提供的《Python 编程语言 | Python Syntax Crash Course》教学练习改编",
+    "samples": [
+      {
+        "name": "样例 1",
+        "input": "5\n",
+        "expected": "78.53975\n",
+        "enabled": true
+      },
+      {
+        "name": "样例 2",
+        "input": "0\n",
+        "expected": "0.00000\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "正式测试 1",
+        "input": "1\n",
+        "expected": "3.14159\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 2",
+        "input": "2\n",
+        "expected": "12.56636\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 3",
+        "input": "10\n",
+        "expected": "314.15900\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 4",
+        "input": "100\n",
+        "expected": "31415.90000\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 5",
+        "input": "999\n",
+        "expected": "3135309.96159\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 4,
+    "chapterTitle": "4. 字符串 | String",
+    "title": "语法速成 04 · 首字母大写后反转",
+    "mode": "stdio",
+    "statement": "## 任务\n\n先把每个单词的首字母改为大写，再把整行字符串按字符倒序输出。\n\n## 输入\n\n输入一行由小写英文字母组成的句子，单词间恰好一个空格。\n\n## 输出\n\n输出处理后的字符串。\n\n## 数据范围与约定\n\n1 ≤ 句子长度 ≤ 200；没有行首或行尾空格。\n\n只输出规定的答案，不输出输入提示或调试信息。",
+    "objective": "先把每个单词的首字母改为大写，再把整行字符串按字符倒序输出。",
+    "inputDescription": "输入一行由小写英文字母组成的句子，单词间恰好一个空格。",
+    "outputDescription": "输出处理后的字符串。",
+    "difficulty": "入门",
+    "referenceLanguage": "python",
+    "referenceCode": "s=input()\nprint(s.title()[::-1])\n",
+    "starterCode": "# 从标准输入读取数据，按题意输出答案。\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "Python",
+      "语法速成",
+      "第4章"
+    ],
+    "source": "用户提供的《Python 编程语言 | Python Syntax Crash Course》教学练习改编",
+    "samples": [
+      {
+        "name": "样例 1",
+        "input": "python is awesome\n",
+        "expected": "emosewA sI nohtyP\n",
+        "enabled": true
+      },
+      {
+        "name": "样例 2",
+        "input": "hello\n",
+        "expected": "olleH\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "正式测试 1",
+        "input": "a b\n",
+        "expected": "B A\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 2",
+        "input": "code master\n",
+        "expected": "retsaM edoC\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 3",
+        "input": "z\n",
+        "expected": "Z\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 4",
+        "input": "hello world python\n",
+        "expected": "nohtyP dlroW olleH\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 5",
+        "input": "a aa aaa\n",
+        "expected": "aaA aA A\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 5,
+    "chapterTitle": "5. 列表 | List",
+    "title": "语法速成 05 · 去重并排序",
+    "mode": "stdio",
+    "statement": "## 任务\n\n给定整数列表，去掉重复值，再按从小到大排序。\n\n## 输入\n\n第一行是整数 `n`；第二行是 `n` 个整数，以空格分隔。\n\n## 输出\n\n输出去重后的整数，按升序排列，以单个空格分隔。\n\n## 数据范围与约定\n\n1 ≤ n ≤ 1000；每个整数的绝对值不超过 1,000,000。\n\n只输出规定的答案，不输出输入提示或调试信息。",
+    "objective": "给定整数列表，去掉重复值，再按从小到大排序。",
+    "inputDescription": "第一行是整数 `n`；第二行是 `n` 个整数，以空格分隔。",
+    "outputDescription": "输出去重后的整数，按升序排列，以单个空格分隔。",
+    "difficulty": "入门",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\na=list(map(int,sys.stdin.read().split()))\nprint(*sorted(set(a[1:1+a[0]])))\n",
+    "starterCode": "# 从标准输入读取数据，按题意输出答案。\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "Python",
+      "语法速成",
+      "第5章"
+    ],
+    "source": "用户提供的《Python 编程语言 | Python Syntax Crash Course》教学练习改编",
+    "samples": [
+      {
+        "name": "样例 1",
+        "input": "8\n3 1 4 1 5 9 2 6\n",
+        "expected": "1 2 3 4 5 6 9\n",
+        "enabled": true
+      },
+      {
+        "name": "样例 2",
+        "input": "4\n7 7 7 7\n",
+        "expected": "7\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "正式测试 1",
+        "input": "5\n-3 -1 -3 0 2\n",
+        "expected": "-3 -1 0 2\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 2",
+        "input": "3\n1 2 3\n",
+        "expected": "1 2 3\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 3",
+        "input": "5\n0 0 0 1 -1\n",
+        "expected": "-1 0 1\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 4",
+        "input": "2\n1000000 -1000000\n",
+        "expected": "-1000000 1000000\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 5",
+        "input": "6\n4 2 4 2 1 3\n",
+        "expected": "1 2 3 4\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 6,
+    "chapterTitle": "6. 元组 | Tuple",
+    "title": "语法速成 06 · 坐标解包",
+    "mode": "stdio",
+    "statement": "## 任务\n\n把一对坐标解包成 `x` 和 `y`，按规定格式输出。\n\n## 输入\n\n一行两个十进制坐标，分别表示 `x` 和 `y`。\n\n## 输出\n\n输出一行 `x = X, y = Y`，X、Y 保留输入中的十进制写法。\n\n## 数据范围与约定\n\n每个坐标在 -1000 到 1000 之间，最多 3 位小数；输入使用通常的十进制写法。\n\n只输出规定的答案，不输出输入提示或调试信息。",
+    "objective": "把一对坐标解包成 `x` 和 `y`，按规定格式输出。",
+    "inputDescription": "一行两个十进制坐标，分别表示 `x` 和 `y`。",
+    "outputDescription": "输出一行 `x = X, y = Y`，X、Y 保留输入中的十进制写法。",
+    "difficulty": "入门",
+    "referenceLanguage": "python",
+    "referenceCode": "x,y=input().split()\nprint(f\"x = {x}, y = {y}\")\n",
+    "starterCode": "# 从标准输入读取数据，按题意输出答案。\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "Python",
+      "语法速成",
+      "第6章"
+    ],
+    "source": "用户提供的《Python 编程语言 | Python Syntax Crash Course》教学练习改编",
+    "samples": [
+      {
+        "name": "样例 1",
+        "input": "3.5 7.2\n",
+        "expected": "x = 3.5, y = 7.2\n",
+        "enabled": true
+      },
+      {
+        "name": "样例 2",
+        "input": "-1.25 0\n",
+        "expected": "x = -1.25, y = 0\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "正式测试 1",
+        "input": "0 0\n",
+        "expected": "x = 0, y = 0\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 2",
+        "input": "1 2\n",
+        "expected": "x = 1, y = 2\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 3",
+        "input": "-999.999 999.999\n",
+        "expected": "x = -999.999, y = 999.999\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 4",
+        "input": "10.01 -4.2\n",
+        "expected": "x = 10.01, y = -4.2\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 5",
+        "input": "1000 -1000\n",
+        "expected": "x = 1000, y = -1000\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 7,
+    "chapterTitle": "7. 字典 | Dictionary",
+    "title": "语法速成 07 · 英汉词典查询",
+    "mode": "stdio",
+    "statement": "## 任务\n\n使用字典查询单词。词典固定包含：`hello → 你好`、`world → 世界`、`python → 蟒蛇`。\n\n## 输入\n\n一行输入待查询的英文单词。\n\n## 输出\n\n若词典收录该词，输出中文含义；否则输出 `未收录`。\n\n## 数据范围与约定\n\n单词长度 1–20，只含小写英文字母；匹配区分大小写。\n\n只输出规定的答案，不输出输入提示或调试信息。",
+    "objective": "使用字典查询单词。词典固定包含：`hello → 你好`、`world → 世界`、`python → 蟒蛇`。",
+    "inputDescription": "一行输入待查询的英文单词。",
+    "outputDescription": "若词典收录该词，输出中文含义；否则输出 `未收录`。",
+    "difficulty": "入门",
+    "referenceLanguage": "python",
+    "referenceCode": "dictionary={\"hello\":\"你好\",\"world\":\"世界\",\"python\":\"蟒蛇\"}\nprint(dictionary.get(input().strip(),\"未收录\"))\n",
+    "starterCode": "# 从标准输入读取数据，按题意输出答案。\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "Python",
+      "语法速成",
+      "第7章"
+    ],
+    "source": "用户提供的《Python 编程语言 | Python Syntax Crash Course》教学练习改编",
+    "samples": [
+      {
+        "name": "样例 1",
+        "input": "hello\n",
+        "expected": "你好\n",
+        "enabled": true
+      },
+      {
+        "name": "样例 2",
+        "input": "apple\n",
+        "expected": "未收录\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "正式测试 1",
+        "input": "world\n",
+        "expected": "世界\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 2",
+        "input": "python\n",
+        "expected": "蟒蛇\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 3",
+        "input": "hell\n",
+        "expected": "未收录\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 4",
+        "input": "z\n",
+        "expected": "未收录\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 5",
+        "input": "pythons\n",
+        "expected": "未收录\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 8,
+    "chapterTitle": "8. 集合 | Set",
+    "title": "语法速成 08 · 交集与并集",
+    "mode": "stdio",
+    "statement": "## 任务\n\n将两个整数列表视为集合，求它们的交集与并集，并按升序输出。\n\n## 输入\n\n第一行是 `n m`；第二行有 `n` 个整数；第三行有 `m` 个整数。列表为空时对应行为空行。\n\n## 输出\n\n第一行输出升序交集，第二行输出升序并集。每行整数用单个空格隔开；空集合输出空行。\n\n## 数据范围与约定\n\n0 ≤ n,m ≤ 1000；元素绝对值 ≤ 10,000；输入列表内可以重复。集合元素的打印顺序必须稳定。\n\n只输出规定的答案，不输出输入提示或调试信息。\n\n输出必须严格遵循上述逐行格式，每行末尾换行，不添加多余空格或空行。",
+    "objective": "将两个整数列表视为集合，求它们的交集与并集，并按升序输出。",
+    "inputDescription": "第一行是 `n m`；第二行有 `n` 个整数；第三行有 `m` 个整数。列表为空时对应行为空行。",
+    "outputDescription": "第一行输出升序交集，第二行输出升序并集。每行整数用单个空格隔开；空集合输出空行。",
+    "difficulty": "入门",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\ndata=list(map(int,sys.stdin.read().split()))\nn,m=data[:2]\na=set(data[2:2+n])\nb=set(data[2+n:2+n+m])\nprint(*sorted(a&b))\nprint(*sorted(a|b))\n",
+    "starterCode": "# 从标准输入读取数据，按题意输出答案。\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "exact",
+    "tags": [
+      "Python",
+      "语法速成",
+      "第8章"
+    ],
+    "source": "用户提供的《Python 编程语言 | Python Syntax Crash Course》教学练习改编",
+    "samples": [
+      {
+        "name": "样例 1",
+        "input": "5 5\n1 2 3 4 5\n4 5 6 7 8\n",
+        "expected": "4 5\n1 2 3 4 5 6 7 8\n",
+        "enabled": true
+      },
+      {
+        "name": "样例 2",
+        "input": "2 2\n1 2\n3 4\n",
+        "expected": "\n1 2 3 4\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "正式测试 1",
+        "input": "3 3\n1 1 -2\n1 3 3\n",
+        "expected": "1\n-2 1 3\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 2",
+        "input": "0 3\n\n2 -1 2\n",
+        "expected": "\n-1 2\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 3",
+        "input": "3 0\n3 2 1\n\n",
+        "expected": "\n1 2 3\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 4",
+        "input": "0 0\n\n\n",
+        "expected": "\n\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 5",
+        "input": "5 4\n-5 -1 0 2 2\n-5 -1 7 9\n",
+        "expected": "-5 -1\n-5 -1 0 2 7 9\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 9,
+    "chapterTitle": "9. 条件语句 | Conditional Statements",
+    "title": "语法速成 09 · 闰年判断",
+    "mode": "stdio",
+    "statement": "## 任务\n\n判断年份是否为闰年：能被 4 整除但不能被 100 整除，或者能被 400 整除。\n\n## 输入\n\n一行输入整数年份 `year`。\n\n## 输出\n\n闰年输出 `YES`，否则输出 `NO`。\n\n## 数据范围与约定\n\n1 ≤ year ≤ 9999。\n\n只输出规定的答案，不输出输入提示或调试信息。",
+    "objective": "判断年份是否为闰年：能被 4 整除但不能被 100 整除，或者能被 400 整除。",
+    "inputDescription": "一行输入整数年份 `year`。",
+    "outputDescription": "闰年输出 `YES`，否则输出 `NO`。",
+    "difficulty": "入门",
+    "referenceLanguage": "python",
+    "referenceCode": "year=int(input())\nprint(\"YES\" if year%400==0 or (year%4==0 and year%100!=0) else \"NO\")\n",
+    "starterCode": "# 从标准输入读取数据，按题意输出答案。\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "Python",
+      "语法速成",
+      "第9章"
+    ],
+    "source": "用户提供的《Python 编程语言 | Python Syntax Crash Course》教学练习改编",
+    "samples": [
+      {
+        "name": "样例 1",
+        "input": "2024\n",
+        "expected": "YES\n",
+        "enabled": true
+      },
+      {
+        "name": "样例 2",
+        "input": "1900\n",
+        "expected": "NO\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "正式测试 1",
+        "input": "2000\n",
+        "expected": "YES\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 2",
+        "input": "2023\n",
+        "expected": "NO\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 3",
+        "input": "1\n",
+        "expected": "NO\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 4",
+        "input": "2400\n",
+        "expected": "YES\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 5",
+        "input": "2100\n",
+        "expected": "NO\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 10,
+    "chapterTitle": "10. 循环 | Loops",
+    "title": "语法速成 10 · 三和五的公倍数",
+    "mode": "stdio",
+    "statement": "## 任务\n\n输出 1 到 `N`（包含 `N`）中同时能被 3 和 5 整除的所有整数。\n\n## 输入\n\n一行输入整数 `N`。\n\n## 输出\n\n按升序输出所有符合条件的数，以单个空格分隔；若没有符合条件的数，输出 `NONE`。\n\n## 数据范围与约定\n\n1 ≤ N ≤ 10000。\n\n只输出规定的答案，不输出输入提示或调试信息。",
+    "objective": "输出 1 到 `N`（包含 `N`）中同时能被 3 和 5 整除的所有整数。",
+    "inputDescription": "一行输入整数 `N`。",
+    "outputDescription": "按升序输出所有符合条件的数，以单个空格分隔；若没有符合条件的数，输出 `NONE`。",
+    "difficulty": "入门",
+    "referenceLanguage": "python",
+    "referenceCode": "n=int(input())\nvalues=list(range(15,n+1,15))\nprint(*values) if values else print(\"NONE\")\n",
+    "starterCode": "# 从标准输入读取数据，按题意输出答案。\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "Python",
+      "语法速成",
+      "第10章"
+    ],
+    "source": "用户提供的《Python 编程语言 | Python Syntax Crash Course》教学练习改编",
+    "samples": [
+      {
+        "name": "样例 1",
+        "input": "100\n",
+        "expected": "15 30 45 60 75 90\n",
+        "enabled": true
+      },
+      {
+        "name": "样例 2",
+        "input": "14\n",
+        "expected": "NONE\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "正式测试 1",
+        "input": "15\n",
+        "expected": "15\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 2",
+        "input": "16\n",
+        "expected": "15\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 3",
+        "input": "150\n",
+        "expected": "15 30 45 60 75 90 105 120 135 150\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 4",
+        "input": "1\n",
+        "expected": "NONE\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 5",
+        "input": "1000\n",
+        "expected": "15 30 45 60 75 90 105 120 135 150 165 180 195 210 225 240 255 270 285 300 315 330 345 360 375 390 405 420 435 450 465 480 495 510 525 540 555 570 585 600 615 630 645 660 675 690 705 720 735 750 765 780 795 810 825 840 855 870 885 900 915 930 945 960 975 990\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 11,
+    "chapterTitle": "11. 函数 | Functions",
+    "title": "语法速成 11 · 忽略空格的回文",
+    "mode": "stdio",
+    "statement": "## 任务\n\n编写 `is_palindrome(s)`：忽略英文字母大小写和普通空格后，判断字符串正读、反读是否相同。\n\n## 输入\n\n一行输入字符串 `s`，只包含英文字母和普通空格。\n\n## 输出\n\n回文输出 `YES`，否则输出 `NO`。\n\n## 数据范围与约定\n\n1 ≤ 字符串长度 ≤ 2000；只有 ASCII 空格会被忽略，全部为空格时视为回文。\n\n只输出规定的答案，不输出输入提示或调试信息。",
+    "objective": "编写 `is_palindrome(s)`：忽略英文字母大小写和普通空格后，判断字符串正读、反读是否相同。",
+    "inputDescription": "一行输入字符串 `s`，只包含英文字母和普通空格。",
+    "outputDescription": "回文输出 `YES`，否则输出 `NO`。",
+    "difficulty": "入门",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\ndef is_palindrome(s):\n    normalized=s.lower().replace(\" \",\"\")\n    return normalized==normalized[::-1]\ns=sys.stdin.readline().rstrip(\"\\n\")\nprint(\"YES\" if is_palindrome(s) else \"NO\")\n",
+    "starterCode": "# 从标准输入读取数据，按题意输出答案。\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "Python",
+      "语法速成",
+      "第11章"
+    ],
+    "source": "用户提供的《Python 编程语言 | Python Syntax Crash Course》教学练习改编",
+    "samples": [
+      {
+        "name": "样例 1",
+        "input": "racecar\n",
+        "expected": "YES\n",
+        "enabled": true
+      },
+      {
+        "name": "样例 2",
+        "input": "Was it a car or a cat I saw\n",
+        "expected": "YES\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "正式测试 1",
+        "input": "A man a plan\n",
+        "expected": "NO\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 2",
+        "input": "A a\n",
+        "expected": "YES\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 3",
+        "input": "Abba\n",
+        "expected": "YES\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 4",
+        "input": "ab ca\n",
+        "expected": "NO\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 5",
+        "input": "   \n",
+        "expected": "YES\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 12,
+    "chapterTitle": "12. 列表推导式 | List Comprehension",
+    "title": "语法速成 12 · 奇数的立方",
+    "mode": "stdio",
+    "statement": "## 任务\n\n用列表推导式练习生成 1 到 `N`（包含 `N`）中所有奇数的立方。\n\n## 输入\n\n一行输入整数 `N`。\n\n## 输出\n\n按原奇数升序输出其立方，以单个空格分隔；当没有奇数时输出 `NONE`。\n\n## 数据范围与约定\n\n0 ≤ N ≤ 100。\n\n只输出规定的答案，不输出输入提示或调试信息。",
+    "objective": "用列表推导式练习生成 1 到 `N`（包含 `N`）中所有奇数的立方。",
+    "inputDescription": "一行输入整数 `N`。",
+    "outputDescription": "按原奇数升序输出其立方，以单个空格分隔；当没有奇数时输出 `NONE`。",
+    "difficulty": "入门",
+    "referenceLanguage": "python",
+    "referenceCode": "n=int(input())\ncubes=[x**3 for x in range(1,n+1) if x%2]\nprint(*cubes) if cubes else print(\"NONE\")\n",
+    "starterCode": "# 从标准输入读取数据，按题意输出答案。\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "Python",
+      "语法速成",
+      "第12章"
+    ],
+    "source": "用户提供的《Python 编程语言 | Python Syntax Crash Course》教学练习改编",
+    "samples": [
+      {
+        "name": "样例 1",
+        "input": "20\n",
+        "expected": "1 27 125 343 729 1331 2197 3375 4913 6859\n",
+        "enabled": true
+      },
+      {
+        "name": "样例 2",
+        "input": "1\n",
+        "expected": "1\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "正式测试 1",
+        "input": "0\n",
+        "expected": "NONE\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 2",
+        "input": "2\n",
+        "expected": "1\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 3",
+        "input": "7\n",
+        "expected": "1 27 125 343\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 4",
+        "input": "21\n",
+        "expected": "1 27 125 343 729 1331 2197 3375 4913 6859 9261\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 5",
+        "input": "100\n",
+        "expected": "1 27 125 343 729 1331 2197 3375 4913 6859 9261 12167 15625 19683 24389 29791 35937 42875 50653 59319 68921 79507 91125 103823 117649 132651 148877 166375 185193 205379 226981 250047 274625 300763 328509 357911 389017 421875 456533 493039 531441 571787 614125 658503 704969 753571 804357 857375 912673 970299\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 13,
+    "chapterTitle": "13. 类与对象 | Class & Object",
+    "title": "语法速成 13 · 矩形面积与周长",
+    "mode": "stdio",
+    "statement": "## 任务\n\n根据宽、高计算矩形面积和周长。建议练习编写具有 `area()` 与 `perimeter()` 方法的 `Rectangle` 类；判题依据输出结果。\n\n## 输入\n\n一行输入两个整数 `width height`。\n\n## 输出\n\n一行输出两个整数：面积和周长，以单个空格隔开。\n\n## 数据范围与约定\n\n0 ≤ width,height ≤ 10000。\n\n## 学习提示\n\n原讲义在此章介绍类。标准输出判题只能检查面积、周长，不能证明提交代码内部一定使用了类。\n\n只输出规定的答案，不输出输入提示或调试信息。",
+    "objective": "根据宽、高计算矩形面积和周长。建议练习编写具有 `area()` 与 `perimeter()` 方法的 `Rectangle` 类；判题依据输出结果。",
+    "inputDescription": "一行输入两个整数 `width height`。",
+    "outputDescription": "一行输出两个整数：面积和周长，以单个空格隔开。",
+    "difficulty": "入门",
+    "referenceLanguage": "python",
+    "referenceCode": "class Rectangle:\n    def __init__(self,width,height):\n        self.width=width\n        self.height=height\n    def area(self):\n        return self.width*self.height\n    def perimeter(self):\n        return 2*(self.width+self.height)\nw,h=map(int,input().split())\nr=Rectangle(w,h)\nprint(r.area(),r.perimeter())\n",
+    "starterCode": "class Rectangle:\n    # 可以在此定义 width、height、area() 和 perimeter()。\n    pass\n\n# 读取宽和高，输出面积与周长。\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "Python",
+      "语法速成",
+      "第13章"
+    ],
+    "source": "用户提供的《Python 编程语言 | Python Syntax Crash Course》教学练习改编",
+    "samples": [
+      {
+        "name": "样例 1",
+        "input": "5 3\n",
+        "expected": "15 16\n",
+        "enabled": true
+      },
+      {
+        "name": "样例 2",
+        "input": "0 8\n",
+        "expected": "0 16\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "正式测试 1",
+        "input": "1 1\n",
+        "expected": "1 4\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 2",
+        "input": "10 20\n",
+        "expected": "200 60\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 3",
+        "input": "1000 2000\n",
+        "expected": "2000000 6000\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 4",
+        "input": "2 7\n",
+        "expected": "14 18\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 5",
+        "input": "10000 10000\n",
+        "expected": "100000000 40000\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 14,
+    "chapterTitle": "14. 文件操作 | File I/O",
+    "title": "语法速成 14 · 逐行数字求和",
+    "mode": "stdio",
+    "statement": "## 任务\n\n原练习把数字写入文件再读回求和。在线判题统一使用标准输入：将接下来的 `n` 行视为文件内容，逐行读取并求和。\n\n## 输入\n\n第一行是整数 `n`，随后 `n` 行每行一个整数。\n\n## 输出\n\n输出这 `n` 个整数的总和。\n\n## 数据范围与约定\n\n1 ≤ n ≤ 1000；每个整数绝对值不超过 1,000,000,000。无需也不应创建或读取本地文件。\n\n## 学习提示\n\n课程正文仍可学习 `open()` 和 `with`；此题只考查逐行读取、转换与求和。\n\n只输出规定的答案，不输出输入提示或调试信息。",
+    "objective": "原练习把数字写入文件再读回求和。在线判题统一使用标准输入：将接下来的 `n` 行视为文件内容，逐行读取并求和。",
+    "inputDescription": "第一行是整数 `n`，随后 `n` 行每行一个整数。",
+    "outputDescription": "输出这 `n` 个整数的总和。",
+    "difficulty": "入门",
+    "referenceLanguage": "python",
+    "referenceCode": "n=int(input())\ntotal=0\nfor _ in range(n):\n    total+=int(input().strip())\nprint(total)\n",
+    "starterCode": "# 从标准输入读取数据，按题意输出答案。\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "Python",
+      "语法速成",
+      "第14章"
+    ],
+    "source": "用户提供的《Python 编程语言 | Python Syntax Crash Course》教学练习改编",
+    "samples": [
+      {
+        "name": "样例 1",
+        "input": "5\n1\n2\n3\n4\n5\n",
+        "expected": "15\n",
+        "enabled": true
+      },
+      {
+        "name": "样例 2",
+        "input": "1\n-7\n",
+        "expected": "-7\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "正式测试 1",
+        "input": "1\n0\n",
+        "expected": "0\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 2",
+        "input": "4\n-3\n5\n-7\n10\n",
+        "expected": "5\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 3",
+        "input": "3\n1000000000\n1000000000\n-1000000000\n",
+        "expected": "1000000000\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 4",
+        "input": "5\n9\n-9\n1\n-1\n0\n",
+        "expected": "0\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 5",
+        "input": "6\n1\n2\n3\n4\n5\n6\n",
+        "expected": "21\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 15,
+    "chapterTitle": "15. 异常处理 | Exception Handling",
+    "title": "语法速成 15 · 安全除法",
+    "mode": "stdio",
+    "statement": "## 任务\n\n编写安全除法逻辑，处理除数为零和参数类型不匹配。\n\n## 输入\n\n输入一行 JSON 数组 `[a,b]`，恰有两个元素。每个元素是整数或字符串。\n\n## 输出\n\n先检查类型：若任一元素为字符串，输出 `TYPE_ERROR`（即使另一个元素为整数 0）；否则若整数 `b=0`，输出 `ZERO_DIVISION`；其余情况输出商，固定保留 6 位小数。\n\n## 数据范围与约定\n\n整数的绝对值不超过 1,000,000；字符串长度 0–20。除法结果使用 Python `:.6f` 格式固定保留 6 位小数；不包含布尔值、null、列表或对象。\n\n只输出规定的答案，不输出输入提示或调试信息。",
+    "objective": "编写安全除法逻辑，处理除数为零和参数类型不匹配。",
+    "inputDescription": "输入一行 JSON 数组 `[a,b]`，恰有两个元素。每个元素是整数或字符串。",
+    "outputDescription": "先检查类型：若任一元素为字符串，输出 `TYPE_ERROR`（即使另一个元素为整数 0）；否则若整数 `b=0`，输出 `ZERO_DIVISION`；其余情况输出商，固定保留 6 位小数。",
+    "difficulty": "基础",
+    "referenceLanguage": "python",
+    "referenceCode": "import json,sys\na,b=json.loads(sys.stdin.read())\ntry:\n    value=a/b\n    print(f\"{value:.6f}\")\nexcept ZeroDivisionError:\n    print(\"ZERO_DIVISION\")\nexcept TypeError:\n    print(\"TYPE_ERROR\")\n",
+    "starterCode": "# 从标准输入读取数据，按题意输出答案。\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "Python",
+      "语法速成",
+      "第15章"
+    ],
+    "source": "用户提供的《Python 编程语言 | Python Syntax Crash Course》教学练习改编",
+    "samples": [
+      {
+        "name": "样例 1",
+        "input": "[10,2]\n",
+        "expected": "5.000000\n",
+        "enabled": true
+      },
+      {
+        "name": "样例 2",
+        "input": "[\"10\",2]\n",
+        "expected": "TYPE_ERROR\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "正式测试 1",
+        "input": "[10,0]\n",
+        "expected": "ZERO_DIVISION\n",
+        "weight": 15.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 2",
+        "input": "[7,4]\n",
+        "expected": "1.750000\n",
+        "weight": 15.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 3",
+        "input": "[-8,2]\n",
+        "expected": "-4.000000\n",
+        "weight": 15.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 4",
+        "input": "[0,5]\n",
+        "expected": "0.000000\n",
+        "weight": 15.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 5",
+        "input": "[9,\"3\"]\n",
+        "expected": "TYPE_ERROR\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 6",
+        "input": "[\"x\",0]\n",
+        "expected": "TYPE_ERROR\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 16,
+    "chapterTitle": "16. 模块与包 | Modules & Packages",
+    "title": "语法速成 16 · 五个数字的最大值",
+    "mode": "stdio",
+    "statement": "## 任务\n\n原讲义用 `random` 模块生成五个数。为使在线判题可重复，这五个数改为由输入给定，求其中最大值。\n\n## 输入\n\n一行输入恰好五个整数。\n\n## 输出\n\n输出其中的最大值。\n\n## 数据范围与约定\n\n每个整数绝对值不超过 1,000,000。原讲义中的 `math`、`random` 模块导入建议在课程示例中自行练习；本题只判定最大值输出，不能验证程序是否导入模块，也不依赖随机数。\n\n只输出规定的答案，不输出输入提示或调试信息。",
+    "objective": "原讲义用 `random` 模块生成五个数。为使在线判题可重复，这五个数改为由输入给定，求其中最大值。",
+    "inputDescription": "一行输入恰好五个整数。",
+    "outputDescription": "输出其中的最大值。",
+    "difficulty": "入门",
+    "referenceLanguage": "python",
+    "referenceCode": "numbers=list(map(int,input().split()))\nprint(max(numbers))\n",
+    "starterCode": "# 从标准输入读取数据，按题意输出答案。\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "Python",
+      "语法速成",
+      "第16章"
+    ],
+    "source": "用户提供的《Python 编程语言 | Python Syntax Crash Course》教学练习改编",
+    "samples": [
+      {
+        "name": "样例 1",
+        "input": "1 2 3 4 5\n",
+        "expected": "5\n",
+        "enabled": true
+      },
+      {
+        "name": "样例 2",
+        "input": "-1 -2 -3 -4 -5\n",
+        "expected": "-1\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "正式测试 1",
+        "input": "0 0 0 0 0\n",
+        "expected": "0\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 2",
+        "input": "100 1 2 3 4\n",
+        "expected": "100\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 3",
+        "input": "1 2 100 3 4\n",
+        "expected": "100\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 4",
+        "input": "-1000000 1000000 0 5 -5\n",
+        "expected": "1000000\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 5",
+        "input": "9 8 7 6 5\n",
+        "expected": "9\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 17,
+    "chapterTitle": "17. 装饰器 | Decorators",
+    "title": "语法速成 17 · 结果翻倍",
+    "mode": "stdio",
+    "statement": "## 任务\n\n计算 `a*b`，再把返回结果翻倍。建议使用讲义中的 `@double_result` 装饰器练习；判题依据输出结果。\n\n## 输入\n\n一行输入两个整数 `a b`。\n\n## 输出\n\n输出整数 `2*a*b`。\n\n## 数据范围与约定\n\n`a`、`b` 的绝对值均不超过 1,000,000。\n\n## 学习提示\n\n仅凭标准输出无法证明代码内部使用了装饰器，因此装饰器是本章推荐练习方式。\n\n只输出规定的答案，不输出输入提示或调试信息。",
+    "objective": "计算 `a*b`，再把返回结果翻倍。建议使用讲义中的 `@double_result` 装饰器练习；判题依据输出结果。",
+    "inputDescription": "一行输入两个整数 `a b`。",
+    "outputDescription": "输出整数 `2*a*b`。",
+    "difficulty": "进阶",
+    "referenceLanguage": "python",
+    "referenceCode": "def double_result(func):\n    def wrapper(*args,**kwargs):\n        return 2*func(*args,**kwargs)\n    return wrapper\n@double_result\ndef multiply(a,b):\n    return a*b\na,b=map(int,input().split())\nprint(multiply(a,b))\n",
+    "starterCode": "def double_result(func):\n    # 建议在这里编写装饰器。\n    pass\n\n# 读取 a、b，输出翻倍后的乘积。\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "Python",
+      "语法速成",
+      "第17章"
+    ],
+    "source": "用户提供的《Python 编程语言 | Python Syntax Crash Course》教学练习改编",
+    "samples": [
+      {
+        "name": "样例 1",
+        "input": "3 4\n",
+        "expected": "24\n",
+        "enabled": true
+      },
+      {
+        "name": "样例 2",
+        "input": "-2 5\n",
+        "expected": "-20\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "正式测试 1",
+        "input": "0 17\n",
+        "expected": "0\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 2",
+        "input": "1 1\n",
+        "expected": "2\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 3",
+        "input": "-3 -4\n",
+        "expected": "24\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 4",
+        "input": "1000000 -1000000\n",
+        "expected": "-2000000000000\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 5",
+        "input": "7 9\n",
+        "expected": "126\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 18,
+    "chapterTitle": "18. 生成器 | Generators",
+    "title": "语法速成 18 · 区间中的偶数",
+    "mode": "stdio",
+    "statement": "## 任务\n\n输出半开区间 `[start,end)` 中全部偶数。建议练习编写 `even_numbers(start,end)` 生成器；判题依据输出结果。\n\n## 输入\n\n一行输入两个整数 `start end`。\n\n## 输出\n\n偶数按升序以单个空格分隔；若区间没有偶数，输出 `NONE`。\n\n## 数据范围与约定\n\n-10000 ≤ start ≤ end ≤ 10000；`end` 不包含在区间内。\n\n## 学习提示\n\n原讲义参考代码使用 `range(start,end)`，这里明确右端点不包含。标准输出判题无法证明内部使用了 `yield`。\n\n只输出规定的答案，不输出输入提示或调试信息。",
+    "objective": "输出半开区间 `[start,end)` 中全部偶数。建议练习编写 `even_numbers(start,end)` 生成器；判题依据输出结果。",
+    "inputDescription": "一行输入两个整数 `start end`。",
+    "outputDescription": "偶数按升序以单个空格分隔；若区间没有偶数，输出 `NONE`。",
+    "difficulty": "进阶",
+    "referenceLanguage": "python",
+    "referenceCode": "def even_numbers(start,end):\n    for n in range(start,end):\n        if n%2==0:\n            yield n\nstart,end=map(int,input().split())\nvalues=list(even_numbers(start,end))\nprint(*values) if values else print(\"NONE\")\n",
+    "starterCode": "def even_numbers(start, end):\n    # 建议在这里用 yield 逐个产生偶数。\n    pass\n\n# 读取区间端点并输出结果。\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "Python",
+      "语法速成",
+      "第18章"
+    ],
+    "source": "用户提供的《Python 编程语言 | Python Syntax Crash Course》教学练习改编",
+    "samples": [
+      {
+        "name": "样例 1",
+        "input": "1 20\n",
+        "expected": "2 4 6 8 10 12 14 16 18\n",
+        "enabled": true
+      },
+      {
+        "name": "样例 2",
+        "input": "2 2\n",
+        "expected": "NONE\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "正式测试 1",
+        "input": "0 1\n",
+        "expected": "0\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 2",
+        "input": "-5 6\n",
+        "expected": "-4 -2 0 2 4\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 3",
+        "input": "10 20\n",
+        "expected": "10 12 14 16 18\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 4",
+        "input": "1 2\n",
+        "expected": "NONE\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 5",
+        "input": "100 101\n",
+        "expected": "100\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 19,
+    "chapterTitle": "19. Lambda 与高阶函数 | Lambda & Higher-Order Functions",
+    "title": "语法速成 19 · 按单词长度排序",
+    "mode": "stdio",
+    "statement": "## 任务\n\n按字符串长度从短到长排序。等长时保留输入时的相对顺序；建议练习 `sorted()` 配合 `lambda`。\n\n## 输入\n\n第一行是整数 `n`，随后 `n` 行，每行一个不含空格的单词。\n\n## 输出\n\n排序后每行输出一个单词。\n\n## 数据范围与约定\n\n1 ≤ n ≤ 100；每个单词长度 1–20，含小写英文字母；比较长度相同的单词时必须使用稳定排序。\n\n## 学习提示\n\n标准输出判题只能验证稳定排序结果，不能证明程序使用了 `lambda`。\n\n只输出规定的答案，不输出输入提示或调试信息。\n\n输出必须严格遵循上述逐行格式，每行末尾换行，不添加多余空格或空行。",
+    "objective": "按字符串长度从短到长排序。等长时保留输入时的相对顺序；建议练习 `sorted()` 配合 `lambda`。",
+    "inputDescription": "第一行是整数 `n`，随后 `n` 行，每行一个不含空格的单词。",
+    "outputDescription": "排序后每行输出一个单词。",
+    "difficulty": "入门",
+    "referenceLanguage": "python",
+    "referenceCode": "n=int(input())\nwords=[input().strip() for _ in range(n)]\nfor word in sorted(words,key=lambda s:len(s)):\n    print(word)\n",
+    "starterCode": "# 从标准输入读取数据，按题意输出答案。\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "exact",
+    "tags": [
+      "Python",
+      "语法速成",
+      "第19章"
+    ],
+    "source": "用户提供的《Python 编程语言 | Python Syntax Crash Course》教学练习改编",
+    "samples": [
+      {
+        "name": "样例 1",
+        "input": "4\nbanana\napple\ncherry\ndate\n",
+        "expected": "date\napple\nbanana\ncherry\n",
+        "enabled": true
+      },
+      {
+        "name": "样例 2",
+        "input": "3\na\nbb\nc\n",
+        "expected": "a\nc\nbb\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "正式测试 1",
+        "input": "4\naa\nbb\nc\ndd\n",
+        "expected": "c\naa\nbb\ndd\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 2",
+        "input": "1\npython\n",
+        "expected": "python\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 3",
+        "input": "5\na\na\nbb\nb\nccc\n",
+        "expected": "a\na\nb\nbb\nccc\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 4",
+        "input": "4\nlong\nx\nyy\nzzz\n",
+        "expected": "x\nyy\nzzz\nlong\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 5",
+        "input": "3\nabc\ndef\nghi\n",
+        "expected": "abc\ndef\nghi\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 20,
+    "chapterTitle": "20. 综合练习 | Comprehensive Exercises",
+    "title": "综合练习 01 · 英文词频前五名",
+    "mode": "stdio",
+    "statement": "## 任务\n\n统计英文文本中的单词出现次数，输出最多 5 个高频单词。\n\n## 输入\n\n输入一行英文文本，单词之间恰好一个空格。\n\n## 输出\n\n每行输出 `word: count`。先按次数降序，次数相同按单词字典序升序；不足 5 个不同单词时全部输出。\n\n## 数据范围与约定\n\n1 ≤ 单词总数 ≤ 1000；每个单词长度 1–20，仅含小写英文字母。固定同频排序，避免不同实现产生不同答案。\n\n只输出规定的答案，不输出输入提示或调试信息。\n\n输出必须严格遵循上述逐行格式，每行末尾换行，不添加多余空格或空行。",
+    "objective": "统计英文文本中的单词出现次数，输出最多 5 个高频单词。",
+    "inputDescription": "输入一行英文文本，单词之间恰好一个空格。",
+    "outputDescription": "每行输出 `word: count`。先按次数降序，次数相同按单词字典序升序；不足 5 个不同单词时全部输出。",
+    "difficulty": "综合",
+    "referenceLanguage": "python",
+    "referenceCode": "from collections import Counter\nwords=input().split()\nfreq=Counter(words)\nfor word,count in sorted(freq.items(),key=lambda item:(-item[1],item[0]))[:5]:\n    print(f\"{word}: {count}\")\n",
+    "starterCode": "# 从标准输入读取数据，按题意输出答案。\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "exact",
+    "tags": [
+      "Python",
+      "语法速成",
+      "第20章"
+    ],
+    "source": "用户提供的《Python 编程语言 | Python Syntax Crash Course》教学练习改编",
+    "samples": [
+      {
+        "name": "样例 1",
+        "input": "the quick brown fox jumps over the lazy dog the dog barks and the fox runs\n",
+        "expected": "the: 4\ndog: 2\nfox: 2\nand: 1\nbarks: 1\n",
+        "enabled": true
+      },
+      {
+        "name": "样例 2",
+        "input": "apple banana apple\n",
+        "expected": "apple: 2\nbanana: 1\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "正式测试 1",
+        "input": "z y x w v u\n",
+        "expected": "u: 1\nv: 1\nw: 1\nx: 1\ny: 1\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 2",
+        "input": "a a a a a\n",
+        "expected": "a: 5\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 3",
+        "input": "dog cat dog cat bird\n",
+        "expected": "cat: 2\ndog: 2\nbird: 1\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 4",
+        "input": "one two three two three three\n",
+        "expected": "three: 3\ntwo: 2\none: 1\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 5",
+        "input": "b a b a c d e f\n",
+        "expected": "a: 2\nb: 2\nc: 1\nd: 1\ne: 1\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 20,
+    "chapterTitle": "20. 综合练习 | Comprehensive Exercises",
+    "title": "综合练习 02 · 学生管理与成绩排名",
+    "mode": "stdio",
+    "statement": "## 任务\n\n处理添加学生和录入成绩的操作，最后按平均分排名。建议用 `Student`、`Classroom` 类实现；判题依据最终结果。\n\n## 输入\n\n第一行是操作数 `q`。接下来 `q` 行，每行是 `ADD name`（新增学生）或 `GRADE name score`（为已添加学生录入一次成绩）。\n\n## 输出\n\n每个学生输出一行 `name average`，平均分固定保留 2 位小数。按**精确平均分**降序，同分按姓名字典序升序。没有学生时输出 `NONE`。\n\n## 数据范围与约定\n\n0 ≤ q ≤ 1000；`ADD` 的姓名唯一，`GRADE` 的姓名已添加；姓名长 1–20，仅含英文字母，区分大小写；0 ≤ score ≤ 100。没有成绩的学生平均分是 0。展示平均分按十进制四舍五入到百分位，排名不按四舍五入后的展示值比较。\n\n## 学习提示\n\n普通输出判题不能证明内部确实使用类；本题通过命令输入体现添加学生、录入成绩和排名。\n\n只输出规定的答案，不输出输入提示或调试信息。\n\n输出必须严格遵循上述逐行格式，每行末尾换行，不添加多余空格或空行。",
+    "objective": "处理添加学生和录入成绩的操作，最后按平均分排名。建议用 `Student`、`Classroom` 类实现；判题依据最终结果。",
+    "inputDescription": "第一行是操作数 `q`。接下来 `q` 行，每行是 `ADD name`（新增学生）或 `GRADE name score`（为已添加学生录入一次成绩）。",
+    "outputDescription": "每个学生输出一行 `name average`，平均分固定保留 2 位小数。按**精确平均分**降序，同分按姓名字典序升序。没有学生时输出 `NONE`。",
+    "difficulty": "综合",
+    "referenceLanguage": "python",
+    "referenceCode": "from collections import defaultdict\nfrom decimal import Decimal,ROUND_HALF_UP\nfrom fractions import Fraction\nq=int(input())\ngrades={}\nfor _ in range(q):\n    parts=input().split()\n    if parts[0]==\"ADD\":\n        grades[parts[1]]=[]\n    else:\n        grades[parts[1]].append(int(parts[2]))\nif not grades:\n    print(\"NONE\")\nelse:\n    def exact_average(values):\n        return Fraction(sum(values),len(values)) if values else Fraction(0,1)\n    for name,values in sorted(grades.items(),key=lambda item:(-exact_average(item[1]),item[0])):\n        avg=(Decimal(sum(values))/Decimal(len(values))) if values else Decimal(0)\n        print(name,avg.quantize(Decimal(\"0.01\"),rounding=ROUND_HALF_UP))\n",
+    "starterCode": "# 从标准输入读取数据，按题意输出答案。\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "exact",
+    "tags": [
+      "Python",
+      "语法速成",
+      "第20章"
+    ],
+    "source": "用户提供的《Python 编程语言 | Python Syntax Crash Course》教学练习改编",
+    "samples": [
+      {
+        "name": "样例 1",
+        "input": "9\nADD Alice\nADD Bob\nADD Carol\nGRADE Alice 90\nGRADE Alice 85\nGRADE Bob 70\nGRADE Bob 75\nGRADE Carol 95\nGRADE Carol 88\n",
+        "expected": "Carol 91.50\nAlice 87.50\nBob 72.50\n",
+        "enabled": true
+      },
+      {
+        "name": "样例 2",
+        "input": "2\nADD Amy\nADD Bob\n",
+        "expected": "Amy 0.00\nBob 0.00\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "正式测试 1",
+        "input": "0\n",
+        "expected": "NONE\n",
+        "weight": 18.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 2",
+        "input": "3\nADD Z\nADD A\nGRADE A 100\n",
+        "expected": "A 100.00\nZ 0.00\n",
+        "weight": 18.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 3",
+        "input": "6\nADD A\nADD B\nGRADE A 0\nGRADE A 100\nGRADE B 50\nGRADE B 50\n",
+        "expected": "A 50.00\nB 50.00\n",
+        "weight": 18.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 4",
+        "input": "9\nADD A\nGRADE A 1\nGRADE A 0\nGRADE A 0\nGRADE A 0\nGRADE A 0\nGRADE A 0\nGRADE A 0\nGRADE A 0\n",
+        "expected": "A 0.13\n",
+        "weight": 18.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 5",
+        "input": "4\nADD B\nADD A\nGRADE A 50\nGRADE B 50\n",
+        "expected": "A 50.00\nB 50.00\n",
+        "weight": 18.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 6",
+        "input": "27\nADD A\nADD Z\nGRADE A 1\nGRADE A 0\nGRADE A 0\nGRADE A 0\nGRADE A 0\nGRADE A 0\nGRADE A 0\nGRADE A 0\nGRADE A 0\nGRADE A 0\nGRADE A 0\nGRADE A 0\nGRADE A 0\nGRADE Z 1\nGRADE Z 0\nGRADE Z 0\nGRADE Z 0\nGRADE Z 0\nGRADE Z 0\nGRADE Z 0\nGRADE Z 0\nGRADE Z 0\nGRADE Z 0\nGRADE Z 0\nGRADE Z 0\n",
+        "expected": "Z 0.08\nA 0.08\n",
+        "weight": 10.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 20,
+    "chapterTitle": "20. 综合练习 | Comprehensive Exercises",
+    "title": "综合练习 03 · CSV 成绩统计",
+    "mode": "stdio",
+    "statement": "## 任务\n\n把标准输入中的每行 `姓名,分数` 当作一行 CSV 数据，统计平均分与最高分。\n\n## 输入\n\n第一行是记录数 `n`，随后 `n` 行，每行格式为 `name,score`，逗号两侧没有空格。\n\n## 输出\n\n第一行输出 `average: X`，X 固定保留 2 位小数；第二行输出 `top: NAME SCORE`，其中 NAME、SCORE 为最高分记录。同分时取输入中最早出现的记录。\n\n## 数据范围与约定\n\n1 ≤ n ≤ 1000；姓名长度 1–20，仅含英文字母；分数为 0–100 的整数。平均分按十进制四舍五入到百分位。不创建或读取本地文件。\n\n## 学习提示\n\n原练习使用磁盘上的 scores.csv。在线判题用标准输入模拟 CSV 内容，避免依赖文件系统。\n\n只输出规定的答案，不输出输入提示或调试信息。\n\n输出必须严格遵循上述逐行格式，每行末尾换行，不添加多余空格或空行。",
+    "objective": "把标准输入中的每行 `姓名,分数` 当作一行 CSV 数据，统计平均分与最高分。",
+    "inputDescription": "第一行是记录数 `n`，随后 `n` 行，每行格式为 `name,score`，逗号两侧没有空格。",
+    "outputDescription": "第一行输出 `average: X`，X 固定保留 2 位小数；第二行输出 `top: NAME SCORE`，其中 NAME、SCORE 为最高分记录。同分时取输入中最早出现的记录。",
+    "difficulty": "综合",
+    "referenceLanguage": "python",
+    "referenceCode": "from decimal import Decimal,ROUND_HALF_UP\nn=int(input())\nrecords=[]\nfor _ in range(n):\n    name,raw=input().strip().split(\",\")\n    records.append((name,int(raw)))\navg=(Decimal(sum(score for _,score in records))/Decimal(n)).quantize(Decimal(\"0.01\"),rounding=ROUND_HALF_UP)\ntop=max(records,key=lambda record:record[1])\nprint(f\"average: {avg}\")\nprint(f\"top: {top[0]} {top[1]}\")\n",
+    "starterCode": "# 从标准输入读取数据，按题意输出答案。\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "exact",
+    "tags": [
+      "Python",
+      "语法速成",
+      "第20章"
+    ],
+    "source": "用户提供的《Python 编程语言 | Python Syntax Crash Course》教学练习改编",
+    "samples": [
+      {
+        "name": "样例 1",
+        "input": "4\nAlice,90\nBob,72\nCarol,95\nDave,88\n",
+        "expected": "average: 86.25\ntop: Carol 95\n",
+        "enabled": true
+      },
+      {
+        "name": "样例 2",
+        "input": "1\nAmy,100\n",
+        "expected": "average: 100.00\ntop: Amy 100\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "正式测试 1",
+        "input": "2\nA,100\nB,100\n",
+        "expected": "average: 100.00\ntop: A 100\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 2",
+        "input": "8\nA,1\nB,0\nB,0\nB,0\nB,0\nB,0\nB,0\nB,0\n",
+        "expected": "average: 0.13\ntop: A 1\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 3",
+        "input": "4\nA,1\nB,2\nC,3\nD,4\n",
+        "expected": "average: 2.50\ntop: D 4\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 4",
+        "input": "5\nZ,20\nA,80\nM,60\nN,40\nP,100\n",
+        "expected": "average: 60.00\ntop: P 100\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "正式测试 5",
+        "input": "2\nCarol,95\nBob,95\n",
+        "expected": "average: 95.00\ntop: Carol 95\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  }
+]

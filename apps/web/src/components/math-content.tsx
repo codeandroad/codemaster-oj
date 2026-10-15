@@ -1,5 +1,7 @@
+"use client";
 import katex from 'katex';
 import {Fragment,type ReactNode} from 'react';
+import {useLocale} from './locale-context';
 import {contentBlocks,inlineTokens} from './content-parser';
 import styles from './math-content.module.css';
 function formulaHTML(text:string,display:boolean){
@@ -7,8 +9,9 @@ function formulaHTML(text:string,display:boolean){
   catch(error){return {html:'',error:error instanceof Error?error.message:'公式语法有误'};}
 }
 function Formula({text,display=false}:{text:string;display?:boolean}){
+  const {locale}=useLocale();
   const result=formulaHTML(text,display);
-  if(result.error)return <code className={styles.mathError} title={result.error}>{display?'$$':'$'}{text}{display?'$$':'$'}</code>;
+  if(result.error)return <code className={styles.mathError} title={`${locale==='en'?'Formula error: ':'公式错误：'}${result.error==='公式语法有误'&&locale==='en'?'Invalid formula syntax':result.error}`}>{display?'$$':'$'}{text}{display?'$$':'$'}</code>;
   return <span className={display?styles.displayMath:styles.inlineMath} data-math-display={display} dangerouslySetInnerHTML={{__html:result.html}}/>;
 }
 function Inline({text}:{text:string}){

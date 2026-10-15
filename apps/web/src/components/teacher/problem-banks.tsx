@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   BookOpenCheck,
+  CheckSquare2,
   FolderPlus,
   Plus,
   Search,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
+import { useLocale, type AppLocale } from "@/components/locale-context";
 import { productionApi, type CampusUser, type ProductionProblem } from "@/lib/production-api";
 import {
   area,
@@ -52,16 +54,32 @@ export interface Group {
   problemIds: string[];
   canEdit: boolean;
 }
-export function reviewVisibilityLabel(problem: ProductionProblem, bankVisibility?: "school" | "private") {
-  if (!problem.published) return problem.publishedVersionId ? "当前草稿未开放 · 旧版保持原范围" : "草稿未向学生开放";
+const localText = (locale: AppLocale, zh: string, en: string) => locale === "zh" ? zh : en;
+export function validationStatusLabel(status: string, locale: AppLocale) {
+  if (locale === "en") return status;
+  return ({ Draft: "草稿", Incomplete: "待完善", Waiting: "排队中", Judging: "评测中", "System Error": "系统错误", Published: "已发布" } as Record<string, string>)[status] ?? status;
+}
+export function reviewVisibilityLabel(problem: ProductionProblem, bankVisibility?: "school" | "private", locale: AppLocale = "zh") {
+  if (!problem.published) return problem.publishedVersionId ? localText(locale,"当前草稿未开放 · 旧版保持原范围","Current draft unavailable · previous version retains its scope") : localText(locale,"草稿未向学生开放","Draft unavailable to students");
   const visibility = problem.bankVisibility ?? bankVisibility;
-  if (visibility !== "school") return "仅指定活动学生可见";
-  if (problem.schoolVisibleAt) return problem.rankReviewStatus === "approved" ? "全校可见 · 参与积分榜" : "全校可见 · 未纳入积分榜";
-  if (problem.rankReviewStatus === "revoked") return "已撤下 · 仅指定活动学生可见";
-  return problem.rankReviewStatus === "rejected" ? "审核未通过 · 仅指定活动学生可见" : "待管理员审核 · 仅指定活动学生可见";
+  if (visibility !== "school") return localText(locale,"仅指定活动学生可见","Only visible to assigned activity students");
+  if (problem.schoolVisibleAt) return problem.rankReviewStatus === "approved" ? localText(locale,"全校可见 · 参与积分榜","School-wide · eligible for leaderboard points") : localText(locale,"全校可见 · 未纳入积分榜","School-wide · excluded from leaderboard points");
+  if (problem.rankReviewStatus === "revoked") return localText(locale,"已撤下 · 仅指定活动学生可见","Withdrawn · only visible to assigned activity students");
+  return problem.rankReviewStatus === "rejected" ? localText(locale,"审核未通过 · 仅指定活动学生可见","Review rejected · only visible to assigned activity students") : localText(locale,"待管理员审核 · 仅指定活动学生可见","Awaiting admin review · only visible to assigned activity students");
+}
+export const MAX_BATCH_PUBLISH = 100;
+export function publishEligibilityReason(problem: ProductionProblem, locale: AppLocale) {
+  if (!problem.canEdit) return localText(locale, "无编辑权限", "No edit permission");
+  if (problem.published) return localText(locale, "当前版本已发布", "Current version already published");
+  if (problem.validationStatus !== "AC") return localText(locale, "参考解尚未通过全部测试", "Reference solution has not passed all tests");
+  if (!problem.versionId) return localText(locale, "缺少题目版本", "Problem version is missing");
+  if (!problem.canPublish) return localText(locale, "当前版本不可发布", "Current version cannot be published");
+  return "";
 }
 
 export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; user: CampusUser }) {
+  const { locale } = useLocale();
+  const tr = (zh: string, en: string) => localText(locale, zh, en);
   const router = useRouter(),
     search = useSearchParams(),
     banks = useData<{ items: Bank[] }>("problem-banks"),
@@ -75,6 +93,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
     [filterGroup, setFilterGroup] = useState(""),
     [filterStatus, setFilterStatus] = useState(""),
     [checked, setChecked] = useState<string[]>([]),
+    [confirmPublish, setConfirmPublish] = useState(false),
     [create, setCreate] = useState(false),
     [manage, setManage] = useState<{ ids: string[]; bankId: string } | null>(
       null,
@@ -101,6 +120,18 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
             .toLowerCase()
             .includes(query.toLowerCase()),
       ) ?? [];
+  const checkedProblems = (problems.data?.items ?? []).filter((problem) => checked.includes(problem.id));
+  const publishableSelection = checkedProblems.filter((problem) => !publishEligibilityReason(problem, locale));
+  const excludedSelection = checkedProblems.filter((problem) => publishEligibilityReason(problem, locale));
+  const publishableScope = rows.filter((problem) => !publishEligibilityReason(problem, locale));
+  const selectableScope = publishableScope.slice(0, MAX_BATCH_PUBLISH);
+  const allPublishableScopeSelected = selectableScope.length > 0 && selectableScope.every((problem) => checked.includes(problem.id));
+  const togglePublishableScope = () => {
+    const scopeIds = new Set(selectableScope.map((problem) => problem.id));
+    setChecked((ids) => allPublishableScopeSelected
+      ? ids.filter((id) => !scopeIds.has(id))
+      : [...new Set([...ids, ...scopeIds])]);
+  };
   const openManage = (ids: string[]) => {
     const selected = (problems.data?.items ?? []).filter((x) =>
         ids.includes(x.id),
@@ -121,17 +152,17 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
           href="/teacher/problems"
           className={`${link} mb-4 inline-block text-sm`}
         >
-          ← 题库与题目
+          ← {tr("题库与题目", "Problem banks and problems")}
         </Link>
       )}
       <PageHeader
-        eyebrow={bankId ? "Problem Bank" : "Problem Banks"}
-        title={bankId ? (bank?.name ?? "题库详情") : "题库与题目"}
+        eyebrow={tr(bankId ? "题库" : "题库与题目", bankId ? "Problem bank" : "Problem banks")}
+        title={bankId ? (bank?.name ?? tr("题库详情", "Bank details")) : tr("题库与题目", "Problem banks and problems")}
         description={
           bankId
             ? bank?.description ||
-              "题库内可使用分组整理题目，分组不会改变访问权限与成绩。"
-            : "组织课程题目，创建练习，维护题面和测试数据。教师发布题目后，校内公开与积分资格仍须管理员逐版审核。"
+              tr("题库内可使用分组整理题目，分组不会改变访问权限与成绩。", "Use groups to organize problems. Groups do not change access or scores.")
+            : tr("组织课程题目，创建练习，维护题面和测试数据。教师发布题目后，校内公开与积分资格仍须管理员逐版审核。", "Organize course problems and maintain statements and tests. School-wide visibility and leaderboard points require admin review of each version.")
         }
         action={
           <div className="flex gap-2">
@@ -140,7 +171,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
               className={buttonVariants({ variant: "secondary" })}
             >
               <Upload size={15} />
-              导入题目
+              {tr("导入题目", "Import problems")}
             </Link>
             {bankId ? (
               <Link
@@ -148,31 +179,31 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                 href={`/teacher/problems/new/edit?bankId=${bankId}`}
               >
                 <Plus size={15} />
-                新建题目
+                {tr("新建题目", "New problem")}
               </Link>
             ) : (
               <Button onClick={() => setCreate(true)}>
                 <BookOpenCheck size={15} />
-                新建题库
+                {tr("新建题库", "New bank")}
               </Button>
             )}
           </div>
         }
       />
       <p className="mt-3 rounded-md border border-border bg-surface-subtle px-4 py-3 text-sm leading-6 text-muted-foreground">
-        教师新建题库默认为私有；如需让题目对全校学生开放，请联系管理员将题库纳入校内审核。发布到校内题库的新版本在审核通过前仅负责教师和指定活动学生可见，不计入积分排行榜。
+        {tr("教师新建题库默认为私有；如需让题目对全校学生开放，请联系管理员将题库纳入校内审核。发布到校内题库的新版本在审核通过前仅负责教师和指定活动学生可见，不计入积分排行榜。", "New teacher banks are private by default. Ask an administrator to include a bank in school-wide review. A new published version stays visible only to its teacher and assigned activity students until approved, and earns no leaderboard points before approval.")}
       </p>
       <State resource={banks} />
       <State resource={problems} />
       <State resource={groups} />
       <Feedback action={action} />
       {!bankId && (
-        <Tabs value={tab} onChange={setTab} items={["题库", "全部题目"]} />
+        <Tabs value={tab === "题库" ? tr("题库", "Banks") : tr("全部题目", "All problems")} onChange={value => setTab(value === tr("题库", "Banks") ? "题库" : "全部题目")} items={[tr("题库", "Banks"), tr("全部题目", "All problems")]} />
       )}
       {!bankId && tab === "题库" ? (
         <section className={`${panel} mt-4`}>
           <Table
-            headers={["名称", "课程", "题目数", "可见范围", "最近修改", "操作"]}
+            headers={[tr("名称", "Name"), tr("课程", "Course"), tr("题目数", "Problems"), tr("可见范围", "Visibility"), tr("最近修改", "Updated"), tr("操作", "Actions")]}
           >
             {banks.data?.items.map((item) => (
               <tr key={item.id}>
@@ -192,12 +223,12 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                 </td>
                 <td>
                   {item.visibility === "school"
-                    ? "校内题库（题目逐版审核）"
-                    : "维护教师 / 获授教师"}
+                    ? tr("校内题库（题目逐版审核）", "School bank (reviewed per version)")
+                    : tr("维护教师 / 获授教师", "Owner / permitted teachers")}
                 </td>
                 <td className="text-muted-foreground">
                   {item.updatedAt
-                    ? new Date(item.updatedAt).toLocaleDateString("zh-CN")
+                    ? new Date(item.updatedAt).toLocaleDateString(locale === "zh" ? "zh-CN" : "en-US")
                     : "—"}
                 </td>
                 <td>
@@ -206,7 +237,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                       href={`/teacher/problems/banks/${item.id}`}
                       className={link}
                     >
-                      打开
+                      {tr("打开", "Open")}
                     </Link>
                     {(item.canContribute ||
                       item.canEdit ||
@@ -215,7 +246,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                         href={`/teacher/imports?bankId=${item.id}`}
                         className={link}
                       >
-                        导入题目
+                        {tr("导入题目", "Import problems")}
                       </Link>
                     )}
                   </div>
@@ -223,7 +254,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
               </tr>
             ))}
             {!banks.loading && !banks.data?.items.length && (
-              <Empty columns={6}>暂无题库。点击“新建题库”建立空题库。</Empty>
+              <Empty columns={6}>{tr("暂无题库。点击“新建题库”建立空题库。", "No banks yet. Create one to get started.")}</Empty>
             )}
           </Table>
         </section>
@@ -234,11 +265,11 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
           {bankId && (
             <aside className={`${panel} self-start`}>
               <div className="flex items-center justify-between border-b border-border p-3">
-                <b className="text-sm">分组</b>
+                <b className="text-sm">{tr("分组", "Groups")}</b>
                 <Button
                   variant="ghost"
                   size="icon"
-                  title="新建分组"
+                  title={tr("新建分组", "New group")}
                   onClick={() => setManage({ ids: [], bankId })}
                 >
                   <FolderPlus size={17} />
@@ -258,15 +289,15 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                     className="min-h-11 flex-1 px-3 py-3 text-left text-sm"
                     onClick={() => setFilterGroup(group.id)}
                   >
-                    {group.name}
+                    {group.id === "" ? tr("全部题目", "All problems") : group.id === "ungrouped" ? tr("未分组", "Ungrouped") : group.name}
                   </button>
                   {"canEdit" in group && group.canEdit && (
                     <button
-                      aria-label={`管理 ${group.name}`}
+                    aria-label={`${tr("管理", "Manage")} ${group.name}`}
                       className="px-2 text-xs text-muted-foreground"
                       onClick={() => setEditGroup(group as Group)}
                     >
-                      管理
+                      {tr("管理", "Manage")}
                     </button>
                   )}
                 </div>
@@ -281,48 +312,69 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                   size={16}
                 />
                 <input
-                  aria-label="搜索题目"
+                  aria-label={tr("搜索题目", "Search problems")}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="搜索题号、标题或主题"
+                  placeholder={tr("搜索题号、标题或主题", "Search ID, title, or topic")}
                   className={`${input} pl-9`}
                 />
               </label>
               <ProblemFilter banks={banks.data?.items??[]} groups={groups.data?.items??[]} bankId={bankId} bank={filterBank} status={filterStatus} group={filterGroup} onBank={setFilterBank} onStatus={setFilterStatus} onGroup={setFilterGroup}/>
+              <Button variant="secondary" size="sm" onClick={togglePublishableScope} disabled={!publishableScope.length || action.busy}>
+                <CheckSquare2 size={15} />
+                {allPublishableScopeSelected
+                  ? tr("取消本范围选择", "Deselect in scope")
+                  : publishableScope.length > MAX_BATCH_PUBLISH
+                    ? tr(`选择前 ${MAX_BATCH_PUBLISH} 道可发布题（共 ${publishableScope.length} 道）`, `Select first ${MAX_BATCH_PUBLISH} publishable (${publishableScope.length} total)`)
+                    : `${tr("选择可发布题目", "Select publishable")} (${publishableScope.length})`}
+              </Button>
               {!bankId && (
                 <Link
                   className={buttonVariants()}
                   href="/teacher/problems/new/edit"
                 >
                   <Plus size={15} />
-                  新建题目
+                  {tr("新建题目", "New problem")}
                 </Link>
               )}
             </div>
             {checked.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface-subtle px-4 py-3 text-sm">
-                <b>已选 {checked.length} 道</b>
-                <Button size="sm" onClick={() => openManage(checked)}>
-                  批量整理分组
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setChecked([])}
-                >
-                  取消选择
-                </Button>
+              <div className="border-b border-border bg-surface-subtle px-4 py-3 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <b>{tr("已选", "Selected")} {checkedProblems.length} {tr("道", "problems")}</b>
+                  <Button size="sm" onClick={() => { action.clear(); setConfirmPublish(true); }} disabled={!publishableSelection.length || publishableSelection.length > MAX_BATCH_PUBLISH || action.busy}>
+                    {tr("批量发布", "Publish selected")} ({publishableSelection.length})
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => openManage(checked)} disabled={action.busy}>
+                    {tr("批量整理分组", "Organize groups")}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setChecked([])} disabled={action.busy}>
+                    {tr("取消选择", "Clear selection")}
+                  </Button>
+                </div>
+                {publishableSelection.length > MAX_BATCH_PUBLISH && (
+                  <p role="status" className="mt-2 text-xs text-muted-foreground">
+                    {tr(`单次最多发布 ${MAX_BATCH_PUBLISH} 道题，请分批选择。`, `Publish at most ${MAX_BATCH_PUBLISH} problems per batch. Narrow your selection.`)}
+                  </p>
+                )}
+                {excludedSelection.length > 0 && (
+                  <p role="status" className="mt-2 text-xs leading-5 text-muted-foreground">
+                    {tr("未纳入发布", "Excluded from publishing")} ({excludedSelection.length})：
+                    {excludedSelection.slice(0, 3).map((problem) => `${problem.title}（${publishEligibilityReason(problem, locale)}）`).join("、")}
+                    {excludedSelection.length > 3 ? tr("等", " and more") : ""}
+                  </p>
+                )}
               </div>
             )}
             <Table
               headers={[
-                "选择",
-                "题目",
-                "题库",
-                "主题 / 分组",
-                "接口",
-                "状态",
-                "操作",
+                tr("选择", "Select"),
+                tr("题目", "Problem"),
+                tr("题库", "Bank"),
+                tr("主题 / 分组", "Topics / groups"),
+                tr("接口", "Interface"),
+                tr("状态", "Status"),
+                tr("操作", "Actions"),
               ]}
             >
               {rows.map((problem) => (
@@ -330,7 +382,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                   <td>
                     <input
                       type="checkbox"
-                      aria-label={`选择 ${problem.title}`}
+                      aria-label={`${tr("选择", "Select")} ${problem.title}`}
                       checked={checked.includes(problem.id)}
                       onChange={(e) =>
                         setChecked((x) =>
@@ -372,37 +424,37 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                     />
                   </td>
                   <td>
-                    {problem.mode === "function" ? "Function" : "Standard I/O"}
+                    {problem.mode === "function" ? tr("函数模式", "Function") : tr("标准输入输出", "Standard I/O")}
                   </td>
                   <td>
                     <StatusPill
                       status={
                         problem.published
-                          ? "Published"
-                          : (problem.validationStatus ?? "Draft")
+                          ? tr("已发布", "Published")
+                          : validationStatusLabel(problem.validationStatus ?? "Draft", locale)
                       }
                     />
-                    <p className="mt-1 max-w-52 text-xs leading-5 text-muted-foreground">{reviewVisibilityLabel(problem, banks.data?.items.find((x) => x.id === problem.bankId)?.visibility)}</p>
+                    <p className="mt-1 max-w-52 text-xs leading-5 text-muted-foreground">{reviewVisibilityLabel(problem, banks.data?.items.find((x) => x.id === problem.bankId)?.visibility, locale)}</p>
                   </td>
                   <td>
                     <Link
                       href={`/teacher/problems/${problem.id}/edit?returnTo=${encodeURIComponent(bankId ? `/teacher/problems/banks/${bankId}` : "/teacher/problems?tab=all")}`}
                       className="inline-flex items-center gap-1 font-semibold text-primary"
                     >
-                      编辑 <ArrowRight size={14} />
+                      {tr("编辑", "Edit")} <ArrowRight size={14} />
                     </Link>
                     <button
                       className={`${link} ml-3`}
                       onClick={() => openManage([problem.id])}
                     >
-                      整理分组
+                      {tr("整理分组", "Organize groups")}
                     </button>
                   </td>
                 </tr>
               ))}
               {!problems.loading && !rows.length && (
                 <Empty columns={7}>
-                  当前范围暂无题目。新建题目或导入后，它们会显示在这里。
+                  {tr("当前范围暂无题目。新建题目或导入后，它们会显示在这里。", "No problems in this scope yet. Create or import problems to show them here.")}
                 </Empty>
               )}
             </Table>
@@ -418,6 +470,35 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
           }}
         />
       )}
+      {confirmPublish && (
+        <Modal title={tr("确认批量发布题目", "Confirm batch publication")} onClose={() => { if (!action.busy) setConfirmPublish(false); }}>
+          <div className="space-y-4 text-sm">
+            <p>{tr(`即将发布 ${publishableSelection.length} 道已通过参考解验证的题目。`, `You are about to publish ${publishableSelection.length} validated problems.`)}</p>
+            <ul className="max-h-52 space-y-1 overflow-y-auto rounded-md border border-border bg-surface-subtle px-4 py-3" aria-label={tr("待发布题目", "Problems to publish")}>
+              {publishableSelection.map((problem) => <li key={problem.id} className="leading-6">{problem.title}</li>)}
+            </ul>
+            {excludedSelection.length > 0 && <p className="text-muted-foreground">{tr(`另外 ${excludedSelection.length} 道不符合发布条件的已选题目将保持原状。`, `${excludedSelection.length} other selected problems are ineligible and will remain unchanged.`)}</p>}
+            <p className="text-muted-foreground">{tr("发布后该版本固定。校内公开与积分资格仍须管理员逐版审核；关联课程不会因此自动发布。", "Published versions are fixed. School-wide visibility and leaderboard points still require admin review; linked courses will not publish automatically.")}</p>
+            <Feedback action={action} />
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setConfirmPublish(false)} disabled={action.busy}>{tr("取消", "Cancel")}</Button>
+              <Button
+                disabled={action.busy || publishableSelection.length < 1 || publishableSelection.length > MAX_BATCH_PUBLISH}
+                onClick={() => void action.run(async () => {
+                  const items = publishableSelection.map((problem) => ({ problemId: problem.id, versionId: problem.versionId! }));
+                  const result = await productionApi<{ publishedCount: number }>("problems/publish-batch", { method: "POST", body: { items } });
+                  setChecked((ids) => ids.filter((id) => !items.some((item) => item.problemId === id)));
+                  setConfirmPublish(false);
+                  problems.reload();
+                  return tr(`已发布 ${result.publishedCount} 道题目。校内公开与积分资格仍待管理员审核。`, `${result.publishedCount} problems published. School-wide visibility and points await admin review.`);
+                })}
+              >
+                {tr("确认发布", "Publish now")}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
       {manage && (
         <ManageGroups
           bankId={manage.bankId}
@@ -431,7 +512,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
       )}
       {editGroup && (
         <Modal
-          title={`管理分组 · ${editGroup.name}`}
+          title={`${tr("管理分组", "Manage group")} · ${editGroup.name}`}
           onClose={() => setEditGroup(null)}
         >
           <form
@@ -446,11 +527,11 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                 });
                 groups.reload();
                 setEditGroup(null);
-                return "分组名称已更新。";
+                return tr("分组名称已更新。", "Group name updated.");
               });
             }}
           >
-            <Field label="分组名称">
+            <Field label={tr("分组名称", "Group name")}>
               <input
                 name="name"
                 defaultValue={editGroup.name}
@@ -459,7 +540,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
               />
             </Field>
             <p className="text-sm text-muted-foreground">
-              解散分组会移除分组关系，题库题目与历史活动保留。
+              {tr("解散分组会移除分组关系，题库题目与历史活动保留。", "Deleting a group removes only its relationships. Problems and past activities remain.")}
             </p>
             <Feedback action={action} />
             <div className="flex justify-between">
@@ -468,21 +549,21 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                 type="button"
                 disabled={action.busy}
                 onClick={() => {
-                  if (window.confirm(`解散“${editGroup.name}”？保留所有题目。`))
+                  if (window.confirm(`${tr("解散", "Delete")} “${editGroup.name}”? ${tr("保留所有题目。", "All problems will remain.")}`))
                     void action.run(async () => {
                       await productionApi(`problem-groups/${editGroup.id}`, {
                         method: "DELETE",
                       });
                       groups.reload();
                       setEditGroup(null);
-                      return "分组已解散，题目保留。";
+                      return tr("分组已解散，题目保留。", "Group deleted. Problems retained.");
                     });
                 }}
               >
-                解散分组
+                {tr("解散分组", "Delete group")}
               </Button>
               <Button type="submit" disabled={action.busy}>
-                保存名称
+                {tr("保存名称", "Save name")}
               </Button>
             </div>
           </form>
@@ -537,9 +618,11 @@ export function CreateBank({
   onClose: () => void;
   onCreated: (id: string) => void;
 }) {
+  const { locale } = useLocale();
+  const tr = (zh: string, en: string) => localText(locale, zh, en);
   const action = useAction();
   return (
-    <Modal title="新建题库" onClose={onClose}>
+    <Modal title={tr("新建题库", "New bank")} onClose={onClose}>
       <form
         className="space-y-4"
         onSubmit={(e) => {
@@ -559,35 +642,35 @@ export function CreateBank({
           });
         }}
       >
-        <Field label="题库名称 *">
+        <Field label={tr("题库名称 *", "Bank name *")}>
           <input autoFocus name="name" required className={input} />
         </Field>
-        <Field label="简介">
+        <Field label={tr("简介", "Description")}>
           <textarea name="description" rows={3} className={area} />
         </Field>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="课程 / 主题">
+          <Field label={tr("课程 / 主题", "Course / topic")}>
             <select name="course" className={input}>
               {["Python", "ACSL", "CIE 9618", "其他"].map((x) => (
-                <option key={x}>{x}</option>
+                <option key={x} value={x}>{x === "其他" ? tr("其他", "Other") : x}</option>
               ))}
             </select>
           </Field>
-          <Field label="可见范围">
+          <Field label={tr("可见范围", "Visibility")}>
             {allowSchool ? <select name="visibility" className={input}>
-              <option value="private">教师私有</option>
-              <option value="school">校内题库（题目逐版审核）</option>
-            </select> : <><input type="hidden" name="visibility" value="private" /><p className={`${input} flex items-center bg-surface-subtle text-muted-foreground`}>教师私有</p></>}
+              <option value="private">{tr("教师私有", "Teacher private")}</option>
+              <option value="school">{tr("校内题库（题目逐版审核）", "School bank (reviewed per version)")}</option>
+            </select> : <><input type="hidden" name="visibility" value="private" /><p className={`${input} flex items-center bg-surface-subtle text-muted-foreground`}>{tr("教师私有", "Teacher private")}</p></>}
           </Field>
         </div>
-        <p className="text-xs leading-5 text-muted-foreground">{allowSchool ? "校内题库仅代表题目可以提交审核；管理员逐版通过前，不会全校公开或计入积分榜。" : "如需全校可见，请联系管理员将题库纳入校内审核；审核通过前，题目仅向指定活动学生开放。"}</p>
+        <p className="text-xs leading-5 text-muted-foreground">{allowSchool ? tr("校内题库仅代表题目可以提交审核；管理员逐版通过前，不会全校公开或计入积分榜。", "A school bank lets problems be submitted for review. Until an administrator approves each version, they are not school-wide and earn no leaderboard points.") : tr("如需全校可见，请联系管理员将题库纳入校内审核；审核通过前，题目仅向指定活动学生开放。", "For school-wide visibility, ask an administrator to include this bank in review. Before approval, problems are available only to assigned activity students.")}</p>
         <Feedback action={action} />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>
-            取消
+            {tr("取消", "Cancel")}
           </Button>
           <Button type="submit" disabled={action.busy}>
-            创建题库
+            {tr("创建题库", "Create bank")}
           </Button>
         </div>
       </form>
@@ -610,6 +693,8 @@ export function ManageGroups({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { locale } = useLocale();
+  const tr = (zh: string, en: string) => localText(locale, zh, en);
   const groups = useData<{ items: Group[] }>(`problem-groups?bankId=${bankId}`),
     [query, setQuery] = useState(""),
     [picked, setPicked] = useState<string[]>([]),
@@ -618,32 +703,32 @@ export function ManageGroups({
     [source, setSource] = useState(initialSource ?? ""),
     action = useAction();
   return (
-    <Modal title="整理分组" onClose={onClose}>
+    <Modal title={tr("整理分组", "Organize groups")} onClose={onClose}>
       <Tabs
-        items={["添加到分组", "移动分组", "移出分组"]}
-        value={mode}
-        onChange={value=>{setMode(value);setPicked([]);setSource("");setNewName("");}}
+        items={[tr("添加到分组", "Add to groups"), tr("移动分组", "Move groups"), tr("移出分组", "Remove from groups")]}
+        value={mode === "添加到分组" ? tr("添加到分组", "Add to groups") : mode === "移动分组" ? tr("移动分组", "Move groups") : tr("移出分组", "Remove from groups")}
+        onChange={value=>{setMode(value === tr("添加到分组", "Add to groups") ? "添加到分组" : value === tr("移动分组", "Move groups") ? "移动分组" : "移出分组");setPicked([]);setSource("");setNewName("");}}
       />
       <p className="mt-4 text-sm text-muted-foreground">
-        已选 {problemIds.length}{" "}
-        道题。添加保留原有分组；移动需要明确选择来源与目标。
+        {tr("已选", "Selected")} {problemIds.length}{" "}
+        {tr("道题。添加保留原有分组；移动需要明确选择来源与目标。", "problems. Adding keeps existing groups; moving requires a source and a target.")}
       </p>
       <input
-        aria-label="搜索分组"
+        aria-label={tr("搜索分组", "Search groups")}
         className={`${input} mt-3`}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="搜索分组"
+        placeholder={tr("搜索分组", "Search groups")}
       />
       <State resource={groups} />
       {mode === "移动分组" && (
-        <Field label="来源分组">
+        <Field label={tr("来源分组", "Source group")}>
           <select
             className={input}
             value={source}
             onChange={(e) => {setSource(e.target.value);setPicked(x=>x.filter(id=>id!==e.target.value));}}
           >
-            <option value="">请选择来源</option>
+            <option value="">{tr("请选择来源", "Choose source")}</option>
             {groups.data?.items
               .filter((g) => g.canEdit && problemIds.every(id=>g.problemIds.includes(id)))
               .map((g) => (
@@ -677,29 +762,29 @@ export function ManageGroups({
               <span>
                 <b>{g.name}</b>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {g.problemIds.length} 题 ·{" "}
+                  {g.problemIds.length} {tr("题", "problems")} ·{" "}
                   {problemIds.filter((id) => g.problemIds.includes(id)).length}{" "}
-                  道已在此组
+                  {tr("道已在此组", "selected in this group")}
                 </p>
               </span>
             </label>
           ))}
-        {!groups.loading&&!groups.error&&!groups.data?.items.some(g=>g.name.toLowerCase().includes(query.toLowerCase())&&(mode!=="移出分组"||problemIds.some(id=>g.problemIds.includes(id))))&&<p className="p-3 text-sm text-muted-foreground">{query?"没有匹配的分组。":mode==="移出分组"?"所选题目尚未加入任何分组。":"此题库暂无分组，可在下方新建。"}</p>}
+        {!groups.loading&&!groups.error&&!groups.data?.items.some(g=>g.name.toLowerCase().includes(query.toLowerCase())&&(mode!=="移出分组"||problemIds.some(id=>g.problemIds.includes(id))))&&<p className="p-3 text-sm text-muted-foreground">{query?tr("没有匹配的分组。","No matching groups."):mode==="移出分组"?tr("所选题目尚未加入任何分组。","Selected problems are not in any group."):tr("此题库暂无分组，可在下方新建。","No groups yet. Create one below.")}</p>}
       </div>
       {mode === "添加到分组" && (
-        <Field label="新建分组（可选）">
+        <Field label={tr("新建分组（可选）", "New group (optional)")}>
           <input
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             className={`${input} mt-3`}
-            placeholder="输入新分组名称"
+            placeholder={tr("输入新分组名称", "Enter a new group name")}
           />
         </Field>
       )}
       <Feedback action={action} />
       <div className="mt-5 flex justify-end gap-2">
         <Button variant="secondary" onClick={onClose}>
-          取消
+          {tr("取消", "Cancel")}
         </Button>
         <Button
           disabled={
@@ -740,10 +825,10 @@ export function ManageGroups({
           }
         >
           {mode === "添加到分组"
-            ? "确认添加"
+            ? tr("确认添加", "Add")
             : mode === "移动分组"
-              ? "确认移动"
-              : "仅移出所选分组"}
+              ? tr("确认移动", "Move")
+              : tr("仅移出所选分组", "Remove from selected groups")}
         </Button>
       </div>
     </Modal>
@@ -753,11 +838,15 @@ export function ProblemPicker({
   selected,
   onClose,
   onAdd,
+  courseMode,
 }: {
   selected: string[];
   onClose: () => void;
   onAdd: (items: ProductionProblem[]) => void;
+  courseMode?: "draft" | "published";
 }) {
+  const { locale } = useLocale();
+  const tr = (zh: string, en: string) => localText(locale, zh, en);
   const banks = useData<{ items: Bank[] }>("problem-banks"),
     groups = useData<{ items: Group[] }>("problem-groups"),
     problems = useData<{ items: ProductionProblem[] }>("problems"),
@@ -768,6 +857,7 @@ export function ProblemPicker({
   const rows =
     problems.data?.items.filter(
       (p) =>
+        (!courseMode || (p.bankVisibility === "school" && (courseMode === "published" || p.canEdit))) &&
         (!bank || p.bankId === bank) &&
         (!group ||
           groups.data?.items
@@ -778,13 +868,17 @@ export function ProblemPicker({
           .includes(query.toLowerCase()),
     ) ?? [];
   return (
-    <Drawer title="从题库与分组选择" onClose={onClose}>
+    <Drawer title={tr("从题库与分组选择", "Choose from banks and groups")} onClose={onClose}>
       <p className="text-xs text-muted-foreground">
-        题库 → 分组 → 题目。多组同题只显示一次，已加入的题目保留选择状态。
+        {courseMode === "draft"
+          ? tr("课程草稿可引用校内题库中你能编辑的题目最新版本；发布课程前，关联题须发布并通过管理员公开审核。", "A course draft can link the latest versions you can edit in school banks. Publish and obtain admin approval for linked problems before publishing the course.")
+          : courseMode === "published"
+            ? tr("课程只能添加已通过管理员审核的校内公开题目。", "Only admin-approved school-wide problems can be added to a published course.")
+            : tr("题库 → 分组 → 题目。多组同题只显示一次，已加入的题目保留选择状态。", "Bank → group → problem. Problems in multiple groups appear once; already added problems stay selected.")}
       </p>
       <div className="mt-4 grid grid-cols-2 gap-3">
         <select
-          aria-label="选择题库"
+          aria-label={tr("选择题库", "Choose bank")}
           className={input}
           value={bank}
           onChange={(e) => {
@@ -792,22 +886,23 @@ export function ProblemPicker({
             setGroup("");
           }}
         >
-          <option value="">全部题库</option>
-          {banks.data?.items.map((x) => (
+          <option value="">{tr("全部题库", "All banks")}</option>
+          {banks.data?.items.filter((x) => !courseMode || x.visibility === "school").map((x) => (
             <option key={x.id} value={x.id}>
               {x.name}
             </option>
           ))}
         </select>
         <select
-          aria-label="选择分组"
+          aria-label={tr("选择分组", "Choose group")}
           className={input}
           value={group}
           onChange={(e) => setGroup(e.target.value)}
         >
-          <option value="">全部分组</option>
+          <option value="">{tr("全部分组", "All groups")}</option>
           {groups.data?.items
-            .filter((x) => !bank || x.bankId === bank)
+            .filter((x) => (!bank || x.bankId === bank) &&
+              (!courseMode || banks.data?.items.some((item) => item.id === x.bankId && item.visibility === "school")))
             .map((x) => (
               <option key={x.id} value={x.id}>
                 {x.name}
@@ -815,18 +910,23 @@ export function ProblemPicker({
             ))}
         </select>
         <input
-          aria-label="搜索选择题目"
+          aria-label={tr("搜索选择题目", "Search problems to select")}
           className={`${input} col-span-2`}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="搜索题目"
+          placeholder={tr("搜索题目", "Search problems")}
         />
       </div>
       <State resource={banks} /><State resource={groups} /><State resource={problems} />
       <div className="mt-4 divide-y divide-border border border-border">
         {rows.map((p) => {
           const exists = selected.includes(p.id),
-            available = p.published || Boolean(p.publishedVersionId);
+            courseReady = p.published && p.bankVisibility === "school" && Boolean(p.schoolVisibleAt) && p.rankReviewStatus === "approved",
+            available = courseMode === "draft"
+              ? true
+              : courseMode === "published"
+                ? courseReady
+                : p.published || Boolean(p.publishedVersionId);
           return (
             <label key={p.id} className="flex gap-3 p-4 text-sm">
               <input
@@ -842,7 +942,7 @@ export function ProblemPicker({
                 }
               />
               <span>
-                <b>{p.publishedTitle ?? p.title}</b>
+                <b>{courseMode ? p.title : p.publishedTitle ?? p.title}</b>
                 <GroupTags
                   groups={
                     groups.data?.items.filter((g) =>
@@ -852,15 +952,34 @@ export function ProblemPicker({
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
                   {exists
-                    ? "已添加"
-                    : available
-                      ? "已发布 · 固定题目版本"
-                      : "教师草稿 · 不能进入正式活动"}
+                    ? tr("已添加", "Added")
+                    : courseMode
+                      ? courseReady
+                        ? tr("已审核公开 · 可随课程发布", "Approved and public · ready for the course")
+                        : p.published
+                          ? p.rankReviewStatus === "rejected"
+                            ? tr("已发布 · 公开审核未通过", "Published · review rejected")
+                            : p.rankReviewStatus === "revoked"
+                              ? tr("已发布 · 已撤下", "Published · withdrawn")
+                              : tr("已发布 · 待管理员公开审核", "Published · awaiting admin review")
+                          : tr("题目草稿 · 仅在课程草稿中预览", "Problem draft · preview only in the course draft")
+                      : available
+                        ? tr("已发布 · 固定题目版本", "Published · fixed problem version")
+                        : tr("教师草稿 · 不能进入正式活动", "Teacher draft · unavailable for formal activities")}
                 </p>
               </span>
             </label>
           );
         })}
+        {!problems.loading && !rows.length && (
+          <p className="p-4 text-sm text-muted-foreground">
+            {courseMode === "draft"
+              ? tr("当前范围暂无可编辑的校内题库题目。", "No editable school-bank problems in this scope.")
+              : courseMode === "published"
+                ? tr("当前范围暂无校内题库题目。", "No school-bank problems in this scope.")
+              : tr("当前范围暂无题目。", "No problems in this scope.")}
+          </p>
+        )}
       </div>
       <div className="mt-5 flex flex-wrap justify-between gap-3">
         <Button
@@ -870,18 +989,24 @@ export function ProblemPicker({
               rows
                 .filter(
                   (p) =>
-                    (p.published || p.publishedVersionId) &&
+                    (courseMode === "draft" || courseMode === "published"
+                      ? courseMode === "draft" || (p.published && p.bankVisibility === "school" && Boolean(p.schoolVisibleAt) && p.rankReviewStatus === "approved")
+                      : p.published || p.publishedVersionId) &&
                     !selected.includes(p.id),
                 )
                 .map((p) => p.id),
             )
           }
         >
-          选择当前范围全部已发布题
+          {courseMode === "draft"
+            ? tr("选择当前范围全部题目", "Select all problems in scope")
+            : courseMode === "published"
+              ? tr("选择当前范围全部已审核题", "Select all approved problems in scope")
+              : tr("选择当前范围全部已发布题", "Select all published problems in scope")}
         </Button>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={onClose}>
-            取消
+            {tr("取消", "Cancel")}
           </Button>
           <Button
             disabled={!picked.length || problems.loading || !!problems.error}
@@ -893,7 +1018,7 @@ export function ProblemPicker({
               )
             }
           >
-            确认加入 {picked.length} 题
+            {tr("确认加入", "Add")} {picked.length} {tr("题", "problems")}
           </Button>
         </div>
       </div>

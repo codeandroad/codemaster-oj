@@ -24,6 +24,16 @@ export class ClassesController {
     return applyResponse(response, await this.domain.execute('classes', request.domainContext));
   }
 
+  @Post('classes/:id/archive')
+  async archive(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('classes', request.domainContext));
+  }
+
+  @Post('classes/:id/restore')
+  async restore(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('classes', request.domainContext));
+  }
+
   @Post('classes/:id/members')
   async addMembers(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('classes', request.domainContext));

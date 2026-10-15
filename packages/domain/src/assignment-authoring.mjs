@@ -4,6 +4,13 @@ const staff=u=>{if(!u.roles.some(r=>['teacher','admin'].includes(r)))fail(403,'F
 const row=r=>{if(!r.rowCount)fail(404,'NOT_FOUND','资源不存在');return r.rows[0];};
 const rewardPoints=(value,fallback=0)=>value===undefined?fallback:integer(value,0,20,'作业每题额外积分');
 function checkRewardBudget(problems){if(problems.reduce((sum,problem)=>sum+problem.rewardPoints,0)>100)fail(400,'REWARD_BUDGET','每份作业奖励总额最多 100 分');}
+async function coursePathId(db,value){
+ if(value===null||value==='')return null;
+ const id=uuid(value,'关联课程 ID');
+ const course=row(await db.query('SELECT id,owner_account_id,published_at,archived_at FROM learning_paths WHERE id=$1 FOR SHARE',[id]));
+ if(course.archived_at||!course.published_at)fail(409,'COURSE_UNAVAILABLE','作业只能关联已发布且未归档的课程');
+ return id;
+}
 async function syncRewards(db,id,problems,accountId){
  await db.query('DELETE FROM point_rewards WHERE assignment_id=$1',[id]);
  for(const problem of problems)if(problem.rewardPoints>0)await db.query('INSERT INTO point_rewards(problem_id,assignment_id,points,updated_by) VALUES($1,$2,$3,$4)',[problem.problemId,id,problem.rewardPoints,accountId]);
@@ -19,19 +26,19 @@ async function input(ctx,db,body,old) {
  for(const p of problems){const problemId=uuid(p.problemId),points=Number(p.points);if(seen.has(problemId))fail(400,'VALIDATION','同一题目只能选择一次');seen.add(problemId);if(!Number.isFinite(points)||points<=0||points>1000||Math.abs(Math.round(points*100)-points*100)>0.00001)fail(400,'VALIDATION','分值须为 0–1000，最多两位小数');const {p:problem}=await ctx.helpers.versionAccess(db,ctx.user,problemId);if(!problem.current_version_id)fail(409,'UNPUBLISHED','只能选择已发布题目');const {v}=await ctx.helpers.versionAccess(db,ctx.user,problemId,problem.current_version_id);if(!v.published_at)fail(409,'UNPUBLISHED','只能选择已发布题目');selected.push({problemId,versionId:v.id,points,rewardPoints:rewardPoints(p.rewardPoints,existingRewards.get(problemId)??0)});}
  checkRewardBudget(selected);
  const participants=body.participants??(old?(await db.query('SELECT identity_id FROM assignment_participants WHERE assignment_id=$1 AND NOT exempt',[old.id])).rows.map(p=>p.identity_id):(await db.query("SELECT cm.identity_id FROM class_members cm JOIN identities i ON i.id=cm.identity_id WHERE cm.class_id=$1 AND i.archived_at IS NULL AND i.kind='student'",[classId])).rows.map(p=>p.identity_id));
- if(!Array.isArray(participants)||participants.length>500)fail(400,'VALIDATION','作业最多 500 名学生');const studentIds=[...new Set(participants.map(id=>uuid(id)))];for(const id of studentIds)if(!(await db.query("SELECT 1 FROM class_members cm JOIN identities i ON i.id=cm.identity_id WHERE class_id=$1 AND identity_id=$2 AND i.kind='student' AND i.archived_at IS NULL",[classId,id])).rowCount)fail(400,'VALIDATION','作业成员须为本班有效学生');const course=body.course===undefined?old?.course??'Python':field(body.course,'课程标签',{max:100});return {title,classId,dueAt,description,course,problems:selected,participants:studentIds};
+ if(!Array.isArray(participants)||participants.length>500)fail(400,'VALIDATION','作业最多 500 名学生');const studentIds=[...new Set(participants.map(id=>uuid(id)))];for(const id of studentIds)if(!(await db.query("SELECT 1 FROM class_members cm JOIN identities i ON i.id=cm.identity_id WHERE class_id=$1 AND identity_id=$2 AND i.kind='student' AND i.archived_at IS NULL",[classId,id])).rowCount)fail(400,'VALIDATION','作业成员须为本班有效学生');const course=body.course===undefined?old?.course??'Python':field(body.course,'课程标签',{max:100});const linkedCourse=body.coursePathId===undefined?old?.course_path_id??null:await coursePathId(db,body.coursePathId);return {title,classId,dueAt,description,course,coursePathId:linkedCourse,problems:selected,participants:studentIds};
 }
 async function apply(db,id,i,accountId){
- await db.query('UPDATE assignments SET title=$1,class_id=$2,due_at=$3,description=$4,course=$6 WHERE id=$5',[i.title,i.classId,i.dueAt,i.description,id,i.course]);await db.query('DELETE FROM assignment_problems WHERE assignment_id=$1',[id]);await db.query('DELETE FROM assignment_participants WHERE assignment_id=$1',[id]);for(const [position,p]of i.problems.entries())await db.query('INSERT INTO assignment_problems(assignment_id,problem_id,version_id,points,position) VALUES($1,$2,$3,$4,$5)',[id,p.problemId,p.versionId,p.points,position]);for(const identityId of i.participants)await db.query('INSERT INTO assignment_participants(assignment_id,identity_id) VALUES($1,$2)',[id,identityId]);
+ await db.query('UPDATE assignments SET title=$1,class_id=$2,due_at=$3,description=$4,course=$6,course_path_id=$7 WHERE id=$5',[i.title,i.classId,i.dueAt,i.description,id,i.course,i.coursePathId]);await db.query('DELETE FROM assignment_problems WHERE assignment_id=$1',[id]);await db.query('DELETE FROM assignment_participants WHERE assignment_id=$1',[id]);for(const [position,p]of i.problems.entries())await db.query('INSERT INTO assignment_problems(assignment_id,problem_id,version_id,points,position) VALUES($1,$2,$3,$4,$5)',[id,p.problemId,p.versionId,p.points,position]);for(const identityId of i.participants)await db.query('INSERT INTO assignment_participants(assignment_id,identity_id) VALUES($1,$2)',[id,identityId]);
  await syncRewards(db,id,i.problems,accountId);
 }
-function publishable(i){if(i.dueAt<=new Date())fail(400,'VALIDATION','截止时间须晚于现在');if(!i.problems.length||!i.participants.length)fail(409,'INCOMPLETE','发布作业前须选择题目和适用学生');}
+async function publishable(db,i){if(i.dueAt<=new Date())fail(400,'VALIDATION','截止时间须晚于现在');if(!i.problems.length||!i.participants.length)fail(409,'INCOMPLETE','发布作业前须选择题目和适用学生');if(i.coursePathId)await coursePathId(db,i.coursePathId);}
 
 // Published work remains editable without changing the version or score of an
 // existing submission. Every edit takes the assignment row lock first; student
 // submission admission takes FOR SHARE on the same row.
 async function editPublished(ctx,db,id,old,body){
- const allowed=new Set(['title','description','course','classId','dueAt','problems','participants','reason','state','expectedRevision']);
+ const allowed=new Set(['title','description','course','coursePathId','classId','dueAt','problems','participants','reason','state','expectedRevision']);
  if(Object.keys(body).some(key=>!allowed.has(key)))fail(400,'VALIDATION','包含不支持的作业修改字段');
  if(!Number.isSafeInteger(body.expectedRevision)||body.expectedRevision<0)fail(400,'VALIDATION','需要有效的作业编辑版本，请刷新后重试');
  if(body.expectedRevision!==old.edit_revision)fail(409,'ASSIGNMENT_REVISION_CONFLICT','作业已被其他操作修改，请刷新后核对再保存');
@@ -41,6 +48,7 @@ async function editPublished(ctx,db,id,old,body){
  const title=body.title===undefined?old.title:field(body.title,'作业标题');
  const description=body.description===undefined?old.description:field(body.description,'作业说明',{min:0,max:10000});
  const course=body.course===undefined?old.course:field(body.course,'课程标签',{max:100});
+ const linkedCourse=body.coursePathId===undefined?old.course_path_id:await coursePathId(db,body.coursePathId);
  const dueAt=body.dueAt===undefined?new Date(old.due_at):new Date(body.dueAt);
  if(!Number.isFinite(dueAt.getTime()))fail(400,'VALIDATION','截止时间格式无效');
  const oldDueAt=new Date(old.due_at),dueChanged=dueAt.getTime()!==oldDueAt.getTime();
@@ -97,9 +105,9 @@ async function editPublished(ctx,db,id,old,body){
  if(removed.length&&(await db.query('SELECT 1 FROM submissions WHERE assignment_id=$1 AND identity_id=ANY($2::uuid[]) LIMIT 1',[id,removed])).rowCount)fail(409,'PARTICIPANT_HAS_SUBMISSIONS','已有提交的学生不能直接移出作业，请在进度页使用带原因的豁免操作');
  if((added.length||removed.length)&&dueAt<=new Date())fail(409,'DEADLINE_PASSED','截止后变更名单须先延长截止时间');
 
- const fields=[];if(title!==old.title)fields.push('title');if(description!==old.description)fields.push('description');if(course!==old.course)fields.push('course');if(dueChanged)fields.push('dueAt');if(problemChanged)fields.push('problems');if(rewardChanged)fields.push('rewards');if(added.length||removed.length)fields.push('participants');
+ const fields=[];if(title!==old.title)fields.push('title');if(description!==old.description)fields.push('description');if(course!==old.course)fields.push('course');if(linkedCourse!==old.course_path_id)fields.push('coursePathId');if(dueChanged)fields.push('dueAt');if(problemChanged)fields.push('problems');if(rewardChanged)fields.push('rewards');if(added.length||removed.length)fields.push('participants');
  if(!fields.length)return;
- await db.query('UPDATE assignments SET title=$1,description=$2,course=$3,due_at=$4,edit_revision=edit_revision+1 WHERE id=$5',[title,description,course,dueAt,id]);
+ await db.query('UPDATE assignments SET title=$1,description=$2,course=$3,due_at=$4,edit_revision=edit_revision+1,course_path_id=$6 WHERE id=$5',[title,description,course,dueAt,id,linkedCourse]);
  if(problemChanged){
   const selectedIds=problems.map(problem=>problem.problemId);
   await db.query('DELETE FROM assignment_problems WHERE assignment_id=$1 AND NOT (problem_id=ANY($2::uuid[]))',[id,selectedIds]);
@@ -117,9 +125,9 @@ async function editPublished(ctx,db,id,old,body){
 export async function handleAssignmentAuthoring(ctx){
  const {route,method,body,pool,user,helpers}=ctx;let match;
  if(route==='/assignments'&&method==='POST'){
-  staff(user);const state=enumValue(body.state??'Published',['Draft','Published'],'作业状态');const id=await transaction(pool,async db=>{const i=await input(ctx,db,body);if(state==='Published')publishable(i);const a=row(await db.query("INSERT INTO assignments(title,class_id,owner_account_id,due_at,description,state) VALUES($1,$2,$3,$4,$5,'Draft') RETURNING id",[i.title,i.classId,user.id,i.dueAt,i.description]));await apply(db,a.id,i,user.id);if(state==='Published')await db.query("UPDATE assignments SET state='Published',published_at=now() WHERE id=$1",[a.id]);await helpers.audit(db,user.id,state==='Draft'?'assignment.draft_create':'assignment.create','assignment',a.id);return a.id;});return {status:201,body:await helpers.assignmentResult(pool,user,id)};
+  staff(user);const state=enumValue(body.state??'Published',['Draft','Published'],'作业状态');const id=await transaction(pool,async db=>{const i=await input(ctx,db,body);if(state==='Published')await publishable(db,i);const a=row(await db.query("INSERT INTO assignments(title,class_id,owner_account_id,due_at,description,state) VALUES($1,$2,$3,$4,$5,'Draft') RETURNING id",[i.title,i.classId,user.id,i.dueAt,i.description]));await apply(db,a.id,i,user.id);if(state==='Published')await db.query("UPDATE assignments SET state='Published',published_at=now() WHERE id=$1",[a.id]);await helpers.audit(db,user.id,state==='Draft'?'assignment.draft_create':'assignment.create','assignment',a.id);return a.id;});return {status:201,body:await helpers.assignmentResult(pool,user,id)};
  }
  match=route.match(/^\/assignments\/([^/]+)(?:\/(publish))?$/);
  if(!match||!(method==='PATCH'&&!match[2]||method==='POST'&&match[2]==='publish'))return null;
- staff(user);const id=uuid(match[1]);await transaction(pool,async db=>{row(await db.query('SELECT id FROM assignments WHERE id=$1 FOR UPDATE',[id]));const a=await helpers.assignmentAccess(db,user,id);if(!a.canManage)fail(403,'FORBIDDEN','无权编辑此作业');if(a.state==='Published'){if(match[2])fail(409,'PUBLISHED_ASSIGNMENT','作业已经发布');await editPublished(ctx,db,id,a,body);return;}if(body.expectedRevision!==undefined){if(!Number.isSafeInteger(body.expectedRevision)||body.expectedRevision<0)fail(400,'VALIDATION','作业编辑版本无效');if(body.expectedRevision!==a.edit_revision)fail(409,'ASSIGNMENT_REVISION_CONFLICT','作业已被其他操作修改，请刷新后核对再保存');}const i=await input(ctx,db,body,a);await apply(db,id,i,user.id);if(match[2]){publishable(i);await db.query("UPDATE assignments SET state='Published',published_at=now() WHERE id=$1",[id]);}await db.query('UPDATE assignments SET edit_revision=edit_revision+1 WHERE id=$1',[id]);await helpers.audit(db,user.id,match[2]?'assignment.publish':'assignment.draft_edit','assignment',id);});return {status:200,body:await helpers.assignmentResult(pool,user,id)};
+ staff(user);const id=uuid(match[1]);await transaction(pool,async db=>{row(await db.query('SELECT id FROM assignments WHERE id=$1 FOR UPDATE',[id]));const a=await helpers.assignmentAccess(db,user,id);if(!a.canManage)fail(403,'FORBIDDEN','无权编辑此作业');if(a.archived_at)fail(409,'ARCHIVED','已归档作业不能修改，请先恢复');if(!(await db.query('SELECT 1 FROM classes WHERE id=$1 AND archived_at IS NULL',[a.class_id])).rowCount)fail(409,'CLASS_ARCHIVED','班级已归档，不能修改作业');if(a.state==='Published'){if(match[2])fail(409,'PUBLISHED_ASSIGNMENT','作业已经发布');await editPublished(ctx,db,id,a,body);return;}if(body.expectedRevision!==undefined){if(!Number.isSafeInteger(body.expectedRevision)||body.expectedRevision<0)fail(400,'VALIDATION','作业编辑版本无效');if(body.expectedRevision!==a.edit_revision)fail(409,'ASSIGNMENT_REVISION_CONFLICT','作业已被其他操作修改，请刷新后核对再保存');}const i=await input(ctx,db,body,a);await apply(db,id,i,user.id);if(match[2]){await publishable(db,i);await db.query("UPDATE assignments SET state='Published',published_at=now() WHERE id=$1",[id]);}await db.query('UPDATE assignments SET edit_revision=edit_revision+1 WHERE id=$1',[id]);await helpers.audit(db,user.id,match[2]?'assignment.publish':'assignment.draft_edit','assignment',id);});return {status:200,body:await helpers.assignmentResult(pool,user,id)};
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLocale } from "@/components/locale-context";
 import { apiMessage, productionApi, type Submission } from "@/lib/production-api";
 import { CodeBlock } from "./student/shared";
 
@@ -13,6 +14,8 @@ export function SubmissionCodeComparison({
   currentId: string;
   currentCode: string;
 }) {
+  const { locale } = useLocale();
+  const tx = (zh: string, en: string) => locale === "en" ? en : zh;
   const [open, setOpen] = useState(false);
   const [original, setOriginal] = useState<Submission | null>(null);
   const [error, setError] = useState("");
@@ -37,7 +40,7 @@ export function SubmissionCodeComparison({
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
       <summary className="cursor-pointer py-2 text-sm font-semibold text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">
-        对比原提交与订正代码
+        {tx("对比原提交与订正代码", "Compare original and corrected code")}
       </summary>
       {open && error ? (
         <div role="alert" className="mt-3 text-sm">
@@ -47,21 +50,21 @@ export function SubmissionCodeComparison({
             className="mt-2 min-h-11 px-3 text-primary underline"
             onClick={() => setRetry((value) => value + 1)}
           >
-            重新加载
+            {tx("重新加载", "Retry")}
           </button>
         </div>
       ) : open && !original ? (
         <p role="status" className="py-4 text-sm text-muted-foreground">
-          正在加载原提交…
+          {tx("正在加载原提交…", "Loading original submission…")}
         </p>
       ) : open && original ? (
         <div className="mt-3 grid min-w-0 gap-3 xl:grid-cols-2">
           <section className="min-w-0">
-            <h3 className="mb-2 text-sm font-semibold">原提交 · {originalId}</h3>
+            <h3 className="mb-2 text-sm font-semibold">{tx("原提交", "Original submission")} · {originalId}</h3>
             <CodeBlock code={original.code} />
           </section>
           <section className="min-w-0">
-            <h3 className="mb-2 text-sm font-semibold">订正提交 · {currentId}</h3>
+            <h3 className="mb-2 text-sm font-semibold">{tx("订正提交", "Corrected submission")} · {currentId}</h3>
             <CodeBlock code={currentCode} />
           </section>
         </div>

@@ -170,6 +170,8 @@
 .production-shell { color:var(--foreground); }
 .production-sidebar { position:sticky;top:0;height:100dvh; }
 .production-page-header { background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:22px 24px; }
+.production-page-header.course-detail-header { padding-block:12px; }
+.production-page-header.course-detail-header p:last-child { margin-top:4px; }
 .production-shell nav a { transition:background-color .12s,color .12s; }
 .production-shell nav a[aria-current="page"] { color:var(--foreground);background:var(--background); }
 .production-shell :where(table) { background:var(--surface); }
@@ -177,6 +179,7 @@
 .production-shell :where(tbody tr):hover { background:var(--surface-subtle); }
 @media(max-width:760px) {
   .production-page-header { padding:18px; }
+  .production-page-header.course-detail-header { padding-block:12px; }
   :where(button,select,[role="button"]) { min-height:44px; }
 }
 @media(prefers-reduced-motion:reduce) { .production-shell nav a { transition:none; } }

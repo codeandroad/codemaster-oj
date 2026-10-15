@@ -16,6 +16,7 @@ import {
 import {validateActivity,validateTimedDates,activeParticipants} from "./activity-validation";
 import { ProblemPicker } from "./problem-banks";
 import { TeacherSubmissionDrawer } from "./assignments";
+import { useLocale } from "@/components/locale-context";
 import {
   date,
   Empty,
@@ -60,6 +61,10 @@ const rewardColumns = [
   { field: "speedBonusPoints", title: "速度上限" },
   { field: "attemptBonusPoints", title: "尝试上限" },
 ] as const;
+function practiceStatusLabel(status: string, locale: "zh" | "en") {
+  if (locale === "en") return status === "ResultsPublished" ? "Results published" : status;
+  return ({ Draft: "草稿", Published: "已发布", Running: "进行中", Ended: "已结束", ResultsPublished: "成绩已发布", Archived: "已归档" } as Record<string, string>)[status] ?? status;
+}
 function rewardCap(problem: TimedProblem) {
   return (problem.rewardPoints ?? 0) + (problem.speedBonusPoints ?? 0) + (problem.attemptBonusPoints ?? 0);
 }
@@ -115,28 +120,35 @@ interface Practice {
   }[];
 }
 export function TeacherTimedList() {
-  const practices = useData<{ items: Practice[] }>("timed-practices"),
+  const { locale } = useLocale();
+  const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
+  const [showArchived,setShowArchived]=useState(false);
+  const [confirm,setConfirm]=useState<Practice|null>(null);
+  const action=useAction();
+  const practices = useData<{ items: Practice[] }>(showArchived?"timed-practices?archived=true":"timed-practices"),
     classes = useData<{ items: SchoolClass[] }>("classes");
   return (
     <>
       <PageHeader
-        eyebrow="Timed Practice"
-        title="计时训练"
-        description="管理课堂测验与 ACSL 模拟训练，发布活动、跟进提交与开放成绩分别进行。"
+        eyebrow={tr("限时训练", "Timed practice")}
+        title={tr("计时训练", "Timed practice")}
+        description={tr("管理课堂测验与 ACSL 模拟训练，发布活动、跟进提交与开放成绩分别进行。", "Manage classroom quizzes and ACSL mock tests. Publishing, tracking submissions, and releasing results are separate actions.")}
         action={
           <Link
             href="/teacher/timed-practice/new/edit"
             className={buttonVariants()}
           >
             <Plus size={15} />
-            新建计时训练
+            {tr("新建计时训练", "New timed practice")}
           </Link>
         }
       />
+      <div className="mt-5 flex gap-2"><Button variant={showArchived?"secondary":"default"} aria-pressed={!showArchived} onClick={()=>setShowArchived(false)}>{tr("使用中","Active")}</Button><Button variant={showArchived?"default":"secondary"} aria-pressed={showArchived} onClick={()=>setShowArchived(true)}>{tr("已归档","Archived")}</Button></div>
       <State resource={practices} />
-      <section className={`${panel} mt-5`}>
+      <Feedback action={action}/>
+      <section className={`${panel} mt-4`}>
         <Table
-          headers={["活动", "班级", "窗口", "时长", "题数", "状态", "操作"]}
+          headers={[tr("活动", "Activity"), tr("班级", "Class"), tr("窗口", "Window"), tr("时长", "Duration"), tr("题数", "Problems"), tr("状态", "Status"), tr("操作", "Actions")]}
           min={900}
         >
           {practices.data?.items.map((p) => (
@@ -153,38 +165,49 @@ export function TeacherTimedList() {
                 <br />
                 {date(p.endsAt)}
               </td>
-              <td>{p.durationMinutes} 分钟</td>
+              <td>{p.durationMinutes} {tr("分钟", "min")}</td>
               <td>{p.problems.length}</td>
               <td>
-                <StatusPill status={p.status} />
+                <StatusPill status={practiceStatusLabel(p.status, locale)} />
               </td>
               <td>
                 <Link
                   href={`/teacher/timed-practice/${p.id}/edit`}
                   className={link}
                 >
-                  {p.status === "Draft" ? "编辑" : "查看"}
+                  {p.status === "Draft" ? tr("编辑", "Edit") : tr("查看", "View")}
                 </Link>
                 <Link
                   href={`/teacher/timed-practice/${p.id}/progress`}
                   className={`${link} ml-4`}
                 >
-                  进行情况
+                  {tr("进行情况", "Progress")}
                 </Link>
+                <Button size="sm" variant="ghost" disabled={action.busy} onClick={()=>setConfirm(p)}>{showArchived?tr("恢复","Restore"):tr("归档","Archive")}</Button>
               </td>
             </tr>
           ))}
           {!practices.loading && !practices.data?.items.length && (
             <Empty columns={7}>
-              暂无训练。点击“新建计时训练”准备课堂活动。
+              {showArchived?tr("暂无已归档训练。","No archived timed practices."):tr("暂无训练。点击“新建计时训练”准备课堂活动。", "No timed practices yet. Create one to prepare a class activity.")}
             </Empty>
           )}
         </Table>
       </section>
+      {confirm&&<Modal title={showArchived?tr("恢复限时训练","Restore timed practice"):tr("归档限时训练","Archive timed practice")} onClose={()=>setConfirm(null)}>
+        <p className="text-sm text-muted-foreground">{showArchived?tr("恢复后训练会回到使用中列表；若所属班级已归档，请先恢复班级。","The practice returns to the active list. Restore its class first if needed."):tr("草稿可直接归档；已发布训练须先结束并公布成绩。尝试、成绩与积分记录会保留。","A draft may be archived immediately. Published practices require released results; attempts, grades, and points remain recorded.")}</p>
+        <div className="mt-5 flex justify-end gap-2"><Button variant="secondary" onClick={()=>setConfirm(null)}>{tr("取消","Cancel")}</Button><Button disabled={action.busy} onClick={()=>void action.run(async()=>{await productionApi(`timed-practices/${confirm.id}/${showArchived?"restore":"archive"}`,{method:"POST",body:{}});setConfirm(null);practices.reload();return showArchived?tr("训练已恢复。","Practice restored."):tr("训练已归档。","Practice archived.");})}>{showArchived?tr("恢复","Restore"):tr("归档","Archive")}</Button></div>
+      </Modal>}
     </>
   );
 }
 const tabs = ["基本信息", "题目与分值", "时间与规则", "反馈与发布"];
+const englishTabs: Record<string, string> = {
+  "基本信息": "Basic information",
+  "题目与分值": "Problems and points",
+  "时间与规则": "Timing and rules",
+  "反馈与发布": "Feedback and publication",
+};
 export function TeacherTimedEditor({ id,userId }: { id: string;userId:string }) {
   const resource = useData<Practice>(
     id === "new" ? null : `timed-practices/${id}`,
@@ -199,6 +222,8 @@ export function TeacherTimedEditor({ id,userId }: { id: string;userId:string }) 
   );
 }
 function TimedEditor({ initial,userId }: { initial: Practice | null;userId:string }) {
+  const { locale } = useLocale();
+  const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
   const router = useRouter(),
     classes = useData<{ items: SchoolClass[] }>("classes"),
     people = useData<{ items: Person[] }>("people"),
@@ -301,47 +326,51 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
         href="/teacher/timed-practice"
         className={`${link} mb-4 inline-block text-sm`}
       >
-        ← 计时训练
+        ← {tr("计时训练", "Timed practice")}
       </Link>
       <PageHeader
-        eyebrow="活动编辑"
-        title={saved?.title ?? "新建计时训练"}
-        description="窗口、个人时长和取分规则由服务端执行，成绩开放另行确认。"
+        eyebrow={tr("活动编辑", "Edit activity")}
+        title={saved?.title ?? tr("新建计时训练", "New timed practice")}
+        description={tr("窗口、个人时长和取分规则由服务端执行，成绩开放另行确认。", "The server enforces the window, individual duration, and scoring rules. Results are released separately.")}
         action={
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => setModal("preview")}>
               <Eye size={15} />
-              学生预览
+              {tr("学生预览", "Student preview")}
             </Button>
             <Button
               disabled={action.busy || published}
               onClick={() =>
                 void action.run(async () => {
                   await save();
-                  return "训练草稿已保存。";
+                  return tr("训练草稿已保存。", "Practice draft saved.");
                 })
               }
             >
-              保存草稿
+              {tr("保存草稿", "Save draft")}
             </Button>
             <Button
               variant="secondary"
               disabled={action.busy || published}
               onClick={() => setModal("publish")}
             >
-              {published ? "已发布" : "发布"}
+              {published ? tr("已发布", "Published") : tr("发布", "Publish")}
             </Button>
           </div>
         }
       />
       <Feedback action={action} />
       {draft.notice}
-      {published&&<p className="mt-3 rounded-md border border-border bg-surface-subtle p-3 text-sm">已发布训练的题目、分值与规则已锁定。<Link className={`${link} ml-2`} href={`/teacher/timed-practice/${saved?.id}/progress`}>进行情况 / 延期与豁免</Link></p>}
-      <Tabs value={tab} onChange={setTab} items={tabs} />
+      {published&&<p className="mt-3 rounded-md border border-border bg-surface-subtle p-3 text-sm">{tr("已发布训练的题目、分值与规则已锁定。", "Problems, points, and rules are locked after publishing.")}<Link className={`${link} ml-2`} href={`/teacher/timed-practice/${saved?.id}/progress`}>{tr("进行情况 / 延期与豁免", "Progress / extensions and exemptions")}</Link></p>}
+      <Tabs
+        value={tr(tab, englishTabs[tab] ?? tab)}
+        onChange={value => setTab(tabs.find(item => tr(item, englishTabs[item] ?? item) === value) ?? tabs[0]!)}
+        items={tabs.map(item => tr(item, englishTabs[item] ?? item))}
+      />
       <section className={`${panel} mt-4 p-5`}>
         {tab === "基本信息" && (
           <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-            <Field label="名称">
+            <Field label={tr("名称", "Name")}>
               <input
                 value={title}
                 disabled={published || action.busy}
@@ -349,7 +378,7 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                 className={input}
               />
             </Field>
-            <Field label="班级">
+            <Field label={tr("班级", "Class")}>
               <select
                 value={classId}
                 disabled={published || action.busy}
@@ -362,7 +391,7 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                 }}
                 className={input}
               >
-                <option value="">请选择班级</option>
+                <option value="">{tr("请选择班级", "Choose a class")}</option>
                 {classes.data?.items.map((x) => (
                   <option key={x.id} value={x.id}>
                     {x.name}
@@ -370,11 +399,11 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                 ))}
               </select>
             </Field>
-            <Field label="适用学生">
+            <Field label={tr("适用学生", "Assigned students")}>
               <div className="flex gap-2">
                 <input
                   readOnly
-                  value={`已选择 ${participants.length} 名学生`}
+                  value={`${tr("已选择", "Selected")} ${participants.length} ${tr("名学生", "students")}`}
                   className={input}
                 />
                 <Button
@@ -382,11 +411,11 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                   disabled={published || action.busy || !classId}
                   onClick={() => {setRosterParticipants([...participants]);setRosterOpen(true);}}
                 >
-                  选择名单
+                  {tr("选择名单", "Choose students")}
                 </Button>
               </div>
             </Field>
-            <Field label="说明">
+            <Field label={tr("说明", "Description")}>
               <textarea
                 value={description}
                 disabled={published || action.busy}
@@ -402,19 +431,19 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
           <>
             <div className="mb-4 flex items-center justify-between">
               <Button disabled={published || action.busy} onClick={() => setPicker(true)}>
-                从题库与分组选择
+                {tr("从题库与分组选择", "Choose from banks and groups")}
               </Button>
               <div className="text-right text-sm">
-                <b>{problems.length} 题 · {problems.reduce((n, p) => n + p.points, 0)} 分</b>
-                <p className="mt-1 text-xs text-muted-foreground">训练奖励上限 +{problems.reduce((sum, p) => sum + rewardCap(p), 0)} / 100 积分</p>
+                <b>{problems.length} {tr("题", "problems")} · {problems.reduce((n, p) => n + p.points, 0)} {tr("分", "points")}</b>
+                <p className="mt-1 text-xs text-muted-foreground">{tr("训练奖励上限", "Practice reward cap")} +{problems.reduce((sum, p) => sum + rewardCap(p), 0)} / 100 {tr("积分", "points")}</p>
               </div>
             </div>
             <div className="mb-4 rounded-md border border-primary/20 bg-primary/5 p-4 text-sm leading-6">
-              <p className="font-semibold">限时训练积分规则</p>
-              <p className="mt-1 text-muted-foreground">每题首次 AC 积分是全站一次性奖励，已在别处领取则不会重复；本训练的奖励仅在个人截止前 AC 且首次发布成绩时结算。训练奖励 = 固定 AC 奖励 + ⌊速度上限 × max(0, 预设训练时长 − 实际用时) ÷ 预设训练时长⌋ + ⌊尝试上限 ÷ 本题正式提交次数⌋。实际用时从服务器记录的训练开始到最终计分的有效 AC 提交接收计算，不使用截止倒计时余量；提交次数包括这次 AC。未 AC 不得训练奖励。三项上限跨全部题合计最多 100 积分，和训练成绩分值分开。</p>
-              <p className="mt-1 text-muted-foreground">训练固定、速度及少尝试奖励只计个人积分；校级排名积分只来自管理员审核公开题的有效首次正式 AC，训练成绩公布后才结算。</p>
+              <p className="font-semibold">{tr("限时训练积分规则", "Timed-practice point rules")}</p>
+              <p className="mt-1 text-muted-foreground">{tr("每题首次 AC 积分是全站一次性奖励，已在别处领取则不会重复；本训练的奖励仅在个人截止前 AC 且首次发布成绩时结算。训练奖励 = 固定 AC 奖励 + ⌊速度上限 × max(0, 预设训练时长 − 实际用时) ÷ 预设训练时长⌋ + ⌊尝试上限 ÷ 本题正式提交次数⌋。实际用时从服务器记录的训练开始到最终计分的有效 AC 提交接收计算，不使用截止倒计时余量；提交次数包括这次 AC。未 AC 不得训练奖励。三项上限跨全部题合计最多 100 积分，和训练成绩分值分开。", "First-AC points for each problem are awarded once across the site. Practice rewards settle only for AC before the individual deadline, when results are first published. Reward = fixed AC reward + floor(speed cap × max(0, planned duration − elapsed time) / planned duration) + floor(attempt cap / formal submission count). Elapsed time runs from the server-recorded start to receipt of the valid scored AC; it does not use countdown time remaining. Attempts include the AC submission. No AC means no practice reward. The combined cap across all problems is 100 points, separate from practice scores.")}</p>
+              <p className="mt-1 text-muted-foreground">{tr("训练固定、速度及少尝试奖励只计个人积分；校级排名积分只来自管理员审核公开题的有效首次正式 AC，训练成绩公布后才结算。", "Fixed, speed, and attempt rewards count toward personal points only. School leaderboard points come only from valid first formal ACs on administrator-approved public problems, and settle after practice results are published.")}</p>
             </div>
-            <Table headers={["顺序", "题目", "分值", "首次 AC", "训练 AC 奖励", "速度上限", "尝试上限", "操作"]} min={1100}>
+            <Table headers={[tr("顺序", "Order"), tr("题目", "Problem"), tr("分值", "Score"), tr("首次 AC", "First AC"), tr("训练 AC 奖励", "Practice AC reward"), tr("速度上限", "Speed cap"), tr("尝试上限", "Attempt cap"), tr("操作", "Actions")]} min={1100}>
               {problems.map((p, i) => (
                 <tr key={p.problemId}>
                   <td>{i + 1}</td>
@@ -428,7 +457,7 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                   </td>
                   <td>
                     <input
-                      aria-label={`${p.title} 分值`}
+                      aria-label={`${p.title} ${tr("分值", "score")}`}
                       disabled={published || action.busy}
                       type="number"
                       step="0.01"
@@ -451,7 +480,7 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                   {rewardColumns.map(({ field, title }) => (
                     <td key={field}>
                       <input
-                        aria-label={`${p.title} ${title}积分`}
+                        aria-label={`${p.title} ${tr(title, title === "训练 AC 奖励" ? "practice AC reward" : title === "速度上限" ? "speed cap" : "attempt cap")} ${tr("积分", "points")}`}
                         disabled={published || action.busy}
                         type="number"
                         step={1}
@@ -468,7 +497,7 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                       <Button
                         variant="ghost"
                         size="icon"
-                        title="上移"
+                        title={tr("上移", "Move up")}
                         disabled={published || action.busy || i === 0}
                         onClick={() => setProblems(move(problems, i, -1))}
                       >
@@ -477,7 +506,7 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                       <Button
                         variant="ghost"
                         size="icon"
-                        title="下移"
+                        title={tr("下移", "Move down")}
                         disabled={published || action.busy || i === problems.length - 1}
                         onClick={() => setProblems(move(problems, i, 1))}
                       >
@@ -486,7 +515,7 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                       <Button
                         variant="ghost"
                         size="icon"
-                        title="移除题目"
+                        title={tr("移除题目", "Remove problem")}
                         disabled={published || action.busy}
                         onClick={() =>
                           setProblems((x) =>
@@ -501,14 +530,14 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                 </tr>
               ))}
               {!problems.length && (
-                <Empty columns={8}>请选择已发布题目。</Empty>
+                <Empty columns={8}>{tr("请选择已发布题目。", "Choose published problems.")}</Empty>
               )}
             </Table>
           </>
         )}
         {tab === "时间与规则" && (
           <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
-            <Field label="开始窗口（本机时区）">
+            <Field label={tr("开始窗口（本机时区）", "Start window (local time zone)")}>
               <input
                 disabled={published || action.busy}
                 type="datetime-local"
@@ -517,7 +546,7 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                 className={input}
               />
             </Field>
-            <Field label="结束窗口（本机时区）">
+            <Field label={tr("结束窗口（本机时区）", "End window (local time zone)")}>
               <input
                 disabled={published || action.busy}
                 type="datetime-local"
@@ -526,7 +555,7 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                 className={input}
               />
             </Field>
-            <Field label="个人时长（分钟）">
+            <Field label={tr("个人时长（分钟）", "Individual duration (minutes)")}>
               <input
                 disabled={published || action.busy}
                 type="number"
@@ -537,24 +566,24 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                 className={input}
               />
             </Field>
-            <Field label="时区">
+            <Field label={tr("时区", "Time zone")}>
               <input
                 readOnly
                 value={Intl.DateTimeFormat().resolvedOptions().timeZone}
                 className={input}
               />
             </Field>
-            <Field label="自测">
+            <Field label={tr("自测", "Self-test")}>
               <input
                 readOnly
-                value="允许公开样例与自定义输入（活动窗口内）"
+                value={tr("允许公开样例与自定义输入（活动窗口内）", "Public samples and custom input allowed during activity window")}
                 className={input}
               />
             </Field>
-            <Field label="取分方式">
+            <Field label={tr("取分方式", "Scoring method")}>
               <input
                 readOnly
-                value="每题最后一次正式接收提交"
+                value={tr("每题最后一次正式接收提交", "Last formally received submission per problem")}
                 className={input}
               />
             </Field>
@@ -564,7 +593,7 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
           <>
             <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
               <section className="border border-border p-4">
-                <b className="text-sm">反馈范围</b>
+                <b className="text-sm">{tr("反馈范围", "Feedback scope")}</b>
                 <label className="mt-3 flex items-start gap-2 text-sm">
                   <input
                     disabled
@@ -572,28 +601,28 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                     checked
                     readOnly
                   />
-                  实时显示 AC / WA 等判题状态；最终分数、隐藏测试与题解仍按发布规则开放
+                  {tr("实时显示 AC / WA 等判题状态；最终分数、隐藏测试与题解仍按发布规则开放", "Show AC / WA statuses live; final scores, hidden tests, and solutions follow publication rules.")}
                 </label>
               </section>
-              <Metric label="成绩开放" value="教师手动发布结果" />
-              <Metric label="题解开放" value="成绩发布后按题目策略开放" />
-              <Metric label="赛后订正" value="独立记录，保留原活动成绩" />
+              <Metric label={tr("成绩开放", "Results release")} value={tr("教师手动发布结果", "Teacher publishes results manually")} />
+              <Metric label={tr("题解开放", "Solution release")} value={tr("成绩发布后按题目策略开放", "After results, per problem policy")} />
+              <Metric label={tr("赛后订正", "Post-practice correction")} value={tr("独立记录，保留原活动成绩", "Tracked separately; original score remains")} />
             </div>
             {published && (
               <Link
                 href={`/teacher/timed-practice/${saved?.id}/progress`}
                 className={`${link} mt-5 inline-block`}
               >
-                打开进行情况 / 成绩发布
+                {tr("打开进行情况 / 成绩发布", "Open progress / publish results")}
               </Link>
             )}
           </>
         )}
       </section>
       {rosterOpen && (
-        <Modal title="适用学生" onClose={() => setRosterOpen(false)}>
+        <Modal title={tr("适用学生", "Assigned students")} onClose={() => setRosterOpen(false)}>
           <div className="flex justify-between text-sm">
-            <b>已选 {rosterParticipants.length}</b>
+            <b>{tr("已选", "Selected")} {rosterParticipants.length}</b>
             <div className="flex gap-2">
               <Button
                 variant="secondary"
@@ -605,14 +634,14 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                   )
                 }
               >
-                选择全部
+                {tr("选择全部", "Select all")}
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setRosterParticipants([])}
               >
-                清空
+                {tr("清空", "Clear")}
               </Button>
             </div>
           </div>
@@ -648,7 +677,7 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
               ))}
           </div>
           <Button className="mt-4" onClick={() => {setParticipants(rosterParticipants);setRosterOpen(false);}}>
-            确认名单
+            {tr("确认名单", "Confirm students")}
           </Button>
         </Modal>
       )}
@@ -676,48 +705,48 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
       )}
       {modal && (
         <Modal
-          title={modal === "preview" ? "学生规则页预览" : "确认发布训练"}
+          title={modal === "preview" ? tr("学生规则页预览", "Student rules preview") : tr("确认发布训练", "Confirm publication")}
           onClose={() => setModal(null)}
         >
-          <h2 className="font-bold">{title || "未命名训练"}</h2>
+          <h2 className="font-bold">{title || tr("未命名训练", "Untitled practice")}</h2>
           <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
             <div>
-              <dt className="text-muted-foreground">班级</dt>
+              <dt className="text-muted-foreground">{tr("班级", "Class")}</dt>
               <dd>
                 {classes.data?.items.find((x) => x.id === classId)?.name ??
-                  "尚未选择"}
+                  tr("尚未选择", "Not selected")}
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">时长</dt>
-              <dd>{duration} 分钟</dd>
+              <dt className="text-muted-foreground">{tr("时长", "Duration")}</dt>
+              <dd>{duration} {tr("分钟", "min")}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">题数 / 总分</dt>
+              <dt className="text-muted-foreground">{tr("题数 / 总分", "Problems / total score")}</dt>
               <dd>
                 {problems.length} / {problems.reduce((n, p) => n + p.points, 0)}
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">取分</dt>
-              <dd>最后一次正式接收提交</dd>
+              <dt className="text-muted-foreground">{tr("取分", "Scoring")}</dt>
+              <dd>{tr("最后一次正式接收提交", "Last formally received submission")}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">训练奖励上限</dt>
-              <dd>+{problems.reduce((sum, problem) => sum + rewardCap(problem), 0)} 积分（首次 AC 奖励另计）</dd>
+              <dt className="text-muted-foreground">{tr("训练奖励上限", "Practice reward cap")}</dt>
+              <dd>+{problems.reduce((sum, problem) => sum + rewardCap(problem), 0)} {tr("积分（首次 AC 奖励另计）", "points (first-AC rewards separate)")}</dd>
             </div>
           </dl>
           <div className="mt-4 border-t border-border pt-3 text-sm">
-            {problems.map((problem) => <p key={problem.problemId} className="py-1">{problem.title}：首次 AC +{problem.firstAcPoints ?? 10}（全站一次）；训练固定 +{problem.rewardPoints ?? 0}、速度最多 +{problem.speedBonusPoints ?? 0}、少尝试最多 +{problem.attemptBonusPoints ?? 0}</p>)}
+            {problems.map((problem) => <p key={problem.problemId} className="py-1">{problem.title}: {tr("首次 AC", "first AC")} +{problem.firstAcPoints ?? 10} {tr("（全站一次）；训练固定", "(once site-wide); fixed practice reward")} +{problem.rewardPoints ?? 0}, {tr("速度最多", "speed up to")} +{problem.speedBonusPoints ?? 0}, {tr("少尝试最多", "fewer attempts up to")} +{problem.attemptBonusPoints ?? 0}</p>)}
           </div>
           <p className="mt-4 text-sm leading-6 text-muted-foreground">
-            确认开始后固定个人截止时间，统一窗口与预设训练时长中先到的时间为准。草稿和自测不会计分。只有个人截止前最终计分的有效 AC 才能在首次发布成绩时领取训练奖励：固定积分 + ⌊速度上限 × max(0, 预设训练时长 − 实际用时) ÷ 预设训练时长⌋ + ⌊尝试上限 ÷ 本题正式提交次数⌋。实际用时按服务器开始到 AC 接收计算，不使用截止倒计时余量。首次 AC 积分全站只领取一次；成绩由教师另行发布。
+            {tr("确认开始后固定个人截止时间，统一窗口与预设训练时长中先到的时间为准。草稿和自测不会计分。只有个人截止前最终计分的有效 AC 才能在首次发布成绩时领取训练奖励：固定积分 + ⌊速度上限 × max(0, 预设训练时长 − 实际用时) ÷ 预设训练时长⌋ + ⌊尝试上限 ÷ 本题正式提交次数⌋。实际用时按服务器开始到 AC 接收计算，不使用截止倒计时余量。首次 AC 积分全站只领取一次；成绩由教师另行发布。", "Starting fixes the individual deadline at the earlier of the activity window and planned duration. Drafts and self-tests do not score. Only a valid scored AC before the individual deadline earns practice rewards when results are first published: fixed points + floor(speed cap × max(0, planned duration − elapsed time) / planned duration) + floor(attempt cap / formal submission count). Elapsed time uses server start and AC receipt, not countdown time remaining. First-AC points are awarded only once site-wide; teachers publish results separately.")}
           </p>
-          <p className="mt-2 text-sm text-muted-foreground">上述训练额外奖励只进入个人积分，不计入校级积分排行榜。</p>
+          <p className="mt-2 text-sm text-muted-foreground">{tr("上述训练额外奖励只进入个人积分，不计入校级积分排行榜。", "Practice bonuses count toward personal points only, not the school leaderboard.")}</p>
           <Feedback action={action} />
           <div className="mt-5 flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setModal(null)}>
-              返回编辑
+              {tr("返回编辑", "Back to editor")}
             </Button>
             {modal === "publish" && (
               <Button
@@ -742,11 +771,11 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                     router.push(
                       `/teacher/timed-practice/${result.id}/progress`,
                     );
-                    return "训练已发布。";
+                    return tr("训练已发布。", "Practice published.");
                   })
                 }
               >
-                确认发布
+                {tr("确认发布", "Confirm publish")}
               </Button>
             )}
           </div>
@@ -757,6 +786,8 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
 }
 
 export function TeacherTimedProgress({ id }: { id: string }) {
+  const { locale } = useLocale();
+  const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
   const resource = useData<Practice>(`timed-practices/${id}`),
     history = useData<{ items: Submission[] }>("submissions"),
     [operation, setOperation] = useState<
@@ -780,12 +811,12 @@ export function TeacherTimedProgress({ id }: { id: string }) {
         href="/teacher/timed-practice"
         className={`${link} mb-4 inline-block text-sm`}
       >
-        ← 计时训练
+        ← {tr("计时训练", "Timed practice")}
       </Link>
       <PageHeader
-        eyebrow="进行情况"
-        title={practice?.title ?? "训练进行情况"}
-        description="最后正式接收时间表示服务器接收记录，不代表学生在线或正在编程。"
+        eyebrow={tr("进行情况", "Progress")}
+        title={practice?.title ?? tr("训练进行情况", "Practice progress")}
+        description={tr("最后正式接收时间表示服务器接收记录，不代表学生在线或正在编程。", "Last formal receipt is the server timestamp; it does not mean a student is online or coding.")}
         action={
           <div className="flex flex-wrap gap-2">
             {(["单独延期", "结束活动", "重判", "发布成绩"] as const).map(
@@ -804,7 +835,7 @@ export function TeacherTimedProgress({ id }: { id: string }) {
                   }
                   onClick={() => setOperation(x)}
                 >
-                  {x}
+                  {tr(x, ({"单独延期":"Extend student","结束活动":"End activity","重判":"Rejudge","发布成绩":"Publish results"} as Record<string,string>)[x] ?? x)}
                 </Button>
               ),
             )}
@@ -815,7 +846,7 @@ export function TeacherTimedProgress({ id }: { id: string }) {
                 history.reload();
               }}
             >
-              刷新
+              {tr("刷新", "Refresh")}
             </Button>
           </div>
         }
@@ -827,28 +858,28 @@ export function TeacherTimedProgress({ id }: { id: string }) {
         <>
           <div className="mt-5 grid grid-cols-4 gap-3 max-md:grid-cols-2">
             <Metric
-              label="未进入"
+              label={tr("未进入", "Not started")}
               value={`${unstarted} / ${applicable.length}`}
             />
-            <Metric label="进行中" value={`${active} / ${applicable.length}`} />
+            <Metric label={tr("进行中", "Active")} value={`${active} / ${applicable.length}`} />
             <Metric
-              label="已结束"
+              label={tr("已结束", "Finished")}
               value={`${applicable.length - unstarted - active} / ${applicable.length}`}
             />
             <Metric
-              label="需要处理"
-              value={`${submissions.filter((s) => s.status === "System Error").length} 个系统问题`}
+              label={tr("需要处理", "Needs action")}
+              value={`${submissions.filter((s) => s.status === "System Error").length} ${tr("个系统问题", "system errors")}`}
             />
           </div>
           <section className={`${panel} mt-5`}>
             <Table
               headers={[
-                "学生",
-                "活动状态",
-                "已接收提交",
-                "最后正式接收时间",
-                "训练奖励积分",
-                "需要处理",
+                tr("学生", "Student"),
+                tr("活动状态", "Activity status"),
+                tr("已接收提交", "Received submissions"),
+                tr("最后正式接收时间", "Last formal receipt"),
+                tr("训练奖励积分", "Practice reward points"),
+                tr("需要处理", "Needs action"),
               ]}
               min={900}
             >
@@ -874,19 +905,19 @@ export function TeacherTimedProgress({ id }: { id: string }) {
                           setOperation("豁免");
                         }}
                       >
-                        {p.exempt ? "取消豁免" : "设置豁免"}
+                        {p.exempt ? tr("取消豁免", "Remove exemption") : tr("设置豁免", "Exempt")}
                       </button>
                     </td>
                     <td>
                       <StatusPill
                         status={
                           p.exempt
-                            ? "Exempt"
+                            ? tr("豁免", "Exempt")
                             : !p.attempt
-                              ? "未进入"
+                              ? tr("未进入", "Not started")
                               : p.attempt.status === "Active"
-                                ? "进行中"
-                                : "已结束"
+                                ? tr("进行中", "Active")
+                                : tr("已结束", "Finished")
                         }
                       />
                     </td>
@@ -910,7 +941,7 @@ export function TeacherTimedProgress({ id }: { id: string }) {
                             >
                               {practice.problems.find(
                                 (p) => p.problemId === x.problemId,
-                              )?.title ?? "题目"}
+                              )?.title ?? tr("题目", "Problem")}
                             </button>
                           ))}
                       </div>
@@ -941,35 +972,35 @@ export function TeacherTimedProgress({ id }: { id: string }) {
                         : "—"}
                     </td>
                     <td className="text-sm">
-                      {grade?.pending ? "待有效判题" : grade ? `${practice.resultsPublished ? "已结算" : "预计"} +${grade.problems.reduce((sum, problem) => sum + (problem.totalRewardPoints ?? 0), 0)}` : "—"}
+                      {grade?.pending ? tr("待有效判题", "Awaiting valid result") : grade ? `${practice.resultsPublished ? tr("已结算", "Settled") : tr("预计", "Estimated")} +${grade.problems.reduce((sum, problem) => sum + (problem.totalRewardPoints ?? 0), 0)}` : "—"}
                     </td>
                     <td>
                       {grade?.problems.some((x) => x.status === "System Error")
-                        ? "System Error · 不计为答错"
+                        ? tr("System Error · 不计为答错", "System error · not counted as wrong")
                         : grade?.pending
-                          ? "等待有效结果"
+                          ? tr("等待有效结果", "Awaiting valid result")
                           : "—"}
                     </td>
                   </tr>
                 );
               })}
               {!participants.length && (
-                <Empty columns={6}>暂无活动学生。</Empty>
+                <Empty columns={6}>{tr("暂无活动学生。", "No assigned students.")}</Empty>
               )}
             </Table>
           </section>
           <p className="mt-3 text-xs text-muted-foreground">
-            显示 {participants.length} 名学生；
-            {participants.filter((x) => x.exempt).length} 人豁免。成绩
+            {tr("显示", "Showing")} {participants.length} {tr("名学生；", "students;")}
+            {participants.filter((x) => x.exempt).length} {tr("人豁免。成绩", "exempt. Results")}
             {practice.resultsPublished
-              ? `已发布 · 第 ${practice.resultsRevision ?? 1} 版`
-              : "未发布"}
-            。
+              ? `${tr("已发布 · 第", "published · version")} ${practice.resultsRevision ?? 1}${locale === "zh" ? " 版" : ""}`
+              : tr("未发布", "unpublished")}
+            {locale === "zh" ? "。" : "."}
           </p>
         </>
       )}
       {operation && practice && (
-        <Modal title={`${operation}确认`} onClose={() => setOperation(null)}>
+        <Modal title={`${tr(operation, ({"单独延期":"Extend student","结束活动":"End activity","重判":"Rejudge","发布成绩":"Publish results","豁免":"Exemption"} as Record<string,string>)[operation] ?? operation)}${locale === "zh" ? "确认" : " confirmation"}`} onClose={() => setOperation(null)}>
           <form
             className="space-y-4"
             onSubmit={(e) => {
@@ -1008,7 +1039,7 @@ export function TeacherTimedProgress({ id }: { id: string }) {
                 if (operation === "重判") {
                   const ids = d.getAll("submissions").map(String);
                   if (!ids.length)
-                    throw new Error("请选择需要重判的正式提交。");
+                    throw new Error(tr("请选择需要重判的正式提交。", "Select formal submissions to rejudge."));
                   for (const submissionId of ids)
                     await productionApi(`submissions/${submissionId}/rejudge`, {
                       method: "POST",
@@ -1019,31 +1050,31 @@ export function TeacherTimedProgress({ id }: { id: string }) {
                 history.reload();
                 setOperation(null);
                 return operation === "重判"
-                  ? "重判任务已提交。候选结果需单独确认，成绩不会自动发布。"
-                  : `${operation}已执行。`;
+                  ? tr("重判任务已提交。候选结果需单独确认，成绩不会自动发布。", "Rejudge job submitted. Candidate results require separate confirmation; grades will not be published automatically.")
+                  : `${tr(operation, ({"单独延期":"Student extension","结束活动":"End activity","发布成绩":"Result publication","豁免":"Exemption"} as Record<string,string>)[operation] ?? operation)} ${tr("已执行。", "completed.")}`;
               });
             }}
           >
             <p className="text-sm leading-6 text-muted-foreground">
               {operation === "发布成绩"
                 ? practice.resultsPublished
-                  ? "将发布当前成绩的一个新修订版本，旧版记录保留。"
-                  : "明确发布当前活动成绩；平台故障或未完成评测会阻止发布。"
+                  ? tr("将发布当前成绩的一个新修订版本，旧版记录保留。", "Publish a new revision of the current results; the previous version remains recorded.")
+                  : tr("明确发布当前活动成绩；平台故障或未完成评测会阻止发布。", "Publish the current activity results. Platform errors or incomplete evaluations block publication.")
                 : operation === "重判"
-                  ? "重新评测所选正式提交，保留原记录，候选结果与成绩发布分别确认。"
+                  ? tr("重新评测所选正式提交，保留原记录，候选结果与成绩发布分别确认。", "Re-evaluate selected formal submissions while retaining original records. Candidate results and publication are confirmed separately.")
                   : operation === "结束活动"
-                    ? "结束本活动所有适用学生的作答，已经接收的提交继续评测。"
-                    : "只影响明确选择的学生，保留历史记录。"}
+                    ? tr("结束本活动所有适用学生的作答，已经接收的提交继续评测。", "End the activity for all assigned students. Already received submissions continue evaluating.")
+                    : tr("只影响明确选择的学生，保留历史记录。", "Only the selected student is affected; history remains.")}
             </p>
             {(operation === "单独延期" || operation === "豁免") && (
-              <Field label="学生">
+              <Field label={tr("学生", "Student")}>
                 <select
                   required
                   className={input}
                   value={student}
                   onChange={(e) => setStudent(e.target.value)}
                 >
-                  <option value="">请选择学生</option>
+                  <option value="">{tr("请选择学生", "Choose a student")}</option>
                   {participants.map((p) => (
                     <option
                       key={p.identityId}
@@ -1057,7 +1088,7 @@ export function TeacherTimedProgress({ id }: { id: string }) {
               </Field>
             )}
             {operation === "单独延期" && (
-              <Field label="新的个人截止时间">
+              <Field label={tr("新的个人截止时间", "New individual deadline")}>
                 <input
                   required
                   name="deadline"
@@ -1084,7 +1115,7 @@ export function TeacherTimedProgress({ id }: { id: string }) {
                 ))}
               </div>
             )}
-            <Field label="操作原因">
+            <Field label={tr("操作原因", "Reason for action")}>
               <textarea
                 name="reason"
                 required
@@ -1100,13 +1131,13 @@ export function TeacherTimedProgress({ id }: { id: string }) {
                 variant="secondary"
                 onClick={() => setOperation(null)}
               >
-                取消
+                {tr("取消", "Cancel")}
               </Button>
               <Button
                 disabled={action.busy}
                 variant={operation === "结束活动" ? "danger" : "primary"}
               >
-                确认{operation}
+                {tr("确认", "Confirm ")}{tr(operation, ({"单独延期":"extension","结束活动":"end","重判":"rejudge","发布成绩":"publication","豁免":"exemption"} as Record<string,string>)[operation] ?? operation)}
               </Button>
             </div>
           </form>

@@ -3,9 +3,10 @@
 import { AppLink as Link } from "@/components/navigation";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowRight, CircleAlert, ClipboardList } from "lucide-react";
+import { ArrowRight, CircleAlert, ClipboardList, UserRound } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
+import { useLocale } from "@/components/locale-context";
 import { genderLabel } from "@/lib/gender";
 import {
   productionApi,
@@ -19,6 +20,7 @@ import {
   Empty,
   Feedback,
   Field,
+  Drawer,
   input,
   link,
   Metric,
@@ -31,6 +33,7 @@ import {
 } from "./shared";
 
 export type TeacherAssignment = Assignment & {
+  archived?: boolean;
   state?: string;
   description?: string;
   course?: string;
@@ -45,6 +48,8 @@ export type TeacherAssignment = Assignment & {
   editRevision?: number;
 };
 export function TeacherDashboard() {
+  const { locale } = useLocale();
+  const tx = (zh: string, en: string) => locale === "en" ? en : zh;
   const classes = useData<{ items: SchoolClass[] }>("classes"),
     assignments = useData<{ items: TeacherAssignment[] }>("assignments");
   const report = useData<{
@@ -77,16 +82,16 @@ export function TeacherDashboard() {
   return (
     <>
       <PageHeader
-        eyebrow="教师工作台"
-        title="Teacher Dashboard"
-        description="查看负责班级、作业进度与需要跟进的学生。"
+        eyebrow={tx("教师工作台", "Teacher workspace")}
+        title={tx("教学工作台", "Teacher dashboard")}
+        description={tx("查看负责班级、作业进度与需要跟进的学生。", "Review classes, assignments, and students who need follow-up.")}
         action={
           active[0] && (
             <Link
               className={buttonVariants()}
               href={`/teacher/assignments/${active[0].id}/progress`}
             >
-              Open progress matrix <ArrowRight size={15} />
+              {tx("查看作业进度", "View assignment progress")} <ArrowRight size={15} />
             </Link>
           )
         }
@@ -95,32 +100,32 @@ export function TeacherDashboard() {
       <State resource={assignments} />
       <div className="mt-5 grid grid-cols-4 gap-3 max-md:grid-cols-2">
         <Metric
-          label="Active classes"
+          label={tx("负责班级", "Classes")}
           value={classes.data?.items.length ?? "—"}
           note={classes.data?.items.map((x) => x.name).join(", ")}
         />
         <Metric
-          label="Open assignments"
+          label={tx("进行中的作业", "Open assignments")}
           value={active.length}
-          note="Cross-class list"
+          note={tx("跨班级汇总", "Across classes")}
         />
         <Metric
-          label="Needs follow-up"
+          label={tx("待跟进", "Needs follow-up")}
           value={report.data?.metrics?.incomplete ?? "—"}
-          note="未提交、未通过和待反馈"
+          note={tx("未提交、未通过和待反馈", "Missing, unsuccessful, and awaiting feedback")}
         />
         <Metric
-          label="Imports"
+          label={tx("题目导入", "Problem imports")}
           value={imports.data?.items.length ?? "—"}
-          note="已完成题目导入批次"
+          note={tx("已完成题目导入批次", "Completed import batches")}
         />
       </div>
       <div className="mt-6 grid grid-cols-[minmax(0,1fr)_360px] gap-6 max-lg:grid-cols-1">
         <section className={panel}>
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <h2 className="font-bold">Assignments requiring attention</h2>
+            <h2 className="font-bold">{tx("需关注的作业", "Assignments needing attention")}</h2>
             <Link className={link} href="/teacher/assignments">
-              Manage all
+              {tx("查看全部", "View all")}
             </Link>
           </div>
           <div className="divide-y divide-border">
@@ -136,17 +141,17 @@ export function TeacherDashboard() {
                     {item.className ??
                       classes.data?.items.find((x) => x.id === item.classId)
                         ?.name}{" "}
-                    · Due {date(item.dueAt)}
+                    · {tx("截止", "Due")} {date(item.dueAt)}
                   </p>
                 </div>
                 <span className="flex items-center gap-2 text-sm text-primary">
-                  Matrix <ArrowRight size={15} />
+                  {tx("查看进度", "View progress")} <ArrowRight size={15} />
                 </span>
               </Link>
             ))}
             {!active.length && (
               <p className="p-5 text-sm text-muted-foreground">
-                暂无进行中的作业。通过 Assignment Management 新建作业。
+                {tx("暂无进行中的作业。可在作业管理中布置新作业。", "No open assignments. Create one in Assignment management.")}
               </p>
             )}
           </div>
@@ -155,32 +160,32 @@ export function TeacherDashboard() {
           <section className={`${panel} p-5`}>
             <h2 className="flex items-center gap-2 font-bold">
               <CircleAlert size={17} className="text-warning" />
-              Follow-up
+              {tx("待跟进", "Follow-up")}
             </h2>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              按班级和活动查看未开始、反复未通过及待反馈记录。
+              {tx("按班级和活动查看未开始、反复未通过及待反馈记录。", "Review missing starts, repeated failures, and pending feedback by class and activity.")}
             </p>
             <Link
               href="/teacher/reports"
               className={`${link} mt-4 inline-block text-sm`}
             >
-              Open teaching reports
+              {tx("查看教学报告", "Open teaching reports")}
             </Link>
           </section>
           <section className={`${panel} p-5`}>
             <h2 className="flex items-center gap-2 font-bold">
               <ClipboardList size={17} className="text-primary" />
-              Classroom actions
+              {tx("常用操作", "Classroom actions")}
             </h2>
             <div className="mt-4 flex flex-col gap-3 text-sm">
               <Link className={link} href="/teacher/assignments/new/edit">
-                New assignment
+                {tx("新建作业", "New assignment")}
               </Link>
               <Link className={link} href="/teacher/classes">
-                Classes & Students
+                {tx("班级与学生", "Classes & students")}
               </Link>
               <Link className={link} href="/teacher/imports">
-                Import Center
+                {tx("导入中心", "Import center")}
               </Link>
             </div>
           </section>
@@ -191,16 +196,22 @@ export function TeacherDashboard() {
 }
 
 export function TeacherClasses({ user }: { user: CampusUser }) {
+  const { locale } = useLocale();
+  const tx = (zh: string, en: string) => locale === "en" ? en : zh;
   const search = useSearchParams();
-  const classes = useData<{ items: SchoolClass[] }>("classes"),
+  const classIdFromQuery = search.get("classId");
+  const [showArchived,setShowArchived]=useState(false);
+  const classes = useData<{ items: (SchoolClass & {archived?:boolean})[] }>(showArchived?"classes?archived=true":"classes"),
     people = useData<{ items: Person[] }>("people"),
     assignments = useData<{ items: TeacherAssignment[] }>("assignments");
-  const [activeId, setActiveId] = useState(search.get("classId") ?? ""),
-    [dialog, setDialog] = useState<"new" | "edit" | null>(null);
-  useEffect(() => { const classId = search.get("classId"); if (classId) setActiveId(classId); }, [search]);
+  const [activeId, setActiveId] = useState(classIdFromQuery ?? ""),
+    [dialog, setDialog] = useState<"new" | "edit" | null>(null),
+    [archiveTarget,setArchiveTarget]=useState<"archive"|"restore"|null>(null),
+    [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  useEffect(() => { if (classIdFromQuery) setActiveId(classIdFromQuery); }, [classIdFromQuery]);
   const current =
-    classes.data?.items.find((x) => x.id === activeId) ??
-    classes.data?.items[0];
+    classes.data?.items.find((x) => x.id === activeId && !!x.archived===showArchived) ??
+    classes.data?.items.find((x)=>!!x.archived===showArchived);
   const canManage=!!current&&(user.roles.includes("admin")||current.teacherIds.includes(user.identityId));
   const currentAssignment = assignments.data?.items.find(
     (x) => x.classId === current?.id && x.state !== "Draft",
@@ -208,6 +219,15 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
   const detail = useData<Assignment>(
     currentAssignment ? `assignments/${currentAssignment.id}` : null,
   );
+  const selectedStudent = current?.studentIds.includes(selectedStudentId ?? "")
+    ? people.data?.items.find((person) => person.id === selectedStudentId)
+    : undefined;
+  const assignmentDetail = detail.data;
+  const selectedGrade = assignmentDetail && assignmentDetail.id === currentAssignment?.id
+    ? assignmentDetail.grades?.find((grade) => grade.identityId === selectedStudentId)
+    : undefined;
+  const selectedAttempted = selectedGrade?.problems.filter((problem) => Boolean(problem.submissionId)).length ?? 0;
+  const selectedSolved = selectedGrade?.problems.filter((problem) => problem.status === "AC").length ?? 0;
   const action = useAction(),
     [code, setCode] = useState<{ name: string; activationCode: string } | null>(
       null,
@@ -215,26 +235,28 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
   return (
     <>
       <PageHeader
-        eyebrow="班级与学生"
-        title="班级与学生"
-        description="按班级查看学生身份、账号激活状态与真实作业进度。"
+        eyebrow={tx("班级与学生", "Classes & students")}
+        title={tx("班级与学生", "Classes & students")}
+        description={tx("按班级查看学生身份、账号激活状态与真实作业进度。", "Review student identities, account activation, and actual assignment progress by class.")}
         action={
           <div className="flex gap-2">
-            <Button onClick={() => setDialog("new")}>新建班级</Button>
+            <Button onClick={() => setDialog("new")}>{tx("新建班级", "New class")}</Button>
             <Link
               className={buttonVariants({ variant: "secondary" })}
-              href={`/teacher/imports?kind=members${current ? `&classId=${current.id}` : ""}`}
+              href={`/teacher/imports?kind=students${current ? `&classId=${current.id}` : ""}`}
             >
-              导入名单
+              {tx("导入名单", "Import roster")}
             </Link>
           </div>
         }
       />
       <div className="mt-5 flex flex-wrap gap-2">
+        <Button variant={showArchived?"secondary":"default"} aria-pressed={!showArchived} onClick={()=>{setShowArchived(false);setActiveId("");setSelectedStudentId(null);}}>{tx("使用中", "Active")}</Button>
+        <Button variant={showArchived?"default":"secondary"} aria-pressed={showArchived} onClick={()=>{setShowArchived(true);setActiveId("");setSelectedStudentId(null);}}>{tx("已归档", "Archived")}</Button>
         {[
-          ["学习内容", "learning"],
-          ["计时训练", "timed-practice"],
-          ["教学报告", "reports"],
+          [tx("课程", "Courses"), "courses"],
+          [tx("限时训练", "Timed practice"), "timed-practice"],
+          [tx("教学报告", "Teaching reports"), "reports"],
         ].map(([name, path]) => (
           <Link
             key={path}
@@ -249,17 +271,17 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
       <State resource={people} />
       <Feedback action={action} />
       <div className="mt-5 grid grid-cols-[300px_minmax(0,1fr)] gap-6 max-md:grid-cols-1">
-        <aside className="space-y-3" aria-label="班级列表">
+        <aside className="space-y-3" aria-label={tx("班级列表", "Class list")}>
           {classes.data?.items.map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveId(item.id)}
+              onClick={() => { setActiveId(item.id); setSelectedStudentId(null); }}
               aria-pressed={item.id === current?.id}
               className={`block w-full border p-4 text-left panel-shadow ${item.id === current?.id ? "border-primary bg-info-soft" : "border-border bg-surface hover:border-primary/50"}`}
             >
               <div className="font-bold">{item.name}</div>
               <div className="mt-1 text-sm text-muted-foreground">
-                {item.studentIds.length} students · {item.type ?? "Classroom"}
+                {item.studentIds.length} {tx("名学生", "students")} · {item.type === "administrative" ? tx("行政班", "Administrative class") : tx("训练班", "Training class")}
               </div>
             </button>
           ))}
@@ -267,43 +289,43 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
             !classes.error &&
             !classes.data?.items.length && (
               <section className={`${panel} p-5 text-sm text-muted-foreground`}>
-                暂无班级。点击 New class 建立班级。
+                {showArchived?tx("暂无已归档班级。", "No archived classes."):tx("暂无班级。点击“新建班级”开始。", "No classes yet. Select New class to begin.")}
               </section>
             )}
         </aside>
         {current && (
           <section className={`${panel} self-start overflow-hidden`}>
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
-              <h2 className="font-bold">{current.name} · 学生名单</h2>
+              <h2 className="font-bold">{current.name} · {tx("学生名单", "Student roster")}</h2>
               <span className="text-xs text-muted-foreground">
-                {current.studentIds.length} students ·{" "}
-                {currentAssignment?.title ?? "尚未布置作业"}
+                {current.studentIds.length} {tx("名学生", "students")} ·{" "}
+                {currentAssignment?.title ?? tx("尚未布置作业", "No assignment yet")}
               </span>
               <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
                   variant="secondary"
-                  disabled={!canManage}
+                  disabled={!canManage||showArchived}
                   onClick={() => setDialog("edit")}
                   data-od-id="edit-class"
                 >
-                  编辑班级
+                  {tx("编辑班级", "Edit class")}
                 </Button>
+                {canManage&&<Button size="sm" variant="secondary" disabled={action.busy} onClick={()=>setArchiveTarget(showArchived?"restore":"archive")}>{showArchived?tx("恢复班级", "Restore class"):tx("归档班级", "Archive class")}</Button>}
               </div>
             </div>
             <State resource={detail} />
             <Table
               headers={[
-                "Student ID",
-                "Name",
-                "性别",
-                "Group",
-                "Account",
-                "Assignment status",
-                "Score",
-                "Progress",
+                tx("学号", "Student ID"),
+                tx("姓名", "Name"),
+                tx("性别", "Gender"),
+                tx("账号状态", "Account"),
+                tx("作业状态", "Assignment status"),
+                tx("得分", "Score"),
+                tx("进度", "Progress"),
               ]}
-              min={840}
+              min={760}
             >
               {current.studentIds.map((id) => {
                 const student = people.data?.items.find((x) => x.id === id),
@@ -319,22 +341,23 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
                       {student?.number ?? "—"}
                     </td>
                     <td>
-                      {student ? <Link
-                        href={`/teacher/reports?${new URLSearchParams({ classId: current.id, studentId: id, studentName: student.name })}`}
-                        className="font-semibold text-primary hover:underline focus-visible:underline"
-                      >{student.name}</Link> : "加载中"}
+                      {student ? <button
+                        type="button"
+                        onClick={() => setSelectedStudentId(id)}
+                        aria-haspopup="dialog"
+                        className="rounded-sm text-left font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                      >{student.name}</button> : tx("加载中", "Loading")}
                     </td>
-                    <td className="text-muted-foreground">{genderLabel(student?.gender)}</td>
-                    <td className="text-muted-foreground">—</td>
+                    <td className="text-muted-foreground">{locale === "en" ? ({male:"Male",female:"Female",other:"Other",undisclosed:"Prefer not to say"} as Record<string,string>)[student?.gender ?? ""] ?? "Not provided" : genderLabel(student?.gender)}</td>
                     <td>
                       {student?.activated ? (
                         <span className="rounded bg-success-soft px-1.5 py-0.5 text-xs font-semibold text-success">
-                          已激活
+                          {tx("已激活", "Active")}
                         </span>
                       ) : (
                         <>
                           <span className="rounded bg-warning-soft px-1.5 py-0.5 text-xs font-semibold text-warning">
-                            待激活
+                            {tx("待激活", "Pending")}
                           </span>
                           <button
                             className={`${link} ml-2 text-xs`}
@@ -348,14 +371,14 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
                                   body: {},
                                 });
                                 setCode({
-                                  name: student?.name ?? "学生",
+                                  name: student?.name ?? tx("学生", "Student"),
                                   activationCode: result.activationCode,
                                 });
-                                return "新激活码已生成。旧码即刻失效。";
+                                return tx("新激活码已生成。旧码即刻失效。", "A new activation code was issued. The old code is now invalid.");
                               })
                             }
                           >
-                            生成激活码
+                            {tx("生成激活码", "Issue activation code")}
                           </button>
                         </>
                       )}
@@ -364,37 +387,80 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
                       <StatusPill
                         status={
                           !attempted
-                            ? "Not started"
+                            ? tx("未开始", "Not started")
                             : solved === grade?.problems.length
-                              ? "Complete"
-                              : "In progress"
+                              ? tx("完成", "Completed")
+                              : tx("进行中", "In progress")
                         }
                       />
                     </td>
                     <td className="font-semibold">
                       {grade?.score === null
-                        ? "待评测"
+                        ? tx("待评测", "Pending judging")
                         : grade
                           ? `${grade.score} / ${grade.maxScore}`
                           : "—"}
                     </td>
                     <td className="text-muted-foreground">
                       {attempted} / {grade?.problems.length ?? 0} · {solved}{" "}
-                      solved
+                      {tx("已解出", "solved")}
                     </td>
                   </tr>
                 );
               })}
               {!current.studentIds.length && (
-                <Empty columns={8}>
-                  该班级暂无学生。通过 Import members
-                  导入名单，无账号的学生将建档并显示待激活。
+                <Empty columns={7}>
+                  {tx("该班级暂无学生。可通过“导入名单”建档入班；学生本人使用激活码认领后创建账号。", "This class has no students. Import a roster to create identities; students create accounts when they claim an activation code.")}
                 </Empty>
               )}
             </Table>
           </section>
         )}
       </div>
+      {selectedStudent && current && (
+        <Drawer title={`${tx("学生详情", "Student details")} · ${selectedStudent.name}`} onClose={() => setSelectedStudentId(null)}>
+          <dl className="grid grid-cols-[minmax(90px,auto)_minmax(0,1fr)] gap-x-5 gap-y-3 text-sm">
+            <dt className="text-muted-foreground">{tx("学号", "Student ID")}</dt>
+            <dd className="font-mono font-semibold">{selectedStudent.number}</dd>
+            <dt className="text-muted-foreground">{tx("性别", "Gender")}</dt>
+            <dd>{locale === "en" ? ({ male: "Male", female: "Female", other: "Other", undisclosed: "Prefer not to say" } as Record<string, string>)[selectedStudent.gender ?? ""] ?? "Not provided" : genderLabel(selectedStudent.gender)}</dd>
+            <dt className="text-muted-foreground">{tx("班级", "Class")}</dt>
+            <dd className="min-w-0 break-words font-semibold">{current.name}</dd>
+            <dt className="text-muted-foreground">{tx("账号状态", "Account status")}</dt>
+            <dd>{selectedStudent.activated ? tx("已激活", "Active") : tx("待激活", "Pending activation")}</dd>
+          </dl>
+          <div className="mt-5 border-t border-border pt-5">
+            <h3 className="font-bold">{tx("当前作业", "Current assignment")}</h3>
+            {currentAssignment ? (
+              <div className="mt-3 rounded-md border border-border bg-surface-subtle p-4 text-sm">
+                <p className="font-semibold">{currentAssignment.title}</p>
+                {selectedGrade ? <p className="mt-2 text-muted-foreground">
+                  {tx("进度", "Progress")} {selectedAttempted} / {selectedGrade.problems.length} · {selectedSolved} {tx("题已解出", "solved")}
+                  {" · "}{tx("得分", "Score")} {selectedGrade.score === null ? tx("待评测", "Pending judging") : `${selectedGrade.score} / ${selectedGrade.maxScore}`}
+                </p> : <p className="mt-2 text-muted-foreground">{detail.loading ? tx("正在加载进度…", "Loading progress…") : detail.error ? tx("暂时无法读取进度。", "Progress is temporarily unavailable.") : tx("该作业未布置给这名学生。", "This assignment was not assigned to this student.")}</p>}
+              </div>
+            ) : <p className="mt-3 text-sm text-muted-foreground">{tx("该班级暂无已发布作业。", "No published assignment for this class yet.")}</p>}
+          </div>
+          <div className="mt-6 flex flex-wrap gap-2 border-t border-border pt-5">
+            {selectedStudent.activated ? (
+              <Link
+                href={`/teacher/people/${encodeURIComponent(selectedStudent.id)}?${new URLSearchParams({ from: "classes", classId: current.id })}`}
+                className={buttonVariants()}
+              >
+                <UserRound size={16} /> {tx("查看学生主页", "View student profile")}
+              </Link>
+            ) : (
+              <p className="w-full text-sm text-muted-foreground">{tx("学生激活账号后，才能访问其公开主页。", "The public profile becomes available after the student activates an account.")}</p>
+            )}
+            <Link
+              href={`/teacher/reports?${new URLSearchParams({ classId: current.id, studentId: selectedStudent.id, studentName: selectedStudent.name })}`}
+              className={buttonVariants({ variant: "secondary" })}
+            >
+              {tx("查看教学报告", "View teaching report")}
+            </Link>
+          </div>
+        </Drawer>
+      )}
       {dialog && (
         <ClassDialog
           existing={classes.data?.items ?? []}
@@ -412,9 +478,9 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
         />
       )}
       {code && (
-        <Modal title={`${code.name} · 激活码`} onClose={() => setCode(null)}>
+        <Modal title={`${code.name} · ${tx("激活码", "Activation code")}`} onClose={() => setCode(null)}>
           <p className="text-sm text-muted-foreground">
-            请将学号和此激活码交给本人，激活后账号自动建立。
+            {tx("请将学号和此激活码交给本人，激活后账号自动建立。", "Give the student their ID and activation code privately. They create an account when claiming it.")}
           </p>
           <p className="mt-4 break-all rounded border border-border bg-surface-subtle p-4 font-mono font-semibold">
             {code.activationCode}
@@ -424,15 +490,19 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
             onClick={() =>
               action.run(async () => {
                 await navigator.clipboard.writeText(code.activationCode);
-                return "激活码已复制。";
+                return tx("激活码已复制。", "Activation code copied.");
               })
             }
           >
-            复制激活码
+            {tx("复制激活码", "Copy activation code")}
           </Button>
           <Feedback action={action} />
         </Modal>
       )}
+      {archiveTarget&&current&&<Modal title={archiveTarget==="archive"?tx("归档班级", "Archive class"):tx("恢复班级", "Restore class")} onClose={()=>setArchiveTarget(null)}>
+        <p className="text-sm text-muted-foreground">{archiveTarget==="archive"?tx("归档后班级将移出使用中列表。请先归档此班级的作业和限时训练；名单、成绩及提交记录会保留。", "Archive assignments and timed practices first. The roster, grades, and submissions will be preserved."):tx("恢复班级后，可继续维护学生名单和教学活动。", "Restoring the class makes its roster and activities manageable again.")}</p>
+        <div className="mt-5 flex justify-end gap-2"><Button variant="secondary" onClick={()=>setArchiveTarget(null)}>{tx("取消", "Cancel")}</Button><Button disabled={action.busy} onClick={()=>void action.run(async()=>{await productionApi(`classes/${current.id}/${archiveTarget}`,{method:"POST",body:{}});setArchiveTarget(null);setActiveId("");classes.reload();return archiveTarget==="archive"?tx("班级已归档。", "Class archived."):tx("班级已恢复。", "Class restored.");})}>{archiveTarget==="archive"?tx("确认归档", "Archive"):tx("确认恢复", "Restore")}</Button></div>
+      </Modal>}
     </>
   );
 }
@@ -453,6 +523,8 @@ function ClassDialog({
   onClose: () => void;
   onSaved: (id: string) => void;
 }) {
+  const { locale } = useLocale();
+  const tx = (zh: string, en: string) => locale === "en" ? en : zh;
   const [name, setName] = useState(current?.name ?? ""),
     [description, setDescription] = useState(
       (current as SchoolClass & { description?: string })?.description ?? "",
@@ -468,7 +540,7 @@ function ClassDialog({
   );
   return (
     <Modal
-      title={mode === "edit" ? `编辑班级与名单 · ${current?.name}` : "新建班级 / 学生集合"}
+      title={mode === "edit" ? `${tx("编辑班级与名单", "Edit class and roster")} · ${current?.name}` : tx("新建班级", "New class")}
       onClose={onClose}
     >
       <form
@@ -476,13 +548,13 @@ function ClassDialog({
         onSubmit={(event) => {
           event.preventDefault();
           void action.run(async () => {
-            if(!name.trim())throw new Error("请输入班级名称。");
+            if(!name.trim())throw new Error(tx("请输入班级名称。", "Enter a class name."));
             if (
               existing.some(
                 (x) => x.id !== current?.id && x.name.trim() === name.trim(),
               )
             )
-              throw new Error("已存在同名班级。");
+              throw new Error(tx("已存在同名班级。", "A class with this name already exists."));
             const membershipChanged =
               !current ||
               selected.length !== current.studentIds.length ||
@@ -504,37 +576,37 @@ function ClassDialog({
           });
         }}
       >
-        <Field label="名称">
+        <Field label={tx("名称", "Name")}>
           <input
             autoFocus
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
             className={input}
-            placeholder="例如 高一3班 或 ACSL 集训组"
+            placeholder={tx("例如 高一3班 或 ACSL 集训组", "For example, Grade 10 Class 3 or ACSL Training")}
           />
         </Field>
-        <Field label="说明（可选）">
+        <Field label={tx("说明（可选）", "Description (optional)")}>
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             className={input}
           />
         </Field>
-        <Field label="班级类型"><select aria-label="班级类型" value={type} onChange={e=>setType(e.target.value)} className={input}><option value="training">训练班</option><option value="administrative">行政班</option></select></Field>
+        <Field label={tx("班级类型", "Class type")}><select aria-label={tx("班级类型", "Class type")} value={type} onChange={e=>setType(e.target.value)} className={input}><option value="training">{tx("训练班", "Training class")}</option><option value="administrative">{tx("行政班", "Administrative class")}</option></select></Field>
         <div>
           <div className="flex justify-between text-sm">
-            <b>从已有学生中选择（可选）</b>
+            <b>{tx("从已有学生中选择（可选）", "Select existing students (optional)")}</b>
             <span className="text-xs text-muted-foreground">
-              已选 {selected.length}
+              {tx("已选", "Selected")} {selected.length}
             </span>
           </div>
           <input
-            aria-label="搜索学生"
+            aria-label={tx("搜索学生", "Search students")}
             className={`${input} mt-2`}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="搜索学号或姓名"
+            placeholder={tx("搜索学号或姓名", "Search student ID or name")}
           />
           <div className="mt-2 max-h-56 overflow-auto rounded-md border border-border">
             {shown.map((student) => (
@@ -559,17 +631,16 @@ function ClassDialog({
             ))}
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            学生仍保留在原班级。名单里没有账号的学生可通过 Import members
-            先建档入班。
+            {tx("学生仍保留在原班级。名单中没有的学生可通过“导入名单”先建档入班。", "Students keep their other class memberships. Use Import roster to create identities for students not listed here.")}
           </p>
         </div>
         <Feedback action={action} />
         <div className="flex justify-end gap-2 border-t border-border pt-4">
           <Button variant="secondary" type="button" onClick={onClose}>
-            取消
+            {tx("取消", "Cancel")}
           </Button>
           <Button type="submit" disabled={action.busy}>
-            {mode === "edit" ? "保存班级与名单" : "创建班级"}
+            {mode === "edit" ? tx("保存班级与名单", "Save class and roster") : tx("创建班级", "Create class")}
           </Button>
         </div>
       </form>

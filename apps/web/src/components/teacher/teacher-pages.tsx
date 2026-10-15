@@ -3,6 +3,7 @@
 import { AppLink as Link } from "@/components/navigation";
 import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/page-chrome";
+import { useLocale } from "@/components/locale-context";
 import { buttonVariants } from "@/components/ui/button";
 import { IdentityImportWizard } from "@/components/admin/import-page";
 import type { CampusUser } from "@/lib/production-api";
@@ -47,8 +48,8 @@ export function TeacherPages({
     ) : (
       <TeacherAssignmentProgress id={match[1]!} />
     );
-  if (path === "/teacher/learning") return <TeacherLearning />;
-  match = path.match(/^\/teacher\/learning\/([^/]+)$/);
+  if (path === "/teacher/courses" || path === "/teacher/learning") return <TeacherLearning />;
+  match = path.match(/^\/teacher\/(?:courses|learning)\/([^/]+)$/);
   if (match) return <TeacherLearningEditor id={match[1]!} />;
   if (path === "/teacher/timed-practice") return <TeacherTimedList />;
   match = path.match(
@@ -61,30 +62,23 @@ export function TeacherPages({
       <TeacherTimedProgress id={match[1]!} />
     );
   if (path === "/teacher/reports") return <TeacherReports />;
-  if (path === "/teacher/imports") return <TeacherImports />;
+  if (path === "/teacher/imports") return <TeacherImports user={user} />;
   return null;
 }
-function TeacherImports() {
+function TeacherImports({ user }: { user: CampusUser }) {
   const search = useSearchParams();
-  return search.get("kind") === "members" ? (
+  const { t } = useLocale();
+  const classId = search.get("classId") ?? "";
+  // Old member-import bookmarks remain valid; students and members now share one flow.
+  return ["students", "members"].includes(search.get("kind") ?? "") ? (
     <>
       <PageHeader
-        eyebrow="Import Center"
-        title="导入中心"
-        description="名单建档、预览去重、确认入班与导入结果分步进行。"
+        eyebrow={t("学生名单")}
+        title={t("学生名单导入")}
+        description={t("只可导入自己负责班级的学生。导入会建立或关联身份；学生凭激活码认领后才创建登录账号。")}
+        action={<Link className={buttonVariants({ variant: "secondary" })} href="/teacher/classes">{t("返回班级与学生")}</Link>}
       />
-      <div className="mt-5 flex gap-2">
-        <Link
-          className={buttonVariants({ variant: "secondary" })}
-          href="/teacher/imports?kind=problems"
-        >
-          题目 / 测试
-        </Link>
-        <Link className={buttonVariants()} href="/teacher/imports?kind=members">
-          班级成员
-        </Link>
-      </div>
-      <IdentityImportWizard teacher showHeader={false} />
+      <IdentityImportWizard key={classId} teacher teacherIdentityId={user.identityId} initialClassId={classId} showHeader={false} />
     </>
   ) : (
     <TeacherProblemImports />

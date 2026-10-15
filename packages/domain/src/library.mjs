@@ -3,10 +3,19 @@ import { assertJudgeAdmission } from './system.mjs';
 import { transaction } from './db.mjs';
 import { fail, field, uuid, enumValue, canonicalHash } from './security.mjs';
 
-export async function canReviewActivitySubmission(db,user,submission){
+export async function canReviewActivitySubmission(db,user,submission,{readOnly=false}={}){
+ if(!readOnly){
+  const inactive=(await db.query(`SELECT EXISTS(
+   SELECT 1 FROM assignments a JOIN classes c ON c.id=a.class_id
+   WHERE a.id=$1 AND (a.archived_at IS NOT NULL OR c.archived_at IS NOT NULL)) OR EXISTS(
+   SELECT 1 FROM timed_attempts ta JOIN timed_practices p ON p.id=ta.practice_id
+   JOIN classes c ON c.id=p.class_id WHERE ta.id=$2 AND (p.archived_at IS NOT NULL OR c.archived_at IS NOT NULL)) inactive`,
+   [submission.assignment_id,submission.timed_attempt_id])).rows[0].inactive;
+  if(inactive)return false;
+ }
  if(user.roles.includes('admin'))return true;
  if(!user.roles.includes('teacher'))return false;
- return !!(await db.query(`SELECT 1 FROM teacher_classes tc JOIN classes c ON c.id=tc.class_id WHERE tc.account_id=$1 AND c.archived_at IS NULL AND (EXISTS(SELECT 1 FROM assignments a WHERE a.id=$2 AND a.class_id=c.id) OR EXISTS(SELECT 1 FROM timed_attempts ta JOIN timed_practices p ON p.id=ta.practice_id WHERE ta.id=$3 AND p.class_id=c.id))`,[user.id,submission.assignment_id,submission.timed_attempt_id])).rowCount;
+ return !!(await db.query(`SELECT 1 FROM teacher_classes tc JOIN classes c ON c.id=tc.class_id WHERE tc.account_id=$1 AND ($4::boolean OR c.archived_at IS NULL) AND (EXISTS(SELECT 1 FROM assignments a WHERE a.id=$2 AND a.class_id=c.id) OR EXISTS(SELECT 1 FROM timed_attempts ta JOIN timed_practices p ON p.id=ta.practice_id WHERE ta.id=$3 AND p.class_id=c.id))`,[user.id,submission.assignment_id,submission.timed_attempt_id,readOnly])).rowCount;
 }
 export const SCHOOL_BANK='00000000-0000-4000-8000-000000000001';
 const isAdmin=user=>user.roles.includes('admin');
@@ -39,15 +48,19 @@ export async function problemPermissions(db,user,problem,version) {
  const assignmentTeacherRead=user.roles.includes('teacher')&&!!version.published_at&&!!(await db.query(`
   SELECT 1 FROM assignment_problems ap
   JOIN assignments a ON a.id=ap.assignment_id
-  JOIN classes c ON c.id=a.class_id AND c.archived_at IS NULL
+  JOIN classes c ON c.id=a.class_id
   JOIN teacher_classes tc ON tc.class_id=c.id AND tc.account_id=$2
   WHERE ap.problem_id=$1 AND ap.version_id=$3 LIMIT 1`,[problem.id,user.id,version.id])).rowCount;
+ const timedTeacherRead=user.roles.includes('teacher')&&!!version.published_at&&!!(await db.query(`
+  SELECT 1 FROM timed_practice_problems tpp JOIN timed_practices tp ON tp.id=tpp.practice_id
+  JOIN teacher_classes tc ON tc.class_id=tp.class_id AND tc.account_id=$2
+  WHERE tpp.problem_id=$1 AND tpp.version_id=$3 LIMIT 1`,[problem.id,user.id,version.id])).rowCount;
  const assignmentRead=user.roles.includes('student')&&!!version.published_at&&!!(await db.query('SELECT 1 FROM assignment_problems ap JOIN assignments assignment ON assignment.id=ap.assignment_id AND assignment.state=\'Published\' JOIN assignment_participants part ON part.assignment_id=ap.assignment_id WHERE ap.version_id=$1 AND part.identity_id=$2 AND NOT part.exempt LIMIT 1',[version.id,user.identityId])).rowCount;
  let timedRead=false,timedReleased=false;
  if(user.roles.includes('student')&&version.published_at&&(await db.query("SELECT to_regclass('timed_practice_problems') existing")).rows[0].existing) {
-  const permitted=(await db.query("SELECT practice.results_published_at FROM timed_practice_problems tp JOIN timed_practices practice ON practice.id=tp.practice_id JOIN timed_practice_participants part ON part.practice_id=tp.practice_id LEFT JOIN timed_attempts attempt ON attempt.practice_id=tp.practice_id AND attempt.identity_id=part.identity_id WHERE tp.version_id=$1 AND part.identity_id=$2 AND NOT part.exempt AND (practice.results_published_at IS NOT NULL OR attempt.id IS NOT NULL) ORDER BY practice.results_published_at DESC NULLS LAST LIMIT 1",[version.id,user.identityId])).rows[0];timedRead=!!permitted;timedReleased=!!permitted?.results_published_at;
+  const permitted=(await db.query("SELECT practice.results_published_at FROM timed_practice_problems tp JOIN timed_practices practice ON practice.id=tp.practice_id JOIN timed_practice_participants part ON part.practice_id=tp.practice_id LEFT JOIN timed_attempts attempt ON attempt.practice_id=tp.practice_id AND attempt.identity_id=part.identity_id WHERE tp.version_id=$1 AND part.identity_id=$2 AND NOT part.exempt AND (practice.state IN ('Published','ResultsPublished') OR practice.state='Archived' AND practice.results_published_at IS NOT NULL) AND (practice.results_published_at IS NOT NULL OR attempt.id IS NOT NULL) ORDER BY practice.results_published_at DESC NULLS LAST LIMIT 1",[version.id,user.identityId])).rows[0];timedRead=!!permitted;timedReleased=!!permitted?.results_published_at;
  }
- return {canRead:own||(!bank.archived_at&&staffRead)||schoolRead||assignmentTeacherRead||assignmentRead||timedRead,canEdit:canEdit&&!bank.archived_at,canRunFree:assignmentRead||timedReleased};
+ return {canRead:own||(!bank.archived_at&&staffRead)||schoolRead||assignmentTeacherRead||timedTeacherRead||assignmentRead||timedRead,canEdit:canEdit&&!bank.archived_at,canRunFree:assignmentRead||timedReleased};
 }
 
 export async function restoreIdentityBindings(db,identityId,newAccountId,{restoreRoles=true,restoreEmail=true}={}) {
@@ -71,12 +84,12 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
  const {audit,versionAccess,submissionAccess}=helpers;
  const result=body=>({status:200,body});
  const bankShape=a=>({id:a.bank.id,name:a.bank.name,description:a.bank.description,course:a.bank.course,updatedAt:a.bank.updated_at,createdAt:a.bank.created_at,problemCount:a.bank.problemCount??0,visibility:a.bank.visibility,permission:a.permission,canEdit:a.canEdit,canContribute:a.canContribute,isSystem:a.bank.is_system});
- const reviewShape=r=>({problemId:r.problem_id,versionId:r.version_id,title:r.title,bankId:r.bank_id,bankName:r.bank_name,bankVisibility:r.bank_visibility,ownerName:r.owner_name,publishedAt:r.published_at,schoolVisibleAt:r.school_visible_at,rankReviewStatus:r.rank_review_status,rankApprovedAt:r.rank_approved_at,rankReviewReason:r.rank_review_reason,priorAcCount:Number(r.prior_ac_count),isCurrent:r.is_current});
+ const reviewShape=r=>({problemId:r.problem_id,versionId:r.version_id,title:r.title,bankId:r.bank_id,bankName:r.bank_name,bankVisibility:r.bank_visibility,ownerName:r.owner_name,publishedAt:r.published_at,schoolVisibleAt:r.school_visible_at,validationStatus:r.validation_status,rankReviewStatus:r.rank_review_status,rankApprovedAt:r.rank_approved_at,rankReviewReason:r.rank_review_reason,priorAcCount:Number(r.prior_ac_count),isCurrent:r.is_current});
  if(route==='/problems/rank-review'&&method==='GET'){
   if(!isAdmin(user))fail(403,'FORBIDDEN','仅管理员可审核校内公开题');
   const rows=(await pool.query(`SELECT p.id problem_id,v.id version_id,v.title,b.id bank_id,b.name bank_name,
     b.visibility bank_visibility,COALESCE(i.name,'管理员') owner_name,v.published_at,
-    v.school_visible_at,v.rank_review_status,v.rank_approved_at,v.rank_review_reason,
+    v.school_visible_at,v.validation_status,v.rank_review_status,v.rank_approved_at,v.rank_review_reason,
     (v.id=p.current_version_id) is_current,
     (SELECT count(DISTINCT s.identity_id)::int FROM submissions s
      WHERE s.version_id=v.id AND s.status='AC' AND s.kind IN ('submit','correction')) prior_ac_count
@@ -88,6 +101,46 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
     WHEN v.rank_review_status='rejected' THEN 1 WHEN v.school_visible_at IS NOT NULL THEN 2 ELSE 3 END,
     v.published_at DESC,p.id LIMIT 500`)).rows;
   return result({items:rows.map(reviewShape)});
+ }
+ if(route==='/problems/rank-review/approve-batch'&&method==='POST'){
+  if(!isAdmin(user))fail(403,'FORBIDDEN','仅管理员可审核校内公开题');
+  if(!Array.isArray(body.items)||body.items.length<1||body.items.length>100)fail(400,'VALIDATION','请选择 1–100 道题目批量通过');
+  const items=body.items.map(item=>({problemId:uuid(item?.problemId,'题目 ID').toLowerCase(),versionId:uuid(item?.versionId,'版本 ID').toLowerCase()}));
+  if(new Set(items.map(item=>item.problemId)).size!==items.length||new Set(items.map(item=>item.versionId)).size!==items.length)fail(400,'VALIDATION','同一题目或版本不能重复选择');
+  return result(await transaction(pool,async db=>{
+   const checked=[];
+   // A stable order prevents two overlapping reviews from locking the same
+   // problems in reverse order. Keep the per-item lock order of single review.
+   for(const item of [...items].sort((a,b)=>a.problemId.localeCompare(b.problemId))){
+    const p=required(await db.query(`SELECT p.id,p.current_version_id,p.archived_at,b.id bank_id,b.name bank_name,
+     b.visibility bank_visibility,b.archived_at bank_archived_at,i.name owner_name
+     FROM problems p JOIN problem_banks b ON b.id=p.bank_id
+     LEFT JOIN accounts a ON a.id=p.owner_account_id LEFT JOIN identities i ON i.id=a.identity_id
+     WHERE p.id=$1 FOR UPDATE OF p,b`,[item.problemId]));
+    if(p.archived_at||p.bank_archived_at||p.bank_visibility!=='school')fail(409,'NOT_SCHOOL_PUBLIC','仅能审核校内题库中未归档题目');
+    const v=required(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND problem_id=$2 FOR UPDATE',[item.versionId,item.problemId]));
+    if(!v.published_at)fail(409,'UNPUBLISHED',`「${v.title}」尚未发布，不能通过校内公开审核`);
+    if(p.current_version_id!==v.id)fail(409,'VERSION_CHANGED',`「${v.title}」不再是当前已发布版本，请刷新列表`);
+    if(v.validation_status!=='AC')fail(409,'NOT_VALIDATED',`「${v.title}」的参考解答尚未通过全部正式测试`);
+    if(!['pending','rejected'].includes(v.rank_review_status))fail(409,v.rank_review_status==='revoked'?'REVIEW_TERMINAL':'APPROVAL_IMMUTABLE',`「${v.title}」已无法批量通过，请刷新列表`);
+    checked.push({p,v});
+   }
+   const reviewed=[];
+   for(const {p,v} of checked){
+    await db.query(`UPDATE problem_versions SET rank_review_status='approved',
+     rank_reviewed_at=clock_timestamp(),rank_reviewed_by=$1,rank_review_reason=NULL,
+     school_visible_at=COALESCE(school_visible_at,clock_timestamp()),rank_approved_at=clock_timestamp()
+     WHERE id=$2`,[user.id,v.id]);
+    await audit(db,user.id,'problem.school_approve','problem_version',v.id,{problemId:p.id,versionId:v.id,batch:true});
+    const version=required(await db.query(`SELECT v.id version_id,v.title,v.published_at,v.school_visible_at,v.validation_status,
+     v.rank_review_status,v.rank_approved_at,v.rank_review_reason,
+     (SELECT count(DISTINCT s.identity_id)::int FROM submissions s WHERE s.version_id=v.id
+      AND s.status='AC' AND s.kind IN ('submit','correction')) prior_ac_count
+     FROM problem_versions v WHERE v.id=$1`,[v.id]));
+    reviewed.push(reviewShape({...version,problem_id:p.id,bank_id:p.bank_id,bank_name:p.bank_name,bank_visibility:p.bank_visibility,owner_name:p.owner_name,is_current:true}));
+   }
+   return {approvedCount:reviewed.length,items:reviewed};
+  }));
  }
  let reviewMatch=route.match(/^\/problems\/([^/]+)\/rank-review$/);
  if(reviewMatch&&method==='PATCH'){
@@ -105,6 +158,7 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
    const v=required(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND problem_id=$2 FOR UPDATE',[versionId,problemId]));
    if(!v.published_at)fail(409,'UNPUBLISHED','只能审核已发布题目版本');
    if(v.rank_review_status==='revoked')fail(409,'REVIEW_TERMINAL','已撤下版本不能恢复；请发布新版本');
+   if(decision==='approved'&&v.validation_status!=='AC')fail(409,'NOT_VALIDATED','参考解答尚未通过全部正式测试');
    if(decision==='revoked'){
     if(!v.school_visible_at)fail(409,'NOT_SCHOOL_VISIBLE','只有已经校内公开的版本可撤下');
    }else{
@@ -117,12 +171,132 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
     rank_approved_at=CASE WHEN $1='approved' THEN clock_timestamp() ELSE rank_approved_at END
     WHERE id=$4`,[decision,user.id,reason,versionId]);
    await audit(db,user.id,decision==='approved'?'problem.school_approve':decision==='rejected'?'problem.school_reject':'problem.school_revoke','problem_version',versionId,{problemId,versionId,reason});
-   const reviewed=required(await db.query(`SELECT v.id version_id,v.title,v.published_at,v.school_visible_at,
+   const reviewed=required(await db.query(`SELECT v.id version_id,v.title,v.published_at,v.school_visible_at,v.validation_status,
     v.rank_review_status,v.rank_approved_at,v.rank_review_reason,
     (SELECT count(DISTINCT s.identity_id)::int FROM submissions s WHERE s.version_id=v.id
      AND s.status='AC' AND s.kind IN ('submit','correction')) prior_ac_count
     FROM problem_versions v WHERE v.id=$1`,[versionId]));
    return reviewShape({...reviewed,problem_id:problemId,bank_id:p.bank_id,bank_name:p.bank_name,bank_visibility:p.bank_visibility,owner_name:p.owner_name,is_current:p.current_version_id===versionId});
+  }));
+ }
+ if(route==='/admin/problem-banks'&&method==='GET'){
+  if(!isAdmin(user))fail(403,'FORBIDDEN','仅管理员可管理全校题库');
+  const banks=(await pool.query(`SELECT b.id,b.name,b.description,b.course,b.visibility,b.is_system,b.archived_at,
+    COALESCE(i.name,'系统') owner_name,
+    (SELECT count(*)::int FROM problems p WHERE p.bank_id=b.id AND p.archived_at IS NULL) problem_count,
+    (SELECT count(*)::int FROM problems p WHERE p.bank_id=b.id AND p.archived_at IS NOT NULL) archived_problem_count,
+    (SELECT count(*)::int FROM problems p JOIN problem_versions v ON v.problem_id=p.id
+     WHERE p.bank_id=b.id AND p.archived_at IS NULL AND v.school_visible_at IS NOT NULL) public_version_count
+   FROM problem_banks b LEFT JOIN accounts a ON a.id=b.owner_account_id
+   LEFT JOIN identities i ON i.id=a.identity_id
+   ORDER BY b.archived_at NULLS FIRST,b.is_system DESC,b.created_at DESC,b.id`)).rows;
+  return result({items:banks.map(b=>({id:b.id,name:b.name,description:b.description,course:b.course,
+   visibility:b.visibility,isSystem:b.is_system,archivedAt:b.archived_at,ownerName:b.owner_name,
+   problemCount:b.problem_count,archivedProblemCount:b.archived_problem_count,publicVersionCount:b.public_version_count}))});
+ }
+ let adminBankMatch=route.match(/^\/admin\/problem-banks\/([^/]+)\/problems$/);
+ if(adminBankMatch&&method==='GET'){
+  if(!isAdmin(user))fail(403,'FORBIDDEN','仅管理员可管理全校题库');
+  const bankId=uuid(adminBankMatch[1],'题库 ID');
+  const bank=required(await pool.query('SELECT id,name,archived_at FROM problem_banks WHERE id=$1',[bankId]));
+  const page=Number(url.searchParams.get('page')||1);
+  if(!Number.isSafeInteger(page)||page<1||page>100000)fail(400,'VALIDATION','页码无效');
+  const search=field(url.searchParams.get('search')??'','搜索内容',{min:0,max:100}).trim();
+  const pattern=`%${search.replace(/[\\%_]/g,'\\$&')}%`;
+  const total=Number((await pool.query(`SELECT count(*)::int count FROM problems p WHERE p.bank_id=$1 AND
+   ($2='' OR EXISTS(SELECT 1 FROM problem_versions v WHERE v.problem_id=p.id AND v.title ILIKE $3 ESCAPE '\\'))`,
+   [bankId,search,pattern])).rows[0].count);
+  const rows=(await pool.query(`SELECT p.id,p.archived_at,p.created_at,COALESCE(i.name,'管理员') owner_name,
+    v.id version_id,v.title,v.published_at,v.validation_status,v.rank_review_status,v.school_visible_at,
+    (SELECT count(*)::int FROM problem_versions pv WHERE pv.problem_id=p.id AND pv.school_visible_at IS NOT NULL) public_version_count,
+    (SELECT count(*)::int FROM submissions s WHERE s.problem_id=p.id) submission_count,
+    (SELECT count(*)::int FROM assignment_problems ap WHERE ap.problem_id=p.id) assignment_count,
+    (SELECT count(*)::int FROM timed_practice_problems tp WHERE tp.problem_id=p.id) timed_count,
+    (SELECT count(*)::int FROM chapter_problems cp WHERE cp.problem_id=p.id) course_count
+   FROM problems p LEFT JOIN accounts a ON a.id=p.owner_account_id LEFT JOIN identities i ON i.id=a.identity_id
+   LEFT JOIN LATERAL (SELECT v.id,v.title,v.published_at,v.validation_status,v.rank_review_status,v.school_visible_at
+    FROM problem_versions v WHERE v.problem_id=p.id
+    ORDER BY (v.id=p.current_version_id) DESC,v.created_at DESC,v.id DESC LIMIT 1) v ON true
+   WHERE p.bank_id=$1 AND ($2='' OR EXISTS(SELECT 1 FROM problem_versions x WHERE x.problem_id=p.id AND x.title ILIKE $3 ESCAPE '\\'))
+   ORDER BY p.archived_at NULLS FIRST,p.created_at DESC,p.id DESC LIMIT 100 OFFSET $4`,
+   [bankId,search,pattern,(page-1)*100])).rows;
+  return result({bank:{id:bank.id,name:bank.name,archivedAt:bank.archived_at},page,pageSize:100,total,
+   items:rows.map(p=>({id:p.id,title:p.title??'未命名题目',versionId:p.version_id,ownerName:p.owner_name,
+    archivedAt:p.archived_at,createdAt:p.created_at,publishedAt:p.published_at,validationStatus:p.validation_status,
+    rankReviewStatus:p.rank_review_status,schoolVisibleAt:p.school_visible_at,publicVersionCount:p.public_version_count,
+    submissionCount:p.submission_count,assignmentCount:p.assignment_count,timedCount:p.timed_count,courseCount:p.course_count}))});
+ }
+ adminBankMatch=route.match(/^\/admin\/problem-banks\/([^/]+)$/);
+ if(adminBankMatch&&method==='PATCH'){
+  if(!isAdmin(user))fail(403,'FORBIDDEN','仅管理员可管理全校题库');
+  if(typeof body.archived!=='boolean')fail(400,'VALIDATION','请明确指定归档状态');
+  const bankId=uuid(adminBankMatch[1],'题库 ID');
+  return result(await transaction(pool,async db=>{
+   const bank=required(await db.query('SELECT * FROM problem_banks WHERE id=$1 FOR UPDATE',[bankId]));
+   if(bank.is_system)fail(409,'SYSTEM_BANK','系统校内题库不能归档');
+   if(body.archived&&!bank.archived_at){
+    if((await db.query(`SELECT 1 FROM problems p JOIN problem_versions v ON v.problem_id=p.id
+     WHERE p.bank_id=$1 AND p.archived_at IS NULL AND v.school_visible_at IS NOT NULL LIMIT 1`,[bankId])).rowCount)
+     fail(409,'REVOKE_PUBLIC_VERSIONS','请先在题目审核中撤下该题库所有已公开版本');
+    if((await db.query(`SELECT 1 FROM problems p JOIN chapter_problems cp ON cp.problem_id=p.id
+     JOIN learning_chapters c ON c.id=cp.chapter_id JOIN learning_paths lp ON lp.id=c.path_id
+     WHERE p.bank_id=$1 AND p.archived_at IS NULL AND c.archived_at IS NULL AND lp.archived_at IS NULL AND lp.published_at IS NOT NULL LIMIT 1`,[bankId])).rowCount)
+     fail(409,'BANK_REFERENCED','题库仍被已发布课程引用，归档会造成断链');
+    if((await db.query(`SELECT 1 FROM problems p JOIN timed_practice_problems tpp ON tpp.problem_id=p.id
+     JOIN timed_practices tp ON tp.id=tpp.practice_id WHERE p.bank_id=$1 AND p.archived_at IS NULL AND tp.archived_at IS NULL LIMIT 1`,[bankId])).rowCount)
+     fail(409,'BANK_REFERENCED','题库仍被未归档训练引用，归档会造成断链');
+   }
+   if(Boolean(bank.archived_at)!==body.archived){
+    await db.query('UPDATE problem_banks SET archived_at=CASE WHEN $2 THEN now() ELSE NULL END,updated_at=now() WHERE id=$1',[bankId,body.archived]);
+    await audit(db,user.id,body.archived?'bank.archive':'bank.restore','problem_bank',bankId,{archived:body.archived});
+   }
+   return {ok:true,archived:body.archived};
+  }));
+ }
+ let adminProblemMatch=route.match(/^\/admin\/problems\/([^/]+)$/);
+ if(adminProblemMatch&&method==='GET'){
+  if(!isAdmin(user))fail(403,'FORBIDDEN','仅管理员可查看题目档案');
+  const problemId=uuid(adminProblemMatch[1],'题目 ID');
+  const p=required(await pool.query(`SELECT p.id,p.archived_at,p.current_version_id,b.id bank_id,b.name bank_name,
+   COALESCE(i.name,'管理员') owner_name FROM problems p JOIN problem_banks b ON b.id=p.bank_id
+   LEFT JOIN accounts a ON a.id=p.owner_account_id LEFT JOIN identities i ON i.id=a.identity_id WHERE p.id=$1`,[problemId]));
+  const versions=(await pool.query(`SELECT id,title,statement,validation_status,published_at,school_visible_at,
+   rank_review_status,created_at FROM problem_versions WHERE problem_id=$1 ORDER BY created_at DESC,id DESC`,[problemId])).rows;
+  return result({id:p.id,bankId:p.bank_id,bankName:p.bank_name,ownerName:p.owner_name,
+   archivedAt:p.archived_at,currentVersionId:p.current_version_id,
+   versions:versions.map(v=>({id:v.id,title:v.title,statement:v.statement,
+    validationStatus:v.validation_status,publishedAt:v.published_at,schoolVisibleAt:v.school_visible_at,
+    rankReviewStatus:v.rank_review_status,createdAt:v.created_at}))});
+ }
+ if(adminProblemMatch&&method==='PATCH'){
+  if(!isAdmin(user))fail(403,'FORBIDDEN','仅管理员可归档题目');
+  if(typeof body.archived!=='boolean')fail(400,'VALIDATION','请明确指定归档状态');
+  const problemId=uuid(adminProblemMatch[1],'题目 ID');
+  return result(await transaction(pool,async db=>{
+   const p=required(await db.query(`SELECT p.id,p.archived_at,b.archived_at bank_archived_at FROM problems p
+    JOIN problem_banks b ON b.id=p.bank_id WHERE p.id=$1 FOR UPDATE OF p,b`,[problemId]));
+   if(!body.archived&&p.bank_archived_at)fail(409,'BANK_ARCHIVED','请先恢复所属题库');
+   if(body.archived&&!p.archived_at){
+    if((await db.query(`SELECT 1 FROM chapter_problems cp JOIN learning_chapters c ON c.id=cp.chapter_id
+     JOIN learning_paths lp ON lp.id=c.path_id WHERE cp.problem_id=$1 AND c.archived_at IS NULL
+     AND lp.archived_at IS NULL AND lp.published_at IS NOT NULL LIMIT 1`,[problemId])).rowCount)
+     fail(409,'PROBLEM_REFERENCED','题目仍被已发布课程引用，归档会造成断链');
+    if((await db.query(`SELECT 1 FROM timed_practice_problems tpp JOIN timed_practices tp ON tp.id=tpp.practice_id
+     WHERE tpp.problem_id=$1 AND tp.archived_at IS NULL LIMIT 1`,[problemId])).rowCount)
+     fail(409,'PROBLEM_REFERENCED','题目仍被未归档训练引用，归档会造成断链');
+    const visible=(await db.query('SELECT id,rank_review_status FROM problem_versions WHERE problem_id=$1 AND school_visible_at IS NOT NULL ORDER BY id FOR UPDATE',[problemId])).rows;
+    for(const v of visible){
+     await db.query(`UPDATE problem_versions SET school_visible_at=NULL,rank_review_status='revoked',
+      rank_reviewed_at=clock_timestamp(),rank_reviewed_by=$1,rank_review_reason='题目归档' WHERE id=$2`,[user.id,v.id]);
+     await audit(db,user.id,'problem.school_revoke','problem_version',v.id,{problemId,versionId:v.id,oldStatus:v.rank_review_status,reason:'题目归档'});
+    }
+    await db.query('UPDATE problems SET archived_at=now() WHERE id=$1',[problemId]);
+    await audit(db,user.id,'problem.archive','problem',problemId,{problemId,count:visible.length});
+   }else if(!body.archived&&p.archived_at){
+    await db.query('UPDATE problems SET archived_at=NULL WHERE id=$1',[problemId]);
+    await audit(db,user.id,'problem.restore','problem',problemId,{problemId});
+   }
+   return {ok:true,archived:body.archived};
   }));
  }
  if(route==='/teachers'&&method==='GET') {
@@ -172,6 +346,14 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
     const visible=await db.query(`SELECT 1 FROM problems p JOIN problem_versions v ON v.problem_id=p.id
      WHERE p.bank_id=$1 AND p.archived_at IS NULL AND v.school_visible_at IS NOT NULL LIMIT 1`,[access.bank.id]);
     if(visible.rowCount)fail(409,'REVOKE_PUBLIC_VERSIONS','请先在题目审核中撤下该题库所有已公开版本');
+   const course=await db.query(`SELECT 1 FROM problems p JOIN chapter_problems cp ON cp.problem_id=p.id
+    JOIN learning_chapters c ON c.id=cp.chapter_id JOIN learning_paths lp ON lp.id=c.path_id
+    WHERE p.bank_id=$1 AND p.archived_at IS NULL AND c.archived_at IS NULL
+    AND lp.archived_at IS NULL AND lp.published_at IS NOT NULL LIMIT 1`,[access.bank.id]);
+   if(course.rowCount)fail(409,'BANK_REFERENCED','题库仍被已发布课程引用，调整可见范围会造成断链');
+   const timed=await db.query(`SELECT 1 FROM problems p JOIN timed_practice_problems tpp ON tpp.problem_id=p.id
+    JOIN timed_practices tp ON tp.id=tpp.practice_id WHERE p.bank_id=$1 AND p.archived_at IS NULL AND tp.archived_at IS NULL LIMIT 1`,[access.bank.id]);
+   if(timed.rowCount)fail(409,'BANK_REFERENCED','题库仍被未归档训练引用，调整可见范围会造成断链');
    }
    const description=body.description===undefined?access.bank.description:field(body.description,'题库简介',{min:0,max:4000});
    const course=body.course===undefined?access.bank.course:field(body.course,'课程标签',{max:100});

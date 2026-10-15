@@ -7,7 +7,7 @@ import { isCampusRoute } from "@/lib/campus-routes";
 
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { BarChart3, BookOpen, BookOpenCheck, ClipboardList, Clock3, Code2, Database, FileClock, Gauge, Home, LayoutDashboard, Library, Menu, NotebookPen, Settings, Users, UserRound, X } from "lucide-react";
+import { BarChart3, BookOpen, BookOpenCheck, ClipboardList, Clock3, Code2, Database, FileClock, FileCode2, Gauge, Home, LayoutDashboard, Library, Menu, NotebookPen, Settings, Users, UserRound, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {NotificationDropdown} from "@/components/student/notification-dropdown";
 import { AccountMenu } from "@/components/account-menu";
@@ -137,6 +137,7 @@ const navigation: Record<CampusRole, { label: string; path: string; icon: typeof
     { label: "课程", path: "/student/learning-paths", icon: BookOpen },
     { label: "作业", path: "/student/assignments", icon: Library },
     { label: "限时训练", path: "/student/timed-practice", icon: FileClock },
+    { label: "Paper 4 练习", path: "/student/paper4", icon: FileCode2 },
     { label: "提交记录", path: "/student/submissions", icon: FileClock },
     { label: "订正本", path: "/student/review-notebook", icon: NotebookPen },
   ],
@@ -147,6 +148,7 @@ const navigation: Record<CampusRole, { label: string; path: string; icon: typeof
     { label: "课程", path: "/teacher/courses", icon: BookOpen },
     { label: "作业管理", path: "/teacher/assignments", icon: ClipboardList },
     { label: "限时训练", path: "/teacher/timed-practice", icon: Clock3 },
+    { label: "Paper 4 实践评测", path: "/teacher/paper4", icon: FileCode2 },
     { label: "教学报告", path: "/teacher/reports", icon: BarChart3 },
     { label: "导入中心", path: "/teacher/imports", icon: Database },
   ],

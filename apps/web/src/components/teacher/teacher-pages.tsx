@@ -1,6 +1,7 @@
 "use client";
 
 import { AppLink as Link } from "@/components/navigation";
+import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/page-chrome";
 import { useLocale } from "@/components/locale-context";
@@ -24,6 +25,9 @@ import {
 } from "./timed";
 import { TeacherReports } from "./reports";
 import { TeacherProblemImports } from "./imports";
+const TeacherPaper4List = dynamic(() => import("@/components/paper4/teacher-paper4").then(module => module.TeacherPaper4List));
+const TeacherPaper4Editor = dynamic(() => import("@/components/paper4/teacher-paper4").then(module => module.TeacherPaper4Editor));
+const TeacherPaper4Review = dynamic(() => import("@/components/paper4/teacher-paper4").then(module => module.TeacherPaper4Review));
 
 export function TeacherPages({
   pathname,
@@ -34,6 +38,11 @@ export function TeacherPages({
 }) {
   const path = pathname.replace(/\/$/, "");
   if (path === "/teacher") return <TeacherDashboard />;
+  if (path === "/teacher/paper4") return <TeacherPaper4List />;
+  let paper4Match = path.match(/^\/teacher\/paper4\/([^/]+)\/review\/([^/]+)$/);
+  if (paper4Match) return <TeacherPaper4Review paperId={paper4Match[1]!} attemptId={paper4Match[2]!} />;
+  paper4Match = path.match(/^\/teacher\/paper4\/([^/]+)$/);
+  if (paper4Match) return <TeacherPaper4Editor id={paper4Match[1]!} />;
   if (path === "/teacher/classes") return <TeacherClasses user={user} />;
   if (path === "/teacher/problems") return <TeacherBanks user={user} />;
   let match = path.match(/^\/teacher\/problems\/banks\/([^/]+)$/);

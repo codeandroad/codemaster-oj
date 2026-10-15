@@ -4,13 +4,16 @@ const availablePages = new Set([
   "/", "/login", "/register", "/admin", "/teacher",
   "/admin/people", "/admin/accounts", "/admin/imports", "/admin/problem-banks", "/admin/judge-service", "/admin/settings",
   "/teacher/classes", "/teacher/imports", "/teacher/problems", "/teacher/assignments", "/teacher/reports",
-  "/teacher/learning", "/teacher/courses", "/teacher/timed-practice", "/teacher/profile",
+  "/teacher/learning", "/teacher/courses", "/teacher/timed-practice", "/teacher/paper4", "/teacher/profile",
   "/student/problems", "/student/assignments", "/student/submissions", "/student/review-notebook",
-  "/student/learning-paths", "/student/timed-practice", "/student/profile",
+  "/student/learning-paths", "/student/timed-practice", "/student/paper4", "/student/profile",
 ]);
 
 const detailPages = [
   /^\/teacher\/problems\/banks\/[^/]+$/,
+  /^\/teacher\/paper4\/[^/]+$/,
+  /^\/teacher\/paper4\/[^/]+\/review\/[^/]+$/,
+  /^\/student\/paper4\/[^/]+$/,
   /^\/teacher\/problems\/[^/]+\/edit$/,
   /^\/teacher\/assignments\/[^/]+\/(progress|edit)$/,
   /^\/teacher\/timed-practice\/[^/]+\/(edit|progress)$/,

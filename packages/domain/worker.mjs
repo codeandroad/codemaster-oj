@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { createPool, transaction } from './src/db.mjs';
 import { GoJudge, InfrastructureError, createJudgingBudget } from './judge.mjs';
+import { processPaper4One } from './paper4-worker.mjs';
 
 const PUBLIC_SYSTEM_MESSAGE = '评测服务暂不可用，正在重试；多次失败后请联系管理员。';
 const DEFAULT_LEASE_SECONDS = 90;
@@ -42,7 +43,10 @@ export async function claimTask(pool, { leaseSeconds = DEFAULT_LEASE_SECONDS, ma
       await client.query('SELECT pg_advisory_xact_lock(798945)');
       const settings=(await client.query('SELECT settings FROM site_settings WHERE id=true')).rows[0]?.settings;
       const concurrency=settings?.runtime?.workerConcurrency??2;
-      if((await client.query("SELECT count(*)::int count FROM judge_tasks WHERE state='leased' AND lease_expires_at>now() AND node_id=$1",[nodeId])).rows[0].count>=concurrency)return null;
+      const active = await client.query(`SELECT
+        (SELECT count(*) FROM judge_tasks WHERE state='leased' AND lease_expires_at>now() AND node_id=$1)
+        +(SELECT count(*) FROM paper4_run_tasks WHERE state='leased' AND lease_expires_at>now() AND node_id=$1) AS count`, [nodeId]);
+      if(Number(active.rows[0].count)>=concurrency)return null;
     }
     // Lock expired tasks before changing state. SKIP LOCKED allows separate
     // workers to recover/claim without blocking each other.
@@ -180,10 +184,18 @@ export async function startWorker({ pool, judge, signal, concurrency = 2, logger
   await judge.ready(signal); // Fail closed before taking a single student job.
   const heartbeat=()=>pool.query('INSERT INTO judge_nodes(id,concurrency,runtime_version,executor_ready,heartbeat_at) VALUES($1,$2,$3,true,now()) ON CONFLICT(id) DO UPDATE SET concurrency=EXCLUDED.concurrency,runtime_version=EXCLUDED.runtime_version,heartbeat_at=now()',[nodeId,concurrency,judge.runtimeVersion??judge.environmentVersion]);
   await heartbeat();await pool.query('UPDATE judge_nodes SET executor_ready=true WHERE id=$1',[nodeId]);const nodeTimer=setInterval(()=>heartbeat().catch(()=>{}),15000);nodeTimer.unref();
-  try {await Promise.all(Array.from({ length: concurrency }, async () => {
+  try {await Promise.all(Array.from({ length: concurrency }, async (_, slot) => {
+    let preferPaper4 = slot % 2 === 1;
     while (!signal.aborted) {
       try {
-        if (!await processOne({ pool, judge, signal, logger, nodeId })) await delay(1000, signal);
+        const options = { pool, judge, signal, logger, nodeId };
+        // Alternate first choice under sustained load, then try the other
+        // queue immediately. Both claims count the same per-node leases.
+        const handled = preferPaper4
+          ? await processPaper4One(options) || await processOne(options)
+          : await processOne(options) || await processPaper4One(options);
+        preferPaper4 = !preferPaper4;
+        if (!handled) await delay(1000, signal);
       } catch {
         logger.error?.(JSON.stringify({ event: 'judge_queue_unavailable' }));
         await delay(5000, signal);

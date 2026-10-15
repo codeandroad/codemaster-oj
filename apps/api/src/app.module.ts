@@ -10,6 +10,7 @@ import {SubmissionsModule} from './modules/submissions.module.js';
 import {EducationModule} from './modules/education.module.js';
 import {CommunityModule} from './modules/community.module.js';
 import {SystemModule} from './modules/system.module.js';
+import {Paper4Module} from './modules/paper4.module.js';
 
 @Controller()
 class HealthController {
@@ -20,7 +21,7 @@ class HealthController {
 export class AppModule {
   static register(options: RuntimeOptions): DynamicModule {
     return {module: AppModule,
-      imports: [CoreModule.register(options), AuthModule, PeopleModule, ClassesModule, LibraryModule, AssignmentsModule, SubmissionsModule, EducationModule, CommunityModule, SystemModule],
+      imports: [CoreModule.register(options), AuthModule, PeopleModule, ClassesModule, LibraryModule, AssignmentsModule, SubmissionsModule, EducationModule, CommunityModule, SystemModule, Paper4Module],
       controllers: [HealthController]};
   }
 }

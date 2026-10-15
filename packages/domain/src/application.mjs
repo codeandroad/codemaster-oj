@@ -6,6 +6,7 @@ import { handleEducation } from './education.mjs';
 import { handleCommunity } from './community.mjs';
 import { createTimedService } from './timed.mjs';
 import { handleMemberImport } from './member-import.mjs';
+import { handlePaper4 } from './paper4.mjs';
 import { handleSystem, assertJudgeAdmission, getSettings } from './system.mjs';
 import { handlePeopleAlignment, handleFavorites, bindPendingTeacherClasses } from './alignment.mjs';
 import { handleAssignmentAuthoring } from './assignment-authoring.mjs';
@@ -601,7 +602,7 @@ export async function createDomainServices(pool,config) {
   return null;
  }
 
- const operations={auth:authOperation,people:peopleOperation,classes:classesOperation,library:libraryOperation,assignments:assignmentsOperation,submissions:submissionsOperation,education:educationOperation,community:handleCommunity,system:systemOperation};
+ const operations={auth:authOperation,people:peopleOperation,classes:classesOperation,library:libraryOperation,assignments:assignmentsOperation,submissions:submissionsOperation,education:educationOperation,community:handleCommunity,system:systemOperation,paper4:handlePaper4};
  const helpers={audit,classAccess,versionAccess,submissionAccess,assignmentAccess,assignmentResult,problemResult,problemInput,insertVersion,issueActivation,personShape,maskSubmission:timed.maskSubmission};
  async function prepareRequest({url:rawUrl,method,headers={},body={},ip='unknown'}) {
   const url=new URL(rawUrl,'http://api.local'),path=url.pathname.replace(/\/$/,'');
@@ -625,6 +626,7 @@ export async function createDomainServices(pool,config) {
 }
 function respond(status,body,cookie){return {status,body,...(cookie?{cookie}:{})};}
 export function resourceArea(route) {
+ if(/^\/paper4(?:\/|$)/.test(route))return 'paper4';
  if(route.startsWith('/auth/'))return 'auth';
  if(/^\/(accounts|people|teachers)(?:\/|$)/.test(route))return 'people';
  if(/^\/classes(?:\/|$)/.test(route))return 'classes';

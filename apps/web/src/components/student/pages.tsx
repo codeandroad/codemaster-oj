@@ -2,6 +2,7 @@
 
 import {StudentProblemFilter} from "./problem-filter";
 import {StudentSubmissionFilter} from "./submission-filter";
+import dynamic from "next/dynamic";
 
 import { AppLink } from "@/components/navigation";
 
@@ -16,6 +17,8 @@ import { Back, CodeBlock, Empty, Feedback, ResultPanel, ResultScore, State, Tabs
 import { StudentLearningDetail, StudentLearningList, type LearningPath } from "./learning";
 import { StudentTimedDetail, StudentTimedList, type TimedPractice } from "./timed";
 import { StudentWorkspace } from "./workspace";
+const StudentPaper4List = dynamic(() => import("@/components/paper4/student-paper4").then(module => module.StudentPaper4List));
+const StudentPaper4Detail = dynamic(() => import("@/components/paper4/student-paper4").then(module => module.StudentPaper4Detail));
 import { genderLabel } from "@/lib/gender";
 import { languageInfo, submissionLanguage } from "./languages";
 import { useLocale, type AppLocale } from "@/components/locale-context";
@@ -35,6 +38,7 @@ export function StudentPages({ pathname, user }: { pathname: string; user: Campu
   if (pathname === "/") return <StudentDashboard user={user}/>;
   if (pathname === "/student/profile" || pathname === "/teacher/profile") return <AlignedProfile user={user} teacher={pathname.startsWith("/teacher")}/>;
   if (parts[1] === "problems") return parts[2] ? <StudentWorkspace id={parts[2]} user={user}/> : <StudentProblems/>;
+  if (parts[1] === "paper4") return parts[2] ? <StudentPaper4Detail paperId={parts[2]} user={user}/> : <StudentPaper4List/>;
   if (parts[1] === "assignments") return parts[2] ? <StudentAssignment id={parts[2]} user={user}/> : <StudentAssignments user={user}/>;
   if (parts[1] === "submissions") return parts[2] ? <StudentSubmission id={parts[2]} user={user}/> : <StudentSubmissions user={user}/>;
   if (parts[1] === "review-notebook") return parts[2] ? <StudentReview id={parts[2]} user={user}/> : <StudentNotebook user={user}/>;

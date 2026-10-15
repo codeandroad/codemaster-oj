@@ -18,6 +18,10 @@ try {
     GRANT SELECT(id,lease_id) ON judge_runs TO campus_worker;
     GRANT UPDATE(status,score,passed,total,public_output,public_message,pending_judge_run_id) ON submissions TO campus_worker;
     GRANT UPDATE(validation_status,validation_message) ON problem_versions TO campus_worker;
+    GRANT SELECT, UPDATE ON paper4_run_tasks TO campus_worker;
+    GRANT SELECT ON paper4_snapshots, paper4_attempts, paper4_versions TO campus_worker;
+    GRANT INSERT ON paper4_runs TO campus_worker;
+    GRANT SELECT(id,lease_id) ON paper4_runs TO campus_worker;
   `);
   console.log('Runtime role grants applied.');
 } finally { await pool.end(); }

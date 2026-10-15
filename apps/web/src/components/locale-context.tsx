@@ -8,6 +8,7 @@ export type AppLocale = "zh" | "en";
 // material are content, so the language selector does not rewrite them.
 const english: Record<string, string> = {
   "首页": "Home", "题目": "Problems", "学习路径": "Learning paths", "作业": "Assignments",
+  "Paper 4 练习": "Paper 4 practice", "Paper 4 实践评测": "Paper 4 practical assessment",
   "限时训练": "Timed practice", "提交记录": "Submissions", "订正本": "Review notebook",
   "教师首页": "Teacher dashboard", "班级与学生": "Classes & students", "题库": "Problem banks",
   "课程": "Courses", "题目编辑": "Problem editor", "作业管理": "Assignment management", "教学报告": "Teaching reports",

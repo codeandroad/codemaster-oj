@@ -1,0 +1,6 @@
+# Merge with compose.local.yaml for the Paper 4 branch preview. The project and
+# database volume are intentionally distinct from the existing local instance.
+name: campus-judge-paper4-preview
+volumes:
+  database:
+    name: campus-judge-paper4-preview_database

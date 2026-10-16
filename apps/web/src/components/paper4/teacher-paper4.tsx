@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ClipboardCheck, FilePlus2, Maximize2, Minimize2, Play, Plus, Save, Send, Settings, Trash2, Upload } from "lucide-react";
+import { Archive, ArrowLeft, ClipboardCheck, Download, FilePlus2, Maximize2, Minimize2, Play, Plus, RotateCcw, Save, Send, Settings, Trash2, Upload } from "lucide-react";
 import { AppLink } from "@/components/navigation";
 import { useLocale } from "@/components/locale-context";
 import { PageHeader } from "@/components/page-chrome";
@@ -16,6 +16,7 @@ import { apiMessage, productionApi, type CampusUser, type SchoolClass } from "@/
 import { paper4Date, paper4Status, type Paper4Attempt, type Paper4AttemptSummary, type Paper4Paper, type Paper4PaperSummary, type Paper4Question, type Paper4RunnerCase, type Paper4Run, type Paper4Stage } from "./model";
 import { Paper4Content } from "./paper4-content";
 import contentStyles from "./paper4-content.module.css";
+import { downloadPaper4Export, type Paper4ExportEnvelope } from "./paper4-export";
 
 const panel = "rounded-lg border border-border bg-surface panel-shadow";
 const input = "min-h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-primary";
@@ -38,14 +39,50 @@ export function TeacherPaper4List() {
   const { locale } = useLocale();
   const tx = (zh: string, en: string) => locale === "en" ? en : zh;
   const [importOpen, setImportOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<Paper4PaperSummary | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const papers = useData<{ items: Paper4PaperSummary[] }>("paper4/papers");
   const classes = useData<{ items: SchoolClass[] }>("classes");
   const className = (id: string | null) => classes.data?.items.find(item => item.id === id)?.name ?? "—";
+  const visible = papers.data?.items.filter(paper => Boolean(paper.archivedAt) === showArchived) ?? [];
+  async function archiveOrRestore() {
+    if (!archiveTarget) return;
+    const restoring = Boolean(archiveTarget.archivedAt);
+    setBusy(true); setError(""); setMessage("");
+    try {
+      await productionApi(`paper4/papers/${encodeURIComponent(archiveTarget.id)}/${restoring ? "restore" : "archive"}`, { method: "POST" });
+      setArchiveTarget(null);
+      papers.reload();
+      setMessage(restoring ? tx("试卷已恢复。", "Paper restored.") : tx("试卷已归档。", "Paper archived."));
+    } catch (reason) { setError(apiMessage(reason)); }
+    finally { setBusy(false); }
+  }
+  async function exportPaper(paper: Paper4PaperSummary) {
+    setBusy(true); setError(""); setMessage("");
+    try {
+      const envelope = await productionApi<Paper4ExportEnvelope>(`paper4/papers/${encodeURIComponent(paper.id)}/export?view=current`);
+      downloadPaper4Export(envelope);
+      setMessage(tx("试卷包已下载；文件含参考答案和隐藏测试，请妥善保存。", "Paper package downloaded. It includes reference solutions and hidden tests; store it securely."));
+    } catch (reason) { setError(apiMessage(reason)); }
+    finally { setBusy(false); }
+  }
   return <>
     <PageHeader eyebrow={tx("教学工具", "Teaching tools")} title={tx("Paper 4 实践评测", "Paper 4 practical assessment")} description={tx("制作 Python 编程实践卷，发布给班级并逐点评分。独立于普通 OJ 判题与积分。", "Create Python practical papers for a class and mark each stage. These papers are separate from ordinary OJ judging and points.")} action={<div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={() => setImportOpen(true)}><Upload size={16}/>{tx("导入试卷包", "Import package")}</Button><AppLink href="/teacher/paper4/new" className={buttonVariants()}><FilePlus2 size={16}/>{tx("新建试卷", "Create paper")}</AppLink></div>}/>
-    <State data={papers}>{papers.data?.items.length ? <div className={`mt-5 overflow-hidden ${panel}`}><div className="overflow-x-auto"><table className="w-full min-w-[660px] text-left text-sm"><thead className="bg-surface-subtle text-xs text-muted-foreground"><tr>{[tx("试卷", "Paper"), tx("班级", "Class"), tx("时间", "Window"), tx("分值", "Marks"), tx("状态", "Status")].map(label => <th scope="col" key={label} className="px-4 py-3">{label}</th>)}</tr></thead><tbody>{papers.data.items.map(paper => <tr key={paper.id} className="border-t border-border hover:bg-surface-subtle"><td className="px-4 py-3"><AppLink href={`/teacher/paper4/${paper.id}`} className="font-semibold text-primary hover:underline focus-visible:underline">{paper.title}</AppLink><span className="mt-1 block text-xs text-muted-foreground">{paper.questionCount} {tx("道大题", "questions")}</span></td><td className="px-4 py-3">{className(paper.classId)}</td><td className="px-4 py-3 text-xs text-muted-foreground">{paper4Date(paper.startsAt, locale)} – {paper4Date(paper.endsAt, locale)}</td><td className="px-4 py-3 font-semibold">{paper.totalMarks}</td><td className="px-4 py-3">{paper4Status(paper.status, locale)}</td></tr>)}</tbody></table></div></div> : <Empty title={tx("还没有实践试卷", "No practical papers yet")} description={tx("先建立草稿并检查题目、阶段与测试，再发布给班级。", "Create a draft, check its questions, stages and tests, then publish to a class.")}/>}</State>
+    <div className="mt-5 flex flex-wrap gap-2"><Button variant={showArchived ? "secondary" : "default"} aria-pressed={!showArchived} onClick={() => setShowArchived(false)}>{tx("使用中", "Active")}</Button><Button variant={showArchived ? "default" : "secondary"} aria-pressed={showArchived} onClick={() => setShowArchived(true)}>{tx("已归档", "Archived")}</Button></div>
+    {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+    {message && <p role="status" className="mt-3 text-sm text-success">{message}</p>}
+    <State data={papers}>{visible.length ? <div className={`mt-4 overflow-hidden ${panel}`}><div className="overflow-x-auto"><table className="w-full min-w-[860px] text-left text-sm"><thead className="bg-surface-subtle text-xs text-muted-foreground"><tr>{[tx("试卷", "Paper"), tx("班级", "Class"), tx("时间", "Window"), tx("分值", "Marks"), tx("状态", "Status"), tx("操作", "Actions")].map(label => <th scope="col" key={label} className="px-4 py-3">{label}</th>)}</tr></thead><tbody>{visible.map(paper => <tr key={paper.id} className="border-t border-border hover:bg-surface-subtle"><td className="px-4 py-3"><AppLink href={`/teacher/paper4/${paper.id}`} className="font-semibold text-primary hover:underline focus-visible:underline">{paper.title}</AppLink><span className="mt-1 block text-xs text-muted-foreground">{paper.questionCount} {tx("道大题", "questions")}</span></td><td className="px-4 py-3">{className(paper.classId)}</td><td className="px-4 py-3 text-xs text-muted-foreground">{paper4Date(paper.startsAt, locale)} – {paper4Date(paper.endsAt, locale)}</td><td className="px-4 py-3 font-semibold">{paper.totalMarks}</td><td className="px-4 py-3"><span className={paper.archivedAt ? "rounded bg-muted px-2 py-1 text-xs font-semibold" : "text-sm"}>{paper.archivedAt ? tx("已归档", "Archived") : paper4Status(paper.status, locale)}</span>{paper.archivedAt && <span className="mt-1 block text-xs text-muted-foreground">{paper4Status(paper.status, locale)}</span>}</td><td className="px-4 py-3"><div className="flex items-center gap-1">{paper.canExport && <Button size="sm" variant="ghost" disabled={busy} title={tx("下载可再次导入的 JSON，包含参考答案和隐藏测试", "Download reimportable JSON with reference solutions and hidden tests")} onClick={() => void exportPaper(paper)}><Download size={14}/>{tx("导出", "Export")}</Button>}<Button size="sm" variant="ghost" disabled={busy} onClick={() => setArchiveTarget(paper)}>{paper.archivedAt ? <RotateCcw size={14}/> : <Archive size={14}/>} {paper.archivedAt ? tx("恢复", "Restore") : tx("归档", "Archive")}</Button></div></td></tr>)}</tbody></table></div></div> : <Empty title={showArchived ? tx("暂无已归档试卷", "No archived papers") : tx("还没有使用中的实践试卷", "No active practical papers")} description={showArchived ? tx("归档的试卷会显示在这里，历史作答和成绩仍会保留。", "Archived papers appear here, with historical attempts and marks retained.") : tx("先建立草稿并检查题目、阶段与测试，再发布给班级。", "Create a draft, check its questions, stages and tests, then publish to a class.")}/>}</State>
     <Paper4ImportDialog open={importOpen} onOpenChange={setImportOpen} classes={classes.data?.items ?? []} tx={tx}/>
+    <Paper4ArchiveDialog paper={archiveTarget} busy={busy} tx={tx} onOpenChange={open => { if (!open && !busy) setArchiveTarget(null); }} onConfirm={() => void archiveOrRestore()}/>
   </>;
+}
+
+function Paper4ArchiveDialog({ paper, busy, tx, onOpenChange, onConfirm }: { paper: Paper4PaperSummary | Paper4Paper | null; busy: boolean; tx: (zh: string, en: string) => string; onOpenChange: (open: boolean) => void; onConfirm: () => void }) {
+  const restoring = Boolean(paper?.archivedAt);
+  return <Dialog open={Boolean(paper)} onOpenChange={onOpenChange}><DialogContent><DialogTitle>{restoring ? tx("恢复 Paper 4 试卷", "Restore Paper 4 paper") : tx("归档 Paper 4 试卷", "Archive Paper 4 paper")}</DialogTitle><DialogDescription>{paper && (restoring ? tx(`恢复「${paper.title}」后，它会回到使用中列表；仍在原截止时间内的进行中答卷可以继续作答。`, `Restore “${paper.title}” to the active list. In-progress attempts can continue if the original deadline has not passed.`) : tx(`归档「${paper.title}」后，学生暂时不能进入试卷或继续作答；已有代码、答卷和成绩保留，恢复后若仍在期限内可继续。`, `Archiving “${paper.title}” pauses student access and work. Existing code, attempts and marks remain; in-progress attempts can continue after restoration if still within the deadline.`))}</DialogDescription><DialogFooter><Button variant="secondary" disabled={busy} onClick={() => onOpenChange(false)}>{tx("取消", "Cancel")}</Button><Button disabled={busy} onClick={onConfirm}>{restoring ? tx("确认恢复", "Restore") : tx("确认归档", "Archive")}</Button></DialogFooter></DialogContent></Dialog>;
 }
 
 interface ImportPreview {
@@ -115,6 +152,7 @@ export function TeacherPaper4Editor({ id, user }: { id: string; user: CampusUser
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [confirmPublish, setConfirmPublish] = useState(false);
+  const [confirmArchive, setConfirmArchive] = useState(false);
   useEffect(() => {
     if (!paper.data) return;
     const next = { title: paper.data.title, description: paper.data.description, classId: paper.data.classId ?? "", startsAt: dateInput(paper.data.startsAt), endsAt: dateInput(paper.data.endsAt), questions: paper.data.questions, runnerCases: paper.data.runnerCases ?? {}, referenceSolutions: paper.data.referenceSolutions ?? {} };
@@ -124,7 +162,9 @@ export function TeacherPaper4Editor({ id, user }: { id: string; user: CampusUser
     setSelected(current => paper.data?.questions.some(item => item.key === current) ? current : paper.data?.questions[0]?.key ?? "");
     setSelectedCaseStage(current => paper.data?.questions.some(item => item.stages.some(stage => stage.id === current)) ? current : paper.data?.questions[0]?.stages.find(stage => stage.judgeMode === "auto")?.id ?? "");
   }, [paper.data]);
-  const published = Boolean(paper.data && paper.data.status.toLowerCase() !== "draft");
+  const archived = Boolean(paper.data?.archivedAt);
+  const isPublished = Boolean(paper.data && paper.data.status.toLowerCase() !== "draft");
+  const published = isPublished || archived;
   const classLocked = viewingDraft && (paper.data?.versionNumber ?? 1) > 1;
   const question = draft.questions.find(item => item.key === selected) ?? draft.questions[0];
   const referenceLineCount = (draft.referenceSolutions[question?.key] ?? "").split("\n").length;
@@ -179,6 +219,23 @@ export function TeacherPaper4Editor({ id, user }: { id: string; user: CampusUser
       setMessage(tx("新版草稿已建立，可以编辑。", "A new editable draft revision is ready."));
     });
   }
+  async function exportPaper() {
+    await perform(async () => {
+      const view = viewingDraft ? "draft" : "current";
+      const envelope = await productionApi<Paper4ExportEnvelope>(`paper4/papers/${encodeURIComponent(id)}/export?view=${view}`);
+      downloadPaper4Export(envelope);
+      setMessage(tx("试卷包已下载；文件含参考答案和隐藏测试，请妥善保存。", "Paper package downloaded. It includes reference solutions and hidden tests; store it securely."));
+    });
+  }
+  async function archiveOrRestore() {
+    await perform(async () => {
+      await productionApi(`paper4/papers/${encodeURIComponent(id)}/${archived ? "restore" : "archive"}`, { method: "POST" });
+      setConfirmArchive(false);
+      paper.reload();
+      attempts.reload();
+      setMessage(archived ? tx("试卷已恢复。", "Paper restored.") : tx("试卷已归档；作答暂时停止，已有代码和成绩保留。", "Paper archived; attempts are paused while existing code and marks remain."));
+    });
+  }
   async function verifyReference(questionKey: string) {
     await perform(async () => {
       if (draftDirty || referencePendingRefresh) { setError(tx("请先保存草稿并等待状态刷新，再运行参考答案验证。", "Save the draft and wait for the status refresh before validating the reference solution.")); return; }
@@ -204,7 +261,8 @@ export function TeacherPaper4Editor({ id, user }: { id: string; user: CampusUser
     <AppLink href="/teacher/paper4" className="mb-4 inline-flex min-h-9 items-center gap-2 text-sm font-semibold text-primary"><ArrowLeft size={16}/>{tx("返回实践评测", "Back to practical papers")}</AppLink>
     <PageHeader eyebrow={fresh ? tx("新建试卷", "Create paper") : tx("实践试卷", "Practical paper")} title={fresh ? tx("建立 Paper 4 草稿", "Create a Paper 4 draft") : paper.data?.title ?? tx("正在加载…", "Loading…")} description={tx("准备题面、自动阶段用例、参考答案和评分点。自动判题给出 AC 状态；75 分成绩由教师复核。", "Prepare questions, auto-stage cases, reference solutions and marking points. Auto judging reports AC status; teachers award marks out of 75.")}/>
     {!fresh && <State data={paper}>{null}</State>}
-    {!fresh && published && <div className={`${panel} mt-4 flex flex-wrap items-center justify-between gap-3 p-4 text-sm`}><div><strong>{tx("当前已发布版本", "Current published version")} {paper.data?.versionNumber ? `v${paper.data.versionNumber}` : ""}</strong><p className="mt-1 text-muted-foreground">{tx("已发布版本保持不变。创建修订草稿后可修改题目和参考答案，再重新验证并发布新版。", "The published version remains unchanged. Create a draft revision to edit questions and reference code, validate it, then publish the new version.")}</p></div>{paper.data?.hasDraft ? <AppLink href={`/teacher/paper4/${encodeURIComponent(id)}?view=draft`} className={buttonVariants()}>{tx("继续编辑修订草稿", "Edit draft revision")}</AppLink> : <Button disabled={busy} onClick={() => void createRevision()}>{tx("创建修订草稿", "Create draft revision")}</Button>}</div>}
+    {!fresh && paper.data && <div className={`${panel} mt-4 flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm`}><div><strong className={archived ? "text-muted-foreground" : "text-foreground"}>{archived ? tx("已归档", "Archived") : paper4Status(paper.data.status, locale)} {paper.data.versionNumber ? `· v${paper.data.versionNumber}` : ""}</strong>{archived && <p className="mt-1 text-xs text-muted-foreground">{tx("归档期间学生不能进入试卷或继续作答；已有代码和成绩保留。恢复后仍在期限内的答卷可继续。", "Students cannot enter or continue this paper while archived. Existing code and marks remain; attempts may continue after restoration if still within the deadline.")}</p>}</div><div className="flex flex-wrap gap-2">{paper.data.canExport && <Button size="sm" variant="secondary" disabled={busy || draftDirty} title={draftDirty ? tx("请先保存草稿；导出的是服务器已保存版本", "Save the draft first; export uses the saved server version") : tx("导出可再次导入的 JSON，含参考答案和隐藏测试", "Export reimportable JSON with reference solutions and hidden tests")} onClick={() => void exportPaper()}><Download size={14}/>{tx("导出 JSON", "Export JSON")}</Button>}<Button size="sm" variant="secondary" disabled={busy || draftDirty} title={draftDirty ? tx("请先保存或撤销未保存的修改", "Save or discard unsaved changes first") : undefined} onClick={() => setConfirmArchive(true)}>{archived ? <RotateCcw size={14}/> : <Archive size={14}/>} {archived ? tx("恢复试卷", "Restore paper") : tx("归档试卷", "Archive paper")}</Button></div></div>}
+    {!fresh && isPublished && <div className={`${panel} mt-4 flex flex-wrap items-center justify-between gap-3 p-4 text-sm`}><div><strong>{tx("当前已发布版本", "Current published version")} {paper.data?.versionNumber ? `v${paper.data.versionNumber}` : ""}</strong><p className="mt-1 text-muted-foreground">{archived ? tx("恢复试卷后才能编辑修订草稿。", "Restore this paper before editing a draft revision.") : tx("已发布版本保持不变。创建修订草稿后可修改题目和参考答案，再重新验证并发布新版。", "The published version remains unchanged. Create a draft revision to edit questions and reference code, validate it, then publish the new version.")}</p></div>{paper.data?.hasDraft ? archived ? null : <AppLink href={`/teacher/paper4/${encodeURIComponent(id)}?view=draft`} className={buttonVariants()}>{tx("继续编辑修订草稿", "Edit draft revision")}</AppLink> : <Button disabled={busy || archived} onClick={() => void createRevision()}>{tx("创建修订草稿", "Create draft revision")}</Button>}</div>}
     {!fresh && viewingDraft && !published && <p className="mt-4 rounded-md border border-info bg-info-soft p-3 text-sm text-primary">{tx("正在编辑修订草稿。原已发布版本仍可供学生作答。", "Editing a draft revision. The current published version remains available to students.")}</p>}
     <div className={`${panel} mt-5 p-4 sm:p-5`}><div className="grid gap-4 md:grid-cols-2"><Field label={tx("试卷标题", "Paper title")}><input className={input} maxLength={180} value={draft.title} disabled={published} onChange={event => setDraft(value => ({ ...value, title: event.target.value }))}/></Field><Field label={tx("发布班级", "Class")}><select className={input} value={draft.classId} disabled={published || classLocked} onChange={event => setDraft(value => ({ ...value, classId: event.target.value }))}><option value="">{tx("稍后选择班级", "Choose a class later")}</option>{classes.data?.items.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>{classLocked && <span className="mt-1 block text-xs font-normal text-muted-foreground">{tx("修订版不能更换班级；如需更换，请新建试卷。", "A revision cannot change class. Create a new paper for another class.")}</span>}</Field><Field label={tx("开始时间", "Starts at")}><input type="datetime-local" className={input} value={draft.startsAt} disabled={published} onChange={event => setDraft(value => ({ ...value, startsAt: event.target.value }))}/></Field><Field label={tx("结束时间", "Ends at")}><input type="datetime-local" className={input} value={draft.endsAt} disabled={published} onChange={event => setDraft(value => ({ ...value, endsAt: event.target.value }))}/></Field></div><Field label={tx("说明", "Instructions")}><textarea rows={2} className={area} value={draft.description} disabled={published} onChange={event => setDraft(value => ({ ...value, description: event.target.value }))}/></Field><p className="mt-3 text-xs text-muted-foreground">{tx("本期支持 Python 3 校内练习与模拟考试；请勿上传正式试卷保密材料。", "This version supports Python 3 school practice and mock exams. Do not upload confidential live exam materials.")}</p></div>
     <div className="mt-4 grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]"><nav aria-label={tx("大题编辑导航", "Question editor navigation")} className={`${panel} h-fit p-3`}><div className="flex items-center justify-between gap-2 px-2 pb-2"><h2 className="text-sm font-bold">{tx("大题", "Questions")}</h2><span className={`text-xs font-semibold ${maxMarks === 75 ? "text-success" : "text-warning"}`}>{maxMarks}/75</span></div>{draft.questions.map((item, index) => <button key={item.key} type="button" aria-current={item.key === question?.key ? "page" : undefined} className={`mb-1 block min-h-10 w-full rounded-md px-3 text-left text-sm focus-visible:outline-2 focus-visible:outline-primary ${item.key === question?.key ? "bg-info-soft font-semibold text-primary" : "hover:bg-muted"}`} onClick={() => { setSelected(item.key); setSelectedCaseStage(item.stages.find(stage => stage.judgeMode === "auto")?.id ?? ""); }}>{index + 1}. {item.title || tx("未命名大题", "Untitled question")}</button>)}<Button size="sm" variant="secondary" className="mt-2 w-full" disabled={published || draft.questions.length >= 3} onClick={() => { const number = Math.max(0, ...draft.questions.map(item => Number(item.key.slice(1)) || 0)) + 1; const next = blankQuestion(number); setDraft(current => ({ ...current, questions: [...current.questions, next] })); setSelected(next.key); setSelectedCaseStage(""); }}><Plus size={14}/>{tx("添加大题", "Add question")}</Button></nav>
@@ -225,6 +283,7 @@ export function TeacherPaper4Editor({ id, user }: { id: string; user: CampusUser
     {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}{message && <p role="status" className="mt-3 text-sm text-success">{message}</p>}
     {!fresh && <section className={`${panel} mt-7 overflow-hidden`}><div className="flex items-center justify-between border-b border-border p-4"><h2 className="font-bold">{tx("学生交卷与批阅", "Student attempts and marking")}</h2><Button variant="ghost" size="sm" onClick={attempts.reload}>{tx("刷新", "Refresh")}</Button></div><State data={attempts}>{attempts.data?.items.length ? <div className="divide-y divide-border">{attempts.data.items.map(item => <AppLink href={`/teacher/paper4/${id}/review/${item.id}`} key={item.id} className="flex min-h-14 flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-primary"><span className="font-semibold text-primary">{item.studentName || item.studentIdentityId || item.id}</span><span className="text-muted-foreground">{item.versionNumber ? `v${item.versionNumber} · ` : ""}{paper4Status(item.status, locale)} · {item.score ?? "—"} / 75 · {paper4Date(item.submittedAt, locale)}</span></AppLink>)}</div> : <p className="p-5 text-sm text-muted-foreground">{tx("尚无学生作答。", "No student attempts yet.")}</p>}</State></section>}
     <Dialog open={confirmPublish} onOpenChange={setConfirmPublish}><DialogContent><DialogTitle>{tx("发布实践试卷", "Publish practical paper")}</DialogTitle><DialogDescription>{tx("全部自动阶段参考答案已验证为 AC。确认后发布当前草稿版本到指定班级；该版本发布后不可修改，可再创建修订草稿。", "All auto-stage reference solutions are validated AC. Publish this draft to the selected class; this version then becomes immutable, but you can create another draft revision.")}</DialogDescription><DialogFooter><Button variant="secondary" onClick={() => setConfirmPublish(false)}>{tx("取消", "Cancel")}</Button><Button disabled={busy || !readyForPublish} onClick={() => void perform(async () => { if (!validate(true) || !readyForPublish) { setConfirmPublish(false); return; } await productionApi(`paper4/papers/${encodeURIComponent(id)}/publish`, { method: "POST" }); setConfirmPublish(false); router.replace(`/teacher/paper4/${encodeURIComponent(id)}`); paper.reload(); setMessage(tx("试卷已发布。", "Paper published.")); })}>{tx("确认发布", "Publish")}</Button></DialogFooter></DialogContent></Dialog>
+    <Paper4ArchiveDialog paper={confirmArchive ? paper.data : null} busy={busy} tx={tx} onOpenChange={open => { if (!open && !busy) setConfirmArchive(false); }} onConfirm={() => void archiveOrRestore()}/>
     <WorkspaceSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} editorOnly initialSection="editor" settings={settings} update={updateSettings} reset={resetSettings}/>
   </>;
 }

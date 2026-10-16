@@ -135,6 +135,7 @@ async function classAllowed(db,user,classId,{allowUnassignedDraft=false}={}){
 async function studentAllowed(db,user,paper){
  if(!user.roles.includes('student'))fail(403,'FORBIDDEN','仅学生可开始练习');
  if(paper.status!=='published')fail(404,'NOT_FOUND','试卷尚未发布');
+ if(paper.archived_at)fail(404,'NOT_FOUND','试卷已归档');
  if(paper.class_id&&!(await db.query('SELECT 1 FROM class_members cm JOIN classes c ON c.id=cm.class_id WHERE cm.class_id=$1 AND cm.identity_id=$2 AND c.archived_at IS NULL',[paper.class_id,user.identityId])).rowCount)
   fail(403,'FORBIDDEN','您不在此试卷的班级名单内');
  if(paper.starts_at&&paper.starts_at>new Date())fail(409,'NOT_STARTED','练习尚未开始');
@@ -142,7 +143,7 @@ async function studentAllowed(db,user,paper){
 async function getPaper(db,user,id,{includeDraft=false,view='current'}={}){
  if(view!=='current'&&view!=='draft')fail(400,'VALIDATION','试卷版本视图无效');
  const paper=one(await db.query(`SELECT p.id,p.owner_account_id,p.current_version_id,p.draft_version_id,p.status paper_status,
-  p.published_at paper_published_at,p.created_at,p.updated_at,
+  p.published_at paper_published_at,p.archived_at,p.created_at,p.updated_at,
   v.id version_id,v.version_number,v.draft_revision,v.title,v.description,v.class_id,v.starts_at,v.ends_at,
   v.published_at version_published_at,v.definition,v.runner_cases,v.reference_solutions,c.name class_name
   FROM paper4_papers p JOIN paper4_versions v ON v.id=CASE WHEN $2::boolean THEN p.draft_version_id ELSE p.current_version_id END
@@ -159,9 +160,10 @@ function paperShape(p,user){
  const manage=canManage(user,p);
  return {id:p.id,title:p.title,description:p.description,classId:p.class_id,className:p.class_name??null,
   status:p.version_published_at?'published':'draft',startsAt:p.starts_at,endsAt:p.ends_at,
-  publishedAt:p.version_published_at,versionId:p.version_id,versionNumber:p.version_number,
+  publishedAt:p.version_published_at,archivedAt:p.archived_at??null,versionId:p.version_id,versionNumber:p.version_number,
   hasDraft:manage&&!!p.draft_version_id,totalMarks:p.definition?.totalMarks??75,
   questions:p.definition?.questions??[],language:'python',canManage:manage,
+  canExport:manage&&staff(user)&&p.owner_account_id===user.id,
   ...(manage?{runnerCases:p.runner_cases??{},referenceSolutions:p.reference_solutions??{}}:{})};
 }
 async function referenceValidation(db,p){
@@ -192,7 +194,7 @@ async function paperResult(db,p,user){
  return result;
 }
 async function getAttempt(db,user,id,{forUpdate=false}={}){
- const attempt=one(await db.query(`SELECT a.*,p.owner_account_id,v.class_id,v.title paper_title,
+ const attempt=one(await db.query(`SELECT a.*,p.owner_account_id,p.archived_at,v.class_id,v.title paper_title,
   v.starts_at,v.ends_at,v.version_number,i.name student_name,
   v.definition,v.runner_cases FROM paper4_attempts a JOIN paper4_papers p ON p.id=a.paper_id
   JOIN paper4_versions v ON v.id=a.version_id JOIN identities i ON i.id=a.identity_id
@@ -218,12 +220,17 @@ async function attemptShape(db,user,attempt){
    status:'published',versionId:attempt.version_id,versionNumber:attempt.version_number,
    startsAt:attempt.starts_at,endsAt:attempt.ends_at,totalMarks:75,
    questions:attempt.definition.questions,language:'python'},canManage:manage,
-  canEdit:own&&attempt.state==='active'&&(!attempt.ends_at||attempt.ends_at>new Date())};
+  canEdit:own&&attempt.state==='active'&&!attempt.archived_at&&(!attempt.ends_at||attempt.ends_at>new Date())};
 }
 async function writableAttempt(db,user,id){
+ // Take the paper lock before the attempt lock. Archive takes the exclusive
+ // paper lock, so a save is either completed before archive or sees it after.
+ const preliminary=await getAttempt(db,user,id);
+ const paper=one(await db.query('SELECT archived_at FROM paper4_papers WHERE id=$1 FOR SHARE',[preliminary.paper_id]));
  const attempt=await getAttempt(db,user,id,{forUpdate:true});
  if(attempt.identity_id!==user.identityId||!user.roles.includes('student'))fail(403,'FORBIDDEN','只能修改自己的答卷');
  if(attempt.state!=='active')fail(409,'ATTEMPT_SUBMITTED','答卷已提交，不能继续修改');
+ if(paper.archived_at)fail(409,'PAPER_ARCHIVED','试卷已归档，暂不能继续作答');
  if(attempt.class_id&&!(await db.query('SELECT 1 FROM class_members cm JOIN classes c ON c.id=cm.class_id WHERE cm.class_id=$1 AND cm.identity_id=$2 AND c.archived_at IS NULL',[attempt.class_id,user.identityId])).rowCount)
   fail(403,'FORBIDDEN','您已不在此试卷的班级名单内');
  if(attempt.starts_at&&attempt.starts_at>new Date())fail(409,'NOT_STARTED','练习尚未开始');
@@ -262,9 +269,11 @@ async function log(db,user,action,type,id,metadata={}){
   [user.id,action,type,String(id),JSON.stringify(metadata)]);
 }
 function summary(p,user){return {id:p.id,title:p.title,description:p.description,classId:p.class_id,className:p.class_name??null,status:p.status,
+ archivedAt:p.archived_at??null,
  startsAt:p.starts_at,endsAt:p.ends_at,totalMarks:p.definition?.totalMarks??75,
  questionCount:p.definition?.questions?.length??0,versionId:p.current_version_id,versionNumber:p.version_number,
- hasDraft:canManage(user,p)&&!!p.draft_version_id,canManage:canManage(user,p)};}
+ hasDraft:canManage(user,p)&&!!p.draft_version_id,canManage:canManage(user,p),
+ canExport:canManage(user,p)&&staff(user)&&p.owner_account_id===user.id};}
 
 export async function handlePaper4(ctx){
  const {route,method,body,user,pool,url}=ctx;
@@ -290,7 +299,7 @@ export async function handlePaper4(ctx){
   const papers=(await pool.query(`SELECT p.*,c.name class_name,v.definition,v.version_number FROM paper4_papers p
    LEFT JOIN classes c ON c.id=p.class_id JOIN paper4_versions v ON v.id=p.current_version_id
    WHERE (p.owner_account_id=$1 AND (p.class_id IS NULL OR EXISTS(SELECT 1 FROM teacher_classes tc WHERE tc.class_id=p.class_id AND tc.account_id=$1)))
-    OR $2::boolean OR p.status='published' AND $3::boolean AND
+    OR $2::boolean OR p.status='published' AND p.archived_at IS NULL AND $3::boolean AND
     (p.class_id IS NULL OR EXISTS(SELECT 1 FROM class_members cm JOIN classes cls ON cls.id=cm.class_id
       WHERE cm.class_id=p.class_id AND cm.identity_id=$4 AND cls.archived_at IS NULL))
    ORDER BY p.created_at DESC,p.id DESC LIMIT 200`,[user.id,admin(user),user.roles.includes('student'),user.identityId])).rows;
@@ -325,8 +334,10 @@ export async function handlePaper4(ctx){
   if(!staff(user))fail(403,'FORBIDDEN','需要教师权限');
   const id=uuid(m[1],'试卷 ID');
   await transaction(pool,async db=>{
-   const locked=one(await db.query('SELECT draft_version_id FROM paper4_papers WHERE id=$1 FOR UPDATE',[id]));
-   if(!locked.draft_version_id)fail(409,'DRAFT_REQUIRED','请先从已发布版本创建新草稿');
+   await db.query('SELECT id FROM paper4_papers WHERE id=$1 FOR UPDATE',[id]);
+   const current=await getPaper(db,user,id,{includeDraft:true});
+   if(current.archived_at)fail(409,'PAPER_ARCHIVED','请先恢复试卷再编辑');
+   if(!current.draft_version_id)fail(409,'DRAFT_REQUIRED','请先从已发布版本创建新草稿');
    const p=await getPaper(db,user,id,{includeDraft:true,view:'draft'});
    const title=body.title===undefined?p.title:field(body.title,'试卷标题',{max:200});
    const description=body.description===undefined?p.description:optionalText(body.description,'试卷说明',4000);
@@ -347,12 +358,40 @@ export async function handlePaper4(ctx){
    await log(db,user,'paper4.update','paper4_paper',id);
   });return respond(200,await paperResult(pool,await getPaper(pool,user,id,{includeDraft:true,view:'draft'}),user));
  }
+ m=route.match(/^\/paper4\/papers\/([^/]+)\/(archive|restore)$/);
+ if(m&&method==='POST'){
+  if(!staff(user))fail(403,'FORBIDDEN','需要教师权限');
+  const id=uuid(m[1],'试卷 ID'),archive=m[2]==='archive';
+  await transaction(pool,async db=>{
+   await db.query('SELECT id FROM paper4_papers WHERE id=$1 FOR UPDATE',[id]);
+   const p=await getPaper(db,user,id,{includeDraft:true});
+   if(!canManage(user,p))fail(403,'FORBIDDEN','无权管理此试卷');
+   if(Boolean(p.archived_at)===archive)return;
+   await db.query('UPDATE paper4_papers SET archived_at=$2,updated_at=now() WHERE id=$1',
+    [id,archive?new Date():null]);
+   await log(db,user,archive?'paper4.archive':'paper4.restore','paper4_paper',id);
+  });
+  return respond(200,await paperResult(pool,await getPaper(pool,user,id,{includeDraft:true}),user));
+ }
+ m=route.match(/^\/paper4\/papers\/([^/]+)\/export$/);
+ if(m&&method==='GET'){
+  if(!staff(user))fail(403,'FORBIDDEN','需要教师权限');
+  const view=url.searchParams.get('view')??'current';
+  const p=await getPaper(pool,user,m[1],{includeDraft:true,view});
+  if(p.owner_account_id!==user.id)fail(403,'FORBIDDEN','只有试卷创建者可以导出完整题包');
+  const manifest={format:'codemaster-paper4',version:1,
+   paper:{title:p.title,description:p.description},questions:p.definition.questions,
+   runnerCases:p.runner_cases??{},referenceSolutions:p.reference_solutions??{}};
+  return respond(200,{filename:`paper4-${p.id}-v${p.version_number}.json`,contentType:'application/json',
+   contentBase64:Buffer.from(JSON.stringify(manifest,null,2)+'\n','utf8').toString('base64')});
+ }
  m=route.match(/^\/paper4\/papers\/([^/]+)\/draft$/);
  if(m&&method==='POST'){
   if(!staff(user))fail(403,'FORBIDDEN','需要教师权限');const id=uuid(m[1],'试卷 ID');let created=false;
   await transaction(pool,async db=>{
    await db.query('SELECT id FROM paper4_papers WHERE id=$1 FOR UPDATE',[id]);
    const p=await getPaper(db,user,id,{includeDraft:true});
+   if(p.archived_at)fail(409,'PAPER_ARCHIVED','请先恢复试卷再建立修订版');
    if(p.draft_version_id)return;
    if(p.paper_status!=='published')fail(409,'DRAFT_EXISTS','试卷已经是草稿');
    const v=one(await db.query(`INSERT INTO paper4_versions
@@ -369,8 +408,10 @@ export async function handlePaper4(ctx){
   if(!staff(user))fail(403,'FORBIDDEN','需要教师权限');
   const id=uuid(m[1],'试卷 ID'),questionKey=key(body.questionKey,'大题键');
   const items=await transaction(pool,async db=>{
-   const locked=one(await db.query('SELECT draft_version_id FROM paper4_papers WHERE id=$1 FOR UPDATE',[id]));
-   if(!locked.draft_version_id)fail(409,'DRAFT_REQUIRED','请先从已发布版本创建新草稿');
+   await db.query('SELECT id FROM paper4_papers WHERE id=$1 FOR UPDATE',[id]);
+   const current=await getPaper(db,user,id,{includeDraft:true});
+   if(current.archived_at)fail(409,'PAPER_ARCHIVED','请先恢复试卷再运行参考答案');
+   if(!current.draft_version_id)fail(409,'DRAFT_REQUIRED','请先从已发布版本创建新草稿');
    const p=await getPaper(db,user,id,{includeDraft:true,view:'draft'});
    const q=p.definition.questions.find(question=>question.key===questionKey);
    if(!q)fail(404,'NOT_FOUND','大题不存在');
@@ -404,6 +445,7 @@ export async function handlePaper4(ctx){
   await transaction(pool,async db=>{
    await db.query('SELECT id FROM paper4_papers WHERE id=$1 FOR UPDATE',[id]);
    const current=await getPaper(db,user,id,{includeDraft:true});
+   if(current.archived_at)fail(409,'PAPER_ARCHIVED','请先恢复试卷再发布');
    if(!current.draft_version_id){if(current.paper_status==='published')return;fail(409,'DRAFT_REQUIRED','没有可发布的草稿');}
    const p=await getPaper(db,user,id,{includeDraft:true,view:'draft'});
    await classAllowed(db,user,p.class_id);
@@ -432,6 +474,7 @@ export async function handlePaper4(ctx){
   const result=await transaction(pool,async db=>{
    await db.query('SELECT id FROM paper4_papers WHERE id=$1 FOR SHARE',[id]);
    const p=await getPaper(db,user,id);await studentAllowed(db,user,p);
+   if(p.archived_at)fail(409,'PAPER_ARCHIVED','试卷已归档，不能新开答卷');
    const existing=(await db.query('SELECT * FROM paper4_attempts WHERE paper_id=$1 AND version_id=$2 AND identity_id=$3 FOR UPDATE',
     [id,p.version_id,user.identityId])).rows[0];
    if(existing)return existing;

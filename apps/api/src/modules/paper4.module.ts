@@ -39,6 +39,21 @@ export class Paper4Controller {
     return this.handle(request, response);
   }
 
+  @Post('papers/:id/archive')
+  archivePaper(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
+    return this.handle(request, response);
+  }
+
+  @Post('papers/:id/restore')
+  restorePaper(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
+    return this.handle(request, response);
+  }
+
+  @Get('papers/:id/export')
+  exportPaper(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
+    return this.handle(request, response);
+  }
+
   @Post('papers/:id/draft')
   createDraftRevision(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
     return this.handle(request, response);

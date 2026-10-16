@@ -32,6 +32,8 @@ export interface Paper4Paper {
   description: string;
   classId: string | null;
   status: string;
+  archivedAt?: string | null;
+  canExport?: boolean;
   startsAt: string | null;
   endsAt: string | null;
   totalMarks: number;

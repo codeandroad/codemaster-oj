@@ -85,6 +85,14 @@ function ChapterLesson({chapter,nextChapterId,pathId,onSaved}:{chapter:LearningC
  const action=useMutation();
  return <article className="space-y-5" data-od-id="learning-chapter-content">
  <section className={`${panel} p-5 sm:p-7`}><h1 className="text-2xl font-bold">{chapter.title}</h1>{chapter.objective&&<div className="mt-4 border-b border-border pb-5"><h2 className="text-sm font-semibold">{ui(locale,"学习目标","Learning objective")}</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{chapter.objective}</p></div>}<div className="mt-6"><LessonContent content={chapter.content}/></div></section>
+ {chapter.checkpoint?.trim()&&<section className={`${panel} p-5 sm:p-7`} data-od-id="learning-checkpoint">
+  <h2 className="text-lg font-bold">{ui(locale,"检查点","Checkpoint")}</h2>
+  <div className="mt-3"><LessonContent content={chapter.checkpoint}/></div>
+  {chapter.checkpointAnswer?.trim()&&<details className="mt-4 border-t border-border pt-4 text-sm">
+   <summary className="cursor-pointer font-semibold text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">{ui(locale,"查看参考答案","View reference answer")}</summary>
+   <div className="mt-3"><LessonContent content={chapter.checkpointAnswer}/></div>
+  </details>}
+ </section>}
  {chapter.problems.length>0&&<section className={`${panel} p-5 sm:p-7`}><h2 className="text-lg font-bold">{ui(locale,"配套练习","Practice problems")}</h2>{chapter.problems.map(p=>{
   const href=`/student/problems/${p.problemId}?${new URLSearchParams({versionId:p.versionId,learningPathId:pathId,chapterId:chapter.id,returnTo:`/student/learning-paths/${pathId}/chapters/${chapter.id}`,sourceLabel:chapter.title})}`;
   const saveScroll=()=>{try{sessionStorage.setItem(`learning-scroll:${pathId}:${chapter.id}`,String(window.scrollY));}catch{}};

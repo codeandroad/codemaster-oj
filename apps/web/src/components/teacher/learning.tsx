@@ -762,8 +762,8 @@ function LearningEditorForm({
         </Button>
         {dirty && <span className="text-warning">{t("有未保存修改")}</span>}
       </div>
-      <div className="mt-5 grid grid-cols-[260px_minmax(0,1fr)] gap-5 max-md:grid-cols-1">
-        <aside className={`${panel} self-start md:sticky md:top-5`}>
+      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className={`${panel} self-start lg:sticky lg:top-5`}>
           <div className="flex justify-between border-b border-border p-3">
             <b>{t("章节")}</b>
             <Button
@@ -795,12 +795,12 @@ function LearningEditorForm({
             <button
               key={x.id}
               onClick={() => setCurrent(x.id)}
-              className={`flex w-full items-center justify-between border-b border-border px-3 py-3 text-left text-sm ${x.id === chapter?.id ? "bg-accent font-semibold text-primary" : ""}`}
+              className={`flex w-full items-start gap-3 border-b border-border px-3 py-3 text-left text-sm leading-5 ${x.id === chapter?.id ? "bg-accent font-semibold text-primary" : ""}`}
             >
-              <span>
+              <span className="min-w-0 flex-1 break-words">
                 {i + 1}. {x.title}
               </span>
-              <span>{x.problems.length} {t("题")}</span>
+              <span className="shrink-0 whitespace-nowrap text-xs leading-5 tabular-nums text-muted-foreground">{x.problems.length} {t("题")}</span>
             </button>
           ))}
           </div>

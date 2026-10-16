@@ -1,0 +1,2707 @@
+[
+  {
+    "chapterNumber": 1,
+    "chapterTitle": "01 Paper 4 workflow and Python foundations",
+    "title": "Temperature Log Audit",
+    "mode": "stdio",
+    "statement": "## Task\nUse small functions to audit a sequence of integer readings. A reading from -40 to 60 inclusive is valid. Report the number of valid readings, their sum, and the number rejected.\n\n## Input\nThe first line contains n. The second line contains n space-separated integers and is empty when n is 0.\n\n## Output\nPrint three integers on one line: valid_count valid_sum rejected_count.\n\n## Limits and conventions\n0 <= n <= 1000; each reading is between -1000 and 1000. A valid sum can be negative.\n\n## Implementation focus\nWrite a predicate for reading validity and a separate procedure or function for the audit. This exercise checks the input/output discipline needed throughout Paper 4. Submit only the required output; do not print prompts or debugging text.",
+    "objective": "Use small functions to audit a sequence of integer readings. A reading from -40 to 60 inclusive is valid. Report the number of valid readings, their sum, and the number rejected.",
+    "inputDescription": "The first line contains n. The second line contains n space-separated integers and is empty when n is 0.",
+    "outputDescription": "Print three integers on one line: valid_count valid_sum rejected_count.",
+    "difficulty": "Beginner",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\ndef valid(value):\n    return -40 <= value <= 60\ndef audit(values):\n    count = total = rejected = 0\n    for value in values:\n        if valid(value):\n            count += 1\n            total += value\n        else:\n            rejected += 1\n    return count, total, rejected\nwords = list(map(int, sys.stdin.read().split()))\nn = words[0]\nprint(*audit(words[1:1+n]))\n",
+    "starterCode": "# Read from standard input and write only the requested answer.\n",
+    "timeLimitMs": 3000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618 Paper 4",
+      "Python",
+      "01 Paper 4 workflow and Python foundations"
+    ],
+    "source": "Original CodeMaster OJ practice aligned to Cambridge 9618 Paper 4 (2026).",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "5\n-40 0 60 61 -41\n",
+        "expected": "3 20 2\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "0\n\n",
+        "expected": "0 0 0\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal test 1",
+        "input": "1\n-40\n",
+        "expected": "1 -40 0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 2",
+        "input": "1\n60\n",
+        "expected": "1 60 0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 3",
+        "input": "4\n-100 200 999 -999\n",
+        "expected": "0 0 4\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 4",
+        "input": "6\n-50 -40 -1 0 60 61\n",
+        "expected": "4 19 2\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 5",
+        "input": "8\n1 2 3 4 5 6 7 8\n",
+        "expected": "8 36 0\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 1,
+    "chapterTitle": "01 Paper 4 workflow and Python foundations",
+    "title": "Workshop Check-in Report",
+    "mode": "stdio",
+    "statement": "## Task\nProcess check-ins in arrival order. Find the code of the earliest attendee and count arrivals strictly after the late threshold. Ties for earliest arrival keep the first input record.\n\n## Input\nThe first line contains n and the late threshold in minutes. The next n lines each contain a code without spaces and an arrival minute.\n\n## Output\nPrint the earliest code and the late count separated by one space. If n is 0, print EMPTY followed by 0.\n\n## Limits and conventions\n0 <= n <= 1000; 0 <= minute, threshold <= 1439; codes are 1-20 uppercase letters or digits.\n\n## Implementation focus\nSeparate record parsing, earliest-selection and late-count logic into named functions. Use strictly greater than for late arrivals. Submit only the required output; do not print prompts or debugging text.",
+    "objective": "Process check-ins in arrival order. Find the code of the earliest attendee and count arrivals strictly after the late threshold. Ties for earliest arrival keep the first input record.",
+    "inputDescription": "The first line contains n and the late threshold in minutes. The next n lines each contain a code without spaces and an arrival minute.",
+    "outputDescription": "Print the earliest code and the late count separated by one space. If n is 0, print EMPTY followed by 0.",
+    "difficulty": "Beginner",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\ndef report(rows, threshold):\n    if not rows:\n        return 'EMPTY', 0\n    earliest_code, earliest_minute = rows[0]\n    late = 0\n    for code, minute in rows:\n        if minute < earliest_minute:\n            earliest_code, earliest_minute = code, minute\n        if minute > threshold:\n            late += 1\n    return earliest_code, late\nlines = sys.stdin.read().splitlines()\nn, threshold = map(int, lines[0].split())\nrows = []\nfor line in lines[1:1+n]:\n    code, minute = line.split()\n    rows.append((code, int(minute)))\nprint(*report(rows, threshold))\n",
+    "starterCode": "# Read from standard input and write only the requested answer.\n",
+    "timeLimitMs": 3000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618 Paper 4",
+      "Python",
+      "01 Paper 4 workflow and Python foundations"
+    ],
+    "source": "Original CodeMaster OJ practice aligned to Cambridge 9618 Paper 4 (2026).",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "4 540\nA1 600\nB2 480\nC3 480\nD4 540\n",
+        "expected": "B2 1\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "0 720\n",
+        "expected": "EMPTY 0\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal test 1",
+        "input": "1 0\nX 0\n",
+        "expected": "X 0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 2",
+        "input": "3 100\nA 101\nB 99\nC 100\n",
+        "expected": "B 1\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 3",
+        "input": "4 500\nZ 501\nY 100\nX 100\nW 100\n",
+        "expected": "Y 1\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 4",
+        "input": "5 1439\nA 1439\nB 0\nC 1439\nD 1\nE 2\n",
+        "expected": "B 0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 5",
+        "input": "2 60\nFIRST 61\nSECOND 60\n",
+        "expected": "SECOND 1\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 2,
+    "chapterTitle": "02 Searching",
+    "title": "First Badge in the Archive",
+    "mode": "stdio",
+    "statement": "## Task\nUse linear search to find the first occurrence of a target badge and count every matching occurrence.\n\n## Input\nThe first line contains n and the target. The second line contains n space-separated integers, or is empty when n is 0.\n\n## Output\nPrint first_index match_count. Indexing begins at 0; print -1 for first_index if the badge is absent.\n\n## Limits and conventions\n0 <= n <= 2000; badge values are between -100000 and 100000. The archive is not sorted.\n\n## Implementation focus\nScan in input order. Do not sort the archive, because sorting would change the reported index. Submit only the required output; do not print prompts or debugging text.",
+    "objective": "Use linear search to find the first occurrence of a target badge and count every matching occurrence.",
+    "inputDescription": "The first line contains n and the target. The second line contains n space-separated integers, or is empty when n is 0.",
+    "outputDescription": "Print first_index match_count. Indexing begins at 0; print -1 for first_index if the badge is absent.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\ndata = list(map(int, sys.stdin.read().split()))\nn, target = data[:2]\nvalues = data[2:2+n]\nfirst = -1\ncount = 0\nfor index, value in enumerate(values):\n    if value == target:\n        if first == -1:\n            first = index\n        count += 1\nprint(first, count)\n",
+    "starterCode": "# Read from standard input and write only the requested answer.\n",
+    "timeLimitMs": 3000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618 Paper 4",
+      "Python",
+      "02 Searching"
+    ],
+    "source": "Original CodeMaster OJ practice aligned to Cambridge 9618 Paper 4 (2026).",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "6 7\n4 7 2 7 7 3\n",
+        "expected": "1 3\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "4 9\n1 3 5 7\n",
+        "expected": "-1 0\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal test 1",
+        "input": "0 8\n\n",
+        "expected": "-1 0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 2",
+        "input": "1 -5\n-5\n",
+        "expected": "0 1\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 3",
+        "input": "6 0\n0 0 0 0 0 0\n",
+        "expected": "0 6\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 4",
+        "input": "5 2\n1 3 4 2 2\n",
+        "expected": "3 2\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 5",
+        "input": "7 10\n1 2 3 4 5 6 10\n",
+        "expected": "6 1\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 2,
+    "chapterTitle": "02 Searching",
+    "title": "Find the Shelf Boundary",
+    "mode": "stdio",
+    "statement": "## Task\nSearch an already sorted catalogue for the first occurrence of a target. Also report the insertion position that preserves ascending order.\n\n## Input\nThe first line contains n and target. The second line contains n integers in nondecreasing order, or is empty when n is 0.\n\n## Output\nPrint first_index insertion_index. If the target is absent, first_index is -1. Both indices are 0-based.\n\n## Limits and conventions\n0 <= n <= 5000; values and target are between -1000000000 and 1000000000. Input is guaranteed sorted.\n\n## Implementation focus\nImplement lower-bound binary search using left and right boundaries; the insertion position is the first index whose value is at least the target. Submit only the required output; do not print prompts or debugging text.",
+    "objective": "Search an already sorted catalogue for the first occurrence of a target. Also report the insertion position that preserves ascending order.",
+    "inputDescription": "The first line contains n and target. The second line contains n integers in nondecreasing order, or is empty when n is 0.",
+    "outputDescription": "Print first_index insertion_index. If the target is absent, first_index is -1. Both indices are 0-based.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\ndata = list(map(int, sys.stdin.buffer.read().split()))\nn, target = data[:2]\nvalues = data[2:2+n]\nleft, right = 0, n\nwhile left < right:\n    mid = (left + right) // 2\n    if values[mid] < target:\n        left = mid + 1\n    else:\n        right = mid\nfirst = left if left < n and values[left] == target else -1\nprint(first, left)\n",
+    "starterCode": "# Read from standard input and write only the requested answer.\n",
+    "timeLimitMs": 3000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618 Paper 4",
+      "Python",
+      "02 Searching"
+    ],
+    "source": "Original CodeMaster OJ practice aligned to Cambridge 9618 Paper 4 (2026).",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "7 4\n1 2 4 4 4 9 10\n",
+        "expected": "2 2\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "5 6\n-5 0 2 8 10\n",
+        "expected": "-1 3\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal test 1",
+        "input": "0 7\n\n",
+        "expected": "-1 0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 2",
+        "input": "1 3\n3\n",
+        "expected": "0 0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 3",
+        "input": "5 -10\n-9 -4 0 1 2\n",
+        "expected": "-1 0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 4",
+        "input": "5 99\n-9 -4 0 1 2\n",
+        "expected": "-1 5\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 5",
+        "input": "6 0\n0 0 0 0 0 0\n",
+        "expected": "0 0\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 3,
+    "chapterTitle": "03 Sorting and complexity",
+    "title": "Stable Priority Display",
+    "mode": "stdio",
+    "statement": "## Task\nSort task records by priority from low to high. Records sharing a priority must keep their original input order.\n\n## Input\nThe first line contains n. Each of the next n lines contains an uppercase task code and an integer priority.\n\n## Output\nPrint the task codes in sorted order, one per line. If n is 0, print EMPTY.\n\n## Limits and conventions\n0 <= n <= 200; task codes are unique and have no spaces; -100 <= priority <= 100.\n\n## Implementation focus\nImplement bubble sort with adjacent swaps only when the left priority is strictly greater. An equal-priority swap would break stability. Submit only the required output; do not print prompts or debugging text.",
+    "objective": "Sort task records by priority from low to high. Records sharing a priority must keep their original input order.",
+    "inputDescription": "The first line contains n. Each of the next n lines contains an uppercase task code and an integer priority.",
+    "outputDescription": "Print the task codes in sorted order, one per line. If n is 0, print EMPTY.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\nlines = sys.stdin.read().splitlines()\nn = int(lines[0])\nrows = []\nfor line in lines[1:1+n]:\n    code, priority = line.split()\n    rows.append((code, int(priority)))\nfor end in range(len(rows)-1, 0, -1):\n    swapped = False\n    for i in range(end):\n        if rows[i][1] > rows[i+1][1]:\n            rows[i], rows[i+1] = rows[i+1], rows[i]\n            swapped = True\n    if not swapped:\n        break\nprint('\\n'.join(code for code, _ in rows) if rows else 'EMPTY')\n",
+    "starterCode": "# Read from standard input and write only the requested answer.\n",
+    "timeLimitMs": 3000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618 Paper 4",
+      "Python",
+      "03 Sorting and complexity"
+    ],
+    "source": "Original CodeMaster OJ practice aligned to Cambridge 9618 Paper 4 (2026).",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "5\nA 3\nB 1\nC 3\nD 2\nE 1\n",
+        "expected": "B\nE\nD\nA\nC\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "0\n",
+        "expected": "EMPTY\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal test 1",
+        "input": "1\nONLY 0\n",
+        "expected": "ONLY\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 2",
+        "input": "5\nA 1\nB 1\nC 1\nD 1\nE 1\n",
+        "expected": "A\nB\nC\nD\nE\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 3",
+        "input": "5\nA 5\nB 4\nC 3\nD 2\nE 1\n",
+        "expected": "E\nD\nC\nB\nA\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 4",
+        "input": "5\nA -2\nB 0\nC -2\nD 4\nE 0\n",
+        "expected": "A\nC\nB\nE\nD\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 5",
+        "input": "6\nA 1\nB 2\nC 3\nD 4\nE 5\nF 6\n",
+        "expected": "A\nB\nC\nD\nE\nF\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 3,
+    "chapterTitle": "03 Sorting and complexity",
+    "title": "Insertion Sort Shift Counter",
+    "mode": "stdio",
+    "statement": "## Task\nSort signed integers in ascending order using insertion sort and count how many existing values are shifted one place to the right.\n\n## Input\nThe first line contains n. The second line contains n space-separated integers, or is empty when n is 0.\n\n## Output\nPrint the sorted values separated by spaces on the first line, or EMPTY if n is 0. Print the number of shifts on the second line.\n\n## Limits and conventions\n0 <= n <= 300; values are between -100000 and 100000. Comparing or placing the key does not count as a shift.\n\n## Implementation focus\nFor each key, shift preceding values only while they are strictly greater than the key. This gives zero shifts for equal values and shows the impact of initial order. Submit only the required output; do not print prompts or debugging text.",
+    "objective": "Sort signed integers in ascending order using insertion sort and count how many existing values are shifted one place to the right.",
+    "inputDescription": "The first line contains n. The second line contains n space-separated integers, or is empty when n is 0.",
+    "outputDescription": "Print the sorted values separated by spaces on the first line, or EMPTY if n is 0. Print the number of shifts on the second line.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\ndata = list(map(int, sys.stdin.read().split()))\nn = data[0]\nvalues = data[1:1+n]\nshifts = 0\nfor i in range(1, n):\n    key = values[i]\n    j = i - 1\n    while j >= 0 and values[j] > key:\n        values[j+1] = values[j]\n        shifts += 1\n        j -= 1\n    values[j+1] = key\nprint(' '.join(map(str, values)) if values else 'EMPTY')\nprint(shifts)\n",
+    "starterCode": "# Read from standard input and write only the requested answer.\n",
+    "timeLimitMs": 3000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618 Paper 4",
+      "Python",
+      "03 Sorting and complexity"
+    ],
+    "source": "Original CodeMaster OJ practice aligned to Cambridge 9618 Paper 4 (2026).",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "5\n4 2 5 2 1\n",
+        "expected": "1 2 2 4 5\n7\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "4\n1 2 3 4\n",
+        "expected": "1 2 3 4\n0\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal test 1",
+        "input": "0\n\n",
+        "expected": "EMPTY\n0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 2",
+        "input": "1\n-3\n",
+        "expected": "-3\n0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 3",
+        "input": "5\n5 4 3 2 1\n",
+        "expected": "1 2 3 4 5\n10\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 4",
+        "input": "5\n7 7 7 7 7\n",
+        "expected": "7 7 7 7 7\n0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 5",
+        "input": "6\n-2 3 -2 0 3 -4\n",
+        "expected": "-4 -2 -2 0 3 3\n7\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 4,
+    "chapterTitle": "04 Stacks",
+    "title": "Bounded Undo History",
+    "mode": "stdio",
+    "statement": "## Task\nImplement a fixed-capacity stack for an editor undo history. Commands may push, pop, peek, or report the current size.\n\n## Input\nThe first line contains q. Each following line is PUSH x, POP, PEEK, or SIZE.\n\n## Output\nFor PUSH print OK or FULL. For POP and PEEK print the top integer, or EMPTY. For SIZE print the number of stored items. If q is 0, print EMPTY.\n\n## Limits and conventions\n0 <= q <= 1000; stack capacity is exactly 5; pushed integers are between -100000 and 100000.\n\n## Implementation focus\nUse a five-slot array and an explicit top pointer. PEEK must not remove the value; a failed PUSH must leave the stack unchanged. Submit only the required output; do not print prompts or debugging text.",
+    "objective": "Implement a fixed-capacity stack for an editor undo history. Commands may push, pop, peek, or report the current size.",
+    "inputDescription": "The first line contains q. Each following line is PUSH x, POP, PEEK, or SIZE.",
+    "outputDescription": "For PUSH print OK or FULL. For POP and PEEK print the top integer, or EMPTY. For SIZE print the number of stored items. If q is 0, print EMPTY.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\nlines = sys.stdin.read().splitlines()\nq = int(lines[0])\nslots = [0] * 5\ntop = -1\nout = []\nfor line in lines[1:1+q]:\n    command = line.split()\n    if command[0] == 'PUSH':\n        if top == 4:\n            out.append('FULL')\n        else:\n            top += 1\n            slots[top] = int(command[1])\n            out.append('OK')\n    elif command[0] == 'POP':\n        if top < 0:\n            out.append('EMPTY')\n        else:\n            out.append(str(slots[top]))\n            top -= 1\n    elif command[0] == 'PEEK':\n        out.append(str(slots[top]) if top >= 0 else 'EMPTY')\n    else:\n        out.append(str(top + 1))\nprint('\\n'.join(out) if out else 'EMPTY')\n",
+    "starterCode": "# Read from standard input and write only the requested answer.\n",
+    "timeLimitMs": 3000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618 Paper 4",
+      "Python",
+      "04 Stacks"
+    ],
+    "source": "Original CodeMaster OJ practice aligned to Cambridge 9618 Paper 4 (2026).",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "6\nPUSH 10\nPUSH 20\nPEEK\nPOP\nPOP\nPOP\n",
+        "expected": "OK\nOK\n20\n20\n10\nEMPTY\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "3\nSIZE\nPEEK\nPOP\n",
+        "expected": "0\nEMPTY\nEMPTY\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal test 1",
+        "input": "0\n",
+        "expected": "EMPTY\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 2",
+        "input": "7\nPUSH 1\nPUSH 2\nPUSH 3\nPUSH 4\nPUSH 5\nPUSH 6\nSIZE\n",
+        "expected": "OK\nOK\nOK\nOK\nOK\nFULL\n5\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 3",
+        "input": "8\nPUSH -1\nPOP\nPUSH 0\nPEEK\nSIZE\nPOP\nSIZE\nPOP\n",
+        "expected": "OK\n-1\nOK\n0\n1\n0\n0\nEMPTY\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 4",
+        "input": "10\nPUSH 3\nPUSH 4\nPUSH 5\nPOP\nPEEK\nPUSH 9\nPOP\nPOP\nPOP\nPOP\n",
+        "expected": "OK\nOK\nOK\n5\n4\nOK\n9\n4\n3\nEMPTY\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 5",
+        "input": "6\nPOP\nPUSH 1\nPUSH 2\nPEEK\nPOP\nSIZE\n",
+        "expected": "EMPTY\nOK\nOK\n2\n2\n1\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 4,
+    "chapterTitle": "04 Stacks",
+    "title": "Postfix Calculator",
+    "mode": "stdio",
+    "statement": "## Task\nEvaluate one postfix expression with a stack. Each operand is a signed integer. Operators are +, -, and *. Reject malformed expressions.\n\n## Input\nThe first line contains n. The second line contains n space-separated tokens; it is empty when n is 0.\n\n## Output\nPrint the integer result if the expression leaves exactly one value. Otherwise print INVALID, including when n is 0.\n\n## Limits and conventions\n0 <= n <= 1000; operands have absolute value <= 100000. For subtraction, the first popped value is the right operand.\n\n## Implementation focus\nUse a stack to hold intermediate results. Check underflow before every operator and check the final stack size. Submit only the required output; do not print prompts or debugging text.",
+    "objective": "Evaluate one postfix expression with a stack. Each operand is a signed integer. Operators are +, -, and *. Reject malformed expressions.",
+    "inputDescription": "The first line contains n. The second line contains n space-separated tokens; it is empty when n is 0.",
+    "outputDescription": "Print the integer result if the expression leaves exactly one value. Otherwise print INVALID, including when n is 0.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\nwords = sys.stdin.read().split()\nn = int(words[0])\ntokens = words[1:1+n]\nstack = []\nvalid = True\nfor token in tokens:\n    if token in ('+', '-', '*'):\n        if len(stack) < 2:\n            valid = False\n            break\n        right = stack.pop()\n        left = stack.pop()\n        if token == '+':\n            stack.append(left + right)\n        elif token == '-':\n            stack.append(left - right)\n        else:\n            stack.append(left * right)\n    else:\n        stack.append(int(token))\nprint(stack[0] if valid and len(stack) == 1 else 'INVALID')\n",
+    "starterCode": "# Read from standard input and write only the requested answer.\n",
+    "timeLimitMs": 3000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618 Paper 4",
+      "Python",
+      "04 Stacks"
+    ],
+    "source": "Original CodeMaster OJ practice aligned to Cambridge 9618 Paper 4 (2026).",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "5\n3 4 + 2 *\n",
+        "expected": "14\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "3\n5 2 -\n",
+        "expected": "3\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal test 1",
+        "input": "0\n\n",
+        "expected": "INVALID\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 2",
+        "input": "1\n-7\n",
+        "expected": "-7\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 3",
+        "input": "2\n1 2\n",
+        "expected": "INVALID\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 4",
+        "input": "1\n+\n",
+        "expected": "INVALID\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 5",
+        "input": "7\n10 2 3 * - 4 +\n",
+        "expected": "8\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 5,
+    "chapterTitle": "05 Queues and circular queues",
+    "title": "Circular Lab Dispatch",
+    "mode": "stdio",
+    "statement": "## Task\nImplement a fixed four-place circular queue for lab jobs. Accept jobs at the tail and serve the oldest job at the head.\n\n## Input\nThe first line contains q. Each following line is ENQ x, DEQ, FRONT, or SIZE.\n\n## Output\nFor ENQ print OK or FULL. For DEQ and FRONT print a job number or EMPTY. For SIZE print the count. If q is 0, print EMPTY.\n\n## Limits and conventions\n0 <= q <= 1000; capacity is exactly 4; job numbers are between -100000 and 100000.\n\n## Implementation focus\nUse a four-slot array, head index, tail index and count. Update indices modulo 4, including after an emptied queue wraps around. Submit only the required output; do not print prompts or debugging text.",
+    "objective": "Implement a fixed four-place circular queue for lab jobs. Accept jobs at the tail and serve the oldest job at the head.",
+    "inputDescription": "The first line contains q. Each following line is ENQ x, DEQ, FRONT, or SIZE.",
+    "outputDescription": "For ENQ print OK or FULL. For DEQ and FRONT print a job number or EMPTY. For SIZE print the count. If q is 0, print EMPTY.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\nlines = sys.stdin.read().splitlines()\nq = int(lines[0])\nslots = [0] * 4\nhead = tail = count = 0\nout = []\nfor line in lines[1:1+q]:\n    command = line.split()\n    if command[0] == 'ENQ':\n        if count == 4:\n            out.append('FULL')\n        else:\n            slots[tail] = int(command[1])\n            tail = (tail + 1) % 4\n            count += 1\n            out.append('OK')\n    elif command[0] == 'DEQ':\n        if count == 0:\n            out.append('EMPTY')\n        else:\n            out.append(str(slots[head]))\n            head = (head + 1) % 4\n            count -= 1\n    elif command[0] == 'FRONT':\n        out.append(str(slots[head]) if count else 'EMPTY')\n    else:\n        out.append(str(count))\nprint('\\n'.join(out) if out else 'EMPTY')\n",
+    "starterCode": "# Read from standard input and write only the requested answer.\n",
+    "timeLimitMs": 3000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618 Paper 4",
+      "Python",
+      "05 Queues and circular queues"
+    ],
+    "source": "Original CodeMaster OJ practice aligned to Cambridge 9618 Paper 4 (2026).",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "7\nENQ 10\nENQ 20\nFRONT\nDEQ\nENQ 30\nDEQ\nSIZE\n",
+        "expected": "OK\nOK\n10\n10\nOK\n20\n1\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "3\nDEQ\nFRONT\nSIZE\n",
+        "expected": "EMPTY\nEMPTY\n0\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal test 1",
+        "input": "0\n",
+        "expected": "EMPTY\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 2",
+        "input": "7\nENQ 1\nENQ 2\nENQ 3\nENQ 4\nENQ 5\nSIZE\nFRONT\n",
+        "expected": "OK\nOK\nOK\nOK\nFULL\n4\n1\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 3",
+        "input": "11\nENQ 1\nENQ 2\nENQ 3\nDEQ\nDEQ\nENQ 4\nENQ 5\nENQ 6\nDEQ\nFRONT\nSIZE\n",
+        "expected": "OK\nOK\nOK\n1\n2\nOK\nOK\nOK\n3\n4\n3\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 4",
+        "input": "10\nENQ -5\nDEQ\nENQ 9\nDEQ\nENQ 11\nDEQ\nDEQ\nENQ 0\nFRONT\nSIZE\n",
+        "expected": "OK\n-5\nOK\n9\nOK\n11\nEMPTY\nOK\n0\n1\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 5",
+        "input": "9\nENQ 1\nENQ 2\nENQ 3\nENQ 4\nDEQ\nDEQ\nDEQ\nDEQ\nSIZE\n",
+        "expected": "OK\nOK\nOK\nOK\n1\n2\n3\n4\n0\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 5,
+    "chapterTitle": "05 Queues and circular queues",
+    "title": "Queue Made from Two Stacks",
+    "mode": "stdio",
+    "statement": "## Task\nBuild a first-in-first-out service queue using only two last-in-first-out stacks. Transfer items from the input stack when the output stack is empty.\n\n## Input\nThe first line contains q. Each following line is OFFER x, TAKE, FRONT, or SIZE.\n\n## Output\nFor OFFER print OK. For TAKE and FRONT print the oldest value or EMPTY. For SIZE print the current item count. If q is 0, print EMPTY.\n\n## Limits and conventions\n0 <= q <= 2000; values are integers with absolute value <= 100000.\n\n## Implementation focus\nImplement the queue by composing two stacks rather than by sorting or rotating the entire queue after every insertion. Submit only the required output; do not print prompts or debugging text.",
+    "objective": "Build a first-in-first-out service queue using only two last-in-first-out stacks. Transfer items from the input stack when the output stack is empty.",
+    "inputDescription": "The first line contains q. Each following line is OFFER x, TAKE, FRONT, or SIZE.",
+    "outputDescription": "For OFFER print OK. For TAKE and FRONT print the oldest value or EMPTY. For SIZE print the current item count. If q is 0, print EMPTY.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\nlines = sys.stdin.read().splitlines()\nq = int(lines[0])\nincoming, outgoing, out = [], [], []\ndef ensure_outgoing():\n    if not outgoing:\n        while incoming:\n            outgoing.append(incoming.pop())\nfor line in lines[1:1+q]:\n    parts = line.split()\n    if parts[0] == 'OFFER':\n        incoming.append(int(parts[1]))\n        out.append('OK')\n    elif parts[0] == 'TAKE':\n        ensure_outgoing()\n        out.append(str(outgoing.pop()) if outgoing else 'EMPTY')\n    elif parts[0] == 'FRONT':\n        ensure_outgoing()\n        out.append(str(outgoing[-1]) if outgoing else 'EMPTY')\n    else:\n        out.append(str(len(incoming) + len(outgoing)))\nprint('\\n'.join(out) if out else 'EMPTY')\n",
+    "starterCode": "# Read from standard input and write only the requested answer.\n",
+    "timeLimitMs": 3000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618 Paper 4",
+      "Python",
+      "05 Queues and circular queues"
+    ],
+    "source": "Original CodeMaster OJ practice aligned to Cambridge 9618 Paper 4 (2026).",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "8\nOFFER 5\nOFFER 6\nFRONT\nOFFER 7\nTAKE\nTAKE\nTAKE\nTAKE\n",
+        "expected": "OK\nOK\n5\nOK\n5\n6\n7\nEMPTY\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "4\nTAKE\nOFFER -2\nFRONT\nSIZE\n",
+        "expected": "EMPTY\nOK\n-2\n1\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal test 1",
+        "input": "0\n",
+        "expected": "EMPTY\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 2",
+        "input": "9\nOFFER 1\nOFFER 2\nTAKE\nOFFER 3\nFRONT\nTAKE\nTAKE\nTAKE\nSIZE\n",
+        "expected": "OK\nOK\n1\nOK\n2\n2\n3\nEMPTY\n0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 3",
+        "input": "8\nOFFER 0\nTAKE\nOFFER 1\nOFFER 2\nFRONT\nTAKE\nFRONT\nSIZE\n",
+        "expected": "OK\n0\nOK\nOK\n1\n1\n2\n1\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 4",
+        "input": "7\nOFFER 11\nOFFER 22\nOFFER 33\nSIZE\nFRONT\nFRONT\nSIZE\n",
+        "expected": "OK\nOK\nOK\n3\n11\n11\n3\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 5",
+        "input": "6\nTAKE\nFRONT\nOFFER -10\nOFFER -20\nTAKE\nTAKE\n",
+        "expected": "EMPTY\nEMPTY\nOK\nOK\n-10\n-20\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 6,
+    "chapterTitle": "06 Linked lists",
+    "title": "Sorted Volunteer Chain",
+    "mode": "stdio",
+    "statement": "## Task\nMaintain integer badge values in an ascending singly linked list with six reusable array nodes. INSERT permits duplicates; DELETE removes one occurrence.\n\n## Input\nThe first line contains q. Each following line is INSERT x, DELETE x, FIND x, or PRINT.\n\n## Output\nINSERT prints OK or FULL. DELETE prints OK or MISSING. FIND prints the 0-based position of the first matching node, or -1. PRINT lists values separated by spaces, or EMPTY. If q is 0, print EMPTY.\n\n## Limits and conventions\n0 <= q <= 2000; capacity is exactly 6 nodes; values are between -10000 and 10000.\n\n## Implementation focus\nUse parallel value and next-index arrays, a head index and a free-list of unused nodes. A deletion must return its node to the free-list. A matching duplicate is inserted after earlier equal values. Submit only the required output; do not print prompts or debugging text.",
+    "objective": "Maintain integer badge values in an ascending singly linked list with six reusable array nodes. INSERT permits duplicates; DELETE removes one occurrence.",
+    "inputDescription": "The first line contains q. Each following line is INSERT x, DELETE x, FIND x, or PRINT.",
+    "outputDescription": "INSERT prints OK or FULL. DELETE prints OK or MISSING. FIND prints the 0-based position of the first matching node, or -1. PRINT lists values separated by spaces, or EMPTY. If q is 0, print EMPTY.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\nlines = sys.stdin.read().splitlines()\nq = int(lines[0])\nvalues = [0] * 6\nnxt = [1, 2, 3, 4, 5, -1]\nhead, free = -1, 0\nout = []\nfor line in lines[1:1+q]:\n    parts = line.split()\n    command = parts[0]\n    if command == 'INSERT':\n        x = int(parts[1])\n        if free == -1:\n            out.append('FULL')\n            continue\n        node = free\n        free = nxt[free]\n        values[node] = x\n        previous, current = -1, head\n        while current != -1 and values[current] <= x:\n            previous, current = current, nxt[current]\n        nxt[node] = current\n        if previous == -1:\n            head = node\n        else:\n            nxt[previous] = node\n        out.append('OK')\n    elif command == 'DELETE':\n        x = int(parts[1])\n        previous, current = -1, head\n        while current != -1 and values[current] != x:\n            previous, current = current, nxt[current]\n        if current == -1:\n            out.append('MISSING')\n        else:\n            if previous == -1:\n                head = nxt[current]\n            else:\n                nxt[previous] = nxt[current]\n            nxt[current] = free\n            free = current\n            out.append('OK')\n    elif command == 'FIND':\n        x = int(parts[1])\n        current, position = head, 0\n        while current != -1 and values[current] != x:\n            current = nxt[current]\n            position += 1\n        out.append(str(position if current != -1 else -1))\n    else:\n        result = []\n        current = head\n        while current != -1:\n            result.append(str(values[current]))\n            current = nxt[current]\n        out.append(' '.join(result) if result else 'EMPTY')\nprint('\\n'.join(out) if out else 'EMPTY')\n",
+    "starterCode": "# Read from standard input and write only the requested answer.\n",
+    "timeLimitMs": 3000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618 Paper 4",
+      "Python",
+      "06 Linked lists"
+    ],
+    "source": "Original CodeMaster OJ practice aligned to Cambridge 9618 Paper 4 (2026).",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "8\nINSERT 7\nINSERT 2\nINSERT 7\nFIND 7\nPRINT\nDELETE 7\nPRINT\nFIND 7\n",
+        "expected": "OK\nOK\nOK\n1\n2 7 7\nOK\n2 7\n1\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "4\nDELETE 1\nFIND 1\nPRINT\nINSERT 1\n",
+        "expected": "MISSING\n-1\nEMPTY\nOK\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal test 1",
+        "input": "0\n",
+        "expected": "EMPTY\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 2",
+        "input": "9\nINSERT 1\nINSERT 2\nINSERT 3\nINSERT 4\nINSERT 5\nINSERT 6\nINSERT 7\nPRINT\nFIND 7\n",
+        "expected": "OK\nOK\nOK\nOK\nOK\nOK\nFULL\n1 2 3 4 5 6\n-1\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 3",
+        "input": "12\nINSERT 1\nINSERT 2\nINSERT 3\nINSERT 4\nINSERT 5\nINSERT 6\nDELETE 1\nINSERT 0\nDELETE 6\nINSERT 8\nPRINT\nFIND 8\n",
+        "expected": "OK\nOK\nOK\nOK\nOK\nOK\nOK\nOK\nOK\nOK\n0 2 3 4 5 8\n5\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 4",
+        "input": "10\nINSERT -5\nINSERT 0\nINSERT -5\nFIND -5\nDELETE -5\nPRINT\nDELETE -5\nPRINT\nDELETE -5\nPRINT\n",
+        "expected": "OK\nOK\nOK\n0\nOK\n-5 0\nOK\n0\nMISSING\n0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 5",
+        "input": "8\nINSERT 10\nINSERT 5\nINSERT 7\nINSERT 3\nDELETE 7\nINSERT 8\nFIND 8\nPRINT\n",
+        "expected": "OK\nOK\nOK\nOK\nOK\nOK\n2\n3 5 8 10\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 6,
+    "chapterTitle": "06 Linked lists",
+    "title": "Reverse the Free-list Chain",
+    "mode": "stdio",
+    "statement": "## Task\nStore a singly linked list in five reusable array nodes. Add values to the head, remove the head, and reverse links in place.\n\n## Input\nThe first line contains q. Each following line is ADD x, REMOVE, REVERSE, or PRINT.\n\n## Output\nADD prints OK or FULL. REMOVE prints the removed head value or EMPTY. REVERSE prints OK. PRINT lists values from head to tail, or EMPTY. If q is 0, print EMPTY.\n\n## Limits and conventions\n0 <= q <= 2000; capacity is exactly 5 nodes; values are between -10000 and 10000.\n\n## Implementation focus\nUse a value array, a next-index array and a free-list. REVERSE must redirect links; it must not merely print values backwards. Freed nodes must become available to ADD. Submit only the required output; do not print prompts or debugging text.",
+    "objective": "Store a singly linked list in five reusable array nodes. Add values to the head, remove the head, and reverse links in place.",
+    "inputDescription": "The first line contains q. Each following line is ADD x, REMOVE, REVERSE, or PRINT.",
+    "outputDescription": "ADD prints OK or FULL. REMOVE prints the removed head value or EMPTY. REVERSE prints OK. PRINT lists values from head to tail, or EMPTY. If q is 0, print EMPTY.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\nlines = sys.stdin.read().splitlines()\nq = int(lines[0])\nvalues = [0] * 5\nnxt = [1, 2, 3, 4, -1]\nhead, free = -1, 0\nout = []\nfor line in lines[1:1+q]:\n    parts = line.split()\n    command = parts[0]\n    if command == 'ADD':\n        if free == -1:\n            out.append('FULL')\n        else:\n            node = free\n            free = nxt[node]\n            values[node] = int(parts[1])\n            nxt[node] = head\n            head = node\n            out.append('OK')\n    elif command == 'REMOVE':\n        if head == -1:\n            out.append('EMPTY')\n        else:\n            node = head\n            head = nxt[node]\n            out.append(str(values[node]))\n            nxt[node] = free\n            free = node\n    elif command == 'REVERSE':\n        previous, current = -1, head\n        while current != -1:\n            following = nxt[current]\n            nxt[current] = previous\n            previous, current = current, following\n        head = previous\n        out.append('OK')\n    else:\n        result = []\n        current = head\n        while current != -1:\n            result.append(str(values[current]))\n            current = nxt[current]\n        out.append(' '.join(result) if result else 'EMPTY')\nprint('\\n'.join(out) if out else 'EMPTY')\n",
+    "starterCode": "# Read from standard input and write only the requested answer.\n",
+    "timeLimitMs": 3000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618 Paper 4",
+      "Python",
+      "06 Linked lists"
+    ],
+    "source": "Original CodeMaster OJ practice aligned to Cambridge 9618 Paper 4 (2026).",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "7\nADD 1\nADD 2\nADD 3\nPRINT\nREVERSE\nPRINT\nREMOVE\n",
+        "expected": "OK\nOK\nOK\n3 2 1\nOK\n1 2 3\n1\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "4\nREVERSE\nPRINT\nREMOVE\nADD -5\n",
+        "expected": "OK\nEMPTY\nEMPTY\nOK\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal test 1",
+        "input": "0\n",
+        "expected": "EMPTY\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 2",
+        "input": "8\nADD 1\nADD 2\nADD 3\nADD 4\nADD 5\nADD 6\nREMOVE\nADD 7\n",
+        "expected": "OK\nOK\nOK\nOK\nOK\nFULL\n5\nOK\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 3",
+        "input": "10\nADD 1\nADD 2\nREVERSE\nREVERSE\nPRINT\nREMOVE\nADD 3\nPRINT\nREMOVE\nPRINT\n",
+        "expected": "OK\nOK\nOK\nOK\n2 1\n2\nOK\n3 1\n3\n1\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 4",
+        "input": "8\nADD 0\nREVERSE\nPRINT\nREMOVE\nREVERSE\nADD -1\nPRINT\nREMOVE\n",
+        "expected": "OK\nOK\n0\n0\nOK\nOK\n-1\n-1\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 5",
+        "input": "9\nADD 4\nADD 5\nADD 6\nREMOVE\nREMOVE\nADD 7\nADD 8\nREVERSE\nPRINT\n",
+        "expected": "OK\nOK\nOK\n6\n5\nOK\nOK\nOK\n4 7 8\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 7,
+    "chapterTitle": "07 Binary search trees",
+    "title": "Orchard Search Tree",
+    "mode": "stdio",
+    "statement": "## Task\nBuild a binary search tree of integer readings. Equal values go into the right subtree. Support lookup and in-order traversal.\n\n## Input\nThe first line contains q. Each following line is INSERT x, FIND x, or INORDER.\n\n## Output\nINSERT prints OK. FIND prints YES or NO. INORDER prints all values in ascending order separated by spaces, or EMPTY. If q is 0, print EMPTY.\n\n## Limits and conventions\n0 <= q <= 300; values are between -100000 and 100000. Duplicate INSERT commands add separate nodes.\n\n## Implementation focus\nCreate a node with left and right links for every inserted item. Walk left when smaller and right otherwise; traverse left, node, right for INORDER. Submit only the required output; do not print prompts or debugging text.",
+    "objective": "Build a binary search tree of integer readings. Equal values go into the right subtree. Support lookup and in-order traversal.",
+    "inputDescription": "The first line contains q. Each following line is INSERT x, FIND x, or INORDER.",
+    "outputDescription": "INSERT prints OK. FIND prints YES or NO. INORDER prints all values in ascending order separated by spaces, or EMPTY. If q is 0, print EMPTY.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\nsys.setrecursionlimit(2000)\nclass Node:\n    def __init__(self, value):\n        self.value = value\n        self.left = None\n        self.right = None\nroot = None\ndef insert(value):\n    global root\n    node = Node(value)\n    if root is None:\n        root = node\n        return\n    current = root\n    while True:\n        if value < current.value:\n            if current.left is None:\n                current.left = node\n                return\n            current = current.left\n        else:\n            if current.right is None:\n                current.right = node\n                return\n            current = current.right\ndef find(value):\n    current = root\n    while current is not None:\n        if value == current.value:\n            return True\n        current = current.left if value < current.value else current.right\n    return False\ndef inorder(node, values):\n    if node is None:\n        return\n    inorder(node.left, values)\n    values.append(str(node.value))\n    inorder(node.right, values)\nlines = sys.stdin.read().splitlines()\nq = int(lines[0])\nout = []\nfor line in lines[1:1+q]:\n    parts = line.split()\n    if parts[0] == 'INSERT':\n        insert(int(parts[1]))\n        out.append('OK')\n    elif parts[0] == 'FIND':\n        out.append('YES' if find(int(parts[1])) else 'NO')\n    else:\n        values = []\n        inorder(root, values)\n        out.append(' '.join(values) if values else 'EMPTY')\nprint('\\n'.join(out) if out else 'EMPTY')\n",
+    "starterCode": "# Read from standard input and write only the requested answer.\n",
+    "timeLimitMs": 3000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618 Paper 4",
+      "Python",
+      "07 Binary search trees"
+    ],
+    "source": "Original CodeMaster OJ practice aligned to Cambridge 9618 Paper 4 (2026).",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "7\nINSERT 8\nINSERT 3\nINSERT 10\nINSERT 8\nFIND 8\nFIND 9\nINORDER\n",
+        "expected": "OK\nOK\nOK\nOK\nYES\nNO\n3 8 8 10\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "2\nFIND 1\nINORDER\n",
+        "expected": "NO\nEMPTY\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal test 1",
+        "input": "0\n",
+        "expected": "EMPTY\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 2",
+        "input": "8\nINSERT 5\nINSERT 4\nINSERT 3\nINSERT 2\nINSERT 1\nINORDER\nFIND 1\nFIND 6\n",
+        "expected": "OK\nOK\nOK\nOK\nOK\n1 2 3 4 5\nYES\nNO\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 3",
+        "input": "8\nINSERT -2\nINSERT 0\nINSERT -2\nINSERT 3\nINSERT -1\nINORDER\nFIND -2\nFIND 2\n",
+        "expected": "OK\nOK\nOK\nOK\nOK\n-2 -2 -1 0 3\nYES\nNO\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 4",
+        "input": "6\nINSERT 1\nINSERT 1\nINSERT 1\nINSERT 1\nINORDER\nFIND 1\n",
+        "expected": "OK\nOK\nOK\nOK\n1 1 1 1\nYES\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 5",
+        "input": "9\nINSERT 10\nINSERT 5\nINSERT 15\nINSERT 12\nINSERT 20\nINSERT 11\nINORDER\nFIND 12\nFIND 13\n",
+        "expected": "OK\nOK\nOK\nOK\nOK\nOK\n5 10 11 12 15 20\nYES\nNO\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 7,
+    "chapterTitle": "07 Binary search trees",
+    "title": "Tree Height and Range Audit",
+    "mode": "stdio",
+    "statement": "## Task\nBuild a binary search tree and answer inclusive range queries. Also report the tree height, counting the root as height 1 and an empty tree as height 0.\n\n## Input\nThe first line contains n and q. The second line contains n integers, or is empty when n is 0. The next q lines each contain a lower and upper bound.\n\n## Output\nPrint the tree height first. Then print sum count for each query, including all duplicate nodes whose values lie in the range.\n\n## Limits and conventions\n0 <= n <= 300; 0 <= q <= 100; -100000 <= values and bounds <= 100000; every lower bound is <= its upper bound.\n\n## Implementation focus\nInsert equal values into the right subtree. Compute height recursively. For range queries, recursively skip subtrees that cannot contain values in the requested interval. Submit only the required output; do not print prompts or debugging text.",
+    "objective": "Build a binary search tree and answer inclusive range queries. Also report the tree height, counting the root as height 1 and an empty tree as height 0.",
+    "inputDescription": "The first line contains n and q. The second line contains n integers, or is empty when n is 0. The next q lines each contain a lower and upper bound.",
+    "outputDescription": "Print the tree height first. Then print sum count for each query, including all duplicate nodes whose values lie in the range.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\nsys.setrecursionlimit(2000)\nclass Node:\n    def __init__(self, value):\n        self.value = value\n        self.left = None\n        self.right = None\ndef insert(root, value):\n    if root is None:\n        return Node(value)\n    current = root\n    while True:\n        if value < current.value:\n            if current.left is None:\n                current.left = Node(value)\n                break\n            current = current.left\n        else:\n            if current.right is None:\n                current.right = Node(value)\n                break\n            current = current.right\n    return root\ndef height(node):\n    if node is None:\n        return 0\n    return 1 + max(height(node.left), height(node.right))\ndef range_audit(node, low, high):\n    if node is None:\n        return 0, 0\n    total, count = (node.value, 1) if low <= node.value <= high else (0, 0)\n    if node.value > low:\n        child_sum, child_count = range_audit(node.left, low, high)\n        total, count = total + child_sum, count + child_count\n    if node.value <= high:\n        child_sum, child_count = range_audit(node.right, low, high)\n        total, count = total + child_sum, count + child_count\n    return total, count\nlines = sys.stdin.read().splitlines()\nn, q = map(int, lines[0].split())\nvalues = list(map(int, lines[1].split())) if n else []\nroot = None\nfor value in values:\n    root = insert(root, value)\nout = [str(height(root))]\nfor line in lines[2:2+q]:\n    low, high = map(int, line.split())\n    out.append(' '.join(map(str, range_audit(root, low, high))))\nprint('\\n'.join(out))\n",
+    "starterCode": "# Read from standard input and write only the requested answer.\n",
+    "timeLimitMs": 3000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618 Paper 4",
+      "Python",
+      "07 Binary search trees"
+    ],
+    "source": "Original CodeMaster OJ practice aligned to Cambridge 9618 Paper 4 (2026).",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "5 3\n8 3 10 8 1\n3 8\n9 20\n11 20\n",
+        "expected": "3\n19 3\n10 1\n0 0\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "0 2\n\n0 0\n-2 2\n",
+        "expected": "0\n0 0\n0 0\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal test 1",
+        "input": "1 2\n5\n5 5\n-10 4\n",
+        "expected": "1\n5 1\n0 0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 2",
+        "input": "6 3\n1 2 3 4 5 6\n1 6\n3 3\n7 9\n",
+        "expected": "6\n21 6\n3 1\n0 0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 3",
+        "input": "6 3\n5 5 5 1 10 5\n5 5\n1 10\n6 9\n",
+        "expected": "5\n20 4\n31 6\n0 0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 4",
+        "input": "5 3\n-4 -9 0 10 -4\n-10 -4\n-3 3\n0 10\n",
+        "expected": "3\n-17 3\n0 1\n10 2\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 5",
+        "input": "3 0\n2 1 3\n",
+        "expected": "2\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 8,
+    "chapterTitle": "08 Dictionaries, hashing and ADT composition",
+    "title": "Catalogue Dictionary",
+    "mode": "stdio",
+    "statement": "## Task\nMaintain a dictionary of item codes to stock levels. Setting an existing code replaces its value; deleting an absent code changes nothing.\n\n## Input\nThe first line contains q. Each following line is SET code amount, GET code, DEL code, or COUNT.\n\n## Output\nSET prints OK. GET prints the stored amount or MISSING. DEL prints DELETED or MISSING. COUNT prints the number of distinct codes. If q is 0, print EMPTY.\n\n## Limits and conventions\n0 <= q <= 2000; codes are 1-20 uppercase letters or digits; -100000 <= amount <= 100000.\n\n## Implementation focus\nUse a key-to-value dictionary. A value of 0 is present and must not be confused with a missing key. Submit only the required output; do not print prompts or debugging text.",
+    "objective": "Maintain a dictionary of item codes to stock levels. Setting an existing code replaces its value; deleting an absent code changes nothing.",
+    "inputDescription": "The first line contains q. Each following line is SET code amount, GET code, DEL code, or COUNT.",
+    "outputDescription": "SET prints OK. GET prints the stored amount or MISSING. DEL prints DELETED or MISSING. COUNT prints the number of distinct codes. If q is 0, print EMPTY.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\nlines = sys.stdin.read().splitlines()\nq = int(lines[0])\ncatalogue = {}\nout = []\nfor line in lines[1:1+q]:\n    parts = line.split()\n    if parts[0] == 'SET':\n        catalogue[parts[1]] = int(parts[2])\n        out.append('OK')\n    elif parts[0] == 'GET':\n        out.append(str(catalogue[parts[1]]) if parts[1] in catalogue else 'MISSING')\n    elif parts[0] == 'DEL':\n        if parts[1] in catalogue:\n            del catalogue[parts[1]]\n            out.append('DELETED')\n        else:\n            out.append('MISSING')\n    else:\n        out.append(str(len(catalogue)))\nprint('\\n'.join(out) if out else 'EMPTY')\n",
+    "starterCode": "# Read from standard input and write only the requested answer.\n",
+    "timeLimitMs": 3000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618 Paper 4",
+      "Python",
+      "08 Dictionaries, hashing and ADT composition"
+    ],
+    "source": "Original CodeMaster OJ practice aligned to Cambridge 9618 Paper 4 (2026).",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "8\nSET A 3\nSET B 0\nGET B\nSET A 9\nGET A\nCOUNT\nDEL B\nCOUNT\n",
+        "expected": "OK\nOK\n0\nOK\n9\n2\nDELETED\n1\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "3\nGET LOST\nDEL LOST\nCOUNT\n",
+        "expected": "MISSING\nMISSING\n0\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal test 1",
+        "input": "0\n",
+        "expected": "EMPTY\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 2",
+        "input": "8\nSET X -5\nGET X\nSET X 0\nGET X\nDEL X\nGET X\nCOUNT\nDEL X\n",
+        "expected": "OK\n-5\nOK\n0\nDELETED\nMISSING\n0\nMISSING\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 3",
+        "input": "8\nSET A 1\nSET B 2\nSET C 3\nDEL B\nSET B 4\nGET B\nCOUNT\nGET C\n",
+        "expected": "OK\nOK\nOK\nDELETED\nOK\n4\n3\n3\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 4",
+        "input": "6\nSET Z 1\nSET Z 2\nSET Z 3\nCOUNT\nGET Z\nDEL Z\n",
+        "expected": "OK\nOK\nOK\n1\n3\nDELETED\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 5",
+        "input": "7\nGET A\nSET A 0\nGET A\nSET B -1\nCOUNT\nDEL A\nCOUNT\n",
+        "expected": "MISSING\nOK\n0\nOK\n2\nDELETED\n1\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 8,
+    "chapterTitle": "08 Dictionaries, hashing and ADT composition",
+    "title": "Hash-Indexed Service Groups",
+    "mode": "stdio",
+    "statement": "## Task\nKeep at most 11 service groups in a hash dictionary. Each integer group key owns a first-in-first-out queue built from two stacks. Hash a key to key modulo 11, resolve collisions with linear probing, and reuse deleted slots.\n\n## Input\nThe first line contains q. Each following line is OFFER key value, TAKE key, FRONT key, GROUPSIZE key, DROP key, or COUNT.\n\n## Output\nOFFER prints OK, or FULL if a new group cannot be stored. TAKE and FRONT print the oldest value, EMPTY for an existing empty group, or MISSING for an unknown group. GROUPSIZE prints the queue length or MISSING. DROP prints DELETED or MISSING. COUNT prints the number of live groups. If q is 0, print EMPTY.\n\n## Limits and conventions\n0 <= q <= 2000; dictionary capacity is exactly 11 groups; keys and values are signed integers with absolute value <= 100000. Taking the last item leaves an empty group until DROP removes it.\n\n## Implementation focus\nImplement the dictionary with key/state arrays and linear probing, including tombstones. Each group queue must be composed from two stacks; transfer the incoming stack only when the outgoing stack is empty. A deleted slot may be reused without losing a later collision-chain member. Submit only the required output; do not print prompts or debugging text.",
+    "objective": "Keep at most 11 service groups in a hash dictionary. Each integer group key owns a first-in-first-out queue built from two stacks. Hash a key to key modulo 11, resolve collisions with linear probing, and reuse deleted slots.",
+    "inputDescription": "The first line contains q. Each following line is OFFER key value, TAKE key, FRONT key, GROUPSIZE key, DROP key, or COUNT.",
+    "outputDescription": "OFFER prints OK, or FULL if a new group cannot be stored. TAKE and FRONT print the oldest value, EMPTY for an existing empty group, or MISSING for an unknown group. GROUPSIZE prints the queue length or MISSING. DROP prints DELETED or MISSING. COUNT prints the number of live groups. If q is 0, print EMPTY.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\nlines = sys.stdin.read().splitlines()\nq = int(lines[0])\nkeys = [None] * 11\nstate = [0] * 11  # 0 never used, 1 live, 2 tombstone\ngroups = [None] * 11  # each group is (incoming_stack, outgoing_stack)\ncount = 0\nout = []\ndef locate(key):\n    start = key % 11\n    for step in range(11):\n        i = (start + step) % 11\n        if state[i] == 0:\n            return -1\n        if state[i] == 1 and keys[i] == key:\n            return i\n    return -1\ndef free_slot(key):\n    start = key % 11\n    first_tombstone = -1\n    for step in range(11):\n        i = (start + step) % 11\n        if state[i] == 2 and first_tombstone < 0:\n            first_tombstone = i\n        if state[i] == 0:\n            return first_tombstone if first_tombstone >= 0 else i\n    return first_tombstone\ndef ensure_outgoing(pair):\n    incoming, outgoing = pair\n    if not outgoing:\n        while incoming:\n            outgoing.append(incoming.pop())\nfor line in lines[1:1+q]:\n    parts = line.split()\n    command = parts[0]\n    if command == 'COUNT':\n        out.append(str(count))\n        continue\n    key = int(parts[1])\n    i = locate(key)\n    if command == 'OFFER':\n        if i < 0:\n            i = free_slot(key)\n            if i < 0:\n                out.append('FULL')\n                continue\n            state[i] = 1\n            keys[i] = key\n            groups[i] = ([], [])\n            count += 1\n        groups[i][0].append(int(parts[2]))\n        out.append('OK')\n    elif command == 'DROP':\n        if i < 0:\n            out.append('MISSING')\n        else:\n            state[i] = 2\n            keys[i] = None\n            groups[i] = None\n            count -= 1\n            out.append('DELETED')\n    elif i < 0:\n        out.append('MISSING')\n    elif command == 'GROUPSIZE':\n        incoming, outgoing = groups[i]\n        out.append(str(len(incoming) + len(outgoing)))\n    else:\n        pair = groups[i]\n        ensure_outgoing(pair)\n        outgoing = pair[1]\n        if not outgoing:\n            out.append('EMPTY')\n        elif command == 'TAKE':\n            out.append(str(outgoing.pop()))\n        else:\n            out.append(str(outgoing[-1]))\nprint('\\n'.join(out) if out else 'EMPTY')\n",
+    "starterCode": "# Read from standard input and write only the requested answer.\n",
+    "timeLimitMs": 3000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618 Paper 4",
+      "Python",
+      "08 Dictionaries, hashing and ADT composition"
+    ],
+    "source": "Original CodeMaster OJ practice aligned to Cambridge 9618 Paper 4 (2026).",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "10\nOFFER 1 10\nOFFER 12 20\nOFFER 1 30\nFRONT 1\nTAKE 1\nFRONT 1\nDROP 12\nOFFER 23 40\nFRONT 23\nCOUNT\n",
+        "expected": "OK\nOK\nOK\n10\n10\n30\nDELETED\nOK\n40\n2\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "7\nTAKE 0\nOFFER -1 7\nTAKE -1\nFRONT -1\nGROUPSIZE -1\nDROP -1\nCOUNT\n",
+        "expected": "MISSING\nOK\n7\nEMPTY\n0\nDELETED\n0\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal test 1",
+        "input": "0\n",
+        "expected": "EMPTY\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 2",
+        "input": "15\nOFFER 0 0\nOFFER 1 1\nOFFER 2 2\nOFFER 3 3\nOFFER 4 4\nOFFER 5 5\nOFFER 6 6\nOFFER 7 7\nOFFER 8 8\nOFFER 9 9\nOFFER 10 10\nOFFER 11 11\nDROP 5\nOFFER 16 99\nFRONT 16\n",
+        "expected": "OK\nOK\nOK\nOK\nOK\nOK\nOK\nOK\nOK\nOK\nOK\nFULL\nDELETED\nOK\n99\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 3",
+        "input": "10\nOFFER 1 10\nOFFER 12 20\nOFFER 23 30\nDROP 1\nDROP 12\nFRONT 23\nOFFER 34 40\nGROUPSIZE 23\nTAKE 23\nCOUNT\n",
+        "expected": "OK\nOK\nOK\nDELETED\nDELETED\n30\nOK\n1\n30\n2\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 4",
+        "input": "10\nOFFER 1 1\nOFFER 1 2\nTAKE 1\nOFFER 1 3\nFRONT 1\nTAKE 1\nTAKE 1\nTAKE 1\nGROUPSIZE 1\nCOUNT\n",
+        "expected": "OK\nOK\n1\nOK\n2\n2\n3\nEMPTY\n0\n1\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal test 5",
+        "input": "11\nOFFER -1 7\nOFFER 10 8\nOFFER 21 9\nDROP -1\nFRONT 21\nOFFER 32 10\nTAKE 10\nFRONT 32\nGROUPSIZE 21\nCOUNT\nDROP 999\n",
+        "expected": "OK\nOK\nOK\nDELETED\n9\nOK\n8\n10\n1\n3\nMISSING\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 9,
+    "chapterTitle": "09 Recursion and backtracking",
+    "title": "Archive subtree totals",
+    "mode": "stdio",
+    "statement": "## Task\n\nA record hierarchy forms a rooted tree. Write a recursive function that returns a record's own value plus every descendant's value. Print the subtree total for each record in ID order. Your solution should include a base case for a leaf.\n\n## Input\n\nFirst line: integer n. The next n lines each contain `id parent value`, in arbitrary order. IDs are 1 to n. Exactly one record has parent 0; every other parent is another ID and there are no cycles.\n\n## Output\n\nPrint n lines, each `id total` for IDs 1 through n.\n\n## Limits and expectations\n\n1 <= n <= 100; values range from -10,000 to 10,000. The reference uses recursion; the data's maximum depth is 100.\n\nWrite a complete Python 3 program. Read standard input, write only the specified standard output, and do not print prompts. The judge checks observable behaviour, including edge cases; your teacher may inspect the source to confirm the requested technique.",
+    "objective": "A record hierarchy forms a rooted tree. Write a recursive function that returns a record's own value plus every descendant's value. Print the subtree total for each record in ID order. Your solution should include a base case for a leaf.",
+    "inputDescription": "First line: integer n. The next n lines each contain `id parent value`, in arbitrary order. IDs are 1 to n. Exactly one record has parent 0; every other parent is another ID and there are no cycles.",
+    "outputDescription": "Print n lines, each `id total` for IDs 1 through n.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\n\ndef solve():\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    n = int(data[0])\n    children = [[] for _ in range(n + 1)]\n    weight = [0] * (n + 1)\n    at = 1\n    for _ in range(n):\n        node, parent, value = map(int, data[at:at + 3])\n        at += 3\n        weight[node] = value\n        if parent:\n            children[parent].append(node)\n\n    totals = [0] * (n + 1)\n    def subtotal(node):\n        total = weight[node]\n        for child in children[node]:\n            total += subtotal(child)\n        totals[node] = total\n        return total\n\n    root = next(node for node in range(1, n + 1)\n                if all(node not in descendants for descendants in children))\n    subtotal(root)\n    print('\\n'.join(f'{node} {totals[node]}' for node in range(1, n + 1)))\n\nsolve()\n",
+    "starterCode": "# Read standard input and write the required output.\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "exact",
+    "tags": [
+      "Cambridge 9618",
+      "Paper 4",
+      "Recursion",
+      "Trees"
+    ],
+    "source": "Original CodeMaster OJ practice for the Cambridge 9618 Paper 4 syllabus",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "4\n3 1 5\n1 0 10\n4 2 7\n2 1 3\n",
+        "expected": "1 25\n2 10\n3 5\n4 7\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "1\n1 0 -4\n",
+        "expected": "1 -4\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal case 1",
+        "input": "5\n5 4 1\n4 3 2\n3 2 3\n2 1 4\n1 0 5\n",
+        "expected": "1 15\n2 10\n3 6\n4 3\n5 1\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 2",
+        "input": "3\n1 0 0\n2 1 0\n3 1 0\n",
+        "expected": "1 0\n2 0\n3 0\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 3",
+        "input": "4\n1 0 1\n2 1 2\n3 2 3\n4 2 4\n",
+        "expected": "1 10\n2 9\n3 3\n4 4\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 4",
+        "input": "2\n2 1 -9\n1 0 8\n",
+        "expected": "1 -1\n2 -9\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 5",
+        "input": "6\n3 1 3\n2 1 2\n1 0 1\n4 2 4\n5 2 5\n6 3 6\n",
+        "expected": "1 21\n2 11\n3 9\n4 4\n5 5\n6 6\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 9,
+    "chapterTitle": "09 Recursion and backtracking",
+    "title": "Routes through a blocked grid",
+    "mode": "stdio",
+    "statement": "## Task\n\nCount the routes from the top-left cell to the bottom-right cell by recursively trying right and down. A route may visit only `.` cells; `#` is blocked. The recursive base cases are leaving the grid, hitting a block, and reaching the destination.\n\n## Input\n\nFirst line: rows r and columns c. Next r lines: exactly c characters, each `.` or `#`.\n\n## Output\n\nPrint one integer: the number of routes. Print 0 if the start or destination is blocked.\n\n## Limits and expectations\n\n1 <= r,c <= 8. Route count fits in a 32-bit integer. Avoid claiming that output tests alone prove use of recursion.\n\nWrite a complete Python 3 program. Read standard input, write only the specified standard output, and do not print prompts. The judge checks observable behaviour, including edge cases; your teacher may inspect the source to confirm the requested technique.",
+    "objective": "Count the routes from the top-left cell to the bottom-right cell by recursively trying right and down. A route may visit only `.` cells; `#` is blocked. The recursive base cases are leaving the grid, hitting a block, and reaching the destination.",
+    "inputDescription": "First line: rows r and columns c. Next r lines: exactly c characters, each `.` or `#`.",
+    "outputDescription": "Print one integer: the number of routes. Print 0 if the start or destination is blocked.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\n\ndef solve():\n    lines = sys.stdin.read().splitlines()\n    r, c = map(int, lines[0].split())\n    grid = lines[1:1 + r]\n\n    def routes(row, col):\n        if row >= r or col >= c or grid[row][col] == '#':\n            return 0\n        if row == r - 1 and col == c - 1:\n            return 1\n        return routes(row + 1, col) + routes(row, col + 1)\n\n    print(routes(0, 0))\n\nsolve()\n",
+    "starterCode": "# Read standard input and write the required output.\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "exact",
+    "tags": [
+      "Cambridge 9618",
+      "Paper 4",
+      "Recursion",
+      "Backtracking"
+    ],
+    "source": "Original CodeMaster OJ practice for the Cambridge 9618 Paper 4 syllabus",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "3 3\n...\n.#.\n...\n",
+        "expected": "2\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "1 1\n.\n",
+        "expected": "1\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal case 1",
+        "input": "1 1\n#\n",
+        "expected": "0\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 2",
+        "input": "2 3\n...\n...\n",
+        "expected": "3\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 3",
+        "input": "4 4\n....\n.##.\n...#\n....\n",
+        "expected": "3\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 4",
+        "input": "3 3\n...\n###\n...\n",
+        "expected": "0\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 5",
+        "input": "6 6\n......\n......\n......\n......\n......\n......\n",
+        "expected": "252\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 10,
+    "chapterTitle": "10 Procedural design and testing",
+    "title": "Ticket intake pipeline",
+    "mode": "stdio",
+    "statement": "## Task\n\nBuild a procedural intake pipeline: validate each ticket, reject malformed or repeated codes, then produce a priority-ordered work list. A valid code contains 4–8 uppercase letters or digits and a valid priority is an integer from 1 to 5. Only the first valid occurrence of a code is accepted. Separate validation, intake, and output into functions.\n\n## Input\n\nFirst line: n. Each of the following n lines is `code priority` with one space; malformed lines may have missing or extra fields.\n\n## Output\n\nFirst print `accepted rejected`. Then print each accepted ticket as `code priority`, ordered by descending priority; ties retain input order.\n\n## Limits and expectations\n\n0 <= n <= 200. A malformed line counts as rejected. The source's decomposition is part of the learning objective and may need teacher review.\n\nWrite a complete Python 3 program. Read standard input, write only the specified standard output, and do not print prompts. The judge checks observable behaviour, including edge cases; your teacher may inspect the source to confirm the requested technique.",
+    "objective": "Build a procedural intake pipeline: validate each ticket, reject malformed or repeated codes, then produce a priority-ordered work list. A valid code contains 4–8 uppercase letters or digits and a valid priority is an integer from 1 to 5. Only the first valid occurrence of a code is accepted. Separate validation, intake, and output into functions.",
+    "inputDescription": "First line: n. Each of the following n lines is `code priority` with one space; malformed lines may have missing or extra fields.",
+    "outputDescription": "First print `accepted rejected`. Then print each accepted ticket as `code priority`, ordered by descending priority; ties retain input order.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\n\ndef valid_code(code):\n    return 4 <= len(code) <= 8 and all(ch in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789' for ch in code)\n\ndef parse_ticket(line):\n    pieces = line.split()\n    if len(pieces) != 2 or not valid_code(pieces[0]):\n        return None\n    try:\n        priority = int(pieces[1])\n    except ValueError:\n        return None\n    if not 1 <= priority <= 5:\n        return None\n    return pieces[0], priority\n\ndef intake(lines):\n    seen = set()\n    accepted = []\n    rejected = 0\n    for line in lines:\n        ticket = parse_ticket(line)\n        if ticket is None or ticket[0] in seen:\n            rejected += 1\n            continue\n        seen.add(ticket[0])\n        accepted.append(ticket)\n    return sorted(accepted, key=lambda item: -item[1]), rejected\n\ndef main():\n    lines = sys.stdin.read().splitlines()\n    n = int(lines[0])\n    accepted, rejected = intake(lines[1:1 + n])\n    print(len(accepted), rejected)\n    for code, priority in accepted:\n        print(code, priority)\n\nmain()\n",
+    "starterCode": "# Read standard input and write the required output.\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "exact",
+    "tags": [
+      "Cambridge 9618",
+      "Paper 4",
+      "Procedural",
+      "Validation",
+      "Testing"
+    ],
+    "source": "Original CodeMaster OJ practice for the Cambridge 9618 Paper 4 syllabus",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "5\nAB12 3\nCD34 5\nAB12 1\nbad1 4\nEF56 5\n",
+        "expected": "3 2\nCD34 5\nEF56 5\nAB12 3\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "2\nA001 1\nB002 2\n",
+        "expected": "2 0\nB002 2\nA001 1\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal case 1",
+        "input": "0\n",
+        "expected": "0 0\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 2",
+        "input": "4\nABCD 5\nABCD 5\nABCDE 1\nBAD 2\n",
+        "expected": "2 2\nABCD 5\nABCDE 1\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 3",
+        "input": "5\nM123 0\nM123 2\nM123 6\nP999 x\nQ888 4\n",
+        "expected": "2 3\nQ888 4\nM123 2\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 4",
+        "input": "3\nZX99 3\nPQ88 3\nAB77 3\n",
+        "expected": "3 0\nZX99 3\nPQ88 3\nAB77 3\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 5",
+        "input": "6\nLONGNAME9 2\nOK12 4\nOK12 4\n8NUM 5\nA001 2\nXY99 5\n",
+        "expected": "4 2\n8NUM 5\nXY99 5\nOK12 4\nA001 2\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 10,
+    "chapterTitle": "10 Procedural design and testing",
+    "title": "Sensor boundary audit",
+    "mode": "stdio",
+    "statement": "## Task\n\nA sensor accepts only integer readings from 0 through 100 inclusive. Design a small audit with separate functions for validating a reading and summarising accepted values. Boundary tests should distinguish -1/0/1 and 99/100/101.\n\n## Input\n\nFirst line: n. Next n lines each contain one integer reading.\n\n## Output\n\nPrint `valid_count invalid_count sum_of_valid`. On the next line, print `minimum maximum` among valid readings, or `EMPTY` if none are valid.\n\n## Limits and expectations\n\n0 <= n <= 1000; -1000 <= reading <= 1000. The reference uses functions, and the judge checks observable results.\n\nWrite a complete Python 3 program. Read standard input, write only the specified standard output, and do not print prompts. The judge checks observable behaviour, including edge cases; your teacher may inspect the source to confirm the requested technique.",
+    "objective": "A sensor accepts only integer readings from 0 through 100 inclusive. Design a small audit with separate functions for validating a reading and summarising accepted values. Boundary tests should distinguish -1/0/1 and 99/100/101.",
+    "inputDescription": "First line: n. Next n lines each contain one integer reading.",
+    "outputDescription": "Print `valid_count invalid_count sum_of_valid`. On the next line, print `minimum maximum` among valid readings, or `EMPTY` if none are valid.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\n\ndef accepted(value):\n    return 0 <= value <= 100\n\ndef summary(values):\n    good = [value for value in values if accepted(value)]\n    return good, len(values) - len(good)\n\ndef main():\n    lines = sys.stdin.read().split()\n    n = int(lines[0])\n    values = [int(item) for item in lines[1:1 + n]]\n    good, bad_count = summary(values)\n    print(len(good), bad_count, sum(good))\n    print(f'{min(good)} {max(good)}' if good else 'EMPTY')\n\nmain()\n",
+    "starterCode": "# Read standard input and write the required output.\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "exact",
+    "tags": [
+      "Cambridge 9618",
+      "Paper 4",
+      "Procedural",
+      "Boundary testing"
+    ],
+    "source": "Original CodeMaster OJ practice for the Cambridge 9618 Paper 4 syllabus",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "6\n-1\n0\n1\n99\n100\n101\n",
+        "expected": "4 2 200\n0 100\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "3\n-5\n999\n101\n",
+        "expected": "0 3 0\nEMPTY\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal case 1",
+        "input": "0\n",
+        "expected": "0 0 0\nEMPTY\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 2",
+        "input": "1\n0\n",
+        "expected": "1 0 0\n0 0\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 3",
+        "input": "1\n100\n",
+        "expected": "1 0 100\n100 100\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 4",
+        "input": "2\n-50\n150\n",
+        "expected": "0 2 0\nEMPTY\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 5",
+        "input": "7\n10\n20\n30\n40\n100\n0\n101\n",
+        "expected": "6 1 200\n0 100\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 11,
+    "chapterTitle": "11 Classes and encapsulation",
+    "title": "Borrow and return ledger",
+    "mode": "stdio",
+    "statement": "## Task\n\nImplement a `Book` class with a private available-copy count and methods `borrow()`, `return_copy()`, and `available()`. A borrow fails at zero copies. Keep a catalogue of Book objects; commands operate on a book code and must not change another book's state.\n\n## Input\n\nFirst line: n, the number of books. Next n lines: `code copies`. Next line: q, the number of commands. Then q lines, each `BORROW code`, `RETURN code`, or `STATUS code`. Unknown codes are possible.\n\n## Output\n\nFor BORROW or RETURN print `OK` on success, `EMPTY` if no copies remain, or `UNKNOWN` for a missing code. For STATUS print the remaining count, or `UNKNOWN`.\n\n## Limits and expectations\n\n0 <= n,q <= 200. Codes are unique and non-empty, initial copies are 0–20; RETURN is allowed at any time. Class design and encapsulation should be checked in a source review.\n\nWrite a complete Python 3 program. Read standard input, write only the specified standard output, and do not print prompts. The judge checks observable behaviour, including edge cases; your teacher may inspect the source to confirm the requested technique.",
+    "objective": "Implement a `Book` class with a private available-copy count and methods `borrow()`, `return_copy()`, and `available()`. A borrow fails at zero copies. Keep a catalogue of Book objects; commands operate on a book code and must not change another book's state.",
+    "inputDescription": "First line: n, the number of books. Next n lines: `code copies`. Next line: q, the number of commands. Then q lines, each `BORROW code`, `RETURN code`, or `STATUS code`. Unknown codes are possible.",
+    "outputDescription": "For BORROW or RETURN print `OK` on success, `EMPTY` if no copies remain, or `UNKNOWN` for a missing code. For STATUS print the remaining count, or `UNKNOWN`.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\n\nclass Book:\n    def __init__(self, copies):\n        self.__copies = copies\n\n    def borrow(self):\n        if self.__copies == 0:\n            return False\n        self.__copies -= 1\n        return True\n\n    def return_copy(self):\n        self.__copies += 1\n\n    def available(self):\n        return self.__copies\n\ndef main():\n    lines = iter(sys.stdin.read().splitlines())\n    n = int(next(lines))\n    books = {}\n    for _ in range(n):\n        code, copies = next(lines).split()\n        books[code] = Book(int(copies))\n    q = int(next(lines))\n    result = []\n    for _ in range(q):\n        action, code = next(lines).split()\n        book = books.get(code)\n        if book is None:\n            result.append('UNKNOWN')\n        elif action == 'STATUS':\n            result.append(str(book.available()))\n        elif action == 'BORROW':\n            result.append('OK' if book.borrow() else 'EMPTY')\n        else:\n            book.return_copy()\n            result.append('OK')\n    print('\\n'.join(result))\n\nmain()\n",
+    "starterCode": "# Read standard input and write the required output.\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "exact",
+    "tags": [
+      "Cambridge 9618",
+      "Paper 4",
+      "OOP",
+      "Encapsulation"
+    ],
+    "source": "Original CodeMaster OJ practice for the Cambridge 9618 Paper 4 syllabus",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "2\nCS01 1\nCS02 0\n7\nSTATUS CS01\nBORROW CS01\nBORROW CS01\nRETURN CS02\nSTATUS CS02\nSTATUS CS01\nSTATUS ZZ99\n",
+        "expected": "1\nOK\nEMPTY\nOK\n1\n0\nUNKNOWN\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "1\nBK01 0\n3\nBORROW BK01\nRETURN BK01\nBORROW BK01\n",
+        "expected": "EMPTY\nOK\nOK\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal case 1",
+        "input": "0\n2\nSTATUS NONE\nBORROW NONE\n",
+        "expected": "UNKNOWN\nUNKNOWN\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 2",
+        "input": "1\nB1 2\n5\nBORROW B1\nBORROW B1\nBORROW B1\nRETURN B1\nSTATUS B1\n",
+        "expected": "OK\nOK\nEMPTY\nOK\n1\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 3",
+        "input": "2\nA 0\nB 3\n5\nBORROW A\nBORROW B\nSTATUS A\nSTATUS B\nRETURN A\n",
+        "expected": "EMPTY\nOK\n0\n2\nOK\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 4",
+        "input": "1\nX 10\n4\nSTATUS X\nRETURN X\nBORROW X\nSTATUS X\n",
+        "expected": "10\nOK\nOK\n10\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 5",
+        "input": "1\nY 0\n0\n",
+        "expected": "\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 11,
+    "chapterTitle": "11 Classes and encapsulation",
+    "title": "Controlled score record",
+    "mode": "stdio",
+    "statement": "## Task\n\nWrite a `StudentRecord` class that owns a private list of scores and exposes `add(score)`, `replace(index, score)`, and `average()` methods. A score is valid from 0 to 100 inclusive; a replacement uses a zero-based index. Invalid changes must leave the record unchanged.\n\n## Input\n\nFirst line: q. Next q lines are `ADD score`, `REPLACE index score`, or `AVERAGE`.\n\n## Output\n\nFor ADD and REPLACE print `OK` or `INVALID`. For AVERAGE print the integer floor of the average, or `EMPTY` when there are no scores.\n\n## Limits and expectations\n\n0 <= q <= 300. Command syntax is otherwise valid; the invalid cases are score range or index range. Teachers should review the class/source structure as well as output.\n\nWrite a complete Python 3 program. Read standard input, write only the specified standard output, and do not print prompts. The judge checks observable behaviour, including edge cases; your teacher may inspect the source to confirm the requested technique.",
+    "objective": "Write a `StudentRecord` class that owns a private list of scores and exposes `add(score)`, `replace(index, score)`, and `average()` methods. A score is valid from 0 to 100 inclusive; a replacement uses a zero-based index. Invalid changes must leave the record unchanged.",
+    "inputDescription": "First line: q. Next q lines are `ADD score`, `REPLACE index score`, or `AVERAGE`.",
+    "outputDescription": "For ADD and REPLACE print `OK` or `INVALID`. For AVERAGE print the integer floor of the average, or `EMPTY` when there are no scores.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\n\nclass StudentRecord:\n    def __init__(self):\n        self.__scores = []\n\n    def add(self, score):\n        if not 0 <= score <= 100:\n            return False\n        self.__scores.append(score)\n        return True\n\n    def replace(self, index, score):\n        if not (0 <= index < len(self.__scores) and 0 <= score <= 100):\n            return False\n        self.__scores[index] = score\n        return True\n\n    def average(self):\n        if not self.__scores:\n            return None\n        return sum(self.__scores) // len(self.__scores)\n\ndef main():\n    lines = sys.stdin.read().splitlines()\n    q = int(lines[0])\n    record = StudentRecord()\n    result = []\n    for line in lines[1:1 + q]:\n        parts = line.split()\n        if parts[0] == 'ADD':\n            result.append('OK' if record.add(int(parts[1])) else 'INVALID')\n        elif parts[0] == 'REPLACE':\n            result.append('OK' if record.replace(int(parts[1]), int(parts[2])) else 'INVALID')\n        else:\n            value = record.average()\n            result.append('EMPTY' if value is None else str(value))\n    print('\\n'.join(result))\n\nmain()\n",
+    "starterCode": "# Read standard input and write the required output.\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "exact",
+    "tags": [
+      "Cambridge 9618",
+      "Paper 4",
+      "OOP",
+      "Encapsulation",
+      "Validation"
+    ],
+    "source": "Original CodeMaster OJ practice for the Cambridge 9618 Paper 4 syllabus",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "7\nAVERAGE\nADD 50\nADD 100\nAVERAGE\nREPLACE 0 70\nAVERAGE\nREPLACE 2 90\n",
+        "expected": "EMPTY\nOK\nOK\n75\nOK\n85\nINVALID\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "4\nADD -1\nADD 0\nADD 101\nAVERAGE\n",
+        "expected": "INVALID\nOK\nINVALID\n0\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal case 1",
+        "input": "0\n",
+        "expected": "\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 2",
+        "input": "5\nADD 100\nADD 100\nREPLACE -1 20\nREPLACE 1 0\nAVERAGE\n",
+        "expected": "OK\nOK\nINVALID\nOK\n50\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 3",
+        "input": "4\nREPLACE 0 50\nADD 42\nREPLACE 0 101\nAVERAGE\n",
+        "expected": "INVALID\nOK\nINVALID\n42\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 4",
+        "input": "6\nADD 0\nADD 1\nADD 2\nAVERAGE\nREPLACE 1 100\nAVERAGE\n",
+        "expected": "OK\nOK\nOK\n1\nOK\n34\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 5",
+        "input": "3\nAVERAGE\nADD 100\nAVERAGE\n",
+        "expected": "EMPTY\nOK\n100\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 12,
+    "chapterTitle": "12 Inheritance, polymorphism and aggregation",
+    "title": "Parcel dispatch catalogue",
+    "mode": "stdio",
+    "statement": "## Task\n\nModel a `Parcel` base class with a `charge()` method. `StandardParcel` charges 5 + 2 × weight; `ExpressParcel` charges 10 + 3 × weight. A `Dispatch` object aggregates mixed parcel objects and obtains each charge polymorphically. Process item additions and total queries.\n\n## Input\n\nFirst line: q. Each command is `ADD STANDARD weight`, `ADD EXPRESS weight`, or `TOTAL`. Weight is a positive integer.\n\n## Output\n\nFor ADD print that parcel's charge. For TOTAL print the sum of charges for all parcels added so far (0 before any ADD).\n\n## Limits and expectations\n\n0 <= q <= 300; 1 <= weight <= 1000. Output testing cannot by itself prove inheritance or polymorphism, so teachers should inspect the source.\n\nWrite a complete Python 3 program. Read standard input, write only the specified standard output, and do not print prompts. The judge checks observable behaviour, including edge cases; your teacher may inspect the source to confirm the requested technique.",
+    "objective": "Model a `Parcel` base class with a `charge()` method. `StandardParcel` charges 5 + 2 × weight; `ExpressParcel` charges 10 + 3 × weight. A `Dispatch` object aggregates mixed parcel objects and obtains each charge polymorphically. Process item additions and total queries.",
+    "inputDescription": "First line: q. Each command is `ADD STANDARD weight`, `ADD EXPRESS weight`, or `TOTAL`. Weight is a positive integer.",
+    "outputDescription": "For ADD print that parcel's charge. For TOTAL print the sum of charges for all parcels added so far (0 before any ADD).",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\n\nclass Parcel:\n    def __init__(self, weight):\n        self.weight = weight\n\n    def charge(self):\n        raise NotImplementedError\n\nclass StandardParcel(Parcel):\n    def charge(self):\n        return 5 + 2 * self.weight\n\nclass ExpressParcel(Parcel):\n    def charge(self):\n        return 10 + 3 * self.weight\n\nclass Dispatch:\n    def __init__(self):\n        self.parcels = []\n\n    def add(self, parcel):\n        self.parcels.append(parcel)\n        return parcel.charge()\n\n    def total(self):\n        return sum(parcel.charge() for parcel in self.parcels)\n\ndef main():\n    lines = sys.stdin.read().splitlines()\n    q = int(lines[0])\n    dispatch = Dispatch()\n    result = []\n    for line in lines[1:1 + q]:\n        parts = line.split()\n        if parts[0] == 'TOTAL':\n            result.append(str(dispatch.total()))\n            continue\n        weight = int(parts[2])\n        parcel = StandardParcel(weight) if parts[1] == 'STANDARD' else ExpressParcel(weight)\n        result.append(str(dispatch.add(parcel)))\n    print('\\n'.join(result))\n\nmain()\n",
+    "starterCode": "# Read standard input and write the required output.\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "exact",
+    "tags": [
+      "Cambridge 9618",
+      "Paper 4",
+      "OOP",
+      "Inheritance",
+      "Polymorphism",
+      "Aggregation"
+    ],
+    "source": "Original CodeMaster OJ practice for the Cambridge 9618 Paper 4 syllabus",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "5\nTOTAL\nADD STANDARD 2\nADD EXPRESS 2\nTOTAL\nADD STANDARD 1\n",
+        "expected": "0\n9\n16\n25\n7\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "3\nADD EXPRESS 1\nADD EXPRESS 10\nTOTAL\n",
+        "expected": "13\n40\n53\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal case 1",
+        "input": "0\n",
+        "expected": "\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 2",
+        "input": "2\nADD STANDARD 1\nTOTAL\n",
+        "expected": "7\n7\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 3",
+        "input": "4\nADD STANDARD 5\nADD EXPRESS 5\nTOTAL\nTOTAL\n",
+        "expected": "15\n25\n40\n40\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 4",
+        "input": "4\nTOTAL\nADD EXPRESS 100\nADD STANDARD 1\nTOTAL\n",
+        "expected": "0\n310\n7\n317\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 5",
+        "input": "5\nADD STANDARD 3\nADD EXPRESS 4\nADD STANDARD 2\nADD EXPRESS 1\nTOTAL\n",
+        "expected": "11\n22\n9\n13\n55\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 12,
+    "chapterTitle": "12 Inheritance, polymorphism and aggregation",
+    "title": "Mixed-media checkout",
+    "mode": "stdio",
+    "statement": "## Task\n\nDefine a `MediaItem` base class and `Book` and `Video` subclasses. A Book has a 21-day loan period, a Video a 7-day period. A `Library` contains a mixture of media items and asks the selected object's `loan_days()` method; an item may be checked out only once until returned.\n\n## Input\n\nFirst line: n. Next n lines: `code type` where type is BOOK or VIDEO. Next line: q. Then q commands: `LOOKUP code`, `BORROW code`, or `RETURN code`.\n\n## Output\n\nLOOKUP prints `days AVAILABLE` or `days OUT`. BORROW prints `days`, `OUT`, or `UNKNOWN`. RETURN prints `OK`, `AVAILABLE`, or `UNKNOWN`. A missing code always prints `UNKNOWN`.\n\n## Limits and expectations\n\n0 <= n,q <= 200. Item codes are unique. The judge tests state transitions; teachers should review the class hierarchy and aggregation.\n\nWrite a complete Python 3 program. Read standard input, write only the specified standard output, and do not print prompts. The judge checks observable behaviour, including edge cases; your teacher may inspect the source to confirm the requested technique.",
+    "objective": "Define a `MediaItem` base class and `Book` and `Video` subclasses. A Book has a 21-day loan period, a Video a 7-day period. A `Library` contains a mixture of media items and asks the selected object's `loan_days()` method; an item may be checked out only once until returned.",
+    "inputDescription": "First line: n. Next n lines: `code type` where type is BOOK or VIDEO. Next line: q. Then q commands: `LOOKUP code`, `BORROW code`, or `RETURN code`.",
+    "outputDescription": "LOOKUP prints `days AVAILABLE` or `days OUT`. BORROW prints `days`, `OUT`, or `UNKNOWN`. RETURN prints `OK`, `AVAILABLE`, or `UNKNOWN`. A missing code always prints `UNKNOWN`.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\n\nclass MediaItem:\n    def __init__(self):\n        self.out = False\n\n    def loan_days(self):\n        raise NotImplementedError\n\nclass Book(MediaItem):\n    def loan_days(self):\n        return 21\n\nclass Video(MediaItem):\n    def loan_days(self):\n        return 7\n\nclass Library:\n    def __init__(self):\n        self.items = {}\n\n    def add(self, code, item):\n        self.items[code] = item\n\n    def command(self, action, code):\n        item = self.items.get(code)\n        if item is None:\n            return 'UNKNOWN'\n        if action == 'LOOKUP':\n            return f\"{item.loan_days()} {'OUT' if item.out else 'AVAILABLE'}\"\n        if action == 'BORROW':\n            if item.out:\n                return 'OUT'\n            item.out = True\n            return str(item.loan_days())\n        if not item.out:\n            return 'AVAILABLE'\n        item.out = False\n        return 'OK'\n\ndef main():\n    lines = iter(sys.stdin.read().splitlines())\n    n = int(next(lines))\n    library = Library()\n    for _ in range(n):\n        code, kind = next(lines).split()\n        library.add(code, Book() if kind == 'BOOK' else Video())\n    q = int(next(lines))\n    print('\\n'.join(library.command(*next(lines).split()) for _ in range(q)))\n\nmain()\n",
+    "starterCode": "# Read standard input and write the required output.\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "exact",
+    "tags": [
+      "Cambridge 9618",
+      "Paper 4",
+      "OOP",
+      "Inheritance",
+      "Polymorphism",
+      "Aggregation"
+    ],
+    "source": "Original CodeMaster OJ practice for the Cambridge 9618 Paper 4 syllabus",
+    "samples": [
+      {
+        "name": "Example 1",
+        "input": "2\nB1 BOOK\nV1 VIDEO\n8\nLOOKUP B1\nBORROW B1\nBORROW B1\nLOOKUP V1\nBORROW V1\nRETURN B1\nLOOKUP B1\nLOOKUP X\n",
+        "expected": "21 AVAILABLE\n21\nOUT\n7 AVAILABLE\n7\nOK\n21 AVAILABLE\nUNKNOWN\n",
+        "enabled": true
+      },
+      {
+        "name": "Example 2",
+        "input": "1\nV2 VIDEO\n4\nRETURN V2\nBORROW V2\nRETURN V2\nRETURN V2\n",
+        "expected": "AVAILABLE\n7\nOK\nAVAILABLE\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal case 1",
+        "input": "0\n2\nLOOKUP MISSING\nRETURN MISSING\n",
+        "expected": "UNKNOWN\nUNKNOWN\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 2",
+        "input": "1\nB9 BOOK\n4\nBORROW B9\nLOOKUP B9\nRETURN B9\nBORROW B9\n",
+        "expected": "21\n21 OUT\nOK\n21\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 3",
+        "input": "2\nB BOOK\nV VIDEO\n5\nBORROW V\nBORROW B\nLOOKUP V\nRETURN V\nLOOKUP B\n",
+        "expected": "7\n21\n7 OUT\nOK\n21 OUT\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 4",
+        "input": "1\nONE BOOK\n0\n",
+        "expected": "\n",
+        "weight": 20.0,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 5",
+        "input": "2\nAA VIDEO\nBB BOOK\n6\nRETURN AA\nRETURN BB\nLOOKUP BB\nBORROW AA\nBORROW BB\nLOOKUP AA\n",
+        "expected": "AVAILABLE\nAVAILABLE\n21 AVAILABLE\n7\n21\n7 OUT\n",
+        "weight": 20.0,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 13,
+    "chapterTitle": "13 Text files and records",
+    "title": "Attendance snapshot from a text file",
+    "mode": "stdio",
+    "statement": "## Task\nAn attendance register contains records in the form ID,name,status. The status is P for present or A for absent. Write all input records to a UTF-8 text file, then reopen the file and derive the report from the stored records. Do not calculate the report directly from the input list.\n\n## Input\nThe first line is an integer n (0 to 20). Each of the next n lines has an ID, a name and a status separated by commas. IDs and names have no commas; status is P or A.\n\n## Output\nPrint exactly three lines: Present: count, Absent: count, and Absent names: names. Sort absent names in ascending alphabetical order and join them with comma-space. Print NONE when there are no absent students.\n\nThe judge checks the final output. A teacher may review the source to confirm that the text file was actually written and read.\n\n## Execution note\nThe OJ source directory is read-only. Create working text files inside a writable temporary directory, for example using Python tempfile.TemporaryDirectory(), and read them before that directory closes. Each test runs in a fresh isolated process; do not expect a file to survive between tests.\n",
+    "objective": "Create a text file of student records, read it back, and derive an attendance report.",
+    "inputDescription": "n, then n comma-separated ID,name,status records.",
+    "outputDescription": "Present count, absent count, and sorted absent names in three labelled lines.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\nimport tempfile\nfrom pathlib import Path\nlines = sys.stdin.read().splitlines()\nn = int(lines[0])\nwith tempfile.TemporaryDirectory() as folder:\n    file_path = Path(folder) / \"attendance.txt\"\n    with file_path.open(\"w\", encoding=\"utf-8\") as stream:\n        for record in lines[1:1+n]:\n            stream.write(record + \"\\n\")\n    present = 0\n    absent = []\n    with file_path.open(\"r\", encoding=\"utf-8\") as stream:\n        for record in stream:\n            student_id, name, status = record.rstrip(\"\\n\").split(\",\")\n            if status == \"P\":\n                present += 1\n            else:\n                absent.append(name)\nprint(f\"Present: {present}\")\nprint(f\"Absent: {len(absent)}\")\nprint(\"Absent names: \" + (\", \".join(sorted(absent)) if absent else \"NONE\"))\n",
+    "starterCode": "import tempfile\nfrom pathlib import Path\n\n# The source directory is read-only. Use a temporary directory for text files.\n# with tempfile.TemporaryDirectory() as folder:\n#     file_path = Path(folder) / \"records.txt\"\n\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618",
+      "Paper 4",
+      "Text files and records",
+      "records",
+      "text files"
+    ],
+    "source": "Original CodeMaster OJ practice for Cambridge 9618 Paper 4 preparation; not an official exam question.",
+    "samples": [
+      {
+        "name": "Sample 1",
+        "input": "3\nS01,Ada,P\nS02,Ben,A\nS03,Cara,A\n",
+        "expected": "Present: 1\nAbsent: 2\nAbsent names: Ben, Cara\n",
+        "enabled": true
+      },
+      {
+        "name": "Sample 2",
+        "input": "0\n",
+        "expected": "Present: 0\nAbsent: 0\nAbsent names: NONE\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal case 1",
+        "input": "1\n1,Mia,A\n",
+        "expected": "Present: 0\nAbsent: 1\nAbsent names: Mia\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 2",
+        "input": "4\nA,Zoe,P\nB,Ali,P\nC,Kai,P\nD,Eve,P\n",
+        "expected": "Present: 4\nAbsent: 0\nAbsent names: NONE\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 3",
+        "input": "5\n1,Zoe,A\n2,Amy,A\n3,Tim,P\n4,Bob,A\n5,Leo,P\n",
+        "expected": "Present: 2\nAbsent: 3\nAbsent names: Amy, Bob, Zoe\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 4",
+        "input": "2\n900,Noah,P\n901,Olivia,A\n",
+        "expected": "Present: 1\nAbsent: 1\nAbsent names: Olivia\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 5",
+        "input": "6\n1,A,P\n2,B,A\n3,C,P\n4,D,A\n5,E,P\n6,F,A\n",
+        "expected": "Present: 3\nAbsent: 3\nAbsent names: B, D, F\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 13,
+    "chapterTitle": "13 Text files and records",
+    "title": "Append-only event journal",
+    "mode": "stdio",
+    "statement": "## Task\nMaintain a UTF-8 event journal. ADD appends an actor-action record to the end of the text file. COUNT and LAST reopen and scan the saved file; they must not rely on an in-memory event list. An actor or action contains letters only and no vertical bar.\n\n## Input\nThe first line gives q (0 to 30). Then q lines are one of:\n- ADD|actor|action\n- COUNT|actor\n- LAST|actor\n\n## Output\nFor each ADD, print ADDED. For COUNT, print the number of matching records. For LAST, print the most recent action by that actor, or NONE. Finally print TOTAL followed by the total number of journal records.\n\nThe judge checks output; a teacher may inspect the program to check append mode and file replay.\n\n## Execution note\nThe OJ source directory is read-only. Create working text files inside a writable temporary directory, for example using Python tempfile.TemporaryDirectory(), and read them before that directory closes. Each test runs in a fresh isolated process; do not expect a file to survive between tests.\n",
+    "objective": "Append event records to a text file and answer queries by replaying the saved log.",
+    "inputDescription": "q, then q pipe-separated ADD, COUNT or LAST commands.",
+    "outputDescription": "One response per command and a final TOTAL count.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\nimport tempfile\nfrom pathlib import Path\nlines = sys.stdin.read().splitlines()\nq = int(lines[0])\nwith tempfile.TemporaryDirectory() as folder:\n    journal = Path(folder) / \"events.txt\"\n    journal.write_text(\"\", encoding=\"utf-8\")\n    for line in lines[1:1+q]:\n        command, actor, *rest = line.split(\"|\")\n        if command == \"ADD\":\n            with journal.open(\"a\", encoding=\"utf-8\") as stream:\n                stream.write(actor + \"|\" + rest[0] + \"\\n\")\n            print(\"ADDED\")\n        else:\n            with journal.open(\"r\", encoding=\"utf-8\") as stream:\n                actions = [action for row in stream for who, action in [row.rstrip(\"\\n\").split(\"|\")] if who == actor]\n            if command == \"COUNT\":\n                print(len(actions))\n            else:\n                print(actions[-1] if actions else \"NONE\")\n    with journal.open(\"r\", encoding=\"utf-8\") as stream:\n        print(\"TOTAL\", sum(1 for _ in stream))\n",
+    "starterCode": "import tempfile\nfrom pathlib import Path\n\n# The source directory is read-only. Use a temporary directory for text files.\n# with tempfile.TemporaryDirectory() as folder:\n#     file_path = Path(folder) / \"records.txt\"\n\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618",
+      "Paper 4",
+      "Text files and records",
+      "append",
+      "journal"
+    ],
+    "source": "Original CodeMaster OJ practice for Cambridge 9618 Paper 4 preparation; not an official exam question.",
+    "samples": [
+      {
+        "name": "Sample 1",
+        "input": "5\nADD|Ada|login\nADD|Ben|submit\nCOUNT|Ada\nLAST|Ben\nCOUNT|Cyd\n",
+        "expected": "ADDED\nADDED\n1\nsubmit\n0\nTOTAL 2\n",
+        "enabled": true
+      },
+      {
+        "name": "Sample 2",
+        "input": "3\nLAST|Amy\nCOUNT|Amy\nADD|Amy|start\n",
+        "expected": "NONE\n0\nADDED\nTOTAL 1\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal case 1",
+        "input": "0\n",
+        "expected": "TOTAL 0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 2",
+        "input": "5\nADD|A|one\nADD|A|two\nLAST|A\nCOUNT|A\nLAST|B\n",
+        "expected": "ADDED\nADDED\ntwo\n2\nNONE\nTOTAL 2\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 3",
+        "input": "4\nADD|A|x\nADD|B|y\nADD|A|z\nLAST|A\n",
+        "expected": "ADDED\nADDED\nADDED\nz\nTOTAL 3\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 4",
+        "input": "6\nCOUNT|Z\nADD|Z|open\nADD|Z|close\nLAST|Z\nCOUNT|Z\nCOUNT|Y\n",
+        "expected": "0\nADDED\nADDED\nclose\n2\n0\nTOTAL 2\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 5",
+        "input": "7\nADD|B|start\nADD|A|open\nLAST|B\nADD|B|finish\nLAST|B\nCOUNT|A\nCOUNT|B\n",
+        "expected": "ADDED\nADDED\nstart\nADDED\nfinish\n1\n2\nTOTAL 3\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 13,
+    "chapterTitle": "13 Text files and records",
+    "title": "CSV gradebook round trip",
+    "mode": "stdio",
+    "statement": "## Task\nWrite the input student-score records to a UTF-8 CSV file with a header ID,Score. Reopen that file and read the records to calculate the report. A passing score is at least 50. The highest student is the one with the greatest score; break ties by the alphabetically smallest ID. Use the CSV module or an equivalent parser.\n\n## Input\nThe first line is n (1 to 20). The next n lines have ID,score, where ID contains letters and digits, and score is an integer from 0 to 100.\n\n## Output\nPrint Average: followed by the arithmetic mean to exactly one decimal place, Passes: followed by the number of passing students, and Top: followed by the highest student's ID. One field per line.\n\nThe judge checks output. The write/read CSV round trip is also suitable for teacher source review.\n\n## Execution note\nThe OJ source directory is read-only. Create working text files inside a writable temporary directory, for example using Python tempfile.TemporaryDirectory(), and read them before that directory closes. Each test runs in a fresh isolated process; do not expect a file to survive between tests.\n",
+    "objective": "Write a CSV gradebook with a header, read it through the CSV parser, and calculate a report.",
+    "inputDescription": "n followed by n ID,score records.",
+    "outputDescription": "Average to one decimal, passing count, and top ID with alphabetical tie break.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import csv\nimport sys\nimport tempfile\nfrom pathlib import Path\nlines = sys.stdin.read().splitlines()\nn = int(lines[0])\nwith tempfile.TemporaryDirectory() as folder:\n    file_path = Path(folder) / \"grades.csv\"\n    with file_path.open(\"w\", newline=\"\", encoding=\"utf-8\") as stream:\n        writer = csv.writer(stream)\n        writer.writerow([\"ID\", \"Score\"])\n        for record in lines[1:1+n]:\n            writer.writerow(record.split(\",\"))\n    with file_path.open(\"r\", newline=\"\", encoding=\"utf-8\") as stream:\n        records = [(row[\"ID\"], int(row[\"Score\"])) for row in csv.DictReader(stream)]\nmean = sum(score for _, score in records) / len(records)\npasses = sum(score >= 50 for _, score in records)\ntop = min(records, key=lambda record: (-record[1], record[0]))[0]\nprint(f\"Average: {mean:.1f}\")\nprint(f\"Passes: {passes}\")\nprint(f\"Top: {top}\")\n",
+    "starterCode": "import tempfile\nfrom pathlib import Path\n\n# The source directory is read-only. Use a temporary directory for text files.\n# with tempfile.TemporaryDirectory() as folder:\n#     file_path = Path(folder) / \"records.txt\"\n\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618",
+      "Paper 4",
+      "Text files and records",
+      "CSV",
+      "records"
+    ],
+    "source": "Original CodeMaster OJ practice for Cambridge 9618 Paper 4 preparation; not an official exam question.",
+    "samples": [
+      {
+        "name": "Sample 1",
+        "input": "3\nS1,80\nS2,50\nS3,20\n",
+        "expected": "Average: 50.0\nPasses: 2\nTop: S1\n",
+        "enabled": true
+      },
+      {
+        "name": "Sample 2",
+        "input": "2\nB,95\nA,95\n",
+        "expected": "Average: 95.0\nPasses: 2\nTop: A\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal case 1",
+        "input": "1\nSolo,0\n",
+        "expected": "Average: 0.0\nPasses: 0\nTop: Solo\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 2",
+        "input": "4\nA,100\nB,99\nC,49\nD,50\n",
+        "expected": "Average: 74.5\nPasses: 3\nTop: A\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 3",
+        "input": "5\nQ,33\nR,67\nS,91\nT,44\nU,65\n",
+        "expected": "Average: 60.0\nPasses: 3\nTop: S\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 4",
+        "input": "3\nZ,50\nY,50\nX,50\n",
+        "expected": "Average: 50.0\nPasses: 3\nTop: X\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 5",
+        "input": "6\nA1,0\nA2,0\nA3,100\nA4,100\nA5,50\nA6,50\n",
+        "expected": "Average: 50.0\nPasses: 4\nTop: A3\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 14,
+    "chapterTitle": "14 Simulated random access files",
+    "title": "Linear-probing record file",
+    "mode": "stdio",
+    "statement": "## Task\nA simulated random-access record file has m numbered slots. Each line stores either - for an empty slot or key:value. The home slot for integer key k is k mod m. On collision, probe the following slots, wrapping after slot m-1. PUT inserts or updates; GET searches until it finds the key, an empty slot, or has checked all m slots. Save slot changes to the text file, and reload the file for searches.\n\n## Input\nThe first line contains m and q (3 <= m <= 17, 0 <= q <= 30). Each next line is PUT key value or GET key. Keys are non-negative integers, values are one uppercase word.\n\n## Output\nPUT prints STORED index, UPDATED index, or FULL. GET prints the value or NOT FOUND. The index is zero-based.\n\nThe judge checks output and collision behavior; a teacher may review the source for the actual fixed-slot text file. This is a text-file simulation, not byte-offset binary seek.\n\n## Execution note\nThe OJ source directory is read-only. Create working text files inside a writable temporary directory, for example using Python tempfile.TemporaryDirectory(), and read them before that directory closes. Each test runs in a fresh isolated process; do not expect a file to survive between tests.\n",
+    "objective": "Apply a hash function and linear probing to a fixed number of text-file slots.",
+    "inputDescription": "m q, then q PUT or GET commands.",
+    "outputDescription": "Response for every command, including zero-based slot positions for writes.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\nimport tempfile\nfrom pathlib import Path\nlines = sys.stdin.read().splitlines()\nm, q = map(int, lines[0].split())\nwith tempfile.TemporaryDirectory() as folder:\n    file_path = Path(folder) / \"slots.txt\"\n    file_path.write_text(\"-\\n\" * m, encoding=\"utf-8\")\n    for line in lines[1:1+q]:\n        parts = line.split()\n        command = parts[0]\n        key = int(parts[1])\n        slots = file_path.read_text(encoding=\"utf-8\").splitlines()\n        home = key % m\n        if command == \"PUT\":\n            value = parts[2]\n            outcome = \"FULL\"\n            for probe in range(m):\n                index = (home + probe) % m\n                if slots[index] == \"-\":\n                    slots[index] = f\"{key}:{value}\"\n                    outcome = f\"STORED {index}\"\n                    break\n                stored_key, _ = slots[index].split(\":\", 1)\n                if int(stored_key) == key:\n                    slots[index] = f\"{key}:{value}\"\n                    outcome = f\"UPDATED {index}\"\n                    break\n            file_path.write_text(\"\\n\".join(slots) + \"\\n\", encoding=\"utf-8\")\n            print(outcome)\n        else:\n            answer = \"NOT FOUND\"\n            for probe in range(m):\n                index = (home + probe) % m\n                if slots[index] == \"-\":\n                    break\n                stored_key, value = slots[index].split(\":\", 1)\n                if int(stored_key) == key:\n                    answer = value\n                    break\n            print(answer)\n",
+    "starterCode": "import tempfile\nfrom pathlib import Path\n\n# The source directory is read-only. Use a temporary directory for text files.\n# with tempfile.TemporaryDirectory() as folder:\n#     file_path = Path(folder) / \"records.txt\"\n\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618",
+      "Paper 4",
+      "Simulated random access files",
+      "hashing",
+      "linear probing"
+    ],
+    "source": "Original CodeMaster OJ practice for Cambridge 9618 Paper 4 preparation; not an official exam question.",
+    "samples": [
+      {
+        "name": "Sample 1",
+        "input": "5 5\nPUT 2 RED\nPUT 7 BLUE\nGET 7\nPUT 2 GREEN\nGET 12\n",
+        "expected": "STORED 2\nSTORED 3\nBLUE\nUPDATED 2\nNOT FOUND\n",
+        "enabled": true
+      },
+      {
+        "name": "Sample 2",
+        "input": "3 4\nPUT 2 A\nPUT 5 B\nPUT 8 C\nPUT 11 D\n",
+        "expected": "STORED 2\nSTORED 0\nSTORED 1\nFULL\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal case 1",
+        "input": "3 0\n",
+        "expected": "",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 2",
+        "input": "4 5\nPUT 3 A\nPUT 7 B\nPUT 11 C\nGET 7\nGET 15\n",
+        "expected": "STORED 3\nSTORED 0\nSTORED 1\nB\nNOT FOUND\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 3",
+        "input": "3 5\nPUT 0 A\nPUT 1 B\nPUT 2 C\nPUT 1 Z\nGET 1\n",
+        "expected": "STORED 0\nSTORED 1\nSTORED 2\nUPDATED 1\nZ\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 4",
+        "input": "5 5\nGET 9\nPUT 9 NINE\nGET 9\nPUT 14 FOURTEEN\nGET 14\n",
+        "expected": "NOT FOUND\nSTORED 4\nNINE\nSTORED 0\nFOURTEEN\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 5",
+        "input": "6 7\nPUT 5 A\nPUT 11 B\nPUT 17 C\nPUT 23 D\nGET 23\nGET 5\nGET 29\n",
+        "expected": "STORED 5\nSTORED 0\nSTORED 1\nSTORED 2\nD\nA\nNOT FOUND\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 14,
+    "chapterTitle": "14 Simulated random access files",
+    "title": "Tombstones in a text-file index",
+    "mode": "stdio",
+    "statement": "## Task\nBuild a fixed-size text-file hash index with m slots. A slot is - when never used, * when deleted, or contains an integer key. The home position is key mod m; collisions use linear probing with wraparound. ADD must reuse the first tombstone in the probe chain, while still detecting duplicates later in the chain. FIND and DEL must search past tombstones but stop at a never-used slot. Rewrite the text file after each mutation and read it for every operation.\n\n## Input\nThe first line contains m and q (3 <= m <= 17, 0 <= q <= 30). Each of the next q lines is ADD key, FIND key, or DEL key. Keys are non-negative integers.\n\n## Output\nADD prints STORED index, EXISTS index, or FULL. FIND prints FOUND index or NOT FOUND. DEL prints REMOVED index or NOT FOUND. Indices start at zero.\n\nThe judge checks outcomes; teacher review can confirm the record file and tombstone handling.\n\n## Execution note\nThe OJ source directory is read-only. Create working text files inside a writable temporary directory, for example using Python tempfile.TemporaryDirectory(), and read them before that directory closes. Each test runs in a fresh isolated process; do not expect a file to survive between tests.\n",
+    "objective": "Implement deletion without breaking a linear-probing search chain.",
+    "inputDescription": "m q followed by q ADD, FIND, or DEL commands.",
+    "outputDescription": "One line for each operation with status and zero-based index when applicable.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\nimport tempfile\nfrom pathlib import Path\nlines = sys.stdin.read().splitlines()\nm, q = map(int, lines[0].split())\nwith tempfile.TemporaryDirectory() as folder:\n    file_path = Path(folder) / \"index.txt\"\n    file_path.write_text(\"-\\n\" * m, encoding=\"utf-8\")\n    for line in lines[1:1+q]:\n        command, raw_key = line.split()\n        key = int(raw_key)\n        slots = file_path.read_text(encoding=\"utf-8\").splitlines()\n        first_deleted = None\n        found = None\n        empty = None\n        for probe in range(m):\n            index = (key % m + probe) % m\n            if slots[index] == \"-\":\n                empty = index\n                break\n            if slots[index] == \"*\" and first_deleted is None:\n                first_deleted = index\n            if slots[index] not in (\"-\", \"*\") and int(slots[index]) == key:\n                found = index\n                break\n        if command == \"ADD\":\n            if found is not None:\n                print(\"EXISTS\", found)\n            elif first_deleted is not None or empty is not None:\n                index = first_deleted if first_deleted is not None else empty\n                slots[index] = str(key)\n                file_path.write_text(\"\\n\".join(slots) + \"\\n\", encoding=\"utf-8\")\n                print(\"STORED\", index)\n            else:\n                print(\"FULL\")\n        elif command == \"FIND\":\n            print(\"FOUND \" + str(found) if found is not None else \"NOT FOUND\")\n        elif found is None:\n            print(\"NOT FOUND\")\n        else:\n            slots[found] = \"*\"\n            file_path.write_text(\"\\n\".join(slots) + \"\\n\", encoding=\"utf-8\")\n            print(\"REMOVED\", found)\n",
+    "starterCode": "import tempfile\nfrom pathlib import Path\n\n# The source directory is read-only. Use a temporary directory for text files.\n# with tempfile.TemporaryDirectory() as folder:\n#     file_path = Path(folder) / \"records.txt\"\n\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618",
+      "Paper 4",
+      "Simulated random access files",
+      "hashing",
+      "deletion"
+    ],
+    "source": "Original CodeMaster OJ practice for Cambridge 9618 Paper 4 preparation; not an official exam question.",
+    "samples": [
+      {
+        "name": "Sample 1",
+        "input": "5 7\nADD 2\nADD 7\nDEL 2\nFIND 7\nADD 12\nFIND 12\nFIND 2\n",
+        "expected": "STORED 2\nSTORED 3\nREMOVED 2\nFOUND 3\nSTORED 2\nFOUND 2\nNOT FOUND\n",
+        "enabled": true
+      },
+      {
+        "name": "Sample 2",
+        "input": "3 6\nADD 0\nADD 3\nADD 6\nDEL 3\nADD 9\nFIND 6\n",
+        "expected": "STORED 0\nSTORED 1\nSTORED 2\nREMOVED 1\nSTORED 1\nFOUND 2\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal case 1",
+        "input": "3 0\n",
+        "expected": "",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 2",
+        "input": "5 6\nADD 1\nADD 6\nADD 11\nDEL 6\nADD 11\nFIND 11\n",
+        "expected": "STORED 1\nSTORED 2\nSTORED 3\nREMOVED 2\nEXISTS 3\nFOUND 3\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 3",
+        "input": "3 5\nADD 0\nADD 1\nADD 2\nADD 3\nFIND 2\n",
+        "expected": "STORED 0\nSTORED 1\nSTORED 2\nFULL\nFOUND 2\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 4",
+        "input": "4 6\nDEL 9\nADD 9\nDEL 9\nFIND 9\nADD 13\nFIND 13\n",
+        "expected": "NOT FOUND\nSTORED 1\nREMOVED 1\nNOT FOUND\nSTORED 1\nFOUND 1\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 5",
+        "input": "6 7\nADD 5\nADD 11\nADD 17\nDEL 5\nFIND 17\nADD 23\nFIND 23\n",
+        "expected": "STORED 5\nSTORED 0\nSTORED 1\nREMOVED 5\nFOUND 1\nSTORED 5\nFOUND 5\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 14,
+    "chapterTitle": "14 Simulated random access files",
+    "title": "Collision probe audit",
+    "mode": "stdio",
+    "statement": "## Task\nStore integer keys in m numbered text-file slots using home slot key mod m and linear probing. Ignore duplicate insertions. For each SEARCH, report whether the key exists, and how many slots were inspected. Stop at the first never-used slot or after m probes. Loading and searching must read the stored text file; insertion rewrites it.\n\n## Input\nThe first line contains m and q (3 <= m <= 17, 0 <= q <= 30). Then q commands are INSERT key or SEARCH key, with non-negative integer keys.\n\n## Output\nINSERT prints INSERTED index, EXISTS index, or FULL. SEARCH prints FOUND index PROBES count, or NOT FOUND PROBES count. A probe always inspects one slot, even if it is empty.\n\nThe judge checks visible probe counts. Teacher review can verify text-file persistence.\n\n## Execution note\nThe OJ source directory is read-only. Create working text files inside a writable temporary directory, for example using Python tempfile.TemporaryDirectory(), and read them before that directory closes. Each test runs in a fresh isolated process; do not expect a file to survive between tests.\n",
+    "objective": "Persist a linear-probing table and count probes for successful and unsuccessful searches.",
+    "inputDescription": "m q followed by INSERT or SEARCH commands.",
+    "outputDescription": "Insertion status or search result with the exact number of inspected slots.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\nimport tempfile\nfrom pathlib import Path\nlines = sys.stdin.read().splitlines()\nm, q = map(int, lines[0].split())\nwith tempfile.TemporaryDirectory() as folder:\n    path = Path(folder) / \"audit.txt\"\n    path.write_text(\"-\\n\" * m, encoding=\"utf-8\")\n    for line in lines[1:1+q]:\n        command, raw_key = line.split()\n        key = int(raw_key)\n        slots = path.read_text(encoding=\"utf-8\").splitlines()\n        found = None\n        empty = None\n        probes = 0\n        for step in range(m):\n            index = (key % m + step) % m\n            probes += 1\n            if slots[index] == \"-\":\n                empty = index\n                break\n            if int(slots[index]) == key:\n                found = index\n                break\n        if command == \"INSERT\":\n            if found is not None:\n                print(\"EXISTS\", found)\n            elif empty is not None:\n                slots[empty] = str(key)\n                path.write_text(\"\\n\".join(slots) + \"\\n\", encoding=\"utf-8\")\n                print(\"INSERTED\", empty)\n            else:\n                print(\"FULL\")\n        else:\n            print(f\"FOUND {found} PROBES {probes}\" if found is not None\n                  else f\"NOT FOUND PROBES {probes}\")\n",
+    "starterCode": "import tempfile\nfrom pathlib import Path\n\n# The source directory is read-only. Use a temporary directory for text files.\n# with tempfile.TemporaryDirectory() as folder:\n#     file_path = Path(folder) / \"records.txt\"\n\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618",
+      "Paper 4",
+      "Simulated random access files",
+      "hashing",
+      "probe analysis"
+    ],
+    "source": "Original CodeMaster OJ practice for Cambridge 9618 Paper 4 preparation; not an official exam question.",
+    "samples": [
+      {
+        "name": "Sample 1",
+        "input": "5 5\nINSERT 2\nINSERT 7\nSEARCH 7\nSEARCH 12\nSEARCH 3\n",
+        "expected": "INSERTED 2\nINSERTED 3\nFOUND 3 PROBES 2\nNOT FOUND PROBES 3\nNOT FOUND PROBES 2\n",
+        "enabled": true
+      },
+      {
+        "name": "Sample 2",
+        "input": "3 4\nINSERT 0\nINSERT 3\nINSERT 6\nSEARCH 9\n",
+        "expected": "INSERTED 0\nINSERTED 1\nINSERTED 2\nNOT FOUND PROBES 3\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal case 1",
+        "input": "4 1\nSEARCH 1\n",
+        "expected": "NOT FOUND PROBES 1\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 2",
+        "input": "3 5\nINSERT 2\nINSERT 5\nSEARCH 8\nSEARCH 5\nSEARCH 0\n",
+        "expected": "INSERTED 2\nINSERTED 0\nNOT FOUND PROBES 3\nFOUND 0 PROBES 2\nNOT FOUND PROBES 2\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 3",
+        "input": "5 5\nINSERT 1\nINSERT 6\nINSERT 1\nSEARCH 1\nSEARCH 11\n",
+        "expected": "INSERTED 1\nINSERTED 2\nEXISTS 1\nFOUND 1 PROBES 1\nNOT FOUND PROBES 3\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 4",
+        "input": "3 5\nINSERT 0\nINSERT 1\nINSERT 2\nINSERT 3\nSEARCH 6\n",
+        "expected": "INSERTED 0\nINSERTED 1\nINSERTED 2\nFULL\nNOT FOUND PROBES 3\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 5",
+        "input": "6 7\nINSERT 5\nINSERT 11\nINSERT 17\nINSERT 23\nSEARCH 23\nSEARCH 29\nSEARCH 0\n",
+        "expected": "INSERTED 5\nINSERTED 0\nINSERTED 1\nINSERTED 2\nFOUND 2 PROBES 4\nNOT FOUND PROBES 5\nNOT FOUND PROBES 4\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 15,
+    "chapterTitle": "15 Exceptions and defensive programming",
+    "title": "Validated sensor readings",
+    "mode": "stdio",
+    "statement": "## Task\nA sensor produces one reading per line. A valid reading is an integer from -40 to 85 inclusive. Ignore malformed lines and out-of-range values. Use exception handling for integer conversion; one bad reading must not stop the remaining input.\n\n## Input\nThe first line is n (0 to 30). The next n lines each contain one reading, which may be invalid text.\n\n## Output\nPrint Valid: count, Sum: sum, Rejected: count, and Maximum: value. For no valid readings, print Maximum: NONE. Use exactly these four labelled lines.\n\nThe judge checks results on boundary and malformed values. A teacher may inspect the source for appropriate exception handling.",
+    "objective": "Recover from invalid numeric input without crashing or counting rejected readings.",
+    "inputDescription": "n followed by n lines, each of which may or may not be a valid integer.",
+    "outputDescription": "Valid count, valid sum, rejected count, and maximum valid reading.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\nlines = sys.stdin.read().splitlines()\nn = int(lines[0])\nvalid = []\nrejected = 0\nfor raw in lines[1:1+n]:\n    try:\n        value = int(raw.strip())\n    except ValueError:\n        rejected += 1\n        continue\n    if not -40 <= value <= 85:\n        rejected += 1\n    else:\n        valid.append(value)\nprint(\"Valid:\", len(valid))\nprint(\"Sum:\", sum(valid))\nprint(\"Rejected:\", rejected)\nprint(\"Maximum:\", max(valid) if valid else \"NONE\")\n",
+    "starterCode": "# Read standard input and print only the requested output.\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618",
+      "Paper 4",
+      "Exceptions and defensive programming",
+      "validation",
+      "exceptions"
+    ],
+    "source": "Original CodeMaster OJ practice for Cambridge 9618 Paper 4 preparation; not an official exam question.",
+    "samples": [
+      {
+        "name": "Sample 1",
+        "input": "5\n10\nbad\n-40\n86\n0\n",
+        "expected": "Valid: 3\nSum: -30\nRejected: 2\nMaximum: 10\n",
+        "enabled": true
+      },
+      {
+        "name": "Sample 2",
+        "input": "3\nx\n100\n \n",
+        "expected": "Valid: 0\nSum: 0\nRejected: 3\nMaximum: NONE\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal case 1",
+        "input": "0\n",
+        "expected": "Valid: 0\nSum: 0\nRejected: 0\nMaximum: NONE\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 2",
+        "input": "4\n-40\n85\n-41\n86\n",
+        "expected": "Valid: 2\nSum: 45\nRejected: 2\nMaximum: 85\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 3",
+        "input": "5\n1\n2\n3\n4\n5\n",
+        "expected": "Valid: 5\nSum: 15\nRejected: 0\nMaximum: 5\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 4",
+        "input": "6\nabc\n0\n+7\n-8\n2.5\n9\n",
+        "expected": "Valid: 4\nSum: 8\nRejected: 2\nMaximum: 9\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 5",
+        "input": "7\n85\n85\n-40\nnone\n-40\n0\n999\n",
+        "expected": "Valid: 5\nSum: 90\nRejected: 2\nMaximum: 85\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 15,
+    "chapterTitle": "15 Exceptions and defensive programming",
+    "title": "Recoverable transaction ledger",
+    "mode": "stdio",
+    "statement": "## Task\nProcess a simple account ledger. Commands are DEPOSIT amount and WITHDRAW amount. An amount must be a positive integer; malformed text, zero and negative values are rejected. A withdrawal cannot exceed the current balance. Each invalid command must leave the balance unchanged so processing can continue. Use exception handling for numeric conversion, and explicit validation for the business rules.\n\n## Input\nThe first line contains the non-negative initial balance and q (0 to 30). Then q lines each contain a command followed by an amount token. The amount token may be malformed.\n\n## Output\nFor each command print OK balance, ERROR INVALID, or ERROR FUNDS. After all commands print FINAL balance.\n\nThe judge checks the recovery and unchanged balance after errors.",
+    "objective": "Keep an account balance unchanged when a command is malformed or impossible.",
+    "inputDescription": "Initial balance and command count, then DEPOSIT/WITHDRAW amount commands.",
+    "outputDescription": "One status per command and the final balance.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\nlines = sys.stdin.read().splitlines()\nbalance, q = map(int, lines[0].split())\nfor line in lines[1:1+q]:\n    command, raw_amount = line.split(maxsplit=1)\n    try:\n        amount = int(raw_amount)\n    except ValueError:\n        print(\"ERROR INVALID\")\n        continue\n    if amount <= 0:\n        print(\"ERROR INVALID\")\n    elif command == \"WITHDRAW\" and amount > balance:\n        print(\"ERROR FUNDS\")\n    else:\n        balance += amount if command == \"DEPOSIT\" else -amount\n        print(\"OK\", balance)\nprint(\"FINAL\", balance)\n",
+    "starterCode": "# Read standard input and print only the requested output.\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618",
+      "Paper 4",
+      "Exceptions and defensive programming",
+      "transactions",
+      "defensive programming"
+    ],
+    "source": "Original CodeMaster OJ practice for Cambridge 9618 Paper 4 preparation; not an official exam question.",
+    "samples": [
+      {
+        "name": "Sample 1",
+        "input": "20 4\nDEPOSIT 5\nWITHDRAW 30\nWITHDRAW 10\nDEPOSIT x\n",
+        "expected": "OK 25\nERROR FUNDS\nOK 15\nERROR INVALID\nFINAL 15\n",
+        "enabled": true
+      },
+      {
+        "name": "Sample 2",
+        "input": "0 3\nWITHDRAW 1\nDEPOSIT 1\nWITHDRAW 1\n",
+        "expected": "ERROR FUNDS\nOK 1\nOK 0\nFINAL 0\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal case 1",
+        "input": "0 0\n",
+        "expected": "FINAL 0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 2",
+        "input": "50 5\nDEPOSIT 0\nWITHDRAW -2\nDEPOSIT abc\nWITHDRAW 10\nWITHDRAW 40\n",
+        "expected": "ERROR INVALID\nERROR INVALID\nERROR INVALID\nOK 40\nOK 0\nFINAL 0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 3",
+        "input": "5 4\nWITHDRAW 5\nDEPOSIT +3\nWITHDRAW 4\nDEPOSIT 2\n",
+        "expected": "OK 0\nOK 3\nERROR FUNDS\nOK 5\nFINAL 5\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 4",
+        "input": "100 3\nWITHDRAW 60\nWITHDRAW 40\nWITHDRAW 1\n",
+        "expected": "OK 40\nOK 0\nERROR FUNDS\nFINAL 0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 5",
+        "input": "12 5\nDEPOSIT 8\nWITHDRAW 10\nDEPOSIT 001\nWITHDRAW 11\nWITHDRAW 0\n",
+        "expected": "OK 20\nOK 10\nOK 11\nOK 0\nERROR INVALID\nFINAL 0\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 15,
+    "chapterTitle": "15 Exceptions and defensive programming",
+    "title": "Import a damaged sales file",
+    "mode": "stdio",
+    "statement": "## Task\nCopy the supplied lines into a UTF-8 sales text file, reopen it, and parse each row as code,quantity,unit_price. The code is one uppercase word. Quantity must be a positive integer; unit_price must be a non-negative decimal with at most two fractional digits. A malformed row must be counted as rejected without ending the import. Use Decimal for money so the final amount is exact.\n\n## Input\nThe first line gives n (0 to 30). The next n lines are raw file rows. They may have missing fields, invalid numbers or negative quantities.\n\n## Output\nPrint Accepted: count, Rejected: count, and Revenue: amount. Format revenue with exactly two decimal places. The judge checks the report; file creation and robust parsing can be reviewed by a teacher.\n\n## Execution note\nThe OJ source directory is read-only. Create working text files inside a writable temporary directory, for example using Python tempfile.TemporaryDirectory(), and read them before that directory closes. Each test runs in a fresh isolated process; do not expect a file to survive between tests.\n",
+    "objective": "Read a text file of sales records, skip malformed rows, and report the valid total.",
+    "inputDescription": "n followed by n raw comma-separated sale rows.",
+    "outputDescription": "Accepted count, rejected count, and exact revenue to two decimal places.",
+    "difficulty": "Intermediate",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\nimport tempfile\nfrom decimal import Decimal, InvalidOperation\nfrom pathlib import Path\nlines = sys.stdin.read().splitlines()\nn = int(lines[0])\naccepted = 0\nrejected = 0\nrevenue = Decimal(\"0\")\nwith tempfile.TemporaryDirectory() as folder:\n    source = Path(folder) / \"sales.txt\"\n    source.write_text(\"\\n\".join(lines[1:1+n]) + (\"\\n\" if n else \"\"), encoding=\"utf-8\")\n    with source.open(\"r\", encoding=\"utf-8\") as stream:\n        for raw in stream:\n            parts = raw.rstrip(\"\\n\").split(\",\")\n            try:\n                if len(parts) != 3:\n                    raise ValueError(\"wrong number of fields\")\n                code, raw_quantity, raw_price = parts\n                if not code.isalpha() or not code.isupper():\n                    raise ValueError(\"invalid code\")\n                quantity = int(raw_quantity)\n                price = Decimal(raw_price)\n                if quantity <= 0 or price < 0 or not price.is_finite() or price.as_tuple().exponent < -2:\n                    raise ValueError(\"invalid amount\")\n            except (ValueError, InvalidOperation):\n                rejected += 1\n                continue\n            accepted += 1\n            revenue += quantity * price\nprint(\"Accepted:\", accepted)\nprint(\"Rejected:\", rejected)\nprint(f\"Revenue: {revenue:.2f}\")\n",
+    "starterCode": "import tempfile\nfrom pathlib import Path\n\n# The source directory is read-only. Use a temporary directory for text files.\n# with tempfile.TemporaryDirectory() as folder:\n#     file_path = Path(folder) / \"records.txt\"\n\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618",
+      "Paper 4",
+      "Exceptions and defensive programming",
+      "files",
+      "exception handling"
+    ],
+    "source": "Original CodeMaster OJ practice for Cambridge 9618 Paper 4 preparation; not an official exam question.",
+    "samples": [
+      {
+        "name": "Sample 1",
+        "input": "5\nPEN,2,1.25\nBAD,0,2.00\nBOOK,1,10\nINK,no,3.50\nTAPE,3,0.50\n",
+        "expected": "Accepted: 3\nRejected: 2\nRevenue: 14.00\n",
+        "enabled": true
+      },
+      {
+        "name": "Sample 2",
+        "input": "3\nA,1,0\nB,2,3.50\nbroken\n",
+        "expected": "Accepted: 2\nRejected: 1\nRevenue: 7.00\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal case 1",
+        "input": "0\n",
+        "expected": "Accepted: 0\nRejected: 0\nRevenue: 0.00\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 2",
+        "input": "4\nA,1,1.234\nB,2,-1\nC,1,2.00\nD,3,0.10\n",
+        "expected": "Accepted: 2\nRejected: 2\nRevenue: 2.30\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 3",
+        "input": "5\nA,1,0.01\nB,1,0.01\nC,1,0.01\nD,1,0.01\nE,1,0.01\n",
+        "expected": "Accepted: 5\nRejected: 0\nRevenue: 0.05\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 4",
+        "input": "4\nA,1,3\nB,2,4.5\nC,3,0.00\nD,4,2.25\n",
+        "expected": "Accepted: 4\nRejected: 0\nRevenue: 21.00\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 5",
+        "input": "6\nx,2,1.00\nQ,,2.00\nM,1,nan\nN,2,3.40\nO,5,0.20\nP,1,1.99\n",
+        "expected": "Accepted: 3\nRejected: 3\nRevenue: 9.79\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 16,
+    "chapterTitle": "16 Integrated practical projects and mock exam practice",
+    "title": "File-backed stockroom processor",
+    "mode": "stdio",
+    "statement": "## Task\nMaintain a stockroom of named products. Use a UTF-8 text file containing product,quantity records; read it before every command and rewrite it after successful changes. A product is an uppercase word. RECEIVE adds a positive quantity, SELL removes a positive quantity only if enough stock exists, and COUNT reports the current quantity (zero for an unknown product). Invalid quantities or insufficient stock must not alter the file.\n\n## Input\nThe first line is q (0 to 30). Each of the next q lines is RECEIVE product amount, SELL product amount, or COUNT product. Amount may be invalid text.\n\n## Output\nRECEIVE and SELL print OK new_quantity, ERROR INVALID, or ERROR STOCK. COUNT prints the quantity only. Finally print INVENTORY followed by a comma-separated product:quantity list in alphabetical order; print INVENTORY EMPTY if no product has ever been successfully received. Products with zero stock remain in the file and report.\n\nThe judge checks output. A teacher can review whether updates really use the text file.\n\n## Execution note\nThe OJ source directory is read-only. Create working text files inside a writable temporary directory, for example using Python tempfile.TemporaryDirectory(), and read them before that directory closes. Each test runs in a fresh isolated process; do not expect a file to survive between tests.\n",
+    "objective": "Combine record-file updates, validation and deterministic stock reports.",
+    "inputDescription": "q, followed by RECEIVE/SELL/COUNT commands.",
+    "outputDescription": "One response per command and a final sorted INVENTORY line.",
+    "difficulty": "Advanced",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\nimport tempfile\nfrom pathlib import Path\nlines = sys.stdin.read().splitlines()\nq = int(lines[0])\nwith tempfile.TemporaryDirectory() as folder:\n    source = Path(folder) / \"stock.txt\"\n    source.write_text(\"\", encoding=\"utf-8\")\n    for command_line in lines[1:1+q]:\n        parts = command_line.split()\n        command, product = parts[:2]\n        records = {}\n        with source.open(\"r\", encoding=\"utf-8\") as stream:\n            for row in stream:\n                name, quantity = row.strip().split(\",\")\n                records[name] = int(quantity)\n        if command == \"COUNT\":\n            print(records.get(product, 0))\n            continue\n        try:\n            amount = int(parts[2])\n        except ValueError:\n            print(\"ERROR INVALID\")\n            continue\n        if amount <= 0:\n            print(\"ERROR INVALID\")\n            continue\n        current = records.get(product, 0)\n        if command == \"SELL\" and amount > current:\n            print(\"ERROR STOCK\")\n            continue\n        records[product] = current + amount if command == \"RECEIVE\" else current - amount\n        with source.open(\"w\", encoding=\"utf-8\") as stream:\n            for name in sorted(records):\n                stream.write(f\"{name},{records[name]}\\n\")\n        print(\"OK\", records[product])\n    with source.open(\"r\", encoding=\"utf-8\") as stream:\n        final = [row.strip().split(\",\") for row in stream]\n    print(\"INVENTORY \" + (\",\".join(f\"{name}:{quantity}\" for name, quantity in final) if final else \"EMPTY\"))\n",
+    "starterCode": "import tempfile\nfrom pathlib import Path\n\n# The source directory is read-only. Use a temporary directory for text files.\n# with tempfile.TemporaryDirectory() as folder:\n#     file_path = Path(folder) / \"records.txt\"\n\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618",
+      "Paper 4",
+      "Integrated practical projects and mock exam practice",
+      "project",
+      "records",
+      "file updates"
+    ],
+    "source": "Original CodeMaster OJ practice for Cambridge 9618 Paper 4 preparation; not an official exam question.",
+    "samples": [
+      {
+        "name": "Sample 1",
+        "input": "6\nRECEIVE PEN 5\nSELL PEN 2\nCOUNT PEN\nSELL BOOK 1\nRECEIVE BOOK 3\nCOUNT BOOK\n",
+        "expected": "OK 5\nOK 3\n3\nERROR STOCK\nOK 3\n3\nINVENTORY BOOK:3,PEN:3\n",
+        "enabled": true
+      },
+      {
+        "name": "Sample 2",
+        "input": "4\nSELL A 1\nRECEIVE A x\nCOUNT A\nRECEIVE A 1\n",
+        "expected": "ERROR STOCK\nERROR INVALID\n0\nOK 1\nINVENTORY A:1\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal case 1",
+        "input": "0\n",
+        "expected": "INVENTORY EMPTY\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 2",
+        "input": "6\nRECEIVE B 5\nRECEIVE A 2\nSELL B 5\nCOUNT B\nCOUNT A\nCOUNT C\n",
+        "expected": "OK 5\nOK 2\nOK 0\n0\n2\n0\nINVENTORY A:2,B:0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 3",
+        "input": "5\nRECEIVE BOX 10\nRECEIVE BOX 5\nSELL BOX 16\nSELL BOX 15\nCOUNT BOX\n",
+        "expected": "OK 10\nOK 15\nERROR STOCK\nOK 0\n0\nINVENTORY BOX:0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 4",
+        "input": "4\nRECEIVE X 0\nRECEIVE X -1\nSELL X abc\nCOUNT X\n",
+        "expected": "ERROR INVALID\nERROR INVALID\nERROR INVALID\n0\nINVENTORY EMPTY\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 5",
+        "input": "7\nRECEIVE Z 3\nRECEIVE A 2\nSELL Z 1\nSELL A 2\nCOUNT Z\nCOUNT A\nCOUNT M\n",
+        "expected": "OK 3\nOK 2\nOK 2\nOK 0\n2\n0\n0\nINVENTORY A:0,Z:2\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 16,
+    "chapterTitle": "16 Integrated practical projects and mock exam practice",
+    "title": "Circular service queue and completion log",
+    "mode": "stdio",
+    "statement": "## Task\nImplement a circular queue of capacity m using a fixed list and head, tail and count. ARRIVE adds a name unless full. SERVE removes and reports the oldest name, or EMPTY. Every served name must also be appended to a UTF-8 completion log. At the end, reopen the log to count completed requests. A name is one uppercase word.\n\n## Input\nThe first line contains m and q (1 <= m <= 20, 0 <= q <= 30). Then q lines are ARRIVE name or SERVE.\n\n## Output\nARRIVE prints WAITING name or FULL name. SERVE prints SERVED name or EMPTY. Finally print COMPLETED count and WAITING count on separate lines.\n\nThe judge checks FIFO, capacity and wraparound through output; source structure and actual log append can be reviewed by a teacher.\n\n## Execution note\nThe OJ source directory is read-only. Create working text files inside a writable temporary directory, for example using Python tempfile.TemporaryDirectory(), and read them before that directory closes. Each test runs in a fresh isolated process; do not expect a file to survive between tests.\n",
+    "objective": "Build a bounded circular queue, serve requests in FIFO order, and replay a completion file.",
+    "inputDescription": "m q followed by ARRIVE name and SERVE commands.",
+    "outputDescription": "A response per command, then completed and waiting counts.",
+    "difficulty": "Advanced",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\nimport tempfile\nfrom pathlib import Path\nlines = sys.stdin.read().splitlines()\ncapacity, q = map(int, lines[0].split())\nqueue = [None] * capacity\nhead = 0\ntail = 0\ncount = 0\nwith tempfile.TemporaryDirectory() as folder:\n    log = Path(folder) / \"completed.txt\"\n    log.write_text(\"\", encoding=\"utf-8\")\n    for line in lines[1:1+q]:\n        parts = line.split()\n        if parts[0] == \"ARRIVE\":\n            name = parts[1]\n            if count == capacity:\n                print(\"FULL\", name)\n            else:\n                queue[tail] = name\n                tail = (tail + 1) % capacity\n                count += 1\n                print(\"WAITING\", name)\n        elif count == 0:\n            print(\"EMPTY\")\n        else:\n            name = queue[head]\n            queue[head] = None\n            head = (head + 1) % capacity\n            count -= 1\n            with log.open(\"a\", encoding=\"utf-8\") as stream:\n                stream.write(name + \"\\n\")\n            print(\"SERVED\", name)\n    with log.open(\"r\", encoding=\"utf-8\") as stream:\n        completed = sum(1 for _ in stream)\nprint(\"COMPLETED\", completed)\nprint(\"WAITING\", count)\n",
+    "starterCode": "import tempfile\nfrom pathlib import Path\n\n# The source directory is read-only. Use a temporary directory for text files.\n# with tempfile.TemporaryDirectory() as folder:\n#     file_path = Path(folder) / \"records.txt\"\n\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618",
+      "Paper 4",
+      "Integrated practical projects and mock exam practice",
+      "project",
+      "circular queue",
+      "append log"
+    ],
+    "source": "Original CodeMaster OJ practice for Cambridge 9618 Paper 4 preparation; not an official exam question.",
+    "samples": [
+      {
+        "name": "Sample 1",
+        "input": "2 6\nARRIVE ADA\nARRIVE BEN\nARRIVE CYD\nSERVE\nARRIVE CYD\nSERVE\n",
+        "expected": "WAITING ADA\nWAITING BEN\nFULL CYD\nSERVED ADA\nWAITING CYD\nSERVED BEN\nCOMPLETED 2\nWAITING 1\n",
+        "enabled": true
+      },
+      {
+        "name": "Sample 2",
+        "input": "1 5\nSERVE\nARRIVE A\nARRIVE B\nSERVE\nSERVE\n",
+        "expected": "EMPTY\nWAITING A\nFULL B\nSERVED A\nEMPTY\nCOMPLETED 1\nWAITING 0\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal case 1",
+        "input": "3 0\n",
+        "expected": "COMPLETED 0\nWAITING 0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 2",
+        "input": "3 8\nARRIVE A\nARRIVE B\nSERVE\nARRIVE C\nARRIVE D\nSERVE\nSERVE\nSERVE\n",
+        "expected": "WAITING A\nWAITING B\nSERVED A\nWAITING C\nWAITING D\nSERVED B\nSERVED C\nSERVED D\nCOMPLETED 4\nWAITING 0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 3",
+        "input": "2 7\nARRIVE X\nARRIVE Y\nSERVE\nARRIVE Z\nSERVE\nSERVE\nSERVE\n",
+        "expected": "WAITING X\nWAITING Y\nSERVED X\nWAITING Z\nSERVED Y\nSERVED Z\nEMPTY\nCOMPLETED 3\nWAITING 0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 4",
+        "input": "1 6\nARRIVE A\nSERVE\nARRIVE B\nSERVE\nARRIVE C\nSERVE\n",
+        "expected": "WAITING A\nSERVED A\nWAITING B\nSERVED B\nWAITING C\nSERVED C\nCOMPLETED 3\nWAITING 0\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 5",
+        "input": "4 7\nARRIVE A\nARRIVE B\nARRIVE C\nARRIVE D\nARRIVE E\nSERVE\nARRIVE F\n",
+        "expected": "WAITING A\nWAITING B\nWAITING C\nWAITING D\nFULL E\nSERVED A\nWAITING F\nCOMPLETED 1\nWAITING 4\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "chapterNumber": 16,
+    "chapterTitle": "16 Integrated practical projects and mock exam practice",
+    "title": "Binary-search-tree index and sorted export",
+    "mode": "stdio",
+    "statement": "## Task\nCreate a binary search tree of integer keys. Insert duplicate keys only once. Smaller keys go left and greater keys go right. SEARCH reports whether a key exists; HEIGHT is the number of nodes on the longest root-to-leaf path (an empty tree has height 0). Finally use an in-order traversal to write the sorted keys, one per line, to a UTF-8 text file. Reopen that file and print its comma-separated contents.\n\n## Input\nThe first line contains n and q (0 <= n <= 20, 0 <= q <= 20). The next line contains n space-separated integers; it is empty when n is 0. The following q lines are SEARCH key or HEIGHT. Keys may be negative.\n\n## Output\nEach SEARCH prints YES or NO. Each HEIGHT prints one integer. End with SORTED followed by the ascending keys joined with comma-space; use SORTED EMPTY for an empty tree.\n\nThe judge checks behavior. A teacher may inspect the class, recursive traversal and file export.\n\n## Execution note\nThe OJ source directory is read-only. Create working text files inside a writable temporary directory, for example using Python tempfile.TemporaryDirectory(), and read them before that directory closes. Each test runs in a fresh isolated process; do not expect a file to survive between tests.\n",
+    "objective": "Combine object-oriented nodes, insertion, in-order traversal and a text-file report.",
+    "inputDescription": "n q, a line of n integer keys, then q SEARCH/HEIGHT commands.",
+    "outputDescription": "Query results and a final SORTED line read back from the exported file.",
+    "difficulty": "Advanced",
+    "referenceLanguage": "python",
+    "referenceCode": "import sys\nimport tempfile\nfrom pathlib import Path\nclass Node:\n    def __init__(self, key):\n        self.key = key\n        self.left = None\n        self.right = None\ndef insert(node, key):\n    if node is None:\n        return Node(key)\n    if key < node.key:\n        node.left = insert(node.left, key)\n    elif key > node.key:\n        node.right = insert(node.right, key)\n    return node\ndef contains(node, key):\n    while node is not None:\n        if node.key == key:\n            return True\n        node = node.left if key < node.key else node.right\n    return False\ndef height(node):\n    return 0 if node is None else 1 + max(height(node.left), height(node.right))\ndef inorder(node, stream):\n    if node is None:\n        return\n    inorder(node.left, stream)\n    stream.write(str(node.key) + \"\\n\")\n    inorder(node.right, stream)\nlines = sys.stdin.read().splitlines()\nn, q = map(int, lines[0].split())\nroot = None\nfor raw in lines[1].split():\n    root = insert(root, int(raw))\nfor command in lines[2:2+q]:\n    parts = command.split()\n    if parts[0] == \"HEIGHT\":\n        print(height(root))\n    else:\n        print(\"YES\" if contains(root, int(parts[1])) else \"NO\")\nwith tempfile.TemporaryDirectory() as folder:\n    path = Path(folder) / \"ordered.txt\"\n    with path.open(\"w\", encoding=\"utf-8\") as stream:\n        inorder(root, stream)\n    values = path.read_text(encoding=\"utf-8\").splitlines()\nprint(\"SORTED \" + (\", \".join(values) if values else \"EMPTY\"))\n",
+    "starterCode": "import tempfile\nfrom pathlib import Path\n\n# The source directory is read-only. Use a temporary directory for text files.\n# with tempfile.TemporaryDirectory() as folder:\n#     file_path = Path(folder) / \"records.txt\"\n\n",
+    "timeLimitMs": 2000,
+    "memoryLimitMb": 128,
+    "comparator": "tokens",
+    "tags": [
+      "9618",
+      "Paper 4",
+      "Integrated practical projects and mock exam practice",
+      "project",
+      "binary search tree",
+      "recursion"
+    ],
+    "source": "Original CodeMaster OJ practice for Cambridge 9618 Paper 4 preparation; not an official exam question.",
+    "samples": [
+      {
+        "name": "Sample 1",
+        "input": "5 4\n10 5 20 7 15\nSEARCH 7\nSEARCH 8\nHEIGHT\nSEARCH 20\n",
+        "expected": "YES\nNO\n3\nYES\nSORTED 5, 7, 10, 15, 20\n",
+        "enabled": true
+      },
+      {
+        "name": "Sample 2",
+        "input": "0 2\n\nHEIGHT\nSEARCH 1\n",
+        "expected": "0\nNO\nSORTED EMPTY\n",
+        "enabled": true
+      }
+    ],
+    "tests": [
+      {
+        "name": "Formal case 1",
+        "input": "1 2\n4\nHEIGHT\nSEARCH 4\n",
+        "expected": "1\nYES\nSORTED 4\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 2",
+        "input": "6 3\n1 2 3 4 5 6\nHEIGHT\nSEARCH 6\nSEARCH 0\n",
+        "expected": "6\nYES\nNO\nSORTED 1, 2, 3, 4, 5, 6\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 3",
+        "input": "6 3\n5 3 7 3 7 5\nHEIGHT\nSEARCH 3\nSEARCH 8\n",
+        "expected": "2\nYES\nNO\nSORTED 3, 5, 7\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 4",
+        "input": "7 4\n0 -3 4 -5 -1 2 8\nSEARCH -5\nSEARCH 9\nHEIGHT\nSEARCH -2\n",
+        "expected": "YES\nNO\n3\nNO\nSORTED -5, -3, -1, 0, 2, 4, 8\n",
+        "weight": 20,
+        "enabled": true
+      },
+      {
+        "name": "Formal case 5",
+        "input": "8 3\n50 30 70 20 40 60 80 65\nHEIGHT\nSEARCH 65\nSEARCH 35\n",
+        "expected": "4\nYES\nNO\nSORTED 20, 30, 40, 50, 60, 65, 70, 80\n",
+        "weight": 20,
+        "enabled": true
+      }
+    ]
+  }
+]

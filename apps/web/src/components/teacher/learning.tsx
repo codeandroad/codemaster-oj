@@ -1,6 +1,7 @@
 "use client";
 
 import { AppLink as Link } from "@/components/navigation";
+import { chapterDirectoryTitle } from "@/lib/learning-chapter-title";
 import {LessonContent} from "../student/shared";
 import {LearningCover,courseCovers,courseDifficulties} from "@/components/learning-course";
 import {PythonPracticePanel,type CoursePractice} from "./python-practice-panel";
@@ -798,7 +799,7 @@ function LearningEditorForm({
               className={`flex w-full items-start gap-3 border-b border-border px-3 py-3 text-left text-sm leading-5 ${x.id === chapter?.id ? "bg-accent font-semibold text-primary" : ""}`}
             >
               <span className="min-w-0 flex-1 break-words">
-                {i + 1}. {x.title}
+                {chapterDirectoryTitle(x.title, i)}
               </span>
               <span className="shrink-0 whitespace-nowrap text-xs leading-5 tabular-nums text-muted-foreground">{x.problems.length} {t("题")}</span>
             </button>

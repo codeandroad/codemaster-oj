@@ -2,6 +2,7 @@
 
 import {LearningCover,LearningProgressSummary,courseDifficulties} from "@/components/learning-course";
 import { AppLink } from "@/components/navigation";
+import { chapterDirectoryTitle } from "@/lib/learning-chapter-title";
 
 import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -14,11 +15,6 @@ import {useLocale,type AppLocale} from "@/components/locale-context";
 
 function ui(locale:AppLocale,zh:string,en:string){return locale==="en"?en:zh;}
 function difficulty(locale:AppLocale,value:keyof typeof courseDifficulties){return locale==="en"?({beginner:"Beginner",intermediate:"Intermediate",advanced:"Advanced"})[value]:courseDifficulties[value];}
-function directoryTitle(title:string,index:number){
- return /^\s*(?:\d{1,3}\s*[.．、:：)]\s*|第\s*\d+\s*章(?:\s|[：:·.-]|$)|Chapter\s+\d+(?:\s|[：:·.-]|$))/i.test(title)
-  ? title
-  : `${index+1}. ${title}`;
-}
 
 export interface LearningChapter {
   id: string; title: string; content: string; position: number; completed: boolean;
@@ -73,7 +69,7 @@ export function StudentLearningDetail({ id, chapterId }: { id: string; chapterId
     if(top<0||top+activeRect.height>container.clientHeight)
       container.scrollTop+=top-(container.clientHeight-activeRect.height)/2;
   },[chapter?.id]);
-  const directory = <nav className="p-2" aria-label={ui(locale,"章节目录","Chapter directory")}>{path.data?.chapters?.map((c, index) => <AppLink key={c.id} href={`/student/learning-paths/${id}/chapters/${c.id}`} aria-current={c.id === chapter?.id ? "page" : undefined} className={`flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm ${c.id === chapter?.id ? "bg-accent font-semibold text-primary" : "text-muted-foreground hover:bg-surface-subtle"}`}><span>{directoryTitle(c.title,index)}</span><span className="shrink-0">{c.completed ? "✓" : c.id === chapter?.id ? ui(locale,"当前","Current") : ""}</span></AppLink>)}</nav>;
+  const directory = <nav className="p-2" aria-label={ui(locale,"章节目录","Chapter directory")}>{path.data?.chapters?.map((c, index) => <AppLink key={c.id} href={`/student/learning-paths/${id}/chapters/${c.id}`} aria-current={c.id === chapter?.id ? "page" : undefined} className={`flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm ${c.id === chapter?.id ? "bg-accent font-semibold text-primary" : "text-muted-foreground hover:bg-surface-subtle"}`}><span>{chapterDirectoryTitle(c.title,index)}</span><span className="shrink-0">{c.completed ? "✓" : c.id === chapter?.id ? ui(locale,"当前","Current") : ""}</span></AppLink>)}</nav>;
   return <><Back href="/student/learning-paths">{ui(locale,"课程","Courses")}</Back><State data={path}>{path.data && <><PageHeader className="course-detail-header" title={path.data.title} description={path.data.description}/><div className="mt-4"><LearningProgressSummary read={path.data.completedChapters} totalChapters={path.data.chapterCount} done={path.data.completedTasks??0} totalTasks={path.data.taskCount??0}/></div><CourseAssignmentLinks items={path.data.assignments??[]} locale={locale}/><div className="mt-5 grid gap-5 md:grid-cols-[260px_minmax(0,1fr)]"><aside className="self-start border border-border bg-surface panel-shadow md:sticky md:top-4"><details className="md:hidden"><summary className="cursor-pointer px-4 py-3 font-semibold">{ui(locale,"章节目录","Chapter directory")} · {chapter ? `${chapter.position+1}/${path.data.chapterCount}` : path.data.chapterCount}<ChevronDown className="float-right" size={16}/></summary><div className="max-h-[60dvh] overflow-y-auto">{directory}</div></details><div ref={desktopDirectoryRef} className="hidden md:block md:max-h-[calc(100dvh-2rem)] md:overflow-y-auto md:overscroll-contain">{directory}</div></aside><main className="min-w-0">{chapter ? <ChapterLesson key={chapter.id} chapter={chapter} nextChapterId={nextChapterId} pathId={id} onSaved={path.reload}/> : <Empty title={selected ? ui(locale,"章节不存在","Chapter not found") : ui(locale,"暂无章节","No chapters available")} description={ui(locale,"从章节目录选择已发布章节；老师发布内容后即可阅读。","Choose a published chapter from the directory. You can read it after your teacher publishes it.")}/>}</main></div></>}</State></>;
 }
 function CourseAssignmentLinks({ items, locale }: { items: NonNullable<LearningPath["assignments"]>; locale: AppLocale }) {

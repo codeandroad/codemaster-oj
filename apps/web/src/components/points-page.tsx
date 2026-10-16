@@ -7,6 +7,7 @@ import { AppLink as Link } from "./navigation";
 import { ChevronLeft, ChevronRight, CircleHelp, Medal, SlidersHorizontal, Trophy, UsersRound } from "lucide-react";
 import styles from "./points-page.module.css";
 import { Button } from "./ui/button";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { useLocale, type AppLocale } from "./locale-context";
 import {
   apiMessage,
@@ -160,7 +161,16 @@ function LeaderboardTable({
 }) {
   const { locale } = useLocale();
   const [period, setPeriod] = useState<RankingPeriod>("all");
-  const [page, setPage] = useState(1);
+  const filterKey = `${classId}/${period}`;
+  const [pagination, setPagination] = useState({ filterKey, page: 1 });
+  // Reset before committing a new scope, including navigation back to an earlier filter.
+  if (pagination.filterKey !== filterKey) setPagination({ filterKey, page: 1 });
+  const page = pagination.filterKey === filterKey ? pagination.page : 1;
+  const setPage = (next: number | ((current: number) => number)) => setPagination({ filterKey, page: typeof next === "function" ? next(page) : next });
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [draftClassId, setDraftClassId] = useState(classId);
+  const [draftPeriod, setDraftPeriod] = useState<RankingPeriod>(period);
+  const filterCount = Number(Boolean(classId)) + Number(period !== "all");
   const [draftFields, setDraftFields] = useState<VisibleFields>(configuredFields);
   const [savedFields, setSavedFields] = useState<VisibleFields>(configuredFields);
   const [saving, setSaving] = useState(false);
@@ -205,66 +215,88 @@ function LeaderboardTable({
 
   return (
     <>
-      <div className={styles.toolbar}>
-        <label className={styles.scopeLabel}>
-          <UsersRound size={17} aria-hidden="true" /><span className="sr-only">{ui(locale, "范围", "Scope")}</span>
-          <select
-            value={classId}
-            onChange={(event) => onClassChange(event.target.value)}
-            className={styles.scopeSelect}
-          >
-            <option value="">{ui(locale, "全校学生", "All students")}</option>
-            {classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select>
-        </label>
-        <div role="group" aria-label={ui(locale, "排行榜时间范围", "Leaderboard time period")} className={styles.periods}>
-          {rankingPeriods.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              aria-pressed={period === option.value}
-              onClick={() => { setPeriod(option.value); setPage(1); }}
-              className={styles.periodButton}
-            >
-              {ui(locale, option.label, option.value === "all" ? "All time" : option.value === "month" ? "This month" : "This week")}
+      <Dialog open={filterOpen} onOpenChange={setFilterOpen}>
+        <div className={styles.pageActions}>
+          <DialogTrigger asChild>
+            <button type="button" className={styles.filterButton} onClick={() => { setDraftClassId(classId); setDraftPeriod(period); }}>
+              <SlidersHorizontal size={16} aria-hidden="true" />{ui(locale, "筛选", "Filters")}
+              {filterCount > 0 && <span className={styles.filterCount}>{filterCount}</span>}
             </button>
-          ))}
+          </DialogTrigger>
         </div>
-        <div className={styles.toolbarActions}>
-          <button type="button" aria-expanded={showRules} aria-controls="leaderboard-rules" onClick={() => setShowRules((value) => !value)} className={styles.textButton}><CircleHelp size={16} aria-hidden="true" />{ui(locale, "积分规则", "Points rules")}</button>
-          {canManage && <button type="button" aria-expanded={showSettings} aria-controls="leaderboard-fields" onClick={() => setShowSettings((value) => !value)} className={styles.textButton}><SlidersHorizontal size={16} aria-hidden="true" />{ui(locale, "显示字段", "Visible fields")}</button>}
-        </div>
-      </div>
-      {showRules && (
-        <div id="leaderboard-rules" className={styles.disclosure}>
-          <p>{ui(locale, "积分来自审核公开题目的首次有效 AC，以及 Paper 4 正式交卷后每道大题首次全部自动测试通过的 10 分。作业与训练额外奖励只计入个人累计积分；同分并列。", "Points come from the first valid AC on approved public problems, plus 10 points for each Paper 4 question that first passes all automatic tests after formal submission. Assignment and practice bonuses count only toward personal totals. Equal points share a rank.")}</p>
-          {optionalCount > 0 && <p className="mt-1">{ui(locale, "解题数按获榜分的不同题目统计；Paper 4 每道大题计一题、每次交卷中，每道大题各计一次提交。AC 率为有效正式提交中的通过比例。", "Solved counts distinct questions earning leaderboard points. Each Paper 4 question counts as one problem and one attempt per formal submission. AC rate is the share of valid judged submissions accepted.")}</p>}
-        </div>
-      )}
-      {canManage && showSettings && (
-        <fieldset id="leaderboard-fields" className={`${styles.disclosure} ${styles.fieldSettings}`}>
-          <legend className="sr-only">{ui(locale, "全校学生端排行榜字段", "Student leaderboard fields")}</legend>
-          <p className="text-sm font-semibold">{ui(locale, "学生端显示字段", "Fields shown to students")} <span className="ml-2 text-xs font-normal text-muted-foreground">{ui(locale, "排名、昵称和积分始终显示", "Rank, nickname, and points are always shown")}</span></p>
-          <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-3">
-            {fieldLabels.map(({ field, label }) => (
-              <label key={field} className="inline-flex min-h-9 cursor-pointer items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  disabled={saving}
-                  checked={draftFields[field]}
-                  onChange={(event) => { setDraftFields((value) => ({ ...value, [field]: event.target.checked })); setSettingsMessage(""); setSettingsError(false); }}
-                  className="size-4 accent-primary"
-                />
-                {ui(locale, label, fieldName(locale, field))}
+        <DialogContent className={styles.filterDrawer} aria-describedby={undefined}>
+          <DialogTitle className={styles.drawerTitle}>{ui(locale, "排行榜筛选", "Leaderboard filters")}</DialogTitle>
+          <div className={styles.drawerBody}>
+            <div className={styles.toolbar}>
+              <label className={styles.scopeLabel}>
+                <span className={styles.filterLabel}><UsersRound size={16} aria-hidden="true" />{ui(locale, "范围", "Scope")}</span>
+                <select
+                  value={draftClassId}
+                  onChange={(event) => setDraftClassId(event.target.value)}
+                  className={styles.scopeSelect}
+                >
+                  <option value="">{ui(locale, "全校学生", "All students")}</option>
+                  {classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
               </label>
-            ))}
-            <Button type="button" size="sm" disabled={saving || !dirtySettings} onClick={() => void saveVisibleFields()}>
-              {saving ? ui(locale, "正在保存…", "Saving…") : ui(locale, "保存显示设置", "Save display settings")}
-            </Button>
+              <fieldset className={styles.periodField}>
+                <legend>{ui(locale, "时间", "Time period")}</legend>
+                <div role="group" aria-label={ui(locale, "排行榜时间范围", "Leaderboard time period")} className={styles.periods}>
+                {rankingPeriods.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={draftPeriod === option.value}
+                    onClick={() => setDraftPeriod(option.value)}
+                    className={styles.periodButton}
+                  >
+                    {ui(locale, option.label, option.value === "all" ? "All time" : option.value === "month" ? "This month" : "This week")}
+                  </button>
+                ))}
+                </div>
+              </fieldset>
+              <div className={styles.toolbarActions}>
+                <button type="button" aria-expanded={showRules} aria-controls="leaderboard-rules" onClick={() => setShowRules((value) => !value)} className={styles.textButton}><CircleHelp size={16} aria-hidden="true" />{ui(locale, "积分规则", "Points rules")}</button>
+                {canManage && <button type="button" aria-expanded={showSettings} aria-controls="leaderboard-fields" onClick={() => setShowSettings((value) => !value)} className={styles.textButton}><SlidersHorizontal size={16} aria-hidden="true" />{ui(locale, "显示字段", "Visible fields")}</button>}
+              </div>
+            </div>
+            {showRules && (
+              <div id="leaderboard-rules" className={styles.disclosure}>
+                <p>{ui(locale, "积分来自审核公开题目的首次有效 AC，以及 Paper 4 正式交卷后每道大题首次全部自动测试通过的 10 分。作业与训练额外奖励只计入个人累计积分。先比较积分，同分时比较 AC 率；两项均相同则并列，暂无有效判题结果者排在已有 AC 率者之后。", "Points come from the first valid AC on approved public problems, plus 10 points for each Paper 4 question that first passes all automatic tests after formal submission. Assignment and practice bonuses count only toward personal totals. Higher points rank first, then higher AC rate. Equal points and rates share a rank; students without judged results follow those with an AC rate.")}</p>
+                {optionalCount > 0 && <p className="mt-1">{ui(locale, "解题数按获榜分的不同题目统计；Paper 4 每道大题计一题、每次交卷中，每道大题各计一次提交。AC 率为有效正式提交中的通过比例。", "Solved counts distinct questions earning leaderboard points. Each Paper 4 question counts as one problem and one attempt per formal submission. AC rate is the share of valid judged submissions accepted.")}</p>}
+              </div>
+            )}
+            {canManage && showSettings && (
+              <fieldset id="leaderboard-fields" className={`${styles.disclosure} ${styles.fieldSettings}`}>
+                <legend className="sr-only">{ui(locale, "全校学生端排行榜字段", "Student leaderboard fields")}</legend>
+                <p className="text-sm font-semibold">{ui(locale, "学生端显示字段", "Fields shown to students")} <span className="ml-2 text-xs font-normal text-muted-foreground">{ui(locale, "排名、昵称和积分始终显示", "Rank, nickname, and points are always shown")}</span></p>
+                <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-3">
+                  {fieldLabels.map(({ field, label }) => (
+                    <label key={field} className="inline-flex min-h-9 cursor-pointer items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        disabled={saving}
+                        checked={draftFields[field]}
+                        onChange={(event) => { setDraftFields((value) => ({ ...value, [field]: event.target.checked })); setSettingsMessage(""); setSettingsError(false); }}
+                        className="size-4 accent-primary"
+                      />
+                      {ui(locale, label, fieldName(locale, field))}
+                    </label>
+                  ))}
+                  <Button type="button" size="sm" disabled={saving || !dirtySettings} onClick={() => void saveVisibleFields()}>
+                    {saving ? ui(locale, "正在保存…", "Saving…") : ui(locale, "保存显示设置", "Save display settings")}
+                  </Button>
+                </div>
+                {settingsMessage && <p role={settingsError ? "alert" : "status"} className={`mt-2 text-sm ${settingsError ? "text-destructive" : "text-muted-foreground"}`}>{settingsMessage === "saved" ? ui(locale, "全校学生端排行榜字段已更新。", "Student leaderboard fields updated.") : settingsMessage}</p>}
+              </fieldset>
+            )}
           </div>
-          {settingsMessage && <p role={settingsError ? "alert" : "status"} className={`mt-2 text-sm ${settingsError ? "text-destructive" : "text-muted-foreground"}`}>{settingsMessage === "saved" ? ui(locale, "全校学生端排行榜字段已更新。", "Student leaderboard fields updated.") : settingsMessage}</p>}
-        </fieldset>
-      )}
+          <div className={styles.drawerFooter}>
+            <Button type="button" variant="secondary" onClick={() => { setDraftClassId(""); setDraftPeriod("all"); }}>{ui(locale, "重置", "Reset")}</Button>
+            <Button type="button" onClick={() => { setFilterOpen(false); setPeriod(draftPeriod); onClassChange(draftClassId); }}>{ui(locale, "应用筛选", "Apply filters")}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <div className={styles.podiumArea} aria-busy={leaders.loading} hidden={!leaders.loading && !leaders.error && !leaders.data?.items.length}>
         {leaders.loading ? (
           <div className={styles.podiumLoading} role="status"><Trophy size={30} aria-hidden="true" /><span>{ui(locale, "正在加载领先学生…", "Loading leading students…")}</span></div>
@@ -363,7 +395,7 @@ function Leaderboard({ user, staff, workspace, personalPoints }: { user: CampusU
       </header>
       <State data={contexts}>
         {contexts.data && (
-          <LeaderboardTable key={effectiveClassId || "school"} user={user} classId={effectiveClassId} classes={classes} onClassChange={selectClass} configuredFields={contexts.data.visibleFields} canManage={workspace === "admin" && contexts.data.canManage} staff={staff} workspace={workspace} onSettingsUpdated={contexts.reload} />
+          <LeaderboardTable user={user} classId={effectiveClassId} classes={classes} onClassChange={selectClass} configuredFields={contexts.data.visibleFields} canManage={workspace === "admin" && contexts.data.canManage} staff={staff} workspace={workspace} onSettingsUpdated={contexts.reload} />
         )}
       </State>
     </section>

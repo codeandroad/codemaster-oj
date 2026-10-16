@@ -135,6 +135,7 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
    assert.equal(all.classId,null,'default leaderboard covers the whole school');
    assert.equal(all.total, 5,'the school board includes active students before their first ranked AC');
    assert.equal(all.items.length, 1);
+   assert.equal(all.items[0].id, charlie.identityId, 'AC rate breaks a points tie');
    assert.equal(all.items[0].points, 20);
    assert.equal(all.items[0].rank, 1);
    assert.equal(all.me.id, alpha.identityId);
@@ -149,7 +150,8 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
    assert.equal((await pointsMe(pool,alpha)).body.rankingPolicy.scope,'approved_school_and_paper4_first_ac');
    const secondPage = (await leaderboard(pool, alpha, '?period=all&pageSize=1&page=2')).body;
    assert.equal(secondPage.items[0].points, 20);
-   assert.equal(secondPage.items[0].rank, 1, 'equal points share a rank across pages');
+   assert.equal(secondPage.items[0].id, alpha.identityId);
+   assert.equal(secondPage.items[0].rank, 2, 'equal points with different AC rates have different ranks across pages');
    const thirdPage = (await leaderboard(pool, alpha, '?period=all&pageSize=1&page=3')).body;
    assert.equal(thirdPage.items[0].id, beta.identityId);
    assert.equal(thirdPage.items[0].rank, 3);
@@ -190,7 +192,7 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
     assert.equal(current.me.solvedProblems, 1);
     assert.equal(current.me.attempts, 3, 'unreleased timed and old formal submissions are excluded');
     assert.equal(current.me.acRate, 66.7);
-    assert.deepEqual(current.items.slice(1).map(item => item.rank), [2, 2, 4, 4]);
+    assert.deepEqual(current.items.slice(1).map(item => item.rank), [2, 3, 4, 4]);
    }
    await updateVisibility(pool,admin,{solvedProblems:false,attempts:false,acRate:false});
    const privateMetrics=(await leaderboard(pool,beta,`?classId=${classId}`)).body;
@@ -268,6 +270,93 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
    assert.equal(afterRelease.points,afterBonus.points+10);
    assert.equal(afterRelease.rankPoints,afterBonus.rankPoints+10);
    assert.equal((await pool.query('SELECT submission_id FROM school_rank_ledger WHERE identity_id=$1 AND problem_id=$2',[alpha.identityId,hidden.id])).rows[0].submission_id,timedAcId);
+  } finally {
+   await pool.end();
+   await manager.query(`DROP SCHEMA ${schema} CASCADE`);
+   await manager.end();
+  }
+ });
+
+test('leaderboard breaks points ties with unrounded AC ratios, preserves true ties across pages and keeps hidden metrics private',
+ { skip: !process.env.TEST_DATABASE_URL, timeout: 60000 }, async () => {
+  const manager = createPool(process.env.TEST_DATABASE_URL);
+  const schema = `leaderboard_ties_${randomBytes(6).toString('hex')}`;
+  await manager.query(`CREATE SCHEMA ${schema}`);
+  const url = new URL(process.env.TEST_DATABASE_URL);
+  url.searchParams.set('options', `-csearch_path=${schema}`);
+  const pool = createPool(url.href);
+  try {
+   await migrate(pool);
+   async function account(kind) {
+    const identityId = (await pool.query('INSERT INTO identities(kind,number,name) VALUES($1,$2,$3) RETURNING id', [kind,randomUUID(),kind])).rows[0].id;
+    const id = (await pool.query('INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,$2,$3) RETURNING id', [identityId,randomUUID(),'test-hash'])).rows[0].id;
+    await pool.query('INSERT INTO account_roles(account_id,role) VALUES($1,$2)', [id,kind]);
+    return {id,identityId,roles:[kind]};
+   }
+   const teacher = await account('teacher'), admin = await account('admin');
+   async function problem() {
+    const id = (await pool.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id', [teacher.id])).rows[0].id;
+    const versionId = (await pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code,validation_status,published_at,
+     school_visible_at,rank_review_status,rank_approved_at,rank_reviewed_at,rank_reviewed_by)
+     VALUES($1,'Ratio test','stdio','Test',500,64,'print(1)','AC',now()-interval '1 day',
+      now()-interval '1 day','approved',now()-interval '1 day',now()-interval '1 day',$2) RETURNING id`, [id,admin.id])).rows[0].id;
+    await pool.query('UPDATE problems SET current_version_id=$2 WHERE id=$1', [id,versionId]);
+    return {id,versionId};
+   }
+   const first = await problem(), second = await problem();
+   async function attempts(student, item, accepted, total) {
+    await pool.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,code,idempotency_key,request_hash,status,score)
+     SELECT $1,$2,$3,$4,'submit','print(1)',gen_random_uuid()::text,'leaderboard-ratio-test',
+      CASE WHEN n<=$5 THEN 'AC' ELSE 'WA' END,CASE WHEN n<=$5 THEN 100 ELSE 0 END
+     FROM generate_series(1,$6::int) n`, [student.id,student.identityId,item.id,item.versionId,accepted,total]);
+   }
+   const morePoints = await account('student'), perfect = await account('student');
+   const higherRatio = await account('student'), equalRatio = await account('student'), lowerRatio = await account('student');
+   const zeroRate = await account('student'), noRate = await account('student'), anotherNoRate = await account('student');
+   await attempts(morePoints,first,1,4);
+   await attempts(morePoints,second,1,4);
+   await attempts(perfect,first,1,1);
+   await attempts(higherRatio,first,1,1000);
+   await attempts(equalRatio,first,2,2000);
+   await attempts(lowerRatio,first,1,1001);
+   await attempts(zeroRate,first,0,1);
+
+   const board = (await leaderboard(pool,teacher,'?pageSize=10')).body;
+   assert.equal(board.total,8);
+   assert.deepEqual(board.rankingPolicy.order,['points_desc','ac_rate_desc']);
+   assert.equal(board.rankingPolicy.ties,'equal_points_and_ac_rate');
+   assert.equal(board.items[0].id,morePoints.identityId,'points remain the primary ranking key even with a lower AC rate');
+   assert.equal(board.items[1].id,perfect.identityId);
+   const ratioTies = board.items.slice(2,4);
+   assert.deepEqual(new Set(ratioTies.map(item=>item.id)),new Set([higherRatio.identityId,equalRatio.identityId]));
+   assert.deepEqual(ratioTies.map(item=>item.rank),[3,3],'equivalent fractions share a rank');
+   assert.equal(board.items[4].id,lowerRatio.identityId);
+   assert.equal(board.items[4].rank,5,'a lower exact ratio does not tie merely because the display rounds equally');
+   assert.deepEqual(board.items.slice(2,5).map(item=>item.acRate),[0.1,0.1,0.1]);
+   assert.equal(board.items[5].id,zeroRate.identityId,'an assessed 0% rate ranks before no assessed results');
+   assert.equal(board.items[5].acRate,0);
+   assert.equal(board.items[5].rank,6);
+   assert.deepEqual(new Set(board.items.slice(6).map(item=>item.id)),new Set([noRate.identityId,anotherNoRate.identityId]));
+   assert.deepEqual(board.items.slice(6).map(item=>item.acRate),[null,null]);
+   assert.deepEqual(board.items.slice(6).map(item=>item.rank),[7,7]);
+
+   const firstPage = (await leaderboard(pool,teacher,'?pageSize=3&page=1')).body;
+   const secondPage = (await leaderboard(pool,higherRatio,'?pageSize=3&page=2')).body;
+   assert.deepEqual(firstPage.items.map(item=>item.id),board.items.slice(0,3).map(item=>item.id));
+   assert.deepEqual(secondPage.items.map(item=>item.id),board.items.slice(3,6).map(item=>item.id),'page selection and response order use the same AC-rate ordering');
+   assert.equal(firstPage.items[2].rank,3);
+   assert.equal(secondPage.items[0].rank,3,'a genuine tie remains shared across page boundaries');
+   assert.equal(secondPage.me.rank,3,'the current student rank agrees with the full ranking even off-page');
+
+   await updateVisibility(pool,admin,{solvedProblems:false,attempts:false,acRate:false});
+   const privateBoard = (await leaderboard(pool,higherRatio,'?pageSize=10')).body;
+   assert.deepEqual(privateBoard.items.map(item=>[item.id,item.rank]),board.items.map(item=>[item.id,item.rank]),'field visibility does not change ranking');
+   for(const person of [...privateBoard.items,privateBoard.me])
+    for(const field of ['solvedProblems','attempts','acRate','accepted','assessed','ac_ratio'])
+     assert.equal(Object.hasOwn(person,field),false,`${field} must not bypass the hidden-field contract`);
+   const staffBoard = (await leaderboard(pool,teacher,'?pageSize=10')).body;
+   assert.equal(staffBoard.items.find(item=>item.id===higherRatio.identityId).attempts,1000,'teachers retain full statistics');
+   assert.equal(staffBoard.items.find(item=>item.id===lowerRatio.identityId).acRate,0.1);
   } finally {
    await pool.end();
    await manager.query(`DROP SCHEMA ${schema} CASCADE`);

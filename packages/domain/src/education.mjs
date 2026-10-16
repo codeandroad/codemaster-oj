@@ -196,7 +196,9 @@ const rankingPolicy = Object.freeze({
  scope:'approved_school_and_paper4_first_ac',
  bonusIncluded:false,
  retroactive:false,
- description:'排名积分计审核公开的普通题首次有效 AC，以及 Paper 4 正式交卷后每道大题全部自动测试首次 AC 的固定 10 分；作业与计时训练额外奖励只计入个人总积分。',
+ order:['points_desc','ac_rate_desc'],
+ ties:'equal_points_and_ac_rate',
+ description:'排名积分计审核公开的普通题首次有效 AC，以及 Paper 4 正式交卷后每道大题全部自动测试首次 AC 的固定 10 分；作业与计时训练额外奖励只计入个人总积分。积分相同时按未四舍五入的 AC 率降序排列；没有有效判题结果时排在已判题学生之后，积分和 AC 率均相同时并列。',
 });
 
 async function leaderboardContexts(pool, user) {
@@ -299,11 +301,13 @@ async function pointsLeaderboard(ctx) {
    AND ($5::uuid IS NULL OR EXISTS (
     SELECT 1 FROM class_members cm WHERE cm.identity_id=i.id AND cm.class_id=$5::uuid))
    AND EXISTS (SELECT 1 FROM account_roles ar WHERE ar.account_id=a.id AND ar.role='student')
+  ), scored AS (
+   SELECT eligible.*,accepted::numeric/NULLIF(assessed,0) ac_ratio FROM eligible
   ), ranked AS (
-   SELECT eligible.*,
-    rank() OVER (ORDER BY points DESC)::int rank,
-    row_number() OVER (ORDER BY points DESC,id)::int row_num
-   FROM eligible
+   SELECT scored.*,
+    rank() OVER (ORDER BY points DESC,ac_ratio DESC NULLS LAST)::int rank,
+    row_number() OVER (ORDER BY points DESC,ac_ratio DESC NULLS LAST,id)::int row_num
+   FROM scored
   ), totals AS (
    SELECT count(*)::int total FROM ranked
   ), selected AS (
@@ -317,7 +321,7 @@ async function pointsLeaderboard(ctx) {
    a.avatar,s.points,s.solved_problems,s.attempts,s.assessed,s.accepted,s.rank,s.in_page,t.total
   FROM totals t LEFT JOIN selected s ON TRUE
   LEFT JOIN accounts a ON a.id=s.account_id
-  ORDER BY s.in_page DESC NULLS LAST,s.points DESC,s.id`, [period,page,pageSize,meId,requestedClassId])).rows;
+  ORDER BY s.in_page DESC NULLS LAST,s.row_num`, [period,page,pageSize,meId,requestedClassId])).rows;
  const redact = !staff(ctx.user);
  const shape = ({id,name,avatar,points,solved_problems,attempts,assessed,accepted,rank}) => ({
   id,name,avatar:avatarForIdentity(avatar,id),points,rank,

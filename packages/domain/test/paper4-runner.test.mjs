@@ -155,3 +155,62 @@ test('real go-judge: unfinished English sample APIs fail checks without crashing
       assert.equal(JSON.stringify(result).includes('Traceback'), false);
     }
   });
+
+test('real go-judge: stage and whole-question runs agree when a public case passes but a private case fails',
+  { skip: !(process.env.GO_JUDGE_TEST_URL && process.env.GO_JUDGE_TEST_TOKEN), timeout: 120000 }, async () => {
+    const manifest = JSON.parse(await readFile(new URL('../../../examples/paper4-english-practice/paper4-english-practice.json', import.meta.url), 'utf8'));
+    const question = manifest.questions.find(item => item.key === 'Q1');
+    const judge = new GoJudge({ url: process.env.GO_JUDGE_TEST_URL, token: process.env.GO_JUDGE_TEST_TOKEN,
+      environmentVersion: 'paper4-stage-aggregate-test' });
+    await judge.ready();
+    // This source passes the visible 25-insert case but accepts non-positive
+    // values; Dequeue also has a misspelled return name, and main prints nothing.
+    const sourceCode = `Queue = [-1] * 20
+HeadPointer = -1
+TailPointer = -1
+NumberItems = 0
+
+def Enqueue(value):
+    global HeadPointer, TailPointer, NumberItems
+    if NumberItems >= 20:
+        return False
+    if TailPointer < 0:
+        TailPointer = HeadPointer = 0
+    else:
+        TailPointer = (TailPointer + 1) % 20
+    Queue[TailPointer] = value
+    NumberItems += 1
+    return True
+
+def Dequeue():
+    global HeadPointer, TailPointer, NumberItems
+    if NumberItems <= 0:
+        return -1
+    ReturnValue = Queue[HeadPointer]
+    HeadPointer = (HeadPointer + 1) % 20
+    NumberItems -= 1
+    if NumberItems == 0:
+        HeadPointer = TailPointer = -1
+    return ReturnValu
+
+if __name__ == '__main__':
+    pass
+`;
+    const stages = question.stages.filter(stage => stage.judgeMode === 'auto');
+    const casesFor = stage => manifest.runnerCases[stage.id].map(item => ({ ...item, stageId: stage.id }));
+    const perStage = new Map();
+    for (const stage of stages) {
+      const result = await runPaper4Snapshot({ sourceCode, question, runnerCases: casesFor(stage) }, judge);
+      perStage.set(stage.id, result.privateResults.map(item => ({ caseId: item.caseId, status: item.status })));
+      assert.equal(result.status, 'WA');
+    }
+    assert.deepEqual(perStage.get('Q1_enqueue'), [
+      { caseId: 'queue-25', status: 'AC' }, { caseId: 'queue-invalid', status: 'WA' },
+    ]);
+    const whole = await runPaper4Snapshot({ sourceCode, question, runnerCases: stages.flatMap(casesFor) }, judge);
+    assert.equal(whole.status, 'WA');
+    for (const stage of stages) {
+      assert.deepEqual(whole.privateResults.filter(item => item.stageId === stage.id)
+        .map(item => ({ caseId: item.caseId, status: item.status })), perStage.get(stage.id));
+    }
+  });

@@ -18,11 +18,18 @@ function Inline({text}:{text:string}){
   return <>{inlineTokens(text).map((token,index)=>token.kind==='math'?<Formula key={index} text={token.text} display={token.display}/>:token.kind==='code'?<code key={index} className={styles.inlineCode}>{token.text}</code>:token.kind==='strong'?<strong key={index}><Inline text={token.text}/></strong>:token.text)}</>;
 }
 export function MathContent({content,renderCode,preserveHeadingLevels=false}:{content:string;renderCode?:(text:string,language?:string)=>ReactNode;preserveHeadingLevels?:boolean}){
+  const {locale}=useLocale();
   return <div className={styles.content}>{contentBlocks(content).map((block,index)=>{
     if(block.kind==='code')return <Fragment key={index}>{renderCode?renderCode(block.text,block.language):<pre className={styles.codeBlock}><code>{block.text}</code></pre>}</Fragment>;
     if(block.kind==='math')return <div key={index} className={styles.mathBlock}><Formula text={block.text} display/></div>;
     if(block.kind==='heading')return preserveHeadingLevels && (block.level ?? 1)>2 ? <h3 key={index}><Inline text={block.text}/></h3> : <h2 key={index}><Inline text={block.text}/></h2>;
     if(block.kind==='list'){const items=block.items?.map((item,i)=><li key={i}><Inline text={item}/></li>);return block.ordered?<ol key={index}>{items}</ol>:<ul key={index}>{items}</ul>;}
+    if(block.kind==='table')return <div key={index} className={styles.tableScroll} role="region" aria-label={locale==='en'?'Table, scroll horizontally if needed':'表格，可横向滚动'} tabIndex={0}>
+      <table className={styles.table}>
+        <thead><tr>{block.headers?.map((header,column)=><th key={column} scope="col" style={{textAlign:block.alignments?.[column]??'left'}}><Inline text={header}/></th>)}</tr></thead>
+        {Boolean(block.rows?.length)&&<tbody>{block.rows?.map((row,rowIndex)=><tr key={rowIndex}>{row.map((cell,column)=><td key={column} style={{textAlign:block.alignments?.[column]??'left'}}><Inline text={cell}/></td>)}</tr>)}</tbody>}
+      </table>
+    </div>;
     return <p key={index}><Inline text={block.text}/></p>;
   })}</div>;
 }

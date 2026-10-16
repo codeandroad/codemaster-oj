@@ -163,8 +163,8 @@ test('real go-judge: stage and whole-question runs agree when a public case pass
     const judge = new GoJudge({ url: process.env.GO_JUDGE_TEST_URL, token: process.env.GO_JUDGE_TEST_TOKEN,
       environmentVersion: 'paper4-stage-aggregate-test' });
     await judge.ready();
-    // This source passes the visible 25-insert case but accepts non-positive
-    // values; Dequeue also has a misspelled return name, and main prints nothing.
+    // This source passes the visible 25-insert case but has a first-insert
+    // edge bug; Dequeue also has a misspelled return name, and main is empty.
     const sourceCode = `Queue = [-1] * 20
 HeadPointer = -1
 TailPointer = -1
@@ -173,6 +173,8 @@ NumberItems = 0
 def Enqueue(value):
     global HeadPointer, TailPointer, NumberItems
     if NumberItems >= 20:
+        return False
+    if NumberItems == 0 and value == 42:
         return False
     if TailPointer < 0:
         TailPointer = HeadPointer = 0
@@ -205,12 +207,38 @@ if __name__ == '__main__':
       assert.equal(result.status, 'WA');
     }
     assert.deepEqual(perStage.get('Q1_enqueue'), [
-      { caseId: 'queue-25', status: 'AC' }, { caseId: 'queue-invalid', status: 'WA' },
+      { caseId: 'queue-25', status: 'AC' }, { caseId: 'queue-first-and-full', status: 'WA' },
     ]);
     const whole = await runPaper4Snapshot({ sourceCode, question, runnerCases: stages.flatMap(casesFor) }, judge);
     assert.equal(whole.status, 'WA');
     for (const stage of stages) {
       assert.deepEqual(whole.privateResults.filter(item => item.stageId === stage.id)
         .map(item => ({ caseId: item.caseId, status: item.status })), perStage.get(stage.id));
+    }
+  });
+
+test('real go-judge: a Paper 4 top-level main can coexist with independently judged function stages',
+  { skip: !(process.env.GO_JUDGE_TEST_URL && process.env.GO_JUDGE_TEST_TOKEN), timeout: 120000 }, async () => {
+    const manifest = JSON.parse(await readFile(new URL('../../../examples/paper4-english-practice/paper4-english-practice.json', import.meta.url), 'utf8'));
+    const question = manifest.questions.find(item => item.key === 'Q1');
+    const guarded = manifest.referenceSolutions.Q1;
+    const marker = "if __name__ == '__main__':\n";
+    const parts = guarded.split(marker);
+    assert.equal(parts.length, 2, 'fixture must contain one guarded main so both styles can be tested');
+    const topLevel = parts[0] + parts[1].replace(/^    /gm, '');
+    assert.equal(topLevel.includes(marker), false);
+    const stages = question.stages.filter(stage => stage.judgeMode === 'auto');
+    const casesFor = stage => manifest.runnerCases[stage.id].map(item => ({ ...item, stageId: stage.id }));
+    const judge = new GoJudge({ url: process.env.GO_JUDGE_TEST_URL, token: process.env.GO_JUDGE_TEST_TOKEN,
+      environmentVersion: 'paper4-top-level-main-test' });
+    await judge.ready();
+    for (const [style, sourceCode] of [['guarded', guarded], ['top-level', topLevel]]) {
+      for (const stage of stages) {
+        const result = await runPaper4Snapshot({ sourceCode, question, runnerCases: casesFor(stage) }, judge);
+        assert.equal(result.status, 'AC', `${style}/${stage.id}: ${JSON.stringify(result.privateResults.map(item => item.status))}`);
+      }
+      const whole = await runPaper4Snapshot({ sourceCode, question, runnerCases: stages.flatMap(casesFor) }, judge);
+      assert.equal(whole.status, 'AC', style);
+      assert.ok(whole.privateResults.every(item => item.status === 'AC'), style);
     }
   });

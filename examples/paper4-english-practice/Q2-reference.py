@@ -1,41 +1,56 @@
-"""Original classroom sample: split a data file into six colour files."""
-
-from pathlib import Path
-
-COLOURS = ('Red', 'Green', 'Blue', 'Orange', 'Yellow', 'Pink')
+"""Runnable reference for Question 2 of 9618/41, May/June 2025."""
 
 
-def ReadData(filename='TheData.txt'):
-    records = []
-    for line in Path(filename).read_text(encoding='utf-8').splitlines():
-        if not line.strip():
-            continue
-        try:
-            value_text, colour_text = line.split(',', 1)
-            colour = colour_text.strip().capitalize()
-            if colour not in COLOURS:
-                continue
-            records.append((int(value_text.strip()), colour))
-        except ValueError:
-            continue
-    return records
+def ReadData():
+    file_name = input("Enter file name: ")
+    try:
+        with open(file_name, "r", encoding="utf-8") as source:
+            return [line.rstrip("\r\n") for line in source]
+    except OSError:
+        print("Could not read the file")
+        return []
 
 
-def SplitData(records):
-    groups = {colour: [] for colour in COLOURS}
-    for value, colour in records:
-        groups[colour].append(value)
-    return groups
+def StoreData(DataToStore, FileName):
+    try:
+        with open(FileName, "a", encoding="utf-8") as output:
+            for item in DataToStore:
+                output.write(str(item) + "\n")
+    except OSError:
+        print("Could not write the file")
 
 
-def StoreData(groups):
-    for colour in COLOURS:
-        lines = ''.join(f'{value}\n' for value in groups[colour])
-        with Path(f'{colour}.txt').open('a', encoding='utf-8') as target:
-            target.write(lines)
+def SplitData(DataArray):
+    Red = []
+    Green = []
+    Blue = []
+    Orange = []
+    Yellow = []
+    Pink = []
+
+    for row in DataArray:
+        value, colour = row.split(",")
+        colour = colour.strip().lower()
+        if colour == "red":
+            Red.append(value)
+        elif colour == "green":
+            Green.append(value)
+        elif colour == "blue":
+            Blue.append(value)
+        elif colour == "orange":
+            Orange.append(value)
+        elif colour == "yellow":
+            Yellow.append(value)
+        elif colour == "pink":
+            Pink.append(value)
+
+    StoreData(Red, "Red.txt")
+    StoreData(Green, "Green.txt")
+    StoreData(Blue, "Blue.txt")
+    StoreData(Orange, "Orange.txt")
+    StoreData(Yellow, "Yellow.txt")
+    StoreData(Pink, "Pink.txt")
 
 
-if __name__ == '__main__':
-    records = ReadData()
-    StoreData(SplitData(records))
-    print(f'Processed: {len(records)}')
+DataFromFile = ReadData()
+SplitData(DataFromFile)

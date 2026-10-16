@@ -1,47 +1,67 @@
-"""Original classroom sample: binary-search tree with recursive traversal."""
-
-import sys
+"""Teacher reference for the binary-tree task in 9618/41/M/J/25 Q3."""
 
 
 class Node:
-    def __init__(self, value):
-        self.value = value
-        self.left = None
-        self.right = None
+    def __init__(self, pNodeData):
+        self.NodeData = pNodeData  # integer
+        self.LeftNode = None  # Node or None
+        self.RightNode = None  # Node or None
+
+    def GetLeft(self):
+        return self.LeftNode
+
+    def GetRight(self):
+        return self.RightNode
+
+    def GetData(self):
+        return self.NodeData
+
+    def SetLeft(self, NewNode):
+        self.LeftNode = NewNode
+
+    def SetRight(self, NewNode):
+        self.RightNode = NewNode
 
 
 class Tree:
-    def __init__(self):
-        self.root = None
+    def __init__(self, FirstNode):
+        self.FirstNode = FirstNode  # Node
 
-    def insert(self, value):
-        self.root = self._insert(self.root, value)
+    def GetRootNode(self):
+        return self.FirstNode
 
-    def _insert(self, node, value):
-        if node is None:
-            return Node(value)
-        if value < node.value:
-            node.left = self._insert(node.left, value)
-        else:
-            node.right = self._insert(node.right, value)
-        return node
-
-    def inorder(self):
-        result = []
-
-        def visit(node):
-            if node is None:
-                return
-            visit(node.left)
-            result.append(node.value)
-            visit(node.right)
-
-        visit(self.root)
-        return result
+    def Insert(self, NewNode):
+        CurrentNode = self.FirstNode
+        while True:
+            if NewNode.GetData() < CurrentNode.GetData():
+                if CurrentNode.GetLeft() is None:
+                    CurrentNode.SetLeft(NewNode)
+                    return
+                CurrentNode = CurrentNode.GetLeft()
+            else:
+                if CurrentNode.GetRight() is None:
+                    CurrentNode.SetRight(NewNode)
+                    return
+                CurrentNode = CurrentNode.GetRight()
 
 
-if __name__ == '__main__':
-    tree = Tree()
-    for text in sys.stdin.read().split():
-        tree.insert(int(text))
-    print(' '.join(map(str, tree.inorder())))
+def OutputInOrder(RootNode):
+    if RootNode.GetLeft() is not None:
+        OutputInOrder(RootNode.GetLeft())
+    print(RootNode.GetData())
+    if RootNode.GetRight() is not None:
+        OutputInOrder(RootNode.GetRight())
+
+
+# The paper asks for a main program, without requiring a particular guard.
+FirstNode = Node(10)
+SecondNode = Node(20)
+ThirdNode = Node(5)
+FourthNode = Node(15)
+FifthNode = Node(7)
+MyTree = Tree(FirstNode)
+MyTree.Insert(SecondNode)
+MyTree.Insert(ThirdNode)
+MyTree.Insert(FourthNode)
+MyTree.Insert(FifthNode)
+OutputInOrder(MyTree.GetRootNode())

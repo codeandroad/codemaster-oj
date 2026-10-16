@@ -29,7 +29,7 @@ async function request(path, method = 'GET', body) {
 }
 await request('auth/login', 'POST', { username: teacher.username, password: teacher.password });
 const manifest = JSON.parse(await readFile(new URL('../examples/paper4-english-practice/paper4-english-practice.json', import.meta.url), 'utf8'));
-const marker = '[local-paper4-english-v2]';
+const marker = '[local-paper4-english-v3]';
 if (!manifest.paper.description.startsWith(marker)) throw new Error('English Paper 4 sample marker is missing.');
 let paper = (await request('paper4/papers')).items.find(item => item.description?.startsWith('[local-paper4-english-v'));
 if (paper?.status === 'published' && paper.description.startsWith(marker)) {
@@ -44,7 +44,21 @@ if (!paper) {
     referenceSolutions: manifest.referenceSolutions });
 } else {
   // New published versions preserve every existing student's version-pinned
-  // attempt. Re-running the seed after a failed validation reuses this draft.
+  // attempt. Never replace a teacher-edited draft during a preview refresh.
+  const stable = value => Array.isArray(value) ? value.map(stable) : value && typeof value === 'object'
+    ? Object.fromEntries(Object.keys(value).sort().map(key => [key, stable(value[key])])) : value;
+  const contents = value => JSON.stringify(stable({ title: value.title, description: value.description,
+    questions: value.questions, runnerCases: value.runnerCases, referenceSolutions: value.referenceSolutions }));
+  if (paper.hasDraft) {
+    const current = await request(`paper4/papers/${paper.id}`);
+    const draft = await request(`paper4/papers/${paper.id}?view=draft`);
+    const unchangedPublishedCopy = draft.description === current.description && contents(draft) === contents(current);
+    const unchangedSeedDraft = draft.description.startsWith(marker) && contents(draft) === contents({
+      ...manifest.paper, ...manifest,
+    });
+    if (!unchangedPublishedCopy && !unchangedSeedDraft)
+      throw new Error('Paper 4 draft contains teacher changes; preview seed will not overwrite it.');
+  }
   if (paper.status === 'published' && !paper.hasDraft)
     await request(`paper4/papers/${paper.id}/draft`, 'POST', {});
   paper = await request(`paper4/papers/${paper.id}`, 'PATCH', { ...manifest.paper,

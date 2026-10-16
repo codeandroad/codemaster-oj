@@ -15,10 +15,22 @@ test('self-contained JSON and ZIP preview the same original three-question paper
   assert.deepEqual(fromZip, fromJson);
   assert.equal(fromJson.preview.questionCount, 3);
   assert.equal(fromJson.preview.totalMarks, 75);
-  assert.equal(fromJson.preview.caseCount, 13);
+  assert.equal(fromJson.preview.caseCount, 22);
   assert.equal(fromJson.preview.referenceSolutionCount, 3);
   assert.deepEqual(fromJson.createBody.questions.map(question => question.key), ['Q1', 'Q2', 'Q3']);
+  const firstQuestion = fromJson.createBody.questions[0];
+  assert.equal(firstQuestion.stages.reduce((marks, stage) => marks + stage.maxMarks, 0), 20);
+  assert.deepEqual(firstQuestion.stages.map(stage => stage.id),
+    ['Q1_setup', 'Q1_enqueue', 'Q1_main', 'Q1_dequeue', 'Q1_main_dequeue', 'Q1_evidence']);
+  assert.equal(fromJson.createBody.referenceSolutions.Q1.includes('def Dequeue():'), true);
+  assert.equal(firstQuestion.statement.includes('Unsuccessful'), true);
+  assert.equal(firstQuestion.statement.includes('Rejected:'), false);
+  assert.equal(fromJson.createBody.runnerCases.Q1_enqueue.some(testCase => testCase.id === 'queue-invalid'), false);
   assert.equal(fromJson.createBody.questions[1].initialFiles['TheData.txt'].trim().split('\n').length, 72);
+  assert.match(fromJson.createBody.questions[1].initialFiles['TheData.txt'], /^10,red\r?\n/);
+  assert.deepEqual(fromJson.createBody.questions[1].stages.map(stage => stage.maxMarks), [7, 6, 5, 2, 3, 2]);
+  assert.deepEqual(fromJson.createBody.questions[2].stages.map(stage => stage.maxMarks), [4, 3, 3, 2, 2, 1, 6, 5, 3, 1]);
+  assert.equal(fromJson.createBody.referenceSolutions.Q3.includes('def OutputInOrder(RootNode):'), true);
   assert.equal(fromJson.createBody.runnerCases.Q3_insert[0].driverCode.includes('/w/main.py'), true);
 });
 

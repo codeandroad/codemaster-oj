@@ -17,11 +17,11 @@ function Formula({text,display=false}:{text:string;display?:boolean}){
 function Inline({text}:{text:string}){
   return <>{inlineTokens(text).map((token,index)=>token.kind==='math'?<Formula key={index} text={token.text} display={token.display}/>:token.kind==='code'?<code key={index} className={styles.inlineCode}>{token.text}</code>:token.kind==='strong'?<strong key={index}><Inline text={token.text}/></strong>:token.text)}</>;
 }
-export function MathContent({content,renderCode}:{content:string;renderCode?:(text:string,language?:string)=>ReactNode}){
+export function MathContent({content,renderCode,preserveHeadingLevels=false}:{content:string;renderCode?:(text:string,language?:string)=>ReactNode;preserveHeadingLevels?:boolean}){
   return <div className={styles.content}>{contentBlocks(content).map((block,index)=>{
     if(block.kind==='code')return <Fragment key={index}>{renderCode?renderCode(block.text,block.language):<pre className={styles.codeBlock}><code>{block.text}</code></pre>}</Fragment>;
     if(block.kind==='math')return <div key={index} className={styles.mathBlock}><Formula text={block.text} display/></div>;
-    if(block.kind==='heading')return <h2 key={index}><Inline text={block.text}/></h2>;
+    if(block.kind==='heading')return preserveHeadingLevels && (block.level ?? 1)>2 ? <h3 key={index}><Inline text={block.text}/></h3> : <h2 key={index}><Inline text={block.text}/></h2>;
     if(block.kind==='list'){const items=block.items?.map((item,i)=><li key={i}><Inline text={item}/></li>);return block.ordered?<ol key={index}>{items}</ol>:<ul key={index}>{items}</ul>;}
     return <p key={index}><Inline text={block.text}/></p>;
   })}</div>;

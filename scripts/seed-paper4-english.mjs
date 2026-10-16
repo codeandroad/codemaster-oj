@@ -29,7 +29,7 @@ async function request(path, method = 'GET', body) {
 }
 await request('auth/login', 'POST', { username: teacher.username, password: teacher.password });
 const manifest = JSON.parse(await readFile(new URL('../examples/paper4-english-practice/paper4-english-practice.json', import.meta.url), 'utf8'));
-const marker = '[local-paper4-english-v3]';
+const marker = '[local-paper4-english-v4]';
 if (!manifest.paper.description.startsWith(marker)) throw new Error('English Paper 4 sample marker is missing.');
 let paper = (await request('paper4/papers')).items.find(item => item.description?.startsWith('[local-paper4-english-v'));
 if (paper?.status === 'published' && paper.description.startsWith(marker)) {

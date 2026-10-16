@@ -3,13 +3,13 @@
   "version": 1,
   "paper": {
     "title": "9618 Paper 4 Practice · May/June 2025 · Paper 41",
-    "description": "[local-paper4-english-v3] Classroom adaptation of the user-supplied 9618/41/M/J/25 programming tasks and subpart marks; not an official Cambridge marking service."
+    "description": "[local-paper4-english-v4] Classroom adaptation of the user-supplied 9618/41/M/J/25 programming tasks and subpart marks; not an official Cambridge marking service."
   },
   "questions": [
     {
       "key": "Q1",
       "title": "A twenty-place circular queue",
-      "statement": "A program stores positive integers in a circular queue. Declare a global one-dimensional array Queue of 20 integers, each initialised to -1. Initialise global HeadPointer and TailPointer to -1 and NumberItems to 0. Write Enqueue(InputData): return False if the queue is full; otherwise store the integer at the next position, update the pointers and count, and return True. The main program must call Enqueue() for every integer from 1 to 25 in ascending order. Output one line for each integer, such as \"5 Successful\" when stored or \"23 Unsuccessful\" when full. Write Dequeue(): return -1 if the queue is empty; otherwise return the next item and update the pointers and count. Extend the main program to call Dequeue() twice and output each return value. Save your source and a screenshot of the run for teacher review.",
+      "statement": "A program stores positive integers in a circular queue. Complete the following parts in one program.\n\n## 1(a) Initialise the queue\n\n- Declare a global 1D array `Queue` with 20 integers. Initialise every position to `-1`.\n- Initialise global `HeadPointer` and `TailPointer` to `-1`, and `NumberItems` to `0`.\n\n## 1(b) Write `Enqueue(InputData)`\n\n- The function takes an integer parameter. If the queue is full, return `False`.\n- Otherwise, store the value in the next position of the circular queue, update the appropriate pointers and `NumberItems`, and return `True`.\n\n## 1(c) Add the first part of the main program\n\n- Call `Enqueue()` with each integer from `1` to `25`, in ascending order.\n- Output the integer and `Successful` if it was stored, or the integer and `Unsuccessful` if it was not. For example: `5 Successful` or `23 Unsuccessful`.\n\n## 1(d) Write `Dequeue()`\n\n- Return `-1` if the queue is empty.\n- Otherwise, return the next item, update the appropriate pointers and decrement `NumberItems`. The pointers must wrap around the array.\n\n## 1(e) Finish and test the main program\n\n- **(i)** Call `Dequeue()` twice and output each returned value.\n- **(ii)** Run the finished program. This practice system saves the run output for teacher review; you do not need to upload a screenshot.",
       "starterCode": "Queue = [-1] * 20\nHeadPointer = -1\nTailPointer = -1\nNumberItems = 0\n\ndef Enqueue(InputData):\n    pass\n\ndef Dequeue():\n    pass\n\n# Write the main program here.\n",
       "initialFiles": {},
       "outputFiles": [],
@@ -52,7 +52,7 @@
         {
           "id": "Q1_evidence",
           "title": "1(e)(ii) Test evidence",
-          "description": "Teacher reviews the saved run screenshot.",
+          "description": "Teacher reviews the saved run output. No screenshot upload is required.",
           "maxMarks": 1,
           "judgeMode": "evidence"
         }
@@ -61,7 +61,7 @@
     {
       "key": "Q2",
       "title": "Separate data into six colour files",
-      "statement": "Use the supplied TheData.txt, which contains 72 comma-separated integer and colour records. The six supplied colour files start empty. Write ReadData() to prompt for a filename and return an array of raw text lines, without assuming a fixed number of lines. SplitData(DataArray) must separate each integer into one of six colour arrays and call StoreData for each array and its matching filename. StoreData(DataToStore, FileName) must append each item on a new line and handle file errors. In the main program, call ReadData() and pass its returned array to SplitData(). Run the program with TheData.txt and retain the resulting Red.txt content for teacher review.",
+      "statement": "A program reads records from a text file and separates the numbers into files by colour. The supplied `TheData.txt` has 72 lines. Each line contains an integer and a colour separated by a comma; its first line is `10,red`. The possible colours are **red, green, blue, orange, yellow and pink**. Six matching output files are supplied empty.\n\n## 2(a) Write `ReadData()`\n\n- Prompt the user for a filename and open that file for reading. Display a clear error message if it cannot be opened.\n- Read each line into a 1D array and return the populated array. Do **not** assume the file always has 72 lines.\n\n## 2(b) Write `SplitData(DataArray)`\n\n- The parameter is a 1D array of strings. Create one 1D array for each of the six colours.\n- Split each string into its integer and colour, then store the integer in the matching colour array. For example, `10,red` places `10` in the red array.\n\n## 2(c) Write `StoreData(DataToStore, FileName)`\n\n- Open the named text file and **append** every item from `DataToStore` on a new line.\n- Use exception handling when opening the file or writing data.\n\n## 2(d) Store the six colour arrays\n\n- Amend `SplitData()` to call `StoreData()` six times, pairing each array with its file: `Blue.txt`, `Green.txt`, `Orange.txt`, `Pink.txt`, `Red.txt` and `Yellow.txt`.\n\n## 2(e) Complete and test the main program\n\n- **(i)** Call `ReadData()`, then pass its returned array to `SplitData()`.\n- **(ii)** Run the program and enter `TheData.txt` when prompted. This practice system saves the run output and generated `Red.txt` for teacher review; you do not need to upload screenshots.",
       "starterCode": "def ReadData():\n    pass\n\ndef StoreData(DataToStore, FileName):\n    pass\n\ndef SplitData(DataArray):\n    pass\n\nDataFromFile = ReadData()\nSplitData(DataFromFile)\n",
       "initialFiles": {
         "TheData.txt": {
@@ -86,7 +86,7 @@
         {
           "id": "Q2_a",
           "title": "ReadData: filename prompt and raw lines",
-          "description": "Prompt for a filename; read an unknown number of lines into a 1D array and return it.",
+          "description": "Prompt for a filename; read an unknown number of lines into a 1D array and return it. Report file opening errors.",
           "maxMarks": 7,
           "judgeMode": "auto"
         },
@@ -130,7 +130,7 @@
     {
       "key": "Q3",
       "title": "A binary tree built with classes",
-      "statement": "Use object-oriented programming to build a binary tree of integers. Declare Node with attributes NodeData (integer), LeftNode (Node or null) and RightNode (Node or null). Its constructor receives the integer data and sets both links to null. Add GetLeft(), GetRight(), GetData(), SetLeft(Node) and SetRight(Node). In the main program, create five Node objects holding 10, 20, 5, 15 and 7 in that order. Declare Tree with a FirstNode attribute, a constructor that receives its root Node and a GetRootNode() method. Write Insert(NewNode) so smaller values travel left, while equal or larger values travel right, repeating until the new node can be linked. Write a recursive OutputInOrder(RootNode) function or Tree method to print the node values in ascending order. Extend the main program to create the Tree with the 10 node, insert the other four nodes in the order given, then call OutputInOrder() with the root node. Your final program is checked automatically; the teacher may inspect the source and saved run when assigning stage marks.",
+      "statement": "Build a binary tree of integers using object-oriented programming. Smaller values belong on the left; equal or larger values belong on the right.\n\n## 3(a) Declare the `Node` class\n\n- **(i)** Give `Node` an integer `NodeData` attribute and `LeftNode` and `RightNode` links, each holding another `Node` or a null value. Its constructor receives the integer, stores it in `NodeData`, and initialises both links to null. If using Python, include attribute declarations as comments.\n- **(ii)** Implement `GetLeft()`, `GetRight()` and `GetData()` to return the corresponding attributes.\n- **(iii)** Implement `SetLeft(NewNode)` and `SetRight(NewNode)` to store the supplied `Node` in the corresponding link.\n\n## 3(b) Start the main program\n\n- Create five separate `Node` objects in this order, containing `10`, `20`, `5`, `15` and `7`.\n\n## 3(c) Declare the `Tree` class\n\n- **(i)** Give `Tree` a `FirstNode` attribute for its root. Its constructor receives a `Node` and stores it in `FirstNode`. If using Python, include the attribute declaration as a comment.\n- **(ii)** Implement `GetRootNode()` to return `FirstNode`.\n- **(iii)** Implement `Insert(NewNode)`. Starting at the root, move left when the new value is smaller, or right when it is equal or larger. Repeat until the correct empty link is found, then store the new node there.\n\n## 3(d) Write recursive `OutputInOrder(RootNode)`\n\n- If a left child exists, call `OutputInOrder()` with that child; then output the current node value; then, if a right child exists, call `OutputInOrder()` with the right child. This prints values in ascending order.\n\n## 3(e) Complete and test the main program\n\n- **(i)** Create a `Tree` with the node containing `10` as its root. Insert the nodes containing `20`, `5`, `15` and `7` in that order. Call `OutputInOrder()` with the tree root.\n- **(ii)** Run the program. This practice system saves the run output for teacher review; you do not need to upload a screenshot.",
       "starterCode": "class Node:\n    def __init__(self, pNodeData):\n        pass\n\n    def GetLeft(self):\n        pass\n\n    def GetRight(self):\n        pass\n\n    def GetData(self):\n        pass\n\n    def SetLeft(self, NewNode):\n        pass\n\n    def SetRight(self, NewNode):\n        pass\n\n\nclass Tree:\n    def __init__(self, FirstNode):\n        pass\n\n    def GetRootNode(self):\n        pass\n\n    def Insert(self, NewNode):\n        pass\n\n\ndef OutputInOrder(RootNode):\n    pass\n\n# Write the main program here.\n",
       "initialFiles": {},
       "outputFiles": [],
@@ -201,7 +201,7 @@
         {
           "id": "Q3_evidence",
           "title": "3(e)(ii) Test evidence",
-          "description": "Teacher reviews the saved run output as evidence; a screenshot is optional.",
+          "description": "Teacher reviews the saved run output. No screenshot upload is required.",
           "maxMarks": 1,
           "judgeMode": "evidence"
         }

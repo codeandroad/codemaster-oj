@@ -20,9 +20,10 @@ import { displayBinding } from "@/components/student/editor-keymap";
 import { NotificationDropdown } from "@/components/student/notification-dropdown";
 import { AccountMenu } from "@/components/account-menu";
 import styles from "@/components/student/workspace.module.css";
-import { Empty, LessonContent, State, useData } from "@/components/student/shared";
+import { Empty, State, useData } from "@/components/student/shared";
 import { ApiError, apiMessage, clearProductionSession, productionApi, type CampusUser } from "@/lib/production-api";
 import { paper4Date, paper4Status, type Paper4Attempt, type Paper4File, type Paper4Paper, type Paper4PaperSummary, type Paper4Run, type Paper4Stage } from "./model";
+import { Paper4Content } from "./paper4-content";
 
 const surface = "min-w-0 rounded-lg border border-border bg-surface panel-shadow";
 
@@ -255,8 +256,8 @@ function Paper4Workspace({ attempt: initialAttempt, user }: { attempt: Paper4Att
           </div>
           <h1 className="mb-3 text-2xl font-bold">{current.title}</h1>
           <nav aria-label={tx("评分阶段", "Marking stages")} className="mb-5 flex flex-wrap gap-1.5">{current.stages.map((item, index) => <button type="button" key={item.id} aria-current={item.id === stage?.id ? "step" : undefined} onClick={() => setStageId(item.id)} className={`inline-flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-primary ${item.id === stage?.id ? "border-primary bg-info-soft text-primary" : "border-border text-muted-foreground hover:bg-muted"}`}>{index + 1}. {item.title}{attempt.snapshots.some(snapshot => snapshot.stageId === item.id) && <span className="inline-flex items-center text-muted-foreground" title={tx("检查点已保存，并非判题通过", "Checkpoint saved; this does not mean the stage passed")}><Bookmark size={13} fill="currentColor" aria-hidden="true"/><span className="sr-only">{tx("检查点已保存，并非判题通过", "Checkpoint saved; this does not mean the stage passed")}</span></span>}</button>)}</nav>
-          <div className="text-sm leading-7"><LessonContent content={current.statement}/></div>
-          {stage?.description && <section className="mt-6 border-t border-border pt-4"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold">{stage.title} · {stage.maxMarks} {tx("分", "marks")}</h2>{stage.judgeMode === "auto" && <Button size="sm" variant="secondary" disabled={frozen || busy || saveStatus === "error" || !currentCode.trim()} onClick={() => runCurrent(stage.id)}><Play size={13}/>{tx("运行本阶段", "Run this stage")}</Button>}</div><LessonContent content={stage.description}/></section>}
+          <Paper4Content content={current.statement}/>
+          {stage?.description && <section className="mt-6 border-t border-border pt-4"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold">{stage.title} · {stage.maxMarks} {tx("分", "marks")}</h2>{stage.judgeMode === "auto" && <Button size="sm" variant="secondary" disabled={frozen || busy || saveStatus === "error" || !currentCode.trim()} onClick={() => runCurrent(stage.id)}><Play size={13}/>{tx("运行本阶段", "Run this stage")}</Button>}</div><Paper4Content content={stage.description}/></section>}
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4"><span className="text-xs text-muted-foreground">{latestSnapshot ? tx(`检查点已保存 · ${paper4Date(latestSnapshot.createdAt, locale)}`, `Checkpoint saved · ${paper4Date(latestSnapshot.createdAt, locale)}`) : tx("本阶段尚无检查点", "No checkpoint for this stage")}</span><Button size="sm" variant="secondary" disabled={frozen || busy || saveStatus === "error" || !stage} onClick={() => void mutate(async () => { await saveFile(current.key); await productionApi(`paper4/attempts/${encodeURIComponent(attempt.id)}/checkpoints`, { method: "POST", body: { stageId: stage!.id } }); setAttempt(await productionApi<Paper4Attempt>(`paper4/attempts/${encodeURIComponent(attempt.id)}`)); setMessage(tx("阶段检查点已保存。", "Stage checkpoint saved.")); })}><Bookmark size={15}/>{tx("保存检查点", "Save checkpoint")}</Button></div>
         </div>
       </section>

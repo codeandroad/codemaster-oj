@@ -1,0 +1,79 @@
+.reading {
+  min-width: 0;
+}
+
+.reading > div {
+  max-width: 74ch;
+  font-size: 14px;
+  line-height: 1.8;
+  overflow-wrap: break-word;
+}
+
+.reading p {
+  margin-bottom: 1.1em;
+}
+
+.reading h2,
+.reading h3 {
+  line-height: 1.35;
+  letter-spacing: -0.012em;
+}
+
+.reading h2 {
+  margin: 1.4em 0 0.55em;
+  font-size: 1.12rem;
+}
+
+.reading h3 {
+  margin: 1.2em 0 0.45em;
+  font-size: 0.98rem;
+  font-weight: 650;
+}
+
+.reading li {
+  padding-left: 0.15em;
+  margin-bottom: 0.45em;
+}
+
+.reading code {
+  overflow-wrap: anywhere;
+}
+
+.reading pre {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.teacherPreview {
+  margin-top: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+}
+
+.teacherPreviewLabel {
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted-foreground);
+}
+
+.stagePreview {
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.stagePreview summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--muted-foreground);
+}
+
+.stagePreview > div {
+  padding-top: 10px;
+}

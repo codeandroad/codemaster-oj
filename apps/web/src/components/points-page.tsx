@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { AppLink as Link } from "./navigation";
-import { PageHeader } from "./page-chrome";
+import { ChevronLeft, ChevronRight, CircleHelp, Medal, SlidersHorizontal, Trophy, UsersRound } from "lucide-react";
+import styles from "./points-page.module.css";
 import { Button } from "./ui/button";
 import { useLocale, type AppLocale } from "./locale-context";
 import {
@@ -80,36 +81,66 @@ function pageNumbers(current: number, last: number): (number | "…")[] {
   });
 }
 
-function LeaderboardRow({ person, current, visibleFields, workspace, classId }: { person: RankedStudent; current: boolean; visibleFields: VisibleFields; workspace: CampusRole; classId: string }) {
+function profileHref(person: RankedStudent, workspace: CampusRole, classId: string) {
+  const query = new URLSearchParams({ from: "points" });
+  if (classId) query.set("classId", classId);
+  return `/${workspace}/people/${encodeURIComponent(person.id)}?${query}`;
+}
+
+function StudentAvatar({ person, podium = false }: { person: RankedStudent; podium?: boolean }) {
+  const className = podium ? styles.podiumAvatar : styles.avatar;
+  return person.avatar ? (
+    <Image src={person.avatar} unoptimized width={podium ? 80 : 40} height={podium ? 80 : 40} alt="" className={className} />
+  ) : (
+    <span aria-hidden="true" className={`${className} ${styles.avatarFallback}`}>{person.name.trim().slice(0, 1) || "学"}</span>
+  );
+}
+
+function LeaderboardPodium({ people, user, workspace, classId }: { people: RankedStudent[]; user: CampusUser; workspace: CampusRole; classId: string }) {
   const { locale } = useLocale();
-  const profileQuery = new URLSearchParams({ from: "points" });
-  if (classId) profileQuery.set("classId", classId);
+  if (!people.length) return null;
   return (
-    <tr className={`border-t border-border ${current ? "bg-primary/6 hover:!bg-primary/10" : ""}`}>
-      <td className={`px-5 py-4 font-semibold tabular-nums ${person.rank <= 3 ? "text-primary" : "text-muted-foreground"}`}>
-        {rankNumber.format(person.rank)}
-      </td>
-      <td className="px-4 py-4">
+    <div className={styles.podium} data-count={people.length} role="group" aria-label={ui(locale, "领先学生", "Leading students")}>
+      {people.map((person, index) => (
         <Link
-          href={`/${workspace}/people/${encodeURIComponent(person.id)}?${profileQuery}`}
-          className="inline-flex min-w-36 items-center gap-3 rounded-md text-foreground hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          key={person.id}
+          href={profileHref(person, workspace, classId)}
+          className={styles.podiumCard}
+          data-slot={index + 1}
+          data-rank={person.rank}
+          aria-label={ui(locale, `${person.name}，第 ${person.rank} 名，${person.points} 积分，查看主页`, `${person.name}, rank ${person.rank}, ${person.points} points, view profile`)}
         >
-          {person.avatar ? (
-            <Image src={person.avatar} unoptimized width={38} height={38} alt="" className="size-9 shrink-0 rounded-full object-cover" />
-          ) : (
-            <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-full bg-accent font-semibold text-primary">
-              {person.name.trim().slice(0, 1) || "学"}
-            </span>
-          )}
-          <span className="min-w-0 font-medium">
-            {person.name}{current && <span className="ml-2 text-xs font-semibold text-primary">{ui(locale, "（我）", "(me)")}</span>}
-          </span>
+          <Trophy className={styles.podiumWatermark} aria-hidden="true" strokeWidth={1} />
+          <span className={styles.podiumRank}><Trophy size={14} aria-hidden="true" />{ui(locale, `第 ${person.rank} 名`, `RANK ${person.rank}`)}</span>
+          <StudentAvatar person={person} podium />
+          <span className={styles.podiumName}>{person.name}{person.id === user.identityId && <span className={styles.podiumMe}>{ui(locale, "我", "You")}</span>}</span>
+          <span className={styles.podiumPoints}>{rankNumber.format(person.points)}<span>{ui(locale, "积分", "points")}</span></span>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function LeaderboardRow({ person, current, pinned = false, visibleFields, workspace, classId }: { person: RankedStudent; current: boolean; pinned?: boolean; visibleFields: VisibleFields; workspace: CampusRole; classId: string }) {
+  const { locale } = useLocale();
+  return (
+    <tr className={`${styles.row} ${current ? styles.currentRow : ""} ${pinned ? styles.pinnedRow : ""}`}>
+      <td className={styles.rankCell}>
+        <span className={styles.rank} data-rank={person.rank}>
+          {person.rank <= 3 && <Medal size={19} aria-hidden="true" />}
+          <span>{rankNumber.format(person.rank)}</span>
+        </span>
+      </td>
+      <td className={styles.studentCell}>
+        <Link href={profileHref(person, workspace, classId)} className={styles.studentLink}>
+          <StudentAvatar person={person} />
+          <span className={styles.studentName}>{person.name}{current && <span className={styles.meTag}>{ui(locale, "我", "You")}</span>}</span>
         </Link>
       </td>
-      <td className="px-4 py-4 text-right font-semibold tabular-nums">{rankNumber.format(person.points)}</td>
-      {visibleFields.solvedProblems && <td className="px-4 py-4 text-right tabular-nums">{person.solvedProblems == null ? "—" : rankNumber.format(person.solvedProblems)}</td>}
-      {visibleFields.attempts && <td className="px-4 py-4 text-right tabular-nums">{person.attempts == null ? "—" : rankNumber.format(person.attempts)}</td>}
-      {visibleFields.acRate && <td className="px-5 py-4 text-right tabular-nums">{person.acRate == null ? "—" : `${Number.isInteger(person.acRate) ? person.acRate : person.acRate.toFixed(1)}%`}</td>}
+      <td className={styles.pointsCell}>{rankNumber.format(person.points)}</td>
+      {visibleFields.solvedProblems && <td className={styles.numberCell}>{person.solvedProblems == null ? "—" : rankNumber.format(person.solvedProblems)}</td>}
+      {visibleFields.attempts && <td className={styles.numberCell}>{person.attempts == null ? "—" : rankNumber.format(person.attempts)}</td>}
+      {visibleFields.acRate && <td className={`${styles.numberCell} ${person.acRate != null ? styles.rateCell : ""}`}>{person.acRate == null ? "—" : `${Number.isInteger(person.acRate) ? person.acRate : person.acRate.toFixed(1)}%`}</td>}
     </tr>
   );
 }
@@ -139,6 +170,7 @@ function LeaderboardTable({
   const [showSettings, setShowSettings] = useState(false);
   const pageSize = 10;
   const ranking = useData<LeaderboardResponse>(`points/leaderboard?${new URLSearchParams({ ...(classId ? { classId } : {}), period, page: String(page), pageSize: String(pageSize) })}`);
+  const leaders = useData<LeaderboardResponse>(`points/leaderboard?${new URLSearchParams({ ...(classId ? { classId } : {}), period, page: "1", pageSize: "3" })}`);
   const total = ranking.data?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const start = total ? (page - 1) * pageSize + 1 : 0;
@@ -173,44 +205,44 @@ function LeaderboardTable({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3 sm:px-5">
-        <label className="inline-flex items-center gap-2 text-sm font-medium">
-          {ui(locale, "范围", "Scope")}
+      <div className={styles.toolbar}>
+        <label className={styles.scopeLabel}>
+          <UsersRound size={17} aria-hidden="true" /><span className="sr-only">{ui(locale, "范围", "Scope")}</span>
           <select
             value={classId}
             onChange={(event) => onClassChange(event.target.value)}
-            className="min-h-9 max-w-48 rounded-md border border-border bg-surface px-3 text-sm focus-visible:outline-2 focus-visible:outline-primary"
+            className={styles.scopeSelect}
           >
             <option value="">{ui(locale, "全校学生", "All students")}</option>
             {classes.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
         </label>
-        <div role="group" aria-label={ui(locale, "排行榜时间范围", "Leaderboard time period")} className="inline-flex rounded-md border border-border bg-surface-subtle p-0.5">
+        <div role="group" aria-label={ui(locale, "排行榜时间范围", "Leaderboard time period")} className={styles.periods}>
           {rankingPeriods.map((option) => (
             <button
               key={option.value}
               type="button"
               aria-pressed={period === option.value}
               onClick={() => { setPeriod(option.value); setPage(1); }}
-              className={`rounded px-3 py-1.5 text-sm font-medium ${period === option.value ? "bg-surface text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              className={styles.periodButton}
             >
               {ui(locale, option.label, option.value === "all" ? "All time" : option.value === "month" ? "This month" : "This week")}
             </button>
           ))}
         </div>
-        <div className="ml-auto flex items-center gap-2">
-          <button type="button" aria-expanded={showRules} aria-controls="leaderboard-rules" onClick={() => setShowRules((value) => !value)} className="rounded-md px-2 py-2 text-sm text-muted-foreground hover:bg-surface-subtle hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary">{ui(locale, "积分规则", "Points rules")}</button>
-          {canManage && <button type="button" aria-expanded={showSettings} aria-controls="leaderboard-fields" onClick={() => setShowSettings((value) => !value)} className="rounded-md px-2 py-2 text-sm font-medium text-primary hover:bg-accent focus-visible:outline-2 focus-visible:outline-primary">{ui(locale, "显示字段", "Visible fields")}</button>}
+        <div className={styles.toolbarActions}>
+          <button type="button" aria-expanded={showRules} aria-controls="leaderboard-rules" onClick={() => setShowRules((value) => !value)} className={styles.textButton}><CircleHelp size={16} aria-hidden="true" />{ui(locale, "积分规则", "Points rules")}</button>
+          {canManage && <button type="button" aria-expanded={showSettings} aria-controls="leaderboard-fields" onClick={() => setShowSettings((value) => !value)} className={styles.textButton}><SlidersHorizontal size={16} aria-hidden="true" />{ui(locale, "显示字段", "Visible fields")}</button>}
         </div>
       </div>
       {showRules && (
-        <div id="leaderboard-rules" className="border-b border-border bg-surface-subtle px-5 py-3 text-xs leading-5 text-muted-foreground">
-          <p>{ui(locale, "榜单积分仅来自管理员审核公开题目的首次有效 AC；作业和训练奖励计入个人积分。按积分排名，同分并列。", "Leaderboard points come only from the first valid AC on administrator-approved public problems. Assignment and practice bonuses count toward personal points. Ties share a rank.")}</p>
-          {optionalCount > 0 && <p className="mt-1">{ui(locale, "解题数为首次 AC 的不同题目数；提交次数包含重复正式提交；AC 率按有效判题的正式提交计算。", "Solved counts distinct first-AC problems. Attempts include repeat submissions. AC rate uses official submissions with valid judging results.")}</p>}
+        <div id="leaderboard-rules" className={styles.disclosure}>
+          <p>{ui(locale, "积分来自审核公开题目的首次有效 AC，以及 Paper 4 正式交卷后每道大题首次全部自动测试通过的 10 分。作业与训练额外奖励只计入个人累计积分；同分并列。", "Points come from the first valid AC on approved public problems, plus 10 points for each Paper 4 question that first passes all automatic tests after formal submission. Assignment and practice bonuses count only toward personal totals. Equal points share a rank.")}</p>
+          {optionalCount > 0 && <p className="mt-1">{ui(locale, "解题数按获榜分的不同题目统计；Paper 4 每道大题计一题、每次交卷中，每道大题各计一次提交。AC 率为有效正式提交中的通过比例。", "Solved counts distinct questions earning leaderboard points. Each Paper 4 question counts as one problem and one attempt per formal submission. AC rate is the share of valid judged submissions accepted.")}</p>}
         </div>
       )}
       {canManage && showSettings && (
-        <fieldset id="leaderboard-fields" className="border-b border-border bg-surface-subtle px-5 py-4">
+        <fieldset id="leaderboard-fields" className={`${styles.disclosure} ${styles.fieldSettings}`}>
           <legend className="sr-only">{ui(locale, "全校学生端排行榜字段", "Student leaderboard fields")}</legend>
           <p className="text-sm font-semibold">{ui(locale, "学生端显示字段", "Fields shown to students")} <span className="ml-2 text-xs font-normal text-muted-foreground">{ui(locale, "排名、昵称和积分始终显示", "Rank, nickname, and points are always shown")}</span></p>
           <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-3">
@@ -233,61 +265,75 @@ function LeaderboardTable({
           {settingsMessage && <p role={settingsError ? "alert" : "status"} className={`mt-2 text-sm ${settingsError ? "text-destructive" : "text-muted-foreground"}`}>{settingsMessage === "saved" ? ui(locale, "全校学生端排行榜字段已更新。", "Student leaderboard fields updated.") : settingsMessage}</p>}
         </fieldset>
       )}
-      <State data={ranking}>
-        {ranking.loading ? (
-          <p role="status" className="px-5 py-10 text-center text-sm text-muted-foreground">{ui(locale, "正在更新排行榜…", "Updating leaderboard…")}</p>
+      <div className={styles.podiumArea} aria-busy={leaders.loading} hidden={!leaders.loading && !leaders.error && !leaders.data?.items.length}>
+        {leaders.loading ? (
+          <div className={styles.podiumLoading} role="status"><Trophy size={30} aria-hidden="true" /><span>{ui(locale, "正在加载领先学生…", "Loading leading students…")}</span></div>
         ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className={`w-full ${tableWidth} text-left text-sm`}>
-                <thead className="text-xs text-muted-foreground">
-                  <tr>
-                    <th scope="col" className="px-5 py-3">{ui(locale, "排名", "Rank")}</th>
-                    <th scope="col" className="px-4 py-3">{ui(locale, "学生", "Student")}</th>
-                    <th scope="col" className="px-4 py-3 text-right">{ui(locale, "积分", "Points")}</th>
-                    {visibleFields.solvedProblems && <th scope="col" className="px-4 py-3 text-right">{fieldName(locale, "solvedProblems")}</th>}
-                    {visibleFields.attempts && <th scope="col" className="px-4 py-3 text-right">{fieldName(locale, "attempts")}</th>}
-                    {visibleFields.acRate && <th scope="col" className="px-5 py-3 text-right">
-                      <abbr title={ui(locale, "AC 的正式提交数 ÷ 已有有效判题结果的正式提交数", "Accepted official submissions ÷ official submissions with valid judging results")} className="cursor-help no-underline">{fieldName(locale, "acRate")} ⓘ</abbr>
-                    </th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {ranking.data?.items.map((person) => <LeaderboardRow key={person.id} person={person} current={person.id === user.identityId} visibleFields={visibleFields} workspace={workspace} classId={classId} />)}
-                  {showMe && <LeaderboardRow person={me} current visibleFields={visibleFields} workspace={workspace} classId={classId} />}
-                </tbody>
-              </table>
-              {!ranking.data?.items.length && !showMe && <p className="px-5 py-8 text-center text-sm text-muted-foreground">{ui(locale, "当前范围暂无学生。", "No students in this scope.")}</p>}
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3 text-sm text-muted-foreground">
-              <span>{total ? ui(locale, `显示 ${start}–${end} / ${rankNumber.format(total)} 名学生`, `Showing ${start}–${end} of ${rankNumber.format(total)} students`) : ui(locale, "暂无学生", "No students")}{showMe ? ui(locale, " · 我的数据单独显示", " · My result shown separately") : ""}</span>
-              <nav aria-label={ui(locale, "排行榜分页", "Leaderboard pagination")} className="flex items-center gap-2">
-                <button type="button" aria-label={ui(locale, "上一页", "Previous page")} disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className="rounded border border-border px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-50">‹</button>
-                {pageNumbers(page, pages).map((number, index) => number === "…" ? (
-                  <span key={`gap-${index}`} aria-hidden="true" className="px-1">…</span>
-                ) : (
-                  <button
-                    key={number}
-                    type="button"
-                    aria-label={ui(locale, `第 ${number} 页`, `Page ${number}`)}
-                    aria-current={page === number ? "page" : undefined}
-                    onClick={() => setPage(number)}
-                    className={`min-w-9 rounded px-2 py-1.5 tabular-nums ${page === number ? "bg-accent font-semibold text-foreground" : "hover:bg-surface-subtle"}`}
-                  >
-                    {number}
-                  </button>
-                ))}
-                <button type="button" aria-label={ui(locale, "下一页", "Next page")} disabled={page >= pages} onClick={() => setPage((value) => value + 1)} className="rounded border border-border px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-50">›</button>
-              </nav>
-            </div>
-          </>
+          <State data={leaders}>
+            <LeaderboardPodium people={leaders.data?.items ?? []} user={user} workspace={workspace} classId={classId} />
+          </State>
         )}
-      </State>
+      </div>
+      <section className={styles.rankingsPanel} aria-labelledby="leaderboard-list-heading">
+        <div className={styles.tableHeading}>
+          <h2 id="leaderboard-list-heading">{ui(locale, "全部排名", "All rankings")}</h2>
+          <span>{ui(locale, `${rankNumber.format(total)} 名学生`, `${rankNumber.format(total)} students`)}</span>
+        </div>
+        <State data={ranking}>
+          {ranking.loading ? (
+            <p role="status" className={styles.tableLoading}>{ui(locale, "正在更新排行榜…", "Updating leaderboard…")}</p>
+          ) : (
+            <>
+              <div className={styles.tableScroll}>
+                <table className={`${styles.table} ${tableWidth}`}>
+                  <thead>
+                    <tr>
+                      <th scope="col" className={styles.rankCell}>{ui(locale, "排名", "Rank")}</th>
+                      <th scope="col" className={styles.studentCell}>{ui(locale, "学生", "Student")}</th>
+                      <th scope="col" className={styles.numberCell}>{ui(locale, "积分", "Points")}</th>
+                      {visibleFields.solvedProblems && <th scope="col" className={styles.numberCell}>{fieldName(locale, "solvedProblems")}</th>}
+                      {visibleFields.attempts && <th scope="col" className={styles.numberCell}>{fieldName(locale, "attempts")}</th>}
+                      {visibleFields.acRate && <th scope="col" className={styles.numberCell}>
+                        <abbr title={ui(locale, "AC 的正式提交数 ÷ 已有有效判题结果的正式提交数", "Accepted official submissions ÷ official submissions with valid judging results")}>{fieldName(locale, "acRate")}<CircleHelp size={12} aria-hidden="true" /></abbr>
+                      </th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ranking.data?.items.map((person) => <LeaderboardRow key={person.id} person={person} current={person.id === user.identityId} visibleFields={visibleFields} workspace={workspace} classId={classId} />)}
+                    {showMe && <LeaderboardRow person={me} current pinned visibleFields={visibleFields} workspace={workspace} classId={classId} />}
+                  </tbody>
+                </table>
+                {!ranking.data?.items.length && !showMe && <div className={styles.empty}><UsersRound size={30} aria-hidden="true" /><p>{ui(locale, "当前范围暂无学生。", "No students in this scope.")}</p></div>}
+              </div>
+              <div className={styles.footer}>
+                <span>{total ? ui(locale, `显示 ${start}–${end} / ${rankNumber.format(total)} 名学生`, `Showing ${start}–${end} of ${rankNumber.format(total)} students`) : ui(locale, "暂无学生", "No students")}{showMe ? ui(locale, " · 我的数据单独显示", " · My result shown separately") : ""}</span>
+                <nav aria-label={ui(locale, "排行榜分页", "Leaderboard pagination")} className={styles.pagination}>
+                  <button type="button" aria-label={ui(locale, "上一页", "Previous page")} disabled={page <= 1} onClick={() => setPage((value) => value - 1)}><ChevronLeft size={16} aria-hidden="true" /></button>
+                  {pageNumbers(page, pages).map((number, index) => number === "…" ? (
+                    <span key={`gap-${index}`} aria-hidden="true">…</span>
+                  ) : (
+                    <button
+                      key={number}
+                      type="button"
+                      aria-label={ui(locale, `第 ${number} 页`, `Page ${number}`)}
+                      aria-current={page === number ? "page" : undefined}
+                      onClick={() => setPage(number)}
+                    >
+                      {number}
+                    </button>
+                  ))}
+                  <button type="button" aria-label={ui(locale, "下一页", "Next page")} disabled={page >= pages} onClick={() => setPage((value) => value + 1)}><ChevronRight size={16} aria-hidden="true" /></button>
+                </nav>
+              </div>
+            </>
+          )}
+        </State>
+      </section>
     </>
   );
 }
 
-function Leaderboard({ user, staff, workspace }: { user: CampusUser; staff: boolean; workspace: CampusRole }) {
+function Leaderboard({ user, staff, workspace, personalPoints }: { user: CampusUser; staff: boolean; workspace: CampusRole; personalPoints?: { points: number; rankPoints: number } | null }) {
   const { locale } = useLocale();
   const contexts = useData<LeaderboardContextsResponse>("points/leaderboard/contexts");
   const searchParams = useSearchParams();
@@ -306,8 +352,15 @@ function Leaderboard({ user, staff, workspace }: { user: CampusUser; staff: bool
   };
 
   return (
-    <section className="mt-4 w-full overflow-hidden rounded-lg border border-border bg-surface" aria-labelledby="leaderboard-heading">
-      <h2 id="leaderboard-heading" className="sr-only">{ui(locale, "积分排行榜列表", "Leaderboard")}</h2>
+    <section className={styles.page} aria-labelledby="leaderboard-heading">
+      <header className={styles.hero}>
+        <span className={styles.heroEmblem} aria-hidden="true"><Trophy size={22} strokeWidth={1.6} /></span>
+        <h1 id="leaderboard-heading">{ui(locale, "积分排行榜", "Leaderboard")}</h1>
+        {!staff && <div className={styles.personalSummary}>
+          <span>{ui(locale, "累计积分", "Total points")}<strong>{personalPoints ? rankNumber.format(personalPoints.points) : "…"}</strong></span>
+          <span>{ui(locale, "排行积分", "Leaderboard points")}<strong>{personalPoints ? rankNumber.format(personalPoints.rankPoints) : "…"}</strong></span>
+        </div>}
+      </header>
       <State data={contexts}>
         {contexts.data && (
           <LeaderboardTable key={effectiveClassId || "school"} user={user} classId={effectiveClassId} classes={classes} onClassChange={selectClass} configuredFields={contexts.data.visibleFields} canManage={workspace === "admin" && contexts.data.canManage} staff={staff} workspace={workspace} onSettingsUpdated={contexts.reload} />
@@ -342,8 +395,7 @@ export function PointsPage({ user, student = true, workspace = "student" }: { us
 
   return (
     <>
-      <PageHeader title={ui(locale, "积分排行榜", "Leaderboard")} action={student ? <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-muted-foreground"><span>{ui(locale, "个人积分", "Total points")} <strong className="ml-1 text-foreground tabular-nums">{me.data?.points ?? "…"}</strong></span><span>{ui(locale, "排行积分", "Leaderboard points")} <strong className="ml-1 text-foreground tabular-nums">{me.data?.rankPoints ?? "…"}</strong></span></div> : undefined} />
-      <Leaderboard user={user} staff={!student} workspace={workspace} />
+      <Leaderboard user={user} staff={!student} workspace={workspace} personalPoints={student ? me.data : undefined} />
       {staff && (
         <section className="mt-6 rounded border border-border bg-surface p-5">
           <h2 className="font-semibold">{ui(locale, "作业额外奖励", "Assignment bonuses")}</h2>

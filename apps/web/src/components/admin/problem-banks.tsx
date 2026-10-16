@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Archive, Plus, RotateCcw, Search } from "lucide-react";
+import { Archive, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { AppLink } from "@/components/navigation";
 import { PageHeader } from "@/components/page-chrome";
 import { Button } from "@/components/ui/button";
@@ -49,7 +49,7 @@ interface ManagedProblemHistory {
   versions: { id: string; title: string; statement: string; validationStatus: string; publishedAt: string | null; schoolVisibleAt: string | null; rankReviewStatus: string; createdAt: string }[];
 }
 
-type BankAction = { bank: ManagedBank; kind: "archive" | "restore" | "school" | "private" };
+type BankAction = { bank: ManagedBank; kind: "archive" | "restore" | "school" | "private" | "delete" };
 type ProblemAction = { problem: ManagedProblem; kind: "archive" | "restore" };
 
 export function AdminProblemBanks() {
@@ -71,14 +71,17 @@ export function AdminProblemBanks() {
     if (!bankAction) return;
     await action.run(async () => {
       const { bank, kind } = bankAction;
-      if (kind === "archive" || kind === "restore") {
+      if (kind === "delete") {
+        await productionApi(`problem-banks/${encodeURIComponent(bank.id)}`, { method: "DELETE" });
+        setSelectedId("");
+      } else if (kind === "archive" || kind === "restore") {
         await productionApi(`admin/problem-banks/${encodeURIComponent(bank.id)}`, { method: "PATCH", body: { archived: kind === "archive" } });
       } else {
         await productionApi(`problem-banks/${encodeURIComponent(bank.id)}`, { method: "PATCH", body: { visibility: kind === "school" ? "school" : "private" } });
       }
       setBankAction(null);
       banks.reload();
-      action.success(tr("题库设置已更新。", "Problem bank updated."));
+      action.success(kind === "delete" ? tr("空题库已删除。", "Empty bank deleted.") : tr("题库设置已更新。", "Problem bank updated."));
     });
   };
   const createBank = async () => {
@@ -122,6 +125,7 @@ export function AdminProblemBanks() {
             <div className="flex flex-wrap gap-2">
               {!selectedBank.archivedAt && !selectedBank.isSystem && <Button size="sm" variant="secondary" onClick={() => setBankAction({ bank: selectedBank, kind: selectedBank.visibility === "private" ? "school" : "private" })}>{selectedBank.visibility === "private" ? tr("纳入校内审核", "Enable school review") : tr("改为私有", "Make private")}</Button>}
               {!selectedBank.isSystem && <Button size="sm" variant="secondary" onClick={() => setBankAction({ bank: selectedBank, kind: selectedBank.archivedAt ? "restore" : "archive" })}>{selectedBank.archivedAt ? <RotateCcw size={14} aria-hidden="true" /> : <Archive size={14} aria-hidden="true" />}{selectedBank.archivedAt ? tr("恢复题库", "Restore bank") : tr("归档题库", "Archive bank")}</Button>}
+              {!selectedBank.isSystem && <Button size="sm" variant="secondary" disabled={selectedBank.problemCount + selectedBank.archivedProblemCount > 0} title={selectedBank.problemCount + selectedBank.archivedProblemCount > 0 ? tr("题库有题目时请使用归档", "Archive banks that contain problems") : undefined} onClick={() => setBankAction({ bank: selectedBank, kind: "delete" })}><Trash2 size={14} aria-hidden="true" />{tr("删除空题库", "Delete empty bank")}</Button>}
             </div>
           </div>
           <p className="mt-3 text-xs leading-5 text-muted-foreground">{selectedBank.publicVersionCount ? tr(`该库仍有 ${selectedBank.publicVersionCount} 个公开题目版本；归档前须在题目审核中撤下。`, `${selectedBank.publicVersionCount} versions are still public. Withdraw them in problem review before archiving.`) : tr("归档不会硬删除数据；被已发布课程或未归档训练引用时会阻止归档。", "Archiving preserves data and is blocked while published courses or active practices reference the bank.")}</p>
@@ -130,13 +134,14 @@ export function AdminProblemBanks() {
         <ManagedProblemList key={activeId} bank={selectedBank} onChanged={banks.reload} />
       </div>}
     </div>
-    {bankAction && <Modal title={bankAction.kind === "archive" ? tr("归档题库", "Archive bank") : bankAction.kind === "restore" ? tr("恢复题库", "Restore bank") : tr("调整题库范围", "Change bank visibility")}
-      description={bankAction.kind === "archive" ? tr("归档后不再供新练习选用，题目版本、提交和成绩保留。若题库有公开版本或被课程、训练引用，系统会阻止归档。", "The bank will no longer be available for new practice. Versions, submissions, and grades remain. Public versions or course/practice references block archiving.") : bankAction.kind === "restore" ? tr("恢复题库不会自动重新公开已撤下题目，也不会补发积分。", "Restoring the bank does not republish withdrawn problems or grant past points.") : tr("调整范围不会自动通过题目审核。已公开版本或活动引用可能阻止缩小范围。", "Changing visibility does not approve problems. Existing public versions or activity references may block reducing visibility.")}
+    {bankAction && <Modal title={bankAction.kind === "delete" ? tr("永久删除空题库", "Permanently delete empty bank") : bankAction.kind === "archive" ? tr("归档题库", "Archive bank") : bankAction.kind === "restore" ? tr("恢复题库", "Restore bank") : tr("调整题库范围", "Change bank visibility")}
+      description={bankAction.kind === "delete" ? tr("只有没有任何题目、分组或导入记录的题库能永久删除；有内容时请归档。", "Only banks with no problems, groups, or import records can be permanently deleted. Archive banks with content.") : bankAction.kind === "archive" ? tr("归档后不再供新练习选用，题目版本、提交和成绩保留。若题库有公开版本或被课程、训练引用，系统会阻止归档。", "The bank will no longer be available for new practice. Versions, submissions, and grades remain. Public versions or course/practice references block archiving.") : bankAction.kind === "restore" ? tr("恢复题库不会自动重新公开已撤下题目，也不会补发积分。", "Restoring the bank does not republish withdrawn problems or grant past points.") : tr("调整范围不会自动通过题目审核。已公开版本或活动引用可能阻止缩小范围。", "Changing visibility does not approve problems. Existing public versions or activity references may block reducing visibility.")}
       onClose={() => setBankAction(null)}>
       <p className="font-semibold">{bankAction.bank.name}</p>
       {bankAction.kind === "archive" && <p className="mt-2 text-sm text-muted-foreground">{tr(`将影响 ${bankAction.bank.problemCount} 道未归档题目；${bankAction.bank.archivedProblemCount} 道题已归档。已发布作业与历史成绩保留。`, `This affects ${bankAction.bank.problemCount} active problems; ${bankAction.bank.archivedProblemCount} are already archived. Published assignments and historical grades remain.`)}</p>}
+      {bankAction.kind === "delete" && bankAction.bank.problemCount + bankAction.bank.archivedProblemCount > 0 && <p className="mt-2 text-sm font-medium text-destructive">{tr("该库仍有题目，请改用归档；已归档题目也不能随题库永久删除。", "This bank still contains problems. Archive it instead; archived problems cannot be deleted with the bank.")}</p>}
       <Feedback action={action} />
-      <div className="mt-5 flex justify-end gap-2"><Button variant="secondary" onClick={() => setBankAction(null)}>{tr("取消", "Cancel")}</Button><Button disabled={action.busy} onClick={() => void changeBank()}>{tr("确认", "Confirm")}</Button></div>
+      <div className="mt-5 flex justify-end gap-2"><Button variant="secondary" onClick={() => setBankAction(null)}>{tr("取消", "Cancel")}</Button><Button variant={bankAction.kind === "delete" ? "danger" : "default"} disabled={action.busy || bankAction.kind === "delete" && bankAction.bank.problemCount + bankAction.bank.archivedProblemCount > 0} onClick={() => void changeBank()}>{bankAction.kind === "delete" ? tr("确认删除", "Delete bank") : tr("确认", "Confirm")}</Button></div>
     </Modal>}
     {creating && <Modal title={tr("新建题库", "Create bank")} description={tr("教师私有题库仅供授权教师使用；校内题库中的题目仍须逐版通过审核后才面向全校学生。", "Private banks are limited to authorized teachers. Versions in school banks still require review before becoming school-wide.")} onClose={() => setCreating(false)}>
       <form onSubmit={event => { event.preventDefault(); void createBank(); }} className="space-y-3">

@@ -1,6 +1,7 @@
 // The Paper 4 queue shares the ordinary judge worker's concurrency budget,
-// node heartbeat and already-verified executor. It never writes ordinary OJ
-// submissions, AC rewards, scores or leaderboard rows.
+// node heartbeat and already-verified executor. Formal Paper 4 runs can
+// trigger their own fixed rank award; they never write ordinary OJ
+// submissions, AC rewards or teacher-assigned Paper 4 marks.
 import { randomUUID } from 'node:crypto';
 import { transaction } from './src/db.mjs';
 import { InfrastructureError } from './judge.mjs';

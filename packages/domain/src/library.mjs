@@ -83,7 +83,7 @@ export async function restoreIdentityBindings(db,identityId,newAccountId,{restor
 export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
  const {audit,versionAccess,submissionAccess}=helpers;
  const result=body=>({status:200,body});
- const bankShape=a=>({id:a.bank.id,name:a.bank.name,description:a.bank.description,course:a.bank.course,updatedAt:a.bank.updated_at,createdAt:a.bank.created_at,problemCount:a.bank.problemCount??0,visibility:a.bank.visibility,permission:a.permission,canEdit:a.canEdit,canContribute:a.canContribute,isSystem:a.bank.is_system});
+ const bankShape=a=>({id:a.bank.id,name:a.bank.name,description:a.bank.description,course:a.bank.course,updatedAt:a.bank.updated_at,createdAt:a.bank.created_at,archivedAt:a.bank.archived_at,problemCount:a.bank.problemCount??0,archivedProblemCount:a.bank.archivedProblemCount??0,visibility:a.bank.visibility,permission:a.permission,canEdit:a.canEdit,canContribute:a.canContribute,isSystem:a.bank.is_system});
  const reviewShape=r=>({problemId:r.problem_id,versionId:r.version_id,title:r.title,bankId:r.bank_id,bankName:r.bank_name,bankVisibility:r.bank_visibility,ownerName:r.owner_name,publishedAt:r.published_at,schoolVisibleAt:r.school_visible_at,validationStatus:r.validation_status,rankReviewStatus:r.rank_review_status,rankApprovedAt:r.rank_approved_at,rankReviewReason:r.rank_review_reason,priorAcCount:Number(r.prior_ac_count),isCurrent:r.is_current});
  if(route==='/problems/rank-review'&&method==='GET'){
   if(!isAdmin(user))fail(403,'FORBIDDEN','仅管理员可审核校内公开题');
@@ -314,13 +314,24 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
   });return result(output);
  }
  if(route==='/problem-banks'&&method==='GET') {
-  const banks=(await pool.query('SELECT * FROM problem_banks WHERE archived_at IS NULL ORDER BY is_system DESC,created_at')).rows;
-  const items=[];for(const bank of banks){try{const access=await bankAccess(pool,user,bank.id);access.bank.problemCount=Number((await pool.query(`SELECT count(*) FROM problems p
+  const includeOwnedArchived=url.searchParams.get('includeArchived')==='owned'&&isStaff(user);
+  const banks=(await pool.query(`SELECT * FROM problem_banks
+   WHERE archived_at IS NULL OR ($1::boolean AND (owner_account_id=$2 OR $3::boolean))
+   ORDER BY archived_at NULLS FIRST,is_system DESC,created_at`,[includeOwnedArchived,user.id,isAdmin(user)])).rows;
+  const items=[];for(const bank of banks){try{
+   const access=bank.archived_at
+    ? {bank,permission:'owner',canRead:true,canEdit:false,canContribute:false}
+    : await bankAccess(pool,user,bank.id);
+   access.bank.problemCount=Number((await pool.query(`SELECT count(*) FROM problems p
    WHERE p.bank_id=$1 AND p.archived_at IS NULL
     AND ($2::boolean OR p.owner_account_id=$3 OR
      $4::boolean AND EXISTS (SELECT 1 FROM problem_versions v WHERE v.problem_id=p.id
        AND v.published_at IS NOT NULL AND v.school_visible_at IS NOT NULL))`,
-   [bank.id,access.canRead||isAdmin(user),user.id,bank.visibility==='school'])).rows[0].count);items.push(bankShape(access));}catch(error){if(error.code!=='FORBIDDEN')throw error;}}return result({items});
+   [bank.id,access.canRead||isAdmin(user),user.id,bank.visibility==='school'])).rows[0].count);
+   access.bank.archivedProblemCount=access.permission==='owner'
+    ? Number((await pool.query('SELECT count(*) FROM problems WHERE bank_id=$1 AND archived_at IS NOT NULL',[bank.id])).rows[0].count)
+    : 0;
+   items.push(bankShape(access));}catch(error){if(error.code!=='FORBIDDEN')throw error;}}return result({items});
  }
  if(route==='/problem-banks'&&method==='POST') {
   if(!isStaff(user))fail(403,'FORBIDDEN','需要教师权限');const name=field(body.name,'题库名称'),description=field(body.description??'','题库简介',{min:0,max:4000}),course=field(body.course??'Python','课程标签',{max:100}),visibility=enumValue(body.visibility??'private',['private','school'],'题库范围');
@@ -328,40 +339,65 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
   const bank=await transaction(pool,async db=>{const bank=required(await db.query('INSERT INTO problem_banks(name,visibility,owner_account_id,description,course) VALUES($1,$2,$3,$4,$5) RETURNING *',[name,visibility,user.id,description,course]));await audit(db,user.id,'bank.create','problem_bank',bank.id,{visibility});return bank;});return {status:201,body:bankShape({bank,permission:'owner',canEdit:true,canContribute:true})};
  }
  let m=route.match(/^\/problem-banks\/([^/]+)$/);
+ if(m&&method==='DELETE') {
+  if(!isStaff(user))fail(403,'FORBIDDEN','需要教师权限');
+  const bankId=uuid(m[1],'题库 ID');
+  return result(await transaction(pool,async db=>{
+   const bank=required(await db.query('SELECT * FROM problem_banks WHERE id=$1 FOR UPDATE',[bankId]));
+   if(bank.is_system)fail(409,'SYSTEM_BANK','系统校内题库不能删除');
+   if(!isAdmin(user)&&bank.owner_account_id!==user.id)fail(403,'FORBIDDEN','只有题库创建者或管理员可以删除题库');
+   const references=(await db.query(`SELECT
+    (SELECT count(*)::int FROM problems WHERE bank_id=$1) problems,
+    (SELECT count(*)::int FROM problem_groups WHERE bank_id=$1) groups,
+    (SELECT count(*)::int FROM problem_import_batches WHERE bank_id=$1) imports`,[bankId])).rows[0];
+   if(references.problems||references.groups||references.imports)
+    fail(409,'BANK_NOT_EMPTY','题库仍有题目、分组或导入记录。请保留历史并归档题库，或先清理未使用的内容');
+   // Legacy course exercise bundles store bank IDs in JSON rather than a
+   // foreign key. Preserve that link even if the relational bank is empty.
+   if((await db.query(`SELECT 1 FROM learning_paths
+    WHERE practice_bundle @> jsonb_build_array(jsonb_build_object('bankId',$1::text)) LIMIT 1`,[bankId])).rowCount)
+    fail(409,'BANK_REFERENCED','该题库仍被课程练习包引用，请先整理课程或归档题库');
+   await db.query('DELETE FROM bank_permissions WHERE bank_id=$1',[bankId]);
+   await db.query('DELETE FROM problem_banks WHERE id=$1',[bankId]);
+   await audit(db,user.id,'bank.delete','problem_bank',bankId,{name:bank.name});
+   return {ok:true,deleted:true};
+  }));
+ }
  if(m&&method==='PATCH') {
   const bank=await transaction(pool,async db=>{
-   const access=await bankAccess(db,user,m[1]);
-   if(!access.owner)fail(403,'FORBIDDEN','只有题库所有者可以修改权限范围');
-   if(access.bank.is_system)fail(409,'SYSTEM_BANK','系统校内题库不能修改或归档');
-   const name=body.name===undefined?access.bank.name:field(body.name,'题库名称');
-   const visibility=body.visibility===undefined?access.bank.visibility:enumValue(body.visibility,['private','school'],'题库范围');
-   if(visibility!==access.bank.visibility&&!isAdmin(user))fail(403,'FORBIDDEN','题库校内可见性只能由管理员调整');
+   const bankId=uuid(m[1],'题库 ID');
+   const existing=required(await db.query('SELECT * FROM problem_banks WHERE id=$1 FOR UPDATE',[bankId]));
+   if(!isAdmin(user)&&(!isStaff(user)||existing.owner_account_id!==user.id))fail(403,'FORBIDDEN','只有题库所有者可以修改权限范围');
+   if(existing.is_system)fail(409,'SYSTEM_BANK','系统校内题库不能修改或归档');
+   const name=body.name===undefined?existing.name:field(body.name,'题库名称');
+   const visibility=body.visibility===undefined?existing.visibility:enumValue(body.visibility,['private','school'],'题库范围');
+   if(visibility!==existing.visibility&&!isAdmin(user))fail(403,'FORBIDDEN','题库校内可见性只能由管理员调整');
    if(body.archived!==undefined&&typeof body.archived!=='boolean')fail(400,'VALIDATION','归档状态无效');
-   if(body.archived&&access.bank.visibility==='school'&&!isAdmin(user))fail(403,'FORBIDDEN','校内公开题库只能由管理员归档');
+   if(body.archived!==undefined&&existing.visibility==='school'&&!isAdmin(user))fail(403,'FORBIDDEN','校内公开题库只能由管理员归档或恢复');
    // Serialize bank demotion with per-version review. Otherwise an approved
    // public version could become private without a revocation timestamp, and
    // its historical submission statistics would silently disappear.
-   await db.query('SELECT id FROM problem_banks WHERE id=$1 FOR UPDATE',[access.bank.id]);
-   if(access.bank.visibility==='school'&&(visibility==='private'||body.archived)){
+   if((existing.visibility==='school'&&visibility==='private')||(body.archived&&!existing.archived_at)){
     const visible=await db.query(`SELECT 1 FROM problems p JOIN problem_versions v ON v.problem_id=p.id
-     WHERE p.bank_id=$1 AND p.archived_at IS NULL AND v.school_visible_at IS NOT NULL LIMIT 1`,[access.bank.id]);
+     WHERE p.bank_id=$1 AND p.archived_at IS NULL AND v.school_visible_at IS NOT NULL LIMIT 1`,[bankId]);
     if(visible.rowCount)fail(409,'REVOKE_PUBLIC_VERSIONS','请先在题目审核中撤下该题库所有已公开版本');
    const course=await db.query(`SELECT 1 FROM problems p JOIN chapter_problems cp ON cp.problem_id=p.id
     JOIN learning_chapters c ON c.id=cp.chapter_id JOIN learning_paths lp ON lp.id=c.path_id
     WHERE p.bank_id=$1 AND p.archived_at IS NULL AND c.archived_at IS NULL
-    AND lp.archived_at IS NULL AND lp.published_at IS NOT NULL LIMIT 1`,[access.bank.id]);
+    AND lp.archived_at IS NULL AND lp.published_at IS NOT NULL LIMIT 1`,[bankId]);
    if(course.rowCount)fail(409,'BANK_REFERENCED','题库仍被已发布课程引用，调整可见范围会造成断链');
    const timed=await db.query(`SELECT 1 FROM problems p JOIN timed_practice_problems tpp ON tpp.problem_id=p.id
-    JOIN timed_practices tp ON tp.id=tpp.practice_id WHERE p.bank_id=$1 AND p.archived_at IS NULL AND tp.archived_at IS NULL LIMIT 1`,[access.bank.id]);
+    JOIN timed_practices tp ON tp.id=tpp.practice_id WHERE p.bank_id=$1 AND p.archived_at IS NULL AND tp.archived_at IS NULL LIMIT 1`,[bankId]);
    if(timed.rowCount)fail(409,'BANK_REFERENCED','题库仍被未归档训练引用，调整可见范围会造成断链');
    }
-   const description=body.description===undefined?access.bank.description:field(body.description,'题库简介',{min:0,max:4000});
-   const course=body.course===undefined?access.bank.course:field(body.course,'课程标签',{max:100});
-   const updated=required(await db.query('UPDATE problem_banks SET name=$1,visibility=$2,archived_at=CASE WHEN $3 THEN now() ELSE NULL END,description=$5,course=$6,updated_at=now() WHERE id=$4 RETURNING *',[name,visibility,body.archived??false,m[1],description,course]));
-   await audit(db,user.id,'bank.update','problem_bank',m[1],{visibility,archived:!!body.archived});
+   const description=body.description===undefined?existing.description:field(body.description,'题库简介',{min:0,max:4000});
+   const course=body.course===undefined?existing.course:field(body.course,'课程标签',{max:100});
+   const archived=body.archived??Boolean(existing.archived_at);
+   const updated=required(await db.query('UPDATE problem_banks SET name=$1,visibility=$2,archived_at=CASE WHEN $3 THEN COALESCE(archived_at,now()) ELSE NULL END,description=$5,course=$6,updated_at=now() WHERE id=$4 RETURNING *',[name,visibility,archived,bankId,description,course]));
+   await audit(db,user.id,'bank.update','problem_bank',bankId,{visibility,archived});
    return updated;
   });
-  return result(bankShape({bank,permission:'owner',canEdit:true,canContribute:true}));
+  return result(bankShape({bank,permission:'owner',canEdit:!bank.archived_at,canContribute:!bank.archived_at}));
  }
  m=route.match(/^\/problem-banks\/([^/]+)\/permissions(?:\/([^/]+))?$/);
  if(m) {

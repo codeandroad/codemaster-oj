@@ -180,7 +180,11 @@ test('Paper 4 practice has isolated drafts, immutable stages, class authorizatio
    await teacher(`/paper4/attempts/${attempt.id}/marks`,{stageId:'Q3a',marks:30},'PATCH',409);
    assert.equal((await pool.query('SELECT count(*)::int n FROM submissions')).rows[0].n,0);
    assert.equal((await pool.query('SELECT count(*)::int n FROM judge_tasks')).rows[0].n,0);
-   assert.equal((await pool.query('SELECT count(*)::int n FROM paper4_run_tasks WHERE snapshot_id IS NOT NULL')).rows[0].n,2);
+   assert.equal((await pool.query('SELECT count(*)::int n FROM paper4_run_tasks WHERE snapshot_id IS NOT NULL')).rows[0].n,5,
+    'two practice runs and one frozen formal run for each of three questions');
+   assert.equal((await pool.query("SELECT count(*)::int n FROM paper4_snapshots WHERE attempt_id=$1 AND origin='formal'",[attempt.id])).rows[0].n,3);
+   assert.equal((await pool.query('SELECT count(*)::int n FROM paper4_rank_ledger')).rows[0].n,0,
+    'manual marks and release do not award unjudged formal code');
    assert.equal((await pool.query('SELECT count(*)::int n FROM paper4_snapshots WHERE attempt_id=$1 AND stage_key=$2',[attempt.id,'Q2a'])).rows[0].n,1);
 
    // Revisions are prepared privately; both the reference validation and

@@ -193,10 +193,10 @@ async function leaderboardVisibility(pool) {
 }
 
 const rankingPolicy = Object.freeze({
- scope:'approved_school_first_ac',
+ scope:'approved_school_and_paper4_first_ac',
  bonusIncluded:false,
  retroactive:false,
- description:'排名积分只计题目经管理员审核并向全校开放后收到的首次有效 AC；作业与计时训练额外奖励只计入个人总积分。',
+ description:'排名积分计审核公开的普通题首次有效 AC，以及 Paper 4 正式交卷后每道大题全部自动测试首次 AC 的固定 10 分；作业与计时训练额外奖励只计入个人总积分。',
 });
 
 async function leaderboardContexts(pool, user) {
@@ -238,10 +238,14 @@ async function pointsLeaderboard(ctx) {
     WHEN 'week' THEN date_trunc('week', now() AT TIME ZONE 'Asia/Shanghai') AT TIME ZONE 'Asia/Shanghai'
     WHEN 'month' THEN date_trunc('month', now() AT TIME ZONE 'Asia/Shanghai') AT TIME ZONE 'Asia/Shanghai'
     ELSE NULL::timestamptz END since_at
+  ), rank_awards AS (
+   SELECT identity_id,points,created_at FROM school_rank_ledger
+   UNION ALL
+   SELECT identity_id,points,created_at FROM paper4_rank_ledger
   ), earned AS (
    SELECT l.identity_id, sum(l.points)::int points,
-    count(DISTINCT l.problem_id)::int solved_problems
-   FROM school_rank_ledger l CROSS JOIN bounds b
+    count(*)::int solved_problems
+   FROM rank_awards l CROSS JOIN bounds b
    WHERE b.since_at IS NULL OR l.created_at>=b.since_at
    GROUP BY l.identity_id
   ), attempts AS (
@@ -267,15 +271,30 @@ async function pointsLeaderboard(ctx) {
      SELECT 1 FROM timed_attempts ta JOIN timed_practices tp ON tp.id=ta.practice_id
      WHERE ta.id=s.timed_attempt_id AND tp.results_published_at IS NOT NULL))
    GROUP BY s.identity_id
+  ), paper4_attempts AS (
+   SELECT a.identity_id,count(*)::int attempts,
+    count(*) FILTER (WHERE r.status IN ('AC','WA','CE','RE','TLE','MLE','OLE'))::int assessed,
+    count(*) FILTER (WHERE r.rank_ac_valid)::int accepted
+   FROM paper4_attempts a
+   JOIN paper4_versions v ON v.id=a.version_id AND v.published_at IS NOT NULL
+   JOIN paper4_snapshots s ON s.attempt_id=a.id AND s.origin='formal'
+   LEFT JOIN LATERAL (SELECT run.status,run.rank_ac_valid FROM paper4_run_tasks task
+    JOIN paper4_runs run ON run.task_id=task.id
+    WHERE task.snapshot_id=s.id ORDER BY run.created_at DESC,run.id DESC LIMIT 1) r ON true
+   CROSS JOIN bounds b
+   WHERE a.state='submitted' AND (b.since_at IS NULL OR a.submitted_at>=b.since_at)
+   GROUP BY a.identity_id
   ), eligible AS (
   SELECT i.id, a.id account_id, COALESCE(NULLIF(btrim(a.nickname),''),'同学') name,
    COALESCE(e.points,0)::int points, COALESCE(e.solved_problems,0)::int solved_problems,
-   COALESCE(t.attempts,0)::int attempts,
-   COALESCE(t.assessed,0)::int assessed, COALESCE(t.accepted,0)::int accepted
+   (COALESCE(t.attempts,0)+COALESCE(p4.attempts,0))::int attempts,
+   (COALESCE(t.assessed,0)+COALESCE(p4.assessed,0))::int assessed,
+   (COALESCE(t.accepted,0)+COALESCE(p4.accepted,0))::int accepted
   FROM identities i
   LEFT JOIN earned e ON e.identity_id=i.id
   JOIN accounts a ON a.identity_id=i.id AND a.disabled_at IS NULL AND a.binding_released_at IS NULL
   LEFT JOIN attempts t ON t.identity_id=i.id
+  LEFT JOIN paper4_attempts p4 ON p4.identity_id=i.id
   WHERE i.kind='student' AND i.archived_at IS NULL
    AND ($5::uuid IS NULL OR EXISTS (
     SELECT 1 FROM class_members cm WHERE cm.identity_id=i.id AND cm.class_id=$5::uuid))
@@ -320,8 +339,10 @@ export async function handleEducation(ctx) {
  if(route==='/points/me'&&method==='GET'){
   if(!user.roles.includes('student'))fail(403,'FORBIDDEN','积分仅适用于学生');
   const totals=(await pool.query(`SELECT
-   (SELECT COALESCE(sum(points),0)::int FROM point_ledger WHERE identity_id=$1) points,
-   (SELECT COALESCE(sum(points),0)::int FROM school_rank_ledger WHERE identity_id=$1) rank_points`,[user.identityId])).rows[0];
+   ((SELECT COALESCE(sum(points),0) FROM point_ledger WHERE identity_id=$1)
+    +(SELECT COALESCE(sum(points),0) FROM paper4_rank_ledger WHERE identity_id=$1))::int points,
+   ((SELECT COALESCE(sum(points),0) FROM school_rank_ledger WHERE identity_id=$1)
+    +(SELECT COALESCE(sum(points),0) FROM paper4_rank_ledger WHERE identity_id=$1))::int rank_points`,[user.identityId])).rows[0];
   return result({points:totals.points,rankPoints:totals.rank_points,rankingPolicy});
  }
  if(route==='/points/leaderboard/contexts'&&method==='GET')return result(await leaderboardContexts(pool,user));

@@ -37,6 +37,7 @@ export interface Paper4Paper {
   startsAt: string | null;
   endsAt: string | null;
   totalMarks: number;
+  firstAcPointsPerQuestion?: number;
   questions: Paper4Question[];
   runnerCases?: Record<string, Paper4RunnerCase[]>;
   referenceSolutions?: Record<string, string>;
@@ -81,6 +82,9 @@ export interface Paper4Attempt {
   marks: Paper4Mark[];
   score: number | null;
   totalMarks: number;
+  firstAcPointsPerQuestion?: number;
+  rankAwards?: Array<{ questionKey: string; points: number; versionId: string; createdAt: string }>;
+  formalJudging?: { total: number; pending: number; completed: number; failed: number };
   releasedAt: string | null;
   paper: Paper4Paper;
   studentName?: string;

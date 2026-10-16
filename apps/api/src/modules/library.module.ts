@@ -120,6 +120,11 @@ export class LibraryController {
     return applyResponse(response, await this.domain.execute('library', request.domainContext));
   }
 
+  @Delete('problem-banks/:id')
+  async deleteBank(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('library', request.domainContext));
+  }
+
   @Get('problem-banks/:id/permissions')
   async permissions(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('library', request.domainContext));

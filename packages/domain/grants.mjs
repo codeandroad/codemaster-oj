@@ -8,6 +8,8 @@ try {
     GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO campus_app;
     GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO campus_app;
     REVOKE INSERT, UPDATE, DELETE ON school_rank_ledger FROM campus_app, campus_worker;
+    REVOKE INSERT, UPDATE, DELETE ON paper4_rank_ledger FROM campus_app, campus_worker;
+    REVOKE INSERT, UPDATE, DELETE ON paper4_runs FROM campus_app;
     REVOKE ALL ON schema_migrations FROM campus_app;
     GRANT SELECT ON schema_migrations TO campus_app;
     GRANT SELECT, UPDATE ON judge_tasks TO campus_worker;
@@ -20,7 +22,9 @@ try {
     GRANT UPDATE(validation_status,validation_message) ON problem_versions TO campus_worker;
     GRANT SELECT, UPDATE ON paper4_run_tasks TO campus_worker;
     GRANT SELECT ON paper4_snapshots, paper4_reference_snapshots, paper4_attempts, paper4_versions TO campus_worker;
-    GRANT INSERT ON paper4_runs TO campus_worker;
+    REVOKE INSERT ON paper4_runs FROM campus_worker;
+    GRANT INSERT(task_id,lease_id,snapshot_id,reference_snapshot_id,status,public_output,public_message,private_results,environment_version)
+      ON paper4_runs TO campus_worker;
     GRANT SELECT(id,lease_id) ON paper4_runs TO campus_worker;
   `);
   console.log('Runtime role grants applied.');

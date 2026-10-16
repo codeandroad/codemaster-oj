@@ -7,11 +7,12 @@ import { LibraryController } from '../dist/modules/library.module.js';
 import { DomainService } from '../dist/domain.service.js';
 import { DomainGuard } from '../dist/domain.guard.js';
 
-test('Nest transports administrator bank inventory and archive operations to library domain',async()=>{
+test('Nest transports bank inventory, archive and delete operations to library domain',async()=>{
  const paths=[
   {method:'GET',path:'/admin/problem-banks'},
   {method:'GET',path:'/admin/problem-banks/11111111-1111-4111-8111-111111111111/problems?page=2'},
   {method:'PATCH',path:'/admin/problem-banks/11111111-1111-4111-8111-111111111111'},
+  {method:'DELETE',path:'/problem-banks/11111111-1111-4111-8111-111111111111'},
   {method:'PATCH',path:'/admin/problems/11111111-1111-4111-8111-111111111111'},
   {method:'GET',path:'/admin/problems/11111111-1111-4111-8111-111111111111'},
  ];

@@ -1,0 +1,37 @@
+.stageEditor {
+  container-type: inline-size;
+}
+
+.stageFields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.stageFields > label {
+  min-width: 0;
+}
+
+.stageFields > label > span {
+  white-space: nowrap;
+}
+
+@container (min-width: 580px) {
+  .stageFields {
+    grid-template-columns: minmax(0, 1fr) minmax(160px, 0.7fr);
+  }
+
+  .stageFields > label:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@container (min-width: 900px) {
+  .stageFields {
+    grid-template-columns: minmax(0, 2.7fr) minmax(200px, 1.1fr) minmax(160px, 0.8fr);
+  }
+
+  .stageFields > label:first-child {
+    grid-column: auto;
+  }
+}

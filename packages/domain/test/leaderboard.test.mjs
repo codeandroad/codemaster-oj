@@ -146,7 +146,7 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
    assert.equal(all.me.acRate, 75);
    assert.equal((await pointsMe(pool,alpha)).body.points,20);
    assert.equal((await pointsMe(pool,alpha)).body.rankPoints,20);
-   assert.equal((await pointsMe(pool,alpha)).body.rankingPolicy.scope,'approved_school_first_ac');
+   assert.equal((await pointsMe(pool,alpha)).body.rankingPolicy.scope,'approved_school_and_paper4_first_ac');
    const secondPage = (await leaderboard(pool, alpha, '?period=all&pageSize=1&page=2')).body;
    assert.equal(secondPage.items[0].points, 20);
    assert.equal(secondPage.items[0].rank, 1, 'equal points share a rank across pages');

@@ -5,12 +5,15 @@ import { AppLink as Link } from "@/components/navigation";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  Archive,
   ArrowRight,
   BookOpenCheck,
   CheckSquare2,
   FolderPlus,
   Plus,
+  RotateCcw,
   Search,
+  Trash2,
   Upload,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -43,9 +46,12 @@ export interface Bank {
   permission: string;
   canEdit?: boolean;
   canContribute?: boolean;
+  isSystem?: boolean;
+  archivedAt?: string | null;
   updatedAt?: string;
   count?: number;
   problemCount?: number;
+  archivedProblemCount?: number;
 }
 export interface Group {
   id: string;
@@ -55,6 +61,7 @@ export interface Group {
   canEdit: boolean;
 }
 const localText = (locale: AppLocale, zh: string, en: string) => locale === "zh" ? zh : en;
+const hasBankProblems = (bank: Bank) => (bank.problemCount ?? 0) + (bank.archivedProblemCount ?? 0) > 0;
 export function validationStatusLabel(status: string, locale: AppLocale) {
   if (locale === "en") return status;
   return ({ Draft: "草稿", Incomplete: "待完善", Waiting: "排队中", Judging: "评测中", "System Error": "系统错误", Published: "已发布" } as Record<string, string>)[status] ?? status;
@@ -82,12 +89,13 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
   const tr = (zh: string, en: string) => localText(locale, zh, en);
   const router = useRouter(),
     search = useSearchParams(),
-    banks = useData<{ items: Bank[] }>("problem-banks"),
+    banks = useData<{ items: Bank[] }>("problem-banks?includeArchived=owned"),
     problems = useData<{ items: ProductionProblem[] }>("problems"),
     groups = useData<{ items: Group[] }>("problem-groups");
   const [tab, setTab] = useState(
       search.get("tab") === "all" ? "全部题目" : "题库",
     ),
+    [showArchived, setShowArchived] = useState(false),
     [query, setQuery] = useState(""),
     [filterBank, setFilterBank] = useState(""),
     [filterGroup, setFilterGroup] = useState(""),
@@ -95,12 +103,17 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
     [checked, setChecked] = useState<string[]>([]),
     [confirmPublish, setConfirmPublish] = useState(false),
     [create, setCreate] = useState(false),
+    [deletingBank, setDeletingBank] = useState<Bank | null>(null),
+    [archivingBank, setArchivingBank] = useState<Bank | null>(null),
     [manage, setManage] = useState<{ ids: string[]; bankId: string } | null>(
       null,
     ),
     [editGroup, setEditGroup] = useState<Group | null>(null),
     action = useAction();
   const bank = banks.data?.items.find((x) => x.id === bankId),
+    activeBanks = banks.data?.items.filter((item) => !item.archivedAt) ?? [],
+    archivedBanks = banks.data?.items.filter((item) => !!item.archivedAt) ?? [],
+    listedBanks = showArchived ? archivedBanks : activeBanks,
     rows =
       problems.data?.items.filter(
         (x) =>
@@ -144,6 +157,25 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
       return;
     }
     setManage({ ids, bankId: bankIds[0] });
+  };
+  const removeEmptyBank = () => {
+    if (!deletingBank) return;
+    void action.run(async () => {
+      await productionApi(`problem-banks/${encodeURIComponent(deletingBank.id)}`, { method: "DELETE" });
+      setDeletingBank(null);
+      banks.reload();
+      return tr("空题库已删除。", "Empty bank deleted.");
+    });
+  };
+  const changeBankArchive = () => {
+    if (!archivingBank) return;
+    void action.run(async () => {
+      const archived = !archivingBank.archivedAt;
+      await productionApi(`problem-banks/${encodeURIComponent(archivingBank.id)}`, { method: "PATCH", body: { archived } });
+      setArchivingBank(null);
+      banks.reload();
+      return archived ? tr("题库已归档，可随时在此恢复。", "Bank archived. You can restore it here at any time.") : tr("题库已恢复。", "Bank restored.");
+    });
   };
   return (
     <>
@@ -202,15 +234,23 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
       )}
       {!bankId && tab === "题库" ? (
         <section className={`${panel} mt-4`}>
+          <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+            <Button size="sm" variant={showArchived ? "ghost" : "secondary"} aria-pressed={!showArchived} onClick={() => setShowArchived(false)}>
+              {tr("使用中", "Active")} · {activeBanks.length}
+            </Button>
+            <Button size="sm" variant={showArchived ? "secondary" : "ghost"} aria-pressed={showArchived} onClick={() => setShowArchived(true)}>
+              {tr("已归档", "Archived")} · {archivedBanks.length}
+            </Button>
+          </div>
           <Table
             headers={[tr("名称", "Name"), tr("课程", "Course"), tr("题目数", "Problems"), tr("可见范围", "Visibility"), tr("最近修改", "Updated"), tr("操作", "Actions")]}
           >
-            {banks.data?.items.map((item) => (
+            {listedBanks.map((item) => (
               <tr key={item.id}>
                 <td>
-                  <Link href={`/teacher/problems/banks/${item.id}`} className="font-semibold text-primary hover:underline focus-visible:underline">{item.name}</Link>
+                  {item.archivedAt ? <span className="font-semibold">{item.name}</span> : <Link href={`/teacher/problems/banks/${item.id}`} className="font-semibold text-primary hover:underline focus-visible:underline">{item.name}</Link>}
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {item.description}
+                    {item.archivedAt ? `${tr("已归档", "Archived")}${item.description ? ` · ${item.description}` : ""}` : item.description}
                   </p>
                 </td>
                 <td>{item.course ?? "Python"}</td>
@@ -233,13 +273,13 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                 </td>
                 <td>
                   <div className="flex gap-3">
-                    <Link
+                    {!item.archivedAt && <Link
                       href={`/teacher/problems/banks/${item.id}`}
                       className={link}
                     >
                       {tr("打开", "Open")}
-                    </Link>
-                    {(item.canContribute ||
+                    </Link>}
+                    {!item.archivedAt && (item.canContribute ||
                       item.canEdit ||
                       ["owner", "edit"].includes(item.permission)) && (
                       <Link
@@ -249,12 +289,22 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                         {tr("导入题目", "Import problems")}
                       </Link>
                     )}
+                    {item.permission === "owner" && !item.isSystem && (
+                      <>
+                        {(item.visibility === "private" || user.roles.includes("admin")) && <button type="button" className={link} onClick={() => setArchivingBank(item)}>
+                          {item.archivedAt ? tr("恢复", "Restore") : tr("归档", "Archive")}
+                        </button>}
+                        <button type="button" className="inline-flex items-center gap-1 font-semibold text-destructive hover:underline focus-visible:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:no-underline" disabled={hasBankProblems(item)} title={hasBankProblems(item) ? tr("有题目时请归档题库", "Archive banks that contain problems") : undefined} onClick={() => setDeletingBank(item)}>
+                          <Trash2 size={14} aria-hidden="true" />{tr("删除空题库", "Delete empty bank")}
+                        </button>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>
             ))}
-            {!banks.loading && !banks.data?.items.length && (
-              <Empty columns={6}>{tr("暂无题库。点击“新建题库”建立空题库。", "No banks yet. Create one to get started.")}</Empty>
+            {!banks.loading && !listedBanks.length && (
+              <Empty columns={6}>{showArchived ? tr("暂无已归档题库。", "No archived banks.") : tr("暂无使用中的题库。点击“新建题库”建立空题库。", "No active banks. Create one to get started.")}</Empty>
             )}
           </Table>
         </section>
@@ -496,6 +546,32 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                 {tr("确认发布", "Publish now")}
               </Button>
             </div>
+          </div>
+        </Modal>
+      )}
+      {deletingBank && (
+        <Modal title={tr("删除题库", "Delete bank")} onClose={() => setDeletingBank(null)}>
+          <p className="text-sm leading-6">
+            {tr(`永久删除“${deletingBank.name}”？只有没有任何题目、分组或导入记录的空题库可以删除。`, `Permanently delete “${deletingBank.name}”? Only banks without any problems, groups, or import records can be deleted.`)}
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">{tr("有内容的题库须归档，以保留已发布版本、提交和成绩。", "Archive banks with content to preserve published versions, submissions, and grades.")}</p>
+          {hasBankProblems(deletingBank) && <p className="mt-2 text-sm font-medium text-destructive">{tr(`该库仍有 ${deletingBank.problemCount ?? 0} 道使用中的题目、${deletingBank.archivedProblemCount ?? 0} 道已归档题目，不能删除。`, `This bank contains ${deletingBank.problemCount ?? 0} active and ${deletingBank.archivedProblemCount ?? 0} archived problems, so it cannot be deleted.`)}</p>}
+          <Feedback action={action} />
+          <div className="mt-5 flex justify-end gap-2">
+            <Button variant="secondary" disabled={action.busy} onClick={() => setDeletingBank(null)}>{tr("取消", "Cancel")}</Button>
+            <Button variant="danger" disabled={action.busy || hasBankProblems(deletingBank)} onClick={removeEmptyBank}>{tr("确认删除", "Delete bank")}</Button>
+          </div>
+        </Modal>
+      )}
+      {archivingBank && (
+        <Modal title={archivingBank.archivedAt ? tr("恢复题库", "Restore bank") : tr("归档题库", "Archive bank")} onClose={() => setArchivingBank(null)}>
+          <p className="text-sm leading-6">{archivingBank.archivedAt
+            ? tr(`恢复“${archivingBank.name}”？恢复后可以继续维护题目，但不会重新公开曾撤下的版本。`, `Restore “${archivingBank.name}”? You can maintain its problems again, but withdrawn versions stay withdrawn.`)
+            : tr(`归档“${archivingBank.name}”？题目版本、提交和成绩都会保留；若仍有公开版本或被已发布课程、未归档训练引用，系统会阻止归档。`, `Archive “${archivingBank.name}”? Versions, submissions, and grades remain. Public versions and active course or practice references block archiving.`)}</p>
+          <Feedback action={action} />
+          <div className="mt-5 flex justify-end gap-2">
+            <Button variant="secondary" disabled={action.busy} onClick={() => setArchivingBank(null)}>{tr("取消", "Cancel")}</Button>
+            <Button disabled={action.busy} onClick={changeBankArchive}>{archivingBank.archivedAt ? <RotateCcw size={15} aria-hidden="true" /> : <Archive size={15} aria-hidden="true" />}{archivingBank.archivedAt ? tr("恢复题库", "Restore bank") : tr("归档题库", "Archive bank")}</Button>
           </div>
         </Modal>
       )}

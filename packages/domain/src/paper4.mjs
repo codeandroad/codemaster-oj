@@ -162,7 +162,7 @@ function paperShape(p,user){
   status:p.version_published_at?'published':'draft',startsAt:p.starts_at,endsAt:p.ends_at,
   publishedAt:p.version_published_at,archivedAt:p.archived_at??null,versionId:p.version_id,versionNumber:p.version_number,
   hasDraft:manage&&!!p.draft_version_id,totalMarks:p.definition?.totalMarks??75,
-  questions:p.definition?.questions??[],language:'python',canManage:manage,
+  questions:p.definition?.questions??[],language:'python',firstAcPointsPerQuestion:10,canManage:manage,
   canExport:manage&&staff(user)&&p.owner_account_id===user.id,
   ...(manage?{runnerCases:p.runner_cases??{},referenceSolutions:p.reference_solutions??{}}:{})};
 }
@@ -208,6 +208,15 @@ async function attemptShape(db,user,attempt){
  const files=(await db.query('SELECT question_key,content,revision,updated_at FROM paper4_attempt_files WHERE attempt_id=$1 ORDER BY question_key',[attempt.id])).rows;
  const snapshots=(await db.query('SELECT id,question_key,stage_key,source_code,revision,created_at FROM paper4_snapshots WHERE attempt_id=$1 ORDER BY created_at,id',[attempt.id])).rows;
  const gradeRows=(await db.query('SELECT stage_key,marks,note,updated_at FROM paper4_stage_marks WHERE attempt_id=$1 ORDER BY stage_key',[attempt.id])).rows;
+ const rankAwards=(await db.query(`SELECT question_key,points,version_id,created_at
+  FROM paper4_rank_ledger WHERE paper_id=$1 AND identity_id=$2 ORDER BY created_at,question_key`,
+  [attempt.paper_id,attempt.identity_id])).rows;
+ const formalJudging=(await db.query(`SELECT count(*)::int total,
+  count(*) FILTER(WHERE t.state IN ('queued','leased'))::int pending,
+  count(*) FILTER(WHERE t.state='completed')::int completed,
+  count(*) FILTER(WHERE t.state='failed')::int failed
+  FROM paper4_snapshots s JOIN paper4_run_tasks t ON t.snapshot_id=s.id
+  WHERE s.attempt_id=$1 AND s.origin='formal'`,[attempt.id])).rows[0];
  const visibleMarks=manage||!!attempt.released_at;
  const marks=visibleMarks?gradeRows.map(m=>({stageId:m.stage_key,marks:m.marks,note:m.note,updatedAt:m.updated_at})):[];
  const score=visibleMarks&&gradeRows.length?gradeRows.reduce((sum,m)=>sum+m.marks,0):null;
@@ -216,7 +225,8 @@ async function attemptShape(db,user,attempt){
   status:attempt.state,startedAt:attempt.started_at,submittedAt:attempt.submitted_at,releasedAt:attempt.released_at,
   files:files.map(f=>({fileKey:f.question_key,content:f.content,revision:f.revision,updatedAt:f.updated_at})),
   snapshots:snapshots.map(s=>({id:s.id,fileKey:s.question_key,stageId:s.stage_key,sourceCode:s.source_code,revision:s.revision,createdAt:s.created_at})),
-  marks,score,totalMarks:75,paper:{id:attempt.paper_id,title:attempt.paper_title,classId:attempt.class_id,
+  marks,score,totalMarks:75,firstAcPointsPerQuestion:10,formalJudging,rankAwards:rankAwards.map(a=>({questionKey:a.question_key,points:a.points,
+   versionId:a.version_id,createdAt:a.created_at})),paper:{id:attempt.paper_id,title:attempt.paper_title,classId:attempt.class_id,
    status:'published',versionId:attempt.version_id,versionNumber:attempt.version_number,
    startsAt:attempt.starts_at,endsAt:attempt.ends_at,totalMarks:75,
    questions:attempt.definition.questions,language:'python'},canManage:manage,
@@ -241,10 +251,16 @@ function questionFor(attempt,fileKey){
  const question=attempt.definition.questions.find(q=>q.key===fileKey);
  if(!question)fail(404,'NOT_FOUND','题号不存在');return question;
 }
-async function snapshotDraft(db,attempt,questionKey,stageKey){
+async function snapshotDraft(db,attempt,questionKey,stageKey,{origin='practice'}={}){
  const draft=one(await db.query('SELECT content,revision FROM paper4_attempt_files WHERE attempt_id=$1 AND question_key=$2',[attempt.id,questionKey]));
- return one(await db.query('INSERT INTO paper4_snapshots(attempt_id,question_key,stage_key,source_code,revision) VALUES($1,$2,$3,$4,$5) RETURNING *',
-  [attempt.id,questionKey,stageKey,draft.content,draft.revision]));
+ return one(await db.query('INSERT INTO paper4_snapshots(attempt_id,question_key,stage_key,source_code,revision,origin) VALUES($1,$2,$3,$4,$5,$6) RETURNING *',
+  [attempt.id,questionKey,stageKey,draft.content,draft.revision,origin]));
+}
+async function queueFormalQuestionRuns(db,attempt){
+ for(const question of attempt.definition.questions){
+  const snapshot=await snapshotDraft(db,attempt,question.key,null,{origin:'formal'});
+  await db.query('INSERT INTO paper4_run_tasks(snapshot_id) VALUES($1)',[snapshot.id]);
+ }
 }
 // A deadline is enforced by the server even if no student keeps the page open.
 // The first authorized read after expiry freezes every saved source exactly
@@ -257,7 +273,7 @@ async function closeExpiredAttempts(pool,{paperId=null,attemptId=null}={}){
     AND ($1::uuid IS NULL OR a.paper_id=$1) AND ($2::uuid IS NULL OR a.id=$2)
    ORDER BY a.id FOR UPDATE OF a`,[paperId,attemptId])).rows;
   for(const a of rows){
-   for(const q of a.definition.questions)await snapshotDraft(db,a,q.key,null);
+   await queueFormalQuestionRuns(db,a);
    await db.query("UPDATE paper4_attempts SET state='submitted',submitted_at=$2 WHERE id=$1 AND state='active'",[a.id,a.ends_at]);
    await db.query(`INSERT INTO audit_events(actor_account_id,action,resource_type,resource_id,metadata)
     VALUES(NULL,'paper4.deadline_submit','paper4_attempt',$1,$2::jsonb)`,[a.id,JSON.stringify({paperId:a.paper_id,deadline:a.ends_at})]);
@@ -629,7 +645,7 @@ export async function handlePaper4(ctx){
   const id=uuid(m[1],'答卷 ID');
   await transaction(pool,async db=>{
    const a=await writableAttempt(db,user,id);
-   for(const q of a.definition.questions)await snapshotDraft(db,a,q.key,null);
+   await queueFormalQuestionRuns(db,a);
    await db.query("UPDATE paper4_attempts SET state='submitted',submitted_at=now() WHERE id=$1",[id]);
    await log(db,user,'paper4.submit','paper4_attempt',id);
   });return respond(200,await attemptShape(pool,user,await getAttempt(pool,user,id)));

@@ -58,11 +58,13 @@ const visibleMessageSql = `FROM student_guestbook_messages m
 async function profile(ctx, identityId) {
  const p = await visibleProfile(ctx.pool, ctx.user, identityId);
  const totals = (await ctx.pool.query(`SELECT
-  COALESCE(sum(points),0)::int points,
-  count(DISTINCT problem_id) FILTER (WHERE reason='first_ac')::int solved_problems
-  FROM point_ledger WHERE identity_id=$1`, [identityId])).rows[0];
- const rankPoints=(await ctx.pool.query(`SELECT COALESCE(sum(points),0)::int points
-  FROM school_rank_ledger WHERE identity_id=$1`,[identityId])).rows[0].points;
+  ((SELECT COALESCE(sum(points),0) FROM point_ledger WHERE identity_id=$1)
+   +(SELECT COALESCE(sum(points),0) FROM paper4_rank_ledger WHERE identity_id=$1))::int points,
+  ((SELECT count(DISTINCT problem_id) FROM point_ledger WHERE identity_id=$1 AND reason='first_ac')
+   +(SELECT count(*) FROM paper4_rank_ledger WHERE identity_id=$1))::int solved_problems`, [identityId])).rows[0];
+ const rankPoints=(await ctx.pool.query(`SELECT
+  ((SELECT COALESCE(sum(points),0) FROM school_rank_ledger WHERE identity_id=$1)
+   +(SELECT COALESCE(sum(points),0) FROM paper4_rank_ledger WHERE identity_id=$1))::int points`,[identityId])).rows[0].points;
  return response({profile:{id:p.id,nickname:p.nickname,avatar:avatarForIdentity(p.avatar,p.id),bio:p.bio,
   points:totals.points,rankPoints,solvedProblems:totals.solved_problems,isSelf:ctx.user.identityId===p.id}});
 }

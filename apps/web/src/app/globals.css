@@ -199,3 +199,8 @@
  .production-page-header > div:first-child { flex-basis:100%; }
  .production-page-header h1 { font-size:24px;line-height:1.3; }
 }
+
+/* Page names live in breadcrumbs; keep only contextual actions above content. */
+.production-page-actions { min-height:36px; }
+.production-page-content > :first-child { margin-top:0; }
+.production-page-content > .production-page-actions + * { margin-top:10px; }

@@ -4,6 +4,8 @@ import { AppLink as Link } from "@/components/navigation";
 import { useEffect, useState } from "react";
 import {activityDate,validateActivity,activeParticipants} from "./activity-validation";
 import {useActivityDraft} from "./use-activity-draft";
+import { StudentAudienceSelector } from "./student-audience-selector";
+import { activityAudienceClassIds, type AudienceDirectory, type AudienceStudent } from "./student-audience";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowDown,
@@ -22,7 +24,6 @@ import {
   apiMessage,
   ApiError,
   type Assignment,
-  type Person,
   type ProductionProblem,
   type SchoolClass,
   type Submission,
@@ -54,7 +55,7 @@ const ui = (locale: AppLocale, zh: string, en: string) => locale === "zh" ? zh :
 const assignmentTabLabel: Record<string, [string, string]> = {
   "Basic information": ["基本信息", "Basic information"],
   Problems: ["题目与分值", "Problems"],
-  "Applicable list": ["发布名单", "Applicable list"],
+  "Applicable list": ["布置名单", "Recipients"],
   Rules: ["规则", "Rules"],
   Preview: ["学生预览", "Preview"],
 };
@@ -69,7 +70,7 @@ export function TeacherAssignments() {
   return (
     <>
       <PageHeader
-        eyebrow="作业管理"
+        eyebrow={ui(locale, "作业管理", "Assignments")}
         title={ui(locale, "作业管理", "Assignment Management")}
         description={ui(locale, "跨班级管理作业，维护适用学生名单，并查看学习进度。", "Manage assignments across classes, select students, and view progress.")}
         action={
@@ -87,8 +88,8 @@ export function TeacherAssignments() {
           headers={[
             ui(locale, "作业", "Assignment"),
             ui(locale, "班级", "Class"),
-            ui(locale, "已布置 / 全班", "Assigned / class"),
-            ui(locale, "未布置 / 豁免", "Unassigned / exempt"),
+            ui(locale, "已布置学生", "Assigned students"),
+            ui(locale, "已豁免", "Exempt"),
             ui(locale, "平均分 / 状态", "Average / status"),
             ui(locale, "操作", "Actions"),
           ]}
@@ -98,15 +99,7 @@ export function TeacherAssignments() {
               item.participantDetails?.filter((person) => !person.exempt).length ?? 0;
             const exempt = item.exemptCount ??
               item.participantDetails?.filter((person) => person.exempt).length ?? 0;
-            const schoolClass = classes.data?.items.find((schoolClass) =>
-              schoolClass.id === item.classId,
-            );
-            const historicalCount = item.participantDetails?.filter((person) =>
-              !schoolClass?.studentIds.includes(person.identityId),
-            ).length ?? 0;
-            const rosterSize = schoolClass
-              ? schoolClass.studentIds.length + historicalCount
-              : assigned + exempt;
+            const classSummary = item.classes?.map(group => group.name).join(" / ") || item.classNames?.join(" / ") || item.className || classes.data?.items.find(group => group.id === item.classId)?.name || ui(locale, "按学生名单", "Selected students");
             return <tr key={item.id}>
               <td>
                 <Link
@@ -121,16 +114,15 @@ export function TeacherAssignments() {
                 {item.courseTitle && <p className="mt-1 text-xs text-muted-foreground">{ui(locale, "关联课程", "Course")}: {item.courseTitle}{!item.courseAvailable && ui(locale, "（已归档）", " (archived)")}</p>}
               </td>
               <td className="text-muted-foreground">
-                {item.className ??
-                  classes.data?.items.find((x) => x.id === item.classId)?.name}
+                {classSummary}
               </td>
               <td>
                 <b>
-                  {assigned} / {rosterSize}
+                  {assigned}
                 </b>
               </td>
               <td>
-                {Math.max(0, rosterSize - assigned - exempt)} / {exempt}
+                {exempt}
               </td>
               <td>
                 <StatusPill
@@ -225,14 +217,13 @@ function AssignmentEditorForm({
     searchParams = useSearchParams(),
     classes = useData<{ items: SchoolClass[] }>("classes"),
     courses = useData<{ items: { id: string; title: string; published: boolean; canEdit: boolean }[] }>("learning-paths"),
-    people = useData<{ items: Person[] }>("people"),
+    audience = useData<AudienceDirectory>("teaching/audience"),
     [tab, setTab] = useState(searchParams.get("tab") === "problems" ? "Problems" : assignmentTabs[0]!),
     [saved, setSaved] = useState(initial),
     [title, setTitle] = useState(initial?.title ?? ""),
     [description, setDescription] = useState(initial?.description ?? ""),
     [course, setCourse] = useState(initial?.course ?? "Python"),
     [coursePathId, setCoursePathId] = useState(initial?.coursePathId ?? ""),
-    [classId, setClassId] = useState(initial?.classId ?? ""),
     [due, setDue] = useState(localInput(initial?.dueAt)),
     [selected, setSelected] = useState<SelectedProblem[]>(
       initial?.problems.map((x) => ({
@@ -249,7 +240,6 @@ function AssignmentEditorForm({
         initial?.participants ??
         [],
     ),
-    [query, setQuery] = useState(""),
     [picker, setPicker] = useState(false),
     [publish, setPublish] = useState(false),
     [confirmUpdate, setConfirmUpdate] = useState(false),
@@ -275,26 +265,15 @@ function AssignmentEditorForm({
       saved?.participantDetails?.filter((person) => person.exempt)
         .map((person) => person.identityId) ?? [],
     ),
-    canEditProblems = !published || !hasSubmissions,
-    classroom = classes.data?.items.find((x) => x.id === classId),
-    students =
-      people.data?.items.filter(
-        (x) => x.kind === "student" && classroom?.studentIds.includes(x.id),
-      ) ?? [],
-    historicalParticipants = classroom
-      ? saved?.participantDetails?.filter((person) =>
-          !classroom.studentIds.includes(person.identityId),
-        ) ?? []
-      : [],
-    rosterTotal = classroom
-      ? students.length + historicalParticipants.length
-      : Math.max(students.length, participants.length + exemptStudentIds.size),
-    historicalStudentIds = new Set(
-      historicalParticipants.map((person) => person.identityId),
-    ),
-    shown = students.filter((x) =>
-      `${x.name} ${x.number}`.toLowerCase().includes(query.toLowerCase()),
-    );
+    canEditProblems = !published || !hasSubmissions;
+  const directory = audience.data?.items ?? [];
+  const students: AudienceStudent[] = [...directory, ...(saved?.participantDetails ?? []).filter(person => !directory.some(student => student.id === person.identityId)).map(person => ({ id: person.identityId, name: person.name, number: "", historical: true }))];
+  const audienceClasses = audience.data?.classes ?? classes.data?.items ?? [];
+  const classIds = audience.data ? activityAudienceClassIds(directory, participants, audience.data.classes.filter(item => item.canAssociate).map(item => item.id), saved ? saved.classIds ?? (saved.classId ? [saved.classId] : []) : undefined, activeParticipants(saved?.participantDetails, saved?.participants ?? [])) : saved?.classIds ?? (saved?.classId ? [saved.classId] : []);
+  const classId = classIds[0] ?? "";
+  const classSummary = classIds.map(id => (audienceClasses.find(item => item.id === id)?.name ?? saved?.classes?.find(item => item.id === id)?.name)).filter(Boolean).join(" / ") || ui(locale, "按学生名单布置", "Selected students");
+  const lockedIds = published && !saved?.protectedParticipantIds ? new Set(activeParticipants(saved?.participantDetails, saved?.participants ?? [])) : protectedStudentIds;
+
   const total = selected.reduce((sum, x) => sum + x.points, 0);
   const rewardTotal = selected.reduce((sum, x) => sum + x.rewardPoints, 0);
   const checkLatestVersion = async (problemId: string) => {
@@ -331,7 +310,7 @@ function AssignmentEditorForm({
     if (problem.versionId) query.set("versionId", problem.versionId);
     return `/teacher/problems/${problem.problemId}/edit?${query.toString()}`;
   };
-  const draft=useActivityDraft({storageKey:`campus-judge:activity-draft:v1:${userId}:assignment:${initial?.id??"new"}`,editable:true,noticeText:published?"改动已临时保存在当前浏览器；点击“保存修改”后才会更新已发布作业。":undefined,snapshot:{title,description,course,coursePathId,classId,due,problems:selected,participants},recoveryDefaults:{coursePathId:""},onRestore:v=>{setTitle(v.title);setDescription(v.description);setCourse(v.course);setCoursePathId(v.coursePathId??"");setClassId(v.classId);setDue(v.due);setSelected(v.problems.map(problem=>({...problem,firstAcPoints:initial?.problems.find(item=>item.problemId===problem.problemId)?.firstAcPoints??problem.firstAcPoints??10,rewardPoints:problem.rewardPoints??initial?.problems.find(item=>item.problemId===problem.problemId)?.rewardPoints??0})));setParticipants(v.participants);}});
+  const draft=useActivityDraft({storageKey:`campus-judge:activity-draft:v1:${userId}:assignment:${initial?.id??"new"}`,editable:true,noticeText:published?"改动已临时保存在当前浏览器；点击“保存修改”后才会更新已发布作业。":undefined,snapshot:{title,description,course,coursePathId,classId,classIds,due,problems:selected,participants},recoveryDefaults:{coursePathId:"",classIds:[]},onRestore:v=>{setTitle(v.title);setDescription(v.description);setCourse(v.course);setCoursePathId(v.coursePathId??"");setDue(v.due);setSelected(v.problems.map(problem=>({...problem,firstAcPoints:initial?.problems.find(item=>item.problemId===problem.problemId)?.firstAcPoints??problem.firstAcPoints??10,rewardPoints:problem.rewardPoints??initial?.problems.find(item=>item.problemId===problem.problemId)?.rewardPoints??0})));setParticipants(v.participants);}});
   const changedProblems = JSON.stringify(
     selected.map((x) => ({ problemId: x.problemId, points: x.points, versionId: x.versionId, rewardPoints: x.rewardPoints })),
   ) !== JSON.stringify(
@@ -348,7 +327,7 @@ function AssignmentEditorForm({
   const changedDescription = description !== (saved?.description ?? "");
   const changedCourse = course !== (saved?.course ?? "Python");
   const changedCoursePath = coursePathId !== (saved?.coursePathId ?? "");
-  const changedClass = classId !== (saved?.classId ?? "");
+  const changedClass = JSON.stringify(classIds) !== JSON.stringify([...(saved?.classIds ?? (saved?.classId ? [saved.classId] : []))].sort());
   const changedDue = due !== localInput(saved?.dueAt);
   const changedPinnedVersions = selected.some((problem) => {
     const original = saved?.problems.find((item) => item.problemId === problem.problemId);
@@ -375,8 +354,6 @@ function AssignmentEditorForm({
       throw new Error("有运行或提交记录的学生不能移出作业，请在进度页使用豁免操作。");
     if (published && participants.some((identityId) => exemptStudentIds.has(identityId)))
       throw new Error("恢复已豁免学生请在作业进度页操作。");
-    if (published && classId !== saved?.classId)
-      throw new Error("已发布作业不能更换班级。请在原班级内选择适用学生。");
     if (published && hasSubmissions && changedProblems)
       throw new Error("已有正式提交，题目、分值、顺序和奖励积分不能修改。可修改说明、截止时间或适用学生。");
     if (published && hasActivity && changedPinnedVersions)
@@ -408,6 +385,7 @@ function AssignmentEditorForm({
           ...(changedDue ? { dueAt } : {}),
           ...(changedProblems ? { problems: problemPayload } : {}),
           ...(changedParticipants ? { participants } : {}),
+          ...(changedClass ? { classIds, classId: classIds[0] ?? null } : {}),
         }
       : {
           state: "Draft",
@@ -415,7 +393,8 @@ function AssignmentEditorForm({
             ? { expectedRevision: saved.editRevision }
             : {}),
           title,
-          classId,
+          classIds,
+          classId: classIds[0] ?? null,
           dueAt,
           description,
           course,
@@ -473,18 +452,18 @@ function AssignmentEditorForm({
                 }
                 void action.run(async () => {
                   await save();
-                  return "作业草稿已保存。";
+                  return ui(locale, "作业草稿已保存。", "Assignment draft saved.");
                 });
               }}
             >
-              {published ? "保存修改" : "保存草稿"}
+              {published ? ui(locale, "保存修改", "Save changes") : ui(locale, "保存草稿", "Save draft")}
             </Button>
             {published ? (
               <Link
                 href={`/teacher/assignments/${saved?.id}/progress`}
                 className={buttonVariants({ variant: "secondary" })}
               >
-                查看进度
+                {ui(locale, "查看进度", "View progress")}
               </Link>
             ) : (
               <Button
@@ -492,7 +471,7 @@ function AssignmentEditorForm({
                 onClick={() => setPublish(true)}
               >
                 <Send size={15} />
-                发布作业
+                {ui(locale, "布置作业", "Assign work")}
               </Button>
             )}
           </div>
@@ -502,7 +481,7 @@ function AssignmentEditorForm({
       {draft.notice}
       {published && (
         <p className="mt-3 border border-info-soft bg-info-soft p-3 text-sm">
-          作业已发布。可以修改标题、说明、截止时间和指定学生；截止时间只能延后。
+          {ui(locale, "作业已布置。可以修改标题、说明、截止时间和指定学生；截止时间只能延后。", "This work is assigned. You can update the title, description, selected students, and extend the deadline.")}
           {hasSubmissions
             ? "已有正式提交，题目、分值、顺序和奖励积分已固定。"
             : "尚无正式提交，可以调整题目、分值、顺序和奖励积分。"}
@@ -557,27 +536,8 @@ function AssignmentEditorForm({
                 </select>
                 <p className="mt-1 text-xs text-muted-foreground">{ui(locale, "仅显示已发布课程；学生可从作业进入所关联的课程。", "Only published courses are shown. Students can open the linked course from their assignment.")}</p>
               </Field>
-              <Field label={ui(locale, "班级", "Class")}>
-                <select
-                  required
-                  value={classId}
-                  disabled={published || action.busy}
-                  onChange={(e) => {
-                    setClassId(e.target.value);
-                    setParticipants(
-                      classes.data?.items.find((x) => x.id === e.target.value)
-                        ?.studentIds ?? [],
-                    );
-                  }}
-                  className={input}
-                >
-                  <option value="">请选择班级</option>
-                  {classes.data?.items.map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {x.name}
-                    </option>
-                  ))}
-                </select>
+              <Field label={ui(locale, "布置学生", "Recipients")}>
+                <div className="flex min-h-10 items-center justify-between gap-3 rounded-md border border-input bg-surface-subtle px-3 text-sm"><span>{ui(locale, `已选择 ${participants.length} 名学生`, `${participants.length} students selected`)}</span><Button type="button" size="sm" variant="ghost" onClick={() => setTab("Applicable list")}>{ui(locale, "选择学生", "Choose students")}</Button></div>
               </Field>
               <Field label={ui(locale, "截止时间", "Due time")}>
                 <input
@@ -813,159 +773,7 @@ function AssignmentEditorForm({
               </Table>
             </>
           )}
-          {tab === "Applicable list" && (
-            <>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <b>作业发布对象</b>
-                  <p className="text-xs text-muted-foreground">
-                    已布置 {participants.length} 人 · 未布置{" "}
-                    {Math.max(0, rosterTotal - participants.length - exemptStudentIds.size)} 人
-                    {exemptStudentIds.size > 0 && ` · 已豁免 ${exemptStudentIds.size} 人`}
-                    {" "}· 名单共 {rosterTotal} 人
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    仅勾选的学生会看到作业；未勾选的学生不会收到本次作业。
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="secondary"
-                    disabled={action.busy || !students.length || (published && !saved?.protectedParticipantIds)}
-                    onClick={() => setParticipants((current) => [...new Set([
-                      ...current.filter((id) => protectedStudentIds.has(id) || historicalStudentIds.has(id)),
-                      ...students.filter((student) => !exemptStudentIds.has(student.id)).map((student) => student.id),
-                    ])])}
-                  >
-                    {exemptStudentIds.size ? "布置给全部可选学生" : "布置给全班"}
-                  </Button>
-                  {query.trim() && (
-                    <Button
-                      variant="secondary"
-                      disabled={action.busy || (published && !saved?.protectedParticipantIds) || !shown.some((student) => !exemptStudentIds.has(student.id))}
-                      onClick={() => setParticipants((current) => [...new Set([
-                        ...current.filter((id) => protectedStudentIds.has(id) || historicalStudentIds.has(id)),
-                        ...shown.filter((student) => !exemptStudentIds.has(student.id)).map((student) => student.id),
-                      ])])}
-                    >
-                      仅布置给搜索结果
-                    </Button>
-                  )}
-                  <Button
-                    variant="secondary"
-                    disabled={action.busy || (published && !saved?.protectedParticipantIds) || !participants.some((id) => !protectedStudentIds.has(id))}
-                    onClick={() => setParticipants((current) => current.filter((id) => protectedStudentIds.has(id)))}
-                  >
-                    {protectedStudentIds.size ? "仅保留已有记录学生" : "清空名单"}
-                  </Button>
-                </div>
-              </div>
-              <input
-                className={`${input} mt-4`}
-                aria-label="搜索适用学生"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="搜索学号或姓名"
-              />
-              <State resource={people} />
-              <div className="mt-4 grid grid-cols-3 gap-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
-                {shown.map((student) => (
-                  <label
-                    key={student.id}
-                    className={`flex items-start gap-3 border p-3 text-sm ${participants.includes(student.id) ? "border-primary/40 bg-accent" : "border-border"}`}
-                  >
-                    <input
-                      className="mt-1"
-                      type="checkbox"
-                      disabled={action.busy || exemptStudentIds.has(student.id) || (published && participants.includes(student.id) && (!saved?.protectedParticipantIds || protectedStudentIds.has(student.id)))}
-                      checked={participants.includes(student.id)}
-                      onChange={(e) =>
-                        setParticipants((x) =>
-                          e.target.checked
-                            ? [...x, student.id]
-                            : x.filter((id) => id !== student.id),
-                        )
-                      }
-                    />
-                    <span>
-                      <b>{student.name}</b>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {student.number} · {classroom?.name}
-                      </p>
-                      {protectedStudentIds.has(student.id) && (
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          已有运行或提交记录，不能从名单中移除
-                        </p>
-                      )}
-                      {exemptStudentIds.has(student.id) && (
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          已豁免，请在进度页恢复
-                        </p>
-                      )}
-                      <span className="mt-2 inline-block">
-                        <StatusPill
-                          status={
-                            exemptStudentIds.has(student.id)
-                              ? "已豁免"
-                              : participants.includes(student.id)
-                              ? "已布置"
-                              : "未布置"
-                          }
-                        />
-                      </span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-              {historicalParticipants.length > 0 && (
-                <section className="mt-5 border-t border-border pt-4">
-                  <b className="text-sm">历史名单成员</b>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    这些学生已不在当前班级名单中。批量选择会保留其原有分配；如需移除无记录的学生，可逐个取消。
-                  </p>
-                  <div className="mt-3 grid grid-cols-3 gap-3 max-lg:grid-cols-2 max-sm:grid-cols-1">
-                    {historicalParticipants
-                      .filter((person) => `${person.name} ${person.identityId}`.toLowerCase().includes(query.toLowerCase()))
-                      .map((person) => (
-                        <label key={person.identityId} className="flex items-start gap-3 border border-border p-3 text-sm">
-                          <input
-                            type="checkbox"
-                            className="mt-1"
-                            checked={participants.includes(person.identityId)}
-                            disabled={action.busy || person.exempt || protectedStudentIds.has(person.identityId)}
-                            onChange={(event) => setParticipants((current) =>
-                              event.target.checked
-                                ? [...current, person.identityId]
-                                : current.filter((id) => id !== person.identityId),
-                            )}
-                          />
-                          <span>
-                            <b>{person.name}</b>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {person.exempt
-                                ? "已豁免，请在进度页恢复"
-                                : protectedStudentIds.has(person.identityId)
-                                  ? "已有运行或提交记录，不能移出"
-                                  : "不在当前班级名单"}
-                            </p>
-                          </span>
-                        </label>
-                      ))}
-                  </div>
-                </section>
-              )}
-              {!classId && (
-                <p className="mt-4 text-sm text-muted-foreground">
-                  {ui(locale, "请先在“基本信息”中选择班级。", "Select a class in Basic information first.")}
-                </p>
-              )}
-              {classId && !participants.length && (
-                <p className="mt-4 text-sm text-destructive" role="alert">
-                  请至少勾选一名学生后再发布或保存修改。
-                </p>
-              )}
-            </>
-          )}
+          {tab === "Applicable list" && <StudentAudienceSelector students={students} classes={audienceClasses} selectedIds={participants} onChange={setParticipants} loading={audience.loading} error={audience.error} onReload={audience.reload} disabled={action.busy} lockedIds={lockedIds} exemptIds={exemptStudentIds}/>}
           {tab === "Rules" && <p className="mb-4 text-sm text-muted-foreground">以下为服务端固定规则，用于说明计分与提交策略，无需手动修改。</p>}
           {tab === "Rules" && (
             <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
@@ -990,7 +798,7 @@ function AssignmentEditorForm({
                 {title || "未命名作业"}
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                {classroom?.name} · 向 {participants.length} 名学生布置 ·
+                {classSummary} · {ui(locale, `向 ${participants.length} 名学生布置`, `Assigned to ${participants.length} students`)} ·
                 {ui(locale, "截止", "Due")} {due || ui(locale, "尚未设置", "Not set")}
               </p>
               {coursePathId && <p className="mt-2 text-sm text-primary">{ui(locale, "关联课程：", "Linked course: ")}{courses.data?.items.find(item => item.id === coursePathId)?.title ?? initial?.courseTitle ?? ui(locale, "课程不可用", "Course unavailable")}</p>}
@@ -1039,11 +847,9 @@ function AssignmentEditorForm({
         />
       )}
       {publish && (
-        <Modal title="确认发布作业" onClose={() => setPublish(false)}>
+        <Modal title={ui(locale, "确认布置作业", "Assign this work")} onClose={() => setPublish(false)}>
           <p className="text-sm leading-6">
-            向 {classroom?.name ?? "未选择班级"} 的 {participants.length}{" "}
-            名适用学生发布 {selected.length} 道题，总分 {total} 分、额外奖励上限 {rewardTotal} 积分。
-            发布时固定题目版本；未勾选的学生不会看到该作业。
+            {ui(locale, `向已选择的 ${participants.length} 名学生布置 ${selected.length} 道题，总分 ${total} 分、额外奖励上限 ${rewardTotal} 积分。未选择的学生不会看到作业。`, `Assign ${selected.length} problems to ${participants.length} selected students, with ${total} marks and up to ${rewardTotal} bonus points. Other students will not see it.`)}
           </p>
           <Feedback action={action} />
           <div className="mt-5 flex justify-end gap-2">
@@ -1056,8 +862,7 @@ function AssignmentEditorForm({
                 !participants.length ||
                 !selected.length ||
                 !title.trim() ||
-                !due ||
-                !classId
+                !due
               }
               onClick={() =>
                 void action.run(async () => {
@@ -1070,17 +875,17 @@ function AssignmentEditorForm({
                   });
                   setPublish(false);
                   router.push(`/teacher/assignments/${result.id}/progress`);
-                  return "作业已发布。";
+                  return ui(locale, "作业已布置。", "Assignment created for the selected students.");
                 })
               }
             >
-              确认发布
+              {ui(locale, "确认布置", "Assign")}
             </Button>
           </div>
         </Modal>
       )}
       {confirmUpdate && published && (
-        <Modal title="确认修改已发布作业" onClose={() => setConfirmUpdate(false)}>
+        <Modal title={ui(locale, "确认修改已布置作业", "Save changes to assigned work")} onClose={() => setConfirmUpdate(false)}>
           <p className="text-sm leading-6">
             修改将立即影响已布置给 {participants.length} 名学生的作业。
             {changedProblems && "题目、分值、顺序或奖励积分有变更。"}

@@ -8,8 +8,7 @@ const statuses=['Waiting','Judging','Executed','AC','WA','CE','RE','TLE','MLE','
 // publication, including in aggregate progress and filtered history.
 const maskedFields=`status displayed_status,
  CASE WHEN masked THEN NULL ELSE score END displayed_score`;
-const maskedCondition=`s.timed_attempt_id IS NOT NULL AND practice.results_published_at IS NULL AND NOT ($2 OR $3 AND EXISTS(
- SELECT 1 FROM teacher_classes manager JOIN classes managed ON managed.id=manager.class_id WHERE manager.class_id=practice.class_id AND manager.account_id=$1 AND managed.archived_at IS NULL))`;
+const maskedCondition=`practice.id IS NOT NULL AND practice.results_published_at IS NULL AND NOT ($2 OR $3 AND practice.owner_account_id=$1)`;
 
 function sign(payload,secret){return createHmac('sha256',secret).update(payload).digest('base64url');}
 function decodeCursor(raw,secret,scope){
@@ -38,10 +37,13 @@ export async function submissionHistory(ctx){
   SELECT s.*,v.title problem_title,i.name student_name,attempt.practice_id timed_practice_id,
    (${maskedCondition}) masked,to_char(s.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') cursor_created_at
   FROM submissions s JOIN problem_versions v ON v.id=s.version_id JOIN identities i ON i.id=s.identity_id
-  LEFT JOIN timed_attempts attempt ON attempt.id=s.timed_attempt_id LEFT JOIN timed_practices practice ON practice.id=attempt.practice_id
-  WHERE (s.identity_id=$6 OR $2 OR $3 AND EXISTS(SELECT 1 FROM teacher_classes tc JOIN classes c ON c.id=tc.class_id WHERE tc.account_id=$1 AND
-   ((c.archived_at IS NULL AND EXISTS(SELECT 1 FROM class_members cm WHERE cm.class_id=c.id AND cm.identity_id=s.identity_id)) OR EXISTS(SELECT 1 FROM assignments a WHERE a.id=s.assignment_id AND a.class_id=c.id) OR practice.class_id=c.id)))
-   AND ($4::uuid IS NULL OR s.identity_id=$4) AND ($5::uuid IS NULL OR s.assignment_id=$5) AND ($7::uuid IS NULL OR s.problem_id=$7)
+  LEFT JOIN LATERAL submission_activity_context(s.original_submission_id) original ON true
+  LEFT JOIN timed_attempts attempt ON attempt.id=COALESCE(s.timed_attempt_id,original.timed_attempt_id) LEFT JOIN timed_practices practice ON practice.id=attempt.practice_id
+  WHERE (s.identity_id=$6 OR $2 OR $3 AND (
+   COALESCE(s.assignment_id,original.assignment_id) IS NOT NULL AND EXISTS(SELECT 1 FROM assignments a WHERE a.id=COALESCE(s.assignment_id,original.assignment_id) AND a.owner_account_id=$1)
+   OR COALESCE(s.timed_attempt_id,original.timed_attempt_id) IS NOT NULL AND practice.owner_account_id=$1
+   OR COALESCE(s.assignment_id,original.assignment_id) IS NULL AND COALESCE(s.timed_attempt_id,original.timed_attempt_id) IS NULL AND (s.original_submission_id IS NULL OR original.resolved) AND EXISTS(SELECT 1 FROM teacher_classes tc JOIN classes c ON c.id=tc.class_id AND c.archived_at IS NULL JOIN class_members cm ON cm.class_id=c.id WHERE tc.account_id=$1 AND cm.identity_id=s.identity_id)))
+   AND ($4::uuid IS NULL OR s.identity_id=$4) AND ($5::uuid IS NULL OR COALESCE(s.assignment_id,original.assignment_id)=$5) AND ($7::uuid IS NULL OR s.problem_id=$7)
    AND ($8::uuid IS NULL OR attempt.practice_id=$8) AND ($9::text[] IS NULL OR s.kind=ANY($9))
  ), visible AS(SELECT scoped.*,${maskedFields} FROM scoped)
  SELECT * FROM visible WHERE ($10::text IS NULL OR displayed_status=$10)

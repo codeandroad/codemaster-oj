@@ -13,3 +13,8 @@ test('export filenames cannot escape the download directory', () => {
   assert.equal(paper4ExportFilename('.json'), 'paper4-export.json');
   assert.equal(paper4ExportFilename('Paper 4.json'), 'Paper 4.json');
 });
+
+test('batch ZIP downloads retain their real file extension',()=>{
+ assert.equal(paper4ExportFilename('paper4-papers.zip','zip'),'paper4-papers.zip');
+ assert.equal(paper4ExportFilename('../../Paper 4.zip','zip'),'-..-Paper 4.zip');
+});

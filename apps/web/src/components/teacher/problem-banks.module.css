@@ -1,0 +1,67 @@
+.sectionBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-top: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.sectionBar > [role="tablist"] {
+  margin-top: 0;
+  border-bottom: 0;
+}
+
+.sectionBar > [role="tablist"] > button {
+  height: 36px;
+  padding-inline: 12px;
+}
+
+.accessGuide {
+  margin-left: auto;
+  min-width: 0;
+}
+
+.accessGuide > details {
+  margin-top: 0;
+  border: 0;
+  background: transparent;
+}
+
+.accessGuide summary {
+  min-height: 36px;
+  padding: 8px 0;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.accessGuide:has(details[open]) {
+  flex: 1 0 100%;
+  order: 1;
+  margin-left: 0;
+}
+
+.accessGuide details[open] > dl {
+  padding: 10px 12px 0;
+}
+
+.guideNote {
+  display: none;
+  margin: 0;
+  padding: 0 12px 10px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.accessGuide:has(details[open]) > .guideNote {
+  display: block;
+}
+
+@media (max-width: 640px) {
+  .sectionBar > [role="tablist"] > button,
+  .accessGuide summary {
+    min-height: 44px;
+  }
+}

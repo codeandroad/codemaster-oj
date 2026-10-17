@@ -1,0 +1,29 @@
+.page { display:grid;gap:10px;min-width:0; }
+.toolbar { display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);padding:6px 8px; }
+.search { position:relative;flex:1;min-width:0;max-width:480px; }
+.search > svg { position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted-foreground);pointer-events:none; }
+.search > input { height:34px;padding-left:32px; }
+.toolbar :global([data-od-id="student-problem-filter"]) > button { height:34px; }
+.tableWrap { min-width:0;overflow-x:auto;border:1px solid var(--border);border-radius:8px;background:var(--surface); }
+.table { width:100%;min-width:1000px;table-layout:fixed;text-align:left;font-size:13px; }
+.table th { padding:8px 10px;background:var(--surface-subtle);color:var(--muted-foreground);font-size:11px;line-height:1.4;font-weight:600;white-space:nowrap; }
+.table td { height:38px;padding:4px 10px;border-top:1px solid var(--border);line-height:1.35;vertical-align:middle;white-space:nowrap; }
+.table th:first-child,.table td:first-child { padding-left:6px;padding-right:2px; }
+.table tr:hover td { background:var(--surface-subtle); }
+.table td > span { max-width:100%; }
+.bookmark { display:inline-flex;width:28px;height:28px;align-items:center;justify-content:center;border-radius:4px;vertical-align:middle;cursor:pointer; }
+.bookmark:hover { background:var(--muted); }
+.bookmark:disabled { opacity:.45;cursor:default; }
+.title,.truncate { display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.title { padding-block:5px; }
+.mode { display:inline-block;border-radius:4px;background:var(--muted);padding:3px 6px;font-size:11px;line-height:1.25;white-space:nowrap; }
+.open { display:inline-flex;min-height:28px;align-items:center; }
+.count { margin:0;font-size:12px;line-height:1.4;color:var(--muted-foreground); }
+@media(max-width:760px) {
+  .page { gap:8px; }
+  .toolbar { padding:4px 6px; }
+  .search > input,.toolbar :global([data-od-id="student-problem-filter"]) > button { height:44px; }
+  .table td { height:48px;padding-block:2px; }
+  .bookmark { width:28px;height:44px; }
+  .title,.open { min-height:44px;align-content:center; }
+}

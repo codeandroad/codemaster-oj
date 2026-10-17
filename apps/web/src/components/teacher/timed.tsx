@@ -3,13 +3,14 @@
 import { AppLink as Link } from "@/components/navigation";
 import { useState } from "react";
 import {useActivityDraft} from "./use-activity-draft";
+import { StudentAudienceSelector } from "./student-audience-selector";
+import { activityAudienceClassIds, type AudienceDirectory, type AudienceStudent } from "./student-audience";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Eye, Plus, Trash2 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
 import {
   productionApi,
-  type Person,
   type SchoolClass,
   type Submission,
 } from "@/lib/production-api";
@@ -62,8 +63,8 @@ const rewardColumns = [
   { field: "attemptBonusPoints", title: "尝试上限" },
 ] as const;
 function practiceStatusLabel(status: string, locale: "zh" | "en") {
-  if (locale === "en") return status === "ResultsPublished" ? "Results published" : status;
-  return ({ Draft: "草稿", Published: "已发布", Running: "进行中", Ended: "已结束", ResultsPublished: "成绩已发布", Archived: "已归档" } as Record<string, string>)[status] ?? status;
+  if (locale === "en") return status === "ResultsPublished" ? "Results published" : status === "Published" ? "Assigned" : status;
+  return ({ Draft: "草稿", Published: "已布置", Running: "进行中", Ended: "已结束", ResultsPublished: "成绩已发布", Archived: "已归档" } as Record<string, string>)[status] ?? status;
 }
 function rewardCap(problem: TimedProblem) {
   return (problem.rewardPoints ?? 0) + (problem.speedBonusPoints ?? 0) + (problem.attemptBonusPoints ?? 0);
@@ -79,8 +80,12 @@ function validateTimedRewards(problems: TimedProblem[]) {
 interface Practice {
   id: string;
   title: string;
-  classId: string;
+  classId: string | null;
+  classIds?: string[];
+  classes?: { id: string; name: string }[];
   className?: string;
+  coursePathId?: string | null;
+  courseTitle?: string | null;
   description?: string;
   startsAt: string;
   endsAt: string;
@@ -157,8 +162,7 @@ export function TeacherTimedList() {
                 <Link href={`/teacher/timed-practice/${p.id}/edit`} className="font-semibold text-primary hover:underline focus-visible:underline">{p.title}</Link>
               </td>
               <td>
-                {p.className ??
-                  classes.data?.items.find((x) => x.id === p.classId)?.name}
+                {p.classes?.map(item => item.name).join(" / ") || p.className || classes.data?.items.find((x) => x.id === p.classId)?.name || tr("按学生名单", "Selected students")}
               </td>
               <td className="text-xs text-muted-foreground">
                 {date(p.startsAt)}
@@ -226,9 +230,11 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
   const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
   const router = useRouter(),
     classes = useData<{ items: SchoolClass[] }>("classes"),
-    people = useData<{ items: Person[] }>("people"),
+    audience = useData<AudienceDirectory>("teaching/audience"),
+    courses = useData<{ items: { id: string; title: string; published: boolean }[] }>("learning-paths"),
     [saved, setSaved] = useState(initial),
     [description, setDescription] = useState(initial?.description ?? ""),
+    [coursePathId, setCoursePathId] = useState(initial?.coursePathId ?? ""),
     [participants, setParticipants] = useState(
       initial?.participants
         ?.filter((p) => !p.exempt)
@@ -238,7 +244,6 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
     [rosterParticipants,setRosterParticipants]=useState<string[]>([]),
     [tab, setTab] = useState(tabs[0]!),
     [title, setTitle] = useState(initial?.title ?? ""),
-    [classId, setClassId] = useState(initial?.classId ?? ""),
     [startsAt, setStarts] = useState(localInput(initial?.startsAt)),
     [endsAt, setEnds] = useState(localInput(initial?.endsAt)),
     [duration, setDuration] = useState(initial?.durationMinutes ?? 60),
@@ -255,14 +260,20 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
     [picker, setPicker] = useState(false),
     [modal, setModal] = useState<"preview" | "publish" | null>(null),
     action = useAction();
-  const published = saved !== null && saved.status !== "Draft",
-    save = async () => {
+  const published = saved !== null && saved.status !== "Draft";
+  const directory = audience.data?.items ?? [];
+  const students: AudienceStudent[] = [...directory, ...(saved?.participants ?? []).filter(person => !directory.some(student => student.id === person.identityId)).map(person => ({ id: person.identityId, name: person.name, number: person.number, historical: true }))];
+  const audienceClasses = audience.data?.classes ?? classes.data?.items ?? [];
+  const classIds = audience.data ? activityAudienceClassIds(directory, participants, audience.data.classes.filter(item => item.canAssociate).map(item => item.id), saved ? saved.classIds ?? (saved.classId ? [saved.classId] : []) : undefined, activeParticipants(saved?.participants)) : saved?.classIds ?? (saved?.classId ? [saved.classId] : []);
+  const classId = classIds[0] ?? "";
+  const classSummary = classIds.map(id => (audienceClasses.find(item => item.id === id)?.name ?? saved?.classes?.find(item => item.id === id)?.name)).filter(Boolean).join(" / ") || tr("按学生名单布置", "Selected students");
+  const save = async () => {
       if (published)
         throw new Error(
           "已发布训练的题目与时长已固定，请在进行情况页维护延期。",
         );
       validateTimedRewards(problems);
-      validateActivity({title,classId,problems,participants,timed:true});
+      validateActivity({title,classIds,problems,participants});
       const {start,end}=validateTimedDates(startsAt,endsAt,duration,0,true);
       const result = await productionApi<Practice>(
         saved ? `timed-practices/${saved.id}` : "timed-practices",
@@ -270,8 +281,10 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
           method: saved ? "PATCH" : "POST",
           body: {
             title,
-            classId,
+            classIds,
+            classId: classIds[0] ?? null,
             description,
+            coursePathId: coursePathId || null,
             participants,
             startsAt: start,
             endsAt: end,
@@ -293,12 +306,13 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
       if (!saved) router.replace(`/teacher/timed-practice/${result.id}/edit`);
       return result;
     };
-  const draft=useActivityDraft({storageKey:`campus-judge:activity-draft:v1:${userId}:timed:${initial?.id??"new"}`,editable:!published,snapshot:{title,description,classId,startsAt,endsAt,duration,showVerdict,problems,participants},onRestore:v=>{setTitle(v.title);setDescription(v.description);setClassId(v.classId);setStarts(v.startsAt);setEnds(v.endsAt);setDuration(v.duration);setShowVerdict(v.showVerdict);setProblems(v.problems.map(problem=>({...problem,firstAcPoints:problem.firstAcPoints??10,rewardPoints:problem.rewardPoints??0,speedBonusPoints:problem.speedBonusPoints??0,attemptBonusPoints:problem.attemptBonusPoints??0})));setParticipants(v.participants);}});
+  const draft=useActivityDraft({storageKey:`campus-judge:activity-draft:v1:${userId}:timed:${initial?.id??"new"}`,editable:!published,snapshot:{title,description,coursePathId,classId,classIds,startsAt,endsAt,duration,showVerdict,problems,participants},recoveryDefaults:{classIds:[],coursePathId:""},onRestore:v=>{setTitle(v.title);setDescription(v.description);setCoursePathId(v.coursePathId??"");setStarts(v.startsAt);setEnds(v.endsAt);setDuration(v.duration);setShowVerdict(v.showVerdict);setProblems(v.problems.map(problem=>({...problem,firstAcPoints:problem.firstAcPoints??10,rewardPoints:problem.rewardPoints??0,speedBonusPoints:problem.speedBonusPoints??0,attemptBonusPoints:problem.attemptBonusPoints??0})));setParticipants(v.participants);}});
   useDirty(
     !published &&
       (title !== (saved?.title ?? "") ||
         description !== (saved?.description ?? "") ||
-        classId !== (saved?.classId ?? "") ||
+        coursePathId !== (saved?.coursePathId ?? "") ||
+        JSON.stringify(classIds) !== JSON.stringify([...(saved?.classIds ?? (saved?.classId ? [saved.classId] : []))].sort()) ||
         startsAt !== localInput(saved?.startsAt) ||
         endsAt !== localInput(saved?.endsAt) ||
         duration !== (saved?.durationMinutes ?? 60) ||
@@ -354,7 +368,7 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
               disabled={action.busy || published}
               onClick={() => setModal("publish")}
             >
-              {published ? tr("已发布", "Published") : tr("发布", "Publish")}
+              {published ? tr("已布置", "Assigned") : tr("布置训练", "Assign practice")}
             </Button>
           </div>
         }
@@ -378,27 +392,6 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                 className={input}
               />
             </Field>
-            <Field label={tr("班级", "Class")}>
-              <select
-                value={classId}
-                disabled={published || action.busy}
-                onChange={(e) => {
-                  setClassId(e.target.value);
-                  setParticipants(
-                    classes.data?.items.find((x) => x.id === e.target.value)
-                      ?.studentIds ?? [],
-                  );
-                }}
-                className={input}
-              >
-                <option value="">{tr("请选择班级", "Choose a class")}</option>
-                {classes.data?.items.map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {x.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
             <Field label={tr("适用学生", "Assigned students")}>
               <div className="flex gap-2">
                 <input
@@ -408,12 +401,19 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                 />
                 <Button
                   variant="secondary"
-                  disabled={published || action.busy || !classId}
+                  disabled={published || action.busy}
                   onClick={() => {setRosterParticipants([...participants]);setRosterOpen(true);}}
                 >
                   {tr("选择名单", "Choose students")}
                 </Button>
               </div>
+            </Field>
+            <Field label={tr("关联课程（可选）", "Linked course (optional)")}>
+              <select className={input} value={coursePathId} disabled={published || action.busy || courses.loading} onChange={event => setCoursePathId(event.target.value)}>
+                <option value="">{tr("不关联课程", "No linked course")}</option>
+                {initial?.coursePathId && !courses.data?.items.some(course => course.id === initial.coursePathId && course.published) && <option value={initial.coursePathId} disabled>{initial.courseTitle || tr("原关联课程", "Previous course")}{tr("（当前不可用）", " (unavailable)")}</option>}
+                {courses.data?.items.filter(course => course.published).map(course => <option key={course.id} value={course.id}>{course.title}</option>)}
+              </select>
             </Field>
             <Field label={tr("说明", "Description")}>
               <textarea
@@ -619,68 +619,10 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
           </>
         )}
       </section>
-      {rosterOpen && (
-        <Modal title={tr("适用学生", "Assigned students")} onClose={() => setRosterOpen(false)}>
-          <div className="flex justify-between text-sm">
-            <b>{tr("已选", "Selected")} {rosterParticipants.length}</b>
-            <div className="flex gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() =>
-                  setRosterParticipants(
-                    classes.data?.items.find((x) => x.id === classId)
-                      ?.studentIds ?? [],
-                  )
-                }
-              >
-                {tr("选择全部", "Select all")}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setRosterParticipants([])}
-              >
-                {tr("清空", "Clear")}
-              </Button>
-            </div>
-          </div>
-          <State resource={people} />
-          <div className="mt-4 max-h-72 overflow-auto border border-border">
-            {people.data?.items
-              .filter((p) =>
-                classes.data?.items
-                  .find((x) => x.id === classId)
-                  ?.studentIds.includes(p.id),
-              )
-              .map((p) => (
-                <label
-                  key={p.id}
-                  className="flex gap-3 border-b border-border p-3 text-sm"
-                >
-                  <input
-                    type="checkbox"
-                    checked={rosterParticipants.includes(p.id)}
-                    onChange={(e) =>
-                      setRosterParticipants((x) =>
-                        e.target.checked
-                          ? [...x, p.id]
-                          : x.filter((id) => id !== p.id),
-                      )
-                    }
-                  />
-                  <span>
-                    <b>{p.name}</b>
-                    <p className="text-xs text-muted-foreground">{p.number}</p>
-                  </span>
-                </label>
-              ))}
-          </div>
-          <Button className="mt-4" onClick={() => {setParticipants(rosterParticipants);setRosterOpen(false);}}>
-            {tr("确认名单", "Confirm students")}
-          </Button>
-        </Modal>
-      )}
+      {rosterOpen && <Modal title={tr("选择布置学生", "Select recipients")} onClose={() => setRosterOpen(false)}>
+        <StudentAudienceSelector students={students} classes={audienceClasses} selectedIds={rosterParticipants} onChange={setRosterParticipants} loading={audience.loading} error={audience.error} onReload={audience.reload}/>
+        <div className="mt-4 flex justify-end"><Button onClick={() => {setParticipants(rosterParticipants);setRosterOpen(false);}}>{tr("确认名单", "Confirm students")}</Button></div>
+      </Modal>}
       {picker && (
         <ProblemPicker
           selected={problems.map((x) => x.problemId)}
@@ -705,18 +647,18 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
       )}
       {modal && (
         <Modal
-          title={modal === "preview" ? tr("学生规则页预览", "Student rules preview") : tr("确认发布训练", "Confirm publication")}
+          title={modal === "preview" ? tr("学生规则页预览", "Student rules preview") : tr("确认布置训练", "Assign this practice")}
           onClose={() => setModal(null)}
         >
           <h2 className="font-bold">{title || tr("未命名训练", "Untitled practice")}</h2>
           <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
             <div>
-              <dt className="text-muted-foreground">{tr("班级", "Class")}</dt>
+              <dt className="text-muted-foreground">{tr("学生名单", "Recipients")}</dt>
               <dd>
-                {classes.data?.items.find((x) => x.id === classId)?.name ??
-                  tr("尚未选择", "Not selected")}
+                {classSummary} · {participants.length} {tr("名学生", "students")}
               </dd>
             </div>
+            {coursePathId && <div><dt className="text-muted-foreground">{tr("关联课程", "Linked course")}</dt><dd>{courses.data?.items.find(course => course.id === coursePathId)?.title || saved?.courseTitle || tr("课程", "Course")}</dd></div>}
             <div>
               <dt className="text-muted-foreground">{tr("时长", "Duration")}</dt>
               <dd>{duration} {tr("分钟", "min")}</dd>
@@ -754,7 +696,7 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                   action.busy ||
                   !problems.length ||
                   !title ||
-                  !classId ||
+                  !participants.length ||
                   !startsAt ||
                   !endsAt
                 }
@@ -771,11 +713,11 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                     router.push(
                       `/teacher/timed-practice/${result.id}/progress`,
                     );
-                    return tr("训练已发布。", "Practice published.");
+                    return tr("训练已布置。", "Practice assigned.");
                   })
                 }
               >
-                {tr("确认发布", "Confirm publish")}
+                {tr("确认布置", "Assign")}
               </Button>
             )}
           </div>
@@ -891,7 +833,7 @@ export function TeacherTimedProgress({ id }: { id: string }) {
                   <tr key={p.identityId}>
                     <td>
                       <Link
-                        href={`/teacher/reports?${new URLSearchParams({ classId: practice.classId, activity: `timed:${id}`, studentId: p.identityId, studentName: p.name })}`}
+                        href={`/teacher/reports?${new URLSearchParams({ activity: `timed:${id}`, studentId: p.identityId, studentName: p.name })}`}
                         className="font-semibold text-primary hover:underline focus-visible:underline"
                       >{p.name}</Link>
                       <p className="text-xs text-muted-foreground">

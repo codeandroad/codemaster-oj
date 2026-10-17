@@ -214,7 +214,7 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
     classes.data?.items.find((x)=>!!x.archived===showArchived);
   const canManage=!!current&&(user.roles.includes("admin")||current.teacherIds.includes(user.identityId));
   const currentAssignment = assignments.data?.items.find(
-    (x) => x.classId === current?.id && x.state !== "Draft",
+    (x) => (x.classIds ?? (x.classId ? [x.classId] : [])).includes(current?.id ?? "") && x.state !== "Draft",
   );
   const detail = useData<Assignment>(
     currentAssignment ? `assignments/${currentAssignment.id}` : null,

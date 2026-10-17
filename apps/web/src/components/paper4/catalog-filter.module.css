@@ -1,0 +1,4 @@
+.compact { display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px; }
+.compact label { gap:6px;font-size:12px;white-space:nowrap; }
+.compact select { height:32px;min-height:32px;padding-inline:8px;font-size:12px; }
+@media(max-width:760px) { .compact select { height:44px;min-height:44px; } }

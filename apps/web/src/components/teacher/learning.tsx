@@ -1,6 +1,10 @@
 "use client";
 
 import { AppLink as Link } from "@/components/navigation";
+import { CourseAccessSummary, courseStatus, type CourseAccessMetadata } from "@/components/course-access";
+import { CourseSettingsDialog } from "./course-settings-dialog";
+import { CoursePaper4Picker } from "./course-paper4-picker";
+import { coursePaper4LinkKey, coursePaper4References, coursePaper4UnitCount, mergeCoursePaper4Links, type CoursePaper4Link } from "@/components/course-paper4";
 import { chapterDirectoryTitle } from "@/lib/learning-chapter-title";
 import {LessonContent} from "../student/shared";
 import {LearningCover,courseCovers,courseDifficulties} from "@/components/learning-course";
@@ -62,7 +66,8 @@ function mergeReviewStatus(local: Chapter[], previous: Chapter[], fresh: Chapter
   if (JSON.stringify(local) === JSON.stringify(previous)) return fresh;
   const status = new Map(fresh.flatMap((chapter) => chapter.problems)
     .map((problem) => [`${problem.problemId}:${problem.versionId}`, problem]));
-  return local.map((chapter) => ({ ...chapter, problems: chapter.problems.map((problem) => {
+  const paper4Status = new Map(fresh.flatMap(chapter => chapter.paper4Links ?? []).map(item => [coursePaper4LinkKey(item), item]));
+  return local.map((chapter) => ({ ...chapter, paper4Links: (chapter.paper4Links ?? []).map(item => ({...item, ...(paper4Status.get(coursePaper4LinkKey(item)) ?? {})})), problems: chapter.problems.map((problem) => {
     const updated = status.get(`${problem.problemId}:${problem.versionId}`);
     return updated ? { ...problem, bankName: updated.bankName, published: updated.published,
       schoolVisibleAt: updated.schoolVisibleAt, rankReviewStatus: updated.rankReviewStatus,
@@ -78,8 +83,9 @@ interface Chapter {
   checkpoint?: string;
   checkpointAnswer?: string;
   problems: ChapterProblem[];
+  paper4Links?: CoursePaper4Link[];
 }
-interface Path {
+interface Path extends CourseAccessMetadata {
   id: string;
   archived?:boolean;
   title: string;
@@ -135,7 +141,7 @@ export function TeacherLearning() {
       <Tabs items={[t("课程"), t("学习资料")]} value={t(tab)} onChange={label=>{const next=label===t("课程")?"课程":"学习资料";setTab(next);if(next!=="课程")setShowArchived(false);}} />
       <Feedback action={action} />
       {tab==="课程"&&<div className="mt-4 flex gap-2"><Button variant={showArchived?"secondary":"default"} aria-pressed={!showArchived} onClick={()=>setShowArchived(false)}>{tx("使用中","Active")}</Button><Button variant={showArchived?"default":"secondary"} aria-pressed={showArchived} onClick={()=>setShowArchived(true)}>{tx("已归档","Archived")}</Button></div>}
-      {tab==="课程"&&<section data-od-id="learning-structure-guide" className="mt-4 rounded-lg border border-border bg-surface px-5 py-4"><h2 className="font-semibold">{t("按章节编排课程")}</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">{t("新建课程后添加讲解、练习与检查点；草稿仅维护教师可见，发布后本校学生可学习。课程不会自动创建班级、作业或训练。")}</p></section>}
+      {tab==="课程"&&<section data-od-id="learning-structure-guide" className="mt-4 rounded-lg border border-border bg-surface px-5 py-4"><h2 className="font-semibold">{t("按章节编排课程")}</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">{locale === "en" ? "Add lessons, practice and checkpoints to a course. Set eligible classes, availability and catalogue visibility in Properties and access. Publishing opens the course according to those settings; it does not create classes or activities." : "新建课程后添加讲解、练习与检查点；在课程属性中设置准入班级、开放时间和目录显示，发布后按设置开放学习。课程不会自动创建班级、作业或训练。"}</p></section>}
       <section className={`${panel} mt-4`}>
         {tab === "课程" ? (
           <>
@@ -147,16 +153,16 @@ export function TeacherLearning() {
               {paths.data?.items.map((path) => (
                 <tr key={path.id}>
                   <td>
-                    <div className="mb-2 w-36"><LearningCover coverKey={path.coverKey}/></div><Link className="font-semibold text-primary hover:underline" href={`/teacher/courses/${path.id}`}>{path.title}</Link><p className="mt-1 text-xs text-muted-foreground">{t(courseDifficulties[path.difficulty??"beginner"])}</p>
+                    <div className="mb-2 w-36"><LearningCover coverKey={path.coverKey} coverImage={path.coverImage}/></div><Link className="font-semibold text-primary hover:underline" href={`/teacher/courses/${path.id}`}>{path.title}</Link><p className="mt-1 text-xs text-muted-foreground">{t(courseDifficulties[path.difficulty??"beginner"])}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {path.description}
                     </p>
                   </td>
                   <td>{path.category}</td>
                   <td>{path.chapterCount}</td>
-                  <td>{path.archived?tx("已归档","Archived"):path.published ? t("本校学生") : t("维护教师草稿")}</td>
+                  <td className="max-w-64 whitespace-normal"><CourseAccessSummary course={path}/></td>
                   <td>
-                    <StatusPill status={path.archived?tx("已归档","Archived"):path.published ? t("已发布") : t("草稿")} />
+                    <StatusPill status={courseStatus(path,locale)} />
                   </td>
                   <td>
                     <Link className={link} href={`/teacher/courses/${path.id}`}>
@@ -240,8 +246,8 @@ export function TeacherLearning() {
         )}
       </section>
       {archiveTarget&&<Modal title={archiveTarget.archived?tx("恢复课程","Restore course"):tx("归档课程","Archive course")} onClose={()=>setArchiveTarget(null)}>
-        <p className="text-sm text-muted-foreground">{archiveTarget.archived?tx("恢复后课程将回到使用中列表。已发布课程的关联题目仍需保持管理员审核通过。","Restoring a published course requires its linked problems to remain approved."):tx("归档后课程从学生课程列表移除。章节与学习进度保留；已发布作业仍可独立查看。","Archiving removes the course from the student catalog. Lessons and progress remain recorded; published assignments remain available independently.")}</p>
-        <div className="mt-5 flex justify-end gap-2"><Button variant="secondary" onClick={()=>setArchiveTarget(null)}>{tx("取消","Cancel")}</Button><Button disabled={action.busy} onClick={()=>void action.run(async()=>{await productionApi(`learning-paths/${archiveTarget.id}${archiveTarget.archived?"/restore":""}`,archiveTarget.archived?{method:"POST",body:{}}:{method:"PATCH",body:{archived:true}});setArchiveTarget(null);paths.reload();return archiveTarget.archived?tx("课程已恢复。","Course restored."):tx("课程已归档。","Course archived.");})}>{archiveTarget.archived?tx("恢复","Restore"):tx("归档","Archive")}</Button></div>
+        <p className="text-sm text-muted-foreground">{archiveTarget.archived?tx("恢复后课程回到使用中列表。普通题目须保持审核通过；若 Paper 4 引用已不可用，课程会保持下架，修复后可重新公开。","Linked problems must remain approved. If Paper 4 references are unavailable, the restored course stays withdrawn until repaired and republished."):tx("归档后课程从学生课程列表移除。章节与学习进度保留；已发布作业仍可独立查看。","Archiving removes the course from the student catalog. Lessons and progress remain recorded; published assignments remain available independently.")}</p>
+        <div className="mt-5 flex justify-end gap-2"><Button variant="secondary" onClick={()=>setArchiveTarget(null)}>{tx("取消","Cancel")}</Button><Button disabled={action.busy} onClick={()=>void action.run(async()=>{const restored = await productionApi<Path>(`learning-paths/${archiveTarget.id}${archiveTarget.archived?"/restore":""}`,archiveTarget.archived?{method:"POST",body:{}}:{method:"PATCH",body:{archived:true}});setArchiveTarget(null);paths.reload();return archiveTarget.archived?(archiveTarget.published && !restored.published && restored.withdrawnAt ? tx("课程已恢复为下架状态：请修复不可用的 Paper 4 引用后重新公开。","Course restored and kept withdrawn. Repair unavailable Paper 4 references before republishing.") : tx("课程已恢复。","Course restored.")):tx("课程已归档。","Course archived.");})}>{archiveTarget.archived?tx("恢复","Restore"):tx("归档","Archive")}</Button></div>
       </Modal>}
       {create &&
         (tab === "课程" ? (
@@ -514,9 +520,11 @@ function LearningEditorForm({
     ),
     [preview, setPreview] = useState(search.get("preview") === "1"),
     [picker, setPicker] = useState(false),
+    [paper4Picker, setPaper4Picker] = useState(false),
     [metadata, setMetadata] = useState(false),
     [progressOpen,setProgressOpen]=useState(false),
     [publish, setPublish] = useState(false),
+    [withdraw, setWithdraw] = useState(false),
     [batchPublishOpen, setBatchPublishOpen] = useState(false),
     [batchPublishLoading, setBatchPublishLoading] = useState(false),
     [batchPublishError, setBatchPublishError] = useState(""),
@@ -536,7 +544,9 @@ function LearningEditorForm({
     if (!path.archived) return;
     setMetadata(false);
     setPublish(false);
+    setWithdraw(false);
     setPicker(false);
+    setPaper4Picker(false);
     setBatchPublishOpen(false);
   }, [path.archived]);
   const chapter = chapters.find((x) => x.id === current) ?? chapters[0],
@@ -546,6 +556,9 @@ function LearningEditorForm({
   for (const problem of chapters.flatMap((item) => item.problems)) {
     linkedByProblem.set(problem.problemId, [...(linkedByProblem.get(problem.problemId) ?? []), problem]);
   }
+  const allPaper4Links = chapters.flatMap(item => item.paper4Links ?? []);
+  const linkedPaper4Count = coursePaper4UnitCount(allPaper4Links);
+  const unavailablePaper4 = allPaper4Links.filter(item => item.available === false || item.readyForCourse === false).length;
   const linkedProblemCount = linkedByProblem.size;
   const linkedStatus = [...linkedByProblem.values()].map((versions) => {
     if (versions.every(courseProblemReady)) return "approved";
@@ -583,6 +596,7 @@ function LearningEditorForm({
             checkpointAnswer: item.checkpointAnswer ?? "",
             position,
             problemIds: item.problems.map((x) => x.problemId),
+            paper4Links: coursePaper4References(item.paper4Links),
           },
         },
       );
@@ -697,7 +711,8 @@ function LearningEditorForm({
         title={path.title}
         description={tr("课程草稿可先关联校内题库的草稿题；发布课程前，所有关联题须已发布并通过管理员公开审核。", "A course draft can link draft problems in school banks. Before publishing the course, every linked problem must be published and approved for school-wide access.")}
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {path.published && canEditCourse && <Button variant="secondary" disabled={action.busy} onClick={() => setWithdraw(true)}>{tr("下架课程", "Withdraw course")}</Button>}
             <Button variant="secondary" onClick={() => setPreview(true)}>
               <Eye size={15} />
               {t("学生预览")}
@@ -715,10 +730,10 @@ function LearningEditorForm({
             </Button>
             <Button
               variant="secondary"
-              disabled={action.busy || !canEditCourse || path.published || pendingProblems > 0}
+              disabled={action.busy || !canEditCourse || path.published || pendingProblems > 0 || unavailablePaper4 > 0}
               onClick={() => setPublish(true)}
             >
-              {path.archived ? tr("已归档", "Archived") : path.published ? t("已发布") : t("发布")}
+              {path.archived ? tr("已归档", "Archived") : path.published ? courseStatus(path,locale) : path.withdrawnAt ? tr("重新公开", "Republish") : t("发布")}
             </Button>
           </div>
         }
@@ -733,7 +748,7 @@ function LearningEditorForm({
               {linkedProblemCount > 0
                 ? tr(`课程关联 ${linkedProblemCount} 题：${approvedProblems} 题已审核公开 · ${reviewingProblems} 题已发布待审核 · ${unpublishedProblems} 题未发布 · ${revisionProblems} 题需新修订版。`,
                   `${linkedProblemCount} linked: ${approvedProblems} approved · ${reviewingProblems} published and awaiting review · ${unpublishedProblems} unpublished · ${revisionProblems} need a new revision.`)
-                : tr("课程草稿尚未关联题目。", "This draft has no linked problems yet.")}
+                : linkedPaper4Count ? tr(`已关联 ${linkedPaper4Count} 道 Paper 4 大题。`, `${linkedPaper4Count} Paper 4 questions linked.`) : tr("课程草稿尚未关联题目。", "This draft has no linked problems yet.")}
             </p>
             <p className="text-xs opacity-85">
               {unpublishedProblems > 0
@@ -742,9 +757,10 @@ function LearningEditorForm({
                   ? tr("已发布题目正等待管理员审核，无需再次发布。", "Published versions are awaiting administrator review. No further publication is needed.")
                   : revisionProblems > 0
                     ? tr("未通过或已撤下的题目需要创建新修订版，并重新验证、发布和审核。", "Rejected or withdrawn problems need a new revision, validation, publication, and review.")
-                    : tr("关联题目已审核公开，课程可以发布。", "Linked problems are approved and public; this course can be published.")}
+                    : unavailablePaper4 ? tr("有 Paper 4 引用已不可用，请移除或重新关联公开版本。", "Some Paper 4 references are unavailable. Remove them or link a public version.") : tr("关联练习已公开，课程可以发布。", "Linked practices are public; this course can be published.")}
             </p>
-            <p className="text-xs opacity-85">{tr("审核只对当前关联的具体题目版本有效；同名题和其他题库的审核结果不会继承。", "Approval applies only to the exact linked problem version. A same-titled problem in another bank does not inherit it.")}</p>
+            {linkedProblemCount > 0 && <p className="text-xs opacity-85">{tr("普通题目审核只对当前关联的具体版本有效。Paper 4 引用须使用已公开试卷。", "Problem approval applies to the exact linked version. Paper 4 references use public papers.")}</p>}
+            {linkedProblemCount > 0 && linkedPaper4Count > 0 && <p className="text-xs opacity-85">{tr(`另关联 ${linkedPaper4Count} 道 Paper 4 大题。`, `Also linked: ${linkedPaper4Count} Paper 4 questions.`)}</p>}
           </div>
           {canEditCourse && savedUnpublishedProblems > 0 && (
             <Button size="sm" variant="secondary" disabled={batchPublishLoading || batchAction.busy} onClick={() => void openBatchPublish()}>
@@ -753,16 +769,20 @@ function LearningEditorForm({
           )}
         </div>
       )}
-      <div className="mt-4 grid items-center gap-4 rounded-lg border border-border bg-surface p-4 sm:grid-cols-[180px_1fr]"><LearningCover coverKey={path.coverKey}/><div><p className="font-semibold">{t(courseDifficulties[path.difficulty??"beginner"])} · {chapters.length} {t("章")}</p><p className="mt-2 text-sm text-muted-foreground">{path.estimatedMinutes??30} {t("分钟 · 阅读与练习进度独立统计")}</p><Button variant="secondary" size="sm" className="mt-3" disabled={!path.canEdit} onClick={()=>setProgressOpen(true)}>{t("查看学生进度总览")}</Button></div></div>
-      {progressOpen&&<LearningProgressDialog id={path.id} onClose={()=>setProgressOpen(false)}/>}
-      {canEditCourse&&canUseLegacyPythonPractice(path)&&<PythonPracticePanel id={path.id} bundle={path.practiceBundle??[]} disabled={dirty||action.busy} onRefreshStatus={async()=>{const fresh=await productionApi<Path>(`learning-paths/${path.id}`);setPath(current=>({...current,practiceBundle:fresh.practiceBundle}));}} onUpdated={async()=>{const fresh=await productionApi<Path>(`learning-paths/${path.id}`);setPath(fresh);setChapters(fresh.chapters??[]);}}/>}
-      <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
-        <Button size="sm" variant="secondary" onClick={()=>{const doc:LearningDocument={format:"codemaster-learning-path",version:1,title:path.title,description:path.description,category:path.category,estimatedMinutes:path.estimatedMinutes??30,difficulty:path.difficulty??"beginner",coverKey:path.coverKey??"general",chapters:chapters.map(c=>({title:c.title,content:c.content,objective:c.objective??"",checkpoint:c.checkpoint??"",checkpointAnswer:c.checkpointAnswer??"",problemIds:c.problems.map(p=>p.problemId)}))};void action.run(async()=>{downloadLearningMarkdown(doc);return t("已导出当前编辑内容（包括未保存修改）。");});}}>{t("导出 Markdown")}</Button>
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border bg-surface px-3 py-2">
+        <div className="w-24 shrink-0"><LearningCover coverKey={path.coverKey} coverImage={path.coverImage}/></div>
+        <div className="min-w-0 flex-1 space-y-1"><CourseAccessSummary course={path} showAuthor/><p className="text-xs text-muted-foreground">{t(courseDifficulties[path.difficulty??"beginner"])} · {chapters.length} {t("章")} · {path.estimatedMinutes??30} {tr("分钟", "minutes")}</p></div>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <Button variant="secondary" size="sm" disabled={!path.canEdit} onClick={()=>setProgressOpen(true)}>{t("查看学生进度总览")}</Button>
+        <Button size="sm" variant="secondary" onClick={()=>{const doc:LearningDocument={format:"codemaster-learning-path",version:1,title:path.title,description:path.description,category:path.category,estimatedMinutes:path.estimatedMinutes??30,difficulty:path.difficulty??"beginner",coverKey:path.coverKey??"general",authorName:path.authorName,authoredAt:path.authoredAt,coverImage:path.coverImage,chapters:chapters.map(c=>({title:c.title,content:c.content,objective:c.objective??"",checkpoint:c.checkpoint??"",checkpointAnswer:c.checkpointAnswer??"",problemIds:c.problems.map(p=>p.problemId),paper4Links:coursePaper4References(c.paper4Links)}))};void action.run(async()=>{downloadLearningMarkdown(doc);return t("已导出当前编辑内容（包括未保存修改）。");});}}>{t("导出 Markdown")}</Button>
         <Button size="sm" variant="secondary" disabled={!canEditCourse} onClick={() => setMetadata(true)}>
-          {t("课程资料")}
+          {tr("课程属性与开放", "Properties and access")}
         </Button>
         {dirty && <span className="text-warning">{t("有未保存修改")}</span>}
       </div>
+      </div>
+      {progressOpen&&<LearningProgressDialog id={path.id} onClose={()=>setProgressOpen(false)}/>}
+      {canEditCourse&&canUseLegacyPythonPractice(path)&&<PythonPracticePanel id={path.id} bundle={path.practiceBundle??[]} disabled={dirty||action.busy} onRefreshStatus={async()=>{const fresh=await productionApi<Path>(`learning-paths/${path.id}`);setPath(current=>({...current,practiceBundle:fresh.practiceBundle}));}} onUpdated={async()=>{const fresh=await productionApi<Path>(`learning-paths/${path.id}`);setPath(fresh);setChapters(fresh.chapters??[]);}}/>}
       <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
         <aside className={`${panel} self-start lg:sticky lg:top-5`}>
           <div className="flex justify-between border-b border-border p-3">
@@ -783,6 +803,7 @@ function LearningEditorForm({
                     checkpoint: "",
                     checkpointAnswer: "",
                     problems: [],
+                    paper4Links: [],
                   },
                 ]);
                 setCurrent(id);
@@ -801,7 +822,7 @@ function LearningEditorForm({
               <span className="min-w-0 flex-1 break-words">
                 {chapterDirectoryTitle(x.title, i)}
               </span>
-              <span className="shrink-0 whitespace-nowrap text-xs leading-5 tabular-nums text-muted-foreground">{x.problems.length} {t("题")}</span>
+              <span className="shrink-0 whitespace-nowrap text-xs leading-5 tabular-nums text-muted-foreground">{x.problems.length + coursePaper4UnitCount(x.paper4Links)} {t("题")}</span>
             </button>
           ))}
           </div>
@@ -888,7 +909,7 @@ function LearningEditorForm({
                   <div>
                     <b>{t("练习引用")}</b>
                     <p className="text-xs text-muted-foreground">
-                      {t("从题库与分组选择；只存引用，不复制题面与测试。")}
+                      {tr("关联普通题目、Paper 4 整套试卷或指定大题；正式 AC 计入课程进度。", "Link problems, whole Paper 4 papers, or selected questions. Formal AC counts toward course progress.")}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -903,8 +924,9 @@ function LearningEditorForm({
                       onClick={() => setPicker(true)}
                     >
                       <Plus size={14} />
-                      {t("添加练习")}
+                      {tr("普通题目", "Problems")}
                     </Button>
+                    <Button size="sm" variant="secondary" disabled={!canEditCourse} onClick={() => setPaper4Picker(true)}><Plus size={14}/>{tr("Paper 4 练习", "Paper 4 practice")}</Button>
                   </div>
                 </div>
                 {chapter.problems.map((p, i) => (
@@ -929,7 +951,7 @@ function LearningEditorForm({
                               ? tr("公开审核未通过", "Review rejected")
                               : p.rankReviewStatus === "revoked"
                                 ? tr("已撤下", "Withdrawn")
-                                : tr("已发布 · 待管理员审核", "Published · awaiting admin review")}
+                                : tr("待公开审核 · 教学可用", "Awaiting public review · teaching ready")}
                       </span>
                     </div>
                     <span className="flex gap-1">
@@ -973,6 +995,18 @@ function LearningEditorForm({
                     </span>
                   </div>
                 ))}
+                {(chapter.paper4Links ?? []).map((item, index) => <div key={coursePaper4LinkKey(item)} className="flex flex-wrap items-start justify-between gap-3 border-t border-border p-3 text-sm">
+                  <div className="min-w-0 flex-1">
+                    <Link href={`/teacher/paper4/${item.paperId}?versionId=${encodeURIComponent(item.versionId)}`} className={`${link} break-words`}>{item.questionKey ? `${item.shortTitle || item.title} · ${item.questionKey} · ${item.questionTitle ?? item.questions[0]?.title ?? ""}` : item.title}</Link>
+                    <p className="mt-1 text-xs text-muted-foreground">{item.questionKey ? tr("指定大题", "Selected question") : tr("整套试卷", "Whole paper")} · v{item.versionNumber ?? "—"} · {item.questions.length} {tr("道大题", "questions")}</p>
+                    <span className={`mt-2 inline-flex rounded border px-2 py-0.5 text-xs font-medium ${item.available === false || item.readyForCourse === false ? "border-warning/25 bg-warning-soft text-warning" : "border-success/25 bg-success-soft text-success"}`}>{item.available === false || item.readyForCourse === false ? tr("引用不可用，请重新关联", "Unavailable; relink a public version") : tr("已公开 · 固定版本", "Public · pinned version")}</span>
+                  </div>
+                  <span className="flex shrink-0 gap-1">
+                    <Button size="icon" variant="ghost" title={tr("Paper 4 练习上移", "Move Paper 4 practice up")} disabled={index === 0 || !canEditCourse} onClick={() => update("paper4Links", move(chapter.paper4Links ?? [], index, -1))}><ArrowUp size={14}/></Button>
+                    <Button size="icon" variant="ghost" title={tr("Paper 4 练习下移", "Move Paper 4 practice down")} disabled={index === (chapter.paper4Links ?? []).length - 1 || !canEditCourse} onClick={() => update("paper4Links", move(chapter.paper4Links ?? [], index, 1))}><ArrowDown size={14}/></Button>
+                    <Button size="sm" variant="ghost" disabled={!canEditCourse} onClick={() => update("paper4Links", (chapter.paper4Links ?? []).filter(link => coursePaper4LinkKey(link) !== coursePaper4LinkKey(item)))}>{tr("移除引用", "Remove link")}</Button>
+                  </span>
+                </div>)}
               </section>
               <Field label={t("检查点 · 独立练习")}>
                 <textarea
@@ -996,6 +1030,7 @@ function LearningEditorForm({
           </section>
         )}
       </div>
+      {paper4Picker && chapter && canEditCourse && <CoursePaper4Picker existing={chapter.paper4Links ?? []} onClose={() => setPaper4Picker(false)} onAdd={links => { update("paper4Links", mergeCoursePaper4Links(chapter.paper4Links ?? [], links)); setPaper4Picker(false); }}/> }
       {picker && chapter && canEditCourse && (
         <ProblemPicker
           courseMode={path.published ? "published" : "draft"}
@@ -1050,83 +1085,17 @@ function LearningEditorForm({
                 {!courseProblemReady(x) && <span className="rounded border border-warning/25 bg-warning-soft px-2 py-0.5 text-xs text-warning">{tr("仅供教师预览", "Teacher preview only")}</span>}
               </p>
             ))}
+            {(chapter?.paper4Links ?? []).map(item => <div key={coursePaper4LinkKey(item)} className="mt-3 rounded-md border border-border p-3 text-sm"><p className="font-semibold text-primary">{item.title}{item.questionKey && ` · ${item.questionKey} · ${item.questionTitle ?? item.questions[0]?.title ?? ""}`}</p><p className="mt-1 text-muted-foreground">{item.questionKey ? tr("指定大题", "Selected question") : tr("整套试卷", "Whole paper")} · v{item.versionNumber ?? "—"} · {item.questions.length} {tr("道大题", "questions")}</p></div>)}
           </article>
         </div>
       )}
-      {metadata && canEditCourse && (
-        <Modal title={t("课程资料")} onClose={() => setMetadata(false)}>
-          <form
-            className="space-y-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const d = new FormData(e.currentTarget);
-              void action.run(async () => {
-                await productionApi(`learning-paths/${path.id}`, {
-                  method: "PATCH",
-                  body: {
-                    title: d.get("title"),
-                    category: d.get("category"),
-                    description: d.get("description"),
-                    difficulty:d.get("difficulty"),coverKey:d.get("coverKey"),
-                    estimatedMinutes: Number(d.get("minutes")),
-                  },
-                });
-                setPath((x) => ({
-                  ...x,
-                  title: String(d.get("title")),
-                  category: String(d.get("category")),
-                  description: String(d.get("description")),
-                  estimatedMinutes:Number(d.get("minutes")),difficulty:String(d.get("difficulty")) as keyof typeof courseDifficulties,coverKey:String(d.get("coverKey")) as keyof typeof courseCovers,
-                }));
-                setMetadata(false);
-                onSaved();
-              });
-            }}
-          >
-            <Field label={t("名称")}>
-              <input
-                name="title"
-                required
-                defaultValue={path.title}
-                className={input}
-              />
-            </Field>
-            <Field label={t("课程标签")}>
-              <input
-                name="category"
-                required
-                defaultValue={path.category}
-                className={input}
-              />
-            </Field>
-            <Field label={t("课程难度")}><select name="difficulty" defaultValue={path.difficulty??"beginner"} className={input}>{Object.entries(courseDifficulties).map(([v,l])=><option key={v} value={v}>{t(l)}</option>)}</select></Field>
-            <Field label={t("课程封面")}><select name="coverKey" defaultValue={path.coverKey??"general"} className={input}>{Object.entries(courseCovers).map(([v,l])=><option key={v} value={v}>{t(l)}</option>)}</select></Field>
-            <Field label={t("简介")}>
-              <textarea
-                name="description"
-                defaultValue={path.description}
-                className={area}
-              />
-            </Field>
-            <Field label={t("预计学习时间（分钟）")}>
-              <input
-                name="minutes"
-                type="number"
-                min={0}
-                max={10000}
-                defaultValue={path.estimatedMinutes ?? 60}
-                className={input}
-              />
-            </Field>
-            <Feedback action={action} />
-            <Button disabled={action.busy}>{t("保存课程资料")}</Button>
-          </form>
-        </Modal>
-      )}
+      {metadata && canEditCourse && <CourseSettingsDialog course={path} onClose={() => setMetadata(false)} onSaved={saved => { setPath(current => ({ ...current, ...saved })); onSaved(); }}/>}
+      {withdraw && canEditCourse && <Modal title={tr("下架课程", "Withdraw course")} onClose={() => setWithdraw(false)}><p className="text-sm leading-6">{tr("下架后学生暂时不能进入课程。章节、学习进度、已布置的任务和历史成绩保留，可随时重新公开。", "Withdrawal pauses student access. Chapters, progress, assigned tasks and past results remain, and the course can be republished.")}</p><Feedback action={action}/><div className="mt-5 flex justify-end gap-2"><Button type="button" variant="secondary" disabled={action.busy} onClick={() => setWithdraw(false)}>{tr("取消", "Cancel")}</Button><Button type="button" disabled={action.busy} onClick={() => void action.run(async () => { const fresh = await productionApi<Path>(`learning-paths/${path.id}/unpublish`, { method: "POST", body: {} }); setPath(current => ({ ...current, ...fresh })); setWithdraw(false); onSaved(); return tr("课程已下架。", "Course withdrawn."); })}>{tr("确认下架", "Withdraw course")}</Button></div></Modal>}
       {publish && canEditCourse && (
         <Modal title={t("确认发布课程")} onClose={() => setPublish(false)}>
           <p className="text-sm">
-            {t("发布后，本校学生可阅读章节并练习关联的已发布题目。")}
+            {tr("公开后，符合课程准入范围与开放时间的学生可阅读章节、练习关联题目。", "Eligible students can read chapters and practise linked problems during the configured availability window.")}
+            <span className="mt-3 block"><CourseAccessSummary course={path}/></span>
           </p>
           <Feedback action={action} />
           <div className="mt-5 flex justify-end gap-2">
@@ -1141,7 +1110,7 @@ function LearningEditorForm({
                   await productionApi(`learning-paths/${path.id}/publish`, {
                     method: "POST",
                   });
-                  setPath((x) => ({ ...x, published: true }));
+                  setPath((x) => ({ ...x, published: true, withdrawnAt: null }));
                   onSaved();
                   setPublish(false);
                   return t("课程已发布。");

@@ -1,3 +1,5 @@
+import {courseMetadataForUser} from './course-access.mjs';
+import {audienceClasses,audienceStudents,defaultClassStudents,replaceAudienceClasses,activityClasses,linkedCourse} from './activity-audience.mjs';
 import { transaction } from './db.mjs';
 import { fail, field, uuid, integer } from './security.mjs';
 
@@ -63,7 +65,7 @@ async function classAccess(db, user, classId) {
 }
 async function canManagePractice(db, user, practice) {
   // Archived activities remain readable by their former class teachers.
-  return isAdmin(user) || user.roles.includes('teacher') && !!(await db.query('SELECT 1 FROM teacher_classes tc WHERE tc.class_id=$1 AND tc.account_id=$2', [practice.class_id, user.id])).rowCount;
+  return isAdmin(user) || user.roles.includes('teacher') && practice.owner_account_id===user.id;
 }
 async function practiceAccess(db, user, id, { lock = false, share = false } = {}) {
   const practice = row(await db.query(`SELECT * FROM timed_practices WHERE id=$1${lock ? ' FOR UPDATE' : share ? ' FOR SHARE' : ''}`, [uuid(id, '计时训练 ID')]));
@@ -125,7 +127,9 @@ async function practiceResult(db, user, id) {
     LEFT JOIN point_rewards global_reward ON global_reward.problem_id=ap.problem_id AND global_reward.assignment_id IS NULL
     WHERE ap.practice_id=$1 ORDER BY ap.position`, [id])).rows;
   const attempt = (await db.query('SELECT * FROM timed_attempts WHERE practice_id=$1 AND identity_id=$2', [id, user.identityId])).rows[0];
-  const result = { id: practice.id, title: practice.title,description:practice.description,className:(await db.query('SELECT name FROM classes WHERE id=$1',[practice.class_id])).rows[0]?.name,createdAt:practice.created_at, classId: practice.class_id, startsAt: practice.starts_at, endsAt: practice.ends_at,
+  const classes=await activityClasses(db,id,'timed');
+  const course=await courseMetadataForUser(db,user,practice.course_path_id);
+  const result = { canManage:practice.canManage,classIds:classes.map(c=>c.id),classes,coursePathId:course?.id??null,courseTitle:course?.title??null,id: practice.id, title: practice.title,description:practice.description,className:(await db.query('SELECT name FROM classes WHERE id=$1',[practice.class_id])).rows[0]?.name,createdAt:practice.created_at, classId: practice.class_id, startsAt: practice.starts_at, endsAt: practice.ends_at,
     durationMinutes: practice.duration_minutes, status: practiceStatus(practice, serverNow), showVerdict: practice.show_verdict,
     resultsPublished: !!practice.results_published_at, forcedEndedAt: practice.forced_ended_at, serverNow, preview: practice.canManage, attempt: practice.canManage ? null : attemptShape(attempt, serverNow),
     problems: problems.map((p) => ({ problemId: p.problem_id, versionId: p.version_id, title: p.title, points: Number(p.points),
@@ -176,7 +180,7 @@ export function createTimedService(pool) {
       if (route === '/timed-practices' && method === 'GET') {
         const archived=url.searchParams.get('archived')==='true';
         const list = await pool.query(isAdmin(user) ? 'SELECT id FROM timed_practices WHERE (archived_at IS NOT NULL)=$1 ORDER BY created_at DESC LIMIT 200'
-          : `SELECT p.id FROM timed_practices p WHERE (p.archived_at IS NOT NULL)=$5 AND (($3 AND EXISTS(SELECT 1 FROM teacher_classes tc WHERE tc.class_id=p.class_id AND tc.account_id=$1))
+          : `SELECT p.id FROM timed_practices p WHERE (p.archived_at IS NOT NULL)=$5 AND (($3 AND p.owner_account_id=$1)
             OR ($4 AND (p.state<>'Draft' AND (p.state<>'Archived' OR p.results_published_at IS NOT NULL)) AND EXISTS(SELECT 1 FROM timed_practice_participants part WHERE part.practice_id=p.id AND part.identity_id=$2 AND NOT part.exempt))) ORDER BY p.created_at DESC LIMIT 200`,
         isAdmin(user) ? [archived] : [user.id, user.identityId, user.roles.includes('teacher'), user.roles.includes('student'),archived]);
         const items = [];
@@ -185,16 +189,18 @@ export function createTimedService(pool) {
       }
       if (route === '/timed-practices' && method === 'POST') {
         staff(user);
-        const title = field(body.title, '训练名称'), classId = uuid(body.classId, '班级 ID'), startsAt = date(body.startsAt, '开始时间'), endsAt = date(body.endsAt, '结束时间');
+        const title = field(body.title, '训练名称'), startsAt = date(body.startsAt, '开始时间'), endsAt = date(body.endsAt, '结束时间');
         const durationMinutes = integer(body.durationMinutes, 1, 240, '个人时长');
         if (endsAt <= startsAt) fail(400, 'VALIDATION', '训练结束时间须晚于开始时间');
         if (body.showVerdict !== undefined && typeof body.showVerdict !== 'boolean') fail(400, 'VALIDATION', '反馈设置无效');
         if (!Array.isArray(body.problems) || body.problems.length < 1 || body.problems.length > 50) fail(400, 'VALIDATION', '训练须包含 1–50 题');
         const created = await transaction(pool, async (db) => {
-          await classAccess(db, user, classId);
-          const participants = body.participants ?? (await db.query("SELECT cm.identity_id FROM class_members cm JOIN identities i ON i.id=cm.identity_id WHERE cm.class_id=$1 AND i.archived_at IS NULL AND i.kind='student'", [classId])).rows.map((entry) => entry.identity_id);
-          if (!Array.isArray(participants) || !participants.length || participants.length > 500) fail(400, 'VALIDATION', '请选择 1–500 名学生');
+          const classIds=await audienceClasses(db,user,body,null,'timed'),classId=classIds[0]??null;
+          const participants=await audienceStudents(db,body.participants??await defaultClassStudents(db,classIds));
+          const coursePathId=await linkedCourse(db,body.coursePathId);
           const practice = row(await db.query('INSERT INTO timed_practices(title,class_id,owner_account_id,starts_at,ends_at,duration_minutes,show_verdict,description) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *', [title, classId, user.id, startsAt, endsAt, durationMinutes, body.showVerdict ?? true,field(body.description??'','训练说明',{min:0,max:10000})]));
+          await replaceAudienceClasses(db,practice.id,classIds,'timed');
+          await db.query('UPDATE timed_practices SET course_path_id=$2 WHERE id=$1',[practice.id,coursePathId]);
           const configuredRewards = [], seenProblems = new Set();
           for (let index = 0; index < body.problems.length; index++) {
             const entry = body.problems[index], problemId = uuid(entry.problemId), points = Number(entry.points);
@@ -214,7 +220,6 @@ export function createTimedService(pool) {
           }
           rewardBudget(configuredRewards);
           for (const identity of new Set(participants)) {
-            if (!(await db.query("SELECT 1 FROM class_members cm JOIN identities i ON i.id=cm.identity_id WHERE cm.class_id=$1 AND cm.identity_id=$2 AND i.kind='student' AND i.archived_at IS NULL", [classId, uuid(identity)])).rowCount) fail(400, 'VALIDATION', '训练成员须为本班有效学生');
             await db.query('INSERT INTO timed_practice_participants(practice_id,identity_id) VALUES($1,$2)', [practice.id, identity]);
           }
           await audit(db, user, 'timed.create', practice.id);
@@ -233,7 +238,7 @@ export function createTimedService(pool) {
       if (!match) return null;
       const id = uuid(match[1]), action = match[2];
       if(!action&&method==='PATCH'){
-        staff(user);await transaction(pool,async db=>{const practice=await practiceAccess(db,user,id,{lock:true});if(!practice.canManage)fail(403,'FORBIDDEN','无权编辑此训练');if(practice.state!=='Draft')fail(409,'IMMUTABLE','已发布训练的题目与规则固定，请使用延期或豁免等独立操作');const classId=body.classId===undefined?practice.class_id:uuid(body.classId);await classAccess(db,user,classId);const title=body.title===undefined?practice.title:field(body.title,'训练名称'),startsAt=body.startsAt===undefined?practice.starts_at:date(body.startsAt,'开始时间'),endsAt=body.endsAt===undefined?practice.ends_at:date(body.endsAt,'结束时间'),duration=body.durationMinutes===undefined?practice.duration_minutes:integer(body.durationMinutes,1,240,'个人时长');if(endsAt<=startsAt)fail(400,'VALIDATION','结束时间须晚于开始时间');if(body.showVerdict!==undefined&&typeof body.showVerdict!=='boolean')fail(400,'VALIDATION','反馈设置无效');
+        staff(user);await transaction(pool,async db=>{const practice=await practiceAccess(db,user,id,{lock:true});if(!practice.canManage)fail(403,'FORBIDDEN','无权编辑此训练');if(practice.state!=='Draft')fail(409,'IMMUTABLE','已发布训练的题目与规则固定，请使用延期或豁免等独立操作');const classIds=await audienceClasses(db,user,body,practice,'timed'),classId=classIds[0]??null;const coursePathId=body.coursePathId===undefined?practice.course_path_id:await linkedCourse(db,body.coursePathId);const title=body.title===undefined?practice.title:field(body.title,'训练名称'),startsAt=body.startsAt===undefined?practice.starts_at:date(body.startsAt,'开始时间'),endsAt=body.endsAt===undefined?practice.ends_at:date(body.endsAt,'结束时间'),duration=body.durationMinutes===undefined?practice.duration_minutes:integer(body.durationMinutes,1,240,'个人时长');if(endsAt<=startsAt)fail(400,'VALIDATION','结束时间须晚于开始时间');if(body.showVerdict!==undefined&&typeof body.showVerdict!=='boolean')fail(400,'VALIDATION','反馈设置无效');
          const problems=body.problems??(await db.query(`SELECT problem_id AS "problemId",version_id AS "versionId",points,
            reward_points AS "rewardPoints",speed_bonus_points AS "speedBonusPoints",attempt_bonus_points AS "attemptBonusPoints"
            FROM timed_practice_problems WHERE practice_id=$1 ORDER BY position`,[id])).rows;
@@ -252,8 +257,10 @@ export function createTimedService(pool) {
            selected.push({problemId,versionId:version.id,points,...rewardCaps(e,previousRewards.get(problemId))});
          }
          rewardBudget(selected);
-         const participants=body.participants??(await db.query('SELECT identity_id FROM timed_practice_participants WHERE practice_id=$1 AND NOT exempt',[id])).rows.map(p=>p.identity_id);if(!Array.isArray(participants)||participants.length>500)fail(400,'VALIDATION','训练最多 500 名学生');for(const identityId of new Set(participants))if(!(await db.query("SELECT 1 FROM class_members cm JOIN identities i ON i.id=cm.identity_id WHERE cm.class_id=$1 AND cm.identity_id=$2 AND i.kind='student' AND i.archived_at IS NULL",[classId,uuid(identityId)])).rowCount)fail(400,'VALIDATION','训练成员须为本班有效学生');
+         const participants=await audienceStudents(db,body.participants??(await db.query('SELECT identity_id FROM timed_practice_participants WHERE practice_id=$1 AND NOT exempt',[id])).rows.map(p=>p.identity_id));
          await db.query('UPDATE timed_practices SET title=$1,class_id=$2,starts_at=$3,ends_at=$4,duration_minutes=$5,show_verdict=$6,description=$8 WHERE id=$7',[title,classId,startsAt,endsAt,duration,body.showVerdict??practice.show_verdict,id,body.description===undefined?practice.description:field(body.description,'训练说明',{min:0,max:10000})]);
+         await replaceAudienceClasses(db,id,classIds,'timed');
+         await db.query('UPDATE timed_practices SET course_path_id=$2 WHERE id=$1',[id,coursePathId]);
          await db.query('DELETE FROM timed_practice_problems WHERE practice_id=$1',[id]);
          await db.query('DELETE FROM timed_practice_participants WHERE practice_id=$1',[id]);
          for(const[position,p]of selected.entries())await db.query(`INSERT INTO timed_practice_problems(
@@ -400,7 +407,7 @@ export function createTimedService(pool) {
           await audit(db, user, 'timed.archive', id);
         } else if (action === 'restore') {
           if (practice.state !== 'Archived') return;
-          if (!(await db.query('SELECT 1 FROM classes WHERE id=$1 AND archived_at IS NULL',[practice.class_id])).rowCount) fail(409,'CLASS_ARCHIVED','请先恢复班级，再恢复限时训练');
+          if (practice.class_id&&!(await db.query('SELECT 1 FROM classes WHERE id=$1 AND archived_at IS NULL',[practice.class_id])).rowCount) fail(409,'CLASS_ARCHIVED','请先恢复班级，再恢复限时训练');
           await db.query("UPDATE timed_practices SET state=$2,archived_at=NULL WHERE id=$1",[id,practice.results_published_at?'ResultsPublished':'Draft']);
           await audit(db,user,'timed.restore',id);
         }

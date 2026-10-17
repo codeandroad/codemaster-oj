@@ -53,41 +53,18 @@
       transparent 55%
     );
 }
-.hero {
+.summaryBar {
   display: flex;
-  flex-direction: column;
+  min-height: 40px;
   align-items: center;
-  gap: 6px;
-  padding: 4px 16px 12px;
-  text-align: center;
-}
-.heroEmblem {
-  display: grid;
-  width: 32px;
-  height: 32px;
-  place-items: center;
-  border: 1px solid
-    color-mix(in oklch, var(--rank-gold-border) 70%, transparent);
-  border-radius: 50%;
-  background: color-mix(in oklch, var(--surface) 70%, transparent);
-  color: var(--rank-gold);
-}
-.hero h1 {
-  margin: 0;
-  font-family: Georgia, "Songti SC", "Noto Serif CJK SC", serif;
-  font-size: clamp(30px, 3vw, 38px);
-  font-weight: 600;
-  line-height: 1.2;
-  letter-spacing: -0.035em;
-  text-wrap: balance;
+  padding-right: 140px;
 }
 .personalSummary {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   gap: 6px 22px;
-  margin-top: 4px;
   color: var(--muted-foreground);
   font-size: 13px;
   line-height: 1.6;
@@ -730,8 +707,9 @@
   }
 }
 @media (max-width: 700px) {
-  .hero {
-    padding: 8px 12px 10px;
+  .summaryBar {
+    min-height: 44px;
+    padding-right: 120px;
   }
   .filterButton {
     min-height: 44px;
@@ -795,9 +773,6 @@
 @media (max-width: 420px) {
   .page::before {
     inset-inline: -16px;
-  }
-  .hero h1 {
-    font-size: 32px;
   }
   .personalSummary {
     gap: 6px 14px;

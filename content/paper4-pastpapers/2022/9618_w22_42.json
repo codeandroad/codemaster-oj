@@ -1,0 +1,418 @@
+{
+  "format": "codemaster-paper4",
+  "version": 1,
+  "paper": {
+    "title": "9618 Paper 4 · October/November 2022 · Paper 42",
+    "description": "Classroom Python adaptation of the supplied question paper, mark scheme and candidate text files. Original subpart marks are retained; automatic checks do not replace teacher marking.",
+    "examYear": 2022,
+    "examSession": "autumn",
+    "examVariant": 42
+  },
+  "questions": [
+    {
+      "key": "Q1",
+      "title": "Priority jobs and insertion sort",
+      "statement": "Jobs have an integer job number and priority from 1 (highest) to 10 (lowest).\n\n## 1(a) [3]\nDeclare global integer `Jobs`, a 100 by 2 array with job number in column 0 and priority in column 1, and global `NumberOfJobs`.\n\n## 1(b) [3]\nWrite `Initialise()` to set every array element to `-1` and `NumberOfJobs` to zero.\n\n## 1(c) [5]\nWrite `AddJob(jobNumber, priority)` to store the job in the next free row. Output `Added` on success or `Not added` if full.\n\n## 1(d) [2]\nIn the main program call `Initialise()` then `AddJob()` for these pairs, in this order: `(12,10), (526,9), (33,8), (12,9), (78,1)`.\n\n## 1(e) [5]\nWrite `InsertionSort()` to order the stored jobs by ascending numerical priority, preserving each job number's association with its priority. Use insertion sort, not a built-in sort.\n\n## 1(f) [3]\nWrite `PrintArray()` to output every stored job on its own line in the format `123 priority 1`.\n\n## 1(g)(i) [1]\nCall `InsertionSort()` then `PrintArray()` in the main program.\n\n## 1(g)(ii) [1]\nRetain output evidence. Saved run output replaces the screenshot, and teachers review the required algorithm and call sequence.\n",
+      "starterCode": "# Write your Python program here.\n",
+      "initialFiles": {},
+      "outputFiles": [],
+      "stages": [
+        {
+          "id": "Q1_a",
+          "title": "1(a) Global jobs storage",
+          "description": "Teacher reviews required declarations, algorithm structure and interfaces.",
+          "maxMarks": 3,
+          "judgeMode": "manual"
+        },
+        {
+          "id": "Q1_b",
+          "title": "1(b) Initialise jobs",
+          "description": "Isolated functional checks; teacher also checks the original algorithm and source requirements.",
+          "maxMarks": 3,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q1_c",
+          "title": "1(c) Add jobs and full boundary",
+          "description": "Isolated functional checks; teacher also checks the original algorithm and source requirements.",
+          "maxMarks": 5,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q1_d",
+          "title": "1(d) Five main insertions",
+          "description": "Isolated functional checks; teacher also checks the original algorithm and source requirements.",
+          "maxMarks": 2,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q1_e",
+          "title": "1(e) Insertion sort by priority",
+          "description": "Isolated functional checks; teacher also checks the original algorithm and source requirements.",
+          "maxMarks": 5,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q1_f",
+          "title": "1(f) Formatted jobs",
+          "description": "Isolated functional checks; teacher also checks the original algorithm and source requirements.",
+          "maxMarks": 3,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q1_gi",
+          "title": "1(g)(i) Sorted main output",
+          "description": "Isolated functional checks; teacher also checks the original algorithm and source requirements.",
+          "maxMarks": 1,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q1_gii",
+          "title": "1(g)(ii) Jobs evidence",
+          "description": "Teacher reviews the specified saved run evidence.",
+          "maxMarks": 1,
+          "judgeMode": "evidence"
+        }
+      ]
+    },
+    {
+      "key": "Q2",
+      "title": "Moving game characters",
+      "statement": "## 2(a) [4]\nDeclare class `Character` with private `Name: STRING`, `XCoordinate: INTEGER` and `YCoordinate: INTEGER`. Its constructor takes those three values. Include Python declaration comments.\n\n## 2(b) [3]\nWrite getters `GetName()`, `GetX()` and `GetY()`.\n\n## 2(c) [2]\nWrite `ChangePosition(XChange,YChange)` to add the two integer changes to the respective coordinates.\n\n## 2(d) [7]\nIn the main program declare an array for a maximum of ten `Character` objects. Read all ten from `Characters.txt`, whose records are three lines: name, x coordinate, y coordinate. For example, Amal starts at `(0,2)`.\n\n## 2(e) [5]\nAsk for a character name, search the array and store its index. Repeat until a name exists. The original test uses lowercase `qui` to select `Qui`; perform case-insensitive matching.\n\n## 2(f) [7]\nAsk for a move letter, repeating until valid: `A` moves left (x minus 1), `W` moves up (y plus 1), `S` moves down (y minus 1), and `D` moves right (x plus 1). Use `ChangePosition()`.\n\n## 2(g)(i) [2]\nOutput the selected character's name and its new coordinates, following the format `Qui has changed coordinates to X = 83 and Y = 9`. Use the actual file values: the supplied file has Qui at `(84,9)` before moving left.\n\n## 2(g)(ii) [1]\nRetain evidence using these four inputs in order: `THOMAS`, `qui`, `X`, `A`. Saved run output replaces the screenshot. The printed paper's illustrative output uses Y = 0; that is a format example, not the coordinate in the supplied file.\n",
+      "starterCode": "# Write your Python program here.\n",
+      "initialFiles": {
+        "Characters.txt": "Amal\r\n0\r\n2\r\nJess\r\n10\r\n12\r\nKarl\r\n50\r\n24\r\nWyona\r\n18\r\n6\r\nRohan\r\n1\r\n5\r\nSantana\r\n99\r\n1\r\nBritney\r\n55\r\n83\r\nRobin\r\n100\r\n75\r\nCain\r\n22\r\n56\r\nQui\r\n84\r\n9"
+      },
+      "outputFiles": [],
+      "stages": [
+        {
+          "id": "Q2_a",
+          "title": "2(a) Private character class",
+          "description": "Teacher reviews required declarations, algorithm structure and interfaces.",
+          "maxMarks": 4,
+          "judgeMode": "manual"
+        },
+        {
+          "id": "Q2_b",
+          "title": "2(b) Character getters",
+          "description": "Isolated functional checks; teacher also checks the original algorithm and source requirements.",
+          "maxMarks": 3,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q2_c",
+          "title": "2(c) Change position",
+          "description": "Isolated functional checks; teacher also checks the original algorithm and source requirements.",
+          "maxMarks": 2,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q2_d",
+          "title": "2(d) Load ten characters",
+          "description": "Isolated functional checks; teacher also checks the original algorithm and source requirements.",
+          "maxMarks": 7,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q2_e",
+          "title": "2(e) Find a valid name",
+          "description": "Isolated functional checks; teacher also checks the original algorithm and source requirements.",
+          "maxMarks": 5,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q2_f",
+          "title": "2(f) Validate and apply movement",
+          "description": "Isolated functional checks; teacher also checks the original algorithm and source requirements.",
+          "maxMarks": 7,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q2_gi",
+          "title": "2(g)(i) Coordinates message",
+          "description": "Isolated functional checks; teacher also checks the original algorithm and source requirements.",
+          "maxMarks": 2,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q2_gii",
+          "title": "2(g)(ii) Movement evidence",
+          "description": "Teacher reviews the specified saved run evidence.",
+          "maxMarks": 1,
+          "judgeMode": "evidence"
+        }
+      ]
+    },
+    {
+      "key": "Q3",
+      "title": "A linear queue and recursive total",
+      "statement": "## 3(a) [3]\nDeclare global integer `Queue` with 100 places. Declare and initialise a head pointer for the first stored item and a tail pointer for the next free place. Use suitable values for an empty linear queue.\n\n## 3(b) [6]\nWrite `Enqueue(value)` to store an integer at the tail and return `True` if successful or `False` when no space remains. This is a linear queue with no wraparound.\n\n## 3(c) [4]\nIn the main program enqueue each integer from 1 to 20 inclusive in ascending order. Output `Successful` if all twenty additions succeeded, otherwise `Unsuccessful`.\n\n## 3(d) [6]\nRewrite this iterative calculation as a recursive function. The original paper does not require a function name.\n\n```text\nFUNCTION IterativeOutput(Start: INTEGER) RETURNS INTEGER\n    Total = 0\n    FOR Count = Start - 1 TO HeadPointer STEP -1\n        Total = Total + Queue[Count]\n    NEXT Count\n    RETURN Total\nENDFUNCTION\n```\n\nThe parameter shown is an exclusive upper bound. A consistently documented last-index convention is also accepted when the main call is adjusted accordingly. Teachers check that the solution is recursive.\n\n## 3(e)(i) [1]\nCall the recursive function from the main program and output the returned total.\n\n## 3(e)(ii) [1]\nRetain output evidence. Saved run output replaces the screenshot.\n",
+      "starterCode": "# Write your Python program here.\n",
+      "initialFiles": {},
+      "outputFiles": [],
+      "stages": [
+        {
+          "id": "Q3_a",
+          "title": "3(a) Linear queue declarations",
+          "description": "Teacher reviews required declarations, algorithm structure and interfaces.",
+          "maxMarks": 3,
+          "judgeMode": "manual"
+        },
+        {
+          "id": "Q3_b",
+          "title": "3(b) Linear enqueue",
+          "description": "Isolated functional checks; teacher also checks the original algorithm and source requirements.",
+          "maxMarks": 6,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q3_c",
+          "title": "3(c) Enqueue one to twenty",
+          "description": "Isolated functional checks; teacher also checks the original algorithm and source requirements.",
+          "maxMarks": 4,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q3_d",
+          "title": "3(d) Recursive queue total",
+          "description": "Isolated functional checks; teacher also checks the original algorithm and source requirements.",
+          "maxMarks": 6,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q3_ei",
+          "title": "3(e)(i) Output total in main",
+          "description": "Isolated functional checks; teacher also checks the original algorithm and source requirements.",
+          "maxMarks": 1,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q3_eii",
+          "title": "3(e)(ii) Queue evidence",
+          "description": "Teacher reviews the specified saved run evidence.",
+          "maxMarks": 1,
+          "judgeMode": "evidence"
+        }
+      ]
+    }
+  ],
+  "runnerCases": {
+    "Q1_b": [
+      {
+        "id": "all-one-hundred-cleared",
+        "public": true,
+        "driverCode": "try:\n    import ast, types, contextlib, io, builtins, inspect, re, sys, __future__\n    source=open('/w/main.py',encoding='utf-8').read()\n    tree=ast.parse(source)\n    defined_functions={n.name for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))}\n    # Keep declarations and definitions wherever the student places them; omit main-program calls.\n    keep=[]\n    for n in tree.body:\n        if isinstance(n,(ast.Import,ast.ImportFrom,ast.FunctionDef,ast.ClassDef)):\n            keep.append(n)\n        elif isinstance(n,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):\n            if not any(isinstance(x,ast.Call) and ((isinstance(x.func,ast.Name) and (x.func.id in defined_functions or x.func.id in ('input','open','print'))) or (isinstance(x.func,ast.Attribute) and x.func.attr in ('input','read','readline','readlines'))) for x in ast.walk(n)):\n                keep.append(n)\n    c=types.ModuleType('candidate'); c.__file__='/w/main.py'\n    sys.modules['candidate']=c\n    future_flags=0\n    with contextlib.redirect_stdout(io.StringIO()):\n        for declaration in keep:\n            try:\n                if isinstance(declaration,ast.ImportFrom) and declaration.module=='__future__':\n                    for feature in declaration.names:future_flags |= getattr(__future__,feature.name).compiler_flag\n                unit=ast.fix_missing_locations(ast.Module(body=[declaration],type_ignores=[]))\n                exec(compile(unit,'/w/main.py','exec',flags=future_flags),c.__dict__)\n            except (NameError,IndexError,AttributeError,TypeError,ValueError):\n                # Main-program assignments can depend on skipped user input or loops.\n                # Missing declarations still cause the actual interface checks to fail.\n                if not isinstance(declaration,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):raise\n    c.Jobs=[[1,2] for _ in range(100)];c.NumberOfJobs=88;c.Initialise()\n    print('PASS' if c.NumberOfJobs==0 and len(c.Jobs)==100 and all(row==[-1,-1] for row in c.Jobs) else 'FAIL')\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "PASS\n"
+      },
+      {
+        "id": "reinitialise-used-jobs",
+        "public": false,
+        "driverCode": "try:\n    import ast, types, contextlib, io, builtins, inspect, re, sys, __future__\n    source=open('/w/main.py',encoding='utf-8').read()\n    tree=ast.parse(source)\n    defined_functions={n.name for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))}\n    # Keep declarations and definitions wherever the student places them; omit main-program calls.\n    keep=[]\n    for n in tree.body:\n        if isinstance(n,(ast.Import,ast.ImportFrom,ast.FunctionDef,ast.ClassDef)):\n            keep.append(n)\n        elif isinstance(n,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):\n            if not any(isinstance(x,ast.Call) and ((isinstance(x.func,ast.Name) and (x.func.id in defined_functions or x.func.id in ('input','open','print'))) or (isinstance(x.func,ast.Attribute) and x.func.attr in ('input','read','readline','readlines'))) for x in ast.walk(n)):\n                keep.append(n)\n    c=types.ModuleType('candidate'); c.__file__='/w/main.py'\n    sys.modules['candidate']=c\n    future_flags=0\n    with contextlib.redirect_stdout(io.StringIO()):\n        for declaration in keep:\n            try:\n                if isinstance(declaration,ast.ImportFrom) and declaration.module=='__future__':\n                    for feature in declaration.names:future_flags |= getattr(__future__,feature.name).compiler_flag\n                unit=ast.fix_missing_locations(ast.Module(body=[declaration],type_ignores=[]))\n                exec(compile(unit,'/w/main.py','exec',flags=future_flags),c.__dict__)\n            except (NameError,IndexError,AttributeError,TypeError,ValueError):\n                # Main-program assignments can depend on skipped user input or loops.\n                # Missing declarations still cause the actual interface checks to fail.\n                if not isinstance(declaration,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):raise\n    c.Initialise()\n    with contextlib.redirect_stdout(io.StringIO()):c.AddJob(7,4)\n    c.Initialise()\n    print('PASS' if c.NumberOfJobs==0 and all(row==[-1,-1] for row in c.Jobs) else 'FAIL')\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "PASS\n"
+      }
+    ],
+    "Q1_c": [
+      {
+        "id": "first-and-second-job",
+        "public": true,
+        "driverCode": "try:\n    import ast, types, contextlib, io, builtins, inspect, re, sys, __future__\n    source=open('/w/main.py',encoding='utf-8').read()\n    tree=ast.parse(source)\n    defined_functions={n.name for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))}\n    # Keep declarations and definitions wherever the student places them; omit main-program calls.\n    keep=[]\n    for n in tree.body:\n        if isinstance(n,(ast.Import,ast.ImportFrom,ast.FunctionDef,ast.ClassDef)):\n            keep.append(n)\n        elif isinstance(n,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):\n            if not any(isinstance(x,ast.Call) and ((isinstance(x.func,ast.Name) and (x.func.id in defined_functions or x.func.id in ('input','open','print'))) or (isinstance(x.func,ast.Attribute) and x.func.attr in ('input','read','readline','readlines'))) for x in ast.walk(n)):\n                keep.append(n)\n    c=types.ModuleType('candidate'); c.__file__='/w/main.py'\n    sys.modules['candidate']=c\n    future_flags=0\n    with contextlib.redirect_stdout(io.StringIO()):\n        for declaration in keep:\n            try:\n                if isinstance(declaration,ast.ImportFrom) and declaration.module=='__future__':\n                    for feature in declaration.names:future_flags |= getattr(__future__,feature.name).compiler_flag\n                unit=ast.fix_missing_locations(ast.Module(body=[declaration],type_ignores=[]))\n                exec(compile(unit,'/w/main.py','exec',flags=future_flags),c.__dict__)\n            except (NameError,IndexError,AttributeError,TypeError,ValueError):\n                # Main-program assignments can depend on skipped user input or loops.\n                # Missing declarations still cause the actual interface checks to fail.\n                if not isinstance(declaration,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):raise\n    c.Initialise();c.AddJob(12,10);c.AddJob(78,1);print(c.NumberOfJobs);print(c.Jobs[:2])\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "Added Added 2\n[[12, 10], [78, 1]]\n"
+      },
+      {
+        "id": "capacity-and-refusal",
+        "public": false,
+        "driverCode": "try:\n    import ast, types, contextlib, io, builtins, inspect, re, sys, __future__\n    source=open('/w/main.py',encoding='utf-8').read()\n    tree=ast.parse(source)\n    defined_functions={n.name for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))}\n    # Keep declarations and definitions wherever the student places them; omit main-program calls.\n    keep=[]\n    for n in tree.body:\n        if isinstance(n,(ast.Import,ast.ImportFrom,ast.FunctionDef,ast.ClassDef)):\n            keep.append(n)\n        elif isinstance(n,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):\n            if not any(isinstance(x,ast.Call) and ((isinstance(x.func,ast.Name) and (x.func.id in defined_functions or x.func.id in ('input','open','print'))) or (isinstance(x.func,ast.Attribute) and x.func.attr in ('input','read','readline','readlines'))) for x in ast.walk(n)):\n                keep.append(n)\n    c=types.ModuleType('candidate'); c.__file__='/w/main.py'\n    sys.modules['candidate']=c\n    future_flags=0\n    with contextlib.redirect_stdout(io.StringIO()):\n        for declaration in keep:\n            try:\n                if isinstance(declaration,ast.ImportFrom) and declaration.module=='__future__':\n                    for feature in declaration.names:future_flags |= getattr(__future__,feature.name).compiler_flag\n                unit=ast.fix_missing_locations(ast.Module(body=[declaration],type_ignores=[]))\n                exec(compile(unit,'/w/main.py','exec',flags=future_flags),c.__dict__)\n            except (NameError,IndexError,AttributeError,TypeError,ValueError):\n                # Main-program assignments can depend on skipped user input or loops.\n                # Missing declarations still cause the actual interface checks to fail.\n                if not isinstance(declaration,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):raise\n    c.Initialise();c.Jobs[:99]=[[i+1,i%10+1] for i in range(99)];c.NumberOfJobs=99;c.AddJob(999,3);before=[r[:] for r in c.Jobs];c.AddJob(1,1);print(c.NumberOfJobs);print('PASS' if c.Jobs==before and c.Jobs[99]==[999,3] else 'FAIL')\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "Added Not added 100 PASS\n"
+      }
+    ],
+    "Q1_d": [
+      {
+        "id": "five-original-jobs",
+        "public": true,
+        "driverCode": "try:\n    INPUTS=[]\n    import contextlib, io, builtins, re, runpy\n    values=iter(INPUTS)\n    original_input=builtins.input\n    builtins.input=lambda prompt='':next(values)\n    out=io.StringIO()\n    try:\n        with contextlib.redirect_stdout(out): ns=runpy.run_path('/w/main.py',run_name='__main__')\n    finally: builtins.input=original_input\n    text=out.getvalue()\n    print('PASS' if ns.get('NumberOfJobs')==5 and sorted(map(tuple,ns.get('Jobs',[])[:5]))==sorted([(12, 10), (526, 9), (33, 8), (12, 9), (78, 1)]) and text.splitlines()[:5]==['Added']*5 else 'FAIL')\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "PASS\n"
+      }
+    ],
+    "Q1_e": [
+      {
+        "id": "original-priorities",
+        "public": true,
+        "driverCode": "try:\n    import ast, types, contextlib, io, builtins, inspect, re, sys, __future__\n    source=open('/w/main.py',encoding='utf-8').read()\n    tree=ast.parse(source)\n    defined_functions={n.name for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))}\n    # Keep declarations and definitions wherever the student places them; omit main-program calls.\n    keep=[]\n    for n in tree.body:\n        if isinstance(n,(ast.Import,ast.ImportFrom,ast.FunctionDef,ast.ClassDef)):\n            keep.append(n)\n        elif isinstance(n,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):\n            if not any(isinstance(x,ast.Call) and ((isinstance(x.func,ast.Name) and (x.func.id in defined_functions or x.func.id in ('input','open','print'))) or (isinstance(x.func,ast.Attribute) and x.func.attr in ('input','read','readline','readlines'))) for x in ast.walk(n)):\n                keep.append(n)\n    c=types.ModuleType('candidate'); c.__file__='/w/main.py'\n    sys.modules['candidate']=c\n    future_flags=0\n    with contextlib.redirect_stdout(io.StringIO()):\n        for declaration in keep:\n            try:\n                if isinstance(declaration,ast.ImportFrom) and declaration.module=='__future__':\n                    for feature in declaration.names:future_flags |= getattr(__future__,feature.name).compiler_flag\n                unit=ast.fix_missing_locations(ast.Module(body=[declaration],type_ignores=[]))\n                exec(compile(unit,'/w/main.py','exec',flags=future_flags),c.__dict__)\n            except (NameError,IndexError,AttributeError,TypeError,ValueError):\n                # Main-program assignments can depend on skipped user input or loops.\n                # Missing declarations still cause the actual interface checks to fail.\n                if not isinstance(declaration,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):raise\n    c.Jobs=[list(x) for x in [(12, 10), (526, 9), (33, 8), (12, 9), (78, 1)]]+[[-1,-1] for _ in range(95)];c.NumberOfJobs=5;c.InsertionSort()\n    print('PASS' if [r[1] for r in c.Jobs[:5]]==[1,8,9,9,10] and sorted(map(tuple,c.Jobs[:5]))==sorted([(12, 10), (526, 9), (33, 8), (12, 9), (78, 1)]) else 'FAIL')\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "PASS\n"
+      },
+      {
+        "id": "empty-single-and-reverse",
+        "public": false,
+        "driverCode": "try:\n    import ast, types, contextlib, io, builtins, inspect, re, sys, __future__\n    source=open('/w/main.py',encoding='utf-8').read()\n    tree=ast.parse(source)\n    defined_functions={n.name for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))}\n    # Keep declarations and definitions wherever the student places them; omit main-program calls.\n    keep=[]\n    for n in tree.body:\n        if isinstance(n,(ast.Import,ast.ImportFrom,ast.FunctionDef,ast.ClassDef)):\n            keep.append(n)\n        elif isinstance(n,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):\n            if not any(isinstance(x,ast.Call) and ((isinstance(x.func,ast.Name) and (x.func.id in defined_functions or x.func.id in ('input','open','print'))) or (isinstance(x.func,ast.Attribute) and x.func.attr in ('input','read','readline','readlines'))) for x in ast.walk(n)):\n                keep.append(n)\n    c=types.ModuleType('candidate'); c.__file__='/w/main.py'\n    sys.modules['candidate']=c\n    future_flags=0\n    with contextlib.redirect_stdout(io.StringIO()):\n        for declaration in keep:\n            try:\n                if isinstance(declaration,ast.ImportFrom) and declaration.module=='__future__':\n                    for feature in declaration.names:future_flags |= getattr(__future__,feature.name).compiler_flag\n                unit=ast.fix_missing_locations(ast.Module(body=[declaration],type_ignores=[]))\n                exec(compile(unit,'/w/main.py','exec',flags=future_flags),c.__dict__)\n            except (NameError,IndexError,AttributeError,TypeError,ValueError):\n                # Main-program assignments can depend on skipped user input or loops.\n                # Missing declarations still cause the actual interface checks to fail.\n                if not isinstance(declaration,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):raise\n    c.Initialise();c.InsertionSort();c.Jobs[:4]=[[4,10],[3,7],[2,4],[1,1]];c.NumberOfJobs=4;c.InsertionSort();print(c.Jobs[:4])\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "[[1, 1], [2, 4], [3, 7], [4, 10]]\n"
+      }
+    ],
+    "Q1_f": [
+      {
+        "id": "two-formatted-jobs",
+        "public": true,
+        "driverCode": "try:\n    import ast, types, contextlib, io, builtins, inspect, re, sys, __future__\n    source=open('/w/main.py',encoding='utf-8').read()\n    tree=ast.parse(source)\n    defined_functions={n.name for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))}\n    # Keep declarations and definitions wherever the student places them; omit main-program calls.\n    keep=[]\n    for n in tree.body:\n        if isinstance(n,(ast.Import,ast.ImportFrom,ast.FunctionDef,ast.ClassDef)):\n            keep.append(n)\n        elif isinstance(n,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):\n            if not any(isinstance(x,ast.Call) and ((isinstance(x.func,ast.Name) and (x.func.id in defined_functions or x.func.id in ('input','open','print'))) or (isinstance(x.func,ast.Attribute) and x.func.attr in ('input','read','readline','readlines'))) for x in ast.walk(n)):\n                keep.append(n)\n    c=types.ModuleType('candidate'); c.__file__='/w/main.py'\n    sys.modules['candidate']=c\n    future_flags=0\n    with contextlib.redirect_stdout(io.StringIO()):\n        for declaration in keep:\n            try:\n                if isinstance(declaration,ast.ImportFrom) and declaration.module=='__future__':\n                    for feature in declaration.names:future_flags |= getattr(__future__,feature.name).compiler_flag\n                unit=ast.fix_missing_locations(ast.Module(body=[declaration],type_ignores=[]))\n                exec(compile(unit,'/w/main.py','exec',flags=future_flags),c.__dict__)\n            except (NameError,IndexError,AttributeError,TypeError,ValueError):\n                # Main-program assignments can depend on skipped user input or loops.\n                # Missing declarations still cause the actual interface checks to fail.\n                if not isinstance(declaration,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):raise\n    c.Initialise();c.Jobs[:2]=[[123,1],[39,3]];c.NumberOfJobs=2;c.PrintArray()\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "123 priority 1\n39 priority 3\n"
+      },
+      {
+        "id": "empty-array-no-rows",
+        "public": false,
+        "driverCode": "try:\n    import ast, types, contextlib, io, builtins, inspect, re, sys, __future__\n    source=open('/w/main.py',encoding='utf-8').read()\n    tree=ast.parse(source)\n    defined_functions={n.name for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))}\n    # Keep declarations and definitions wherever the student places them; omit main-program calls.\n    keep=[]\n    for n in tree.body:\n        if isinstance(n,(ast.Import,ast.ImportFrom,ast.FunctionDef,ast.ClassDef)):\n            keep.append(n)\n        elif isinstance(n,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):\n            if not any(isinstance(x,ast.Call) and ((isinstance(x.func,ast.Name) and (x.func.id in defined_functions or x.func.id in ('input','open','print'))) or (isinstance(x.func,ast.Attribute) and x.func.attr in ('input','read','readline','readlines'))) for x in ast.walk(n)):\n                keep.append(n)\n    c=types.ModuleType('candidate'); c.__file__='/w/main.py'\n    sys.modules['candidate']=c\n    future_flags=0\n    with contextlib.redirect_stdout(io.StringIO()):\n        for declaration in keep:\n            try:\n                if isinstance(declaration,ast.ImportFrom) and declaration.module=='__future__':\n                    for feature in declaration.names:future_flags |= getattr(__future__,feature.name).compiler_flag\n                unit=ast.fix_missing_locations(ast.Module(body=[declaration],type_ignores=[]))\n                exec(compile(unit,'/w/main.py','exec',flags=future_flags),c.__dict__)\n            except (NameError,IndexError,AttributeError,TypeError,ValueError):\n                # Main-program assignments can depend on skipped user input or loops.\n                # Missing declarations still cause the actual interface checks to fail.\n                if not isinstance(declaration,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):raise\n    c.Initialise();c.PrintArray()\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": ""
+      }
+    ],
+    "Q1_gi": [
+      {
+        "id": "sorted-main-job-output",
+        "public": true,
+        "driverCode": "try:\n    INPUTS=[]\n    import contextlib, io, builtins, re, runpy\n    values=iter(INPUTS)\n    original_input=builtins.input\n    builtins.input=lambda prompt='':next(values)\n    out=io.StringIO()\n    try:\n        with contextlib.redirect_stdout(out): ns=runpy.run_path('/w/main.py',run_name='__main__')\n    finally: builtins.input=original_input\n    text=out.getvalue()\n    rows=[(int(a),int(b)) for a,b in re.findall(r'(?mi)^\\s*(\\d+)\\s+priority\\s+(\\d+)\\s*$',text)]\n    print('PASS' if sorted(rows)==sorted([(12, 10), (526, 9), (33, 8), (12, 9), (78, 1)]) and [p for n,p in rows]==[1,8,9,9,10] else 'FAIL')\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "PASS\n"
+      }
+    ],
+    "Q2_b": [
+      {
+        "id": "get-name-and-coordinates",
+        "public": true,
+        "driverCode": "try:\n    import ast, types, contextlib, io, builtins, inspect, re, sys, __future__\n    source=open('/w/main.py',encoding='utf-8').read()\n    tree=ast.parse(source)\n    defined_functions={n.name for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))}\n    # Keep declarations and definitions wherever the student places them; omit main-program calls.\n    keep=[]\n    for n in tree.body:\n        if isinstance(n,(ast.Import,ast.ImportFrom,ast.FunctionDef,ast.ClassDef)):\n            keep.append(n)\n        elif isinstance(n,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):\n            if not any(isinstance(x,ast.Call) and ((isinstance(x.func,ast.Name) and (x.func.id in defined_functions or x.func.id in ('input','open','print'))) or (isinstance(x.func,ast.Attribute) and x.func.attr in ('input','read','readline','readlines'))) for x in ast.walk(n)):\n                keep.append(n)\n    c=types.ModuleType('candidate'); c.__file__='/w/main.py'\n    sys.modules['candidate']=c\n    future_flags=0\n    with contextlib.redirect_stdout(io.StringIO()):\n        for declaration in keep:\n            try:\n                if isinstance(declaration,ast.ImportFrom) and declaration.module=='__future__':\n                    for feature in declaration.names:future_flags |= getattr(__future__,feature.name).compiler_flag\n                unit=ast.fix_missing_locations(ast.Module(body=[declaration],type_ignores=[]))\n                exec(compile(unit,'/w/main.py','exec',flags=future_flags),c.__dict__)\n            except (NameError,IndexError,AttributeError,TypeError,ValueError):\n                # Main-program assignments can depend on skipped user input or loops.\n                # Missing declarations still cause the actual interface checks to fail.\n                if not isinstance(declaration,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):raise\n    x=c.Character('Amal',0,2);print(x.GetName(),x.GetX(),x.GetY())\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "Amal 0 2\n"
+      },
+      {
+        "id": "negative-coordinates",
+        "public": false,
+        "driverCode": "try:\n    import ast, types, contextlib, io, builtins, inspect, re, sys, __future__\n    source=open('/w/main.py',encoding='utf-8').read()\n    tree=ast.parse(source)\n    defined_functions={n.name for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))}\n    # Keep declarations and definitions wherever the student places them; omit main-program calls.\n    keep=[]\n    for n in tree.body:\n        if isinstance(n,(ast.Import,ast.ImportFrom,ast.FunctionDef,ast.ClassDef)):\n            keep.append(n)\n        elif isinstance(n,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):\n            if not any(isinstance(x,ast.Call) and ((isinstance(x.func,ast.Name) and (x.func.id in defined_functions or x.func.id in ('input','open','print'))) or (isinstance(x.func,ast.Attribute) and x.func.attr in ('input','read','readline','readlines'))) for x in ast.walk(n)):\n                keep.append(n)\n    c=types.ModuleType('candidate'); c.__file__='/w/main.py'\n    sys.modules['candidate']=c\n    future_flags=0\n    with contextlib.redirect_stdout(io.StringIO()):\n        for declaration in keep:\n            try:\n                if isinstance(declaration,ast.ImportFrom) and declaration.module=='__future__':\n                    for feature in declaration.names:future_flags |= getattr(__future__,feature.name).compiler_flag\n                unit=ast.fix_missing_locations(ast.Module(body=[declaration],type_ignores=[]))\n                exec(compile(unit,'/w/main.py','exec',flags=future_flags),c.__dict__)\n            except (NameError,IndexError,AttributeError,TypeError,ValueError):\n                # Main-program assignments can depend on skipped user input or loops.\n                # Missing declarations still cause the actual interface checks to fail.\n                if not isinstance(declaration,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):raise\n    x=c.Character('Z',-7,12);print(x.GetName(),x.GetX(),x.GetY())\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "Z -7 12\n"
+      }
+    ],
+    "Q2_c": [
+      {
+        "id": "independent-coordinate-changes",
+        "public": true,
+        "driverCode": "try:\n    import ast, types, contextlib, io, builtins, inspect, re, sys, __future__\n    source=open('/w/main.py',encoding='utf-8').read()\n    tree=ast.parse(source)\n    defined_functions={n.name for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))}\n    # Keep declarations and definitions wherever the student places them; omit main-program calls.\n    keep=[]\n    for n in tree.body:\n        if isinstance(n,(ast.Import,ast.ImportFrom,ast.FunctionDef,ast.ClassDef)):\n            keep.append(n)\n        elif isinstance(n,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):\n            if not any(isinstance(x,ast.Call) and ((isinstance(x.func,ast.Name) and (x.func.id in defined_functions or x.func.id in ('input','open','print'))) or (isinstance(x.func,ast.Attribute) and x.func.attr in ('input','read','readline','readlines'))) for x in ast.walk(n)):\n                keep.append(n)\n    c=types.ModuleType('candidate'); c.__file__='/w/main.py'\n    sys.modules['candidate']=c\n    future_flags=0\n    with contextlib.redirect_stdout(io.StringIO()):\n        for declaration in keep:\n            try:\n                if isinstance(declaration,ast.ImportFrom) and declaration.module=='__future__':\n                    for feature in declaration.names:future_flags |= getattr(__future__,feature.name).compiler_flag\n                unit=ast.fix_missing_locations(ast.Module(body=[declaration],type_ignores=[]))\n                exec(compile(unit,'/w/main.py','exec',flags=future_flags),c.__dict__)\n            except (NameError,IndexError,AttributeError,TypeError,ValueError):\n                # Main-program assignments can depend on skipped user input or loops.\n                # Missing declarations still cause the actual interface checks to fail.\n                if not isinstance(declaration,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):raise\n    x=c.Character('Amal',0,2);x.ChangePosition(-1,3);print(x.GetX(),x.GetY());x.ChangePosition(4,-8);print(x.GetX(),x.GetY())\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "-1 5 3 -3\n"
+      },
+      {
+        "id": "zero-change",
+        "public": false,
+        "driverCode": "try:\n    import ast, types, contextlib, io, builtins, inspect, re, sys, __future__\n    source=open('/w/main.py',encoding='utf-8').read()\n    tree=ast.parse(source)\n    defined_functions={n.name for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))}\n    # Keep declarations and definitions wherever the student places them; omit main-program calls.\n    keep=[]\n    for n in tree.body:\n        if isinstance(n,(ast.Import,ast.ImportFrom,ast.FunctionDef,ast.ClassDef)):\n            keep.append(n)\n        elif isinstance(n,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):\n            if not any(isinstance(x,ast.Call) and ((isinstance(x.func,ast.Name) and (x.func.id in defined_functions or x.func.id in ('input','open','print'))) or (isinstance(x.func,ast.Attribute) and x.func.attr in ('input','read','readline','readlines'))) for x in ast.walk(n)):\n                keep.append(n)\n    c=types.ModuleType('candidate'); c.__file__='/w/main.py'\n    sys.modules['candidate']=c\n    future_flags=0\n    with contextlib.redirect_stdout(io.StringIO()):\n        for declaration in keep:\n            try:\n                if isinstance(declaration,ast.ImportFrom) and declaration.module=='__future__':\n                    for feature in declaration.names:future_flags |= getattr(__future__,feature.name).compiler_flag\n                unit=ast.fix_missing_locations(ast.Module(body=[declaration],type_ignores=[]))\n                exec(compile(unit,'/w/main.py','exec',flags=future_flags),c.__dict__)\n            except (NameError,IndexError,AttributeError,TypeError,ValueError):\n                # Main-program assignments can depend on skipped user input or loops.\n                # Missing declarations still cause the actual interface checks to fail.\n                if not isinstance(declaration,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):raise\n    x=c.Character('X',2,-5);x.ChangePosition(0,0);print(x.GetX(),x.GetY())\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "2 -5\n"
+      }
+    ],
+    "Q2_d": [
+      {
+        "id": "all-ten-file-characters",
+        "public": true,
+        "driverCode": "try:\n    INPUTS=['Amal', 'A']\n    import contextlib, io, builtins, re, runpy\n    values=iter(INPUTS)\n    original_input=builtins.input\n    builtins.input=lambda prompt='':next(values)\n    out=io.StringIO()\n    try:\n        with contextlib.redirect_stdout(out): ns=runpy.run_path('/w/main.py',run_name='__main__')\n    finally: builtins.input=original_input\n    text=out.getvalue()\n    arrays=[a for a in ns.values() if isinstance(a,list) and len(a)==10 and all(hasattr(x,'GetName') for x in a)]\n    expected=[('Amal', -1, 2), ('Jess', 10, 12), ('Karl', 50, 24), ('Wyona', 18, 6), ('Rohan', 1, 5), ('Santana', 99, 1), ('Britney', 55, 83), ('Robin', 100, 75), ('Cain', 22, 56), ('Qui', 84, 9)]\n    print('PASS' if any([(x.GetName(),x.GetX(),x.GetY()) for x in a]==expected for a in arrays) else 'FAIL')\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "PASS\n"
+      },
+      {
+        "id": "last-character-loaded",
+        "public": false,
+        "driverCode": "try:\n    INPUTS=['qui', 'D']\n    import contextlib, io, builtins, re, runpy\n    values=iter(INPUTS)\n    original_input=builtins.input\n    builtins.input=lambda prompt='':next(values)\n    out=io.StringIO()\n    try:\n        with contextlib.redirect_stdout(out): ns=runpy.run_path('/w/main.py',run_name='__main__')\n    finally: builtins.input=original_input\n    text=out.getvalue()\n    print('PASS' if re.search('(?is)Qui\\\\s+has changed coordinates to\\\\s+X\\\\s*=\\\\s*85\\\\s+and\\\\s+Y\\\\s*=\\\\s*9\\\\b',text) else 'FAIL')\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "PASS\n"
+      }
+    ],
+    "Q2_e": [
+      {
+        "id": "original-invalid-name-then-qui",
+        "public": true,
+        "driverCode": "try:\n    INPUTS=['THOMAS', 'qui', 'X', 'A']\n    import contextlib, io, builtins, re, runpy\n    values=iter(INPUTS)\n    original_input=builtins.input\n    builtins.input=lambda prompt='':next(values)\n    out=io.StringIO()\n    try:\n        with contextlib.redirect_stdout(out): ns=runpy.run_path('/w/main.py',run_name='__main__')\n    finally: builtins.input=original_input\n    text=out.getvalue()\n    print('PASS' if re.search('(?is)Qui\\\\s+has changed coordinates to\\\\s+X\\\\s*=\\\\s*83\\\\s+and\\\\s+Y\\\\s*=\\\\s*9\\\\b',text) else 'FAIL')\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "PASS\n"
+      },
+      {
+        "id": "repeated-missing-name-and-uppercase",
+        "public": false,
+        "driverCode": "try:\n    INPUTS=['absent', 'nobody', 'AMAL', 'W']\n    import contextlib, io, builtins, re, runpy\n    values=iter(INPUTS)\n    original_input=builtins.input\n    builtins.input=lambda prompt='':next(values)\n    out=io.StringIO()\n    try:\n        with contextlib.redirect_stdout(out): ns=runpy.run_path('/w/main.py',run_name='__main__')\n    finally: builtins.input=original_input\n    text=out.getvalue()\n    print('PASS' if re.search('(?is)Amal\\\\s+has changed coordinates to\\\\s+X\\\\s*=\\\\s*0\\\\s+and\\\\s+Y\\\\s*=\\\\s*3\\\\b',text) else 'FAIL')\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "PASS\n"
+      }
+    ],
+    "Q2_f": [
+      {
+        "id": "move-left-after-invalid-letter",
+        "public": true,
+        "driverCode": "try:\n    INPUTS=['qui', 'X', 'A']\n    import contextlib, io, builtins, re, runpy\n    values=iter(INPUTS)\n    original_input=builtins.input\n    builtins.input=lambda prompt='':next(values)\n    out=io.StringIO()\n    try:\n        with contextlib.redirect_stdout(out): ns=runpy.run_path('/w/main.py',run_name='__main__')\n    finally: builtins.input=original_input\n    text=out.getvalue()\n    print('PASS' if re.search('(?is)Qui\\\\s+has changed coordinates to\\\\s+X\\\\s*=\\\\s*83\\\\s+and\\\\s+Y\\\\s*=\\\\s*9\\\\b',text) else 'FAIL')\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "PASS\n"
+      },
+      {
+        "id": "move-up",
+        "public": false,
+        "driverCode": "try:\n    INPUTS=['Qui', 'W']\n    import contextlib, io, builtins, re, runpy\n    values=iter(INPUTS)\n    original_input=builtins.input\n    builtins.input=lambda prompt='':next(values)\n    out=io.StringIO()\n    try:\n        with contextlib.redirect_stdout(out): ns=runpy.run_path('/w/main.py',run_name='__main__')\n    finally: builtins.input=original_input\n    text=out.getvalue()\n    print('PASS' if re.search('(?is)Qui\\\\s+has changed coordinates to\\\\s+X\\\\s*=\\\\s*84\\\\s+and\\\\s+Y\\\\s*=\\\\s*10\\\\b',text) else 'FAIL')\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "PASS\n"
+      },
+      {
+        "id": "move-down",
+        "public": false,
+        "driverCode": "try:\n    INPUTS=['Qui', 'S']\n    import contextlib, io, builtins, re, runpy\n    values=iter(INPUTS)\n    original_input=builtins.input\n    builtins.input=lambda prompt='':next(values)\n    out=io.StringIO()\n    try:\n        with contextlib.redirect_stdout(out): ns=runpy.run_path('/w/main.py',run_name='__main__')\n    finally: builtins.input=original_input\n    text=out.getvalue()\n    print('PASS' if re.search('(?is)Qui\\\\s+has changed coordinates to\\\\s+X\\\\s*=\\\\s*84\\\\s+and\\\\s+Y\\\\s*=\\\\s*8\\\\b',text) else 'FAIL')\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "PASS\n"
+      },
+      {
+        "id": "move-right",
+        "public": false,
+        "driverCode": "try:\n    INPUTS=['Qui', 'D']\n    import contextlib, io, builtins, re, runpy\n    values=iter(INPUTS)\n    original_input=builtins.input\n    builtins.input=lambda prompt='':next(values)\n    out=io.StringIO()\n    try:\n        with contextlib.redirect_stdout(out): ns=runpy.run_path('/w/main.py',run_name='__main__')\n    finally: builtins.input=original_input\n    text=out.getvalue()\n    print('PASS' if re.search('(?is)Qui\\\\s+has changed coordinates to\\\\s+X\\\\s*=\\\\s*85\\\\s+and\\\\s+Y\\\\s*=\\\\s*9\\\\b',text) else 'FAIL')\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "PASS\n"
+      }
+    ],
+    "Q2_gi": [
+      {
+        "id": "specified-coordinate-format",
+        "public": true,
+        "driverCode": "try:\n    INPUTS=['THOMAS', 'qui', 'X', 'A']\n    import contextlib, io, builtins, re, runpy\n    values=iter(INPUTS)\n    original_input=builtins.input\n    builtins.input=lambda prompt='':next(values)\n    out=io.StringIO()\n    try:\n        with contextlib.redirect_stdout(out): ns=runpy.run_path('/w/main.py',run_name='__main__')\n    finally: builtins.input=original_input\n    text=out.getvalue()\n    print('PASS' if re.search('(?is)Qui\\\\s+has changed coordinates to\\\\s+X\\\\s*=\\\\s*83\\\\s+and\\\\s+Y\\\\s*=\\\\s*9\\\\b',text) else 'FAIL')\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "PASS\n"
+      },
+      {
+        "id": "different-character-coordinate-format",
+        "public": false,
+        "driverCode": "try:\n    INPUTS=['Karl', 'S']\n    import contextlib, io, builtins, re, runpy\n    values=iter(INPUTS)\n    original_input=builtins.input\n    builtins.input=lambda prompt='':next(values)\n    out=io.StringIO()\n    try:\n        with contextlib.redirect_stdout(out): ns=runpy.run_path('/w/main.py',run_name='__main__')\n    finally: builtins.input=original_input\n    text=out.getvalue()\n    print('PASS' if re.search('(?is)Karl\\\\s+has changed coordinates to\\\\s+X\\\\s*=\\\\s*50\\\\s+and\\\\s+Y\\\\s*=\\\\s*23\\\\b',text) else 'FAIL')\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "PASS\n"
+      }
+    ],
+    "Q3_b": [
+      {
+        "id": "linear-capacity",
+        "public": true,
+        "driverCode": "try:\n    import ast, types, contextlib, io, builtins, inspect, re, sys, __future__\n    source=open('/w/main.py',encoding='utf-8').read()\n    tree=ast.parse(source)\n    defined_functions={n.name for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))}\n    # Keep declarations and definitions wherever the student places them; omit main-program calls.\n    keep=[]\n    for n in tree.body:\n        if isinstance(n,(ast.Import,ast.ImportFrom,ast.FunctionDef,ast.ClassDef)):\n            keep.append(n)\n        elif isinstance(n,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):\n            if not any(isinstance(x,ast.Call) and ((isinstance(x.func,ast.Name) and (x.func.id in defined_functions or x.func.id in ('input','open','print'))) or (isinstance(x.func,ast.Attribute) and x.func.attr in ('input','read','readline','readlines'))) for x in ast.walk(n)):\n                keep.append(n)\n    c=types.ModuleType('candidate'); c.__file__='/w/main.py'\n    sys.modules['candidate']=c\n    future_flags=0\n    with contextlib.redirect_stdout(io.StringIO()):\n        for declaration in keep:\n            try:\n                if isinstance(declaration,ast.ImportFrom) and declaration.module=='__future__':\n                    for feature in declaration.names:future_flags |= getattr(__future__,feature.name).compiler_flag\n                unit=ast.fix_missing_locations(ast.Module(body=[declaration],type_ignores=[]))\n                exec(compile(unit,'/w/main.py','exec',flags=future_flags),c.__dict__)\n            except (NameError,IndexError,AttributeError,TypeError,ValueError):\n                # Main-program assignments can depend on skipped user input or loops.\n                # Missing declarations still cause the actual interface checks to fail.\n                if not isinstance(declaration,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):raise\n    c.Queue=[0]*100;c.HeadPointer=0;c.TailPointer=0\n    r=[c.Enqueue(i) for i in range(1,102)]\n    print('PASS' if r==[True]*100+[False] and c.TailPointer==100 and c.Queue==list(range(1,101)) else 'FAIL')\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "PASS\n"
+      },
+      {
+        "id": "last-slot-and-no-wrap",
+        "public": false,
+        "driverCode": "try:\n    import ast, types, contextlib, io, builtins, inspect, re, sys, __future__\n    source=open('/w/main.py',encoding='utf-8').read()\n    tree=ast.parse(source)\n    defined_functions={n.name for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))}\n    # Keep declarations and definitions wherever the student places them; omit main-program calls.\n    keep=[]\n    for n in tree.body:\n        if isinstance(n,(ast.Import,ast.ImportFrom,ast.FunctionDef,ast.ClassDef)):\n            keep.append(n)\n        elif isinstance(n,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):\n            if not any(isinstance(x,ast.Call) and ((isinstance(x.func,ast.Name) and (x.func.id in defined_functions or x.func.id in ('input','open','print'))) or (isinstance(x.func,ast.Attribute) and x.func.attr in ('input','read','readline','readlines'))) for x in ast.walk(n)):\n                keep.append(n)\n    c=types.ModuleType('candidate'); c.__file__='/w/main.py'\n    sys.modules['candidate']=c\n    future_flags=0\n    with contextlib.redirect_stdout(io.StringIO()):\n        for declaration in keep:\n            try:\n                if isinstance(declaration,ast.ImportFrom) and declaration.module=='__future__':\n                    for feature in declaration.names:future_flags |= getattr(__future__,feature.name).compiler_flag\n                unit=ast.fix_missing_locations(ast.Module(body=[declaration],type_ignores=[]))\n                exec(compile(unit,'/w/main.py','exec',flags=future_flags),c.__dict__)\n            except (NameError,IndexError,AttributeError,TypeError,ValueError):\n                # Main-program assignments can depend on skipped user input or loops.\n                # Missing declarations still cause the actual interface checks to fail.\n                if not isinstance(declaration,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):raise\n    c.Queue=[0]*100;c.HeadPointer=20;c.TailPointer=99\n    print(c.Enqueue(-7),c.Enqueue(3),c.TailPointer,c.Queue[99],c.Queue[0])\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "True False 100 -7 0\n"
+      }
+    ],
+    "Q3_c": [
+      {
+        "id": "one-to-twenty-success",
+        "public": true,
+        "driverCode": "try:\n    INPUTS=[]\n    import contextlib, io, builtins, re, runpy\n    values=iter(INPUTS)\n    original_input=builtins.input\n    builtins.input=lambda prompt='':next(values)\n    out=io.StringIO()\n    try:\n        with contextlib.redirect_stdout(out): ns=runpy.run_path('/w/main.py',run_name='__main__')\n    finally: builtins.input=original_input\n    text=out.getvalue()\n    a=ns.get('Queue',[])\n    print('PASS' if a[:20]==list(range(1,21)) and ns.get('TailPointer')==20 and text.split()[0]=='Successful' else 'FAIL')\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "PASS\n"
+      }
+    ],
+    "Q3_d": [
+      {
+        "id": "recursive-total-original",
+        "public": true,
+        "driverCode": "try:\n    import ast, types, contextlib, io, builtins, inspect, re, sys, __future__\n    source=open('/w/main.py',encoding='utf-8').read()\n    tree=ast.parse(source)\n    defined_functions={n.name for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))}\n    # Keep declarations and definitions wherever the student places them; omit main-program calls.\n    keep=[]\n    for n in tree.body:\n        if isinstance(n,(ast.Import,ast.ImportFrom,ast.FunctionDef,ast.ClassDef)):\n            keep.append(n)\n        elif isinstance(n,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):\n            if not any(isinstance(x,ast.Call) and ((isinstance(x.func,ast.Name) and (x.func.id in defined_functions or x.func.id in ('input','open','print'))) or (isinstance(x.func,ast.Attribute) and x.func.attr in ('input','read','readline','readlines'))) for x in ast.walk(n)):\n                keep.append(n)\n    c=types.ModuleType('candidate'); c.__file__='/w/main.py'\n    sys.modules['candidate']=c\n    future_flags=0\n    with contextlib.redirect_stdout(io.StringIO()):\n        for declaration in keep:\n            try:\n                if isinstance(declaration,ast.ImportFrom) and declaration.module=='__future__':\n                    for feature in declaration.names:future_flags |= getattr(__future__,feature.name).compiler_flag\n                unit=ast.fix_missing_locations(ast.Module(body=[declaration],type_ignores=[]))\n                exec(compile(unit,'/w/main.py','exec',flags=future_flags),c.__dict__)\n            except (NameError,IndexError,AttributeError,TypeError,ValueError):\n                # Main-program assignments can depend on skipped user input or loops.\n                # Missing declarations still cause the actual interface checks to fail.\n                if not isinstance(declaration,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):raise\n    functions=[]\n    for node in tree.body:\n        if isinstance(node,ast.FunctionDef) and node.name!='Enqueue' and len(node.args.args)==1:\n            if any(isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id==node.name for n in ast.walk(node)):\n                functions.append(getattr(c,node.name))\n    if not functions:raise ValueError('recursive function missing')\n    fn=functions[0]\n    c.Queue=list(range(1,21))+[0]*80;c.HeadPointer=0;c.TailPointer=20\n    print('PASS' if fn(20)==210 or fn(19)==210 else 'FAIL')\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "PASS\n"
+      },
+      {
+        "id": "recursive-total-nonzero-head",
+        "public": false,
+        "driverCode": "try:\n    import ast, types, contextlib, io, builtins, inspect, re, sys, __future__\n    source=open('/w/main.py',encoding='utf-8').read()\n    tree=ast.parse(source)\n    defined_functions={n.name for n in tree.body if isinstance(n,(ast.FunctionDef,ast.AsyncFunctionDef))}\n    # Keep declarations and definitions wherever the student places them; omit main-program calls.\n    keep=[]\n    for n in tree.body:\n        if isinstance(n,(ast.Import,ast.ImportFrom,ast.FunctionDef,ast.ClassDef)):\n            keep.append(n)\n        elif isinstance(n,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):\n            if not any(isinstance(x,ast.Call) and ((isinstance(x.func,ast.Name) and (x.func.id in defined_functions or x.func.id in ('input','open','print'))) or (isinstance(x.func,ast.Attribute) and x.func.attr in ('input','read','readline','readlines'))) for x in ast.walk(n)):\n                keep.append(n)\n    c=types.ModuleType('candidate'); c.__file__='/w/main.py'\n    sys.modules['candidate']=c\n    future_flags=0\n    with contextlib.redirect_stdout(io.StringIO()):\n        for declaration in keep:\n            try:\n                if isinstance(declaration,ast.ImportFrom) and declaration.module=='__future__':\n                    for feature in declaration.names:future_flags |= getattr(__future__,feature.name).compiler_flag\n                unit=ast.fix_missing_locations(ast.Module(body=[declaration],type_ignores=[]))\n                exec(compile(unit,'/w/main.py','exec',flags=future_flags),c.__dict__)\n            except (NameError,IndexError,AttributeError,TypeError,ValueError):\n                # Main-program assignments can depend on skipped user input or loops.\n                # Missing declarations still cause the actual interface checks to fail.\n                if not isinstance(declaration,(ast.Assign,ast.AnnAssign,ast.For,ast.While)):raise\n    functions=[]\n    for node in tree.body:\n        if isinstance(node,ast.FunctionDef) and node.name!='Enqueue' and len(node.args.args)==1:\n            if any(isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id==node.name for n in ast.walk(node)):\n                functions.append(getattr(c,node.name))\n    if not functions:raise ValueError('recursive function missing')\n    fn=functions[0]\n    c.Queue=[999,999,4,-2,8,3]+[0]*94;c.HeadPointer=2;c.TailPointer=6\n    print('PASS' if fn(6)==13 or fn(5)==13 else 'FAIL')\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "PASS\n"
+      }
+    ],
+    "Q3_ei": [
+      {
+        "id": "main-total-two-hundred-ten",
+        "public": true,
+        "driverCode": "try:\n    INPUTS=[]\n    import contextlib, io, builtins, re, runpy\n    values=iter(INPUTS)\n    original_input=builtins.input\n    builtins.input=lambda prompt='':next(values)\n    out=io.StringIO()\n    try:\n        with contextlib.redirect_stdout(out): ns=runpy.run_path('/w/main.py',run_name='__main__')\n    finally: builtins.input=original_input\n    text=out.getvalue()\n    print('PASS' if text.split()==['Successful','210'] else 'FAIL')\nexcept Exception:\n    print(\"FAIL\")\n",
+        "expectedStdout": "PASS\n"
+      }
+    ]
+  },
+  "referenceSolutions": {
+    "Q1": "Jobs=[[-1,-1] for _ in range(100)] # ARRAY[0:99,0:1] OF INTEGER\nNumberOfJobs=0 # INTEGER\n\ndef Initialise():\n    global Jobs,NumberOfJobs\n    Jobs=[[-1,-1] for _ in range(100)];NumberOfJobs=0\n\ndef AddJob(number,priority):\n    global NumberOfJobs\n    if NumberOfJobs==100:print('Not added');return\n    Jobs[NumberOfJobs]=[number,priority];NumberOfJobs+=1\n    print('Added')\n\ndef InsertionSort():\n    for i in range(1,NumberOfJobs):\n        value=Jobs[i][:];j=i-1\n        while j>=0 and Jobs[j][1]>value[1]:\n            Jobs[j+1]=Jobs[j][:];j-=1\n        Jobs[j+1]=value\n\ndef PrintArray():\n    for i in range(NumberOfJobs):print(Jobs[i][0],'priority',Jobs[i][1])\n\nif __name__=='__main__':\n    Initialise()\n    AddJob(12,10);AddJob(526,9);AddJob(33,8);AddJob(12,9);AddJob(78,1)\n    InsertionSort();PrintArray()\n",
+    "Q2": "class Character:\n    def __init__(self,name,x,y):\n        self.__Name=name # STRING\n        self.__XCoordinate=x # INTEGER\n        self.__YCoordinate=y # INTEGER\n    def GetName(self):return self.__Name\n    def GetX(self):return self.__XCoordinate\n    def GetY(self):return self.__YCoordinate\n    def ChangePosition(self,XChange,YChange):\n        self.__XCoordinate+=XChange;self.__YCoordinate+=YChange\n\nif __name__=='__main__':\n    Characters=[] # ARRAY[0:9] OF Character\n    with open('Characters.txt') as f:\n        for _ in range(10):Characters.append(Character(f.readline().strip(),int(f.readline()),int(f.readline())))\n    index=-1\n    while index==-1:\n        name=input('Character name: ').lower()\n        for i,character in enumerate(Characters):\n            if character.GetName().lower()==name:index=i;break\n    move=input('Direction A,W,S,D: ').upper()\n    while move not in ('A','W','S','D'):move=input('Direction A,W,S,D: ').upper()\n    delta={'A':(-1,0),'W':(0,1),'S':(0,-1),'D':(1,0)}\n    Characters[index].ChangePosition(*delta[move])\n    character=Characters[index]\n    print(character.GetName(),'has changed coordinates to X =',character.GetX(),'and Y =',character.GetY())\n",
+    "Q3": "Queue=[0]*100 # ARRAY[0:99] OF INTEGER\nHeadPointer=0 # INTEGER\nTailPointer=0 # INTEGER\n\ndef Enqueue(value):\n    global TailPointer\n    if TailPointer>=100:return False\n    Queue[TailPointer]=value;TailPointer+=1\n    return True\n\ndef RecursiveOutput(Start):\n    if Start<=HeadPointer:return 0\n    return Queue[Start-1]+RecursiveOutput(Start-1)\n\nif __name__=='__main__':\n    successful=True\n    for n in range(1,21):\n        if not Enqueue(n):successful=False\n    print('Successful' if successful else 'Unsuccessful')\n    print(RecursiveOutput(TailPointer))\n"
+  }
+}

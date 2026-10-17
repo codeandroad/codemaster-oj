@@ -1,0 +1,112 @@
+[
+  {
+    "key": "9618_s21_41",
+    "year": 2021,
+    "season": "May/June",
+    "variant": "41",
+    "files": {
+      "sf": {
+        "sha256": "b333e4f59362a65cfa671b802fc3642e1918c1cb4798f3cc3f6f34910c265c98",
+        "textFiles": {
+          "TreasureChestData.txt": "2*2\r\n4\r\n10\r\n100/10\r\n10\r\n15\r\n1000*4\r\n4000\r\n20\r\n125/25\r\n5\r\n30\r\n3000+4000\r\n7000\r\n18"
+        }
+      },
+      "qp": {
+        "sha256": "3ce3201d19c9147b6960a55de792c06494f4f7b97ac67852d5b6cdc3caf5f3fe",
+        "pages": 12
+      },
+      "ms": {
+        "sha256": "a17356cf7b84c3bc0eef9cd2f87873f7a35d16704be7ec4802a5d8a501fe2c1e",
+        "pages": 30
+      }
+    }
+  },
+  {
+    "key": "9618_s21_42",
+    "year": 2021,
+    "season": "May/June",
+    "variant": "42",
+    "files": {
+      "sf": {
+        "sha256": "c021bbe55cc6d00ac29b929da119ba9fae6a464d1e67c88a10cf25666ce2190a",
+        "textFiles": {
+          "TreasureChestData.txt": "2*2\r\n4\r\n10\r\n100/10\r\n10\r\n15\r\n1000*4\r\n4000\r\n20\r\n125/25\r\n5\r\n30\r\n3000+4000\r\n7000\r\n18"
+        }
+      },
+      "qp": {
+        "sha256": "1076baff06141542ace8b4aebd647e17d8c1115c10bc1462e36acbb48215e356",
+        "pages": 12
+      },
+      "ms": {
+        "sha256": "b66575798435f35ec6d0dd5a80df6d0952470f90ca47582b99a78b73178b85db",
+        "pages": 30
+      }
+    }
+  },
+  {
+    "key": "9618_s21_43",
+    "year": 2021,
+    "season": "May/June",
+    "variant": "43",
+    "files": {
+      "sf": {
+        "sha256": "7e3364f8554fc3a941ff7fa165533d7d3b5a37e618cd707adcedc4595143f07e",
+        "textFiles": {
+          "TreasureChestData.txt": "2*2\r\n4\r\n10\r\n100/10\r\n10\r\n15\r\n1000*4\r\n4000\r\n20\r\n125/25\r\n5\r\n30\r\n3000+4000\r\n7000\r\n18"
+        }
+      },
+      "qp": {
+        "sha256": "3b6d4cba62aed1aef8ba6ad69c8bf90f31be5a760c1d9af53c9866c61ff7a9a3",
+        "pages": 12
+      },
+      "ms": {
+        "sha256": "fbc3be2699a9a33a4241cf35c3f69fa921b064206dfe4ad3be2d1d0e5cc3fd0a",
+        "pages": 30
+      }
+    }
+  },
+  {
+    "key": "9618_w21_41",
+    "year": 2021,
+    "season": "October/November",
+    "variant": "41",
+    "files": {
+      "qp": {
+        "sha256": "cdcc1cc5e36b3a597824c7410e77ba2d91a2619f8e51968fa9966dd85c7a8b8f",
+        "pages": 12
+      },
+      "sf": {
+        "sha256": "159a93f7fde66db5f83144e7de3080ef003ca82b6f3cc2e1ec3cabb924194abe",
+        "textFiles": {
+          "Pictures.txt": "Flowers\r\n45\r\n50\r\nblack\r\nLandscape\r\n30\r\n40\r\ngold\r\nPeople\r\n40\r\n60\r\nred\r\nAbstract\r\n35\r\n48\r\nsilver\r\nAbstract\r\n90\r\n120\r\nwhite\r\nFlowers\r\n70\r\n40\r\ngold\r\nAbstract\r\n50\r\n50\r\nred\r\nPeople\r\n20\r\n20\r\nblack\r\nLandscape\r\n30\r\n45\r\nblack\r\nLandscape\r\n50\r\n75\r\nwhite\r\nAbstract\r\n100\r\n50\r\ngold\r\nAbstract\r\n200\r\n40\r\nsilver\r\nFlowers\r\n80\r\n40\r\nsilver\r\nLandscape\r\n25\r\n35\r\ngold\r\nLandscape\r\n25\r\n37\r\nblack\r\nFlowers\r\n45\r\n30\r\nblue\r\nPeople\r\n20\r\n30\r\nwhite\r\nAbstract\r\n60\r\n70\r\nwhite\r\nPeople\r\n50\r\n40\r\nblack\r\nLandscape\r\n50\r\n40\r\ngrey\r\nAbstract\r\n40\r\n40\r\ngold"
+        }
+      },
+      "ms": {
+        "sha256": "f95f8e857df8a51e9fffe6f9011ac74ce446eb243084580db30b8deff0ea37ec",
+        "pages": 23
+      }
+    }
+  },
+  {
+    "key": "9618_w21_42",
+    "year": 2021,
+    "season": "October/November",
+    "variant": "42",
+    "files": {
+      "qp": {
+        "sha256": "2a9591d200d84f008c6a598097eac4e682582c28111e6b9b961b069a7f754f18",
+        "pages": 12
+      },
+      "sf": {
+        "sha256": "e71769b8b8c4e1706d24f3fa4a86b1ab06f32432af24a2397e7c92a8136be2e3",
+        "textFiles": {
+          "Pictures.txt": "Flowers\r\n45\r\n50\r\nblack\r\nLandscape\r\n30\r\n40\r\ngold\r\nPeople\r\n40\r\n60\r\nred\r\nAbstract\r\n35\r\n48\r\nsilver\r\nAbstract\r\n90\r\n120\r\nwhite\r\nFlowers\r\n70\r\n40\r\ngold\r\nAbstract\r\n50\r\n50\r\nred\r\nPeople\r\n20\r\n20\r\nblack\r\nLandscape\r\n30\r\n45\r\nblack\r\nLandscape\r\n50\r\n75\r\nwhite\r\nAbstract\r\n100\r\n50\r\ngold\r\nAbstract\r\n200\r\n40\r\nsilver\r\nFlowers\r\n80\r\n40\r\nsilver\r\nLandscape\r\n25\r\n35\r\ngold\r\nLandscape\r\n25\r\n37\r\nblack\r\nFlowers\r\n45\r\n30\r\nblue\r\nPeople\r\n20\r\n30\r\nwhite\r\nAbstract\r\n60\r\n70\r\nwhite\r\nPeople\r\n50\r\n40\r\nblack\r\nLandscape\r\n50\r\n40\r\ngrey\r\nAbstract\r\n40\r\n40\r\ngold"
+        }
+      },
+      "ms": {
+        "sha256": "c22f23e2aa64a4e05480e879716361cb6e4d2e7f5c700d3c1eb9179fe3306adb",
+        "pages": 23
+      }
+    }
+  }
+]

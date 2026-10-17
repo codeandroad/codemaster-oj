@@ -42,12 +42,14 @@ test('only final Paper 4 whole-question AC awards 10 points once across revision
       {id:'hidden',public:false,expectedStdout:'1\n'}],
     Q2_auto:[{id:'file',public:true,expectedStdout:'2\n'}] };
     async function paper({endsAt=null}={}) {
-      const paperId = (await pool.query(`INSERT INTO paper4_papers(owner_account_id,class_id,title,ends_at,status,published_at)
-        VALUES($1,$2,'Rank paper',$3,'published',now()) RETURNING id`,[teacher.id,classId,endsAt])).rows[0].id;
+      const paperId = (await pool.query(`INSERT INTO paper4_papers(owner_account_id,class_id,title,ends_at,status,published_at,delivery_kind,activity_kind)
+        VALUES($1,$2,'Rank paper',$3,'published',now(),'activity','practice') RETURNING id`,[teacher.id,classId,endsAt])).rows[0].id;
       const versionId = (await pool.query(`INSERT INTO paper4_versions(paper_id,version_number,title,description,class_id,ends_at,definition,runner_cases,published_at)
         VALUES($1,1,'Rank paper','',$2,$3,$4::jsonb,$5::jsonb,now()) RETURNING id`,
       [paperId,classId,endsAt,JSON.stringify(definition),JSON.stringify(runnerCases)])).rows[0].id;
       await pool.query('UPDATE paper4_papers SET current_version_id=$2 WHERE id=$1',[paperId,versionId]);
+      await pool.query('INSERT INTO paper4_activity_participants(paper_id,identity_id) VALUES($1,$2)',[paperId,student.identityId]);
+      await pool.query('INSERT INTO paper4_activity_classes(paper_id,class_id) VALUES($1,$2)',[paperId,classId]);
       return {paperId,versionId};
     }
     async function attempt(paperId,versionId,{submitted=false}={}) {
@@ -230,7 +232,7 @@ test('Paper 4 rank migration preserves historical attempts and never retroactive
   const pool=createPool(url.href);
   try{
    await pool.query('CREATE TABLE schema_migrations(name text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');
-   await pool.query("INSERT INTO schema_migrations(name) VALUES('035_paper4_rank_points.sql'),('036_paper4_rank_verdict_consistency.sql')");
+   await pool.query("INSERT INTO schema_migrations(name) VALUES('035_paper4_rank_points.sql'),('036_paper4_rank_verdict_consistency.sql'),('037_paper4_catalog_activities.sql'),('039_paper4_activity_audiences.sql'),('042_course_paper4_links.sql')");
    await migrate(pool);
    const teacherIdentity=(await pool.query("INSERT INTO identities(kind,number,name) VALUES('teacher',$1,'Teacher') RETURNING id",[randomUUID()])).rows[0].id;
    const studentIdentity=(await pool.query("INSERT INTO identities(kind,number,name) VALUES('student',$1,'Student') RETURNING id",[randomUUID()])).rows[0].id;
@@ -248,7 +250,7 @@ test('Paper 4 rank migration preserves historical attempts and never retroactive
    const oldTask=(await pool.query('INSERT INTO paper4_run_tasks(snapshot_id) VALUES($1) RETURNING id',[oldSnapshot])).rows[0].id;
    await pool.query(`INSERT INTO paper4_runs(task_id,lease_id,snapshot_id,status,private_results,environment_version)
     VALUES($1,$2,$3,'AC',$4::jsonb,'legacy')`,[oldTask,randomUUID(),oldSnapshot,JSON.stringify([{stageId:'s1',caseId:'case1',status:'AC'}])]);
-   await pool.query("DELETE FROM schema_migrations WHERE name IN ('035_paper4_rank_points.sql','036_paper4_rank_verdict_consistency.sql')");
+   await pool.query("DELETE FROM schema_migrations WHERE name IN ('035_paper4_rank_points.sql','036_paper4_rank_verdict_consistency.sql','037_paper4_catalog_activities.sql','039_paper4_activity_audiences.sql','042_course_paper4_links.sql')");
    await migrate(pool);
    assert.equal((await pool.query('SELECT origin FROM paper4_snapshots WHERE id=$1',[oldSnapshot])).rows[0].origin,'practice');
    assert.equal((await pool.query('SELECT count(*)::int n FROM paper4_rank_ledger')).rows[0].n,0);

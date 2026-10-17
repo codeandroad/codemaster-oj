@@ -52,7 +52,8 @@ interface ImportRecord {
 }
 const steps = ["1 选择文件与去向", "2 预览题目", "3 确认导入"];
 export function TeacherProblemImports() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const tx = (zh: string, en: string) => locale === "en" ? en : zh;
   const search = useSearchParams(),
     banks = useData<{ items: Bank[] }>("problem-banks"),
     groups = useData<{ items: Group[] }>("problem-groups"),
@@ -159,9 +160,10 @@ export function TeacherProblemImports() {
     <>
       <PageHeader
         eyebrow={t("题目与测试")}
-        title={t("题目导入")}
+        title={tx("普通 OJ 题目导入", "OJ problem import")}
         description={t("导入题目草稿与测试数据，并在题目编辑器中完成校验。")}
       />
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-surface px-4 py-3 text-sm"><p className="text-muted-foreground">{tx("这里导入 problems.json 等普通题目包；Paper 4 试卷包使用独立格式。", "Import ordinary problem packages such as problems.json here. Paper 4 paper packages use a separate format.")}</p><Link href="/teacher/paper4" className="font-semibold text-primary hover:underline focus-visible:underline">{tx("Paper 4 试卷导入 / 导出", "Paper 4 import / export")} →</Link></div>
       <Tabs
         value={section}
         onChange={setSection}
@@ -677,11 +679,12 @@ export function TeacherProblemImports() {
       )}
       {selectedRecord && <Drawer title={selectedRecord.fileName || "JSON 清单"} onClose={() => setSelectedRecord(null)}>
         <dl className="space-y-3 text-sm">
+          <div><dt className="text-muted-foreground">{tx("资源类型", "Resource type")}</dt><dd>{tx("普通 OJ 题目包（非 Paper 4 试卷）", "Ordinary OJ problems (not a Paper 4 paper)")}</dd></div>
           <div><dt className="text-muted-foreground">导入时间</dt><dd>{date(selectedRecord.createdAt)}</dd></div>
           <div><dt className="text-muted-foreground">来源文件</dt><dd className="break-all">{selectedRecord.fileName || "JSON 清单"}</dd></div>
           <div><dt className="text-muted-foreground">导入结果</dt><dd>共 {selectedRecord.summary.total} 道 · 成功 {selectedRecord.summary.created} 道 · 失败 {selectedRecord.summary.failed} 道</dd></div>
         </dl>
-        <Link href={`/teacher/problems/banks/${selectedRecord.bankId}`} className={`${buttonVariants({variant:"secondary"})} mt-5`}>打开目标题库</Link>
+        <Link href={`/teacher/problems/banks/${selectedRecord.bankId}`} className={`${buttonVariants({variant:"secondary"})} mt-5`}>{tx("打开普通题库", "Open problem bank")}</Link>
       </Drawer>}
       {editing !== null && rows[editing] && (
         <CandidateEditor

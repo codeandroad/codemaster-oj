@@ -100,7 +100,7 @@ button.metadataTag:hover { background:var(--muted);color:var(--foreground); }
 .topicPopover p { margin:8px 0 0;color:var(--muted-foreground); }
 .topicList { display:flex;gap:6px;flex-wrap:wrap;max-height:160px;overflow:auto;margin-top:9px; }
 .topicList span { background:var(--background);padding:3px 8px;border-radius:4px;overflow-wrap:anywhere; }
-.contextReturn { color:var(--muted-foreground);font-size:11px;padding:6px;border-radius:4px; }
+.contextReturn { color:var(--muted-foreground);font-size:11px;padding:6px;border-radius:4px;white-space:nowrap;flex-shrink:0; }
 .contextReturn:hover { background:var(--muted);color:var(--foreground); }
 @media(max-width:760px) { .problemList span{display:inline;max-width:none}.brand{flex-wrap:wrap}.contextReturn{min-height:44px}.problemNavigation .tool{width:40px;height:44px}.metadataTag{min-height:36px}.problemHeading h1{font-size:24px}.topicPopover{width:min(230px,65vw)} }
 .shortcutHint { position:fixed;z-index:70;overflow:auto;border:1px solid var(--border);border-radius:7px;padding:16px 18px;background:var(--surface);color:var(--foreground);box-shadow:0 8px 28px oklch(0% 0 0 / .18); }

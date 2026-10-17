@@ -7,3 +7,14 @@ test('unknown current problem does not invent a previous/next position',()=>{con
 test('target version replaces current version and preserves assignment context',()=>{const url=new URL(navigationHref(list[1],{assignmentId:'assignment-1',returnTo:'/student/assignments/assignment-1',sourceLabel:'作业'}),'https://example.test');assert.equal(url.searchParams.get('versionId'),'v-b');assert.equal(url.searchParams.get('assignmentId'),'assignment-1');assert.equal(url.searchParams.get('returnTo'),'/student/assignments/assignment-1');assert.equal(url.searchParams.get('originalSubmissionId'),null);});
 test('timed context remains scoped while unsafe return destinations are discarded',()=>{const href=navigationHref(list[0],{timedPracticeId:'timed-1',returnTo:'//evil.test'});assert.ok(href.includes('timedPracticeId=timed-1'));assert.ok(!href.includes('returnTo'));});
 test('chapter practice navigation preserves course, chapter and pinned version',()=>{const url=new URL(navigationHref(list[1],{learningPathId:'course-1',chapterId:'chapter-2',returnTo:'/student/learning-paths/course-1/chapters/chapter-2'}),'https://example.test');assert.equal(url.searchParams.get('learningPathId'),'course-1');assert.equal(url.searchParams.get('chapterId'),'chapter-2');assert.equal(url.searchParams.get('versionId'),'v-b');assert.equal(url.searchParams.get('assignmentId'),null);});
+
+test('outside a library, forward enters its first accessible problem and never cycles paper questions',()=>{
+ const entry=problemNavigation(list,'',{enterFromOutside:true});
+ assert.equal(entry.previous,null);assert.deepEqual(entry.next,list[0]);
+ assert.equal(problemNavigation([], '', {enterFromOutside:true}).next,null);
+ assert.equal(problemNavigation(list,'c',{enterFromOutside:true}).next,null);
+ assert.equal(problemNavigation(list,'b',{enterFromOutside:true}).previous.problemId,'a');
+ const href=new URL(navigationHref(entry.next,{}),'https://example.test');
+ assert.equal(href.pathname,'/student/problems/a');assert.equal(href.searchParams.get('versionId'),'v-a');
+ assert.equal(href.searchParams.get('question'),null);assert.equal(href.searchParams.get('learningPathId'),null);
+});

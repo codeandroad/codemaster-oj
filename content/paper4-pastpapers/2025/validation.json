@@ -1,0 +1,594 @@
+{
+  "format": "paper4-authoring-validation-v1",
+  "validatedAt": "2026-10-16T15:54:37.813902+00:00",
+  "executionBoundary": "Existing isolated judge executor only; no reference/candidate Python in host, API or web. No database writes.",
+  "referenceAndBlankReports": [
+    {
+      "key": "9618_s25_41",
+      "sha256": "83b0e556849b9a199618eccefde84c7e33fa21b51a376ee181fe9453ef5d6c49",
+      "questions": [
+        {
+          "key": "Q1",
+          "cases": 6,
+          "passed": true,
+          "referenceStatus": "AC",
+          "failures": [],
+          "blankAcceptedStages": []
+        },
+        {
+          "key": "Q2",
+          "cases": 6,
+          "passed": true,
+          "referenceStatus": "AC",
+          "failures": [],
+          "blankAcceptedStages": []
+        },
+        {
+          "key": "Q3",
+          "cases": 10,
+          "passed": true,
+          "referenceStatus": "AC",
+          "failures": [],
+          "blankAcceptedStages": []
+        }
+      ],
+      "passed": true,
+      "validatedAt": "2026-10-16T15:52:51.765Z"
+    },
+    {
+      "key": "9618_s25_42",
+      "sha256": "3745ce178f188596c1aa9f7aa67d5acd6c49b0484c0cc78fe99fbde22111181f",
+      "questions": [
+        {
+          "key": "Q1",
+          "cases": 12,
+          "passed": true,
+          "referenceStatus": "AC",
+          "failures": [],
+          "blankAcceptedStages": []
+        },
+        {
+          "key": "Q2",
+          "cases": 9,
+          "passed": true,
+          "referenceStatus": "AC",
+          "failures": [],
+          "blankAcceptedStages": []
+        },
+        {
+          "key": "Q3",
+          "cases": 7,
+          "passed": true,
+          "referenceStatus": "AC",
+          "failures": [],
+          "blankAcceptedStages": []
+        }
+      ],
+      "passed": true,
+      "validatedAt": "2026-10-16T15:51:28.884Z"
+    },
+    {
+      "key": "9618_s25_43",
+      "sha256": "7e83e9e664effbb2206a4158d71e18dc52e0e12ef3bfcc57280e28728cc8fe6b",
+      "questions": [
+        {
+          "key": "Q1",
+          "cases": 9,
+          "passed": true,
+          "referenceStatus": "AC",
+          "failures": [],
+          "blankAcceptedStages": []
+        },
+        {
+          "key": "Q2",
+          "cases": 7,
+          "passed": true,
+          "referenceStatus": "AC",
+          "failures": [],
+          "blankAcceptedStages": []
+        },
+        {
+          "key": "Q3",
+          "cases": 7,
+          "passed": true,
+          "referenceStatus": "AC",
+          "failures": [],
+          "blankAcceptedStages": []
+        }
+      ],
+      "passed": true,
+      "validatedAt": "2026-10-16T15:51:28.885Z"
+    },
+    {
+      "key": "9618_w25_41",
+      "sha256": "e6104b807e55a72e952bec5988b6d746dee3c78e32ec2e0aa9c874c00e51bb28",
+      "questions": [
+        {
+          "key": "Q1",
+          "cases": 6,
+          "passed": true,
+          "referenceStatus": "AC",
+          "failures": [],
+          "blankAcceptedStages": []
+        },
+        {
+          "key": "Q2",
+          "cases": 8,
+          "passed": true,
+          "referenceStatus": "AC",
+          "failures": [],
+          "blankAcceptedStages": []
+        },
+        {
+          "key": "Q3",
+          "cases": 8,
+          "passed": true,
+          "referenceStatus": "AC",
+          "failures": [],
+          "blankAcceptedStages": []
+        }
+      ],
+      "passed": true,
+      "validatedAt": "2026-10-16T15:51:28.885Z"
+    },
+    {
+      "key": "9618_w25_42",
+      "sha256": "c1dede90d71b623c954b3a7b000a058613fd096bf01c6cd15707020107490bc3",
+      "questions": [
+        {
+          "key": "Q1",
+          "cases": 5,
+          "passed": true,
+          "referenceStatus": "AC",
+          "failures": [],
+          "blankAcceptedStages": []
+        },
+        {
+          "key": "Q2",
+          "cases": 9,
+          "passed": true,
+          "referenceStatus": "AC",
+          "failures": [],
+          "blankAcceptedStages": []
+        },
+        {
+          "key": "Q3",
+          "cases": 6,
+          "passed": true,
+          "referenceStatus": "AC",
+          "failures": [],
+          "blankAcceptedStages": []
+        }
+      ],
+      "passed": true,
+      "validatedAt": "2026-10-16T15:51:28.885Z"
+    },
+    {
+      "key": "9618_w25_43",
+      "sha256": "d7ec5496d621acf94a7763898e551371cb2b7ad8d28feb8d8e4b558e27309980",
+      "questions": [
+        {
+          "key": "Q1",
+          "cases": 11,
+          "passed": true,
+          "referenceStatus": "AC",
+          "failures": [],
+          "blankAcceptedStages": []
+        },
+        {
+          "key": "Q2",
+          "cases": 11,
+          "passed": true,
+          "referenceStatus": "AC",
+          "failures": [],
+          "blankAcceptedStages": []
+        },
+        {
+          "key": "Q3",
+          "cases": 7,
+          "passed": true,
+          "referenceStatus": "AC",
+          "failures": [],
+          "blankAcceptedStages": []
+        }
+      ],
+      "passed": true,
+      "validatedAt": "2026-10-16T15:51:28.885Z"
+    }
+  ],
+  "compatibilityReports": [
+    {
+      "paper": "9618_s25_42",
+      "question": "Q1",
+      "sha256": "3745ce178f188596c1aa9f7aa67d5acd6c49b0484c0cc78fe99fbde22111181f",
+      "kind": "unguarded",
+      "passed": true,
+      "status": "AC",
+      "cases": 12
+    },
+    {
+      "paper": "9618_s25_42",
+      "question": "Q1",
+      "sha256": "3745ce178f188596c1aa9f7aa67d5acd6c49b0484c0cc78fe99fbde22111181f",
+      "kind": "globals-after-definitions",
+      "passed": true,
+      "status": "AC",
+      "cases": 12
+    },
+    {
+      "paper": "9618_s25_42",
+      "question": "Q1",
+      "sha256": "3745ce178f188596c1aa9f7aa67d5acd6c49b0484c0cc78fe99fbde22111181f",
+      "kind": "empty-declarations",
+      "passed": true,
+      "status": "WA",
+      "cases": 12
+    },
+    {
+      "paper": "9618_s25_42",
+      "question": "Q2",
+      "sha256": "3745ce178f188596c1aa9f7aa67d5acd6c49b0484c0cc78fe99fbde22111181f",
+      "kind": "unguarded",
+      "passed": true,
+      "status": "AC",
+      "cases": 9
+    },
+    {
+      "paper": "9618_s25_42",
+      "question": "Q2",
+      "sha256": "3745ce178f188596c1aa9f7aa67d5acd6c49b0484c0cc78fe99fbde22111181f",
+      "kind": "empty-declarations",
+      "passed": true,
+      "status": "WA",
+      "cases": 9
+    },
+    {
+      "paper": "9618_s25_42",
+      "question": "Q3",
+      "sha256": "3745ce178f188596c1aa9f7aa67d5acd6c49b0484c0cc78fe99fbde22111181f",
+      "kind": "unguarded",
+      "passed": true,
+      "status": "AC",
+      "cases": 7
+    },
+    {
+      "paper": "9618_s25_42",
+      "question": "Q3",
+      "sha256": "3745ce178f188596c1aa9f7aa67d5acd6c49b0484c0cc78fe99fbde22111181f",
+      "kind": "empty-declarations",
+      "passed": true,
+      "status": "WA",
+      "cases": 7
+    },
+    {
+      "paper": "9618_s25_43",
+      "question": "Q1",
+      "sha256": "7e83e9e664effbb2206a4158d71e18dc52e0e12ef3bfcc57280e28728cc8fe6b",
+      "kind": "unguarded",
+      "passed": true,
+      "status": "AC",
+      "cases": 9
+    },
+    {
+      "paper": "9618_s25_43",
+      "question": "Q1",
+      "sha256": "7e83e9e664effbb2206a4158d71e18dc52e0e12ef3bfcc57280e28728cc8fe6b",
+      "kind": "globals-after-definitions",
+      "passed": true,
+      "status": "AC",
+      "cases": 9
+    },
+    {
+      "paper": "9618_s25_43",
+      "question": "Q1",
+      "sha256": "7e83e9e664effbb2206a4158d71e18dc52e0e12ef3bfcc57280e28728cc8fe6b",
+      "kind": "empty-declarations",
+      "passed": true,
+      "status": "WA",
+      "cases": 9
+    },
+    {
+      "paper": "9618_s25_43",
+      "question": "Q2",
+      "sha256": "7e83e9e664effbb2206a4158d71e18dc52e0e12ef3bfcc57280e28728cc8fe6b",
+      "kind": "unguarded",
+      "passed": true,
+      "status": "AC",
+      "cases": 7
+    },
+    {
+      "paper": "9618_s25_43",
+      "question": "Q2",
+      "sha256": "7e83e9e664effbb2206a4158d71e18dc52e0e12ef3bfcc57280e28728cc8fe6b",
+      "kind": "empty-declarations",
+      "passed": true,
+      "status": "WA",
+      "cases": 7
+    },
+    {
+      "paper": "9618_s25_43",
+      "question": "Q3",
+      "sha256": "7e83e9e664effbb2206a4158d71e18dc52e0e12ef3bfcc57280e28728cc8fe6b",
+      "kind": "unguarded",
+      "passed": true,
+      "status": "AC",
+      "cases": 7
+    },
+    {
+      "paper": "9618_s25_43",
+      "question": "Q3",
+      "sha256": "7e83e9e664effbb2206a4158d71e18dc52e0e12ef3bfcc57280e28728cc8fe6b",
+      "kind": "empty-declarations",
+      "passed": true,
+      "status": "WA",
+      "cases": 7
+    },
+    {
+      "paper": "9618_w25_41",
+      "question": "Q1",
+      "sha256": "e6104b807e55a72e952bec5988b6d746dee3c78e32ec2e0aa9c874c00e51bb28",
+      "kind": "unguarded",
+      "passed": true,
+      "status": "AC",
+      "cases": 6
+    },
+    {
+      "paper": "9618_w25_41",
+      "question": "Q1",
+      "sha256": "e6104b807e55a72e952bec5988b6d746dee3c78e32ec2e0aa9c874c00e51bb28",
+      "kind": "globals-after-definitions",
+      "passed": true,
+      "status": "AC",
+      "cases": 6
+    },
+    {
+      "paper": "9618_w25_41",
+      "question": "Q1",
+      "sha256": "e6104b807e55a72e952bec5988b6d746dee3c78e32ec2e0aa9c874c00e51bb28",
+      "kind": "empty-declarations",
+      "passed": true,
+      "status": "WA",
+      "cases": 6
+    },
+    {
+      "paper": "9618_w25_41",
+      "question": "Q2",
+      "sha256": "e6104b807e55a72e952bec5988b6d746dee3c78e32ec2e0aa9c874c00e51bb28",
+      "kind": "unguarded",
+      "passed": true,
+      "status": "AC",
+      "cases": 8
+    },
+    {
+      "paper": "9618_w25_41",
+      "question": "Q2",
+      "sha256": "e6104b807e55a72e952bec5988b6d746dee3c78e32ec2e0aa9c874c00e51bb28",
+      "kind": "empty-declarations",
+      "passed": true,
+      "status": "WA",
+      "cases": 8
+    },
+    {
+      "paper": "9618_w25_41",
+      "question": "Q3",
+      "sha256": "e6104b807e55a72e952bec5988b6d746dee3c78e32ec2e0aa9c874c00e51bb28",
+      "kind": "unguarded",
+      "passed": true,
+      "status": "AC",
+      "cases": 8
+    },
+    {
+      "paper": "9618_w25_41",
+      "question": "Q3",
+      "sha256": "e6104b807e55a72e952bec5988b6d746dee3c78e32ec2e0aa9c874c00e51bb28",
+      "kind": "empty-declarations",
+      "passed": true,
+      "status": "WA",
+      "cases": 8
+    },
+    {
+      "paper": "9618_w25_42",
+      "question": "Q1",
+      "sha256": "c1dede90d71b623c954b3a7b000a058613fd096bf01c6cd15707020107490bc3",
+      "kind": "unguarded",
+      "passed": true,
+      "status": "AC",
+      "cases": 5
+    },
+    {
+      "paper": "9618_w25_42",
+      "question": "Q1",
+      "sha256": "c1dede90d71b623c954b3a7b000a058613fd096bf01c6cd15707020107490bc3",
+      "kind": "empty-declarations",
+      "passed": true,
+      "status": "WA",
+      "cases": 5
+    },
+    {
+      "paper": "9618_w25_42",
+      "question": "Q2",
+      "sha256": "c1dede90d71b623c954b3a7b000a058613fd096bf01c6cd15707020107490bc3",
+      "kind": "unguarded",
+      "passed": true,
+      "status": "AC",
+      "cases": 9
+    },
+    {
+      "paper": "9618_w25_42",
+      "question": "Q2",
+      "sha256": "c1dede90d71b623c954b3a7b000a058613fd096bf01c6cd15707020107490bc3",
+      "kind": "empty-declarations",
+      "passed": true,
+      "status": "WA",
+      "cases": 9
+    },
+    {
+      "paper": "9618_w25_42",
+      "question": "Q3",
+      "sha256": "c1dede90d71b623c954b3a7b000a058613fd096bf01c6cd15707020107490bc3",
+      "kind": "unguarded",
+      "passed": true,
+      "status": "AC",
+      "cases": 6
+    },
+    {
+      "paper": "9618_w25_42",
+      "question": "Q3",
+      "sha256": "c1dede90d71b623c954b3a7b000a058613fd096bf01c6cd15707020107490bc3",
+      "kind": "globals-after-definitions",
+      "passed": true,
+      "status": "AC",
+      "cases": 6
+    },
+    {
+      "paper": "9618_w25_42",
+      "question": "Q3",
+      "sha256": "c1dede90d71b623c954b3a7b000a058613fd096bf01c6cd15707020107490bc3",
+      "kind": "empty-declarations",
+      "passed": true,
+      "status": "WA",
+      "cases": 6
+    },
+    {
+      "paper": "9618_w25_43",
+      "question": "Q1",
+      "sha256": "d7ec5496d621acf94a7763898e551371cb2b7ad8d28feb8d8e4b558e27309980",
+      "kind": "unguarded",
+      "passed": true,
+      "status": "AC",
+      "cases": 11
+    },
+    {
+      "paper": "9618_w25_43",
+      "question": "Q1",
+      "sha256": "d7ec5496d621acf94a7763898e551371cb2b7ad8d28feb8d8e4b558e27309980",
+      "kind": "empty-declarations",
+      "passed": true,
+      "status": "WA",
+      "cases": 11
+    },
+    {
+      "paper": "9618_w25_43",
+      "question": "Q2",
+      "sha256": "d7ec5496d621acf94a7763898e551371cb2b7ad8d28feb8d8e4b558e27309980",
+      "kind": "unguarded",
+      "passed": true,
+      "status": "AC",
+      "cases": 11
+    },
+    {
+      "paper": "9618_w25_43",
+      "question": "Q2",
+      "sha256": "d7ec5496d621acf94a7763898e551371cb2b7ad8d28feb8d8e4b558e27309980",
+      "kind": "globals-after-definitions",
+      "passed": true,
+      "status": "AC",
+      "cases": 11
+    },
+    {
+      "paper": "9618_w25_43",
+      "question": "Q2",
+      "sha256": "d7ec5496d621acf94a7763898e551371cb2b7ad8d28feb8d8e4b558e27309980",
+      "kind": "empty-declarations",
+      "passed": true,
+      "status": "WA",
+      "cases": 11
+    },
+    {
+      "paper": "9618_w25_43",
+      "question": "Q3",
+      "sha256": "d7ec5496d621acf94a7763898e551371cb2b7ad8d28feb8d8e4b558e27309980",
+      "kind": "unguarded",
+      "passed": true,
+      "status": "AC",
+      "cases": 7
+    },
+    {
+      "paper": "9618_w25_43",
+      "question": "Q3",
+      "sha256": "d7ec5496d621acf94a7763898e551371cb2b7ad8d28feb8d8e4b558e27309980",
+      "kind": "empty-declarations",
+      "passed": true,
+      "status": "WA",
+      "cases": 7
+    },
+    {
+      "paper": "9618_s25_41",
+      "question": "Q1",
+      "sha256": "83b0e556849b9a199618eccefde84c7e33fa21b51a376ee181fe9453ef5d6c49",
+      "kind": "unguarded",
+      "passed": true,
+      "status": "AC",
+      "cases": 6
+    },
+    {
+      "paper": "9618_s25_41",
+      "question": "Q1",
+      "sha256": "83b0e556849b9a199618eccefde84c7e33fa21b51a376ee181fe9453ef5d6c49",
+      "kind": "globals-after-definitions",
+      "passed": true,
+      "status": "AC",
+      "cases": 6
+    },
+    {
+      "paper": "9618_s25_41",
+      "question": "Q1",
+      "sha256": "83b0e556849b9a199618eccefde84c7e33fa21b51a376ee181fe9453ef5d6c49",
+      "kind": "empty-declarations",
+      "passed": true,
+      "status": "WA",
+      "cases": 6
+    },
+    {
+      "paper": "9618_s25_41",
+      "question": "Q2",
+      "sha256": "83b0e556849b9a199618eccefde84c7e33fa21b51a376ee181fe9453ef5d6c49",
+      "kind": "unguarded",
+      "passed": true,
+      "status": "AC",
+      "cases": 6
+    },
+    {
+      "paper": "9618_s25_41",
+      "question": "Q2",
+      "sha256": "83b0e556849b9a199618eccefde84c7e33fa21b51a376ee181fe9453ef5d6c49",
+      "kind": "empty-declarations",
+      "passed": true,
+      "status": "WA",
+      "cases": 6
+    },
+    {
+      "paper": "9618_s25_41",
+      "question": "Q3",
+      "sha256": "83b0e556849b9a199618eccefde84c7e33fa21b51a376ee181fe9453ef5d6c49",
+      "kind": "unguarded",
+      "passed": true,
+      "status": "AC",
+      "cases": 10
+    },
+    {
+      "paper": "9618_s25_41",
+      "question": "Q3",
+      "sha256": "83b0e556849b9a199618eccefde84c7e33fa21b51a376ee181fe9453ef5d6c49",
+      "kind": "empty-declarations",
+      "passed": true,
+      "status": "WA",
+      "cases": 10
+    },
+    {
+      "paper": "9618_s25_41",
+      "question": "Q3",
+      "sha256": "83b0e556849b9a199618eccefde84c7e33fa21b51a376ee181fe9453ef5d6c49",
+      "kind": "private-fields",
+      "passed": true,
+      "status": "AC",
+      "cases": 10
+    }
+  ],
+  "notes": [
+    "All current manifest SHA-256 values match the isolated validation reports.",
+    "Reference programs pass every automatic case. Blank and empty-declaration controls fail every complete automatic stage.",
+    "Correct programs without a main guard and with relocated global declarations remain accepted.",
+    "The2025 Paper41 Node/Tree implementation with private fields also passes all10 automatic cases."
+  ]
+}

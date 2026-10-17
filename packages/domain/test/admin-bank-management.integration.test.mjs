@@ -117,9 +117,8 @@ test('admin bank management covers private banks, safe problem archiving and rev
    assert.equal((await request(`/problems/${schoolProblem}?versionId=${version}`,'GET',undefined,teacher)).status,404,'unassigned teacher cannot read archived private history');
    await pool.query('INSERT INTO teacher_classes(class_id,account_id) VALUES($1,$2)',[classId,teacher.data.user.id]);
    const assignedTeacher=await request(`/problems/${schoolProblem}?versionId=${version}`,'GET',undefined,teacher);
-   assert.equal(assignedTeacher.status,200,'class teacher can read archived assignment or practice version');
-   assert.equal(assignedTeacher.data.referenceCode,undefined,'class teacher does not gain reference solution through historical access');
-   assert.equal((await request(`/problems/${timedOnlyProblem}?versionId=${timedOnlyVersion}`,'GET',undefined,teacher)).status,200,'class teacher can inspect archived timed-only fixed version');
+   assert.equal(assignedTeacher.status,404,'class membership alone cannot grant another activity owner’s private pinned versions');
+   assert.equal((await request(`/problems/${timedOnlyProblem}?versionId=${timedOnlyVersion}`,'GET',undefined,teacher)).status,404,'a class co-teacher cannot inspect another owner’s timed-only fixed version');
    assert.equal((await request(`/problems/${timedOnlyProblem}?versionId=${timedOnlyVersion}`,'GET',undefined,timedStudent)).status,404,'timed-only version stays hidden before release');
    await pool.query('UPDATE timed_practices SET results_published_at=now() WHERE id=$1',[practice]);
    const releasedTimed=await request(`/problems/${schoolProblem}?versionId=${version}`,'GET',undefined,timedStudent);

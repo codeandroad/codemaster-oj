@@ -4,9 +4,9 @@ export interface Paper4ExportEnvelope {
   contentBase64: string;
 }
 
-export function paper4ExportFilename(filename: string): string {
-  const stem = filename.replace(/\.json$/i, "").replace(/[\\/:*?"<>|\x00-\x1f\x7f]/g, "-").replace(/^\.+/, "").trim().slice(0, 120);
-  return `${stem || "paper4-export"}.json`;
+export function paper4ExportFilename(filename: string, extension: "json" | "zip" = "json"): string {
+  const stem = filename.replace(/\.(?:json|zip)$/i, "").replace(/[\\/:*?"<>|\x00-\x1f\x7f]/g, "-").replace(/^\.+/, "").trim().slice(0, 120);
+  return `${stem || "paper4-export"}.${extension}`;
 }
 
 export function paper4ExportBytes(contentBase64: string): Uint8Array<ArrayBuffer> {
@@ -17,12 +17,13 @@ export function paper4ExportBytes(contentBase64: string): Uint8Array<ArrayBuffer
 }
 
 export function downloadPaper4Export(envelope: Paper4ExportEnvelope): void {
-  if (envelope.contentType !== "application/json") throw new Error("Unexpected Paper 4 export format.");
-  const blob = new Blob([paper4ExportBytes(envelope.contentBase64)], { type: "application/json" });
+  if (!["application/json", "application/zip"].includes(envelope.contentType)) throw new Error("Unexpected Paper 4 export format.");
+  const extension = envelope.contentType === "application/zip" ? "zip" : "json";
+  const blob = new Blob([paper4ExportBytes(envelope.contentBase64)], { type: envelope.contentType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = paper4ExportFilename(envelope.filename);
+  link.download = paper4ExportFilename(envelope.filename, extension);
   document.body.appendChild(link);
   link.click();
   link.remove();

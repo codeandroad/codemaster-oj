@@ -1,0 +1,916 @@
+{
+  "format": "codemaster-paper4-collection",
+  "version": 1,
+  "description": "Teacher materials. Each paper JSON is imported separately; this catalog is not an import manifest.",
+  "sourceArchive": "paper4.zip",
+  "draftOnly": true,
+  "missingPapers": [
+    "9618_w21_43"
+  ],
+  "syntheticData": {
+    "9618_s26_41": [
+      "Toys.txt"
+    ],
+    "9618_s26_42": [
+      "AvatarFile.txt"
+    ],
+    "9618_s26_43": [
+      "Characters.txt"
+    ]
+  },
+  "papers": [
+    {
+      "key": "9618_s21_41",
+      "year": 2021,
+      "session": "summer",
+      "variant": 41,
+      "path": "2021/9618_s21_41.json",
+      "sha256": "66785cb9b8a48f69f1d310dbc22190260a4fb47a70418cef76edd667f7a284ad",
+      "title": "9618 Paper 4 · May/June 2021 · Paper 41",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 10,
+        "manual": 5,
+        "evidence": 4
+      },
+      "cases": 22,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "sf": "b333e4f59362a65cfa671b802fc3642e1918c1cb4798f3cc3f6f34910c265c98",
+        "qp": "3ce3201d19c9147b6960a55de792c06494f4f7b97ac67852d5b6cdc3caf5f3fe",
+        "ms": "a17356cf7b84c3bc0eef9cd2f87873f7a35d16704be7ec4802a5d8a501fe2c1e"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 22,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_s21_42",
+      "year": 2021,
+      "session": "summer",
+      "variant": 42,
+      "path": "2021/9618_s21_42.json",
+      "sha256": "5cc0dd742874ffb0693c2b0ab7464079600ca35356c6c11f0ec4dd055cfd7c09",
+      "title": "9618 Paper 4 · May/June 2021 · Paper 42",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 10,
+        "manual": 5,
+        "evidence": 4
+      },
+      "cases": 22,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "sf": "c021bbe55cc6d00ac29b929da119ba9fae6a464d1e67c88a10cf25666ce2190a",
+        "qp": "1076baff06141542ace8b4aebd647e17d8c1115c10bc1462e36acbb48215e356",
+        "ms": "b66575798435f35ec6d0dd5a80df6d0952470f90ca47582b99a78b73178b85db"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 22,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_s21_43",
+      "year": 2021,
+      "session": "summer",
+      "variant": 43,
+      "path": "2021/9618_s21_43.json",
+      "sha256": "fb99831e796b0688e414aa4065068d35597de2f60622eee8e6afda8d0957ec3a",
+      "title": "9618 Paper 4 · May/June 2021 · Paper 43",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 10,
+        "manual": 5,
+        "evidence": 4
+      },
+      "cases": 22,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "sf": "7e3364f8554fc3a941ff7fa165533d7d3b5a37e618cd707adcedc4595143f07e",
+        "qp": "3b6d4cba62aed1aef8ba6ad69c8bf90f31be5a760c1d9af53c9866c61ff7a9a3",
+        "ms": "fbc3be2699a9a33a4241cf35c3f69fa921b064206dfe4ad3be2d1d0e5cc3fd0a"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 22,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_w21_41",
+      "year": 2021,
+      "session": "autumn",
+      "variant": 41,
+      "path": "2021/9618_w21_41.json",
+      "sha256": "99052e2e0818fec769e69f4295759f2ef5dd081c6aa3284e70c323cf65127f95",
+      "title": "9618 Paper 4 · October/November 2021 · Paper 41",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 12,
+        "manual": 4,
+        "evidence": 5
+      },
+      "cases": 22,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "qp": "cdcc1cc5e36b3a597824c7410e77ba2d91a2619f8e51968fa9966dd85c7a8b8f",
+        "sf": "159a93f7fde66db5f83144e7de3080ef003ca82b6f3cc2e1ec3cabb924194abe",
+        "ms": "f95f8e857df8a51e9fffe6f9011ac74ce446eb243084580db30b8deff0ea37ec"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 22,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_w21_42",
+      "year": 2021,
+      "session": "autumn",
+      "variant": 42,
+      "path": "2021/9618_w21_42.json",
+      "sha256": "6d0394707d9625386f373bf91a090cde3e8172b8f17a30c242e0f47f1169d0fc",
+      "title": "9618 Paper 4 · October/November 2021 · Paper 42",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 12,
+        "manual": 4,
+        "evidence": 5
+      },
+      "cases": 22,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "qp": "2a9591d200d84f008c6a598097eac4e682582c28111e6b9b961b069a7f754f18",
+        "sf": "e71769b8b8c4e1706d24f3fa4a86b1ab06f32432af24a2397e7c92a8136be2e3",
+        "ms": "c22f23e2aa64a4e05480e879716361cb6e4d2e7f5c700d3c1eb9179fe3306adb"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 22,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_s22_41",
+      "year": 2022,
+      "session": "summer",
+      "variant": 41,
+      "path": "2022/9618_s22_41.json",
+      "sha256": "d9b5d6d81f0028d3aa3ca8a19e611409ec90110aef88d21f706d7f7eb7e73501",
+      "title": "9618 Paper 4 · May/June 2022 · Paper 41",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 12,
+        "manual": 7,
+        "evidence": 4
+      },
+      "cases": 23,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "qp": "baf6c7a8e6486e9ff36e01e61bc304d6b50c4114849b7bc44923b4bfdbf13cf1",
+        "sf": "024437bc2e74cb6f81f023aa85fa637c9f4665b9da6bccdff6eb7cfe46c25ec5",
+        "ms": "203cc5900d90e14ce40e48b2d9943d762a5d2ae25c8f38c51221ed27bc8cceb6"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 23,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_s22_42",
+      "year": 2022,
+      "session": "summer",
+      "variant": 42,
+      "path": "2022/9618_s22_42.json",
+      "sha256": "4fa949a7e45ce0278f149e9007f04f651c01249d9aea8b96b480336d2ce5e43d",
+      "title": "9618 Paper 4 · May/June 2022 · Paper 42",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 9,
+        "manual": 5,
+        "evidence": 5
+      },
+      "cases": 18,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "qp": "9d7790c2e8959263cf2398072667b4225d513a4b8fe5510417cb45b2e2150a28",
+        "sf": "5be87f3544f973cf9de7b62d68972cd64ac8a34ffa83192993a56203ab77a592",
+        "ms": "01849b7c07a31e084c3c6865f48b9645d3fe2e308caa4513019028171804f2da"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 18,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_s22_43",
+      "year": 2022,
+      "session": "summer",
+      "variant": 43,
+      "path": "2022/9618_s22_43.json",
+      "sha256": "1f6ca2a7bea17f18cd631fad9a77b864bc75cb6d78e82e225f805dc71c041ae5",
+      "title": "9618 Paper 4 · May/June 2022 · Paper 43",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 12,
+        "manual": 7,
+        "evidence": 4
+      },
+      "cases": 23,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "qp": "5da5d6afbba5723215d36bccc5cb3954de7eee106f6318451f5970928ce532c4",
+        "sf": "6b7c2a416d3aa145f565d324cb5bde0bd894b4df2b7c11fea9a54e2ef2005923",
+        "ms": "8657713e1d251af7670697cf2bdcebd5187ba4a02fec76211e74c9c76e50512e"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 23,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_w22_41",
+      "year": 2022,
+      "session": "autumn",
+      "variant": 41,
+      "path": "2022/9618_w22_41.json",
+      "sha256": "6da6be7ad194b0250601b0753e3315cd8fc6124a4d5233b680b68671d4f1e516",
+      "title": "9618 Paper 4 · October/November 2022 · Paper 41",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 9,
+        "manual": 9,
+        "evidence": 3
+      },
+      "cases": 19,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "sf": "4886942c8ecb6150f5f150b4d7407e0d8dd9825a1ccbfad7056a0db012abf2c8",
+        "qp": "9d89d836ed79f2a1714c3c035a8d3a8059b881c79bf2e4eb0dd7437623850746",
+        "ms": "e6744b0f8fddc70675759a88541928d22ea90464c813c7b035164da3889da147"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 19,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_w22_42",
+      "year": 2022,
+      "session": "autumn",
+      "variant": 42,
+      "path": "2022/9618_w22_42.json",
+      "sha256": "c87c680afcf8a3d2332685022e1816dc9e1b0c43998e48f328e8713167c33f40",
+      "title": "9618 Paper 4 · October/November 2022 · Paper 42",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 16,
+        "manual": 3,
+        "evidence": 3
+      },
+      "cases": 30,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "sf": "340e5fd72a755fe4836c4fedc0e53bdf41d59c1ec30a1645109f9098671a1aee",
+        "qp": "7ca7d31200f532d32165f1a60fc40774a51a1535def0f82d55bfeffee407ad8c",
+        "ms": "bcb575f9f9cf16cbcbd4b1f21cfbea1845e4df7cb404f7710695ecebbd77ea4e"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 30,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_w22_43",
+      "year": 2022,
+      "session": "autumn",
+      "variant": 43,
+      "path": "2022/9618_w22_43.json",
+      "sha256": "558a8d64dc2c59cae09f15171acb0a5735b569ef85eba042381f1322942c7a28",
+      "title": "9618 Paper 4 · October/November 2022 · Paper 43",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 9,
+        "manual": 9,
+        "evidence": 3
+      },
+      "cases": 19,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "sf": "7eb332aee4b5bf8775fb799637eeb67ceecee17c38e73074ad01a403f0339bfc",
+        "qp": "d203f2335ff47abf35b564c64ac166189e9d51aceb646fe54bbb39199cf2348e",
+        "ms": "842907be72a3721bcbb3cb2ee0c1f07b1ac11129bb80ff98e41f3da54e885ff6"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 19,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_s23_41",
+      "year": 2023,
+      "session": "summer",
+      "variant": 41,
+      "path": "2023/9618_s23_41.json",
+      "sha256": "9ee417c9e1038cec7583d8d649e8772721f87fac78c1bd6ac5ea0e803899ae83",
+      "title": "9618 Paper 4 · May/June 2023 · Paper 41",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 10,
+        "manual": 12,
+        "evidence": 4
+      },
+      "cases": 24,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "qp": "44dd77e6e14a4189d61d5b4c21917b0f79b21f9a8999c6e6219c40e7785807cd",
+        "sf": "9c8419cda1f9b0a19408824e774f66808bf92538ae25d4797f3736cfd3da1730",
+        "ms": "3ffc9e38590a391a00768c5852ebe94f9d0e980ca38990bc32ce3b03331e1014"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 24,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_s23_42",
+      "year": 2023,
+      "session": "summer",
+      "variant": 42,
+      "path": "2023/9618_s23_42.json",
+      "sha256": "c668a458b8c84d60da20de2bdda909ef04e0e90a1506f1eeeed081b60f8492cd",
+      "title": "9618 Paper 4 · May/June 2023 · Paper 42",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 8,
+        "manual": 11,
+        "evidence": 3
+      },
+      "cases": 20,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "qp": "171cd998f187c6abf16da41ab3b32a174c3bf094e9fddc6ccd3372362981df40",
+        "sf": "05d0d3cef2f086d0c780091424989848044c53e55641c96b4ff2450b754e6afb",
+        "ms": "f398e772f129c91e740db9f03f321536248e86b73e147c3da1d6cb79bf1a211d"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 20,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_s23_43",
+      "year": 2023,
+      "session": "summer",
+      "variant": 43,
+      "path": "2023/9618_s23_43.json",
+      "sha256": "c8f1aff1f7770e428db41cae073cb28c37fd3471f6d1b9dca96a5e7206183636",
+      "title": "9618 Paper 4 · May/June 2023 · Paper 43",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 10,
+        "manual": 12,
+        "evidence": 4
+      },
+      "cases": 24,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "qp": "609cadb80084f87daa10c333921c29fe6e8f768d86a55acff936fdd90cbad12c",
+        "sf": "c1288d76fcc783c9a01f36645cc803a957a0da6a5007e8c82badc514a422df46",
+        "ms": "31d11e334df2a3a5654b1d7eb631c990614fe25de792782c575bc452c5606948"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 24,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_w23_41",
+      "year": 2023,
+      "session": "autumn",
+      "variant": 41,
+      "path": "2023/9618_w23_41.json",
+      "sha256": "68c09357e5593958db50115d358950183b6714033eeb1ef83b9170cdd3748bde",
+      "title": "9618 Paper 4 · October/November 2023 · Paper 41",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 11,
+        "manual": 11,
+        "evidence": 4
+      },
+      "cases": 25,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "sf": "bc2b80f3e06c359e14553390ff7125488915566eebd2d4b8c6813fb7ad637754",
+        "qp": "0a4fe7dda1802ed15f4181bc00334e2ababacc86f5201e6fb134ad8e597dea54",
+        "ms": "69d4bbeaa764394bf74f8d38ef718edad2784d897fe8ceefa140b378df9ec1a3"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 25,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_w23_42",
+      "year": 2023,
+      "session": "autumn",
+      "variant": 42,
+      "path": "2023/9618_w23_42.json",
+      "sha256": "43a70c7726b1c3c63591c3f015b2836c2364cf5449c26472a3446fdda96eaf7a",
+      "title": "9618 Paper 4 · October/November 2023 · Paper 42",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 9,
+        "manual": 12,
+        "evidence": 5
+      },
+      "cases": 21,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "sf": "60e30a8ca8ca7ca2cc481caa341287ed67c85d5b551033faa2af6797cd677067",
+        "qp": "001ea14f27009c08be7f467f60fd6574bcd1fff3e4e2e2cd90c6ed7c8b46a3da",
+        "ms": "3b02e55e7e923777a0d55862e721c481719e0cc3aea4890b51dd49d8868063b0"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 21,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_w23_43",
+      "year": 2023,
+      "session": "autumn",
+      "variant": 43,
+      "path": "2023/9618_w23_43.json",
+      "sha256": "4bf2484fa2954aed0ea4c504b10e0c5bd6e053c84413bed7fbd68ad49d47ff0b",
+      "title": "9618 Paper 4 · October/November 2023 · Paper 43",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 11,
+        "manual": 11,
+        "evidence": 4
+      },
+      "cases": 25,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "sf": "c1157527dce4fc1ee3005ee7592ccf5936f8dbc2127b2eb9f808facb40b43417",
+        "qp": "e5cc991f99cd5163b942ccaa776f34d91a12f103bb45642f4c301407c617852f",
+        "ms": "10deab183778ecd27e3442d9dc98bc98096e10d1240e8bd6d214593509e57b51"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 25,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_s24_41",
+      "year": 2024,
+      "session": "summer",
+      "variant": 41,
+      "path": "2024/9618_s24_41.json",
+      "sha256": "e8c12e9914fb23dba4d14976a552a8e48a946a262a03c259327c008ae198fb4b",
+      "title": "9618 Paper 4 · May/June 2024 · Paper 41",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 9,
+        "manual": 10,
+        "evidence": 6
+      },
+      "cases": 21,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "qp": "e96ebfa553a7960fc510be38f2f0aeaacc5031c18d8bd7ea1d0712eb58f8dfc3",
+        "sf": "b3caf326f99de8325e708428bc10dac211aff04f2a1f7f8f7d1adc7fdc620beb",
+        "ms": "5bbcb30c30d13ab20970a4ae4f8e7f0bcf79faa6fc00f8f770530b6aa4c0ce26"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 21,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_s24_42",
+      "year": 2024,
+      "session": "summer",
+      "variant": 42,
+      "path": "2024/9618_s24_42.json",
+      "sha256": "1db0d03f0bce90df414d0198ac738f5166ec322cd749baaca494859e269103a6",
+      "title": "9618 Paper 4 · May/June 2024 · Paper 42",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 9,
+        "manual": 11,
+        "evidence": 6
+      },
+      "cases": 21,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "qp": "a0e625893eecdbb50535abcca92ced97d47cfa9beed02fa0bf6af186c7a0252b",
+        "sf": "e2cfbd0f0389fc680181bcb5c6414c33fa278c0751a2a9e4a261ea0ad58276c2",
+        "ms": "09c2788dcdf20692d0036e927fd872be886bbe8e7081ee1fe6c2a36c02f9f679"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 21,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_s24_43",
+      "year": 2024,
+      "session": "summer",
+      "variant": 43,
+      "path": "2024/9618_s24_43.json",
+      "sha256": "417f5a23b1e06af4045918ff95664c94a3225c70c41fa3277a6f4018403be7e0",
+      "title": "9618 Paper 4 · May/June 2024 · Paper 43",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 9,
+        "manual": 10,
+        "evidence": 6
+      },
+      "cases": 21,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "qp": "061fd266afa5182043d630b5aab69d097e5f0a99a843814a6657156c588ca65c",
+        "sf": "2acaa6bb39181a7e7883d961b24b83cddbb7a37658bc8bd920dcf6966f36f87a",
+        "ms": "4b4e81807b63fb817851446ef723126919faba3fc390e1636f2176d9c6486808"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 21,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_w24_41",
+      "year": 2024,
+      "session": "autumn",
+      "variant": 41,
+      "path": "2024/9618_w24_41.json",
+      "sha256": "5ab77d8a5de8d39b6decab039c3c8b4426555bffdb36ba0108b2065c7fd8d58e",
+      "title": "9618 Paper 4 · October/November 2024 · Paper 41",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 10,
+        "manual": 10,
+        "evidence": 6
+      },
+      "cases": 24,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "sf": "31f0f67245ea4b4fe5feb4195c573ed3c0c00a7cbba1cea748a0a8775a08a699",
+        "qp": "2c91c43abd658b2b985cf2063909faa0873b7ae1f11596233662f4702a2b01c7",
+        "ms": "efa60c884ce1ce9383de3c03214eb43bd001e7bfbeb03ff3dc9550e22b027e5d"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 24,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_w24_42",
+      "year": 2024,
+      "session": "autumn",
+      "variant": 42,
+      "path": "2024/9618_w24_42.json",
+      "sha256": "5b80ad411d4166e2bdb81aa565b05f36c188ee28063fe2a0315beb6a7a1daa60",
+      "title": "9618 Paper 4 · October/November 2024 · Paper 42",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 8,
+        "manual": 12,
+        "evidence": 4
+      },
+      "cases": 19,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "sf": "a028b4e88d53914fc964debcfd5c2db4c51b050395022f21c48e38498f7ef9d3",
+        "qp": "714d785ed06744a0fdb69c0a33488cfd9a6ad6fe9ae7a8ad9d7d4da54bb76480",
+        "ms": "f0048b6d46754e49d4ad24b7820b6e9372b581b96c98066a6858ab814316d425"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 19,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_w24_43",
+      "year": 2024,
+      "session": "autumn",
+      "variant": 43,
+      "path": "2024/9618_w24_43.json",
+      "sha256": "ba7038adcc1abbad54d34cf38482c8df3a69105513d94a8373a3e6d180fc9a73",
+      "title": "9618 Paper 4 · October/November 2024 · Paper 43",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 10,
+        "manual": 10,
+        "evidence": 6
+      },
+      "cases": 24,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "sf": "b15d266d64be18ea973c7f29c6b6e93112f24ab2dc1dcb4e0a75513776a28d2f",
+        "qp": "fed8c938aee2777c070b94bfeb0e47976d5ccdb58b8f38c91baf1ae29a992e5a",
+        "ms": "6b537ad9349887a3654d2beb41631ad5ac8f1ec4834838cfeefe22dfb2411cb8"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 24,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_s25_41",
+      "year": 2025,
+      "session": "summer",
+      "variant": 41,
+      "path": "2025/9618_s25_41.json",
+      "sha256": "83b0e556849b9a199618eccefde84c7e33fa21b51a376ee181fe9453ef5d6c49",
+      "title": "9618 Paper 4 · May/June 2025 · Paper 41",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 17,
+        "manual": 2,
+        "evidence": 3
+      },
+      "cases": 22,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "qp": "bb3f54d2e359b707caafdd90be899cadac2bcb19889b6478fb8631a6921c5c68",
+        "sf": "ebf10562b3585cec3cdcb8557fc13c78a25535aa7ea06121848ffdb81644a481",
+        "ms": "6736744388fcec3c311d8d428197c2f7646c018cfe65404c7e08ff8546f47498"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 22,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_s25_42",
+      "year": 2025,
+      "session": "summer",
+      "variant": 42,
+      "path": "2025/9618_s25_42.json",
+      "sha256": "3745ce178f188596c1aa9f7aa67d5acd6c49b0484c0cc78fe99fbde22111181f",
+      "title": "9618 Paper 4 · May/June 2025 · Paper 42",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 15,
+        "manual": 7,
+        "evidence": 3
+      },
+      "cases": 28,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "qp": "bf1d0c138dd661eb307a1774053728b080548cdc9e817ed3d26a42d0f0d19f84",
+        "sf": "fc395c3ecd93d24048d06230e7e4ee3f8d2fa0f53b2e2cd12bc2df2afa0afb7e",
+        "ms": "25658284fa546f9c00abce84c55a1978bdac1c2c995da6f1110ba1a8172b86e0"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 28,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_s25_43",
+      "year": 2025,
+      "session": "summer",
+      "variant": 43,
+      "path": "2025/9618_s25_43.json",
+      "sha256": "7e83e9e664effbb2206a4158d71e18dc52e0e12ef3bfcc57280e28728cc8fe6b",
+      "title": "9618 Paper 4 · May/June 2025 · Paper 43",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 14,
+        "manual": 5,
+        "evidence": 4
+      },
+      "cases": 23,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "qp": "21f1a713008edb1e4cd06242c942b02426deb9755e0c100b30774357f117f81e",
+        "sf": "82b70a662ef520676114fb74f0bedd68497853e77ed3b37feef7a4331d0ce9ae",
+        "ms": "f73823e54cd08b45d4533cc46c07b6ba8c6ffb26d9abd01ee0beae6b0839eba9"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 23,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_w25_41",
+      "year": 2025,
+      "session": "autumn",
+      "variant": 41,
+      "path": "2025/9618_w25_41.json",
+      "sha256": "e6104b807e55a72e952bec5988b6d746dee3c78e32ec2e0aa9c874c00e51bb28",
+      "title": "9618 Paper 4 · October/November 2025 · Paper 41",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 12,
+        "manual": 9,
+        "evidence": 3
+      },
+      "cases": 22,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "sf": "822a48f31970cf3df6d484e98ab0b2b0cd915777412c73a51acc7bad5d2a6119",
+        "qp": "9f116bcca315c075d1012b37e4eadb909b485853898b08ad32c21cecdac4145b",
+        "ms": "1357b41babe7024a603d8c42a4b7298e42dc21baf100b168c22409b696bb3526"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 22,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_w25_42",
+      "year": 2025,
+      "session": "autumn",
+      "variant": 42,
+      "path": "2025/9618_w25_42.json",
+      "sha256": "c1dede90d71b623c954b3a7b000a058613fd096bf01c6cd15707020107490bc3",
+      "title": "9618 Paper 4 · October/November 2025 · Paper 42",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 12,
+        "manual": 5,
+        "evidence": 4
+      },
+      "cases": 20,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "sf": "f30a6947ae34b3078131036387e8c34ee4e15700183a3d15988f88f4827ead21",
+        "qp": "42bae8891b7d9269f16fbf6630828b760ac1c585230e99040c88019d95f60a66",
+        "ms": "5bfdaabc0844334ff8b1109a3347e1b26b7ba632e43f2de31b6afec2f148d2ab"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 20,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_w25_43",
+      "year": 2025,
+      "session": "autumn",
+      "variant": 43,
+      "path": "2025/9618_w25_43.json",
+      "sha256": "d7ec5496d621acf94a7763898e551371cb2b7ad8d28feb8d8e4b558e27309980",
+      "title": "9618 Paper 4 · October/November 2025 · Paper 43",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 15,
+        "manual": 5,
+        "evidence": 5
+      },
+      "cases": 29,
+      "candidateData": "original-supplied-text-files",
+      "sourceChecksums": {
+        "sf": "83cca7ac371e7b135ed0ce6bd1992128436e8088af724986aa769746fdfc4656",
+        "qp": "58c20a3d8f887d80293640868f86470f1d5a10f0e5ce42da4f05a54464c79d2d",
+        "ms": "18afbd54b5996ee5e98d1e77f8389950beda55f31df73043e9360658e8ef87c8"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 29,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_s26_41",
+      "year": 2026,
+      "session": "summer",
+      "variant": 41,
+      "path": "2026/9618_s26_41.json",
+      "sha256": "2526072d3734bcacf763db93b9a7efdd6d0185a146e463a54fbc96d29409c42b",
+      "title": "9618 Paper 4 · May/June 2026 · Paper 41",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 10,
+        "manual": 8,
+        "evidence": 5
+      },
+      "cases": 17,
+      "candidateData": "synthetic-classroom-replacement",
+      "sourceChecksums": {
+        "ms": "8e46a3b44b97281092faded669e75b19720f7b8ab62db0d1dac7781646939597",
+        "qp": "e73afe72bcaf254e96300aaf476fe013af81a240d29749161bfcddb7a96acb95"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 17,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_s26_42",
+      "year": 2026,
+      "session": "summer",
+      "variant": 42,
+      "path": "2026/9618_s26_42.json",
+      "sha256": "e6370fab96442c5125aa13058b16083f12be4ae9a580d9fa622c3ee8a9045e3d",
+      "title": "9618 Paper 4 · May/June 2026 · Paper 42",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 12,
+        "manual": 6,
+        "evidence": 6
+      },
+      "cases": 17,
+      "candidateData": "synthetic-classroom-replacement",
+      "sourceChecksums": {
+        "ms": "5f9883f60b082e00161cad09932cd40b662efd1e50b36b8d9e0b614c2be963ad",
+        "qp": "6cfd2588e1d52a7f8c83d70783bfc4c435bd862abfd6a25afd9384155db9ea7d"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 17,
+        "blankControlsRejected": true
+      }
+    },
+    {
+      "key": "9618_s26_43",
+      "year": 2026,
+      "session": "summer",
+      "variant": 43,
+      "path": "2026/9618_s26_43.json",
+      "sha256": "7d47ab31882ad0b1f927966f31c34b93fb1ffd51d43099fb13f3c63928b0ce51",
+      "title": "9618 Paper 4 · May/June 2026 · Paper 43",
+      "questions": 3,
+      "marks": 75,
+      "stages": {
+        "auto": 14,
+        "manual": 5,
+        "evidence": 6
+      },
+      "cases": 23,
+      "candidateData": "synthetic-classroom-replacement",
+      "sourceChecksums": {
+        "ms": "784a49401da04d8d9b525ff965b89c550eda555fb18e49f8153115f8fa197cb6",
+        "qp": "e3d51e17833dfb74e5e21f5b661339fb180ce0c10e70fcf6c6b5220b7c23c2f9"
+      },
+      "referenceValidation": {
+        "passed": true,
+        "cases": 23,
+        "blankControlsRejected": true
+      }
+    }
+  ]
+}

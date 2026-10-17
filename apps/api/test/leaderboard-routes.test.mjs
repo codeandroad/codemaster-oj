@@ -88,7 +88,7 @@ test('Nest school leaderboard routes enforce admin-only visibility, cross-class 
    assert.equal(earnedPoints.status,200);
    assert.equal(earnedPoints.data.points,10);
    assert.equal(earnedPoints.data.rankPoints,10);
-   assert.equal(earnedPoints.data.rankingPolicy.scope,'approved_school_first_ac');
+   assert.equal(earnedPoints.data.rankingPolicy.scope,'approved_school_and_paper4_first_ac');
    const leaderboard=`/api/v1/points/leaderboard?classId=${classId}`;
    const before=await request(leaderboard,{auth:student});
    assert.equal(before.status,200);

@@ -28,10 +28,17 @@ export class EducationController {
     return applyResponse(response, await this.domain.execute('education', request.domainContext));
   }
 
+  @Get('teaching/audience')
+  async audience(@Req() request: DomainRequest,@Res({passthrough:true}) response:Response){return applyResponse(response,await this.domain.execute('education',request.domainContext));}
+
+
   @Get('learning-resources')
   async resources(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('education', request.domainContext));
   }
+
+  @Get('learning-resources/:id')
+  async resource(@Req() request: DomainRequest,@Res({passthrough:true}) response:Response){return applyResponse(response,await this.domain.execute('education',request.domainContext));}
 
   @Post('learning-resources')
   async createResource(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
@@ -95,6 +102,9 @@ export class EducationController {
   async restorePath(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('education', request.domainContext));
   }
+
+  @Post('learning-paths/:id/unpublish')
+  async unpublishPath(@Req() request: DomainRequest,@Res({passthrough:true}) response:Response){return applyResponse(response,await this.domain.execute('education',request.domainContext));}
 
   @Post('learning-paths/:id/publish')
   async publishPath(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {

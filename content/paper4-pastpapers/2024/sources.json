@@ -1,0 +1,136 @@
+[
+  {
+    "key": "9618_s24_41",
+    "year": 2024,
+    "season": "May/June",
+    "variant": "41",
+    "files": {
+      "qp": {
+        "sha256": "e96ebfa553a7960fc510be38f2f0aeaacc5031c18d8bd7ea1d0712eb58f8dfc3",
+        "pages": 16
+      },
+      "sf": {
+        "sha256": "b3caf326f99de8325e708428bc10dac211aff04f2a1f7f8f7d1adc7fdc620beb",
+        "textFiles": {
+          "Trees.txt": "Beech,30,400,200,No\r\nHazel,40,300,200,No\r\nOak,5,900,600,No\r\nHolly,30,600,300,Yes\r\nWalnut,30,2500,1000,No\r\nMagnolia Grandiflora,50,500,300,Yes\r\nPhotinia,30,400,400,Yes\r\nBlue Conifer,40,250,50,Yes\r\nGreen Conifer,40,300,150,Yes"
+        }
+      },
+      "ms": {
+        "sha256": "5bbcb30c30d13ab20970a4ae4f8e7f0bcf79faa6fc00f8f770530b6aa4c0ce26",
+        "pages": 38
+      }
+    }
+  },
+  {
+    "key": "9618_s24_42",
+    "year": 2024,
+    "season": "May/June",
+    "variant": "42",
+    "files": {
+      "qp": {
+        "sha256": "a0e625893eecdbb50535abcca92ced97d47cfa9beed02fa0bf6af186c7a0252b",
+        "pages": 16
+      },
+      "sf": {
+        "sha256": "e2cfbd0f0389fc680181bcb5c6414c33fa278c0751a2a9e4a261ea0ad58276c2",
+        "textFiles": {
+          "Easy.txt": "house\r\nhues\r\nhose\r\nhoes\r\nshoe\r\nsou\r\nohs\r\nose\r\noes\r\nsue\r\nuse\r\nhue\r\nhoe\r\nhes\r\nshe",
+          "Hard.txt": "fainted\r\ndefiant\r\ndetain\r\nfadein\r\nnidate\r\nanted\r\nfated\r\nfined\r\ntined\r\ndefat\r\nfeint\r\nteind\r\nentia\r\nfetid\r\ntenia\r\nfaint\r\nfiend\r\ntinea\r\nadit\r\ndaft\r\ndefi\r\ndiet\r\ndite\r\nfain\r\nfend\r\nfine\r\nneif\r\ntend\r\naide\r\ndate\r\ndeft\r\ndine\r\nedit\r\nfane\r\nfeta\r\nidea\r\nnide\r\ntide\r\nante\r\ndeaf\r\ndeni\r\ndint\r\nfate\r\nfiat\r\nnaif\r\nnite\r\ntied\r\nanti\r\ndean\r\ndent\r\ndita\r\nfade\r\nfeat\r\nfind\r\nneat\r\ntain\r\ntine\r\naft\r\nand\r\nate\r\ndie\r\neat\r\nfad\r\nfen\r\nfin\r\nnit\r\ntea\r\ntin\r\naid\r\nane\r\ndan\r\ndif\r\neft\r\nfan\r\nfet\r\nfit\r\ntad\r\nted\r\nain\r\nani\r\ndef\r\ndin\r\nend\r\nfat\r\nfid\r\nnae\r\ntae\r\nten\r\nait\r\nant\r\nden\r\ndit\r\neta\r\nfed\r\nfie\r\nnet\r\ntan\r\ntie",
+          "Medium.txt": "direct\r\ndie\r\ndit\r\nice\r\nire\r\nrec\r\nred\r\nrei\r\nret\r\nrid\r\nted\r\ntic\r\ntie\r\ncedi\r\ncire\r\ncite\r\ndice\r\ndiet\r\ndire\r\ndirt\r\ndite\r\nedit\r\netic\r\niced\r\nired\r\nrice\r\nride\r\nrite\r\ntide\r\ntied\r\ntier\r\ntire\r\ncider\r\ncited\r\nciter\r\ncried\r\ndicer\r\nedict\r\nrecti\r\nriced\r\ntired\r\ntrice\r\ntried\r\ncredit\r\ntriced"
+        }
+      },
+      "ms": {
+        "sha256": "09c2788dcdf20692d0036e927fd872be886bbe8e7081ee1fe6c2a36c02f9f679",
+        "pages": 50
+      }
+    }
+  },
+  {
+    "key": "9618_s24_43",
+    "year": 2024,
+    "season": "May/June",
+    "variant": "43",
+    "files": {
+      "qp": {
+        "sha256": "061fd266afa5182043d630b5aab69d097e5f0a99a843814a6657156c588ca65c",
+        "pages": 16
+      },
+      "sf": {
+        "sha256": "2acaa6bb39181a7e7883d961b24b83cddbb7a37658bc8bd920dcf6966f36f87a",
+        "textFiles": {
+          "Trees.txt": "Beech,30,400,200,No\r\nHazel,40,300,200,No\r\nOak,5,900,600,No\r\nHolly,30,600,300,Yes\r\nWalnut,30,2500,1000,No\r\nMagnolia Grandiflora,50,500,300,Yes\r\nPhotinia,30,400,400,Yes\r\nBlue Conifer,40,250,50,Yes\r\nGreen Conifer,40,300,150,Yes"
+        }
+      },
+      "ms": {
+        "sha256": "4b4e81807b63fb817851446ef723126919faba3fc390e1636f2176d9c6486808",
+        "pages": 38
+      }
+    }
+  },
+  {
+    "key": "9618_w24_41",
+    "year": 2024,
+    "season": "October/November",
+    "variant": "41",
+    "files": {
+      "sf": {
+        "sha256": "31f0f67245ea4b4fe5feb4195c573ed3c0c00a7cbba1cea748a0a8775a08a699",
+        "textFiles": {
+          "Data.txt": "beige\r\ngreen\r\nscarlet\r\nsilver\r\nbronze\r\nslate\r\nyellow\r\norange\r\njade\r\nlavender\r\nmagnolia\r\nmagenta\r\nturquoise\r\nblack\r\ngrey\r\nrusset\r\nmaroon\r\nmango\r\nmint\r\npurple\r\nred\r\npink\r\nwhite\r\ncream\r\nnavy\r\nolive\r\nbrown\r\nviolet\r\ncyan\r\namber\r\naqua\r\nazure\r\ncopper\r\nfawn\r\nfuschia\r\ngold\r\nindigo\r\nivory\r\nmauve\r\nmulberry\r\npeach\r\nperiwinkle\r\nplum\r\nrose\r\nsage"
+        }
+      },
+      "qp": {
+        "sha256": "2c91c43abd658b2b985cf2063909faa0873b7ae1f11596233662f4702a2b01c7",
+        "pages": 16
+      },
+      "ms": {
+        "sha256": "efa60c884ce1ce9383de3c03214eb43bd001e7bfbeb03ff3dc9550e22b027e5d",
+        "pages": 37
+      }
+    }
+  },
+  {
+    "key": "9618_w24_42",
+    "year": 2024,
+    "season": "October/November",
+    "variant": "42",
+    "files": {
+      "sf": {
+        "sha256": "a028b4e88d53914fc964debcfd5c2db4c51b050395022f21c48e38498f7ef9d3",
+        "textFiles": {
+          "HighScoreTable.txt": "GHEH\r\n3\r\n10\r\nKWQW\r\n4\r\n20\r\nMMND\r\n4\r\n18\r\nRFOO\r\n5\r\n20\r\nXXHD\r\n3\r\n19\r\nQWSD\r\n3\r\n15\r\nJGHF\r\n5\r\n22"
+        }
+      },
+      "qp": {
+        "sha256": "714d785ed06744a0fdb69c0a33488cfd9a6ad6fe9ae7a8ad9d7d4da54bb76480",
+        "pages": 16
+      },
+      "ms": {
+        "sha256": "f0048b6d46754e49d4ad24b7820b6e9372b581b96c98066a6858ab814316d425",
+        "pages": 39
+      }
+    }
+  },
+  {
+    "key": "9618_w24_43",
+    "year": 2024,
+    "season": "October/November",
+    "variant": "43",
+    "files": {
+      "sf": {
+        "sha256": "b15d266d64be18ea973c7f29c6b6e93112f24ab2dc1dcb4e0a75513776a28d2f",
+        "textFiles": {
+          "Data.txt": "beige\r\ngreen\r\nscarlet\r\nsilver\r\nbronze\r\nslate\r\nyellow\r\norange\r\njade\r\nlavender\r\nmagnolia\r\nmagenta\r\nturquoise\r\nblack\r\ngrey\r\nrusset\r\nmaroon\r\nmango\r\nmint\r\npurple\r\nred\r\npink\r\nwhite\r\ncream\r\nnavy\r\nolive\r\nbrown\r\nviolet\r\ncyan\r\namber\r\naqua\r\nazure\r\ncopper\r\nfawn\r\nfuschia\r\ngold\r\nindigo\r\nivory\r\nmauve\r\nmulberry\r\npeach\r\nperiwinkle\r\nplum\r\nrose\r\nsage"
+        }
+      },
+      "qp": {
+        "sha256": "fed8c938aee2777c070b94bfeb0e47976d5ccdb58b8f38c91baf1ae29a992e5a",
+        "pages": 16
+      },
+      "ms": {
+        "sha256": "6b537ad9349887a3654d2beb41631ad5ac8f1ec4834838cfeefe22dfb2411cb8",
+        "pages": 37
+      }
+    }
+  }
+]

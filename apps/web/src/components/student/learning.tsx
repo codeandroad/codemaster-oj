@@ -1,5 +1,10 @@
 "use client";
 
+import { CoursePaper4Practice } from "./course-paper4-practice";
+import { useCourseProgressRefresh } from "./course-progress-refresh";
+import type { CoursePaper4Link } from "@/components/course-paper4";
+import { coursePaper4Progress } from "@/components/paper4/paper4-learning-navigation";
+import { CourseAccessSummary, type CourseAccessMetadata } from "@/components/course-access";
 import {LearningCover,LearningProgressSummary,courseDifficulties} from "@/components/learning-course";
 import { AppLink } from "@/components/navigation";
 import { chapterDirectoryTitle } from "@/lib/learning-chapter-title";
@@ -19,12 +24,14 @@ function difficulty(locale:AppLocale,value:keyof typeof courseDifficulties){retu
 export interface LearningChapter {
   id: string; title: string; content: string; position: number; completed: boolean;
   objective?: string; checkpoint?: string; checkpointAnswer?: string; estimatedMinutes?: number;taskCount?:number;completedTasks?:number;
+  paper4Links?: CoursePaper4Link[];
   problems: { problemId: string; title: string; versionId: string;completed?:boolean }[];
 }
-export interface LearningPath { id: string; title: string; description: string; category: string; published: boolean; chapterCount: number; completedChapters: number; canEdit: boolean;difficulty?:keyof typeof courseDifficulties;coverKey?:string;taskCount?:number;completedTasks?:number; chapters?: LearningChapter[]; assignments?: { id: string; title: string; dueAt: string }[]; }
+export interface LearningPath extends CourseAccessMetadata { id: string; title: string; description: string; category: string; published: boolean; chapterCount: number; completedChapters: number; canEdit: boolean;difficulty?:keyof typeof courseDifficulties;coverKey?:string;taskCount?:number;completedTasks?:number; chapters?: LearningChapter[]; assignments?: { id: string; title: string; dueAt: string }[]; }
 export function StudentLearningList(){
  const {locale}=useLocale();
  const paths=useData<{items:LearningPath[]}>("learning-paths");
+ useCourseProgressRefresh(paths);
  return <>
   <PageHeader title={ui(locale,"课程","Courses")} description={ui(locale,"按章节阅读、练习与复盘；已读和判题通过分别记录。","Read, practice, and review each chapter. Reading and accepted submissions are tracked separately.")}/>
   <State data={paths} empty={paths.data&&!paths.data.items.length?ui(locale,"暂无已发布课程","No published courses yet"):undefined}>
@@ -35,7 +42,7 @@ export function StudentLearningList(){
       {label:ui(locale,"练习完成","Practice completed"),value:path.completedTasks??0,total:path.taskCount??0,empty:ui(locale,"暂无练习","No practice")},
      ];
      return <li key={path.id} className="grid min-w-0 gap-x-4 gap-y-3 px-4 py-4 transition-colors hover:bg-surface-subtle sm:grid-cols-[88px_minmax(0,1fr)] lg:grid-cols-[88px_minmax(0,1fr)_240px_auto] lg:items-center">
-      <div aria-hidden="true" className="hidden h-[50px] w-[88px] overflow-hidden rounded border border-border bg-surface-subtle sm:block"><LearningCover coverKey={path.coverKey}/></div>
+      <div aria-hidden="true" className="hidden h-[50px] w-[88px] overflow-hidden rounded border border-border bg-surface-subtle sm:block"><LearningCover coverKey={path.coverKey} coverImage={path.coverImage}/></div>
       <div className="min-w-0">
        <p className="text-xs text-muted-foreground">{path.category} · {difficulty(locale,path.difficulty??"beginner")}</p>
        <h2 className="mt-1 truncate text-base font-semibold"><AppLink href={`/student/learning-paths/${path.id}`} className="text-primary hover:underline focus-visible:underline">{path.title}</AppLink></h2>
@@ -58,6 +65,8 @@ export function StudentLearningDetail({ id, chapterId }: { id: string; chapterId
   const chapter = path.data?.chapters?.find(c => c.id === selected) ?? (!selected ? path.data?.chapters?.find(c => !c.completed) ?? path.data?.chapters?.[0] : undefined);
   const chapterIndex = chapter ? path.data?.chapters?.findIndex(c => c.id === chapter.id) ?? -1 : -1;
   const nextChapterId = chapterIndex >= 0 ? path.data?.chapters?.[chapterIndex + 1]?.id : undefined;
+  const pending = path.data?.chapters?.some(item => item.paper4Links?.some(link => coursePaper4Progress(link).pending > 0)) ?? false;
+  useCourseProgressRefresh({ ...path, pending });
   useEffect(()=>{if(!chapter)return;try{const value=sessionStorage.getItem(`learning-scroll:${id}:${chapter.id}`);if(value!==null){sessionStorage.removeItem(`learning-scroll:${id}:${chapter.id}`);const frame=requestAnimationFrame(()=>window.scrollTo(0,Number(value)||0));return ()=>cancelAnimationFrame(frame);}}catch{}},[id,chapter]);
   useEffect(()=>{
     const container=desktopDirectoryRef.current;
@@ -70,7 +79,7 @@ export function StudentLearningDetail({ id, chapterId }: { id: string; chapterId
       container.scrollTop+=top-(container.clientHeight-activeRect.height)/2;
   },[chapter?.id]);
   const directory = <nav className="p-2" aria-label={ui(locale,"章节目录","Chapter directory")}>{path.data?.chapters?.map((c, index) => <AppLink key={c.id} href={`/student/learning-paths/${id}/chapters/${c.id}`} aria-current={c.id === chapter?.id ? "page" : undefined} className={`flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm ${c.id === chapter?.id ? "bg-accent font-semibold text-primary" : "text-muted-foreground hover:bg-surface-subtle"}`}><span className="min-w-0 flex-1 break-words">{chapterDirectoryTitle(c.title,index)}</span>{c.completed&&<CheckCircle2 size={15} className="shrink-0 text-success" aria-label={ui(locale,"本章已读","Chapter read")}/>}</AppLink>)}</nav>;
-  return <><Back href="/student/learning-paths">{ui(locale,"课程","Courses")}</Back><State data={path}>{path.data && <><PageHeader className="course-detail-header" title={path.data.title} description={path.data.description}/><div className="mt-4"><LearningProgressSummary read={path.data.completedChapters} totalChapters={path.data.chapterCount} done={path.data.completedTasks??0} totalTasks={path.data.taskCount??0}/></div><CourseAssignmentLinks items={path.data.assignments??[]} locale={locale}/><div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]"><aside className="self-start border border-border bg-surface panel-shadow lg:sticky lg:top-4"><details className="lg:hidden"><summary className="cursor-pointer px-4 py-3 font-semibold">{ui(locale,"章节目录","Chapter directory")} · {chapter ? `${chapter.position+1}/${path.data.chapterCount}` : path.data.chapterCount}<ChevronDown className="float-right" size={16}/></summary><div className="max-h-[60dvh] overflow-y-auto">{directory}</div></details><div ref={desktopDirectoryRef} className="hidden lg:block lg:max-h-[calc(100dvh-2rem)] lg:overflow-y-auto lg:overscroll-contain">{directory}</div></aside><main className="min-w-0">{chapter ? <ChapterLesson key={chapter.id} chapter={chapter} nextChapterId={nextChapterId} pathId={id} onSaved={path.reload}/> : <Empty title={selected ? ui(locale,"章节不存在","Chapter not found") : ui(locale,"暂无章节","No chapters available")} description={ui(locale,"从章节目录选择已发布章节；老师发布内容后即可阅读。","Choose a published chapter from the directory. You can read it after your teacher publishes it.")}/>}</main></div></>}</State></>;
+  return <><Back href="/student/learning-paths">{ui(locale,"课程","Courses")}</Back><State data={path}>{path.data && <><PageHeader className="course-detail-header" title={chapter?.title ?? path.data.title} description={path.data.description}/><div className="mt-2"><CourseAccessSummary course={path.data} showAuthor/></div><div className="mt-4"><LearningProgressSummary read={path.data.completedChapters} totalChapters={path.data.chapterCount} done={path.data.completedTasks??0} totalTasks={path.data.taskCount??0}/></div><CourseAssignmentLinks items={path.data.assignments??[]} locale={locale}/><div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]"><aside className="self-start border border-border bg-surface panel-shadow lg:sticky lg:top-4"><details className="lg:hidden"><summary className="cursor-pointer px-4 py-3 font-semibold">{ui(locale,"章节目录","Chapter directory")} · {chapter ? `${chapter.position+1}/${path.data.chapterCount}` : path.data.chapterCount}<ChevronDown className="float-right" size={16}/></summary><div className="max-h-[60dvh] overflow-y-auto">{directory}</div></details><div ref={desktopDirectoryRef} className="hidden lg:block lg:max-h-[calc(100dvh-2rem)] lg:overflow-y-auto lg:overscroll-contain">{directory}</div></aside><main className="min-w-0">{chapter ? <ChapterLesson key={chapter.id} chapter={chapter} nextChapterId={nextChapterId} pathId={id} onSaved={path.reload}/> : <Empty title={selected ? ui(locale,"章节不存在","Chapter not found") : ui(locale,"暂无章节","No chapters available")} description={ui(locale,"从章节目录选择已发布章节；老师发布内容后即可阅读。","Choose a published chapter from the directory. You can read it after your teacher publishes it.")}/>}</main></div></>}</State></>;
 }
 function CourseAssignmentLinks({ items, locale }: { items: NonNullable<LearningPath["assignments"]>; locale: AppLocale }) {
  if (!items.length) return null;
@@ -93,11 +102,11 @@ function ChapterLesson({chapter,nextChapterId,pathId,onSaved}:{chapter:LearningC
    <div className="mt-3"><LessonContent content={chapter.checkpointAnswer}/></div>
   </details>}
  </section>}
- {chapter.problems.length>0&&<section className={`${panel} p-5 sm:p-7`}><h2 className="text-lg font-bold">{ui(locale,"配套练习","Practice problems")}</h2>{chapter.problems.map(p=>{
+ {(chapter.problems.length>0 || Boolean(chapter.paper4Links?.length))&&<section className={`${panel} p-5 sm:p-7`}><h2 className="text-lg font-bold">{ui(locale,"配套练习","Practice problems")}</h2>{chapter.problems.map(p=>{
   const href=`/student/problems/${p.problemId}?${new URLSearchParams({versionId:p.versionId,learningPathId:pathId,chapterId:chapter.id,returnTo:`/student/learning-paths/${pathId}/chapters/${chapter.id}`,sourceLabel:chapter.title})}`;
   const saveScroll=()=>{try{sessionStorage.setItem(`learning-scroll:${pathId}:${chapter.id}`,String(window.scrollY));}catch{}};
   return <div key={p.problemId} className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4"><div><h3 className="font-semibold"><AppLink href={href} className="text-primary hover:underline focus-visible:underline" onClick={saveScroll}>{p.title}</AppLink></h3>{p.completed?<p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-success/25 bg-success-soft px-2.5 py-1 text-sm font-semibold text-success"><CheckCircle2 size={15} aria-hidden="true"/>{ui(locale,"已通过正式判题","Accepted in formal judging")}</p>:<p className="mt-1 text-xs text-muted-foreground">{ui(locale,"题库中的已发布版本","Published problem version")}</p>}</div><AppLink className={buttonVariants({variant:"secondary"})} href={href} onClick={saveScroll}>{p.completed?ui(locale,"再次练习","Practice again"):ui(locale,"开始练习","Start practice")}</AppLink></div>;
- })}</section>}
+ })}{Boolean(chapter.paper4Links?.length) && <CoursePaper4Practice links={chapter.paper4Links ?? []} pathId={pathId} chapterId={chapter.id}/>}</section>}
  <section className={`${panel} flex flex-wrap items-center justify-between gap-4 p-5`}><div><p className="font-semibold">{chapter.completed?ui(locale,"本章已读","Chapter read"):ui(locale,"完成本章学习","Complete this chapter")}</p><p className="mt-1 text-xs text-muted-foreground">{ui(locale,"阅读进度独立保存，不代表练习通过或计入成绩。","Reading progress is saved separately. It does not mean practice was accepted or counted toward a grade.")}</p></div><Button variant={chapter.completed?"secondary":"primary"} disabled={action.busy||(chapter.completed&&!nextChapterId)} onClick={()=>action.run(async()=>{
   if(!chapter.completed){
    await productionApi(`chapters/${chapter.id}/progress`,{method:"POST",body:{completed:true}});

@@ -1,0 +1,409 @@
+{
+  "format": "codemaster-paper4",
+  "version": 1,
+  "paper": {
+    "title": "9618 Paper 4 Practice · May/June 2025 · Paper 41",
+    "description": "[local-paper4-english-v4] Classroom adaptation of the user-supplied 9618/41/M/J/25 programming tasks and subpart marks; not an official Cambridge marking service."
+  },
+  "questions": [
+    {
+      "key": "Q1",
+      "title": "A twenty-place circular queue",
+      "statement": "A program stores positive integers in a circular queue. Complete the following parts in one program.\n\n## 1(a) Initialise the queue\n\n- Declare a global 1D array `Queue` with 20 integers. Initialise every position to `-1`.\n- Initialise global `HeadPointer` and `TailPointer` to `-1`, and `NumberItems` to `0`.\n\n## 1(b) Write `Enqueue(InputData)`\n\n- The function takes an integer parameter. If the queue is full, return `False`.\n- Otherwise, store the value in the next position of the circular queue, update the appropriate pointers and `NumberItems`, and return `True`.\n\n## 1(c) Add the first part of the main program\n\n- Call `Enqueue()` with each integer from `1` to `25`, in ascending order.\n- Output the integer and `Successful` if it was stored, or the integer and `Unsuccessful` if it was not. For example: `5 Successful` or `23 Unsuccessful`.\n\n## 1(d) Write `Dequeue()`\n\n- Return `-1` if the queue is empty.\n- Otherwise, return the next item, update the appropriate pointers and decrement `NumberItems`. The pointers must wrap around the array.\n\n## 1(e) Finish and test the main program\n\n- **(i)** Call `Dequeue()` twice and output each returned value.\n- **(ii)** Run the finished program. This practice system saves the run output for teacher review; you do not need to upload a screenshot.",
+      "starterCode": "Queue = [-1] * 20\nHeadPointer = -1\nTailPointer = -1\nNumberItems = 0\n\ndef Enqueue(InputData):\n    pass\n\ndef Dequeue():\n    pass\n\n# Write the main program here.\n",
+      "initialFiles": {},
+      "outputFiles": [],
+      "stages": [
+        {
+          "id": "Q1_setup",
+          "title": "1(a) Queue state",
+          "description": "Teacher checks the global array and the three initialised state variables.",
+          "maxMarks": 2,
+          "judgeMode": "manual"
+        },
+        {
+          "id": "Q1_enqueue",
+          "title": "1(b) Enqueue and full boundary",
+          "description": "Functional tests call Enqueue and inspect the state after 25 insert attempts.",
+          "maxMarks": 6,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q1_main",
+          "title": "1(c) Enqueue output",
+          "description": "Run the complete program and check the first 25 Successful/Unsuccessful lines.",
+          "maxMarks": 3,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q1_dequeue",
+          "title": "1(d) Dequeue and wraparound",
+          "description": "Functional tests remove values, reuse slots and empty the queue.",
+          "maxMarks": 6,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q1_main_dequeue",
+          "title": "1(e)(i) Dequeue output",
+          "description": "Run the complete program and check the two Dequeue return values after the 25 lines.",
+          "maxMarks": 2,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q1_evidence",
+          "title": "1(e)(ii) Test evidence",
+          "description": "Teacher reviews the saved run output. No screenshot upload is required.",
+          "maxMarks": 1,
+          "judgeMode": "evidence"
+        }
+      ]
+    },
+    {
+      "key": "Q2",
+      "title": "Separate data into six colour files",
+      "statement": "A program reads records from a text file and separates the numbers into files by colour. The supplied `TheData.txt` has 72 lines. Each line contains an integer and a colour separated by a comma; its first line is `10,red`. The possible colours are **red, green, blue, orange, yellow and pink**. Six matching output files are supplied empty.\n\n## 2(a) Write `ReadData()`\n\n- Prompt the user for a filename and open that file for reading. Display a clear error message if it cannot be opened.\n- Read each line into a 1D array and return the populated array. Do **not** assume the file always has 72 lines.\n\n## 2(b) Write `SplitData(DataArray)`\n\n- The parameter is a 1D array of strings. Create one 1D array for each of the six colours.\n- Split each string into its integer and colour, then store the integer in the matching colour array. For example, `10,red` places `10` in the red array.\n\n## 2(c) Write `StoreData(DataToStore, FileName)`\n\n- Open the named text file and **append** every item from `DataToStore` on a new line.\n- Use exception handling when opening the file or writing data.\n\n## 2(d) Store the six colour arrays\n\n- Amend `SplitData()` to call `StoreData()` six times, pairing each array with its file: `Blue.txt`, `Green.txt`, `Orange.txt`, `Pink.txt`, `Red.txt` and `Yellow.txt`.\n\n## 2(e) Complete and test the main program\n\n- **(i)** Call `ReadData()`, then pass its returned array to `SplitData()`.\n- **(ii)** Run the program and enter `TheData.txt` when prompted. This practice system saves the run output and generated `Red.txt` for teacher review; you do not need to upload screenshots.",
+      "starterCode": "def ReadData():\n    pass\n\ndef StoreData(DataToStore, FileName):\n    pass\n\ndef SplitData(DataArray):\n    pass\n\nDataFromFile = ReadData()\nSplitData(DataFromFile)\n",
+      "initialFiles": {
+        "TheData.txt": "10,red\n20,green\n10,blue\n15,orange\n9,red\n22,blue\n16,green\n21,orange\n33,pink\n29,pink\n3,blue\n1,red\n30,yellow\n21,green\n93,blue\n76,red\n2,blue\n34,green\n71,orange\n9,pink\n3,pink\n4,yellow\n100,blue\n82,yellow\n38,green\n12,pink\n4,pink\n8,yellow\n29,orange\n53,blue\n71,green\n19,red\n38,red\n18,orange\n99,pink\n13,green\n34,red\n3,green\n65,blue\n221,orange\n46,red\n76,blue\n3,green\n2,orange\n76,pink\n56,pink\n34,blue\n14,red\n21,yellow\n42,green\n12,blue\n45,red\n6,blue\n5,green\n28,orange\n102,pink\n146,pink\n234,yellow\n54,blue\n34,yellow\n1,green\n53,pink\n56,pink\n67,yellow\n54,orange\n62,blue\n156,green\n37,red\n43,red\n68,orange\n46,pink\n5,green",
+        "Red.txt": "",
+        "Green.txt": "",
+        "Blue.txt": "",
+        "Orange.txt": "",
+        "Yellow.txt": "",
+        "Pink.txt": ""
+      },
+      "outputFiles": [
+        "Red.txt",
+        "Green.txt",
+        "Blue.txt",
+        "Orange.txt",
+        "Yellow.txt",
+        "Pink.txt"
+      ],
+      "stages": [
+        {
+          "id": "Q2_a",
+          "title": "ReadData: filename prompt and raw lines",
+          "description": "Prompt for a filename; read an unknown number of lines into a 1D array and return it. Report file opening errors.",
+          "maxMarks": 7,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q2_b",
+          "title": "SplitData: six colour arrays",
+          "description": "Accept DataArray, split each raw line and place its integer in the matching colour array.",
+          "maxMarks": 6,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q2_c",
+          "title": "StoreData: append and file errors",
+          "description": "Accept DataToStore and FileName, append items line by line and handle opening or writing errors.",
+          "maxMarks": 5,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q2_d",
+          "title": "Store all six colour arrays",
+          "description": "Within SplitData, call StoreData once for each colour array with its matching filename.",
+          "maxMarks": 2,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q2_e1",
+          "title": "Main program",
+          "description": "Call ReadData(), then pass its result to SplitData(). Run with TheData.txt.",
+          "maxMarks": 3,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q2_e2",
+          "title": "Run and file evidence",
+          "description": "Teacher reviews the run record and the generated Red.txt content. Evidence marks do not block automatic AC.",
+          "maxMarks": 2,
+          "judgeMode": "evidence"
+        }
+      ]
+    },
+    {
+      "key": "Q3",
+      "title": "A binary tree built with classes",
+      "statement": "Build a binary tree of integers using object-oriented programming. Smaller values belong on the left; equal or larger values belong on the right.\n\n## 3(a) Declare the `Node` class\n\n- **(i)** Give `Node` an integer `NodeData` attribute and `LeftNode` and `RightNode` links, each holding another `Node` or a null value. Its constructor receives the integer, stores it in `NodeData`, and initialises both links to null. If using Python, include attribute declarations as comments.\n- **(ii)** Implement `GetLeft()`, `GetRight()` and `GetData()` to return the corresponding attributes.\n- **(iii)** Implement `SetLeft(NewNode)` and `SetRight(NewNode)` to store the supplied `Node` in the corresponding link.\n\n## 3(b) Start the main program\n\n- Create five separate `Node` objects in this order, containing `10`, `20`, `5`, `15` and `7`.\n\n## 3(c) Declare the `Tree` class\n\n- **(i)** Give `Tree` a `FirstNode` attribute for its root. Its constructor receives a `Node` and stores it in `FirstNode`. If using Python, include the attribute declaration as a comment.\n- **(ii)** Implement `GetRootNode()` to return `FirstNode`.\n- **(iii)** Implement `Insert(NewNode)`. Starting at the root, move left when the new value is smaller, or right when it is equal or larger. Repeat until the correct empty link is found, then store the new node there.\n\n## 3(d) Write recursive `OutputInOrder(RootNode)`\n\n- If a left child exists, call `OutputInOrder()` with that child; then output the current node value; then, if a right child exists, call `OutputInOrder()` with the right child. This prints values in ascending order.\n\n## 3(e) Complete and test the main program\n\n- **(i)** Create a `Tree` with the node containing `10` as its root. Insert the nodes containing `20`, `5`, `15` and `7` in that order. Call `OutputInOrder()` with the tree root.\n- **(ii)** Run the program. This practice system saves the run output for teacher review; you do not need to upload a screenshot.",
+      "starterCode": "class Node:\n    def __init__(self, pNodeData):\n        pass\n\n    def GetLeft(self):\n        pass\n\n    def GetRight(self):\n        pass\n\n    def GetData(self):\n        pass\n\n    def SetLeft(self, NewNode):\n        pass\n\n    def SetRight(self, NewNode):\n        pass\n\n\nclass Tree:\n    def __init__(self, FirstNode):\n        pass\n\n    def GetRootNode(self):\n        pass\n\n    def Insert(self, NewNode):\n        pass\n\n\ndef OutputInOrder(RootNode):\n    pass\n\n# Write the main program here.\n",
+      "initialFiles": {},
+      "outputFiles": [],
+      "stages": [
+        {
+          "id": "Q3_node",
+          "title": "3(a)(i) Node and constructor",
+          "description": "Declare Node and initialise its data and null links.",
+          "maxMarks": 4,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q3_getters",
+          "title": "3(a)(ii) Get methods",
+          "description": "Return the left node, right node and integer data.",
+          "maxMarks": 3,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q3_setters",
+          "title": "3(a)(iii) Set methods",
+          "description": "Store a Node object in each child link.",
+          "maxMarks": 3,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q3_nodes_main",
+          "title": "3(b) Five nodes in the main program",
+          "description": "Teacher checks that the main program creates Node objects containing 10, 20, 5, 15 and 7.",
+          "maxMarks": 2,
+          "judgeMode": "manual"
+        },
+        {
+          "id": "Q3_tree",
+          "title": "3(c)(i) Tree and constructor",
+          "description": "Declare Tree and initialise FirstNode from the Node argument.",
+          "maxMarks": 2,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q3_root",
+          "title": "3(c)(ii) GetRootNode",
+          "description": "Return the root Node object.",
+          "maxMarks": 1,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q3_insert",
+          "title": "3(c)(iii) Insert a Node",
+          "description": "Find the correct parent, putting smaller data left and equal or larger data right.",
+          "maxMarks": 6,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q3_inorder",
+          "title": "3(d) Recursive OutputInOrder",
+          "description": "Automatic cases check output order for two trees. The teacher separately inspects the source to award marks for the recursive algorithm.",
+          "maxMarks": 5,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q3_main",
+          "title": "3(e)(i) Build and output the tree",
+          "description": "The main program must create the five Node objects in order, build the Tree, insert the four original objects in order and call OutputInOrder with the root.",
+          "maxMarks": 3,
+          "judgeMode": "auto"
+        },
+        {
+          "id": "Q3_evidence",
+          "title": "3(e)(ii) Test evidence",
+          "description": "Teacher reviews the saved run output. No screenshot upload is required.",
+          "maxMarks": 1,
+          "judgeMode": "evidence"
+        }
+      ]
+    }
+  ],
+  "runnerCases": {
+    "Q1_enqueue": [
+      {
+        "id": "queue-25",
+        "public": true,
+        "driverCode": "try:\n    import ast, types\n    with open('/w/main.py', encoding='utf-8') as source_file:\n        source_tree = ast.parse(source_file.read(), filename='/w/main.py')\n    first_definition = next((index for index, node in enumerate(source_tree.body) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))), len(source_tree.body))\n    prelude = [node for node in source_tree.body[:first_definition] if isinstance(node, (ast.Import, ast.ImportFrom, ast.Assign, ast.AnnAssign, ast.AugAssign, ast.For))]\n    definitions = [node for node in source_tree.body[first_definition:] if isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]\n    candidate = types.ModuleType('candidate')\n    candidate.__file__ = '/w/main.py'\n    exec(compile(ast.fix_missing_locations(ast.Module(body=prelude + definitions, type_ignores=[])), '/w/main.py', 'exec'), candidate.__dict__)\n    results = [candidate.Enqueue(n) for n in range(1, 26)]\n    accepted = sum(result is True for result in results)\n    print(accepted, len(results) - accepted)\n    print(candidate.HeadPointer, candidate.TailPointer, candidate.NumberItems, candidate.Queue.count(-1))\nexcept Exception:\n    print('__CHECK_FAILED__')\n",
+        "expectedStdout": "20 5\n0 19 20 0\n"
+      },
+      {
+        "id": "queue-first-and-full",
+        "public": false,
+        "driverCode": "try:\n    import ast, types\n    with open('/w/main.py', encoding='utf-8') as source_file:\n        source_tree = ast.parse(source_file.read(), filename='/w/main.py')\n    first_definition = next((index for index, node in enumerate(source_tree.body) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))), len(source_tree.body))\n    prelude = [node for node in source_tree.body[:first_definition] if isinstance(node, (ast.Import, ast.ImportFrom, ast.Assign, ast.AnnAssign, ast.AugAssign, ast.For))]\n    definitions = [node for node in source_tree.body[first_definition:] if isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]\n    candidate = types.ModuleType('candidate')\n    candidate.__file__ = '/w/main.py'\n    exec(compile(ast.fix_missing_locations(ast.Module(body=prelude + definitions, type_ignores=[])), '/w/main.py', 'exec'), candidate.__dict__)\n    print(candidate.Enqueue(42), candidate.HeadPointer, candidate.TailPointer, candidate.NumberItems)\n    for n in range(2, 21): candidate.Enqueue(n)\n    print(candidate.Enqueue(43), candidate.NumberItems, candidate.TailPointer)\nexcept Exception:\n    print('__CHECK_FAILED__')\n",
+        "expectedStdout": "True 0 0 1\nFalse 20 19\n"
+      }
+    ],
+    "Q1_main": [
+      {
+        "id": "queue-success-lines",
+        "public": true,
+        "driverCode": "try:\n    import contextlib, io, re, runpy\n    output = io.StringIO()\n    with contextlib.redirect_stdout(output):\n        runpy.run_path('/w/main.py', run_name='__main__')\n    lines = [line.strip() for line in output.getvalue().splitlines() if line.strip()]\n    main_ok = len(lines) >= 25 and all(re.fullmatch(rf'{number}\\s+{\"Successful\" if number <= 20 else \"Unsuccessful\"}', lines[number - 1]) for number in range(1, 26))\n    if False:\n        main_ok = main_ok and len(lines) == 27 and lines[25:] == ['1', '2']\n    print('PASS' if main_ok else 'FAIL')\nexcept Exception:\n    print('__CHECK_FAILED__')\n",
+        "expectedStdout": "PASS\n"
+      }
+    ],
+    "Q1_dequeue": [
+      {
+        "id": "queue-wrap",
+        "public": true,
+        "driverCode": "try:\n    import ast, types\n    with open('/w/main.py', encoding='utf-8') as source_file:\n        source_tree = ast.parse(source_file.read(), filename='/w/main.py')\n    first_definition = next((index for index, node in enumerate(source_tree.body) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))), len(source_tree.body))\n    prelude = [node for node in source_tree.body[:first_definition] if isinstance(node, (ast.Import, ast.ImportFrom, ast.Assign, ast.AnnAssign, ast.AugAssign, ast.For))]\n    definitions = [node for node in source_tree.body[first_definition:] if isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]\n    candidate = types.ModuleType('candidate')\n    candidate.__file__ = '/w/main.py'\n    exec(compile(ast.fix_missing_locations(ast.Module(body=prelude + definitions, type_ignores=[])), '/w/main.py', 'exec'), candidate.__dict__)\n    for n in range(1, 21): candidate.Enqueue(n)\n    print(candidate.Dequeue(), candidate.Dequeue())\n    print(candidate.Enqueue(21), candidate.Enqueue(22))\n    print(candidate.HeadPointer, candidate.TailPointer, candidate.NumberItems)\n    print(candidate.Dequeue(), candidate.Dequeue())\nexcept Exception:\n    print('__CHECK_FAILED__')\n",
+        "expectedStdout": "1 2\nTrue True\n2 1 20\n3 4\n"
+      },
+      {
+        "id": "queue-empty",
+        "public": false,
+        "driverCode": "try:\n    import ast, types\n    with open('/w/main.py', encoding='utf-8') as source_file:\n        source_tree = ast.parse(source_file.read(), filename='/w/main.py')\n    first_definition = next((index for index, node in enumerate(source_tree.body) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))), len(source_tree.body))\n    prelude = [node for node in source_tree.body[:first_definition] if isinstance(node, (ast.Import, ast.ImportFrom, ast.Assign, ast.AnnAssign, ast.AugAssign, ast.For))]\n    definitions = [node for node in source_tree.body[first_definition:] if isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))]\n    candidate = types.ModuleType('candidate')\n    candidate.__file__ = '/w/main.py'\n    exec(compile(ast.fix_missing_locations(ast.Module(body=prelude + definitions, type_ignores=[])), '/w/main.py', 'exec'), candidate.__dict__)\n    print(candidate.Dequeue())\n    candidate.Enqueue(9)\n    print(candidate.Dequeue(), candidate.Dequeue())\n    print(candidate.HeadPointer, candidate.TailPointer, candidate.NumberItems)\nexcept Exception:\n    print('__CHECK_FAILED__')\n",
+        "expectedStdout": "-1\n9 -1\n-1 -1 0\n"
+      }
+    ],
+    "Q1_main_dequeue": [
+      {
+        "id": "queue-two-returns",
+        "public": true,
+        "driverCode": "try:\n    import contextlib, io, re, runpy\n    output = io.StringIO()\n    with contextlib.redirect_stdout(output):\n        runpy.run_path('/w/main.py', run_name='__main__')\n    lines = [line.strip() for line in output.getvalue().splitlines() if line.strip()]\n    main_ok = len(lines) >= 25 and all(re.fullmatch(rf'{number}\\s+{\"Successful\" if number <= 20 else \"Unsuccessful\"}', lines[number - 1]) for number in range(1, 26))\n    if True:\n        main_ok = main_ok and len(lines) == 27 and lines[25:] == ['1', '2']\n    print('PASS' if main_ok else 'FAIL')\nexcept Exception:\n    print('__CHECK_FAILED__')\n",
+        "expectedStdout": "PASS\n"
+      }
+    ],
+    "Q2_a": [
+      {
+        "id": "read-short-and-long-files",
+        "public": true,
+        "inputFiles": {
+          "ShortData.txt": "10,red\n22,blue\n7,pink\n",
+          "LongData.txt": "1,red\n2,red\n3,red\n4,red\n5,red\n6,red\n7,red\n8,red\n9,red\n10,red\n11,red\n12,red\n13,red\n14,red\n15,red\n16,red\n17,red\n18,red\n19,red\n20,red\n21,red\n22,red\n23,red\n24,red\n25,red\n26,red\n27,red\n28,red\n29,red\n30,red\n31,red\n32,red\n33,red\n34,red\n35,red\n36,red\n37,red\n38,red\n39,red\n40,red\n41,red\n42,red\n43,red\n44,red\n45,red\n46,red\n47,red\n48,red\n49,red\n50,red\n51,red\n52,red\n53,red\n54,red\n55,red\n56,red\n57,red\n58,red\n59,red\n60,red\n61,red\n62,red\n63,red\n64,red\n65,red\n66,red\n67,red\n68,red\n69,red\n70,red\n71,red\n72,red\n73,red\n74,red\n75,red\n76,red\n77,red\n78,red\n79,red\n80,red\n"
+        },
+        "driverCode": "try:\n    import contextlib\n    import importlib.util\n    import io\n    import sys\n    from pathlib import Path\n    \n    output_names = (\"Red.txt\", \"Green.txt\", \"Blue.txt\", \"Orange.txt\", \"Yellow.txt\", \"Pink.txt\",)\n    original_outputs = {name: Path(name).read_bytes() for name in output_names if Path(name).exists()}\n    old_stdin = sys.stdin\n    try:\n        sys.stdin = io.StringIO('TheData.txt\\n')\n        with contextlib.redirect_stdout(io.StringIO()):\n            spec = importlib.util.spec_from_file_location('candidate', '/w/main.py')\n            candidate = importlib.util.module_from_spec(spec)\n            spec.loader.exec_module(candidate)\n    finally:\n        sys.stdin = old_stdin\n        for name, content in original_outputs.items():\n            Path(name).write_bytes(content)\n    def read_file(name):\n        previous_stdin = sys.stdin\n        prompt = io.StringIO()\n        try:\n            sys.stdin = io.StringIO(name + '\\n')\n            with contextlib.redirect_stdout(prompt), contextlib.redirect_stderr(prompt):\n                data = candidate.ReadData()\n        finally:\n            sys.stdin = previous_stdin\n        return data, prompt.getvalue()\n    \n    short, short_prompt = read_file('ShortData.txt')\n    long, long_prompt = read_file('LongData.txt')\n    _, missing_prompt = read_file('MissingData.txt')\n    assert isinstance(short, (list, tuple)) and isinstance(long, (list, tuple))\n    assert [str(item).rstrip('\\r\\n') for item in short] == ['10,red', '22,blue', '7,pink']\n    assert len(long) == 80 and str(long[0]).rstrip('\\r\\n') == '1,red'\n    assert str(long[-1]).rstrip('\\r\\n') == '80,red'\n    assert short_prompt.strip() and long_prompt.strip()\n    assert missing_prompt.strip() and missing_prompt.strip() != short_prompt.strip()\n    print('OK')\nexcept Exception:\n    print('__CHECK_FAILED__')\n",
+        "expectedStdout": "OK\n"
+      }
+    ],
+    "Q2_b": [
+      {
+        "id": "partition-six-colours",
+        "public": true,
+        "driverCode": "try:\n    import contextlib\n    import importlib.util\n    import io\n    import sys\n    from pathlib import Path\n    \n    output_names = (\"Red.txt\", \"Green.txt\", \"Blue.txt\", \"Orange.txt\", \"Yellow.txt\", \"Pink.txt\",)\n    original_outputs = {name: Path(name).read_bytes() for name in output_names if Path(name).exists()}\n    old_stdin = sys.stdin\n    try:\n        sys.stdin = io.StringIO('TheData.txt\\n')\n        with contextlib.redirect_stdout(io.StringIO()):\n            spec = importlib.util.spec_from_file_location('candidate', '/w/main.py')\n            candidate = importlib.util.module_from_spec(spec)\n            spec.loader.exec_module(candidate)\n    finally:\n        sys.stdin = old_stdin\n        for name, content in original_outputs.items():\n            Path(name).write_bytes(content)\n    calls = []\n    candidate.StoreData = lambda items, name: calls.append((name, [str(item) for item in items]))\n    candidate.SplitData(['10,red', '20,green', '30,blue', '40,orange', '50,yellow', '60,pink', '7,red'])\n    assert len(calls) == 6\n    actual = dict(calls)\n    assert len(actual) == 6\n    assert actual == {\n        'Red.txt': ['10', '7'], 'Green.txt': ['20'], 'Blue.txt': ['30'],\n        'Orange.txt': ['40'], 'Yellow.txt': ['50'], 'Pink.txt': ['60'],\n    }\n    print('OK')\nexcept Exception:\n    print('__CHECK_FAILED__')\n",
+        "expectedStdout": "OK\n"
+      }
+    ],
+    "Q2_c": [
+      {
+        "id": "append-and-handle-error",
+        "public": true,
+        "inputFiles": {
+          "Red.txt": "100\n"
+        },
+        "driverCode": "try:\n    import contextlib\n    import importlib.util\n    import io\n    import sys\n    from pathlib import Path\n    \n    output_names = (\"Red.txt\", \"Green.txt\", \"Blue.txt\", \"Orange.txt\", \"Yellow.txt\", \"Pink.txt\",)\n    original_outputs = {name: Path(name).read_bytes() for name in output_names if Path(name).exists()}\n    old_stdin = sys.stdin\n    try:\n        sys.stdin = io.StringIO('TheData.txt\\n')\n        with contextlib.redirect_stdout(io.StringIO()):\n            spec = importlib.util.spec_from_file_location('candidate', '/w/main.py')\n            candidate = importlib.util.module_from_spec(spec)\n            spec.loader.exec_module(candidate)\n    finally:\n        sys.stdin = old_stdin\n        for name, content in original_outputs.items():\n            Path(name).write_bytes(content)\n    candidate.StoreData(['7', '9'], 'Red.txt')\n    assert Path('Red.txt').read_text(encoding='utf-8') == '100\\n7\\n9\\n'\n    error_output = io.StringIO()\n    with contextlib.redirect_stdout(error_output), contextlib.redirect_stderr(error_output):\n        candidate.StoreData(['1'], 'missing-directory/output.txt')\n    assert error_output.getvalue().strip()\n    print('OK')\nexcept Exception:\n    print('__CHECK_FAILED__')\n",
+        "expectedStdout": "OK\n"
+      }
+    ],
+    "Q2_d": [
+      {
+        "id": "six-file-calls",
+        "public": false,
+        "inputFiles": {
+          "Red.txt": "100\n"
+        },
+        "driverCode": "try:\n    import contextlib\n    import importlib.util\n    import io\n    import sys\n    from pathlib import Path\n    \n    output_names = (\"Red.txt\", \"Green.txt\", \"Blue.txt\", \"Orange.txt\", \"Yellow.txt\", \"Pink.txt\",)\n    original_outputs = {name: Path(name).read_bytes() for name in output_names if Path(name).exists()}\n    old_stdin = sys.stdin\n    try:\n        sys.stdin = io.StringIO('TheData.txt\\n')\n        with contextlib.redirect_stdout(io.StringIO()):\n            spec = importlib.util.spec_from_file_location('candidate', '/w/main.py')\n            candidate = importlib.util.module_from_spec(spec)\n            spec.loader.exec_module(candidate)\n    finally:\n        sys.stdin = old_stdin\n        for name, content in original_outputs.items():\n            Path(name).write_bytes(content)\n    candidate.SplitData(['7,red', '8,blue', '9,pink'])\n    expected = {'Red.txt': '100\\n7\\n', 'Blue.txt': '8\\n', 'Pink.txt': '9\\n'}\n    for name in output_names:\n        assert Path(name).read_text(encoding='utf-8') == expected.get(name, '')\n    print('OK')\nexcept Exception:\n    print('__CHECK_FAILED__')\n",
+        "expectedStdout": "OK\n"
+      }
+    ],
+    "Q2_e1": [
+      {
+        "id": "original-supplied-data",
+        "public": true,
+        "stdin": "TheData.txt\n",
+        "expectedFiles": {
+          "Red.txt": "10\n9\n1\n76\n19\n38\n34\n46\n14\n45\n37\n43\n",
+          "Green.txt": "20\n16\n21\n34\n38\n71\n13\n3\n3\n42\n5\n1\n156\n5\n",
+          "Blue.txt": "10\n22\n3\n93\n2\n100\n53\n65\n76\n34\n12\n6\n54\n62\n",
+          "Orange.txt": "15\n21\n71\n29\n18\n221\n2\n28\n54\n68\n",
+          "Yellow.txt": "30\n4\n82\n8\n21\n234\n34\n67\n",
+          "Pink.txt": "33\n29\n9\n3\n12\n4\n99\n76\n56\n102\n146\n53\n56\n46\n"
+        }
+      },
+      {
+        "id": "short-file-run",
+        "public": false,
+        "stdin": "TheData.txt\n",
+        "inputFiles": {
+          "TheData.txt": "7,red\n8,blue\n3,red\n"
+        },
+        "expectedFiles": {
+          "Red.txt": "7\n3\n",
+          "Green.txt": "",
+          "Blue.txt": "8\n",
+          "Orange.txt": "",
+          "Yellow.txt": "",
+          "Pink.txt": ""
+        }
+      }
+    ],
+    "Q3_node": [
+      {
+        "id": "node-initial-state",
+        "public": true,
+        "driverCode": "try:\n    import ast, types\n    with open('/w/main.py', encoding='utf-8') as source_file:\n        source_tree = ast.parse(source_file.read(), filename='/w/main.py')\n    candidate = types.ModuleType('candidate')\n    candidate.__file__ = '/w/main.py'\n    def safe_constant(node):\n        if isinstance(node, ast.Assign):\n            targets, value = node.targets, node.value\n        elif isinstance(node, ast.AnnAssign):\n            targets, value = [node.target], node.value\n        else:\n            return False\n        if value is None or not all(isinstance(target, ast.Name) for target in targets):\n            return False\n        try:\n            ast.literal_eval(value)\n        except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):\n            return False\n        return True\n    def declaration(node):\n        return isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) or safe_constant(node)\n    declarations = [node for node in source_tree.body if declaration(node)]\n    exec(compile(ast.fix_missing_locations(ast.Module(body=declarations, type_ignores=[])), '/w/main.py', 'exec'), candidate.__dict__)\n    node = candidate.Node(10)\n    print('PASS' if node.NodeData == 10 and node.LeftNode is None and node.RightNode is None else 'FAIL')\nexcept Exception:\n    print('FAIL')\n",
+        "expectedStdout": "PASS\n"
+      }
+    ],
+    "Q3_getters": [
+      {
+        "id": "node-getters",
+        "public": true,
+        "driverCode": "try:\n    import ast, types\n    with open('/w/main.py', encoding='utf-8') as source_file:\n        source_tree = ast.parse(source_file.read(), filename='/w/main.py')\n    candidate = types.ModuleType('candidate')\n    candidate.__file__ = '/w/main.py'\n    def safe_constant(node):\n        if isinstance(node, ast.Assign):\n            targets, value = node.targets, node.value\n        elif isinstance(node, ast.AnnAssign):\n            targets, value = [node.target], node.value\n        else:\n            return False\n        if value is None or not all(isinstance(target, ast.Name) for target in targets):\n            return False\n        try:\n            ast.literal_eval(value)\n        except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):\n            return False\n        return True\n    def declaration(node):\n        return isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) or safe_constant(node)\n    declarations = [node for node in source_tree.body if declaration(node)]\n    exec(compile(ast.fix_missing_locations(ast.Module(body=declarations, type_ignores=[])), '/w/main.py', 'exec'), candidate.__dict__)\n    root = candidate.Node(10)\n    left = candidate.Node(5)\n    right = candidate.Node(20)\n    root.LeftNode, root.RightNode = left, right\n    print('PASS' if root.GetData() == 10 and root.GetLeft() is left and root.GetRight() is right else 'FAIL')\nexcept Exception:\n    print('FAIL')\n",
+        "expectedStdout": "PASS\n"
+      }
+    ],
+    "Q3_setters": [
+      {
+        "id": "node-setters",
+        "public": true,
+        "driverCode": "try:\n    import ast, types\n    with open('/w/main.py', encoding='utf-8') as source_file:\n        source_tree = ast.parse(source_file.read(), filename='/w/main.py')\n    candidate = types.ModuleType('candidate')\n    candidate.__file__ = '/w/main.py'\n    def safe_constant(node):\n        if isinstance(node, ast.Assign):\n            targets, value = node.targets, node.value\n        elif isinstance(node, ast.AnnAssign):\n            targets, value = [node.target], node.value\n        else:\n            return False\n        if value is None or not all(isinstance(target, ast.Name) for target in targets):\n            return False\n        try:\n            ast.literal_eval(value)\n        except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):\n            return False\n        return True\n    def declaration(node):\n        return isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) or safe_constant(node)\n    declarations = [node for node in source_tree.body if declaration(node)]\n    exec(compile(ast.fix_missing_locations(ast.Module(body=declarations, type_ignores=[])), '/w/main.py', 'exec'), candidate.__dict__)\n    root = candidate.Node(10)\n    left = candidate.Node(5)\n    right = candidate.Node(20)\n    root.SetLeft(left)\n    root.SetRight(right)\n    print('PASS' if root.LeftNode is left and root.RightNode is right else 'FAIL')\nexcept Exception:\n    print('FAIL')\n",
+        "expectedStdout": "PASS\n"
+      }
+    ],
+    "Q3_tree": [
+      {
+        "id": "tree-initial-root",
+        "public": true,
+        "driverCode": "try:\n    import ast, types\n    with open('/w/main.py', encoding='utf-8') as source_file:\n        source_tree = ast.parse(source_file.read(), filename='/w/main.py')\n    candidate = types.ModuleType('candidate')\n    candidate.__file__ = '/w/main.py'\n    def safe_constant(node):\n        if isinstance(node, ast.Assign):\n            targets, value = node.targets, node.value\n        elif isinstance(node, ast.AnnAssign):\n            targets, value = [node.target], node.value\n        else:\n            return False\n        if value is None or not all(isinstance(target, ast.Name) for target in targets):\n            return False\n        try:\n            ast.literal_eval(value)\n        except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):\n            return False\n        return True\n    def declaration(node):\n        return isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) or safe_constant(node)\n    declarations = [node for node in source_tree.body if declaration(node)]\n    exec(compile(ast.fix_missing_locations(ast.Module(body=declarations, type_ignores=[])), '/w/main.py', 'exec'), candidate.__dict__)\n    root = candidate.Node(10)\n    tree = candidate.Tree(root)\n    print('PASS' if tree.FirstNode is root else 'FAIL')\nexcept Exception:\n    print('FAIL')\n",
+        "expectedStdout": "PASS\n"
+      }
+    ],
+    "Q3_root": [
+      {
+        "id": "tree-get-root",
+        "public": true,
+        "driverCode": "try:\n    import ast, types\n    with open('/w/main.py', encoding='utf-8') as source_file:\n        source_tree = ast.parse(source_file.read(), filename='/w/main.py')\n    candidate = types.ModuleType('candidate')\n    candidate.__file__ = '/w/main.py'\n    def safe_constant(node):\n        if isinstance(node, ast.Assign):\n            targets, value = node.targets, node.value\n        elif isinstance(node, ast.AnnAssign):\n            targets, value = [node.target], node.value\n        else:\n            return False\n        if value is None or not all(isinstance(target, ast.Name) for target in targets):\n            return False\n        try:\n            ast.literal_eval(value)\n        except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):\n            return False\n        return True\n    def declaration(node):\n        return isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) or safe_constant(node)\n    declarations = [node for node in source_tree.body if declaration(node)]\n    exec(compile(ast.fix_missing_locations(ast.Module(body=declarations, type_ignores=[])), '/w/main.py', 'exec'), candidate.__dict__)\n    root = candidate.Node(10)\n    tree = candidate.Tree(root)\n    print('PASS' if tree.GetRootNode() is root else 'FAIL')\nexcept Exception:\n    print('FAIL')\n",
+        "expectedStdout": "PASS\n"
+      }
+    ],
+    "Q3_insert": [
+      {
+        "id": "tree-links",
+        "public": true,
+        "driverCode": "try:\n    import ast, types\n    with open('/w/main.py', encoding='utf-8') as source_file:\n        source_tree = ast.parse(source_file.read(), filename='/w/main.py')\n    candidate = types.ModuleType('candidate')\n    candidate.__file__ = '/w/main.py'\n    def safe_constant(node):\n        if isinstance(node, ast.Assign):\n            targets, value = node.targets, node.value\n        elif isinstance(node, ast.AnnAssign):\n            targets, value = [node.target], node.value\n        else:\n            return False\n        if value is None or not all(isinstance(target, ast.Name) for target in targets):\n            return False\n        try:\n            ast.literal_eval(value)\n        except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):\n            return False\n        return True\n    def declaration(node):\n        return isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) or safe_constant(node)\n    declarations = [node for node in source_tree.body if declaration(node)]\n    exec(compile(ast.fix_missing_locations(ast.Module(body=declarations, type_ignores=[])), '/w/main.py', 'exec'), candidate.__dict__)\n    root = candidate.Node(10)\n    tree = candidate.Tree(root)\n    inserted = []\n    for value in [20,5,15,7]:\n        new_node = candidate.Node(value)\n        inserted.append(new_node)\n        tree.Insert(new_node)\n    root = tree.GetRootNode()\n    print('PASS' if root.GetLeft() is inserted[1] and root.GetRight() is inserted[0] and root.GetLeft().GetRight() is inserted[3] and root.GetRight().GetLeft() is inserted[2] else 'FAIL')\nexcept Exception:\n    print('FAIL')\n",
+        "expectedStdout": "PASS\n"
+      },
+      {
+        "id": "tree-equal-right",
+        "public": false,
+        "driverCode": "try:\n    import ast, types\n    with open('/w/main.py', encoding='utf-8') as source_file:\n        source_tree = ast.parse(source_file.read(), filename='/w/main.py')\n    candidate = types.ModuleType('candidate')\n    candidate.__file__ = '/w/main.py'\n    def safe_constant(node):\n        if isinstance(node, ast.Assign):\n            targets, value = node.targets, node.value\n        elif isinstance(node, ast.AnnAssign):\n            targets, value = [node.target], node.value\n        else:\n            return False\n        if value is None or not all(isinstance(target, ast.Name) for target in targets):\n            return False\n        try:\n            ast.literal_eval(value)\n        except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):\n            return False\n        return True\n    def declaration(node):\n        return isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) or safe_constant(node)\n    declarations = [node for node in source_tree.body if declaration(node)]\n    exec(compile(ast.fix_missing_locations(ast.Module(body=declarations, type_ignores=[])), '/w/main.py', 'exec'), candidate.__dict__)\n    root = candidate.Node(10)\n    tree = candidate.Tree(root)\n    inserted = []\n    for value in [10,5,12,11]:\n        new_node = candidate.Node(value)\n        inserted.append(new_node)\n        tree.Insert(new_node)\n    root = tree.GetRootNode()\n    print('PASS' if root.GetRight() is inserted[0] and root.GetLeft() is inserted[1] and root.GetRight().GetRight() is inserted[2] and root.GetRight().GetRight().GetLeft() is inserted[3] else 'FAIL')\nexcept Exception:\n    print('FAIL')\n",
+        "expectedStdout": "PASS\n"
+      }
+    ],
+    "Q3_inorder": [
+      {
+        "id": "tree-inorder",
+        "public": true,
+        "driverCode": "try:\n    import ast, types\n    with open('/w/main.py', encoding='utf-8') as source_file:\n        source_tree = ast.parse(source_file.read(), filename='/w/main.py')\n    candidate = types.ModuleType('candidate')\n    candidate.__file__ = '/w/main.py'\n    def safe_constant(node):\n        if isinstance(node, ast.Assign):\n            targets, value = node.targets, node.value\n        elif isinstance(node, ast.AnnAssign):\n            targets, value = [node.target], node.value\n        else:\n            return False\n        if value is None or not all(isinstance(target, ast.Name) for target in targets):\n            return False\n        try:\n            ast.literal_eval(value)\n        except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):\n            return False\n        return True\n    def declaration(node):\n        return isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) or safe_constant(node)\n    declarations = [node for node in source_tree.body if declaration(node)]\n    exec(compile(ast.fix_missing_locations(ast.Module(body=declarations, type_ignores=[])), '/w/main.py', 'exec'), candidate.__dict__)\n    root = candidate.Node(10)\n    tree = candidate.Tree(root)\n    inserted = []\n    for value in [20,5,15,7]:\n        new_node = candidate.Node(value)\n        inserted.append(new_node)\n        tree.Insert(new_node)\n    import contextlib, io\n    expected = [5,7,10,15,20]\n    passed = False\n    for emit in (getattr(candidate, 'OutputInOrder', None), getattr(tree, 'OutputInOrder', None)):\n        if emit is None:\n            continue\n        result = io.StringIO()\n        try:\n            with contextlib.redirect_stdout(result):\n                emit(tree.GetRootNode())\n            passed = [int(part) for part in result.getvalue().split()] == expected\n        except Exception:\n            passed = False\n        if passed:\n            break\n    print('PASS' if passed else 'FAIL')\nexcept Exception:\n    print('FAIL')\n",
+        "expectedStdout": "PASS\n"
+      },
+      {
+        "id": "tree-inorder-duplicate",
+        "public": false,
+        "driverCode": "try:\n    import ast, types\n    with open('/w/main.py', encoding='utf-8') as source_file:\n        source_tree = ast.parse(source_file.read(), filename='/w/main.py')\n    candidate = types.ModuleType('candidate')\n    candidate.__file__ = '/w/main.py'\n    def safe_constant(node):\n        if isinstance(node, ast.Assign):\n            targets, value = node.targets, node.value\n        elif isinstance(node, ast.AnnAssign):\n            targets, value = [node.target], node.value\n        else:\n            return False\n        if value is None or not all(isinstance(target, ast.Name) for target in targets):\n            return False\n        try:\n            ast.literal_eval(value)\n        except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):\n            return False\n        return True\n    def declaration(node):\n        return isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) or safe_constant(node)\n    declarations = [node for node in source_tree.body if declaration(node)]\n    exec(compile(ast.fix_missing_locations(ast.Module(body=declarations, type_ignores=[])), '/w/main.py', 'exec'), candidate.__dict__)\n    root = candidate.Node(8)\n    tree = candidate.Tree(root)\n    inserted = []\n    for value in [8,6,9,1]:\n        new_node = candidate.Node(value)\n        inserted.append(new_node)\n        tree.Insert(new_node)\n    import contextlib, io\n    expected = [1,6,8,8,9]\n    passed = False\n    for emit in (getattr(candidate, 'OutputInOrder', None), getattr(tree, 'OutputInOrder', None)):\n        if emit is None:\n            continue\n        result = io.StringIO()\n        try:\n            with contextlib.redirect_stdout(result):\n                emit(tree.GetRootNode())\n            passed = [int(part) for part in result.getvalue().split()] == expected\n        except Exception:\n            passed = False\n        if passed:\n            break\n    print('PASS' if passed else 'FAIL')\nexcept Exception:\n    print('FAIL')\n",
+        "expectedStdout": "PASS\n"
+      }
+    ],
+    "Q3_main": [
+      {
+        "id": "tree-main",
+        "public": true,
+        "expectedStdout": "PASS\n",
+        "driverCode": "try:\n    import ast, types\n    with open('/w/main.py', encoding='utf-8') as source_file:\n        source_tree = ast.parse(source_file.read(), filename='/w/main.py')\n    candidate = types.ModuleType('candidate')\n    candidate.__file__ = '/w/main.py'\n    def safe_constant(node):\n        if isinstance(node, ast.Assign):\n            targets, value = node.targets, node.value\n        elif isinstance(node, ast.AnnAssign):\n            targets, value = [node.target], node.value\n        else:\n            return False\n        if value is None or not all(isinstance(target, ast.Name) for target in targets):\n            return False\n        try:\n            ast.literal_eval(value)\n        except (ValueError, TypeError, SyntaxError, MemoryError, RecursionError):\n            return False\n        return True\n    def declaration(node):\n        return isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) or safe_constant(node)\n    declarations = [node for node in source_tree.body if declaration(node)]\n    exec(compile(ast.fix_missing_locations(ast.Module(body=declarations, type_ignores=[])), '/w/main.py', 'exec'), candidate.__dict__)\n    import contextlib, io\n    node_events, tree_events, insert_events, output_events = [], [], [], []\n    original_node_init = candidate.Node.__init__\n    def observe_node(self, *args, **kwargs):\n        original_node_init(self, *args, **kwargs)\n        node_events.append((self, self.GetData()))\n    candidate.Node.__init__ = observe_node\n    original_tree_init = candidate.Tree.__init__\n    def observe_tree(self, *args, **kwargs):\n        root_argument = args[0] if args else next(iter(kwargs.values()), None)\n        original_tree_init(self, *args, **kwargs)\n        tree_events.append((self, root_argument))\n    candidate.Tree.__init__ = observe_tree\n    original_insert = candidate.Tree.Insert\n    insert_depth = 0\n    def observe_insert(self, *args, **kwargs):\n        global insert_depth\n        new_node = args[0] if args else next(iter(kwargs.values()), None)\n        if insert_depth == 0:\n            insert_events.append((self, new_node))\n        insert_depth += 1\n        try:\n            return original_insert(self, *args, **kwargs)\n        finally:\n            insert_depth -= 1\n    candidate.Tree.Insert = observe_insert\n    output_depth = 0\n    def observe_output(original, receiver, *args, **kwargs):\n        global output_depth\n        root_argument = args[0] if args else next(iter(kwargs.values()), None)\n        if output_depth == 0:\n            output_events.append((receiver, root_argument))\n        output_depth += 1\n        try:\n            return original(*args, **kwargs)\n        finally:\n            output_depth -= 1\n    original_global_output = getattr(candidate, 'OutputInOrder', None)\n    if original_global_output is not None:\n        def observe_global_output(*args, **kwargs):\n            return observe_output(original_global_output, None, *args, **kwargs)\n        candidate.OutputInOrder = observe_global_output\n    original_method_output = getattr(candidate.Tree, 'OutputInOrder', None)\n    if original_method_output is not None:\n        def observe_method_output(self, *args, **kwargs):\n            return observe_output(lambda *a, **k: original_method_output(self, *a, **k), self, *args, **kwargs)\n        candidate.Tree.OutputInOrder = observe_method_output\n    main_nodes = [node for node in source_tree.body if not declaration(node)]\n    candidate.__dict__['__name__'] = '__main__'\n    result = io.StringIO()\n    with contextlib.redirect_stdout(result):\n        exec(compile(ast.fix_missing_locations(ast.Module(body=main_nodes, type_ignores=[])), '/w/main.py', 'exec'), candidate.__dict__)\n    passed = False\n    for built_tree, root_argument in tree_events:\n        calls = [node for owner, node in insert_events if owner is built_tree]\n        if len(calls) != 4 or len(output_events) != 1:\n            continue\n        receiver, output_root = output_events[0]\n        if receiver is not None and receiver is not built_tree:\n            continue\n        if output_root is not root_argument or built_tree.GetRootNode() is not root_argument:\n            continue\n        used_nodes = [root_argument, *calls]\n        positions = [next((index for index, (node, _) in enumerate(node_events) if node is used), -1) for used in used_nodes]\n        values = [next((value for node, value in node_events if node is used), None) for used in used_nodes]\n        if values == [10, 20, 5, 15, 7] and all(left < right for left, right in zip(positions, positions[1:])) and positions[0] >= 0:\n            try:\n                passed = [int(part) for part in result.getvalue().split()] == [5, 7, 10, 15, 20]\n            except ValueError:\n                passed = False\n            if passed:\n                break\n    print('PASS' if passed else 'FAIL')\nexcept Exception:\n    print('FAIL')\n"
+      }
+    ]
+  },
+  "referenceSolutions": {
+    "Q1": "\"\"\"Reference for Question 1 of the original English practice package.\"\"\"\n\nQueue = [-1] * 20\nHeadPointer = -1\nTailPointer = -1\nNumberItems = 0\n\n\ndef Enqueue(InputData):\n    global HeadPointer, TailPointer, NumberItems\n    if NumberItems == 20:\n        return False\n    TailPointer = (TailPointer + 1) % 20\n    Queue[TailPointer] = InputData\n    if NumberItems == 0:\n        HeadPointer = TailPointer\n    NumberItems += 1\n    return True\n\n\ndef Dequeue():\n    global HeadPointer, TailPointer, NumberItems\n    if NumberItems == 0:\n        return -1\n    value = Queue[HeadPointer]\n    NumberItems -= 1\n    if NumberItems == 0:\n        HeadPointer = -1\n        TailPointer = -1\n    else:\n        HeadPointer = (HeadPointer + 1) % 20\n    return value\n\n\ndef main():\n    for number in range(1, 26):\n        result = Enqueue(number)\n        print(f'{number} {\"Successful\" if result else \"Unsuccessful\"}')\n    print(Dequeue())\n    print(Dequeue())\n\n\nif __name__ == '__main__':\n    main()\n",
+    "Q2": "\"\"\"Runnable reference for Question 2 of 9618/41, May/June 2025.\"\"\"\n\n\ndef ReadData():\n    file_name = input(\"Enter file name: \")\n    try:\n        with open(file_name, \"r\", encoding=\"utf-8\") as source:\n            return [line.rstrip(\"\\r\\n\") for line in source]\n    except OSError:\n        print(\"Could not read the file\")\n        return []\n\n\ndef StoreData(DataToStore, FileName):\n    try:\n        with open(FileName, \"a\", encoding=\"utf-8\") as output:\n            for item in DataToStore:\n                output.write(str(item) + \"\\n\")\n    except OSError:\n        print(\"Could not write the file\")\n\n\ndef SplitData(DataArray):\n    Red = []\n    Green = []\n    Blue = []\n    Orange = []\n    Yellow = []\n    Pink = []\n\n    for row in DataArray:\n        value, colour = row.split(\",\")\n        colour = colour.strip().lower()\n        if colour == \"red\":\n            Red.append(value)\n        elif colour == \"green\":\n            Green.append(value)\n        elif colour == \"blue\":\n            Blue.append(value)\n        elif colour == \"orange\":\n            Orange.append(value)\n        elif colour == \"yellow\":\n            Yellow.append(value)\n        elif colour == \"pink\":\n            Pink.append(value)\n\n    StoreData(Red, \"Red.txt\")\n    StoreData(Green, \"Green.txt\")\n    StoreData(Blue, \"Blue.txt\")\n    StoreData(Orange, \"Orange.txt\")\n    StoreData(Yellow, \"Yellow.txt\")\n    StoreData(Pink, \"Pink.txt\")\n\n\nDataFromFile = ReadData()\nSplitData(DataFromFile)\n",
+    "Q3": "\"\"\"Teacher reference for the binary-tree task in 9618/41/M/J/25 Q3.\"\"\"\n\n\nclass Node:\n    def __init__(self, pNodeData):\n        self.NodeData = pNodeData  # integer\n        self.LeftNode = None  # Node or None\n        self.RightNode = None  # Node or None\n\n    def GetLeft(self):\n        return self.LeftNode\n\n    def GetRight(self):\n        return self.RightNode\n\n    def GetData(self):\n        return self.NodeData\n\n    def SetLeft(self, NewNode):\n        self.LeftNode = NewNode\n\n    def SetRight(self, NewNode):\n        self.RightNode = NewNode\n\n\nclass Tree:\n    def __init__(self, FirstNode):\n        self.FirstNode = FirstNode  # Node\n\n    def GetRootNode(self):\n        return self.FirstNode\n\n    def Insert(self, NewNode):\n        CurrentNode = self.FirstNode\n        while True:\n            if NewNode.GetData() < CurrentNode.GetData():\n                if CurrentNode.GetLeft() is None:\n                    CurrentNode.SetLeft(NewNode)\n                    return\n                CurrentNode = CurrentNode.GetLeft()\n            else:\n                if CurrentNode.GetRight() is None:\n                    CurrentNode.SetRight(NewNode)\n                    return\n                CurrentNode = CurrentNode.GetRight()\n\n\ndef OutputInOrder(RootNode):\n    if RootNode.GetLeft() is not None:\n        OutputInOrder(RootNode.GetLeft())\n    print(RootNode.GetData())\n    if RootNode.GetRight() is not None:\n        OutputInOrder(RootNode.GetRight())\n\n\n# The paper asks for a main program, without requiring a particular guard.\nFirstNode = Node(10)\nSecondNode = Node(20)\nThirdNode = Node(5)\nFourthNode = Node(15)\nFifthNode = Node(7)\nMyTree = Tree(FirstNode)\nMyTree.Insert(SecondNode)\nMyTree.Insert(ThirdNode)\nMyTree.Insert(FourthNode)\nMyTree.Insert(FifthNode)\nOutputInOrder(MyTree.GetRootNode())\n"
+  }
+}

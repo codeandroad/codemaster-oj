@@ -1,5 +1,6 @@
 "use client";
 
+import { PublicationGuide } from "@/components/problem-publication-status";
 import { useState } from "react";
 import { MathContent } from "@/components/math-content";
 import { useLocale, type AppLocale } from "@/components/locale-context";
@@ -53,19 +54,20 @@ interface ReviewProblemDetail extends Omit<ProductionProblem, "samples" | "tests
 }
 
 const statusLabels: Record<ReviewStatus, string> = {
-  pending: "待审核",
-  approved: "已纳入排名积分",
-  rejected: "未纳入排名积分",
+  pending: "待公开审核",
+  approved: "已公开",
+  rejected: "审核未通过",
   revoked: "已撤下",
 };
 const MAX_BATCH_APPROVE = 100;
 
 const reviewEnglish: Record<string, string> = {
+  "待公开审核": "Awaiting public review", "已公开": "Public", "审核未通过": "Review rejected",
   "待审核": "Pending", "已纳入排名积分": "Eligible for leaderboard points", "未纳入排名积分": "Not eligible", "已撤下": "Withdrawn", "全部": "All",
-  "题目排名积分资格审核": "Problem leaderboard points review",
+  "题目排名积分资格审核": "Public problem review",
   "列出校内题库已发布的当前及历史版本。教师可以发布题目供教学使用；只有管理员审核通过的版本，后续首次 AC 才计入全校积分排行榜。": "Review current and past published versions. Teachers may publish problems for teaching; only administrator-approved versions award school leaderboard points for future first accepted submissions.",
   "刷新列表": "Refresh list", "新版本须重新审核；已有 AC 不追溯计分，学生须重新正式提交并通过才获得排名积分。已公开版本（含历史版）可撤下，停止后续公开与新增榜分，历史榜分保留；撤下后如需恢复，请发布新版本。": "Each new version needs review. Earlier accepted submissions receive no retroactive points; students must submit and pass again. Public versions can be withdrawn, while historical leaderboard points remain. Publish a new version to restore access.",
-  "审核状态筛选": "Filter review status", "题目 / 版本": "Problem / version", "上传教师": "Teacher", "题库 / 题目可见性": "Bank / visibility", "发布时间": "Published", "积分资格": "Points eligibility", "已 AC 人数": "Students with AC", "操作": "Actions",
+  "审核状态筛选": "Filter review status", "题目 / 版本": "Problem / version", "上传教师": "Teacher", "题库 / 题目可见性": "Bank / visibility", "版本启用时间": "Version released", "积分资格": "Points eligibility", "公开状态": "Public status", "已 AC 人数": "Students with AC", "操作": "Actions",
   "当前版": "Current version", "历史版": "Past version", "全校自由练习可见": "Visible to all school students", "仅指定活动学生可见": "Visible only in assigned activities",
   "已撤下 · 需发布新版": "Withdrawn · publish a new version", "复审通过": "Approve on review", "通过": "Approve", "不通过": "Reject", "撤下": "Withdraw", "历史版不可审核": "Past version cannot be reviewed",
   "当前没有待审核的题目版本。": "No problem versions awaiting review.", "此状态下暂无题目版本。": "No problem versions with this status.",
@@ -115,7 +117,7 @@ export function ProblemReviews() {
   const banks = useData<{ items: ReviewBank[] }>("problem-banks");
   const action = useMutation();
   const bankAction = useMutation();
-  const [filter, setFilter] = useState<ReviewStatus | "all">("pending");
+  const [filter, setFilter] = useState<ReviewStatus | "all">("all");
   const [selectedVersionIds, setSelectedVersionIds] = useState<string[]>([]);
   const [approving, setApproving] = useState<string | null>(null);
   const [bankId, setBankId] = useState("");
@@ -182,18 +184,16 @@ export function ProblemReviews() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold">{t("题目排名积分资格审核")}</h2>
+          <h2 className="text-lg font-bold">{locale === "en" ? "Public problem review" : "题目公开审核"}</h2>
           <p className="mt-1 text-sm leading-6 text-muted-foreground">
-            {t("列出校内题库已发布的当前及历史版本。教师可以发布题目供教学使用；只有管理员审核通过的版本，后续首次 AC 才计入全校积分排行榜。")}
+            {locale === "en" ? "Approval opens a problem for school-wide practice and future first-AC points. Before approval, a released version is available only to its assigned students." : "审核通过后，题目向全校开放自由练习并参与后续首次 AC 积分。审核前的教学版本仅指定学生可用。"}
           </p>
         </div>
         <Button variant="secondary" size="sm" disabled={reviews.loading || action.busy} onClick={() => { setSelectedVersionIds([]); reviews.reload(); }}>{t("刷新列表")}</Button>
       </div>
-      <p className="rounded-md border border-border bg-surface-subtle px-4 py-3 text-xs leading-5 text-muted-foreground">
-        {t("旧版已公开题目保留学生访问，但没有自动获得积分资格；当前版本审核不通过会停止公开。新版本仍须审核，历史 AC 不追溯计分。")}
-      </p>
+      <PublicationGuide/>
       <div className="flex flex-wrap gap-2" role="group" aria-label={t("审核状态筛选")}>
-        {(["pending", "all", "approved", "rejected", "revoked"] as const).map((value) => (
+        {(["all", "pending", "approved", "rejected", "revoked"] as const).map((value) => (
           <Button key={value} type="button" size="sm" variant={filter === value ? "primary" : "secondary"} aria-pressed={filter === value} disabled={action.busy} onClick={() => { setFilter(value); setSelectedVersionIds([]); }}>
             {t(value === "all" ? "全部" : statusLabels[value])}
             <span className="ml-1 tabular-nums">{items.filter((item) => matchesFilter(item, value)).length}</span>
@@ -213,7 +213,7 @@ export function ProblemReviews() {
           <table className="w-full min-w-[940px] text-left text-sm">
             <thead className="bg-surface-subtle text-xs text-muted-foreground"><tr>
               <th scope="col" className="w-10 px-4 py-3"><input type="checkbox" aria-label={t(approvableShown.length > MAX_BATCH_APPROVE ? "选择当前列表前 100 道可通过题目" : "选择当前列表可通过题目")} checked={allSelectableShownSelected} disabled={!selectableShown.length || action.busy} onChange={(event) => setSelectedVersionIds(event.target.checked ? selectableShown.map((item) => item.versionId) : [])} /></th>
-              {["题目 / 版本", "上传教师", "题库 / 题目可见性", "发布时间", "积分资格", "已 AC 人数", "操作"].map((label) => <th key={label} scope="col" className="px-4 py-3">{t(label)}</th>)}
+              {["题目 / 版本", "上传教师", "题库 / 题目可见性", "版本启用时间", "公开状态", "已 AC 人数", "操作"].map((label) => <th key={label} scope="col" className="px-4 py-3">{t(label)}</th>)}
             </tr></thead>
             <tbody>
               {shown.map((item) => {

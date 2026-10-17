@@ -196,12 +196,13 @@ test('prototype flows persist identity claims, imports, drafts, favorites, setti
   await teacher(`/timed-practices/${practice.id}/archive`,{});
   await admin(`/problem-banks/${bank.id}`,{visibility:'private'},'PATCH');
   assert.equal((await secondTeacher('/problem-banks')).items.some(item=>item.id===bank.id),false);
-  const managerPinned=await secondTeacher(`/problems/${complete.id}?versionId=${revisedSample.versionId}`);
-  assert.equal(managerPinned.canEdit,false);assert.equal(managerPinned.referenceCode,undefined);assert.equal(managerPinned.tests,undefined);assert.equal(managerPinned.samples.some(sample=>sample.name==='停用公开样例'),false);
-  assert.equal((await secondTeacher(`/problems/${complete.id}?versionId=${draftPin.problems[0].versionId}`)).versionId,third.versionId);
+  // Optional class source tags do not grant a co-teacher access to another
+  // owner’s private activity versions. Named students retain their exact pins.
+  await secondTeacher(`/problems/${complete.id}?versionId=${revisedSample.versionId}`,undefined,'GET',404);
+  await secondTeacher(`/problems/${complete.id}?versionId=${draftPin.problems[0].versionId}`,undefined,'GET',404);
   await secondTeacher(`/problems/${complete.id}?versionId=${complete.versionId}`,undefined,'GET',404);
   await pool.query('UPDATE problems SET archived_at=now() WHERE id=$1',[complete.id]);
-  assert.equal((await secondTeacher(`/problems/${complete.id}?versionId=${revisedSample.versionId}`)).canEdit,false);
+  await secondTeacher(`/problems/${complete.id}?versionId=${revisedSample.versionId}`,undefined,'GET',404);
   assert.equal((await student(`/problems/${complete.id}?versionId=${archivedStudentAssignment.problems[0].versionId}`)).versionId,third.versionId);
   await secondTeacher(`/problems/${complete.id}`,undefined,'GET',404);
   await student(`/problems/${complete.id}?versionId=${complete.versionId}`,undefined,'GET',404);

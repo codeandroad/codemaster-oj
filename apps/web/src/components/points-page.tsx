@@ -9,6 +9,7 @@ import styles from "./points-page.module.css";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { useLocale, type AppLocale } from "./locale-context";
+import { PageHeader } from "./page-chrome";
 import {
   apiMessage,
   productionApi,
@@ -384,15 +385,14 @@ function Leaderboard({ user, staff, workspace, personalPoints }: { user: CampusU
   };
 
   return (
-    <section className={styles.page} aria-labelledby="leaderboard-heading">
-      <header className={styles.hero}>
-        <span className={styles.heroEmblem} aria-hidden="true"><Trophy size={22} strokeWidth={1.6} /></span>
-        <h1 id="leaderboard-heading">{ui(locale, "积分排行榜", "Leaderboard")}</h1>
-        {!staff && <div className={styles.personalSummary}>
+    <section className={styles.page} aria-label={ui(locale, "积分排行榜", "Leaderboard")}>
+      <PageHeader title={ui(locale, "积分排行榜", "Leaderboard")}/>
+      {!staff && <div className={styles.summaryBar}>
+        <div className={styles.personalSummary}>
           <span>{ui(locale, "累计积分", "Total points")}<strong>{personalPoints ? rankNumber.format(personalPoints.points) : "…"}</strong></span>
           <span>{ui(locale, "排行积分", "Leaderboard points")}<strong>{personalPoints ? rankNumber.format(personalPoints.rankPoints) : "…"}</strong></span>
-        </div>}
-      </header>
+        </div>
+      </div>}
       <State data={contexts}>
         {contexts.data && (
           <LeaderboardTable user={user} classId={effectiveClassId} classes={classes} onClassChange={selectClass} configuredFields={contexts.data.visibleFields} canManage={workspace === "admin" && contexts.data.canManage} staff={staff} workspace={workspace} onSettingsUpdated={contexts.reload} />

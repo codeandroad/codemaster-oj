@@ -1,0 +1,139 @@
+[
+  {
+    "key": "9618_s23_41",
+    "year": 2023,
+    "season": "May/June",
+    "variant": "41",
+    "files": {
+      "qp": {
+        "sha256": "44dd77e6e14a4189d61d5b4c21917b0f79b21f9a8999c6e6219c40e7785807cd",
+        "pages": 12
+      },
+      "sf": {
+        "sha256": "9c8419cda1f9b0a19408824e774f66808bf92538ae25d4797f3736cfd3da1730",
+        "textFiles": {
+          "AnimalData.txt": "horse\r\nturtle\r\nlion\r\nwhale\r\nrabbit\r\neagle\r\nelephant\r\nhamster",
+          "ColourData.txt": "red\r\ngreen\r\nblack\r\ngrey\r\norange\r\npurple\r\nyellow\r\nwhite\r\nblue\r\npink",
+          "Data.txt": "10\r\n4\r\n5\r\n13\r\n25\r\n31\r\n4\r\n66\r\n12\r\n5\r\n0\r\n11\r\n15\r\n20\r\n21\r\n12\r\n33\r\n49\r\n12\r\n12\r\n7\r\n7\r\n4\r\n22\r\n0"
+        }
+      },
+      "ms": {
+        "sha256": "3ffc9e38590a391a00768c5852ebe94f9d0e980ca38990bc32ce3b03331e1014",
+        "pages": 38
+      }
+    }
+  },
+  {
+    "key": "9618_s23_42",
+    "year": 2023,
+    "season": "May/June",
+    "variant": "42",
+    "files": {
+      "qp": {
+        "sha256": "171cd998f187c6abf16da41ab3b32a174c3bf094e9fddc6ccd3372362981df40",
+        "pages": 12
+      },
+      "sf": {
+        "sha256": "05d0d3cef2f086d0c780091424989848044c53e55641c96b4ff2450b754e6afb",
+        "textFiles": {
+          "Employees.txt": "15.22\r\n12452\r\nJunior Developer\r\n17.80\r\n21548\r\nWeb Developer\r\n22.50\r\n02586\r\n5.25\r\nInterface Manager\r\n12.50\r\n65912\r\nAssistant Tester\r\n33.49\r\n42004\r\n2.00\r\nTeam Leader\r\n10.57\r\n82610\r\nIntern\r\n21.58\r\n51947\r\n10.50\r\nJunior Testing Manager\r\n31.59\r\n51847\r\n7.5\r\nSystem analyst\r\n",
+          "HoursWeek1.txt": "21548\r\n50.0\r\n12452\r\n48.0\r\n51947\r\n51\r\n82610\r\n47.5\r\n02586\r\n28.5\r\n65912\r\n38.0\r\n42004\r\n22.5\r\n51847\r\n10.0\r\n"
+        }
+      },
+      "ms": {
+        "sha256": "f398e772f129c91e740db9f03f321536248e86b73e147c3da1d6cb79bf1a211d",
+        "pages": 37
+      }
+    }
+  },
+  {
+    "key": "9618_s23_43",
+    "year": 2023,
+    "season": "May/June",
+    "variant": "43",
+    "files": {
+      "qp": {
+        "sha256": "609cadb80084f87daa10c333921c29fe6e8f768d86a55acff936fdd90cbad12c",
+        "pages": 12
+      },
+      "sf": {
+        "sha256": "c1288d76fcc783c9a01f36645cc803a957a0da6a5007e8c82badc514a422df46",
+        "textFiles": {
+          "AnimalData.txt": "horse\r\nturtle\r\nlion\r\nwhale\r\nrabbit\r\neagle\r\nelephant\r\nhamster",
+          "ColourData.txt": "red\r\ngreen\r\nblack\r\ngrey\r\norange\r\npurple\r\nyellow\r\nwhite\r\nblue\r\npink",
+          "Data.txt": "10\r\n4\r\n5\r\n13\r\n25\r\n31\r\n4\r\n66\r\n12\r\n5\r\n0\r\n11\r\n15\r\n20\r\n21\r\n12\r\n33\r\n49\r\n12\r\n12\r\n7\r\n7\r\n4\r\n22\r\n0"
+        }
+      },
+      "ms": {
+        "sha256": "31d11e334df2a3a5654b1d7eb631c990614fe25de792782c575bc452c5606948",
+        "pages": 38
+      }
+    }
+  },
+  {
+    "key": "9618_w23_41",
+    "year": 2023,
+    "season": "October/November",
+    "variant": "41",
+    "files": {
+      "sf": {
+        "sha256": "bc2b80f3e06c359e14553390ff7125488915566eebd2d4b8c6813fb7ad637754",
+        "textFiles": {
+          "QueueData.txt": "1234\r\n1568\r\n9512\r\n4567\r\n8512\r\n4125\r\n9651\r\n4851\r\n2520\r\n3265\r\n8966\r\n8512\r\n4567\r\n8512\r\n4125\r\n9512\r\n4567\r\n8512\r\n8512\r\n4567\r\n8512\r\n4125\r\n2520"
+        }
+      },
+      "qp": {
+        "sha256": "0a4fe7dda1802ed15f4181bc00334e2ababacc86f5201e6fb134ad8e597dea54",
+        "pages": 12
+      },
+      "ms": {
+        "sha256": "69d4bbeaa764394bf74f8d38ef718edad2784d897fe8ceefa140b378df9ec1a3",
+        "pages": 37
+      }
+    }
+  },
+  {
+    "key": "9618_w23_42",
+    "year": 2023,
+    "season": "October/November",
+    "variant": "42",
+    "files": {
+      "sf": {
+        "sha256": "60e30a8ca8ca7ca2cc481caa341287ed67c85d5b551033faa2af6797cd677067",
+        "textFiles": {
+          "StackData.txt": "a\r\nb\r\nd\r\nf\r\ng\r\nu\r\ne\r\nh\r\ni\r\nk\r\no\r\nh\r\nf\r\nx\r\ns\r\na\r\nq\r\nf\r\ng\r\nj\r\no\r\np\r\nh\r\nr\r\ny\r\nf\r\nd\r\nb\r\nh\r\nj\r\nk\r\nm\r\nn\r\nn\r\nb\r\nv\r\nc\r\nd\r\nw\r\ne\r\ne\r\ne\r\nt\r\ny\r\nu\r\nh\r\nj\r\nk\r\no\r\np\r\nf\r\nd\r\ne\r\nw\r\nq\r\nq\r\nc\r\ng\r\ny\r\ne\r\nf\r\nt\r\nb\r\nj\r\nu\r\ni\r\nl\r\nj\r\nm\r\nb\r\nd\r\nw\r\nf\r\nt\r\ng\r\ng\r\nh\r\nh\r\ni\r\nu\r\ne\r\nw\r\ns\r\nq\r\nd\r\nc\r\nx\r\nz\r\np\r\no\r\nu\r\nt\r\ng\r\nj\r\nk\r\nn\r\nc\r\ns\r\nx\r\nt"
+        }
+      },
+      "qp": {
+        "sha256": "001ea14f27009c08be7f467f60fd6574bcd1fff3e4e2e2cd90c6ed7c8b46a3da",
+        "pages": 16
+      },
+      "ms": {
+        "sha256": "3b02e55e7e923777a0d55862e721c481719e0cc3aea4890b51dd49d8868063b0",
+        "pages": 34
+      }
+    }
+  },
+  {
+    "key": "9618_w23_43",
+    "year": 2023,
+    "season": "October/November",
+    "variant": "43",
+    "files": {
+      "sf": {
+        "sha256": "c1157527dce4fc1ee3005ee7592ccf5936f8dbc2127b2eb9f808facb40b43417",
+        "textFiles": {
+          "QueueData.txt": "1234\r\n1568\r\n9512\r\n4567\r\n8512\r\n4125\r\n9651\r\n4851\r\n2520\r\n3265\r\n8966\r\n8512\r\n4567\r\n8512\r\n4125\r\n9512\r\n4567\r\n8512\r\n8512\r\n4567\r\n8512\r\n4125\r\n2520"
+        }
+      },
+      "qp": {
+        "sha256": "e5cc991f99cd5163b942ccaa776f34d91a12f103bb45642f4c301407c617852f",
+        "pages": 12
+      },
+      "ms": {
+        "sha256": "10deab183778ecd27e3442d9dc98bc98096e10d1240e8bd6d214593509e57b51",
+        "pages": 37
+      }
+    }
+  }
+]

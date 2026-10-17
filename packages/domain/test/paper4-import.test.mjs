@@ -62,3 +62,19 @@ test('JSON cannot smuggle references or extra fields into a draft', async () => 
   json.questions[0].unexpected = true;
   assert.throws(() => parsePaper4Import(packageBody('extra.json', Buffer.from(JSON.stringify(json)))), errorCode('PAPER4_IMPORT'));
 });
+
+
+test('exam classification survives import preview and rejects invalid or extra metadata', async () => {
+ const manifest=JSON.parse(await readFile(new URL('paper4-english-practice.json',sample),'utf8'));
+ Object.assign(manifest.paper,{examYear:2025,examSession:'summer',examVariant:41});
+ const parse=()=>parsePaper4Import(packageBody('classified.json',Buffer.from(JSON.stringify(manifest))));
+ const result=parse();
+ for(const metadata of ['examYear','examSession','examVariant']){
+  assert.equal(result.preview[metadata],manifest.paper[metadata]);
+  assert.equal(result.createBody[metadata],manifest.paper[metadata]);
+ }
+ for(const [field,value] of [['examYear','2025'],['examYear',2025.5],['examSession','winter'],['examVariant',44]]){
+  const old=manifest.paper[field];manifest.paper[field]=value;
+  assert.throws(parse,error=>error.status===400);manifest.paper[field]=old;
+ }
+});

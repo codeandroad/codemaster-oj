@@ -14,6 +14,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ProblemPublicationStatus } from "@/components/problem-publication-status";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
 import {
   isPending,
@@ -293,7 +294,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
               onClick={() => setPublish(true)}
             >
               <Send size={15} />
-              {tr("发布", "Publish")}
+              {bankVisibility === "school" ? tr("提交公开审核", "Request public review") : tr("启用教学版本", "Release for teaching")}
             </Button>
           </div>
         }
@@ -320,13 +321,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
         >
           {tr("整理分组", "Organize groups")}
         </Button>
-        <StatusPill
-          status={
-            saved?.published
-              ? tr("已发布", "Published")
-              : validationStatusLabel(saved?.validationStatus ?? "Draft", locale)
-          }
-        />
+        {saved ? <ProblemPublicationStatus problem={saved} bankVisibility={bankVisibility}/> : <StatusPill status={tr("草稿", "Draft")}/>}
         {saved && <span className="text-xs text-muted-foreground">{reviewVisibilityLabel(saved, bankVisibility, locale)}</span>}
         {dirty && <span className="text-xs text-warning">{tr("有未保存修改", "Unsaved changes")}</span>}
       </div>
@@ -769,7 +764,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                 disabled={!editable || !saved?.canPublish || dirty || action.busy}
                 onClick={() => setPublish(true)}
               >
-                {tr("发布", "Publish")}
+                {bankVisibility === "school" ? tr("提交公开审核", "Request public review") : tr("启用教学版本", "Release for teaching")}
               </Button>
             </aside>
           </div>
@@ -829,7 +824,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
         </Modal>
       )}
       {publish && saved && (
-        <Modal title={tr("确认发布题目版本", "Publish problem version?")} onClose={() => setPublish(false)}>
+        <Modal title={bankVisibility === "school" ? tr("提交公开审核", "Request public review") : tr("启用教学版本", "Release for teaching")} onClose={() => setPublish(false)}>
           <p className="text-sm leading-6">
             {tr("发布", "Publish")} “{saved.title}” {tr("的已验证版本。历史活动与提交保留原版本。", "as a validated version. Past activities and submissions keep the earlier version.")} {bankVisibility === "school" ? tr("本版本将进入管理员审核；通过前仅指定活动学生可见，也不会计入全校排名积分。", "This version enters admin review. Until approved, it is visible only to assigned activity students and earns no leaderboard points.") : tr("当前题库为教师私有，仅指定活动学生可见；如需全校开放，须由管理员调整题库范围并审核该版本。", "This bank is teacher-private and visible only to assigned activity students. An administrator must adjust the bank scope and approve this version for school-wide access.")}
           </p>
@@ -853,7 +848,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                 })
               }
             >
-              {tr("确认发布", "Confirm publish")}
+              {bankVisibility === "school" ? tr("提交审核", "Request review") : tr("启用版本", "Release version")}
             </Button>
           </div>
         </Modal>

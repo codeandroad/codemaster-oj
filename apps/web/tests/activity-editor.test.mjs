@@ -9,3 +9,6 @@ test('timed rules enforce future end, window order and integer duration',()=>{as
 test('participant baseline preserves exemptions and prefers authoritative details',()=>{assert.deepEqual(activeParticipants([{identityId:'a',exempt:false},{identityId:'b',exempt:true}],['a','b']),['a']);assert.deepEqual(activeParticipants(undefined,['a']),['a']);assert.deepEqual(activeParticipants([],['a']),[]);});
 
 test('past windows are valid drafts but cannot be published',()=>{const starts='2026-09-26T09:00:00+08:00',ends='2026-09-30T09:00:00+08:00',now=Date.parse('2026-10-13T05:32:00+08:00');assert.doesNotThrow(()=>validateTimedDates(starts,ends,60,now,true));assert.throws(()=>validateTimedDates(starts,ends,60,now),/已过期/);assert.throws(()=>validateTimedDates(ends,starts,60,now,true),/晚于开始/);});
+
+
+test('explicit student recipients publish without a class, while empty recipients remain invalid',()=>{assert.doesNotThrow(()=>validateActivity({...valid,classId:null,classIds:[],publish:true}));assert.doesNotThrow(()=>validateActivity({...valid,classId:'',classIds:['c1','c2'],timed:true}));assert.throws(()=>validateActivity({...valid,classId:null,classIds:[],participants:[],publish:true}),/学生/);});

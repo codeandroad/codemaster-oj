@@ -4,18 +4,24 @@ import { transaction } from './db.mjs';
 import { fail, field, uuid, enumValue, canonicalHash } from './security.mjs';
 
 export async function canReviewActivitySubmission(db,user,submission,{readOnly=false}={}){
+ if(submission.original_submission_id&&!submission.assignment_id&&!submission.timed_attempt_id){
+  const context=(await db.query('SELECT assignment_id,timed_attempt_id FROM submission_activity_context($1)',[submission.original_submission_id])).rows[0];
+  if(context)submission={...submission,...context};
+ }
  if(!readOnly){
   const inactive=(await db.query(`SELECT EXISTS(
-   SELECT 1 FROM assignments a JOIN classes c ON c.id=a.class_id
-   WHERE a.id=$1 AND (a.archived_at IS NOT NULL OR c.archived_at IS NOT NULL)) OR EXISTS(
+   SELECT 1 FROM assignments a
+   WHERE a.id=$1 AND a.archived_at IS NOT NULL) OR EXISTS(
    SELECT 1 FROM timed_attempts ta JOIN timed_practices p ON p.id=ta.practice_id
-   JOIN classes c ON c.id=p.class_id WHERE ta.id=$2 AND (p.archived_at IS NOT NULL OR c.archived_at IS NOT NULL)) inactive`,
+   WHERE ta.id=$2 AND p.archived_at IS NOT NULL) inactive`,
    [submission.assignment_id,submission.timed_attempt_id])).rows[0].inactive;
   if(inactive)return false;
  }
  if(user.roles.includes('admin'))return true;
  if(!user.roles.includes('teacher'))return false;
- return !!(await db.query(`SELECT 1 FROM teacher_classes tc JOIN classes c ON c.id=tc.class_id WHERE tc.account_id=$1 AND ($4::boolean OR c.archived_at IS NULL) AND (EXISTS(SELECT 1 FROM assignments a WHERE a.id=$2 AND a.class_id=c.id) OR EXISTS(SELECT 1 FROM timed_attempts ta JOIN timed_practices p ON p.id=ta.practice_id WHERE ta.id=$3 AND p.class_id=c.id))`,[user.id,submission.assignment_id,submission.timed_attempt_id,readOnly])).rowCount;
+ return !!(await db.query(`SELECT 1 WHERE EXISTS(SELECT 1 FROM assignments a WHERE a.id=$2 AND a.owner_account_id=$1)
+  OR EXISTS(SELECT 1 FROM timed_attempts ta JOIN timed_practices p ON p.id=ta.practice_id
+   WHERE ta.id=$3 AND p.owner_account_id=$1)`,[user.id,submission.assignment_id,submission.timed_attempt_id])).rowCount;
 }
 export const SCHOOL_BANK='00000000-0000-4000-8000-000000000001';
 const isAdmin=user=>user.roles.includes('admin');
@@ -42,19 +48,16 @@ export async function problemPermissions(db,user,problem,version) {
  const canEdit=!problem.archived_at&&(own||(isStaff(user)&&(bankOwner||grant==='edit')));
  const schoolRead=!!version.published_at&&!!version.school_visible_at&&bank.visibility==='school'&&!bank.archived_at&&!problem.archived_at;
  if(own||(!bank.archived_at&&staffRead)||schoolRead)return {canRead:true,canEdit:canEdit&&!bank.archived_at,canRunFree:true};
- // A teacher who currently manages the class can still inspect the exact
+ // An activity owner can still inspect the exact
  // selected version after private-bank access changes, including in a draft.
  // This does not grant access to other versions or authoring-only material.
  const assignmentTeacherRead=user.roles.includes('teacher')&&!!version.published_at&&!!(await db.query(`
   SELECT 1 FROM assignment_problems ap
   JOIN assignments a ON a.id=ap.assignment_id
-  JOIN classes c ON c.id=a.class_id
-  JOIN teacher_classes tc ON tc.class_id=c.id AND tc.account_id=$2
-  WHERE ap.problem_id=$1 AND ap.version_id=$3 LIMIT 1`,[problem.id,user.id,version.id])).rowCount;
+  WHERE a.owner_account_id=$2 AND ap.problem_id=$1 AND ap.version_id=$3 LIMIT 1`,[problem.id,user.id,version.id])).rowCount;
  const timedTeacherRead=user.roles.includes('teacher')&&!!version.published_at&&!!(await db.query(`
   SELECT 1 FROM timed_practice_problems tpp JOIN timed_practices tp ON tp.id=tpp.practice_id
-  JOIN teacher_classes tc ON tc.class_id=tp.class_id AND tc.account_id=$2
-  WHERE tpp.problem_id=$1 AND tpp.version_id=$3 LIMIT 1`,[problem.id,user.id,version.id])).rowCount;
+  WHERE tp.owner_account_id=$2 AND tpp.problem_id=$1 AND tpp.version_id=$3 LIMIT 1`,[problem.id,user.id,version.id])).rowCount;
  const assignmentRead=user.roles.includes('student')&&!!version.published_at&&!!(await db.query('SELECT 1 FROM assignment_problems ap JOIN assignments assignment ON assignment.id=ap.assignment_id AND assignment.state=\'Published\' JOIN assignment_participants part ON part.assignment_id=ap.assignment_id WHERE ap.version_id=$1 AND part.identity_id=$2 AND NOT part.exempt LIMIT 1',[version.id,user.identityId])).rowCount;
  let timedRead=false,timedReleased=false;
  if(user.roles.includes('student')&&version.published_at&&(await db.query("SELECT to_regclass('timed_practice_problems') existing")).rows[0].existing) {
@@ -257,12 +260,12 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
  if(adminProblemMatch&&method==='GET'){
   if(!isAdmin(user))fail(403,'FORBIDDEN','仅管理员可查看题目档案');
   const problemId=uuid(adminProblemMatch[1],'题目 ID');
-  const p=required(await pool.query(`SELECT p.id,p.archived_at,p.current_version_id,b.id bank_id,b.name bank_name,
+  const p=required(await pool.query(`SELECT p.id,p.archived_at,p.current_version_id,b.id bank_id,b.name bank_name,b.visibility bank_visibility,
    COALESCE(i.name,'管理员') owner_name FROM problems p JOIN problem_banks b ON b.id=p.bank_id
    LEFT JOIN accounts a ON a.id=p.owner_account_id LEFT JOIN identities i ON i.id=a.identity_id WHERE p.id=$1`,[problemId]));
   const versions=(await pool.query(`SELECT id,title,statement,validation_status,published_at,school_visible_at,
    rank_review_status,created_at FROM problem_versions WHERE problem_id=$1 ORDER BY created_at DESC,id DESC`,[problemId])).rows;
-  return result({id:p.id,bankId:p.bank_id,bankName:p.bank_name,ownerName:p.owner_name,
+  return result({id:p.id,bankId:p.bank_id,bankName:p.bank_name,bankVisibility:p.bank_visibility,ownerName:p.owner_name,
    archivedAt:p.archived_at,currentVersionId:p.current_version_id,
    versions:versions.map(v=>({id:v.id,title:v.title,statement:v.statement,
     validationStatus:v.validation_status,publishedAt:v.published_at,schoolVisibleAt:v.school_visible_at,

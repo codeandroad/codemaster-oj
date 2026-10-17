@@ -29,11 +29,27 @@ export interface Paper4RunnerCase {
 export interface Paper4Paper {
   id: string;
   title: string;
+  shortTitle?: string;
   description: string;
+  examYear?: number | null;
+  examSession?: "summer" | "autumn" | null;
+  examVariant?: 41 | 42 | 43 | null;
   classId: string | null;
+  className?: string | null;
+  classIds?: string[];
+  classes?: { id: string; name: string; archived?: boolean }[];
+  participantCount?: number;
+  participants?: string[];
+  participantDetails?: { identityId: string; name: string; number: string }[];
+  deliveryKind?: "catalog" | "activity";
+  activityKind?: "practice" | "exam" | null;
+  sourcePaperId?: string | null;
+  sourceVersionId?: string | null;
+  canAssign?: boolean;
   status: string;
   archivedAt?: string | null;
   canExport?: boolean;
+  canManage?: boolean;
   startsAt: string | null;
   endsAt: string | null;
   totalMarks: number;
@@ -76,6 +92,8 @@ export interface Paper4Mark {
 export interface Paper4Attempt {
   id: string;
   paperId: string;
+  versionId?: string;
+  attemptNumber?: number;
   status: string;
   files: Paper4File[];
   snapshots: Paper4Snapshot[];
@@ -154,4 +172,15 @@ export function paper4Date(value: string | null | undefined, locale: "zh" | "en"
   return new Intl.DateTimeFormat(locale === "en" ? "en-US" : "zh-CN", {
     timeZone: "Asia/Shanghai", dateStyle: "medium", timeStyle: "short",
   }).format(new Date(value));
+}
+
+export function paper4ClassNames(paper: Pick<Paper4Paper, "classes" | "className">) {
+  const names = [...new Set(paper.classes?.map(item => item.name).filter(Boolean) ?? [])];
+  return names.length ? names.join(" / ") : paper.className ?? "";
+}
+
+export function paper4ShortTitle(paper: Pick<Paper4Paper, "title" | "shortTitle" | "examYear" | "examSession" | "examVariant">) {
+  if (paper.shortTitle?.trim()) return paper.shortTitle.trim();
+  if (paper.examYear && paper.examSession && paper.examVariant) return `9618/${paper.examVariant} ${paper.examSession === "summer" ? "mj" : "on"} ${String(paper.examYear).slice(-2)}`;
+  return paper.title.slice(0, 60);
 }

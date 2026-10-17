@@ -3,6 +3,7 @@ import type { IncomingHttpHeaders } from 'node:http';
 import { createPool } from '../../../packages/domain/src/db.mjs';
 import { createDomainServices, loadConfig } from '../../../packages/domain/src/application.mjs';
 import { cleanupExpiredMemberImports } from '../../../packages/domain/src/member-import.mjs';
+import { paper4RequestBodyLimit } from '../../../packages/domain/src/paper4-request-limit.mjs';
 import { parseJsonBody } from '../../../packages/domain/src/http-contract.mjs';
 import type { DomainContext, DomainArea, DomainServices, DomainConfig } from '../../../packages/domain/src/application.mjs';
 
@@ -39,7 +40,7 @@ export class DomainService implements OnModuleInit, OnModuleDestroy {
   async prepare(input: {url: string; method: string; headers: IncomingHttpHeaders; rawBody?: Buffer; ip?: string}): Promise<DomainContext> {
     const context = await this.services.prepareRequest({...input, body: {}});
     if (!['GET', 'HEAD', 'OPTIONS'].includes(input.method)) {
-      context.body = parseJsonBody(input.rawBody, input.headers, this.config.bodyLimit);
+      context.body = parseJsonBody(input.rawBody, input.headers, paper4RequestBodyLimit(input.url,input.method,this.config.bodyLimit));
     }
     return context;
   }

@@ -19,6 +19,21 @@ export class Paper4Controller {
     return this.handle(request, response);
   }
 
+  @Post('imports/batch-preview')
+  previewBatchImport(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
+    return this.handle(request, response);
+  }
+
+  @Post('papers/batch-import')
+  batchImportPapers(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
+    return this.handle(request, response);
+  }
+
+  @Post('papers/batch-export')
+  batchExportPapers(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
+    return this.handle(request, response);
+  }
+
   @Get('papers')
   listPapers(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
     return this.handle(request, response);
@@ -26,6 +41,21 @@ export class Paper4Controller {
 
   @Post('papers')
   createPaper(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
+    return this.handle(request, response);
+  }
+
+  @Post('papers/batch-publish')
+  batchPublishPapers(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
+    return this.handle(request, response);
+  }
+
+  @Post('papers/batch-activities')
+  batchCreateActivities(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
+    return this.handle(request, response);
+  }
+
+  @Patch('papers/:id/metadata')
+  updatePaperMetadata(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
     return this.handle(request, response);
   }
 
@@ -66,6 +96,16 @@ export class Paper4Controller {
 
   @Post('papers/:id/publish')
   publishPaper(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
+    return this.handle(request, response);
+  }
+
+  @Get('papers/:id/activities')
+  listActivities(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
+    return this.handle(request, response);
+  }
+
+  @Post('papers/:id/activities')
+  createActivity(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
     return this.handle(request, response);
   }
 

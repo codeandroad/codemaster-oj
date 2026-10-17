@@ -1,9 +1,11 @@
+import {loadCoursePaper4,paper4Progress,chapterPaper4Links,setChapterPaper4Links,assertCoursePaper4Ready} from './course-paper4.mjs';
 import {pythonPractice} from './python-practice.mjs';
 import {validateLearningDocument} from './learning-document.mjs';
 import { transaction } from './db.mjs';
 import { fail, field, uuid, bytes, integer,enumValue } from './security.mjs';
 import { getTimedPracticeResult } from './timed.mjs';
 import { avatarForIdentity } from './avatars.mjs';
+import {readableCourseIds,courseClasses,courseProperties,saveCourseProperties,assertCoursePublicationAccess} from './course-access.mjs';
 
 const staff = user => user.roles.includes('teacher') || user.roles.includes('admin');
 const administrator = user => user.roles.includes('admin');
@@ -16,12 +18,12 @@ async function pathAccess(db, user, id, edit = false, lock = false, allowArchive
  const canEdit = staff(user) && (administrator(user) || path.owner_account_id === user.id);
  if(path.archived_at&&(!allowArchived||!canEdit))fail(404,'NOT_FOUND','内容不存在');
  if (edit && !canEdit) fail(403, 'FORBIDDEN', '只能维护本人负责的学习内容');
- if (!canEdit && !path.published_at) fail(404, 'NOT_FOUND', '内容不存在');
+ if (!canEdit && !(await readableCourseIds(db,user,[path.id])).has(path.id)) fail(404, 'NOT_FOUND', '内容不存在');
  return { ...path, canEdit };
 }
 
 function pathShape(p) {
- return { id: p.id, title: p.title,estimatedMinutes:p.estimated_minutes,updatedAt:p.updated_at,createdAt:p.created_at, description: p.description, category: p.category, published: !!p.published_at,archived:!!p.archived_at,
+ return {authorName:p.author_name??'',authoredAt:p.authored_at??p.created_at,coverImage:p.cover_image??null,accessScope:p.access_scope??'school',availableFrom:p.available_from??null,availableUntil:p.available_until??null,listed:p.listed??true,withdrawnAt:p.withdrawn_at??null,classIds:(p.classes??[]).map(c=>c.id),classes:p.classes??[], id: p.id, title: p.title,estimatedMinutes:p.estimated_minutes,updatedAt:p.updated_at,createdAt:p.created_at, description: p.description, category: p.category, published: !!p.published_at,archived:!!p.archived_at,
   difficulty:p.difficulty??'beginner',coverKey:p.cover_key??'general',taskCount:Number(p.task_count??0),completedTasks:Number(p.completed_tasks??0),chapterCount: Number(p.chapter_count ?? 0), completedChapters: Number(p.completed_chapters ?? 0), canEdit: p.canEdit ?? false };
 }
 
@@ -41,10 +43,13 @@ async function taskStats(db,user,ids,draftIds=[]) {
     AND b.archived_at IS NULL AND b.visibility='school' GROUP BY c.path_id`,[draftIds])).rows;
   for(const draft of drafts)stats.set(draft.path_id,{...draft,completed_tasks:0});
  }
+ const paper4=await loadCoursePaper4(db,ids,[user.identityId]);
+ for(const id of ids){const additional=paper4Progress(paper4,'path',id,user.identityId),old=stats.get(id)??{};stats.set(id,{...old,task_count:Number(old.task_count??0)+additional.taskCount,completed_tasks:Number(old.completed_tasks??0)+additional.completedTasks});}
  return stats;
 }
 async function pathResult(ctx, id, db = ctx.pool, allowArchived = false) {
  const p = await pathAccess(db, ctx.user, id, false, false, allowArchived);
+ p.classes=await courseClasses(db,id);
  const chapters = (await db.query(`SELECT c.*, COALESCE(pr.completed,false) completed FROM learning_chapters c
   LEFT JOIN learning_progress pr ON pr.chapter_id=c.id AND pr.identity_id=$2 WHERE c.path_id=$1 AND c.archived_at IS NULL ORDER BY c.position,c.created_at,c.id`, [id, ctx.user.identityId])).rows;
  const links = chapters.length ? (await db.query(`SELECT cp.*,v.title,v.published_at,v.school_visible_at,v.rank_review_status,b.name bank_name,b.visibility bank_visibility,b.archived_at bank_archived_at,p.archived_at problem_archived_at
@@ -66,14 +71,15 @@ async function pathResult(ctx, id, db = ctx.pool, allowArchived = false) {
  }
  const versions=[...new Set([...visible.values()].flat().map(l=>l.versionId))];
  const solved=new Set(versions.length?(await db.query("SELECT DISTINCT version_id FROM submissions WHERE identity_id=$1 AND version_id=ANY($2::uuid[]) AND kind IN ('submit','correction') AND status='AC' AND (timed_attempt_id IS NULL OR EXISTS(SELECT 1 FROM timed_attempts ta JOIN timed_practices tp ON tp.id=ta.practice_id WHERE ta.id=submissions.timed_attempt_id AND tp.results_published_at IS NOT NULL))",[ctx.user.identityId,versions])).rows.map(r=>r.version_id):[]);
+ const paper4=await loadCoursePaper4(db,[id],[ctx.user.identityId]),paper4Total=paper4Progress(paper4,'path',id,ctx.user.identityId);
  const bundle=Array.isArray(p.practice_bundle)?p.practice_bundle:[];
  const state=p.canEdit&&bundle.length?(await db.query('SELECT id,validation_status,published_at FROM problem_versions WHERE id=ANY($1::uuid[])',[bundle.map(x=>x.versionId)])).rows:[];
  const status=new Map(state.map(v=>[v.id,v]));
  const linkedAssignments=p.published_at&&ctx.user.roles.includes('student')?(await db.query(`SELECT a.id,a.title,a.due_at FROM assignments a WHERE a.course_path_id=$1 AND a.state='Published' AND a.archived_at IS NULL AND EXISTS(SELECT 1 FROM assignment_participants ap WHERE ap.assignment_id=a.id AND ap.identity_id=$2 AND NOT ap.exempt) ORDER BY a.due_at DESC,a.created_at DESC`,[id,ctx.user.identityId])).rows:[];
- return { ...pathShape({ ...p, task_count:versions.length,completed_tasks:solved.size,chapter_count: chapters.length, completed_chapters: chapters.filter(c => c.completed).length }),
+ return { ...pathShape({ ...p, task_count:versions.length+paper4Total.taskCount,completed_tasks:solved.size+paper4Total.completedTasks,chapter_count: chapters.length, completed_chapters: chapters.filter(c => c.completed).length }),
   assignments:linkedAssignments.map(a=>({id:a.id,title:a.title,dueAt:a.due_at})),
   practiceBundle:p.canEdit?bundle.map(x=>({...x,validationStatus:status.get(x.versionId)?.validation_status??'Unknown',published:!!status.get(x.versionId)?.published_at})):undefined,
-  chapters: chapters.map(c => ({ id: c.id, title: c.title, content: c.content, position: c.position, completed: c.completed,objective:c.objective,checkpoint:c.checkpoint,checkpointAnswer:c.checkpoint_answer, taskCount:(visible.get(c.id)??[]).length,completedTasks:(visible.get(c.id)??[]).filter(l=>solved.has(l.versionId)).length,problems: (visible.get(c.id) ?? []).map(l=>({...l,completed:solved.has(l.versionId)})) })) };
+  chapters: chapters.map(c => ({ id: c.id, title: c.title, content: c.content, position: c.position, completed: c.completed,objective:c.objective,checkpoint:c.checkpoint,checkpointAnswer:c.checkpoint_answer, paper4Links:chapterPaper4Links(paper4,c.id,ctx.user.identityId,{includeUnavailable:p.canEdit}),taskCount:(visible.get(c.id)??[]).length+paper4Progress(paper4,'chapter',c.id,ctx.user.identityId).taskCount,completedTasks:(visible.get(c.id)??[]).filter(l=>solved.has(l.versionId)).length+paper4Progress(paper4,'chapter',c.id,ctx.user.identityId).completedTasks,problems: (visible.get(c.id) ?? []).map(l=>({...l,completed:solved.has(l.versionId)})) })) };
 }
 
 async function setLinks(ctx, db, path, chapterId, problemIds) {
@@ -112,22 +118,22 @@ async function chapterAccess(ctx, db, id, edit = false) {
 
 async function teachingReport(ctx) {
  requireStaff(ctx.user);
- const classId = ctx.url.searchParams.get('classId');
- const assignmentId = ctx.url.searchParams.get('assignmentId');
- const timedPracticeId = ctx.url.searchParams.get('timedPracticeId');
+ const classId = ctx.url.searchParams.get('classId')||null;
+ const assignmentId = ctx.url.searchParams.get('assignmentId')||null;
+ const timedPracticeId = ctx.url.searchParams.get('timedPracticeId')||null;
  if (classId) uuid(classId); if (assignmentId) uuid(assignmentId); if(timedPracticeId)uuid(timedPracticeId);
  if(assignmentId&&timedPracticeId)fail(400,'VALIDATION','请分别选择作业或计时训练');
  const classes = (await ctx.pool.query(`SELECT c.id,c.name,(c.archived_at IS NOT NULL) archived FROM classes c WHERE ($1::boolean OR EXISTS
   (SELECT 1 FROM teacher_classes tc WHERE tc.class_id=c.id AND tc.account_id=$2)) ORDER BY c.archived_at IS NOT NULL,c.name,c.id`, [administrator(ctx.user),ctx.user.id])).rows;
  if (classId && !classes.some(c => c.id === classId)) fail(403, 'FORBIDDEN', '无权查看该班级报告');
- const activityClassId=!classId&&assignmentId?(await ctx.pool.query('SELECT class_id FROM assignments WHERE id=$1',[assignmentId])).rows[0]?.class_id:
-  !classId&&timedPracticeId?(await ctx.pool.query('SELECT class_id FROM timed_practices WHERE id=$1',[timedPracticeId])).rows[0]?.class_id:null;
- if(activityClassId&&!classes.some(c=>c.id===activityClassId))fail(403,'FORBIDDEN','无权查看该活动报告');
- const classIds = classId ? [classId] : activityClassId?[activityClassId]:classes.filter(c=>!c.archived).map(c => c.id);
  const sinceRaw=ctx.url.searchParams.get('since'),untilRaw=ctx.url.searchParams.get('until');const since=sinceRaw?new Date(sinceRaw):null,until=untilRaw?new Date(untilRaw):null;if(since&&!Number.isFinite(since.getTime())||until&&!Number.isFinite(until.getTime())||since&&until&&until<since)fail(400,'VALIDATION','时间范围无效');
- const assignments = (await ctx.pool.query("SELECT id,title,class_id,due_at FROM assignments WHERE class_id=ANY($1::uuid[]) AND state='Published' AND ($2::timestamptz IS NULL OR created_at>=$2) AND ($3::timestamptz IS NULL OR created_at<=$3) ORDER BY created_at DESC,id", [classIds,since,until])).rows;
+ const assignments = (await ctx.pool.query(`SELECT id,title,class_id,due_at FROM assignments a WHERE state='Published'
+  AND ($4::boolean OR owner_account_id=$5) AND ($1::uuid IS NULL OR class_id=$1 OR EXISTS(SELECT 1 FROM assignment_classes ac WHERE ac.assignment_id=a.id AND ac.class_id=$1))
+  AND ($2::timestamptz IS NULL OR created_at>=$2) AND ($3::timestamptz IS NULL OR created_at<=$3) ORDER BY created_at DESC,id`, [classId,since,until,administrator(ctx.user),ctx.user.id])).rows;
  if (assignmentId && !assignments.some(a => a.id === assignmentId)) fail(403, 'FORBIDDEN', '无权查看该作业报告');
- const timedPractices=(await ctx.pool.query("SELECT id,title,class_id,ends_at FROM timed_practices WHERE class_id=ANY($1::uuid[]) AND state<>'Draft' AND (state<>'Archived' OR results_published_at IS NOT NULL) AND ($2::timestamptz IS NULL OR created_at>=$2) AND ($3::timestamptz IS NULL OR created_at<=$3) ORDER BY created_at DESC,id",[classIds,since,until])).rows;
+ const timedPractices=(await ctx.pool.query(`SELECT id,title,class_id,ends_at FROM timed_practices p WHERE state<>'Draft' AND (state<>'Archived' OR results_published_at IS NOT NULL)
+  AND ($4::boolean OR owner_account_id=$5) AND ($1::uuid IS NULL OR class_id=$1 OR EXISTS(SELECT 1 FROM timed_practice_classes ac WHERE ac.practice_id=p.id AND ac.class_id=$1))
+  AND ($2::timestamptz IS NULL OR created_at>=$2) AND ($3::timestamptz IS NULL OR created_at<=$3) ORDER BY created_at DESC,id`,[classId,since,until,administrator(ctx.user),ctx.user.id])).rows;
  if(timedPracticeId&&!timedPractices.some(p=>p.id===timedPracticeId))fail(403,'FORBIDDEN','无权查看该训练报告');
  const chosen = timedPracticeId?[]:assignmentId ? assignments.filter(a => a.id === assignmentId) : assignments;
  const chosenTimed=assignmentId?[]:timedPracticeId?timedPractices.filter(p=>p.id===timedPracticeId):timedPractices;
@@ -161,7 +167,7 @@ async function teachingReport(ctx) {
   WHERE (s.assignment_id=ANY($1::uuid[]) OR ta.practice_id=ANY($2::uuid[])) AND s.kind='submit' ORDER BY s.created_at DESC,s.id DESC LIMIT 100`, [selectedIds,selectedTimed])).rows;
  const diagnostics=(await ctx.pool.query(`SELECT s.identity_id,s.problem_id,count(*) FILTER(WHERE s.kind='submit' AND s.status IN ('WA','CE','RE','TLE','MLE','OLE'))::int failures,
   bool_or(EXISTS(SELECT 1 FROM review_entries r JOIN accounts ra ON ra.id=r.author_account_id WHERE r.submission_id=s.id AND ra.identity_id=s.identity_id AND r.created_at>COALESCE((SELECT max(feedback.created_at) FROM review_entries feedback JOIN account_roles fr ON fr.account_id=feedback.author_account_id WHERE feedback.submission_id=s.id AND fr.role IN ('teacher','admin')),'-infinity'::timestamptz))) waiting_feedback
-  FROM submissions s LEFT JOIN submissions original ON original.id=s.original_submission_id LEFT JOIN timed_attempts ta ON ta.id=COALESCE(s.timed_attempt_id,original.timed_attempt_id)
+  FROM submissions s LEFT JOIN LATERAL submission_activity_context(s.original_submission_id) original ON true LEFT JOIN timed_attempts ta ON ta.id=COALESCE(s.timed_attempt_id,original.timed_attempt_id)
   WHERE COALESCE(s.assignment_id,original.assignment_id)=ANY($1::uuid[]) OR ta.practice_id=ANY($2::uuid[]) GROUP BY s.identity_id,s.problem_id`,[selectedIds,selectedTimed])).rows;
  for(const student of rows){const ds=diagnostics.filter(d=>d.identity_id===student.identityId);student.notStarted=!student.assignments.some(a=>a.problems.some(p=>p.submissionId||p.pending));student.incomplete=student.assignments.some(a=>a.problems.some(p=>p.status!=='AC'));student.repeatedFailureProblemIds=ds.filter(d=>d.failures>=2).map(d=>d.problem_id);student.waitingFeedback=ds.some(d=>d.waiting_feedback);}
  const metrics={denominator:rows.length,notStarted:rows.filter(s=>s.notStarted).length,incomplete:rows.filter(s=>s.incomplete).length,repeatedFailures:rows.filter(s=>s.repeatedFailureProblemIds.length).length,waitingFeedback:rows.filter(s=>s.waitingFeedback).length};
@@ -366,7 +372,13 @@ export async function handleEducation(ctx) {
  const resourceMatch=route.match(/^\/learning-resources(?:\/([^/]+))?$/);
  if(resourceMatch){
   const shape=r=>({id:r.id,type:r.type,title:r.title,content:r.content,pathId:r.path_id,chapterId:r.chapter_id,scope:r.scope,createdAt:r.created_at,updatedAt:r.updated_at,canEdit:administrator(user)||r.owner_account_id===user.id});
-  if(method==='GET'&&!resourceMatch[1]){const rows=(await pool.query("SELECT r.* FROM learning_resources r WHERE r.archived_at IS NULL AND ($1 OR r.owner_account_id=$2 OR r.scope='school' AND (r.path_id IS NULL OR EXISTS(SELECT 1 FROM learning_paths p WHERE p.id=r.path_id AND p.published_at IS NOT NULL AND p.archived_at IS NULL))) ORDER BY r.updated_at DESC",[administrator(user),user.id])).rows;return result({items:rows.map(shape)});}
+  if(method==='GET'){
+   const rows=(await pool.query(`SELECT r.* FROM learning_resources r WHERE r.archived_at IS NULL AND ($1::uuid IS NULL OR r.id=$1) AND ($2::boolean OR r.owner_account_id=$3 OR r.scope='school') ORDER BY r.updated_at DESC,r.id`,[resourceMatch[1]?uuid(resourceMatch[1]):null,administrator(user),user.id])).rows;
+   const courseIds=[...new Set(rows.map(r=>r.path_id).filter(Boolean))],readable=await readableCourseIds(pool,user,courseIds,{listed:!resourceMatch[1]});
+   const visible=rows.filter(r=>administrator(user)||r.owner_account_id===user.id||(!r.path_id||readable.has(r.path_id)));
+   if(resourceMatch[1]){if(!visible.length)fail(404,'NOT_FOUND','资料不存在');return result(shape(visible[0]));}
+   return result({items:visible.map(shape)});
+  }
   requireStaff(user);if(!['POST','PATCH','DELETE'].includes(method))return null;
   const output=await transaction(pool,async db=>{const old=resourceMatch[1]?exists(await db.query('SELECT * FROM learning_resources WHERE id=$1 AND archived_at IS NULL FOR UPDATE',[uuid(resourceMatch[1])])):null;if(old&&!administrator(user)&&old.owner_account_id!==user.id)fail(403,'FORBIDDEN','只能编辑本人资料');if(method==='DELETE'){if(!old)fail(404,'NOT_FOUND','资料不存在');await db.query('UPDATE learning_resources SET archived_at=now() WHERE id=$1',[old.id]);await helpers.audit(db,user.id,'learning.resource_archive','learning_resource',old.id);return {ok:true};}
    const title=body.title===undefined?old?.title:field(body.title,'资料标题'),content=body.content===undefined?old?.content??'':bytes(body.content,'资料内容'),type=enumValue(body.type??old?.type??'note',['reading','video','reference','note','article','link'],'资料类型'),scope=enumValue(body.scope??old?.scope??'school',['school','private'],'资料范围'),pathId=body.pathId===undefined?old?.path_id??null:body.pathId?uuid(body.pathId):null,chapterId=body.chapterId===undefined?old?.chapter_id??null:body.chapterId?uuid(body.chapterId):null;if(!title)fail(400,'VALIDATION','需要资料标题');if(pathId)await pathAccess(db,user,pathId,true);if(chapterId){const {chapter}=await chapterAccess(ctx,db,chapterId,true);if(chapter.path_id!==pathId)fail(400,'VALIDATION','章节必须属于所选路径');}if(scope==='school'&&pathId){const path=await pathAccess(db,user,pathId,true);if(!path.published_at)fail(409,'INCOMPLETE','公开资料只能关联已发布路径');}
@@ -385,9 +397,12 @@ export async function handleEducation(ctx) {
  if (route === '/learning-paths' && method === 'GET') {
   const archived=ctx.url.searchParams.get('archived')==='true';
   if(archived)requireStaff(user);
-  const paths = (await pool.query(`SELECT p.*,(SELECT count(*) FROM learning_chapters c WHERE c.path_id=p.id AND c.archived_at IS NULL) chapter_count,
+  let paths = (await pool.query(`SELECT p.*,(SELECT count(*) FROM learning_chapters c WHERE c.path_id=p.id AND c.archived_at IS NULL) chapter_count,
    (SELECT count(*) FROM learning_progress pr JOIN learning_chapters c ON c.id=pr.chapter_id WHERE c.path_id=p.id AND c.archived_at IS NULL AND pr.identity_id=$2 AND pr.completed) completed_chapters
    FROM learning_paths p WHERE (p.archived_at IS NOT NULL)=$5 AND (NOT $5 AND p.published_at IS NOT NULL OR ($3::boolean AND (p.owner_account_id=$1 OR $4::boolean))) ORDER BY p.updated_at DESC,p.id`, [user.id,user.identityId,staff(user),administrator(user),archived])).rows;
+  const readable=await readableCourseIds(pool,user,paths.map(p=>p.id),{listed:true});
+  paths=paths.filter(p=>readable.has(p.id));
+  for(const path of paths)path.classes=await courseClasses(pool,path.id);
   const stats=await taskStats(pool,user,paths.map(p=>p.id),paths.filter(p=>!p.published_at).map(p=>p.id));
   return result({ items:paths.map(p=>({...pathShape({...p,...stats.get(p.id),canEdit:staff(user)&&(administrator(user)||p.owner_account_id===user.id)}),archived:!!p.archived_at})) });
  }
@@ -395,9 +410,13 @@ export async function handleEducation(ctx) {
   requireStaff(user);const doc=validateLearningDocument(body);
   const path=await transaction(pool,async db=>{
    const p=exists(await db.query('INSERT INTO learning_paths(owner_account_id,title,description,category,estimated_minutes,difficulty,cover_key) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *',[user.id,doc.title,doc.description,doc.category,doc.estimatedMinutes,doc.difficulty,doc.coverKey]));
+   const properties=await courseProperties(db,user,doc);
+   await saveCourseProperties(db,p.id,properties);
+   Object.assign(p,{author_name:properties.authorName,authored_at:properties.authoredAt??p.authored_at,cover_image:properties.coverImage});
    for(let position=0;position<doc.chapters.length;position++){
     const c=doc.chapters[position];const chapter=exists(await db.query('INSERT INTO learning_chapters(path_id,title,content,position,objective,checkpoint,checkpoint_answer) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *',[p.id,c.title,c.content,position,c.objective,c.checkpoint,c.checkpointAnswer]));
     await setLinks(ctx,db,p,chapter.id,c.problemIds);
+    await setChapterPaper4Links(db,chapter.id,c.paper4Links??[]);
    }
    await helpers.audit(db,user.id,'learning.import','learning_path',p.id,{chapterCount:doc.chapters.length});return p;
   });return result(pathShape({...path,chapter_count:doc.chapters.length,canEdit:true}),201);
@@ -407,6 +426,9 @@ export async function handleEducation(ctx) {
   const title=field(body.title,'学习路径标题'),description=field(body.description??'','描述',{min:0,max:4000}),category=field(body.category??'Python','分类',{max:100});
   const path = await transaction(pool,async db=>{
    const p=exists(await db.query('INSERT INTO learning_paths(owner_account_id,title,description,category,estimated_minutes,difficulty,cover_key) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *',[user.id,title,description,category,integer(body.estimatedMinutes??30,1,10080,'预计学习时长'),enumValue(body.difficulty??'beginner',['beginner','intermediate','advanced'],'难度'),enumValue(body.coverKey??'general',['python','algorithms','general'],'封面')]));
+   const properties=await courseProperties(db,user,body);
+   await saveCourseProperties(db,p.id,properties);
+   Object.assign(p,{author_name:properties.authorName,authored_at:properties.authoredAt??p.authored_at,cover_image:properties.coverImage,access_scope:properties.accessScope,available_from:properties.availableFrom,available_until:properties.availableUntil,listed:properties.listed,classes:await courseClasses(db,p.id)});
    await helpers.audit(db,user.id,'learning.create','learning_path',p.id); return p;
   });
   return result(pathShape({...path,canEdit:true}),201);
@@ -448,8 +470,12 @@ export async function handleEducation(ctx) {
   const students=(await pool.query(`SELECT i.id,i.name,i.number,
    (SELECT count(*)::int FROM learning_progress pr JOIN learning_chapters c ON c.id=pr.chapter_id WHERE c.path_id=$1 AND c.archived_at IS NULL AND pr.identity_id=i.id AND pr.completed) completed_chapters,
    (SELECT count(DISTINCT cp.version_id)::int FROM chapter_problems cp JOIN learning_chapters c ON c.id=cp.chapter_id JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id JOIN problem_versions v ON v.id=cp.version_id WHERE c.path_id=$1 AND c.archived_at IS NULL AND p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school' AND v.published_at IS NOT NULL AND v.school_visible_at IS NOT NULL AND EXISTS(SELECT 1 FROM submissions s WHERE s.identity_id=i.id AND s.version_id=cp.version_id AND s.kind IN ('submit','correction') AND s.status='AC' AND (s.timed_attempt_id IS NULL OR EXISTS(SELECT 1 FROM timed_attempts ta JOIN timed_practices tp ON tp.id=ta.practice_id WHERE ta.id=s.timed_attempt_id AND tp.results_published_at IS NOT NULL)))) completed_tasks
-   FROM identities i WHERE i.kind='student' AND i.archived_at IS NULL AND ($2::boolean OR EXISTS(SELECT 1 FROM class_members cm JOIN teacher_classes tc ON tc.class_id=cm.class_id JOIN classes cl ON cl.id=cm.class_id WHERE cm.identity_id=i.id AND tc.account_id=$3 AND cl.archived_at IS NULL)) ORDER BY i.number,i.id`,[path.id,administrator(user),user.id])).rows;
-  return result({chapterCount,taskCount:counts.get(path.id)?.task_count??0,items:students.map(s=>({id:s.id,name:s.name,number:s.number,completedChapters:Number(s.completed_chapters),completedTasks:Number(s.completed_tasks)}))});
+   FROM identities i WHERE i.kind='student' AND i.archived_at IS NULL AND ($2::boolean
+    OR EXISTS(SELECT 1 FROM class_members cm JOIN teacher_classes tc ON tc.class_id=cm.class_id JOIN classes cl ON cl.id=cm.class_id WHERE cm.identity_id=i.id AND tc.account_id=$3 AND cl.archived_at IS NULL)
+    OR EXISTS(SELECT 1 FROM assignment_participants part JOIN assignments a ON a.id=part.assignment_id WHERE part.identity_id=i.id AND NOT part.exempt AND a.owner_account_id=$3 AND a.course_path_id=$1 AND a.state='Published')
+    OR EXISTS(SELECT 1 FROM timed_practice_participants part JOIN timed_practices t ON t.id=part.practice_id WHERE part.identity_id=i.id AND NOT part.exempt AND t.owner_account_id=$3 AND t.course_path_id=$1 AND t.state<>'Draft')) ORDER BY i.number,i.id`,[path.id,administrator(user),user.id])).rows;
+  const paper4=await loadCoursePaper4(pool,[path.id],students.map(s=>s.id));
+  return result({chapterCount,taskCount:counts.get(path.id)?.task_count??0,items:students.map(s=>({id:s.id,name:s.name,number:s.number,completedChapters:Number(s.completed_chapters),completedTasks:Number(s.completed_tasks)+paper4Progress(paper4,'path',path.id,s.id).completedTasks}))});
  }
  let match=route.match(/^\/learning-paths\/([^/]+)$/);
  if (match && method === 'GET') return result(await pathResult(ctx,match[1],pool,true));
@@ -457,10 +483,12 @@ export async function handleEducation(ctx) {
  if(restoreMatch&&method==='POST'){
   requireStaff(user);const id=uuid(restoreMatch[1]);
   await transaction(pool,async db=>{
-   const path=exists(await db.query('SELECT id,owner_account_id,archived_at,published_at FROM learning_paths WHERE id=$1 FOR UPDATE',[id]));
+   const path=exists(await db.query('SELECT * FROM learning_paths WHERE id=$1 FOR UPDATE',[id]));
    if(!administrator(user)&&path.owner_account_id!==user.id)fail(403,'FORBIDDEN','只能恢复本人课程');
    if(!path.archived_at)return;
+   let withdrawForPaper4=false;
    if(path.published_at){
+    await assertCoursePublicationAccess(db,path);
     const links=(await db.query(`SELECT cp.problem_id,v.problem_id version_problem_id,
       p.archived_at problem_archived_at,b.archived_at bank_archived_at,b.visibility bank_visibility,
       v.published_at,v.school_visible_at,v.rank_review_status
@@ -470,15 +498,24 @@ export async function handleEducation(ctx) {
       WHERE c.path_id=$1 AND c.archived_at IS NULL FOR SHARE OF p,b,v`,[id])).rows;
     if(links.some(link=>link.problem_id!==link.version_problem_id||link.problem_archived_at||link.bank_archived_at||link.bank_visibility!=='school'||!link.published_at||!link.school_visible_at||link.rank_review_status!=='approved'))
      fail(409,'UNAPPROVED_LESSON_PROBLEM','课程存在未通过审核的关联题目，无法恢复公开课程');
+    // Keep broken Paper 4 links editable without reopening the course to
+    // students. The owner may be unable to restore another teacher's source.
+    try{await assertCoursePaper4Ready(db,path.id);}
+    catch(error){if(error.code!=='UNAVAILABLE_PAPER4_LINK')throw error;withdrawForPaper4=true;}
    }
-   await db.query('UPDATE learning_paths SET archived_at=NULL,updated_at=clock_timestamp() WHERE id=$1',[id]);
-   await helpers.audit(db,user.id,'learning.restore','learning_path',id);
+   await db.query(`UPDATE learning_paths SET archived_at=NULL,updated_at=clock_timestamp(),
+    published_at=CASE WHEN $2 THEN NULL ELSE published_at END,
+    withdrawn_at=CASE WHEN $2 THEN clock_timestamp() ELSE withdrawn_at END WHERE id=$1`,[id,withdrawForPaper4]);
+   await helpers.audit(db,user.id,'learning.restore','learning_path',id,{withdrawnForUnavailablePaper4:withdrawForPaper4});
   });return result(await pathResult(ctx,id));
  }
  if (match && method === 'PATCH') {
   requireStaff(user);
   const p=await transaction(pool,async db=>{
    const path=await pathAccess(db,user,match[1],true,true);
+   const properties=await courseProperties(db,user,body,path);
+   await saveCourseProperties(db,path.id,properties);
+   if(path.published_at&&properties.audienceChanged&&body.archived!==true)await assertCoursePublicationAccess(db,{...path,access_scope:properties.accessScope});
    const title=body.title===undefined?path.title:field(body.title,'标题');
    const description=body.description===undefined?path.description:field(body.description,'描述',{min:0,max:4000});
    const category=body.category===undefined?path.category:field(body.category,'分类',{max:100});
@@ -491,13 +528,25 @@ export async function handleEducation(ctx) {
    const p=exists(await db.query('UPDATE learning_paths SET title=$1,description=$2,category=$3,archived_at=CASE WHEN $4 THEN now() ELSE archived_at END,updated_at=now(),estimated_minutes=$6,difficulty=$7,cover_key=$8 WHERE id=$5 RETURNING *',[title,description,category,body.archived===true,path.id,body.estimatedMinutes===undefined?path.estimated_minutes:integer(body.estimatedMinutes,1,10080,'预计学习时长'),enumValue(body.difficulty??path.difficulty,['beginner','intermediate','advanced'],'难度'),enumValue(body.coverKey??path.cover_key,['python','algorithms','general'],'封面')]));
    await helpers.audit(db,user.id,body.archived?'learning.archive':'learning.edit','learning_path',path.id);return p;
   });
-  return result(pathShape({...p,canEdit:true}));
+  return result(await pathResult(ctx,p.id,pool,true));
+ }
+ match=route.match(/^\/learning-paths\/([^/]+)\/unpublish$/);
+ if(match&&method==='POST'){
+  requireStaff(user);
+  await transaction(pool,async db=>{
+   const path=await pathAccess(db,user,match[1],true,true);
+   if(!path.published_at)return;
+   await db.query('UPDATE learning_paths SET published_at=NULL,withdrawn_at=now(),updated_at=now() WHERE id=$1',[path.id]);
+   await helpers.audit(db,user.id,'learning.unpublish','learning_path',path.id);
+  });return result(await pathResult(ctx,match[1]));
  }
  match=route.match(/^\/learning-paths\/([^/]+)\/publish$/);
  if (match && method === 'POST') {
   requireStaff(user);
   await transaction(pool,async db=>{
    const path=await pathAccess(db,user,match[1],true,true);
+   await assertCoursePublicationAccess(db,path);
+   await assertCoursePaper4Ready(db,path.id);
    const chapters=(await db.query('SELECT * FROM learning_chapters WHERE path_id=$1 AND archived_at IS NULL',[path.id])).rows;
    if (!chapters.length||chapters.some(c=>!c.content.trim())) fail(409,'INCOMPLETE','发布前需要至少一个有正文的章节');
    // Hold the bank, problem and version rows through publication so an
@@ -510,7 +559,7 @@ export async function handleEducation(ctx) {
     WHERE c.path_id=$1 AND c.archived_at IS NULL FOR SHARE OF p,b,v`,[path.id])).rows;
    if(linked.some(link=>link.problem_archived_at||link.bank_archived_at||link.bank_visibility!=='school'||link.version_problem_id!==link.problem_id||!link.published_at||!link.school_visible_at||link.rank_review_status!=='approved'))
     fail(409,'UNAPPROVED_LESSON_PROBLEM','章节练习须先发布并通过管理员校内公开审核，课程才能发布');
-   await db.query('UPDATE learning_paths SET published_at=COALESCE(published_at,now()),updated_at=now() WHERE id=$1',[path.id]);
+   await db.query('UPDATE learning_paths SET published_at=COALESCE(published_at,now()),withdrawn_at=NULL,updated_at=now() WHERE id=$1',[path.id]);
    await helpers.audit(db,user.id,'learning.publish','learning_path',path.id);
   });
   return result(await pathResult(ctx,match[1]));
@@ -524,10 +573,11 @@ export async function handleEducation(ctx) {
    if(path.published_at&&!content.trim())fail(409,'INCOMPLETE','已发布路径新增章节必须有正文');
    const c=exists(await db.query('INSERT INTO learning_chapters(path_id,title,content,position,objective,checkpoint,checkpoint_answer) VALUES($1,$2,$3,(SELECT COALESCE(max(position),-1)+1 FROM learning_chapters WHERE path_id=$1),$4,$5,$6) RETURNING *',[path.id,title,content,field(body.objective??'','学习目标',{min:0,max:4000}),field(body.checkpoint??'','检查点',{min:0,max:10000}),field(body.checkpointAnswer??'','检查点答案',{min:0,max:10000})]));
    await setLinks(ctx,db,path,c.id,body.problemIds??[]);
+   await setChapterPaper4Links(db,c.id,body.paper4Links??[]);
    await db.query('UPDATE learning_paths SET updated_at=now() WHERE id=$1',[path.id]);
    await helpers.audit(db,user.id,'learning.chapter_create','learning_chapter',c.id);return c;
   });
-  return result({id:chapter.id,pathId:chapter.path_id,title:chapter.title,content:chapter.content,position:chapter.position,objective:chapter.objective,checkpoint:chapter.checkpoint,checkpointAnswer:chapter.checkpoint_answer,completed:false},201);
+  return result({id:chapter.id,pathId:chapter.path_id,title:chapter.title,content:chapter.content,position:chapter.position,objective:chapter.objective,checkpoint:chapter.checkpoint,checkpointAnswer:chapter.checkpoint_answer,completed:false,paper4Links:chapterPaper4Links(await loadCoursePaper4(pool,[chapter.path_id],[user.identityId]),chapter.id,user.identityId,{includeUnavailable:true})},201);
  }
  match=route.match(/^\/chapters\/([^/]+)$/);
  if (match && ['PATCH','DELETE'].includes(method)) {
@@ -547,12 +597,13 @@ export async function handleEducation(ctx) {
     if(position>chapter.position)await db.query('UPDATE learning_chapters SET position=position-1 WHERE path_id=$1 AND archived_at IS NULL AND id<>$2 AND position > $3 AND position <= $4',[path.id,chapter.id,chapter.position,position]);
     await db.query('UPDATE learning_chapters SET title=$1,content=$2,position=$3,updated_at=now(),objective=$5,checkpoint=$6,checkpoint_answer=$7 WHERE id=$4',[title,content,position,chapter.id,body.objective===undefined?chapter.objective:field(body.objective,'学习目标',{min:0,max:4000}),body.checkpoint===undefined?chapter.checkpoint:field(body.checkpoint,'检查点',{min:0,max:10000}),body.checkpointAnswer===undefined?chapter.checkpoint_answer:field(body.checkpointAnswer,'检查点答案',{min:0,max:10000})]);
     if (body.problemIds!==undefined) await setLinks(ctx,db,path,chapter.id,body.problemIds);
+    if(body.paper4Links!==undefined)await setChapterPaper4Links(db,chapter.id,body.paper4Links);
    }
    await db.query('UPDATE learning_paths SET updated_at=now() WHERE id=$1',[path.id]);
    await helpers.audit(db,user.id,method==='DELETE'?'learning.chapter_archive':'learning.chapter_edit','learning_chapter',chapter.id);
    return chapter;
   });
-  return result({ok:true,id:c.id,pathId:c.path_id});
+  return result({ok:true,id:c.id,pathId:c.path_id,paper4Links:method==='DELETE'?[]:chapterPaper4Links(await loadCoursePaper4(pool,[c.path_id],[user.identityId]),c.id,user.identityId,{includeUnavailable:true})});
  }
  match=route.match(/^\/chapters\/([^/]+)\/progress$/);
  if (match && method==='POST') {

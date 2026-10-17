@@ -6,3 +6,14 @@ function context(failChapter=false,role='teacher') {const calls=[],id='11111111-
 test('import commits the path and chapters together as a draft',async()=>{const {ctx,calls}=context();const r=await handleEducation(ctx);assert.equal(r.status,201);assert.equal(r.body.published,false);assert.equal(r.body.chapterCount,1);assert.equal(calls.at(-1).sql,'COMMIT');assert.ok(!calls.some(c=>c.sql.includes('published_at')));});
 test('database failure rolls back the entire import',async()=>{const {ctx,calls}=context(true);await assert.rejects(handleEducation(ctx));assert.equal(calls.at(-1).sql,'ROLLBACK');assert.ok(!calls.some(c=>c.sql==='COMMIT'));});
 test('student cannot import learning paths',async()=>{const {ctx,calls}=context(false,'student');await assert.rejects(handleEducation(ctx),e=>e.status===403);assert.equal(calls.length,0);});
+
+test('course document permits bounded embedded covers and rejects oversize documents and unsafe image types',()=>{
+ const header=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB','base64');
+ const bounded=Buffer.alloc(524288);header.copy(bounded);
+ const coverImage='data:image/png;base64,'+bounded.toString('base64');
+ const imported=validateLearningDocument({...doc,coverImage,authorName:'Author',authoredAt:'2024-01-01T00:00:00Z',classIds:['foreign'],accessScope:'classes',listed:false});
+ assert.equal(imported.coverImage,coverImage);assert.equal(imported.authorName,'Author');assert.equal(imported.accessScope,undefined);assert.equal(imported.classIds,undefined);assert.equal(imported.listed,undefined);
+ assert.throws(()=>validateLearningDocument({...doc,coverImage:'data:image/png;base64,'+Buffer.concat([bounded,Buffer.from([0])]).toString('base64')}),error=>error.code==='INVALID_COVER');
+ assert.throws(()=>validateLearningDocument({...doc,extra:'x'.repeat(1572864)}),error=>error.status===413);
+ assert.throws(()=>validateLearningDocument({...doc,coverImage:'data:image/svg+xml;base64,PHN2Zy8+'}),error=>error.code==='INVALID_COVER');
+});

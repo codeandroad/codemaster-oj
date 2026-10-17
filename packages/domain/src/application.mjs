@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import {courseMetadataForUser} from './course-access.mjs';
 import { transaction } from './db.mjs';
 import { parseFunctionInput, parseJsonValue } from './function-input.mjs';
 import { handleLibrary, bankAccess, problemPermissions, restoreIdentityBindings, canReviewActivitySubmission, SCHOOL_BANK } from './library.mjs';
@@ -10,6 +11,7 @@ import { handlePaper4 } from './paper4.mjs';
 import { handleSystem, assertJudgeAdmission, getSettings } from './system.mjs';
 import { handlePeopleAlignment, handleFavorites, bindPendingTeacherClasses } from './alignment.mjs';
 import { handleAssignmentAuthoring } from './assignment-authoring.mjs';
+import {activityClasses,handleTeachingAudience,handleClassHub} from './activity-audience.mjs';
 import { submissionHistory,problemOwnProgress,emptyOwnProgress } from './submission-history.mjs';
 import { LANGUAGES, languageLimitsFor, starterCodesFor } from './languages.mjs';
 import { avatarForIdentity, isPresetAvatar } from './avatars.mjs';
@@ -78,7 +80,7 @@ export async function createDomainServices(pool,config) {
     LEFT JOIN classes c ON c.id=a.class_id
     WHERE ap.problem_id=$1 AND ap.version_id=$2 AND (
      $3::boolean
-     OR $4::boolean AND EXISTS(SELECT 1 FROM teacher_classes tc WHERE tc.class_id=a.class_id AND tc.account_id=$6)
+     OR $4::boolean AND a.owner_account_id=$6
      OR $5::boolean AND a.state='Published' AND EXISTS(SELECT 1 FROM assignment_participants part WHERE part.assignment_id=a.id AND part.identity_id=$7 AND NOT part.exempt)
     ) LIMIT 1`,[problemId,versionId,rolesInclude(user,'admin'),rolesInclude(user,'teacher'),rolesInclude(user,'student'),user.id,user.identityId]);
    if(!selected.rowCount){
@@ -86,7 +88,7 @@ export async function createDomainServices(pool,config) {
      JOIN timed_practices tp ON tp.id=tpp.practice_id
      WHERE tpp.problem_id=$1 AND tpp.version_id=$2 AND (
       $3::boolean
-      OR $4::boolean AND EXISTS(SELECT 1 FROM teacher_classes tc WHERE tc.class_id=tp.class_id AND tc.account_id=$6)
+      OR $4::boolean AND tp.owner_account_id=$6
       OR $5::boolean AND (tp.state IN ('Published','ResultsPublished')
        OR tp.state='Archived' AND tp.results_published_at IS NOT NULL) AND EXISTS(
        SELECT 1 FROM timed_practice_participants part
@@ -117,11 +119,17 @@ export async function createDomainServices(pool,config) {
   if(owner){Object.assign(result,v.metadata||{});result.referenceCode=v.reference_code;result.tests=(await db.query('SELECT input,expected,weight,name,enabled FROM test_cases WHERE version_id=$1 ORDER BY position',[v.id])).rows.map(t=>({...t,weight:Number(t.weight)}));result.formalTestCount=result.tests.filter(t=>t.enabled).length;}else {const metadata=v.metadata||{},hasAC=!!(await db.query("SELECT 1 FROM submissions WHERE identity_id=$1 AND version_id=$2 AND kind IN ('submit','correction') AND status='AC' AND timed_attempt_id IS NULL LIMIT 1",[user.identityId,v.id])).rowCount;const allow=permissions.canRunFree&&(metadata.hintPolicy==='always'||metadata.hintPolicy!=='never'&&hasAC);if(allow){result.editorial=metadata.editorial||'';result.hints=metadata.hints||[];}else {result.editorial='';result.hints=[];}}return result;
  }
  async function submissionAccess(db,user,id) {
-  const s=row(await db.query('SELECT s.*,v.title problem_title,i.name student_name FROM submissions s JOIN problem_versions v ON v.id=s.version_id JOIN identities i ON i.id=s.identity_id WHERE s.id=$1',[submissionId(id)]));
+  const s=row(await db.query('SELECT s.*,COALESCE(s.assignment_id,original.assignment_id) access_assignment_id,COALESCE(s.timed_attempt_id,original.timed_attempt_id) access_timed_attempt_id,(s.original_submission_id IS NULL OR original.resolved) context_resolved,v.title problem_title,i.name student_name FROM submissions s LEFT JOIN LATERAL submission_activity_context(s.original_submission_id) original ON true JOIN problem_versions v ON v.id=s.version_id JOIN identities i ON i.id=s.identity_id WHERE s.id=$1',[submissionId(id)]));
   if(s.identity_id!==user.identityId&&!rolesInclude(user,'admin')) {
-   if(!rolesInclude(user,'teacher')||!(await db.query('SELECT 1 FROM teacher_classes tc JOIN classes c ON c.id=tc.class_id WHERE tc.account_id=$2 AND ((c.archived_at IS NULL AND EXISTS(SELECT 1 FROM class_members cm WHERE cm.class_id=c.id AND cm.identity_id=$1)) OR EXISTS(SELECT 1 FROM assignments a WHERE a.id=$3 AND a.class_id=c.id) OR EXISTS(SELECT 1 FROM timed_attempts attempt JOIN timed_practices practice ON practice.id=attempt.practice_id WHERE attempt.id=$4 AND practice.class_id=c.id))',[s.identity_id,user.id,s.assignment_id,s.timed_attempt_id])).rowCount) fail(403,'FORBIDDEN','无权访问该提交');
+   let allowed=false;
+   if(rolesInclude(user,'teacher')){
+    if(s.access_assignment_id)allowed=!!(await db.query('SELECT 1 FROM assignments WHERE id=$1 AND owner_account_id=$2',[s.access_assignment_id,user.id])).rowCount;
+    else if(s.access_timed_attempt_id)allowed=!!(await db.query('SELECT 1 FROM timed_attempts a JOIN timed_practices p ON p.id=a.practice_id WHERE a.id=$1 AND p.owner_account_id=$2',[s.access_timed_attempt_id,user.id])).rowCount;
+    else if(s.context_resolved)allowed=!!(await db.query('SELECT 1 FROM class_members cm JOIN teacher_classes tc ON tc.class_id=cm.class_id JOIN classes c ON c.id=cm.class_id WHERE cm.identity_id=$1 AND tc.account_id=$2 AND c.archived_at IS NULL',[s.identity_id,user.id])).rowCount;
+   }
+   if(!allowed)fail(403,'FORBIDDEN','无权访问该提交');
   }
-  if(rolesInclude(user,'admin')&&s.identity_id!==user.identityId) await audit(db,user.id,'submission.admin_read','submission',s.id);
+  if(rolesInclude(user,'admin')&&s.identity_id!==user.identityId)await audit(db,user.id,'submission.admin_read','submission',s.id);
   return s;
  }
  async function assignmentAccess(db,user,id) {
@@ -129,15 +137,16 @@ export async function createDomainServices(pool,config) {
   const isParticipant=rolesInclude(user,'student')&&!!(await db.query('SELECT 1 FROM assignment_participants WHERE assignment_id=$1 AND identity_id=$2 AND NOT exempt',[id,user.identityId])).rowCount;
   // Former class teachers retain historical access after a class is archived.
   // Every mutation of an archived assignment is rejected separately below.
-  const canManage=rolesInclude(user,'admin')||(rolesInclude(user,'teacher')&&!!(await db.query('SELECT 1 FROM teacher_classes tc WHERE tc.class_id=$1 AND tc.account_id=$2',[a.class_id,user.id])).rowCount);
+  const canManage=rolesInclude(user,'admin')||(rolesInclude(user,'teacher')&&a.owner_account_id===user.id);
   if(a.state==='Draft'&&!canManage)fail(404,'NOT_FOUND','作业尚未发布');if(!isParticipant&&!canManage)fail(403,'FORBIDDEN','未分配该作业或无权管理');if(a.state==='Draft'&&!canManage)fail(404,'NOT_FOUND','作业尚未发布');return {...a,isParticipant:isParticipant&&a.state==='Published',canManage};
  }
  async function assignmentResult(db,user,id) {
   const a=await assignmentAccess(db,user,id);
   const ps=(await db.query('SELECT ap.problem_id,ap.version_id,ap.points,v.title,COALESCE(global_reward.points,10) first_ac_points,COALESCE(assignment_reward.points,0) reward_points FROM assignment_problems ap JOIN problem_versions v ON v.id=ap.version_id LEFT JOIN point_rewards global_reward ON global_reward.problem_id=ap.problem_id AND global_reward.assignment_id IS NULL LEFT JOIN point_rewards assignment_reward ON assignment_reward.problem_id=ap.problem_id AND assignment_reward.assignment_id=ap.assignment_id WHERE ap.assignment_id=$1 ORDER BY ap.position',[id])).rows;
-  const linkedCourse=a.course_path_id?(await db.query('SELECT id,title,published_at,archived_at FROM learning_paths WHERE id=$1',[a.course_path_id])).rows[0]:null;
+  const linkedCourse=await courseMetadataForUser(db,user,a.course_path_id);
   const visibleCourse=Boolean(linkedCourse?.published_at&&!linkedCourse.archived_at);
-  const result={id:a.id,title:a.title,classId:a.class_id,className:(await db.query('SELECT name FROM classes WHERE id=$1',[a.class_id])).rows[0]?.name,state:a.state,archived:!!a.archived_at,description:a.description,course:a.course,coursePathId:a.canManage?a.course_path_id:visibleCourse?a.course_path_id:null,courseTitle:a.canManage?linkedCourse?.title??null:visibleCourse?linkedCourse.title:null,courseAvailable:visibleCourse,published:a.state==='Published',publishedAt:a.published_at,createdAt:a.created_at,dueAt:a.due_at,editRevision:a.edit_revision,problems:ps.map(p=>({problemId:p.problem_id,versionId:p.version_id,title:p.title,points:Number(p.points),firstAcPoints:Number(p.first_ac_points),rewardPoints:Number(p.reward_points)}))};
+  const linkedClasses=await activityClasses(db,id);
+  const result={id:a.id,title:a.title,canManage:a.canManage,classIds:linkedClasses.map(c=>c.id),classes:linkedClasses,classId:a.class_id,className:(await db.query('SELECT name FROM classes WHERE id=$1',[a.class_id])).rows[0]?.name,state:a.state,archived:!!a.archived_at,description:a.description,course:a.course,coursePathId:linkedCourse?.id??null,courseTitle:linkedCourse?.title??null,courseAvailable:visibleCourse,published:a.state==='Published',publishedAt:a.published_at,createdAt:a.created_at,dueAt:a.due_at,editRevision:a.edit_revision,problems:ps.map(p=>({problemId:p.problem_id,versionId:p.version_id,title:p.title,points:Number(p.points),firstAcPoints:Number(p.first_ac_points),rewardPoints:Number(p.reward_points)}))};
   {
    const protectedParticipantIds=a.canManage?(await db.query('SELECT DISTINCT identity_id FROM submissions WHERE assignment_id=$1',[id])).rows.map(person=>person.identity_id):[];
    if(a.canManage)result.protectedParticipantIds=protectedParticipantIds;
@@ -291,6 +300,7 @@ export async function createDomainServices(pool,config) {
  async function classesOperation(context) {
   const {route,method,body,url,user,sess,ip}=context;
   let m;
+  const hub=await handleClassHub(context);if(hub)return hub;
   for (const handler of [handleMemberImport]) { const result=await handler(context); if(result)return result; }
    if(route==='/classes'&&method==='GET'){
     const archived=url.searchParams.get('archived')==='true';if(archived)staff(user);
@@ -452,11 +462,7 @@ export async function createDomainServices(pool,config) {
   let m;
    if(route==='/assignments'&&method==='GET'){
     const archived=url.searchParams.get('archived')==='true';
-    const rows=(await pool.query(`SELECT a.* FROM assignments a WHERE (a.archived_at IS NOT NULL)=$6 AND ($1 OR $2 AND EXISTS(SELECT 1 FROM teacher_classes tc WHERE tc.class_id=a.class_id AND tc.account_id=$3) OR $4 AND a.state='Published' AND EXISTS(SELECT 1 FROM assignment_participants p WHERE p.assignment_id=a.id AND p.identity_id=$5 AND NOT p.exempt)) ORDER BY a.created_at DESC LIMIT 200`,[rolesInclude(user,'admin'),rolesInclude(user,'teacher'),user.id,rolesInclude(user,'student'),user.identityId,archived])).rows;const items=[];for(const a of rows)items.push(await assignmentResult(pool,user,a.id));return respond(200,{items,serverNow:row(await pool.query('SELECT clock_timestamp() AS server_now')).server_now});
-   }
-   if(route==='/assignments'&&method==='POST'){
-    staff(user);const title=field(body.title,'作业标题'),classId=uuid(body.classId,'班级 ID'),dueAt=new Date(body.dueAt);if(!Number.isFinite(dueAt.getTime())||dueAt<=new Date())fail(400,'VALIDATION','截止时间须晚于现在');if(!Array.isArray(body.problems)||body.problems.length<1||body.problems.length>50)fail(400,'VALIDATION','作业须包含 1–50 题');
-    const a=await transaction(pool,async db=>{await classAccess(db,user,classId);const participants=body.participants??(await db.query('SELECT identity_id FROM class_members WHERE class_id=$1',[classId])).rows.map(p=>p.identity_id);if(!Array.isArray(participants)||!participants.length||participants.length>500)fail(400,'VALIDATION','请选择 1–500 名学生');const a=row(await db.query('INSERT INTO assignments(title,class_id,owner_account_id,due_at) VALUES($1,$2,$3,$4) RETURNING id',[title,classId,user.id,dueAt]));for(let i=0;i<body.problems.length;i++){const p=body.problems[i],points=Number(p.points);if(!Number.isFinite(points)||points<=0||points>1000)fail(400,'VALIDATION','题目分值须为 0–1000');const problem=row(await db.query('SELECT p.*,v.published_at FROM problems p JOIN problem_versions v ON v.id=p.current_version_id WHERE p.id=$1 AND p.archived_at IS NULL',[uuid(p.problemId)]));if(!problem.published_at)fail(409,'UNPUBLISHED','作业只能选择已发布题目');await versionAccess(db,user,problem.id,problem.current_version_id);await db.query('INSERT INTO assignment_problems(assignment_id,problem_id,version_id,points,position) VALUES($1,$2,$3,$4,$5)',[a.id,problem.id,problem.current_version_id,points,i]);}for(const id of new Set(participants)){if(!(await db.query('SELECT 1 FROM class_members cm JOIN identities i ON i.id=cm.identity_id WHERE class_id=$1 AND identity_id=$2 AND i.archived_at IS NULL AND i.kind=$3',[classId,uuid(id),'student'])).rowCount)fail(400,'VALIDATION','作业成员须为本班有效学生');await db.query('INSERT INTO assignment_participants(assignment_id,identity_id) VALUES($1,$2)',[a.id,id]);}await audit(db,user.id,'assignment.create','assignment',a.id);return a;});return respond(201,await assignmentResult(pool,user,a.id));
+    const rows=(await pool.query(`SELECT a.* FROM assignments a WHERE (a.archived_at IS NOT NULL)=$6 AND ($1 OR $2 AND a.owner_account_id=$3 OR $4 AND a.state='Published' AND EXISTS(SELECT 1 FROM assignment_participants p WHERE p.assignment_id=a.id AND p.identity_id=$5 AND NOT p.exempt)) ORDER BY a.created_at DESC LIMIT 200`,[rolesInclude(user,'admin'),rolesInclude(user,'teacher'),user.id,rolesInclude(user,'student'),user.identityId,archived])).rows;const items=[];for(const a of rows)items.push(await assignmentResult(pool,user,a.id));return respond(200,{items,serverNow:row(await pool.query('SELECT clock_timestamp() AS server_now')).server_now});
    }
    m=route.match(/^\/assignments\/([^/]+)$/);
    if(m&&method==='GET')return respond(200,await assignmentResult(pool,user,m[1]));
@@ -474,7 +480,7 @@ export async function createDomainServices(pool,config) {
       await db.query('UPDATE assignments SET archived_at=clock_timestamp() WHERE id=$1',[id]);
      }else{
       if(!assignment.archived_at)return;
-      if(!(await db.query('SELECT 1 FROM classes WHERE id=$1 AND archived_at IS NULL',[assignment.class_id])).rowCount)fail(409,'CLASS_ARCHIVED','请先恢复班级，再恢复作业');
+      if(assignment.class_id&&!(await db.query('SELECT 1 FROM classes WHERE id=$1 AND archived_at IS NULL',[assignment.class_id])).rowCount)fail(409,'CLASS_ARCHIVED','请先恢复班级，再恢复作业');
       if(assignment.state==='Published'){
        const linked=(await db.query(`SELECT ap.problem_id,p.archived_at problem_archived_at,
         b.archived_at bank_archived_at,v.problem_id version_problem_id,v.published_at
@@ -588,7 +594,7 @@ export async function createDomainServices(pool,config) {
  async function educationOperation(context) {
   const {route,method,body,url,user,sess,ip}=context;
   let m;
-  for (const handler of [handleEducation, timed.handle]) { const result=await handler(context); if(result)return result; }
+  for (const handler of [handleTeachingAudience, handleEducation, timed.handle]) { const result=await handler(context); if(result)return result; }
   return null;
  }
 
@@ -634,7 +640,7 @@ export function resourceArea(route) {
   || /^\/admin\/(problem-banks|problems)(?:\/|$)/.test(route))return 'library';
  if(/^\/assignments(?:\/|$)/.test(route))return 'assignments';
  if(/^\/(submissions|review-notebook)(?:\/|$)/.test(route))return 'submissions';
- if(/^\/(learning-paths|learning-resources|chapters|reports|timed-practices|points)(?:\/|$)/.test(route))return 'education';
+ if(/^\/(teaching|learning-paths|learning-resources|chapters|reports|timed-practices|points)(?:\/|$)/.test(route))return 'education';
  if(/^\/(profiles|profile-message-reports|student-notifications)(?:\/|$)/.test(route))return 'community';
  if(/^\/(site-info|system-settings|audit-events|judge-status|judge-maintenance|judge-tasks)(?:\/|$)/.test(route))return 'system';
  return null;

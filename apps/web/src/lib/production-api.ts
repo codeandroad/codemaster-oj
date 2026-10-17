@@ -80,7 +80,10 @@ export interface Assignment {
   title: string;
   archived?: boolean;
   className?: string;
-  classId: string;
+  classId: string | null;
+  classIds?: string[];
+  classNames?: string[];
+  classes?: { id: string; name: string }[];
   course?: string;
   coursePathId?: string | null;
   courseTitle?: string | null;

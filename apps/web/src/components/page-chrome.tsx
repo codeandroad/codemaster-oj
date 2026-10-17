@@ -2,8 +2,9 @@
 
 import type { ReactNode } from "react";
 import {useLocale} from "@/components/locale-context";
+import {usePageHeading} from "@/components/page-heading-context";
 
-export function PageHeader({ eyebrow, title, description, action, className }: {
+export function PageHeader({ title, action, className }: {
   eyebrow?: string;
   title: string;
   description?: string | null;
@@ -11,13 +12,10 @@ export function PageHeader({ eyebrow, title, description, action, className }: {
   className?: string;
 }) {
   const {t}=useLocale();
+  usePageHeading(t(title));
+  if (!action) return null;
   return (
-    <div className={`production-page-header flex flex-wrap items-end justify-between gap-4 ${className ?? ""}`}>
-      <div className="min-w-0 flex-1">
-        {eyebrow && <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t(eyebrow)}</p>}
-        <h1 className="break-words text-[26px] font-bold leading-tight">{t(title)}</h1>
-        {description && <p className="mt-2 max-w-[76ch] text-sm leading-6 text-muted-foreground">{t(description)}</p>}
-      </div>
+    <div className={`production-page-actions flex min-w-0 flex-wrap items-center justify-end gap-2 ${className ?? ""}`}>
       {action}
     </div>
   );
@@ -25,7 +23,7 @@ export function PageHeader({ eyebrow, title, description, action, className }: {
 
 export function StatusPill({ status }: { status: string }) {
   const {t}=useLocale();
-  const positive = /^(AC|Solved)(?:\b|\s|·)/.test(status) || ["已发布", "可用", "完成", "Available", "Active", "Completed", "Published"].includes(status);
+  const positive = /^(AC|Solved)(?:\b|\s|·)/.test(status) || ["已发布", "可用", "完成", "Available", "Active", "Completed", "Published", "已公开", "Public", "已布置", "Assigned"].includes(status);
   const warning = /^(WA|TLE|MLE|RE|CE|Attempted)(?:\b|\s|·)/.test(status) || ["等待验证", "Unavailable", "Failed", "Disabled", "Waiting", "System Error"].includes(status);
   const colors = positive
     ? "border-success/25 bg-success-soft text-success"

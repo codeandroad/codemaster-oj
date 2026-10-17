@@ -1,5 +1,7 @@
 "use client";
+import { ProblemPublicationStatus, PublicationGuide } from "@/components/problem-publication-status";
 import {ProblemFilter} from "./problem-filter";
+import styles from "./problem-banks.module.css";
 
 import { AppLink as Link } from "@/components/navigation";
 import { useState } from "react";
@@ -17,7 +19,7 @@ import {
   Upload,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { PageHeader, StatusPill } from "@/components/page-chrome";
+import { PageHeader } from "@/components/page-chrome";
 import { useLocale, type AppLocale } from "@/components/locale-context";
 import { productionApi, type CampusUser, type ProductionProblem } from "@/lib/production-api";
 import {
@@ -70,9 +72,9 @@ export function reviewVisibilityLabel(problem: ProductionProblem, bankVisibility
   if (!problem.published) return problem.publishedVersionId ? localText(locale,"当前草稿未开放 · 旧版保持原范围","Current draft unavailable · previous version retains its scope") : localText(locale,"草稿未向学生开放","Draft unavailable to students");
   const visibility = problem.bankVisibility ?? bankVisibility;
   if (visibility !== "school") return localText(locale,"仅指定活动学生可见","Only visible to assigned activity students");
-  if (problem.schoolVisibleAt) return problem.rankReviewStatus === "approved" ? localText(locale,"全校可见 · 参与积分榜","School-wide · eligible for leaderboard points") : localText(locale,"全校可见 · 未纳入积分榜","School-wide · excluded from leaderboard points");
-  if (problem.rankReviewStatus === "revoked") return localText(locale,"已撤下 · 仅指定活动学生可见","Withdrawn · only visible to assigned activity students");
-  return problem.rankReviewStatus === "rejected" ? localText(locale,"审核未通过 · 仅指定活动学生可见","Review rejected · only visible to assigned activity students") : localText(locale,"待管理员审核 · 仅指定活动学生可见","Awaiting admin review · only visible to assigned activity students");
+  if (problem.schoolVisibleAt) return problem.rankReviewStatus === "approved" ? localText(locale,"全校自由练习 · 参与积分榜","School-wide practice · leaderboard points") : localText(locale,"全校自由练习 · 积分资格未通过审核","School-wide practice · points not approved");
+  if (problem.rankReviewStatus === "revoked") return localText(locale,"仅指定活动学生可用 · 不再开放自由练习","Assigned students only · free practice withdrawn");
+  return problem.rankReviewStatus === "rejected" ? localText(locale,"仅指定活动学生可用 · 修订后可重新申请公开","Assigned students only · revise to request review") : localText(locale,"仅指定活动学生可用 · 审核通过后全校公开","Assigned students only · public after approval");
 }
 export const MAX_BATCH_PUBLISH = 100;
 export function publishEligibilityReason(problem: ProductionProblem, locale: AppLocale) {
@@ -222,19 +224,25 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
           </div>
         }
       />
-      <p className="mt-3 rounded-md border border-border bg-surface-subtle px-4 py-3 text-sm leading-6 text-muted-foreground">
-        {tr("教师新建题库默认为私有；如需让题目对全校学生开放，请联系管理员将题库纳入校内审核。发布到校内题库的新版本在审核通过前仅负责教师和指定活动学生可见，不计入积分排行榜。", "New teacher banks are private by default. Ask an administrator to include a bank in school-wide review. A new published version stays visible only to its teacher and assigned activity students until approved, and earns no leaderboard points before approval.")}
-      </p>
       <State resource={banks} />
       <State resource={problems} />
       <State resource={groups} />
       <Feedback action={action} />
-      {!bankId && (
-        <Tabs value={tab === "题库" ? tr("题库", "Banks") : tr("全部题目", "All problems")} onChange={value => setTab(value === tr("题库", "Banks") ? "题库" : "全部题目")} items={[tr("题库", "Banks"), tr("全部题目", "All problems")]} />
-      )}
+      <div className={styles.sectionBar}>
+        {!bankId && (
+          <Tabs value={tab === "题库" ? tr("题库", "Banks") : tr("全部题目", "All problems")} onChange={value => setTab(value === tr("题库", "Banks") ? "题库" : "全部题目")} items={[tr("题库", "Banks"), tr("全部题目", "All problems")]} />
+        )}
+        <div className={styles.accessGuide}>
+          <PublicationGuide />
+          <p className={styles.guideNote}>
+            {tr("私有题库的题目仅供指定学生使用。需要全校自由练习时，由管理员审核公开。", "Private-bank problems are for assigned students. An administrator approves school-wide practice.")}
+            {bankId && bank?.description && <span className="mt-1 block">{bank.description}</span>}
+          </p>
+        </div>
+      </div>
       {!bankId && tab === "题库" ? (
-        <section className={`${panel} mt-4`}>
-          <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+        <section className={`${panel} mt-2`}>
+          <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">
             <Button size="sm" variant={showArchived ? "ghost" : "secondary"} aria-pressed={!showArchived} onClick={() => setShowArchived(false)}>
               {tr("使用中", "Active")} · {activeBanks.length}
             </Button>
@@ -310,7 +318,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
         </section>
       ) : (
         <div
-          className={`mt-5 ${bankId ? "grid grid-cols-[240px_minmax(0,1fr)] gap-5 max-md:grid-cols-1" : ""}`}
+          className={`mt-2 ${bankId ? "grid grid-cols-[240px_minmax(0,1fr)] gap-3 max-md:grid-cols-1" : ""}`}
         >
           {bankId && (
             <aside className={`${panel} self-start`}>
@@ -477,13 +485,8 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                     {problem.mode === "function" ? tr("函数模式", "Function") : tr("标准输入输出", "Standard I/O")}
                   </td>
                   <td>
-                    <StatusPill
-                      status={
-                        problem.published
-                          ? tr("已发布", "Published")
-                          : validationStatusLabel(problem.validationStatus ?? "Draft", locale)
-                      }
-                    />
+                    <ProblemPublicationStatus problem={problem} bankVisibility={banks.data?.items.find((x) => x.id === problem.bankId)?.visibility}/>
+                    {!problem.published && <p className="mt-1 text-xs text-muted-foreground">{tr("参考验证", "Reference check")}: {validationStatusLabel(problem.validationStatus ?? "Draft", locale)}</p>}
                     <p className="mt-1 max-w-52 text-xs leading-5 text-muted-foreground">{reviewVisibilityLabel(problem, banks.data?.items.find((x) => x.id === problem.bankId)?.visibility, locale)}</p>
                   </td>
                   <td>
@@ -1034,13 +1037,13 @@ export function ProblemPicker({
                         ? tr("已审核公开 · 可随课程发布", "Approved and public · ready for the course")
                         : p.published
                           ? p.rankReviewStatus === "rejected"
-                            ? tr("已发布 · 公开审核未通过", "Published · review rejected")
+                            ? tr("审核未通过 · 教学可用", "Review rejected · teaching ready")
                             : p.rankReviewStatus === "revoked"
-                              ? tr("已发布 · 已撤下", "Published · withdrawn")
-                              : tr("已发布 · 待管理员公开审核", "Published · awaiting admin review")
+                              ? tr("已撤下 · 教学可用", "Withdrawn · teaching ready")
+                              : tr("待公开审核 · 教学可用", "Awaiting public review · teaching ready")
                           : tr("题目草稿 · 仅在课程草稿中预览", "Problem draft · preview only in the course draft")
                       : available
-                        ? tr("已发布 · 固定题目版本", "Published · fixed problem version")
+                        ? tr("教学可用 · 固定版本", "Teaching ready · fixed version")
                         : tr("教师草稿 · 不能进入正式活动", "Teacher draft · unavailable for formal activities")}
                 </p>
               </span>

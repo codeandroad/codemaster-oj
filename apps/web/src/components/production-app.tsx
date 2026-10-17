@@ -13,6 +13,8 @@ import {NotificationDropdown} from "@/components/student/notification-dropdown";
 import { AccountMenu } from "@/components/account-menu";
 import { BrandLogo } from "@/components/brand-logo";
 import { PageHeader } from "@/components/page-chrome";
+import { PageHeadingProvider } from "@/components/page-heading-context";
+import { PageBreadcrumbs, ShellPageHeading } from "@/components/page-breadcrumbs";
 import { ProductionLoginPage } from "@/components/auth/login-page";
 import { ProductionRegisterPage } from "@/components/auth/register-page";
 import { AdminAccountsPage, AdminPeoplePage } from "@/components/admin/accounts-people";
@@ -135,6 +137,7 @@ const navigation: Record<CampusRole, { label: string; path: string; icon: typeof
     { label: "首页", path: "/", icon: Home },
     { label: "题目", path: "/student/problems", icon: Code2 },
     { label: "课程", path: "/student/learning-paths", icon: BookOpen },
+    { label: "我的班级", path: "/student/classes", icon: Users },
     { label: "作业", path: "/student/assignments", icon: Library },
     { label: "限时训练", path: "/student/timed-practice", icon: FileClock },
     { label: "Paper 4 练习", path: "/student/paper4", icon: FileCode2 },
@@ -148,7 +151,7 @@ const navigation: Record<CampusRole, { label: string; path: string; icon: typeof
     { label: "课程", path: "/teacher/courses", icon: BookOpen },
     { label: "作业管理", path: "/teacher/assignments", icon: ClipboardList },
     { label: "限时训练", path: "/teacher/timed-practice", icon: Clock3 },
-    { label: "Paper 4 实践评测", path: "/teacher/paper4", icon: FileCode2 },
+    { label: "Paper 4 试卷", path: "/teacher/paper4", icon: FileCode2 },
     { label: "教学报告", path: "/teacher/reports", icon: BarChart3 },
     { label: "导入中心", path: "/teacher/imports", icon: Database },
   ],
@@ -161,6 +164,12 @@ const navigation: Record<CampusRole, { label: string; path: string; icon: typeof
     { label: "判题服务", path: "/admin/judge-service", icon: Gauge },
     { label: "系统设置", path: "/admin/settings", icon: Settings },
   ],
+};
+const shortNavigationEnglish: Record<string, string> = {
+  "教师首页": "Dashboard", "管理员首页": "Dashboard", "班级与学生": "Classes",
+  "我的班级": "My classes", "作业管理": "Assignments", "Paper 4 试卷": "Paper 4",
+  "教学报告": "Reports", "身份档案": "Identities", "账号与角色": "Accounts",
+  "题库管理": "Problem banks", "导入中心": "Imports",
 };
 function ProductionShell({
   user,
@@ -194,10 +203,10 @@ function ProductionShell({
             href={item.path}
             onNavigate={() => setOpen(false)}
             aria-current={activePath(item.path) ? "page" : undefined}
-            className={`flex h-10 items-center gap-3 rounded-md px-3 text-sm ${activePath(item.path) ? "bg-accent font-semibold text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+            className={`flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm ${activePath(item.path) ? "bg-accent font-semibold text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
           >
-            <item.icon size={17} />
-            <span className="min-w-0 truncate" title={t(item.label)}>{t(item.label)}</span>
+            <item.icon size={17} className="shrink-0" aria-hidden="true"/>
+            <span className="min-w-0 flex-1 whitespace-normal break-words leading-5">{locale === "en" ? shortNavigationEnglish[item.label] ?? t(item.label) : item.label}</span>
           </AppLink>
         ) : (
           <div
@@ -215,7 +224,7 @@ function ProductionShell({
     </nav>
   );
   return (
-    <WorkspaceThemeProvider theme={shellTheme}><PersonalAppearanceProvider pageTheme={settings.pageTheme} updatePageTheme={pageTheme=>update({pageTheme})}><div data-od-id="production-shell" style={{colorScheme:shellTheme}} className={`production-shell min-h-screen bg-background text-foreground ${shellTheme==="dark"?"dark":""}`}>
+    <PageHeadingProvider pathname={pathname}><WorkspaceThemeProvider theme={shellTheme}><PersonalAppearanceProvider pageTheme={settings.pageTheme} updatePageTheme={pageTheme=>update({pageTheme})}><div data-od-id="production-shell" style={{colorScheme:shellTheme}} className={`production-shell min-h-screen bg-background text-foreground ${shellTheme==="dark"?"dark":""}`}>
       <div className={`grid min-h-screen ${role==="student"?"md:grid-cols-[224px_minmax(0,1fr)]":"md:grid-cols-[236px_minmax(0,1fr)]"}`}>
         <aside className="production-sidebar hidden flex-col border-r border-border bg-surface md:flex">
           <div className="flex h-16 flex-col justify-center border-b border-border px-4">
@@ -239,7 +248,7 @@ function ProductionShell({
                 <Menu size={18} />
               </Button>
               <BrandLogo className="h-auto w-[130px] max-w-full md:hidden" />
-              <HeaderDate locale={locale}/>
+              <PageBreadcrumbs pathname={pathname} role={role}/><ShellPageHeading pathname={pathname} role={role}/>
             </div>
             <div className="flex shrink-0 items-center gap-3">
               {role==="student"&&<NotificationDropdown/>}
@@ -253,7 +262,7 @@ function ProductionShell({
           <div className="px-4">
             <Feedback action={action} />
           </div>
-          <main className="mx-auto max-w-[1500px] space-y-5 p-4 sm:p-6">{children}</main>
+          <main className="production-page-content mx-auto max-w-[1500px] space-y-3 px-4 py-4 sm:px-6">{children}</main>
         </div>
       </div>
       {open && (
@@ -279,22 +288,10 @@ function ProductionShell({
           </aside>
         </div>
       )}
-    </div></PersonalAppearanceProvider></WorkspaceThemeProvider>
+    </div></PersonalAppearanceProvider></WorkspaceThemeProvider></PageHeadingProvider>
   );
 }
 
-function HeaderDate({locale}:{locale:"zh"|"en"}) {
-  const [now,setNow]=useState(()=>new Date());
-  useEffect(()=>{
-    const timer=window.setInterval(()=>setNow(new Date()),30_000);
-    return ()=>window.clearInterval(timer);
-  },[]);
-  const parts=new Intl.DateTimeFormat("zh-CN",{timeZone:"Asia/Shanghai",year:"numeric",month:"2-digit",day:"2-digit",weekday:"long"}).formatToParts(now);
-  const part=(type:string)=>parts.find(value=>value.type===type)?.value??"";
-  const iso=`${part("year")}-${part("month")}-${part("day")}`;
-  const label=locale==="zh"?`${iso} ${part("weekday").replace("星期","周")}`:new Intl.DateTimeFormat("en-US",{timeZone:"Asia/Shanghai",dateStyle:"full"}).format(now);
-  return <time dateTime={iso} suppressHydrationWarning className="min-w-0 truncate text-xs font-medium text-muted-foreground sm:text-sm">{label}</time>;
-}
 
 function ProductionView({pathname,role,user,profileVersion,onProfileSaved}:{pathname:string;role:CampusRole;user:CampusUser;profileVersion:number;onProfileSaved:(next:CampusUser)=>void}) {
   if(pathname.endsWith("/points"))return <PointsPage user={user} student={role==="student"} workspace={role}/>;

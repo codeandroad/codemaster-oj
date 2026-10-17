@@ -81,8 +81,11 @@ test('Paper 4 practice has isolated drafts, immutable stages, class authorizatio
     questions:[{key:'Q1',title:'Unverified question',statement:'Teacher review only',stages:[
      {id:'Q1a',title:'Review',maxMarks:75,judgeMode:'manual'}]}]},'POST',201);
    await teacher(`/paper4/papers/${manualOnly.id}/publish`,{},'POST',409);
-   const paper=await teacher('/paper4/papers',{title:'Paper 4 practice',classId:cls.id,questions,runnerCases,referenceSolutions},'POST',201);
+   const paper=await teacher('/paper4/papers',{title:'Paper 4 practice',examYear:2025,examSession:'summer',examVariant:41,classId:cls.id,questions,runnerCases,referenceSolutions},'POST',201);
    assert.equal(paper.totalMarks,75);
+   assert.equal(paper.examYear,2025);
+   assert.equal(paper.examSession,'summer');
+   assert.equal(paper.examVariant,41);
    await student(`/paper4/papers/${paper.id}`,undefined,'GET',404);
    await outsider(`/paper4/papers/${paper.id}`,undefined,'GET',404);
    await teacher(`/paper4/papers/${paper.id}`,{description:'Draft updated'},'PATCH');
@@ -98,6 +101,8 @@ test('Paper 4 practice has isolated drafts, immutable stages, class authorizatio
    await teacher(`/paper4/papers/${paper.id}/publish`,{});
    await teacher(`/paper4/papers/${paper.id}`,{description:'Cannot rewrite published version'},'PATCH',409);
    const published=await student(`/paper4/papers/${paper.id}`);
+   assert.equal(published.examYear,2025);
+   assert.equal((await teacher('/paper4/papers')).items.find(item=>item.id===paper.id).examSession,'summer');
    assert.equal(published.runnerCases,undefined);
    assert.equal(published.referenceSolutions,undefined);
    assert.equal(JSON.stringify(published).includes('private-driver'),false);
@@ -198,11 +203,15 @@ test('Paper 4 practice has isolated drafts, immutable stages, class authorizatio
    assert.equal((await student(`/paper4/papers/${paper.id}`)).versionId,originalVersion);
    await validateReferences(paper.id);
    assert.equal((await teacher(`/paper4/papers/${paper.id}?view=draft`)).referenceValidation.Q1a.status,'AC');
-   const changed=await teacher(`/paper4/papers/${paper.id}`,{description:'Revised practice'},'PATCH');
+   const changed=await teacher(`/paper4/papers/${paper.id}`,{description:'Revised practice',examYear:2026,examSession:'autumn',examVariant:42},'PATCH');
    assert.equal(changed.referenceValidation.Q1a.status,'unverified');
    assert.equal((await student(`/paper4/papers/${paper.id}`)).description,'Draft updated');
    const draftExport=await teacher(`/paper4/papers/${paper.id}/export?view=draft`);
    const draftPackage=parsePaper4Import(draftExport).createBody;
+   assert.equal(draftPackage.examYear,2026);
+   assert.equal(draftPackage.examSession,'autumn');
+   assert.equal(draftPackage.examVariant,42);
+   assert.equal((await student(`/paper4/papers/${paper.id}`)).examYear,2025);
    assert.equal(draftPackage.description,'Revised practice');
    assert.equal(draftPackage.classId,null);
    assert.deepEqual(draftPackage.questions,changed.questions);
@@ -215,6 +224,8 @@ test('Paper 4 practice has isolated drafts, immutable stages, class authorizatio
    assert.equal(revised.versionNumber,2);
    assert.notEqual(revised.versionId,originalVersion);
    assert.equal((await student(`/paper4/papers/${paper.id}`)).description,'Revised practice');
+   assert.equal((await student(`/paper4/attempts/${attempt.id}`)).paper.examYear,2025);
+   assert.equal((await student(`/paper4/papers/${paper.id}`)).examYear,2026);
    const newAttempt=await student(`/paper4/papers/${paper.id}/attempt`,{},'POST',201);
    assert.notEqual(newAttempt.id,attempt.id);
    assert.equal(newAttempt.versionId,revised.versionId);
@@ -242,9 +253,9 @@ test('Paper 4 practice has isolated drafts, immutable stages, class authorizatio
    assert.equal(reimport.createBody.endsAt,null);
    await student(`/paper4/papers/${paper.id}/export`,undefined,'GET',403);
    await otherTeacher(`/paper4/papers/${paper.id}/export`,undefined,'GET',403);
-   assert.equal((await admin(`/paper4/papers/${paper.id}`)).canExport,false);
-   assert.equal((await admin('/paper4/papers')).items.find(item=>item.id===paper.id).canExport,false);
-   await admin(`/paper4/papers/${paper.id}/export`,undefined,'GET',403);
+   assert.equal((await admin(`/paper4/papers/${paper.id}`)).canExport,true);
+   assert.equal((await admin('/paper4/papers')).items.find(item=>item.id===paper.id).canExport,true);
+   assert.equal((await admin(`/paper4/papers/${paper.id}/export`)).contentType,'application/json');
    await otherTeacher(`/paper4/papers/${paper.id}/archive`,{},'POST',403);
    await student(`/paper4/papers/${paper.id}/archive`,{},'POST',403);
    const beforeArchiveSnapshots=(await pool.query('SELECT count(*)::int n FROM paper4_snapshots WHERE attempt_id=$1',[newAttempt.id])).rows[0].n;
@@ -320,6 +331,11 @@ test('Paper 4 practice has isolated drafts, immutable stages, class authorizatio
    assert.equal(JSON.stringify(summary).includes('Implement a circular structure'),false);
    await student(`/paper4/papers/${scheduled.id}`,undefined,'GET',409);
    await student(`/paper4/papers/${scheduled.id}/attempt`,{},'POST',409);
+   await teacher(`/paper4/papers/${scheduled.id}/draft`,{},'POST',201);
+   await teacher(`/paper4/papers/${scheduled.id}`,{startsAt:null,endsAt:null},'PATCH');
+   await validateReferences(scheduled.id);
+   const unscheduledExam=await teacher(`/paper4/papers/${scheduled.id}/publish`,{},'POST',400);
+   assert.equal(unscheduledExam.error.code,'VALIDATION','legacy exam revisions cannot publish without both time boundaries');
 
    const timedPaper=await teacher('/paper4/papers',{title:'Deadline freeze',classId:cls.id,
     endsAt:new Date(Date.now()+3600000).toISOString(),questions,runnerCases,referenceSolutions},'POST',201);
@@ -339,10 +355,85 @@ test('Paper 4 practice has isolated drafts, immutable stages, class authorizatio
    assert.equal((await teacher(`/paper4/attempts?paperId=${timedPaper.id}`)).items[0].status,'submitted');
    assert.equal((await pool.query('SELECT count(*)::int n FROM paper4_snapshots WHERE attempt_id=$1',[expiring.id])).rows[0].n,3);
    await student(`/paper4/attempts/${expiring.id}/files/Q1`,{content:'after deadline',revision:1},'PATCH',409);
+   // Catalogue batch publication is one transaction: no selected draft changes
+   // if any paper is unauthorized, ineligible or not reference-validated.
+   const batchFirst=await teacher('/paper4/papers',{title:'Batch first draft',questions,runnerCases,referenceSolutions},'POST',201);
+   const batchSecond=await teacher('/paper4/papers',{title:'Batch second draft',questions,runnerCases,referenceSolutions},'POST',201);
+   await validateReferences(batchFirst.id);await validateReferences(batchSecond.id);
+   const batchBody={paperIds:[batchFirst.id,batchSecond.id]};
+   const batchState=async(ids)=>({
+    papers:(await pool.query('SELECT * FROM paper4_papers WHERE id=ANY($1::uuid[]) ORDER BY id',[ids])).rows,
+    versions:(await pool.query('SELECT * FROM paper4_versions WHERE paper_id=ANY($1::uuid[]) ORDER BY id',[ids])).rows,
+    publishes:(await pool.query("SELECT count(*)::int n FROM audit_events WHERE action='paper4.publish'")).rows[0].n,
+   });
+   const initialBatchState=await batchState(batchBody.paperIds);
+   const rejectedBatch=async(body,status=400,api=teacher)=>{
+    const result=await api('/paper4/papers/batch-publish',body,'POST',status);
+    assert.deepEqual(await batchState(batchBody.paperIds),initialBatchState,'failed batch must preserve paper/version metadata and publication audit count');
+    return result;
+   };
+   await rejectedBatch(batchBody,403,student);
+   for(const paperIds of [undefined,[],[batchFirst.id,batchFirst.id],[batchFirst.id,batchFirst.id.toUpperCase()],Array(101).fill(randomUUID()),['not-a-uuid']])
+    await rejectedBatch({...batchBody,paperIds});
+   await rejectedBatch({...batchBody,paperIds:[batchFirst.id,randomUUID()]},404);
+   // Old class/time batch requests fail instead of silently becoming public.
+   for(const assignment of [{classId:cls.id},{classId:'bad'},{startsAt:new Date().toISOString()},
+    {endsAt:new Date(Date.now()+3600000).toISOString()}])await rejectedBatch({...batchBody,...assignment});
+   const foreignPaper=await otherTeacher('/paper4/papers',{title:'Private other teacher paper title',questions,runnerCases,referenceSolutions},'POST',201);
+   const unauthorized=await rejectedBatch({...batchBody,paperIds:[batchFirst.id,foreignPaper.id]},403);
+   assert.equal(unauthorized.error.paperTitle,undefined);
+   assert.equal(unauthorized.error.message.includes(foreignPaper.title),false);
+   const unverifiedBatch=await teacher('/paper4/papers',{title:'Unverified batch draft',questions,runnerCases,referenceSolutions},'POST',201);
+   const noCasesBatch=await teacher('/paper4/papers',{title:'Batch missing tests',questions,referenceSolutions},'POST',201);
+   const noReferenceBatch=await teacher('/paper4/papers',{title:'Batch missing reference',questions,runnerCases},'POST',201);
+   const archivedBatch=await teacher('/paper4/papers',{title:'Archived batch draft',questions,runnerCases,referenceSolutions},'POST',201);
+   await teacher(`/paper4/papers/${archivedBatch.id}/archive`,{});
+   for(const [invalid,code] of [[unverifiedBatch,'REFERENCE_NOT_VALIDATED'],[noCasesBatch,'STAGE_CASES_REQUIRED'],
+    [noReferenceBatch,'REFERENCE_REQUIRED'],[archivedBatch,'PAPER_ARCHIVED'],[paper,'INITIAL_DRAFT_REQUIRED']]){
+    const beforeInvalid=await batchState([invalid.id]);
+    const rejection=await rejectedBatch({...batchBody,paperIds:[batchFirst.id,invalid.id]},409);
+    assert.equal(rejection.error.code,code);
+    assert.equal(rejection.error.paperId,invalid.id);
+    assert.equal(rejection.error.paperTitle,invalid.title);
+    assert.ok(rejection.error.message.includes(invalid.title));
+    assert.deepEqual(await batchState([invalid.id]),beforeInvalid);
+   }
+   const publishedRevision=await teacher(`/paper4/papers/${paper.id}/draft`,{},'POST',201);
+   assert.equal(publishedRevision.hasDraft,true);
+   const revisionRejection=await rejectedBatch({...batchBody,paperIds:[batchFirst.id,paper.id]},409);
+   assert.equal(revisionRejection.error.code,'INITIAL_DRAFT_REQUIRED');
+   assert.equal((await teacher(`/paper4/papers/${paper.id}?view=draft`)).versionId,publishedRevision.versionId);
+   const noStudentDrafts=await student('/paper4/papers');
+   assert.equal(noStudentDrafts.items.some(item=>batchBody.paperIds.includes(item.id)),false);
+   const tasksBeforeBatch=(await pool.query('SELECT count(*)::int n FROM paper4_run_tasks')).rows[0].n;
+   const batchPublished=await teacher('/paper4/papers/batch-publish',{...batchBody,paperIds:[batchSecond.id,batchFirst.id]});
+   assert.deepEqual(batchPublished.items.map(item=>item.id),[batchSecond.id,batchFirst.id],'response preserves checkbox order');
+   for(const item of batchPublished.items){
+    assert.equal(item.status,'published');assert.equal(item.hasDraft,false);
+    assert.equal(item.deliveryKind,'catalog');assert.equal(item.classId,null);assert.equal(item.className,null);
+    assert.equal(item.startsAt,null);assert.equal(item.endsAt,null);
+    assert.ok(Object.values(item.referenceValidation).every(result=>result.status==='AC'));
+    assert.equal((await student(`/paper4/papers/${item.id}`)).classId,null);
+    assert.equal((await outsider(`/paper4/papers/${item.id}`)).status,'published');
+   }
+   const afterBatch=await batchState(batchBody.paperIds);
+   assert.deepEqual(afterBatch.versions.map(v=>v.draft_revision),initialBatchState.versions.map(v=>v.draft_revision));
+   assert.equal(afterBatch.publishes,initialBatchState.publishes+2);
+   assert.equal((await pool.query('SELECT count(*)::int n FROM paper4_run_tasks')).rows[0].n,tasksBeforeBatch,'catalogue publication does not rerun unchanged references');
+   assert.equal((await student('/paper4/papers')).items.filter(item=>batchBody.paperIds.includes(item.id)).length,2);
+   const afterSuccess=await batchState(batchBody.paperIds);
+   await teacher('/paper4/papers/batch-publish',batchBody,'POST',409);
+   assert.deepEqual(await batchState(batchBody.paperIds),afterSuccess,'repeat batch cannot republish');
+   const adminDraft=await teacher('/paper4/papers',{title:'Administrator batch assignment',questions,runnerCases,referenceSolutions},'POST',201);
+   await validateReferences(adminDraft.id);
+   const adminBatch=await admin('/paper4/papers/batch-publish',{paperIds:[adminDraft.id]});
+   assert.equal(adminBatch.items[0].classId,null);
+   assert.equal((await outsider(`/paper4/papers/${adminDraft.id}`)).status,'published');
+
    await pool.query('DELETE FROM teacher_classes WHERE class_id=$1',[cls.id]);
-   await teacher(`/paper4/papers/${paper.id}`,undefined,'GET',403);
-   await teacher(`/paper4/attempts/${attempt.id}`,undefined,'GET',403);
-   await teacher(`/paper4/runs/${run.id}`,undefined,'GET',403);
+   await teacher(`/paper4/papers/${paper.id}`,undefined,'GET',200);
+   await teacher(`/paper4/attempts/${attempt.id}`,undefined,'GET',200);
+   await teacher(`/paper4/runs/${run.id}`,undefined,'GET',200);
    assert.equal((await admin(`/paper4/attempts/${attempt.id}`)).score,60);
   }finally{
    if(server)await new Promise(resolve=>server.close(resolve));

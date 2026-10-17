@@ -1,6 +1,6 @@
 export function activityDate(value:string,label:string){if(!value)throw new Error(`请填写${label}。`);const date=new Date(value);if(!Number.isFinite(date.getTime()))throw new Error(`${label}格式无效。`);return date.toISOString();}
-export function validateActivity({title,classId,problems,participants,publish=false,timed=false}:{title:string;classId:string;problems:{problemId:string;points:number;rewardPoints?:number}[];participants:string[];publish?:boolean;timed?:boolean}){
- if(!title.trim())throw new Error('请填写活动名称。');if(!classId)throw new Error('请选择班级。');
+export function validateActivity({title,problems,participants,publish=false,timed=false}:{title:string;classId?:string|null;classIds?:string[];problems:{problemId:string;points:number;rewardPoints?:number}[];participants:string[];publish?:boolean;timed?:boolean}){
+ if(!title.trim())throw new Error('请填写活动名称。');
  if(problems.length>50||new Set(problems.map(p=>p.problemId)).size!==problems.length)throw new Error('最多选择 50 道题目，同一题目不能重复。');
  if(problems.some(p=>!Number.isFinite(p.points)||p.points<=0||p.points>1000||Math.abs(p.points*100-Math.round(p.points*100))>0.00001))throw new Error('题目分值须大于 0、不超过 1000，最多两位小数。');
  if(problems.some(p=>p.rewardPoints!==undefined&&(!Number.isInteger(p.rewardPoints)||p.rewardPoints<0||p.rewardPoints>20)))throw new Error('本作业额外奖励须为 0–20 的整数积分。');

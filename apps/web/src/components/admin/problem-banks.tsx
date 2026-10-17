@@ -1,5 +1,6 @@
 "use client";
 
+import { ProblemPublicationStatus } from "@/components/problem-publication-status";
 import { useState } from "react";
 import { Archive, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { AppLink } from "@/components/navigation";
@@ -43,6 +44,7 @@ interface ManagedProblem {
 interface ManagedProblemHistory {
   id: string;
   bankName: string;
+  bankVisibility?: "school" | "private";
   ownerName: string;
   archivedAt: string | null;
   currentVersionId: string | null;
@@ -191,7 +193,7 @@ function ManagedProblemList({ bank, onChanged }: { bank: ManagedBank; onChanged:
       <tbody>{list.data?.items.map(problem => <tr key={problem.id} className="border-t border-border">
         <td className="px-4 py-3"><div><button type="button" className="font-semibold text-primary hover:underline focus-visible:underline" onClick={() => setDetailId(problem.id)}>{problem.title}</button></div><span className="text-xs text-muted-foreground">{problem.id.slice(0, 8)}{problem.archivedAt ? ` · ${tr("已归档", "Archived")}` : ""}</span></td>
         <td className="px-4 py-3">{problem.ownerName}</td>
-        <td className="px-4 py-3"><span>{problem.publishedAt ? tr("已发布", "Published") : tr("草稿", "Draft")}</span><span className="block text-xs text-muted-foreground">{problem.publicVersionCount ? tr(`${problem.publicVersionCount} 个公开版本`, `${problem.publicVersionCount} public versions`) : problem.rankReviewStatus === "pending" && problem.publishedAt ? tr("待审核", "Pending review") : problem.validationStatus ?? "—"}</span></td>
+        <td className="px-4 py-3"><ProblemPublicationStatus problem={problem} bankVisibility={bank.visibility}/><span className="block text-xs text-muted-foreground">{problem.publicVersionCount ? tr(`${problem.publicVersionCount} 个公开版本`, `${problem.publicVersionCount} public versions`) : problem.rankReviewStatus === "pending" && problem.publishedAt ? tr("待审核", "Pending review") : problem.validationStatus ?? "—"}</span></td>
         <td className="px-4 py-3 text-xs text-muted-foreground">{tr(`课程 ${problem.courseCount} · 作业 ${problem.assignmentCount} · 训练 ${problem.timedCount} · 提交 ${problem.submissionCount}`, `Courses ${problem.courseCount} · Assignments ${problem.assignmentCount} · Practices ${problem.timedCount} · Submissions ${problem.submissionCount}`)}</td>
         <td className="px-4 py-3"><Button size="sm" variant="ghost" disabled={Boolean(bank.archivedAt && problem.archivedAt)} onClick={() => setCandidate({ problem, kind: problem.archivedAt ? "restore" : "archive" })}>{problem.archivedAt ? tr("恢复题目", "Restore") : tr("归档题目", "Archive")}</Button></td>
       </tr>)}{!list.data?.items.length && <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">{tr("此题库暂无符合条件的题目。", "No matching problems in this bank.")}</td></tr>}</tbody>
@@ -215,7 +217,7 @@ function ManagedProblemDetail({ id, onClose }: { id: string; onClose: () => void
     <Loading resource={detail}>{detail.data && <div className="space-y-4 text-sm">
       <p className="text-muted-foreground">{detail.data.bankName} · {detail.data.ownerName} · {detail.data.versions.length} {tr("个历史版本", "versions")}</p>
       {detail.data.versions.map(version => <section key={version.id} className="rounded-md border border-border p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{version.title}{version.id === detail.data?.currentVersionId ? ` · ${tr("当前版本", "Current version")}` : ""}</h3><span className="text-xs text-muted-foreground">{version.publishedAt ? tr("已发布", "Published") : tr("草稿", "Draft")} · {version.rankReviewStatus}</span></div>
+        <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{version.title}{version.id === detail.data?.currentVersionId ? ` · ${tr("当前版本", "Current version")}` : ""}</h3><ProblemPublicationStatus problem={version} bankVisibility={detail.data?.bankVisibility}/></div>
         <p className="mt-2 whitespace-pre-wrap leading-6">{version.statement || tr("暂无题面", "No statement")}</p>
         <p className="mt-2 text-xs text-muted-foreground">{tr("验证", "Validation")}: {version.validationStatus} · {tr("校内公开", "School-wide")}: {version.schoolVisibleAt ? tr("是", "Yes") : tr("否", "No")}</p>
       </section>)}

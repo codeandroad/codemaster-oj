@@ -129,6 +129,11 @@ export class Paper4Controller {
     return this.handle(request, response);
   }
 
+  @Get('attempts/:id/solutions/:questionKey')
+  getSolution(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
+    return this.handle(request, response);
+  }
+
   @Patch('attempts/:id/files/:fileKey')
   saveFile(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
     return this.handle(request, response);

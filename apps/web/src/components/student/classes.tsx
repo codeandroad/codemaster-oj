@@ -7,7 +7,7 @@ import { AppLink } from "@/components/navigation";
 import { PageHeader } from "@/components/page-chrome";
 import { useLocale } from "@/components/locale-context";
 import { buttonVariants } from "@/components/ui/button";
-import { Back, Empty, LessonContent, State, useData } from "./shared";
+import { Empty, LessonContent, State, useData } from "./shared";
 
 interface StudentClassSummary {
   id: string;
@@ -64,7 +64,6 @@ export function StudentClass({ id }: { id: string }) {
   const data = resource.data;
   const taskCount = (data?.assignments.length ?? 0) + (data?.timedPractices.length ?? 0) + (data?.paper4Activities.length ?? 0);
   return <>
-    <Back href="/student/classes">{tx("我的班级", "My classes")}</Back>
     <State data={resource}>{data && <>
       <PageHeader title={data.name} description={data.description}/>
       <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground"><span>{tx(`${data.memberCount ?? 0} 名学生`, `${data.memberCount ?? 0} students`)}</span>{data.teachers.length > 0 && <span>{tx("教师：", "Teachers: ")}{data.teachers.map(teacher => teacher.name).join(" / ")}</span>}</div>

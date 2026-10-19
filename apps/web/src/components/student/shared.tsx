@@ -1,7 +1,5 @@
 "use client";
 
-import { AppLink } from "@/components/navigation";
-
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { StatusPill } from "@/components/page-chrome";
@@ -56,7 +54,6 @@ export function Empty({ title, description }: { title: string; description?: str
 export function Tabs({ items, value, onChange, label }: { items: string[]; value: string; onChange: (value: string) => void; label: string }) {
   return <div role="tablist" aria-label={label} className="mt-5 flex overflow-x-auto border-b border-border">{items.map(item => <button type="button" role="tab" key={item} aria-selected={value === item} onClick={() => onChange(item)} className={`h-10 shrink-0 border-b-2 px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-primary ${value === item ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}>{item}</button>)}</div>;
 }
-export function Back({ href, children }: { href: string; children: ReactNode }) { return <AppLink href={href} className="mb-4 inline-flex min-h-9 items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground">← {children}</AppLink>; }
 export function kindLabel(kind: string, locale:AppLocale="zh") { return kind === "submit" ? ui(locale,"正式提交","Formal submission") : kind === "correction" ? ui(locale,"订正","Correction") : kind === "samples" ? ui(locale,"公开样例自测","Public sample run") : ui(locale,"自定义输入自测","Custom input run"); }
 export function ResultScore({ result }: { result: Submission }) {
   const {locale}=useLocale();

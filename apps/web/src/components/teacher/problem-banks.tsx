@@ -181,14 +181,6 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
   };
   return (
     <>
-      {bankId && (
-        <Link
-          href="/teacher/problems"
-          className={`${link} mb-4 inline-block text-sm`}
-        >
-          ← {tr("题库与题目", "Problem banks and problems")}
-        </Link>
-      )}
       <PageHeader
         eyebrow={tr(bankId ? "题库" : "题库与题目", bankId ? "Problem bank" : "Problem banks")}
         title={bankId ? (bank?.name ?? tr("题库详情", "Bank details")) : tr("题库与题目", "Problem banks and problems")}

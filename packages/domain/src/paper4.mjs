@@ -256,8 +256,8 @@ async function paperResult(db,p,user){
  return result;
 }
 async function getAttempt(db,user,id,{forUpdate=false}={}){
- const attempt=one(await db.query(`SELECT a.*,p.owner_account_id,p.archived_at,p.short_title,p.delivery_kind,p.activity_kind,p.source_paper_id,p.source_version_id,v.class_id,v.title paper_title,
-  v.starts_at,v.ends_at,v.version_number,i.name student_name,
+ const attempt=one(await db.query(`SELECT a.*,p.owner_account_id,p.archived_at,p.status paper_status,p.short_title,p.delivery_kind,p.activity_kind,p.source_paper_id,p.source_version_id,v.class_id,v.title paper_title,
+  v.starts_at,v.ends_at,v.version_number,v.published_at version_published_at,i.name student_name,
   v.definition,v.runner_cases FROM paper4_attempts a JOIN paper4_papers p ON p.id=a.paper_id
   JOIN paper4_versions v ON v.id=a.version_id JOIN identities i ON i.id=a.identity_id
   WHERE a.id=$1 ${forUpdate?'FOR UPDATE OF a':''}`,[uuid(id,'答卷 ID')]));
@@ -794,6 +794,26 @@ export async function handlePaper4(ctx){
    status:a.state,startedAt:a.started_at,submittedAt:a.submitted_at,releasedAt:a.released_at,
    score:a.marked_stages?Number(a.score):null,markedStages:Number(a.marked_stages),
    totalStages:a.definition.questions.reduce((n,q)=>n+q.stages.length,0)}))});
+ }
+ m=route.match(/^\/paper4\/attempts\/([^/]+)\/solutions\/([^/]+)$/);
+ if(m&&method==='GET'){
+  const attempt=await getAttempt(pool,user,m[1]);
+  const question=questionFor(attempt,m[2]);
+  if(!canManage(user,attempt)){
+   if(!user.roles.includes('student')||attempt.identity_id!==user.identityId)
+    fail(403,'FORBIDDEN','只能查看本人答卷的参考答案');
+   if(attempt.paper_status!=='published'||!attempt.version_published_at||attempt.archived_at)
+    fail(404,'NOT_FOUND','试卷参考答案不可用');
+   if(attempt.starts_at&&attempt.starts_at>new Date())fail(409,'NOT_STARTED','练习尚未开始');
+   if(attempt.delivery_kind==='activity'&&attempt.activity_kind==='exam'&&!attempt.released_at)
+    fail(403,'SOLUTION_LOCKED','模拟考试成绩公布后才能查看参考答案');
+  }
+  // Resolve only the requested question from the attempt's immutable version.
+  // Do not load other answers, hidden cases or teacher drivers into this payload.
+  const row=one(await pool.query(`SELECT reference_solutions ->> $3::text code FROM paper4_versions
+   WHERE id=$1 AND paper_id=$2`,[attempt.version_id,attempt.paper_id,question.key]));
+  if(typeof row.code!=='string'||!row.code.trim())fail(404,'NOT_FOUND','此大题暂无参考答案');
+  return respond(200,{questionKey:question.key,language:'python',code:row.code});
  }
  m=route.match(/^\/paper4\/attempts\/([^/]+)$/);
  if(m&&method==='GET'){

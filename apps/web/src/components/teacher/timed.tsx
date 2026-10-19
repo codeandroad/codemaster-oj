@@ -336,12 +336,6 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
   );
   return (
     <>
-      <Link
-        href="/teacher/timed-practice"
-        className={`${link} mb-4 inline-block text-sm`}
-      >
-        ← {tr("计时训练", "Timed practice")}
-      </Link>
       <PageHeader
         eyebrow={tr("活动编辑", "Edit activity")}
         title={saved?.title ?? tr("新建计时训练", "New timed practice")}
@@ -749,12 +743,6 @@ export function TeacherTimedProgress({ id }: { id: string }) {
       ) ?? [];
   return (
     <>
-      <Link
-        href="/teacher/timed-practice"
-        className={`${link} mb-4 inline-block text-sm`}
-      >
-        ← {tr("计时训练", "Timed practice")}
-      </Link>
       <PageHeader
         eyebrow={tr("进行情况", "Progress")}
         title={practice?.title ?? tr("训练进行情况", "Practice progress")}

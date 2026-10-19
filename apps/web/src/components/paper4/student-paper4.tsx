@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Bookmark, ChevronLeft, ChevronRight, Code2, Download, FileCode2, FileText, HelpCircle, House, LayoutPanelLeft, List, Loader2, Maximize2, Play, RefreshCw, RotateCcw, Send, Settings } from "lucide-react";
+import { ArrowLeft, BookOpen, Bookmark, CheckCircle2, ChevronLeft, ChevronRight, Code2, Download, FileCode2, FileText, HelpCircle, House, LayoutPanelLeft, List, Loader2, Maximize2, Play, RefreshCw, RotateCcw, Send, Settings } from "lucide-react";
 import { AppLink, useNavigationBlocker } from "@/components/navigation";
 import { useLocale } from "@/components/locale-context";
 import { PageHeader } from "@/components/page-chrome";
@@ -26,6 +26,7 @@ import { State, useData } from "@/components/student/shared";
 import { ApiError, apiMessage, clearProductionSession, productionApi, type CampusUser, type ProductionProblem } from "@/lib/production-api";
 import { paper4ClassNames, paper4Date, paper4ShortTitle, paper4Status, type Paper4Attempt, type Paper4File, type Paper4Paper, type Paper4PaperSummary, type Paper4Run, type Paper4Stage } from "./model";
 import { Paper4Content } from "./paper4-content";
+import { Paper4Solutions } from "./paper4-solutions";
 import { Paper4CatalogFilter } from "./catalog-filter";
 import { filterPaper4Catalog } from "./paper4-catalog";
 import { createPaper4EntryLoader } from "./paper4-entry";
@@ -145,6 +146,7 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
   const initialQuestion = paper4InitialQuestion(questions, initialQuestionKey);
   const courseQuestion = learningContext && courseQuestionKey ? questions.find(question => question.key === courseQuestionKey) : null;
   const [questionKey, setQuestionKey] = useState(initialQuestion?.key ?? "");
+  const [leftTab, setLeftTab] = useState<"problem" | "solutions">("problem");
   const [stageId, setStageId] = useState(initialQuestion?.stages[0]?.id ?? "");
   const [codes, setCodes] = useState<Record<string, string>>(() => Object.fromEntries(initialAttempt.files.map(file => [file.fileKey, file.content])));
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
@@ -164,6 +166,7 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
   const editorRef = useRef<CodeEditorHandle>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
+  const statementBodyRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
   const widthDrag = useRef<{ left: number; width: number; next: number } | null>(null);
   const heightDrag = useRef<{ top: number; height: number; next: number } | null>(null);
@@ -171,6 +174,7 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
   const { layout, dispatch } = useWorkspaceLayout(user.id);
   const current = questions.find(question => question.key === questionKey) ?? questions[0];
   const stage = current?.stages.find(item => item.id === stageId) ?? current?.stages[0];
+  const hasAutomaticChecks = Boolean(current?.stages.some(item => item.judgeMode === "auto") || current?.stages.every(item => item.judgeMode === undefined));
   const rankPointsPerQuestion = attempt.firstAcPointsPerQuestion ?? attempt.paper.firstAcPointsPerQuestion ?? 10;
   const currentAward = attempt.rankAwards?.find(award => award.questionKey === current.key);
   const submitted = ["submitted", "reviewed", "released"].includes(attempt.status.toLowerCase());
@@ -250,6 +254,12 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
     const next = questions.find(question => question.key === key);
     if (!next) return;
     setQuestionKey(key); setStageId(next.stages[0]?.id ?? ""); setRun(null);
+    if (statementBodyRef.current) statementBodyRef.current.scrollTop = 0;
+  }
+  function changeLeftTab(next: "problem" | "solutions") {
+    setLeftTab(next);
+    dispatch({ type: "show", panel: "statement" });
+    if (statementBodyRef.current) statementBodyRef.current.scrollTop = 0;
   }
   const libraryNavigation = problemNavigation((library.data?.items ?? []).map(problem => ({ problemId: problem.id, versionId: problem.versionId, title: problem.title })), "", { enterFromOutside: true });
   function openLibraryProblem(target: NavigationProblem | null) {
@@ -262,6 +272,7 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
   }
   const runCurrent = (stageToRun?: string) => void mutate(async () => {
     if (!current) return;
+    if (!hasAutomaticChecks) throw new Error(tx("本题尚未配置自动测试，请保存检查点并按要求核对代码与测试证据。", "No automatic tests are configured for this question. Save a checkpoint and review the code and test evidence against the requirements."));
     await saveFile(current.key);
     setRun(await productionApi<Paper4Run>(`paper4/attempts/${encodeURIComponent(attempt.id)}/runs`, { method: "POST", body: { fileKey: current.key, ...(stageToRun ? { stageId: stageToRun } : {}) } }));
     dispatch({ type: "show", panel: "testing" });
@@ -298,7 +309,9 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
   const rightClass = [styles.right, layout.panels.editor === "hidden" ? styles.editorHidden : layout.panels.editor === "collapsed" ? styles.editorCollapsed : "", layout.panels.testing === "hidden" ? styles.testingHidden : layout.panels.testing === "collapsed" ? styles.testingCollapsed : ""].join(" ");
   const panelClass = (panel: WorkspacePanel) => [styles.panel, styles[panel], layout.panels[panel] === "collapsed" ? styles.collapsed : "", layout.maximized === panel ? styles.maxPanel : ""].join(" ");
   const panelActions = (panel: WorkspacePanel) => <PanelControls panel={panel} collapsed={layout.panels[panel] === "collapsed"} maximized={layout.maximized === panel} onCollapse={() => dispatch({ type: "toggle-collapse", panel })} onMaximize={() => dispatch({ type: "toggle-maximize", panel })}/>;
-  const runButtons = <><Button size="sm" variant="secondary" title={tx("运行当前大题的全部自动阶段", "Run all auto stages in this question")} disabled={frozen || busy || saveStatus === "error" || !currentCode.trim()} onClick={() => runCurrent()}><Play size={14}/>{tx("运行本题", "Run question")}</Button><Button size="sm" disabled={frozen || busy || dirty || saveStatus === "error"} onClick={() => setSubmitOpen(true)}><Send size={14}/>{freePractice ? tx("提交练习", "Submit practice") : tx("交卷", "Submit")}</Button>{freePractice && submitted && !attempt.paper.archivedAt && <Button size="sm" variant="secondary" disabled={busy || Boolean(attempt.formalJudging?.pending)} onClick={() => void mutate(onRestart)}><RotateCcw size={14}/>{tx("再次练习", "Practice again")}</Button>}</>;
+  const questionRunDisabled = frozen || busy || saveStatus === "error" || !currentCode.trim() || !hasAutomaticChecks;
+  const runQuestionButton = (location: "toolbar" | "stage") => <Button size="sm" variant="secondary" data-od-id={`paper4-${location}-run-question`} title={hasAutomaticChecks ? tx("运行当前大题的全部自动阶段", "Run all auto stages in this question") : tx("本题尚未配置自动测试", "No automatic tests are configured for this question")} disabled={questionRunDisabled} onClick={() => runCurrent()}><Play size={14} aria-hidden="true"/>{tx("运行本题", "Run question")}</Button>;
+  const runButtons = <>{runQuestionButton("toolbar")}<Button size="sm" disabled={frozen || busy || dirty || saveStatus === "error"} onClick={() => setSubmitOpen(true)}><Send size={14}/>{freePractice ? tx("提交练习", "Submit practice") : tx("交卷", "Submit")}</Button>{freePractice && submitted && !attempt.paper.archivedAt && <Button size="sm" variant="secondary" disabled={busy || Boolean(attempt.formalJudging?.pending)} onClick={() => void mutate(onRestart)}><RotateCcw size={14}/>{tx("再次练习", "Practice again")}</Button>}</>;
   function widthStart(event: PointerEvent<HTMLDivElement>) { if (!mainRef.current) return; const rect = mainRef.current.getBoundingClientRect(); widthDrag.current = { left: rect.left, width: rect.width, next: settings.panelPercent }; event.currentTarget.setPointerCapture(event.pointerId); event.preventDefault(); }
   function widthMove(event: PointerEvent<HTMLDivElement>) { if (!widthDrag.current) return; const next = Math.max(25, Math.min(70, Math.round((event.clientX - widthDrag.current.left) / widthDrag.current.width * 100))); widthDrag.current.next = next; mainRef.current?.style.setProperty("--workspace-left", `${next}%`); }
   function widthEnd(event: PointerEvent<HTMLDivElement>) { if (!widthDrag.current) return; update({ panelPercent: widthDrag.current.next }); widthDrag.current = null; if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); }
@@ -333,18 +346,37 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
     <nav className={styles.mobileTabs} aria-label={tx("答题分区", "Workspace panels")}>{panelIds.map(panel => <button key={panel} type="button" aria-pressed={layout.mobilePanel === panel} onClick={() => dispatch({ type: "mobile", panel })}>{panel === "statement" ? tx("题目", "Problem") : panel === "editor" ? tx("代码", "Code") : tx("测试", "Tests")}</button>)}</nav>
     <main ref={mainRef} className={mainClass} data-mobile={layout.mobilePanel} style={{ "--workspace-left": `${settings.panelPercent}%` } as CSSProperties}>
       <section className={panelClass("statement")}>
-        <header className={styles.panelHeader}><span className={styles.panelTitle}><FileText size={16}/>{tx("题目描述", "Problem")}</span>{panelActions("statement")}</header>
-        <div className={styles.panelBody}>
+        <header className={styles.panelHeader}>
+          <div className={styles.tabs} role="tablist" aria-label={tx("题目内容", "Problem content")}>
+            {([{ value: "problem", label: tx("题目描述", "Problem"), icon: FileText }, { value: "solutions", label: tx("参考答案", "Solutions"), icon: BookOpen }] as const).map(({ value, label, icon: Icon }) => <button key={value} id={`paper4-tab-${value}`} data-paper4-tab={value} type="button" role="tab" aria-selected={leftTab === value} aria-controls="paper4-content-panel" tabIndex={leftTab === value ? 0 : -1} className={styles.tab} onClick={() => changeLeftTab(value)} onKeyDown={event => {
+              if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+              if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+              event.preventDefault();
+              const next = event.key === "Home" ? "problem" : event.key === "End" ? "solutions" : value === "problem" ? "solutions" : "problem";
+              changeLeftTab(next);
+              event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`[data-paper4-tab="${next}"]`)?.focus();
+            }}><Icon size={15} aria-hidden="true"/>{label}</button>)}
+          </div>
+          {panelActions("statement")}
+        </header>
+        <div ref={statementBodyRef} className={styles.panelBody} id="paper4-content-panel" role="tabpanel" aria-labelledby={`paper4-tab-${leftTab}`} tabIndex={0}>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <label className="flex items-center gap-2 font-semibold">{tx("大题", "Question")}<select aria-label={tx("选择大题", "Select question")} className="min-h-9 max-w-[260px] rounded-md border border-border bg-surface px-2 text-foreground" value={current.key} onChange={event => changeQuestion(event.target.value)}>{questions.map((question, index) => <option key={question.key} value={question.key}>{index + 1}. {question.title}</option>)}</select></label>
             <span>{freePractice ? tx("自由练习", "Free practice") : attempt.paper.activityKind === "exam" ? tx("模拟考试", "Mock exam") : tx("练习任务", "Practice task")} · {freePractice && attempt.status === "submitted" ? tx("练习已提交", "Practice submitted") : paper4Status(attempt.status, locale)}{attempt.attemptNumber ? tx(` · 第 ${attempt.attemptNumber} 次`, ` · Attempt ${attempt.attemptNumber}`) : ""}{!freePractice && attempt.paper.endsAt ? ` · ${paper4Date(attempt.paper.endsAt, locale)}` : ""}</span>
           </div>
           {learningContext && <p className="mb-3 rounded-md border border-border bg-surface-subtle px-3 py-2 text-xs leading-5 text-muted-foreground" data-od-id="paper4-course-context">{courseQuestion ? tx(`本章节练习只需 ${courseQuestion.key} 正式 AC。提交仍评测整卷，其他未完成的大题不影响本练习完成。`, `This course practice needs a formal AC for ${courseQuestion.key} only. Submission judges the whole paper; unfinished questions do not block this practice unit.`) : tx("本章节关联整套试卷，所有大题正式 AC 后完成本练习。", "This chapter links the whole paper. All questions need formal AC to complete this practice.")}</p>}
           <div className="mb-3 flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold">{current.title}</h1><span className={`rounded-md px-2 py-1 text-xs font-semibold ${currentAward ? "bg-success-soft text-success" : "bg-surface-subtle text-muted-foreground"}`}>{currentAward ? tx(`已获得 ${currentAward.points} 积分`, `${currentAward.points} points earned`) : tx(`首次正式 AC +${rankPointsPerQuestion} 积分`, `First formal AC +${rankPointsPerQuestion} points`)}</span></div>
-          <nav aria-label={tx("评分阶段", "Marking stages")} className="mb-5 flex flex-wrap gap-1.5">{current.stages.map((item, index) => <button type="button" key={item.id} aria-current={item.id === stage?.id ? "step" : undefined} onClick={() => setStageId(item.id)} className={`inline-flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-primary ${item.id === stage?.id ? "border-primary bg-info-soft text-primary" : "border-border text-muted-foreground hover:bg-muted"}`}>{index + 1}. {item.title}{attempt.snapshots.some(snapshot => snapshot.stageId === item.id) && <span className="inline-flex items-center text-muted-foreground" title={tx("检查点已保存，并非判题通过", "Checkpoint saved; this does not mean the stage passed")}><Bookmark size={13} fill="currentColor" aria-hidden="true"/><span className="sr-only">{tx("检查点已保存，并非判题通过", "Checkpoint saved; this does not mean the stage passed")}</span></span>}</button>)}</nav>
+          {leftTab === "problem" ? <><nav aria-label={tx("评分阶段", "Marking stages")} className="mb-5 flex flex-wrap gap-1.5">{current.stages.map((item, index) => <button type="button" key={item.id} aria-current={item.id === stage?.id ? "step" : undefined} onClick={() => setStageId(item.id)} className={`inline-flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-primary ${item.id === stage?.id ? "border-primary bg-info-soft text-primary" : "border-border text-muted-foreground hover:bg-muted"}`}>{index + 1}. {item.title}{attempt.snapshots.some(snapshot => snapshot.stageId === item.id) && <span className="inline-flex items-center text-muted-foreground" title={tx("检查点已保存，并非判题通过", "Checkpoint saved; this does not mean the stage passed")}><Bookmark size={13} fill="currentColor" aria-hidden="true"/><span className="sr-only">{tx("检查点已保存，并非判题通过", "Checkpoint saved; this does not mean the stage passed")}</span></span>}</button>)}</nav>
           <Paper4Content content={current.statement}/>
-          {stage?.description && <section className="mt-6 border-t border-border pt-4"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold">{stage.title} · {stage.maxMarks} {tx("分", "marks")}</h2>{stage.judgeMode === "auto" && <Button size="sm" variant="secondary" disabled={frozen || busy || saveStatus === "error" || !currentCode.trim()} onClick={() => runCurrent(stage.id)}><Play size={13}/>{tx("运行本阶段", "Run this stage")}</Button>}</div><Paper4Content content={stage.description}/></section>}
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4"><span className="text-xs text-muted-foreground">{latestSnapshot ? tx(`检查点已保存 · ${paper4Date(latestSnapshot.createdAt, locale)}`, `Checkpoint saved · ${paper4Date(latestSnapshot.createdAt, locale)}`) : tx("本阶段尚无检查点", "No checkpoint for this stage")}</span><Button size="sm" variant="secondary" disabled={frozen || busy || saveStatus === "error" || !stage} onClick={() => void mutate(async () => { await saveFile(current.key); await productionApi(`paper4/attempts/${encodeURIComponent(attempt.id)}/checkpoints`, { method: "POST", body: { stageId: stage!.id } }); setAttempt(await productionApi<Paper4Attempt>(`paper4/attempts/${encodeURIComponent(attempt.id)}`)); setMessage(tx("阶段检查点已保存。", "Stage checkpoint saved.")); })}><Bookmark size={15}/>{tx("保存检查点", "Save checkpoint")}</Button></div>
+          {stage && <section className="mt-6 border-t border-border pt-4" data-od-id="paper4-stage-actions">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2"><h2 className="font-bold">{stage.title} · {stage.maxMarks} {tx("分", "marks")}</h2><span className="rounded bg-surface-subtle px-2 py-0.5 text-xs text-muted-foreground">{stage.judgeMode === "auto" ? tx("自动测试", "Automatic checks") : stage.judgeMode === "evidence" ? tx("测试证据", "Test evidence") : stage.judgeMode === "manual" ? tx("代码复核", "Code review") : tx("本题测试", "Question checks")}</span></div>
+              <div className="flex flex-wrap items-center gap-2">{stage.judgeMode === "auto" && <Button size="sm" variant="outline" data-od-id="paper4-check-stage" disabled={questionRunDisabled} title={tx("仅检查所选阶段，不代表整道大题通过", "Check only the selected stage, not the whole question")} onClick={() => runCurrent(stage.id)}><CheckCircle2 size={14} aria-hidden="true"/>{tx("检查本阶段", "Check this stage")}</Button>}{runQuestionButton("stage")}</div>
+            </div>
+            {stage.description?.trim() && <Paper4Content content={stage.description}/>}
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">{!hasAutomaticChecks ? tx("本题尚未配置自动测试，请保存检查点并按要求核对代码与测试证据。", "No automatic tests are configured for this question. Save a checkpoint and review the code and test evidence against the requirements.") : stage.judgeMode === "auto" ? tx("运行本题与顶部按钮相同，会检查本大题的全部自动阶段；检查本阶段仅运行当前阶段的测试。", "Run question matches the toolbar action and checks all auto stages in this question. Check this stage runs only the selected stage's tests.") : stage.judgeMode === "evidence" ? tx("运行本题可查看自动测试结果；本阶段的测试过程与证据需另行核对，不会自动判 AC。", "Run question shows automatic test results. The testing process and evidence for this stage are reviewed separately and do not receive an automatic AC.") : stage.judgeMode === "manual" ? tx("运行本题可查看自动测试结果；本阶段要求的代码结构与实现方法需另行核对，不会自动判 AC。", "Run question shows automatic test results. This stage's code structure and implementation requirements are reviewed separately and do not receive an automatic AC.") : tx("运行本题会检查本大题的全部测试。保存检查点不代表测试已通过。", "Run question checks all configured tests for this question. Saving a checkpoint does not mean the tests passed.")}</p>
+          </section>}
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4"><span className="text-xs text-muted-foreground">{latestSnapshot ? tx(`检查点已保存 · ${paper4Date(latestSnapshot.createdAt, locale)}`, `Checkpoint saved · ${paper4Date(latestSnapshot.createdAt, locale)}`) : tx("本阶段尚无检查点", "No checkpoint for this stage")}</span><Button size="sm" variant="secondary" disabled={frozen || busy || saveStatus === "error" || !stage} onClick={() => void mutate(async () => { await saveFile(current.key); await productionApi(`paper4/attempts/${encodeURIComponent(attempt.id)}/checkpoints`, { method: "POST", body: { stageId: stage!.id } }); setAttempt(await productionApi<Paper4Attempt>(`paper4/attempts/${encodeURIComponent(attempt.id)}`)); setMessage(tx("阶段检查点已保存。", "Stage checkpoint saved.")); })}><Bookmark size={15}/>{tx("保存检查点", "Save checkpoint")}</Button></div></> : <Paper4Solutions key={`${attempt.id}:${current.key}`} attemptId={attempt.id} questionKey={current.key} locked={!freePractice && attempt.paper.activityKind === "exam" && !attempt.releasedAt}/>}
         </div>
       </section>
       <div role="separator" aria-label={tx("调整题目与代码区域宽度", "Resize problem and code panels")} aria-orientation="vertical" aria-valuemin={25} aria-valuemax={70} aria-valuenow={settings.panelPercent} tabIndex={0} onPointerDown={widthStart} onPointerMove={widthMove} onPointerUp={widthEnd} onPointerCancel={widthEnd} onLostPointerCapture={widthEnd} onKeyDown={event => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); update({ panelPercent: settings.panelPercent + (event.key === "ArrowLeft" ? -2 : 2) }); } }} className={styles.separator}/>

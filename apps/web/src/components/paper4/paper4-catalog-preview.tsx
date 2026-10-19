@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ClipboardCheck, FileText } from "lucide-react";
-import { AppLink } from "@/components/navigation";
+import { ClipboardCheck, FileText } from "lucide-react";
 import { useLocale } from "@/components/locale-context";
 import { PageHeader } from "@/components/page-chrome";
 import { Button } from "@/components/ui/button";
@@ -22,7 +21,6 @@ export function Paper4CatalogPreview({ paper, pinnedVersion = false }: { paper: 
   const question = paper.questions.find(item => item.key === questionKey) ?? paper.questions[0];
   const examLabel = paper4ExamLabel(paper, locale);
   return <>
-    <AppLink href="/teacher/paper4" className="mb-4 inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-primary"><ArrowLeft size={16} aria-hidden="true"/>{tx("返回自由练习题库", "Back to practice library")}</AppLink>
     <PageHeader eyebrow={examLabel || tx("全校自由练习", "School-wide free practice")} title={paper.title} description={paper.description} action={!pinnedVersion && paper.canAssign && !paper.archivedAt ? <Button onClick={() => setAssignOpen(true)}><ClipboardCheck size={16} aria-hidden="true"/>{tx("布置活动", "Assign activity")}</Button> : undefined}/>
     {pinnedVersion && <p role="note" className="mt-4 rounded-md border border-border bg-surface-subtle px-4 py-3 text-sm"><strong>{tx("固定版本", "Pinned version")} · v{paper.versionNumber ?? "—"} · {tx("只读预览", "Read-only preview")}</strong><span className="mt-1 block text-muted-foreground">{tx("显示课程关联时保存的试卷版本。", "This is the paper version saved with the course link.")}</span></p>}
     <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground"><span>{paper.questions.length} {tx("道大题", "questions")}</span><span>{paper.totalMarks} {tx("分", "marks")}</span><span>{tx("全校可见 · 不限时间", "School-wide · No time limit")}</span></div>

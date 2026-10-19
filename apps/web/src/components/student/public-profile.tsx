@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { Award, Flag, MessageCircle, Trash2 } from "lucide-react";
 import { AppLink } from "@/components/navigation";
 import { ProfileHero } from "@/components/profile-hero";
@@ -80,7 +79,6 @@ function Pagination({ page, total, onChange, label, locale }: { page: number; to
 /** Public information is always loaded from the public profile API, never from private CampusUser fields. */
 export function StudentPublicProfile({ identityId, viewer, embedded = false, workspace = "student" }: { identityId: string; viewer: CampusUser; embedded?: boolean; workspace?: CampusRole }) {
   const { locale } = useLocale();
-  const search = useSearchParams();
   const base = `profiles/${encodeURIComponent(identityId)}`;
   const profile = useData<{ profile: PublicProfile }>(base);
   const [activityPage, setActivityPage] = useState(1);
@@ -97,17 +95,7 @@ export function StudentPublicProfile({ identityId, viewer, embedded = false, wor
   const person = profile.data?.profile;
   const own = person?.isSelf ?? identityId === viewer.identityId;
   const publicHref = `/${workspace}/people/${encodeURIComponent(identityId)}`;
-  const origin = search.get("from");
-  const classId = search.get("classId");
-  const back = origin === "reports" && workspace === "admin"
-    ? { href: "/admin/settings?tab=reports", label: ui(locale, "返回留言举报", "Back to message reports") }
-    : origin === "classes" && workspace === "teacher"
-      ? { href: `/teacher/classes${classId ? `?classId=${encodeURIComponent(classId)}` : ""}`, label: ui(locale, "返回班级与学生", "Back to classes & students") }
-    : origin === "points"
-      ? { href: `/${workspace}/points${classId ? `?classId=${encodeURIComponent(classId)}` : ""}`, label: ui(locale, "返回积分榜", "Back to leaderboard") }
-      : origin === "profile" && workspace === "student"
-        ? { href: "/student/profile", label: ui(locale, "返回个人资料", "Back to profile") }
-        : { href: workspace === "student" ? "/" : workspace === "teacher" ? "/teacher" : "/admin", label: ui(locale, "返回工作区", "Back to workspace") };
+
 
   return <div className={embedded ? "mt-6 space-y-5" : "space-y-5"}>
     {embedded ? (
@@ -116,7 +104,7 @@ export function StudentPublicProfile({ identityId, viewer, embedded = false, wor
         <AppLink href={`${publicHref}?from=profile`} className={buttonVariants({ variant: "secondary" })}>{ui(locale, "查看公开主页", "View public profile")}</AppLink>
       </div>
     ) : (
-      <><AppLink href={back.href} className="inline-flex min-h-9 items-center text-sm font-semibold text-primary hover:underline">← {back.label}</AppLink><h1 className="sr-only">{ui(locale, "学生主页", "Student profile")}</h1></>
+      <h1 className="sr-only">{ui(locale, "学生主页", "Student profile")}</h1>
     )}
 
     <State data={profile}>

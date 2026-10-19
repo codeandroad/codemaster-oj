@@ -430,12 +430,6 @@ function AssignmentEditorForm({
   };
   return (
     <>
-      <Link
-        className={`${link} mb-4 inline-block text-sm`}
-        href="/teacher/assignments"
-      >
-        ← {ui(locale, "作业列表", "Assignment list")}
-      </Link>
       <PageHeader
         eyebrow="作业编辑"
         title={saved?.title ?? ui(locale, "新建作业", "New assignment")}
@@ -956,12 +950,6 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
       assignment?.participantDetails?.filter((x) => x.exempt).length ?? 0;
   return (
     <>
-      <Link
-        href="/teacher/assignments"
-        className={`${link} mb-4 inline-block text-sm`}
-      >
-        ← {ui(locale, "作业列表", "Assignment list")}
-      </Link>
       <PageHeader
         eyebrow="作业进度"
         title={`${assignment?.title ?? ui(locale, "作业", "Assignment")} · ${ui(locale, "进度", "Progress Matrix")}`}

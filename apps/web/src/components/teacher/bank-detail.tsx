@@ -104,12 +104,6 @@ export function TeacherBankDetail({ id }: { id: string }) {
   ];
   return (
     <>
-      <Link
-        className={`${link} mb-4 inline-block text-sm`}
-        href="/teacher/problems"
-      >
-        ← {tr("返回题库", "Back to banks")}
-      </Link>
       <PageHeader
         eyebrow={tr("题库", "Problem bank")}
         title={bank?.name ?? tr("题库详情", "Bank details")}

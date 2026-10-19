@@ -76,3 +76,37 @@ test('unknown locations do not expose path fragments as names or clickable ances
   assert.deepEqual(trail.map(item => item.label), ['Teacher workspace', 'Page']);
   assert.deepEqual(trail.slice(0, -1).map(item => item.href), ['/teacher']);
 });
+
+test('contextual profile sources remain reachable in the breadcrumb without a body back link', () => {
+  for (const [role, query, href] of [
+    ['student', 'from=points&classId=class-1', '/student/points?classId=class-1'],
+    ['teacher', 'from=classes&classId=class-1', '/teacher/classes?classId=class-1'],
+    ['admin', 'from=reports', '/admin/settings?tab=reports'],
+    ['student', 'from=profile', '/student/profile'],
+  ]) {
+    const trail = pageBreadcrumbs(`/${role}/people/${identity}`, role, 'en', '', new URLSearchParams(query));
+    assert.equal(trail.at(-2).href, href);
+    assert.equal(trail.at(-1).href, `/${role}/people/${identity}`);
+  }
+});
+
+test('editor breadcrumb preserves the source bank or filters and rejects unrelated return targets', () => {
+  const pathname = `/teacher/problems/${identity}/edit`;
+  const trailFor = returnTo => pageBreadcrumbs(pathname, 'teacher', 'en', '', new URLSearchParams({ returnTo }));
+  const bank = `/teacher/problems/banks/${identity}?group=practice`;
+  assert.equal(trailFor(bank).at(-2).href, bank);
+  assert.equal(trailFor('/teacher/problems?tab=all&search=queue')[1].href, '/teacher/problems?tab=all&search=queue');
+  assert.equal(trailFor(`/teacher/assignments/${identity}/progress`).at(-2).href, `/teacher/assignments/${identity}/progress`);
+  assert.equal(trailFor('/teacher/imports?tab=validation').at(-2).href, '/teacher/imports?tab=validation');
+  for (const target of ['https://example.com', '//example.com', '/\\example.com', '/admin/accounts']) {
+    assert.deepEqual(trailFor(target).map(item => item.href), ['/teacher', '/teacher/problems', pathname]);
+  }
+});
+
+test('identity import breadcrumbs provide the roster or identity collection as the parent', () => {
+  const teacher = pageBreadcrumbs('/teacher/imports', 'teacher', 'en', '', new URLSearchParams('kind=students&classId=class-1'));
+  assert.equal(teacher.at(-2).href, '/teacher/classes?classId=class-1');
+  assert.equal(pageBreadcrumbs('/admin/imports', 'admin', 'en').at(-2).href, '/admin/people');
+  assert.equal(pageBreadcrumbs('/admin/imports', 'admin', 'en', '', new URLSearchParams('kind=teacher')).at(-2).href, '/admin/people?kind=teacher');
+  assert.equal(pageBreadcrumbs('/teacher/imports', 'teacher', 'en').at(-1).href, '/teacher/imports');
+});

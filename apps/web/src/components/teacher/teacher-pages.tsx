@@ -1,11 +1,9 @@
 "use client";
 
-import { AppLink as Link } from "@/components/navigation";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/page-chrome";
 import { useLocale } from "@/components/locale-context";
-import { buttonVariants } from "@/components/ui/button";
 import { IdentityImportWizard } from "@/components/admin/import-page";
 import type { CampusUser } from "@/lib/production-api";
 import { TeacherDashboard, TeacherClasses } from "./dashboard-classes";
@@ -40,7 +38,7 @@ export function TeacherPages({
   if (path === "/teacher") return <TeacherDashboard />;
   if (path === "/teacher/paper4") return <TeacherPaper4List />;
   let paper4Match = path.match(/^\/teacher\/paper4\/([^/]+)\/review\/([^/]+)$/);
-  if (paper4Match) return <TeacherPaper4Review paperId={paper4Match[1]!} attemptId={paper4Match[2]!} />;
+  if (paper4Match) return <TeacherPaper4Review attemptId={paper4Match[2]!} />;
   paper4Match = path.match(/^\/teacher\/paper4\/([^/]+)$/);
   if (paper4Match) return <TeacherPaper4Editor id={paper4Match[1]!} user={user} />;
   if (path === "/teacher/classes") return <TeacherClasses user={user} />;
@@ -85,7 +83,6 @@ function TeacherImports({ user }: { user: CampusUser }) {
         eyebrow={t("学生名单")}
         title={t("学生名单导入")}
         description={t("只可导入自己负责班级的学生。导入会建立或关联身份；学生凭激活码认领后才创建登录账号。")}
-        action={<Link className={buttonVariants({ variant: "secondary" })} href="/teacher/classes">{t("返回班级与学生")}</Link>}
       />
       <IdentityImportWizard key={classId} teacher teacherIdentityId={user.identityId} initialClassId={classId} showHeader={false} />
     </>

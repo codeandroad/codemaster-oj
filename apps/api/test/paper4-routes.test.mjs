@@ -39,6 +39,7 @@ test('Paper 4 Nest routes preserve the method, body, and route for the domain au
     ['GET', `/paper4/papers/${id}/attempt?versionId=${id}`],
     ['GET', `/paper4/attempts?paperId=${id}`],
     ['GET', `/paper4/attempts/${id}`],
+    ['GET', `/paper4/attempts/${id}/solutions/Q1`],
     ['PATCH', `/paper4/attempts/${id}/files/main.py`, { content: 'print(1)', revision: 0 }],
     ['POST', `/paper4/attempts/${id}/checkpoints`, { stageId: 'q1a' }],
     ['POST', `/paper4/attempts/${id}/runs`, { fileKey: 'main.py' }],

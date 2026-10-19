@@ -700,12 +700,6 @@ function LearningEditorForm({
   };
   return (
     <>
-      <Link
-        href="/teacher/courses"
-        className={`${link} mb-4 inline-block text-sm`}
-      >
-        ← {t("课程")}
-      </Link>
       <PageHeader
         eyebrow={t("课程编辑")}
         title={path.title}

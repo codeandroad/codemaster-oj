@@ -41,7 +41,6 @@ import {
   Feedback,
   Field,
   input,
-  link,
   Modal,
   panel,
   State,
@@ -257,15 +256,6 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
   const list = (kind: "samples" | "tests") => problem[kind] ?? [];
   return (
     <div className={styles.editor} data-od-id="teacher-problem-editor">
-      <button
-        className={`${link} mb-3 text-sm`}
-        onClick={() => {
-          if (!dirty || window.confirm(tr("有未保存修改，确认离开编辑器？", "You have unsaved changes. Leave the editor?")))
-            router.push(back);
-        }}
-      >
-        ← {tr("返回题库与题目", "Back to problem banks")}
-      </button>
       <PageHeader
         eyebrow={tr("题目编辑", "Problem editor")}
         title={problem.title || tr("新建题目", "New problem")}

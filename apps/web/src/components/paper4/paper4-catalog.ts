@@ -1,5 +1,10 @@
 import type { Paper4PaperSummary } from "./model";
 
+/** Outer-list navigation opens the target paper, without inheriting another paper's version or chapter. */
+export function paper4PracticeHref(paperId: string, scope: "catalog" | "activities") {
+  return `/student/paper4/${encodeURIComponent(paperId)}${scope === "activities" ? "?scope=activities" : ""}`;
+}
+
 export function paper4Years(items: Paper4PaperSummary[]): number[] {
   return [...new Set(items.flatMap(item => item.examYear == null ? [] : [item.examYear]))].sort((a, b) => b - a);
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, BookOpen, Bookmark, CheckCircle2, ChevronLeft, ChevronRight, Code2, Download, FileCode2, FileText, HelpCircle, House, LayoutPanelLeft, List, Loader2, Maximize2, Play, RefreshCw, RotateCcw, Send, Settings } from "lucide-react";
 import { AppLink, useNavigationBlocker } from "@/components/navigation";
@@ -10,10 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { WorkspaceThemeProvider } from "@/components/ui/theme-context";
 import { CodeEditor, type CodeEditorHandle } from "@/components/student/code-editor";
+import type { EditorTheme } from "@/components/student/editor-themes";
 import { useWorkspaceSettings, WorkspaceSettingsDialog } from "@/components/student/workspace-settings";
 import { useWorkspaceLayout, PanelControls } from "@/components/student/workspace-panels";
 import { ProblemListDrawer } from "@/components/student/problem-list-drawer";
-import { navigationHref, problemNavigation, type NavigationProblem } from "@/components/student/problem-navigation";
+import { problemNavigation, type NavigationProblem } from "@/components/student/problem-navigation";
 import { panelIds, type WorkspacePanel } from "@/components/student/workspace-layout-model";
 import { formatCode, downloadCode } from "@/components/student/code-format";
 import { FormatCodeIcon } from "@/components/student/format-code-icon";
@@ -23,13 +24,15 @@ import { NotificationDropdown } from "@/components/student/notification-dropdown
 import { AccountMenu } from "@/components/account-menu";
 import styles from "@/components/student/workspace.module.css";
 import { State, useData } from "@/components/student/shared";
-import { ApiError, apiMessage, clearProductionSession, productionApi, type CampusUser, type ProductionProblem } from "@/lib/production-api";
+import { ApiError, apiMessage, clearProductionSession, productionApi, type CampusUser } from "@/lib/production-api";
 import { paper4ClassNames, paper4Date, paper4ShortTitle, paper4Status, type Paper4Attempt, type Paper4File, type Paper4Paper, type Paper4PaperSummary, type Paper4Run, type Paper4Stage } from "./model";
 import { Paper4Content } from "./paper4-content";
+import { Paper4OriginalQuestion } from "./paper4-original-question";
 import { Paper4Solutions } from "./paper4-solutions";
 import { Paper4CatalogFilter } from "./catalog-filter";
-import { filterPaper4Catalog } from "./paper4-catalog";
+import { filterPaper4Catalog, paper4PracticeHref } from "./paper4-catalog";
 import { createPaper4EntryLoader } from "./paper4-entry";
+import { createPaper4SaveState, paper4SaveReducer, paper4SaveSummary } from "./paper4-save-state";
 import paperStyles from "./paper4-workspace.module.css";
 import listStyles from "./student-paper4-list.module.css";
 import { paper4LearningContext, paper4ChapterHref, paper4EntryKey, paper4InitialQuestion, type Paper4LearningContext } from "./paper4-learning-navigation";
@@ -82,7 +85,7 @@ function StudentPaper4Collection({ scope, onScope }: { scope: "catalog" | "activ
           <th scope="col">{tx("操作", "Action")}</th>
         </tr></thead>
         <tbody>{visible.map(paper => {
-          const href = `/student/paper4/${paper.id}${activities ? "?scope=activities" : ""}`;
+          const href = paper4PracticeHref(paper.id, scope);
           const recipients = paper4ClassNames(paper) || tx("按学生名单布置", "Direct assignment");
           const availability = paper.startsAt || paper.endsAt ? `${paper.startsAt ? paper4Date(paper.startsAt, locale) : tx("即日起", "Available now")} – ${paper.endsAt ? paper4Date(paper.endsAt, locale) : tx("无截止时间", "No deadline")}` : tx("不限时间", "No time limit");
           return <tr key={paper.id}>
@@ -141,20 +144,23 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
   const tx = useCallback((zh: string, en: string) => locale === "en" ? en : zh, [locale]);
   const [attempt, setAttempt] = useState(initialAttempt);
   const questions = attempt.paper.questions;
-  const library = useData<{ items: ProductionProblem[] }>("problems");
   const freePractice = isFreePractice(attempt.paper);
+  const libraryScope = freePractice ? "catalog" : "activities";
+  const library = useData<{ items: Paper4PaperSummary[] }>(`paper4/papers?scope=${libraryScope}`);
   const initialQuestion = paper4InitialQuestion(questions, initialQuestionKey);
   const courseQuestion = learningContext && courseQuestionKey ? questions.find(question => question.key === courseQuestionKey) : null;
   const [questionKey, setQuestionKey] = useState(initialQuestion?.key ?? "");
   const [leftTab, setLeftTab] = useState<"problem" | "solutions">("problem");
+  const [solutionTheme, setSolutionTheme] = useState<EditorTheme>("github-dark");
   const [stageId, setStageId] = useState(initialQuestion?.stages[0]?.id ?? "");
   const [codes, setCodes] = useState<Record<string, string>>(() => Object.fromEntries(initialAttempt.files.map(file => [file.fileKey, file.content])));
-  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "error">("saved");
+  const [saveState, dispatchSave] = useReducer(paper4SaveReducer, codes, createPaper4SaveState);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [run, setRun] = useState<Paper4Run | null>(null);
   const [submitOpen, setSubmitOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsScope, setSettingsScope] = useState<"workspace" | "editor">("workspace");
   const [layoutOpen, setLayoutOpen] = useState(false);
@@ -176,7 +182,6 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
   const stage = current?.stages.find(item => item.id === stageId) ?? current?.stages[0];
   const hasAutomaticChecks = Boolean(current?.stages.some(item => item.judgeMode === "auto") || current?.stages.every(item => item.judgeMode === undefined));
   const rankPointsPerQuestion = attempt.firstAcPointsPerQuestion ?? attempt.paper.firstAcPointsPerQuestion ?? 10;
-  const currentAward = attempt.rankAwards?.find(award => award.questionKey === current.key);
   const submitted = ["submitted", "reviewed", "released"].includes(attempt.status.toLowerCase());
   const frozen = attempt.canEdit === false || submitted;
   const currentCode = current ? codes[current.key] ?? current.starterCode : "";
@@ -185,7 +190,7 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
   const revisions = useRef<Record<string, number>>(Object.fromEntries(initialAttempt.files.map(file => [file.fileKey, file.revision])));
   const inflight = useRef(new Map<string, Promise<void>>());
   const alive = useRef(true);
-  const dirty = Object.keys(codes).some(key => codes[key] !== saved.current[key]);
+  const { dirty, status: saveStatus } = paper4SaveSummary(codes, saveState);
   useNavigationBlocker(dirty);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   useEffect(() => {
@@ -201,22 +206,27 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
       if (latest.current[key] !== saved.current[key]) return saveFile(key);
       return;
     }
+    // A failed request may have reached the server. Even after a local undo,
+    // retry must obtain a confirmed revision before clearing that error.
+    let retryFailedSave = Boolean(saveState.errors[key]);
+    if (latest.current[key] === saved.current[key] && !retryFailedSave) return;
+    dispatchSave({ type: "start", key });
     const operation = (async () => {
-      while (latest.current[key] !== saved.current[key]) {
+      while (retryFailedSave || latest.current[key] !== saved.current[key]) {
         const content = latest.current[key] ?? "";
-        setSaveStatus("saving");
         const response = await productionApi<Paper4File>(`paper4/attempts/${encodeURIComponent(attempt.id)}/files/${encodeURIComponent(key)}`, { method: "PATCH", body: { content, revision: revisions.current[key] ?? 0 } });
         if (!Number.isInteger(response.revision)) throw new Error(tx("服务器没有返回代码修订号，保存状态无法确认。", "The server did not confirm a code revision."));
         revisions.current[key] = response.revision;
         saved.current[key] = content;
+        retryFailedSave = false;
+        if (alive.current) dispatchSave({ type: "acknowledge", key, content });
       }
-      if (alive.current) setSaveStatus("saved");
     })();
     inflight.current.set(key, operation);
     try { await operation; }
-    catch (reason) { if (alive.current) { setSaveStatus("error"); setError(apiMessage(reason)); } throw reason; }
-    finally { inflight.current.delete(key); }
-  }, [attempt.id, tx]);
+    catch (reason) { if (alive.current) { dispatchSave({ type: "fail", key, message: apiMessage(reason) }); setError(apiMessage(reason)); } throw reason; }
+    finally { inflight.current.delete(key); if (alive.current) dispatchSave({ type: "settle", key }); }
+  }, [attempt.id, saveState.errors, tx]);
   const saveAll = useCallback(async () => {
     await Promise.all(questions.map(question => saveFile(question.key)));
   }, [questions, saveFile]);
@@ -250,6 +260,19 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
     catch (reason) { setError(apiMessage(reason)); }
     finally { setBusy(false); }
   }
+  async function submitAttempt() {
+    if (submitting || formatting || frozen) return;
+    setSubmitting(true);
+    try {
+      await saveAll();
+      const updated = await productionApi<Paper4Attempt>(`paper4/attempts/${encodeURIComponent(attempt.id)}/submit`, { method: "POST" });
+      setAttempt(updated);
+      setSubmitOpen(false);
+      setMessage(freePractice ? tx("练习已提交，正在自动判题。每题首次 AC 将获得积分；本次记录保留后可再次练习。", "Practice submitted for automatic judging. Each question’s first AC earns points. This attempt is preserved and you can practice again.") : tx("已交卷。大题 AC 奖励将在自动判题后记入；请等待教师复核试卷成绩。", "Submitted. Question AC points are awarded after automatic judging; await teacher review for the paper mark."));
+    } finally {
+      setSubmitting(false);
+    }
+  }
   function changeQuestion(key: string) {
     const next = questions.find(question => question.key === key);
     if (!next) return;
@@ -261,13 +284,15 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
     dispatch({ type: "show", panel: "statement" });
     if (statementBodyRef.current) statementBodyRef.current.scrollTop = 0;
   }
-  const libraryNavigation = problemNavigation((library.data?.items ?? []).map(problem => ({ problemId: problem.id, versionId: problem.versionId, title: problem.title })), "", { enterFromOutside: true });
+  const libraryItems = filterPaper4Catalog(library.data?.items ?? [], "", "");
+  const libraryNavigation = problemNavigation(libraryItems.map(paper => ({ problemId: paper.id, title: paper.title })), attempt.paperId);
   function openLibraryProblem(target: NavigationProblem | null) {
     if (!target || busy || formatting || library.loading || library.error) return;
     setProblemListOpen(false);
+    if (target.problemId === attempt.paperId) return;
     void mutate(async () => {
       if (!frozen) await saveAll();
-      router.push(navigationHref(target, {}));
+      router.push(paper4PracticeHref(target.problemId, libraryScope));
     });
   }
   const runCurrent = (stageToRun?: string) => void mutate(async () => {
@@ -278,7 +303,7 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
     dispatch({ type: "show", panel: "testing" });
   });
   const formatCurrent = () => {
-    if (formatting || frozen || !currentCode.trim()) return;
+    if (formatting || frozen || submitting || !currentCode.trim()) return;
     setFormatting(true);
     void formatCode(currentCode, "python", settings.tabSize)
       .then(formatted => { editorRef.current?.replaceCode(formatted); setNotice(tx("代码已格式化，可使用撤销恢复。", "Code formatted. Use Undo to restore it.")); })
@@ -298,7 +323,7 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
       const key = event.key.toLowerCase();
       if (key === "s") { event.preventDefault(); if (!frozen) void mutate(async () => { await saveAll(); setNotice(tx("代码已保存到服务器。", "Code saved to server.")); }); }
       else if (key === "'" && settings.runShortcut && !busy && !frozen) { event.preventDefault(); runCurrent(); }
-      else if (key === "enter" && settings.submitShortcut && !busy && !frozen && !dirty) { event.preventDefault(); setSubmitOpen(true); }
+      else if (key === "enter" && settings.submitShortcut && !busy && !formatting && !frozen && !dirty) { event.preventDefault(); setSubmitOpen(true); }
     }
     window.addEventListener("keydown", shortcut);
     return () => window.removeEventListener("keydown", shortcut);
@@ -311,7 +336,7 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
   const panelActions = (panel: WorkspacePanel) => <PanelControls panel={panel} collapsed={layout.panels[panel] === "collapsed"} maximized={layout.maximized === panel} onCollapse={() => dispatch({ type: "toggle-collapse", panel })} onMaximize={() => dispatch({ type: "toggle-maximize", panel })}/>;
   const questionRunDisabled = frozen || busy || saveStatus === "error" || !currentCode.trim() || !hasAutomaticChecks;
   const runQuestionButton = (location: "toolbar" | "stage") => <Button size="sm" variant="secondary" data-od-id={`paper4-${location}-run-question`} title={hasAutomaticChecks ? tx("运行当前大题的全部自动阶段", "Run all auto stages in this question") : tx("本题尚未配置自动测试", "No automatic tests are configured for this question")} disabled={questionRunDisabled} onClick={() => runCurrent()}><Play size={14} aria-hidden="true"/>{tx("运行本题", "Run question")}</Button>;
-  const runButtons = <>{runQuestionButton("toolbar")}<Button size="sm" disabled={frozen || busy || dirty || saveStatus === "error"} onClick={() => setSubmitOpen(true)}><Send size={14}/>{freePractice ? tx("提交练习", "Submit practice") : tx("交卷", "Submit")}</Button>{freePractice && submitted && !attempt.paper.archivedAt && <Button size="sm" variant="secondary" disabled={busy || Boolean(attempt.formalJudging?.pending)} onClick={() => void mutate(onRestart)}><RotateCcw size={14}/>{tx("再次练习", "Practice again")}</Button>}</>;
+  const runButtons = <>{runQuestionButton("toolbar")}<Button size="sm" disabled={frozen || busy || formatting || dirty || saveStatus === "error"} onClick={() => setSubmitOpen(true)}><Send size={14}/>{freePractice ? tx("提交练习", "Submit practice") : tx("交卷", "Submit")}</Button>{freePractice && submitted && !attempt.paper.archivedAt && <Button size="sm" variant="secondary" disabled={busy || Boolean(attempt.formalJudging?.pending)} onClick={() => void mutate(onRestart)}><RotateCcw size={14}/>{tx("再次练习", "Practice again")}</Button>}</>;
   function widthStart(event: PointerEvent<HTMLDivElement>) { if (!mainRef.current) return; const rect = mainRef.current.getBoundingClientRect(); widthDrag.current = { left: rect.left, width: rect.width, next: settings.panelPercent }; event.currentTarget.setPointerCapture(event.pointerId); event.preventDefault(); }
   function widthMove(event: PointerEvent<HTMLDivElement>) { if (!widthDrag.current) return; const next = Math.max(25, Math.min(70, Math.round((event.clientX - widthDrag.current.left) / widthDrag.current.width * 100))); widthDrag.current.next = next; mainRef.current?.style.setProperty("--workspace-left", `${next}%`); }
   function widthEnd(event: PointerEvent<HTMLDivElement>) { if (!widthDrag.current) return; update({ panelPercent: widthDrag.current.next }); widthDrag.current = null; if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); }
@@ -348,7 +373,7 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
       <section className={panelClass("statement")}>
         <header className={styles.panelHeader}>
           <div className={styles.tabs} role="tablist" aria-label={tx("题目内容", "Problem content")}>
-            {([{ value: "problem", label: tx("题目描述", "Problem"), icon: FileText }, { value: "solutions", label: tx("参考答案", "Solutions"), icon: BookOpen }] as const).map(({ value, label, icon: Icon }) => <button key={value} id={`paper4-tab-${value}`} data-paper4-tab={value} type="button" role="tab" aria-selected={leftTab === value} aria-controls="paper4-content-panel" tabIndex={leftTab === value ? 0 : -1} className={styles.tab} onClick={() => changeLeftTab(value)} onKeyDown={event => {
+            {([{ value: "problem", label: tx("题目描述", "Problem"), icon: FileText }, { value: "solutions", label: tx("参考答案", "Solution"), icon: BookOpen }] as const).map(({ value, label, icon: Icon }) => <button key={value} id={`paper4-tab-${value}`} data-paper4-tab={value} type="button" role="tab" aria-selected={leftTab === value} aria-controls="paper4-content-panel" tabIndex={leftTab === value ? 0 : -1} className={styles.tab} onClick={() => changeLeftTab(value)} onKeyDown={event => {
               if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
               if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
               event.preventDefault();
@@ -359,15 +384,16 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
           </div>
           {panelActions("statement")}
         </header>
-        <div ref={statementBodyRef} className={styles.panelBody} id="paper4-content-panel" role="tabpanel" aria-labelledby={`paper4-tab-${leftTab}`} tabIndex={0}>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <div ref={statementBodyRef} className={`${styles.panelBody} ${paperStyles.statementBody}`} id="paper4-content-panel" role="tabpanel" aria-labelledby={`paper4-tab-${leftTab}`} tabIndex={0}>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground" data-od-id="paper4-question-selector">
             <label className="flex items-center gap-2 font-semibold">{tx("大题", "Question")}<select aria-label={tx("选择大题", "Select question")} className="min-h-9 max-w-[260px] rounded-md border border-border bg-surface px-2 text-foreground" value={current.key} onChange={event => changeQuestion(event.target.value)}>{questions.map((question, index) => <option key={question.key} value={question.key}>{index + 1}. {question.title}</option>)}</select></label>
             <span>{freePractice ? tx("自由练习", "Free practice") : attempt.paper.activityKind === "exam" ? tx("模拟考试", "Mock exam") : tx("练习任务", "Practice task")} · {freePractice && attempt.status === "submitted" ? tx("练习已提交", "Practice submitted") : paper4Status(attempt.status, locale)}{attempt.attemptNumber ? tx(` · 第 ${attempt.attemptNumber} 次`, ` · Attempt ${attempt.attemptNumber}`) : ""}{!freePractice && attempt.paper.endsAt ? ` · ${paper4Date(attempt.paper.endsAt, locale)}` : ""}</span>
           </div>
           {learningContext && <p className="mb-3 rounded-md border border-border bg-surface-subtle px-3 py-2 text-xs leading-5 text-muted-foreground" data-od-id="paper4-course-context">{courseQuestion ? tx(`本章节练习只需 ${courseQuestion.key} 正式 AC。提交仍评测整卷，其他未完成的大题不影响本练习完成。`, `This course practice needs a formal AC for ${courseQuestion.key} only. Submission judges the whole paper; unfinished questions do not block this practice unit.`) : tx("本章节关联整套试卷，所有大题正式 AC 后完成本练习。", "This chapter links the whole paper. All questions need formal AC to complete this practice.")}</p>}
-          <div className="mb-3 flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold">{current.title}</h1><span className={`rounded-md px-2 py-1 text-xs font-semibold ${currentAward ? "bg-success-soft text-success" : "bg-surface-subtle text-muted-foreground"}`}>{currentAward ? tx(`已获得 ${currentAward.points} 积分`, `${currentAward.points} points earned`) : tx(`首次正式 AC +${rankPointsPerQuestion} 积分`, `First formal AC +${rankPointsPerQuestion} points`)}</span></div>
-          {leftTab === "problem" ? <><nav aria-label={tx("评分阶段", "Marking stages")} className="mb-5 flex flex-wrap gap-1.5">{current.stages.map((item, index) => <button type="button" key={item.id} aria-current={item.id === stage?.id ? "step" : undefined} onClick={() => setStageId(item.id)} className={`inline-flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-primary ${item.id === stage?.id ? "border-primary bg-info-soft text-primary" : "border-border text-muted-foreground hover:bg-muted"}`}>{index + 1}. {item.title}{attempt.snapshots.some(snapshot => snapshot.stageId === item.id) && <span className="inline-flex items-center text-muted-foreground" title={tx("检查点已保存，并非判题通过", "Checkpoint saved; this does not mean the stage passed")}><Bookmark size={13} fill="currentColor" aria-hidden="true"/><span className="sr-only">{tx("检查点已保存，并非判题通过", "Checkpoint saved; this does not mean the stage passed")}</span></span>}</button>)}</nav>
-          <Paper4Content content={current.statement}/>
+          <h1 className="sr-only">{current.title}</h1>
+          <div hidden={leftTab !== "problem"}>
+          <Paper4OriginalQuestion key={`${attempt.versionId ?? attempt.id}:${current.key}`} paper={attempt.paper} question={current} selectedStage={stage}/>
+          <nav aria-label={tx("评分阶段", "Marking stages")} className="mt-4 mb-3 flex flex-wrap gap-1.5">{current.stages.map((item, index) => <button type="button" key={item.id} aria-current={item.id === stage?.id ? "step" : undefined} onClick={() => setStageId(item.id)} className={`inline-flex min-h-9 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-primary ${item.id === stage?.id ? "border-primary bg-info-soft text-primary" : "border-border text-muted-foreground hover:bg-muted"}`}>{index + 1}. {item.title}{attempt.snapshots.some(snapshot => snapshot.stageId === item.id) && <span className="inline-flex items-center text-muted-foreground" title={tx("检查点已保存，并非判题通过", "Checkpoint saved; this does not mean the stage passed")}><Bookmark size={13} fill="currentColor" aria-hidden="true"/><span className="sr-only">{tx("检查点已保存，并非判题通过", "Checkpoint saved; this does not mean the stage passed")}</span></span>}</button>)}</nav>
           {stage && <section className="mt-6 border-t border-border pt-4" data-od-id="paper4-stage-actions">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2"><h2 className="font-bold">{stage.title} · {stage.maxMarks} {tx("分", "marks")}</h2><span className="rounded bg-surface-subtle px-2 py-0.5 text-xs text-muted-foreground">{stage.judgeMode === "auto" ? tx("自动测试", "Automatic checks") : stage.judgeMode === "evidence" ? tx("测试证据", "Test evidence") : stage.judgeMode === "manual" ? tx("代码复核", "Code review") : tx("本题测试", "Question checks")}</span></div>
@@ -376,7 +402,7 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
             {stage.description?.trim() && <Paper4Content content={stage.description}/>}
             <p className="mt-2 text-xs leading-5 text-muted-foreground">{!hasAutomaticChecks ? tx("本题尚未配置自动测试，请保存检查点并按要求核对代码与测试证据。", "No automatic tests are configured for this question. Save a checkpoint and review the code and test evidence against the requirements.") : stage.judgeMode === "auto" ? tx("运行本题与顶部按钮相同，会检查本大题的全部自动阶段；检查本阶段仅运行当前阶段的测试。", "Run question matches the toolbar action and checks all auto stages in this question. Check this stage runs only the selected stage's tests.") : stage.judgeMode === "evidence" ? tx("运行本题可查看自动测试结果；本阶段的测试过程与证据需另行核对，不会自动判 AC。", "Run question shows automatic test results. The testing process and evidence for this stage are reviewed separately and do not receive an automatic AC.") : stage.judgeMode === "manual" ? tx("运行本题可查看自动测试结果；本阶段要求的代码结构与实现方法需另行核对，不会自动判 AC。", "Run question shows automatic test results. This stage's code structure and implementation requirements are reviewed separately and do not receive an automatic AC.") : tx("运行本题会检查本大题的全部测试。保存检查点不代表测试已通过。", "Run question checks all configured tests for this question. Saving a checkpoint does not mean the tests passed.")}</p>
           </section>}
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4"><span className="text-xs text-muted-foreground">{latestSnapshot ? tx(`检查点已保存 · ${paper4Date(latestSnapshot.createdAt, locale)}`, `Checkpoint saved · ${paper4Date(latestSnapshot.createdAt, locale)}`) : tx("本阶段尚无检查点", "No checkpoint for this stage")}</span><Button size="sm" variant="secondary" disabled={frozen || busy || saveStatus === "error" || !stage} onClick={() => void mutate(async () => { await saveFile(current.key); await productionApi(`paper4/attempts/${encodeURIComponent(attempt.id)}/checkpoints`, { method: "POST", body: { stageId: stage!.id } }); setAttempt(await productionApi<Paper4Attempt>(`paper4/attempts/${encodeURIComponent(attempt.id)}`)); setMessage(tx("阶段检查点已保存。", "Stage checkpoint saved.")); })}><Bookmark size={15}/>{tx("保存检查点", "Save checkpoint")}</Button></div></> : <Paper4Solutions key={`${attempt.id}:${current.key}`} attemptId={attempt.id} questionKey={current.key} locked={!freePractice && attempt.paper.activityKind === "exam" && !attempt.releasedAt}/>}
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4"><span className="text-xs text-muted-foreground">{latestSnapshot ? tx(`检查点已保存 · ${paper4Date(latestSnapshot.createdAt, locale)}`, `Checkpoint saved · ${paper4Date(latestSnapshot.createdAt, locale)}`) : tx("本阶段尚无检查点", "No checkpoint for this stage")}</span><Button size="sm" variant="secondary" disabled={frozen || busy || saveStatus === "error" || !stage} onClick={() => void mutate(async () => { await saveFile(current.key); await productionApi(`paper4/attempts/${encodeURIComponent(attempt.id)}/checkpoints`, { method: "POST", body: { stageId: stage!.id } }); setAttempt(await productionApi<Paper4Attempt>(`paper4/attempts/${encodeURIComponent(attempt.id)}`)); setMessage(tx("阶段检查点已保存。", "Stage checkpoint saved.")); })}><Bookmark size={15}/>{tx("保存检查点", "Save checkpoint")}</Button></div></div>{leftTab === "solutions" && <Paper4Solutions key={`${attempt.id}:${current.key}`} attemptId={attempt.id} questionKey={current.key} locked={!freePractice && attempt.paper.activityKind === "exam" && !attempt.releasedAt} theme={solutionTheme} onThemeChange={setSolutionTheme}/>}
         </div>
       </section>
       <div role="separator" aria-label={tx("调整题目与代码区域宽度", "Resize problem and code panels")} aria-orientation="vertical" aria-valuemin={25} aria-valuemax={70} aria-valuenow={settings.panelPercent} tabIndex={0} onPointerDown={widthStart} onPointerMove={widthMove} onPointerUp={widthEnd} onPointerCancel={widthEnd} onLostPointerCapture={widthEnd} onKeyDown={event => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); update({ panelPercent: settings.panelPercent + (event.key === "ArrowLeft" ? -2 : 2) }); } }} className={styles.separator}/>
@@ -394,7 +420,7 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
               <button type="button" className={styles.tool} title={tx("最大化代码区", "Maximize code panel")} aria-label={tx("最大化代码区", "Maximize code panel")} onClick={() => dispatch({ type: "toggle-maximize", panel: "editor" })}><Maximize2 size={14}/></button>
             </div>
           </div>
-          <div className={styles.editorBody}><CodeEditor editorRef={editorRef} code={currentCode} language="python" settings={settings} idPrefix="paper4" readOnly={frozen || formatting} inputLabel={tx(`${current.title} Python 代码`, `${current.title} Python code`)} status={saveStatus === "saved" ? tx("已保存到服务器", "Saved to server") : saveStatus === "saving" ? tx("正在保存…", "Saving…") : tx("保存失败", "Save failed")} actions={settings.actionPlacement === "editor" ? runButtons : undefined} onFormat={formatCurrent} onChange={value => { latest.current[current.key] = value; setCodes(existing => ({ ...existing, [current.key]: value })); setSaveStatus("saving"); }}/></div>
+          <div className={styles.editorBody}><CodeEditor editorRef={editorRef} code={currentCode} language="python" settings={settings} idPrefix="paper4" readOnly={frozen || formatting || submitting} inputLabel={tx(`${current.title} Python 代码`, `${current.title} Python code`)} status={saveStatus === "saved" ? tx("已保存到服务器", "Saved to server") : saveStatus === "saving" ? tx("正在保存…", "Saving…") : tx("保存失败", "Save failed")} actions={settings.actionPlacement === "editor" ? runButtons : undefined} onFormat={formatCurrent} onChange={value => { if (submitting || frozen) return; latest.current[current.key] = value; setCodes(existing => ({ ...existing, [current.key]: value })); }}/></div>
         </section>
         <div role="separator" aria-label={tx("调整代码与测试区域高度", "Resize code and test panels")} aria-orientation="horizontal" aria-valuemin={20} aria-valuemax={85} aria-valuenow={layout.editorPercent} tabIndex={0} onPointerDown={heightStart} onPointerMove={heightMove} onPointerUp={heightEnd} onPointerCancel={heightEnd} onLostPointerCapture={heightEnd} onKeyDown={event => { if (event.key === "ArrowUp" || event.key === "ArrowDown") { event.preventDefault(); dispatch({ type: "resize", percent: layout.editorPercent + (event.key === "ArrowUp" ? -2 : 2) }); } }} className={`${styles.separator} ${styles.horizontal}`}/>
         <section className={panelClass("testing")}>
@@ -412,11 +438,11 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
     {notice && <div role="status" className={styles.notice}>{notice}</div>}
     <Dialog open={layoutOpen} onOpenChange={setLayoutOpen}><DialogContent className={styles.layoutMenu}><DialogTitle>{tx("布局与面板", "Layout and panels")}</DialogTitle><DialogDescription>{tx("展开、折叠或最大化作答区域。", "Show, collapse or maximize workspace panels.")}</DialogDescription>{panelIds.map(panel => <button key={panel} type="button" onClick={() => { dispatch({ type: "show", panel }); setLayoutOpen(false); }}>{panel === "statement" ? tx("题目描述", "Problem") : panel === "editor" ? tx("代码编辑器", "Code editor") : tx("测试结果", "Results")}<span className="text-xs text-muted-foreground">{layout.panels[panel] === "open" ? tx("已显示", "Shown") : tx("显示", "Show")}</span></button>)}<button type="button" onClick={() => { if (document.fullscreenElement) void document.exitFullscreen(); else void rootRef.current?.requestFullscreen(); setLayoutOpen(false); }}>{tx("浏览器全屏", "Browser full screen")}<Maximize2 size={15}/></button></DialogContent></Dialog>
     <Dialog open={helpOpen} onOpenChange={setHelpOpen}><DialogContent><DialogTitle>{tx("快捷键与保存", "Shortcuts and saving")}</DialogTitle><DialogDescription>{tx("代码自动保存到服务器。Ctrl / ⌘ + S 手动保存；Ctrl / ⌘ + 单引号运行；Ctrl / ⌘ + Enter 提交；Esc 退出最大化。", "Code autosaves to the server. Ctrl / ⌘ + S saves now, Ctrl / ⌘ + apostrophe runs, Ctrl / ⌘ + Enter submits, and Esc exits maximize.")}{" "}{freePractice ? tx("自由练习可在提交后再次练习，首次 AC 积分只发放一次。", "Free practice can be repeated after submission. First-AC points are awarded once.") : tx("教师评定试卷成绩。", "Your teacher awards the paper mark.")}</DialogDescription><DialogFooter><Button onClick={() => setHelpOpen(false)}>{tx("知道了", "Close")}</Button></DialogFooter></DialogContent></Dialog>
-    <Dialog open={resetOpen} onOpenChange={setResetOpen}><DialogContent><DialogTitle>{tx("恢复起始代码？", "Restore starter code?")}</DialogTitle><DialogDescription>{tx("仅替换当前大题的编辑器内容；已有检查点仍保留。", "Only the current question's editor content changes. Existing checkpoints remain.")}</DialogDescription><DialogFooter><Button variant="secondary" onClick={() => setResetOpen(false)}>{tx("取消", "Cancel")}</Button><Button onClick={() => { latest.current[current.key] = current.starterCode; setCodes(existing => ({ ...existing, [current.key]: current.starterCode })); setSaveStatus("saving"); setResetOpen(false); }}>{tx("恢复代码", "Restore code")}</Button></DialogFooter></DialogContent></Dialog>
-    <Dialog open={submitOpen} onOpenChange={setSubmitOpen}><DialogContent><DialogTitle>{freePractice ? tx("提交本次练习", "Submit this practice") : tx("确认交卷", "Submit paper")}</DialogTitle><DialogDescription>{freePractice ? tx("提交后保留并冻结本次代码与检查点，自动判定各大题 AC。每题首次 AC 奖励 10 积分；之后可开始新一轮练习，重复 AC 不重复发放积分。", "Submission preserves and freezes this attempt, then judges each question for AC. Each question awards 10 points on its first AC only. You can start another practice attempt afterwards.") : tx("交卷后代码与检查点将冻结。系统将逐大题判定首次 AC 奖励积分；75 分试卷成绩由教师复核后公布。", "Submission freezes your code and checkpoints. Each question is judged for first-AC points; the paper mark out of 75 appears after teacher review.")}</DialogDescription><DialogFooter><Button variant="secondary" onClick={() => setSubmitOpen(false)}>{tx("继续作答", "Keep working")}</Button><Button disabled={busy} onClick={() => void mutate(async () => { await saveAll(); const updated = await productionApi<Paper4Attempt>(`paper4/attempts/${encodeURIComponent(attempt.id)}/submit`, { method: "POST" }); setAttempt(updated); setSubmitOpen(false); setMessage(freePractice ? tx("练习已提交，正在自动判题。每题首次 AC 将获得积分；本次记录保留后可再次练习。", "Practice submitted for automatic judging. Each question’s first AC earns points. This attempt is preserved and you can practice again.") : tx("已交卷。大题 AC 奖励将在自动判题后记入；请等待教师复核试卷成绩。", "Submitted. Question AC points are awarded after automatic judging; await teacher review for the paper mark.")); })}>{freePractice ? tx("提交练习", "Submit practice") : tx("确认交卷", "Submit")}</Button></DialogFooter></DialogContent></Dialog>
-    <ProblemListDrawer open={problemListOpen} onOpenChange={setProblemListOpen} title={tx("题目列表", "Problem list")} items={library.data?.items ?? []} currentId="" loading={library.loading} error={library.error} onRetry={library.reload} onSelect={problem => {
-      const target = library.data?.items.find(item => item.id === problem.id);
-      if (target) openLibraryProblem({ problemId: target.id, versionId: target.versionId, title: target.title });
+    <Dialog open={resetOpen} onOpenChange={setResetOpen}><DialogContent><DialogTitle>{tx("恢复起始代码？", "Restore starter code?")}</DialogTitle><DialogDescription>{tx("仅替换当前大题的编辑器内容；已有检查点仍保留。", "Only the current question's editor content changes. Existing checkpoints remain.")}</DialogDescription><DialogFooter><Button variant="secondary" onClick={() => setResetOpen(false)}>{tx("取消", "Cancel")}</Button><Button onClick={() => { latest.current[current.key] = current.starterCode; setCodes(existing => ({ ...existing, [current.key]: current.starterCode })); setResetOpen(false); }}>{tx("恢复代码", "Restore code")}</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={submitOpen} onOpenChange={open => { if (!submitting) setSubmitOpen(open); }}><DialogContent><DialogTitle>{freePractice ? tx("提交本次练习", "Submit this practice") : tx("确认交卷", "Submit paper")}</DialogTitle><DialogDescription>{freePractice ? tx("提交后保留并冻结本次代码与检查点，自动判定各大题 AC。每题首次 AC 奖励 10 积分；之后可开始新一轮练习，重复 AC 不重复发放积分。", "Submission preserves and freezes this attempt, then judges each question for AC. Each question awards 10 points on its first AC only. You can start another practice attempt afterwards.") : tx("交卷后代码与检查点将冻结。系统将逐大题判定首次 AC 奖励积分；75 分试卷成绩由教师复核后公布。", "Submission freezes your code and checkpoints. Each question is judged for first-AC points; the paper mark out of 75 appears after teacher review.")}</DialogDescription><DialogFooter><Button variant="secondary" disabled={submitting} onClick={() => setSubmitOpen(false)}>{tx("继续作答", "Keep working")}</Button><Button disabled={busy || formatting} onClick={() => void mutate(submitAttempt)}>{freePractice ? tx("提交练习", "Submit practice") : tx("确认交卷", "Submit")}</Button></DialogFooter></DialogContent></Dialog>
+    <ProblemListDrawer open={problemListOpen} onOpenChange={setProblemListOpen} title={tx("题目列表", "Problem list")} description={freePractice ? tx("Paper 4 练习 · 自由练习", "Paper 4 Practice · Free practice") : tx("Paper 4 练习 · 已布置活动", "Paper 4 Practice · Assigned activities")} items={libraryItems} currentId={attempt.paperId} loading={library.loading} error={library.error} onRetry={library.reload} onSelect={problem => {
+      const target = libraryItems.find(item => item.id === problem.id);
+      if (target) openLibraryProblem({ problemId: target.id, title: target.title });
     }}/>
     <WorkspaceSettingsDialog key={settingsScope} editorOnly={settingsScope === "editor"} initialSection={settingsScope === "editor" ? "editor" : "layout"} open={settingsOpen} onOpenChange={setSettingsOpen} settings={settings} update={update} reset={reset}/>
   </div></WorkspaceThemeProvider>;

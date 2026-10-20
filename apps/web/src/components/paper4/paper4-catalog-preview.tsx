@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/page-chrome";
 import { Button } from "@/components/ui/button";
 import type { Paper4Paper } from "./model";
 import { Paper4Content } from "./paper4-content";
+import { Paper4OriginalQuestion } from "./paper4-original-question";
 import { paper4ExamLabel } from "./paper4-catalog";
 import { Paper4AssignDialog } from "./paper4-assign-dialog";
 
@@ -30,7 +31,7 @@ export function Paper4CatalogPreview({ paper, pinnedVersion = false }: { paper: 
       </nav>
       <article className="min-w-0 p-5 sm:p-6">
         <h2 className="mb-4 text-xl font-bold">{question.title}</h2>
-        <Paper4Content content={question.statement}/>
+        <Paper4OriginalQuestion key={`${paper.versionId ?? paper.id}:${question.key}`} paper={paper} question={question}/>
         {Object.keys(question.initialFiles).length > 0 && <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-xs text-muted-foreground"><span className="font-semibold">{tx("配套文件", "Work files")}</span>{Object.keys(question.initialFiles).map(name => <span key={name} className="inline-flex items-center gap-1 rounded-md bg-surface-subtle px-2 py-1 font-mono"><FileText size={12} aria-hidden="true"/>{name}</span>)}</div>}
         <div className="mt-5 divide-y divide-border border-t border-border">
           {question.stages.map(stage => <section key={stage.id} className="py-4 last:pb-0"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{stage.title}</h3><span className="text-sm text-muted-foreground">{stage.maxMarks} {tx("分", "marks")} · {stage.judgeMode === "auto" ? tx("自动评测", "Auto") : stage.judgeMode === "evidence" ? tx("过程与证据", "Process and evidence") : tx("人工评分", "Teacher review")}</span></div>{stage.description && <Paper4Content content={stage.description}/>}</section>)}

@@ -11,3 +11,6 @@ coverage/
 .production-style-backups/
 backups/
 .DS_Store
+
+# Original question PDFs and rendered excerpts are supplied locally.
+apps/web/public/paper4-originals/

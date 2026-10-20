@@ -8,6 +8,8 @@ import { handleCommunity } from './community.mjs';
 import { createTimedService } from './timed.mjs';
 import { handleMemberImport } from './member-import.mjs';
 import { handlePaper4 } from './paper4.mjs';
+import { handleLuq } from './luq.mjs';
+import {publicProblemMetadata,studentPublicStatementRows} from './problem-public-statements.mjs';
 import { handleSystem, assertJudgeAdmission, getSettings } from './system.mjs';
 import { handlePeopleAlignment, handleFavorites, bindPendingTeacherClasses } from './alignment.mjs';
 import { handleAssignmentAuthoring } from './assignment-authoring.mjs';
@@ -26,7 +28,7 @@ const row=(result,message='资源不存在')=>{if(!result.rowCount) fail(404,'NO
 const identityIds=(value,name,max=500)=>{if(value===undefined)return [];if(!Array.isArray(value)||value.length>max)fail(400,'VALIDATION',`${name}须为最多 ${max} 项的 ID 数组`);return [...new Set(value.map(id=>uuid(id,name)))];};
 const userShape=r=>({id:r.id,identityId:r.identity_id,name:r.name,number:r.number,gender:r.gender??null,username:r.username,email:r.email||null,nickname:r.nickname,bio:r.bio,avatar:avatarForIdentity(r.avatar,r.identity_id),roles:r.roles,activatedAt:r.created_at});
 const personShape=r=>({id:r.id,kind:r.kind,number:r.number,name:r.name,gender:r.gender??null,classes:r.classes||[],activated:!!r.activated});
-const problemShape=(r,{includeDisabledSamples=false}={})=>({...Object.fromEntries(Object.entries(r.metadata||{}).filter(([key])=>!['editorial','hints'].includes(key))),id:r.problem_id,title:r.title,mode:r.mode,statement:r.statement,functionName:r.function_name,starterCode:r.starter_code,starterCodes:starterCodesFor(r),supportedLanguages:LANGUAGES,languageLimits:languageLimitsFor(r),referenceLanguage:r.reference_language||'python',samples:(r.samples||[]).filter(sample=>includeDisabledSamples||sample.enabled!==false),timeLimitMs:r.time_limit_ms,memoryLimitMb:r.memory_limit_mb,comparator:r.comparator,tags:r.tags||[],source:r.source||'',versionId:r.id,publishedVersionId:r.published_version_id||(r.published_at?r.id:null),publishedTitle:r.published_title||(r.published_at?r.title:null),published:!!r.published_at,schoolVisibleAt:r.school_visible_at??null,rankReviewStatus:r.rank_review_status??'pending',rankApprovedAt:r.rank_approved_at??null,bankVisibility:r.bank_visibility,validationStatus:r.validation_status,validationMessage:r.validation_message||null,formalTestCount:r.formal_test_count===undefined?undefined:Number(r.formal_test_count),canPublish:r.validation_status==='AC'&&!r.published_at});
+const problemShape=(r,{includeDisabledSamples=false}={})=>({...publicProblemMetadata(r.metadata),id:r.problem_id,title:r.title,mode:r.mode,statement:r.statement,statementLanguage:r.statement_language,publicStatementPending:r.public_statement_pending,functionName:r.function_name,starterCode:r.starter_code,starterCodes:starterCodesFor(r),supportedLanguages:LANGUAGES,languageLimits:languageLimitsFor(r),referenceLanguage:r.reference_language||'python',samples:(r.samples||[]).filter(sample=>includeDisabledSamples||sample.enabled!==false),timeLimitMs:r.time_limit_ms,memoryLimitMb:r.memory_limit_mb,comparator:r.comparator,tags:r.tags||[],source:r.source||'',versionId:r.id,publishedVersionId:r.published_version_id||(r.published_at?r.id:null),publishedTitle:r.published_title||(r.published_at?r.title:null),published:!!r.published_at,schoolVisibleAt:r.school_visible_at??null,rankReviewStatus:r.rank_review_status??'pending',rankApprovedAt:r.rank_approved_at??null,bankVisibility:r.bank_visibility,validationStatus:r.validation_status,validationMessage:r.validation_message||null,formalTestCount:r.formal_test_count===undefined?undefined:Number(r.formal_test_count),canPublish:r.validation_status==='AC'&&!r.published_at});
 const submissionShape=r=>({id:`SUB${r.id}`,identityId:r.identity_id,problemId:r.problem_id,problemTitle:r.problem_title,versionId:r.version_id,kind:r.kind,language:r.language||'python',status:r.status,score:r.score===null?null:Number(r.score),passed:r.passed,total:r.total,createdAt:r.created_at,code:r.code,publicOutput:r.public_output||null,message:r.public_message||null,assignmentId:r.assignment_id||null,timedPracticeId:r.timed_practice_id||null,timedAttemptId:r.timed_attempt_id||null,originalSubmissionId:r.original_submission_id?`SUB${r.original_submission_id}`:null,studentName:r.student_name});
 const reviewEntryShape=r=>({id:r.id,note:r.note,createdAt:r.created_at,submissionId:`SUB${r.submission_id}`,problemTitle:r.problem_title,problemId:r.problem_id,versionId:r.version_id,timedPracticeId:r.timed_practice_id||null,timedAttemptId:r.timed_attempt_id||null,originalSubmissionId:r.original_submission_id?`SUB${r.original_submission_id}`:null,status:r.status,authorName:r.author_name,authorIdentityId:r.author_identity_id});
 const reviewEntryQuery='SELECT r.id,r.note,r.created_at,s.id submission_id,s.problem_id,s.version_id,s.original_submission_id,s.status,s.identity_id,s.timed_attempt_id,v.title problem_title,i.id author_identity_id,i.name author_name FROM review_entries r JOIN submissions s ON s.id=r.submission_id JOIN problem_versions v ON v.id=s.version_id JOIN accounts a ON a.id=r.author_account_id JOIN identities i ON i.id=a.identity_id';
@@ -114,9 +116,16 @@ export async function createDomainServices(pool,config) {
   const permissions=await problemPermissions(db,user,p,v);if(!permissions.canRead)fail(404,'NOT_FOUND','题目不存在');return {p,v,owner:permissions.canEdit,permissions};
  }
  async function problemResult(db,user,problemId,versionId) {
-  const {p,v,owner,permissions}=await versionAccess(db,user,problemId,versionId);const result=problemShape(v,{includeDisabledSamples:owner});result.publishedVersionId=owner?p.current_version_id:v.id;result.publishedTitle=owner?result.publishedTitle:v.title;result.bankId=p.bank_id;result.bankVisibility=(await db.query('SELECT visibility FROM problem_banks WHERE id=$1',[p.bank_id])).rows[0]?.visibility;result.canEdit=owner;result.canPublish=owner&&result.canPublish;
+  const {p,v,owner,permissions}=await versionAccess(db,user,problemId,versionId);
+  const presented=isStaff(user)?v:(await studentPublicStatementRows(db,[v]))[0];
+  const result=problemShape(presented,{includeDisabledSamples:owner});result.publishedVersionId=owner?p.current_version_id:v.id;result.publishedTitle=owner?result.publishedTitle:v.title;result.bankId=p.bank_id;result.bankVisibility=(await db.query('SELECT visibility FROM problem_banks WHERE id=$1',[p.bank_id])).rows[0]?.visibility;result.canEdit=owner;result.canPublish=owner&&result.canPublish;
   result.firstAcPoints=(await db.query('SELECT COALESCE((SELECT points FROM point_rewards WHERE problem_id=$1 AND assignment_id IS NULL),10) first_ac_points',[problemId])).rows[0].first_ac_points;
-  if(owner){Object.assign(result,v.metadata||{});result.referenceCode=v.reference_code;result.tests=(await db.query('SELECT input,expected,weight,name,enabled FROM test_cases WHERE version_id=$1 ORDER BY position',[v.id])).rows.map(t=>({...t,weight:Number(t.weight)}));result.formalTestCount=result.tests.filter(t=>t.enabled).length;}else {const metadata=v.metadata||{},hasAC=!!(await db.query("SELECT 1 FROM submissions WHERE identity_id=$1 AND version_id=$2 AND kind IN ('submit','correction') AND status='AC' AND timed_attempt_id IS NULL LIMIT 1",[user.identityId,v.id])).rowCount;const allow=permissions.canRunFree&&(metadata.hintPolicy==='always'||metadata.hintPolicy!=='never'&&hasAC);if(allow){result.editorial=metadata.editorial||'';result.hints=metadata.hints||[];}else {result.editorial='';result.hints=[];}}return result;
+  if(owner){Object.assign(result,v.metadata||{});result.referenceCode=v.reference_code;result.tests=(await db.query('SELECT input,expected,weight,name,enabled FROM test_cases WHERE version_id=$1 ORDER BY position',[v.id])).rows.map(t=>({...t,weight:Number(t.weight)}));result.formalTestCount=result.tests.filter(t=>t.enabled).length;}else {
+   // Student assistance is explicitly published and served only by the Luq
+   // provide endpoint. Legacy editorials/hints may include full answers and
+   // must not leak through detail requests, SSR or background prefetches.
+   result.editorial='';result.hints=[];
+  }return result;
  }
  async function submissionAccess(db,user,id) {
   const s=row(await db.query('SELECT s.*,COALESCE(s.assignment_id,original.assignment_id) access_assignment_id,COALESCE(s.timed_attempt_id,original.timed_attempt_id) access_timed_attempt_id,(s.original_submission_id IS NULL OR original.resolved) context_resolved,v.title problem_title,i.name student_name FROM submissions s LEFT JOIN LATERAL submission_activity_context(s.original_submission_id) original ON true JOIN problem_versions v ON v.id=s.version_id JOIN identities i ON i.id=s.identity_id WHERE s.id=$1',[submissionId(id)]));
@@ -383,7 +392,8 @@ export async function createDomainServices(pool,config) {
     const problemIds=rows.map(r=>r.problem_id),ownProgress=await problemOwnProgress(pool,user,problemIds);
     const configured=(await pool.query('SELECT problem_id,points FROM point_rewards WHERE assignment_id IS NULL AND problem_id=ANY($1::uuid[])',[problemIds])).rows;
     const firstAcPoints=new Map(configured.map(reward=>[reward.problem_id,reward.points]));
-    return respond(200,{items:rows.map(r=>({...problemShape(r,{includeDisabledSamples:!!r.can_edit}),bankId:r.bank_id,canEdit:!!r.can_edit,canPublish:!!r.can_edit&&r.validation_status==='AC'&&!r.published_at,firstAcPoints:firstAcPoints.get(r.problem_id)??10,ownProgress:ownProgress.get(r.problem_id)||emptyOwnProgress()}))});
+    const presented=isStaff(user)?rows:await studentPublicStatementRows(pool,rows);
+    return respond(200,{items:presented.map(r=>({...problemShape(r,{includeDisabledSamples:!!r.can_edit}),bankId:r.bank_id,canEdit:!!r.can_edit,canPublish:!!r.can_edit&&r.validation_status==='AC'&&!r.published_at,firstAcPoints:firstAcPoints.get(r.problem_id)??10,ownProgress:ownProgress.get(r.problem_id)||emptyOwnProgress()}))});
    }
    if(route==='/problems'&&method==='POST'){
     staff(user);const input=problemInput(body);const v=await transaction(pool,async db=>{const access=await bankAccess(db,user,input.bankId);if(!access.canContribute)fail(403,'FORBIDDEN','无权向该题库添加题目');const p=row(await db.query('INSERT INTO problems(owner_account_id,bank_id) VALUES($1,$2) RETURNING id',[user.id,input.bankId]));return insertVersion(db,user,p.id,input);});return respond(201,await problemResult(pool,user,v.problem_id,v.id));
@@ -608,7 +618,7 @@ export async function createDomainServices(pool,config) {
   return null;
  }
 
- const operations={auth:authOperation,people:peopleOperation,classes:classesOperation,library:libraryOperation,assignments:assignmentsOperation,submissions:submissionsOperation,education:educationOperation,community:handleCommunity,system:systemOperation,paper4:handlePaper4};
+ const operations={auth:authOperation,people:peopleOperation,classes:classesOperation,library:libraryOperation,assignments:assignmentsOperation,submissions:submissionsOperation,education:educationOperation,community:handleCommunity,system:systemOperation,paper4:handlePaper4,luq:handleLuq};
  const helpers={audit,classAccess,versionAccess,submissionAccess,assignmentAccess,assignmentResult,problemResult,problemInput,insertVersion,issueActivation,personShape,maskSubmission:timed.maskSubmission};
  async function prepareRequest({url:rawUrl,method,headers={},body={},ip='unknown'}) {
   const url=new URL(rawUrl,'http://api.local'),path=url.pathname.replace(/\/$/,'');
@@ -632,6 +642,7 @@ export async function createDomainServices(pool,config) {
 }
 function respond(status,body,cookie){return {status,body,...(cookie?{cookie}:{})};}
 export function resourceArea(route) {
+ if(/^\/luq(?:\/|$)/.test(route))return 'luq';
  if(/^\/paper4(?:\/|$)/.test(route))return 'paper4';
  if(route.startsWith('/auth/'))return 'auth';
  if(/^\/(accounts|people|teachers)(?:\/|$)/.test(route))return 'people';

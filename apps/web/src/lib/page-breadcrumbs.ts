@@ -3,6 +3,9 @@ export type BreadcrumbLocale = "zh" | "en";
 export type PageBreadcrumb = { label: string; href: string };
 type Label = readonly [zh: string, en: string];
 const sections: Record<string, Label> = {
+  "/student/luq": ["我的 Luq", "My Luq"],
+  "/teacher/luq": ["Luq 助学管理", "Luq support"],
+  "/admin/luq": ["Luq 管理", "Luq administration"],
   "/login": ["登录", "Sign in"], "/register": ["注册", "Register"],
   "/student/problems": ["题目", "Problems"],
   "/student/learning-paths": ["课程", "Courses"],

@@ -800,13 +800,7 @@ export async function handlePaper4(ctx){
   const attempt=await getAttempt(pool,user,m[1]);
   const question=questionFor(attempt,m[2]);
   if(!canManage(user,attempt)){
-   if(!user.roles.includes('student')||attempt.identity_id!==user.identityId)
-    fail(403,'FORBIDDEN','只能查看本人答卷的参考答案');
-   if(attempt.paper_status!=='published'||!attempt.version_published_at||attempt.archived_at)
-    fail(404,'NOT_FOUND','试卷参考答案不可用');
-   if(attempt.starts_at&&attempt.starts_at>new Date())fail(409,'NOT_STARTED','练习尚未开始');
-   if(attempt.delivery_kind==='activity'&&attempt.activity_kind==='exam'&&!attempt.released_at)
-    fail(403,'SOLUTION_LOCKED','模拟考试成绩公布后才能查看参考答案');
+   fail(403,'LUQ_ASSISTANCE_REQUIRED','请通过助学内容入口查看已审核发布的题解');
   }
   // Resolve only the requested question from the attempt's immutable version.
   // Do not load other answers, hidden cases or teacher drivers into this payload.

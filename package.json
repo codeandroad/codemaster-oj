@@ -16,6 +16,7 @@
     "dev:api": "npm --prefix apps/api run dev",
     "start:local": "node scripts/start-local-production.mjs",
     "stop:local": "docker compose --project-name campus-judge-local --env-file deploy/.env.local -f deploy/compose.local.yaml stop",
-    "check:separation": "node scripts/check-separation.mjs"
+    "check:separation": "node scripts/check-separation.mjs",
+    "check:paper4-originals": "node scripts/check-paper4-originals.mjs"
   }
 }

@@ -10,6 +10,7 @@ import { completePaper4Task } from '../paper4-worker.mjs';
 const upgrade = '037_paper4_catalog_activities.sql';
 const audienceUpgrade = '039_paper4_activity_audiences.sql';
 const courseLinksUpgrade = '042_course_paper4_links.sql';
+const luqUpgrades = ['043_luq.sql', '044_luq_initial_grant.sql', '045_luq_assistance_prices.sql', '046_luq_content_batches.sql', '047_problem_public_statements.sql'];
 const questions = [{ key: 'Q1', title: 'Preserve a queue', statement: 'Implement the queue in English.',
   starterCode: '# Start here\n', initialFiles: { 'Data.txt': 'original\r\n' }, outputFiles: ['Result.txt'],
   stages: [{ id: 'Q1a', title: 'Queue operations', maxMarks: 75, judgeMode: 'auto' }] }];
@@ -32,7 +33,7 @@ async function fixture(run, { beforeUpgrade = false } = {}) {
   try {
     if (beforeUpgrade) {
       await pool.query('CREATE TABLE schema_migrations(name text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');
-      await pool.query('INSERT INTO schema_migrations(name) VALUES($1),($2),($3)', [upgrade,audienceUpgrade,courseLinksUpgrade]);
+      await pool.query('INSERT INTO schema_migrations(name) SELECT unnest($1::text[])', [[upgrade,audienceUpgrade,courseLinksUpgrade,...luqUpgrades]]);
     }
     await migrate(pool);
     async function account(role) {
@@ -250,14 +251,14 @@ test('Paper 4 catalogue migration retains legacy class access, saved files, form
     await finish(task);
     const preserve = async () => ({
       versions: (await pool.query('SELECT * FROM paper4_versions ORDER BY id')).rows,
-      snapshots: (await pool.query('SELECT * FROM paper4_snapshots ORDER BY id')).rows,
+      snapshots: (await pool.query(`SELECT to_jsonb(s)-'luq_solution_assisted'-'luq_first_ac_amount'-'luq_reward_rule_version' AS data FROM paper4_snapshots s ORDER BY id`)).rows.map(r=>r.data),
       files: (await pool.query('SELECT * FROM paper4_attempt_files ORDER BY attempt_id,question_key')).rows,
       ledger: (await pool.query('SELECT * FROM paper4_rank_ledger ORDER BY identity_id,paper_id,question_key')).rows,
       runs: (await pool.query('SELECT * FROM paper4_runs ORDER BY id')).rows,
     });
     const before = await preserve(); assert.equal(before.ledger.length, 1);
     const attemptBefore = (await pool.query('SELECT * FROM paper4_attempts WHERE id=$1', [attempt])).rows[0];
-    await pool.query('DELETE FROM schema_migrations WHERE name IN ($1,$2,$3)', [upgrade,audienceUpgrade,courseLinksUpgrade]); await migrate(pool);
+    await pool.query('DELETE FROM schema_migrations WHERE name=ANY($1::text[])', [[upgrade,audienceUpgrade,courseLinksUpgrade,...luqUpgrades]]); await migrate(pool);
     assert.deepEqual(await preserve(), before, 'upgrade does not rewrite evidence or historical awards');
     const after = (await pool.query('SELECT * FROM paper4_attempts WHERE id=$1', [attempt])).rows[0];
     assert.deepEqual(after, { ...attemptBefore, attempt_number: 1 });

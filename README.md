@@ -34,6 +34,8 @@ npm run start:local
 
 积分排行榜默认展示全校学生，也可筛选班级。管理员在「系统设置 → 题目审核」逐版本批准题目向全校公开；批准后的新正式 AC 才计入校级排名积分。教师设置的作业与训练额外奖励保留在个人和活动积分记录，不参与全校排名。学生端排行榜字段由管理员统一设置。
 
+Luq 是独立的可消费助学点，保留现有成绩、个人累计积分及榜分。学生可用 Luq 解锁经教师审核的中文题面或完整题解；管理员可发放、调整和退款，教师可设置冻结的活动额外奖励及辅助开放规则。默认首次有效正式 AC +4、中文题面 3、题解 8 Luq；历史成果不补发，私有参考答案不自动公开。升级须同时应用迁移 043 和运行角色授权；详见 [Luq 实现、配置与升级](docs/luq-system.md)。
+
 编程工作区顶部的 Settings 可调整代码编辑、快捷键、布局及本地计时器。语言选择和草稿按账号、题目版本、活动上下文及语言分别保存；正式提交会记录语言。函数题的 C++ 接口采用明确的 JSON 协议，说明见 [生产设计](docs/campus-judge-production-design.md#judging)。
 
 停止服务并保留数据：`npm run stop:local`。重新启动：`npm run start:local`。脚本不会重设已有密码或覆盖成绩，持久卷仍为 `campus-judge-local_database`；不要通过删除卷处理启动问题。
@@ -55,3 +57,9 @@ node scripts/check-separation.mjs
 本地开发分别运行 `npm run dev:api` 和 `npm run dev:web`，所需数据库和会话环境见 [部署说明](docs/campus-judge-deployment.md)。正式学校部署使用 `deploy/compose.yaml`，需校园域名、HTTPS 和学校机器上的隔离、负载、备份恢复验收。
 
 设计与范围见 [生产设计](docs/campus-judge-production-design.md) 和 [设计审查](docs/campus-judge-design-review.md)。最新本地检查见 [根目录迁移验收](docs/campus-judge-root-migration-verification.md)；先前的三角色原型对齐与页面切换记录分别见 [原型对齐](docs/campus-judge-prototype-alignment.md)、[导航验收](docs/campus-judge-navigation-verification.md)。[Next.js 文档](https://nextjs.org/docs/app)、[NestJS 文档](https://docs.nestjs.com/)。
+
+Luq 初始助学金与批量定价：迁移 044 为每个未领取的活跃学生身份追加默认 100 Luq（保留原余额，未来建档自动发放）；管理员可配置初始金额。教师可在 Paper 4 勾选多卷后点击「Luq 价格」，分别设置翻译和题解的解锁价格，已购买权益和考核限制保留。详见 [Luq 配置与迁移](docs/luq-system.md) 及 [本地核验](docs/paper4-luq-translations-2026-10-20.md)。
+
+Luq 助学管理的「批量审核题解」支持普通题目和 Paper 4 大题，清楚区分已发布、待审核与缺少内容，并可勾选已有草稿统一审核发布。迁移 046 保存幂等审核批次，发布前校验权限与正文快照，不自动公开私有参考程序。详见 [批量审核说明](docs/luq-batch-review-2026-10-20.md)。
+
+普通题可按准确版本追加经审核的公开英文展示，中文题面和完整题解仍通过 Luq 辅助入口提供。迁移 047 不覆盖原题版本、课程关联或判题材料，不自动回填内容。本轮整理范围为本地 3000 的 80 题英文展示与中文翻译、缺失的 58 份题解，并补齐 4 个历史版本以保留旧课程入口；已有 22 份课程题解保留。实际迁移、发布与验证状态见 [普通题内容整理记录](docs/luq-ordinary-content-2026-10-20.md)。

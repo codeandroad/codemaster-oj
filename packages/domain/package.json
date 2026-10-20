@@ -10,7 +10,7 @@
     "migrate": "node src/migrate.mjs",
     "bootstrap": "node src/bootstrap.mjs",
     "worker": "node worker.mjs",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test --test-concurrency=1 test/*.test.mjs"
   },
   "dependencies": {
     "argon2": "0.44.0",

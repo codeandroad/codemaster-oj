@@ -48,6 +48,8 @@ export interface ProductionProblem {
   title: string;
   mode: "stdio" | "function";
   statement: string;
+  statementLanguage?: "en";
+  publicStatementPending?: boolean;
   functionName?: string;
   starterCode: string;
   starterCodes?: Partial<Record<SubmissionLanguage, string>>;

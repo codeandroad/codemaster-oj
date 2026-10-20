@@ -1,13 +1,15 @@
 "use client";
 import {ProfileEditor} from "./profile-editor";
 import {PointsPage} from "./points-page";
+import { AdminLuqPage, StudentLuqPage, LuqBalance } from "./luq/account-pages";
+import { TeacherLuqPage } from "./luq/teaching-page";
 
 import { AppLink } from "@/components/navigation";
 import { isCampusRoute } from "@/lib/campus-routes";
 
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { BarChart3, BookOpen, BookOpenCheck, ClipboardList, Clock3, Code2, Database, FileClock, FileCode2, Gauge, Home, LayoutDashboard, Library, Menu, NotebookPen, Settings, Users, UserRound, X } from "lucide-react";
+import { BarChart3, BookOpen, BookOpenCheck, ClipboardList, Clock3, Code2, Database, FileClock, FileCode2, Gauge, Home, LayoutDashboard, Library, Menu, NotebookPen, Settings, Users, UserRound, Wallet, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {NotificationDropdown} from "@/components/student/notification-dropdown";
 import { AccountMenu } from "@/components/account-menu";
@@ -143,6 +145,7 @@ const navigation: Record<CampusRole, { label: string; path: string; icon: typeof
     { label: "Paper 4 练习", path: "/student/paper4", icon: FileCode2 },
     { label: "提交记录", path: "/student/submissions", icon: FileClock },
     { label: "订正本", path: "/student/review-notebook", icon: NotebookPen },
+    { label: "Luq 助学点", path: "/student/luq", icon: Wallet },
   ],
   teacher: [
     { label: "教师首页", path: "/teacher", icon: LayoutDashboard },
@@ -153,6 +156,7 @@ const navigation: Record<CampusRole, { label: string; path: string; icon: typeof
     { label: "限时训练", path: "/teacher/timed-practice", icon: Clock3 },
     { label: "Paper 4 试卷", path: "/teacher/paper4", icon: FileCode2 },
     { label: "教学报告", path: "/teacher/reports", icon: BarChart3 },
+    { label: "Luq 助学管理", path: "/teacher/luq", icon: Wallet },
     { label: "导入中心", path: "/teacher/imports", icon: Database },
   ],
   admin: [
@@ -163,6 +167,7 @@ const navigation: Record<CampusRole, { label: string; path: string; icon: typeof
     { label: "题库管理", path: "/admin/problem-banks", icon: BookOpenCheck },
     { label: "判题服务", path: "/admin/judge-service", icon: Gauge },
     { label: "系统设置", path: "/admin/settings", icon: Settings },
+    { label: "Luq 管理", path: "/admin/luq", icon: Wallet },
   ],
 };
 const shortNavigationEnglish: Record<string, string> = {
@@ -170,6 +175,7 @@ const shortNavigationEnglish: Record<string, string> = {
   "我的班级": "My classes", "作业管理": "Assignments", "Paper 4 试卷": "Paper 4",
   "教学报告": "Reports", "身份档案": "Identities", "账号与角色": "Accounts",
   "题库管理": "Problem banks", "导入中心": "Imports",
+  "Luq 助学点": "My Luq", "Luq 助学管理": "Luq support", "Luq 管理": "Luq administration",
 };
 function ProductionShell({
   user,
@@ -251,7 +257,7 @@ function ProductionShell({
               <PageBreadcrumbs pathname={pathname} role={role}/><ShellPageHeading pathname={pathname} role={role}/>
             </div>
             <div className="flex shrink-0 items-center gap-3">
-              {role==="student"&&<NotificationDropdown/>}
+              {role==="student"&&<><LuqBalance identityId={user.identityId}/><NotificationDropdown/></>}
               <AccountMenu user={user} role={role} busy={action.busy} onLogout={() => action.run(async () => {
                 try { await productionApi("auth/logout", {method:"POST"}); }
                 catch(reason) { if (!(reason instanceof ApiError && reason.status===401)) throw reason; }
@@ -294,6 +300,9 @@ function ProductionShell({
 
 
 function ProductionView({pathname,role,user,profileVersion,onProfileSaved}:{pathname:string;role:CampusRole;user:CampusUser;profileVersion:number;onProfileSaved:(next:CampusUser)=>void}) {
+  if (pathname === "/student/luq") return <StudentLuqPage/>;
+  if (pathname === "/teacher/luq") return <TeacherLuqPage/>;
+  if (pathname === "/admin/luq") return <AdminLuqPage/>;
   if(pathname.endsWith("/points"))return <PointsPage user={user} student={role==="student"} workspace={role}/>;
   if(/^\/(student|teacher|admin)\/people\/[^/]+$/.test(pathname))return <StudentPublicProfile identityId={pathname.split("/")[3]} viewer={user} workspace={role}/>;
   if(pathname==="/student/profile")return <><ProfileEditor user={user} onSaved={onProfileSaved}/><StudentPublicProfile key={profileVersion} identityId={user.identityId} viewer={user} embedded/></>;

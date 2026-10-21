@@ -28,6 +28,16 @@ test('prototype flows persist identity claims, imports, drafts, favorites, setti
   await teacher('/auth/profile',{gender:'invalid'},'PATCH',400);
   await teacher('/auth/verify-identity',{kind:'teacher',number:'T1',name:'教师',activationCode:ti.activationCode},'POST',400);
   const si=await admin('/people',{kind:'student',number:'S1',name:'学生',gender:'male',classIds:[cls.id]},'POST',201);await student('/auth/register',{kind:'student',number:'S1',name:'学生',activationCode:si.activationCode,username:'alignment-student',password:'Alignment-student-2026!'},'POST',201);
+  for(const [index,email] of [undefined,null,'','   '].entries()){
+   const number='OPTIONAL'+index,name='Optional email '+index,username='optional-email-'+index;
+   const person=await admin('/people',{kind:'student',number,name},'POST',201);
+   const register=client();
+   const body={kind:'student',number,name,activationCode:person.activationCode,username,password:'Optional-email-2026!',email};
+   await register('/auth/register',{...body,email:'not-an-email'},'POST',400);
+   const result=await register('/auth/register',body,'POST',201);
+   assert.equal(result.user.email,null);
+   assert.equal(result.user.showNicknameOnLeaderboard,false);
+  }
   const initialAvatar=(await student('/auth/me')).user.avatar;
   assert.match(initialAvatar,/^\/avatars\/oj-(?:0[1-9]|1[0-4])\.(?:jpg|png)$/);
   assert.equal((await student('/auth/profile',{avatar:'/avatars/oj-02.jpg'},'PATCH')).user.avatar,'/avatars/oj-02.jpg');

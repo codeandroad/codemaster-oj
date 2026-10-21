@@ -293,7 +293,7 @@ async function pointsLeaderboard(ctx) {
    WHERE a.state='submitted' AND (b.since_at IS NULL OR a.submitted_at>=b.since_at)
    GROUP BY a.identity_id
   ), eligible AS (
-  SELECT i.id, a.id account_id, COALESCE(NULLIF(btrim(a.nickname),''),'同学') name,
+  SELECT i.id, a.id account_id, CASE WHEN a.leaderboard_use_nickname THEN COALESCE(NULLIF(btrim(a.nickname),''),i.name) ELSE i.name END name,
    COALESCE(e.points,0)::int points, COALESCE(e.solved_problems,0)::int solved_problems,
    (COALESCE(t.attempts,0)+COALESCE(p4.attempts,0))::int attempts,
    (COALESCE(t.assessed,0)+COALESCE(p4.assessed,0))::int assessed,

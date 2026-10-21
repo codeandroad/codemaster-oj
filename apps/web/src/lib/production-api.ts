@@ -2,7 +2,7 @@ export type CampusRole = "student" | "teacher" | "admin";
 export type CampusGender = "male" | "female" | "other" | "undisclosed";
 export interface CampusUser {
   id: string;
-  nickname?:string;bio?:string;avatar?:string;
+  showNicknameOnLeaderboard?:boolean;nickname?:string;bio?:string;avatar?:string;
   identityId: string;
   name: string;
   gender: CampusGender | null;

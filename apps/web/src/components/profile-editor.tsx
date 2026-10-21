@@ -29,6 +29,7 @@ export function ProfileEditor({ user, onSaved }: { user: CampusUser; onSaved?: (
   const { locale } = useLocale();
   const [editing, setEditing] = useState(false);
   const [nickname, setNickname] = useState(user.nickname ?? "");
+  const [showNicknameOnLeaderboard, setShowNicknameOnLeaderboard] = useState(user.showNicknameOnLeaderboard ?? false);
   const [bio, setBio] = useState(user.bio ?? "");
   const [avatar, setAvatar] = useState(user.avatar ?? "");
   const [gender, setGender] = useState<CampusGender | "">(currentGender(user));
@@ -40,6 +41,7 @@ export function ProfileEditor({ user, onSaved }: { user: CampusUser; onSaved?: (
 
   function resetDraft() {
     setNickname(user.nickname ?? "");
+    setShowNicknameOnLeaderboard(user.showNicknameOnLeaderboard ?? false);
     setBio(user.bio ?? "");
     setAvatar(user.avatar ?? "");
     setGender(currentGender(user));
@@ -70,9 +72,10 @@ export function ProfileEditor({ user, onSaved }: { user: CampusUser; onSaved?: (
 
   function save() {
     setBusy(true); setMessage(""); setError("");
-    void productionApi<AuthResponse>("auth/profile", { method: "PATCH", body: { nickname: nickname.trim(), bio: bio.trim(), avatar, gender: gender || null } })
+    void productionApi<AuthResponse>("auth/profile", { method: "PATCH", body: { showNicknameOnLeaderboard: showNicknameOnLeaderboard && !!nickname.trim(), nickname: nickname.trim(), bio: bio.trim(), avatar, gender: gender || null } })
       .then(result => {
         setNickname(result.user.nickname ?? "");
+        setShowNicknameOnLeaderboard(result.user.showNicknameOnLeaderboard ?? false);
         setBio(result.user.bio ?? "");
         setAvatar(result.user.avatar ?? "");
         setGender(currentGender(result.user));
@@ -87,7 +90,7 @@ export function ProfileEditor({ user, onSaved }: { user: CampusUser; onSaved?: (
   return <div className="mt-5 space-y-4">
     <h1 className="sr-only">{ui(locale, "个人资料", "Profile")}</h1>
     <ProfileHero avatar={editing ? avatar : user.avatar} nickname={displayName} bio={editing ? bio : user.bio} self selfLabel={ui(locale, "我的资料", "My profile")} actions={editing ? undefined : <Button type="button" variant="outline" onClick={() => { setMessage(""); setEditing(true); }}><Pencil size={15}/>{ui(locale, "编辑个人资料", "Edit profile")}</Button>}>
-      <p className="mt-4 text-xs leading-5 text-muted-foreground">{ui(locale, "昵称、头像和介绍对校内用户可见。身份资料仅在你的账号页面显示。", "Your nickname, avatar, and bio are visible to school users. Identity details appear only on your account page.")}</p>
+      <p className="mt-4 text-xs leading-5 text-muted-foreground">{ui(locale, "昵称、头像和介绍对校内用户可见。排行榜默认显示姓名，可在下方编辑资料时改为显示昵称。", "Your nickname, avatar, and bio are visible to school users. The leaderboard uses your full name unless you enable nickname display below.")}</p>
     </ProfileHero>
 
     {editing ? <form className="rounded-xl border border-border bg-surface px-5 py-5 sm:px-7" onSubmit={event => { event.preventDefault(); save(); }}>
@@ -107,7 +110,8 @@ export function ProfileEditor({ user, onSaved }: { user: CampusUser; onSaved?: (
           <p className="w-full text-xs text-muted-foreground">{ui(locale, "支持 JPEG、PNG、WebP，最大 5 MB；图片会裁剪为正方形。", "JPEG, PNG, and WebP up to 5 MB. Images are cropped to a square.")}</p>
         </div>
       </div>
-      <label className={editRow + " sm:items-center"}><span className="text-sm font-medium text-muted-foreground">{ui(locale, "昵称", "Nickname")}</span><input className={control} value={nickname} maxLength={40} onChange={event => setNickname(event.target.value)} placeholder={ui(locale, "填写公开昵称", "Enter a public nickname")}/></label>
+      <label className={editRow + " sm:items-center"}><span className="text-sm font-medium text-muted-foreground">{ui(locale, "昵称", "Nickname")}</span><input className={control} value={nickname} maxLength={40} onChange={event => { setNickname(event.target.value); if (!event.target.value.trim()) setShowNicknameOnLeaderboard(false); }} placeholder={ui(locale, "填写公开昵称", "Enter a public nickname")}/></label>
+      {user.roles.includes("student") && <div className={editRow}><span className="text-sm font-medium text-muted-foreground">{ui(locale, "排行榜姓名", "Leaderboard name")}</span><div><label className="flex min-h-9 items-center gap-2 text-sm"><input type="checkbox" checked={showNicknameOnLeaderboard} disabled={!nickname.trim()} onChange={event => setShowNicknameOnLeaderboard(event.target.checked)} className="h-4 w-4 accent-primary"/>{ui(locale, "在排行榜中显示昵称", "Show my nickname on the leaderboard")}</label><p className="text-xs text-muted-foreground">{ui(locale, "默认显示学生姓名；填写昵称并开启后使用昵称。", "Your full name is shown by default. Enter a nickname and enable this option to use it instead.")}</p></div></div>}
       <label className={editRow + " sm:items-center"}><span className="text-sm font-medium text-muted-foreground">{ui(locale, "性别", "Gender")}</span><select className={control} value={gender} onChange={event => setGender(event.target.value as CampusGender | "")}><option value="">{ui(locale, "未填写", "Not provided")}</option>{genderOptions.map(option => <option key={option.value} value={option.value}>{ui(locale, option.label, englishGender[option.value])}</option>)}</select></label>
       <label className={editRow}><span className="pt-2 text-sm font-medium text-muted-foreground">{ui(locale, "个人介绍", "Bio")}</span><span><textarea className={control} value={bio} maxLength={500} rows={4} onChange={event => setBio(event.target.value)} placeholder={ui(locale, "介绍你的编程兴趣或正在学习的内容", "Tell others about your coding interests or what you're learning")}/><span className="mt-1 block text-right text-xs text-muted-foreground">{bio.length} / 500</span></span></label>
       <p className="mt-3 text-xs leading-5 text-muted-foreground">{ui(locale, "姓名和身份编号由管理员维护；性别仅显示在你的身份资料中。", "Your name and school ID are maintained by an administrator. Gender is only shown in your private identity details.")}</p>
@@ -117,6 +121,7 @@ export function ProfileEditor({ user, onSaved }: { user: CampusUser; onSaved?: (
       <div className="border-b border-border pb-3"><h3 id="profile-details-heading" className="text-lg font-bold">{ui(locale, "资料详情", "Profile details")}</h3><p className="mt-1 text-sm text-muted-foreground">{ui(locale, "账号与身份信息仅供本人查看。", "Account and identity details are visible only to you.")}</p></div>
       <dl>
         <Detail label={ui(locale, "真实姓名", "Full name")}>{user.name}</Detail>
+        {user.roles.includes("student") && <Detail label={ui(locale, "排行榜姓名", "Leaderboard name")}>{user.showNicknameOnLeaderboard && user.nickname?.trim() ? user.nickname : user.name}</Detail>}
         <Detail label={ui(locale, "身份", "Role")}>{roleName}</Detail>
         <Detail label={ui(locale, "身份编号", "School ID")}>{user.number || "—"}</Detail>
         <Detail label={ui(locale, "用户名", "Username")}>{user.username}</Detail>

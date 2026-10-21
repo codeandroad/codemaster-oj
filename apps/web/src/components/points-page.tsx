@@ -270,7 +270,7 @@ function LeaderboardTable({
             {canManage && showSettings && (
               <fieldset id="leaderboard-fields" className={`${styles.disclosure} ${styles.fieldSettings}`}>
                 <legend className="sr-only">{ui(locale, "全校学生端排行榜字段", "Student leaderboard fields")}</legend>
-                <p className="text-sm font-semibold">{ui(locale, "学生端显示字段", "Fields shown to students")} <span className="ml-2 text-xs font-normal text-muted-foreground">{ui(locale, "排名、昵称和积分始终显示", "Rank, nickname, and points are always shown")}</span></p>
+                <p className="text-sm font-semibold">{ui(locale, "学生端显示字段", "Fields shown to students")} <span className="ml-2 text-xs font-normal text-muted-foreground">{ui(locale, "排名、姓名或昵称和积分始终显示", "Rank, display name, and points are always shown")}</span></p>
                 <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-3">
                   {fieldLabels.map(({ field, label }) => (
                     <label key={field} className="inline-flex min-h-9 cursor-pointer items-center gap-2 text-sm">

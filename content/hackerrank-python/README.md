@@ -55,3 +55,5 @@ node scripts/import-hackerrank-python-course.mjs
 NumPy 练习使用隔离执行器中固定的 NumPy 2.2.6；运行库、隔离、真实检查与当前限制见 [实施记录](../../docs/hackerrank-python-course-2026-10-24.md)。
 
 后续用户授权的 Luq 内容已在本地 3000 发布：115 份中文题面、115 份完整题解，沿用逐题原价（本批分别为 3/8 Luq），学生需通过现有辅助入口解锁，不能随界面语言免费取得正文。参考代码保留主题选择，默认 GitHub Dark。此发布独立于原始草稿导入器，不由导入器自动执行。详见 [本地内容发布记录](../../docs/hackerrank-python-luq-content-2026-10-24.md)。
+
+再次获得用户明确授权后，课程、115 道练习、115 份中文题面及 115 份题解已增量同步到 [cmoj.space](https://cmoj.space/student/learning-paths/743d18d3-50b7-4b25-8841-9bab5ed06285)，保持章节与准确题目版本关联及 3/8 Luq 报价。没有复制本地学生记录或覆盖线上旧内容；私有材料经后端接口传输，未加入公开仓库。实际线上验证与备份见 [增量同步记录](../../docs/tx99-python-course-sync-2026-10-24.md)。

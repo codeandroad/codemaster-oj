@@ -11,6 +11,17 @@ const judge = enabled ? new GoJudge({ url: process.env.GO_JUDGE_TEST_URL, token:
   environmentVersion: process.env.JUDGE_ENVIRONMENT_VERSION ?? 'integration-runtime' }) : null;
 const make = (code, tests = [{ input: '', expected: '', weight: 100 }], changes = {}) => ({ code, tests, kind: 'submit', version, ...changes });
 
+test('real sandbox: pinned NumPy stdio/function, immutable vendor, no site initialization', { skip: !enabled, timeout: 30000 }, async () => {
+  const scientificVersion = { ...version, time_limit_ms: 2000, memory_limit_mb: 128 };
+  const code = 'import numpy as np\nprint(np.__version__)\nprint(int(np.linalg.det([[2,0],[0,3]]).round()))';
+  assert.equal((await judge.judge(make(code, [{ input: '', expected: '2.2.6 6', weight: 100 }], { version: scientificVersion }))).status, 'AC');
+  const solve = 'import numpy as np\ndef solve(a): return np.array(a,dtype=np.int64).T.tolist()';
+  assert.equal((await judge.judge(make(solve, [{ input: '[[[1,2],[3,4]]]', expected: '[[1,3],[2,4]]', weight: 100 }],
+    { version: { ...scientificVersion, mode: 'function', function_name: 'solve', comparator: 'json' } }))).status, 'AC');
+  const isolation = "import os,sys\nassert sys.flags.isolated and sys.flags.no_site\nassert '/w' not in sys.path and '' not in sys.path\nassert os.environ['OPENBLAS_NUM_THREADS']=='1'\ntry:\n open('/usr/local/lib/campus-python/numpy/__init__.py','a').write('x')\nexcept OSError:\n print('readonly')\nelse:\n print('WRITABLE')";
+  assert.equal((await judge.judge(make(isolation, [{ input: '', expected: 'readonly', weight: 100 }], { version: scientificVersion }))).status, 'AC');
+});
+
 test('real sandbox: Python 3.12, cgroup v2, non-root, isolated network', { skip: !enabled }, async () => {
   assert.match(await judge.ready(), /python-3\.12\./);
 });

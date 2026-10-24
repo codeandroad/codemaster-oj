@@ -7,6 +7,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     clang-19 g++-14 libstdc++-14-dev nlohmann-json3-dev \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=node_runtime /usr/local/bin/node /usr/local/bin/node
+COPY deploy/python-vendor-requirements.txt /opt/python-vendor-requirements.txt
+# This root-owned directory is included by the existing read-only /usr mount.
+# -I -S remains enabled; only the trusted bootstrap adds this explicit path.
+RUN python -m pip install --no-cache-dir --no-deps --only-binary=:all: --require-hashes \
+    --target=/usr/local/lib/campus-python -r /opt/python-vendor-requirements.txt \
+    && chmod -R a-w /usr/local/lib/campus-python
 COPY --from=executor /opt/go-judge /opt/go-judge
 COPY deploy/judge-mount.yaml /opt/mount.yaml
 COPY deploy/judge-seccomp.yaml /opt/seccomp.yaml

@@ -1,0 +1,116 @@
+courseKey,chapterNumber,category,sourceId,slug,sourceTitle,sourceUrl,difficulty
+01-01,1,Introduction,7876,py-hello-world,"Say ""Hello, World!"" With Python",https://www.hackerrank.com/challenges/py-hello-world/problem,Easy
+01-02,1,Introduction,22447,py-if-else,Python If-Else,https://www.hackerrank.com/challenges/py-if-else/problem,Easy
+01-03,1,Introduction,7883,python-arithmetic-operators,Arithmetic Operators,https://www.hackerrank.com/challenges/python-arithmetic-operators/problem,Easy
+01-04,1,Introduction,7884,python-division,Python: Division,https://www.hackerrank.com/challenges/python-division/problem,Easy
+01-05,1,Introduction,7941,python-loops,Loops,https://www.hackerrank.com/challenges/python-loops/problem,Easy
+01-06,1,Introduction,22727,write-a-function,Write a function,https://www.hackerrank.com/challenges/write-a-function/problem,Medium
+01-07,1,Introduction,8026,python-print,Print Function,https://www.hackerrank.com/challenges/python-print/problem,Easy
+02-01,2,Basic Data Types,1572,list-comprehensions,List Comprehensions,https://www.hackerrank.com/challenges/list-comprehensions/problem,Easy
+02-02,2,Basic Data Types,1374,find-second-maximum-number-in-a-list,Find the Runner-Up Score!,https://www.hackerrank.com/challenges/find-second-maximum-number-in-a-list/problem,Easy
+02-03,2,Basic Data Types,1375,nested-list,Nested Lists,https://www.hackerrank.com/challenges/nested-list/problem,Easy
+02-04,2,Basic Data Types,1377,finding-the-percentage,Finding the percentage,https://www.hackerrank.com/challenges/finding-the-percentage/problem,Easy
+02-05,2,Basic Data Types,7888,python-lists,Lists,https://www.hackerrank.com/challenges/python-lists/problem,Easy
+02-06,2,Basic Data Types,7889,python-tuples,Tuples,https://www.hackerrank.com/challenges/python-tuples/problem,Easy
+03-01,3,Strings,9870,swap-case,sWAP cASE,https://www.hackerrank.com/challenges/swap-case/problem,Easy
+03-02,3,Strings,8057,python-string-split-and-join,String Split and Join,https://www.hackerrank.com/challenges/python-string-split-and-join/problem,Easy
+03-03,3,Strings,1371,whats-your-name,What's Your Name?,https://www.hackerrank.com/challenges/whats-your-name/problem,Easy
+03-04,3,Strings,7890,python-mutations,Mutations,https://www.hackerrank.com/challenges/python-mutations/problem,Easy
+03-05,3,Strings,1373,find-a-string,Find a string,https://www.hackerrank.com/challenges/find-a-string/problem,Easy
+03-06,3,Strings,11742,string-validators,String Validators,https://www.hackerrank.com/challenges/string-validators/problem,Easy
+03-07,3,Strings,9953,text-alignment,Text Alignment,https://www.hackerrank.com/challenges/text-alignment/problem,Easy
+03-08,3,Strings,11766,text-wrap,Text Wrap,https://www.hackerrank.com/challenges/text-wrap/problem,Easy
+03-09,3,Strings,9629,designer-door-mat,Designer Door Mat,https://www.hackerrank.com/challenges/designer-door-mat/problem,Easy
+03-10,3,Strings,8059,python-string-formatting,String Formatting,https://www.hackerrank.com/challenges/python-string-formatting/problem,Easy
+03-11,3,Strings,14245,alphabet-rangoli,Alphabet Rangoli,https://www.hackerrank.com/challenges/alphabet-rangoli/problem,Easy
+03-12,3,Strings,14254,capitalize,Capitalize!,https://www.hackerrank.com/challenges/capitalize/problem,Easy
+03-13,3,Strings,9693,the-minion-game,The Minion Game,https://www.hackerrank.com/challenges/the-minion-game/problem,Medium
+03-14,3,Strings,8703,merge-the-tools,Merge the Tools!,https://www.hackerrank.com/challenges/merge-the-tools/problem,Medium
+04-01,4,Sets,9375,py-introduction-to-sets,Introduction to Sets,https://www.hackerrank.com/challenges/py-introduction-to-sets/problem,Easy
+04-02,4,Sets,8382,no-idea,No Idea!,https://www.hackerrank.com/challenges/no-idea/problem,Medium
+04-03,4,Sets,1603,symmetric-difference,Symmetric Difference,https://www.hackerrank.com/challenges/symmetric-difference/problem,Easy
+04-04,4,Sets,9406,py-set-add,Set .add(),https://www.hackerrank.com/challenges/py-set-add/problem,Easy
+04-05,4,Sets,9415,py-set-discard-remove-pop,"Set .discard(), .remove() & .pop()",https://www.hackerrank.com/challenges/py-set-discard-remove-pop/problem,Easy
+04-06,4,Sets,9417,py-set-union,Set .union() Operation,https://www.hackerrank.com/challenges/py-set-union/problem,Easy
+04-07,4,Sets,9419,py-set-intersection-operation,Set .intersection() Operation,https://www.hackerrank.com/challenges/py-set-intersection-operation/problem,Easy
+04-08,4,Sets,9420,py-set-difference-operation,Set .difference() Operation,https://www.hackerrank.com/challenges/py-set-difference-operation/problem,Easy
+04-09,4,Sets,9421,py-set-symmetric-difference-operation,Set .symmetric_difference() Operation,https://www.hackerrank.com/challenges/py-set-symmetric-difference-operation/problem,Easy
+04-10,4,Sets,9457,py-set-mutations,Set Mutations,https://www.hackerrank.com/challenges/py-set-mutations/problem,Easy
+04-11,4,Sets,9060,py-the-captains-room,The Captain's Room,https://www.hackerrank.com/challenges/py-the-captains-room/problem,Easy
+04-12,4,Sets,9022,py-check-subset,Check Subset,https://www.hackerrank.com/challenges/py-check-subset/problem,Easy
+04-13,4,Sets,9456,py-check-strict-superset,Check Strict Superset,https://www.hackerrank.com/challenges/py-check-strict-superset/problem,Easy
+05-01,5,Math,9951,polar-coordinates,Polar Coordinates,https://www.hackerrank.com/challenges/polar-coordinates/problem,Easy
+05-02,5,Math,9668,find-angle,Find Angle MBC,https://www.hackerrank.com/challenges/find-angle/problem,Medium
+05-03,5,Math,12523,triangle-quest-2,Triangle Quest 2,https://www.hackerrank.com/challenges/triangle-quest-2/problem,Medium
+05-04,5,Math,7887,python-mod-divmod,Mod Divmod,https://www.hackerrank.com/challenges/python-mod-divmod/problem,Easy
+05-05,5,Math,7885,python-power-mod-power,Power - Mod Power,https://www.hackerrank.com/challenges/python-power-mod-power/problem,Easy
+05-06,5,Math,7882,python-integers-come-in-all-sizes,Integers Come In All Sizes,https://www.hackerrank.com/challenges/python-integers-come-in-all-sizes/problem,Easy
+05-07,5,Math,7944,python-quest-1,Triangle Quest,https://www.hackerrank.com/challenges/python-quest-1/problem,Medium
+06-01,6,Itertools,11684,itertools-product,itertools.product(),https://www.hackerrank.com/challenges/itertools-product/problem,Easy
+06-02,6,Itertools,11685,itertools-permutations,itertools.permutations(),https://www.hackerrank.com/challenges/itertools-permutations/problem,Easy
+06-03,6,Itertools,11692,itertools-combinations,itertools.combinations(),https://www.hackerrank.com/challenges/itertools-combinations/problem,Easy
+06-04,6,Itertools,11693,itertools-combinations-with-replacement,itertools.combinations_with_replacement(),https://www.hackerrank.com/challenges/itertools-combinations-with-replacement/problem,Easy
+06-05,6,Itertools,8702,compress-the-string,Compress the String!,https://www.hackerrank.com/challenges/compress-the-string/problem,Medium
+06-06,6,Itertools,8679,iterables-and-iterators,Iterables and Iterators,https://www.hackerrank.com/challenges/iterables-and-iterators/problem,Medium
+06-07,6,Itertools,8696,maximize-it,Maximize It!,https://www.hackerrank.com/challenges/maximize-it/problem,Hard
+07-01,7,Collections,11694,collections-counter,collections.Counter(),https://www.hackerrank.com/challenges/collections-counter/problem,Easy
+07-02,7,Collections,8386,defaultdict-tutorial,DefaultDict Tutorial,https://www.hackerrank.com/challenges/defaultdict-tutorial/problem,Easy
+07-03,7,Collections,11955,py-collections-namedtuple,Collections.namedtuple(),https://www.hackerrank.com/challenges/py-collections-namedtuple/problem,Easy
+07-04,7,Collections,11975,py-collections-ordereddict,Collections.OrderedDict(),https://www.hackerrank.com/challenges/py-collections-ordereddict/problem,Easy
+07-05,7,Collections,8385,word-order,Word Order,https://www.hackerrank.com/challenges/word-order/problem,Medium
+07-06,7,Collections,11976,py-collections-deque,Collections.deque(),https://www.hackerrank.com/challenges/py-collections-deque/problem,Easy
+07-07,7,Collections,9698,most-commons,Company Logo,https://www.hackerrank.com/challenges/most-commons/problem,Medium
+07-08,7,Collections,8380,piling-up,Piling Up!,https://www.hackerrank.com/challenges/piling-up/problem,Medium
+08-01,8,Date and Time,9649,calendar-module,Calendar Module,https://www.hackerrank.com/challenges/calendar-module/problem,Easy
+08-02,8,Date and Time,8212,python-time-delta,Time Delta,https://www.hackerrank.com/challenges/python-time-delta/problem,Medium
+09-01,9,Errors and Exceptions,11765,exceptions,Exceptions,https://www.hackerrank.com/challenges/exceptions/problem,Easy
+09-02,9,Errors and Exceptions,12191,incorrect-regex,Incorrect Regex,https://www.hackerrank.com/challenges/incorrect-regex/problem,Easy
+10-01,10,Classes,1653,class-1-dealing-with-complex-numbers,Classes: Dealing with Complex Numbers,https://www.hackerrank.com/challenges/class-1-dealing-with-complex-numbers/problem,Medium
+10-02,10,Classes,1654,class-2-find-the-torsional-angle,Class 2 - Find the Torsional Angle,https://www.hackerrank.com/challenges/class-2-find-the-torsional-angle/problem,Easy
+11-01,11,Built-Ins,11741,zipped,Zipped!,https://www.hackerrank.com/challenges/zipped/problem,Easy
+11-02,11,Built-Ins,12190,input,Input(),https://www.hackerrank.com/challenges/input/problem,Easy
+11-03,11,Built-Ins,8531,python-eval,Python Evaluation,https://www.hackerrank.com/challenges/python-eval/problem,Easy
+11-04,11,Built-Ins,8203,python-sort-sort,Athlete Sort,https://www.hackerrank.com/challenges/python-sort-sort/problem,Medium
+11-05,11,Built-Ins,12189,any-or-all,Any or All,https://www.hackerrank.com/challenges/any-or-all/problem,Easy
+11-06,11,Built-Ins,12499,ginorts,ginortS,https://www.hackerrank.com/challenges/ginorts/problem,Medium
+12-01,12,Python Functionals,1564,map-and-lambda-expression,Map and Lambda Function,https://www.hackerrank.com/challenges/map-and-lambda-expression/problem,Easy
+12-02,12,Python Functionals,1565,validate-list-of-email-address-with-filter,Validating Email Addresses With a Filter,https://www.hackerrank.com/challenges/validate-list-of-email-address-with-filter/problem,Medium
+12-03,12,Python Functionals,29250,reduce-function,Reduce Function,https://www.hackerrank.com/challenges/reduce-function/problem,Medium
+13-01,13,Regex and Parsing,12177,introduction-to-regex,Detect Floating Point Number,https://www.hackerrank.com/challenges/introduction-to-regex/problem,Easy
+13-02,13,Regex and Parsing,12182,re-split,Re.split(),https://www.hackerrank.com/challenges/re-split/problem,Easy
+13-03,13,Regex and Parsing,12183,re-group-groups,"Group(), Groups() & Groupdict()",https://www.hackerrank.com/challenges/re-group-groups/problem,Easy
+13-04,13,Regex and Parsing,12184,re-findall-re-finditer,Re.findall() & Re.finditer(),https://www.hackerrank.com/challenges/re-findall-re-finditer/problem,Easy
+13-05,13,Regex and Parsing,12185,re-start-re-end,Re.start() & Re.end(),https://www.hackerrank.com/challenges/re-start-re-end/problem,Easy
+13-06,13,Regex and Parsing,11637,re-sub-regex-substitution,Regex Substitution,https://www.hackerrank.com/challenges/re-sub-regex-substitution/problem,Medium
+13-07,13,Regex and Parsing,1604,validate-a-roman-number,Validating Roman Numerals,https://www.hackerrank.com/challenges/validate-a-roman-number/problem,Easy
+13-08,13,Regex and Parsing,1558,validating-the-phone-number,Validating phone numbers,https://www.hackerrank.com/challenges/validating-the-phone-number/problem,Easy
+13-09,13,Regex and Parsing,12109,validating-named-email-addresses,Validating and Parsing Email Addresses,https://www.hackerrank.com/challenges/validating-named-email-addresses/problem,Easy
+13-10,13,Regex and Parsing,9714,hex-color-code,Hex Color Code,https://www.hackerrank.com/challenges/hex-color-code/problem,Easy
+13-11,13,Regex and Parsing,11657,html-parser-part-1,HTML Parser - Part 1,https://www.hackerrank.com/challenges/html-parser-part-1/problem,Easy
+13-12,13,Regex and Parsing,11665,html-parser-part-2,HTML Parser - Part 2,https://www.hackerrank.com/challenges/html-parser-part-2/problem,Easy
+13-13,13,Regex and Parsing,9719,detect-html-tags-attributes-and-attribute-values,"Detect HTML Tags, Attributes and Attribute Values",https://www.hackerrank.com/challenges/detect-html-tags-attributes-and-attribute-values/problem,Easy
+13-14,13,Regex and Parsing,12187,validating-uid,Validating UID,https://www.hackerrank.com/challenges/validating-uid/problem,Easy
+13-15,13,Regex and Parsing,12186,validating-credit-card-number,Validating Credit Card Numbers,https://www.hackerrank.com/challenges/validating-credit-card-number/problem,Medium
+13-16,13,Regex and Parsing,12538,validating-postalcode,Validating Postal Codes,https://www.hackerrank.com/challenges/validating-postalcode/problem,Hard
+13-17,13,Regex and Parsing,12524,matrix-script,Matrix Script,https://www.hackerrank.com/challenges/matrix-script/problem,Hard
+14-01,14,XML,1605,xml-1-find-the-score,XML 1 - Find the Score,https://www.hackerrank.com/challenges/xml-1-find-the-score/problem,Easy
+14-02,14,XML,1652,xml2-find-the-maximum-depth,XML2 - Find the Maximum Depth,https://www.hackerrank.com/challenges/xml2-find-the-maximum-depth/problem,Easy
+15-01,15,Closures and Decorators,1620,standardize-mobile-number-using-decorators,Standardize Mobile Number Using Decorators,https://www.hackerrank.com/challenges/standardize-mobile-number-using-decorators/problem,Easy
+15-02,15,Closures and Decorators,1621,decorators-2-name-directory,Decorators 2 - Name Directory,https://www.hackerrank.com/challenges/decorators-2-name-directory/problem,Easy
+16-01,16,Numpy,5176,np-arrays,Arrays,https://www.hackerrank.com/challenges/np-arrays/problem,Easy
+16-02,16,Numpy,8094,np-shape-reshape,Shape and Reshape,https://www.hackerrank.com/challenges/np-shape-reshape/problem,Easy
+16-03,16,Numpy,13496,np-transpose-and-flatten,Transpose and Flatten,https://www.hackerrank.com/challenges/np-transpose-and-flatten/problem,Easy
+16-04,16,Numpy,13497,np-concatenate,Concatenate,https://www.hackerrank.com/challenges/np-concatenate/problem,Easy
+16-05,16,Numpy,13498,np-zeros-and-ones,Zeros and Ones,https://www.hackerrank.com/challenges/np-zeros-and-ones/problem,Easy
+16-06,16,Numpy,13499,np-eye-and-identity,Eye and Identity,https://www.hackerrank.com/challenges/np-eye-and-identity/problem,Easy
+16-07,16,Numpy,13500,np-array-mathematics,Array Mathematics,https://www.hackerrank.com/challenges/np-array-mathematics/problem,Easy
+16-08,16,Numpy,13501,floor-ceil-and-rint,"Floor, Ceil and Rint",https://www.hackerrank.com/challenges/floor-ceil-and-rint/problem,Easy
+16-09,16,Numpy,13502,np-sum-and-prod,Sum and Prod,https://www.hackerrank.com/challenges/np-sum-and-prod/problem,Easy
+16-10,16,Numpy,13503,np-min-and-max,Min and Max,https://www.hackerrank.com/challenges/np-min-and-max/problem,Easy
+16-11,16,Numpy,13504,np-mean-var-and-std,"Mean, Var, and Std",https://www.hackerrank.com/challenges/np-mean-var-and-std/problem,Easy
+16-12,16,Numpy,13505,np-dot-and-cross,Dot and Cross,https://www.hackerrank.com/challenges/np-dot-and-cross/problem,Easy
+16-13,16,Numpy,13506,np-inner-and-outer,Inner and Outer,https://www.hackerrank.com/challenges/np-inner-and-outer/problem,Easy
+16-14,16,Numpy,13507,np-polynomials,Polynomials,https://www.hackerrank.com/challenges/np-polynomials/problem,Easy
+16-15,16,Numpy,13508,np-linear-algebra,Linear Algebra,https://www.hackerrank.com/challenges/np-linear-algebra/problem,Easy
+17-01,17,Debugging,66426,words-score,Words Score,https://www.hackerrank.com/challenges/words-score/problem,Medium
+17-02,17,Debugging,66403,default-arguments,Default Arguments,https://www.hackerrank.com/challenges/default-arguments/problem,Medium

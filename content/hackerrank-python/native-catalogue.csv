@@ -1,0 +1,116 @@
+courseKey,chapterNumber,originalExerciseTitle,mode,sourceSlug,sourceUrl
+01-01,1,Python 01-01 · Workshop badge,stdio,py-hello-world,https://www.hackerrank.com/challenges/py-hello-world/problem
+01-02,1,Python 01-02 · Parcel routing,stdio,py-if-else,https://www.hackerrank.com/challenges/py-if-else/problem
+01-03,1,Python 01-03 · Warehouse change,stdio,python-arithmetic-operators,https://www.hackerrank.com/challenges/python-arithmetic-operators/problem
+01-04,1,Python 01-04 · Bundle report,stdio,python-division,https://www.hackerrank.com/challenges/python-division/problem
+01-05,1,Python 01-05 · Cube checkpoints,stdio,python-loops,https://www.hackerrank.com/challenges/python-loops/problem
+01-06,1,Python 01-06 · Anniversary calendar,function,write-a-function,https://www.hackerrank.com/challenges/write-a-function/problem
+01-07,1,Python 01-07 · Shelf labels,stdio,python-print,https://www.hackerrank.com/challenges/python-print/problem
+02-01,2,Python 02-01 · Grid cells outside a diagonal,function,list-comprehensions,https://www.hackerrank.com/challenges/list-comprehensions/problem
+02-02,2,Python 02-02 · Second distinct reading,function,find-second-maximum-number-in-a-list,https://www.hackerrank.com/challenges/find-second-maximum-number-in-a-list/problem
+02-03,2,Python 02-03 · Lowest stock above minimum,function,nested-list,https://www.hackerrank.com/challenges/nested-list/problem
+02-04,2,Python 02-04 · Weighted module average,function,finding-the-percentage,https://www.hackerrank.com/challenges/finding-the-percentage/problem
+02-05,2,Python 02-05 · Editable reading queue,function,python-lists,https://www.hackerrank.com/challenges/python-lists/problem
+02-06,2,Python 02-06 · Immutable coordinate key,function,python-tuples,https://www.hackerrank.com/challenges/python-tuples/problem
+03-01,3,Python 03-01 · Case inversion label,function,swap-case,https://www.hackerrank.com/challenges/swap-case/problem
+03-02,3,Python 03-02 · Normalize a tag line,function,python-string-split-and-join,https://www.hackerrank.com/challenges/python-string-split-and-join/problem
+03-03,3,Python 03-03 · Workshop greeting function,function,whats-your-name,https://www.hackerrank.com/challenges/whats-your-name/problem
+03-04,3,Python 03-04 · Repair a label segment,function,python-mutations,https://www.hackerrank.com/challenges/python-mutations/problem
+03-05,3,Python 03-05 · Overlapping alert counter,function,find-a-string,https://www.hackerrank.com/challenges/find-a-string/problem
+03-06,3,Python 03-06 · ASCII character audit,function,string-validators,https://www.hackerrank.com/challenges/string-validators/problem
+03-07,3,Python 03-07 · Centered notice,function,text-alignment,https://www.hackerrank.com/challenges/text-alignment/problem
+03-08,3,Python 03-08 · Fixed-width packet chunks,function,text-wrap,https://www.hackerrank.com/challenges/text-wrap/problem
+03-09,3,Python 03-09 · Signal panel,function,designer-door-mat,https://www.hackerrank.com/challenges/designer-door-mat/problem
+03-10,3,Python 03-10 · Numeric labels,function,python-string-formatting,https://www.hackerrank.com/challenges/python-string-formatting/problem
+03-11,3,Python 03-11 · Alphabet diamond,function,alphabet-rangoli,https://www.hackerrank.com/challenges/alphabet-rangoli/problem
+03-12,3,Python 03-12 · Title initials without reflow,function,capitalize,https://www.hackerrank.com/challenges/capitalize/problem
+03-13,3,Python 03-13 · Substring start scores,function,the-minion-game,https://www.hackerrank.com/challenges/the-minion-game/problem
+03-14,3,Python 03-14 · Distinct characters per packet,function,merge-the-tools,https://www.hackerrank.com/challenges/merge-the-tools/problem
+04-01,4,Python 04-01 · Mean of distinct readings,function,py-introduction-to-sets,https://www.hackerrank.com/challenges/py-introduction-to-sets/problem
+04-02,4,Python 04-02 · Preference balance,function,no-idea,https://www.hackerrank.com/challenges/no-idea/problem
+04-03,4,Python 04-03 · One-team participants,function,symmetric-difference,https://www.hackerrank.com/challenges/symmetric-difference/problem
+04-04,4,Python 04-04 · Unique access badges,function,py-set-add,https://www.hackerrank.com/challenges/py-set-add/problem
+04-05,4,Python 04-05 · Deterministic set console,function,py-set-discard-remove-pop,https://www.hackerrank.com/challenges/py-set-discard-remove-pop/problem
+04-06,4,Python 04-06 · Combined permissions,function,py-set-union,https://www.hackerrank.com/challenges/py-set-union/problem
+04-07,4,Python 04-07 · Common permissions,function,py-set-intersection-operation,https://www.hackerrank.com/challenges/py-set-intersection-operation/problem
+04-08,4,Python 04-08 · Unshared permissions,function,py-set-difference-operation,https://www.hackerrank.com/challenges/py-set-difference-operation/problem
+04-09,4,Python 04-09 · Permissions on exactly one side,function,py-set-symmetric-difference-operation,https://www.hackerrank.com/challenges/py-set-symmetric-difference-operation/problem
+04-10,4,Python 04-10 · Permission update stream,function,py-set-mutations,https://www.hackerrank.com/challenges/py-set-mutations/problem
+04-11,4,Python 04-11 · Unpaired serial,function,py-the-captains-room,https://www.hackerrank.com/challenges/py-the-captains-room/problem
+04-12,4,Python 04-12 · Prerequisite coverage,function,py-check-subset,https://www.hackerrank.com/challenges/py-check-subset/problem
+04-13,4,Python 04-13 · Strict coverage audit,function,py-check-strict-superset,https://www.hackerrank.com/challenges/py-check-strict-superset/problem
+05-01,5,Python 05-01 · Complex beacon distance,function,polar-coordinates,https://www.hackerrank.com/challenges/polar-coordinates/problem
+05-02,5,Python 05-02 · Ramp inclination,function,find-angle,https://www.hackerrank.com/challenges/find-angle/problem
+05-03,5,Python 05-03 · Palindromic number pyramid,function,triangle-quest-2,https://www.hackerrank.com/challenges/triangle-quest-2/problem
+05-04,5,Python 05-04 · Signed floor division,function,python-mod-divmod,https://www.hackerrank.com/challenges/python-mod-divmod/problem
+05-05,5,Python 05-05 · Repeated-growth residue,function,python-power-mod-power,https://www.hackerrank.com/challenges/python-power-mod-power/problem
+05-06,5,Python 05-06 · Exact growth difference,function,python-integers-come-in-all-sizes,https://www.hackerrank.com/challenges/python-integers-come-in-all-sizes/problem
+05-07,5,Python 05-07 · Triangular digit rows,function,python-quest-1,https://www.hackerrank.com/challenges/python-quest-1/problem
+06-01,6,Python 06-01 · Compatible timetable pairs,function,itertools-product,https://www.hackerrank.com/challenges/itertools-product/problem
+06-02,6,Python 06-02 · Ordered badge codes,function,itertools-permutations,https://www.hackerrank.com/challenges/itertools-permutations/problem
+06-03,6,Python 06-03 · Committee labels,function,itertools-combinations,https://www.hackerrank.com/challenges/itertools-combinations/problem
+06-04,6,Python 06-04 · Reusable bead selections,function,itertools-combinations-with-replacement,https://www.hackerrank.com/challenges/itertools-combinations-with-replacement/problem
+06-05,6,Python 06-05 · Consecutive signal runs,function,compress-the-string,https://www.hackerrank.com/challenges/compress-the-string/problem
+06-06,6,Python 06-06 · Marked-ticket chance,function,iterables-and-iterators,https://www.hackerrank.com/challenges/iterables-and-iterators/problem
+06-07,6,Python 06-07 · Residue optimizer,function,maximize-it,https://www.hackerrank.com/challenges/maximize-it/problem
+07-01,7,Python 07-01 · Equipment requests,function,collections-counter,https://www.hackerrank.com/challenges/collections-counter/problem
+07-02,7,Python 07-02 · Inverted keyword index,function,defaultdict-tutorial,https://www.hackerrank.com/challenges/defaultdict-tutorial/problem
+07-03,7,Python 07-03 · Column-aware mark sheet,function,py-collections-namedtuple,https://www.hackerrank.com/challenges/py-collections-namedtuple/problem
+07-04,7,Python 07-04 · First-seen inventory totals,function,py-collections-ordereddict,https://www.hackerrank.com/challenges/py-collections-ordereddict/problem
+07-05,7,Python 07-05 · Token frequency order,function,word-order,https://www.hackerrank.com/challenges/word-order/problem
+07-06,7,Python 07-06 · Two-ended help queue,function,py-collections-deque,https://www.hackerrank.com/challenges/py-collections-deque/problem
+07-07,7,Python 07-07 · Frequent sensor labels,function,most-commons,https://www.hackerrank.com/challenges/most-commons/problem
+07-08,7,Python 07-08 · End-picked descending blocks,function,piling-up,https://www.hackerrank.com/challenges/piling-up/problem
+08-01,8,Python 08-01 · Weekday labels,function,calendar-module,https://www.hackerrank.com/challenges/calendar-module/problem
+08-02,8,Python 08-02 · Timezone-separated check-ins,function,python-time-delta,https://www.hackerrank.com/challenges/python-time-delta/problem
+09-01,9,Python 09-01 · Safe integer quotient service,function,exceptions,https://www.hackerrank.com/challenges/exceptions/problem
+09-02,9,Python 09-02 · Pattern compile audit,function,incorrect-regex,https://www.hackerrank.com/challenges/incorrect-regex/problem
+10-01,10,Python 10-01 · Complex number calculator,function,class-1-dealing-with-complex-numbers,https://www.hackerrank.com/challenges/class-1-dealing-with-complex-numbers/problem
+10-02,10,Python 10-02 · Angle between plane normals,function,class-2-find-the-torsional-angle,https://www.hackerrank.com/challenges/class-2-find-the-torsional-angle/problem
+11-01,11,Python 11-01 · Aligned assessment totals,function,zipped,https://www.hackerrank.com/challenges/zipped/problem
+11-02,11,Python 11-02 · Safe polynomial check,function,input,https://www.hackerrank.com/challenges/input/problem
+11-03,11,Python 11-03 · Restricted expression interpreter,function,python-eval,https://www.hackerrank.com/challenges/python-eval/problem
+11-04,11,Python 11-04 · Stable results table,function,python-sort-sort,https://www.hackerrank.com/challenges/python-sort-sort/problem
+11-05,11,Python 11-05 · Batch safety flags,function,any-or-all,https://www.hackerrank.com/challenges/any-or-all/problem
+11-06,11,Python 11-06 · Custom identifier ordering,function,ginorts,https://www.hackerrank.com/challenges/ginorts/problem
+12-01,12,Python 12-01 · Triangular number mapping,function,map-and-lambda-expression,https://www.hackerrank.com/challenges/map-and-lambda-expression/problem
+12-02,12,Python 12-02 · Filter lab mailboxes,function,validate-list-of-email-address-with-filter,https://www.hackerrank.com/challenges/validate-list-of-email-address-with-filter/problem
+12-03,12,Python 12-03 · Product of rational factors,function,reduce-function,https://www.hackerrank.com/challenges/reduce-function/problem
+13-01,13,Python 13-01 · Decimal literal recognition,function,introduction-to-regex,https://www.hackerrank.com/challenges/introduction-to-regex/problem
+13-02,13,Python 13-02 · Delimited reading fields,function,re-split,https://www.hackerrank.com/challenges/re-split/problem
+13-03,13,Python 13-03 · Structured log captures,function,re-group-groups,https://www.hackerrank.com/challenges/re-group-groups/problem
+13-04,13,Python 13-04 · Vowel runs,function,re-findall-re-finditer,https://www.hackerrank.com/challenges/re-findall-re-finditer/problem
+13-05,13,Python 13-05 · Overlapping match spans,function,re-start-re-end,https://www.hackerrank.com/challenges/re-start-re-end/problem
+13-06,13,Python 13-06 · Whole-word abbreviation,function,re-sub-regex-substitution,https://www.hackerrank.com/challenges/re-sub-regex-substitution/problem
+13-07,13,Python 13-07 · Canonical Roman labels,function,validate-a-roman-number,https://www.hackerrank.com/challenges/validate-a-roman-number/problem
+13-08,13,Python 13-08 · Office extension format,function,validating-the-phone-number,https://www.hackerrank.com/challenges/validating-the-phone-number/problem
+13-09,13,Python 13-09 · Named laboratory contacts,function,validating-named-email-addresses,https://www.hackerrank.com/challenges/validating-named-email-addresses/problem
+13-10,13,Python 13-10 · Hex colour tokens,function,hex-color-code,https://www.hackerrank.com/challenges/hex-color-code/problem
+13-11,13,Python 13-11 · Start-tag stream,function,html-parser-part-1,https://www.hackerrank.com/challenges/html-parser-part-1/problem
+13-12,13,Python 13-12 · HTML text and comment events,function,html-parser-part-2,https://www.hackerrank.com/challenges/html-parser-part-2/problem
+13-13,13,Python 13-13 · Tag attribute catalogue,function,detect-html-tags-attributes-and-attribute-values,https://www.hackerrank.com/challenges/detect-html-tags-attributes-and-attribute-values/problem
+13-14,13,Python 13-14 · Distinct-character badge validator,function,validating-uid,https://www.hackerrank.com/challenges/validating-uid/problem
+13-15,13,Python 13-15 · Check-digit membership cards,function,validating-credit-card-number,https://www.hackerrank.com/challenges/validating-credit-card-number/problem
+13-16,13,Python 13-16 · Alternating postal identifiers,function,validating-postalcode,https://www.hackerrank.com/challenges/validating-postalcode/problem
+13-17,13,Python 13-17 · Column message decoder,function,matrix-script,https://www.hackerrank.com/challenges/matrix-script/problem
+14-01,14,Python 14-01 · XML attribute census,function,xml-1-find-the-score,https://www.hackerrank.com/challenges/xml-1-find-the-score/problem
+14-02,14,Python 14-02 · XML leaf depths,function,xml2-find-the-maximum-depth,https://www.hackerrank.com/challenges/xml2-find-the-maximum-depth/problem
+15-01,15,Python 15-01 · Normalized support numbers,function,standardize-mobile-number-using-decorators,https://www.hackerrank.com/challenges/standardize-mobile-number-using-decorators/problem
+15-02,15,Python 15-02 · Age-ordered attendee labels,function,decorators-2-name-directory,https://www.hackerrank.com/challenges/decorators-2-name-directory/problem
+16-01,16,Python 16-01 · Reverse a numeric sensor vector,function,np-arrays,https://www.hackerrank.com/challenges/np-arrays/problem
+16-02,16,Python 16-02 · Reshape the sample buffer,function,np-shape-reshape,https://www.hackerrank.com/challenges/np-shape-reshape/problem
+16-03,16,Python 16-03 · Matrix orientation report,function,np-transpose-and-flatten,https://www.hackerrank.com/challenges/np-transpose-and-flatten/problem
+16-04,16,Python 16-04 · Stack matching data blocks,function,np-concatenate,https://www.hackerrank.com/challenges/np-concatenate/problem
+16-05,16,Python 16-05 · Binary mask pair,function,np-zeros-and-ones,https://www.hackerrank.com/challenges/np-zeros-and-ones/problem
+16-06,16,Python 16-06 · Offset identity mask,function,np-eye-and-identity,https://www.hackerrank.com/challenges/np-eye-and-identity/problem
+16-07,16,Python 16-07 · Elementwise calibration,function,np-array-mathematics,https://www.hackerrank.com/challenges/np-array-mathematics/problem
+16-08,16,Python 16-08 · Three rounding policies,function,floor-ceil-and-rint,https://www.hackerrank.com/challenges/floor-ceil-and-rint/problem
+16-09,16,Python 16-09 · Column-sum product,function,np-sum-and-prod,https://www.hackerrank.com/challenges/np-sum-and-prod/problem
+16-10,16,Python 16-10 · Best row minimum,function,np-min-and-max,https://www.hackerrank.com/challenges/np-min-and-max/problem
+16-11,16,Python 16-11 · Population statistics report,function,np-mean-var-and-std,https://www.hackerrank.com/challenges/np-mean-var-and-std/problem
+16-12,16,Python 16-12 · Matrix product assembly,function,np-dot-and-cross,https://www.hackerrank.com/challenges/np-dot-and-cross/problem
+16-13,16,Python 16-13 · Vector pairing report,function,np-inner-and-outer,https://www.hackerrank.com/challenges/np-inner-and-outer/problem
+16-14,16,Python 16-14 · Calibration curve evaluation,function,np-polynomials,https://www.hackerrank.com/challenges/np-polynomials/problem
+16-15,16,Python 16-15 · Area transformation determinant,function,np-linear-algebra,https://www.hackerrank.com/challenges/np-linear-algebra/problem
+17-01,17,Python 17-01 · Repair the word scorer,function,words-score,https://www.hackerrank.com/challenges/words-score/problem
+17-02,17,Python 17-02 · Independent accumulator calls,function,default-arguments,https://www.hackerrank.com/challenges/default-arguments/problem

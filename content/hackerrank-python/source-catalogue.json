@@ -1,0 +1,1158 @@
+{
+  "source": "https://www.hackerrank.com/domains/python",
+  "retrievedOn": "2026-10-24",
+  "reportedTotal": 115,
+  "metadataOnly": true,
+  "challenges": [
+    {
+      "sourceId": 7876,
+      "title": "Say \"Hello, World!\" With Python",
+      "slug": "py-hello-world",
+      "url": "https://www.hackerrank.com/challenges/py-hello-world/problem",
+      "difficulty": "Easy",
+      "maxScore": 5,
+      "category": "Introduction",
+      "categorySlug": "py-introduction"
+    },
+    {
+      "sourceId": 22447,
+      "title": "Python If-Else",
+      "slug": "py-if-else",
+      "url": "https://www.hackerrank.com/challenges/py-if-else/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Introduction",
+      "categorySlug": "py-introduction"
+    },
+    {
+      "sourceId": 7883,
+      "title": "Arithmetic Operators",
+      "slug": "python-arithmetic-operators",
+      "url": "https://www.hackerrank.com/challenges/python-arithmetic-operators/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Introduction",
+      "categorySlug": "py-introduction"
+    },
+    {
+      "sourceId": 7884,
+      "title": "Python: Division",
+      "slug": "python-division",
+      "url": "https://www.hackerrank.com/challenges/python-division/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Introduction",
+      "categorySlug": "py-introduction"
+    },
+    {
+      "sourceId": 7941,
+      "title": "Loops",
+      "slug": "python-loops",
+      "url": "https://www.hackerrank.com/challenges/python-loops/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Introduction",
+      "categorySlug": "py-introduction"
+    },
+    {
+      "sourceId": 22727,
+      "title": "Write a function",
+      "slug": "write-a-function",
+      "url": "https://www.hackerrank.com/challenges/write-a-function/problem",
+      "difficulty": "Medium",
+      "maxScore": 10,
+      "category": "Introduction",
+      "categorySlug": "py-introduction"
+    },
+    {
+      "sourceId": 8026,
+      "title": "Print Function",
+      "slug": "python-print",
+      "url": "https://www.hackerrank.com/challenges/python-print/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Introduction",
+      "categorySlug": "py-introduction"
+    },
+    {
+      "sourceId": 1572,
+      "title": "List Comprehensions",
+      "slug": "list-comprehensions",
+      "url": "https://www.hackerrank.com/challenges/list-comprehensions/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Basic Data Types",
+      "categorySlug": "py-basic-data-types"
+    },
+    {
+      "sourceId": 1374,
+      "title": "Find the Runner-Up Score!  ",
+      "slug": "find-second-maximum-number-in-a-list",
+      "url": "https://www.hackerrank.com/challenges/find-second-maximum-number-in-a-list/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Basic Data Types",
+      "categorySlug": "py-basic-data-types"
+    },
+    {
+      "sourceId": 1375,
+      "title": "Nested Lists",
+      "slug": "nested-list",
+      "url": "https://www.hackerrank.com/challenges/nested-list/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Basic Data Types",
+      "categorySlug": "py-basic-data-types"
+    },
+    {
+      "sourceId": 1377,
+      "title": "Finding the percentage",
+      "slug": "finding-the-percentage",
+      "url": "https://www.hackerrank.com/challenges/finding-the-percentage/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Basic Data Types",
+      "categorySlug": "py-basic-data-types"
+    },
+    {
+      "sourceId": 7888,
+      "title": "Lists",
+      "slug": "python-lists",
+      "url": "https://www.hackerrank.com/challenges/python-lists/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Basic Data Types",
+      "categorySlug": "py-basic-data-types"
+    },
+    {
+      "sourceId": 7889,
+      "title": "Tuples ",
+      "slug": "python-tuples",
+      "url": "https://www.hackerrank.com/challenges/python-tuples/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Basic Data Types",
+      "categorySlug": "py-basic-data-types"
+    },
+    {
+      "sourceId": 9870,
+      "title": "sWAP cASE",
+      "slug": "swap-case",
+      "url": "https://www.hackerrank.com/challenges/swap-case/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Strings",
+      "categorySlug": "py-strings"
+    },
+    {
+      "sourceId": 8057,
+      "title": "String Split and Join",
+      "slug": "python-string-split-and-join",
+      "url": "https://www.hackerrank.com/challenges/python-string-split-and-join/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Strings",
+      "categorySlug": "py-strings"
+    },
+    {
+      "sourceId": 1371,
+      "title": "What's Your Name?",
+      "slug": "whats-your-name",
+      "url": "https://www.hackerrank.com/challenges/whats-your-name/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Strings",
+      "categorySlug": "py-strings"
+    },
+    {
+      "sourceId": 7890,
+      "title": "Mutations",
+      "slug": "python-mutations",
+      "url": "https://www.hackerrank.com/challenges/python-mutations/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Strings",
+      "categorySlug": "py-strings"
+    },
+    {
+      "sourceId": 1373,
+      "title": "Find a string",
+      "slug": "find-a-string",
+      "url": "https://www.hackerrank.com/challenges/find-a-string/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Strings",
+      "categorySlug": "py-strings"
+    },
+    {
+      "sourceId": 11742,
+      "title": "String Validators",
+      "slug": "string-validators",
+      "url": "https://www.hackerrank.com/challenges/string-validators/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Strings",
+      "categorySlug": "py-strings"
+    },
+    {
+      "sourceId": 9953,
+      "title": "Text Alignment",
+      "slug": "text-alignment",
+      "url": "https://www.hackerrank.com/challenges/text-alignment/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Strings",
+      "categorySlug": "py-strings"
+    },
+    {
+      "sourceId": 11766,
+      "title": "Text Wrap",
+      "slug": "text-wrap",
+      "url": "https://www.hackerrank.com/challenges/text-wrap/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Strings",
+      "categorySlug": "py-strings"
+    },
+    {
+      "sourceId": 9629,
+      "title": "Designer Door Mat",
+      "slug": "designer-door-mat",
+      "url": "https://www.hackerrank.com/challenges/designer-door-mat/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Strings",
+      "categorySlug": "py-strings"
+    },
+    {
+      "sourceId": 8059,
+      "title": "String Formatting",
+      "slug": "python-string-formatting",
+      "url": "https://www.hackerrank.com/challenges/python-string-formatting/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Strings",
+      "categorySlug": "py-strings"
+    },
+    {
+      "sourceId": 14245,
+      "title": "Alphabet Rangoli",
+      "slug": "alphabet-rangoli",
+      "url": "https://www.hackerrank.com/challenges/alphabet-rangoli/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Strings",
+      "categorySlug": "py-strings"
+    },
+    {
+      "sourceId": 14254,
+      "title": "Capitalize!",
+      "slug": "capitalize",
+      "url": "https://www.hackerrank.com/challenges/capitalize/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Strings",
+      "categorySlug": "py-strings"
+    },
+    {
+      "sourceId": 9693,
+      "title": "The Minion Game",
+      "slug": "the-minion-game",
+      "url": "https://www.hackerrank.com/challenges/the-minion-game/problem",
+      "difficulty": "Medium",
+      "maxScore": 40,
+      "category": "Strings",
+      "categorySlug": "py-strings"
+    },
+    {
+      "sourceId": 8703,
+      "title": "Merge the Tools!",
+      "slug": "merge-the-tools",
+      "url": "https://www.hackerrank.com/challenges/merge-the-tools/problem",
+      "difficulty": "Medium",
+      "maxScore": 40,
+      "category": "Strings",
+      "categorySlug": "py-strings"
+    },
+    {
+      "sourceId": 11684,
+      "title": "itertools.product()",
+      "slug": "itertools-product",
+      "url": "https://www.hackerrank.com/challenges/itertools-product/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Itertools",
+      "categorySlug": "py-itertools"
+    },
+    {
+      "sourceId": 11694,
+      "title": "collections.Counter()",
+      "slug": "collections-counter",
+      "url": "https://www.hackerrank.com/challenges/collections-counter/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Collections",
+      "categorySlug": "py-collections"
+    },
+    {
+      "sourceId": 11685,
+      "title": "itertools.permutations()",
+      "slug": "itertools-permutations",
+      "url": "https://www.hackerrank.com/challenges/itertools-permutations/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Itertools",
+      "categorySlug": "py-itertools"
+    },
+    {
+      "sourceId": 9951,
+      "title": "Polar Coordinates",
+      "slug": "polar-coordinates",
+      "url": "https://www.hackerrank.com/challenges/polar-coordinates/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Math",
+      "categorySlug": "py-math"
+    },
+    {
+      "sourceId": 9375,
+      "title": "Introduction to Sets",
+      "slug": "py-introduction-to-sets",
+      "url": "https://www.hackerrank.com/challenges/py-introduction-to-sets/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Sets",
+      "categorySlug": "py-sets"
+    },
+    {
+      "sourceId": 8386,
+      "title": "DefaultDict Tutorial",
+      "slug": "defaultdict-tutorial",
+      "url": "https://www.hackerrank.com/challenges/defaultdict-tutorial/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Collections",
+      "categorySlug": "py-collections"
+    },
+    {
+      "sourceId": 9649,
+      "title": "Calendar Module",
+      "slug": "calendar-module",
+      "url": "https://www.hackerrank.com/challenges/calendar-module/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Date and Time",
+      "categorySlug": "py-date-time"
+    },
+    {
+      "sourceId": 11765,
+      "title": "Exceptions",
+      "slug": "exceptions",
+      "url": "https://www.hackerrank.com/challenges/exceptions/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Errors and Exceptions",
+      "categorySlug": "errors-exceptions"
+    },
+    {
+      "sourceId": 11955,
+      "title": "Collections.namedtuple()",
+      "slug": "py-collections-namedtuple",
+      "url": "https://www.hackerrank.com/challenges/py-collections-namedtuple/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Collections",
+      "categorySlug": "py-collections"
+    },
+    {
+      "sourceId": 8212,
+      "title": "Time Delta",
+      "slug": "python-time-delta",
+      "url": "https://www.hackerrank.com/challenges/python-time-delta/problem",
+      "difficulty": "Medium",
+      "maxScore": 30,
+      "category": "Date and Time",
+      "categorySlug": "py-date-time"
+    },
+    {
+      "sourceId": 9668,
+      "title": "Find Angle MBC",
+      "slug": "find-angle",
+      "url": "https://www.hackerrank.com/challenges/find-angle/problem",
+      "difficulty": "Medium",
+      "maxScore": 10,
+      "category": "Math",
+      "categorySlug": "py-math"
+    },
+    {
+      "sourceId": 8382,
+      "title": "No Idea!",
+      "slug": "no-idea",
+      "url": "https://www.hackerrank.com/challenges/no-idea/problem",
+      "difficulty": "Medium",
+      "maxScore": 50,
+      "category": "Sets",
+      "categorySlug": "py-sets"
+    },
+    {
+      "sourceId": 11975,
+      "title": "Collections.OrderedDict()",
+      "slug": "py-collections-ordereddict",
+      "url": "https://www.hackerrank.com/challenges/py-collections-ordereddict/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Collections",
+      "categorySlug": "py-collections"
+    },
+    {
+      "sourceId": 1603,
+      "title": "Symmetric Difference",
+      "slug": "symmetric-difference",
+      "url": "https://www.hackerrank.com/challenges/symmetric-difference/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Sets",
+      "categorySlug": "py-sets"
+    },
+    {
+      "sourceId": 11692,
+      "title": "itertools.combinations()",
+      "slug": "itertools-combinations",
+      "url": "https://www.hackerrank.com/challenges/itertools-combinations/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Itertools",
+      "categorySlug": "py-itertools"
+    },
+    {
+      "sourceId": 12191,
+      "title": "Incorrect Regex",
+      "slug": "incorrect-regex",
+      "url": "https://www.hackerrank.com/challenges/incorrect-regex/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Errors and Exceptions",
+      "categorySlug": "errors-exceptions"
+    },
+    {
+      "sourceId": 9406,
+      "title": "Set .add() ",
+      "slug": "py-set-add",
+      "url": "https://www.hackerrank.com/challenges/py-set-add/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Sets",
+      "categorySlug": "py-sets"
+    },
+    {
+      "sourceId": 11693,
+      "title": "itertools.combinations_with_replacement()",
+      "slug": "itertools-combinations-with-replacement",
+      "url": "https://www.hackerrank.com/challenges/itertools-combinations-with-replacement/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Itertools",
+      "categorySlug": "py-itertools"
+    },
+    {
+      "sourceId": 8385,
+      "title": "Word Order",
+      "slug": "word-order",
+      "url": "https://www.hackerrank.com/challenges/word-order/problem",
+      "difficulty": "Medium",
+      "maxScore": 50,
+      "category": "Collections",
+      "categorySlug": "py-collections"
+    },
+    {
+      "sourceId": 9415,
+      "title": "Set .discard(), .remove() & .pop()",
+      "slug": "py-set-discard-remove-pop",
+      "url": "https://www.hackerrank.com/challenges/py-set-discard-remove-pop/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Sets",
+      "categorySlug": "py-sets"
+    },
+    {
+      "sourceId": 11976,
+      "title": "Collections.deque()",
+      "slug": "py-collections-deque",
+      "url": "https://www.hackerrank.com/challenges/py-collections-deque/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Collections",
+      "categorySlug": "py-collections"
+    },
+    {
+      "sourceId": 8702,
+      "title": "Compress the String! ",
+      "slug": "compress-the-string",
+      "url": "https://www.hackerrank.com/challenges/compress-the-string/problem",
+      "difficulty": "Medium",
+      "maxScore": 20,
+      "category": "Itertools",
+      "categorySlug": "py-itertools"
+    },
+    {
+      "sourceId": 9698,
+      "title": "Company Logo",
+      "slug": "most-commons",
+      "url": "https://www.hackerrank.com/challenges/most-commons/problem",
+      "difficulty": "Medium",
+      "maxScore": 30,
+      "category": "Collections",
+      "categorySlug": "py-collections"
+    },
+    {
+      "sourceId": 9417,
+      "title": "Set .union() Operation",
+      "slug": "py-set-union",
+      "url": "https://www.hackerrank.com/challenges/py-set-union/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Sets",
+      "categorySlug": "py-sets"
+    },
+    {
+      "sourceId": 8380,
+      "title": "Piling Up!",
+      "slug": "piling-up",
+      "url": "https://www.hackerrank.com/challenges/piling-up/problem",
+      "difficulty": "Medium",
+      "maxScore": 50,
+      "category": "Collections",
+      "categorySlug": "py-collections"
+    },
+    {
+      "sourceId": 12523,
+      "title": "Triangle Quest 2",
+      "slug": "triangle-quest-2",
+      "url": "https://www.hackerrank.com/challenges/triangle-quest-2/problem",
+      "difficulty": "Medium",
+      "maxScore": 20,
+      "category": "Math",
+      "categorySlug": "py-math"
+    },
+    {
+      "sourceId": 8679,
+      "title": "Iterables and Iterators",
+      "slug": "iterables-and-iterators",
+      "url": "https://www.hackerrank.com/challenges/iterables-and-iterators/problem",
+      "difficulty": "Medium",
+      "maxScore": 40,
+      "category": "Itertools",
+      "categorySlug": "py-itertools"
+    },
+    {
+      "sourceId": 9419,
+      "title": "Set .intersection() Operation",
+      "slug": "py-set-intersection-operation",
+      "url": "https://www.hackerrank.com/challenges/py-set-intersection-operation/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Sets",
+      "categorySlug": "py-sets"
+    },
+    {
+      "sourceId": 7887,
+      "title": "Mod Divmod",
+      "slug": "python-mod-divmod",
+      "url": "https://www.hackerrank.com/challenges/python-mod-divmod/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Math",
+      "categorySlug": "py-math"
+    },
+    {
+      "sourceId": 7885,
+      "title": "Power - Mod Power",
+      "slug": "python-power-mod-power",
+      "url": "https://www.hackerrank.com/challenges/python-power-mod-power/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Math",
+      "categorySlug": "py-math"
+    },
+    {
+      "sourceId": 8696,
+      "title": "Maximize It!",
+      "slug": "maximize-it",
+      "url": "https://www.hackerrank.com/challenges/maximize-it/problem",
+      "difficulty": "Hard",
+      "maxScore": 50,
+      "category": "Itertools",
+      "categorySlug": "py-itertools"
+    },
+    {
+      "sourceId": 9420,
+      "title": "Set .difference() Operation",
+      "slug": "py-set-difference-operation",
+      "url": "https://www.hackerrank.com/challenges/py-set-difference-operation/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Sets",
+      "categorySlug": "py-sets"
+    },
+    {
+      "sourceId": 7882,
+      "title": "Integers Come In All Sizes",
+      "slug": "python-integers-come-in-all-sizes",
+      "url": "https://www.hackerrank.com/challenges/python-integers-come-in-all-sizes/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Math",
+      "categorySlug": "py-math"
+    },
+    {
+      "sourceId": 9421,
+      "title": "Set .symmetric_difference() Operation",
+      "slug": "py-set-symmetric-difference-operation",
+      "url": "https://www.hackerrank.com/challenges/py-set-symmetric-difference-operation/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Sets",
+      "categorySlug": "py-sets"
+    },
+    {
+      "sourceId": 9457,
+      "title": "Set Mutations",
+      "slug": "py-set-mutations",
+      "url": "https://www.hackerrank.com/challenges/py-set-mutations/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Sets",
+      "categorySlug": "py-sets"
+    },
+    {
+      "sourceId": 7944,
+      "title": "Triangle Quest",
+      "slug": "python-quest-1",
+      "url": "https://www.hackerrank.com/challenges/python-quest-1/problem",
+      "difficulty": "Medium",
+      "maxScore": 20,
+      "category": "Math",
+      "categorySlug": "py-math"
+    },
+    {
+      "sourceId": 9060,
+      "title": "The Captain's Room ",
+      "slug": "py-the-captains-room",
+      "url": "https://www.hackerrank.com/challenges/py-the-captains-room/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Sets",
+      "categorySlug": "py-sets"
+    },
+    {
+      "sourceId": 9022,
+      "title": "Check Subset",
+      "slug": "py-check-subset",
+      "url": "https://www.hackerrank.com/challenges/py-check-subset/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Sets",
+      "categorySlug": "py-sets"
+    },
+    {
+      "sourceId": 9456,
+      "title": "Check Strict Superset",
+      "slug": "py-check-strict-superset",
+      "url": "https://www.hackerrank.com/challenges/py-check-strict-superset/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Sets",
+      "categorySlug": "py-sets"
+    },
+    {
+      "sourceId": 1653,
+      "title": "Classes: Dealing with Complex Numbers",
+      "slug": "class-1-dealing-with-complex-numbers",
+      "url": "https://www.hackerrank.com/challenges/class-1-dealing-with-complex-numbers/problem",
+      "difficulty": "Medium",
+      "maxScore": 20,
+      "category": "Classes",
+      "categorySlug": "py-classes"
+    },
+    {
+      "sourceId": 1654,
+      "title": "Class 2 - Find the Torsional Angle",
+      "slug": "class-2-find-the-torsional-angle",
+      "url": "https://www.hackerrank.com/challenges/class-2-find-the-torsional-angle/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Classes",
+      "categorySlug": "py-classes"
+    },
+    {
+      "sourceId": 11741,
+      "title": "Zipped!",
+      "slug": "zipped",
+      "url": "https://www.hackerrank.com/challenges/zipped/problem",
+      "difficulty": "Easy",
+      "maxScore": 10,
+      "category": "Built-Ins",
+      "categorySlug": "py-built-ins"
+    },
+    {
+      "sourceId": 12190,
+      "title": "Input()",
+      "slug": "input",
+      "url": "https://www.hackerrank.com/challenges/input/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Built-Ins",
+      "categorySlug": "py-built-ins"
+    },
+    {
+      "sourceId": 8531,
+      "title": "Python Evaluation",
+      "slug": "python-eval",
+      "url": "https://www.hackerrank.com/challenges/python-eval/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Built-Ins",
+      "categorySlug": "py-built-ins"
+    },
+    {
+      "sourceId": 8203,
+      "title": "Athlete Sort",
+      "slug": "python-sort-sort",
+      "url": "https://www.hackerrank.com/challenges/python-sort-sort/problem",
+      "difficulty": "Medium",
+      "maxScore": 30,
+      "category": "Built-Ins",
+      "categorySlug": "py-built-ins"
+    },
+    {
+      "sourceId": 12189,
+      "title": "Any or All",
+      "slug": "any-or-all",
+      "url": "https://www.hackerrank.com/challenges/any-or-all/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Built-Ins",
+      "categorySlug": "py-built-ins"
+    },
+    {
+      "sourceId": 12499,
+      "title": "ginortS",
+      "slug": "ginorts",
+      "url": "https://www.hackerrank.com/challenges/ginorts/problem",
+      "difficulty": "Medium",
+      "maxScore": 40,
+      "category": "Built-Ins",
+      "categorySlug": "py-built-ins"
+    },
+    {
+      "sourceId": 12177,
+      "title": "Detect Floating Point Number",
+      "slug": "introduction-to-regex",
+      "url": "https://www.hackerrank.com/challenges/introduction-to-regex/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Regex and Parsing",
+      "categorySlug": "py-regex"
+    },
+    {
+      "sourceId": 1564,
+      "title": "Map and Lambda Function",
+      "slug": "map-and-lambda-expression",
+      "url": "https://www.hackerrank.com/challenges/map-and-lambda-expression/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Python Functionals",
+      "categorySlug": "py-functionals"
+    },
+    {
+      "sourceId": 12182,
+      "title": "Re.split()",
+      "slug": "re-split",
+      "url": "https://www.hackerrank.com/challenges/re-split/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Regex and Parsing",
+      "categorySlug": "py-regex"
+    },
+    {
+      "sourceId": 1565,
+      "title": "Validating Email Addresses With a Filter ",
+      "slug": "validate-list-of-email-address-with-filter",
+      "url": "https://www.hackerrank.com/challenges/validate-list-of-email-address-with-filter/problem",
+      "difficulty": "Medium",
+      "maxScore": 20,
+      "category": "Python Functionals",
+      "categorySlug": "py-functionals"
+    },
+    {
+      "sourceId": 12183,
+      "title": "Group(), Groups() & Groupdict()",
+      "slug": "re-group-groups",
+      "url": "https://www.hackerrank.com/challenges/re-group-groups/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Regex and Parsing",
+      "categorySlug": "py-regex"
+    },
+    {
+      "sourceId": 29250,
+      "title": "Reduce Function",
+      "slug": "reduce-function",
+      "url": "https://www.hackerrank.com/challenges/reduce-function/problem",
+      "difficulty": "Medium",
+      "maxScore": 30,
+      "category": "Python Functionals",
+      "categorySlug": "py-functionals"
+    },
+    {
+      "sourceId": 12184,
+      "title": "Re.findall() & Re.finditer()",
+      "slug": "re-findall-re-finditer",
+      "url": "https://www.hackerrank.com/challenges/re-findall-re-finditer/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Regex and Parsing",
+      "categorySlug": "py-regex"
+    },
+    {
+      "sourceId": 12185,
+      "title": "Re.start() & Re.end()",
+      "slug": "re-start-re-end",
+      "url": "https://www.hackerrank.com/challenges/re-start-re-end/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Regex and Parsing",
+      "categorySlug": "py-regex"
+    },
+    {
+      "sourceId": 11637,
+      "title": "Regex Substitution",
+      "slug": "re-sub-regex-substitution",
+      "url": "https://www.hackerrank.com/challenges/re-sub-regex-substitution/problem",
+      "difficulty": "Medium",
+      "maxScore": 20,
+      "category": "Regex and Parsing",
+      "categorySlug": "py-regex"
+    },
+    {
+      "sourceId": 1604,
+      "title": "Validating Roman Numerals",
+      "slug": "validate-a-roman-number",
+      "url": "https://www.hackerrank.com/challenges/validate-a-roman-number/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Regex and Parsing",
+      "categorySlug": "py-regex"
+    },
+    {
+      "sourceId": 1558,
+      "title": "Validating phone numbers",
+      "slug": "validating-the-phone-number",
+      "url": "https://www.hackerrank.com/challenges/validating-the-phone-number/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Regex and Parsing",
+      "categorySlug": "py-regex"
+    },
+    {
+      "sourceId": 12109,
+      "title": "Validating and Parsing Email Addresses",
+      "slug": "validating-named-email-addresses",
+      "url": "https://www.hackerrank.com/challenges/validating-named-email-addresses/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Regex and Parsing",
+      "categorySlug": "py-regex"
+    },
+    {
+      "sourceId": 9714,
+      "title": "Hex Color Code",
+      "slug": "hex-color-code",
+      "url": "https://www.hackerrank.com/challenges/hex-color-code/problem",
+      "difficulty": "Easy",
+      "maxScore": 30,
+      "category": "Regex and Parsing",
+      "categorySlug": "py-regex"
+    },
+    {
+      "sourceId": 11657,
+      "title": "HTML Parser - Part 1",
+      "slug": "html-parser-part-1",
+      "url": "https://www.hackerrank.com/challenges/html-parser-part-1/problem",
+      "difficulty": "Easy",
+      "maxScore": 30,
+      "category": "Regex and Parsing",
+      "categorySlug": "py-regex"
+    },
+    {
+      "sourceId": 11665,
+      "title": "HTML Parser - Part 2",
+      "slug": "html-parser-part-2",
+      "url": "https://www.hackerrank.com/challenges/html-parser-part-2/problem",
+      "difficulty": "Easy",
+      "maxScore": 30,
+      "category": "Regex and Parsing",
+      "categorySlug": "py-regex"
+    },
+    {
+      "sourceId": 9719,
+      "title": "Detect HTML Tags, Attributes and Attribute Values",
+      "slug": "detect-html-tags-attributes-and-attribute-values",
+      "url": "https://www.hackerrank.com/challenges/detect-html-tags-attributes-and-attribute-values/problem",
+      "difficulty": "Easy",
+      "maxScore": 30,
+      "category": "Regex and Parsing",
+      "categorySlug": "py-regex"
+    },
+    {
+      "sourceId": 1605,
+      "title": "XML 1 - Find the Score",
+      "slug": "xml-1-find-the-score",
+      "url": "https://www.hackerrank.com/challenges/xml-1-find-the-score/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "XML",
+      "categorySlug": "xml"
+    },
+    {
+      "sourceId": 12187,
+      "title": "Validating UID ",
+      "slug": "validating-uid",
+      "url": "https://www.hackerrank.com/challenges/validating-uid/problem",
+      "difficulty": "Easy",
+      "maxScore": 40,
+      "category": "Regex and Parsing",
+      "categorySlug": "py-regex"
+    },
+    {
+      "sourceId": 12186,
+      "title": "Validating Credit Card Numbers",
+      "slug": "validating-credit-card-number",
+      "url": "https://www.hackerrank.com/challenges/validating-credit-card-number/problem",
+      "difficulty": "Medium",
+      "maxScore": 40,
+      "category": "Regex and Parsing",
+      "categorySlug": "py-regex"
+    },
+    {
+      "sourceId": 1652,
+      "title": "XML2 - Find the Maximum Depth",
+      "slug": "xml2-find-the-maximum-depth",
+      "url": "https://www.hackerrank.com/challenges/xml2-find-the-maximum-depth/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "XML",
+      "categorySlug": "xml"
+    },
+    {
+      "sourceId": 1620,
+      "title": "Standardize Mobile Number Using Decorators",
+      "slug": "standardize-mobile-number-using-decorators",
+      "url": "https://www.hackerrank.com/challenges/standardize-mobile-number-using-decorators/problem",
+      "difficulty": "Easy",
+      "maxScore": 30,
+      "category": "Closures and Decorators",
+      "categorySlug": "closures-and-decorators"
+    },
+    {
+      "sourceId": 12538,
+      "title": "Validating Postal Codes",
+      "slug": "validating-postalcode",
+      "url": "https://www.hackerrank.com/challenges/validating-postalcode/problem",
+      "difficulty": "Hard",
+      "maxScore": 80,
+      "category": "Regex and Parsing",
+      "categorySlug": "py-regex"
+    },
+    {
+      "sourceId": 1621,
+      "title": "Decorators 2 - Name Directory",
+      "slug": "decorators-2-name-directory",
+      "url": "https://www.hackerrank.com/challenges/decorators-2-name-directory/problem",
+      "difficulty": "Easy",
+      "maxScore": 30,
+      "category": "Closures and Decorators",
+      "categorySlug": "closures-and-decorators"
+    },
+    {
+      "sourceId": 12524,
+      "title": "Matrix Script",
+      "slug": "matrix-script",
+      "url": "https://www.hackerrank.com/challenges/matrix-script/problem",
+      "difficulty": "Hard",
+      "maxScore": 100,
+      "category": "Regex and Parsing",
+      "categorySlug": "py-regex"
+    },
+    {
+      "sourceId": 66426,
+      "title": "Words Score",
+      "slug": "words-score",
+      "url": "https://www.hackerrank.com/challenges/words-score/problem",
+      "difficulty": "Medium",
+      "maxScore": 10,
+      "category": "Debugging",
+      "categorySlug": "py-debugging"
+    },
+    {
+      "sourceId": 5176,
+      "title": "Arrays",
+      "slug": "np-arrays",
+      "url": "https://www.hackerrank.com/challenges/np-arrays/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Numpy",
+      "categorySlug": "numpy"
+    },
+    {
+      "sourceId": 8094,
+      "title": "Shape and Reshape",
+      "slug": "np-shape-reshape",
+      "url": "https://www.hackerrank.com/challenges/np-shape-reshape/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Numpy",
+      "categorySlug": "numpy"
+    },
+    {
+      "sourceId": 66403,
+      "title": "Default Arguments",
+      "slug": "default-arguments",
+      "url": "https://www.hackerrank.com/challenges/default-arguments/problem",
+      "difficulty": "Medium",
+      "maxScore": 30,
+      "category": "Debugging",
+      "categorySlug": "py-debugging"
+    },
+    {
+      "sourceId": 13496,
+      "title": "Transpose and Flatten",
+      "slug": "np-transpose-and-flatten",
+      "url": "https://www.hackerrank.com/challenges/np-transpose-and-flatten/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Numpy",
+      "categorySlug": "numpy"
+    },
+    {
+      "sourceId": 13497,
+      "title": "Concatenate",
+      "slug": "np-concatenate",
+      "url": "https://www.hackerrank.com/challenges/np-concatenate/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Numpy",
+      "categorySlug": "numpy"
+    },
+    {
+      "sourceId": 13498,
+      "title": "Zeros and Ones",
+      "slug": "np-zeros-and-ones",
+      "url": "https://www.hackerrank.com/challenges/np-zeros-and-ones/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Numpy",
+      "categorySlug": "numpy"
+    },
+    {
+      "sourceId": 13499,
+      "title": "Eye and Identity",
+      "slug": "np-eye-and-identity",
+      "url": "https://www.hackerrank.com/challenges/np-eye-and-identity/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Numpy",
+      "categorySlug": "numpy"
+    },
+    {
+      "sourceId": 13500,
+      "title": "Array Mathematics",
+      "slug": "np-array-mathematics",
+      "url": "https://www.hackerrank.com/challenges/np-array-mathematics/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Numpy",
+      "categorySlug": "numpy"
+    },
+    {
+      "sourceId": 13501,
+      "title": "Floor, Ceil and Rint",
+      "slug": "floor-ceil-and-rint",
+      "url": "https://www.hackerrank.com/challenges/floor-ceil-and-rint/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Numpy",
+      "categorySlug": "numpy"
+    },
+    {
+      "sourceId": 13502,
+      "title": "Sum and Prod",
+      "slug": "np-sum-and-prod",
+      "url": "https://www.hackerrank.com/challenges/np-sum-and-prod/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Numpy",
+      "categorySlug": "numpy"
+    },
+    {
+      "sourceId": 13503,
+      "title": "Min and Max",
+      "slug": "np-min-and-max",
+      "url": "https://www.hackerrank.com/challenges/np-min-and-max/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Numpy",
+      "categorySlug": "numpy"
+    },
+    {
+      "sourceId": 13504,
+      "title": "Mean, Var, and Std",
+      "slug": "np-mean-var-and-std",
+      "url": "https://www.hackerrank.com/challenges/np-mean-var-and-std/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Numpy",
+      "categorySlug": "numpy"
+    },
+    {
+      "sourceId": 13505,
+      "title": "Dot and Cross",
+      "slug": "np-dot-and-cross",
+      "url": "https://www.hackerrank.com/challenges/np-dot-and-cross/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Numpy",
+      "categorySlug": "numpy"
+    },
+    {
+      "sourceId": 13506,
+      "title": "Inner and Outer",
+      "slug": "np-inner-and-outer",
+      "url": "https://www.hackerrank.com/challenges/np-inner-and-outer/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Numpy",
+      "categorySlug": "numpy"
+    },
+    {
+      "sourceId": 13507,
+      "title": "Polynomials",
+      "slug": "np-polynomials",
+      "url": "https://www.hackerrank.com/challenges/np-polynomials/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Numpy",
+      "categorySlug": "numpy"
+    },
+    {
+      "sourceId": 13508,
+      "title": "Linear Algebra",
+      "slug": "np-linear-algebra",
+      "url": "https://www.hackerrank.com/challenges/np-linear-algebra/problem",
+      "difficulty": "Easy",
+      "maxScore": 20,
+      "category": "Numpy",
+      "categorySlug": "numpy"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState,useImperativeHandle, type ReactNode, type Ref, type CSSProperties, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState,useImperativeHandle, type ReactNode, type Ref, type CSSProperties, type KeyboardEvent } from "react";
 import type { SubmissionLanguage } from "@/lib/production-api";
 import { useLocale } from "@/components/locale-context";
 import { languageInfo } from "./languages";
@@ -9,6 +9,7 @@ import {editKey,matchingBrackets,editorCommand,moveEditorLines,type EditSnapshot
 export interface CodeEditorHandle {replaceCode:(code:string)=>void;focus:()=>void}
 import {editorTheme} from "./editor-themes";
 import {editorActionFor} from "./editor-keymap";
+import {createVimState,vimKey,type VimState} from "./editor-vim";
 import styles from "./code-editor.module.css";
 
 const keywords: Record<SubmissionLanguage, Set<string>> = {
@@ -38,18 +39,58 @@ const fontFamily: Record<WorkspaceSettings["fontFamily"], string> = {
   courier: '"Courier New", Courier, monospace',
 };
 
-export function CodeEditor({ code, onChange, language, settings, status,idPrefix="production",inputLabel,readOnly=false,editorRef,onFormat,actions }: { code: string; onChange: (code: string) => void; language: SubmissionLanguage; settings: WorkspaceSettings; status?: string;idPrefix?:string;inputLabel?:string;readOnly?:boolean;editorRef?:Ref<CodeEditorHandle>;onFormat?:()=>void;actions?:ReactNode }) {
+export function CodeEditor({ code, onChange, language, settings, status,idPrefix="production",inputLabel,readOnly=false,editorRef,onFormat,onEnableVim,actions }: { code: string; onChange: (code: string) => void; language: SubmissionLanguage; settings: WorkspaceSettings; status?: string;idPrefix?:string;inputLabel?:string;readOnly?:boolean;editorRef?:Ref<CodeEditorHandle>;onFormat?:()=>void;onEnableVim?:()=>void;actions?:ReactNode }) {
   const {locale}=useLocale();const tx=(zh:string,en:string)=>locale==='en'?en:zh;
   const highlight=useRef<HTMLPreElement>(null),numbers=useRef<HTMLDivElement>(null),fieldRef=useRef<HTMLTextAreaElement>(null),textSurface=useRef<HTMLDivElement>(null),mirror=useRef<HTMLDivElement>(null);
-  const [cursor,setCursor]=useState({start:0,end:0,line:1,column:1}),[focused,setFocused]=useState(false),[scroll,setScroll]=useState({top:0,left:0}),[lineHeights,setLineHeights]=useState<number[]>([]),[viewportHeight,setViewportHeight]=useState(900);
+  const [cursor,setCursor]=useState({start:0,end:0,line:1,column:1}),[focused,setFocused]=useState(false),[scroll,setScroll]=useState({top:0,left:0}),[lineHeights,setLineHeights]=useState<number[]>([]),[viewport,setViewport]=useState({height:900,width:0});
+  const [escapeVim,setEscapeVim]=useState(false),[caretPosition,setCaretPosition]=useState({left:10,top:14,width:8,height:24,character:''});
+  const caretMirror=useRef<HTMLDivElement>(null);
+  const vimEnabled=settings.keyBinding==='vim'||escapeVim,viewportHeight=viewport.height;
   const historyLanguage=useRef(language);
+  const vimRef=useRef(createVimState()),[vim,setVim]=useState(createVimState);
+  const insertGroup=useRef<{checkpoint:EditSnapshot;recorded:boolean}|null>(null);
+  const pendingSelection=useRef<EditSnapshot|null>(null);
+  function updateVim(next:VimState){vimRef.current=next;setVim(next);}
+  useEffect(()=>{setEscapeVim(false);updateVim(createVimState());insertGroup.current=null;},[settings.keyBinding,language]);
   const history=useRef<{current:EditSnapshot;past:EditSnapshot[];future:EditSnapshot[]}>({current:{value:code,start:0,end:0},past:[],future:[]});
   const lines=code.split("\n"),editorStyle={tabSize:settings.tabSize,fontSize:settings.fontSize,fontFamily:fontFamily[settings.fontFamily],fontVariantLigatures:settings.ligatures?"common-ligatures":"none",lineHeight:"24px"} as const;
   useEffect(() => {
-    if(historyLanguage.current!==language||history.current.current.value!==code){history.current={current:{value:code,start:0,end:0},past:[],future:[]};setCursor({start:0,end:0,line:1,column:1});}
+    if(historyLanguage.current!==language||history.current.current.value!==code){history.current={current:{value:code,start:0,end:0},past:[],future:[]};setCursor({start:0,end:0,line:1,column:1});updateVim(createVimState());insertGroup.current=null;}
     historyLanguage.current=language;
   },[code,language]);
-  useEffect(()=>{const surface=textSurface.current;if(!surface)return;const measure=()=>setViewportHeight(surface.clientHeight);measure();const observer=new ResizeObserver(measure);observer.observe(surface);return()=>observer.disconnect();},[]);
+  // Restore a controlled edit's caret before the next key can observe the DOM.
+  // A deferred animation frame can otherwise lose to a rapid Vim command.
+  useLayoutEffect(()=>{const next=pendingSelection.current;if(next&&fieldRef.current?.value===next.value){pendingSelection.current=null;move(next);}});
+  useEffect(()=>{const surface=textSurface.current;if(!surface)return;const measure=()=>setViewport(current=>current.height===surface.clientHeight&&current.width===surface.clientWidth?current:{height:surface.clientHeight,width:surface.clientWidth});measure();const observer=new ResizeObserver(measure);observer.observe(surface);return()=>observer.disconnect();},[]);
+  const caretOffset=useCallback((at:number)=>{
+    const mirror=caretMirror.current,field=fieldRef.current,node=mirror?.firstChild;
+    if(!mirror||!field||!node)return null;
+    // A normal-mode caret belongs ON the current character, not at the insertion
+    // boundary before it. A non-collapsed range also resolves wrapped boundaries.
+    const usableWidth=field.clientWidth;mirror.style.width=`${usableWidth}px`;
+    at=Math.max(0,Math.min(at,code.length));
+    const character=String.fromCodePoint(code.codePointAt(at)??32),block=vimRef.current.mode!=='insert';
+    const blank=character==='\n'||character==='\t'||at===code.length;
+    const range=document.createRange();range.setStart(node,at);
+    if(block&&!blank)range.setEnd(node,at+character.length);else range.collapse(true);
+    const rect=range.getClientRects()[0]??range.getBoundingClientRect(),base=mirror.getBoundingClientRect();
+    // Client rects include CSS zoom/transforms; overlay coordinates are local CSS
+    // pixels. Keep measurement and painting in the same coordinate system.
+    const scale=usableWidth>0?base.width/usableWidth||1:1;
+    const cell=document.createRange();cell.setStart(node,code.length);cell.setEnd(node,code.length+1);
+    const cellWidth=cell.getBoundingClientRect().width/scale||settings.fontSize*.6;
+    const height=block?24:settings.fontSize+4;
+    return {left:(rect.left-base.left)/scale,top:(rect.top-base.top)/scale+(rect.height/scale-height)/2,width:block?blank?cellWidth:Math.max(1,rect.width/scale):3,height,character:block&&!blank?character:''};
+  },[code,settings.fontSize]);
+  useLayoutEffect(()=>{
+    const field=fieldRef.current;
+    if(!vimEnabled||!focused||readOnly||!field)return;
+    // Use the browser's text layout, including tabs, CJK, wrapping and ligatures.
+    const at=vim.mode.startsWith('visual')?vim.head:cursor.start;
+    const position=caretOffset(at);if(!position)return;
+    const next={...position,left:position.left-field.scrollLeft,top:position.top-field.scrollTop};
+    setCaretPosition(current=>current.left===next.left&&current.top===next.top&&current.width===next.width&&current.height===next.height&&current.character===next.character?current:next);
+  },[vimEnabled,focused,readOnly,vim.mode,vim.head,cursor.start,code,scroll.left,scroll.top,settings.fontSize,settings.fontFamily,settings.ligatures,settings.tabSize,settings.wordWrap,viewport.width,viewport.height,caretOffset]);
   useEffect(() => {
     if(!settings.wordWrap||!textSurface.current||!mirror.current)return;
     const measure=()=>{const heights=Array.from(mirror.current?.children??[],element=>Math.max(24,element.getBoundingClientRect().height));setLineHeights(previous=>previous.length===heights.length&&previous.every((v,i)=>v===heights[i])?previous:heights);};
@@ -62,13 +103,28 @@ export function CodeEditor({ code, onChange, language, settings, status,idPrefix
     setCursor({start:field.selectionStart,end:field.selectionEnd,line:parts.length,column:parts.at(-1)!.length+1});
     history.current.current={value:field.value,start:field.selectionStart,end:field.selectionEnd};
   }
-  function move(next:EditSnapshot){requestAnimationFrame(()=>{const field=fieldRef.current;if(!field)return;field.setSelectionRange(next.start,next.end);selection(field);});}
+  function move(next:EditSnapshot){const position=()=>{const field=fieldRef.current;if(!field||field.value!==next.value)return;field.setSelectionRange(next.start,next.end);selection(field);
+    if(vimEnabled){
+      const at=vimRef.current.mode.startsWith('visual')?vimRef.current.head:next.start;
+      const exact=caretOffset(at);
+      if(exact){
+        if(exact.top<field.scrollTop)field.scrollTop=Math.max(0,Math.floor(exact.top-2));else if(exact.top+exact.height>field.scrollTop+field.clientHeight)field.scrollTop=Math.ceil(exact.top+exact.height+2-field.clientHeight);
+        if(!settings.wordWrap){if(exact.left<field.scrollLeft)field.scrollLeft=Math.max(0,Math.floor(exact.left-2));else if(exact.left+exact.width>field.scrollLeft+field.clientWidth-14)field.scrollLeft=Math.ceil(exact.left+exact.width+14-field.clientWidth);}
+        return;
+      }
+      const parts=next.value.slice(0,at).split('\n'),line=parts.length-1;
+      const top=14+(settings.wordWrap?lineHeights.slice(0,line).reduce((sum,n)=>sum+n,0):line*24);
+      if(top<field.scrollTop)field.scrollTop=top;else if(top+24>field.scrollTop+field.clientHeight)field.scrollTop=top+24-field.clientHeight;
+      if(!settings.wordWrap){const column=(parts.at(-1)??'').replace(/\t/g,' '.repeat(settings.tabSize)).length,left=10+column*settings.fontSize*.61;if(left<field.scrollLeft)field.scrollLeft=left;else if(left+16>field.scrollLeft+field.clientWidth)field.scrollLeft=left+16-field.clientWidth;}
+    }
+  };if(fieldRef.current?.value===next.value){pendingSelection.current=null;position();}else pendingSelection.current=next;}
   function apply(next:EditSnapshot,moveCursor=true){
     const current=history.current.current;
-    if(next.value!==current.value){history.current.past.push({...current});if(history.current.past.length>100)history.current.past.shift();history.current.future=[];}
-    history.current.current={...next};onChange(next.value);if(moveCursor)move(next);
+    if(next.value!==current.value){const group=insertGroup.current;if(!group||!group.recorded){history.current.past.push({...group?.checkpoint??current});if(history.current.past.length>100)history.current.past.shift();if(group)group.recorded=true;}history.current.future=[];}
+    history.current.current={...next};if(next.value!==current.value)onChange(next.value);if(moveCursor)move(next);
   }
   function undo(redo=false){
+    insertGroup.current=null;
     const source=redo?history.current.future:history.current.past,target=redo?history.current.past:history.current.future,next=source.pop();
     if(!next)return;target.push({...history.current.current});history.current.current={...next};onChange(next.value);move(next);
   }
@@ -77,6 +133,19 @@ export function CodeEditor({ code, onChange, language, settings, status,idPrefix
     if(readOnly)return;
     const field=event.currentTarget;selection(field);
     if(event.nativeEvent.isComposing||event.key==='Process'||event.keyCode===229)return;
+    const enableVim=event.key==='Escape'&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&!vimEnabled;
+    if(enableVim){setEscapeVim(true);onEnableVim?.();}
+    if(vimEnabled||enableVim){
+      const previous=enableVim?{...createVimState(),mode:'insert' as const}:vimRef.current,next=vimKey({value:field.value,start:field.selectionStart,end:field.selectionEnd},previous,event,settings.autoIndent);
+      if(next){event.preventDefault();event.stopPropagation();
+        if(previous.mode!=='insert'&&next.state.mode==='insert')insertGroup.current={checkpoint:{...history.current.current},recorded:false};
+        if(next.state.mode!=='insert')insertGroup.current=null;
+        updateVim(next.state);
+        if(next.history)undo(next.history==='redo');else apply(next.snapshot);
+        return;
+      }
+      if(previous.mode==='insert'&&!insertGroup.current)insertGroup.current={checkpoint:{...history.current.current},recorded:false};
+    }
     const action=editorActionFor(event,settings.editorKeymap);
     if(action){event.preventDefault();
       const snapshot={value:field.value,start:field.selectionStart,end:field.selectionEnd};
@@ -89,6 +158,9 @@ export function CodeEditor({ code, onChange, language, settings, status,idPrefix
     if(settings.keyBinding==='emacs'&&event.ctrlKey&&!event.metaKey&&['a','e'].includes(event.key.toLowerCase())){
       event.preventDefault();const at=event.key.toLowerCase()==='a'?code.slice(0,field.selectionStart).lastIndexOf("\n")+1:(()=>{const end=code.indexOf("\n",field.selectionStart);return end<0?code.length:end;})();field.setSelectionRange(at,at);selection(field);return;
     }
+    // Unhandled normal-mode keys (including Tab / IME setup) must never fall
+    // through to the insert-mode indentation and bracket helpers.
+    if(vimEnabled&&vimRef.current.mode!=='insert')return;
     if(event.ctrlKey||event.metaKey||event.altKey)return;
     const next=editKey({value:field.value,start:field.selectionStart,end:field.selectionEnd},event.key,{language,tabSize:settings.tabSize,autoIndent:settings.autoIndent,autoClose:settings.autoClose,shift:event.shiftKey});
     if(next){event.preventDefault();apply(next);}
@@ -105,14 +177,15 @@ export function CodeEditor({ code, onChange, language, settings, status,idPrefix
         <div aria-hidden className={styles.guides}>{visibleGuides.map(row=><div key={row.i} className={styles.guideRow} style={{top:row.top}}>{Array.from({length:row.depth},(_,i)=><span key={i} className={styles.guide} style={{left:`calc(${i*settings.tabSize}ch - ${scroll.left}px)`}}/>)}</div>)}</div>
         <pre ref={highlight} aria-hidden className={`${styles.highlight} ${settings.wordWrap?styles.hiddenHighlight:''}`} style={editorStyle}><CodeTokens code={code+"\n"} language={language} matches={matches}/></pre>
         {settings.wordWrap&&<div ref={mirror} aria-hidden className={styles.mirror} style={editorStyle}>{lines.map((line,index)=><div key={index}>{line||"\u200b"}</div>)}</div>}
-        <textarea readOnly={readOnly} ref={fieldRef} aria-label={inputLabel??`${languageInfo[language].name} ${tx('代码编辑器','code editor')}`} data-od-id={`${idPrefix}-code-input`} value={code}
+        {vimEnabled&&focused&&!readOnly&&<><div ref={caretMirror} aria-hidden className={`${styles.caretMirror} ${settings.wordWrap?styles.wrap:''}`} style={editorStyle}>{code+' '}</div>{(cursor.start===cursor.end||vim.mode.startsWith('visual'))&&<div className={styles.caretLayer} aria-hidden><span className={`${styles.vimCaret} ${vim.mode!=='insert'?styles.vimBlock:''}`} data-od-id={`${idPrefix}-vim-caret`} data-caret-shape={vim.mode==='insert'?'bar':'block'} style={{left:caretPosition.left,top:caretPosition.top,width:caretPosition.width,height:caretPosition.height}}>{caretPosition.character}</span></div>}</>}
+        <textarea readOnly={readOnly||(vimEnabled&&vim.mode!=='insert')} ref={fieldRef} aria-label={inputLabel??`${languageInfo[language].name} ${tx('代码编辑器','code editor')}`} aria-describedby={vimEnabled?`${idPrefix}-vim-status`:undefined} data-vim-mode={vimEnabled?vim.mode:undefined} data-od-id={`${idPrefix}-code-input`} value={code}
           onChange={event=>{const field=event.target;apply({value:field.value,start:field.selectionStart,end:field.selectionEnd},false);selection(field);}}
-          onFocus={event=>{setFocused(true);selection(event.currentTarget);}} onBlur={()=>setFocused(false)} onSelect={event=>selection(event.currentTarget)} onKeyDown={onKeyDown} onKeyUp={event=>selection(event.currentTarget)} onClick={event=>selection(event.currentTarget)}
+          onFocus={event=>{setFocused(true);selection(event.currentTarget);}} onBlur={()=>setFocused(false)} onSelect={event=>selection(event.currentTarget)} onKeyDown={onKeyDown} onKeyUp={event=>selection(event.currentTarget)} onClick={event=>{if(vimEnabled&&vimRef.current.mode!=='insert'){updateVim({...createVimState(),register:vimRef.current.register,linewise:vimRef.current.linewise});}selection(event.currentTarget);}}
           onCompositionEnd={event=>selection(event.currentTarget)}
           onScroll={event=>{const field=event.currentTarget;setScroll({top:field.scrollTop,left:field.scrollLeft});if(highlight.current){highlight.current.scrollTop=field.scrollTop;highlight.current.scrollLeft=field.scrollLeft;}if(numbers.current)numbers.current.scrollTop=field.scrollTop;}}
-          spellCheck={false} autoCapitalize="none" autoComplete="off" wrap={settings.wordWrap?"soft":"off"} className={`${styles.input} ${settings.wordWrap?styles.wrappedInput+' '+styles.wrap:''}`} style={editorStyle}/>
+          spellCheck={false} autoCapitalize="none" autoComplete="off" wrap={settings.wordWrap?"soft":"off"} className={`${styles.input} ${vimEnabled?styles.vimInput:''} ${settings.wordWrap?styles.wrappedInput+' '+styles.wrap:''}`} style={editorStyle}/>
       </div>
     </div>
-    <div className={styles.status}><span className="flex flex-wrap items-center gap-3"><span aria-live="off">{locale==='en'?`Line ${cursor.line}, column ${cursor.column}`:`行 ${cursor.line}，列 ${cursor.column}`}</span><span>{status??tx('草稿保存在当前浏览器会话','Draft saved in this browser session')}</span></span>{actions&&<div className="flex shrink-0 items-center gap-2" data-od-id="editor-run-actions">{actions}</div>}</div>
+    <div className={styles.status}><span className="flex flex-wrap items-center gap-3">{vimEnabled&&<span id={`${idPrefix}-vim-status`} role="status" className="font-mono font-semibold">VIM · {vim.query!==null?`/${vim.query}`:({normal:tx('普通','NORMAL'),insert:tx('插入','INSERT'),visual:tx('可视','VISUAL'),'visual-line':tx('可视行','VISUAL LINE')}[vim.mode])}{vim.query===null&&` ${vim.operator}${vim.count}${vim.pending}`}</span>}<span aria-live="off">{locale==='en'?`Line ${cursor.line}, column ${cursor.column}`:`行 ${cursor.line}，列 ${cursor.column}`}</span><span>{status??tx('草稿保存在当前浏览器会话','Draft saved in this browser session')}</span></span>{actions&&<div className="flex shrink-0 items-center gap-2" data-od-id="editor-run-actions">{actions}</div>}</div>
   </div>;
 }

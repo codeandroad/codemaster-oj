@@ -10,3 +10,5 @@
 .production-style-backups
 backups
 **/*.log
+content/hackerrank-python/problems.json
+content/hackerrank-python/build-problems.py

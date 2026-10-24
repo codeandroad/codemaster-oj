@@ -173,6 +173,13 @@ test('startup refuses a missing config, weak cgroups or a root/shared-network ru
   await assert.rejects(root.judge.ready(), InfrastructureError);
   const network = executor([versionResponse, config, [accepted(JSON.stringify({ python: [3, 12, 1], uid: 10000, interfaces: ['lo', 'eth0'], reachable: false }))]]);
   await assert.rejects(network.judge.ready(), InfrastructureError);
+  for (const numpyResult of [accepted('2.2.5'), accepted('', { status: 'Nonzero Exit Status', exitStatus: 1 })]) {
+    const mismatch = executor([versionResponse, config,
+      [accepted(JSON.stringify({ python: [3, 12, 1], uid: 10000, interfaces: ['lo'], reachable: false }))], [numpyResult]]);
+    mismatch.judge.environmentVersion = 'runtime-numpy2.2.6';
+    await assert.rejects(mismatch.judge.ready(), /NumPy 2\.2\.6 runtime is unavailable/);
+    assert.equal(mismatch.calls.length, 4, 'Do not proceed to accept work when the declared library is unavailable');
+  }
   const safe = executor([versionResponse, config, [accepted(JSON.stringify({ python: [3, 12, 1], uid: 10000, interfaces: ['lo'], reachable: false }))],
     [accepted('', { fileIds: { main: 'cachedbinary123' } })], [accepted('19.1.7 14 202302')],
     [accepted(JSON.stringify({ node: '22.16.0', uid: 10000, interfaces: ['lo'] }))]]);
@@ -241,4 +248,18 @@ test('the executor transport timeout covers C++ compile allowance without length
   await judge.execute(judge.command({ language: 'cpp', code: 'int main(){}', version }));
   assert.equal(timeout, 35000);
   assert.equal(judge.requestTimeoutMs, 15000);
+});
+
+test('Python keeps isolated mode and adds only the fixed scientific vendor path', () => {
+  const judge = new GoJudge({ url: 'http://private-executor', token: 'secret', environmentVersion: 'image' });
+  const stdio = judge.command({ code: 'print(1)', version });
+  assert.deepEqual(stdio.args.slice(1, 4), ['-I', '-S', '-c']);
+  assert.match(stdio.args[4], /sys\.path\.append\('\/usr\/local\/lib\/campus-python'\)/);
+  assert.match(stdio.args[4], /runpy\.run_path\('\/w\/main\.py', run_name='__main__'\)/);
+  assert.ok(stdio.env.includes('OPENBLAS_NUM_THREADS=1'));
+  assert.ok(!stdio.env.some(value => value.startsWith('PYTHONPATH=')));
+  const wrapped = judge.command({ code: 'def solve(x): return x', script: 'print(42)', functionName: 'solve', version });
+  assert.equal(wrapped.args[5], 'solve');
+  assert.match(wrapped.args[4], /print\(42\)$/);
+  assert.equal(stdio.procLimit, 8);
 });

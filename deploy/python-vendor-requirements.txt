@@ -1,0 +1,4 @@
+# CPython 3.12 Linux wheels, x86_64 and aarch64; no source builds or dependencies.
+numpy==2.2.6 \
+    --hash=sha256:fd83c01228a688733f1ded5201c678f0c53ecc1006ffbc404db9f7a899ac6249 \
+    --hash=sha256:f2618db89be1b4e05f7a1a847a9c1c0abd63e63a1607d892dd54668dd92faf87

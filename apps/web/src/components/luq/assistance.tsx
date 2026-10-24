@@ -6,6 +6,7 @@ import { useLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/teacher/shared";
 import { LessonContent } from "@/components/student/shared";
+import { SolutionContent } from "@/components/luq/solution-content";
 import { apiMessage, productionApi, productionId } from "@/lib/production-api";
 
 export type AssistanceKind = "FULL_TRANSLATION" | "FULL_SOLUTION";
@@ -130,6 +131,8 @@ export function LuqAssistance({
         <>
           {renderBody ? (
             renderBody(provided.body)
+          ) : kind === "FULL_SOLUTION" ? (
+            <SolutionContent body={provided.body} />
           ) : (
             <LessonContent content={provided.body} />
           )}

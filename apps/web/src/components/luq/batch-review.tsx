@@ -1,11 +1,10 @@
 "use client";
 
-import { useRef, useState, type CSSProperties } from "react";
+import { useRef, useState } from "react";
 import { useLocale } from "@/components/locale-context";
-import { MathContent } from "@/components/math-content";
+import { SolutionContent } from "@/components/luq/solution-content";
 import { Button } from "@/components/ui/button";
-import { CodeBlock } from "@/components/student/shared";
-import { editorTheme, editorThemes, type EditorTheme } from "@/components/student/editor-themes";
+import { type EditorTheme } from "@/components/student/editor-themes";
 import { Modal, State, input, panel, useData } from "@/components/teacher/shared";
 import { ApiError, apiMessage, productionApi } from "@/lib/production-api";
 
@@ -227,16 +226,12 @@ function SolutionPreview({ item, onClose, onRefresh }: { item: ReviewItem; onClo
   const contents = useData<{ items: ReviewContent[] }>(`luq/contents?${new URLSearchParams(target)}`);
   const content = contents.data?.items.find(value => value.id === item.contentId && value.kind === "FULL_SOLUTION"
     && value.versionId === item.versionId && value.contentHash === item.contentHash);
-  const selectedTheme = editorTheme(theme);
   return <Modal title={tx("参考答案预览", "Solution preview")} onClose={onClose} wide>
     <div className="space-y-3">
       <p className="text-sm font-medium">{itemLabel(item)}</p>
       <p className="text-xs text-muted-foreground">{tx("版本", "Version")} <code>{item.versionId.slice(0, 8)}</code> · {statusLabel(item.status, tx)}</p>
       <State resource={contents}/>
-      {!contents.loading && !contents.error && (content ? <MathContent content={content.body} renderCode={(code, language) => <section className="my-3 min-w-0 overflow-hidden rounded-md border border-border">
-        <label className="flex flex-wrap items-center justify-end gap-2 border-b border-border bg-surface-subtle px-3 py-2 text-xs"><span>{tx("代码主题", "Code theme")}</span><select className="min-h-8 max-w-48 rounded-md border border-border bg-surface px-2 text-foreground" value={theme} onChange={event => setTheme(editorTheme(event.target.value).id)}>{editorThemes.map(value => <option key={value.id} value={value.id}>{value.id === "github-dark" ? "GitHub Dark" : value.id === "github-light" ? "GitHub Light" : value.label}</option>)}</select></label>
-        <div style={{ ...selectedTheme.tokens, colorScheme: selectedTheme.type } as CSSProperties} data-solution-theme={theme}><CodeBlock code={code} language={language === "cpp" ? "cpp" : language === "javascript" || language === "js" ? "javascript" : "python"}/></div>
-      </section>}/> : <div className="space-y-2"><p role="alert" className="text-sm text-destructive">{tx("此题解已变更，请刷新状态后重新核对。", "This solution has changed. Refresh status and review again.")}</p><Button size="sm" variant="secondary" onClick={onRefresh}>{tx("刷新并重新核对", "Refresh and review again")}</Button></div>)}
+      {!contents.loading && !contents.error && (content ? <SolutionContent body={content.body} theme={theme} onThemeChange={setTheme}/> : <div className="space-y-2"><p role="alert" className="text-sm text-destructive">{tx("此题解已变更，请刷新状态后重新核对。", "This solution has changed. Refresh status and review again.")}</p><Button size="sm" variant="secondary" onClick={onRefresh}>{tx("刷新并重新核对", "Refresh and review again")}</Button></div>)}
     </div>
   </Modal>;
 }

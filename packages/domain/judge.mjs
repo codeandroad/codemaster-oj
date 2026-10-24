@@ -22,6 +22,10 @@ export const JOB_CPU_BUDGET_NS = 30_000_000_000;
 export const JOB_WALL_BUDGET_MS = 60_000;
 const FAILURE_ORDER = ['CE', 'RE', 'TLE', 'MLE', 'OLE', 'WA'];
 const FATAL_VERDICTS = new Set(['CE', 'RE', 'TLE', 'MLE', 'OLE']);
+// Keep isolated mode and skip site initialization (.pth/sitecustomize/user site).
+// The executor image owns this read-only, hash-pinned scientific package path.
+const PYTHON_VENDOR_BOOTSTRAP = "import sys\nsys.path.append('/usr/local/lib/campus-python')\n";
+const PYTHON_STDIO_BOOTSTRAP = "import runpy\nrunpy.run_path('/w/main.py', run_name='__main__')\n";
 const MESSAGES = {
   AC: '全部测试通过。', WA: '部分测试未通过。', CE: '代码语法、函数名称或参数签名不符合题目要求。',
   RE: '程序运行异常。', TLE: '运行超过时间限制。', MLE: '运行超过内存限制。', OLE: '输出超过限制。',
@@ -310,7 +314,9 @@ export class GoJudge {
       copyIn: { 'main.js': { content: code } },
     };
     return {
-      ...common, args: [this.python, '-I', '-S', ...(script ? ['-c', script, functionName] : ['/w/main.py'])],
+      ...common,
+      env: [...common.env, 'OPENBLAS_NUM_THREADS=1', 'OMP_NUM_THREADS=1', 'MKL_NUM_THREADS=1'],
+      args: [this.python, '-I', '-S', '-c', PYTHON_VENDOR_BOOTSTRAP + (script ?? PYTHON_STDIO_BOOTSTRAP), ...(script ? [functionName] : [])],
       copyIn: code === undefined ? {} : { 'main.py': { content: code } },
     };
   }
@@ -356,6 +362,12 @@ export class GoJudge {
     try { runtime = JSON.parse(probe.files.stdout); } catch { throw new InfrastructureError('Executor runtime probe failed.'); }
     if (probe.status !== 'Accepted' || runtime.python?.[0] !== 3 || runtime.python?.[1] !== 12 || !Number.isInteger(runtime.uid) || runtime.uid === 0 ||
         runtime.reachable !== false || !Array.isArray(runtime.interfaces) || runtime.interfaces.some((name) => name !== 'lo')) throw new InfrastructureError('Python 3.12, non-root execution and an isolated network namespace are required.');
+    if (this.environmentVersion.includes('numpy2.2.6')) {
+      const numpy = await this.execute(this.command({ script: 'import numpy; print(numpy.__version__)',
+        version: { time_limit_ms: 2000, memory_limit_mb: 128 } }), signal);
+      if (numpy.status !== 'Accepted' || numpy.files?.stdout.trim() !== '2.2.6')
+        throw new InfrastructureError('The declared NumPy 2.2.6 runtime is unavailable.');
+    }
     const cppProbeCode = '#include <version>\n#include <iostream>\nstatic_assert(__clang_major__ == 19);\nstatic_assert(_GLIBCXX_RELEASE == 14);\nstatic_assert(__cplusplus >= 202302L);\nint main(){std::cout << __clang_major__ << "." << __clang_minor__ << "." << __clang_patchlevel__ << " " << _GLIBCXX_RELEASE << " " << __cplusplus;}';
     const toolchainVersion = { time_limit_ms: 5000, memory_limit_mb: 256 };
     const compiled = await this.execute(this.command({ language: 'cpp', code: cppProbeCode, version: toolchainVersion }), signal);

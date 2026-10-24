@@ -6,6 +6,13 @@
 .highlight,.input { position:absolute;inset:0;width:100%;height:100%;margin:0;padding:14px 14px 28px 10px;border:0;font:inherit;line-height:24px;letter-spacing:0;tab-size:inherit;white-space:pre;overflow:auto; }
 .highlight { pointer-events:none;overflow:hidden;z-index:2;background:transparent; }
 .input { resize:none;z-index:3;color:transparent;background:transparent;caret-color:var(--code-foreground);border-radius:0; }
+.input.vimInput { caret-color:transparent; }
+.caretMirror { position:absolute;top:0;left:0;width:100%;padding:14px 14px 28px 10px;font:inherit;line-height:24px;letter-spacing:0;tab-size:inherit;white-space:pre;visibility:hidden;pointer-events:none; }
+.caretMirror.wrap { white-space:pre-wrap;overflow-wrap:break-word; }
+.caretLayer { position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:4; }
+.vimCaret { position:absolute;width:3px;background:var(--code-foreground);border-radius:1px; }
+.vimBlock { overflow:hidden;border-radius:0;color:var(--code);font:inherit;line-height:24px;white-space:pre; }
+@media (forced-colors:active) { .vimCaret { background:CanvasText;forced-color-adjust:none; }.vimBlock { color:Canvas; } }
 .input:focus,.input:focus-visible { outline:none!important;box-shadow:none!important; }
 .input::selection { background:var(--accent);color:var(--code-foreground); }
 .wrap { white-space:pre-wrap;overflow-wrap:break-word; }

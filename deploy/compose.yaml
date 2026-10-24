@@ -35,7 +35,7 @@ services:
       DATABASE_URL: postgres://campus_app:${APP_DB_PASSWORD}@db:5432/campus
       APP_ORIGIN: ${APP_ORIGIN:?set APP_ORIGIN}
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
-      JUDGE_IMAGE: campus-judge-py3.12-clang19-libstdcxx14-cxx23-node22-gojudge1.13.2
+      JUDGE_IMAGE: campus-judge-py3.12-numpy2.2.6-clang19-libstdcxx14-cxx23-node22-gojudge1.13.2
       PORT: 3001
       HOST: 0.0.0.0
       COOKIE_SECURE: 'true'
@@ -57,7 +57,7 @@ services:
       GO_JUDGE_TOKEN: ${JUDGE_AUTH_TOKEN:?set JUDGE_AUTH_TOKEN}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
       WORKER_NODE_ID: ${WORKER_NODE_ID:-judge-node-01}
-      JUDGE_ENVIRONMENT_VERSION: campus-judge-py3.12-clang19-libstdcxx14-cxx23-node22-gojudge1.13.2
+      JUDGE_ENVIRONMENT_VERSION: campus-judge-py3.12-numpy2.2.6-clang19-libstdcxx14-cxx23-node22-gojudge1.13.2
     networks: [business, execution]
     depends_on:
       migrate: {condition: service_completed_successfully}

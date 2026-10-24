@@ -14,3 +14,7 @@ backups/
 
 # Original question PDFs and rendered excerpts are supplied locally.
 apps/web/public/paper4-originals/
+
+# Teacher-only reference programs and hidden cases must not enter the public repo.
+content/hackerrank-python/problems.json
+content/hackerrank-python/build-problems.py

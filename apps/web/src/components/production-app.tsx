@@ -18,6 +18,7 @@ import { PageHeader } from "@/components/page-chrome";
 import { PageHeadingProvider } from "@/components/page-heading-context";
 import { PageBreadcrumbs, ShellPageHeading } from "@/components/page-breadcrumbs";
 import { ProductionLoginPage } from "@/components/auth/login-page";
+import { AuthNotice } from "@/components/auth/auth-shell";
 import { ProductionRegisterPage } from "@/components/auth/register-page";
 import { AdminAccountsPage, AdminPeoplePage } from "@/components/admin/accounts-people";
 import { AdminImportPage } from "@/components/admin/import-page";
@@ -34,6 +35,7 @@ import { TeacherPages } from "@/components/teacher/teacher-pages";
 import { ApiError, apiMessage, clearProductionSession, productionApi, roleHome, type AuthResponse, type CampusRole, type CampusUser, type Person, type SchoolClass } from "@/lib/production-api";
 
 export function ProductionApp() {
+  const { locale } = useLocale();
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<CampusUser | null>(null);
@@ -62,12 +64,15 @@ export function ProductionApp() {
     router.replace(roleHome(next));
   };
   if (!isCampusRoute(pathname)) return null;
+  const authPage = pathname === "/login" || pathname === "/register";
+  if (loading && authPage) return <AuthNotice title={locale === "en" ? pathname === "/register" ? "Create account" : "Sign in" : pathname === "/register" ? "注册账号" : "登录"} message={locale === "en" ? "Connecting to your school…" : "正在连接校内服务…"} />;
   if (loading)
     return (
       <main className="grid min-h-screen place-items-center bg-background">
         <p role="status">正在连接校内服务…</p>
       </main>
     );
+  if (error && authPage) return <AuthNotice error title={locale === "en" ? "Unable to connect" : "暂时无法连接服务"} message={error}><Button className="mt-5 w-fit" onClick={() => { setLoading(true); setError(""); setCheck(value => value + 1); }}>{locale === "en" ? "Retry" : "重试"}</Button></AuthNotice>;
   if (error)
     return (
       <main className="mx-auto max-w-lg p-8">

@@ -8,10 +8,12 @@ const row=r=>{if(!r.rowCount)fail(404,'NOT_FOUND','资源不存在');return r.ro
 const respond=body=>({status:200,body});
 const ids=(value,name='身份')=>{if(!Array.isArray(value)||value.length>500)fail(400,'VALIDATION',`${name}须为最多 500 项的数组`);return [...new Set(value.map(id=>uuid(id,name)))];};
 
-export async function personDetails(db,id) {
- const p=row(await db.query(`SELECT i.*,a.id account_id,a.username,a.last_login_at FROM identities i LEFT JOIN accounts a ON a.identity_id=i.id AND a.binding_released_at IS NULL WHERE i.id=$1 AND i.archived_at IS NULL`,[id]));
+export async function personDetails(db,id,{includeArchived=false}={}) {
+ const p=row(await db.query(`SELECT i.*,a.id account_id,a.username,a.last_login_at,
+  EXISTS(SELECT 1 FROM accounts history WHERE history.identity_id=i.id) has_account_history
+  FROM identities i LEFT JOIN accounts a ON a.identity_id=i.id AND a.binding_released_at IS NULL WHERE i.id=$1 AND ($2 OR i.archived_at IS NULL)`,[id,includeArchived]));
  const classes=(await db.query(`SELECT DISTINCT c.id,c.name FROM classes c WHERE c.archived_at IS NULL AND (EXISTS(SELECT 1 FROM class_members cm WHERE cm.class_id=c.id AND cm.identity_id=$1) OR EXISTS(SELECT 1 FROM identity_teacher_classes itc WHERE itc.class_id=c.id AND itc.identity_id=$1) OR EXISTS(SELECT 1 FROM teacher_classes tc JOIN accounts a ON a.id=tc.account_id WHERE tc.class_id=c.id AND a.identity_id=$1 AND a.binding_released_at IS NULL)) ORDER BY c.name`,[id])).rows;
- return {id:p.id,kind:p.kind,number:p.number,name:p.name,gender:p.gender??null,notes:p.notes,classes,activated:!!p.account_id,accountId:p.account_id||null,username:p.username||null,lastLoginAt:p.last_login_at||null};
+ return {id:p.id,kind:p.kind,number:p.number,name:p.name,gender:p.gender??null,notes:p.notes,classes,activated:!!p.account_id,accountId:p.account_id||null,username:p.username||null,lastLoginAt:p.last_login_at||null,deletedAt:p.archived_at??null,canDelete:p.kind!=='admin'&&!p.has_account_history,deleteBlockedReason:p.kind==='admin'?'管理员身份不能删除':p.has_account_history?'此档案有账号历史，请编辑资料或停用账号；解除关联后也不能删除。':null};
 }
 async function setIdentityClasses(ctx,db,person,classIds) {
  const selected=ids(classIds,'班级');for(const id of selected)await ctx.helpers.classAccess(db,ctx.user,id);
@@ -29,20 +31,46 @@ export async function bindPendingTeacherClasses(db,identityId,accountId) {
  await db.query(`INSERT INTO teacher_classes(class_id,account_id) SELECT class_id,$2 FROM identity_teacher_classes WHERE identity_id=$1 ON CONFLICT DO NOTHING`,[identityId,accountId]);
 }
 export async function handlePeopleAlignment(ctx) {
- const {pool,user,route,method,body,helpers}=ctx;let m;
+ const {pool,user,route,method,body,url,helpers}=ctx;let m;
  if(route==='/accounts'&&method==='GET'){
   admin(user);const accounts=(await pool.query(`SELECT a.id,a.identity_id,a.username,a.original_username,a.disabled_at,a.binding_released_at,a.credentials_moved_to_account_id,a.last_login_at,i.kind,i.number,i.name,ARRAY(SELECT role FROM account_roles WHERE account_id=a.id ORDER BY role) roles,(a.binding_released_at IS NOT NULL AND a.credentials_moved_to_account_id IS NULL AND NOT EXISTS(SELECT 1 FROM accounts occupied WHERE occupied.username=COALESCE(a.original_username,a.username) AND occupied.id<>a.id)) can_link FROM accounts a JOIN identities i ON i.id=a.identity_id ORDER BY a.created_at DESC LIMIT 5000`)).rows;
   const items=[];for(const a of accounts){const p=await personDetails(pool,a.identity_id);items.push({id:a.id,identityId:a.identity_id,username:a.username,originalUsername:a.original_username||null,name:a.name,number:a.number,gender:p.gender,kind:a.kind,roles:a.roles,disabled:!!a.disabled_at,bindingReleased:!!a.binding_released_at,credentialsTransferred:!!a.credentials_moved_to_account_id,canLink:!!a.can_link,lastLoginAt:a.last_login_at,classes:p.classes});}return respond({items});
  }
  if(route==='/people'&&method==='GET'){
-  staff(user);const people=(await pool.query(`SELECT i.id FROM identities i WHERE archived_at IS NULL AND ($1 OR i.id=$2 OR EXISTS(SELECT 1 FROM class_members cm JOIN teacher_classes tc ON tc.class_id=cm.class_id JOIN classes c ON c.id=cm.class_id WHERE cm.identity_id=i.id AND tc.account_id=$3 AND c.archived_at IS NULL)) ORDER BY i.kind,i.number LIMIT 5000`,[user.roles.includes('admin'),user.identityId,user.id])).rows;
-  const items=[];for(const p of people)items.push(await personDetails(pool,p.id));return respond({items});
+  staff(user);const deleted=url.searchParams.get('deleted')==='true';if(deleted)admin(user);
+  const people=(await pool.query(`SELECT i.id FROM identities i WHERE (i.archived_at IS NOT NULL)=$4 AND ($1 OR i.id=$2 OR EXISTS(SELECT 1 FROM class_members cm JOIN teacher_classes tc ON tc.class_id=cm.class_id JOIN classes c ON c.id=cm.class_id WHERE cm.identity_id=i.id AND tc.account_id=$3 AND c.archived_at IS NULL)) ORDER BY i.kind,i.number LIMIT 5000`,[user.roles.includes('admin'),user.identityId,user.id,deleted])).rows;
+  const items=[];for(const p of people)items.push(await personDetails(pool,p.id,{includeArchived:deleted}));return respond({items});
  }
  if(route==='/people'&&method==='POST'){
   admin(user);const kind=enumValue(body.kind,['student','teacher','admin'],'身份类型'),number=field(body.number,'编号'),name=field(body.name,'姓名'),gender=body.gender===undefined?null:genderValue(body.gender),notes=field(body.notes??'','备注',{min:0,max:4000});
-  const result=await transaction(pool,async db=>{const p=row(await db.query('INSERT INTO identities(kind,number,name,gender,notes) VALUES($1,$2,$3,$4,$5) RETURNING *',[kind,number,name,gender,notes]));await setIdentityClasses(ctx,db,p,body.classIds??[]);await helpers.audit(db,user.id,'identity.create','identity',p.id);const issued=await helpers.issueActivation(db,user,p.id);return {...issued,person:await personDetails(db,p.id)};});return {status:201,body:result};
+  const result=await transaction(pool,async db=>{if((await db.query('SELECT 1 FROM identities WHERE kind=$1 AND number=$2 AND archived_at IS NOT NULL',[kind,number])).rowCount)fail(409,'IDENTITY_DELETED','该编号的档案已删除，请在“已删除”列表恢复后编辑。');const p=row(await db.query('INSERT INTO identities(kind,number,name,gender,notes) VALUES($1,$2,$3,$4,$5) RETURNING *',[kind,number,name,gender,notes]));await setIdentityClasses(ctx,db,p,body.classIds??[]);await helpers.audit(db,user.id,'identity.create','identity',p.id);const issued=await helpers.issueActivation(db,user,p.id);return {...issued,person:await personDetails(db,p.id)};});return {status:201,body:result};
  }
  m=route.match(/^\/people\/([^/]+)$/);
+ if(m&&method==='DELETE'){
+  admin(user);const id=uuid(m[1]);
+  const result=await transaction(pool,async db=>{
+   const p=row(await db.query('SELECT * FROM identities WHERE id=$1 FOR UPDATE',[id]));
+   if(p.kind==='admin')fail(409,'IDENTITY_PROTECTED','管理员身份不能删除');
+   if((await db.query('SELECT 1 FROM accounts WHERE identity_id=$1',[id])).rowCount)fail(409,'IDENTITY_HAS_ACCOUNT','此档案有账号历史，请编辑资料或停用账号；解除关联后也不能删除。');
+   if(body.number!==p.number||body.name!==p.name)fail(409,'IDENTITY_CHANGED','档案已变更，请刷新后重新确认删除。');
+   if(!p.archived_at){
+    await db.query('UPDATE identities SET archived_at=now() WHERE id=$1',[id]);
+    await db.query('DELETE FROM activation_tokens WHERE identity_id=$1',[id]);
+    await helpers.audit(db,user.id,'identity.delete','identity',id,{kind:p.kind,number:p.number,name:p.name,recoverable:true});
+   }
+   return {ok:true,deleted:true};
+  });return respond(result);
+ }
+ const restore=route.match(/^\/people\/([^/]+)\/restore$/);
+ if(restore&&method==='POST'){
+  admin(user);const id=uuid(restore[1]);
+  const person=await transaction(pool,async db=>{
+   const p=row(await db.query('SELECT * FROM identities WHERE id=$1 FOR UPDATE',[id]));
+   if(p.kind==='admin'||(await db.query('SELECT 1 FROM accounts WHERE identity_id=$1',[id])).rowCount)fail(409,'IDENTITY_PROTECTED','仅能恢复未激活的学生或教师档案');
+   if(p.archived_at){await db.query('UPDATE identities SET archived_at=NULL WHERE id=$1',[id]);await helpers.audit(db,user.id,'identity.restore','identity',id);}
+   return personDetails(db,id);
+  });return respond(person);
+ }
  if(m&&method==='PATCH'){
   admin(user);const person=await transaction(pool,async db=>{const p=row(await db.query('SELECT * FROM identities WHERE id=$1 AND archived_at IS NULL FOR UPDATE',[uuid(m[1])]));const name=body.name===undefined?p.name:field(body.name,'姓名'),number=body.number===undefined?p.number:field(body.number,'编号'),gender=body.gender===undefined?p.gender:genderValue(body.gender),notes=body.notes===undefined?p.notes:field(body.notes,'备注',{min:0,max:4000});await db.query('UPDATE identities SET name=$1,number=$2,gender=$3,notes=$4 WHERE id=$5',[name,number,gender,notes,p.id]);if(body.classIds!==undefined)await setIdentityClasses(ctx,db,p,body.classIds);await helpers.audit(db,user.id,'identity.update','identity',p.id);return personDetails(db,p.id);});return respond(person);
  }

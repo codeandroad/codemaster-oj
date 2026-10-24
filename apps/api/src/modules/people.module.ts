@@ -1,4 +1,4 @@
-import { Controller, Module, Req, Res, UseGuards, Get, Patch, Post } from '@nestjs/common';
+import { Controller, Module, Req, Res, UseGuards, Delete, Get, Patch, Post } from '@nestjs/common';
 import type { Response } from 'express';
 import { DomainService } from '../domain.service.js';
 import { DomainGuard, type DomainRequest } from '../domain.guard.js';
@@ -47,6 +47,16 @@ export class PeopleController {
 
   @Patch('people/:id')
   async updatePerson(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('people', request.domainContext));
+  }
+
+  @Delete('people/:id')
+  async deletePerson(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('people', request.domainContext));
+  }
+
+  @Post('people/:id/restore')
+  async restorePerson(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('people', request.domainContext));
   }
 

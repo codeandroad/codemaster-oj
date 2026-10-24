@@ -1,96 +1,134 @@
 "use client";
 
 import Link from "next/link";
-import { usePublicSite } from "./site-info";
-import { Eye, EyeOff, LockKeyhole } from "lucide-react";
-import { useState, type FormEvent } from "react";
-import { BrandLogo } from "@/components/brand-logo";
+import { AlertCircle, Eye, EyeOff, LoaderCircle, LockKeyhole } from "lucide-react";
+import { useRef, useState, type FormEvent } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ApiError, apiMessage, productionApi, type AuthResponse, type CampusUser } from "@/lib/production-api";
-import {useLocale} from "@/components/locale-context";
+import { useLocale } from "@/components/locale-context";
+import { AuthShell } from "./auth-shell";
+import styles from "./auth-shell.module.css";
 
-const inputClass = "min-h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-base outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/30";
+type Field = "username" | "password" | "resetCode" | "confirmation";
+type FormIssue = { field?: Field; kind: "username" | "password" | "resetCode" | "passwordLength" | "confirmation" | "login" | "disabled" | "server"; message?: string };
 
 export function ProductionLoginPage({ onLogin }: { onLogin: (user: CampusUser) => void }) {
-  const {t}=useLocale();
-  const site = usePublicSite();
+  const { t, locale } = useLocale();
+  const tx = (zh: string, en: string) => locale === "en" ? en : zh;
   const [mode, setMode] = useState<"login" | "reset">("login");
+  const [username, setUsername] = useState("");
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
+  const [showResetCode, setShowResetCode] = useState(false);
+  const [issue, setIssue] = useState<FormIssue | null>(null);
+  const [resetComplete, setResetComplete] = useState(false);
+  const submitting = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
 
+  const error = issue ? {
+    username: tx("请输入用户名。", "Enter your username."),
+    password: tx("请输入密码。", "Enter your password."),
+    resetCode: tx("请输入管理员提供的一次性重置凭据。", "Enter the one-time reset code from your administrator."),
+    passwordLength: tx("新密码需要 8–128 位。", "Use 8–128 characters for your new password."),
+    confirmation: t("两次输入的新密码不一致。"),
+    login: t("用户名或密码不正确"),
+    disabled: t("账号已禁用"),
+    server: issue.message ?? "",
+  }[issue.kind] : "";
+
+  function focusField(field: Field) {
+    const input = formRef.current?.elements.namedItem(field);
+    if (input instanceof HTMLInputElement) input.focus();
+  }
+  function clearIssue() { setIssue(null); setResetComplete(false); }
+  function switchMode() {
+    if (submitting.current) return;
+    setMode(current => current === "login" ? "reset" : "login");
+    setShowPassword(false); setShowResetCode(false); setIssue(null); setResetComplete(false);
+    requestAnimationFrame(() => titleRef.current?.focus());
+  }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitting.current) return;
     const form = event.currentTarget;
     const fields = new FormData(form);
-    setBusy(true);
-    setError("");
-    setMessage("");
+    const login = String(fields.get("username") ?? "").trim();
+    const password = String(fields.get("password") ?? "");
+    const resetCode = String(fields.get("resetCode") ?? "").trim();
+    const invalid: FormIssue | null = !login ? { field: "username", kind: "username" }
+      : mode === "reset" && !resetCode ? { field: "resetCode", kind: "resetCode" }
+      : !password ? { field: "password", kind: "password" }
+      : mode === "reset" && (password.length < 8 || password.length > 128) ? { field: "password", kind: "passwordLength" }
+      : mode === "reset" && password !== fields.get("confirmation") ? { field: "confirmation", kind: "confirmation" } : null;
+    setResetComplete(false);
+    if (invalid) { setIssue(invalid); focusField(invalid.field!); return; }
+    submitting.current = true; setBusy(true); setIssue(null);
     try {
-      const username = String(fields.get("username") ?? "").trim();
-      const password = fields.get("password");
       if (mode === "login") {
-        const response = await productionApi<AuthResponse>("auth/login", {
-          method: "POST", body: { username, password },
-        });
-        form.reset();
-        onLogin(response.user);
+        const response = await productionApi<AuthResponse>("auth/login", { method: "POST", body: { username: login, password } });
+        form.reset(); setUsername(""); onLogin(response.user);
       } else {
-        if (password !== fields.get("confirmation")) throw new Error(t("两次输入的新密码不一致。"));
-        await productionApi("auth/reset", {
-          method: "POST",
-          body: { username, resetCode: String(fields.get("resetCode") ?? "").trim(), password },
-        });
-        form.reset();
-        setMode("login");
-        setShowPassword(false);
-        setMessage(t("密码已重置，请使用新密码登录。"));
+        await productionApi("auth/reset", { method: "POST", body: { username: login, resetCode, password } });
+        form.reset(); setMode("login"); setShowPassword(false); setShowResetCode(false); setResetComplete(true);
+        requestAnimationFrame(() => titleRef.current?.focus());
       }
     } catch (reason) {
-      setError(reason instanceof ApiError && reason.code === "ACCOUNT_DISABLED" ? t("账号已禁用") : reason instanceof ApiError && reason.code === "LOGIN_FAILED" ? t("用户名或密码不正确") : apiMessage(reason));
-    } finally {
-      setBusy(false);
-    }
+      const next: FormIssue = reason instanceof ApiError && reason.code === "ACCOUNT_DISABLED" ? { kind: "disabled", field: "username" }
+        : reason instanceof ApiError && reason.code === "LOGIN_FAILED" ? { kind: "login", field: "password" }
+        : { kind: "server", message: apiMessage(reason) };
+      setIssue(next);
+      // The focused error remains associated after the busy fieldset is enabled.
+      requestAnimationFrame(() => next.field ? focusField(next.field) : document.getElementById("login-error")?.focus());
+    } finally { submitting.current = false; setBusy(false); }
   }
+  const invalid = (field: Field) => issue?.field === field || issue?.kind === "login" && field === "username";
+  const describedBy = (field: Field) => invalid(field) ? "login-error" : undefined;
 
-  return (
-    <main className="min-h-screen bg-background px-4 py-5 sm:px-6 sm:py-10">
-      <div className="mx-auto grid max-w-[1120px] items-start gap-8 lg:min-h-[calc(100vh-80px)] lg:items-center lg:gap-10 lg:grid-cols-[minmax(0,1fr)_440px]">
-        <section className="hidden lg:block">
-          <BrandLogo className="h-auto w-[386px] max-w-full" />
-          <p className="mt-3 text-lg text-muted-foreground">{site.schoolName}</p>
-          <div className="mt-8 grid max-w-xl grid-cols-3 gap-3 text-sm">{[["学生", "学习、作业、训练、订正"], ["教师", "题库、班级、活动"], ["管理员", "账号、服务、设置"]].map(([label, value]) => <div key={label} className="border border-border bg-surface p-4 panel-shadow"><div className="text-xs font-semibold text-muted-foreground">{t(label)}</div><div className="mt-2 text-sm font-semibold">{t(value)}</div></div>)}</div>
-        </section>
-        <section className="mx-auto w-full max-w-[520px] border border-border bg-surface p-4 panel-shadow sm:p-6" aria-labelledby="login-title">
-          <BrandLogo className="mb-4 h-auto w-[230px] max-w-full lg:hidden" />
-          <h2 id="login-title" className="text-2xl font-bold">{t(mode === "login" ? "登录" : "重置密码")}</h2>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">{t(mode === "login" ? "使用你在注册时自行设置的用户名与密码登录。日常登录无需再次验证身份，也无需强制修改密码。" : "请先向学校管理员核实身份并取得一次性重置凭据，然后自行设置新密码。")}</p>
-          {mode === "reset" && <div className="mt-4 space-y-3 text-sm leading-6"><h3 className="font-bold">{t("联系学校管理员重置密码")}</h3><p className="text-muted-foreground">{t("本校使用本地账号，没有公网邮件找回服务。请向课程教师或管理员提供用户名、姓名及学号 / 工号，由管理员核实身份后提供一次性重置凭据。不要提供原密码。")}</p><p className="border border-border bg-surface-subtle p-3">{t("已有账号无需重新注册或再次激活；重置密码不会删除班级、作业或提交记录。")}</p></div>}<form key={mode} onSubmit={submit} className="mt-5 space-y-4" aria-busy={busy}>
-            <label htmlFor="login-username" className="block text-sm font-semibold">{t("用户名")}
-              <input id="login-username" name="username" autoComplete="username" autoCapitalize="none" required maxLength={128} className={`mt-1 ${inputClass}`} />
-            </label>
-            {mode === "reset" && <label htmlFor="reset-code" className="block text-sm font-semibold">{t("一次性重置凭据")}
-              <input id="reset-code" name="resetCode" autoComplete="off" required maxLength={256} className={`mt-1 ${inputClass}`} />
-            </label>}
-            <div>
-              <label htmlFor="login-password" className="block text-sm font-semibold">{t(mode === "reset" ? "新密码（8–128 位）" : "密码")}</label>
-              <div className="relative mt-1">
-                <input id="login-password" name="password" type={showPassword ? "text" : "password"} autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={mode === "reset" ? 8 : undefined} maxLength={128} aria-describedby={error ? "login-error" : undefined} className={`${inputClass} pr-12`} />
-                <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-11 w-11" aria-label={t(showPassword ? "隐藏密码" : "显示密码")} aria-pressed={showPassword} onClick={() => setShowPassword((current) => !current)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</Button>
-              </div>
-            </div>
-            {mode === "reset" && <label htmlFor="password-confirmation" className="block text-sm font-semibold">{t("再次输入新密码")}
-              <input id="password-confirmation" name="confirmation" type="password" autoComplete="new-password" required minLength={8} maxLength={128} className={`mt-1 ${inputClass}`} />
-            </label>}
-            {error && <p id="login-error" role="alert" className="border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
-            {message && <p role="status" className="text-sm text-success">{message}</p>}
-            <Button type="submit" disabled={busy} className="h-11 w-full"><LockKeyhole size={16} />{t(busy ? "正在处理…" : mode === "login" ? "登录" : "设置新密码")}</Button>
-            <Button type="button" variant="link" className="h-11 px-0" disabled={busy} onClick={() => { setMode(mode === "login" ? "reset" : "login"); setError(""); setMessage(""); setShowPassword(false); }}>{t(mode === "login" ? "忘记密码？" : "返回登录")}</Button>
-          </form>
-          <Link href="/register" className={`${buttonVariants({ variant: "secondary" })} mt-3 min-h-11 w-full`}>{t("注册账号 / 激活身份")}</Link>
-        </section>
+  return <AuthShell>
+    <header>
+      <h2 ref={titleRef} tabIndex={-1} id="login-title" className={styles.title}>{mode === "login" ? t("登录") : t("重置密码")}</h2>
+      <p className={styles.description}>{t(mode === "login" ? "使用你在注册时自行设置的用户名与密码登录。日常登录无需再次验证身份，也无需强制修改密码。" : "请先向学校管理员核实身份并取得一次性重置凭据，然后自行设置新密码。")}</p>
+    </header>
+    {mode === "reset" && <details className={styles.help}>
+      <summary>{tx("如何获取重置凭据？", "How do I get a reset code?")}</summary>
+      <p>{t("本校使用本地账号，没有公网邮件找回服务。请向课程教师或管理员提供用户名、姓名及学号 / 工号，由管理员核实身份后提供一次性重置凭据。不要提供原密码。")}</p>
+      <p>{t("已有账号无需重新注册或再次激活；重置密码不会删除班级、作业或提交记录。")}</p>
+    </details>}
+    <form key={mode} ref={formRef} onSubmit={submit} className={styles.form} aria-busy={busy} noValidate>
+      <fieldset className={styles.fields} disabled={busy}>
+        <div>
+          <label htmlFor="login-username" className={styles.label}>{t("用户名")}</label>
+          <div className={styles.inputWrap}><input id="login-username" name="username" value={username} onChange={event => { setUsername(event.target.value); clearIssue(); }} autoComplete="username" autoCapitalize="none" spellCheck={false} required maxLength={128} aria-invalid={invalid("username")} aria-describedby={describedBy("username")} className={styles.input} /></div>
+        </div>
+        {mode === "reset" && <div>
+          <label htmlFor="reset-code" className={styles.label}>{t("一次性重置凭据")}</label>
+          <div className={styles.inputWrap}><input id="reset-code" name="resetCode" type={showResetCode ? "text" : "password"} autoComplete="off" required maxLength={256} onChange={clearIssue} aria-invalid={invalid("resetCode")} aria-describedby={describedBy("resetCode")} className={`${styles.input} ${styles.passwordInput}`} /><Button type="button" variant="ghost" size="icon" className={styles.visibility} aria-label={tx(showResetCode ? "隐藏重置凭据" : "显示重置凭据", showResetCode ? "Hide reset code" : "Show reset code")} aria-pressed={showResetCode} onClick={() => setShowResetCode(current => !current)}>{showResetCode ? <EyeOff size={18} /> : <Eye size={18} />}</Button></div>
+        </div>}
+        <div className={styles.passwordField}>
+          <div className={styles.labelRow}>
+            <label htmlFor="login-password" className={styles.label}>{t(mode === "reset" ? "新密码（8–128 位）" : "密码")}</label>
+          </div>
+          <div className={styles.inputWrap}>
+            <input id="login-password" name="password" type={showPassword ? "text" : "password"} autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={mode === "reset" ? 8 : undefined} maxLength={128} onChange={clearIssue} aria-invalid={invalid("password")} aria-describedby={describedBy("password")} className={`${styles.input} ${styles.passwordInput}`} />
+            <Button type="button" variant="ghost" size="icon" className={styles.visibility} aria-label={t(showPassword ? "隐藏密码" : "显示密码")} aria-pressed={showPassword} onClick={() => setShowPassword(current => !current)}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</Button>
+          </div>
+        </div>
+        {mode === "reset" && <div>
+          <label htmlFor="password-confirmation" className={styles.label}>{t("再次输入新密码")}</label>
+          <div className={styles.inputWrap}><input id="password-confirmation" name="confirmation" type={showPassword ? "text" : "password"} autoComplete="new-password" required minLength={8} maxLength={128} onChange={clearIssue} aria-invalid={invalid("confirmation")} aria-describedby={describedBy("confirmation")} className={styles.input} /></div>
+        </div>}
+      </fieldset>
+      <div className={styles.loginFeedback}>
+        {error && <p id="login-error" tabIndex={-1} role="alert" className={styles.error}><AlertCircle size={16} aria-hidden="true" /><span>{error}</span></p>}
+        {resetComplete && <p role="status" className={styles.success}>{t("密码已重置，请使用新密码登录。")}</p>}
       </div>
-    </main>
-  );
+      <Button type="submit" disabled={busy} className={styles.submit} aria-label={busy ? tx(mode === "login" ? "正在登录…" : "正在处理…", mode === "login" ? "Signing in…" : "Processing…") : t(mode === "login" ? "登录" : "设置新密码")}>
+        {busy ? <LoaderCircle size={17} className={styles.spinner} aria-hidden="true" /> : <LockKeyhole size={17} aria-hidden="true" />}
+        <span role="status">{busy ? tx(mode === "login" ? "正在登录…" : "正在处理…", mode === "login" ? "Signing in…" : "Processing…") : t(mode === "login" ? "登录" : "设置新密码")}</span>
+      </Button>
+      <Button type="button" variant="link" className={styles.forgot} disabled={busy} onClick={switchMode}>{t(mode === "login" ? "忘记密码？" : "返回登录")}</Button>
+    </form>
+    <Link href="/register" className={`${buttonVariants({ variant: "secondary" })} ${styles.registerAction}`}>{t("注册账号 / 激活身份")}</Link>
+  </AuthShell>;
 }

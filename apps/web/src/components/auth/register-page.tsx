@@ -1,38 +1,108 @@
 "use client";
 
 import Link from "next/link";
-import { AlertCircle, ArrowLeft, CheckCircle2, Eye, EyeOff, KeyRound, UserRound } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Eye, EyeOff, KeyRound, LoaderCircle, UserRound } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { BrandLogo } from "@/components/brand-logo";
+import { Button } from "@/components/ui/button";
 import { apiMessage, productionApi } from "@/lib/production-api";
-import {useLocale} from "@/components/locale-context";
+import { useLocale } from "@/components/locale-context";
+import { AuthShell } from "./auth-shell";
+import { registrationIssue, type RegistrationField, type RegistrationIssue, type RegistrationValues } from "./registration-fields";
+import styles from "./auth-shell.module.css";
 
-const input = "h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-base outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/30 aria-invalid:border-destructive";
 interface VerifiedPerson { kind: "student" | "teacher"; number: string; name: string; classes: string[]; }
+type Issue = RegistrationIssue | { kind: "server"; message: string; field?: RegistrationField };
+
 export function ProductionRegisterPage() {
-  const {t}=useLocale();
-  const [step, setStep] = useState<"verify" | "account" | "done">("verify"), [kind, setKind] = useState<"student" | "teacher">("student"), [show, setShow] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(""), [person, setPerson] = useState<VerifiedPerson | null>(null);
-  const [values, setValues] = useState({ number: "", name: "", activationCode: "", username: "", password: "", confirmation: "", email: "" });
-  const title = useRef<HTMLHeadingElement>(null), firstRender = useRef(true);
+  const { t, locale } = useLocale();
+  const tx = (zh: string, en: string) => locale === "en" ? en : zh;
+  const [step, setStep] = useState<"verify" | "account" | "done">("verify");
+  const [kind, setKind] = useState<"student" | "teacher">("student");
+  const [show, setShow] = useState(false), [showActivation, setShowActivation] = useState(false);
+  const [busy, setBusy] = useState(false), [issue, setIssue] = useState<Issue | null>(null);
+  const [person, setPerson] = useState<VerifiedPerson | null>(null);
+  const [values, setValues] = useState<RegistrationValues>({ number: "", name: "", activationCode: "", username: "", password: "", confirmation: "", email: "" });
+  const title = useRef<HTMLHeadingElement>(null), firstRender = useRef(true), submitting = useRef(false);
   useEffect(() => { if (firstRender.current) { firstRender.current = false; return; } title.current?.focus(); }, [step]);
-  function change(field: keyof typeof values, value: string) { setValues(old => ({ ...old, [field]: value })); setError(""); }
+  const labels: Record<RegistrationField, string> = {
+    number: t(kind === "student" ? "学号" : "工号"), name: t("姓名"), activationCode: t("激活码"),
+    username: t("用户名"), password: t("密码"), confirmation: t("确认密码"), email: t("联系邮箱（可选）"),
+  };
+  const error = !issue ? "" : issue.kind === "server" ? t(issue.message) : {
+    required: tx(`请填写${labels[issue.field]}。`, `Enter your ${labels[issue.field].toLowerCase()}.`),
+    username: tx("用户名需为 3–40 位英文字母、数字、点、下划线或短横线，并以字母或数字开头。", "Use 3–40 letters, numbers, dots, underscores or hyphens, starting with a letter or number."),
+    password: tx("密码需要 8–128 位。", "Use 8–128 characters for your password."),
+    confirmation: t("两次输入的密码不一致，请重新确认。"),
+    email: tx("请填写有效的邮箱地址，或留空。", "Enter a valid email address, or leave it blank."),
+  }[issue.kind];
+  function focusField(field?: RegistrationField) {
+    requestAnimationFrame(() => document.getElementById(field ? `register-${field}` : "register-error")?.focus());
+  }
+  function change(field: RegistrationField, value: string) { setValues(old => ({ ...old, [field]: value })); setIssue(null); }
   async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setBusy(true); setError("");
+    event.preventDefault();
+    if (submitting.current || step === "done") return;
+    const invalid = registrationIssue(step, values);
+    if (invalid) { setIssue(invalid); focusField(invalid.field); return; }
+    submitting.current = true; setBusy(true); setIssue(null);
     try {
       const identity = { kind, number: values.number.trim(), name: values.name.trim(), activationCode: values.activationCode.trim() };
       if (step === "verify") {
         const result = await productionApi<{ person: VerifiedPerson }>("auth/verify-identity", { method: "POST", body: identity });
-        setPerson(result.person); setStep("account");
+        setPerson(result.person); setShowActivation(false); setStep("account");
       } else {
-        if (values.password !== values.confirmation) throw new Error(t("两次输入的密码不一致，请重新确认。"));
         await productionApi("auth/register", { method: "POST", body: { ...identity, username: values.username.trim(), password: values.password, email: values.email.trim() || null } });
         setValues(old => ({ ...old, activationCode: "", password: "", confirmation: "" })); setShow(false); setStep("done");
       }
-    } catch (reason) { setError(apiMessage(reason)); } finally { setBusy(false); }
+    } catch (reason) {
+      const field = step === "verify" ? "activationCode" : undefined;
+      setIssue({ kind: "server", message: apiMessage(reason), field }); focusField(field);
+    } finally { submitting.current = false; setBusy(false); }
   }
-  function field(name: keyof typeof values, label: string, options: { type?: string; autoComplete?: string; required?: boolean; minLength?: number; maxLength?: number } = {}) {
-    return <div><label htmlFor={`register-${name}`} className="text-sm font-semibold">{t(label)}</label><input id={`register-${name}`} name={name} value={values[name]} onChange={event => change(name, event.target.value)} type={options.type ?? "text"} autoComplete={options.autoComplete ?? "off"} autoCapitalize={name === "username" ? "none" : undefined} spellCheck={false} required={options.required ?? true} minLength={options.minLength} maxLength={options.maxLength ?? 128} className={`mt-1 ${input} ${name === "activationCode" ? "font-mono" : ""}`}/></div>;
+  function field(name: RegistrationField, options: { type?: string; autoComplete?: string; required?: boolean; minLength?: number; maxLength?: number } = {}) {
+    const secret = name === "password" || name === "activationCode", revealed = name === "activationCode" ? showActivation : show;
+    return <div><label htmlFor={`register-${name}`} className={styles.label}>{labels[name]}</label>
+      <div className={styles.inputWrap}><input id={`register-${name}`} name={name} value={values[name]} onChange={event => change(name, event.target.value)}
+        type={secret ? revealed ? "text" : "password" : options.type ?? "text"} autoComplete={options.autoComplete ?? "off"}
+        autoCapitalize={name === "username" ? "none" : undefined} spellCheck={false} required={options.required ?? true}
+        minLength={options.minLength} maxLength={options.maxLength ?? 128} aria-invalid={issue?.field === name}
+        aria-describedby={issue?.field === name ? "register-error" : name === "password" ? "password-hint" : undefined}
+        className={`${styles.input} ${secret ? styles.passwordInput : ""}`} />
+        {secret && <Button type="button" variant="ghost" size="icon" className={styles.visibility}
+          aria-label={name === "activationCode" ? tx(revealed ? "隐藏激活码" : "显示激活码", revealed ? "Hide activation code" : "Show activation code") : t(revealed ? "隐藏密码" : "显示密码")}
+          aria-pressed={revealed} onClick={() => name === "activationCode" ? setShowActivation(value => !value) : setShow(value => !value)}>
+          {revealed ? <EyeOff size={18} /> : <Eye size={18} />}</Button>}
+      </div></div>;
   }
-  return <main className="min-h-screen bg-background px-4 py-5 sm:px-6 sm:py-10"><div className="mx-auto w-full max-w-[520px]"><header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3"><div className="flex min-w-0 flex-col items-start"><BrandLogo className="h-auto w-[170px] max-w-full"/><h1 className="sr-only">CodeMaster OJ</h1><p className="-mt-1 text-xs text-muted-foreground">{t("注册账号 · 激活身份")}</p></div><Link href="/login" className={`${buttonVariants({ variant: "ghost" })} h-11 px-2`}><ArrowLeft size={16}/>{t("登录")}</Link></header><section aria-label={t("注册账号")} className="mt-5 border border-border bg-surface p-4 panel-shadow sm:p-6"><ol aria-label={t("注册进度")} className="grid grid-cols-3 gap-2 border-b border-border pb-4 text-xs font-semibold">{[["verify", "验证身份"], ["account", "设置账号"], ["done", "完成"]].map(([value, label], index) => { const current = value === step, done = step === "done" && value !== "done" || step === "account" && value === "verify"; return <li key={value} aria-current={current ? "step" : undefined} className={`flex min-w-0 flex-col items-center gap-2 sm:flex-row sm:justify-center ${current ? "text-primary" : done ? "text-success" : "text-muted-foreground"}`}><span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border ${current ? "border-primary bg-primary text-primary-foreground" : done ? "border-success bg-success-soft" : "border-border"}`}>{done ? "✓" : index + 1}</span><span>{t(label)}</span></li>; })}</ol><h2 ref={title} tabIndex={-1} className="mt-5 text-lg font-bold outline-none">{t(step === "verify" ? "验证你的身份" : step === "account" ? "设置登录账号" : "注册完成")}</h2>{step === "verify" && <form onSubmit={submit} className="mt-4" aria-busy={busy}><div role="group" aria-label={t("身份类型")} className="grid grid-cols-2 gap-2">{(["student", "teacher"] as const).map(role => <Button key={role} type="button" disabled={busy} aria-pressed={role === kind} variant={role === kind ? "default" : "secondary"} className="h-11" onClick={() => { setKind(role); setPerson(null); setValues(old => ({ ...old, number: "", name: "", activationCode: "" })); setError(""); }}>{t(role === "student" ? "我是学生" : "我是教师")}</Button>)}</div><p className="mt-4 text-sm leading-6 text-muted-foreground">{t(kind === "student" ? "首次注册时，请填写名单中的学号和姓名，以及教师或管理员提供的激活码，认领已有身份。验证通过后，由你自行设置用户名与密码，管理员不代建账号。日常登录无需重复验证身份。" : "首次注册时，请填写名单中的工号和姓名，以及管理员提供的激活码，认领已有身份。验证通过后，由你自行设置用户名与密码，管理员不代建账号。日常登录无需重复验证身份。")}</p><div className="mt-4 space-y-4">{field("number", kind === "student" ? "学号" : "工号")}{field("name", "姓名", { autoComplete: "name", maxLength: 100 })}{field("activationCode", "激活码", { maxLength: 256 })}</div>{error && <div role="alert" className="mt-4 border border-warning/30 bg-warning-soft p-3 text-sm leading-6"><div className="flex items-start gap-2"><AlertCircle size={18} className="mt-1 shrink-0 text-warning"/><div><h3 className="font-bold">{t("身份验证未通过")}</h3><p className="mt-1">{error}</p><p className="mt-2">{t("请核对身份类型、编号和姓名；激活码过期或已被替换时，请联系教师或管理员获取新码。已注册的账号请直接登录，无需再次激活。")}</p></div></div><Button type="button" variant="secondary" className="mt-3 h-11" onClick={() => { setError(""); document.getElementById("register-activationCode")?.focus(); }}>{t("重新核对身份信息")}</Button></div>}<Button type="submit" disabled={busy} className="mt-5 h-11 w-full"><KeyRound size={16}/>{t(busy ? "正在验证…" : "验证身份")}</Button></form>}{step === "account" && <form onSubmit={submit} className="mt-4" aria-busy={busy}><div className="break-words border border-success/30 bg-success-soft p-3 text-sm leading-6">{t("身份验证通过")}：<strong>{person?.name}</strong> · {person?.number}{person?.classes.length ? `（${person.classes.join("、")}）` : ""}。{t("历史作业与记录仍保留在身份档案上。")}</div><div className="mt-4 space-y-4">{field("username", "用户名", { autoComplete: "username" })}<div><label htmlFor="register-password" className="text-sm font-semibold">{t("密码")}</label><div className="relative mt-1"><input id="register-password" name="password" value={values.password} onChange={event => change("password", event.target.value)} type={show ? "text" : "password"} autoComplete="new-password" required minLength={8} maxLength={128} aria-describedby="password-hint" className={`${input} pr-12`}/><Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-11 w-11" aria-label={t(show ? "隐藏密码" : "显示密码")} aria-pressed={show} onClick={() => setShow(!show)}>{show ? <EyeOff size={18}/> : <Eye size={18}/>}</Button></div><p id="password-hint" className="mt-1 text-xs text-muted-foreground">{t("至少 8 位。")}</p></div>{field("confirmation", "确认密码", { type: show ? "text" : "password", autoComplete: "new-password", minLength: 8 })}{field("email", "联系邮箱（可选）", { type: "email", autoComplete: "email", required: false, maxLength: 254 })}</div>{error && <p role="alert" className="mt-4 border border-destructive/25 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}<div className="mt-5 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"><Button type="submit" disabled={busy} className="h-11"><UserRound size={16}/>{t(busy ? "正在创建…" : "完成注册")}</Button><Button type="button" variant="secondary" disabled={busy} className="h-11" onClick={() => { setError(""); setShow(false); setPerson(null); setStep("verify"); }}><ArrowLeft size={16}/>{t("返回验证身份")}</Button></div><p className="mt-3 text-xs leading-5 text-muted-foreground">{t("返回后保留已填内容；修改身份信息后需重新验证。完成注册时激活码只使用一次。")}</p></form>}{step === "done" && <div className="mt-5 text-center"><CheckCircle2 size={40} className="mx-auto text-success"/><p className="mt-3 break-words text-sm leading-6 text-muted-foreground">{values.name} · {values.number} {t("已关联账号")} <strong>{values.username}</strong>。{t("历史作业与提交记录仍属于你的身份档案。")}</p><p className="mt-2 text-sm text-muted-foreground">{t("请使用自行设置的用户名和密码登录。")}</p><Link href="/login" className={`${buttonVariants()} mt-5 min-h-11 w-full`}>{t("前往登录")}</Link></div>}<p className="mt-5 border-t border-border pt-4 text-xs leading-5 text-muted-foreground">{t("已有账号？")}<Link href="/login" className="inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-4">{t("返回登录")}</Link></p></section></div></main>;
+  const feedback = <div className={styles.feedback}>{error && <p id="register-error" tabIndex={-1} role="alert" className={styles.error}><AlertCircle size={16} aria-hidden="true" /><span>{error}</span></p>}</div>;
+  return <AuthShell titleId="register-title">
+    <header><h2 ref={title} tabIndex={-1} id="register-title" className={styles.title}>{t(step === "verify" ? "注册账号" : step === "account" ? "设置登录账号" : "注册完成")}</h2>
+      <p className={styles.description}>{step === "done" ? t("请使用自行设置的用户名和密码登录。") : tx("先验证学校身份，再设置登录账号。", "Verify your school identity, then set up your account.")}</p></header>
+    <ol aria-label={t("注册进度")} className={styles.steps}>{[["verify", "验证身份"], ["account", "设置账号"], ["done", "完成"]].map(([value, label], index) => {
+      const done = step === "done" && value !== "done" || step === "account" && value === "verify";
+      return <li key={value} aria-current={value === step ? "step" : undefined} className={`${styles.step} ${done ? styles.complete : ""}`}><span className={styles.stepNumber}>{done ? "✓" : index + 1}</span><span>{t(label)}</span></li>;
+    })}</ol>
+    {step === "verify" && <form onSubmit={submit} noValidate className={styles.registerForm} aria-busy={busy}>
+      <fieldset disabled={busy} className={styles.fields}>
+        <div role="group" aria-label={t("身份类型")} className={styles.identityKind}>{(["student", "teacher"] as const).map(role => <Button key={role} type="button" aria-pressed={role === kind} variant={role === kind ? "primary" : "secondary"} className={styles.kindButton} onClick={() => { setKind(role); setPerson(null); setShowActivation(false); setValues(old => ({ ...old, number: "", name: "", activationCode: "" })); setIssue(null); }}>{t(role === "student" ? "我是学生" : "我是教师")}</Button>)}</div>
+        <details className={styles.help}><summary>{tx("如何获取激活码？", "How do I get an activation code?")}</summary><p>{t(kind === "student" ? "首次注册时，请填写名单中的学号和姓名，以及教师或管理员提供的激活码，认领已有身份。验证通过后，由你自行设置用户名与密码，管理员不代建账号。日常登录无需重复验证身份。" : "首次注册时，请填写名单中的工号和姓名，以及管理员提供的激活码，认领已有身份。验证通过后，由你自行设置用户名与密码，管理员不代建账号。日常登录无需重复验证身份。")}</p></details>
+        <div className={styles.identityGrid}>{field("number", { maxLength: 200 })}{field("name", { autoComplete: "name", maxLength: 100 })}</div>
+        {field("activationCode", { autoComplete: "one-time-code", maxLength: 100 })}
+      </fieldset>{feedback}
+      <Button type="submit" disabled={busy} className={styles.submit} aria-label={t(busy ? "正在验证…" : "验证身份")}>{busy ? <LoaderCircle size={17} className={styles.spinner} aria-hidden="true" /> : <KeyRound size={17} aria-hidden="true" />}<span role="status">{t(busy ? "正在验证…" : "验证身份")}</span></Button>
+    </form>}
+    {step === "account" && <form onSubmit={submit} noValidate className={styles.registerForm} aria-busy={busy}>
+      <p className={styles.notice}>{t("身份验证通过")}：<strong>{person?.name}</strong> · {person?.number}{person?.classes.length ? `（${person.classes.join("、")}）` : ""}</p>
+      <fieldset disabled={busy} className={`${styles.fields} ${styles.registerFields}`}>
+        {field("username", { autoComplete: "username", minLength: 3, maxLength: 40 })}
+        <div className={styles.fieldGrid}>{field("password", { autoComplete: "new-password", minLength: 8 })}{field("confirmation", { type: show ? "text" : "password", autoComplete: "new-password", minLength: 8 })}</div>
+        <p id="password-hint" className={styles.hint}>{t("至少 8 位。")}</p>
+        {field("email", { type: "email", autoComplete: "email", required: false, maxLength: 254 })}
+      </fieldset>{feedback}
+      <Button type="submit" disabled={busy} className={styles.submit} aria-label={t(busy ? "正在创建…" : "完成注册")}>{busy ? <LoaderCircle size={17} className={styles.spinner} aria-hidden="true" /> : <UserRound size={17} aria-hidden="true" />}<span role="status">{t(busy ? "正在创建…" : "完成注册")}</span></Button>
+      <div className={styles.back}><Button type="button" variant="link" disabled={busy} className={styles.textButton} onClick={() => { setIssue(null); setShow(false); setShowActivation(false); setPerson(null); setStep("verify"); }}><ArrowLeft size={14} />{t("返回验证身份")}</Button></div>
+    </form>}
+    {step === "done" && <div className={styles.done}><CheckCircle2 size={34} aria-hidden="true" /><p>{values.name} · {values.number} {t("已关联账号")} <strong>{values.username}</strong>。{t("历史作业与提交记录仍属于你的身份档案。")}</p><Link href="/login" className={styles.submit + " inline-flex items-center justify-center text-sm font-semibold"}>{t("前往登录")}</Link></div>}
+    {step !== "done" && <p className={styles.register}><span>{t("已有账号？")}</span><Link href="/login" aria-disabled={busy} onClick={event => { if (busy) event.preventDefault(); }}>{t("返回登录")}</Link></p>}
+  </AuthShell>;
 }

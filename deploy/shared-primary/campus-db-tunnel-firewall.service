@@ -1,0 +1,14 @@
+[Unit]
+Description=Limit the shared database tunnel listener to the business bridge
+Requires=docker.service
+After=docker.service
+Before=campus-db-tunnel.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/campus-db-tunnel-firewall
+RemainAfterExit=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

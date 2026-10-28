@@ -1,0 +1,8 @@
+[Unit]
+Description=Keep the restricted primary database endpoint aligned with the current container
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/campus-primary-db-watch
+NoNewPrivileges=yes

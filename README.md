@@ -56,6 +56,8 @@ node scripts/check-separation.mjs
 
 本地开发分别运行 `npm run dev:api` 和 `npm run dev:web`，所需数据库和会话环境见 [部署说明](docs/campus-judge-deployment.md)。正式学校部署使用 `deploy/compose.yaml`，需校园域名、HTTPS 和学校机器上的隔离、负载、备份恢复验收。
 
+tx99 的 cmoj.space 与 ali99 的 HTTPS 8443 入口现共用 tx99 的唯一写入主库；两边学生记录和 Luq 流水已合并保留。ali99 旧库停止归档，不得作为在线回退；迁移只在主库执行。拓扑、受限隧道、备份与实际验证见[共用主库实施记录](docs/shared-primary-2026-10-27.md)，宿主配置模板见 [deploy/shared-primary](deploy/shared-primary/README.md)。
+
 设计与范围见 [生产设计](docs/campus-judge-production-design.md) 和 [设计审查](docs/campus-judge-design-review.md)。最新本地检查见 [根目录迁移验收](docs/campus-judge-root-migration-verification.md)；先前的三角色原型对齐与页面切换记录分别见 [原型对齐](docs/campus-judge-prototype-alignment.md)、[导航验收](docs/campus-judge-navigation-verification.md)。[Next.js 文档](https://nextjs.org/docs/app)、[NestJS 文档](https://docs.nestjs.com/)。
 
 Luq 初始助学金与批量定价：迁移 044 为每个未领取的活跃学生身份追加默认 100 Luq（保留原余额，未来建档自动发放）；管理员可配置初始金额。教师可在 Paper 4 勾选多卷后点击「Luq 价格」，分别设置翻译和题解的解锁价格，已购买权益和考核限制保留。详见 [Luq 配置与迁移](docs/luq-system.md) 及 [本地核验](docs/paper4-luq-translations-2026-10-20.md)。

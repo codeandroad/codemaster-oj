@@ -235,7 +235,9 @@ test('upgrading preserves old points and consumes historical AC; only the one-ti
   const beforeAccounts=(await old.query('SELECT * FROM accounts ORDER BY id')).rows;
   await migrate(old);await migrate(old);
   assert.deepEqual((await old.query('SELECT id,identity_id,code,status,score FROM submissions ORDER BY id')).rows,before);
-  assert.deepEqual((await old.query('SELECT * FROM accounts ORDER BY id')).rows,beforeAccounts);
+  const upgradedAccounts=(await old.query('SELECT * FROM accounts ORDER BY id')).rows;
+  assert.deepEqual(upgradedAccounts.map(({leaderboard_use_nickname,...legacy})=>legacy),beforeAccounts);
+  assert.ok(upgradedAccounts.every(account=>account.leaderboard_use_nickname===false));
   assert.equal((await old.query('SELECT count(*)::int n FROM luq_ledger WHERE kind<>\'initial_grant\'')).rows[0].n,0);
   assert.equal((await old.query("SELECT reason FROM luq_first_ac_claims WHERE identity_id=$1 AND subject_key=$2",[identity,'problem:'+p])).rows[0].reason,'historical_ac');
   assert.equal((await old.query("SELECT reason FROM luq_first_ac_claims WHERE identity_id=$1 AND subject_key=$2",[identity,'paper4:'+sourcePaper+':Q1'])).rows[0].reason,'historical_ac');

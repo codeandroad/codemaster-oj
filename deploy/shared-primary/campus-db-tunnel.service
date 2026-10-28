@@ -1,0 +1,22 @@
+[Unit]
+Description=Restricted encrypted database connection from ali99 to the tx99 primary
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+StartLimitIntervalSec=0
+
+[Service]
+User=campus-db-tunnel
+Group=campus-db-tunnel
+ExecStart=/usr/bin/ssh -F /dev/null -NT -i /etc/codemaster-db-tunnel/id_ed25519 -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/etc/codemaster-db-tunnel/known_hosts -o HostKeyAlgorithms=ssh-ed25519 -o ExitOnForwardFailure=yes -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o ConnectTimeout=10 -L 172.18.0.1:15432:127.0.0.1:15432 campus-db-tunnel@43.133.218.11
+Restart=always
+RestartSec=3
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

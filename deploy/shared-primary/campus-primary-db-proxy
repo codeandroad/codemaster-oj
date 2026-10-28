@@ -1,0 +1,7 @@
+#!/usr/bin/python3
+import subprocess,json,os
+c=json.loads(subprocess.check_output(['/usr/bin/docker','inspect','campus-judge-tx99-db-1']))[0]
+assert c['State']['Running']
+n=c['NetworkSettings']['Networks']['campus-judge-tx99_business'];ip=n['IPAddress']
+assert ip and ip.startswith('172.')
+os.execv('/lib/systemd/systemd-socket-proxyd',['systemd-socket-proxyd',ip+':5432'])

@@ -1,0 +1,10 @@
+[Unit]
+Description=Check primary database endpoint after container address changes
+
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=15
+AccuracySec=2
+
+[Install]
+WantedBy=timers.target

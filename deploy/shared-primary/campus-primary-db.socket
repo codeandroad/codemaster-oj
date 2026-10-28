@@ -1,0 +1,11 @@
+[Unit]
+Description=Loopback endpoint for the Campus Judge primary database
+Requires=docker.service
+After=docker.service
+
+[Socket]
+ListenStream=127.0.0.1:15432
+NoDelay=true
+
+[Install]
+WantedBy=sockets.target

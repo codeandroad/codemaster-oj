@@ -1,0 +1,9 @@
+[Unit]
+Description=Forward the loopback primary database endpoint to its internal container
+Requires=docker.service
+After=docker.service
+
+[Service]
+ExecStart=/usr/local/libexec/campus-primary-db-proxy
+NoNewPrivileges=yes
+PrivateTmp=yes

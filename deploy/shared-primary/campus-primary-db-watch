@@ -1,0 +1,12 @@
+#!/usr/bin/python3
+import subprocess,json,pathlib
+try:
+ c=json.loads(subprocess.check_output(['/usr/bin/docker','inspect','campus-judge-tx99-db-1'],timeout=8))[0]
+ if not c['State']['Running']:raise SystemExit(0)
+ ip=c['NetworkSettings']['Networks']['campus-judge-tx99_business']['IPAddress']
+ pid=subprocess.check_output(['systemctl','show','campus-primary-db.service','-p','MainPID','--value'],text=True).strip()
+ if pid=='0':raise SystemExit(0)
+ args=pathlib.Path('/proc/'+pid+'/cmdline').read_bytes().split(b'\0')
+ if (ip+':5432').encode() not in args:subprocess.run(['systemctl','restart','campus-primary-db.service'],check=True,timeout=10)
+except (subprocess.CalledProcessError,subprocess.TimeoutExpired,FileNotFoundError):
+ raise SystemExit(0)

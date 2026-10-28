@@ -1,0 +1,18 @@
+# Example drop-in; deployed ali99 folds these settings into compose.ali99.yaml.
+services:
+  db:
+    profiles: [local-archive-only]
+  migrate:
+    profiles: [local-archive-only]
+    command: [sh, -c, 'echo "Run production migrations on tx99 only; this database is an archived independent copy."; exit 1']
+  api:
+    depends_on: !reset {}
+    extra_hosts: [primary-db:${CAMPUS_PRIMARY_TUNNEL_GATEWAY:?set the business bridge gateway}]
+    environment:
+      DATABASE_URL: ${CAMPUS_PRIMARY_APP_DATABASE_URL:?set shared primary application URL}
+  worker:
+    depends_on: !override
+      judge: {condition: service_started}
+    extra_hosts: [primary-db:${CAMPUS_PRIMARY_TUNNEL_GATEWAY:?set the business bridge gateway}]
+    environment:
+      WORKER_DATABASE_URL: ${CAMPUS_PRIMARY_WORKER_DATABASE_URL:?set shared primary worker URL}

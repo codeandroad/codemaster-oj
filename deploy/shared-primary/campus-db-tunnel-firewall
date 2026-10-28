@@ -1,0 +1,14 @@
+#!/usr/bin/python3
+import subprocess,json
+n=json.loads(subprocess.check_output(['/usr/bin/docker','network','inspect','campus-judge-ali99_business']))[0]
+assert n['Internal'] and n['IPAM']['Config'][0]['Gateway']=='172.18.0.1'
+bridge=n.get('Options',{}).get('com.docker.network.bridge.name') or 'br-'+n['Id'][:12]
+ipt=['/usr/sbin/iptables','-w','5'];chain='CAMPUS-SHARED-DB'
+def run(*a):return subprocess.run(ipt+list(a),stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode
+def check(*a):subprocess.run(ipt+list(a),check=True)
+if run('-nL',chain):check('-N',chain)
+if run('-C',chain,'-i','lo','-j','ACCEPT'):check('-I',chain,'1','-i','lo','-j','ACCEPT')
+if run('-C',chain,'-i',bridge,'-s','172.18.0.0/16','-j','ACCEPT'):check('-I',chain,'1','-i',bridge,'-s','172.18.0.0/16','-j','ACCEPT')
+if run('-C',chain,'-p','tcp','-j','REJECT','--reject-with','tcp-reset'):check('-A',chain,'-p','tcp','-j','REJECT','--reject-with','tcp-reset')
+rule=['-d','172.18.0.1/32','-p','tcp','--dport','15432','-j',chain]
+if run('-C','INPUT',*rule):check('-I','INPUT','1',*rule)

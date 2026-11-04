@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { useLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
+import { useRangeSelection } from "@/components/ui/use-range-selection";
 import { Feedback, Field, input, panel, useAction } from "@/components/teacher/shared";
 import { productionApi } from "@/lib/production-api";
 import type { AssistanceKind } from "./assistance";
@@ -31,12 +32,29 @@ export function LuqBatchPrices({ targetType, choices, initialIds = [], onSaved }
   const [publication, setPublication] = useState<PublicationStatus[] | null>(null);
   const action = useAction(), pending = useRef<{ signature: string; requestId: string } | null>(null);
   const filtered = choices.filter(item => item.title.toLowerCase().includes(query.toLowerCase()));
+  const { getRange, resetAnchor } = useRangeSelection(filtered, JSON.stringify([targetType, query]));
   const selectedIds = choices.filter(item => selected.includes(item.id)).map(item => item.id).sort();
   const allVisible = filtered.length > 0 && filtered.every(item => selected.includes(item.id));
+
+  function changeTargetSelection(id: string, event: ChangeEvent<HTMLInputElement>) {
+    const checked = event.currentTarget.checked;
+    const range = getRange(id, event);
+    setSelected(current => range || checked
+      ? [...new Set([...current, ...(range ?? [id])])]
+      : current.filter(selectedId => selectedId !== id));
+  }
+
+  function toggleVisible() {
+    resetAnchor();
+    setSelected(current => allVisible
+      ? current.filter(id => !filtered.some(item => item.id === id))
+      : [...new Set([...current, ...filtered.map(item => item.id)])]);
+  }
+
   return <section className={`${panel} space-y-3 p-3`}>
     <div className="flex flex-wrap items-center justify-between gap-2">
       <h2 className="font-semibold">{tx("批量设置解锁价格", "Batch unlock prices")}</h2>
-      <span className="text-xs text-muted-foreground">{tx(`已选 ${selectedIds.length} 项`, `${selectedIds.length} selected`)}</span>
+      <span className="text-xs text-muted-foreground" role="status">{tx(`已选 ${selectedIds.length} 项`, `${selectedIds.length} selected`)}</span>
     </div>
     <p className="text-xs text-muted-foreground">{targetType === "paper4"
       ? tx("每道大题分别按所设价格解锁。批量定价保留现有开放方式和时间，已购买权益继续有效。", "Each question uses the selected price. Existing access rules, opening times and purchased entitlements are retained.")
@@ -44,12 +62,12 @@ export function LuqBatchPrices({ targetType, choices, initialIds = [], onSaved }
     <p className="text-xs text-muted-foreground">{tx("设置价格不会发布内容；对应题目版本的译文或题解须先录入、审核并发布，学生才能解锁。", "Setting a price does not publish content. Author, review and publish the translation or solution for the matching problem version before students can unlock it.")}</p>
     <div className="flex flex-wrap items-center gap-2">
       <input aria-label={tx("搜索批量配置对象", "Search batch targets")} placeholder={tx("搜索名称、年份或考季", "Search title, year or session")} className={`${input} max-w-sm`} value={query} onChange={e => setQuery(e.target.value)}/>
-      <Button size="sm" variant="secondary" disabled={!filtered.length || action.busy} onClick={() => setSelected(current => allVisible ? current.filter(id => !filtered.some(item => item.id === id)) : [...new Set([...current, ...filtered.map(item => item.id)])])}>{allVisible ? tx("取消当前筛选", "Deselect filtered") : tx("全选当前筛选", "Select filtered")}</Button>
-      <Button size="sm" variant="ghost" disabled={!selected.length || action.busy} onClick={() => setSelected([])}>{tx("清空选择", "Clear selection")}</Button>
+      <Button size="sm" variant="secondary" disabled={!filtered.length || action.busy} onClick={toggleVisible}>{allVisible ? tx("取消当前筛选", "Deselect filtered") : tx("全选当前筛选", "Select filtered")}</Button>
+      <Button size="sm" variant="ghost" disabled={!selected.length || action.busy} onClick={() => { resetAnchor(); setSelected([]); }}>{tx("清空选择", "Clear selection")}</Button>
     </div>
     <div className="max-h-64 overflow-y-auto rounded-md border border-border">
       {filtered.map(item => <label key={item.id} className="flex cursor-pointer items-center gap-2 border-b border-border px-3 py-2 text-sm last:border-b-0 hover:bg-surface-subtle">
-        <input type="checkbox" checked={selected.includes(item.id)} disabled={action.busy} onChange={e => setSelected(current => e.target.checked ? [...current, item.id] : current.filter(id => id !== item.id))}/>
+        <input type="checkbox" checked={selected.includes(item.id)} disabled={action.busy} onChange={event => changeTargetSelection(item.id, event)}/>
         <span className="min-w-0 break-words">{item.title}</span>
       </label>)}
       {!filtered.length && <p className="p-3 text-sm text-muted-foreground">{tx("没有匹配项", "No matching items")}</p>}

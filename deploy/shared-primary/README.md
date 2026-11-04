@@ -1,5 +1,10 @@
 # Shared primary deployment assets
 
+Historical only: the user requested independent sites on 2026-10-28. The tunnel,
+proxy and related remote login roles are disabled. Do not enable these services;
+use [the independent deployment record](../../docs/ali99-independent-2026-10-28.md)
+and [current configuration](../independent/README.md).
+
 The deployed topology and validation are recorded in
 [the implementation record](../../docs/shared-primary-2026-10-27.md).
 These files contain no keys, database passwords or student records. Treat them as

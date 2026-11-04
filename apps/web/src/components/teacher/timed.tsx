@@ -8,6 +8,7 @@ import { activityAudienceClassIds, type AudienceDirectory, type AudienceStudent 
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Eye, Plus, Trash2 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { useRangeSelection } from "@/components/ui/use-range-selection";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
 import {
   productionApi,
@@ -1027,24 +1028,7 @@ export function TeacherTimedProgress({ id }: { id: string }) {
                 />
               </Field>
             )}
-            {operation === "重判" && (
-              <div className="max-h-64 overflow-y-auto border border-border">
-                {submissions.map((s) => (
-                  <label
-                    key={s.id}
-                    className="flex gap-2 border-b border-border p-3 text-sm"
-                  >
-                    <input type="checkbox" name="submissions" value={s.id} />
-                    <span>
-                      {s.studentName} · {s.problemTitle}
-                      <p className="text-xs text-muted-foreground">
-                        {s.id} · {s.status} · {date(s.createdAt)}
-                      </p>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
+            {operation === "重判" && <RejudgeSubmissionList submissions={submissions} />}
             <Field label={tr("操作原因", "Reason for action")}>
               <textarea
                 name="reason"
@@ -1081,5 +1065,37 @@ export function TeacherTimedProgress({ id }: { id: string }) {
         />
       )}
     </>
+  );
+}
+
+function RejudgeSubmissionList({ submissions }: { submissions: Submission[] }) {
+  const [selected, setSelected] = useState<string[]>([]);
+  const { getRange } = useRangeSelection(submissions);
+  return (
+    <div className="max-h-64 overflow-y-auto border border-border">
+      {submissions.map((submission) => (
+        <label key={submission.id} className="flex gap-2 border-b border-border p-3 text-sm">
+          <input
+            type="checkbox"
+            name="submissions"
+            value={submission.id}
+            checked={selected.includes(submission.id)}
+            onChange={event => {
+              const range = getRange(submission.id, event);
+              const checked = event.currentTarget.checked;
+              setSelected(ids => range || checked
+                ? [...new Set([...ids, ...(range ?? [submission.id])])]
+                : ids.filter(id => id !== submission.id));
+            }}
+          />
+          <span>
+            {submission.studentName} · {submission.problemTitle}
+            <p className="text-xs text-muted-foreground">
+              {submission.id} · {submission.status} · {date(submission.createdAt)}
+            </p>
+          </span>
+        </label>
+      ))}
+    </div>
   );
 }

@@ -18,6 +18,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "@/components/locale-context";
 import { ArrowDown, ArrowUp, Eye, FilePlus2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useRangeSelection } from "@/components/ui/use-range-selection";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
 import { productionApi, type ProductionProblem } from "@/lib/production-api";
 import { ProblemPicker } from "./problem-banks";
@@ -532,6 +533,13 @@ function LearningEditorForm({
     [batchSelected, setBatchSelected] = useState<string[]>([]),
     batchAction = useAction(),
     action = useAction();
+  const { getRange: getBatchRange, resetAnchor: resetBatchAnchor } = useRangeSelection(
+    (batchCandidates ?? []).map(item => ({
+      id: item.problemId,
+      disabled: item.status !== "ready" || batchAction.busy,
+    })),
+    JSON.stringify([path.id, batchPublishOpen, batchPublishLoading]),
+  );
   const localCourse = useRef({ path, chapters });
   useEffect(() => { localCourse.current = { path, chapters }; }, [path, chapters]);
   useEffect(() => {
@@ -617,6 +625,7 @@ function LearningEditorForm({
   };
   const openBatchPublish = async () => {
     if (!canEditCourse) return;
+    resetBatchAnchor();
     setBatchPublishOpen(true);
     setBatchPublishLoading(true);
     setBatchPublishError("");
@@ -1134,8 +1143,14 @@ function LearningEditorForm({
                 <p>{tr(`关联 ${batchCandidates.length} 题 · 可发布 ${batchCandidates.filter((item) => item.status === "ready").length} 题 · 已发布 ${batchCandidates.filter((item) => item.status === "published").length} 题 · 暂不可发布 ${batchCandidates.filter((item) => !["ready", "published"].includes(item.status)).length} 题 · 已选 ${batchSelected.length} 题`,
                   `${batchCandidates.length} linked · ${batchCandidates.filter((item) => item.status === "ready").length} ready · ${batchCandidates.filter((item) => item.status === "published").length} published · ${batchCandidates.filter((item) => !["ready", "published"].includes(item.status)).length} unavailable · ${batchSelected.length} selected`)}</p>
                 <div className="flex gap-2">
-                  <Button size="sm" variant="secondary" disabled={batchAction.busy} onClick={() => setBatchSelected(batchCandidates.filter((item) => item.status === "ready").slice(0, 100).map((item) => item.problemId))}>{tr("全选可发布", "Select ready")}</Button>
-                  <Button size="sm" variant="ghost" disabled={batchAction.busy || !batchSelected.length} onClick={() => setBatchSelected([])}>{tr("清空选择", "Clear")}</Button>
+                  <Button size="sm" variant="secondary" disabled={batchAction.busy} onClick={() => {
+                    resetBatchAnchor();
+                    setBatchSelected(batchCandidates.filter(item => item.status === "ready").slice(0, 100).map(item => item.problemId));
+                  }}>{tr("全选可发布", "Select ready")}</Button>
+                  <Button size="sm" variant="ghost" disabled={batchAction.busy || !batchSelected.length} onClick={() => {
+                    resetBatchAnchor();
+                    setBatchSelected([]);
+                  }}>{tr("清空选择", "Clear")}</Button>
                 </div>
               </div>
               {batchCandidates.filter((item) => item.status === "ready").length > 100 && <p className="mt-2 text-xs text-muted-foreground">{tr("一次最多发布 100 题；完成后可继续发布剩余题目。", "You can publish up to 100 problems per batch. Run another batch for the rest.")}</p>}
@@ -1154,9 +1169,13 @@ function LearningEditorForm({
                     : item.status === "conflicting-links" ? tr("不同章节引用了同题的不同版本，请先统一", "Chapters link different versions of this problem")
                     : tr("当前账号无法发布此题", "Your account cannot publish this problem");
                   return <label key={item.problemId} className={`flex items-start gap-3 border-b border-border px-3 py-2 text-sm last:border-b-0 ${item.status === "ready" ? "cursor-pointer hover:bg-surface-subtle" : "text-muted-foreground"}`}>
-                    <input type="checkbox" className="mt-1 size-4 accent-primary" disabled={item.status !== "ready" || batchAction.busy} checked={batchSelected.includes(item.problemId)} onChange={(event) => setBatchSelected((selected) => event.target.checked
-                      ? selected.length >= 100 ? selected : [...selected, item.problemId]
-                      : selected.filter((id) => id !== item.problemId))} />
+                    <input type="checkbox" className="mt-1 size-4 accent-primary" disabled={item.status !== "ready" || batchAction.busy} checked={batchSelected.includes(item.problemId)} onChange={(event) => {
+                      const range = getBatchRange(item.problemId, event);
+                      const checked = event.currentTarget.checked;
+                      setBatchSelected(selected => range || checked
+                        ? [...new Set([...selected, ...(range ?? [item.problemId])])].slice(0, 100)
+                        : selected.filter(id => id !== item.problemId));
+                    }} />
                     <span className="min-w-0 flex-1"><span className="block break-words font-medium text-foreground">{item.title}</span><span className="mt-0.5 block text-xs">{item.bankName ? `${tr("题库", "Bank")}：${item.bankName} · ` : ""}{status}</span></span>
                   </label>;
                 })}

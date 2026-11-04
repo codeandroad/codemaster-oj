@@ -90,8 +90,9 @@ export interface Assignment {
   coursePathId?: string | null;
   courseTitle?: string | null;
   courseAvailable?: boolean;
+  problemOrder?: "course" | "custom";
   dueAt: string;
-  problems: { problemId: string; points: number; title?: string; versionId?: string; firstAcPoints?: number; rewardPoints?: number }[];
+  problems: { problemId: string; points: number; title?: string; versionId?: string; position?: number; firstAcPoints?: number; rewardPoints?: number }[];
   participants: string[];
   participantDetails?: { identityId: string; name: string; exempt: boolean; hasActivity?: boolean }[];
   grades?: {
@@ -103,6 +104,10 @@ export interface Assignment {
     problems: {
       problemId: string;
       submissionId: string | null;
+      completionSource?: "other_entry" | null;
+      creditedAt?: string | null;
+      hasAssignmentSubmission?: boolean;
+      assignmentAttempts?: number;
       score: number | null;
       status: string;
     }[];

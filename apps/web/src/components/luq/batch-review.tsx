@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { useLocale } from "@/components/locale-context";
 import { SolutionContent } from "@/components/luq/solution-content";
 import { Button } from "@/components/ui/button";
+import { useRangeSelection } from "@/components/ui/use-range-selection";
 import { type EditorTheme } from "@/components/student/editor-themes";
 import { Modal, State, input, panel, useData } from "@/components/teacher/shared";
 import { ApiError, apiMessage, productionApi } from "@/lib/production-api";
@@ -91,14 +92,30 @@ export function LuqBatchReview({ targetType }: { targetType: "problem" | "paper4
   const filtered = items.filter(item => (filter === "all" || item.status === filter)
     && `${itemLabel(item)} ${item.versionId}`.toLowerCase().includes(query.trim().toLowerCase()));
   const visibleDrafts = filtered.filter(selectable);
+  const { getRange, resetAnchor } = useRangeSelection(visibleDrafts.map(item => ({ id: item.contentId! })), JSON.stringify([targetType, filter, query]));
   const selectedItems = items.filter(item => selectable(item) && selected.includes(item.contentId!));
   const allVisible = visibleDrafts.length > 0 && visibleDrafts.every(item => selected.includes(item.contentId!));
   const someVisible = visibleDrafts.some(item => selected.includes(item.contentId!));
   const unavailable = list.loading || Boolean(list.error) || busy;
 
+  function clearSelection() {
+    resetAnchor();
+    setSelected([]);
+  }
+
+  function changeDraftSelection(item: ReviewItem, event: ChangeEvent<HTMLInputElement>) {
+    const id = item.contentId;
+    if (!id || !selectable(item)) return;
+    const checked = event.currentTarget.checked;
+    const range = getRange(id, event);
+    setSelected(current => range || checked
+      ? [...new Set([...current, ...(range ?? [id])])]
+      : current.filter(selectedId => selectedId !== id));
+  }
+
   function refresh() {
     if (lock.current) return;
-    setSelected([]);
+    clearSelection();
     setBatch(null);
     setPreview(null);
     setReviewed(false);
@@ -108,6 +125,7 @@ export function LuqBatchReview({ targetType }: { targetType: "problem" | "paper4
     list.reload();
   }
   function toggleVisible() {
+    resetAnchor();
     setSelected(current => allVisible
       ? current.filter(id => !visibleDrafts.some(item => item.contentId === id))
       : [...new Set([...current, ...visibleDrafts.map(item => item.contentId!)])]);
@@ -137,7 +155,7 @@ export function LuqBatchReview({ targetType }: { targetType: "problem" | "paper4
         `已审核发布 ${result.publishedCount} 项题解${result.alreadyPublishedCount ? `，另有 ${result.alreadyPublishedCount} 项已发布，本次未重复发布` : ""}。解锁价格及活动开放规则保持不变。`,
         `Published ${result.publishedCount} reviewed solutions${result.alreadyPublishedCount ? `; ${result.alreadyPublishedCount} were already published and were not published again` : ""}. Unlock prices and activity access rules are unchanged.`,
       ));
-      setSelected([]);
+      clearSelection();
       setBatch(null);
       setReviewed(false);
       list.reload();
@@ -167,7 +185,7 @@ export function LuqBatchReview({ targetType }: { targetType: "problem" | "paper4
     <div className="flex flex-wrap items-center gap-2">
       <input className={`${input} max-w-sm`} aria-label={tx("搜索待审核题解", "Search solution reviews")} placeholder={tx("搜索题目、试卷、大题或版本", "Search problem, paper, question or version")} value={query} onChange={event => setQuery(event.target.value)}/>
       <Button size="sm" variant="secondary" disabled={unavailable || !visibleDrafts.length} onClick={toggleVisible}>{allVisible ? tx("取消筛选内待审核", "Deselect filtered drafts") : tx("全选筛选内待审核", "Select filtered drafts")}</Button>
-      <Button size="sm" variant="ghost" disabled={busy || !selected.length} onClick={() => setSelected([])}>{tx("清空", "Clear")}</Button>
+      <Button size="sm" variant="ghost" disabled={busy || !selected.length} onClick={clearSelection}>{tx("清空", "Clear")}</Button>
       <span className="text-xs text-muted-foreground" role="status">{tx(`已选 ${selectedItems.length} 项`, `${selectedItems.length} selected`)}</span>
       <Button size="sm" className="sm:ml-auto" disabled={unavailable || !selectedItems.length || selectedItems.length > 500} onClick={confirm}>{tx("审核并发布所选", "Review and publish selected")}</Button>
     </div>
@@ -184,7 +202,7 @@ export function LuqBatchReview({ targetType }: { targetType: "problem" | "paper4
           <th scope="col" className="px-2 py-2">{tx("操作", "Actions")}</th>
         </tr></thead>
         <tbody>{filtered.map(item => <tr key={`${item.targetId}:${item.questionKey ?? ""}:${item.versionId}`} className="border-t border-border align-top hover:bg-surface-subtle/50">
-          <td className="p-2 text-center"><input type="checkbox" aria-label={tx(`选择 ${itemLabel(item)}`, `Select ${itemLabel(item)}`)} checked={Boolean(item.contentId && selected.includes(item.contentId))} disabled={busy || !selectable(item)} onChange={event => setSelected(current => event.target.checked ? [...new Set([...current, item.contentId!])] : current.filter(id => id !== item.contentId))}/></td>
+          <td className="p-2 text-center"><input type="checkbox" aria-label={tx(`选择 ${itemLabel(item)}`, `Select ${itemLabel(item)}`)} checked={Boolean(item.contentId && selected.includes(item.contentId))} disabled={busy || !selectable(item)} onChange={event => changeDraftSelection(item, event)}/></td>
           <td className="break-words px-2 py-2"><span className="font-medium">{item.title}</span>{item.questionKey && <span className="mt-0.5 block text-xs text-muted-foreground">{item.questionKey}{item.questionTitle ? ` · ${item.questionTitle}` : ""}</span>}</td>
           <td className="px-2 py-2"><code className="text-xs" title={item.versionId}>{item.versionId.slice(0, 8)}</code></td>
           <td className="px-2 py-2"><span className={`inline-block rounded border px-1.5 py-0.5 text-xs ${statusStyle[item.status]}`}>{statusLabel(item.status, tx)}</span></td>

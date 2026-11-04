@@ -1,16 +1,14 @@
 "use client";
 
-import { Languages } from "lucide-react";
 import type { ReactNode } from "react";
 import { BrandLogo } from "@/components/brand-logo";
 import { useLocale } from "@/components/locale-context";
-import { Button } from "@/components/ui/button";
 import { usePublicSite } from "./site-info";
 import styles from "./auth-shell.module.css";
 
 /** Public authentication uses the system's light palette, outside workspace themes. */
 export function AuthShell({ children, titleId = "login-title" }: { children: ReactNode; titleId?: string }) {
-  const { locale, setLocale } = useLocale();
+  const { locale } = useLocale();
   const site = usePublicSite();
   const tx = (zh: string, en: string) => locale === "en" ? en : zh;
   const roles = [
@@ -19,7 +17,7 @@ export function AuthShell({ children, titleId = "login-title" }: { children: Rea
   ];
   return <main className={styles.page}>
     <div className={styles.frame}>
-      <aside className={styles.introduction} aria-label={tx("CodeMaster OJ 简介", "About CodeMaster OJ")}>
+      <aside className={styles.introduction} aria-label={tx("CodeMaster 简介", "About CodeMaster")}>
         <div className={styles.brand}>
           <BrandLogo className={styles.logo} />
           <p className={styles.school} title={site.schoolName}>{site.schoolName}</p>
@@ -35,11 +33,6 @@ export function AuthShell({ children, titleId = "login-title" }: { children: Rea
         {children}
       </section>
     </div>
-    <footer className={styles.footer}>
-      <Button type="button" variant="ghost" className={styles.language} onClick={() => setLocale(locale === "en" ? "zh" : "en")} aria-label={locale === "en" ? "切换为简体中文" : "Switch to English"}>
-        <Languages size={15} aria-hidden="true" />{locale === "en" ? "简体中文" : "English"}
-      </Button>
-    </footer>
   </main>;
 }
 

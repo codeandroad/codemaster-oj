@@ -9,6 +9,15 @@ import { applyResponse } from '../domain.response.js';
 export class CommunityController {
  constructor(private readonly domain: DomainService) {}
 
+ @Get('presence')
+ async presence(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
+  return applyResponse(response,await this.domain.execute('presence',request.domainContext));
+ }
+ @Post('presence/heartbeat')
+ async heartbeat(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
+  return applyResponse(response,await this.domain.execute('presence',request.domainContext));
+ }
+
  @Get('student-notifications')
  async notifications(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));

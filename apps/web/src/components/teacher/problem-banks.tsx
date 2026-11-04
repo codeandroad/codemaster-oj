@@ -1,6 +1,8 @@
 "use client";
 import { ProblemPublicationStatus, PublicationGuide } from "@/components/problem-publication-status";
 import {ProblemFilter} from "./problem-filter";
+import { useProblemSelection } from "./use-problem-selection";
+import { courseProblemOrder } from "./assignment-problem-order";
 import styles from "./problem-banks.module.css";
 
 import { AppLink as Link } from "@/components/navigation";
@@ -19,6 +21,7 @@ import {
   Upload,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { useRangeSelection } from "@/components/ui/use-range-selection";
 import { PageHeader } from "@/components/page-chrome";
 import { useLocale, type AppLocale } from "@/components/locale-context";
 import { productionApi, type CampusUser, type ProductionProblem } from "@/lib/production-api";
@@ -68,7 +71,7 @@ export function validationStatusLabel(status: string, locale: AppLocale) {
   if (locale === "en") return status;
   return ({ Draft: "草稿", Incomplete: "待完善", Waiting: "排队中", Judging: "评测中", "System Error": "系统错误", Published: "已发布" } as Record<string, string>)[status] ?? status;
 }
-export function reviewVisibilityLabel(problem: ProductionProblem, bankVisibility?: "school" | "private", locale: AppLocale = "zh") {
+export function reviewVisibilityLabel(problem: ProductionProblem, bankVisibility?: "school" | "private", locale: AppLocale = "en") {
   if (!problem.published) return problem.publishedVersionId ? localText(locale,"当前草稿未开放 · 旧版保持原范围","Current draft unavailable · previous version retains its scope") : localText(locale,"草稿未向学生开放","Draft unavailable to students");
   const visibility = problem.bankVisibility ?? bankVisibility;
   if (visibility !== "school") return localText(locale,"仅指定活动学生可见","Only visible to assigned activity students");
@@ -102,7 +105,6 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
     [filterBank, setFilterBank] = useState(""),
     [filterGroup, setFilterGroup] = useState(""),
     [filterStatus, setFilterStatus] = useState(""),
-    [checked, setChecked] = useState<string[]>([]),
     [confirmPublish, setConfirmPublish] = useState(false),
     [create, setCreate] = useState(false),
     [deletingBank, setDeletingBank] = useState<Bank | null>(null),
@@ -135,6 +137,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
             .toLowerCase()
             .includes(query.toLowerCase()),
       ) ?? [];
+  const { checked, setChecked, changeRow } = useProblemSelection(rows, JSON.stringify([bankId, tab, query, filterBank, filterGroup, filterStatus]));
   const checkedProblems = (problems.data?.items ?? []).filter((problem) => checked.includes(problem.id));
   const publishableSelection = checkedProblems.filter((problem) => !publishEligibilityReason(problem, locale));
   const excludedSelection = checkedProblems.filter((problem) => publishEligibilityReason(problem, locale));
@@ -434,13 +437,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                       type="checkbox"
                       aria-label={`${tr("选择", "Select")} ${problem.title}`}
                       checked={checked.includes(problem.id)}
-                      onChange={(e) =>
-                        setChecked((x) =>
-                          e.target.checked
-                            ? [...x, problem.id]
-                            : x.filter((id) => id !== problem.id),
-                        )
-                      }
+                      onChange={(event) => changeRow(problem.id, event)}
                     />
                   </td>
                   <td>
@@ -773,6 +770,14 @@ export function ManageGroups({
     [mode, setMode] = useState(initialMode ?? "添加到分组"),
     [source, setSource] = useState(initialSource ?? ""),
     action = useAction();
+  const rows = (groups.data?.items ?? [])
+    .filter((group) => group.name.toLowerCase().includes(query.toLowerCase()) &&
+      (mode !== "移出分组" || problemIds.some(id => group.problemIds.includes(id))))
+    .map((group) => ({
+      ...group,
+      disabled: !group.canEdit || (mode === "移动分组" && group.id === source) || action.busy,
+    }));
+  const { getRange } = useRangeSelection(rows, JSON.stringify([bankId, mode, query, source]));
   return (
     <Modal title={tr("整理分组", "Organize groups")} onClose={onClose}>
       <Tabs
@@ -811,9 +816,7 @@ export function ManageGroups({
         </Field>
       )}
       <div className="mt-3 max-h-64 overflow-auto border border-border">
-        {groups.data?.items
-          .filter((g) => g.name.toLowerCase().includes(query.toLowerCase()) && (mode!=="移出分组" || problemIds.some(id=>g.problemIds.includes(id))))
-          .map((g) => (
+        {rows.map((g) => (
             <label
               key={g.id}
               className="flex min-h-11 items-center gap-3 border-b border-border px-3 py-2 text-sm hover:bg-muted"
@@ -821,14 +824,14 @@ export function ManageGroups({
               <input
                 type="checkbox"
                 checked={picked.includes(g.id)}
-                disabled={!g.canEdit || (mode === "移动分组" && g.id === source) || action.busy}
-                onChange={(e) =>
-                  setPicked((x) =>
-                    e.target.checked
-                      ? [...x, g.id]
-                      : x.filter((id) => id !== g.id),
-                  )
-                }
+                disabled={g.disabled}
+                onChange={(event) => {
+                  const range = getRange(g.id, event);
+                  const checked = event.currentTarget.checked;
+                  setPicked(ids => range || checked
+                    ? [...new Set([...ids, ...(range ?? [g.id])])]
+                    : ids.filter(id => id !== g.id));
+                }}
               />
               <span>
                 <b>{g.name}</b>
@@ -840,7 +843,7 @@ export function ManageGroups({
               </span>
             </label>
           ))}
-        {!groups.loading&&!groups.error&&!groups.data?.items.some(g=>g.name.toLowerCase().includes(query.toLowerCase())&&(mode!=="移出分组"||problemIds.some(id=>g.problemIds.includes(id))))&&<p className="p-3 text-sm text-muted-foreground">{query?tr("没有匹配的分组。","No matching groups."):mode==="移出分组"?tr("所选题目尚未加入任何分组。","Selected problems are not in any group."):tr("此题库暂无分组，可在下方新建。","No groups yet. Create one below.")}</p>}
+        {!groups.loading&&!groups.error&&!rows.length&&<p className="p-3 text-sm text-muted-foreground">{query?tr("没有匹配的分组。","No matching groups."):mode==="移出分组"?tr("所选题目尚未加入任何分组。","Selected problems are not in any group."):tr("此题库暂无分组，可在下方新建。","No groups yet. Create one below.")}</p>}
       </div>
       {mode === "添加到分组" && (
         <Field label={tr("新建分组（可选）", "New group (optional)")}>
@@ -910,11 +913,13 @@ export function ProblemPicker({
   onClose,
   onAdd,
   courseMode,
+  orderedProblemIds,
 }: {
   selected: string[];
   onClose: () => void;
   onAdd: (items: ProductionProblem[]) => void;
   courseMode?: "draft" | "published";
+  orderedProblemIds?: readonly string[];
 }) {
   const { locale } = useLocale();
   const tr = (zh: string, en: string) => localText(locale, zh, en);
@@ -925,8 +930,9 @@ export function ProblemPicker({
     [group, setGroup] = useState(""),
     [query, setQuery] = useState(""),
     [picked, setPicked] = useState<string[]>([]);
+  const orderedProblems = courseProblemOrder(problems.data?.items ?? [], orderedProblemIds ?? [], problem => problem.id);
   const rows =
-    problems.data?.items.filter(
+    orderedProblems.filter(
       (p) =>
         (!courseMode || (p.bankVisibility === "school" && (courseMode === "published" || p.canEdit))) &&
         (!bank || p.bankId === bank) &&
@@ -937,7 +943,16 @@ export function ProblemPicker({
         `${p.title} ${p.tags?.join(" ")}`
           .toLowerCase()
           .includes(query.toLowerCase()),
-    ) ?? [];
+    ).map((problem) => {
+      const exists = selected.includes(problem.id);
+      const courseReady = problem.published && problem.bankVisibility === "school" &&
+        Boolean(problem.schoolVisibleAt) && problem.rankReviewStatus === "approved";
+      const available = courseMode === "draft" || (courseMode === "published"
+        ? courseReady
+        : problem.published || Boolean(problem.publishedVersionId));
+      return { problem, id: problem.id, exists, courseReady, available, disabled: exists || !available };
+    });
+  const { getRange, resetAnchor } = useRangeSelection(rows, JSON.stringify([courseMode, bank, group, query, orderedProblemIds]));
   return (
     <Drawer title={tr("从题库与分组选择", "Choose from banks and groups")} onClose={onClose}>
       <p className="text-xs text-muted-foreground">
@@ -946,6 +961,7 @@ export function ProblemPicker({
           : courseMode === "published"
             ? tr("课程只能添加已通过管理员审核的校内公开题目。", "Only admin-approved school-wide problems can be added to a published course.")
             : tr("题库 → 分组 → 题目。多组同题只显示一次，已加入的题目保留选择状态。", "Bank → group → problem. Problems in multiple groups appear once; already added problems stay selected.")}
+        {" "}{tr("先勾选一项，再按住 Shift 点击另一项，即可选中当前列表中两者之间的可选题目。", "Select a problem, then Shift-click another to select all eligible problems in between in the current list.")}
       </p>
       <div className="mt-4 grid grid-cols-2 gap-3">
         <select
@@ -990,27 +1006,20 @@ export function ProblemPicker({
       </div>
       <State resource={banks} /><State resource={groups} /><State resource={problems} />
       <div className="mt-4 divide-y divide-border border border-border">
-        {rows.map((p) => {
-          const exists = selected.includes(p.id),
-            courseReady = p.published && p.bankVisibility === "school" && Boolean(p.schoolVisibleAt) && p.rankReviewStatus === "approved",
-            available = courseMode === "draft"
-              ? true
-              : courseMode === "published"
-                ? courseReady
-                : p.published || Boolean(p.publishedVersionId);
+        {rows.map(({ problem: p, exists, courseReady, available, disabled }) => {
           return (
             <label key={p.id} className="flex gap-3 p-4 text-sm">
               <input
                 type="checkbox"
-                disabled={exists || !available}
+                disabled={disabled}
                 checked={exists || picked.includes(p.id)}
-                onChange={(e) =>
-                  setPicked((x) =>
-                    e.target.checked
-                      ? [...x, p.id]
-                      : x.filter((id) => id !== p.id),
-                  )
-                }
+                onChange={(event) => {
+                  const range = getRange(p.id, event);
+                  const checked = event.currentTarget.checked;
+                  setPicked(ids => range || checked
+                    ? [...new Set([...ids, ...(range ?? [p.id])])]
+                    : ids.filter(id => id !== p.id));
+                }}
               />
               <span>
                 <b>{courseMode ? p.title : p.publishedTitle ?? p.title}</b>
@@ -1055,19 +1064,10 @@ export function ProblemPicker({
       <div className="mt-5 flex flex-wrap justify-between gap-3">
         <Button
           variant="secondary"
-          onClick={() =>
-            setPicked(
-              rows
-                .filter(
-                  (p) =>
-                    (courseMode === "draft" || courseMode === "published"
-                      ? courseMode === "draft" || (p.published && p.bankVisibility === "school" && Boolean(p.schoolVisibleAt) && p.rankReviewStatus === "approved")
-                      : p.published || p.publishedVersionId) &&
-                    !selected.includes(p.id),
-                )
-                .map((p) => p.id),
-            )
-          }
+          onClick={() => {
+            resetAnchor();
+            setPicked(rows.filter(row => !row.disabled).map(row => row.id));
+          }}
         >
           {courseMode === "draft"
             ? tr("选择当前范围全部题目", "Select all problems in scope")
@@ -1083,7 +1083,7 @@ export function ProblemPicker({
             disabled={!picked.length || problems.loading || !!problems.error}
             onClick={() =>
               onAdd(
-                (problems.data?.items ?? []).filter((x) =>
+                orderedProblems.filter((x) =>
                   picked.includes(x.id),
                 ),
               )

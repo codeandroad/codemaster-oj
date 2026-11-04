@@ -1,4 +1,5 @@
 "use client";
+import { OnlineStudents } from "@/components/student/student-presence";
 
 import { Fragment, useCallback, useEffect, useReducer, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -412,6 +413,7 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
           </section>}
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4"><span className="text-xs text-muted-foreground">{latestSnapshot ? tx(`检查点已保存 · ${paper4Date(latestSnapshot.createdAt, locale)}`, `Checkpoint saved · ${paper4Date(latestSnapshot.createdAt, locale)}`) : tx("本阶段尚无检查点", "No checkpoint for this stage")}</span><Button size="sm" variant="secondary" disabled={frozen || busy || saveStatus === "error" || !stage} onClick={() => void mutate(async () => { await saveFile(current.key); await productionApi(`paper4/attempts/${encodeURIComponent(attempt.id)}/checkpoints`, { method: "POST", body: { stageId: stage!.id } }); setAttempt(await productionApi<Paper4Attempt>(`paper4/attempts/${encodeURIComponent(attempt.id)}`)); setMessage(tx("阶段检查点已保存。", "Stage checkpoint saved.")); })}><Bookmark size={15}/>{tx("保存检查点", "Save checkpoint")}</Button></div></div>{leftTab === "solutions" && <Paper4Solutions key={`${attempt.id}:${current.key}`} attemptId={attempt.id} questionKey={current.key} locked={!freePractice && attempt.paper.activityKind === "exam" && !attempt.releasedAt} theme={solutionTheme} onThemeChange={setSolutionTheme}/>}
         </div>
+        <OnlineStudents identityId={user.identityId}/>
       </section>
       <div role="separator" aria-label={tx("调整题目与代码区域宽度", "Resize problem and code panels")} aria-orientation="vertical" aria-valuemin={25} aria-valuemax={70} aria-valuenow={settings.panelPercent} tabIndex={0} onPointerDown={widthStart} onPointerMove={widthMove} onPointerUp={widthEnd} onPointerCancel={widthEnd} onLostPointerCapture={widthEnd} onKeyDown={event => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); update({ panelPercent: settings.panelPercent + (event.key === "ArrowLeft" ? -2 : 2) }); } }} className={styles.separator}/>
       <div ref={rightRef} className={rightClass} style={{ "--workspace-editor-height": `${layout.editorPercent}%` } as CSSProperties}>

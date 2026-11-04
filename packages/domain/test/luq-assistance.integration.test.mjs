@@ -37,6 +37,7 @@ async function fixture(run){
    await call(teacher,`/luq/contents/${draft.id}/publish`,{reviewed:true});return draft;
   }
   async function grant(user,amount){return transaction(pool,db=>postLuqEntry(db,{identityId:user.identityId,delta:amount,kind:'admin_grant',sourceKey:randomUUID(),reason:'Test grant',actorAccountId:admin.id}));}
+  async function refund(user,entry){return transaction(pool,db=>postLuqEntry(db,{identityId:user.identityId,delta:-entry.delta,kind:'refund',sourceKey:`refund:${entry.id}`,refundOf:entry.id,reason:'Test refund',actorAccountId:admin.id}));}
   const quote=(user,target,kind='FULL_SOLUTION')=>call(user,'/luq/assistance/quote',{...target,kind});
   const provide=(user,target,kind='FULL_SOLUTION')=>call(user,'/luq/assistance/provide',{...target,kind});
   async function unlock(user,target,kind='FULL_SOLUTION',requestKey=randomUUID()){
@@ -44,10 +45,78 @@ async function fixture(run){
   }
   async function submit(user,target){return (await pool.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,code,idempotency_key,request_hash)
    VALUES($1,$2,$3,$4,'submit','print(1)',$5,'fixture') RETURNING *`,[user.id,user.identityId,target.problemId,target.versionId,randomUUID()])).rows[0];}
-  await run({pool,teacher,otherTeacher,student,otherStudent,admin,call,problem,version,publish,grant,quote,provide,unlock,submit});
+  await run({pool,teacher,otherTeacher,student,otherStudent,admin,call,problem,version,publish,grant,refund,quote,provide,unlock,submit});
  }finally{await pool.end();await manager.query(`DROP SCHEMA ${schema} CASCADE`);await manager.end();}
 }
 const rejects=(promise,code)=>assert.rejects(promise,error=>error.code===code);
+
+test('Luq solution credit follows the actual paid translation across versions and charges only once',options,async()=>fixture(async f=>{
+ const target=await f.problem(),other=await f.problem();
+ await f.publish(target,'FULL_TRANSLATION','中文题面');
+ const next=await f.version(target.problemId);
+ await f.publish(next);await f.publish(other);
+ await f.grant(f.student,8);
+ const original=await f.quote(f.student,next);
+ assert.equal((await f.unlock(f.student,target,'FULL_TRANSLATION')).charged,3);
+ await f.call(f.teacher,'/luq/policies',{targetType:'problem',targetId:target.problemId,kind:'FULL_TRANSLATION',mode:'paid',price:7});
+ const discounted=await f.quote(f.student,next);
+ assert.deepEqual([discounted.basePrice,discounted.translationCredit,discounted.price,discounted.balanceAfter],[8,3,5,0]);
+ assert.equal((await f.quote(f.student,other)).price,8);
+ assert.equal((await f.quote(f.otherStudent,next)).price,8);
+ await rejects(f.call(f.student,'/luq/assistance/unlock',{...next,kind:'FULL_SOLUTION',requestKey:randomUUID(),
+  confirmedPrice:original.price,confirmedContentId:original.contentId}),'QUOTE_CHANGED');
+ const results=await Promise.all(Array.from({length:3},()=>f.unlock(f.student,next)));
+ assert.equal(results.reduce((total,result)=>total+result.charged,0),5);
+ assert.ok(results.every(result=>result.balance===0));
+ const purchases=(await f.pool.query("SELECT id,delta,metadata FROM luq_ledger WHERE kind='purchase' ORDER BY id")).rows;
+ assert.deepEqual(purchases.map(entry=>entry.delta),[-3,-5]);
+ assert.equal(purchases[1].metadata.translationCreditLedgerId,purchases[0].id);
+ await rejects(f.refund(f.student,purchases[0]),'LUQ_TRANSLATION_CREDIT_USED');
+ assert.equal((await f.quote(f.student,next)).balance,0);
+}));
+
+test('Luq excludes refunded translations and preserves zero-charge credited unlocks with request-key replay',options,async()=>fixture(async f=>{
+ const target=await f.problem(),other=await f.problem();
+ await f.publish(target);await f.publish(target,'FULL_TRANSLATION','中文题面');await f.publish(other);
+ for(const user of [f.student,f.otherStudent]){
+  await f.grant(user,3);await f.unlock(user,target,'FULL_TRANSLATION');
+ }
+ const refunded=(await f.pool.query("SELECT id,delta FROM luq_ledger WHERE identity_id=$1 AND kind='purchase'",[f.otherStudent.identityId])).rows[0];
+ await f.refund(f.otherStudent,refunded);
+ assert.deepEqual([(await f.quote(f.otherStudent,target)).price,(await f.quote(f.otherStudent,target)).balance],[8,3]);
+ await f.call(f.teacher,'/luq/policies',{targetType:'problem',targetId:target.problemId,kind:'FULL_SOLUTION',mode:'paid',price:2});
+ const q=await f.quote(f.student,target);
+ assert.deepEqual([q.price,q.translationCredit,q.mode,q.requiresConfirmation],[0,2,'paid',true]);
+ await rejects(f.provide(f.student,target),'UNLOCK_REQUIRED');
+ const requestKey=randomUUID();
+ const first=await f.unlock(f.student,target,'FULL_SOLUTION',requestKey),replay=await f.unlock(f.student,target,'FULL_SOLUTION',requestKey);
+ assert.equal(first.unlocked,true);assert.equal(first.charged,0);assert.equal(replay.entitlementId,first.entitlementId);
+ await rejects(f.unlock(f.student,other,'FULL_SOLUTION',requestKey),'IDEMPOTENCY_CONFLICT');
+ await f.call(f.teacher,'/luq/policies',{targetType:'problem',targetId:target.problemId,kind:'FULL_SOLUTION',mode:'paid',price:8});
+ assert.equal((await f.quote(f.student,target)).unlocked,true);assert.ok((await f.provide(f.student,target)).body);
+ assert.equal((await f.pool.query("SELECT count(*)::int n FROM luq_ledger WHERE identity_id=$1 AND kind='purchase'",[f.student.identityId])).rows[0].n,1);
+ const translation=(await f.pool.query("SELECT id,delta FROM luq_ledger WHERE identity_id=$1 AND kind='purchase'",[f.student.identityId])).rows[0];
+ await rejects(f.refund(f.student,translation),'LUQ_TRANSLATION_CREDIT_USED');
+}));
+
+test('Luq serializes a translation refund against spending its credit',options,async()=>fixture(async f=>{
+ const target=await f.problem();await f.publish(target);await f.publish(target,'FULL_TRANSLATION','中文题面');
+ await f.grant(f.student,8);await f.unlock(f.student,target,'FULL_TRANSLATION');
+ const translation=(await f.pool.query("SELECT id,delta FROM luq_ledger WHERE identity_id=$1 AND kind='purchase'",[f.student.identityId])).rows[0];
+ const q=await f.quote(f.student,target);
+ const [purchase,refund]=await Promise.allSettled([
+  f.call(f.student,'/luq/assistance/unlock',{...target,kind:'FULL_SOLUTION',requestKey:randomUUID(),confirmedPrice:q.price,confirmedContentId:q.contentId}),
+  f.refund(f.student,translation),
+ ]);
+ const after=await f.quote(f.student,target);
+ if(purchase.status==='fulfilled'){
+  assert.equal(purchase.value.charged,5);assert.equal(refund.reason?.code,'LUQ_TRANSLATION_CREDIT_USED');
+  assert.equal(after.balance,0);assert.equal(after.unlocked,true);
+ }else{
+  assert.equal(refund.status,'fulfilled');assert.equal(purchase.reason.code,'QUOTE_CHANGED');
+  assert.equal(after.balance,8);assert.equal(after.price,8);assert.equal(after.unlocked,false);
+ }
+}));
 
 test('Luq reviewed assistance has no body in quotes/unlocks, exact funds and concurrent unlocks charge once',options,async()=>fixture(async f=>{
  const target=await f.problem();

@@ -2,10 +2,11 @@
 
 import { AppLink } from "@/components/navigation";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Ban, KeyRound, Link2, Pencil, Plus, Trash2, Undo2, Unlink } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { useRangeSelection } from "@/components/ui/use-range-selection";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
 import { genderLabel, genderOptions } from "@/lib/gender";
 import { productionApi, type CampusAccount, type CampusGender, type CampusRole, type Person, type SchoolClass } from "@/lib/production-api";
@@ -96,7 +97,15 @@ function DeleteIdentityDialog({person,onClose,onDeleted}:{person:AdminPerson;onC
 }
 
 function ClassPicker({classes,value,onChange,kind}:{classes:SchoolClass[];value:string[];onChange:(v:string[])=>void;kind:string}) { const t=useAdminText();
-  return <fieldset className="border border-border p-3"><legend className="px-1 text-sm font-semibold">{kind==="student"?"所在班级":"负责班级"}{t("（可选）")}</legend><div className="flex flex-wrap gap-3">{classes.map(c=><label key={c.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={value.includes(c.id)} onChange={e=>onChange(e.target.checked?[...value,c.id]:value.filter(id=>id!==c.id))}/>{c.name}</label>)}</div>{!classes.length&&<p className="text-sm text-muted-foreground">{t("暂无班级，可先建立身份。")}</p>}</fieldset>;
+  const { getRange } = useRangeSelection(classes, kind);
+  function changeClass(id: string, event: ChangeEvent<HTMLInputElement>) {
+    const range = getRange(id, event);
+    onChange(range || event.currentTarget.checked
+      ? [...new Set([...value, ...(range ?? [id])])]
+      : value.filter((classId) => classId !== id));
+  }
+
+  return <fieldset className="border border-border p-3"><legend className="px-1 text-sm font-semibold">{kind==="student"?"所在班级":"负责班级"}{t("（可选）")}</legend><div className="flex flex-wrap gap-3">{classes.map(c=><label key={c.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={value.includes(c.id)} onChange={(event) => changeClass(c.id, event)}/>{c.name}</label>)}</div>{!classes.length&&<p className="text-sm text-muted-foreground">{t("暂无班级，可先建立身份。")}</p>}</fieldset>;
 }
 function CreateIdentity({kind,classes,onClose,onCreated}:{kind:"student"|"teacher";classes:SchoolClass[];onClose:()=>void;onCreated:(r:{person:AdminPerson;activationCode:string})=>void}) { const t=useAdminText();
   const [classIds,setClassIds]=useState<string[]>([]),action=useMutation();
@@ -112,5 +121,22 @@ function GenerateCodesDialog({classes,onClose}:{classes:SchoolClass[];onClose:()
   const people=useData<{items:AdminPerson[]}>("people"),[kind,setKind]=useState("all"),[classId,setClassId]=useState("all"),[picked,setPicked]=useState<string[]>([]),[result,setResult]=useState<{person:AdminPerson;activationCode:string}[]|null>(null),action=useMutation();
   const shown=(people.data?.items??[]).filter(p=>p.kind!=="admin"&&!p.activated&&(kind==="all"||p.kind===kind)&&(classId==="all"||p.classes?.some(c=>c.id===classId)));
   const allOn=shown.length>0&&shown.every(p=>picked.includes(p.id));
-  return <Modal title={t("生成激活码" )} description={t("为待激活的身份生成一次性激活码；重新生成会使旧码作废。" )} onClose={onClose} wide>{!result?<><div className="flex flex-wrap gap-2"><select aria-label={t("激活身份类型" )} value={kind} onChange={e=>setKind(e.target.value)} className={`${inputClass} w-36`}><option value="all">{t("学生与教师")}</option><option value="student">{t("学生")}</option><option value="teacher">{t("教师")}</option></select><select aria-label={t("激活身份班级" )} value={classId} onChange={e=>setClassId(e.target.value)} className={`${inputClass} w-40`}><option value="all">{t("全部班级")}</option>{classes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><label className="ml-auto flex items-center gap-2 text-sm"><input type="checkbox" checked={allOn} onChange={()=>setPicked(allOn?picked.filter(id=>!shown.some(p=>p.id===id)):[...new Set([...picked,...shown.map(p=>p.id)])])}/>{t("全选当前列表")}</label></div><Loading resource={people}><div className="max-h-80 overflow-auto border border-border"><table className="w-full text-left text-sm"><thead className="bg-surface-subtle text-xs text-muted-foreground"><tr>{["选择","编号","姓名","类型","班级"].map(h=><th key={h} className="px-4 py-3">{t(h)}</th>)}</tr></thead><tbody>{shown.map(p=><tr key={p.id} className="border-t border-border"><td className="px-4 py-3"><input type="checkbox" aria-label={`选择 ${p.name}`} checked={picked.includes(p.id)} onChange={e=>setPicked(e.target.checked?[...picked,p.id]:picked.filter(id=>id!==p.id))}/></td><td className="px-4 py-3 font-mono text-xs">{p.number}</td><td className="px-4 py-3">{p.name}</td><td className="px-4 py-3">{t(p.kind==="student"?"学生":"教师")}</td><td className="px-4 py-3">{p.classes?.map(c=>c.name).join("、")||"未分配"}</td></tr>)}{!shown.length&&<tr><td colSpan={5} className="p-8 text-center text-muted-foreground">{t("当前筛选下没有待激活身份。")}</td></tr>}</tbody></table></div></Loading><Feedback action={action}/><div className="flex justify-end gap-2"><Button variant="secondary" onClick={onClose}>{t("取消")}</Button><Button disabled={action.busy||!picked.length} onClick={()=>action.run(async()=>{const r=await productionApi<{items:{person:AdminPerson;activationCode:string}[]}>("people/activation-batch",{method:"POST",body:{identityIds:picked}});setResult(r.items);})}>{t("生成")} {picked.length} {t("个激活码")}</Button></div></>:<><div className="max-h-80 overflow-auto border border-border"><table className="w-full text-left text-sm"><thead className="bg-surface-subtle"><tr>{["编号","姓名","激活码","操作"].map(h=><th key={h} className="p-3">{t(h)}</th>)}</tr></thead><tbody>{result.map(r=><tr key={r.person.id} className="border-t border-border"><td className="p-3">{r.person.number}</td><td className="p-3">{r.person.name}</td><td className="p-3"><code className="select-all break-all">{r.activationCode}</code></td><td className="p-3"><CopyCode text={r.activationCode}/></td></tr>)}</tbody></table></div><p className="text-xs text-muted-foreground">{t("请私下交付。关闭后清除明文，有效期 7 天。")}</p><div className="flex justify-end gap-2"><CopyCode text={result.map(r=>`${r.person.number}\t${r.person.name}\t${r.activationCode}`).join("\n")} label={t("复制全部" )}/><Button onClick={onClose}>{t("已记录，关闭")}</Button></div></>}</Modal>;
+  const { getRange, resetAnchor } = useRangeSelection(shown, JSON.stringify([kind, classId]));
+
+  function changePerson(id: string, event: ChangeEvent<HTMLInputElement>) {
+    const checked = event.currentTarget.checked;
+    const range = getRange(id, event);
+    setPicked((ids) => range || checked
+      ? [...new Set([...ids, ...(range ?? [id])])]
+      : ids.filter((personId) => personId !== id));
+  }
+
+  function toggleShown() {
+    resetAnchor();
+    const shownIds = new Set(shown.map((person) => person.id));
+    setPicked((ids) => allOn
+      ? ids.filter((id) => !shownIds.has(id))
+      : [...new Set([...ids, ...shownIds])]);
+  }
+  return <Modal title={t("生成激活码" )} description={t("为待激活的身份生成一次性激活码；重新生成会使旧码作废。" )} onClose={onClose} wide>{!result?<><div className="flex flex-wrap gap-2"><select aria-label={t("激活身份类型" )} value={kind} onChange={e=>setKind(e.target.value)} className={`${inputClass} w-36`}><option value="all">{t("学生与教师")}</option><option value="student">{t("学生")}</option><option value="teacher">{t("教师")}</option></select><select aria-label={t("激活身份班级" )} value={classId} onChange={e=>setClassId(e.target.value)} className={`${inputClass} w-40`}><option value="all">{t("全部班级")}</option>{classes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select><label className="ml-auto flex items-center gap-2 text-sm"><input type="checkbox" checked={allOn} onChange={toggleShown}/>{t("全选当前列表")}</label></div><Loading resource={people}><div className="max-h-80 overflow-auto border border-border"><table className="w-full text-left text-sm"><thead className="bg-surface-subtle text-xs text-muted-foreground"><tr>{["选择","编号","姓名","类型","班级"].map(h=><th key={h} className="px-4 py-3">{t(h)}</th>)}</tr></thead><tbody>{shown.map(p=><tr key={p.id} className="border-t border-border"><td className="px-4 py-3"><input type="checkbox" aria-label={`选择 ${p.name}`} checked={picked.includes(p.id)} onChange={(event) => changePerson(p.id, event)}/></td><td className="px-4 py-3 font-mono text-xs">{p.number}</td><td className="px-4 py-3">{p.name}</td><td className="px-4 py-3">{t(p.kind==="student"?"学生":"教师")}</td><td className="px-4 py-3">{p.classes?.map(c=>c.name).join("、")||"未分配"}</td></tr>)}{!shown.length&&<tr><td colSpan={5} className="p-8 text-center text-muted-foreground">{t("当前筛选下没有待激活身份。")}</td></tr>}</tbody></table></div></Loading><Feedback action={action}/><div className="flex justify-end gap-2"><Button variant="secondary" onClick={onClose}>{t("取消")}</Button><Button disabled={action.busy||!picked.length} onClick={()=>action.run(async()=>{const r=await productionApi<{items:{person:AdminPerson;activationCode:string}[]}>("people/activation-batch",{method:"POST",body:{identityIds:picked}});setResult(r.items);})}>{t("生成")} {picked.length} {t("个激活码")}</Button></div></>:<><div className="max-h-80 overflow-auto border border-border"><table className="w-full text-left text-sm"><thead className="bg-surface-subtle"><tr>{["编号","姓名","激活码","操作"].map(h=><th key={h} className="p-3">{t(h)}</th>)}</tr></thead><tbody>{result.map(r=><tr key={r.person.id} className="border-t border-border"><td className="p-3">{r.person.number}</td><td className="p-3">{r.person.name}</td><td className="p-3"><code className="select-all break-all">{r.activationCode}</code></td><td className="p-3"><CopyCode text={r.activationCode}/></td></tr>)}</tbody></table></div><p className="text-xs text-muted-foreground">{t("请私下交付。关闭后清除明文，有效期 7 天。")}</p><div className="flex justify-end gap-2"><CopyCode text={result.map(r=>`${r.person.number}\t${r.person.name}\t${r.activationCode}`).join("\n")} label={t("复制全部" )}/><Button onClick={onClose}>{t("已记录，关闭")}</Button></div></>}</Modal>;
 }

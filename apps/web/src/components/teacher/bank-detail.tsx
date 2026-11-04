@@ -11,10 +11,12 @@ import {
   Upload,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { useRangeSelection } from "@/components/ui/use-range-selection";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
 import { productionApi, type ProductionProblem } from "@/lib/production-api";
 import { Bank, Group, GroupTags, ManageGroups, MAX_BATCH_PUBLISH, publishEligibilityReason, reviewVisibilityLabel, validationStatusLabel } from "./problem-banks";
 import { useLocale } from "@/components/locale-context";
+import { useProblemSelection } from "./use-problem-selection";
 import {
   Drawer,
   Feedback,
@@ -38,7 +40,6 @@ export function TeacherBankDetail({ id }: { id: string }) {
     groups = useData<{ items: Group[] }>(`problem-groups?bankId=${id}`),
     bank = banks.data?.items.find((x) => x.id === id),
     [view, setView] = useState("all"),
-    [checked, setChecked] = useState<string[]>([]),
     [confirmPublish, setConfirmPublish] = useState(false),
     [manage, setManage] = useState<{
       ids: string[];
@@ -62,8 +63,9 @@ export function TeacherBankDetail({ id }: { id: string }) {
               groups.data?.items
                 .find((g) => g.id === view)
                 ?.problemIds.includes(p.id),
-            ),
-    selected = checked.filter((id) => rows.some((p) => p.id === id)),
+            );
+  const { checked, setChecked, changeRow } = useProblemSelection(rows, JSON.stringify([id, view]));
+  const selected = checked.filter((id) => rows.some((p) => p.id === id)),
     currentGroup = groups.data?.items.find((g) => g.id === view),
     label =
       view === "all"
@@ -315,13 +317,7 @@ export function TeacherBankDetail({ id }: { id: string }) {
                           aria-label={`${tr("选择", "Select")} ${p.title}`}
                           type="checkbox"
                           checked={checked.includes(p.id)}
-                          onChange={(e) =>
-                            setChecked((x) =>
-                              e.target.checked
-                                ? [...x, p.id]
-                                : x.filter((id) => id !== p.id),
-                            )
-                          }
+                          onChange={(event) => changeRow(p.id, event)}
                         />
                       </td>
                       <td className="px-4 py-3">
@@ -643,7 +639,12 @@ function AddExisting({
         (p) =>
           (!source || p.bankId === source) &&
           p.title.toLowerCase().includes(query.toLowerCase()),
-      ) ?? [];
+      ).map((problem) => {
+        const already = (targetGroup?.problemIds ?? existing).includes(problem.id);
+        const copyable = problem.bankId === bankId || problem.canEdit !== false;
+        return { problem, id: problem.id, already, copyable, disabled: already || !copyable };
+      }) ?? [];
+  const { getRange } = useRangeSelection(rows, JSON.stringify([bankId, targetGroup?.id, source, query]));
   return (
     <Drawer title={tr("从已有题目添加", "Add existing problems")} onClose={onClose}>
       <p className="text-sm text-muted-foreground">
@@ -673,24 +674,20 @@ function AddExisting({
       </div>
       <State resource={problems} />
       <div className="mt-4 divide-y divide-border border border-border">
-        {rows.map((p) => {
-          const already = targetGroup
-              ? targetGroup.problemIds.includes(p.id)
-              : existing.includes(p.id),
-            copyable = p.bankId === bankId || p.canEdit !== false;
+        {rows.map(({ problem: p, already, copyable, disabled }) => {
           return (
             <label className="flex gap-3 p-4 text-sm" key={p.id}>
               <input
                 type="checkbox"
-                disabled={already || !copyable}
+                disabled={disabled}
                 checked={already || picked.includes(p.id)}
-                onChange={(e) =>
-                  setPicked((x) =>
-                    e.target.checked
-                      ? [...x, p.id]
-                      : x.filter((id) => id !== p.id),
-                  )
-                }
+                onChange={(event) => {
+                  const range = getRange(p.id, event);
+                  const checked = event.currentTarget.checked;
+                  setPicked(ids => range || checked
+                    ? [...new Set([...ids, ...(range ?? [p.id])])]
+                    : ids.filter(id => id !== p.id));
+                }}
               />
               <span>
                 <b>{p.title}</b>
@@ -719,7 +716,7 @@ function AddExisting({
             void action.run(async () => {
               const added: string[] = [];
               for (const id of picked) {
-                const source = rows.find((p) => p.id === id);
+                const source = rows.find((p) => p.id === id)?.problem;
                 if (!source) continue;
                 if (source.bankId === bankId) added.push(id);
                 else {

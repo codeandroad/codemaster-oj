@@ -263,7 +263,7 @@ function LeaderboardTable({
             </div>
             {showRules && (
               <div id="leaderboard-rules" className={styles.disclosure}>
-                <p>{ui(locale, "积分来自审核公开题目的首次有效 AC，以及 Paper 4 正式交卷后每道大题首次全部自动测试通过的 10 分。作业与训练额外奖励只计入个人累计积分。先比较积分，同分时比较 AC 率；两项均相同则并列，暂无有效判题结果者排在已有 AC 率者之后。", "Points come from the first valid AC on approved public problems, plus 10 points for each Paper 4 question that first passes all automatic tests after formal submission. Assignment and practice bonuses count only toward personal totals. Higher points rank first, then higher AC rate. Equal points and rates share a rank; students without judged results follow those with an AC rate.")}</p>
+                <p>{ui(locale, "积分来自审核公开题目的首次有效 AC，以及 Paper 4 正式交卷后每道大题首次全部自动测试通过的 10 分。作业与训练额外奖励只计入个人累计积分。积分相同时比较实际 AC 率，暂无有效判题结果者排在已有 AC 率者之后。积分和 AC 率均相同时比较当前 Luq 余额，三项均相同则并列。", "Points come from the first valid AC on approved public problems, plus 10 points for each Paper 4 question that first passes all automatic tests after formal submission. Assignment and practice bonuses count only toward personal totals. When points match, higher unrounded AC rates rank first. Students without judged results follow those with an AC rate. Current Luq balance breaks any remaining tie. Students with all three values equal share a rank.")}</p>
                 {optionalCount > 0 && <p className="mt-1">{ui(locale, "解题数按获榜分的不同题目统计；Paper 4 每道大题计一题、每次交卷中，每道大题各计一次提交。AC 率为有效正式提交中的通过比例。", "Solved counts distinct questions earning leaderboard points. Each Paper 4 question counts as one problem and one attempt per formal submission. AC rate is the share of valid judged submissions accepted.")}</p>}
               </div>
             )}

@@ -1,4 +1,4 @@
-# CodeMaster OJ · Production
+# CodeMaster · Production
 
 独立的校内教学 OJ。前端采用 Next.js 16 / React / TypeScript，API 采用 NestJS 12 / TypeScript，业务数据使用 PostgreSQL 17。Python 3.12、C++23 和 JavaScript 代码由独立 worker 和 Linux go-judge 沙箱评测；C++ 使用 Clang 19 与 GCC 14 libstdc++。这个项目可以单独复制、安装、构建和部署，不依赖相邻的原型仓库。
 
@@ -38,6 +38,12 @@ Luq 是独立的可消费助学点，保留现有成绩、个人累计积分及�
 
 编程工作区顶部的 Settings 可调整代码编辑、快捷键、布局及本地计时器。代码区齿轮 → 代码编辑器 → 键位绑定可选择 Vim（默认仍为标准）；普通题与 Paper 4 共用，设置按账号保存在当前浏览器。支持普通/插入/可视模式及常用移动、编辑、撤销和查找键位，具体范围见 [Vim 模式说明](docs/editor-vim-2026-10-24.md)。语言选择和草稿按账号、题目版本、活动上下文及语言分别保存；正式提交会记录语言。函数题的 C++ 接口采用明确的 JSON 协议，说明见 [生产设计](docs/campus-judge-production-design.md#judging)。
 
+普通题运行结果按用例展示输入、输出、预期结果及字符差异，默认选中首个失败用例；可定位的异常可跳回代码行。函数返回与调试打印分开，正式提交不公开隐藏测试内容。实现、验证与历史记录限制见 [运行反馈说明](docs/run-feedback-2026-11-04.md)。
+
+关联课程的作业默认按章节及章内题目顺序显示，也可使用保存的手动顺序；升级需应用迁移 050。学生列表将「本作业提交」与跨入口 AC 区分显示，答题页支持沿同一顺序继续下一题。额外 Luq 为 0 时不显示规则提示，正数奖励使用可展开的紧凑提示。详见 [作业练习体验与课程题干整理](docs/assignment-practice-2026-11-04.md)。
+
+普通题与 Paper 4 题干区右下角显示全站在线学生，点击可向上展开、搜索、访问主页和最小化。班级详情也提供可搜索的同学名单。品牌显示为 CodeMaster；未设置语言时默认英文，用户可在个人设置中选择中文。升级需应用迁移 051（会话在线时间），详见 [在线学生与界面设置](docs/student-presence-2026-11-05.md)。
+
 停止服务并保留数据：`npm run stop:local`。重新启动：`npm run start:local`。脚本不会重设已有密码或覆盖成绩，持久卷仍为 `campus-judge-local_database`；不要通过删除卷处理启动问题。
 
 本机入口和初始化数据库端口仅绑定 loopback；本地 HTTP 会话传输配置与学校 HTTPS 部署配置分开维护。
@@ -56,7 +62,7 @@ node scripts/check-separation.mjs
 
 本地开发分别运行 `npm run dev:api` 和 `npm run dev:web`，所需数据库和会话环境见 [部署说明](docs/campus-judge-deployment.md)。正式学校部署使用 `deploy/compose.yaml`，需校园域名、HTTPS 和学校机器上的隔离、负载、备份恢复验收。
 
-tx99 的 cmoj.space 与 ali99 的 HTTPS 8443 入口现共用 tx99 的唯一写入主库；两边学生记录和 Luq 流水已合并保留。ali99 旧库停止归档，不得作为在线回退；迁移只在主库执行。拓扑、受限隧道、备份与实际验证见[共用主库实施记录](docs/shared-primary-2026-10-27.md)，宿主配置模板见 [deploy/shared-primary](deploy/shared-primary/README.md)。
+tx99 的 cmoj.space 与 ali99 的 HTTPS 8443 入口现分别使用独立数据库，不再使用隧道或自动同步。ali99 从切换时的最新一致性快照恢复，保留学生记录、课程关联和 Luq 数据；旧卷及备份保留。当前拓扑与验证见[恢复独立运行记录](docs/ali99-independent-2026-10-28.md)，配置模板见 [deploy/independent](deploy/independent/README.md)。此前的[共用主库记录](docs/shared-primary-2026-10-27.md)保留作历史。
 
 设计与范围见 [生产设计](docs/campus-judge-production-design.md) 和 [设计审查](docs/campus-judge-design-review.md)。最新本地检查见 [根目录迁移验收](docs/campus-judge-root-migration-verification.md)；先前的三角色原型对齐与页面切换记录分别见 [原型对齐](docs/campus-judge-prototype-alignment.md)、[导航验收](docs/campus-judge-navigation-verification.md)。[Next.js 文档](https://nextjs.org/docs/app)、[NestJS 文档](https://docs.nestjs.com/)。
 

@@ -58,6 +58,7 @@ interface Report {
       problems: {
         problemId: string;
         submissionId: string | null;
+        completionSource?: "other_entry" | null;
         score: number | null;
         status: string;
       }[];
@@ -119,7 +120,7 @@ export function TeacherReports() {
     notStarted =
       report?.metrics?.notStarted ??
       students.filter((s) =>
-        s.assignments.every((a) => a.problems.every((p) => !p.submissionId)),
+        s.assignments.every((a) => a.problems.every((p) => !p.submissionId && p.completionSource !== "other_entry")),
       ).length,
     incomplete =
       report?.metrics?.incomplete ??
@@ -163,7 +164,7 @@ export function TeacherReports() {
             )
           : drill.id === "notStarted"
             ? s.assignments.every((a) =>
-                a.problems.every((p) => !p.submissionId),
+                a.problems.every((p) => !p.submissionId && p.completionSource !== "other_entry"),
               )
             : drill.id === "incomplete"
               ? s.assignments.some((a) =>
@@ -300,7 +301,7 @@ export function TeacherReports() {
             headers={[
               tr("学生", "Student"),
               tr("活动状态", "Activity status"),
-              tr("已正式提交", "Formal submissions"),
+              tr("已提交或已认定通过", "Submitted or credited"),
               tr("反复未通过题", "Repeated failures"),
               tr("原结果 / 订正", "Original result / correction"),
             ]}
@@ -308,7 +309,7 @@ export function TeacherReports() {
           >
             {students.map((s) => {
               const problems = s.assignments.flatMap((a) => a.problems),
-                submitted = problems.filter((p) => p.submissionId).length,
+                submitted = problems.filter((p) => p.submissionId || p.completionSource === "other_entry").length,
                 solved = problems.filter((p) => p.status === "AC").length;
               return (
                 <tr key={s.identityId}>
@@ -461,7 +462,7 @@ export function TeacherReports() {
                             )?.title ?? p.problemId.slice(0, 8)}
                           </span>
                           <span>
-                            {statusLabel(p.status)} ·{" "}
+                            {statusLabel(p.status)}{p.completionSource === "other_entry" && ` (${tr("其他入口已通过", "Passed elsewhere")})`} ·{" "}
                             {p.score === null ? tr("待评测", "Pending") : `${p.score}%`}
                           </span>
                         </button>

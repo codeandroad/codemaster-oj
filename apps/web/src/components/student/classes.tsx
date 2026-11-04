@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, ChevronRight, ClipboardList, FileText, Users } from "lucide-react";
 import { AppLink } from "@/components/navigation";
 import { PageHeader } from "@/components/page-chrome";
+import { ProfileAvatar } from "@/components/profile-hero";
 import { useLocale } from "@/components/locale-context";
 import { buttonVariants } from "@/components/ui/button";
 import { Empty, LessonContent, State, useData } from "./shared";
@@ -18,6 +19,7 @@ interface StudentClassSummary {
 }
 interface ClassCourse { id: string; title: string; description?: string; }
 interface LinkedCourse { coursePathId?: string | null; courseTitle?: string | null; }
+interface ClassMember { id: string; displayName: string; avatar: string; }
 interface ClassResource {
   id: string;
   title: string;
@@ -28,6 +30,7 @@ interface ClassResource {
   updatedAt?: string | null;
 }
 interface StudentClassDetail extends StudentClassSummary {
+  members: ClassMember[];
   teachers: { name: string }[];
   assignments: (LinkedCourse & { id: string; title: string; dueAt: string })[];
   timedPractices: (LinkedCourse & { id: string; title: string; startsAt: string; endsAt: string; durationMinutes: number })[];
@@ -67,7 +70,9 @@ export function StudentClass({ id }: { id: string }) {
     <State data={resource}>{data && <>
       <PageHeader title={data.name} description={data.description}/>
       <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground"><span>{tx(`${data.memberCount ?? 0} 名学生`, `${data.memberCount ?? 0} students`)}</span>{data.teachers.length > 0 && <span>{tx("教师：", "Teachers: ")}{data.teachers.map(teacher => teacher.name).join(" / ")}</span>}</div>
-      <nav aria-label={tx("班级内容", "Class content")} className="mt-4 flex border-b border-border">
+      <div className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="min-w-0">
+      <nav aria-label={tx("班级内容", "Class content")} className="flex overflow-x-auto border-b border-border">
         {([{ key: "tasks", label: tx("任务", "Tasks"), count: taskCount }, { key: "courses", label: tx("课程", "Courses"), count: data.courses.length }, { key: "resources", label: tx("资料", "Resources"), count: data.resources.length }] as const).map(item => <button key={item.key} type="button" aria-pressed={tab === item.key} onClick={() => router.replace(`/student/classes/${encodeURIComponent(id)}${item.key === "tasks" ? "" : `?tab=${item.key}`}`)} className={`min-h-11 border-b-2 px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-primary ${tab === item.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{item.label}<span className="ml-1.5 text-xs tabular-nums">{item.count}</span></button>)}
       </nav>
       {tab === "tasks" && (taskCount ? <div className={`${surface} mt-4`}>
@@ -77,8 +82,24 @@ export function StudentClass({ id }: { id: string }) {
       </div> : <Empty title={tx("暂无布置给你的班级任务", "No class tasks assigned to you")}/>)}
       {tab === "courses" && (data.courses.length ? <div className={`${surface} mt-4`}>{data.courses.map(course => <AppLink key={course.id} href={`/student/learning-paths/${course.id}`} className="flex min-h-16 items-center gap-3 border-b border-border px-4 py-3 last:border-b-0 hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-primary"><BookOpen size={18} aria-hidden="true" className="shrink-0 text-primary"/><span className="min-w-0 flex-1"><strong className="block text-sm text-primary">{course.title}</strong>{course.description && <span className="mt-1 block line-clamp-2 text-xs text-muted-foreground">{course.description}</span>}</span><ChevronRight size={17} aria-hidden="true" className="shrink-0 text-muted-foreground"/></AppLink>)}</div> : <Empty title={tx("暂无关联课程", "No linked courses")}/>)}
       {tab === "resources" && (data.resources.length ? <div className={`${surface} mt-4`}>{data.resources.map(item => <ClassResourceRow key={item.id} resource={item} linkedCourse={data.courses.some(course => course.id === item.pathId)}/>)}</div> : <Empty title={tx("暂无班级资料", "No class resources")}/>)}
+      </div>
+      <ClassRoster key={id} members={data.members ?? []}/>
+      </div>
     </>}</State>
   </>;
+}
+
+function ClassRoster({ members }: { members: ClassMember[] }) {
+  const { locale } = useLocale();
+  const [search, setSearch] = useState("");
+  const tx = (zh: string, en: string) => locale === "en" ? en : zh;
+  const query = search.trim().toLocaleLowerCase(locale);
+  const visible = query ? members.filter(member => member.displayName.toLocaleLowerCase(locale).includes(query)) : members;
+  return <section aria-labelledby="class-students-heading" className={`${surface} order-first xl:order-last`}>
+    <div className="flex items-center justify-between border-b border-border px-3 py-2.5"><h2 id="class-students-heading" className="text-sm font-semibold">{tx("班级同学", "Students")}</h2><span className="text-xs tabular-nums text-muted-foreground">{members.length}</span></div>
+    {members.length > 0 && <div className="p-2"><input type="search" aria-label={tx("搜索班级同学", "Search classmates")} placeholder={tx("搜索同学", "Search students")} value={search} onChange={event => setSearch(event.target.value)} className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary"/></div>}
+    {visible.length ? <ul className="max-h-64 overflow-y-auto overscroll-contain xl:max-h-96">{visible.map(member => <li key={member.id}><AppLink href={`/student/people/${encodeURIComponent(member.id)}`} className="flex min-h-12 items-center gap-2.5 border-t border-border px-3 py-2 hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2"><ProfileAvatar avatar={member.avatar} nickname={member.displayName}/><span className="min-w-0 flex-1 break-words text-sm font-medium text-primary">{member.displayName}</span><ChevronRight size={15} aria-hidden="true" className="shrink-0 text-muted-foreground"/></AppLink></li>)}</ul> : <p className="px-3 py-4 text-sm text-muted-foreground">{members.length ? tx("没有匹配的同学", "No matching students") : tx("暂无已激活的学生主页", "No student profiles available yet")}</p>}
+  </section>;
 }
 
 function ClassTaskRow({ href, title, kind, timing, course }: { href: string; title: string; kind: string; timing: string; course?: LinkedCourse }) {

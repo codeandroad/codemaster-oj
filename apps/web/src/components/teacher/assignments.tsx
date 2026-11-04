@@ -4,6 +4,7 @@ import { AppLink as Link } from "@/components/navigation";
 import { useEffect, useState } from "react";
 import {activityDate,validateActivity,activeParticipants} from "./activity-validation";
 import {useActivityDraft} from "./use-activity-draft";
+import { courseProblemOrder, savedProblemOrder } from "./assignment-problem-order";
 import { StudentAudienceSelector } from "./student-audience-selector";
 import { activityAudienceClassIds, type AudienceDirectory, type AudienceStudent } from "./student-audience";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -224,14 +225,15 @@ function AssignmentEditorForm({
     [description, setDescription] = useState(initial?.description ?? ""),
     [course, setCourse] = useState(initial?.course ?? "Python"),
     [coursePathId, setCoursePathId] = useState(initial?.coursePathId ?? ""),
+    [problemOrder, setProblemOrder] = useState<"course" | "custom">(initial?.problemOrder ?? "course"),
     [due, setDue] = useState(localInput(initial?.dueAt)),
     [selected, setSelected] = useState<SelectedProblem[]>(
-      initial?.problems.map((x) => ({
+      savedProblemOrder(initial?.problems ?? []).map((x) => ({
         ...x,
         title: x.title ?? "题目",
         firstAcPoints: x.firstAcPoints ?? 10,
         rewardPoints: x.rewardPoints ?? 0,
-      })) ?? [],
+      })),
     ),
     [participants, setParticipants] = useState(
       initial?.participantDetails
@@ -248,6 +250,19 @@ function AssignmentEditorForm({
     [versionError, setVersionError] = useState(""),
     [stale, setStale] = useState(false),
     action = useAction();
+  const courseOutline = useData<{ id: string; chapters: { problems: { problemId: string }[] }[] }>(coursePathId ? `learning-paths/${coursePathId}` : null);
+  const needsCourseOrder = problemOrder === "course" && Boolean(coursePathId);
+  const matchingCourseOutline = courseOutline.data?.id === coursePathId;
+  const courseOrderReady = !needsCourseOrder ||
+    (matchingCourseOutline && !courseOutline.loading && !courseOutline.error);
+  const courseOrderState = {
+    ...courseOutline,
+    loading: courseOutline.loading || (!matchingCourseOutline && !courseOutline.error),
+  };
+  const courseProblemIds = matchingCourseOutline
+    ? courseOutline.data!.chapters.flatMap(chapter => chapter.problems.map(problem => problem.problemId)) : [];
+  const orderedSelected = !courseOrderReady ? [] : needsCourseOrder
+    ? courseProblemOrder(selected, courseProblemIds, item => item.problemId) : selected;
   const published = saved?.state !== "Draft" && Boolean(saved),
     hasActivity = Boolean(saved?.hasActivity || saved?.hasSubmissions),
     hasSubmissions = Boolean(saved?.hasSubmissions || saved?.grades?.some(
@@ -310,11 +325,11 @@ function AssignmentEditorForm({
     if (problem.versionId) query.set("versionId", problem.versionId);
     return `/teacher/problems/${problem.problemId}/edit?${query.toString()}`;
   };
-  const draft=useActivityDraft({storageKey:`campus-judge:activity-draft:v1:${userId}:assignment:${initial?.id??"new"}`,editable:true,noticeText:published?"改动已临时保存在当前浏览器；点击“保存修改”后才会更新已发布作业。":undefined,snapshot:{title,description,course,coursePathId,classId,classIds,due,problems:selected,participants},recoveryDefaults:{coursePathId:"",classIds:[]},onRestore:v=>{setTitle(v.title);setDescription(v.description);setCourse(v.course);setCoursePathId(v.coursePathId??"");setDue(v.due);setSelected(v.problems.map(problem=>({...problem,firstAcPoints:initial?.problems.find(item=>item.problemId===problem.problemId)?.firstAcPoints??problem.firstAcPoints??10,rewardPoints:problem.rewardPoints??initial?.problems.find(item=>item.problemId===problem.problemId)?.rewardPoints??0})));setParticipants(v.participants);}});
+  const draft=useActivityDraft({storageKey:`campus-judge:activity-draft:v1:${userId}:assignment:${initial?.id??"new"}`,editable:true,noticeText:published?"改动已临时保存在当前浏览器；点击“保存修改”后才会更新已发布作业。":undefined,snapshot:{title,description,course,coursePathId,problemOrder,classId,classIds,due,problems:selected,participants},recoveryDefaults:{coursePathId:"",problemOrder:"course",classIds:[]},onRestore:v=>{setTitle(v.title);setDescription(v.description);setCourse(v.course);setCoursePathId(v.coursePathId??"");setProblemOrder(v.problemOrder==="custom"?"custom":"course");setDue(v.due);setSelected(v.problems.map(problem=>({...problem,firstAcPoints:initial?.problems.find(item=>item.problemId===problem.problemId)?.firstAcPoints??problem.firstAcPoints??10,rewardPoints:problem.rewardPoints??initial?.problems.find(item=>item.problemId===problem.problemId)?.rewardPoints??0})));setParticipants(v.participants);}});
   const changedProblems = JSON.stringify(
     selected.map((x) => ({ problemId: x.problemId, points: x.points, versionId: x.versionId, rewardPoints: x.rewardPoints })),
   ) !== JSON.stringify(
-    (saved?.problems ?? []).map((x) => ({
+    savedProblemOrder(saved?.problems ?? []).map((x) => ({
       problemId: x.problemId,
       points: x.points,
       versionId: x.versionId,
@@ -327,6 +342,7 @@ function AssignmentEditorForm({
   const changedDescription = description !== (saved?.description ?? "");
   const changedCourse = course !== (saved?.course ?? "Python");
   const changedCoursePath = coursePathId !== (saved?.coursePathId ?? "");
+  const changedProblemOrder = problemOrder !== (saved?.problemOrder ?? "course");
   const changedClass = JSON.stringify(classIds) !== JSON.stringify([...(saved?.classIds ?? (saved?.classId ? [saved.classId] : []))].sort());
   const changedDue = due !== localInput(saved?.dueAt);
   const changedPinnedVersions = selected.some((problem) => {
@@ -334,7 +350,7 @@ function AssignmentEditorForm({
     return original && original.versionId !== problem.versionId;
   });
   const hasChanges = changedTitle || changedDescription || changedCourse || changedCoursePath ||
-    changedClass || changedDue || changedProblems || changedParticipants;
+    changedClass || changedDue || changedProblems || changedParticipants || changedProblemOrder;
   useDirty(hasChanges);
   const save = async () => {
     if (published && !hasChanges)
@@ -382,6 +398,7 @@ function AssignmentEditorForm({
           ...(changedDescription ? { description } : {}),
           ...(changedCourse ? { course } : {}),
           ...(changedCoursePath ? { coursePathId: coursePathId || null } : {}),
+          ...(changedProblemOrder ? { problemOrder } : {}),
           ...(changedDue ? { dueAt } : {}),
           ...(changedProblems ? { problems: problemPayload } : {}),
           ...(changedParticipants ? { participants } : {}),
@@ -399,6 +416,7 @@ function AssignmentEditorForm({
           description,
           course,
           coursePathId: coursePathId || null,
+          problemOrder,
           problems: problemPayload,
           participants,
         };
@@ -418,7 +436,8 @@ function AssignmentEditorForm({
     }
     draft.clear();
     setSaved(result);
-    setSelected(result.problems.map((problem) => ({
+    setProblemOrder(result.problemOrder ?? "course");
+    setSelected(savedProblemOrder(result.problems).map((problem) => ({
       ...problem,
       title: problem.title ?? selected.find((item) => item.problemId === problem.problemId)?.title ?? "题目",
       firstAcPoints: problem.firstAcPoints ?? selected.find((item) => item.problemId === problem.problemId)?.firstAcPoints ?? 10,
@@ -580,7 +599,7 @@ function AssignmentEditorForm({
                   )}
                   {published && hasSubmissions && (
                     <p className="mt-1 text-xs text-muted-foreground">
-                      已有正式提交，不能调整本作业的题目、分值、顺序或奖励积分。
+                      已有正式提交，题目、分值和保存的手动顺序已锁定；仍可切换显示顺序。
                     </p>
                   )}
                   {published && hasActivity && !hasSubmissions && (
@@ -590,7 +609,7 @@ function AssignmentEditorForm({
                   )}
                 </div>
                 <div className="flex gap-2">
-                  <Button disabled={!canEditProblems || action.busy} onClick={() => setPicker(true)}>
+                  <Button disabled={!canEditProblems || action.busy || !courseOrderReady} onClick={() => setPicker(true)}>
                     <Plus size={15} />
                     从题库与分组选择
                   </Button>
@@ -603,13 +622,24 @@ function AssignmentEditorForm({
                   </Link>
                 </div>
               </div>
+              <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+                <label htmlFor="assignment-problem-order" className="font-medium">{ui(locale, "题目顺序", "Problem order")}</label>
+                <select id="assignment-problem-order" className={`${input} w-auto`} value={problemOrder} disabled={action.busy} onChange={event => setProblemOrder(event.target.value as "course" | "custom")}>
+                  <option value="course">{ui(locale, "课程章节顺序", "Course chapter order")}</option>
+                  <option value="custom">{ui(locale, "保存的手动顺序", "Saved custom order")}</option>
+                </select>
+                <span className="text-muted-foreground">{problemOrder === "course" && coursePathId
+                  ? ui(locale, "按章节及章内题目排序，其他题目排在末尾。", "Chapter order, then problem order; other problems follow.")
+                  : ui(locale, "按保存的题目顺序显示。", "Uses the saved problem order.")}</span>
+              </div>
+              {!courseOrderReady && <State resource={courseOrderState} />}
               {versionError && (
                 <p role="alert" className="mb-3 text-sm text-destructive">
                   {versionError}
                 </p>
               )}
-              <Table headers={["顺序", "题目", "接口", "作业分值", "首次 AC 积分", "本作业额外奖励", "操作"]}>
-                {selected.map((p, i) => (
+              {courseOrderReady && <Table headers={["顺序", "题目", "接口", "作业分值", "首次 AC 积分", "本作业额外奖励", "操作"]}>
+                {orderedSelected.map((p, i) => (
                   <tr key={p.problemId}>
                     <td>{i + 1}</td>
                     <td>
@@ -723,7 +753,7 @@ function AssignmentEditorForm({
                           size="icon"
                           title="上移"
                           disabled={!canEditProblems || action.busy || i === 0}
-                          onClick={() => setSelected(move(selected, i, -1))}
+                          onClick={() => { setSelected(move(orderedSelected, i, -1)); setProblemOrder("custom"); }}
                         >
                           <ArrowUp size={15} />
                         </Button>
@@ -732,7 +762,7 @@ function AssignmentEditorForm({
                           size="icon"
                           title="下移"
                           disabled={!canEditProblems || action.busy || i === selected.length - 1}
-                          onClick={() => setSelected(move(selected, i, 1))}
+                          onClick={() => { setSelected(move(orderedSelected, i, 1)); setProblemOrder("custom"); }}
                         >
                           <ArrowDown size={15} />
                         </Button>
@@ -764,7 +794,7 @@ function AssignmentEditorForm({
                 {!selected.length && (
                   <Empty columns={7}>从题库与分组选择已发布题目。</Empty>
                 )}
-              </Table>
+              </Table>}
             </>
           )}
           {tab === "Applicable list" && <StudentAudienceSelector students={students} classes={audienceClasses} selectedIds={participants} onChange={setParticipants} loading={audience.loading} error={audience.error} onReload={audience.reload} disabled={action.busy} lockedIds={lockedIds} exemptIds={exemptStudentIds}/>}
@@ -797,8 +827,9 @@ function AssignmentEditorForm({
               </p>
               {coursePathId && <p className="mt-2 text-sm text-primary">{ui(locale, "关联课程：", "Linked course: ")}{courses.data?.items.find(item => item.id === coursePathId)?.title ?? initial?.courseTitle ?? ui(locale, "课程不可用", "Course unavailable")}</p>}
               <p className="mt-4 whitespace-pre-wrap text-sm">{description}</p>
-              <Table headers={["题目", "作业分值", "首次 AC 积分", "本作业额外奖励"]} min={400}>
-                {selected.map((p) => (
+              {!courseOrderReady && <State resource={courseOrderState} />}
+              {courseOrderReady && <Table headers={["题目", "作业分值", "首次 AC 积分", "本作业额外奖励"]} min={400}>
+                {orderedSelected.map((p) => (
                   <tr key={p.problemId}>
                     <td>
                       <Link href={problemEditorHref(p)} className={link}>
@@ -810,7 +841,7 @@ function AssignmentEditorForm({
                     <td>+{p.rewardPoints}</td>
                   </tr>
                 ))}
-              </Table>
+              </Table>}
               <p className="mt-2 text-xs text-muted-foreground">作业额外奖励计入个人积分，不计入校级积分排行榜。</p>
               <p className="mt-4 text-xs text-muted-foreground">
                 只有已勾选的学生看到作业、截止时间和进度；公开样例运行不会改变作业成绩。
@@ -819,9 +850,10 @@ function AssignmentEditorForm({
           )}
         </div>
       </section>
-      {picker && (
+      {picker && courseOrderReady && (
         <ProblemPicker
           selected={selected.map((x) => x.problemId)}
+          orderedProblemIds={problemOrder === "course" ? courseProblemIds : undefined}
           onClose={() => setPicker(false)}
           onAdd={(items) => {
             setSelected((x) => [
@@ -944,7 +976,7 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
       x.problems.every((p) => p.status === "AC"),
     ).length,
     started = grades.filter((x) =>
-      x.problems.some((p) => p.submissionId),
+      x.problems.some((p) => p.submissionId || p.completionSource === "other_entry"),
     ).length,
     exempt =
       assignment?.participantDetails?.filter((x) => x.exempt).length ?? 0;
@@ -991,7 +1023,7 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
             <div className="border-b border-border px-4 py-3">
               <h2 className="font-bold">{ui(locale, "学生进度矩阵", "Student progress matrix")}</h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                固定学生列，横向滚动题目。成绩取截止前正式提交最高分；系统错误不记为学生答错。
+                {ui(locale, "成绩取截止前最高有效分；同版本在其他入口正式 AC 可直接计满分，标注来源且不新增提交或奖励。", "Grades use the best valid score before the deadline. A formal AC on the same version elsewhere earns full credit, with its source marked and no new submission or reward.")}
               </p>
             </div>
             <div className="overflow-x-auto">
@@ -1042,7 +1074,7 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
                           status={
                             student.problems.every((p) => p.status === "AC")
                               ? ui(locale, "完成", "Complete")
-                              : student.problems.some((p) => p.submissionId)
+                              : student.problems.some((p) => p.submissionId || p.completionSource === "other_entry")
                                 ? ui(locale, "进行中", "In progress")
                                 : ui(locale, "未开始", "Not started")
                           }
@@ -1063,6 +1095,7 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
                             className="border-l border-border text-center"
                           >
                             <button
+                              disabled={cell?.completionSource === "other_entry"}
                               onClick={() =>
                                 setSelected({
                                   student,
@@ -1072,7 +1105,7 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
                               }
                               className="min-h-16 w-full px-2 py-2 hover:bg-info-soft"
                             >
-                              <b>{cell?.status ?? "—"}</b>
+                              <b>{cell?.status ?? "—"}</b>{cell?.completionSource === "other_entry" && <span className="block text-xs text-muted-foreground">{ui(locale, "其他入口已通过", "Passed elsewhere")}</span>}
                               <p className="text-xs text-muted-foreground">
                                 {cell?.score === null ||
                                 cell?.score === undefined

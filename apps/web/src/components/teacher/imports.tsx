@@ -2,6 +2,7 @@
 
 import { AppLink as Link } from "@/components/navigation";
 import { useRef, useState } from "react";
+import { useRangeSelection } from "@/components/ui/use-range-selection";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Pencil, Upload } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -83,6 +84,10 @@ export function TeacherProblemImports() {
     [testProblem, setTestProblem] = useState(""),
     [query, setQuery] = useState(""),
     action = useAction();
+  const { getRange, resetAnchor } = useRangeSelection(
+    rows.map((_, index) => ({ id: String(index) })),
+    JSON.stringify([section, step, editing]),
+  );
   const targetName =
       destination === "新建题库"
         ? bankName.trim() || "未命名新题库"
@@ -100,6 +105,7 @@ export function TeacherProblemImports() {
   const read = async (file: File | undefined) => {
     if (!file) return;
     const { rows: parsed, files: parsedFiles } = await readProblemImport(file);
+    resetAnchor();
     setFiles(parsedFiles);
     setRows(parsed);
     setSelected(parsed.map((_, i) => i));
@@ -369,7 +375,10 @@ export function TeacherProblemImports() {
                     </div>
                     <Button
                       variant="secondary"
-                      onClick={() => setSelected(rows.map((_, i) => i))}
+                      onClick={() => {
+                        resetAnchor();
+                        setSelected(rows.map((_, i) => i));
+                      }}
                     >
                       全选候选
                     </Button>
@@ -393,12 +402,12 @@ export function TeacherProblemImports() {
                               aria-label={`选择候选 ${String(row.title ?? i + 1)}`}
                               type="checkbox"
                               checked={selected.includes(i)}
-                              onChange={(e) => {
-                                setSelected((x) =>
-                                  e.target.checked
-                                    ? [...x, i]
-                                    : x.filter((v) => v !== i),
-                                );
+                              onChange={(event) => {
+                                const range = getRange(String(i), event)?.map(Number);
+                                const checked = event.currentTarget.checked;
+                                setSelected(indices => range || checked
+                                  ? [...new Set([...indices, ...(range ?? [i])])]
+                                  : indices.filter(index => index !== i));
                                 setKey(productionId());
                               }}
                             />

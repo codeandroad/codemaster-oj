@@ -154,7 +154,7 @@ test('Paper 4 legacy student solution access fails closed for unavailable papers
  });
 });
 
-test('Paper 4 explicitly reviewed assistance reuses a source entitlement in activity copies and cannot bypass an exam',options,async()=>{
+test('Paper 4 translation credit and reviewed solution entitlements follow a source question across activity copies',options,async()=>{
  await fixture(async({teacher,student,otherStudent,admin,pool,source,activity,begin,solution})=>{
   const paper=await source(),attempt=await begin(student,paper),target={paper4AttemptId:attempt.id,questionKey:'Q1',kind:'FULL_SOLUTION'};
   const quote=()=>student.send('/luq/assistance/quote',target);
@@ -166,16 +166,25 @@ test('Paper 4 explicitly reviewed assistance reuses a source entitlement in acti
   const tx=(await import('../src/db.mjs')).transaction;
   await tx(pool,db=>grant(db,{identityId:student.user.identityId,delta:8,kind:'admin_grant',sourceKey:randomUUID(),actorAccountId:admin.user.id,reason:'Assistance fixture'}));
   const q=await quote();assert.equal(q.price,8);assert.equal(JSON.stringify(q).includes('print(42)'),false);
-  await student.send('/luq/assistance/unlock',{...target,requestKey:randomUUID(),confirmedPrice:q.price,confirmedContentId:q.contentId});
+  const translation=await teacher.send('/luq/contents',{paperId:paper.id,versionId:paper.versionId,questionKey:'Q1',kind:'FULL_TRANSLATION',body:'中文题面'},'POST',201);
+  await teacher.send(`/luq/contents/${translation.id}/publish`,{reviewed:true});
+  const translationTarget={...target,kind:'FULL_TRANSLATION'};
+  const tq=await student.send('/luq/assistance/quote',translationTarget);
+  assert.equal(tq.price,3);
+  await student.send('/luq/assistance/unlock',{...translationTarget,requestKey:randomUUID(),confirmedPrice:tq.price,confirmedContentId:tq.contentId});
+  const practice=await activity(paper,'practice'),copy=await begin(student,practice),copyTarget={...target,paper4AttemptId:copy.id};
+  const discount=await student.send('/luq/assistance/quote',copyTarget);
+  assert.deepEqual([discount.basePrice,discount.translationCredit,discount.price],[8,3,5]);
+  const purchase=await student.send('/luq/assistance/unlock',{...copyTarget,requestKey:randomUUID(),confirmedPrice:discount.price,confirmedContentId:discount.contentId});
+  assert.equal(purchase.charged,5);
   const content=await student.send('/luq/assistance/provide',target);
   assert.ok(content.body.includes('print(42)'));assert.ok(!content.body.includes('REFERENCE_Q1_ORIGINAL'));
   await solution(student,attempt,'Q1',403);
   await otherStudent.send('/luq/assistance/provide',target,'POST',404);
-  const practice=await activity(paper,'practice'),copy=await begin(student,practice),copyTarget={...target,paper4AttemptId:copy.id};
   const copyQuote=await student.send('/luq/assistance/quote',copyTarget);
   assert.equal(copyQuote.unlocked,true);assert.equal(copyQuote.price,0);
   assert.equal((await student.send('/luq/assistance/provide',copyTarget)).body,content.body);
-  assert.equal((await pool.query('SELECT count(*)::int n FROM luq_assistance_entitlements')).rows[0].n,1);
+  assert.equal((await pool.query('SELECT count(*)::int n FROM luq_assistance_entitlements')).rows[0].n,2);
   const exam=await activity(paper,'exam'),examAttempt=await begin(student,exam);
   assert.equal((await quote()).mode,'disabled','the public source is not an exam bypass');
   await student.send('/luq/assistance/provide',target,'POST',403);
@@ -186,6 +195,6 @@ test('Paper 4 explicitly reviewed assistance reuses a source entitlement in acti
   for(const stage of questions.flatMap(q=>q.stages))await teacher.send(`/paper4/attempts/${examAttempt.id}/marks`,{stageId:stage.id,marks:0},'PATCH');
   await teacher.send(`/paper4/attempts/${examAttempt.id}/release`,{});
   assert.equal((await student.send('/luq/assistance/provide',examTarget)).body,content.body);
-  assert.equal((await pool.query("SELECT count(*)::int n FROM luq_ledger WHERE kind='purchase'")).rows[0].n,1);
+  assert.deepEqual((await pool.query("SELECT delta FROM luq_ledger WHERE kind='purchase' ORDER BY id")).rows.map(row=>row.delta),[-3,-5]);
  });
 });

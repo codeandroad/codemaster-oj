@@ -6,7 +6,8 @@ import { useLocale } from "@/components/locale-context";
 import { languageInfo } from "./languages";
 import type { WorkspaceSettings } from "./workspace-settings";
 import {editKey,matchingBrackets,editorCommand,moveEditorLines,type EditSnapshot} from "./editor-behavior";
-export interface CodeEditorHandle {replaceCode:(code:string)=>void;focus:()=>void}
+import {codeLocationOffset} from "./result-feedback";
+export interface CodeEditorHandle {replaceCode:(code:string)=>void;focus:()=>void;revealLocation:(line:number,column?:number)=>void}
 import {editorTheme} from "./editor-themes";
 import {editorActionFor} from "./editor-keymap";
 import {createVimState,vimKey,type VimState} from "./editor-vim";
@@ -128,7 +129,23 @@ export function CodeEditor({ code, onChange, language, settings, status,idPrefix
     const source=redo?history.current.future:history.current.past,target=redo?history.current.past:history.current.future,next=source.pop();
     if(!next)return;target.push({...history.current.current});history.current.current={...next};onChange(next.value);move(next);
   }
-  useImperativeHandle(editorRef,()=>({replaceCode:formatted=>apply({value:formatted,start:0,end:0}),focus:()=>fieldRef.current?.focus()}));
+  useImperativeHandle(editorRef,()=>({
+    replaceCode:formatted=>apply({value:formatted,start:0,end:0}),
+    focus:()=>fieldRef.current?.focus(),
+    revealLocation:(line,column=1)=>{
+      const field=fieldRef.current,at=codeLocationOffset(code,line,column);
+      if(!field||at===null)return;
+      // Navigation changes only the caret, never the student's code or undo stack.
+      if(vimEnabled&&vimRef.current.mode!=='insert')updateVim({...createVimState(),register:vimRef.current.register,linewise:vimRef.current.linewise});
+      field.focus();field.setSelectionRange(at,at);selection(field);
+      const exact=caretOffset(at),top=exact?.top??14+(settings.wordWrap?lineHeights.slice(0,line-1).reduce((sum,n)=>sum+n,0):(line-1)*24);
+      field.scrollTop=Math.max(0,top-field.clientHeight/2);
+      if(!settings.wordWrap)field.scrollLeft=Math.max(0,(exact?.left??10+(column-1)*settings.fontSize*.61)-field.clientWidth/2);
+      if(highlight.current){highlight.current.scrollTop=field.scrollTop;highlight.current.scrollLeft=field.scrollLeft;}
+      if(numbers.current)numbers.current.scrollTop=field.scrollTop;
+      setScroll({top:field.scrollTop,left:field.scrollLeft});
+    },
+  }));
   function onKeyDown(event:KeyboardEvent<HTMLTextAreaElement>){
     if(readOnly)return;
     const field=event.currentTarget;selection(field);

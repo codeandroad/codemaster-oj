@@ -19,7 +19,6 @@ import {
 } from "@/components/teacher/shared";
 import { LessonContent } from "@/components/student/shared";
 import { productionApi, type ProductionProblem } from "@/lib/production-api";
-import { luqPolicyDescription } from "@/lib/luq-policy-display";
 import type {
   Paper4Paper,
   Paper4PaperSummary,
@@ -860,71 +859,31 @@ export function StudentLuqRule({
   activityType: ActivityType;
   activityId: string;
 }) {
-  const { locale } = useLocale();
   const tx = useText(),
     rule = useData<RuleResponse>(
       `luq/reward-rules?${new URLSearchParams({ activityType, activityId })}`,
-    ),
-    policies = useData<PolicyResponse>(
-      `luq/policies?${new URLSearchParams({ targetType: activityType, targetId: activityId })}`,
     );
   const r = rule.data?.rule;
+  if (rule.loading || rule.error || !r || r.amount <= 0) return null;
   return (
-    <aside className="my-3 rounded-md border border-border bg-surface-subtle px-3 py-2 text-xs leading-6">
-      <State resource={rule} />
-      {!rule.loading && !rule.error && r && (
-        <>
-          <strong>
-            {tx("本活动 Luq 规则", "Activity Luq rule")} · +{r.amount} Luq
-          </strong>
-          <span>
-            {" "}
-            ·{" "}
-            {tx(
-              `至少 ${r.minimumAc} 题 AC，得分至少 ${r.minimumScore}%；每人一次。`,
-              `At least ${r.minimumAc} accepted problems and ${r.minimumScore}% score; once per student.`,
-            )}{" "}
-            {r.allowSolutionAssisted
-              ? tx(
-                  "本学习 / 订正任务的额外奖励允许答案辅助后的提交参与。",
-                  "Solution-assisted submissions can qualify for this learning/correction activity's extra reward.",
-                )
-              : tx(
-                  "提交前获得本站完整答案的提交不参与本活动奖励。",
-                  "Submissions made after receiving the full solution do not qualify for this activity reward.",
-                )}{" "}
-            {activityType === "paper4_activity" &&
-              tx(
-                "Paper 4 \u767e\u5206\u6bd4\u6307\u6574\u9053\u5927\u9898 AC \u6bd4\u4f8b\uff0c\u4e0d\u662f\u6559\u5e08\u624b\u52a8\u8bc4\u5206\u3002",
-                "Paper 4 percentages measure accepted whole questions, not manually awarded marks.",
-              )}{" "}
-            {activityType !== "assignment" &&
-              tx(
-                "首次公布成绩后结算。",
-                "Settled after the first result publication.",
-              )}
-          </span>
-        </>
-      )}
-      <State resource={policies} />
-      {!policies.loading && !policies.error && policies.data && (
-        <>
-          <dl className="mt-1 flex flex-wrap gap-x-5 gap-y-1 border-t border-border pt-1">
-            {policies.data.items.map((policy) => (
-              <div key={policy.kind} className="flex flex-wrap gap-x-2">
-                <dt className="font-semibold">{kindName(policy.kind, tx)}</dt>
-                <dd>{luqPolicyDescription(policy, locale)}</dd>
-              </div>
-            ))}
-          </dl>
-          <p className="text-muted-foreground">
-            {tx(
-              "实际开放还取决于题目权限、已发布内容和其他考核限制；已购买内容也遵守这些规则。",
-              "Access also depends on problem permissions, published content and other assessment restrictions. Purchased content follows the same rules.",
-            )}
-          </p>
-        </>
-      )}
-    </aside>
+    <details key={`${activityType}:${activityId}`} className="my-1 text-xs leading-5 text-muted-foreground">
+      <summary className="w-fit cursor-pointer rounded-sm py-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+        <span className="font-semibold text-foreground">{tx("额外奖励", "Extra reward")} +{r.amount} Luq</span>
+        <span className="ml-2">{tx("奖励条件", "Conditions")}</span>
+      </summary>
+      <p className="mt-1">
+        {tx(`至少 ${r.minimumAc} 题 AC`, `At least ${r.minimumAc} accepted problem${r.minimumAc === 1 ? "" : "s"}`)}
+        {r.minimumScore > 0 && tx(`，得分至少 ${r.minimumScore}%`, ` and ${r.minimumScore}% score`)}
+        {tx("；每人每活动一次。", "; once per student per activity.")}{" "}
+        {r.allowSolutionAssisted
+          ? tx("允许答案辅助后的提交参与奖励。", "Solution-assisted submissions qualify for this reward.")
+          : tx("提交前获得完整答案的提交不参与奖励。", "Submissions made after receiving the full solution do not qualify.")}{" "}
+        {activityType === "paper4_activity" && r.minimumScore > 0 && tx(
+          "百分比按整道大题 AC 比例计算。",
+          "The percentage measures accepted whole questions.",
+        )}{" "}
+        {activityType !== "assignment" && tx("首次公布成绩后结算。", "Settled after the first result publication.")}
+      </p>
+    </details>
   );
 }

@@ -21,6 +21,7 @@ export async function postLuqEntry(db, { identityId, delta, kind, sourceKey, act
  } catch (error) {
   if (error.message.includes('LUQ_INSUFFICIENT_BALANCE')) fail(409, 'LUQ_INSUFFICIENT_BALANCE', 'Luq 余额不足');
   if (error.code === '23505' || error.message.includes('LUQ_IDEMPOTENCY_CONFLICT')) fail(409, 'IDEMPOTENCY_CONFLICT', '此请求编号已用于其他操作');
+  if (error.message.includes('LUQ_TRANSLATION_CREDIT_USED')) fail(409, 'LUQ_TRANSLATION_CREDIT_USED', '这笔翻译费用已抵扣题解费用，无法全额退款');
   if (error.message.includes('LUQ_INVALID_REFUND')) fail(400, 'LUQ_INVALID_REFUND', '只能全额退还原 Luq 消费');
   if (error.message.includes('LUQ_BALANCE_LIMIT')) fail(409, 'LUQ_BALANCE_LIMIT', 'Luq 余额超过上限');
   if (error.message.includes('LUQ_STUDENT_REQUIRED')) fail(400, 'LUQ_STUDENT_REQUIRED', 'Luq 账户必须关联学生身份');

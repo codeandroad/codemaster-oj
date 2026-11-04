@@ -31,7 +31,7 @@ export function ProfileHero({ avatar, nickname, bio, actions, children, self = f
       <div className="absolute -right-12 -top-28 size-80 rounded-full border border-white/15 sm:right-10"/>
       <div className="absolute -right-20 -top-20 size-80 rounded-full border border-white/15 sm:right-0"/>
       <span className="absolute right-5 top-0 font-mono text-[110px] font-bold tracking-[-.16em] text-white/15 sm:right-16 sm:text-[145px]">{"</>"}</span>
-      <span className="absolute left-5 top-4 text-xs font-semibold tracking-wide text-white/75 sm:left-7">CodeMaster OJ · {locale === "en" ? "Campus coding profile" : "校内编程档案"}</span>
+      <span className="absolute left-5 top-4 text-xs font-semibold tracking-wide text-white/75 sm:left-7">CodeMaster · {locale === "en" ? "Campus coding profile" : "校内编程档案"}</span>
     </div>
     <div className="px-5 pb-5 sm:px-7 sm:pb-6">
       <div className="-mt-12 flex flex-wrap items-end justify-between gap-3 sm:-mt-14">

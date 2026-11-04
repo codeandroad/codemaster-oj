@@ -1,4 +1,5 @@
 "use client";
+import { StudentPresenceHeartbeat } from "./student/student-presence";
 import {ProfileEditor} from "./profile-editor";
 import {PointsPage} from "./points-page";
 import { AdminLuqPage, StudentLuqPage, LuqBalance } from "./luq/account-pages";
@@ -8,6 +9,7 @@ import { AppLink } from "@/components/navigation";
 import { isCampusRoute } from "@/lib/campus-routes";
 
 import { useEffect, useState, type ReactNode } from "react";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { BarChart3, BookOpen, BookOpenCheck, ClipboardList, Clock3, Code2, Database, FileClock, FileCode2, Gauge, Home, LayoutDashboard, Library, Menu, NotebookPen, Settings, Users, UserRound, Wallet, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -69,7 +71,7 @@ export function ProductionApp() {
   if (loading)
     return (
       <main className="grid min-h-screen place-items-center bg-background">
-        <p role="status">正在连接校内服务…</p>
+        <p role="status">{locale === "en" ? "Connecting to your school…" : "正在连接校内服务…"}</p>
       </main>
     );
   if (error && authPage) return <AuthNotice error title={locale === "en" ? "Unable to connect" : "暂时无法连接服务"} message={error}><Button className="mt-5 w-fit" onClick={() => { setLoading(true); setError(""); setCheck(value => value + 1); }}>{locale === "en" ? "Retry" : "重试"}</Button></AuthNotice>;
@@ -107,8 +109,9 @@ export function ProductionApp() {
         : "teacher"
       : requestedRole;
   const allowed = user.roles.includes(role) || (role === "teacher" && user.roles.includes("admin"));
-  return (
-    allowed && (/^\/student\/problems\/[^/]+$/.test(pathname) || /^\/student\/paper4\/[^/]+$/.test(pathname)) ? <StudentPages pathname={pathname} user={user}/> :
+  return <>
+    {user.roles.includes("student") && <StudentPresenceHeartbeat identityId={user.identityId}/>}
+    {allowed && (/^\/student\/problems\/[^/]+$/.test(pathname) || /^\/student\/paper4\/[^/]+$/.test(pathname)) ? <StudentPages pathname={pathname} user={user}/> :
     <ProductionShell
       user={user}
       role={role}
@@ -130,8 +133,8 @@ export function ProductionApp() {
           </AppLink>
         </div>
       )}
-    </ProductionShell>
-  );
+    </ProductionShell>}
+  </>;
 }
 
 function viewKey(pathname: string) {
@@ -246,28 +249,30 @@ function ProductionShell({
 
         </aside>
         <div className="min-w-0">
-          <header className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-4 sm:px-6">
-            <div className="flex min-w-0 flex-1 items-center gap-3">
+          <header className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2 gap-y-0.5 border-b border-border bg-surface px-3 py-1.5 sm:px-6 md:flex md:min-h-14 md:gap-3 md:py-0">
+            <div className="flex shrink-0 items-center gap-1 md:hidden">
               <Button
                 variant="ghost"
                 size="icon"
-                className="md:hidden"
                 aria-label={t("打开导航")}
                 aria-expanded={open}
                 onClick={() => setOpen(true)}
               >
                 <Menu size={18} />
               </Button>
-              <BrandLogo className="h-auto w-[130px] max-w-full md:hidden" />
-              <PageBreadcrumbs pathname={pathname} role={role}/><ShellPageHeading pathname={pathname} role={role}/>
+              <Image src="/brand/codemaster-oj-symbol-v2.svg" alt="CodeMaster" width={32} height={32} unoptimized className="size-8 min-[400px]:hidden"/>
+              <span className="hidden min-[400px]:block"><BrandLogo className="h-auto w-[115px]" /></span>
             </div>
-            <div className="flex shrink-0 items-center gap-3">
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-1 md:order-last md:shrink-0 md:gap-3">
               {role==="student"&&<><LuqBalance identityId={user.identityId}/><NotificationDropdown/></>}
               <AccountMenu user={user} role={role} busy={action.busy} onLogout={() => action.run(async () => {
                 try { await productionApi("auth/logout", {method:"POST"}); }
                 catch(reason) { if (!(reason instanceof ApiError && reason.status===401)) throw reason; }
                 onLogout();
               })}/>
+            </div>
+            <div className="col-span-2 flex min-w-0 items-center pb-1 pt-0.5 md:order-first md:flex-1 md:p-0">
+              <PageBreadcrumbs pathname={pathname} role={role}/><ShellPageHeading pathname={pathname} role={role}/>
             </div>
           </header>
           <div className="px-4">

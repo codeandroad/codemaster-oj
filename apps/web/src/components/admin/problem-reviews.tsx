@@ -1,10 +1,11 @@
 "use client";
 
 import { PublicationGuide } from "@/components/problem-publication-status";
-import { useState } from "react";
+import { useState, type ChangeEvent } from "react";
 import { MathContent } from "@/components/math-content";
 import { useLocale, type AppLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
+import { useRangeSelection } from "@/components/ui/use-range-selection";
 import { productionApi, type ProductionProblem } from "@/lib/production-api";
 import { Drawer, Feedback, Loading, Modal, dateLabel, inputClass, useData, useMutation } from "./common";
 import { reviewVersionActions, type ReviewStatus } from "./problem-review-policy";
@@ -135,6 +136,24 @@ export function ProblemReviews() {
   const selectedItems = approvableShown.filter((item) => selectedVersionIds.includes(item.versionId));
   const allSelectableShownSelected = selectableShown.length > 0 && selectableShown.every((item) => selectedVersionIds.includes(item.versionId));
   const privateBanks = banks.data?.items.filter((bank) => bank.visibility === "private" && !bank.isSystem) ?? [];
+  const isSelectionDisabled = (versionId: string) => action.busy ||
+    (selectedVersionIds.length >= MAX_BATCH_APPROVE && !selectedVersionIds.includes(versionId));
+  const { getRange, resetAnchor } = useRangeSelection(shown.map((item) => ({
+    id: item.versionId,
+    disabled: !canApprove(item) || isSelectionDisabled(item.versionId),
+  })), filter);
+
+  const clearSelection = () => {
+    resetAnchor();
+    setSelectedVersionIds([]);
+  };
+  const changeSelection = (versionId: string, event: ChangeEvent<HTMLInputElement>) => {
+    const checked = event.currentTarget.checked;
+    const range = getRange(versionId, event);
+    setSelectedVersionIds((ids) => range || checked
+      ? [...new Set([...ids, ...(range ?? [versionId])])].slice(0, MAX_BATCH_APPROVE)
+      : ids.filter((id) => id !== versionId));
+  };
 
   const close = () => { setCandidate(null); setReason(""); action.clear(); };
   const approve = (item: ProblemReview) => {
@@ -145,6 +164,7 @@ export function ProblemReviews() {
         body: { versionId: item.versionId, decision: "approved" },
       });
       setSelectedVersionIds((ids) => ids.filter((versionId) => versionId !== item.versionId));
+      resetAnchor();
       reviews.reload();
       action.success(t("题目已纳入后续首次 AC 排名积分。"));
     }).finally(() => setApproving(null));
@@ -158,7 +178,7 @@ export function ProblemReviews() {
         method: "POST",
         body: { items: selected },
       });
-      setSelectedVersionIds([]);
+      clearSelection();
       reviews.reload();
       action.success(locale === "en" ? `${result.approvedCount} problem versions approved.` : `已通过 ${result.approvedCount} 道题目的当前版本。`);
     }).finally(() => setApproving(null));
@@ -175,6 +195,7 @@ export function ProblemReviews() {
         },
       });
       close();
+      resetAnchor();
       reviews.reload();
       action.success(t(candidate.decision === "revoked" ? "此版本已撤下，后续不再公开或新增排名积分；历史榜分保留。" : "题目暂不纳入全校排名积分。"));
     });
@@ -189,12 +210,12 @@ export function ProblemReviews() {
             {locale === "en" ? "Approval opens a problem for school-wide practice and future first-AC points. Before approval, a released version is available only to its assigned students." : "审核通过后，题目向全校开放自由练习并参与后续首次 AC 积分。审核前的教学版本仅指定学生可用。"}
           </p>
         </div>
-        <Button variant="secondary" size="sm" disabled={reviews.loading || action.busy} onClick={() => { setSelectedVersionIds([]); reviews.reload(); }}>{t("刷新列表")}</Button>
+        <Button variant="secondary" size="sm" disabled={reviews.loading || action.busy} onClick={() => { clearSelection(); reviews.reload(); }}>{t("刷新列表")}</Button>
       </div>
       <PublicationGuide/>
       <div className="flex flex-wrap gap-2" role="group" aria-label={t("审核状态筛选")}>
         {(["all", "pending", "approved", "rejected", "revoked"] as const).map((value) => (
-          <Button key={value} type="button" size="sm" variant={filter === value ? "primary" : "secondary"} aria-pressed={filter === value} disabled={action.busy} onClick={() => { setFilter(value); setSelectedVersionIds([]); }}>
+          <Button key={value} type="button" size="sm" variant={filter === value ? "primary" : "secondary"} aria-pressed={filter === value} disabled={action.busy} onClick={() => { setFilter(value); clearSelection(); }}>
             {t(value === "all" ? "全部" : statusLabels[value])}
             <span className="ml-1 tabular-nums">{items.filter((item) => matchesFilter(item, value)).length}</span>
           </Button>
@@ -205,14 +226,14 @@ export function ProblemReviews() {
           {selectedItems.length > 0 && <div className="flex flex-wrap items-center gap-3 border-b border-border bg-surface-subtle px-4 py-3 text-sm">
             <strong>{t("已选")} {selectedItems.length}</strong>
             <Button size="sm" disabled={action.busy} onClick={approveSelected}>{approving === "batch" ? t("正在通过…") : `${t("批量通过")} (${selectedItems.length})`}</Button>
-            <Button size="sm" variant="ghost" disabled={action.busy} onClick={() => setSelectedVersionIds([])}>{t("取消选择")}</Button>
+            <Button size="sm" variant="ghost" disabled={action.busy} onClick={clearSelection}>{t("取消选择")}</Button>
             <p className="w-full text-xs leading-5 text-muted-foreground">{t("已选版本将从通过时刻起向全校开放并参与后续首次 AC 积分；历史 AC 不追溯。")}</p>
           </div>}
           {approvableShown.length > MAX_BATCH_APPROVE && <p className="border-b border-border px-4 py-2 text-xs text-muted-foreground">{t("最多选择前 100 道可通过题目；审核后可继续选择下一批。")}</p>}
           <div className="overflow-x-auto">
           <table className="w-full min-w-[940px] text-left text-sm">
             <thead className="bg-surface-subtle text-xs text-muted-foreground"><tr>
-              <th scope="col" className="w-10 px-4 py-3"><input type="checkbox" aria-label={t(approvableShown.length > MAX_BATCH_APPROVE ? "选择当前列表前 100 道可通过题目" : "选择当前列表可通过题目")} checked={allSelectableShownSelected} disabled={!selectableShown.length || action.busy} onChange={(event) => setSelectedVersionIds(event.target.checked ? selectableShown.map((item) => item.versionId) : [])} /></th>
+              <th scope="col" className="w-10 px-4 py-3"><input type="checkbox" aria-label={t(approvableShown.length > MAX_BATCH_APPROVE ? "选择当前列表前 100 道可通过题目" : "选择当前列表可通过题目")} checked={allSelectableShownSelected} disabled={!selectableShown.length || action.busy} onChange={(event) => { resetAnchor(); setSelectedVersionIds(event.currentTarget.checked ? selectableShown.map((item) => item.versionId) : []); }} /></th>
               {["题目 / 版本", "上传教师", "题库 / 题目可见性", "版本启用时间", "公开状态", "已 AC 人数", "操作"].map((label) => <th key={label} scope="col" className="px-4 py-3">{t(label)}</th>)}
             </tr></thead>
             <tbody>
@@ -224,7 +245,7 @@ export function ProblemReviews() {
                     : item.isCurrent ? statusLabels.pending : "历史版 · 未获积分资格"
                   : statusLabels[item.rankReviewStatus];
                 return <tr key={item.versionId} className="border-t border-border">
-                <td className="px-4 py-3">{canApprove(item) && <input type="checkbox" aria-label={`${t("选择题目")} ${item.title}`} checked={selectedVersionIds.includes(item.versionId)} disabled={action.busy || (selectedVersionIds.length >= MAX_BATCH_APPROVE && !selectedVersionIds.includes(item.versionId))} onChange={(event) => setSelectedVersionIds((ids) => event.target.checked ? [...ids, item.versionId] : ids.filter((versionId) => versionId !== item.versionId))} />}</td>
+                <td className="px-4 py-3">{actions.canApprove && <input type="checkbox" aria-label={`${t("选择题目")} ${item.title}`} checked={selectedVersionIds.includes(item.versionId)} disabled={isSelectionDisabled(item.versionId)} onChange={(event) => changeSelection(item.versionId, event)} />}</td>
                 <td className="px-4 py-3">
                   <button type="button" className="text-left font-semibold text-primary hover:underline focus-visible:underline" onClick={() => setInspecting(item)}>{item.title}</button>
                   <p className="mt-1 font-mono text-xs text-muted-foreground" title={item.versionId}>{t(item.isCurrent ? "当前版" : "历史版")} · {item.versionId.slice(0, 8)}</p>

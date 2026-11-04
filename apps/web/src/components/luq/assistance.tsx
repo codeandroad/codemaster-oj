@@ -23,6 +23,8 @@ interface Quote {
   mode: "disabled" | "paid" | "free";
   unlocked: boolean;
   price: number;
+  basePrice?: number;
+  translationCredit?: number;
   balance: number;
   balanceAfter: number;
   contentId?: string;
@@ -92,7 +94,7 @@ export function LuqAssistance({
     try {
       if (quote.mode === "paid" && !quote.unlocked) {
         requestKey.current ??= productionId();
-        await productionApi("luq/assistance/unlock", {
+        const unlock = await productionApi<{ balance: number }>("luq/assistance/unlock", {
           method: "POST",
           body: {
             ...body,
@@ -106,7 +108,8 @@ export function LuqAssistance({
           ...quote,
           unlocked: true,
           price: 0,
-          balance: quote.balanceAfter,
+          balance: unlock.balance,
+          balanceAfter: unlock.balance,
           requiresConfirmation: false,
         });
         window.dispatchEvent(new Event("campus-judge:luq-changed"));
@@ -202,6 +205,14 @@ export function LuqAssistance({
                 <dl className="grid grid-cols-2 gap-2 rounded-md border border-border bg-surface-subtle p-3">
                   <dt>{tx("内容", "Content")}</dt>
                   <dd className="text-right font-semibold">{title}</dd>
+                  {quote.mode === "paid" && !quote.unlocked && (quote.translationCredit ?? 0) > 0 && (
+                    <>
+                      <dt>{tx("题解原价", "Solution price")}</dt>
+                      <dd className="text-right">{quote.basePrice} Luq</dd>
+                      <dt>{tx("已付翻译抵扣", "Translation credit")}</dt>
+                      <dd className="text-right">−{quote.translationCredit} Luq</dd>
+                    </>
+                  )}
                   <dt>{tx("本次费用", "Cost")}</dt>
                   <dd className="text-right font-semibold">
                     {quote.unlocked || quote.mode === "free" ? 0 : quote.price}{" "}
@@ -281,7 +292,7 @@ export function LuqAssistance({
                 >
                   {busy
                     ? tx("处理中…", "Processing…")
-                    : quote.mode === "paid" && !quote.unlocked
+                    : quote.mode === "paid" && !quote.unlocked && quote.price > 0
                       ? tx(
                           `确认支付 ${quote.price} Luq 并查看`,
                           `Pay ${quote.price} Luq and view`,

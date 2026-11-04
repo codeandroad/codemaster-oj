@@ -259,7 +259,7 @@ const adminEnglish: Record<string, string> = {
   "保存设置": "Save settings",
   "取消 / 恢复本次修改": "Discard changes",
   "当前摘要：": "Current site: ",
-  "站点默认语言为历史配置；当前界面以个人设置中的语言选择为准，未设置时显示中文。修改时区不重新计算或篡改已有活动时间。": "The site default language is a legacy setting. Your personal language choice controls the interface; without one, Chinese is shown. Changing the timezone does not alter past activity times.",
+  "站点默认语言为历史配置；当前界面以个人设置中的语言选择为准，未设置时显示英文。修改时区不重新计算或篡改已有活动时间。": "The site default language is a legacy setting. Your personal language choice controls the interface; without one, English is shown. Changing the timezone does not alter past activity times.",
   "允许语言": "Languages",
   "版本展示": "Version",
   "可用状态": "Availability",

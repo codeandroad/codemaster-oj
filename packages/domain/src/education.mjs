@@ -147,17 +147,17 @@ async function teachingReport(ctx) {
    for (const g of grade.problems) {
     if (!problems.has(g.problemId)) problems.set(g.problemId, { problemId:g.problemId,title:titles.get(g.problemId),attempted:0,denominator:0,valid:0,totalPercent:0,pending:0 });
     const p = problems.get(g.problemId); p.denominator++;
-    if (g.submissionId || g.pending) p.attempted++;
+    if (g.hasAssignmentSubmission ?? Boolean(g.submissionId || g.pending)) p.attempted++;
     const unresolved=g.pending||(['Waiting','Judging','System Error'].includes(g.status)&&g.score===null);
     if (unresolved) p.pending++;
-    else if (g.score !== null && g.submissionId) { p.valid++; p.totalPercent += g.score; }
+    else if (g.score !== null && (g.submissionId || g.completionSource==='other_entry')) { p.valid++; p.totalPercent += g.score; }
    }
   }
  }
  const rows = [...students.values()].sort((a,b) => a.name.localeCompare(b.name,'zh-CN'));
- const submitted = rows.filter(s => s.assignments.some(a => a.problems.some(p => p.submissionId || p.pending)));
+ const submitted = rows.filter(s => s.assignments.some(a => a.problems.some(p => p.hasAssignmentSubmission ?? Boolean(p.submissionId || p.pending))));
  const pending = rows.filter(s => s.assignments.some(a => a.pending));
- const graded = rows.filter(s => !s.assignments.some(a => a.pending) && s.assignments.some(a => a.problems.some(p => p.score !== null&&p.submissionId)));
+ const graded = rows.filter(s => !s.assignments.some(a => a.pending) && s.assignments.some(a => a.problems.some(p => p.score !== null&&(p.submissionId||p.completionSource==='other_entry'))));
  const totals = graded.map(s => ({ score:s.assignments.reduce((n,a)=>n+(a.score??0),0), max:s.assignments.reduce((n,a)=>n+a.maxScore,0) }));
  const round = value => Math.round(value*100)/100;
  const selectedIds = chosen.map(a => a.id);
@@ -169,7 +169,7 @@ async function teachingReport(ctx) {
   bool_or(EXISTS(SELECT 1 FROM review_entries r JOIN accounts ra ON ra.id=r.author_account_id WHERE r.submission_id=s.id AND ra.identity_id=s.identity_id AND r.created_at>COALESCE((SELECT max(feedback.created_at) FROM review_entries feedback JOIN account_roles fr ON fr.account_id=feedback.author_account_id WHERE feedback.submission_id=s.id AND fr.role IN ('teacher','admin')),'-infinity'::timestamptz))) waiting_feedback
   FROM submissions s LEFT JOIN LATERAL submission_activity_context(s.original_submission_id) original ON true LEFT JOIN timed_attempts ta ON ta.id=COALESCE(s.timed_attempt_id,original.timed_attempt_id)
   WHERE COALESCE(s.assignment_id,original.assignment_id)=ANY($1::uuid[]) OR ta.practice_id=ANY($2::uuid[]) GROUP BY s.identity_id,s.problem_id`,[selectedIds,selectedTimed])).rows;
- for(const student of rows){const ds=diagnostics.filter(d=>d.identity_id===student.identityId);student.notStarted=!student.assignments.some(a=>a.problems.some(p=>p.submissionId||p.pending));student.incomplete=student.assignments.some(a=>a.problems.some(p=>p.status!=='AC'));student.repeatedFailureProblemIds=ds.filter(d=>d.failures>=2).map(d=>d.problem_id);student.waitingFeedback=ds.some(d=>d.waiting_feedback);}
+ for(const student of rows){const ds=diagnostics.filter(d=>d.identity_id===student.identityId);student.notStarted=!student.assignments.some(a=>a.problems.some(p=>p.submissionId||p.pending||p.completionSource==='other_entry'));student.incomplete=student.assignments.some(a=>a.problems.some(p=>p.status!=='AC'));student.repeatedFailureProblemIds=ds.filter(d=>d.failures>=2).map(d=>d.problem_id);student.waitingFeedback=ds.some(d=>d.waiting_feedback);}
  const metrics={denominator:rows.length,notStarted:rows.filter(s=>s.notStarted).length,incomplete:rows.filter(s=>s.incomplete).length,repeatedFailures:rows.filter(s=>s.repeatedFailureProblemIds.length).length,waitingFeedback:rows.filter(s=>s.waitingFeedback).length};
  return {metrics,timeFilter:{since:since?.toISOString()??null,until:until?.toISOString()??null,basis:'activity-created-at'}, classes, assignments:assignments.map(a=>({id:a.id,title:a.title,classId:a.class_id,dueAt:a.due_at,type:'assignment'})),
   timedPractices:timedPractices.map(p=>({id:p.id,title:p.title,classId:p.class_id,dueAt:p.ends_at,type:'timed'})),
@@ -202,9 +202,9 @@ const rankingPolicy = Object.freeze({
  scope:'approved_school_and_paper4_first_ac',
  bonusIncluded:false,
  retroactive:false,
- order:['points_desc','ac_rate_desc'],
- ties:'equal_points_and_ac_rate',
- description:'排名积分计审核公开的普通题首次有效 AC，以及 Paper 4 正式交卷后每道大题全部自动测试首次 AC 的固定 10 分；作业与计时训练额外奖励只计入个人总积分。积分相同时按未四舍五入的 AC 率降序排列；没有有效判题结果时排在已判题学生之后，积分和 AC 率均相同时并列。',
+ order:['points_desc','ac_rate_desc','luq_balance_desc'],
+ ties:'equal_points_ac_rate_and_luq_balance',
+ description:'排名积分计审核公开的普通题首次有效 AC，以及 Paper 4 正式交卷后每道大题全部自动测试首次 AC 的固定 10 分。作业与计时训练额外奖励只计入个人总积分。积分相同时比较未四舍五入的 AC 率，暂无有效判题结果者排在已有 AC 率者之后。积分和 AC 率均相同时比较当前 Luq 余额，三项均相同则并列。',
 });
 
 async function leaderboardContexts(pool, user) {
@@ -297,12 +297,14 @@ async function pointsLeaderboard(ctx) {
    COALESCE(e.points,0)::int points, COALESCE(e.solved_problems,0)::int solved_problems,
    (COALESCE(t.attempts,0)+COALESCE(p4.attempts,0))::int attempts,
    (COALESCE(t.assessed,0)+COALESCE(p4.assessed,0))::int assessed,
-   (COALESCE(t.accepted,0)+COALESCE(p4.accepted,0))::int accepted
+   (COALESCE(t.accepted,0)+COALESCE(p4.accepted,0))::int accepted,
+   COALESCE(luq.balance,0) luq_balance
   FROM identities i
   LEFT JOIN earned e ON e.identity_id=i.id
   JOIN accounts a ON a.identity_id=i.id AND a.disabled_at IS NULL AND a.binding_released_at IS NULL
   LEFT JOIN attempts t ON t.identity_id=i.id
   LEFT JOIN paper4_attempts p4 ON p4.identity_id=i.id
+  LEFT JOIN luq_accounts luq ON luq.identity_id=i.id
   WHERE i.kind='student' AND i.archived_at IS NULL
    AND ($5::uuid IS NULL OR EXISTS (
     SELECT 1 FROM class_members cm WHERE cm.identity_id=i.id AND cm.class_id=$5::uuid))
@@ -311,8 +313,8 @@ async function pointsLeaderboard(ctx) {
    SELECT eligible.*,accepted::numeric/NULLIF(assessed,0) ac_ratio FROM eligible
   ), ranked AS (
    SELECT scored.*,
-    rank() OVER (ORDER BY points DESC,ac_ratio DESC NULLS LAST)::int rank,
-    row_number() OVER (ORDER BY points DESC,ac_ratio DESC NULLS LAST,id)::int row_num
+    rank() OVER (ORDER BY points DESC,ac_ratio DESC NULLS LAST,luq_balance DESC)::int rank,
+    row_number() OVER (ORDER BY points DESC,ac_ratio DESC NULLS LAST,luq_balance DESC,id)::int row_num
    FROM scored
   ), totals AS (
    SELECT count(*)::int total FROM ranked

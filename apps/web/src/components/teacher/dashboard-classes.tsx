@@ -2,6 +2,7 @@
 
 import { AppLink as Link } from "@/components/navigation";
 import { useEffect, useState } from "react";
+import { useRangeSelection } from "@/components/ui/use-range-selection";
 import { useSearchParams } from "next/navigation";
 import { ArrowRight, CircleAlert, ClipboardList, UserRound } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -226,7 +227,7 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
   const selectedGrade = assignmentDetail && assignmentDetail.id === currentAssignment?.id
     ? assignmentDetail.grades?.find((grade) => grade.identityId === selectedStudentId)
     : undefined;
-  const selectedAttempted = selectedGrade?.problems.filter((problem) => Boolean(problem.submissionId)).length ?? 0;
+  const selectedAttempted = selectedGrade?.problems.filter((problem) => (Boolean(problem.submissionId) || problem.completionSource === "other_entry")).length ?? 0;
   const selectedSolved = selectedGrade?.problems.filter((problem) => problem.status === "AC").length ?? 0;
   const action = useAction(),
     [code, setCode] = useState<{ name: string; activationCode: string } | null>(
@@ -331,7 +332,7 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
                 const student = people.data?.items.find((x) => x.id === id),
                   grade = detail.data?.grades?.find((x) => x.identityId === id),
                   attempted =
-                    grade?.problems.filter((x) => !!x.submissionId).length ?? 0,
+                    grade?.problems.filter((x) => (!!x.submissionId || x.completionSource === "other_entry")).length ?? 0,
                   solved =
                     grade?.problems.filter((x) => x.status === "AC").length ??
                     0;
@@ -538,6 +539,7 @@ function ClassDialog({
       x.kind === "student" &&
       `${x.number} ${x.name}`.toLowerCase().includes(query.toLowerCase()),
   );
+  const { getRange } = useRangeSelection(shown, query);
   return (
     <Modal
       title={mode === "edit" ? `${tx("编辑班级与名单", "Edit class and roster")} · ${current?.name}` : tx("新建班级", "New class")}
@@ -617,13 +619,13 @@ function ClassDialog({
                 <input
                   type="checkbox"
                   checked={selected.includes(student.id)}
-                  onChange={(e) =>
-                    setSelected((x) =>
-                      e.target.checked
-                        ? [...x, student.id]
-                        : x.filter((id) => id !== student.id),
-                    )
-                  }
+                  onChange={(event) => {
+                    const range = getRange(student.id, event);
+                    const checked = event.currentTarget.checked;
+                    setSelected(ids => range || checked
+                      ? [...new Set([...ids, ...(range ?? [student.id])])]
+                      : ids.filter(id => id !== student.id));
+                  }}
                 />
                 <span className="font-mono text-xs">{student.number}</span>
                 <b>{student.name}</b>

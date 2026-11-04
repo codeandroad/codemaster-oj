@@ -10,7 +10,7 @@ import { completePaper4Task } from '../paper4-worker.mjs';
 const upgrade = '037_paper4_catalog_activities.sql';
 const audienceUpgrade = '039_paper4_activity_audiences.sql';
 const courseLinksUpgrade = '042_course_paper4_links.sql';
-const luqUpgrades = ['043_luq.sql', '044_luq_initial_grant.sql', '045_luq_assistance_prices.sql', '046_luq_content_batches.sql', '047_problem_public_statements.sql'];
+const luqUpgrades = ['043_luq.sql', '044_luq_initial_grant.sql', '045_luq_assistance_prices.sql', '046_luq_content_batches.sql', '047_problem_public_statements.sql', '049_luq_translation_credit.sql'];
 const questions = [{ key: 'Q1', title: 'Preserve a queue', statement: 'Implement the queue in English.',
   starterCode: '# Start here\n', initialFiles: { 'Data.txt': 'original\r\n' }, outputFiles: ['Result.txt'],
   stages: [{ id: 'Q1a', title: 'Queue operations', maxMarks: 75, judgeMode: 'auto' }] }];

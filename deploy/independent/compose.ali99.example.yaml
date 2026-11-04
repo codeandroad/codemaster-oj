@@ -1,0 +1,57 @@
+# Host-specific template; restore a verified snapshot into the new empty volume before starting students.
+services:
+  db:
+    volumes: !override
+      - independent_database_20261028:/var/lib/postgresql/data
+      - ./init-db-roles.sh:/docker-entrypoint-initdb.d/10-roles.sh:ro
+    image: campus-judge-ali99-db:17-alpine
+    pull_policy: never
+    mem_limit: 320m
+    cpus: 0.5
+    command: [postgres, -c, shared_buffers=64MB, -c, max_connections=50, -c, work_mem=4MB]
+  migrate:
+    image: campus-judge-shared-domain:20261027
+    pull_policy: never
+    mem_limit: 256m
+  api:
+    image: campus-judge-shared-api:20261027
+    pull_policy: never
+    mem_limit: 320m
+    cpus: 0.75
+    environment:
+      NODE_OPTIONS: --max-old-space-size=240
+  worker:
+    image: campus-judge-shared-domain:20261027
+    pull_policy: never
+    mem_limit: 256m
+    cpus: 0.4
+    environment:
+      NODE_OPTIONS: --max-old-space-size=192
+  judge:
+    image: campus-judge-ali99-judge:c0ddd8c
+    pull_policy: never
+    mem_limit: 1g
+    memswap_limit: 1g
+    cpus: 1
+    shm_size: 128m
+    command: [-http-addr=:5050, -parallelism=1, -container-cred-start=10000, -net-share=false, -no-fallback, -silent, -mount-conf=/opt/mount.yaml, -seccomp-conf=/opt/seccomp.yaml, -output-limit=1m, -copy-out-limit=8m, -file-timeout=2m]
+  web:
+    image: campus-judge-ali99-web:53d10e5
+    pull_policy: never
+    mem_limit: 256m
+    cpus: 0.5
+    environment:
+      NODE_OPTIONS: --max-old-space-size=192
+  gateway:
+    image: campus-judge-ali99-gateway:2.10.2-alpine
+    pull_policy: never
+    mem_limit: 96m
+    ports: !override
+      - '8443:8443'
+    volumes: !override
+      - ./Caddyfile.ali99:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  independent_database_20261028: {}

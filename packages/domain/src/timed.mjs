@@ -165,7 +165,7 @@ export async function maskTimedSubmission(db, user, submission) {
   if (!submission.timed_attempt_id) return submission;
   const practice = row(await db.query('SELECT p.* FROM timed_attempts a JOIN timed_practices p ON p.id=a.practice_id WHERE a.id=$1', [submission.timed_attempt_id]));
   if (practice.results_published_at || await canManagePractice(db, user, practice)) return { ...submission, timed_practice_id: practice.id };
-  return { ...submission, timed_practice_id: practice.id, status: submission.status,
+  return { ...submission, timed_practice_id: practice.id, results_visible: false, status: submission.status,
     score: null, passed: null, total: null, public_output: submission.kind === 'submit' ? null : submission.public_output,
     public_message: '判题状态实时显示；最终成绩将在教师发布结果后显示。' };
 }

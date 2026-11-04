@@ -2,7 +2,7 @@
 
 Luq 是独立的可消费助学点，用于取得获授权的学习辅助内容。成绩、个人累计积分、全校榜分继续使用原来的计算与流水；同一次可信业务事件可以分别触发它们。Luq 不兑换历史积分，不提供现金充值、转账、商城或余额排行榜。
 
-本说明对应迁移 `043_luq.sql`、`044_luq_initial_grant.sql`、`045_luq_assistance_prices.sql`、`046_luq_content_batches.sql` 和 `047_problem_public_statements.sql`。设计决策见 [D47](campus-judge-design-summary.md#decision-d47)、[D48](campus-judge-design-summary.md#decision-d48)、[D49](campus-judge-design-summary.md#decision-d49) 与 [D50](campus-judge-design-summary.md#decision-d50)，现有成绩与榜分规则见 [生产设计](campus-judge-production-design.md#grading)。本文描述实现，不代表生产环境已经迁移或部署；实际检查结果由本次交付报告单独记录。
+本说明对应迁移 `043_luq.sql`、`044_luq_initial_grant.sql`、`045_luq_assistance_prices.sql`、`046_luq_content_batches.sql`、`047_problem_public_statements.sql` 和 `049_luq_translation_credit.sql`。设计决策见 [D47](campus-judge-design-summary.md#decision-d47)、[D48](campus-judge-design-summary.md#decision-d48)、[D49](campus-judge-design-summary.md#decision-d49)、[D50](campus-judge-design-summary.md#decision-d50) 与 [D60](campus-judge-design-summary.md#decision-d60)，现有成绩与榜分规则见 [生产设计](campus-judge-production-design.md#grading)。本文描述实现，不代表生产环境已经迁移或部署。
 
 ## 工程与数据边界
 
@@ -90,9 +90,11 @@ Luq 是独立的可消费助学点，用于取得获授权的学习辅助内容�
 
 交易分为三个步骤：
 
-1. `POST /api/v1/luq/assistance/quote` 仅返回类型、价格、余额、扣后余额、是否开放及正文标识，**不返回正文**。
+1. `POST /api/v1/luq/assistance/quote` 返回类型、原价、翻译抵扣、实付价格、余额、扣后余额、是否开放及正文标识，**不返回正文**。
 2. 学生明确确认后调用 `/unlock`，服务端重新计价、校验确认的价格和正文标识，在同一事务写扣费与永久权益。余额不足失败，恰好够用成功；没有已发布正文不扣费。同一权益重复请求、并发请求或跨设备重试只扣一次。
 3. `/provide` 再次鉴权，读取获授权的版本正文并记录服务器提供事件。已解锁的同类型内容免费重看；旧权益可用于新的已发布版本，但不会把旧版答案错当成新版答案。与原卷完全相同的 Paper 4 活动副本可使用原版已审核内容；有改动的副本必须另有对应版本内容。
+
+先购买中文题面，再解锁同一普通题或同一 Paper 4 大题的付费题解时，以翻译流水的实际未退款支出抵扣当前题解价。例如实际支付 3 Luq 的翻译，原价 8 Luq 的题解只需补 5 Luq。免费翻译、已退款翻译和其他题目的购买不抵扣。实付最低为 0；全额抵扣仍需确认并保存永久题解权益，不写零金额流水。解锁与退款由同一个账户锁串行处理，已用于抵扣的翻译不再单独全额退款。已有消费、余额和权益不追溯改写。
 
 购买后取消查看，不产生答案提供记录。中文翻译不影响首次 AC Luq。完整题解或参考代码在提交接收之前已经由本站提供时，该次提交仍照常判题、计成绩和既有积分，但不取得本题首次 AC Luq；免费的完整答案使用相同规则。先提交、后查看、仍在等待判题的提交保留原快照。已获得的奖励不会因之后查看答案被追回。
 
@@ -108,7 +110,7 @@ Luq 是独立的可消费助学点，用于取得获授权的学习辅助内容�
 | --- | --- |
 | `GET /luq/me` | 学生本人余额和分页流水 |
 | `GET /luq/ledger`、`GET /luq/reviews` | 管理员流水与重判核查；流水支持身份筛选 |
-| `POST /luq/grants`、`/adjustments`、`/refunds` | 管理员带原因记账；退款关联原消费，全额最多一次，保留购买权益 |
+| `POST /luq/grants`、`/adjustments`、`/refunds` | 管理员带原因记账；退款关联原消费，全额最多一次，保留购买权益；拒绝已用于题解抵扣的翻译全额退款 |
 | `GET/PATCH /luq/settings` | 登录用户读取价格；仅管理员修改 |
 | `GET/POST /luq/contents`、`POST /luq/contents/:id/publish` | 内容维护者录入及审核发布；学生不得调用来读取正文 |
 | `GET/POST /luq/public-statements` | 维护者读取原题快照并明确审核发布准确版本的公开英文展示；元属性白名单、摘要核验、追加保存 |
@@ -123,10 +125,10 @@ Luq 是独立的可消费助学点，用于取得获授权的学习辅助内容�
 
 ## 迁移与运行
 
-本轮仅按用户授权更新本地 3000，未推送或操作 rslab。其他环境升级应沿用已有部署流程：
+各环境升级沿用已有部署流程：
 
 1. 对现有数据库做一致性备份，保留卷、学生代码、任务、成绩和身份数据。
-2. 使用迁移所有者运行 `packages/domain/src/migrate.mjs`，依次应用尚未执行的 043–047 迁移；044 会追加现有学生初始助学金（默认 100），045 增加可选题目价格与批次记录，046 增加参考答案批量审核的追加式请求记录，047 增加准确版本的公开英文展示表且不自动回填内容；随后运行同一版本的 `packages/domain/grants.mjs`。两者必须一起升级，不能只迁移表而沿用旧授权脚本。现有 Compose 的 `migrate` 服务已按此顺序执行。
+2. 使用迁移所有者运行 `packages/domain/src/migrate.mjs`，按顺序应用所有尚未执行的迁移。049 增加题解权益与翻译原流水的关联、全额抵扣的幂等请求记录及退款保护，不改写历史账本。随后运行同一版本的 `packages/domain/grants.mjs`。两者必须一起升级；现有 Compose 的 `migrate` 服务已按此顺序执行。
 3. 使用匹配的 API/Web/worker 版本，核对受限运行角色及迁移成功状态。迁移所有者凭据只用于迁移，不给 API、worker 或执行器。
 4. 管理员确认价格和教师额度；教师逐版本审核需要开放的内容。旧题目的 hints/editorial 和 Paper 4 私有 reference_solutions 不自动迁为已发布辅助正文；升级后需要先录入、审核才能从学生辅助入口取得内容。没有审核内容的入口显示不可用，不收费。
 

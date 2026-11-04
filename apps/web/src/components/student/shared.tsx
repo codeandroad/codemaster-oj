@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button";
 import { StatusPill } from "@/components/page-chrome";
 import { apiMessage, isPending, productionApi, type Submission, type SubmissionLanguage } from "@/lib/production-api";
+import type { ResultCase } from "./result-feedback";
+export { RunResultPanel as ResultPanel } from "./run-result-panel";
 import { CodeTokens } from "./code-editor";
 import { MathContent } from "@/components/math-content";
 import {useLocale,type AppLocale} from "@/components/locale-context";
@@ -13,7 +15,7 @@ function ui(locale:AppLocale,zh:string,en:string){return locale==="en"?en:zh;}
 export const panel = "rounded-lg border border-border bg-surface p-5";
 export const input = "h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/30";
 export const textarea = "w-full rounded-md border border-input bg-background p-3 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/30";
-export const date = (value?: string | null, locale:AppLocale="zh") => value ? new Intl.DateTimeFormat(locale==="en"?"en-US":"zh-CN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Shanghai" }).format(new Date(value)) : "—";
+export const date = (value?: string | null, locale:AppLocale="en") => value ? new Intl.DateTimeFormat(locale==="en"?"en-US":"zh-CN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Shanghai" }).format(new Date(value)) : "—";
 export const shortId = (value: string) => value.startsWith("SUB") ? value : value.slice(0, 8);
 export function useData<T>(path: string) {
   const [data, setData] = useState<T | null>(null);
@@ -54,7 +56,7 @@ export function Empty({ title, description }: { title: string; description?: str
 export function Tabs({ items, value, onChange, label }: { items: string[]; value: string; onChange: (value: string) => void; label: string }) {
   return <div role="tablist" aria-label={label} className="mt-5 flex overflow-x-auto border-b border-border">{items.map(item => <button type="button" role="tab" key={item} aria-selected={value === item} onClick={() => onChange(item)} className={`h-10 shrink-0 border-b-2 px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-primary ${value === item ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}>{item}</button>)}</div>;
 }
-export function kindLabel(kind: string, locale:AppLocale="zh") { return kind === "submit" ? ui(locale,"正式提交","Formal submission") : kind === "correction" ? ui(locale,"订正","Correction") : kind === "samples" ? ui(locale,"公开样例自测","Public sample run") : ui(locale,"自定义输入自测","Custom input run"); }
+export function kindLabel(kind: string, locale:AppLocale="en") { return kind === "submit" ? ui(locale,"正式提交","Formal submission") : kind === "correction" ? ui(locale,"订正","Correction") : kind === "samples" ? ui(locale,"公开样例自测","Public sample run") : ui(locale,"自定义输入自测","Custom input run"); }
 export function ResultScore({ result }: { result: Submission }) {
   const {locale}=useLocale();
   const status = result.kind === "samples" && result.status === "AC" ? ui(locale,"样例全部通过","All samples passed") : result.kind === "samples" && result.status === "WA" ? ui(locale,"样例输出不符","Sample output mismatch") : result.kind === "custom" && result.status === "AC" ? ui(locale,"执行完成","Execution complete") : result.status;
@@ -62,7 +64,7 @@ export function ResultScore({ result }: { result: Submission }) {
 }
 export interface DetailedSubmission extends Submission {
   reviews?: { id: string; note: string; authorName: string; authorIdentityId?: string; createdAt: string }[];
-  testResults?: { position: number; status: string; timeMs?: number | null; memoryKb?: number | null }[];
+  testResults?: ResultCase[];
   resultsVisible?: boolean;
 }
 export function useSubmission(id: string | null) {
@@ -87,10 +89,6 @@ export function useSubmission(id: string | null) {
     }; void poll(); return () => { controller.abort(); clearTimeout(timer); };
   }, [id, revision]);
   return { result, error, reload };
-}
-export function ResultPanel({ result, error, reload }: ReturnType<typeof useSubmission>) {
-  const {locale}=useLocale();
-  return <div aria-live="polite" className="space-y-3">{error && <p role="alert" className="text-sm text-destructive">{error}</p>}{result ? <><ResultScore result={result}/><p className="text-xs text-muted-foreground">{kindLabel(result.kind,locale)} · {isPending(result.status) ? ui(locale,"已接收，等待有效评测结果。","Received; waiting for a valid judging result.") : result.kind === "custom" ? ui(locale,"仅展示程序输出，未判断正确性。","Output only; correctness was not evaluated.") : result.passed == null || result.total == null ? ui(locale,"结果尚未公布，不表示零分。","Result not yet published; this is not a zero.") : ui(locale,`${result.passed} / ${result.total} 组测试通过`,`${result.passed} / ${result.total} tests passed`)}</p>{result.message && <p className="whitespace-pre-wrap break-words text-sm">{result.message}</p>}{result.publicOutput != null && <div><h3 className="text-xs font-semibold">{ui(locale,"公开测试输出","Public test output")}</h3><pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap border border-border bg-surface-subtle p-3 text-xs">{result.publicOutput}</pre></div>}</> : <p className="text-sm text-muted-foreground">{error ? ui(locale,"未能加载结果。","Could not load result.") : ui(locale,"尚未运行。","Not run yet.")}</p>}{(result && isPending(result.status)) || error ? <Button variant="secondary" onClick={reload}>{ui(locale,"刷新结果","Refresh result")}</Button> : null}</div>;
 }
 export function PythonTokens({ code }: { code: string }) {
   return <CodeTokens code={code} language="python"/>;

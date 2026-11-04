@@ -51,10 +51,13 @@ try:
     compile(tree, 'main.py', 'exec')
     name = sys.argv[1]
     if name and not any(isinstance(node, ast.FunctionDef) and node.name == name for node in tree.body):
-        print('Required top-level function is missing.')
+        print('Required top-level function %s is missing.' % name)
         sys.exit(65)
 except SyntaxError as error:
-    print('SyntaxError at line %s: %s' % (error.lineno, error.msg))
+    print('%s at line %s, column %s: %s' % (type(error).__name__, error.lineno, error.offset or 1, error.msg))
+    if error.text:
+        print(error.text.rstrip())
+        print(' ' * max(0, (error.offset or 1) - 1) + '^')
     sys.exit(65)
 `;
 
@@ -62,12 +65,13 @@ except SyntaxError as error:
 // by a pipe collector, so print does not become a return value. Like any function
 // wrapper this is a calling convention, not a security boundary; Linux isolation
 // is provided by go-judge and the answer remains outside that boundary.
-const FUNCTION_HARNESS = String.raw`import ast, copy, inspect, json, os, sys
+const FUNCTION_HARNESS = String.raw`import ast, copy, inspect, json, os, sys, traceback
 _write = os.write
 _encode = json.dumps
 _deepcopy = copy.deepcopy
 _loads = json.loads
 _signature = inspect.signature
+_traceback = traceback.print_exc
 _source = open('/w/main.py', encoding='utf-8').read()
 _function_name = sys.argv[1]
 _payload = _loads(sys.stdin.read())
@@ -84,11 +88,13 @@ try:
     exec(compile(_source, 'main.py', 'exec'), _scope)
     _fn = _scope.get(_function_name)
     if not callable(_fn):
+        print('TypeError: %s must be a callable function.' % _function_name, file=sys.stderr)
         _emit({'status': 'CE'})
         sys.exit(65)
     try:
         _signature(_fn).bind(*_args, **_kwargs)
     except (TypeError, ValueError):
+        _traceback()
         _emit({'status': 'CE'})
         sys.exit(65)
     _value = _fn(*_args, **_kwargs)
@@ -103,7 +109,8 @@ try:
 except (SystemExit, KeyboardInterrupt):
     raise
 except BaseException:
-    # Exception text could contain hidden arguments. Do not send it as feedback.
+    # Retained in bounded private logs; API exposes details only for public runs.
+    _traceback()
     _emit({'status': 'RE'})
     sys.exit(70)
 `;
@@ -122,8 +129,8 @@ const before = structuredClone([args, kwargs]);
 const emit = (value) => fs.writeSync(3, JSON.stringify(value));
 let fn;
 try {
-  fn = new Function('require', 'console', source + '\nreturn typeof ' + name + ' === "function" ? ' + name + ' : undefined;')(require, console);
-  if (typeof fn !== 'function') { emit({status: 'CE'}); process.exit(65); }
+  fn = new Function('require', 'console', source + '\nreturn typeof ' + name + ' === "function" ? ' + name + ' : undefined;\n//# sourceURL=main.js')(require, console);
+  if (typeof fn !== 'function') { console.error('TypeError: ' + name + ' must be a callable function.'); emit({status: 'CE'}); process.exit(65); }
   const value = fn(...args, ...(Object.keys(kwargs).length ? [kwargs] : []));
   if (value && typeof value.then === 'function') throw new Error('Async returns are unsupported.');
   if (!equal([args, kwargs], before)) emit({status: 'WA', reason: 'input_mutation'});
@@ -138,6 +145,7 @@ try {
     emit({status: 'OK', value: JSON.parse(encoded)});
   }
 } catch (error) {
+  console.error(error?.stack || String(error));
   if (error?.code === 'ERR_SCRIPT_EXECUTION_TIMEOUT') process.exit(70);
   emit({status: 'RE'}); process.exit(70);
 }
@@ -146,7 +154,7 @@ try {
 function cppFunctionSource(code, name) {
   // The exact signature is intentionally explicit. Arbitrary C++ parameter
   // types cannot be inferred safely from free-text problem metadata.
-  return `#include <nlohmann/json.hpp>\n#include <unistd.h>\n#include <cmath>\n#include <iostream>\n#include <stdexcept>\n#include <string>\nusing nlohmann::json;\n${code}\n\nbool campus_valid_json(const json& value, int depth, int& nodes) {\n  if (depth > 64 || ++nodes > 50000) return false;\n  if (value.is_number_float() && !std::isfinite(value.get<double>())) return false;\n  if (value.is_array() || value.is_object())\n    for (const auto& child : value) if (!campus_valid_json(child, depth + 1, nodes)) return false;\n  return true;\n}\n\nint main() {\n  try {\n    json payload; std::cin >> payload;\n    json args = payload.is_array() ? payload : payload.at("args");\n    json kwargs = payload.is_array() ? json::object() : payload.value("kwargs", json::object());\n    const json beforeArgs = args, beforeKwargs = kwargs;\n    json (*fn)(json&, json&) = &${name};\n    json value = fn(args, kwargs);\n    int nodes = 0;\n    if (!campus_valid_json(value, 0, nodes)) throw std::runtime_error("Invalid JSON return");\n    json protocol = (args != beforeArgs || kwargs != beforeKwargs)\n      ? json{{"status", "WA"}, {"reason", "input_mutation"}}\n      : json{{"status", "OK"}, {"value", value}};\n    const std::string result = protocol.dump();\n    if (::write(3, result.data(), result.size()) < 0) return 70;\n    return 0;\n  } catch (...) {\n    const std::string result = R"({"status":"RE"})";\n    ::write(3, result.data(), result.size());\n    return 70;\n  }\n}\n`;
+  return `#include <nlohmann/json.hpp>\n#include <unistd.h>\n#include <cmath>\n#include <iostream>\n#include <stdexcept>\n#include <string>\nusing nlohmann::json;\n#line 1 "main.cpp"\n${code}\n#line 1 "runner.cpp"\n\nbool campus_valid_json(const json& value, int depth, int& nodes) {\n  if (depth > 64 || ++nodes > 50000) return false;\n  if (value.is_number_float() && !std::isfinite(value.get<double>())) return false;\n  if (value.is_array() || value.is_object())\n    for (const auto& child : value) if (!campus_valid_json(child, depth + 1, nodes)) return false;\n  return true;\n}\n\nint main() {\n  try {\n    json payload; std::cin >> payload;\n    json args = payload.is_array() ? payload : payload.at("args");\n    json kwargs = payload.is_array() ? json::object() : payload.value("kwargs", json::object());\n    const json beforeArgs = args, beforeKwargs = kwargs;\n    json (*fn)(json&, json&) = &${name};\n    json value = fn(args, kwargs);\n    int nodes = 0;\n    if (!campus_valid_json(value, 0, nodes)) throw std::runtime_error("Invalid JSON return");\n    json protocol = (args != beforeArgs || kwargs != beforeKwargs)\n      ? json{{"status", "WA"}, {"reason", "input_mutation"}}\n      : json{{"status", "OK"}, {"value", value}};\n    const std::string result = protocol.dump();\n    if (::write(3, result.data(), result.size()) < 0) return 70;\n    return 0;\n  } catch (const std::exception& error) {\n    std::cerr << "RuntimeError: " << error.what() << std::endl;\n    const std::string result = R"({"status":"RE"})";\n    ::write(3, result.data(), result.size());\n    return 70;\n  } catch (...) {\n    std::cerr << "RuntimeError: unhandled exception" << std::endl;\n    const std::string result = R"({"status":"RE"})";\n    ::write(3, result.data(), result.size());\n    return 70;\n  }\n}\n`;
 }
 
 const RUNTIME_PROBE = String.raw`import json, os, socket, sys
@@ -463,7 +471,7 @@ export class GoJudge {
       }
       budget.cpuNs += result.time; budget.wallNs += result.runTime;
       let verdict = resultVerdict(result);
-      let returned;
+      let returned, failureReason;
       if (version.mode === 'function' && (verdict === 'OK' || (result.status === 'Nonzero Exit Status' && [65, 70].includes(result.exitStatus)))) {
         let protocol;
         try {
@@ -474,6 +482,7 @@ export class GoJudge {
               Object.hasOwn(protocol, 'value') && validateJsonValue(protocol.value) === undefined) throw new Error('Invalid return protocol.');
         } catch { protocol = null; verdict = 'RE'; }
         if (protocol) {
+          if (protocol.reason === 'input_mutation') failureReason = 'input_mutation';
           if (protocol.status === 'OK' && Object.hasOwn(protocol, 'value') && result.status === 'Accepted') { returned = protocol.value; verdict = 'OK'; }
           else if (['CE', 'RE', 'WA'].includes(protocol.status)) verdict = protocol.status;
           else verdict = 'RE';
@@ -493,7 +502,10 @@ export class GoJudge {
       privateResults.push({ testId: test.id ?? null, position: i + 1, status: verdict,
         cpuMs: Math.ceil(result.time / 1000000), wallMs: Math.ceil(result.runTime / 1000000), memoryBytes: result.memory,
         stdout: capped(result.files?.stdout, PRIVATE_LOG_LIMIT), stderr: capped(result.files?.stderr, PRIVATE_LOG_LIMIT),
-        ...(version.mode === 'function' ? { returned: capped(JSON.stringify(returned ?? null), PRIVATE_LOG_LIMIT) } : {}) });
+        ...(returned !== undefined ? { returned: capped(JSON.stringify(returned), PRIVATE_LOG_LIMIT) } : {}),
+        ...(failureReason ? { reason: failureReason } : {}),
+        outputTruncated: bytes(result.files?.stdout ?? '') > PRIVATE_LOG_LIMIT || version.mode === 'function' && bytes(JSON.stringify(returned ?? null)) > PRIVATE_LOG_LIMIT,
+        stderrTruncated: bytes(result.files?.stderr ?? '') > PRIVATE_LOG_LIMIT });
       if (['custom', 'samples'].includes(task.kind)) {
         // Only these job kinds contain public input. Formal tests never feed
         // stdout/stderr, function values, or exception text into student output.

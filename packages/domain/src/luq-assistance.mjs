@@ -22,14 +22,24 @@ async function aidState(db,user,input,helpers){
   AND kind=$3 AND language=$4 AND status='published' AND published_at IS NOT NULL`,[target.subjectKey,target.versionId,kind,language])).rows[0];
  const entitlement=(await db.query(`SELECT id,ledger_id FROM luq_assistance_entitlements
   WHERE identity_id=$1 AND subject_key=$2 AND kind=$3 AND language=$4`,[user.identityId,target.subjectKey,kind,language])).rows[0];
- const settings=await getLuqSettings(db),cost=policy.price??(kind==='FULL_TRANSLATION'?settings.translationPrice:settings.solutionPrice);
- if(policy.mode==='paid'&&cost===0)policy.mode='free';
+ const settings=await getLuqSettings(db);
+ const basePrice=policy.price??(kind==='FULL_TRANSLATION'?settings.translationPrice:settings.solutionPrice);
+ if(policy.mode==='paid'&&basePrice===0)policy.mode='free';
+ let translationPurchase=null;
+ if(content&&kind==='FULL_SOLUTION'&&policy.mode==='paid'&&!entitlement){
+  translationPurchase=(await db.query(`SELECT l.id,-l.delta paid FROM luq_assistance_entitlements e
+   JOIN luq_ledger l ON l.id=e.ledger_id AND l.identity_id=e.identity_id AND l.kind='purchase'
+   WHERE e.identity_id=$1 AND e.subject_key=$2 AND e.kind='FULL_TRANSLATION' AND e.language='zh-CN'
+     AND NOT EXISTS (SELECT 1 FROM luq_ledger refund WHERE refund.refund_of=l.id)`,
+  [user.identityId,target.subjectKey])).rows[0]??null;
+ }
+ const translationCredit=Math.min(basePrice,translationPurchase?.paid??0);
  const currentBalance=await balance(db,user.identityId);
- const price=policy.mode==='free'||entitlement?0:cost;
+ const price=policy.mode==='free'||entitlement?0:basePrice-translationCredit;
  const available=!!content&&policy.mode!=='disabled';
- return {target,kind,language,policy,content,entitlement,quote:{available,mode:policy.mode,unlocked:!!entitlement,
-  price,balance:currentBalance,balanceAfter:currentBalance-price,contentId:available?content.id:null,
-  requiresConfirmation:available&&price>0,affectsFirstAcLuq:kind==='FULL_SOLUTION',
+ return {target,kind,language,policy,content,entitlement,translationPurchase,quote:{available,mode:policy.mode,unlocked:!!entitlement,
+  price,basePrice,translationCredit,balance:currentBalance,balanceAfter:currentBalance-price,contentId:available?content.id:null,
+  requiresConfirmation:available&&policy.mode==='paid'&&!entitlement,affectsFirstAcLuq:kind==='FULL_SOLUTION',
   reason:!content?'此版本尚无已审核发布的辅助内容':policy.reason??null}};
 }
 function assertAvailable(state){
@@ -51,21 +61,31 @@ export async function handleLuqAssistance(ctx){
   const requestKey=uuid(body.requestKey,'请求键');
   return response(await transaction(pool,async db=>{
    await lockLuqAssistance(db,user.identityId);
+   // Refunds take this wallet lock in luq_post_entry. Keep the credit lookup
+   // and entitlement insert in the same wallet transaction as the charge.
+   await db.query("SELECT pg_advisory_xact_lock(hashtextextended('luq-account:'||$1::text,0))",[user.identityId]);
    const state=await aidState(db,user,body,helpers);assertAvailable(state);
    const requestHash=canonicalHash({subjectKey:state.target.subjectKey,kind:state.kind,language:state.language});
-   const old=(await db.query('SELECT request_hash,metadata FROM luq_ledger WHERE request_key=$1',[`${user.identityId}:${requestKey}`])).rows[0];
+   const scopedRequestKey=`${user.identityId}:${requestKey}`;
+   const old=(await db.query(`SELECT request_hash FROM luq_ledger WHERE request_key=$1
+    UNION ALL SELECT request_hash FROM luq_assistance_entitlements WHERE request_key=$1`,[scopedRequestKey])).rows[0];
    if(old&&old.request_hash!==requestHash)fail(409,'IDEMPOTENCY_CONFLICT','同一请求键不能用于不同辅助内容');
    if(state.entitlement||state.policy.mode==='free')return {unlocked:!!state.entitlement,balance:state.quote.balance,charged:0,entitlementId:state.entitlement?.id??null};
    if(body.confirmedContentId!==state.content.id||body.confirmedPrice!==state.quote.price)fail(409,'QUOTE_CHANGED','内容或价格已更新，请重新确认');
    if(state.quote.balance<state.quote.price)fail(409,'INSUFFICIENT_LUQ','Luq 余额不足');
-   const entry=await postLuqEntry(db,{identityId:user.identityId,delta:-state.quote.price,kind:'purchase',
+   const {price,basePrice,translationCredit}=state.quote;
+   const translationCreditLedgerId=state.translationPurchase?.id??null;
+   const priceDetails={basePrice,translationCredit,translationCreditLedgerId};
+   const entry=price>0?await postLuqEntry(db,{identityId:user.identityId,delta:-price,kind:'purchase',
     sourceKey:`purchase:${user.identityId}:${state.target.subjectKey}:${state.kind}:${state.language}`,
-    requestKey:`${user.identityId}:${requestKey}`,requestHash,actorAccountId:user.id,reason:`解锁 ${state.kind}`,
-    metadata:{subjectKey:state.target.subjectKey,kind:state.kind,language:state.language,contentId:state.content.id}});
-   const entitlement=one(await db.query(`INSERT INTO luq_assistance_entitlements(identity_id,subject_key,kind,language,ledger_id)
-    VALUES($1,$2,$3,$4,$5) RETURNING id`,[user.identityId,state.target.subjectKey,state.kind,state.language,entry.id]));
-   await audit(db,user,'luq.assistance_unlock','luq_entitlement',entitlement.id,{ledgerId:entry.id});
-   return {unlocked:true,balance:entry.balanceAfter,charged:state.quote.price,entitlementId:entitlement.id};
+    requestKey:scopedRequestKey,requestHash,actorAccountId:user.id,reason:`解锁 ${state.kind}`,
+    metadata:{subjectKey:state.target.subjectKey,kind:state.kind,language:state.language,contentId:state.content.id,...priceDetails}}):null;
+   const entitlement=one(await db.query(`INSERT INTO luq_assistance_entitlements
+    (identity_id,subject_key,kind,language,ledger_id,translation_credit_ledger_id,request_key,request_hash)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,[user.identityId,state.target.subjectKey,state.kind,state.language,
+    entry?.id??null,translationCreditLedgerId,entry?null:scopedRequestKey,entry?null:requestHash]));
+   await audit(db,user,'luq.assistance_unlock','luq_entitlement',entitlement.id,{ledgerId:entry?.id??null,...priceDetails});
+   return {unlocked:true,balance:entry?.balanceAfter??state.quote.balance,charged:price,entitlementId:entitlement.id};
   }));
  }
  if(route==='/luq/assistance/provide'&&method==='POST'){

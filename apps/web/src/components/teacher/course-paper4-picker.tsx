@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
+import { useRangeSelection } from "@/components/ui/use-range-selection";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { apiMessage, productionApi } from "@/lib/production-api";
 import { coursePaper4LinkKey, type CoursePaper4Link } from "@/components/course-paper4";
@@ -51,7 +52,12 @@ export function CoursePaper4Picker({existing, onClose, onAdd}: {
   const matches = papers?.filter(item => item.id === paperId || `${item.title} ${paper4ShortTitle(item)} ${item.examYear ?? ""}`.toLocaleLowerCase().includes(query)) ?? [];
   const wholeExists = Boolean(paper && existing.some(link => link.paperId === paper.id && link.versionId === paper.versionId && link.questionKey === null));
   const linkedKeys = new Set(existing.map(coursePaper4LinkKey));
-  const selectable = paper?.questions.filter(question => !wholeExists && !linkedKeys.has(`${paper.id}:${paper.versionId}:${question.key}`)) ?? [];
+  const questions = paper?.questions.map(question => ({
+    question,
+    id: question.key,
+    disabled: wholeExists || linkedKeys.has(`${paper.id}:${paper.versionId}:${question.key}`),
+  })) ?? [];
+  const { getRange } = useRangeSelection(questions, JSON.stringify([paperId, paper?.versionId, scope, retry]));
   const selectedQuestions = paper ? (scope === "all" ? paper.questions : paper.questions.filter(question => selected.includes(question.key))) : [];
   const canAdd = Boolean(paper && !loading && !wholeExists && selectedQuestions.length);
   return <Dialog open onOpenChange={open => { if (!open) onClose(); }}><DialogContent className="max-h-[calc(100dvh-2rem)] max-w-2xl overflow-y-auto">
@@ -66,7 +72,36 @@ export function CoursePaper4Picker({existing, onClose, onAdd}: {
       {paper && <section className="rounded-md border border-border p-4">
         <p className="font-semibold">{paper.title}</p><p className="mt-1 text-xs text-muted-foreground">v{paper.versionNumber} · {paper.questions.length} {tx("道大题", "questions")}</p>
         <label className="mt-4 block text-sm font-semibold">{tx("关联范围", "Practice scope")}<select value={scope} onChange={event => { setScope(event.target.value); setSelected([]); }} className={`${input} mt-2`}><option value="all">{tx("整套试卷", "Whole paper")}</option><option value="questions">{tx("指定大题", "Selected questions")}</option></select></label>
-        {scope === "all" ? <ul className="mt-3 space-y-2 text-sm text-muted-foreground">{paper.questions.map(question => <li key={question.key}>{question.key} · {question.title}</li>)}</ul> : <fieldset className="mt-3 space-y-2"><legend className="sr-only">{tx("选择大题", "Choose questions")}</legend>{paper.questions.map(question => { const enabled = selectable.some(item => item.key === question.key); return <label key={question.key} className={`flex min-h-11 items-start gap-3 rounded-md border border-border p-3 text-sm ${!enabled ? "text-muted-foreground" : "cursor-pointer"}`}><input className="mt-0.5 size-4 accent-primary" type="checkbox" disabled={!enabled} checked={!enabled || selected.includes(question.key)} onChange={event => setSelected(keys => event.target.checked ? [...keys, question.key] : keys.filter(key => key !== question.key))}/><span className="min-w-0 break-words">{question.key} · {question.title}{!enabled && <span className="ml-2 text-xs">{tx("已关联", "Already linked")}</span>}</span></label>; })}</fieldset>}
+        {scope === "all" ? (
+          <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+            {paper.questions.map(question => <li key={question.key}>{question.key} · {question.title}</li>)}
+          </ul>
+        ) : (
+          <fieldset className="mt-3 space-y-2">
+            <legend className="sr-only">{tx("选择大题", "Choose questions")}</legend>
+            {questions.map(({ question, id, disabled }) => (
+              <label key={id} className={`flex min-h-11 items-start gap-3 rounded-md border border-border p-3 text-sm ${disabled ? "text-muted-foreground" : "cursor-pointer"}`}>
+                <input
+                  className="mt-0.5 size-4 accent-primary"
+                  type="checkbox"
+                  disabled={disabled}
+                  checked={disabled || selected.includes(id)}
+                  onChange={event => {
+                    const range = getRange(id, event);
+                    const checked = event.currentTarget.checked;
+                    setSelected(keys => range || checked
+                      ? [...new Set([...keys, ...(range ?? [id])])]
+                      : keys.filter(key => key !== id));
+                  }}
+                />
+                <span className="min-w-0 break-words">
+                  {id} · {question.title}
+                  {disabled && <span className="ml-2 text-xs">{tx("已关联", "Already linked")}</span>}
+                </span>
+              </label>
+            ))}
+          </fieldset>
+        )}
         {wholeExists && <p className="mt-3 text-sm text-muted-foreground">{tx("本章节已关联这套试卷的全部大题。", "All questions in this version are already linked in this chapter.")}</p>}
       </section>}
     </div>

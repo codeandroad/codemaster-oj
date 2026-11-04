@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Archive, ClipboardCheck, Download, FilePlus2, Maximize2, Minimize2, Play, Plus, RotateCcw, Save, Send, Settings, Trash2, Upload } from "lucide-react";
 import { AppLink } from "@/components/navigation";
@@ -8,6 +8,7 @@ import { useLocale } from "@/components/locale-context";
 import { PageHeader } from "@/components/page-chrome";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
+import { useRangeSelection } from "@/components/ui/use-range-selection";
 import { Empty, State, useData } from "@/components/student/shared";
 import { CodeBlock } from "@/components/student/shared";
 import { CodeEditor } from "@/components/student/code-editor";
@@ -72,6 +73,8 @@ export function TeacherPaper4List() {
   }) ?? [];
   const visible = filterPaper4Catalog(categoryItems, year, session);
   const selectable = visible.filter(paper => paper.canManage && paper.canExport || catalog && paper.status === "published" && !paper.archivedAt && paper.canAssign);
+  const selectableIds = new Set(selectable.map(paper => paper.id));
+  const { getRange, resetAnchor } = useRangeSelection(selectable, JSON.stringify([scope, showArchived, year, session]));
   const selectedPapers = selectable.filter(paper => selectedIds.includes(paper.id));
   const exportPapers = selectedPapers.filter(paper => paper.canManage && paper.canExport);
   const assignPapers = catalog ? selectedPapers.filter(paper => paper.status === "published" && !paper.archivedAt && paper.canAssign) : [];
@@ -79,11 +82,22 @@ export function TeacherPaper4List() {
   const allSelected = selectable.length > 0 && selectable.slice(0, 100).every(paper => selectedIds.includes(paper.id));
   const partialSelection = selectedPapers.length > 0 && !allSelected;
   const checkbox = "size-4 cursor-pointer rounded border-input accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-40";
-  const changeCategory = (archived: boolean) => { setShowArchived(archived); setYear(""); setSession(""); setSelectedIds([]); };
+  const clearSelection = () => { resetAnchor(); setSelectedIds([]); };
+  const changeCategory = (archived: boolean) => { setShowArchived(archived); setYear(""); setSession(""); clearSelection(); };
   useEffect(() => {
     setSelectedIds([]); setYear(""); setSession(""); setShowArchived(false);
     setBatchOpen(false); setBatchAssignOpen(false); setAssignTarget(null); setError(""); setMessage("");
   }, [scope]);
+
+  function changePaperSelection(id: string, event: ChangeEvent<HTMLInputElement>) {
+    const checked = event.currentTarget.checked;
+    const range = getRange(id, event);
+    setSelectedIds(ids => {
+      if (!range && !checked) return ids.filter(selectedId => selectedId !== id);
+      const current = ids.filter(selectedId => selectableIds.has(selectedId));
+      return [...new Set([...current, ...(range ?? [id])])].slice(0, 100);
+    });
+  }
 
   async function archiveOrRestore() {
     if (!archiveTarget) return;
@@ -92,6 +106,7 @@ export function TeacherPaper4List() {
     try {
       await productionApi(`paper4/papers/${encodeURIComponent(archiveTarget.id)}/${restoring ? "restore" : "archive"}`, { method: "POST" });
       setArchiveTarget(null);
+      resetAnchor();
       setSelectedIds(ids => ids.filter(id => id !== archiveTarget.id));
       papers.reload();
       setMessage(restoring ? tx("试卷已恢复。", "Paper restored.") : tx("试卷已归档。", "Paper archived."));
@@ -129,10 +144,10 @@ export function TeacherPaper4List() {
     </div>
       </div>
     <div className={listStyles.filterBar}>
-      <Paper4CatalogFilter compact items={categoryItems} year={year} session={session} onYear={value => { setYear(value); setSelectedIds([]); }} onSession={value => { setSession(value); setSelectedIds([]); }}/>
+      <Paper4CatalogFilter compact items={categoryItems} year={year} session={session} onYear={value => { setYear(value); clearSelection(); }} onSession={value => { setSession(value); clearSelection(); }}/>
       <div className={listStyles.batchActions}>
         <span role="status" aria-live="polite" className={listStyles.selectionCount}>{tx(`已选 ${selectedPapers.length} 套`, `${selectedPapers.length} selected`)}</span>
-        {selectedPapers.length > 0 && <Button size="sm" variant="ghost" disabled={busy} onClick={() => setSelectedIds([])}>{tx("取消选择", "Clear selection")}</Button>}
+        {selectedPapers.length > 0 && <Button size="sm" variant="ghost" disabled={busy} onClick={clearSelection}>{tx("取消选择", "Clear selection")}</Button>}
         {catalog && !showArchived && <Button size="sm" variant="secondary" disabled={busy || !selectedPapers.length} onClick={() => router.push(`/teacher/luq?${new URLSearchParams({ targetType: "paper4", mode: "batch", ids: selectedPapers.map(paper => paper.id).join(",") })}`)}>{tx("Luq 价格", "Luq prices")}</Button>}
         <Button size="sm" variant="secondary" disabled={busy || !exportPapers.length} title={tx("ZIP 内含参考答案和隐藏测试，请妥善保存", "ZIP includes references and hidden tests; keep it private")} onClick={() => void exportSelected()}><Download size={16} aria-hidden="true"/>{tx(`导出 ZIP${exportPapers.length ? `（${exportPapers.length}）` : ""}`, `Export ZIP${exportPapers.length ? ` (${exportPapers.length})` : ""}`)}</Button>
         {catalog && !showArchived && <Button size="sm" variant="secondary" disabled={busy || !assignPapers.length} onClick={() => { setError(""); setMessage(""); setBatchAssignOpen(true); }}><ClipboardCheck size={16} aria-hidden="true"/>{tx(`批量布置${assignPapers.length ? `（${assignPapers.length}）` : ""}`, `Assign selected${assignPapers.length ? ` (${assignPapers.length})` : ""}`)}</Button>}
@@ -149,19 +164,19 @@ export function TeacherPaper4List() {
         <thead className="bg-surface-subtle text-xs text-muted-foreground"><tr>
           {<th scope="col" className="w-14 px-1 py-1">
             <label className={listStyles.checkTarget}>
-              <input ref={element => { selectAllRef.current = element; if (element) element.indeterminate = partialSelection; }} type="checkbox" className={checkbox} checked={allSelected} aria-checked={partialSelection ? "mixed" : allSelected} disabled={busy || !selectable.length} aria-label={tx("全选当前列表可操作的试卷（最多100套）", "Select available papers in this list (up to 100)")} onChange={() => setSelectedIds(allSelected ? [] : selectable.slice(0, 100).map(paper => paper.id))}/>
+              <input ref={element => { selectAllRef.current = element; if (element) element.indeterminate = partialSelection; }} type="checkbox" className={checkbox} checked={allSelected} aria-checked={partialSelection ? "mixed" : allSelected} disabled={busy || !selectable.length} aria-label={tx("全选当前列表可操作的试卷（最多100套）", "Select available papers in this list (up to 100)")} onChange={() => { resetAnchor(); setSelectedIds(allSelected ? [] : selectable.slice(0, 100).map(paper => paper.id)); }}/>
             </label>
           </th>}
           {[tx("试卷", "Paper"), ...(!catalog ? [tx("布置对象", "Recipients"), tx("类型", "Type"), tx("时间", "Window")] : []), tx("分值", "Marks"), tx("状态", "Status"), tx("操作", "Actions")].map(label => <th scope="col" key={label} className="whitespace-nowrap px-4 py-3">{label}</th>)}
         </tr></thead>
         <tbody>{visible.map(paper => {
           const selected = selectedPapers.some(item => item.id === paper.id);
-          const eligible = selectable.some(item => item.id === paper.id);
+          const eligible = selectableIds.has(paper.id);
           const status = paper.status === "published" ? catalog ? tx("已公开", "Public") : tx("已布置", "Assigned") : paper4Status(paper.status, locale);
           return <tr key={paper.id} className={`border-t border-border ${selected ? "bg-info-soft" : "hover:bg-surface-subtle"}`}>
             {<td className="px-1 py-1">
               <label className={listStyles.checkTarget} title={eligible ? undefined : tx("仅可选择本人可管理或可布置的试卷", "Select papers you can manage or assign")}>
-                <input type="checkbox" className={checkbox} checked={selected} disabled={busy || !eligible || (!selected && selectedPapers.length >= 100)} aria-label={tx(`选择「${paper.title}」`, `Select ${paper.title}`)} onChange={event => setSelectedIds(ids => event.target.checked ? [...ids, paper.id] : ids.filter(id => id !== paper.id))}/>
+                <input type="checkbox" className={checkbox} checked={selected} disabled={busy || !eligible || (!selected && selectedPapers.length >= 100)} aria-label={tx(`选择「${paper.title}」`, `Select ${paper.title}`)} onChange={event => changePaperSelection(paper.id, event)}/>
               </label>
             </td>}
             <td className={listStyles.paperCell}><AppLink href={`/teacher/paper4/${paper.id}`} title={paper.title} className={`${listStyles.title} font-semibold text-primary hover:underline focus-visible:underline`}>{paper.title}</AppLink><span className={listStyles.metadata}>{paper.questionCount} {tx("道大题", "questions")}{paper4ExamLabel(paper, locale) && ` · ${paper4ExamLabel(paper, locale)}`}</span></td>
@@ -177,10 +192,10 @@ export function TeacherPaper4List() {
         })}</tbody>
       </table>
     </div> : <Empty title={year || session ? tx("没有符合筛选条件的试卷", "No papers match these filters") : showArchived ? tx("暂无已归档试卷", "No archived papers") : catalog ? tx("暂无自由练习试卷", "No practice library papers") : tx("暂无已布置活动", "No assigned activities")} description={year || session ? tx("请调整年份或考季后重试。", "Try another year or exam session.") : showArchived ? tx("归档的试卷会显示在这里，历史作答和成绩仍会保留。", "Archived papers appear here, with historical attempts and marks retained.") : catalog ? tx("创建或导入草稿，验证参考答案后即可发布为全校自由练习。", "Create or import a draft, validate its references, then publish it for school-wide free practice.") : tx("从已公开试卷中选择学生布置练习或模拟考试，不要求先加入班级。", "Assign a public paper to selected students as practice or a mock exam. Class membership is not required.")}/>}</State>
-    {batchOpen && publishPapers.length > 0 && <Paper4BatchPublishDialog papers={publishPapers} onClose={() => setBatchOpen(false)} onPublished={count => { setBatchOpen(false); setSelectedIds([]); setMessage(tx(`已公开 ${count} 套试卷，全校学生可自由练习。`, `${count} papers published for school-wide free practice.`)); papers.reload(); }} onReturnFocus={() => { if (batchButtonRef.current && !batchButtonRef.current.disabled) batchButtonRef.current.focus(); else selectAllRef.current?.focus(); }}/>}
-    {batchAssignOpen && assignPapers.length > 0 && <Paper4AssignDialog papers={assignPapers} onClose={() => setBatchAssignOpen(false)} onCreated={activities => { setBatchAssignOpen(false); setSelectedIds([]); setMessage(tx(`已布置 ${activities.length} 套试卷，可在“已布置活动”中查看。`, `${activities.length} papers assigned. View them in Assigned activities.`)); papers.reload(); }}/>}
+    {batchOpen && publishPapers.length > 0 && <Paper4BatchPublishDialog papers={publishPapers} onClose={() => setBatchOpen(false)} onPublished={count => { setBatchOpen(false); clearSelection(); setMessage(tx(`已公开 ${count} 套试卷，全校学生可自由练习。`, `${count} papers published for school-wide free practice.`)); papers.reload(); }} onReturnFocus={() => { if (batchButtonRef.current && !batchButtonRef.current.disabled) batchButtonRef.current.focus(); else selectAllRef.current?.focus(); }}/>}
+    {batchAssignOpen && assignPapers.length > 0 && <Paper4AssignDialog papers={assignPapers} onClose={() => setBatchAssignOpen(false)} onCreated={activities => { setBatchAssignOpen(false); clearSelection(); setMessage(tx(`已布置 ${activities.length} 套试卷，可在“已布置活动”中查看。`, `${activities.length} papers assigned. View them in Assigned activities.`)); papers.reload(); }}/>}
     {assignTarget && <Paper4AssignDialog paper={assignTarget} onClose={() => setAssignTarget(null)} onCreated={activities => { setAssignTarget(null); router.push(`/teacher/paper4/${activities[0]!.id}`); }}/>}
-    {importOpen && <Paper4BatchImportDialog open={importOpen} onOpenChange={setImportOpen} onImported={count => { setSelectedIds([]); setMessage(tx(`已创建 ${count} 套 Paper 4 草稿，验证参考答案后即可公开。`, `${count} Paper 4 drafts created. Validate references before publishing.`)); papers.reload(); }}/>}
+    {importOpen && <Paper4BatchImportDialog open={importOpen} onOpenChange={setImportOpen} onImported={count => { clearSelection(); setMessage(tx(`已创建 ${count} 套 Paper 4 草稿，验证参考答案后即可公开。`, `${count} Paper 4 drafts created. Validate references before publishing.`)); papers.reload(); }}/>}
     <Paper4ArchiveDialog paper={archiveTarget} busy={busy} tx={tx} onOpenChange={open => { if (!open && !busy) setArchiveTarget(null); }} onConfirm={() => void archiveOrRestore()}/>
   </div>;
 }

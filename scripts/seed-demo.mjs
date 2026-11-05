@@ -309,15 +309,17 @@ try {
       assert.equal(person.kind, role, `Unexpected demo ${role} identity.`);
       account.person = person;
     }
+    // Explicitly deleted demo assignments remain retired across local restarts.
+    // Other missing fixtures still fail rather than resetting existing data.
     const retained = (
       await pool.query(
         `SELECT EXISTS(SELECT 1 FROM classes WHERE id=$1) AS class,
-        EXISTS(SELECT 1 FROM assignments WHERE id=$2) AS assignment,
+        (EXISTS(SELECT 1 FROM assignments WHERE id=$2) OR EXISTS(SELECT 1 FROM audit_events WHERE action='assignment.delete' AND resource_type='assignment' AND resource_id=$2::uuid::text)) AS assignment,
         EXISTS(SELECT 1 FROM learning_paths WHERE id=$3) AS learning,
         EXISTS(SELECT 1 FROM timed_practices WHERE id=$4) AS timed,
         EXISTS(SELECT 1 FROM problem_versions WHERE id=$5) AS addition,
         EXISTS(SELECT 1 FROM problem_versions WHERE id=$6) AS rows,
-        EXISTS(SELECT 1 FROM assignments WHERE id=$7) AS history`,
+        (EXISTS(SELECT 1 FROM assignments WHERE id=$7) OR EXISTS(SELECT 1 FROM audit_events WHERE action='assignment.delete' AND resource_type='assignment' AND resource_id=$7::uuid::text)) AS history`,
         [
           state.fixtures.class.id,
           state.fixtures.assignment.id,

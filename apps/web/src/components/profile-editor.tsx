@@ -1,10 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import { Camera, Pencil, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Button } from "./ui/button";
 import { ProfileAvatar, ProfileHero } from "./profile-hero";
-import { defaultAvatarPath, randomDefaultAvatarPath } from "@/lib/default-avatars";
+import { DEFAULT_AVATARS, defaultAvatarPath, randomDefaultAvatarPath } from "@/lib/default-avatars";
 import { genderLabel, genderOptions } from "@/lib/gender";
 import { apiMessage, productionApi, type AuthResponse, type CampusGender, type CampusUser } from "@/lib/production-api";
 import { useLocale, type AppLocale } from "./locale-context";
@@ -107,6 +108,14 @@ export function ProfileEditor({ user, onSaved }: { user: CampusUser; onSaved?: (
             <Button type="button" variant="secondary" size="sm" onClick={() => setAvatar(randomDefaultAvatarPath(avatar))}>{ui(locale, "换一个预设头像", "Try another preset")}</Button>
             <Button type="button" variant="ghost" size="sm" onClick={() => setAvatar(defaultAvatarPath(user.identityId))}>{ui(locale, "使用默认头像", "Use default avatar")}</Button>
           </div>
+          <details className="w-full min-w-0 max-w-xl rounded-md border border-border bg-surface">
+            <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{ui(locale, "选择预设头像", "Choose a preset")} <span className="font-normal text-muted-foreground">({DEFAULT_AVATARS.length})</span></summary>
+            <div className="grid max-h-56 grid-cols-[repeat(auto-fill,minmax(48px,1fr))] gap-2 overflow-y-auto border-t border-border p-2" aria-label={ui(locale, "预设头像", "Preset avatars")}>
+              {DEFAULT_AVATARS.map((path, index) => <button key={path} type="button" disabled={busy} aria-label={ui(locale, `预设头像 ${index + 1}`, `Preset avatar ${index + 1}`)} aria-pressed={avatar === path} onClick={() => setAvatar(path)} className={`flex aspect-square items-center justify-center overflow-hidden rounded-md border-2 p-0.5 transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${avatar === path ? "border-primary bg-accent" : "border-transparent"}`}>
+                <Image src={path} alt="" width={48} height={48} unoptimized loading="lazy" decoding="async" className="size-full rounded-sm object-cover"/>
+              </button>)}
+            </div>
+          </details>
           <p className="w-full text-xs text-muted-foreground">{ui(locale, "支持 JPEG、PNG、WebP，最大 5 MB；图片会裁剪为正方形。", "JPEG, PNG, and WebP up to 5 MB. Images are cropped to a square.")}</p>
         </div>
       </div>

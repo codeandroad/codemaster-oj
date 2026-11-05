@@ -41,6 +41,8 @@ test('prototype flows persist identity claims, imports, drafts, favorites, setti
   const initialAvatar=(await student('/auth/me')).user.avatar;
   assert.match(initialAvatar,/^\/avatars\/oj-(?:0[1-9]|1[0-4])\.(?:jpg|png)$/);
   assert.equal((await student('/auth/profile',{avatar:'/avatars/oj-02.jpg'},'PATCH')).user.avatar,'/avatars/oj-02.jpg');
+  assert.equal((await student('/auth/profile',{avatar:'/avatars/oj-132.webp'},'PATCH')).user.avatar,'/avatars/oj-132.webp');
+  assert.equal((await student('/auth/me')).user.avatar,'/avatars/oj-132.webp');
   await student('/auth/profile',{avatar:'https://example.test/unapproved.jpg'},'PATCH',400);
   assert.equal((await student('/auth/profile',{avatar:''},'PATCH')).user.avatar,initialAvatar);
   assert.equal((await student('/auth/me')).user.gender,'male');assert.equal((await student('/auth/profile',{gender:null},'PATCH')).user.gender,null);

@@ -3,8 +3,8 @@ import { test } from "node:test";
 import { luqPolicyDescription } from "../src/lib/luq-policy-display.ts";
 
 test("per-item prices are disclosed without changing disabled or free policy labels", () => {
-  assert.equal(luqPolicyDescription({ mode: "paid", price: 4 }, "en"), "4 Luq");
-  assert.equal(luqPolicyDescription({ mode: "paid", price: 0 }, "zh"), "0 Luq");
+  assert.equal(luqPolicyDescription({ mode: "paid", price: 4 }, "en"), "4 scholarship");
+  assert.equal(luqPolicyDescription({ mode: "paid", price: 0 }, "zh"), "0 奖学金");
   assert.equal(luqPolicyDescription({ mode: "paid", price: null }, "en"), "Paid");
   assert.equal(luqPolicyDescription({ mode: "disabled", price: 8 }, "en"), "Disabled");
   assert.equal(luqPolicyDescription({ mode: "free", price: 8 }, "zh"), "免费");

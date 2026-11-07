@@ -4,8 +4,8 @@ import {getLuqSettings} from './luq-ledger.mjs';
 
 const one=result=>{if(!result.rowCount)fail(404,'NOT_FOUND','活动不存在');return result.rows[0];};
 const types=['assignment','timed','paper4_activity'];
-export const defaultLuqRule=()=>({amount:0,minimumAc:1,minimumScore:0,taskKind:'challenge',allowSolutionAssisted:false,version:0});
-export function luqRuleShape(rule){return rule?{id:rule.id,amount:rule.amount,minimumAc:rule.minimum_ac,minimumScore:Number(rule.minimum_score),taskKind:rule.task_kind,allowSolutionAssisted:rule.allow_solution_assisted,version:rule.rule_version,createdAt:rule.created_at}:defaultLuqRule();}
+export const defaultLuqRule=()=>({amount:0,minimumAc:1,minimumScore:0,requireAll:false,taskKind:'challenge',allowSolutionAssisted:false,version:0});
+export function luqRuleShape(rule){return rule?{id:rule.id,amount:rule.amount,minimumAc:rule.minimum_ac,minimumScore:Number(rule.minimum_score),requireAll:rule.require_all,taskKind:rule.task_kind,allowSolutionAssisted:rule.allow_solution_assisted,version:rule.rule_version,createdAt:rule.created_at}:defaultLuqRule();}
 
 // Lock the same activity row as publication/admission. A reward rule cannot
 // race with publication or be silently changed after students can start.
@@ -48,14 +48,16 @@ export async function handleLuqRules(ctx){
   const settings=await getLuqSettings(db),previous=await readLuqRule(db,activityType,activityId);
   if(integer(body.expectedVersion,0,1000000,'规则版本')!==previous.version)fail(409,'LUQ_RULE_CONFLICT','规则已更新，请刷新后核对');
   const amount=integer(body.amount,0,settings.activityRewardCap,'额外 Luq');
-  const minimumAc=integer(body.minimumAc,1,50,'达标 AC 题数');
-  const minimumScore=Number(body.minimumScore);
+  const requireAll=body.requireAll??previous.requireAll;
+  if(typeof requireAll!=='boolean'||(requireAll&&activityType!=='assignment'))fail(400,'VALIDATION','只有作业可以设置全部必做题通过奖励');
+  const minimumAc=requireAll?1:integer(body.minimumAc,1,50,'达标 AC 题数');
+  const minimumScore=requireAll?0:Number(body.minimumScore);
   if(!Number.isFinite(minimumScore)||minimumScore<0||minimumScore>100)fail(400,'VALIDATION','达标成绩百分比须为 0–100');
   const taskKind=enumValue(body.taskKind??'challenge',['challenge','learning','correction'],'任务类型');
   if(typeof body.allowSolutionAssisted!=='boolean')fail(400,'VALIDATION','请明确答案辅助提交的奖励资格');
   if(taskKind==='challenge'&&body.allowSolutionAssisted)fail(400,'VALIDATION','挑战任务不奖励提交前已提供完整答案的作答');
-  const rule=one(await db.query(`INSERT INTO luq_activity_rules(activity_type,activity_id,rule_version,amount,minimum_ac,minimum_score,task_kind,allow_solution_assisted,created_by)
-   VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,[activityType,activityId,previous.version+1,amount,minimumAc,minimumScore,taskKind,body.allowSolutionAssisted,user.id]));
+  const rule=one(await db.query(`INSERT INTO luq_activity_rules(activity_type,activity_id,rule_version,amount,minimum_ac,minimum_score,task_kind,allow_solution_assisted,created_by,require_all)
+   VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,[activityType,activityId,previous.version+1,amount,minimumAc,minimumScore,taskKind,body.allowSolutionAssisted,user.id,requireAll]));
   await helpers.audit(db,user.id,'luq.rule_version','activity',activityId,{activityType,ruleId:rule.id,version:rule.rule_version,amount});
   return {rule:luqRuleShape(rule),canManage:true,frozen:false,cap:settings.activityRewardCap};
  });

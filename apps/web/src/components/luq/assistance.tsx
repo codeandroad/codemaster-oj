@@ -45,10 +45,12 @@ export function LuqAssistance({
   target,
   kind,
   renderBody,
+  endpoint = "luq/assistance",
 }: {
   target: AssistanceTarget;
   kind: AssistanceKind;
   renderBody?: (body: string) => ReactNode;
+  endpoint?: "luq/assistance" | "practice/luq/assistance";
 }) {
   const { locale } = useLocale(),
     tx = (zh: string, en: string) => (locale === "en" ? en : zh);
@@ -74,7 +76,7 @@ export function LuqAssistance({
     setError("");
     try {
       setQuote(
-        await productionApi<Quote>("luq/assistance/quote", {
+        await productionApi<Quote>(`${endpoint}/quote`, {
           method: "POST",
           body,
         }),
@@ -94,7 +96,7 @@ export function LuqAssistance({
     try {
       if (quote.mode === "paid" && !quote.unlocked) {
         requestKey.current ??= productionId();
-        const unlock = await productionApi<{ balance: number }>("luq/assistance/unlock", {
+        const unlock = await productionApi<{ balance: number }>(`${endpoint}/unlock`, {
           method: "POST",
           body: {
             ...body,
@@ -115,7 +117,7 @@ export function LuqAssistance({
         window.dispatchEvent(new Event("campus-judge:luq-changed"));
       }
       setProvided(
-        await productionApi<Provided>("luq/assistance/provide", {
+        await productionApi<Provided>(`${endpoint}/provide`, {
           method: "POST",
           body,
         }),
@@ -151,12 +153,12 @@ export function LuqAssistance({
           <p className="text-sm text-muted-foreground">
             {kind === "FULL_TRANSLATION"
               ? tx(
-                  "查看已审核的中文题面。翻译不影响首次 AC 的 Luq 奖励。",
-                  "Read the reviewed Chinese statement. Translation does not affect first-AC Luq.",
+                  "查看已审核的中文题面。翻译不影响首次 AC 的奖学金奖励。",
+                  "Read the reviewed Chinese statement. Translation does not affect first-AC scholarship rewards.",
                 )
               : tx(
-                  "查看已发布的题解。提交前查看完整答案会影响本题首次 AC 的 Luq 奖励；成绩和排行榜积分不变。",
-                  "Read the published solution. Viewing a full solution before submitting affects first-AC Luq for this problem; grades and leaderboard points are unchanged.",
+                  "查看已发布的题解。提交前查看完整答案会影响本题首次 AC 的奖学金奖励；成绩和排行榜积分不变。",
+                  "Read the published solution. Viewing a full solution before submitting affects first-AC scholarship rewards for this problem; grades and leaderboard points are unchanged.",
                 )}
           </p>
           <Button
@@ -196,8 +198,8 @@ export function LuqAssistance({
               <p role="status">
                 {quote.reason ||
                   tx(
-                    "暂未发布内容，或当前活动尚未开放。不会扣除 Luq。",
-                    "Content is unavailable or restricted by this activity. No Luq will be deducted.",
+                    "暂未发布内容，或当前活动尚未开放。不会扣除奖学金。",
+                    "Content is unavailable or restricted by this activity. No scholarship will be deducted.",
                   )}
               </p>
             ) : (
@@ -208,25 +210,25 @@ export function LuqAssistance({
                   {quote.mode === "paid" && !quote.unlocked && (quote.translationCredit ?? 0) > 0 && (
                     <>
                       <dt>{tx("题解原价", "Solution price")}</dt>
-                      <dd className="text-right">{quote.basePrice} Luq</dd>
+                      <dd className="text-right">{quote.basePrice} {tx("奖学金", "scholarship")}</dd>
                       <dt>{tx("已付翻译抵扣", "Translation credit")}</dt>
-                      <dd className="text-right">−{quote.translationCredit} Luq</dd>
+                      <dd className="text-right">−{quote.translationCredit} {tx("奖学金", "scholarship")}</dd>
                     </>
                   )}
                   <dt>{tx("本次费用", "Cost")}</dt>
                   <dd className="text-right font-semibold">
                     {quote.unlocked || quote.mode === "free" ? 0 : quote.price}{" "}
-                    Luq
+                    {tx("奖学金", "scholarship")}
                   </dd>
                   <dt>{tx("当前余额", "Balance")}</dt>
-                  <dd className="text-right">{quote.balance} Luq</dd>
+                  <dd className="text-right">{quote.balance} {tx("奖学金", "scholarship")}</dd>
                   <dt>{tx("扣后余额", "Balance after")}</dt>
                   <dd className="text-right">
                     {quote.unlocked || quote.mode === "free"
-                      ? `${quote.balance} Luq`
+                      ? `${quote.balance} ${tx("奖学金", "scholarship")}`
                       : quote.balanceAfter < 0
                         ? tx("余额不足", "Insufficient")
-                        : `${quote.balanceAfter} Luq`}
+                        : `${quote.balanceAfter} ${tx("奖学金", "scholarship")}`}
                   </dd>
                 </dl>
                 <p className="text-muted-foreground">
@@ -248,8 +250,8 @@ export function LuqAssistance({
                 {kind === "FULL_SOLUTION" && (
                   <p className="rounded-md border border-warning/30 bg-warning/5 p-3">
                     {tx(
-                      "确认后本站会提供完整答案并记录提供时间。此后提交不领取本题首次 AC Luq；此前已提交、正在判题的答案及已经到账的奖励不受影响。挑战任务通常也不奖励看过答案后的提交。",
-                      "Confirmation provides the full answer and records the delivery time. Later submissions do not earn first-AC Luq for this problem. Already received submissions and awarded rewards are unaffected. Challenge activities normally exclude assisted submissions too.",
+                      "确认后本站会提供完整答案并记录提供时间。此后提交不领取本题首次 AC 奖学金；此前已提交、正在判题的答案及已经到账的奖励不受影响。挑战任务通常也不奖励看过答案后的提交。",
+                      "Confirmation provides the full answer and records the delivery time. Later submissions do not earn first-AC scholarship for this problem. Already received submissions and awarded rewards are unaffected. Challenge activities normally exclude assisted submissions too.",
                     )}
                   </p>
                 )}
@@ -258,8 +260,8 @@ export function LuqAssistance({
                   quote.balance < quote.price && (
                     <p role="alert" className="text-destructive">
                       {tx(
-                        "Luq 余额不足，无法解锁。",
-                        "Insufficient Luq to unlock this content.",
+                        "奖学金余额不足，无法解锁。",
+                        "Insufficient scholarship to unlock this content.",
                       )}
                     </p>
                   )}
@@ -294,8 +296,8 @@ export function LuqAssistance({
                     ? tx("处理中…", "Processing…")
                     : quote.mode === "paid" && !quote.unlocked && quote.price > 0
                       ? tx(
-                          `确认支付 ${quote.price} Luq 并查看`,
-                          `Pay ${quote.price} Luq and view`,
+                          `确认使用 ${quote.price} 奖学金并查看`,
+                          `Use ${quote.price} scholarship and view`,
                         )
                       : tx("确认查看", "Confirm and view")}
                 </Button>

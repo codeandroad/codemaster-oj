@@ -7,6 +7,7 @@ import {migrate} from '../src/migrate.mjs';
 import {bootstrap} from '../src/bootstrap.mjs';
 import {createApp,loadConfig} from '../src/app.mjs';
 import {completePaper4Task} from '../paper4-worker.mjs';
+import {suspendSchoolOwnershipForHistoricalMigration,markHistoricalLegacyActor} from './helpers/historical-school-ownership.mjs';
 
 const upgrade='039_paper4_activity_audiences.sql';
 const questions=[{key:'Q1',title:'A fixed queue',statement:'Implement the queue in English.',starterCode:'# Start here\n',initialFiles:{'Data.txt':'original\n'},outputFiles:[],stages:[{id:'Q1a',title:'Queue operations',maxMarks:75,judgeMode:'auto'}]}];
@@ -21,8 +22,11 @@ async function fixture(run,{beforeUpgrade=false}={}){
  const pool=createPool(connection.href);let server;
  try{
   if(beforeUpgrade){await pool.query('CREATE TABLE schema_migrations(name text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');await pool.query('INSERT INTO schema_migrations(name) VALUES($1)',[upgrade]);}
-  await migrate(pool);const password=`fixture-${randomUUID()}`;
-  await bootstrap(pool,{name:'Administrator',number:'P4-AUDIENCE-ADMIN',username:'p4-audience-admin',password});
+  await migrate(pool);
+  const restoreSchoolOwnership=beforeUpgrade?await suspendSchoolOwnershipForHistoricalMigration(pool):null;
+  const password=`fixture-${randomUUID()}`;
+  const adminId=await bootstrap(pool,{name:'Administrator',number:'P4-AUDIENCE-ADMIN',username:'p4-audience-admin',password});
+  if(beforeUpgrade)await markHistoricalLegacyActor(pool,adminId);
   server=http.createServer(await createApp(pool,loadConfig({SESSION_SECRET:randomBytes(48).toString('hex'),APP_ORIGIN:'http://paper4.test',COOKIE_SECURE:'false'})));
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}/api/v1`;
   function client(){let cookie='',csrf='',user;const send=async(path,body,method=body===undefined?'GET':'POST',status=200,token)=>{
@@ -34,7 +38,9 @@ async function fixture(run,{beforeUpgrade=false}={}){
   const actors={admin};
   for(const [tag,kind] of [['teacher','teacher'],['otherTeacher','teacher'],['classmate','student'],['cross','student'],['unassigned','student'],['excluded','student']]){
    const api=client(),person=await admin.send('/people',{kind,number:`P4-${tag}`,name:tag},'POST',201);
-   await api.send('/auth/register',{kind,number:person.person.number,name:tag,activationCode:person.activationCode,username:`p4-${tag.toLowerCase()}`,password},'POST',201);actors[tag]=api;
+   await api.send('/auth/register',{kind,number:person.person.number,name:tag,activationCode:person.activationCode,username:`p4-${tag.toLowerCase()}`,password},'POST',201);
+   if(beforeUpgrade)await markHistoricalLegacyActor(pool,api.user.id);
+   actors[tag]=api;
   }
   const classA=await admin.send('/classes',{name:'Class A',teacherIds:[actors.teacher.user.identityId],studentIds:[actors.classmate.user.identityId]},'POST',201);
   const classB=await admin.send('/classes',{name:'Class B',teacherIds:[actors.otherTeacher.user.identityId],studentIds:[actors.cross.user.identityId]},'POST',201);
@@ -49,7 +55,7 @@ async function fixture(run,{beforeUpgrade=false}={}){
    for(const task of validation.items)await finish(task.id);
    return actors.teacher.send(`/paper4/papers/${paper.id}/publish`,{});
   }
-  await run({...actors,pool,classA,classB,finish,source});
+  await run({...actors,pool,classA,classB,finish,source,restoreSchoolOwnership});
  }finally{if(server)await new Promise(resolve=>server.close(resolve));await pool.end();await manager.query(`DROP SCHEMA ${schema} CASCADE`);await manager.end();}
 }
 
@@ -146,7 +152,7 @@ test('classless named-recipient mock exams freeze exactly once and share canonic
 });
 
 test('recipient migration preserves legacy work and points while later class changes do not expand the audience',options,async()=>{
- await fixture(async({pool,teacher,classmate,cross,unassigned,excluded,classA})=>{
+ await fixture(async({pool,teacher,classmate,cross,unassigned,excluded,classA,restoreSchoolOwnership})=>{
   const definition={language:'python',totalMarks:75,questions};
   async function legacy(title,classId,kind='activity'){
    const p=(await pool.query(`INSERT INTO paper4_papers(owner_account_id,class_id,title,status,published_at,delivery_kind,activity_kind)
@@ -170,6 +176,7 @@ test('recipient migration preserves legacy work and points while later class cha
    marks:(await pool.query('SELECT * FROM paper4_stage_marks ORDER BY attempt_id,stage_key')).rows,runs:(await pool.query('SELECT * FROM paper4_runs ORDER BY id')).rows,ledger:(await pool.query('SELECT * FROM paper4_rank_ledger ORDER BY identity_id,paper_id')).rows};}
   const before=await evidence();assert.equal(before.ledger.length,1);
   await pool.query('DELETE FROM schema_migrations WHERE name=$1',[upgrade]);await migrate(pool);
+  await restoreSchoolOwnership();
   assert.deepEqual(await evidence(),before);
   const recipients=(await pool.query('SELECT identity_id FROM paper4_activity_participants WHERE paper_id=$1',[activity.id])).rows.map(r=>r.identity_id);
   assert.deepEqual(new Set(recipients),new Set([classmate.user.identityId,cross.user.identityId]),'snapshot class members and preserve an old attempt owner from another class');

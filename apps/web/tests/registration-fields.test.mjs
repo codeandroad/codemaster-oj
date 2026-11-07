@@ -1,11 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {registrationIssue} from '../src/components/auth/registration-fields.ts';
+import {activationSchoolLabel,activationSchoolName,registrationIssue} from '../src/components/auth/registration-fields.ts';
 
-const values={number:'001',name:'Student',activationCode:'one-time-code',username:'student.name',password:' passphrase ',confirmation:' passphrase ',email:''};
+const values={schoolSlug:'alpha-school',number:'001',name:'Student',activationCode:'one-time-code',username:'student.name',password:' passphrase ',confirmation:' passphrase ',email:''};
+test('activation school options use localized names and disambiguate identical school names',()=>{
+ const alpha={id:'a',slug:'alpha',name:'Alpha',nameEn:'Alpha School',nameZh:'甲学校'};
+ const beta={id:'b',slug:'beta',name:'Beta',nameEn:'Alpha School',nameZh:'乙学校'};
+ assert.equal(activationSchoolName(alpha,'en'),'Alpha School');
+ assert.equal(activationSchoolName(alpha,'zh'),'甲学校');
+ assert.equal(activationSchoolLabel(alpha,[alpha,beta],'en'),'Alpha School (alpha)');
+ assert.equal(activationSchoolLabel(beta,[alpha,beta],'en'),'Alpha School (beta)');
+ assert.equal(activationSchoolLabel(alpha,[alpha,beta],'zh'),'甲学校');
+ assert.equal(activationSchoolName({...alpha,nameEn:''},'en'),'甲学校');
+ assert.equal(activationSchoolName({...alpha,nameEn:'',nameZh:''},'en'),'Alpha');
+});
 test('identity verification checks required fields in visual order without requiring account fields',()=>{
  assert.equal(registrationIssue('verify',{...values,username:'',password:'',confirmation:''}),null);
- for(const [field,cleared] of [['number',{}],['name',{}],['activationCode',{}]]){
+ for(const [field,cleared] of [['schoolSlug',{}],['number',{}],['name',{}],['activationCode',{}]]){
   assert.deepEqual(registrationIssue('verify',{...values,...cleared,[field]:'   '}),{field,kind:'required'});
  }
  assert.equal(registrationIssue('verify',{...values,number:'00001',name:'张同学'}),null);

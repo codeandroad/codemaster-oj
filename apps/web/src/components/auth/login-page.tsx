@@ -12,7 +12,7 @@ import styles from "./auth-shell.module.css";
 type Field = "username" | "password" | "resetCode" | "confirmation";
 type FormIssue = { field?: Field; kind: "username" | "password" | "resetCode" | "passwordLength" | "confirmation" | "login" | "disabled" | "server"; message?: string };
 
-export function ProductionLoginPage({ onLogin }: { onLogin: (user: CampusUser) => void }) {
+export function ProductionLoginPage({ onLogin, joinIntent = false }: { onLogin: (user: CampusUser) => void; joinIntent?: boolean }) {
   const { t, locale } = useLocale();
   const tx = (zh: string, en: string) => locale === "en" ? en : zh;
   const [mode, setMode] = useState<"login" | "reset">("login");
@@ -88,7 +88,7 @@ export function ProductionLoginPage({ onLogin }: { onLogin: (user: CampusUser) =
   return <AuthShell>
     <header>
       <h2 ref={titleRef} tabIndex={-1} id="login-title" className={styles.title}>{mode === "login" ? t("登录") : t("重置密码")}</h2>
-      <p className={styles.description}>{t(mode === "login" ? "使用你在注册时自行设置的用户名与密码登录。日常登录无需再次验证身份，也无需强制修改密码。" : "请先向学校管理员核实身份并取得一次性重置凭据，然后自行设置新密码。")}</p>
+      <p className={styles.description}>{mode === "login" ? joinIntent ? tx("登录后使用邀请码加入学校。还没有账号？可先注册个人账号。", "Sign in to join a school with an invitation. New here? Create a personal account first.") : tx("登录后继续课程学习与编程练习。", "Continue your courses and coding practice.") : t("请先向学校管理员核实身份并取得一次性重置凭据，然后自行设置新密码。")}</p>
     </header>
     {mode === "reset" && <details className={styles.help}>
       <summary>{tx("如何获取重置凭据？", "How do I get a reset code?")}</summary>
@@ -129,6 +129,6 @@ export function ProductionLoginPage({ onLogin }: { onLogin: (user: CampusUser) =
       </Button>
       <Button type="button" variant="link" className={styles.forgot} disabled={busy} onClick={switchMode}>{t(mode === "login" ? "忘记密码？" : "返回登录")}</Button>
     </form>
-    <Link href="/register" className={`${buttonVariants({ variant: "secondary" })} ${styles.registerAction}`}>{t("注册账号 / 激活身份")}</Link>
+    <Link href={joinIntent ? "/register?join=1" : "/register"} className={`${buttonVariants({ variant: "secondary" })} ${styles.registerAction}`}>{tx("创建个人账号", "Create a personal account")}</Link><div className="mt-3 flex flex-wrap justify-center gap-x-5 gap-y-2 text-sm"><Link href="/schools?join=1" className="font-semibold text-primary hover:underline">{tx("邀请码加入学校", "Join a school")}</Link><Link href="/activate" className="text-muted-foreground hover:text-primary hover:underline">{tx("激活学校身份", "Activate school identity")}</Link></div>
   </AuthShell>;
 }

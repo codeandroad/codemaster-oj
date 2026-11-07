@@ -3,13 +3,11 @@
 import type { ReactNode } from "react";
 import { BrandLogo } from "@/components/brand-logo";
 import { useLocale } from "@/components/locale-context";
-import { usePublicSite } from "./site-info";
 import styles from "./auth-shell.module.css";
 
 /** Public authentication uses the system's light palette, outside workspace themes. */
 export function AuthShell({ children, titleId = "login-title" }: { children: ReactNode; titleId?: string }) {
   const { locale } = useLocale();
-  const site = usePublicSite();
   const tx = (zh: string, en: string) => locale === "en" ? en : zh;
   const roles = [
     { name: tx("学生", "Students"), description: tx("课程学习、自由练习", "Courses and coding practice") },
@@ -20,7 +18,7 @@ export function AuthShell({ children, titleId = "login-title" }: { children: Rea
       <aside className={styles.introduction} aria-label={tx("CodeMaster 简介", "About CodeMaster")}>
         <div className={styles.brand}>
           <BrandLogo className={styles.logo} />
-          <p className={styles.school} title={site.schoolName}>{site.schoolName}</p>
+          <p className={styles.school}>{tx("计算机科学 • 在线学习平台", "Computer Science • Online Learning Platform")}</p>
         </div>
         <ul className={styles.roles}>
           {roles.map(({ name, description }) => <li className={styles.role} key={name}>

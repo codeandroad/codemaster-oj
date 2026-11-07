@@ -74,18 +74,18 @@ export async function handleLuqLedger(ctx) {
  }
  if (route === '/luq/reviews' && method === 'GET') {
   admin(user);
-  const items = (await pool.query('SELECT r.*,i.name student_name FROM luq_review_cases r JOIN identities i ON i.id=r.identity_id ORDER BY r.id DESC LIMIT 200')).rows.map(r => ({id:String(r.id),identityId:r.identity_id,studentName:r.student_name,subjectKey:r.subject_key,reason:r.reason,metadata:r.metadata,createdAt:r.created_at}));
+  const items = (await pool.query("SELECT r.*,i.name student_name FROM luq_review_cases r JOIN identities i ON i.id=r.identity_id WHERE i.kind='student' ORDER BY r.id DESC LIMIT 200")).rows.map(r => ({id:String(r.id),identityId:r.identity_id,studentName:r.student_name,subjectKey:r.subject_key,reason:r.reason,metadata:r.metadata,createdAt:r.created_at}));
   return response({items});
  }
  if (route === '/luq/ledger' && method === 'GET') {
   admin(user);
   const identityId = url.searchParams.get('identityId') ? uuid(url.searchParams.get('identityId')) : null;
   const page = integer(Number(url.searchParams.get('page') ?? 1), 1, 100000, '页码'), pageSize = 50;
-  const total = Number((await pool.query('SELECT count(*) FROM luq_ledger WHERE ($1::uuid IS NULL OR identity_id=$1)', [identityId])).rows[0].count);
+  const total = Number((await pool.query("SELECT count(*) FROM luq_ledger l JOIN identities i ON i.id=l.identity_id WHERE i.kind='student' AND ($1::uuid IS NULL OR l.identity_id=$1)", [identityId])).rows[0].count);
   const rows = (await pool.query(`SELECT l.*,i.name student_name,i.number student_number,
    EXISTS(SELECT 1 FROM luq_ledger refund WHERE refund.refund_of=l.id) refunded
    FROM luq_ledger l JOIN identities i ON i.id=l.identity_id
-   WHERE ($1::uuid IS NULL OR l.identity_id=$1) ORDER BY l.id DESC LIMIT $2 OFFSET $3`, [identityId, pageSize, (page - 1) * pageSize])).rows;
+   WHERE i.kind='student' AND ($1::uuid IS NULL OR l.identity_id=$1) ORDER BY l.id DESC LIMIT $2 OFFSET $3`, [identityId, pageSize, (page - 1) * pageSize])).rows;
   return response({ items: rows.map(luqLedgerShape), total, page, pageSize });
  }
  if (route === '/luq/settings' && method === 'GET') return response(await getLuqSettings(pool));
@@ -113,7 +113,7 @@ export async function handleLuqLedger(ctx) {
   if (!/^[1-9][0-9]{0,18}$/.test(ledgerId)) fail(400, 'VALIDATION', '消费流水编号无效');
   const reason = field(body.reason, '退款原因', { max: 2000 });
   return transaction(pool, async db => {
-   const original = (await db.query("SELECT * FROM luq_ledger WHERE id=$1 AND kind='purchase'", [ledgerId])).rows[0];
+   const original = (await db.query("SELECT l.* FROM luq_ledger l JOIN identities i ON i.id=l.identity_id WHERE l.id=$1 AND l.kind='purchase' AND i.kind='student'", [ledgerId])).rows[0];
    if (!original) fail(404, 'NOT_FOUND', '原消费不存在');
    return response(await postLuqEntry(db, { identityId: original.identity_id, delta: -original.delta, kind: 'refund',
     sourceKey: `refund:${ledgerId}`, requestKey: `refund:${user.id}:${requestId}`, actorAccountId: user.id, reason,

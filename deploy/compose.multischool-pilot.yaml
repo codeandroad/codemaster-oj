@@ -1,0 +1,32 @@
+# Merge only with compose.local.yaml, through scripts/start-multischool-pilot.mjs.
+# The explicit volume name is essential: Compose project names alone do not
+# isolate the hard-coded database volume in the base local configuration.
+name: campus-judge-multischool-pilot
+services:
+  api:
+    environment:
+      APP_ORIGINS: http://localhost:3004
+  worker:
+    environment:
+      WORKER_NODE_ID: multischool-pilot-judge-01
+  judge:
+    build: !reset null
+    image: ${PILOT_JUDGE_IMAGE:?set PILOT_JUDGE_IMAGE}
+volumes:
+  database:
+    name: campus-judge-multischool-pilot_database
+networks:
+  # Explicit small subnets avoid exhausting the developer machine's default
+  # Docker address pool. Docker rejects a subnet that overlaps another network.
+  edge:
+    ipam:
+      config: [{subnet: '${PILOT_EDGE_SUBNET:-172.30.52.0/28}'}]
+  business:
+    ipam:
+      config: [{subnet: '${PILOT_BUSINESS_SUBNET:-172.30.52.16/28}'}]
+  execution:
+    ipam:
+      config: [{subnet: '${PILOT_EXECUTION_SUBNET:-172.30.52.32/28}'}]
+  maintenance:
+    ipam:
+      config: [{subnet: '${PILOT_MAINTENANCE_SUBNET:-172.30.52.48/28}'}]

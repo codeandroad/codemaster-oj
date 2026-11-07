@@ -225,7 +225,54 @@ function ManagedProblemDetail({ id, onClose }: { id: string; onClose: () => void
         <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{version.title}{version.id === detail.data?.currentVersionId ? ` · ${tr("当前版本", "Current version")}` : ""}</h3><ProblemPublicationStatus problem={version} bankVisibility={detail.data?.bankVisibility}/></div>
         <p className="mt-2 whitespace-pre-wrap leading-6">{version.statement || tr("暂无题面", "No statement")}</p>
         <p className="mt-2 text-xs text-muted-foreground">{tr("验证", "Validation")}: {version.validationStatus} · {tr("校内公开", "School-wide")}: {version.schoolVisibleAt ? tr("是", "Yes") : tr("否", "No")}</p>
+        {version.id === detail.data?.currentVersionId && detail.data.bankVisibility === "school" &&
+          !detail.data.archivedAt && version.rankReviewStatus === "approved" && version.schoolVisibleAt &&
+          <PlatformProblemRequest key={version.id} problemId={id} versionId={version.id}/>}
       </section>)}
     </div>}</Loading>
   </Drawer>;
+}
+
+
+type PlatformProblemStatus = {
+  eligible: boolean;
+  platformPublished: boolean;
+  publicRequestStatus: "pending" | "approved" | "rejected" | null;
+};
+
+function PlatformProblemRequest({ problemId, versionId }: { problemId: string; versionId: string }) {
+  const { locale } = useLocale();
+  const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
+  const base = `admin/problems/${encodeURIComponent(problemId)}/publication-request`;
+  const status = useData<PlatformProblemStatus>(`${base}?versionId=${encodeURIComponent(versionId)}`);
+  const [updated, setUpdated] = useState<PlatformProblemStatus | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const action = useMutation();
+  const current = updated ?? status.data;
+  return <section className="mt-3 border-t border-border pt-3" aria-label={tr("平台公开审核", "Platform publication review")}>
+    <Loading resource={status}>
+      {current && <>
+        <p className="mb-2 text-xs text-muted-foreground">
+          {!current.eligible ? tr("当前版本不符合平台公开条件。用于限时训练的题目不能公开。", "This version is ineligible for public practice. Problems used in timed practice cannot be published.")
+            : current.platformPublished ? tr("已在平台公开练习区发布", "Published in platform public practice")
+              : current.publicRequestStatus === "pending" ? tr("等待平台管理员审核", "Awaiting platform review")
+                : current.publicRequestStatus === "rejected" ? tr("平台审核未通过", "Platform review declined")
+                  : tr("仅校内开放", "Available within the school")}
+        </p>
+        {current.eligible && !current.platformPublished && current.publicRequestStatus !== "pending" && (
+          confirming ? <div className="space-y-2">
+            <p>{tr("提交本版本的题干和样例供平台审核。通过后，所有登录用户可练习此题。", "Send this version's statement and samples for platform review. Once approved, any signed-in user can practice it.")}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="secondary" disabled={action.busy} onClick={() => { setConfirming(false); action.clear(); }}>{tr("取消", "Cancel")}</Button>
+              <Button size="sm" disabled={action.busy} onClick={() => void action.run(async () => {
+                setUpdated(await productionApi<PlatformProblemStatus>(base, { method: "POST", body: { versionId } }));
+                setConfirming(false);
+              })}>{tr("确认提交", "Confirm request")}</Button>
+            </div>
+          </div> : <Button size="sm" variant="secondary" onClick={() => setConfirming(true)}>{tr("申请平台公开", "Request platform publication")}</Button>
+        )}
+      </>}
+      <Feedback action={action}/>
+    </Loading>
+  </section>;
 }

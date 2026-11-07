@@ -6,6 +6,7 @@ import { migrate } from '../src/migrate.mjs';
 import { handlePaper4 } from '../src/paper4.mjs';
 import { handleEducation } from '../src/education.mjs';
 import { completePaper4Task } from '../paper4-worker.mjs';
+import { suspendSchoolOwnershipForHistoricalMigration } from './helpers/historical-school-ownership.mjs';
 
 const upgrade = '037_paper4_catalog_activities.sql';
 const audienceUpgrade = '039_paper4_activity_audiences.sql';
@@ -36,6 +37,7 @@ async function fixture(run, { beforeUpgrade = false } = {}) {
       await pool.query('INSERT INTO schema_migrations(name) SELECT unnest($1::text[])', [[upgrade,audienceUpgrade,courseLinksUpgrade,...luqUpgrades]]);
     }
     await migrate(pool);
+    const restoreSchoolOwnership = beforeUpgrade ? await suspendSchoolOwnershipForHistoricalMigration(pool) : null;
     async function account(role) {
       const identityId = (await pool.query('INSERT INTO identities(kind,number,name) VALUES($1,$2,$3) RETURNING id',
         [role, randomUUID(), `${role} Paper 4 library`])).rows[0].id;
@@ -91,7 +93,7 @@ async function fixture(run, { beforeUpgrade = false } = {}) {
       assert.equal(tasks.length, 1); await finish(tasks[0].id);
     }
     await run({ pool, teacher, otherTeacher, admin, student, outsider, classA, classB, foreignClass,
-      request, rejected, finish, validate, draft, publish, completeAttempt });
+      request, rejected, finish, validate, draft, publish, completeAttempt, restoreSchoolOwnership });
   } finally {
     await pool.end(); await manager.query(`DROP SCHEMA ${schema} CASCADE`); await manager.end();
   }
@@ -234,7 +236,7 @@ test('free Paper 4 retries preserve submitted work and earn one canonical questi
 
 test('Paper 4 catalogue migration retains legacy class access, saved files, formal results and immutable rewards', options, async () => {
   await fixture(async f => {
-    const { pool, teacher, student, outsider, classA, request, rejected, finish } = f;
+    const { pool, teacher, student, outsider, classA, request, rejected, finish, restoreSchoolOwnership } = f;
     const definition = { language: 'python', totalMarks: 75, questions };
     const legacyPaper = (await pool.query(`INSERT INTO paper4_papers(owner_account_id,class_id,title,status,published_at)
       VALUES($1,$2,'Legacy class paper','published',now()) RETURNING id`, [teacher.id, classA])).rows[0].id;
@@ -259,6 +261,7 @@ test('Paper 4 catalogue migration retains legacy class access, saved files, form
     const before = await preserve(); assert.equal(before.ledger.length, 1);
     const attemptBefore = (await pool.query('SELECT * FROM paper4_attempts WHERE id=$1', [attempt])).rows[0];
     await pool.query('DELETE FROM schema_migrations WHERE name=ANY($1::text[])', [[upgrade,audienceUpgrade,courseLinksUpgrade,...luqUpgrades]]); await migrate(pool);
+    await restoreSchoolOwnership();
     assert.deepEqual(await preserve(), before, 'upgrade does not rewrite evidence or historical awards');
     const after = (await pool.query('SELECT * FROM paper4_attempts WHERE id=$1', [attempt])).rows[0];
     assert.deepEqual(after, { ...attemptBefore, attempt_number: 1 });

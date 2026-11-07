@@ -9,6 +9,19 @@ import { applyResponse } from '../domain.response.js';
 export class CommunityController {
  constructor(private readonly domain: DomainService) {}
 
+ @Get('practice/presence')
+ async publicPresence(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
+  return applyResponse(response,await this.domain.execute('publicPresence',request.domainContext));
+ }
+ @Post('practice/presence/heartbeat')
+ async publicHeartbeat(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
+  return applyResponse(response,await this.domain.execute('publicPresence',request.domainContext));
+ }
+ @Get('practice/presence/students/:identityId')
+ async publicPreview(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
+  return applyResponse(response,await this.domain.execute('publicPresence',request.domainContext));
+ }
+
  @Get('presence')
  async presence(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('presence',request.domainContext));
@@ -17,16 +30,22 @@ export class CommunityController {
  async heartbeat(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('presence',request.domainContext));
  }
+ @Get('presence/students/:identityId')
+ async studentPreview(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
+  return applyResponse(response,await this.domain.execute('presence',request.domainContext));
+ }
 
- @Get('student-notifications')
+ @Get(['student-notifications','schools/:schoolId/student-notifications','staff-notifications','schools/:schoolId/staff-notifications','account-notifications'])
  async notifications(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
- @Post('student-notifications/read-all')
+ @Post(['student-notifications/read-all','schools/:schoolId/student-notifications/read-all',
+  'staff-notifications/read-all','schools/:schoolId/staff-notifications/read-all','account-notifications/read-all'])
  async readAllNotifications(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
- @Post('student-notifications/:notificationId/read')
+ @Post(['student-notifications/:notificationId/read','schools/:schoolId/student-notifications/:notificationId/read',
+  'staff-notifications/:notificationId/read','schools/:schoolId/staff-notifications/:notificationId/read','account-notifications/:notificationId/read'])
  async readNotification(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }

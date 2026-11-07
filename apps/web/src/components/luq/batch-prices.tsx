@@ -91,15 +91,15 @@ export function LuqBatchPrices({ targetType, choices, initialIds = [], onSaved }
       <fieldset disabled={action.busy} className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_auto]">
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={translation} onChange={e => setTranslation(e.target.checked)}/>{tx("设置中文题面价格", "Set translation price")}</label>
-          <Field label={tx("翻译 Luq（留空使用全校默认）", "Translation Luq (blank = school default)")}><input className={input} type="number" min={0} max={1000} step={1} disabled={!translation} value={translationPrice} onChange={e => setTranslationPrice(e.target.value)} placeholder={tx("全校默认", "School default")}/></Field>
+          <Field label={tx("翻译价格（奖学金；留空使用全校默认）", "Translation cost (scholarship; blank = school default)")}><input className={input} type="number" min={0} max={1000} step={1} disabled={!translation} value={translationPrice} onChange={e => setTranslationPrice(e.target.value)} placeholder={tx("全校默认", "School default")}/></Field>
         </div>
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={solution} onChange={e => setSolution(e.target.checked)}/>{tx("设置完整题解价格", "Set solution price")}</label>
-          <Field label={tx("题解 Luq（留空使用全校默认）", "Solution Luq (blank = school default)")}><input className={input} type="number" min={0} max={1000} step={1} disabled={!solution} value={solutionPrice} onChange={e => setSolutionPrice(e.target.value)} placeholder={tx("全校默认", "School default")}/></Field>
+          <Field label={tx("题解价格（奖学金；留空使用全校默认）", "Solution cost (scholarship; blank = school default)")}><input className={input} type="number" min={0} max={1000} step={1} disabled={!solution} value={solutionPrice} onChange={e => setSolutionPrice(e.target.value)} placeholder={tx("全校默认", "School default")}/></Field>
         </div>
         <Button type="submit" size="sm" disabled={action.busy || !selectedIds.length || (!translation && !solution)}>{tx(`应用到 ${selectedIds.length} 项`, `Apply to ${selectedIds.length} items`)}</Button>
       </fieldset>
-      <p className="mt-2 text-xs text-muted-foreground">{tx("0 Luq 表示免费提供，不产生永久购买权益；禁用和考核限制仍然生效。", "0 Luq provides free access without a permanent purchase. Disabled access and assessment restrictions still apply.")}</p>
+      <p className="mt-2 text-xs text-muted-foreground">{tx("0 奖学金表示免费提供，不产生永久购买权益；禁用和考核限制仍然生效。", "0 scholarship provides free access without a permanent purchase. Disabled access and assessment restrictions still apply.")}</p>
       <Feedback action={action}/>
       {publication && <div className="mt-2 space-y-1 text-xs" role="status">
         <p className="text-muted-foreground">{tx("本次保存时的当前版本内容；课程或活动中固定的旧版本需单独审核。", "Current-version content at the time of this save; older versions pinned in courses or activities need their own review.")}</p>

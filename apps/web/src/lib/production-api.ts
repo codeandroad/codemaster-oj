@@ -8,6 +8,8 @@ export interface CampusUser {
   gender: CampusGender | null;
   username: string;
   roles: CampusRole[];
+  platformAdmin?: boolean;
+  defaultSchoolId?: string | null;
   number: string;
   email?: string | null;
 }
@@ -45,6 +47,7 @@ export interface ProblemCase {
 }
 export interface ProductionProblem {
   id: string;
+  solved?: boolean;
   title: string;
   mode: "stdio" | "function";
   statement: string;
@@ -69,6 +72,9 @@ export interface ProductionProblem {
   bankId?: string | null;
   tags?: string[];
   difficulty?: string;
+  objective?: string;
+  parameters?: (string | { name: string; type?: string; description?: string })[];
+  returnType?: string;
   source?: string;
   canEdit?: boolean;
   firstAcPoints?: number;
@@ -137,6 +143,8 @@ export interface Submission {
 export type SubmissionLanguage = "python" | "cpp" | "javascript";
 export interface ReviewEntry {
   id: string;
+  originalStatus?: string;
+  teacherFeedback?: boolean;
   submissionId: string;
   problemId: string;
   problemTitle?: string;
@@ -184,25 +192,46 @@ export async function productionApi<T>(
     ...(options.signal ? { signal: options.signal } : {}),
   });
   const payload = await response.json().catch(() => null);
-  if (!response.ok)
+  if (!response.ok) {
+    const code = payload?.error?.code;
+    // A missing school resource may mean that the membership was revoked.
+    // Confirm with the school list before switching workspaces.
+    if (typeof window !== "undefined" && (code === "LEGACY_WORKSPACE_REQUIRED"
+      || response.status === 404 && /^\/?schools\/[^/]+\//.test(path))) {
+      window.dispatchEvent(new Event("codemaster:school-access-check"));
+    }
     throw new ApiError(
       response.status,
       payload?.error?.code ?? "REQUEST_FAILED",
       payload?.error?.message ??
         (response.status === 401 ? "登录已失效，请重新登录。" : "请求失败，请稍后重试。"),
     );
+  }
   if (payload?.csrfToken) csrfToken = payload.csrfToken;
   return payload as T;
 }
 
 export function apiMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "操作失败，请稍后重试。";
+  const message = error instanceof Error ? error.message : "操作失败，请稍后重试。";
+  // Present the current name without changing API codes or historical ledger data.
+  const scholarshipMessages: Record<string, string> = {
+    "Luq 余额不足": "奖学金余额不足",
+    "只能全额退还原 Luq 消费": "只能全额退还原奖学金消费",
+    "Luq 余额超过上限": "奖学金余额超过上限",
+    "Luq 账户必须关联学生身份": "奖学金账户必须关联学生身份",
+  };
+  return scholarshipMessages[message] ?? message.replace(
+    /^(额外 Luq|初始 Luq|首次 AC Luq|Luq 数量)(须为 .+ 的整数)$/,
+    (_, label: string, detail: string) => `${label.replace("Luq", "奖学金")}${detail}`,
+  );
 }
 export function isPending(status: string) {
   return ["waiting", "queued", "judging", "running", "pending"].includes(status.toLowerCase());
 }
 export function roleHome(user: CampusUser) {
-  return user.roles.includes("admin")
+  return !user.roles.length
+    ? user.platformAdmin ? "/platform" : "/practice"
+    : user.roles.includes("admin")
     ? "/admin"
     : user.roles.includes("teacher")
       ? "/teacher"

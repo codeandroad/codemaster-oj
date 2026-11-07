@@ -5,6 +5,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { createPool, transaction } from '../src/db.mjs';
 import { migrate } from '../src/migrate.mjs';
 import { handleLuqLedger, postLuqEntry } from '../src/luq-ledger.mjs';
+import { handleLuqRules } from '../src/luq-rules.mjs';
 const url=process.env.TEST_DATABASE_URL;
 let pool,manager,schema,teacher,admin;
 const req=(route,method,user,body={})=>handleLuqLedger({pool,route,method,user,body,url:new URL('http://localhost'+route)});
@@ -90,12 +91,19 @@ test('refunds are linked and once-only; different retry IDs do not pay twice and
  assert.equal(ledger.find(item=>item.id===debit.id).refunded,true);
  assert.equal(ledger.find(item=>item.refundOf===debit.id).refunded,false);
 });
-async function assignment(s,problems,amount=6,allow=false){
+async function assignment(s,problems,amount=6,allow=false,{requireAll=false}={}){
  const id=(await pool.query("INSERT INTO assignments(title,owner_account_id,due_at,state) VALUES('Luq',$1,now()+interval '1 hour','Draft') RETURNING id",[teacher.id])).rows[0].id;
  for(const[pindex,p]of problems.entries())await pool.query('INSERT INTO assignment_problems(assignment_id,problem_id,version_id,points,position) VALUES($1,$2,$3,$4,$5)',[id,p.id,p.versionId,100/problems.length,pindex]);
  await pool.query('INSERT INTO assignment_participants VALUES($1,$2,false)',[id,s.identityId]);
- await pool.query(`INSERT INTO luq_activity_rules(activity_type,activity_id,rule_version,amount,minimum_ac,minimum_score,task_kind,allow_solution_assisted,created_by)
- VALUES('assignment',$1,1,$2,$3,100,$4,$5,$6)`,[id,amount,problems.length,allow?'learning':'challenge',allow,teacher.id]);
+ if(requireAll){
+  const route='/luq/reward-rules';
+  const result=await handleLuqRules({route,method:'POST',pool,user:teacher,url:new URL('http://localhost'+route),helpers:{audit:async()=>{}},
+   body:{activityType:'assignment',activityId:id,amount,requireAll,taskKind:'challenge',allowSolutionAssisted:false,expectedVersion:0}});
+  assert.equal(result.body.rule.requireAll,true);
+ }else{
+  await pool.query(`INSERT INTO luq_activity_rules(activity_type,activity_id,rule_version,amount,minimum_ac,minimum_score,task_kind,allow_solution_assisted,created_by)
+   VALUES('assignment',$1,1,$2,$3,100,$4,$5,$6)`,[id,amount,problems.length,allow?'learning':'challenge',allow,teacher.id]);
+ }
  await pool.query("UPDATE assignments SET state='Published' WHERE id=$1",[id]);return id;
 }
 test('assignment targets stack with first AC exactly once and published rules freeze',{skip:!url},async()=>{
@@ -104,6 +112,20 @@ test('assignment targets stack with first AC exactly once and published rules fr
  await submit(s,p,{assignmentId:id});assert.equal(await balance(s),14);
  await assert.rejects(pool.query("INSERT INTO luq_activity_rules(activity_type,activity_id,rule_version,amount,created_by) VALUES('assignment',$1,2,10,$2)",[id,teacher.id]),/LUQ_RULE_FROZEN/);
  const next=await assignment(s,[p],3);await submit(s,p,{assignmentId:next});assert.equal(await balance(s),17,'same problem new activity earns only configured activity bonus');
+});
+test('assignment completion pays 15 once after every required formal in-assignment AC',{skip:!url},async()=>{
+ const s=await account(),p=await problem(),q=await problem(),id=await assignment(s,[p,q],15,false,{requireAll:true});
+ await submit(s,p);
+ await submit(s,q,{assignmentId:id});
+ assert.equal(await balance(s),8,'outside AC earns only the normal first-AC award');
+ await submit(s,p,{assignmentId:id,kind:'samples'});
+ assert.equal(await balance(s),8,'sample runs do not count as completion');
+ await Promise.all([submit(s,p,{assignmentId:id}),submit(s,p,{assignmentId:id})]);
+ assert.equal(await balance(s),23);
+ const rewards=(await pool.query("SELECT delta FROM luq_ledger WHERE identity_id=$1 AND kind='activity'",[s.identityId])).rows;
+ assert.deepEqual(rewards,[{delta:15}]);
+ const notifications=(await pool.query("SELECT data FROM student_system_notifications WHERE legacy_identity_id=$1 AND kind='activity_reward'",[s.identityId])).rows;
+ assert.deepEqual(notifications,[{data:{amount:15,activityTitle:'Luq'}}]);
 });
 test('challenge excludes assisted attempts; learning may explicitly allow them',{skip:!url},async()=>{
  const s=await account(),p=await problem();await delivery(s,p);const challenge=await assignment(s,[p],6);await submit(s,p,{assignmentId:challenge});assert.equal(await balance(s),0);
@@ -236,8 +258,8 @@ test('upgrading preserves old points and consumes historical AC; only the one-ti
   await migrate(old);await migrate(old);
   assert.deepEqual((await old.query('SELECT id,identity_id,code,status,score FROM submissions ORDER BY id')).rows,before);
   const upgradedAccounts=(await old.query('SELECT * FROM accounts ORDER BY id')).rows;
-  assert.deepEqual(upgradedAccounts.map(({leaderboard_use_nickname,...legacy})=>legacy),beforeAccounts);
-  assert.ok(upgradedAccounts.every(account=>account.leaderboard_use_nickname===false));
+  assert.deepEqual(upgradedAccounts.map(({leaderboard_use_nickname,default_school_id,...legacy})=>legacy),beforeAccounts);
+  assert.ok(upgradedAccounts.every(account=>account.leaderboard_use_nickname===false&&account.default_school_id===null));
   assert.equal((await old.query('SELECT count(*)::int n FROM luq_ledger WHERE kind<>\'initial_grant\'')).rows[0].n,0);
   assert.equal((await old.query("SELECT reason FROM luq_first_ac_claims WHERE identity_id=$1 AND subject_key=$2",[identity,'problem:'+p])).rows[0].reason,'historical_ac');
   assert.equal((await old.query("SELECT reason FROM luq_first_ac_claims WHERE identity_id=$1 AND subject_key=$2",[identity,'paper4:'+sourcePaper+':Q1'])).rows[0].reason,'historical_ac');

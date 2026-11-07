@@ -1,6 +1,9 @@
 import { transaction } from './db.mjs';
 import { enumValue, fail, field, integer, uuid } from './security.mjs';
 import { avatarForIdentity } from './avatars.mjs';
+import { listAccountNotifications, markAccountNotificationsRead } from './account-notifications.mjs';
+import { listStudentNotifications, markStudentNotificationsRead } from './student-notifications.mjs';
+import { listStaffCourseNotifications, markStaffCourseNotificationsRead } from './staff-course-notifications.mjs';
 
 const response = (body, status = 200) => ({status, body});
 const student = user => user.roles.includes('student');
@@ -280,58 +283,24 @@ async function dismissReport(ctx, reportId) {
  return response({ok:true,status:'dismissed'});
 }
 
-const visibleNotificationSql=`FROM student_guestbook_notifications n
- JOIN student_guestbook_messages m ON m.id=n.message_id AND m.deleted_at IS NULL
- JOIN accounts a ON a.id=m.author_account_id
-  AND a.disabled_at IS NULL AND a.binding_released_at IS NULL
- JOIN identities i ON i.id=a.identity_id AND i.archived_at IS NULL
- WHERE n.recipient_identity_id=$1`;
-
-async function notifications(ctx) {
- if(!student(ctx.user)) fail(403,'FORBIDDEN','只有学生可以查看通知');
- const {page,pageSize}=paging(ctx.url);
- const total=(await ctx.pool.query(`SELECT count(*)::int total,
-  count(*) FILTER (WHERE n.read_at IS NULL)::int unread ${visibleNotificationSql}`,
-  [ctx.user.identityId])).rows[0];
- const rows=(await ctx.pool.query(`SELECT n.id,n.message_id,n.recipient_identity_id,n.created_at,n.read_at,m.body,
-  COALESCE(NULLIF(btrim(a.nickname),''),'同学') author_nickname
-  ${visibleNotificationSql}
-  ORDER BY n.created_at DESC,n.id DESC LIMIT $2 OFFSET $3`,
-  [ctx.user.identityId,pageSize,(page-1)*pageSize])).rows;
- return response({items:rows.map(r=>({id:r.id,messageId:r.message_id,body:r.body,
-  profileIdentityId:r.recipient_identity_id,
-  authorNickname:r.author_nickname,createdAt:r.created_at,readAt:r.read_at})),
-  total:total.total,unreadCount:total.unread,page,pageSize});
-}
-
-async function readNotification(ctx, notificationId) {
- if(!student(ctx.user)) fail(403,'FORBIDDEN','只有学生可以处理通知');
- const row=(await ctx.pool.query(`UPDATE student_guestbook_notifications
-  SET read_at=COALESCE(read_at,clock_timestamp())
-  WHERE id=$1 AND recipient_identity_id=$2
-  RETURNING read_at`,[notificationId,ctx.user.identityId])).rows[0];
- if(!row) fail(404,'NOT_FOUND','通知不存在');
- return response({ok:true,readAt:row.read_at});
-}
-
-async function readAllNotifications(ctx) {
- if(!student(ctx.user)) fail(403,'FORBIDDEN','只有学生可以处理通知');
- await ctx.pool.query(`UPDATE student_guestbook_notifications n
-  SET read_at=clock_timestamp()
-  FROM student_guestbook_messages m
-  WHERE n.message_id=m.id AND n.recipient_identity_id=$1
-   AND n.read_at IS NULL AND m.deleted_at IS NULL`,[ctx.user.identityId]);
- return response({ok:true});
-}
-
 export async function handleCommunity(ctx) {
+ if(ctx.route==='/account-notifications' && ctx.method==='GET') return listAccountNotifications(ctx,paging(ctx.url));
+ if(ctx.route==='/account-notifications/read-all' && ctx.method==='POST') return markAccountNotificationsRead(ctx);
+ const accountAction=ctx.route.match(/^\/account-notifications\/([^/]+)\/read$/);
+ if(accountAction && ctx.method==='POST') return markAccountNotificationsRead(ctx,uuid(accountAction[1],'通知 ID'));
+ const schoolInbox=ctx.route.match(/^\/schools\/([^/]+)(\/(?:student|staff)-notifications(?:\/.*)?)$/);
+ if(schoolInbox) ctx={...ctx,route:schoolInbox[2],notificationSchoolId:schoolInbox[1]};
+ if(ctx.route==='/staff-notifications' && ctx.method==='GET') return listStaffCourseNotifications(ctx,paging(ctx.url));
+ if(ctx.route==='/staff-notifications/read-all' && ctx.method==='POST') return markStaffCourseNotificationsRead(ctx);
+ const staffAction=ctx.route.match(/^\/staff-notifications\/([^/]+)\/read$/);
+ if(staffAction && ctx.method==='POST') return markStaffCourseNotificationsRead(ctx,uuid(staffAction[1],'通知 ID'));
  if(ctx.route==='/student-notifications') {
-  if(ctx.method==='GET') return notifications(ctx);
+  if(ctx.method==='GET') return listStudentNotifications(ctx,paging(ctx.url));
   return null;
  }
- if(ctx.route==='/student-notifications/read-all' && ctx.method==='POST') return readAllNotifications(ctx);
+ if(ctx.route==='/student-notifications/read-all' && ctx.method==='POST') return markStudentNotificationsRead(ctx);
  const notificationAction=ctx.route.match(/^\/student-notifications\/([^/]+)\/read$/);
- if(notificationAction && ctx.method==='POST') return readNotification(ctx,uuid(notificationAction[1],'通知 ID'));
+ if(notificationAction && ctx.method==='POST') return markStudentNotificationsRead(ctx,uuid(notificationAction[1],'通知 ID'));
  if(ctx.route==='/profile-message-reports' && ctx.method==='GET') return allReports(ctx);
  const reportAction=ctx.route.match(/^\/profile-message-reports\/([^/]+)\/dismiss$/);
  if(reportAction && ctx.method==='POST') return dismissReport(ctx,uuid(reportAction[1],'举报 ID'));

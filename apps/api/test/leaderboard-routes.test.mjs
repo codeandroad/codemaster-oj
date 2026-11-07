@@ -73,6 +73,7 @@ test('Nest school leaderboard routes enforce admin-only visibility, cross-class 
    assert.deepEqual(new Set(studentContext.data.items.map(item=>item.id)),new Set([classId,otherClassId]));
    assert.equal(studentContext.data.canManage,false);
    assert.equal(studentContext.data.visibleFields.attempts,false);
+   assert.equal(studentContext.data.visibleFields.luqBalance,true);
    assert.equal((await request(contexts,{auth:teacher})).data.canManage,false);
    assert.equal((await request(contexts,{auth:admin})).data.canManage,true);
    assert.equal((await request(settings,{auth:student})).data.visibleFields.attempts,false);
@@ -85,6 +86,7 @@ test('Nest school leaderboard routes enforce admin-only visibility, cross-class 
    assert.equal(all.data.items[1].id,identityId);
    assert.equal(all.data.items[0].name,'Other Student','existing nickname does not imply opt-in');
    assert.equal(all.data.items[1].name,'Student');
+   assert.equal(all.data.items[1].luqBalance,100,'HTTP returns the current initial Scholarship balance');
    const profile='/api/v1/auth/profile';
    assert.equal((await request(profile,{method:'PATCH',body:{showNicknameOnLeaderboard:'true'},auth:student})).status,400);
    const optedIn=await request(profile,{method:'PATCH',body:{showNicknameOnLeaderboard:true},auth:student});
@@ -118,7 +120,7 @@ test('Nest school leaderboard routes enforce admin-only visibility, cross-class 
    assert.equal(otherClass.data.items[0].id,otherIdentityId);
    assert.equal(otherClass.data.me,null);
    assert.equal((await request(`/api/v1/points/leaderboard?classId=${randomUUID()}`,{auth:student})).status,404);
-   const visibleFields={solvedProblems:true,attempts:true,acRate:false};
+   const visibleFields={solvedProblems:true,attempts:true,acRate:false,luqBalance:false};
    assert.equal((await request(settings,{method:'PATCH',body:{visibleFields},auth:student})).status,403);
    assert.equal((await request(settings,{method:'PATCH',body:{visibleFields},auth:teacher})).status,403);
    assert.equal((await request(settings,{method:'PATCH',body:{visibleFields},auth:admin,csrf:false})).status,403);
@@ -128,10 +130,15 @@ test('Nest school leaderboard routes enforce admin-only visibility, cross-class 
    assert.equal(after.status,200);
    assert.equal(after.data.me.attempts,0);
    assert.equal(Object.hasOwn(after.data.me,'acRate'),false);
+   for(const item of [...after.data.items,after.data.me]) assert.equal(Object.hasOwn(item,'luqBalance'),false,'hidden balance is absent from HTTP payload');
+   const staffBalance=await request(leaderboard,{auth:teacher});
+   assert.equal(staffBalance.data.items[0].luqBalance,100);
    assert.equal(Object.hasOwn(after.data.me,'publicTag'),false);
    const otherAfter=await request(`/api/v1/points/leaderboard?classId=${otherClassId}`,{auth:student});
    assert.equal(otherAfter.data.visibleFields.attempts,true,'one admin setting covers all class filters');
    assert.equal(otherAfter.data.items[0].attempts,2,'the post-AC submission still counts as an attempt');
+   assert.equal(otherAfter.data.visibleFields.luqBalance,false);
+   assert.equal(Object.hasOwn(otherAfter.data.items[0],'luqBalance'),false,'balance visibility is global across filters');
   }finally{
    if(app)await app.close();
    await pool.end();

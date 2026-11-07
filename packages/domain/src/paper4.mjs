@@ -1,3 +1,4 @@
+import { paper4QuestionSubmissions } from './problem-submissions.mjs';
 import { transaction } from './db.mjs';
 import { HttpError, fail, field, bytes, uuid, integer } from './security.mjs';
 import { parsePaper4Import } from './paper4-import.mjs';
@@ -809,6 +810,14 @@ export async function handlePaper4(ctx){
   if(typeof row.code!=='string'||!row.code.trim())fail(404,'NOT_FOUND','此大题暂无参考答案');
   return respond(200,{questionKey:question.key,language:'python',code:row.code});
  }
+ m=route.match(/^\/paper4\/attempts\/([^/]+)\/questions\/([^/]+)\/submissions$/);
+ if(m&&method==='GET')return transaction(pool,async db=>{
+  const initial=await getAttempt(db,user,m[1]);
+  await db.query('SELECT id FROM paper4_papers WHERE id=$1 FOR SHARE',[initial.paper_id]);
+  const attempt=await getAttempt(db,user,m[1]);
+  await getPaper(db,user,attempt.paper_id,{versionId:attempt.version_id});
+  return respond(200,await paper4QuestionSubmissions(db,attempt,questionFor(attempt,m[2]),user,url));
+ });
  m=route.match(/^\/paper4\/attempts\/([^/]+)$/);
  if(m&&method==='GET'){
   const attempt=await getAttempt(pool,user,m[1]);

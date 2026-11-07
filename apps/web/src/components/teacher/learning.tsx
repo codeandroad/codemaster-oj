@@ -2,7 +2,9 @@
 
 import { AppLink as Link } from "@/components/navigation";
 import { CourseAccessSummary, courseStatus, type CourseAccessMetadata } from "@/components/course-access";
+import { CourseCatalogTable, CourseCatalogRow } from "./course-catalog-table";
 import { CourseSettingsDialog } from "./course-settings-dialog";
+import { CourseAdmissionsDialog } from "@/components/schools/course-admissions-dialog";
 import { CoursePaper4Picker } from "./course-paper4-picker";
 import { coursePaper4LinkKey, coursePaper4References, coursePaper4UnitCount, mergeCoursePaper4Links, type CoursePaper4Link } from "@/components/course-paper4";
 import { chapterDirectoryTitle } from "@/lib/learning-chapter-title";
@@ -111,11 +113,14 @@ interface Resource {
   scope: string;
   canEdit?: boolean;
 }
-export function TeacherLearning() {
+const LEGACY_SCHOOL_ID = "00000000-0000-4000-8000-000000000052";
+
+export function TeacherLearning({ canManageAdmissions = false }: { canManageAdmissions?: boolean }) {
   const {t,locale} = useLocale();
   const tx=(zh:string,en:string)=>locale==="en"?en:zh;
   const [showArchived,setShowArchived]=useState(false);
   const [archiveTarget,setArchiveTarget]=useState<Path|null>(null);
+  const [admissionTarget, setAdmissionTarget] = useState<Path | null>(null);
   const router = useRouter(),
     paths = useData<{ items: Path[] }>(showArchived?"learning-paths?archived=true":"learning-paths"),
     resources = useData<{ items: Resource[] }>("learning-resources"),
@@ -147,40 +152,22 @@ export function TeacherLearning() {
         {tab === "课程" ? (
           <>
             <State resource={paths} />
-            <div data-od-id="learning-path-table" className="min-w-0 [&_th]:whitespace-nowrap [&_td:not(:first-child)]:whitespace-nowrap [&_th:first-child]:w-[42%] [&_td:first-child]:min-w-[300px] [&_th:nth-child(2)]:w-[12%] [&_th:nth-child(3)]:w-[7%] [&_th:nth-child(4)]:w-[14%] [&_th:nth-child(5)]:w-[9%] [&_th:last-child]:w-[16%] [&_td:first-child_p]:max-w-md">
-            <Table min={1000}
-              headers={[t("课程名称"), t("分类"), t("章节"), t("可见范围"), t("状态"), t("操作")]}
-            >
-              {paths.data?.items.map((path) => (
-                <tr key={path.id}>
-                  <td>
-                    <div className="mb-2 w-36"><LearningCover coverKey={path.coverKey} coverImage={path.coverImage}/></div><Link className="font-semibold text-primary hover:underline" href={`/teacher/courses/${path.id}`}>{path.title}</Link><p className="mt-1 text-xs text-muted-foreground">{t(courseDifficulties[path.difficulty??"beginner"])}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {path.description}
-                    </p>
-                  </td>
-                  <td>{path.category}</td>
-                  <td>{path.chapterCount}</td>
-                  <td className="max-w-64 whitespace-normal"><CourseAccessSummary course={path}/></td>
-                  <td>
-                    <StatusPill status={courseStatus(path,locale)} />
-                  </td>
-                  <td>
-                    <Link className={link} href={`/teacher/courses/${path.id}`}>
-                      {path.archived?tx("查看","View"):path.canEdit ? t("编辑") : t("查看")}
-                    </Link>
-                    {!path.archived&&<Link className={`${link} ml-4`} href={`/teacher/courses/${path.id}?preview=1`}>{t("学生预览")}</Link>}
-                    {path.canEdit&&<Button size="sm" variant="ghost" disabled={action.busy} onClick={()=>setArchiveTarget(path)}>{path.archived?tx("恢复","Restore"):tx("归档","Archive")}</Button>}
-                  </td>
-                </tr>
+            <CourseCatalogTable empty={!paths.loading && !paths.data?.items.length ? (showArchived ? tx("暂无已归档课程。", "No archived courses.") : t("暂无课程。点击“新建课程”组织章节内容。")) : undefined}>
+              {paths.data?.items.map(path => (
+                <CourseCatalogRow key={path.id} course={path}
+                  title={<Link className={link} href={`/teacher/courses/${path.id}`}>{path.title}</Link>}
+                  access={<CourseAccessSummary course={path}/>}
+                  status={<StatusPill status={courseStatus(path, locale)}/>}
+                  actions={<>
+                    <Link className={link} href={`/teacher/courses/${path.id}`}>{path.archived ? tx("查看", "View") : path.canEdit ? t("编辑") : t("查看")}</Link>
+                    {!path.archived && <Link className={`${link} ml-4`} href={`/teacher/courses/${path.id}?preview=1`}>{t("学生预览")}</Link>}
+                    {canManageAdmissions && path.published && !path.archived &&
+                      <Button size="sm" variant="ghost" onClick={() => setAdmissionTarget(path)}>{tx("课程准入", "Course admissions")}</Button>}
+                    {path.canEdit && <Button size="sm" variant="ghost" disabled={action.busy} onClick={() => setArchiveTarget(path)}>{path.archived ? tx("恢复", "Restore") : tx("归档", "Archive")}</Button>}
+                  </>}
+                />
               ))}
-              {!paths.loading && !paths.data?.items.length && (
-                <Empty columns={6}>
-                  {showArchived?tx("暂无已归档课程。","No archived courses."):t("暂无课程。点击“新建课程”组织章节内容。")}
-                </Empty>
-              )}
-            </Table>
-            </div>
+            </CourseCatalogTable>
           </>
         ) : (
           <>
@@ -246,6 +233,7 @@ export function TeacherLearning() {
           </>
         )}
       </section>
+      {admissionTarget && <CourseAdmissionsDialog schoolId={LEGACY_SCHOOL_ID} course={admissionTarget} onClose={() => setAdmissionTarget(null)} />}
       {archiveTarget&&<Modal title={archiveTarget.archived?tx("恢复课程","Restore course"):tx("归档课程","Archive course")} onClose={()=>setArchiveTarget(null)}>
         <p className="text-sm text-muted-foreground">{archiveTarget.archived?tx("恢复后课程回到使用中列表。普通题目须保持审核通过；若 Paper 4 引用已不可用，课程会保持下架，修复后可重新公开。","Linked problems must remain approved. If Paper 4 references are unavailable, the restored course stays withdrawn until repaired and republished."):tx("归档后课程从学生课程列表移除。章节与学习进度保留；已发布作业仍可独立查看。","Archiving removes the course from the student catalog. Lessons and progress remain recorded; published assignments remain available independently.")}</p>
         <div className="mt-5 flex justify-end gap-2"><Button variant="secondary" onClick={()=>setArchiveTarget(null)}>{tx("取消","Cancel")}</Button><Button disabled={action.busy} onClick={()=>void action.run(async()=>{const restored = await productionApi<Path>(`learning-paths/${archiveTarget.id}${archiveTarget.archived?"/restore":""}`,archiveTarget.archived?{method:"POST",body:{}}:{method:"PATCH",body:{archived:true}});setArchiveTarget(null);paths.reload();return archiveTarget.archived?(archiveTarget.published && !restored.published && restored.withdrawnAt ? tx("课程已恢复为下架状态：请修复不可用的 Paper 4 引用后重新公开。","Course restored and kept withdrawn. Repair unavailable Paper 4 references before republishing.") : tx("课程已恢复。","Course restored.")):tx("课程已归档。","Course archived.");})}>{archiveTarget.archived?tx("恢复","Restore"):tx("归档","Archive")}</Button></div>

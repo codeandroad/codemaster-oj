@@ -43,7 +43,14 @@ test('Luq production grants: application cannot overwrite balances and worker se
   await assert.rejects(asRole('campus_app',"UPDATE problem_public_statements SET statement='Changed' WHERE version_id=$1",[version]),e=>e.code==='42501');
   await assert.rejects(asRole('campus_app','DELETE FROM problem_public_statements WHERE version_id=$1',[version]),e=>e.code==='42501');
   await assert.rejects(asRole('campus_app','DELETE FROM luq_initial_grants WHERE identity_id=$1',[student]),e=>e.code==='42501');
-  for(const role of ['campus_app','campus_worker'])await assert.rejects(asRole(role,'SELECT luq_grant_initial($1)',[student]),e=>e.code==='42501');
+  const beforeInitialReplay=(await pool.query('SELECT * FROM luq_initial_grants WHERE identity_id=$1',[student])).rows;
+  const beforeLedgerReplay=(await pool.query('SELECT * FROM luq_ledger WHERE identity_id=$1 ORDER BY id',[student])).rows;
+  await Promise.all(Array.from({length:3},()=>asRole('campus_app','SELECT luq_grant_initial($1)',[student])));
+  assert.deepEqual((await pool.query('SELECT * FROM luq_initial_grants WHERE identity_id=$1',[student])).rows,beforeInitialReplay,
+   'the application can initialize public wallets without granting an existing learner twice');
+  assert.deepEqual((await pool.query('SELECT * FROM luq_ledger WHERE identity_id=$1 ORDER BY id',[student])).rows,beforeLedgerReplay);
+  assert.equal((await pool.query('SELECT balance FROM luq_accounts WHERE identity_id=$1',[student])).rows[0].balance,110);
+  await assert.rejects(asRole('campus_worker','SELECT luq_grant_initial($1)',[student]),e=>e.code==='42501');
   await assert.rejects(asRole('campus_worker',"SELECT * FROM luq_post_entry($1,10,'admin_grant','worker-grant',$2,'Denied','{}',NULL,NULL,NULL)",[student,account]),e=>e.code==='42501');
   const submission=(await asRole('campus_app',`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,code,idempotency_key,request_hash)
    VALUES($1,$2,$3,$4,'submit','print(1)',$5,'roles') RETURNING id`,[studentAccount,student,problem,version,randomUUID()])).rows[0].id;

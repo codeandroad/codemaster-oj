@@ -85,6 +85,21 @@ export class LibraryController {
     return applyResponse(response, await this.domain.execute('library', request.domainContext));
   }
 
+  @Get('admin/problems/:id/publication-request')
+  async adminPublicProblemStatus(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('schoolPractice', request.domainContext));
+  }
+
+  @Post('admin/problems/:id/publication-request')
+  async adminRequestPublicProblem(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('schoolPractice', request.domainContext));
+  }
+
+  @Get('problems/:id/submissions')
+  async problemSubmissions(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('library', request.domainContext));
+  }
+
   @Get('problems/:id')
   async problem(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('library', request.domainContext));

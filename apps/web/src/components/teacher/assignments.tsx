@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
+import { ActivityRewardEditor } from "@/components/luq/teaching-page";
 import { useLocale, type AppLocale } from "@/components/locale-context";
 import {
   productionApi,
@@ -798,7 +799,11 @@ function AssignmentEditorForm({
             </>
           )}
           {tab === "Applicable list" && <StudentAudienceSelector students={students} classes={audienceClasses} selectedIds={participants} onChange={setParticipants} loading={audience.loading} error={audience.error} onReload={audience.reload} disabled={action.busy} lockedIds={lockedIds} exemptIds={exemptStudentIds}/>}
-          {tab === "Rules" && <p className="mb-4 text-sm text-muted-foreground">以下为服务端固定规则，用于说明计分与提交策略，无需手动修改。</p>}
+          {tab === "Rules" && <div className="mb-4">
+            {saved
+              ? <ActivityRewardEditor key={`${saved.id}:${saved.state}`} activityType="assignment" activityId={saved.id} />
+              : <p className="text-sm text-muted-foreground">{ui(locale, "保存草稿后可设置作业完成奖学金。", "Save the draft to set an assignment completion scholarship.")}</p>}
+          </div>}
           {tab === "Rules" && (
             <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
               {[
@@ -1320,13 +1325,16 @@ export function TeacherSubmissionDrawer({
               const form = e.currentTarget;
               const d = new FormData(form);
               void action.run(async () => {
-                await productionApi("review-notebook", {
+                const result = await productionApi<{ teacherFeedback: boolean; feedbackPending: boolean }>("review-notebook", {
                   method: "POST",
                   body: { submissionId: id, note: d.get("note") },
                 });
                 form.reset();
                 submission.reload();
-                return "教师反馈已保存。";
+                if (!result.teacherFeedback) return ui(locale, "笔记已保存。", "Note saved.");
+                return result.feedbackPending
+                  ? ui(locale, "反馈已保存，成绩发布后会通知学生。", "Feedback saved. The student will be notified when results are published.")
+                  : ui(locale, "反馈已保存，已通知学生。", "Feedback saved and the student has been notified.");
               });
             }}
           >

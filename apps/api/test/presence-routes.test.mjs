@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomBytes, randomUUID} from 'node:crypto';
+import {readFile} from 'node:fs/promises';
 import {createApiApplication} from '../dist/application.js';
 import {createPool} from '../../../packages/domain/src/db.mjs';
 import {migrate} from '../../../packages/domain/src/migrate.mjs';
@@ -18,6 +19,12 @@ test('Nest presence routes require auth and CSRF, expose only public fields, and
  let app;
  try {
   await migrate(pool);
+  const grants = await readFile(new URL('../../../packages/domain/grants.mjs', import.meta.url), 'utf8');
+  const grantsSql = grants.match(/await pool\.query\(`([\s\S]*?)`\);/)?.[1];
+  assert.ok(grantsSql);
+  await pool.query(grantsSql.replaceAll('SCHEMA public', `SCHEMA ${schema}`));
+  const appUrl = new URL(connection.href);
+  appUrl.searchParams.set('options', `-crole=campus_app -csearch_path=${schema}`);
   const password = randomBytes(20).toString('base64url');
   const passwordHash = await hashPassword(password);
   async function account(kind, name) {
@@ -28,7 +35,7 @@ test('Nest presence routes require auth and CSRF, expose only public fields, and
    return {id: account.id, identityId: identity.id, username};
   }
   const student = await account('student', 'Student'), teacher = await account('teacher', 'Teacher');
-  app = await createApiApplication({databaseUrl: connection.href, logger: false,
+  app = await createApiApplication({databaseUrl: appUrl.href, logger: false,
    config: loadConfig({SESSION_SECRET: randomBytes(32).toString('hex'), APP_ORIGIN: 'http://school.test', COOKIE_SECURE: 'false'})});
   await app.listen(0, '127.0.0.1');
   const base = await app.getUrl();
@@ -64,6 +71,28 @@ test('Nest presence routes require auth and CSRF, expose only public fields, and
   assert.equal(list.data.onlineCount, 1);
   assert.deepEqual(Object.keys(list.data.items[0]).sort(), ['avatar', 'displayName', 'identityId']);
   assert.equal(list.data.items[0].identityId, student.identityId);
+  const previewPath = `/presence/students/${student.identityId}`;
+  assert.equal((await request(previewPath)).status, 401);
+  const preview = await request(previewPath, {auth: staff});
+  assert.equal(preview.status, 200, JSON.stringify(preview.data));
+  assert.equal(preview.cache, 'no-store');
+  assert.deepEqual(Object.keys(preview.data).sort(), ['activity', 'stats', 'student']);
+  assert.deepEqual(Object.keys(preview.data.student).sort(), ['avatar', 'displayName', 'identityId', 'isSelf']);
+  assert.equal(preview.data.student.identityId, student.identityId);
+  assert.equal(preview.data.student.displayName, 'Student');
+  assert.equal(preview.data.student.isSelf, false);
+  assert.equal((await request(previewPath, {auth: first})).data.student.isSelf, true);
+  assert.deepEqual(preview.data.activity, []);
+  assert.equal((await request(`/presence/students/${teacher.identityId}`, {auth: first})).status, 404);
+  assert.equal((await request(`/presence/students/${randomUUID()}`, {auth: first})).status, 404);
+  assert.equal((await request('/presence/students/not-a-uuid', {auth: first})).status, 400);
+  // Ownership is checked independently from legacy roles, so an orphaned
+  // account cannot act as a caller or be exposed as an online target.
+  await pool.query('DELETE FROM legacy_school_account_ownership WHERE account_id=$1', [student.id]);
+  assert.equal((await request(previewPath, {auth: first})).status, 403);
+  assert.equal((await request(previewPath, {auth: staff})).status, 404);
+  assert.equal((await request('/presence', {auth: staff})).data.onlineCount, 0);
+  await pool.query('INSERT INTO legacy_school_account_ownership(account_id) VALUES($1)', [student.id]);
   assert.equal((await request('/presence?pageSize=51', {auth: staff})).status, 400);
   assert.equal((await request('/auth/logout', {method: 'POST', body: {}, auth: first})).status, 200);
   assert.equal((await request('/presence', {auth: staff})).data.onlineCount, 1);

@@ -44,9 +44,9 @@ const adminEnglish: Record<string, string> = {
   "正在删除…": "Deleting…",
   "档案已删除，可在“已删除”列表恢复。": "Record deleted. Restore it from Deleted records.",
   "档案已恢复。原激活码已失效，请重新生成激活码。": "Record restored. Generate a new activation code; the old code is invalid.",
-  "删除的档案保留原编号及关联记录，可恢复后编辑；旧激活码失效，Luq 不重复发放。": "Deleted records retain their ID and relationships. Restore to edit them. Old activation codes are invalid; Luq is not granted again.",
+  "删除的档案保留原编号及关联记录，可恢复后编辑；旧激活码失效，奖学金不重复发放。": "Deleted records retain their ID and relationships. Restore to edit them. Old activation codes are invalid; Scholarship is not granted again.",
   "仅可删除从未激活过的学生或教师档案。删除后可恢复，原编号和关联记录保留。": "Only student or teacher records that have never been activated can be deleted. They remain recoverable with their ID and relationships intact.",
-  "删除后，此人将从正常档案和可选学生名单隐藏，原激活码立即失效。Luq 流水、班级关联及历史活动名单保留。": "Deletion hides this person from active records and student selection, and invalidates their activation code. Luq entries, class relationships and existing activity rosters are retained.",
+  "删除后，此人将从正常档案和可选学生名单隐藏，原激活码立即失效。奖学金流水、班级关联及历史活动名单保留。": "Deletion hides this person from active records and student selection, and invalidates their activation code. Scholarship entries, class relationships and existing activity rosters are retained.",
   "管理员身份不能删除": "Administrator identities cannot be deleted",
   "此档案有账号历史，请编辑资料或停用账号；解除关联后也不能删除。": "This record has account history. Edit its details or disable the account; unlinking does not make it deletable.",
   "此档案不能删除，请编辑资料或停用账号。": "This record cannot be deleted. Edit its details or disable the account.",
@@ -330,9 +330,18 @@ const adminEnglish: Record<string, string> = {
   "刷新提交状态": "Refresh submission", "· 保留": " · retain ", "备份：": "Backup: ", "时间：": "Time: ", "范围：": "Scope: ", "恢复验证：": "Restore verified: ",
 };
 
+// Keep older message keys readable while using the current display name.
+const adminDisplayAliases: Record<string, string> = {
+  "删除的档案保留原编号及关联记录，可恢复后编辑；旧激活码失效，Luq 不重复发放。": "删除的档案保留原编号及关联记录，可恢复后编辑；旧激活码失效，奖学金不重复发放。",
+  "删除后，此人将从正常档案和可选学生名单隐藏，原激活码立即失效。Luq 流水、班级关联及历史活动名单保留。": "删除后，此人将从正常档案和可选学生名单隐藏，原激活码立即失效。奖学金流水、班级关联及历史活动名单保留。",
+};
+
 export function useAdminText() {
   const { locale, t } = useLocale();
-  return (text: string) => locale === "en" ? (adminEnglish[text] ?? t(text)) : t(text);
+  return (text: string) => {
+    const display = adminDisplayAliases[text] ?? text;
+    return locale === "en" ? (adminEnglish[display] ?? t(display)) : t(display);
+  };
 }
 
 export const inputClass = "h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/30";

@@ -4,13 +4,14 @@ import Link from "next/link";
 import { AlertCircle, ArrowLeft, CheckCircle2, Eye, EyeOff, KeyRound, LoaderCircle, UserRound } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { apiMessage, productionApi } from "@/lib/production-api";
+import { ApiError, apiMessage, productionApi } from "@/lib/production-api";
 import { useLocale } from "@/components/locale-context";
+import { useData } from "@/components/admin/common";
 import { AuthShell } from "./auth-shell";
-import { registrationIssue, type RegistrationField, type RegistrationIssue, type RegistrationValues } from "./registration-fields";
+import { activationSchoolLabel, activationSchoolName, registrationIssue, type ActivationSchool, type RegistrationField, type RegistrationIssue, type RegistrationValues } from "./registration-fields";
 import styles from "./auth-shell.module.css";
 
-interface VerifiedPerson { kind: "student" | "teacher"; number: string; name: string; classes: string[]; }
+interface VerifiedPerson { kind: "student" | "teacher"; number: string; name: string; classes: {name: string}[]; }
 type Issue = RegistrationIssue | { kind: "server"; message: string; field?: RegistrationField };
 
 export function ProductionRegisterPage() {
@@ -21,15 +22,20 @@ export function ProductionRegisterPage() {
   const [show, setShow] = useState(false), [showActivation, setShowActivation] = useState(false);
   const [busy, setBusy] = useState(false), [issue, setIssue] = useState<Issue | null>(null);
   const [person, setPerson] = useState<VerifiedPerson | null>(null);
-  const [values, setValues] = useState<RegistrationValues>({ number: "", name: "", activationCode: "", username: "", password: "", confirmation: "", email: "" });
+  const [school, setSchool] = useState<ActivationSchool | null>(null);
+  const schoolDirectory = useData<{ items: ActivationSchool[] }>("auth/activation-schools");
+  const schools = schoolDirectory.data?.items ?? [];
+  const soleSchoolSlug = !schoolDirectory.loading && !schoolDirectory.error && schools.length === 1 ? schools[0].slug : "";
+  const [values, setValues] = useState<RegistrationValues>({ schoolSlug: "", number: "", name: "", activationCode: "", username: "", password: "", confirmation: "", email: "" });
   const title = useRef<HTMLHeadingElement>(null), firstRender = useRef(true), submitting = useRef(false);
   useEffect(() => { if (firstRender.current) { firstRender.current = false; return; } title.current?.focus(); }, [step]);
   const labels: Record<RegistrationField, string> = {
+    schoolSlug: tx("学校", "School"),
     number: t(kind === "student" ? "学号" : "工号"), name: t("姓名"), activationCode: t("激活码"),
     username: t("用户名"), password: t("密码"), confirmation: t("确认密码"), email: t("联系邮箱（可选）"),
   };
   const error = !issue ? "" : issue.kind === "server" ? t(issue.message) : {
-    required: tx(`请填写${labels[issue.field]}。`, `Enter your ${labels[issue.field].toLowerCase()}.`),
+    required: issue.field === "schoolSlug" ? tx("请选择学校。", "Select your school.") : tx(`请填写${labels[issue.field]}。`, `Enter your ${labels[issue.field].toLowerCase()}.`),
     username: tx("用户名需为 3–40 位英文字母、数字、点、下划线或短横线，并以字母或数字开头。", "Use 3–40 letters, numbers, dots, underscores or hyphens, starting with a letter or number."),
     password: tx("密码需要 8–128 位。", "Use 8–128 characters for your password."),
     confirmation: t("两次输入的密码不一致，请重新确认。"),
@@ -41,22 +47,24 @@ export function ProductionRegisterPage() {
   function change(field: RegistrationField, value: string) { setValues(old => ({ ...old, [field]: value })); setIssue(null); }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submitting.current || step === "done") return;
-    const invalid = registrationIssue(step, values);
+    if (submitting.current || step === "done" || step === "verify" && (schoolDirectory.loading || schoolDirectory.error || !schools.length)) return;
+    const schoolSlug = step === "verify" ? soleSchoolSlug || values.schoolSlug : values.schoolSlug;
+    const invalid = registrationIssue(step, { ...values, schoolSlug });
     if (invalid) { setIssue(invalid); focusField(invalid.field); return; }
     submitting.current = true; setBusy(true); setIssue(null);
     try {
-      const identity = { kind, number: values.number.trim(), name: values.name.trim(), activationCode: values.activationCode.trim() };
+      const identity = { schoolSlug: schoolSlug.trim().toLowerCase(), kind, number: values.number.trim(), name: values.name.trim(), activationCode: values.activationCode.trim() };
       if (step === "verify") {
-        const result = await productionApi<{ person: VerifiedPerson }>("auth/verify-identity", { method: "POST", body: identity });
-        setPerson(result.person); setShowActivation(false); setStep("account");
+        const result = await productionApi<{ person: VerifiedPerson; school: ActivationSchool }>("auth/verify-identity", { method: "POST", body: identity });
+        setValues(old => ({ ...old, schoolSlug: identity.schoolSlug }));
+        setPerson(result.person); setSchool(result.school); setShowActivation(false); setStep("account");
       } else {
         await productionApi("auth/register", { method: "POST", body: { ...identity, username: values.username.trim(), password: values.password, email: values.email.trim() || null } });
         setValues(old => ({ ...old, activationCode: "", password: "", confirmation: "" })); setShow(false); setStep("done");
       }
     } catch (reason) {
       const field = step === "verify" ? "activationCode" : undefined;
-      setIssue({ kind: "server", message: apiMessage(reason), field }); focusField(field);
+      setIssue({ kind: "server", message: reason instanceof ApiError && reason.code === "CLAIM_FAILED" ? tx("学校、身份信息或激活码无效，请联系本校管理员。", "The school, identity details or activation code are invalid. Contact your school administrator.") : apiMessage(reason), field }); focusField(field);
     } finally { submitting.current = false; setBusy(false); }
   }
   function field(name: RegistrationField, options: { type?: string; autoComplete?: string; required?: boolean; minLength?: number; maxLength?: number } = {}) {
@@ -64,7 +72,7 @@ export function ProductionRegisterPage() {
     return <div><label htmlFor={`register-${name}`} className={styles.label}>{labels[name]}</label>
       <div className={styles.inputWrap}><input id={`register-${name}`} name={name} value={values[name]} onChange={event => change(name, event.target.value)}
         type={secret ? revealed ? "text" : "password" : options.type ?? "text"} autoComplete={options.autoComplete ?? "off"}
-        autoCapitalize={name === "username" ? "none" : undefined} spellCheck={false} required={options.required ?? true}
+        autoCapitalize={name === "username" || name === "schoolSlug" ? "none" : undefined} spellCheck={false} required={options.required ?? true}
         minLength={options.minLength} maxLength={options.maxLength ?? 128} aria-invalid={issue?.field === name}
         aria-describedby={issue?.field === name ? "register-error" : name === "password" ? "password-hint" : undefined}
         className={`${styles.input} ${secret ? styles.passwordInput : ""}`} />
@@ -76,7 +84,7 @@ export function ProductionRegisterPage() {
   }
   const feedback = <div className={styles.feedback}>{error && <p id="register-error" tabIndex={-1} role="alert" className={styles.error}><AlertCircle size={16} aria-hidden="true" /><span>{error}</span></p>}</div>;
   return <AuthShell titleId="register-title">
-    <header><h2 ref={title} tabIndex={-1} id="register-title" className={styles.title}>{t(step === "verify" ? "注册账号" : step === "account" ? "设置登录账号" : "注册完成")}</h2>
+    <header><h2 ref={title} tabIndex={-1} id="register-title" className={styles.title}>{step === "verify" ? tx("激活学校身份", "Activate school identity") : t(step === "account" ? "设置登录账号" : "注册完成")}</h2>
       <p className={styles.description}>{step === "done" ? t("请使用自行设置的用户名和密码登录。") : tx("先验证学校身份，再设置登录账号。", "Verify your school identity, then set up your account.")}</p></header>
     <ol aria-label={t("注册进度")} className={styles.steps}>{[["verify", "验证身份"], ["account", "设置账号"], ["done", "完成"]].map(([value, label], index) => {
       const done = step === "done" && value !== "done" || step === "account" && value === "verify";
@@ -84,15 +92,28 @@ export function ProductionRegisterPage() {
     })}</ol>
     {step === "verify" && <form onSubmit={submit} noValidate className={styles.registerForm} aria-busy={busy}>
       <fieldset disabled={busy} className={styles.fields}>
+        <div><label htmlFor="register-schoolSlug" className={styles.label}>{labels.schoolSlug}</label>
+          <div className={styles.inputWrap}><select id="register-schoolSlug" name="schoolSlug" value={soleSchoolSlug || values.schoolSlug} required
+            disabled={schoolDirectory.loading || !!schoolDirectory.error || !schools.length}
+            aria-invalid={issue?.field === "schoolSlug"}
+            aria-describedby={issue?.field === "schoolSlug" ? "register-error" : "register-school-hint"}
+            className={styles.input} onChange={event => { setValues(old => ({ ...old, schoolSlug: event.target.value, activationCode: "" })); setPerson(null); setSchool(null); setShowActivation(false); setIssue(null); }}>
+            {!soleSchoolSlug && <option value="">{schoolDirectory.loading ? tx("正在加载学校…", "Loading schools…") : tx("请选择学校", "Select your school")}</option>}
+            {schools.map(item => <option key={item.id} value={item.slug}>{activationSchoolLabel(item, schools, locale)}</option>)}
+          </select></div>
+          {schoolDirectory.error ? <p role="alert" className={styles.hint}>{tx("学校列表加载失败。", "Could not load schools.")} <Button type="button" variant="link" className={styles.textButton} onClick={schoolDirectory.reload}>{tx("重试", "Retry")}</Button></p>
+            : !schoolDirectory.loading && !schools.length && <p role="status" className={styles.hint}>{tx("暂无可选择的学校，请联系学校管理员。", "No schools are available. Contact your school administrator.")}</p>}
+        </div>
+        <p id="register-school-hint" className={styles.hint}>{tx("选择学校，并填写本校管理员提供的激活码。学号或工号仅在所选学校内匹配。", "Select your school and use its activation code. Your student or staff ID is matched only within the selected school.")}</p>
         <div role="group" aria-label={t("身份类型")} className={styles.identityKind}>{(["student", "teacher"] as const).map(role => <Button key={role} type="button" aria-pressed={role === kind} variant={role === kind ? "primary" : "secondary"} className={styles.kindButton} onClick={() => { setKind(role); setPerson(null); setShowActivation(false); setValues(old => ({ ...old, number: "", name: "", activationCode: "" })); setIssue(null); }}>{t(role === "student" ? "我是学生" : "我是教师")}</Button>)}</div>
         <details className={styles.help}><summary>{tx("如何获取激活码？", "How do I get an activation code?")}</summary><p>{t(kind === "student" ? "首次注册时，请填写名单中的学号和姓名，以及教师或管理员提供的激活码，认领已有身份。验证通过后，由你自行设置用户名与密码，管理员不代建账号。日常登录无需重复验证身份。" : "首次注册时，请填写名单中的工号和姓名，以及管理员提供的激活码，认领已有身份。验证通过后，由你自行设置用户名与密码，管理员不代建账号。日常登录无需重复验证身份。")}</p></details>
         <div className={styles.identityGrid}>{field("number", { maxLength: 200 })}{field("name", { autoComplete: "name", maxLength: 100 })}</div>
         {field("activationCode", { autoComplete: "one-time-code", maxLength: 100 })}
       </fieldset>{feedback}
-      <Button type="submit" disabled={busy} className={styles.submit} aria-label={t(busy ? "正在验证…" : "验证身份")}>{busy ? <LoaderCircle size={17} className={styles.spinner} aria-hidden="true" /> : <KeyRound size={17} aria-hidden="true" />}<span role="status">{t(busy ? "正在验证…" : "验证身份")}</span></Button>
+      <Button type="submit" disabled={busy || schoolDirectory.loading || !!schoolDirectory.error || !schools.length} className={styles.submit} aria-label={t(busy ? "正在验证…" : "验证身份")}>{busy ? <LoaderCircle size={17} className={styles.spinner} aria-hidden="true" /> : <KeyRound size={17} aria-hidden="true" />}<span role="status">{t(busy ? "正在验证…" : "验证身份")}</span></Button>
     </form>}
     {step === "account" && <form onSubmit={submit} noValidate className={styles.registerForm} aria-busy={busy}>
-      <p className={styles.notice}>{t("身份验证通过")}：<strong>{person?.name}</strong> · {person?.number}{person?.classes.length ? `（${person.classes.join("、")}）` : ""}</p>
+      <p className={styles.notice}>{school && activationSchoolName(school, locale)} · {t("身份验证通过")}：<strong>{person?.name}</strong> · {person?.number}{person?.classes.length ? `（${person.classes.map(item => item.name).join("、")}）` : ""}</p>
       <fieldset disabled={busy} className={`${styles.fields} ${styles.registerFields}`}>
         {field("username", { autoComplete: "username", minLength: 3, maxLength: 40 })}
         <div className={styles.fieldGrid}>{field("password", { autoComplete: "new-password", minLength: 8 })}{field("confirmation", { type: show ? "text" : "password", autoComplete: "new-password", minLength: 8 })}</div>
@@ -103,6 +124,7 @@ export function ProductionRegisterPage() {
       <div className={styles.back}><Button type="button" variant="link" disabled={busy} className={styles.textButton} onClick={() => { setIssue(null); setShow(false); setShowActivation(false); setPerson(null); setStep("verify"); }}><ArrowLeft size={14} />{t("返回验证身份")}</Button></div>
     </form>}
     {step === "done" && <div className={styles.done}><CheckCircle2 size={34} aria-hidden="true" /><p>{values.name} · {values.number} {t("已关联账号")} <strong>{values.username}</strong>。{t("历史作业与提交记录仍属于你的身份档案。")}</p><Link href="/login" className={styles.submit + " inline-flex items-center justify-center text-sm font-semibold"}>{t("前往登录")}</Link></div>}
+    {step !== "done" && <p className="mt-3 text-sm text-muted-foreground">{tx("没有学校激活码？", "No school activation code?")} <Link href="/register" className="font-semibold text-primary hover:underline">{tx("创建个人账号", "Create a personal account")}</Link></p>}
     {step !== "done" && <p className={styles.register}><span>{t("已有账号？")}</span><Link href="/login" aria-disabled={busy} onClick={event => { if (busy) event.preventDefault(); }}>{t("返回登录")}</Link></p>}
   </AuthShell>;
 }

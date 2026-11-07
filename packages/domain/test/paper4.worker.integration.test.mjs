@@ -5,13 +5,17 @@ import pg from 'pg';
 import { migrate } from '../src/migrate.mjs';
 import { claimTask, completeTask } from '../worker.mjs';
 import { claimPaper4Task, completePaper4Task, failPaper4Task, loadPaper4Task,
-  renewPaper4Lease } from '../paper4-worker.mjs';
+  renewPaper4Lease, processPaper4One } from '../paper4-worker.mjs';
+import { claimSchoolTask, finishSchoolTask } from '../school-worker.mjs';
+import { GoJudge } from '../judge.mjs';
 
 // A disposable schema on an explicitly provided test database. Production
 // tables, volumes, accounts and scores are never truncated or reset.
 const databaseUrl = process.env.JUDGE_TEST_DATABASE_URL;
 const enabled = Boolean(databaseUrl);
+const realEnabled = Boolean(databaseUrl && process.env.GO_JUDGE_TEST_URL && process.env.GO_JUDGE_TEST_TOKEN);
 let adminPool, pool, schema, accountId, identityId, ordinaryVersionId, problemId, paperId, paperVersionId, attemptId;
+let schoolId, schoolProblemId, schoolVersionId;
 const result = { status: 'Executed', publicOutput: 'ok\n', publicMessage: 'No score',
   privateResults: [{ caseId: 'sample', public: true, status: 'Executed', checks: [] }], environmentVersion: 'test-runtime' };
 
@@ -125,4 +129,61 @@ test('Paper 4 infrastructure retries are fenced and never become zero or AC', { 
   const runs = (await pool.query('SELECT status FROM paper4_runs WHERE task_id=$1', [queued.id])).rows;
   assert.deepEqual(runs.map(run => run.status), ['System Error']);
   assert.equal((await pool.query('SELECT count(*) FROM submissions')).rows[0].count, '2');
+});
+
+async function enqueueSchool() {
+  if (!schoolId) {
+    schoolId = (await pool.query("INSERT INTO schools(slug,name) VALUES('shared-queue-school','Shared queue test') RETURNING id")).rows[0].id;
+    const bankId = (await pool.query("INSERT INTO school_problem_banks(school_id,owner_account_id,name,request_id) VALUES($1,$2,'Test bank',$3) RETURNING id", [schoolId,accountId,randomUUID()])).rows[0].id;
+    schoolProblemId = (await pool.query("INSERT INTO school_problems(school_id,bank_id,owner_account_id,draft,request_id) VALUES($1,$2,$3,'{}',$4) RETURNING id", [schoolId,bankId,accountId,randomUUID()])).rows[0].id;
+    schoolVersionId = (await pool.query("INSERT INTO school_problem_versions(school_id,problem_id,draft_revision,definition) VALUES($1,$2,1,'{}') RETURNING id", [schoolId,schoolProblemId])).rows[0].id;
+  }
+  // This fixture tests leasing only; it is never passed to the executor.
+  return (await pool.query(`INSERT INTO school_judge_jobs(school_id,problem_id,version_id,account_id,request_id,request_hash,kind,access_context,payload)
+    VALUES($1,$2,$3,$4,$5,'shared-capacity-test','samples','school','{}') RETURNING *`,
+  [schoolId,schoolProblemId,schoolVersionId,accountId,randomUUID()])).rows[0];
+}
+
+test('school claim consumes shared capacity and fences both ordinary and Paper 4 claims', { skip: !enabled }, async () => {
+  const school = await enqueueSchool(); const paper = await enqueuePaper(); const ordinary = await enqueueOrdinary();
+  const nodeId = 'three-queues-school-first';
+  const leasedSchool = await claimSchoolTask(pool, { nodeId });
+  assert.equal(leasedSchool.id, school.id);
+  assert.deepEqual(await Promise.all([claimTask(pool,{nodeId}),claimPaper4Task(pool,{nodeId})]), [null,null]);
+  assert.equal(await finishSchoolTask(pool,leasedSchool,ordinaryResult),true);
+  const [leasedOrdinary,leasedPaper] = await Promise.all([claimTask(pool,{nodeId}),claimPaper4Task(pool,{nodeId})]);
+  assert.equal(Number(Boolean(leasedOrdinary))+Number(Boolean(leasedPaper)),1,'one newly freed slot cannot be claimed twice');
+  if(leasedOrdinary){
+    assert.equal(leasedOrdinary.id,ordinary.id);await completeTask(pool,leasedOrdinary,ordinaryResult);
+    const next=await claimPaper4Task(pool,{nodeId});assert.equal(next.id,paper.id);await completePaper4Task(pool,next,result);
+  }else{
+    assert.equal(leasedPaper.id,paper.id);await completePaper4Task(pool,leasedPaper,result);
+    const next=await claimTask(pool,{nodeId});assert.equal(next.id,ordinary.id);await completeTask(pool,next,ordinaryResult);
+  }
+});
+
+test('ordinary and Paper 4 leases also block school jobs until their shared slot is free', { skip: !enabled }, async () => {
+  const school = await enqueueSchool(); await enqueuePaper(); await enqueueOrdinary();
+  const nodeId = 'three-queues-ordinary-first';
+  const ordinary = await claimTask(pool,{nodeId});assert.ok(ordinary);
+  assert.equal(await claimSchoolTask(pool,{nodeId}),null);assert.equal(await claimPaper4Task(pool,{nodeId}),null);
+  await completeTask(pool,ordinary,ordinaryResult);
+  const paper = await claimPaper4Task(pool,{nodeId});assert.ok(paper);
+  assert.equal(await claimSchoolTask(pool,{nodeId}),null);
+  await completePaper4Task(pool,paper,result);
+  const leased = await claimSchoolTask(pool,{nodeId});assert.equal(leased.id,school.id);
+  await finishSchoolTask(pool,leased,ordinaryResult);
+});
+
+test('real Paper 4 worker + go-judge persists a genuine automatic-stage AC', { skip: !realEnabled, timeout: 90000 }, async () => {
+  const snapshot = (await pool.query(`INSERT INTO paper4_snapshots(attempt_id,question_key,stage_key,source_code,revision)
+    VALUES($1,'Q2','s1',$2,0) RETURNING id`, [attemptId,"open('Blue.txt','w').write('1\\n')"])).rows[0];
+  const queued = (await pool.query('INSERT INTO paper4_run_tasks(snapshot_id) VALUES($1) RETURNING id',[snapshot.id])).rows[0];
+  const judge = new GoJudge({url:process.env.GO_JUDGE_TEST_URL,token:process.env.GO_JUDGE_TEST_TOKEN,environmentVersion:'paper4-worker-test'});
+  await judge.ready();
+  assert.equal(await processPaper4One({pool,judge,logger:{info(){},error(){}}}),true);
+  const saved=(await pool.query('SELECT t.state,r.status,r.private_results FROM paper4_run_tasks t JOIN paper4_runs r ON r.task_id=t.id WHERE t.id=$1',[queued.id])).rows[0];
+  assert.equal(saved.state,'completed');assert.equal(saved.status,'AC');
+  assert.equal(saved.private_results[0].stageId,'s1');assert.equal(saved.private_results[0].status,'AC');
+  assert.equal(saved.private_results[0].generatedFiles['Blue.txt'],'1\n');
 });

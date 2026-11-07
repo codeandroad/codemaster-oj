@@ -3,9 +3,21 @@ export type BreadcrumbLocale = "zh" | "en";
 export type PageBreadcrumb = { label: string; href: string };
 type Label = readonly [zh: string, en: string];
 const sections: Record<string, Label> = {
-  "/student/luq": ["我的 Luq", "My Luq"],
-  "/teacher/luq": ["Luq 助学管理", "Luq support"],
-  "/admin/luq": ["Luq 管理", "Luq administration"],
+  "/practice": ["公开学习", "Public learning"],
+  "/practice/courses": ["课程", "Courses"],
+  "/practice/problems": ["题目", "Problems"],
+  "/practice/submissions": ["提交记录", "Submissions"],
+  "/practice/review-notebook": ["订正本", "Review notebook"],
+  "/practice/leaderboard": ["公开练习榜", "Leaderboard"],
+  "/practice/scholarship": ["我的奖学金", "Scholarship"],
+  "/practice/settings": ["个人设置", "Personal settings"],
+  "/practice/profile": ["个人资料", "Profile"],
+  "/activate": ["激活学校身份", "Activate school identity"],
+  "/platform": ["平台管理", "Platform administration"],
+  "/schools": ["学校工作区", "School workspaces"],
+  "/student/luq": ["我的奖学金", "Scholarship"],
+  "/teacher/luq": ["奖学金管理", "Scholarship management"],
+  "/admin/luq": ["奖学金管理", "Scholarship management"],
   "/login": ["登录", "Sign in"], "/register": ["注册", "Register"],
   "/student/problems": ["题目", "Problems"],
   "/student/learning-paths": ["课程", "Courses"],
@@ -30,6 +42,7 @@ const sections: Record<string, Label> = {
   "/admin/problem-banks": ["题库管理", "Problem banks"],
   "/admin/judge-service": ["判题服务", "Judge service"],
   "/admin/settings": ["系统设置", "System settings"],
+  "/admin/course-admissions": ["课程申请", "Course applications"],
 };
 for (const role of ["student", "teacher", "admin"]) {
   sections[`/${role}/profile`] = ["个人资料", "Profile"];

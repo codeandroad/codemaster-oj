@@ -67,6 +67,7 @@ interface RewardRule {
   amount: number;
   minimumAc: number;
   minimumScore: number;
+  requireAll: boolean;
   taskKind: "challenge" | "learning" | "correction";
   allowSolutionAssisted: boolean;
   version: number;
@@ -175,12 +176,12 @@ export function TeacherLuqPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-lg font-bold">
-        {tx("Luq 助学管理", "Luq learning support")}
+        {tx("奖学金管理", "Scholarship management")}
       </h1>
       <p className="text-sm text-muted-foreground">
         {tx(
-          "先选择负责的题目或活动。内容审核发布与活动开放规则分别管理；Luq 不改变原有成绩或榜分。",
-          "Select a problem or activity you manage. Reviewed content and activity access rules are managed separately; Luq does not change existing grades or ranking points.",
+          "先选择负责的题目或活动。内容审核发布与活动开放规则分别管理；奖学金不改变原有成绩或榜分。",
+          "Select a problem or activity you manage. Reviewed content and activity access rules are managed separately; scholarship does not change existing grades or ranking points.",
         )}
       </p>
       <div className="flex flex-wrap gap-2" role="group" aria-label={tx("管理方式", "Management mode")}>
@@ -588,7 +589,7 @@ function PolicyForm({
             <option value="free">{tx("免费", "Free")}</option>
           </select>
         </Field>
-        {["problem", "paper4"].includes(targetType) && <Field label={tx("解锁 Luq（留空默认）", "Unlock Luq (blank = default)")}><input className={input} type="number" min={0} max={1000} step={1} value={price} onChange={event => setPrice(event.target.value)} placeholder={tx("全校默认", "School default")}/></Field>}
+        {["problem", "paper4"].includes(targetType) && <Field label={tx("解锁价格（奖学金；留空默认）", "Unlock cost (scholarship; blank = default)")}><input className={input} type="number" min={0} max={1000} step={1} value={price} onChange={event => setPrice(event.target.value)} placeholder={tx("全校默认", "School default")}/></Field>}
         <Field label={tx("开放时间（可选）", "Opens at (optional)")}>
           <input
             type="datetime-local"
@@ -606,7 +607,7 @@ function PolicyForm({
   );
 }
 
-function ActivityRewardEditor({
+export function ActivityRewardEditor({
   activityType,
   activityId,
 }: {
@@ -620,7 +621,7 @@ function ActivityRewardEditor({
   return (
     <section className={`${panel} space-y-3 p-4`}>
       <h2 className="font-semibold">
-        {tx("活动额外 Luq 奖励", "Extra activity Luq reward")}
+        {activityType === "assignment" ? tx("作业完成奖学金", "Assignment completion scholarship") : tx("活动额外奖学金奖励", "Extra activity scholarship reward")}
       </h2>
       <State resource={rules} />
       {rules.data && (
@@ -647,7 +648,10 @@ function RewardForm({
   reload: () => void;
 }) {
   const tx = useText(),
-    [rule, setRule] = useState(data.rule),
+    [rule, setRule] = useState({
+      ...data.rule,
+      requireAll: data.rule.requireAll || (activityType === "assignment" && !data.frozen && data.rule.version === 0),
+    }),
     action = useAction(),
     locked = data.frozen || !data.canManage;
   return (
@@ -666,6 +670,7 @@ function RewardForm({
             },
           });
           reload();
+          return tx("奖学金规则已保存。", "Scholarship rule saved.");
         });
       }}
     >
@@ -680,8 +685,8 @@ function RewardForm({
               "Publish and freeze the rule before the activity starts. Extra rewards default to zero and are not based on speed or attempt count.",
             )}{" "}
         {tx(
-          `管理员上限 ${data.cap} Luq / 人 / 活动。`,
-          `Administrator cap: ${data.cap} Luq per student/activity.`,
+          `管理员上限 ${data.cap} 奖学金 / 人 / 活动。`,
+          `Administrator cap: ${data.cap} scholarship per student/activity.`,
         )}
       </p>
       <fieldset
@@ -708,7 +713,7 @@ function RewardForm({
             <option value="correction">{tx("订正", "Correction")}</option>
           </select>
         </Field>
-        <Field label={tx("额外奖励 Luq", "Extra Luq")}>
+        <Field label={tx("额外奖学金", "Extra scholarship")}>
           <input
             className={input}
             type="number"
@@ -721,44 +726,54 @@ function RewardForm({
             }
           />
         </Field>
-        <Field label={tx("至少 AC 题数", "Minimum accepted problems")}>
-          <input
-            className={input}
-            type="number"
-            min={1}
-            max={50}
-            step={1}
-            value={rule.minimumAc}
-            onChange={(event) =>
-              setRule({ ...rule, minimumAc: Number(event.target.value) })
+        {activityType === "assignment" && (
+          <Field label={tx("发放条件", "Award condition")}>
+            <select className={input} value={rule.requireAll ? "complete" : "threshold"} onChange={event => setRule({ ...rule, requireAll: event.target.value === "complete" })}>
+              <option value="complete">{tx("通过全部必做题", "Pass every required problem")}</option>
+              <option value="threshold">{tx("达到指定题数和得分", "Meet a problem and score threshold")}</option>
+            </select>
+          </Field>
+        )}
+        {!rule.requireAll && (<>
+          <Field label={tx("至少 AC 题数", "Minimum accepted problems")}>
+            <input
+              className={input}
+              type="number"
+              min={1}
+              max={50}
+              step={1}
+              value={rule.minimumAc}
+              onChange={(event) =>
+                setRule({ ...rule, minimumAc: Number(event.target.value) })
+              }
+            />
+          </Field>
+          <Field
+            label={
+              activityType === "paper4_activity"
+                ? tx(
+                    "\u6700\u4f4e\u5927\u9898 AC \u6bd4\u4f8b\uff08%\uff09",
+                    "Minimum accepted-question percentage",
+                  )
+                : tx(
+                    "\u6700\u4f4e\u5f97\u5206\u767e\u5206\u6bd4",
+                    "Minimum score (%)",
+                  )
             }
-          />
-        </Field>
-        <Field
-          label={
-            activityType === "paper4_activity"
-              ? tx(
-                  "\u6700\u4f4e\u5927\u9898 AC \u6bd4\u4f8b\uff08%\uff09",
-                  "Minimum accepted-question percentage",
-                )
-              : tx(
-                  "\u6700\u4f4e\u5f97\u5206\u767e\u5206\u6bd4",
-                  "Minimum score (%)",
-                )
-          }
-        >
-          <input
-            className={input}
-            type="number"
-            min={0}
-            max={100}
-            step={0.01}
-            value={rule.minimumScore}
-            onChange={(event) =>
-              setRule({ ...rule, minimumScore: Number(event.target.value) })
-            }
-          />
-        </Field>
+          >
+            <input
+              className={input}
+              type="number"
+              min={0}
+              max={100}
+              step={0.01}
+              value={rule.minimumScore}
+              onChange={(event) =>
+                setRule({ ...rule, minimumScore: Number(event.target.value) })
+              }
+            />
+          </Field>
+        </>)}
         <label className="flex items-center gap-2 text-sm sm:col-span-2">
           <input
             type="checkbox"
@@ -777,10 +792,15 @@ function RewardForm({
       </fieldset>
       <p className="text-xs text-muted-foreground">
         {tx(
-          "全部达标条件须同时满足；每学生每活动一次，可与首次 AC Luq 叠加。限时考核在首次公布成绩后结算。",
-          "All conditions must be met. Awarded once per student/activity, and can stack with first-AC Luq. Timed assessments settle after the first result publication.",
+          "全部达标条件须同时满足；每学生每活动一次，可与首次 AC 奖学金叠加。限时考核在首次公布成绩后结算。",
+          "All conditions must be met. Awarded once per student/activity, and can stack with first-AC scholarship. Timed assessments settle after the first result publication.",
         )}
       </p>
+      {activityType === "assignment" && (
+        <p className="text-xs text-muted-foreground">
+          {tx("奖励按本作业截止前收到的有效正式提交计算。达标后自动发放，并通过站内通知告知学生。", "Eligible formal submissions received in this assignment by the deadline count toward the reward. Qualifying students receive it automatically with an in-app notification.")}
+        </p>
+      )}
       {!locked && (
         <Button type="submit" size="sm" disabled={action.busy}>
           {tx("保存奖励规则", "Save reward rule")}
@@ -868,13 +888,18 @@ export function StudentLuqRule({
   return (
     <details key={`${activityType}:${activityId}`} className="my-1 text-xs leading-5 text-muted-foreground">
       <summary className="w-fit cursor-pointer rounded-sm py-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
-        <span className="font-semibold text-foreground">{tx("额外奖励", "Extra reward")} +{r.amount} Luq</span>
+        <span className="font-semibold text-foreground">{r.requireAll ? tx("作业完成奖励", "Completion reward") : tx("额外奖励", "Extra reward")} +{r.amount} {tx("奖学金", "scholarship")}</span>
         <span className="ml-2">{tx("奖励条件", "Conditions")}</span>
       </summary>
       <p className="mt-1">
-        {tx(`至少 ${r.minimumAc} 题 AC`, `At least ${r.minimumAc} accepted problem${r.minimumAc === 1 ? "" : "s"}`)}
-        {r.minimumScore > 0 && tx(`，得分至少 ${r.minimumScore}%`, ` and ${r.minimumScore}% score`)}
-        {tx("；每人每活动一次。", "; once per student per activity.")}{" "}
+        {r.requireAll
+          ? tx("在截止前通过本作业全部必做题的正式判题。", "Pass every required problem through formal submissions received in this assignment by the deadline.")
+          : <>
+            {tx(`至少 ${r.minimumAc} 题 AC`, `At least ${r.minimumAc} accepted problem${r.minimumAc === 1 ? "" : "s"}`)}
+            {r.minimumScore > 0 && tx(`，得分至少 ${r.minimumScore}%`, ` and ${r.minimumScore}% score`)}
+            {"."}
+          </>}
+        {" "}{tx("每人每活动一次。", "Awarded once per student and activity.")}{" "}
         {r.allowSolutionAssisted
           ? tx("允许答案辅助后的提交参与奖励。", "Solution-assisted submissions qualify for this reward.")
           : tx("提交前获得完整答案的提交不参与奖励。", "Submissions made after receiving the full solution do not qualify.")}{" "}

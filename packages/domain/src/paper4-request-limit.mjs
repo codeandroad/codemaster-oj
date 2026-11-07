@@ -2,6 +2,6 @@
 // Ordinary requests keep their existing limit and authorization pipeline.
 export function paper4RequestBodyLimit(path,method,defaultLimit=2*1024*1024){
  const pathname=new URL(path,'http://api.local').pathname.replace(/\/$/,'');
- return method==='POST'&&['/api/v1/paper4/imports/batch-preview','/api/v1/paper4/papers/batch-import'].includes(pathname)
+ return method==='POST'&&(['/api/v1/paper4/imports/batch-preview','/api/v1/paper4/papers/batch-import'].includes(pathname)||/^\/api\/v1\/schools\/[^/]+\/paper4\/papers\/(?:import|import-preview)$/.test(pathname))
   ?12*1024*1024:defaultLimit;
 }

@@ -124,6 +124,11 @@ export class Paper4Controller {
     return this.handle(request, response);
   }
 
+  @Get('attempts/:id/questions/:questionKey/submissions')
+  questionSubmissions(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
+    return this.handle(request, response);
+  }
+
   @Get('attempts/:id')
   getAttempt(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
     return this.handle(request, response);

@@ -4,18 +4,17 @@ import { StudentLuqRule } from "@/components/luq/teaching-page";
 import { AppLink } from "@/components/navigation";
 
 import { useEffect, useState } from "react";
-import { ArrowRight, Clock3 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
 import { isPending, productionApi, type CampusUser, type Submission } from "@/lib/production-api";
-import { Empty, Feedback, State, Tabs, panel, useData, useMutation } from "./shared";
+import { Empty, Feedback, State, panel, useData, useMutation } from "./shared";
 import { hasTimedDraft } from "./drafts";
+import { StudentTimedPracticeCard, StudentTimedPracticeTabs, timedPracticeCategoryLabel as categoryLabel, type TimingCategory } from "./activity-cards";
 import {useLocale,type AppLocale} from "@/components/locale-context";
 
 function ui(locale:AppLocale,zh:string,en:string){return locale==="en"?en:zh;}
 function displayDate(value:string|null|undefined,locale:AppLocale){return value?new Intl.DateTimeFormat(locale==="en"?"en-US":"zh-CN",{dateStyle:"medium",timeStyle:"short",timeZone:"Asia/Shanghai"}).format(new Date(value)):"—";}
-function categoryLabel(locale:AppLocale,value:string){return ({Upcoming:ui(locale,"即将开始","Upcoming"),Available:ui(locale,"可参加","Available"),Completed:ui(locale,"已结束","Completed"),Archived:ui(locale,"历史归档","Archived") } as Record<string,string>)[value]??value;}
 function timedStatusLabel(locale:AppLocale,value:string){return ({Submitted:ui(locale,"已提交","Submitted"),"Draft only":ui(locale,"仅有草稿","Draft only"),"Not submitted":ui(locale,"未提交","Not submitted"),Waiting:ui(locale,"等待中","Waiting"),Judging:ui(locale,"评测中","Judging"),Executed:ui(locale,"已运行","Executed") } as Record<string,string>)[value]??value;}
 
 export interface TimedAttempt { id: string; status: "Active" | "Finished"; startedAt: string; deadlineAt: string; finishedAt?: string | null; serverNow: string; }
@@ -74,10 +73,31 @@ function TimedRewardResults({ practice }: { practice: TimedPractice }) {
 }
 export function StudentTimedList() {
   const {locale}=useLocale();
-  const [tab, setTab] = useState("Available");
+  const [tab, setTab] = useState<TimingCategory>("Available");
   const practices = useData<{ items: TimedPractice[] }>(tab === "Archived" ? "timed-practices?archived=true" : "timed-practices");
   const visible = practices.data?.items.filter(p => tab === "Archived" ? p.status === "Archived" : p.status !== "Archived" && category(p) === tab) ?? [];
-  return <><PageHeader eyebrow={ui(locale,"课堂训练","Classroom practice")} title={ui(locale,"限时训练","Timed Practice")} description={ui(locale,"以学校时区显示，开始和截止时间由服务器执行。","School-timezone activities; start times and deadlines are enforced by the server.")}/><Tabs items={["Upcoming", "Available", "Completed", "Archived"].map(value=>categoryLabel(locale,value))} value={categoryLabel(locale,tab)} onChange={value=>setTab(["Upcoming", "Available", "Completed", "Archived"].find(category=>categoryLabel(locale,category)===value)??"Available")} label={ui(locale,"训练状态","Timed practice status")}/><State data={practices}>{visible.length ? <div className="mt-4 grid gap-4">{visible.map(p => <section key={p.id} className="grid items-center gap-4 border border-border bg-surface p-5 panel-shadow md:grid-cols-[minmax(0,1fr)_220px_auto]"><div><div className="flex items-center gap-2"><Clock3 size={18} className="text-primary"/><h2 className="font-bold"><AppLink href={`/student/timed-practice/${p.id}`} className="hover:text-primary hover:underline focus-visible:underline">{p.title}</AppLink></h2><StatusPill status={categoryLabel(locale,p.status === "Archived" ? "Archived" : category(p))}/></div><p className="mt-2 text-sm text-muted-foreground">{p.classNames?.join(" / ") || p.classes?.map(item => item.name).join(" / ") || ui(locale,"按学生名单布置","Direct assignment")}</p>{p.coursePathId && p.courseTitle && <AppLink href={`/student/learning-paths/${p.coursePathId}`} className="mt-1 inline-block text-xs font-semibold text-primary hover:underline focus-visible:underline">{ui(locale,"课程：","Course: ")}{p.courseTitle}</AppLink>}</div><div className="text-sm"><p>{displayDate(p.startsAt,locale)}–{displayDate(p.endsAt,locale)}</p><p className="text-xs text-muted-foreground">Asia/Shanghai · {p.durationMinutes} {ui(locale,"分钟","min")} · {p.problems.length} {ui(locale,"题","problems")}</p></div><AppLink href={`/student/timed-practice/${p.id}`} className={buttonVariants({ variant: tab === "Available" ? "primary" : "secondary" })}>{ui(locale,"查看","View")} <ArrowRight size={15}/></AppLink></section>)}</div> : <Empty title={ui(locale,`暂无${categoryLabel(locale,tab)}的训练`,`No ${tab.toLowerCase()} practice`)} description={ui(locale,"老师发布的计时训练会根据服务器时间显示在对应分类。","Timed practices from your teacher appear in the corresponding category based on server time.")}/>}</State></>;
+  const categories = ["Upcoming", "Available", "Completed", "Archived"] as const;
+  return <>
+    <PageHeader title={ui(locale, "限时训练", "Timed Practice")} />
+    <StudentTimedPracticeTabs categories={categories} value={tab} onChange={setTab} />
+    <State data={practices}>{visible.length ? <div className="mt-4 grid gap-4">
+      {visible.map(practice => <StudentTimedPracticeCard
+        key={practice.id}
+        title={practice.title}
+        href={`/student/timed-practice/${practice.id}`}
+        status={categoryLabel(locale, practice.status === "Archived" ? "Archived" : category(practice))}
+        audience={practice.classNames?.join(" / ") || practice.classes?.map(item => item.name).join(" / ") || ui(locale, "按学生名单布置", "Direct assignment")}
+        course={practice.coursePathId && practice.courseTitle ? {
+          href: `/student/learning-paths/${practice.coursePathId}`, title: practice.courseTitle,
+        } : undefined}
+        startsAt={practice.startsAt}
+        endsAt={practice.endsAt}
+        durationMinutes={practice.durationMinutes}
+        problemCount={practice.problems.length}
+        active={tab === "Available"}
+      />)}
+    </div> : <Empty title={ui(locale, `暂无${categoryLabel(locale, tab)}的训练`, `No ${tab.toLowerCase()} practice`)} description={ui(locale, "老师发布的计时训练会根据服务器时间显示在对应分类。", "Timed practices from your teacher appear in the corresponding category based on server time.")} />}</State>
+  </>;
 }
 export function StudentTimedDetail({ id, user }: { id: string; user: CampusUser }) {
   const {locale}=useLocale();

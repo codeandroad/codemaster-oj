@@ -1,5 +1,7 @@
 "use client";
 
+import { LegacyActivationSchoolHint } from "@/components/auth/activation-school-hint";
+
 import { AppLink as Link } from "@/components/navigation";
 import { useEffect, useState } from "react";
 import { useRangeSelection } from "@/components/ui/use-range-selection";
@@ -9,6 +11,8 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
 import { useLocale } from "@/components/locale-context";
 import { genderLabel } from "@/lib/gender";
+import type { SchoolActivity } from "@/components/schools/school-activities-model";
+import { schoolWorkspaceHref } from "@/components/schools/school-workspace-location";
 import {
   productionApi,
   type Assignment,
@@ -48,11 +52,14 @@ export type TeacherAssignment = Assignment & {
   protectedParticipantIds?: string[];
   editRevision?: number;
 };
-export function TeacherDashboard() {
+export function TeacherDashboard({ schoolId }: { schoolId?: string }) {
   const { locale } = useLocale();
   const tx = (zh: string, en: string) => locale === "en" ? en : zh;
-  const classes = useData<{ items: SchoolClass[] }>("classes"),
-    assignments = useData<{ items: TeacherAssignment[] }>("assignments");
+  const base = schoolId ? `schools/${schoolId}` : null;
+  const classes = useData<{ items: Pick<SchoolClass, "id" | "name">[]; hasMore?: boolean }>(base ? `${base}/classes` : "classes");
+  const assignments = useData<{ items: TeacherAssignment[] }>(base ? null : "assignments");
+  const schoolAssignments = useData<{ items: SchoolActivity[]; hasMore: boolean }>(base ? `${base}/activities?kind=assignment` : null);
+  const schoolTimed = useData<{ items: SchoolActivity[]; hasMore: boolean }>(base ? `${base}/activities?kind=timed` : null);
   const report = useData<{
     metrics?: {
       incomplete: number;
@@ -73,13 +80,29 @@ export function TeacherDashboard() {
         problems: { status: string; submissionId: string | null }[];
       }[];
     }[];
-  }>("reports");
-  const imports = useData<{ items: { id: string }[] }>("problems/import");
+  }>(base ? null : "reports");
+  const imports = useData<{ items: { id: string }[] }>(base ? null : "problems/import");
   const [now] = useState(() => Date.now());
-  const active =
-    assignments.data?.items.filter(
-      (item) => item.state !== "Draft" && new Date(item.dueAt).getTime() > now,
-    ) ?? [];
+  const active = base
+    ? (schoolAssignments.data?.items ?? []).filter(item => item.phase === "Open").map(item => ({
+        id: item.id,
+        title: item.title,
+        dueAt: item.endsAt,
+        className: item.classIds?.map(id => classes.data?.items.find(cls => cls.id === id)?.name).filter(Boolean).join(", "),
+      }))
+    : (assignments.data?.items ?? []).filter(item => item.state !== "Draft" && new Date(item.dueAt).getTime() > now).map(item => ({
+        id: item.id,
+        title: item.title,
+        dueAt: item.dueAt,
+        className: item.className ?? classes.data?.items.find(cls => cls.id === item.classId)?.name,
+      }));
+  const href = (section: string, legacyPath: string, query = "") => schoolId
+    ? `${schoolWorkspaceHref(schoolId, section, "teacher")}${query}`
+    : legacyPath;
+  const progressHref = (id: string) => href("assignments", `/teacher/assignments/${id}/progress`, `&activityId=${encodeURIComponent(id)}&activityReport=1`);
+  const classCount = classes.data ? `${classes.data.items.length}${classes.data.hasMore ? "+" : ""}` : "—";
+  const activeCount = base && !schoolAssignments.data ? "—" : `${active.length}${schoolAssignments.data?.hasMore ? "+" : ""}`;
+  const timedCount = schoolTimed.data ? `${schoolTimed.data.items.filter(item => item.phase === "Open").length}${schoolTimed.data.hasMore ? "+" : ""}` : "—";
   return (
     <>
       <PageHeader
@@ -90,7 +113,7 @@ export function TeacherDashboard() {
           active[0] && (
             <Link
               className={buttonVariants()}
-              href={`/teacher/assignments/${active[0].id}/progress`}
+              href={progressHref(active[0].id)}
             >
               {tx("查看作业进度", "View assignment progress")} <ArrowRight size={15} />
             </Link>
@@ -98,34 +121,48 @@ export function TeacherDashboard() {
         }
       />
       <State resource={classes} />
-      <State resource={assignments} />
+      <State resource={base ? schoolAssignments : assignments} />
+      {base && <State resource={schoolTimed} />}
       <div className="mt-5 grid grid-cols-4 gap-3 max-md:grid-cols-2">
         <Metric
           label={tx("负责班级", "Classes")}
-          value={classes.data?.items.length ?? "—"}
+          value={classCount}
           note={classes.data?.items.map((x) => x.name).join(", ")}
         />
         <Metric
           label={tx("进行中的作业", "Open assignments")}
-          value={active.length}
+          value={activeCount}
           note={tx("跨班级汇总", "Across classes")}
         />
-        <Metric
-          label={tx("待跟进", "Needs follow-up")}
-          value={report.data?.metrics?.incomplete ?? "—"}
-          note={tx("未提交、未通过和待反馈", "Missing, unsuccessful, and awaiting feedback")}
-        />
-        <Metric
-          label={tx("题目导入", "Problem imports")}
-          value={imports.data?.items.length ?? "—"}
-          note={tx("已完成题目导入批次", "Completed import batches")}
-        />
+        {base ? <>
+          <Metric
+            label={tx("进行中的限时训练", "Open timed practice")}
+            value={timedCount}
+            note={tx("跨班级汇总", "Across classes")}
+          />
+          <Metric
+            label={tx("待发布作业", "Assignment drafts")}
+            value={schoolAssignments.data ? `${schoolAssignments.data.items.filter(item => item.state === "Draft").length}${schoolAssignments.data.hasMore ? "+" : ""}` : "—"}
+            note={tx("在作业管理中继续编辑", "Continue editing in Assignments")}
+          />
+        </> : <>
+          <Metric
+            label={tx("待跟进", "Needs follow-up")}
+            value={report.data?.metrics?.incomplete ?? "—"}
+            note={tx("未提交、未通过和待反馈", "Missing, unsuccessful, and awaiting feedback")}
+          />
+          <Metric
+            label={tx("题目导入", "Problem imports")}
+            value={imports.data?.items.length ?? "—"}
+            note={tx("已完成题目导入批次", "Completed import batches")}
+          />
+        </>}
       </div>
       <div className="mt-6 grid grid-cols-[minmax(0,1fr)_360px] gap-6 max-lg:grid-cols-1">
         <section className={panel}>
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <h2 className="font-bold">{tx("需关注的作业", "Assignments needing attention")}</h2>
-            <Link className={link} href="/teacher/assignments">
+            <Link className={link} href={href("assignments", "/teacher/assignments")}>
               {tx("查看全部", "View all")}
             </Link>
           </div>
@@ -133,16 +170,14 @@ export function TeacherDashboard() {
             {active.map((item) => (
               <Link
                 key={item.id}
-                href={`/teacher/assignments/${item.id}/progress`}
+                href={progressHref(item.id)}
                 className="flex items-center justify-between gap-3 p-4 hover:bg-surface-subtle"
               >
                 <div>
                   <b>{item.title}</b>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {item.className ??
-                      classes.data?.items.find((x) => x.id === item.classId)
-                        ?.name}{" "}
-                    · {tx("截止", "Due")} {date(item.dueAt)}
+                    {item.className && `${item.className} · `}
+                    {item.dueAt ? `${tx("截止", "Due")} ${date(item.dueAt)}` : tx("无截止时间", "No deadline")}
                   </p>
                 </div>
                 <span className="flex items-center gap-2 text-sm text-primary">
@@ -164,10 +199,10 @@ export function TeacherDashboard() {
               {tx("待跟进", "Follow-up")}
             </h2>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              {tx("按班级和活动查看未开始、反复未通过及待反馈记录。", "Review missing starts, repeated failures, and pending feedback by class and activity.")}
+              {base ? tx("查看活动参与者的答题进度与成绩。", "Review participants’ progress and grades by activity.") : tx("按班级和活动查看未开始、反复未通过及待反馈记录。", "Review missing starts, repeated failures, and pending feedback by class and activity.")}
             </p>
             <Link
-              href="/teacher/reports"
+              href={href("reports", "/teacher/reports")}
               className={`${link} mt-4 inline-block text-sm`}
             >
               {tx("查看教学报告", "Open teaching reports")}
@@ -179,13 +214,13 @@ export function TeacherDashboard() {
               {tx("常用操作", "Classroom actions")}
             </h2>
             <div className="mt-4 flex flex-col gap-3 text-sm">
-              <Link className={link} href="/teacher/assignments/new/edit">
+              <Link className={link} href={href("assignments", "/teacher/assignments/new/edit", "&activityEdit=new")}>
                 {tx("新建作业", "New assignment")}
               </Link>
-              <Link className={link} href="/teacher/classes">
+              <Link className={link} href={href("classes", "/teacher/classes")}>
                 {tx("班级与学生", "Classes & students")}
               </Link>
-              <Link className={link} href="/teacher/imports">
+              <Link className={link} href={href("imports", "/teacher/imports")}>
                 {tx("导入中心", "Import center")}
               </Link>
             </div>
@@ -480,6 +515,7 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
       )}
       {code && (
         <Modal title={`${code.name} · ${tx("激活码", "Activation code")}`} onClose={() => setCode(null)}>
+          <LegacyActivationSchoolHint/>
           <p className="text-sm text-muted-foreground">
             {tx("请将学号和此激活码交给本人，激活后账号自动建立。", "Give the student their ID and activation code privately. They create an account when claiming it.")}
           </p>
@@ -490,7 +526,7 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
             className="mt-4"
             onClick={() =>
               action.run(async () => {
-                await navigator.clipboard.writeText(code.activationCode);
+                await navigator.clipboard.writeText(`legacy-school\t${code.name}\t${code.activationCode}`);
                 return tx("激活码已复制。", "Activation code copied.");
               })
             }

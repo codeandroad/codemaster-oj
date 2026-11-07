@@ -9,6 +9,11 @@ import { applyResponse } from '../domain.response.js';
 export class AuthController {
   constructor(private readonly domain: DomainService) {}
 
+  @Get('auth/activation-schools')
+  async activationSchools(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('auth', request.domainContext));
+  }
+
   @Post('auth/verify-identity')
   async verifyIdentity(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('auth', request.domainContext));
@@ -22,6 +27,11 @@ export class AuthController {
 
   @Post('auth/login')
   async login(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('auth', request.domainContext));
+  }
+
+  @Post('auth/register-personal')
+  async registerPersonal(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('auth', request.domainContext));
   }
 
@@ -42,6 +52,16 @@ export class AuthController {
 
   @Patch('auth/profile')
   async profile(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('auth', request.domainContext));
+  }
+
+  @Get('auth/default-workspace')
+  async defaultWorkspace(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('auth', request.domainContext));
+  }
+
+  @Patch('auth/default-workspace')
+  async updateDefaultWorkspace(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('auth', request.domainContext));
   }
 }

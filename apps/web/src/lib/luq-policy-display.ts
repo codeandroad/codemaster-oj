@@ -13,7 +13,7 @@ export function luqPolicyDescription(
   const labels = english
     ? { disabled: "Disabled", paid: "Paid", free: "Free" }
     : { disabled: "禁用", paid: "付费", free: "免费" };
-  const label = policy.mode === "paid" && policy.price != null ? `${policy.price} Luq` : labels[policy.mode];
+  const label = policy.mode === "paid" && policy.price != null ? `${policy.price} ${english ? "scholarship" : "奖学金"}` : labels[policy.mode];
   if (policy.mode === "disabled" || !policy.opensAt) return label;
   const date = new Date(policy.opensAt);
   if (Number.isNaN(date.getTime())) return label;

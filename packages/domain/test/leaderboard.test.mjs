@@ -123,9 +123,9 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
    assert.equal((await contexts(pool,alpha)).body.canManage,false);
    assert.equal((await contexts(pool,teacher)).body.canManage,false);
    assert.equal((await contexts(pool,admin)).body.canManage,true);
-   assert.deepEqual((await contexts(pool,alpha)).body.visibleFields,{solvedProblems:true,attempts:false,acRate:true});
+   assert.deepEqual((await contexts(pool,alpha)).body.visibleFields,{solvedProblems:true,attempts:false,acRate:true,luqBalance:true});
    const hiddenByDefault=(await leaderboard(pool,alpha,`?classId=${classId}`)).body;
-   assert.deepEqual(hiddenByDefault.visibleFields,{solvedProblems:true,attempts:false,acRate:true});
+   assert.deepEqual(hiddenByDefault.visibleFields,{solvedProblems:true,attempts:false,acRate:true,luqBalance:true});
    assert.equal(Object.hasOwn(hiddenByDefault.me,'attempts'),false,'hidden student fields must be redacted by the API');
    assert.equal(Object.hasOwn(hiddenByDefault.me,'publicTag'),false);
    assert.equal((await leaderboard(pool,teacher,`?classId=${classId}`)).body.items.find(item=>item.id===alpha.identityId).attempts,5,'teachers retain full metrics');
@@ -151,6 +151,7 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
    assert.equal(all.me.solvedProblems, 2);
    assert.equal(all.me.attempts, 5);
    assert.equal(all.me.acRate, 66.7);
+   assert.equal(all.me.luqBalance,Number((await pool.query('SELECT balance FROM luq_accounts WHERE identity_id=$1',[alpha.identityId])).rows[0].balance),'balance is read from the real account');
    assert.equal((await pointsMe(pool,alpha)).body.points,20);
    assert.equal((await pointsMe(pool,alpha)).body.rankPoints,20);
    assert.equal((await pointsMe(pool,alpha)).body.rankingPolicy.scope,'approved_school_and_paper4_first_ac');
@@ -198,14 +199,15 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
     assert.equal(current.me.solvedProblems, 1);
     assert.equal(current.me.attempts, 4, 'unreleased timed and old formal submissions are excluded');
     assert.equal(current.me.acRate, 50);
+    assert.equal(current.me.luqBalance,all.me.luqBalance,'time filters do not turn the current balance into period earnings');
     assert.deepEqual(current.items.slice(1).map(item => item.rank), [2, 3, 4, 4]);
    }
-   await updateVisibility(pool,admin,{solvedProblems:false,attempts:false,acRate:false});
+   await updateVisibility(pool,admin,{solvedProblems:false,attempts:false,acRate:false,luqBalance:false});
    const privateMetrics=(await leaderboard(pool,beta,`?classId=${classId}`)).body;
    for(const item of [...privateMetrics.items,privateMetrics.me])
-    for(const key of ['solvedProblems','attempts','acRate'])assert.equal(Object.hasOwn(item,key),false);
+    for(const key of ['solvedProblems','attempts','acRate','luqBalance'])assert.equal(Object.hasOwn(item,key),false);
    assert.equal((await leaderboard(pool,teacher,`?classId=${classId}`)).body.items.find(item=>item.id===alpha.identityId).solvedProblems,2);
-   assert.deepEqual((await leaderboard(pool,alpha)).body.visibleFields,{solvedProblems:false,attempts:false,acRate:false},'global visibility applies to all filters');
+   assert.deepEqual((await leaderboard(pool,alpha)).body.visibleFields,{solvedProblems:false,attempts:false,acRate:false,luqBalance:false},'global visibility applies to all filters');
    await submission(outsider,first,'submit','AC');
    assert.equal((await leaderboard(pool,alpha)).body.total,5,'default leaderboard includes students from other classes');
    assert.equal((await leaderboard(pool,alpha,`?classId=${classId}`)).body.total,4);
@@ -384,27 +386,40 @@ test('leaderboard orders by points, unrounded AC rate and current Luq balance, p
 
    await grantLuq(equalRatio,7);
    const balanceBoard = (await leaderboard(pool,teacher,'?pageSize=10')).body;
+   assert.equal(balanceBoard.items.find(item=>item.id===equalRatio.identityId).luqBalance,111,'initial 100, first AC 4 and grant 7 are reflected without changing points');
    assert.deepEqual(balanceBoard.items.slice(2,5).map(item=>[item.id,item.rank]),[
     [equalRatio.identityId,3], [higherRatio.identityId,4], [lowerRatio.identityId,5],
    ]);
    const balanceFirstPage = (await leaderboard(pool,higherRatio,'?pageSize=3&page=1')).body;
    assert.equal(balanceFirstPage.items[2].id,equalRatio.identityId);
    assert.equal(balanceFirstPage.me.rank,4,'the student rank uses the current balance even off-page');
+   assert.equal(balanceFirstPage.me.luqBalance,104,'off-page own row includes the initial grant and first-AC reward');
 
-   await updateVisibility(pool,admin,{solvedProblems:false,attempts:false,acRate:false});
+   await updateVisibility(pool,admin,{solvedProblems:false,attempts:false,acRate:false,luqBalance:false});
    const privateBoard = (await leaderboard(pool,higherRatio,'?pageSize=10')).body;
    assert.deepEqual(privateBoard.items.map(item=>[item.id,item.rank]),balanceBoard.items.map(item=>[item.id,item.rank]),'field visibility does not change ranking');
    for(const person of [...privateBoard.items,privateBoard.me])
-    for(const field of ['solvedProblems','attempts','acRate','accepted','assessed','ac_ratio'])
+    for(const field of ['solvedProblems','attempts','acRate','luqBalance','accepted','assessed','ac_ratio'])
      assert.equal(Object.hasOwn(person,field),false,`${field} must not bypass the hidden-field contract`);
    const staffBoard = (await leaderboard(pool,teacher,'?pageSize=10')).body;
    assert.equal(staffBoard.items.find(item=>item.id===higherRatio.identityId).attempts,1000,'teachers retain full statistics');
    assert.equal(staffBoard.items.find(item=>item.id===lowerRatio.identityId).acRate,0.1);
+   assert.equal(staffBoard.items.find(item=>item.id===equalRatio.identityId).luqBalance,111,'staff retain full metrics as with the existing optional fields');
    for (const item of [...privateBoard.items,privateBoard.me,...staffBoard.items]) {
-    for (const field of ['balance','luqBalance','luq_balance']) {
-     assert.equal(Object.hasOwn(item,field),false,'Luq balances remain private');
+    for (const field of ['balance','luq_balance']) {
+     assert.equal(Object.hasOwn(item,field),false,'internal aliases must never bypass the visible-field projection');
     }
    }
+   await updateVisibility(pool,admin,{solvedProblems:true,attempts:true,acRate:true});
+   assert.equal((await contexts(pool,higherRatio)).body.visibleFields.luqBalance,false,'old clients preserve the configured Scholarship visibility');
+   for (const fields of [
+    {solvedProblems:true,attempts:true,acRate:true,luqBalance:'true'},
+    {solvedProblems:true,attempts:true,acRate:true,luqBalance:true,unexpected:true},
+   ]) await assert.rejects(updateVisibility(pool,admin,fields),error=>error.status===400);
+   await updateVisibility(pool,admin,{solvedProblems:true,attempts:true,acRate:true,luqBalance:true});
+   const restored=(await leaderboard(pool,higherRatio,'?pageSize=10')).body;
+   assert.deepEqual(restored.items.map(item=>[item.id,item.rank]),balanceBoard.items.map(item=>[item.id,item.rank]));
+   assert.equal(restored.items.find(item=>item.id===equalRatio.identityId).luqBalance,111,'re-enabling the field restores the real balance');
   } finally {
    await pool.end();
    await manager.query(`DROP SCHEMA ${schema} CASCADE`);

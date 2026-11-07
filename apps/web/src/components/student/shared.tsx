@@ -63,11 +63,11 @@ export function ResultScore({ result }: { result: Submission }) {
   return <div className="flex flex-wrap items-center gap-2"><StatusPill status={status}/>{!isPending(result.status) && result.score != null && !/system.?error/i.test(result.status) && ["submit", "correction"].includes(result.kind) && <b>{Number(result.score).toFixed(2)} / 100</b>}</div>;
 }
 export interface DetailedSubmission extends Submission {
-  reviews?: { id: string; note: string; authorName: string; authorIdentityId?: string; createdAt: string }[];
+  reviews?: { id: string; note: string; authorName: string; authorIdentityId?: string; teacherFeedback?: boolean; createdAt: string }[];
   testResults?: ResultCase[];
   resultsVisible?: boolean;
 }
-export function useSubmission(id: string | null) {
+export function useSubmission(id: string | null, endpoint?: string, normalize?: (result: DetailedSubmission) => DetailedSubmission) {
   const {locale}=useLocale();
   const localeRef=useRef(locale);
   useEffect(()=>{localeRef.current=locale;},[locale]);
@@ -80,14 +80,15 @@ export function useSubmission(id: string | null) {
     setResult(null); setError("");
     const poll = async () => {
       try {
-        const next = await productionApi<DetailedSubmission>(`submissions/${encodeURIComponent(id)}`, { signal: controller.signal });
+        const raw = await productionApi<DetailedSubmission>(endpoint ?? `submissions/${encodeURIComponent(id)}`, { signal: controller.signal });
+        const next = normalize ? normalize(raw) : raw;
         if (controller.signal.aborted) return;
         setResult(next);
         if (isPending(next.status) && ++polls < 120) timer = setTimeout(poll, 1500);
         else if (isPending(next.status)) setError(ui(localeRef.current,"仍在队列中，自动刷新已暂停，请手动刷新或稍后返回。","Still queued. Automatic refresh has paused; refresh manually or return later."));
       } catch (reason) { if (!controller.signal.aborted) setError(apiMessage(reason)); }
     }; void poll(); return () => { controller.abort(); clearTimeout(timer); };
-  }, [id, revision]);
+  }, [id, revision, endpoint, normalize]);
   return { result, error, reload };
 }
 export function PythonTokens({ code }: { code: string }) {

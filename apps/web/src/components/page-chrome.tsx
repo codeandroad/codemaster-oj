@@ -22,13 +22,14 @@ export function PageHeader({ title, action, className }: {
 }
 
 export function StatusPill({ status }: { status: string }) {
-  const {t}=useLocale();
+  const {t,locale}=useLocale();
+  const label = status === "NotPassed" ? (locale === "en" ? "Not passed" : "未通过") : status === "NeedsReview" ? (locale === "en" ? "Needs review" : "待复核") : t(status);
   const positive = /^(AC|Solved)(?:\b|\s|·)/.test(status) || ["已发布", "可用", "完成", "Available", "Active", "Completed", "Published", "已公开", "Public", "已布置", "Assigned"].includes(status);
-  const warning = /^(WA|TLE|MLE|RE|CE|Attempted)(?:\b|\s|·)/.test(status) || ["等待验证", "Unavailable", "Failed", "Disabled", "Waiting", "System Error"].includes(status);
+  const warning = /^(WA|TLE|MLE|RE|CE|Attempted)(?:\b|\s|·)/.test(status) || ["等待验证", "Unavailable", "Failed", "Disabled", "Waiting", "System Error", "NotPassed", "NeedsReview"].includes(status);
   const colors = positive
     ? "border-success/25 bg-success-soft text-success"
     : warning
       ? "border-warning/25 bg-warning-soft text-warning"
       : "border-border bg-muted text-muted-foreground";
-  return <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${colors}`}><span aria-hidden>●</span>{t(status)}</span>;
+  return <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${colors}`}><span aria-hidden>●</span>{label}</span>;
 }

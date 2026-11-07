@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { pageBreadcrumbs } from '../src/lib/page-breadcrumbs.ts';
-import { isCampusRoute } from '../src/lib/campus-routes.ts';
+import { isCampusRoute, resolvePublicLearningBookmark } from '../src/lib/campus-routes.ts';
 
 const identity = '6d1e89c5-83fd-48ce-8025-303e63d4eba0';
 const roleFor = path => path.startsWith('/teacher') ? 'teacher' : path.startsWith('/admin') ? 'admin' : 'student';
@@ -109,4 +109,19 @@ test('identity import breadcrumbs provide the roster or identity collection as t
   assert.equal(pageBreadcrumbs('/admin/imports', 'admin', 'en').at(-2).href, '/admin/people');
   assert.equal(pageBreadcrumbs('/admin/imports', 'admin', 'en', '', new URLSearchParams('kind=teacher')).at(-2).href, '/admin/people?kind=teacher');
   assert.equal(pageBreadcrumbs('/teacher/imports', 'teacher', 'en').at(-1).href, '/teacher/imports');
+});
+
+
+test('public bookmarks survive a lost school workspace without carrying private context', () => {
+  const course = resolvePublicLearningBookmark('/student/learning-paths', new URLSearchParams({
+    scope: 'public', publicCourseId: identity, chapterId: 'school-private',
+  }));
+  assert.equal(course, `/practice/courses/${identity}`);
+  const submission = resolvePublicLearningBookmark('/schools', new URLSearchParams({
+    section: 'review-notebook', scope: 'public', schoolId: 'former-school',
+    submissionId: identity, submissionSchoolId: 'source-school', review: '1',
+  }));
+  assert.equal(submission, `/practice/review-notebook?submissionId=${identity}&submissionSchoolId=source-school&review=1`);
+  assert.equal(resolvePublicLearningBookmark('/schools', new URLSearchParams({ section: 'courses' })), null);
+  assert.equal(resolvePublicLearningBookmark('/schools', new URLSearchParams({ section: 'constructor', scope: 'public' })), null);
 });

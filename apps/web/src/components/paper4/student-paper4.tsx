@@ -3,7 +3,7 @@ import { OnlineStudents } from "@/components/student/student-presence";
 
 import { Fragment, useCallback, useEffect, useReducer, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, BookOpen, Bookmark, CheckCircle2, ChevronLeft, ChevronRight, Code2, Download, FileCode2, FileText, HelpCircle, House, LayoutPanelLeft, List, Loader2, Maximize2, Play, RefreshCw, RotateCcw, Send, Settings } from "lucide-react";
+import { ArrowLeft, BookOpen, Bookmark, CheckCircle2, ChevronLeft, ChevronRight, Code2, Download, FileCode2, FileText, HelpCircle, History, House, LayoutPanelLeft, List, Loader2, Maximize2, Play, RefreshCw, RotateCcw, Send, Settings } from "lucide-react";
 import { AppLink, useNavigationBlocker } from "@/components/navigation";
 import { useLocale } from "@/components/locale-context";
 import { PageHeader } from "@/components/page-chrome";
@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { WorkspaceThemeProvider } from "@/components/ui/theme-context";
 import { CodeEditor, type CodeEditorHandle } from "@/components/student/code-editor";
+import { CopyCodeButton } from "@/components/student/copy-code-button";
+import { ProblemSubmissionsTable, SolvedStatus, useProblemSubmissions } from "@/components/student/problem-submissions";
 import type { EditorTheme } from "@/components/student/editor-themes";
 import { useWorkspaceSettings, WorkspaceSettingsDialog } from "@/components/student/workspace-settings";
 import { useWorkspaceLayout, PanelControls } from "@/components/student/workspace-panels";
@@ -94,7 +96,7 @@ function StudentPaper4Collection({ scope, onScope }: { scope: "catalog" | "activ
           const recipients = paper4ClassNames(paper) || tx("按学生名单布置", "Direct assignment");
           const availability = paper.startsAt || paper.endsAt ? `${paper.startsAt ? paper4Date(paper.startsAt, locale) : tx("即日起", "Available now")} – ${paper.endsAt ? paper4Date(paper.endsAt, locale) : tx("无截止时间", "No deadline")}` : tx("不限时间", "No time limit");
           return <Fragment key={paper.id}><tr>
-            <td><AppLink href={href} title={paper.title} className={listStyles.title}>{paper.title}</AppLink>{activities && <button type="button" className="mt-1 block text-xs text-muted-foreground underline underline-offset-2 hover:text-primary" aria-expanded={rulesFor === paper.id} aria-controls={`luq-rules-${paper.id}`} onClick={() => setRulesFor(current => current === paper.id ? null : paper.id)}>{tx("查看 Luq 与辅助规则", "Luq and assistance rules")}</button>}</td>
+            <td><AppLink href={href} title={paper.title} className={listStyles.title}>{paper.title}</AppLink>{activities && <button type="button" className="mt-1 block text-xs text-muted-foreground underline underline-offset-2 hover:text-primary" aria-expanded={rulesFor === paper.id} aria-controls={`luq-rules-${paper.id}`} onClick={() => setRulesFor(current => current === paper.id ? null : paper.id)}>{tx("查看奖学金与辅助规则", "Scholarship and assistance rules")}</button>}</td>
             <td>{activities ? (paper.activityKind === "exam" ? tx("模拟考试", "Mock exam") : tx("练习任务", "Practice task")) : paper.examYear ?? "—"}</td>
             <td>{activities ? <span className={listStyles.truncate} title={recipients}>{recipients}</span> : paper.examSession === "summer" ? tx("夏季", "May/June") : paper.examSession === "autumn" ? tx("秋季", "October/November") : "—"}</td>
             <td>{activities ? <span className={listStyles.truncate} title={availability}>{availability}</span> : paper.examVariant ?? "—"}</td>
@@ -155,7 +157,7 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
   const initialQuestion = paper4InitialQuestion(questions, initialQuestionKey);
   const courseQuestion = learningContext && courseQuestionKey ? questions.find(question => question.key === courseQuestionKey) : null;
   const [questionKey, setQuestionKey] = useState(initialQuestion?.key ?? "");
-  const [leftTab, setLeftTab] = useState<"problem" | "translation" | "solutions">("problem");
+  const [leftTab, setLeftTab] = useState<"problem" | "translation" | "solutions" | "submissions">("problem");
   const [solutionTheme, setSolutionTheme] = useState<EditorTheme>("github-dark");
   const [stageId, setStageId] = useState(initialQuestion?.stages[0]?.id ?? "");
   const [codes, setCodes] = useState<Record<string, string>>(() => Object.fromEntries(initialAttempt.files.map(file => [file.fileKey, file.content])));
@@ -185,6 +187,7 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
   const { layout, dispatch } = useWorkspaceLayout(user.id);
   const current = questions.find(question => question.key === questionKey) ?? questions[0];
   const stage = current?.stages.find(item => item.id === stageId) ?? current?.stages[0];
+  const submissions = useProblemSubmissions(current ? `paper4/attempts/${encodeURIComponent(attempt.id)}/questions/${encodeURIComponent(current.key)}/submissions` : "", `${attempt.status}:${attempt.formalJudging?.pending ?? ""}:${attempt.formalJudging?.completed ?? ""}:${attempt.releasedAt ?? ""}`);
   const hasAutomaticChecks = Boolean(current?.stages.some(item => item.judgeMode === "auto") || current?.stages.every(item => item.judgeMode === undefined));
   const rankPointsPerQuestion = attempt.firstAcPointsPerQuestion ?? attempt.paper.firstAcPointsPerQuestion ?? 10;
   const submitted = ["submitted", "reviewed", "released"].includes(attempt.status.toLowerCase());
@@ -284,7 +287,7 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
     setQuestionKey(key); setStageId(next.stages[0]?.id ?? ""); setRun(null);
     if (statementBodyRef.current) statementBodyRef.current.scrollTop = 0;
   }
-  function changeLeftTab(next: "problem" | "translation" | "solutions") {
+  function changeLeftTab(next: "problem" | "translation" | "solutions" | "submissions") {
     setLeftTab(next);
     dispatch({ type: "show", panel: "statement" });
     if (statementBodyRef.current) statementBodyRef.current.scrollTop = 0;
@@ -379,12 +382,12 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
       <section className={panelClass("statement")}>
         <header className={styles.panelHeader}>
           <div className={styles.tabs} role="tablist" aria-label={tx("题目内容", "Problem content")}>
-            {([{ value: "problem", label: tx("题目描述", "Problem"), icon: FileText }, { value: "translation", label: tx("中文题面", "Translation"), icon: BookOpen }, { value: "solutions", label: tx("参考答案", "Solution"), icon: BookOpen }] as const).map(({ value, label, icon: Icon }) => <button key={value} id={`paper4-tab-${value}`} data-paper4-tab={value} type="button" role="tab" aria-selected={leftTab === value} aria-controls="paper4-content-panel" tabIndex={leftTab === value ? 0 : -1} className={styles.tab} onClick={() => changeLeftTab(value)} onKeyDown={event => {
+            {([{ value: "problem", label: tx("题目描述", "Problem"), icon: FileText }, { value: "translation", label: tx("中文题面", "Translation"), icon: BookOpen }, { value: "solutions", label: tx("参考答案", "Solution"), icon: BookOpen }, { value: "submissions", label: tx("提交记录", "Submissions"), icon: History }] as const).map(({ value, label, icon: Icon }) => <button key={value} id={`paper4-tab-${value}`} data-paper4-tab={value} type="button" role="tab" aria-selected={leftTab === value} aria-controls="paper4-content-panel" tabIndex={leftTab === value ? 0 : -1} className={styles.tab} onClick={() => changeLeftTab(value)} onKeyDown={event => {
               if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
               if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
               event.preventDefault();
-              const order = ["problem", "translation", "solutions"] as const;
-              const next = event.key === "Home" ? order[0] : event.key === "End" ? order[2] : order[(order.indexOf(value) + (event.key === "ArrowLeft" ? 2 : 1)) % order.length];
+              const order = ["problem", "translation", "solutions", "submissions"] as const;
+              const next = event.key === "Home" ? order[0] : event.key === "End" ? order[order.length - 1] : order[(order.indexOf(value) + (event.key === "ArrowLeft" ? order.length - 1 : 1)) % order.length];
               changeLeftTab(next);
               event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`[data-paper4-tab="${next}"]`)?.focus();
             }}><Icon size={15} aria-hidden="true"/>{label}</button>)}
@@ -394,11 +397,12 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
         <div ref={statementBodyRef} className={`${styles.panelBody} ${paperStyles.statementBody}`} id="paper4-content-panel" role="tabpanel" aria-labelledby={`paper4-tab-${leftTab}`} tabIndex={0}>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground" data-od-id="paper4-question-selector">
             <label className="flex items-center gap-2 font-semibold">{tx("大题", "Question")}<select aria-label={tx("选择大题", "Select question")} className="min-h-9 max-w-[260px] rounded-md border border-border bg-surface px-2 text-foreground" value={current.key} onChange={event => changeQuestion(event.target.value)}>{questions.map((question, index) => <option key={question.key} value={question.key}>{index + 1}. {question.title}</option>)}</select></label>
-            <span>{freePractice ? tx("自由练习", "Free practice") : attempt.paper.activityKind === "exam" ? tx("模拟考试", "Mock exam") : tx("练习任务", "Practice task")} · {freePractice && attempt.status === "submitted" ? tx("练习已提交", "Practice submitted") : paper4Status(attempt.status, locale)}{attempt.attemptNumber ? tx(` · 第 ${attempt.attemptNumber} 次`, ` · Attempt ${attempt.attemptNumber}`) : ""}{!freePractice && attempt.paper.endsAt ? ` · ${paper4Date(attempt.paper.endsAt, locale)}` : ""}</span>
+            <div className="flex flex-wrap items-center justify-end gap-3"><SolvedStatus solved={submissions.data?.solved ?? false}/><span>{freePractice ? tx("自由练习", "Free practice") : attempt.paper.activityKind === "exam" ? tx("模拟考试", "Mock exam") : tx("练习任务", "Practice task")} · {freePractice && attempt.status === "submitted" ? tx("练习已提交", "Practice submitted") : paper4Status(attempt.status, locale)}{attempt.attemptNumber ? tx(` · 第 ${attempt.attemptNumber} 次`, ` · Attempt ${attempt.attemptNumber}`) : ""}{!freePractice && attempt.paper.endsAt ? ` · ${paper4Date(attempt.paper.endsAt, locale)}` : ""}</span></div>
           </div>
           {learningContext && <p className="mb-3 rounded-md border border-border bg-surface-subtle px-3 py-2 text-xs leading-5 text-muted-foreground" data-od-id="paper4-course-context">{courseQuestion ? tx(`本章节练习只需 ${courseQuestion.key} 正式 AC。提交仍评测整卷，其他未完成的大题不影响本练习完成。`, `This course practice needs a formal AC for ${courseQuestion.key} only. Submission judges the whole paper; unfinished questions do not block this practice unit.`) : tx("本章节关联整套试卷，所有大题正式 AC 后完成本练习。", "This chapter links the whole paper. All questions need formal AC to complete this practice.")}</p>}
           {!freePractice && <StudentLuqRule activityType="paper4_activity" activityId={attempt.paperId}/>}
           <h1 className="sr-only">{current.title}</h1>
+          {leftTab === "submissions" && <ProblemSubmissionsTable feed={submissions}/>}
           {leftTab === "translation" && <LuqAssistance key={`translation:${attempt.id}:${current.key}`} target={{ paper4AttemptId: attempt.id, questionKey: current.key }} kind="FULL_TRANSLATION"/>}
           <div hidden={leftTab !== "problem"}>
           <Paper4OriginalQuestion key={`${attempt.versionId ?? attempt.id}:${current.key}`} paper={attempt.paper} question={current} selectedStage={stage}/>
@@ -422,6 +426,7 @@ function Paper4Workspace({ attempt: initialAttempt, user, initialQuestionKey, co
           <div className={styles.editorToolbar}>
             <div className="flex min-w-0 items-center gap-2"><span className="font-mono font-semibold">{current.key}.py</span><span className="hidden text-muted-foreground sm:inline">Python 3</span></div>
             <div className={styles.tools}>
+              <CopyCodeButton code={currentCode} className={styles.tool}/>
               <button type="button" className={styles.tool} title={tx("下载代码", "Download code")} aria-label={tx("下载代码", "Download code")} onClick={() => downloadCode(currentCode, `${current.key}.py`)}><Download size={14}/></button>
               <button type="button" className={styles.tool} title={`${tx("格式化代码", "Format code")} · ${displayBinding(settings.editorKeymap.format)}`} aria-label={tx("格式化代码", "Format code")} disabled={frozen || formatting || !currentCode.trim()} onClick={formatCurrent}><FormatCodeIcon/></button>
               <button type="button" className={styles.tool} title={tx("重置起始代码", "Reset starter code")} aria-label={tx("重置起始代码", "Reset starter code")} disabled={frozen || busy} onClick={() => setResetOpen(true)}><RotateCcw size={14}/></button>

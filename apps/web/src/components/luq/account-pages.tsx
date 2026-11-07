@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { RefreshCw, Wallet } from "lucide-react";
+import { RefreshCw } from "lucide-react";
+import { ScholarshipIcon } from "./scholarship-icon";
 import { AppLink } from "@/components/navigation";
 import { useLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
@@ -57,7 +58,11 @@ function useText() {
   return (zh: string, en: string) => (locale === "en" ? en : zh);
 }
 
-export function LuqBalance({ identityId }: { identityId: string }) {
+export function LuqBalance({ identityId, endpoint = "luq/me", href = "/student/luq" }: {
+  identityId: string;
+  endpoint?: "luq/me" | "practice/luq/me";
+  href?: string;
+}) {
   const tx = useText(),
     [account, setAccount] = useState<LuqAccount | null>(null),
     [notice, setNotice] = useState("");
@@ -68,7 +73,7 @@ export function LuqBalance({ identityId }: { identityId: string }) {
     async function refresh() {
       if (document.visibilityState === "hidden") return;
       try {
-        const next = await productionApi<LuqAccount>("luq/me");
+        const next = await productionApi<LuqAccount>(endpoint);
         if (!alive) return;
         const latest = next.items?.[0]?.id ?? null;
         if (seen.current !== undefined && latest !== seen.current) {
@@ -79,7 +84,7 @@ export function LuqBalance({ identityId }: { identityId: string }) {
             index < 0 ? next.items.slice(0, 1) : next.items.slice(0, index)
           ).filter((item) => item.delta > 0);
           const amount = arrived.reduce((sum, item) => sum + item.delta, 0);
-          if (amount) setNotice(`+${amount} Luq`);
+          if (amount) setNotice(`+${amount}`);
         }
         seen.current = latest;
         setAccount(next);
@@ -98,16 +103,16 @@ export function LuqBalance({ identityId }: { identityId: string }) {
       window.removeEventListener("focus", refreshEvent);
       window.removeEventListener("campus-judge:luq-changed", refreshEvent);
     };
-  }, [identityId]);
+  }, [identityId, endpoint]);
   return (
     <span className="inline-flex items-center gap-2 text-xs">
       <AppLink
-        href="/student/luq"
+        href={href}
         className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-border px-2 font-semibold hover:bg-surface-subtle"
-        aria-label={tx("Luq 余额与流水", "Luq balance and history")}
+        aria-label={tx("奖学金余额与流水", "Scholarship balance and history")}
       >
-        <Wallet size={14} aria-hidden="true" />
-        {account ? account.balance : "—"} Luq
+        <ScholarshipIcon size={18} />
+        {account ? account.balance : "—"}
       </AppLink>
       {notice && (
         <button
@@ -116,7 +121,7 @@ export function LuqBalance({ identityId }: { identityId: string }) {
           className="text-success"
           aria-label={tx("奖励到账，点击关闭提示", "Reward received; dismiss")}
         >
-          <span role="status">{notice}</span>
+          <span role="status">{notice} {tx("奖学金", "scholarship")}</span>
         </button>
       )}
     </span>
@@ -198,7 +203,7 @@ function Ledger({
       ))}
       {!entries.length && (
         <Empty columns={5 + (names ? 1 : 0) + (onRefund ? 1 : 0)}>
-          {tx("暂无 Luq 流水。", "No Luq transactions yet.")}
+          {tx("暂无奖学金流水。", "No scholarship transactions yet.")}
         </Empty>
       )}
     </Table>
@@ -242,27 +247,27 @@ function LedgerPager({
   );
 }
 
-export function StudentLuqPage() {
+export function StudentLuqPage({ endpoint = "luq/me" }: { endpoint?: "luq/me" | "practice/luq/me" } = {}) {
   const tx = useText(),
     [page, setPage] = useState(1),
-    resource = useData<LuqAccount>(`luq/me?page=${page}`);
+    resource = useData<LuqAccount>(`${endpoint}?page=${page}`);
   return (
     <div className="space-y-4">
       <section
         className={`${panel} flex flex-wrap items-center justify-between gap-3 p-4`}
       >
         <div>
-          <h1 className="text-lg font-bold">{tx("我的 Luq", "My Luq")}</h1>
+          <h1 className="text-lg font-bold">{tx("我的奖学金", "My scholarship")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {tx(
-              "独立的可消费助学点，不影响成绩、个人积分和排行榜。",
-              "Spendable learning credits, separate from grades, personal points, and the leaderboard.",
+              "奖学金可用于解锁中文题面和题解，与成绩、个人积分分别记账。",
+              "Use your scholarship balance to unlock translations and solutions. It is recorded separately from grades and personal points.",
             )}
           </p>
         </div>
         <div className="flex items-center gap-4">
-          <strong className="text-2xl tabular-nums">
-            {resource.data?.balance ?? "—"} <span className="text-sm">Luq</span>
+          <strong className="inline-flex items-center gap-1.5 text-2xl tabular-nums" aria-label={tx("奖学金余额", "Scholarship balance")}>
+            <ScholarshipIcon size={26} />{resource.data?.balance ?? "—"}
           </strong>
           <Button size="sm" variant="secondary" onClick={resource.reload}>
             <RefreshCw size={14} />
@@ -286,8 +291,8 @@ export function StudentLuqPage() {
       </section>
       <p className="text-xs leading-6 text-muted-foreground">
         {tx(
-          "学生按初始发放规则一次性领取 Luq，同一身份不重复发放。历史积分不兑换，历史 AC 不补发。首次正式 AC 可计奖题目按规则奖励；同题不重复。中文翻译不影响首次 AC Luq，提交前查看完整答案会影响该奖励。",
-          "Students receive the configured starting Luq allowance once per identity. Historical points and accepted work are not converted. Eligible first formal ACs earn a once-per-problem reward. Translation does not affect first-AC Luq; viewing a full solution before submission does.",
+          "学生按初始发放规则一次性领取奖学金，同一身份不重复发放。历史积分不兑换，历史 AC 不补发。首次正式 AC 可计奖题目按规则奖励；同题不重复。中文翻译不影响首次 AC 奖学金，提交前查看完整答案会影响该奖励。",
+          "Students receive the configured starting scholarship allowance once per identity. Historical points and accepted work are not converted. Eligible first formal ACs earn a once-per-problem reward. Translation does not affect first-AC scholarship rewards; viewing a full solution before submission does.",
         )}
       </p>
     </div>
@@ -340,7 +345,7 @@ export function AdminLuqPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="mr-auto text-lg font-bold">
-          {tx("Luq 管理", "Luq administration")}
+          {tx("奖学金管理", "Scholarship management")}
         </h1>
         {[
           ["grant", tx("发放与调整", "Grants & adjustments")],
@@ -400,7 +405,7 @@ export function AdminLuqPage() {
                 </option>
               </select>
             </Field>
-            <Field label={tx("每人 Luq", "Luq per student")}>
+            <Field label={tx("每人奖学金", "Scholarship per student")}>
               <input
                 type="number"
                 step={1}
@@ -427,8 +432,8 @@ export function AdminLuqPage() {
           </div>
           <p className="text-xs text-muted-foreground">
             {tx(
-              `将为 ${ids.length} 人各${amount >= 0 ? "增加" : "扣减"} ${Math.abs(amount)} Luq。调整不覆盖余额；余额不足时不会扣成负数。`,
-              `${ids.length} students × ${amount} Luq. Adjustments append ledger entries and never create negative balances.`,
+              `将为 ${ids.length} 人各${amount >= 0 ? "增加" : "扣减"} ${Math.abs(amount)} 奖学金。调整不覆盖余额；余额不足时不会扣成负数。`,
+              `${ids.length} students × ${amount} scholarship. Adjustments append ledger entries and never create negative balances.`,
             )}
           </p>
           <Button
@@ -592,7 +597,7 @@ function SettingsForm({
     >
       <div className="grid gap-4 sm:grid-cols-2">
         {labels.map(([key, label]) => (
-          <Field key={key} label={`${label} · Luq`}>
+          <Field key={key} label={`${label} · ${tx("奖学金", "Scholarship")}`}>
             <input
               className={input}
               type="number"
@@ -609,8 +614,8 @@ function SettingsForm({
       </div>
       <p className="text-xs text-muted-foreground">
         {tx(
-          "初始发放按稳定学生身份只记一次，修改额度只影响尚未领取的新身份；设为 0 仍会记录已领取，之后不补发。已冻结的活动规则及已有权益保持原记录。Luq 不兑换历史积分，也不进入排行榜。",
-          "The initial allowance is recorded once per stable student identity. Changes affect only identities not yet enrolled; zero is recorded as claimed with no later top-up. Frozen activity rules and entitlements retain their records. Luq neither converts historical points nor enters the leaderboard.",
+          "初始发放按稳定学生身份只记一次，修改额度只影响尚未领取的新身份；设为 0 仍会记录已领取，之后不补发。已冻结的活动规则及已有权益保持原记录。奖学金不兑换历史积分。",
+          "The initial allowance is recorded once per stable student identity. Changes affect only identities not yet enrolled; zero is recorded as claimed with no later top-up. Frozen activity rules and entitlements retain their records. Scholarship does not convert historical points.",
         )}
       </p>
       <Button
@@ -646,15 +651,15 @@ function RefundDialog({
     lock = useRef(false);
   return (
     <Modal
-      title={tx("退回消费 Luq", "Refund Luq purchase")}
+      title={tx("退回消费奖学金", "Refund scholarship purchase")}
       onClose={() => {
         if (!busy) onClose();
       }}
     >
       <p className="mb-4 text-sm">
         {tx(
-          `退回 ${Math.abs(entry.delta)} Luq，关联原消费且最多退款一次。已购买的权益保留。`,
-          `Return ${Math.abs(entry.delta)} Luq, once per original purchase. The unlocked entitlement is retained.`,
+          `退回 ${Math.abs(entry.delta)} 奖学金，关联原消费且最多退款一次。已购买的权益保留。`,
+          `Return ${Math.abs(entry.delta)} scholarship, once per original purchase. The unlocked entitlement is retained.`,
         )}
       </p>
       <Field label={tx("退款原因", "Refund reason")}>
@@ -731,8 +736,8 @@ function RejudgeReviews() {
       </div>
       <p className="px-4 py-2 text-xs text-muted-foreground">
         {tx(
-          "重判异常保留核查记录，不自动追回已发 Luq。需要调整时请在发放与调整页注明核查原因。",
-          "Rejudge anomalies are recorded for review; awarded Luq is not automatically clawed back. Record the review reason when making an adjustment.",
+          "重判异常保留核查记录，不自动追回已发奖学金。需要调整时请在发放与调整页注明核查原因。",
+          "Rejudge anomalies are recorded for review; awarded scholarship is not automatically clawed back. Record the review reason when making an adjustment.",
         )}
       </p>
       <State resource={reviews} />

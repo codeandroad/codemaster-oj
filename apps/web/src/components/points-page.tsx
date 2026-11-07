@@ -6,6 +6,7 @@ import Image from "next/image";
 import { AppLink as Link } from "./navigation";
 import { ChevronLeft, ChevronRight, CircleHelp, Medal, SlidersHorizontal, Trophy, UsersRound } from "lucide-react";
 import styles from "./points-page.module.css";
+import { ScholarshipIcon } from "./luq/scholarship-icon";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { useLocale, type AppLocale } from "./locale-context";
@@ -29,10 +30,11 @@ interface RankedStudent {
   solvedProblems?: number;
   attempts?: number;
   acRate?: number | null;
+  luqBalance?: number;
 }
 
 type RankingPeriod = "all" | "month" | "week";
-type OptionalField = "solvedProblems" | "attempts" | "acRate";
+type OptionalField = "solvedProblems" | "attempts" | "acRate" | "luqBalance";
 type VisibleFields = Record<OptionalField, boolean>;
 interface LeaderboardContext {
   id: string;
@@ -53,11 +55,12 @@ interface LeaderboardResponse {
   visibleFields: VisibleFields;
 }
 
-const allFieldsVisible: VisibleFields = { solvedProblems: true, attempts: true, acRate: true };
+const allFieldsVisible: VisibleFields = { solvedProblems: true, attempts: true, acRate: true, luqBalance: true };
 const fieldLabels: { field: OptionalField; label: string }[] = [
   { field: "solvedProblems", label: "解题数" },
   { field: "attempts", label: "提交次数" },
   { field: "acRate", label: "首解 AC 率" },
+  { field: "luqBalance", label: "奖学金" },
 ];
 
 const rankingPeriods: { value: RankingPeriod; label: string }[] = [
@@ -68,7 +71,12 @@ const rankingPeriods: { value: RankingPeriod; label: string }[] = [
 const rankNumber = new Intl.NumberFormat("zh-CN");
 const ui = (locale: AppLocale, zh: string, en: string) => locale === "en" ? en : zh;
 const fieldName = (locale: AppLocale, field: OptionalField) => {
-  const names: Record<OptionalField, [string, string]> = { solvedProblems: ["解题数", "Solved"], attempts: ["提交次数", "Attempts"], acRate: ["首解 AC 率", "First-solve AC rate"] };
+  const names: Record<OptionalField, [string, string]> = {
+    solvedProblems: ["解题数", "Solved"],
+    attempts: ["提交次数", "Attempts"],
+    acRate: ["首解 AC 率", "First-solve AC rate"],
+    luqBalance: ["奖学金", "Scholarship"],
+  };
   return ui(locale, ...names[field]);
 };
 
@@ -98,7 +106,7 @@ function StudentAvatar({ person, podium = false }: { person: RankedStudent; podi
   );
 }
 
-function LeaderboardPodium({ people, user, workspace, classId }: { people: RankedStudent[]; user: CampusUser; workspace: CampusRole; classId: string }) {
+function LeaderboardPodium({ people, user, workspace, classId, visibleFields }: { people: RankedStudent[]; user: CampusUser; workspace: CampusRole; classId: string; visibleFields: VisibleFields }) {
   const { locale } = useLocale();
   if (!people.length) return null;
   return (
@@ -117,6 +125,7 @@ function LeaderboardPodium({ people, user, workspace, classId }: { people: Ranke
           <StudentAvatar person={person} podium />
           <span className={styles.podiumName}>{person.name}{person.id === user.identityId && <span className={styles.podiumMe}>{ui(locale, "我", "You")}</span>}</span>
           <span className={styles.podiumPoints}>{rankNumber.format(person.points)}<span>{ui(locale, "积分", "points")}</span></span>
+          {visibleFields.luqBalance && person.luqBalance != null && <span className="mt-1 inline-flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground" title={ui(locale, "当前奖学金余额", "Current Scholarship balance")}><ScholarshipIcon size={14} aria-hidden="true" /><span>{rankNumber.format(person.luqBalance)}</span><span className="sr-only">{ui(locale, "奖学金", "Scholarship")}</span></span>}
         </Link>
       ))}
     </div>
@@ -143,6 +152,7 @@ function LeaderboardRow({ person, current, pinned = false, visibleFields, worksp
       {visibleFields.solvedProblems && <td className={styles.numberCell}>{person.solvedProblems == null ? "—" : rankNumber.format(person.solvedProblems)}</td>}
       {visibleFields.attempts && <td className={styles.numberCell}>{person.attempts == null ? "—" : rankNumber.format(person.attempts)}</td>}
       {visibleFields.acRate && <td className={`${styles.numberCell} ${person.acRate != null ? styles.rateCell : ""}`}>{person.acRate == null ? "—" : `${Number.isInteger(person.acRate) ? person.acRate : person.acRate.toFixed(1)}%`}</td>}
+      {visibleFields.luqBalance && <td className={styles.numberCell}>{person.luqBalance == null ? "—" : <span className="inline-flex items-center gap-1.5"><ScholarshipIcon size={14} aria-hidden="true" />{rankNumber.format(person.luqBalance)}</span>}</td>}
     </tr>
   );
 }
@@ -190,7 +200,7 @@ function LeaderboardTable({
   const showMe = me && !ranking.data?.items.some((person) => person.id === me.id);
   const visibleFields = staff ? allFieldsVisible : ranking.data?.visibleFields ?? configuredFields;
   const optionalCount = fieldLabels.filter(({ field }) => visibleFields[field]).length;
-  const tableWidth = optionalCount === 3 ? "min-w-[700px]" : optionalCount === 2 ? "min-w-[580px]" : optionalCount === 1 ? "min-w-[500px]" : "min-w-[420px]";
+  const tableWidth = optionalCount === 4 ? "min-w-[820px]" : optionalCount === 3 ? "min-w-[700px]" : optionalCount === 2 ? "min-w-[580px]" : optionalCount === 1 ? "min-w-[500px]" : "min-w-[420px]";
   const dirtySettings = fieldLabels.some(({ field }) => draftFields[field] !== savedFields[field]);
 
   async function saveVisibleFields() {
@@ -263,7 +273,7 @@ function LeaderboardTable({
             </div>
             {showRules && (
               <div id="leaderboard-rules" className={styles.disclosure}>
-                <p>{ui(locale, "积分来自审核公开题目的首次有效 AC，以及 Paper 4 正式交卷后每道大题首次全部自动测试通过的 10 分。作业与训练额外奖励只计入个人累计积分。积分相同时比较未四舍五入的首解 AC 率，暂无有效统计样本者排在已有比率者之后。积分和首解 AC 率均相同时比较当前 Luq 余额，三项均相同则并列。", "Points come from the first valid AC on approved public problems, plus 10 points for each Paper 4 question that first passes all automatic tests after formal submission. Assignment and practice bonuses count only toward personal totals. When points match, higher unrounded first-solve AC rates rank first. Students without results included in the rate rank below those with a rate. Current Luq balance breaks any remaining tie. Students with all three values equal share a rank.")}</p>
+                <p>{ui(locale, "积分来自审核公开题目的首次有效 AC，以及 Paper 4 正式交卷后每道大题首次全部自动测试通过的 10 分。作业与训练额外奖励只计入个人累计积分。积分相同时比较未四舍五入的首解 AC 率，暂无有效统计样本者排在已有比率者之后。积分和首解 AC 率均相同时比较当前奖学金余额，三项均相同则并列。", "Points come from the first valid AC on approved public problems, plus 10 points for each Paper 4 question that first passes all automatic tests after formal submission. Assignment and practice bonuses count only toward personal totals. When points match, higher unrounded first-solve AC rates rank first. Students without results included in the rate rank below those with a rate. Current scholarship balance breaks any remaining tie. Students with all three values equal share a rank.")}</p>
                 {optionalCount > 0 && <p className="mt-1">{ui(locale, "解题数按获榜分的不同题目统计。首解 AC 率是纳入统计的有效判题结果中 AC 的比例。普通练习和作业按接收顺序计至同一题目版本的首次有效 AC，之后的重交仍计入提交次数。限时训练按正式提交统计，Paper 4 每次交卷中每道大题各计一次。", "Solved counts distinct questions earning leaderboard points. The first-solve AC rate is the share of included judging results that passed. For practice and assignments, results count in submission order through the first valid AC on each problem version. Later resubmissions still count as attempts. Timed practice counts formal submissions, and Paper 4 counts each question per formal submission.")}</p>}
               </div>
             )}
@@ -303,7 +313,7 @@ function LeaderboardTable({
           <div className={styles.podiumLoading} role="status"><Trophy size={30} aria-hidden="true" /><span>{ui(locale, "正在加载领先学生…", "Loading leading students…")}</span></div>
         ) : (
           <State data={leaders}>
-            <LeaderboardPodium people={leaders.data?.items ?? []} user={user} workspace={workspace} classId={classId} />
+            <LeaderboardPodium people={leaders.data?.items ?? []} user={user} workspace={workspace} classId={classId} visibleFields={staff ? allFieldsVisible : leaders.data?.visibleFields ?? configuredFields} />
           </State>
         )}
       </div>
@@ -329,6 +339,7 @@ function LeaderboardTable({
                       {visibleFields.acRate && <th scope="col" className={styles.numberCell}>
                         <abbr title={ui(locale, "纳入统计的 AC 数 ÷ 有效判题数。普通练习和作业计至同一版本首次有效 AC，限时训练和 Paper 4 按正式提交统计。", "Accepted results ÷ valid results included in the rate. Practice and assignments count through the first valid AC per version. Timed practice and Paper 4 count formal submissions.")}>{fieldName(locale, "acRate")}<CircleHelp size={12} aria-hidden="true" /></abbr>
                       </th>}
+                      {visibleFields.luqBalance && <th scope="col" className={styles.numberCell}><abbr title={ui(locale, "当前可用余额；不受排行榜时间筛选影响", "Current available balance, independent of the selected time period")}>{fieldName(locale, "luqBalance")}<CircleHelp size={12} aria-hidden="true" /></abbr></th>}
                     </tr>
                   </thead>
                   <tbody>

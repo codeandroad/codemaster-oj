@@ -25,6 +25,7 @@ import {
 import {teacherDraftKey} from "./teacher-drafts";
 import {useTeacherDraft} from "./use-teacher-draft";
 import {CodeEditor} from "../student/code-editor";
+import {CopyCodeButton} from "../student/copy-code-button";
 import {useWorkspaceTheme} from "../ui/theme-context";
 import {defaultWorkspaceSettings} from "../student/workspace-settings";
 import type {SubmissionLanguage} from "@/lib/production-api";
@@ -853,7 +854,7 @@ function CodeField({label,value,onChange,language="python"}:{label:string;value:
  const pageTheme=useWorkspaceTheme();
  const {locale}=useLocale();
  const isReference=label.includes("参考")||label.toLowerCase().includes("reference");
- return <Field label={label}><div className={styles.code} data-od-id={`teacher-code-${isReference?"reference":language}`}><CodeEditor idPrefix={`teacher-${isReference?"reference":language}`} inputLabel={label} status={locale==="zh"?"修改后需保存草稿":"Save draft after editing"} code={value} onChange={onChange} language={language} settings={{...defaultWorkspaceSettings,theme:pageTheme==="dark"?"vs_dark":"vs",fontSize:13}}/></div></Field>;
+ return <Field label={label}><div className="flex justify-end"><CopyCodeButton code={value}/></div><div className={styles.code} data-od-id={`teacher-code-${isReference?"reference":language}`}><CodeEditor idPrefix={`teacher-${isReference?"reference":language}`} inputLabel={label} status={locale==="zh"?"修改后需保存草稿":"Save draft after editing"} code={value} onChange={onChange} language={language} settings={{...defaultWorkspaceSettings,theme:pageTheme==="dark"?"vs_dark":"vs",fontSize:13}}/></div></Field>;
 }
 function ProblemPreview({
   problem,

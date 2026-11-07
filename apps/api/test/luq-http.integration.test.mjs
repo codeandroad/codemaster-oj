@@ -52,6 +52,17 @@ test('Luq real Nest transport: role/CSRF boundary, idempotent grants, content pr
   await teacher.call('/luq/grants',{method:'POST',body:grant,expected:403});
   await admin.call('/luq/grants',{method:'POST',body:grant});await admin.call('/luq/grants',{method:'POST',body:grant});
   assert.equal((await student.call('/luq/me')).balance,8);
+  const inbox=await student.call('/student-notifications');
+  assert.equal(inbox.unreadCount,1,'replaying the grant does not resend the notice');
+  const [notice]=inbox.items;
+  assert.equal(notice.kind,'scholarship_grant');
+  assert.equal(notice.amount,8);
+  assert.equal(notice.reason,grant.reason);
+  assert.equal((await other.call('/student-notifications')).total,0);
+  await other.call(`/student-notifications/${notice.id}/read`,{method:'POST',expected:404});
+  await student.call(`/student-notifications/${notice.id}/read`,{method:'POST'});
+  assert.equal((await student.call('/student-notifications')).unreadCount,0);
+
   await admin.call('/luq/grants',{method:'POST',body:{...grant,amount:9},expected:409});
   assert.equal((await other.call('/luq/me')).balance,0);
   const input={problemId,versionId,kind:'FULL_SOLUTION',language:''};

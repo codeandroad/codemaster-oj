@@ -55,7 +55,7 @@ export function TeacherPages({
     ) : (
       <TeacherAssignmentProgress id={match[1]!} />
     );
-  if (path === "/teacher/courses" || path === "/teacher/learning") return <TeacherLearning />;
+  if (path === "/teacher/courses" || path === "/teacher/learning") return <TeacherLearning canManageAdmissions={user.roles.includes("admin")} />;
   match = path.match(/^\/teacher\/(?:courses|learning)\/([^/]+)$/);
   if (match) return <TeacherLearningEditor id={match[1]!} />;
   if (path === "/teacher/timed-practice") return <TeacherTimedList />;

@@ -37,7 +37,9 @@ export async function claimPaper4Task(pool, { leaseSeconds = DEFAULT_LEASE_SECON
       const concurrency = settings?.runtime?.workerConcurrency ?? 2;
       const active = await client.query(`SELECT
         (SELECT count(*) FROM judge_tasks WHERE state='leased' AND lease_expires_at>now() AND node_id=$1)
-        +(SELECT count(*) FROM paper4_run_tasks WHERE state='leased' AND lease_expires_at>now() AND node_id=$1) AS count`, [nodeId]);
+        +(SELECT count(*) FROM paper4_run_tasks WHERE state='leased' AND lease_expires_at>now() AND node_id=$1)
+        +(SELECT count(*) FROM school_judge_jobs WHERE state='leased' AND lease_expires_at>now() AND node_id=$1)
+        +(SELECT count(*) FROM school_paper4_jobs WHERE state='leased' AND lease_expires_at>now() AND node_id=$1) AS count`, [nodeId]);
       if (Number(active.rows[0].count) >= concurrency) return null;
     }
     const expired = await client.query(`SELECT * FROM paper4_run_tasks WHERE state='leased' AND lease_expires_at<=now()

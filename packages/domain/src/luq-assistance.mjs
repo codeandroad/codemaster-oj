@@ -16,8 +16,10 @@ async function audit(db,user,action,type,id,metadata={}){
 async function balance(db,identityId){return Number((await db.query('SELECT balance FROM luq_accounts WHERE identity_id=$1',[identityId])).rows[0]?.balance??0);}
 async function aidState(db,user,input,helpers){
  const kind=assistanceKind(input.kind),language=assistanceLanguage(kind,input.language);
- const target=await resolveAssistanceTarget(db,user,input,{helpers});
+ const target=helpers.assistanceTarget?await helpers.assistanceTarget(db,user,input):await resolveAssistanceTarget(db,user,input,{helpers});
  const policy=await resolveAssistancePolicy(db,user,target,kind);
+ const restriction=helpers.assistanceRestriction?await helpers.assistanceRestriction(db,user,target,kind):null;
+ if(restriction?.mode==='disabled')Object.assign(policy,restriction);
  const content=(await db.query(`SELECT id FROM luq_assistance_contents WHERE subject_key=$1 AND version_id=$2
   AND kind=$3 AND language=$4 AND status='published' AND published_at IS NOT NULL`,[target.subjectKey,target.versionId,kind,language])).rows[0];
  const entitlement=(await db.query(`SELECT id,ledger_id FROM luq_assistance_entitlements
@@ -52,14 +54,12 @@ async function contentTarget(db,user,row,helpers){
  return resolveAssistanceTarget(db,user,bits[0]==='problem'?{problemId:bits[1],versionId:row.version_id}:{paperId:paper.paper_id,versionId:row.version_id,questionKey:bits[2]}, {manage:true,helpers});
 }
 
-export async function handleLuqAssistance(ctx){
- const {pool,user,route,method,body={},url,helpers={}}=ctx;
- if(route==='/luq/assistance/quote'&&method==='POST'){
-  return response((await aidState(pool,user,body,helpers)).quote);
+export async function studentAssistanceOperation(db,user,action,body={},helpers={}){
+ if(action==='quote'){
+  return (await aidState(db,user,body,helpers)).quote;
  }
- if(route==='/luq/assistance/unlock'&&method==='POST'){
+ if(action==='unlock'){
   const requestKey=uuid(body.requestKey,'请求键');
-  return response(await transaction(pool,async db=>{
    await lockLuqAssistance(db,user.identityId);
    // Refunds take this wallet lock in luq_post_entry. Keep the credit lookup
    // and entitlement insert in the same wallet transaction as the charge.
@@ -86,10 +86,8 @@ export async function handleLuqAssistance(ctx){
     entry?.id??null,translationCreditLedgerId,entry?null:scopedRequestKey,entry?null:requestHash]));
    await audit(db,user,'luq.assistance_unlock','luq_entitlement',entitlement.id,{ledgerId:entry?.id??null,...priceDetails});
    return {unlocked:true,balance:entry?.balanceAfter??state.quote.balance,charged:price,entitlementId:entitlement.id};
-  }));
  }
- if(route==='/luq/assistance/provide'&&method==='POST'){
-  return response(await transaction(pool,async db=>{
+ if(action==='provide'){
    await lockLuqAssistance(db,user.identityId);
    const state=await aidState(db,user,body,helpers);assertAvailable(state);
    if(state.policy.mode!=='free'&&!state.entitlement)fail(403,'UNLOCK_REQUIRED','请先确认并解锁辅助内容');
@@ -99,8 +97,14 @@ export async function handleLuqAssistance(ctx){
     (identity_id,subject_key,version_id,kind,language,content_id,entitlement_id,context_type,context_id)
     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id,provided_at`,[user.identityId,state.target.subjectKey,state.target.versionId,state.kind,state.language,state.content.id,state.entitlement?.id??null,state.target.contextType,state.target.contextId]));
    return {body:content.body,kind:state.kind,language:state.language,providedAt:delivery.provided_at,contentId:state.content.id,deliveryId:delivery.id};
-  }));
  }
+ return null;
+}
+
+export async function handleLuqAssistance(ctx){
+ const {pool,user,route,method,body={},url,helpers={}}=ctx;
+ const studentAction=route.match(/^\/luq\/assistance\/(quote|unlock|provide)$/);
+ if(studentAction&&method==='POST')return response(await transaction(pool,db=>studentAssistanceOperation(db,user,studentAction[1],body,helpers)));
  if(route==='/luq/contents/review'&&method==='GET'){
   if(!isLuqStaff(user))fail(403,'FORBIDDEN','需要教师权限');
   const targetType=enumValue(url.searchParams.get('targetType'),['problem','paper4'],'内容目标');

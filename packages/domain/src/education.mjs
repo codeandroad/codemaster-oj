@@ -204,7 +204,7 @@ const rankingPolicy = Object.freeze({
  retroactive:false,
  order:['points_desc','ac_rate_desc','luq_balance_desc'],
  ties:'equal_points_ac_rate_and_luq_balance',
- description:'排名积分计审核公开的普通题首次有效 AC，以及 Paper 4 正式交卷后每道大题全部自动测试首次 AC 的固定 10 分。作业与计时训练额外奖励只计入个人总积分。积分相同时比较未四舍五入的 AC 率，暂无有效判题结果者排在已有 AC 率者之后。积分和 AC 率均相同时比较当前 Luq 余额，三项均相同则并列。',
+ description:'排名积分计审核公开的普通题首次有效 AC，以及 Paper 4 正式交卷后每道大题全部自动测试首次 AC 的固定 10 分。作业与计时训练额外奖励只计入个人总积分。积分相同时比较未四舍五入的首解 AC 率，暂无有效统计样本者排在已有首解 AC 率者之后。普通练习与作业按同一学生和题目版本统计至首个有效 AC，限时训练与 Paper 4 按正式提交统计。积分和首解 AC 率均相同时比较当前 Luq 余额，三项均相同则并列。',
 });
 
 async function leaderboardContexts(pool, user) {
@@ -256,16 +256,13 @@ async function pointsLeaderboard(ctx) {
    FROM rank_awards l CROSS JOIN bounds b
    WHERE b.since_at IS NULL OR l.created_at>=b.since_at
    GROUP BY l.identity_id
-  ), attempts AS (
-   SELECT s.identity_id, count(*)::int attempts,
-    count(*) FILTER (WHERE s.status IN ('AC','WA','CE','RE','TLE','MLE','OLE'))::int assessed,
-    count(*) FILTER (WHERE s.status='AC')::int accepted
+  ), eligible_submissions AS NOT MATERIALIZED (
+   SELECT s.id,s.identity_id,s.version_id,s.status,s.created_at,s.timed_attempt_id
    FROM submissions s
    JOIN problem_versions v ON v.id=s.version_id AND v.problem_id=s.problem_id
    JOIN problems p ON p.id=s.problem_id
    JOIN problem_banks bank ON bank.id=p.bank_id
-   CROSS JOIN bounds b
-   WHERE s.kind='submit' AND (b.since_at IS NULL OR s.created_at>=b.since_at)
+   WHERE s.kind='submit'
     AND v.published_at IS NOT NULL AND v.rank_approved_at IS NOT NULL
     AND s.created_at>=v.rank_approved_at
     AND (
@@ -278,7 +275,26 @@ async function pointsLeaderboard(ctx) {
     AND (s.timed_attempt_id IS NULL OR EXISTS (
      SELECT 1 FROM timed_attempts ta JOIN timed_practices tp ON tp.id=ta.practice_id
      WHERE ta.id=s.timed_attempt_id AND tp.results_published_at IS NOT NULL))
-   GROUP BY s.identity_id
+  ), first_ordinary_ac AS (
+   SELECT DISTINCT ON (identity_id,version_id) identity_id,version_id,created_at,id
+   FROM eligible_submissions
+   WHERE timed_attempt_id IS NULL AND status='AC'
+   ORDER BY identity_id,version_id,created_at,id
+  ), period_submissions AS (
+   SELECT s.identity_id,s.status,
+    (s.timed_attempt_id IS NOT NULL OR first_ac.id IS NULL
+     OR (s.created_at,s.id)<=(first_ac.created_at,first_ac.id)) counts_toward_rate
+   FROM eligible_submissions s
+   LEFT JOIN first_ordinary_ac first_ac
+    ON first_ac.identity_id=s.identity_id AND first_ac.version_id=s.version_id
+   CROSS JOIN bounds b
+   WHERE b.since_at IS NULL OR s.created_at>=b.since_at
+  ), attempts AS (
+   SELECT identity_id,count(*)::int attempts,
+    count(*) FILTER (WHERE counts_toward_rate AND status IN ('AC','WA','CE','RE','TLE','MLE','OLE'))::int assessed,
+    count(*) FILTER (WHERE counts_toward_rate AND status='AC')::int accepted
+   FROM period_submissions
+   GROUP BY identity_id
   ), paper4_attempts AS (
    SELECT a.identity_id,count(*)::int attempts,
     count(*) FILTER (WHERE r.status IN ('AC','WA','CE','RE','TLE','MLE','OLE'))::int assessed,

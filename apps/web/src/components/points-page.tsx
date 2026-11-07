@@ -57,7 +57,7 @@ const allFieldsVisible: VisibleFields = { solvedProblems: true, attempts: true, 
 const fieldLabels: { field: OptionalField; label: string }[] = [
   { field: "solvedProblems", label: "解题数" },
   { field: "attempts", label: "提交次数" },
-  { field: "acRate", label: "AC 率" },
+  { field: "acRate", label: "首解 AC 率" },
 ];
 
 const rankingPeriods: { value: RankingPeriod; label: string }[] = [
@@ -68,7 +68,7 @@ const rankingPeriods: { value: RankingPeriod; label: string }[] = [
 const rankNumber = new Intl.NumberFormat("zh-CN");
 const ui = (locale: AppLocale, zh: string, en: string) => locale === "en" ? en : zh;
 const fieldName = (locale: AppLocale, field: OptionalField) => {
-  const names: Record<OptionalField, [string, string]> = { solvedProblems: ["解题数", "Solved"], attempts: ["提交次数", "Attempts"], acRate: ["AC 率", "AC rate"] };
+  const names: Record<OptionalField, [string, string]> = { solvedProblems: ["解题数", "Solved"], attempts: ["提交次数", "Attempts"], acRate: ["首解 AC 率", "First-solve AC rate"] };
   return ui(locale, ...names[field]);
 };
 
@@ -263,8 +263,8 @@ function LeaderboardTable({
             </div>
             {showRules && (
               <div id="leaderboard-rules" className={styles.disclosure}>
-                <p>{ui(locale, "积分来自审核公开题目的首次有效 AC，以及 Paper 4 正式交卷后每道大题首次全部自动测试通过的 10 分。作业与训练额外奖励只计入个人累计积分。积分相同时比较实际 AC 率，暂无有效判题结果者排在已有 AC 率者之后。积分和 AC 率均相同时比较当前 Luq 余额，三项均相同则并列。", "Points come from the first valid AC on approved public problems, plus 10 points for each Paper 4 question that first passes all automatic tests after formal submission. Assignment and practice bonuses count only toward personal totals. When points match, higher unrounded AC rates rank first. Students without judged results follow those with an AC rate. Current Luq balance breaks any remaining tie. Students with all three values equal share a rank.")}</p>
-                {optionalCount > 0 && <p className="mt-1">{ui(locale, "解题数按获榜分的不同题目统计；Paper 4 每道大题计一题、每次交卷中，每道大题各计一次提交。AC 率为有效正式提交中的通过比例。", "Solved counts distinct questions earning leaderboard points. Each Paper 4 question counts as one problem and one attempt per formal submission. AC rate is the share of valid judged submissions accepted.")}</p>}
+                <p>{ui(locale, "积分来自审核公开题目的首次有效 AC，以及 Paper 4 正式交卷后每道大题首次全部自动测试通过的 10 分。作业与训练额外奖励只计入个人累计积分。积分相同时比较未四舍五入的首解 AC 率，暂无有效统计样本者排在已有比率者之后。积分和首解 AC 率均相同时比较当前 Luq 余额，三项均相同则并列。", "Points come from the first valid AC on approved public problems, plus 10 points for each Paper 4 question that first passes all automatic tests after formal submission. Assignment and practice bonuses count only toward personal totals. When points match, higher unrounded first-solve AC rates rank first. Students without results included in the rate rank below those with a rate. Current Luq balance breaks any remaining tie. Students with all three values equal share a rank.")}</p>
+                {optionalCount > 0 && <p className="mt-1">{ui(locale, "解题数按获榜分的不同题目统计。首解 AC 率是纳入统计的有效判题结果中 AC 的比例。普通练习和作业按接收顺序计至同一题目版本的首次有效 AC，之后的重交仍计入提交次数。限时训练按正式提交统计，Paper 4 每次交卷中每道大题各计一次。", "Solved counts distinct questions earning leaderboard points. The first-solve AC rate is the share of included judging results that passed. For practice and assignments, results count in submission order through the first valid AC on each problem version. Later resubmissions still count as attempts. Timed practice counts formal submissions, and Paper 4 counts each question per formal submission.")}</p>}
               </div>
             )}
             {canManage && showSettings && (
@@ -327,7 +327,7 @@ function LeaderboardTable({
                       {visibleFields.solvedProblems && <th scope="col" className={styles.numberCell}>{fieldName(locale, "solvedProblems")}</th>}
                       {visibleFields.attempts && <th scope="col" className={styles.numberCell}>{fieldName(locale, "attempts")}</th>}
                       {visibleFields.acRate && <th scope="col" className={styles.numberCell}>
-                        <abbr title={ui(locale, "AC 的正式提交数 ÷ 已有有效判题结果的正式提交数", "Accepted official submissions ÷ official submissions with valid judging results")}>{fieldName(locale, "acRate")}<CircleHelp size={12} aria-hidden="true" /></abbr>
+                        <abbr title={ui(locale, "纳入统计的 AC 数 ÷ 有效判题数。普通练习和作业计至同一版本首次有效 AC，限时训练和 Paper 4 按正式提交统计。", "Accepted results ÷ valid results included in the rate. Practice and assignments count through the first valid AC per version. Timed practice and Paper 4 count formal submissions.")}>{fieldName(locale, "acRate")}<CircleHelp size={12} aria-hidden="true" /></abbr>
                       </th>}
                     </tr>
                   </thead>

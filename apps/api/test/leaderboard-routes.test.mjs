@@ -46,6 +46,8 @@ test('Nest school leaderboard routes enforce admin-only visibility, cross-class 
     rank_reviewed_at=now(),rank_reviewed_by=$2 WHERE id=$1`,[versionId,adminId]);
    await pool.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,code,idempotency_key,request_hash,status,score)
     VALUES($1,$2,$3,$4,'submit','print(1)',$5,'leaderboard-http','AC',100)`,[otherStudentId,otherIdentityId,problemId,versionId,randomUUID()]);
+   await pool.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,code,idempotency_key,request_hash,status,score)
+    VALUES($1,$2,$3,$4,'submit','print(2)',$5,'leaderboard-http-repeat','WA',0)`,[otherStudentId,otherIdentityId,problemId,versionId,randomUUID()]);
    app=await createApiApplication({databaseUrl:connection.toString(),logger:false,
     config:loadConfig({SESSION_SECRET:randomBytes(32).toString('hex'),APP_ORIGIN:'http://school.test',COOKIE_SECURE:'false'})});
    await app.listen(0,'127.0.0.1');
@@ -79,6 +81,7 @@ test('Nest school leaderboard routes enforce admin-only visibility, cross-class 
    assert.equal(all.data.classId,null);
    assert.equal(all.data.total,2,'default board includes students from every class, including zero-point students');
    assert.equal(all.data.items[0].id,otherIdentityId);
+   assert.equal(all.data.items[0].acRate,100,'a wrong answer after the first AC leaves the rate intact');
    assert.equal(all.data.items[1].id,identityId);
    assert.equal(all.data.items[0].name,'Other Student','existing nickname does not imply opt-in');
    assert.equal(all.data.items[1].name,'Student');
@@ -128,6 +131,7 @@ test('Nest school leaderboard routes enforce admin-only visibility, cross-class 
    assert.equal(Object.hasOwn(after.data.me,'publicTag'),false);
    const otherAfter=await request(`/api/v1/points/leaderboard?classId=${otherClassId}`,{auth:student});
    assert.equal(otherAfter.data.visibleFields.attempts,true,'one admin setting covers all class filters');
+   assert.equal(otherAfter.data.items[0].attempts,2,'the post-AC submission still counts as an attempt');
   }finally{
    if(app)await app.close();
    await pool.end();

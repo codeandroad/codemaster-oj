@@ -65,8 +65,8 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
    await pool.query('INSERT INTO class_members(class_id,identity_id) VALUES($1,$2)',[otherClassId,outsider.identityId]);
    const previousMonth = (await pool.query("SELECT (date_trunc('month',now() AT TIME ZONE 'Asia/Shanghai')-interval '8 days') AT TIME ZONE 'Asia/Shanghai' AS at")).rows[0].at;
    const approvedBeforePreviousMonth=new Date(previousMonth.getTime()-86400000);
-   async function problem() {
-    const id = (await pool.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id', [teacher.id])).rows[0].id;
+   async function problem(existingId) {
+    const id = existingId ?? (await pool.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id', [teacher.id])).rows[0].id;
     const versionId = (await pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code,validation_status,published_at)
      VALUES($1,'Leaderboard problem','stdio','Test',500,64,'print(1)','AC',$2) RETURNING id`, [id,approvedBeforePreviousMonth])).rows[0].id;
     await pool.query('UPDATE problems SET current_version_id=$2 WHERE id=$1', [id, versionId]);
@@ -76,11 +76,11 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
    await pool.query(`UPDATE problem_versions SET school_visible_at=$2,
     rank_review_status='approved',rank_approved_at=$2,rank_reviewed_at=$2,rank_reviewed_by=$3
     WHERE id=ANY($1::uuid[])`,[[first.versionId,second.versionId,hidden.versionId],approvedBeforePreviousMonth,admin.id]);
-   async function submission(student, item, kind, status, createdAt = new Date(), timedAttemptId = null, assignmentId = null) {
+   async function submission(student, item, kind, status, createdAt = new Date(), timedAttemptId = null, assignmentId = null, language = 'python') {
     const score = status === 'AC' ? 100 : ['Waiting', 'Judging', 'System Error'].includes(status) ? null : 0;
-    return (await pool.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,timed_attempt_id,assignment_id,kind,code,idempotency_key,request_hash,status,score,created_at)
-     VALUES($1,$2,$3,$4,$5,$6,$7,'print(1)',$8,'leaderboard-test',$9,$10,$11) RETURNING id`,
-     [student.id, student.identityId, item.id, item.versionId, timedAttemptId, assignmentId, kind, randomUUID(), status, score, createdAt])).rows[0].id;
+    return (await pool.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,timed_attempt_id,assignment_id,kind,code,idempotency_key,request_hash,status,score,created_at,language)
+     VALUES($1,$2,$3,$4,$5,$6,$7,'print(1)',$8,'leaderboard-test',$9,$10,$11,$12) RETURNING id`,
+     [student.id, student.identityId, item.id, item.versionId, timedAttemptId, assignmentId, kind, randomUUID(), status, score, createdAt, language])).rows[0].id;
    }
 
    await submission(alpha, first, 'submit', 'AC', previousMonth);
@@ -91,9 +91,15 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
    await pool.query('ALTER TABLE school_rank_ledger DISABLE TRIGGER school_rank_ledger_immutable');
    await pool.query('UPDATE school_rank_ledger SET created_at=$2 WHERE identity_id=$1 AND problem_id=$3',[alpha.identityId,previousMonth,first.id]);
    await pool.query('ALTER TABLE school_rank_ledger ENABLE TRIGGER school_rank_ledger_immutable');
-   await submission(alpha, second, 'submit', 'AC');
-   await submission(alpha, second, 'submit', 'WA');
-   await submission(alpha, second, 'submit', 'AC');
+   const receivedAt = new Date();
+   const earlierId = await submission(alpha, second, 'submit', 'Waiting', receivedAt);
+   await submission(alpha, second, 'submit', 'AC', receivedAt);
+   await pool.query("UPDATE submissions SET status='WA',score=0 WHERE id=$1",[earlierId]);
+   assert.equal((await leaderboard(pool,alpha,'?period=week')).body.me.acRate,50,'receive order includes an earlier submission judged after the first AC');
+   await submission(alpha, second, 'submit', 'WA', receivedAt);
+   assert.equal((await leaderboard(pool,alpha,'?period=week')).body.me.acRate,50,'a WA after the first AC is neutral even when received timestamps are equal');
+   await submission(alpha, second, 'submit', 'AC', receivedAt);
+   assert.equal((await leaderboard(pool,alpha,'?period=week')).body.me.acRate,50,'an AC after the first AC is also neutral');
    await submission(alpha, second, 'samples', 'AC');
    await submission(alpha, second, 'correction', 'AC');
    await submission(beta, first, 'submit', 'AC');
@@ -122,7 +128,7 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
    assert.deepEqual(hiddenByDefault.visibleFields,{solvedProblems:true,attempts:false,acRate:true});
    assert.equal(Object.hasOwn(hiddenByDefault.me,'attempts'),false,'hidden student fields must be redacted by the API');
    assert.equal(Object.hasOwn(hiddenByDefault.me,'publicTag'),false);
-   assert.equal((await leaderboard(pool,teacher,`?classId=${classId}`)).body.items.find(item=>item.id===alpha.identityId).attempts,4,'teachers retain full metrics');
+   assert.equal((await leaderboard(pool,teacher,`?classId=${classId}`)).body.items.find(item=>item.id===alpha.identityId).attempts,5,'teachers retain full metrics');
    assert.equal((await leaderboard(pool,alpha,`?classId=${otherClassId}`)).body.total,1,'students may select another class, including members without points');
    assert.equal((await leaderboard(pool,teacher,`?classId=${otherClassId}`)).body.total,1,'teachers may view classes they do not teach');
    await assert.rejects(leaderboard(pool,alpha,`?classId=${randomUUID()}`),error=>error.status===404);
@@ -143,8 +149,8 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
    assert.equal(Object.hasOwn(all.me,'publicTag'),false);
    assert.equal(all.me.points, 20);
    assert.equal(all.me.solvedProblems, 2);
-   assert.equal(all.me.attempts, 4);
-   assert.equal(all.me.acRate, 75);
+   assert.equal(all.me.attempts, 5);
+   assert.equal(all.me.acRate, 66.7);
    assert.equal((await pointsMe(pool,alpha)).body.points,20);
    assert.equal((await pointsMe(pool,alpha)).body.rankPoints,20);
    assert.equal((await pointsMe(pool,alpha)).body.rankingPolicy.scope,'approved_school_and_paper4_first_ac');
@@ -190,8 +196,8 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
     assert.equal(current.items[0].points, 20);
     assert.equal(current.me.points, 10, `${period} excludes previous-month awards`);
     assert.equal(current.me.solvedProblems, 1);
-    assert.equal(current.me.attempts, 3, 'unreleased timed and old formal submissions are excluded');
-    assert.equal(current.me.acRate, 66.7);
+    assert.equal(current.me.attempts, 4, 'unreleased timed and old formal submissions are excluded');
+    assert.equal(current.me.acRate, 50);
     assert.deepEqual(current.items.slice(1).map(item => item.rank), [2, 3, 4, 4]);
    }
    await updateVisibility(pool,admin,{solvedProblems:false,attempts:false,acRate:false});
@@ -254,10 +260,13 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
    await pool.query('INSERT INTO point_rewards(problem_id,assignment_id,points,updated_by) VALUES($1,$2,7,$3)',[first.id,assignmentId,teacher.id]);
    await pool.query("UPDATE assignments SET state='Published' WHERE id=$1",[assignmentId]);
    const beforeBonus=(await pointsMe(pool,alpha)).body;
-   await submission(alpha,first,'submit','AC',new Date(),null,assignmentId);
+   await submission(alpha,first,'submit','AC',new Date(),null,assignmentId,'cpp');
    const afterBonus=(await pointsMe(pool,alpha)).body;
    assert.equal(afterBonus.points,beforeBonus.points+7);
    assert.equal(afterBonus.rankPoints,beforeBonus.rankPoints);
+   const afterAssignment=(await leaderboard(pool,teacher)).body.items.find(item=>item.id===alpha.identityId);
+   assert.equal(afterAssignment.attempts,6);
+   assert.equal(afterAssignment.acRate,66.7,'a different language and ordinary assignment still share the same first solve');
 
    // A timed AC followed by a scored WA earns first-AC rank points only when
    // the first result is published, matching the personal first-AC policy.
@@ -270,6 +279,24 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
    assert.equal(afterRelease.points,afterBonus.points+10);
    assert.equal(afterRelease.rankPoints,afterBonus.rankPoints+10);
    assert.equal((await pool.query('SELECT submission_id FROM school_rank_ledger WHERE identity_id=$1 AND problem_id=$2',[alpha.identityId,hidden.id])).rows[0].submission_id,timedAcId);
+   const afterTimed=(await leaderboard(pool,teacher)).body.items.find(item=>item.id===alpha.identityId);
+   assert.equal(afterTimed.attempts,8);
+   assert.equal(afterTimed.acRate,60,'both results of a published timed attempt enter the rate');
+
+   await submission(newcomer,first,'submit','AC',previousMonth);
+   await submission(newcomer,first,'submit','WA');
+   for (const period of ['month','week']) {
+    const repeat=(await leaderboard(pool,teacher,`?period=${period}`)).body.items.find(item=>item.id===newcomer.identityId);
+    assert.equal(repeat.attempts,1);
+    assert.equal(repeat.acRate,null,'a previous-period first AC leaves a current-period repeat without a rate sample');
+   }
+   const newVersion=await problem(first.id);
+   await pool.query(`UPDATE problem_versions SET school_visible_at=$2,rank_review_status='approved',
+    rank_approved_at=$2,rank_reviewed_at=$2,rank_reviewed_by=$3 WHERE id=$1`,[newVersion.versionId,approvedBeforePreviousMonth,admin.id]);
+   await submission(newcomer,newVersion,'submit','WA');
+   const newVersionResult=(await leaderboard(pool,teacher,'?period=week')).body.items.find(item=>item.id===newcomer.identityId);
+   assert.equal(newVersionResult.attempts,2);
+   assert.equal(newVersionResult.acRate,0,'the first AC on an old version does not hide a valid result for a new version');
   } finally {
    await pool.end();
    await manager.query(`DROP SCHEMA ${schema} CASCADE`);
@@ -294,8 +321,8 @@ test('leaderboard orders by points, unrounded AC rate and current Luq balance, p
     return {id,identityId,roles:[kind]};
    }
    const teacher = await account('teacher'), admin = await account('admin');
-   async function problem() {
-    const id = (await pool.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id', [teacher.id])).rows[0].id;
+   async function problem(existingId) {
+    const id = existingId ?? (await pool.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id', [teacher.id])).rows[0].id;
     const versionId = (await pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code,validation_status,published_at,
      school_visible_at,rank_review_status,rank_approved_at,rank_reviewed_at,rank_reviewed_by)
      VALUES($1,'Ratio test','stdio','Test',500,64,'print(1)','AC',now()-interval '1 day',
@@ -303,12 +330,12 @@ test('leaderboard orders by points, unrounded AC rate and current Luq balance, p
     await pool.query('UPDATE problems SET current_version_id=$2 WHERE id=$1', [id,versionId]);
     return {id,versionId};
    }
-   const first = await problem(), second = await problem();
+   const first = await problem(), second = await problem(), newerFirst = await problem(first.id);
    async function attempts(student, item, accepted, total) {
     await pool.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,code,idempotency_key,request_hash,status,score)
      SELECT $1,$2,$3,$4,'submit','print(1)',gen_random_uuid()::text,'leaderboard-ratio-test',
-      CASE WHEN n<=$5 THEN 'AC' ELSE 'WA' END,CASE WHEN n<=$5 THEN 100 ELSE 0 END
-     FROM generate_series(1,$6::int) n`, [student.id,student.identityId,item.id,item.versionId,accepted,total]);
+      CASE WHEN $5::boolean AND n=$6 THEN 'AC' ELSE 'WA' END,CASE WHEN $5 AND n=$6 THEN 100 ELSE 0 END
+     FROM generate_series(1,$6::int) n ORDER BY n`, [student.id,student.identityId,item.id,item.versionId,accepted,total]);
    }
    async function grantLuq(student, amount) {
     await pool.query("SELECT luq_post_entry($1,$2,'admin_grant',$3,$4,'Leaderboard test grant')",
@@ -317,13 +344,14 @@ test('leaderboard orders by points, unrounded AC rate and current Luq balance, p
    const morePoints = await account('student'), perfect = await account('student');
    const higherRatio = await account('student'), equalRatio = await account('student'), lowerRatio = await account('student');
    const zeroRate = await account('student'), noRate = await account('student'), anotherNoRate = await account('student');
-   await attempts(morePoints,first,1,4);
-   await attempts(morePoints,second,1,4);
-   await attempts(perfect,first,1,1);
-   await attempts(higherRatio,first,1,1000);
-   await attempts(equalRatio,first,2,2000);
-   await attempts(lowerRatio,first,1,1001);
-   await attempts(zeroRate,first,0,1);
+   await attempts(morePoints,first,true,4);
+   await attempts(morePoints,second,true,4);
+   await attempts(perfect,first,true,1);
+   await attempts(higherRatio,first,true,1000);
+   await attempts(equalRatio,first,true,1000);
+   await attempts(equalRatio,newerFirst,true,1000);
+   await attempts(lowerRatio,first,true,1001);
+   await attempts(zeroRate,first,false,1);
    await grantLuq(perfect,100);
    await grantLuq(lowerRatio,200);
 

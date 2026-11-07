@@ -11,13 +11,18 @@ export interface ResultCase {
   output?: string | null;
   stdout?: string;
   stderr?: string;
+  runtimeError?: string;
   reason?: "input_mutation";
   truncated?: boolean;
 }
 export interface CodeLocation { line: number; column?: number; file: string }
 export interface DiffPart { text: string; changed: boolean }
 
-export function defaultResultCase(cases: ResultCase[]) {
+export function defaultResultCase(cases: ResultCase[], status?: string) {
+  if (status === "RE") {
+    const runtimeError = cases.findIndex(item => item.status === "RE");
+    if (runtimeError >= 0) return runtimeError;
+  }
   const index = cases.findIndex(c => !["AC", "Executed", "NotRun"].includes(c.status));
   return index >= 0 ? index : 0;
 }

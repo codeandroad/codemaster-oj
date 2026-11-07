@@ -7,7 +7,7 @@ import { migrate } from '../src/migrate.mjs';
 import { bootstrap } from '../src/bootstrap.mjs';
 import { createApp, loadConfig } from '../src/app.mjs';
 
-test('HTTP result feedback uses authorized, confirmed runs and public data only',
+test('HTTP result feedback uses authorized, confirmed runs and context-aware diagnostics',
  {skip:!process.env.TEST_DATABASE_URL,timeout:60000},async t=>{
  const manager=createPool(process.env.TEST_DATABASE_URL),schema=`feedback_${randomBytes(6).toString('hex')}`;
  await manager.query(`CREATE SCHEMA ${schema}`);
@@ -44,9 +44,9 @@ test('HTTP result feedback uses authorized, confirmed runs and public data only'
    return (await pool.query(`INSERT INTO judge_runs(task_id,lease_id,submission_id,version_id,status,score,passed,total,private_results,environment_version,created_at)
     VALUES($1,$2,$3,$4,$5,$6,1,2,$7,'feedback-test',clock_timestamp()) RETURNING id`,[task,randomUUID(),id,versionId,status,score,JSON.stringify(raw)])).rows[0].id;
   }
-  async function submission(kind='samples',{raw=logs,status='WA',score=50,timedAttemptId=null}={}){
-   const id=(await pool.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,code,custom_input,idempotency_key,request_hash,status,score,passed,total,timed_attempt_id)
-    VALUES($1,$2,$3,$4,$5,'def solve(x): return x+2','[9]',$6,'feedback',$7,$8,1,2,$9) RETURNING id`,[student.id,student.identityId,problemId,versionId,kind,randomUUID(),status,score,timedAttemptId])).rows[0].id;
+  async function submission(kind='samples',{raw=logs,status='WA',score=50,timedAttemptId=null,originalId=null}={}){
+   const id=(await pool.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,code,custom_input,idempotency_key,request_hash,status,score,passed,total,timed_attempt_id,original_submission_id)
+    VALUES($1,$2,$3,$4,$5,'def solve(x): return x+2','[9]',$6,'feedback',$7,$8,1,2,$9,$10) RETURNING id`,[student.id,student.identityId,problemId,versionId,kind,randomUUID(),status,score,timedAttemptId,originalId])).rows[0].id;
    const runId=await createRun(id,raw,{kind,status,score});return {id,runId};
   }
   const detail=id=>student.api(`/submissions/SUB${id}`);
@@ -61,10 +61,25 @@ test('HTTP result feedback uses authorized, confirmed runs and public data only'
    const {id}=await submission('custom',{status:'Executed',score:null,raw:[{position:1,status:'Executed',returned:'11',stdout:'debug',stderr:''}]});
    const result=await detail(id);assert.equal(result.score,null);assert.equal(result.testResults[0].output,'11');assert.equal(result.testResults[0].input,'[9]');assert.equal(result.testResults[0].expected,undefined);
   });
-  await t.test('hidden formal and correction tests keep all raw logs private for student and staff',async()=>{
+  const exceptionLog={status:'RE',score:0,raw:[{position:1,status:'RE',cpuMs:4,stdout:'PRIVATE_STDOUT',stderr:'ValueError: retained error',returned:'PRIVATE_RETURN',testId:'PRIVATE_CASE'}]};
+  await t.test('ordinary formal and correction runs expose the runtime error only for authorized readers',async()=>{
+   const original=await submission('submit',exceptionLog);
    for(const kind of ['submit','correction']){
-    const {id}=await submission(kind,{status:'RE',score:0,raw:[{position:1,status:'RE',cpuMs:4,stdout:'PRIVATE_INPUT',stderr:'PRIVATE_STACK',returned:'PRIVATE_RETURN',testId:'PRIVATE_CASE'}]});
-    for(const api of [student.api,admin]){const result=await api(`/submissions/SUB${id}`);assert.deepEqual(result.testResults,[{position:1,status:'RE',timeMs:4}]);assert.doesNotMatch(JSON.stringify(result),/PRIVATE_/);}
+    const {id}=kind==='submit'?original:await submission(kind,{...exceptionLog,originalId:original.id});
+    for(const api of [student.api,admin]){
+     const result=await api(`/submissions/SUB${id}`);
+     assert.deepEqual(result.testResults,[{position:1,status:'RE',timeMs:4,runtimeError:'ValueError: retained error',mode:'function'}]);
+     assert.doesNotMatch(JSON.stringify(result),/PRIVATE_/);
+    }
+    const denied=await other.api(`/submissions/SUB${id}`,undefined,403);
+    assert.doesNotMatch(JSON.stringify(denied),/retained error|runtimeError|PRIVATE_/);
+   }
+  });
+  await t.test('legacy correction with no original submission keeps its runtime diagnostic private',async()=>{
+   const {id}=await submission('correction',exceptionLog);
+   for(const api of [student.api,admin]){
+    const result=await api(`/submissions/SUB${id}`);
+    assert.deepEqual(result.testResults,[{position:1,status:'RE',timeMs:4}]);
    }
   });
   await t.test('pending rejudge results do not replace displayed output until explicitly confirmed',async()=>{
@@ -76,14 +91,21 @@ test('HTTP result feedback uses authorized, confirmed runs and public data only'
    await pool.query("INSERT INTO audit_events(actor_account_id,action,resource_type,resource_id,metadata) VALUES($1,'submission.rejudge_confirm','submission',$2,$3)",[adminUser.id,String(id),JSON.stringify({runId})]);
    assert.equal((await detail(id)).testResults[0].output,'999');
   });
-  await t.test('unreleased timed results cannot disclose cases via submission detail',async()=>{
+  await t.test('timed runtime errors stay private before and after release, including through correction chains',async()=>{
    const practice=(await pool.query("INSERT INTO timed_practices(title,owner_account_id,starts_at,ends_at,duration_minutes,state) VALUES('Timed feedback',$1,now()-interval '1 minute',now()+interval '1 hour',60,'Draft') RETURNING id",[adminUser.id])).rows[0].id;
    await pool.query('INSERT INTO timed_practice_participants(practice_id,identity_id) VALUES($1,$2)',[practice,student.identityId]);
    await pool.query("UPDATE timed_practices SET state='Published' WHERE id=$1",[practice]);
    const attempt=(await pool.query("INSERT INTO timed_attempts(practice_id,identity_id,account_id,started_at,deadline_at) VALUES($1,$2,$3,now()-interval '1 minute',now()+interval '1 hour') RETURNING id",[practice,student.identityId,student.id])).rows[0].id;
-   const {id}=await submission('submit',{timedAttemptId:attempt});const masked=await detail(id);
+   const {id}=await submission('submit',{...exceptionLog,timedAttemptId:attempt});const masked=await detail(id);
    assert.equal(masked.resultsVisible,false);assert.equal(masked.score,null);assert.deepEqual(masked.testResults,[]);
-   assert.equal((await admin(`/submissions/SUB${id}`)).testResults.length,2);
+   const measurements=[{position:1,status:'RE',timeMs:4}];
+   assert.deepEqual((await admin(`/submissions/SUB${id}`)).testResults,measurements);
+   await pool.query('UPDATE timed_practices SET results_published_at=now() WHERE id=$1',[practice]);
+   const released=await detail(id);
+   assert.equal(released.resultsVisible,true);assert.deepEqual(released.testResults,measurements);
+   const correction=await submission('correction',{...exceptionLog,originalId:id});
+   const nextCorrection=await submission('correction',{...exceptionLog,originalId:correction.id});
+   for(const correctionId of [correction.id,nextCorrection.id])assert.deepEqual((await detail(correctionId)).testResults,measurements);
   });
  }finally{if(server)await new Promise(resolve=>server.close(resolve));await pool.end();await manager.query(`DROP SCHEMA ${schema} CASCADE`);await manager.end();}
 });

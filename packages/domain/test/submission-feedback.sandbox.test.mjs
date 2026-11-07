@@ -33,11 +33,16 @@ test('real sandbox: JavaScript errors identify main.js; C++ source compile lines
  const exception=await run('json solve(json& args, json& kwargs) { throw std::runtime_error("example error"); }',{language:'cpp'});
  assert.equal(exception.status,'RE');assert.match(exception.privateResults[0].stderr,/RuntimeError: example error/);
 });
-test('real sandbox: hidden exception text stays private in formal and correction projections', {skip:!enabled},async()=>{
+test('real sandbox: retained exception text is visible in ordinary runs but private in timed contexts', {skip:!enabled},async()=>{
  for(const kind of ['submit','correction']){
   const result=await run('def solve(x): raise ValueError(x)',{kind,tests:[{input:'["HIDDEN_INPUT_SENTINEL"]',expected:'null'}]});
   assert.equal(result.status,'RE');assert.match(result.privateResults[0].stderr,/HIDDEN_INPUT_SENTINEL/);
   assert.doesNotMatch(result.publicOutput+result.publicMessage,/HIDDEN_INPUT_SENTINEL/);
-  assert.doesNotMatch(JSON.stringify(submissionCaseFeedback({kind},version,result.privateResults)),/HIDDEN_INPUT_SENTINEL|stderr|input|returned|output/);
+  const context={kind,context_resolved:true,original_submission_id:kind==='correction'?'1':null};
+  const ordinary=submissionCaseFeedback(context,version,result.privateResults)[0];
+  assert.equal(ordinary.runtimeError,result.privateResults[0].stderr);
+  for(const field of ['stderr','stdout','input','expected','output','returned','testId','visibility'])assert.equal(ordinary[field],undefined);
+  const timed=kind==='submit'?{timed_attempt_id:'timed-attempt'}:{access_timed_attempt_id:'timed-attempt'};
+  assert.doesNotMatch(JSON.stringify(submissionCaseFeedback({...context,...timed},version,result.privateResults)),/HIDDEN_INPUT_SENTINEL|runtimeError|stderr|input|returned|output/);
  }
 });

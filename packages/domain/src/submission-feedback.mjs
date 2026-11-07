@@ -1,10 +1,11 @@
 const text = (value, limit = 8192) => typeof value === 'string' ? value.slice(0, limit) : '';
 
 // This is the only projection from private judge logs to public case feedback.
-// Formal/correction runs deliberately return measurements only, even for staff.
 export function submissionCaseFeedback(submission, version, results) {
  if (submission.results_visible === false) return [];
  const visible = ['samples', 'custom'].includes(submission.kind);
+ const showRuntimeError = (submission.kind === 'submit' || submission.kind === 'correction' && submission.original_submission_id != null) &&
+  submission.context_resolved === true && !submission.timed_attempt_id && !submission.access_timed_attempt_id;
  const samples = (version?.samples ?? []).filter(sample => sample.enabled !== false);
  return (Array.isArray(results) ? results : []).slice(0, 100).map((raw, index) => {
   const r = raw && typeof raw === 'object' ? raw : {};
@@ -12,7 +13,14 @@ export function submissionCaseFeedback(submission, version, results) {
   const item = { position, status: typeof r.status === 'string' ? r.status : 'NotRun',
    ...(Number.isFinite(r.cpuMs) ? { timeMs: r.cpuMs } : {}),
    ...(Number.isFinite(r.memoryBytes) ? { memoryKb: Math.ceil(r.memoryBytes / 1024) } : {}) };
-  if (!visible || !version) return item;
+  if (!visible) {
+   // Practice may expose the exception stream, which is controlled by the submitted program.
+   // Keep the other formal test fields private, and withhold stderr in timed contexts.
+   const runtimeError = showRuntimeError && item.status === 'RE' ? text(r.stderr) : '';
+   return runtimeError ? { ...item, runtimeError, mode: version?.mode,
+    ...(r.stderrTruncated === true || r.stderr.length > runtimeError.length ? { truncated: true } : {}) } : item;
+  }
+  if (!version) return item;
   const sample = submission.kind === 'samples' ? samples[position - 1] : null;
   if (submission.kind === 'samples' && !sample || submission.kind === 'custom' && position !== 1) return item;
   const hasReturn = version.mode === 'function' && ['AC', 'WA', 'Executed'].includes(item.status) && typeof r.returned === 'string' && r.reason !== 'input_mutation';
@@ -35,6 +43,6 @@ export async function loadSubmissionCaseFeedback(db, submission, masked) {
     AND e.resource_id=$1::text AND e.metadata->>'runId'=r.id::text))
   ORDER BY r.created_at DESC,r.id DESC LIMIT 1`, [submission.id, submission.pending_judge_run_id ?? null, submission.status, submission.score])).rows[0];
  const version = ['samples', 'custom'].includes(submission.kind) ?
-  (await db.query('SELECT mode,comparator,samples FROM problem_versions WHERE id=$1', [submission.version_id])).rows[0] : null;
+  (await db.query('SELECT mode,comparator,samples FROM problem_versions WHERE id=$1', [submission.version_id])).rows[0] : { mode: submission.problem_mode };
  return submissionCaseFeedback(masked, version, run?.private_results);
 }

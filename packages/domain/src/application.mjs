@@ -131,7 +131,7 @@ export async function createDomainServices(pool,config) {
   }return result;
  }
  async function submissionAccess(db,user,id) {
-  const s=row(await db.query('SELECT s.*,COALESCE(s.assignment_id,original.assignment_id) access_assignment_id,COALESCE(s.timed_attempt_id,original.timed_attempt_id) access_timed_attempt_id,(s.original_submission_id IS NULL OR original.resolved) context_resolved,v.title problem_title,i.name student_name FROM submissions s LEFT JOIN LATERAL submission_activity_context(s.original_submission_id) original ON true JOIN problem_versions v ON v.id=s.version_id JOIN identities i ON i.id=s.identity_id WHERE s.id=$1',[submissionId(id)]));
+  const s=row(await db.query('SELECT s.*,COALESCE(s.assignment_id,original.assignment_id) access_assignment_id,COALESCE(s.timed_attempt_id,original.timed_attempt_id) access_timed_attempt_id,(s.original_submission_id IS NULL OR original.resolved) context_resolved,v.title problem_title,v.mode problem_mode,i.name student_name FROM submissions s LEFT JOIN LATERAL submission_activity_context(s.original_submission_id) original ON true JOIN problem_versions v ON v.id=s.version_id JOIN identities i ON i.id=s.identity_id WHERE s.id=$1',[submissionId(id)]));
   if(s.identity_id!==user.identityId&&!rolesInclude(user,'admin')) {
    let allowed=false;
    if(rolesInclude(user,'teacher')){

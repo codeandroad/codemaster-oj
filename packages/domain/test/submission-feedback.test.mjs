@@ -4,9 +4,29 @@ import { submissionCaseFeedback } from '../src/submission-feedback.mjs';
 
 const version={mode:'function',comparator:'json',samples:[{input:'DISABLED',expected:'SECRET',enabled:false},{input:'[[1,2]]',expected:'[2,3]'}],reference_code:'PRIVATE_REFERENCE'};
 const logs=[{position:1,status:'WA',cpuMs:3,memoryBytes:1025,stdout:'debug',stderr:'Error',returned:'[2,4]',testId:'PRIVATE_ID',secret:'PRIVATE_OTHER'}];
-test('formal and correction logs expose measurements only, never hidden content',()=>{
+test('formal and correction logs omit output and protect unresolved or timed runtime errors',()=>{
  for(const kind of ['submit','correction','unknown'])assert.deepEqual(submissionCaseFeedback({kind},version,logs),[{position:1,status:'WA',timeMs:3,memoryKb:2}]);
+ const runtime=[{...logs[0],status:'RE'}];
+ for(const submission of [
+  {kind:'submit'},
+  {kind:'submit',context_resolved:true,timed_attempt_id:'timed-attempt'},
+  {kind:'correction',context_resolved:true},
+  {kind:'correction',context_resolved:true,original_submission_id:'1',access_timed_attempt_id:'original-timed-attempt'},
+  {kind:'correction',context_resolved:false,original_submission_id:'1'},
+  {kind:'unknown',context_resolved:true},
+ ])assert.deepEqual(submissionCaseFeedback(submission,version,runtime),[{position:1,status:'RE',timeMs:3,memoryKb:2}]);
  assert.deepEqual(submissionCaseFeedback({kind:'samples',results_visible:false},version,logs),[]);
+});
+test('ordinary formal and correction runtime errors expose only retained stderr and its truncation',()=>{
+ const results=[logs[0],{...logs[0],position:2,status:'RE',stderr:'ValueError: bad argument'},{...logs[0],position:3,status:'RE',stderr:'x'.repeat(9000)},{position:4,status:'RE'}];
+ for(const kind of ['submit','correction']){
+  assert.deepEqual(submissionCaseFeedback({kind,context_resolved:true,original_submission_id:kind==='correction'?'1':null},version,results),[
+   {position:1,status:'WA',timeMs:3,memoryKb:2},
+   {position:2,status:'RE',timeMs:3,memoryKb:2,mode:'function',runtimeError:'ValueError: bad argument'},
+   {position:3,status:'RE',timeMs:3,memoryKb:2,mode:'function',runtimeError:'x'.repeat(8192),truncated:true},
+   {position:4,status:'RE'},
+  ]);
+ }
 });
 test('public samples use the pinned version and enabled sample order with separate return/debug output',()=>{
  const [row]=submissionCaseFeedback({kind:'samples'},version,logs);

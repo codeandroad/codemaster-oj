@@ -9,7 +9,7 @@ import {loadConfig} from '../../../packages/domain/src/application.mjs';
 import {canonicalHash} from '../../../packages/domain/src/security.mjs';
 
 test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limits and JSON errors',
-  {skip: !process.env.TEST_DATABASE_URL, timeout: 60000}, async () => {
+  {skip: !process.env.TEST_DATABASE_URL, timeout: 60000}, async t => {
   const manager=createPool(process.env.TEST_DATABASE_URL);
   const schema=`nest_${randomBytes(6).toString('hex')}`;
   await manager.query(`CREATE SCHEMA ${schema}`);
@@ -148,6 +148,81 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
     assert.equal((await request('/api/v1/problem-groups/move',{method:'POST',auth:admin,body:move,headers:{'X-CSRF-Token':'invalid'}})).status,403);
     const moved=await request('/api/v1/problem-groups/move',{method:'POST',auth:admin,body:move});assert.equal(moved.status,200,JSON.stringify(moved.data));assert.equal(moved.data.moved,1);
     const afterGroups=(await request('/api/v1/problem-groups',{auth:admin})).data.items;assert(!afterGroups.find(g=>g.id===groups[0].id).problemIds.includes(sampleDraft.data.id));assert(afterGroups.find(g=>g.id===groups[1].id).problemIds.includes(sampleDraft.data.id));
+    await t.test('ordinary runtime diagnostics reach the owner while timed attempts and their corrections stay private', async () => {
+      const runtimeError = 'ValueError: diagnostic sentinel';
+      const measurements = [{position:1,status:'RE',timeMs:5,memoryKb:2048},{position:2,status:'NotRun'}];
+      const rawResults = [
+        {position:1,status:'RE',cpuMs:5,memoryBytes:2097152,stderr:runtimeError,
+          stdout:'PRIVATE_STDOUT',returned:'PRIVATE_RETURN',input:'PRIVATE_INPUT',expected:'PRIVATE_EXPECTED',testId:'PRIVATE_ID'},
+        {position:2,status:'NotRun'},
+      ];
+      async function recordFailure(submissionId) {
+        const id = submissionId.slice(3);
+        await pool.query(`WITH completed AS (
+          UPDATE judge_tasks SET state='completed' WHERE submission_id=$1 RETURNING id,version_id
+        ) INSERT INTO judge_runs(task_id,lease_id,submission_id,version_id,status,score,passed,total,private_results,environment_version)
+          SELECT id,gen_random_uuid(),$1,version_id,'RE',0,0,2,$2,'nest-feedback-test' FROM completed`, [id,JSON.stringify(rawResults)]);
+        await pool.query("UPDATE submissions SET status='RE',score=0,passed=0,total=2 WHERE id=$1",[id]);
+      }
+      const detail = (id, auth) => request(`/api/v1/submissions/${id}`,{auth});
+
+      for (const {data:{id}} of [submission, correction, inAssignment]) {
+        await recordFailure(id);
+        const result = await detail(id, student);
+        assert.equal(result.status, 200);
+        assert.equal(result.data.testResults[0].runtimeError, runtimeError);
+        assert.equal(result.data.testResults[0].mode, 'stdio');
+        assert.equal(result.data.testResults[0].stderr, undefined);
+        assert.deepEqual(result.data.testResults[1], measurements[1]);
+        assert.doesNotMatch(JSON.stringify(result.data), /PRIVATE_/);
+      }
+      assert.equal((await detail(submission.data.id)).status, 401);
+      const outsider = await request('/api/v1/people',{method:'POST',body:{kind:'student',number:'OUTSIDER',name:'Nest outsider'},auth:admin});
+      assert.equal(outsider.status, 201);
+      const outsiderAccount = await request('/api/v1/auth/register',{method:'POST',body:{kind:'student',number:'OUTSIDER',name:'Nest outsider',
+        username:'nest-outsider',activationCode:outsider.data.activationCode,password:randomBytes(24).toString('base64url')}});
+      assert.equal(outsiderAccount.status, 201);
+      const denied = await detail(submission.data.id, outsiderAccount);
+      assert.equal(denied.status, 403);
+      assert.doesNotMatch(JSON.stringify(denied.data), /testResults|diagnostic sentinel/);
+
+      const practice = await request('/api/v1/timed-practices',{method:'POST',auth:admin,body:{
+        title:'Timed diagnostics',startsAt:new Date(Date.now()-1000).toISOString(),endsAt:new Date(Date.now()+600000).toISOString(),
+        durationMinutes:5,showVerdict:true,participants:[person.data.person.id],problems:[{problemId:problem.id,versionId:version.id,points:100}],
+      }});
+      assert.equal(practice.status, 201, JSON.stringify(practice.data));
+      const activityAction = (action, auth) => request(`/api/v1/timed-practices/${practice.data.id}/${action}`,{method:'POST',body:{},auth});
+      for (const [action, auth] of [['publish',admin], ['start',student]]) {
+        const result = await activityAction(action, auth);
+        assert.equal(result.status, 200, JSON.stringify(result.data));
+      }
+      const timed = await request('/api/v1/submissions',{method:'POST',auth:student,body:{
+        problemId:problem.id,versionId:version.id,kind:'submit',code:'print(3)',idempotencyKey:'nest-timed-runtime',timedPracticeId:practice.data.id,
+      }});
+      assert.equal(timed.status, 201, JSON.stringify(timed.data));
+      await recordFailure(timed.data.id);
+      const embargoed = await detail(timed.data.id, student);
+      assert.equal(embargoed.status, 200);
+      assert.equal(embargoed.data.resultsVisible, false);
+      assert.deepEqual(embargoed.data.testResults, []);
+      assert.deepEqual((await detail(timed.data.id, admin)).data.testResults, measurements);
+      for (const [action, auth] of [['finish',student], ['results',admin]]) {
+        const result = await activityAction(action, auth);
+        assert.equal(result.status, 200, JSON.stringify(result.data));
+      }
+      const timedCorrection = await request('/api/v1/submissions',{method:'POST',auth:student,body:{
+        problemId:problem.id,kind:'correction',code:'print(4)',idempotencyKey:'nest-timed-correction-runtime',originalSubmissionId:timed.data.id,
+      }});
+      assert.equal(timedCorrection.status, 201, JSON.stringify(timedCorrection.data));
+      await recordFailure(timedCorrection.data.id);
+      for (const {data:{id}} of [timed, timedCorrection]) {
+        const result = await detail(id, student);
+        assert.equal(result.status, 200);
+        assert.equal(result.data.resultsVisible, true);
+        assert.deepEqual(result.data.testResults, measurements);
+        assert.doesNotMatch(JSON.stringify(result.data), /diagnostic sentinel|PRIVATE_/);
+      }
+    });
     const unknown=await request('/api/v1/does-not-exist',{auth:admin});
     assert.equal(unknown.status,404);assert.equal(unknown.data.error.code,'NOT_FOUND');
     assert.equal((await request(`/api/v1/accounts/${student.data.user.id}`,{method:'PATCH',body:{disabled:true},auth:admin})).status,200);

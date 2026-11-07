@@ -8,6 +8,11 @@ test('result defaults to the first failure, not a passed or unexecuted case', ()
  assert.equal(defaultResultCase([{status:'AC'},{status:'AC'}]),0);
  assert.equal(defaultResultCase([]),0);
 });
+test('a runtime verdict opens the exception case even if an earlier case had a wrong answer', () => {
+ const cases = [{status:'AC'},{status:'WA'},{status:'RE'},{status:'NotRun'}];
+ assert.equal(defaultResultCase(cases,'RE'),2);
+ assert.equal(defaultResultCase(cases,'WA'),1);
+});
 test('diff preserves original values and highlights only changed characters', () => {
  const diff=outputDifference('[1,3]','[1,2]');
  assert.deepEqual(diff.actual,[{text:'[1,',changed:false},{text:'3',changed:true},{text:']',changed:false}]);

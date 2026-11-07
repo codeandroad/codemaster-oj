@@ -42,7 +42,7 @@ function ResultContent({ result, reload, currentCode, currentLanguage, onLocate 
   const label = (status: string) => titles[status]?.[locale === "en" ? 1 : 0] ?? status;
   const [selected, setSelected] = useState<number | null>(null), [diff, setDiff] = useState(true);
   const caseList = useRef<HTMLDivElement>(null);
-  const cases = result.testResults ?? [], index = selected == null ? defaultResultCase(cases) : Math.min(selected, cases.length - 1), active = cases[index];
+  const cases = result.testResults ?? [], index = selected == null ? defaultResultCase(cases, result.status) : Math.min(selected, cases.length - 1), active = cases[index];
   useEffect(() => {
     const list = caseList.current, tab = list?.querySelector<HTMLElement>('[aria-selected="true"]');
     if (!list || !tab) return;
@@ -50,7 +50,9 @@ function ResultContent({ result, reload, currentCode, currentLanguage, onLocate 
   }, [index, cases.length]);
   const pending = isPending(result.status), hidden = !["samples", "custom"].includes(result.kind), publicCase = active?.visibility === "public";
   const status = active?.status ?? result.status;
-  const diagnostic = readableDiagnostic(publicCase ? active.stderr || (result.status === "CE" ? result.message ?? "" : "") : result.status === "CE" && result.resultsVisible !== false ? result.message ?? "" : "", result.language, active?.mode === "function");
+  const caseDiagnostic = publicCase ? active.stderr : active?.status === "RE" ? active.runtimeError : undefined;
+  const diagnosticText = result.resultsVisible === false ? "" : caseDiagnostic || (result.status === "CE" ? result.message ?? "" : "");
+  const diagnostic = readableDiagnostic(diagnosticText, result.language, active?.mode === "function");
   const location = diagnostic.location && codeLocationOffset(result.code, diagnostic.location.line, diagnostic.location.column) !== null ? diagnostic.location : undefined;
   const stale = currentCode !== undefined && (currentCode !== result.code || currentLanguage !== undefined && currentLanguage !== (result.language ?? "python"));
   const canDiff = publicCase && active.status === "WA" && typeof active.output === "string" && typeof active.expected === "string";
@@ -79,17 +81,17 @@ function ResultContent({ result, reload, currentCode, currentLanguage, onLocate 
     </button>)}</div>}
     <div id={`${id}-detail`} role={active ? "tabpanel" : undefined} aria-labelledby={active ? `${id}-case-${index}` : undefined} className={styles.detail}>
       {active && <span className="sr-only">{label(active.status)}</span>}
-      {hint && !pending && <p className={styles.hint}>{hint}</p>}
+      {hint && !pending && <p className={styles.hint} data-tone={status === "RE" ? "error" : undefined}>{hint}</p>}
       {diagnostic.text && <div className={styles.diagnostic}><div className={styles.diagnosticHeader}><strong>{tx("错误详情", "Error details")}</strong>{location && (onLocate ? <button type="button" disabled={stale} title={stale ? tx("代码已修改，请重新运行后定位", "Run the changed code again before locating the error") : undefined} onClick={() => onLocate(location)}><MapPin size={14}/>{location.file}:{location.line}{location.column ? `:${location.column}` : ""}</button> : <span>{location.file}:{location.line}</span>)}</div><pre>{diagnostic.text}</pre></div>}
       {publicCase && <>
         <Value label={tx("输入", "Input")} value={active.input ?? ""}/>
         {active.mode === "function" && active.stdout && <Value label={tx("标准输出 / 调试日志", "Stdout / debug log")} value={active.stdout}/>}
         {active.output != null && <Value label={active.mode === "function" ? tx("返回值", "Output / return value") : tx("实际输出", "Output")} value={active.output} parts={difference?.actual} tone="actual"/>}
         {active.expected !== undefined && <Value label={tx("预期结果", "Expected")} value={active.expected} parts={difference?.expected} tone="expected"/>}
-        {active.truncated && <p className={styles.notice}>{tx("输出或日志较长，仅显示保存的前段内容。", "The output or log is long. Only the retained beginning is shown.")}</p>}
-        {canDiff && diff && <p className={styles.summary}>{tx("高亮表示不同内容；差异中的空格、制表符和换行分别显示为 ·、⇥、↵。", "Highlights show differences; changed spaces, tabs and newlines appear as ·, ⇥ and ↵.")}</p>}
       </>}
-      {(hidden || result.resultsVisible === false) && !pending && <p className={styles.privacy}><LockKeyhole size={14}/>{result.resultsVisible === false ? tx("详细成绩尚未公布，不代表零分。", "Detailed results have not been released. This is not a zero score.") : tx("正式测试数据不公开。可运行公开样例或自定义输入，查看详细输出与错误。", "Formal test data is private. Run samples or custom input to inspect output and error details.")}</p>}
+      {active?.truncated && (publicCase || diagnostic.text) && <p className={styles.notice}>{tx("输出或日志较长，仅显示保存的前段内容。", "The output or log is long. Only the retained beginning is shown.")}</p>}
+      {canDiff && diff && <p className={styles.summary}>{tx("高亮表示不同内容；差异中的空格、制表符和换行分别显示为 ·、⇥、↵。", "Highlights show differences; changed spaces, tabs and newlines appear as ·, ⇥ and ↵.")}</p>}
+      {(hidden || result.resultsVisible === false) && !pending && <p className={styles.privacy}><LockKeyhole size={14}/>{result.resultsVisible === false ? tx("详细成绩尚未公布，不代表零分。", "Detailed results have not been released. This is not a zero score.") : <span>{tx("正式测试的输入和预期结果不公开。", "Formal test inputs and expected results are private.")}{status === "RE" && !diagnostic.text && tx(" 可运行公开样例或自定义输入来查看异常详情。", " Run public samples or custom input to inspect error details.")}</span>}</p>}
       {!cases.length && result.publicOutput && !hidden && result.resultsVisible !== false && <Value label={tx("运行输出", "Run output")} value={result.publicOutput}/>}
     </div>
   </>;

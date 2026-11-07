@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState,useImperativeHandle, type ReactNode, type Ref, type CSSProperties, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState,useImperativeHandle, type ReactNode, type Ref, type CSSProperties, type KeyboardEvent } from "react";
 import type { SubmissionLanguage } from "@/lib/production-api";
 import { useLocale } from "@/components/locale-context";
 import { languageInfo } from "./languages";
@@ -11,6 +11,7 @@ export interface CodeEditorHandle {replaceCode:(code:string)=>void;focus:()=>voi
 import {editorTheme} from "./editor-themes";
 import {editorActionFor} from "./editor-keymap";
 import {createVimState,vimKey,type VimState} from "./editor-vim";
+import {getEditorCompletion,type EditorCompletion} from "./editor-completion";
 import styles from "./code-editor.module.css";
 
 const keywords: Record<SubmissionLanguage, Set<string>> = {
@@ -40,6 +41,9 @@ const fontFamily: Record<WorkspaceSettings["fontFamily"], string> = {
   courier: '"Courier New", Courier, monospace',
 };
 
+type CompletionMenu = EditorCompletion & {value:string;at:number;language:SubmissionLanguage;active:number};
+const completionRowHeight=28,maxVisibleCompletionRows=6;
+
 export function CodeEditor({ code, onChange, language, settings, status,idPrefix="production",inputLabel,readOnly=false,editorRef,onFormat,onEnableVim,actions }: { code: string; onChange: (code: string) => void; language: SubmissionLanguage; settings: WorkspaceSettings; status?: string;idPrefix?:string;inputLabel?:string;readOnly?:boolean;editorRef?:Ref<CodeEditorHandle>;onFormat?:()=>void;onEnableVim?:()=>void;actions?:ReactNode }) {
   const {locale}=useLocale();const tx=(zh:string,en:string)=>locale==='en'?en:zh;
   const highlight=useRef<HTMLPreElement>(null),numbers=useRef<HTMLDivElement>(null),fieldRef=useRef<HTMLTextAreaElement>(null),textSurface=useRef<HTMLDivElement>(null),mirror=useRef<HTMLDivElement>(null);
@@ -49,14 +53,17 @@ export function CodeEditor({ code, onChange, language, settings, status,idPrefix
   const vimEnabled=settings.keyBinding==='vim'||escapeVim,viewportHeight=viewport.height;
   const historyLanguage=useRef(language);
   const vimRef=useRef(createVimState()),[vim,setVim]=useState(createVimState);
+  const completionId=useId(),completionList=useRef<HTMLDivElement>(null),composing=useRef(false);
+  const [completion,setCompletion]=useState<CompletionMenu|null>(null);
   const insertGroup=useRef<{checkpoint:EditSnapshot;recorded:boolean}|null>(null);
   const pendingSelection=useRef<EditSnapshot|null>(null);
   function updateVim(next:VimState){vimRef.current=next;setVim(next);}
-  useEffect(()=>{setEscapeVim(false);updateVim(createVimState());insertGroup.current=null;},[settings.keyBinding,language]);
+  useEffect(()=>{setEscapeVim(false);updateVim(createVimState());insertGroup.current=null;setCompletion(null);},[settings.keyBinding,language]);
+  useEffect(()=>{if(readOnly)setCompletion(null);},[readOnly]);
   const history=useRef<{current:EditSnapshot;past:EditSnapshot[];future:EditSnapshot[]}>({current:{value:code,start:0,end:0},past:[],future:[]});
   const lines=code.split("\n"),editorStyle={tabSize:settings.tabSize,fontSize:settings.fontSize,fontFamily:fontFamily[settings.fontFamily],fontVariantLigatures:settings.ligatures?"common-ligatures":"none",lineHeight:"24px"} as const;
   useEffect(() => {
-    if(historyLanguage.current!==language||history.current.current.value!==code){history.current={current:{value:code,start:0,end:0},past:[],future:[]};setCursor({start:0,end:0,line:1,column:1});updateVim(createVimState());insertGroup.current=null;}
+    if(historyLanguage.current!==language||history.current.current.value!==code){history.current={current:{value:code,start:0,end:0},past:[],future:[]};setCursor({start:0,end:0,line:1,column:1});updateVim(createVimState());insertGroup.current=null;setCompletion(null);}
     historyLanguage.current=language;
   },[code,language]);
   // Restore a controlled edit's caret before the next key can observe the DOM.
@@ -92,6 +99,20 @@ export function CodeEditor({ code, onChange, language, settings, status,idPrefix
     const next={...position,left:position.left-field.scrollLeft,top:position.top-field.scrollTop};
     setCaretPosition(current=>current.left===next.left&&current.top===next.top&&current.width===next.width&&current.height===next.height&&current.character===next.character?current:next);
   },[vimEnabled,focused,readOnly,vim.mode,vim.head,cursor.start,code,scroll.left,scroll.top,settings.fontSize,settings.fontFamily,settings.ligatures,settings.tabSize,settings.wordWrap,viewport.width,viewport.height,caretOffset]);
+  const menu=focused&&!readOnly&&vimEnabled&&vim.mode==='insert'&&completion?.value===code&&completion.language===language&&cursor.start===cursor.end&&completion.at===cursor.start?completion:null;
+  const menuWidth=Math.max(0,Math.min(300,viewport.width-16));
+  const roomAbove=caretPosition.top-6,roomBelow=viewport.height-caretPosition.top-caretPosition.height-6;
+  const menuRows=Math.min(maxVisibleCompletionRows,menu?.candidates.length??0);
+  const menuAbove=roomBelow<menuRows*completionRowHeight+2&&roomAbove>roomBelow;
+  const visibleRows=Math.min(menuRows,Math.floor(((menuAbove?roomAbove:roomBelow)-2)/completionRowHeight));
+  const menuHeight=visibleRows*completionRowHeight+2;
+  const visibleMenu=menu&&menuWidth>0&&visibleRows>0&&caretPosition.top+caretPosition.height>0&&caretPosition.top<viewport.height&&caretPosition.left>=0&&caretPosition.left<viewport.width?menu:null;
+  useLayoutEffect(()=>{
+    const list=completionList.current,option=list?.children.item(visibleMenu?.active??-1);
+    if(!list||!(option instanceof HTMLElement))return;
+    if(option.offsetTop<list.scrollTop)list.scrollTop=option.offsetTop;
+    else if(option.offsetTop+option.offsetHeight>list.scrollTop+list.clientHeight)list.scrollTop=option.offsetTop+option.offsetHeight-list.clientHeight;
+  },[visibleMenu,menuHeight]);
   useEffect(() => {
     if(!settings.wordWrap||!textSurface.current||!mirror.current)return;
     const measure=()=>{const heights=Array.from(mirror.current?.children??[],element=>Math.max(24,element.getBoundingClientRect().height));setLineHeights(previous=>previous.length===heights.length&&previous.every((v,i)=>v===heights[i])?previous:heights);};
@@ -100,9 +121,11 @@ export function CodeEditor({ code, onChange, language, settings, status,idPrefix
   function selection(field:HTMLTextAreaElement){
     // Ignore selection events from the old DOM value while a controlled edit is committing.
     if(field.value!==history.current.current.value)return;
-    const before=field.value.slice(0,field.selectionStart),parts=before.split("\n");
-    setCursor({start:field.selectionStart,end:field.selectionEnd,line:parts.length,column:parts.at(-1)!.length+1});
-    history.current.current={value:field.value,start:field.selectionStart,end:field.selectionEnd};
+    const {value,selectionStart:start,selectionEnd:end}=field;
+    const parts=value.slice(0,start).split("\n");
+    setCursor({start,end,line:parts.length,column:parts.at(-1)!.length+1});
+    history.current.current={value,start,end};
+    setCompletion(current=>current&&(current.value!==value||current.at!==start||start!==end)?null:current);
   }
   function move(next:EditSnapshot){const position=()=>{const field=fieldRef.current;if(!field||field.value!==next.value)return;field.setSelectionRange(next.start,next.end);selection(field);
     if(vimEnabled){
@@ -120,11 +143,13 @@ export function CodeEditor({ code, onChange, language, settings, status,idPrefix
     }
   };if(fieldRef.current?.value===next.value){pendingSelection.current=null;position();}else pendingSelection.current=next;}
   function apply(next:EditSnapshot,moveCursor=true){
+    setCompletion(null);
     const current=history.current.current;
     if(next.value!==current.value){const group=insertGroup.current;if(!group||!group.recorded){history.current.past.push({...group?.checkpoint??current});if(history.current.past.length>100)history.current.past.shift();if(group)group.recorded=true;}history.current.future=[];}
     history.current.current={...next};if(next.value!==current.value)onChange(next.value);if(moveCursor)move(next);
   }
   function undo(redo=false){
+    setCompletion(null);
     insertGroup.current=null;
     const source=redo?history.current.future:history.current.past,target=redo?history.current.past:history.current.future,next=source.pop();
     if(!next)return;target.push({...history.current.current});history.current.current={...next};onChange(next.value);move(next);
@@ -146,10 +171,43 @@ export function CodeEditor({ code, onChange, language, settings, status,idPrefix
       setScroll({top:field.scrollTop,left:field.scrollLeft});
     },
   }));
+  function openCompletion(field:HTMLTextAreaElement,automatic=false,reverse=false){
+    const {value,selectionStart:at,selectionEnd}=field;
+    const result=at===selectionEnd?getEditorCompletion(value,at,language):null;
+    setCompletion(result&&(!automatic||Array.from(result.prefix).length>=2)
+      ?{...result,value,at,language,active:reverse?result.candidates.length-1:0}
+      :null);
+  }
+  function acceptCompletion(field:HTMLTextAreaElement,menu:CompletionMenu,index:number){
+    if(readOnly||!vimEnabled||vimRef.current.mode!=='insert'||composing.current||menu.language!==language||field.value!==menu.value||field.selectionStart!==menu.at||field.selectionEnd!==menu.at)return;
+    const candidate=menu.candidates[index];
+    if(!candidate)return;
+    const at=menu.from+candidate.label.length;
+    apply({value:menu.value.slice(0,menu.from)+candidate.label+menu.value.slice(menu.to),start:at,end:at});
+  }
   function onKeyDown(event:KeyboardEvent<HTMLTextAreaElement>){
     if(readOnly)return;
     const field=event.currentTarget;selection(field);
-    if(event.nativeEvent.isComposing||event.key==='Process'||event.keyCode===229)return;
+    if(composing.current||event.nativeEvent.isComposing||event.key==='Process'||event.keyCode===229)return;
+    if(vimEnabled&&vimRef.current.mode==='insert'&&!event.metaKey&&!event.altKey&&!event.shiftKey){
+      const key=event.key.toLowerCase();
+      const manual=event.ctrlKey&&(key==='n'||key==='p');
+      const current=visibleMenu&&visibleMenu.value===field.value&&visibleMenu.at===field.selectionStart&&field.selectionStart===field.selectionEnd?visibleMenu:null;
+      if(manual||(current&&!event.ctrlKey&&(key==='arrowdown'||key==='arrowup'))){
+        event.preventDefault();event.stopPropagation();
+        const reverse=key==='p'||key==='arrowup';
+        if(current){
+          const count=current.candidates.length;
+          setCompletion({...current,active:(current.active+(reverse?-1:1)+count)%count});
+        }else openCompletion(field,false,reverse);
+        return;
+      }
+      if(!event.ctrlKey&&key==='enter'&&current){
+        event.preventDefault();event.stopPropagation();
+        acceptCompletion(field,current,current.active);
+        return;
+      }
+    }
     const enableVim=event.key==='Escape'&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&!vimEnabled;
     if(enableVim){setEscapeVim(true);onEnableVim?.();}
     if(vimEnabled||enableVim){
@@ -186,6 +244,8 @@ export function CodeEditor({ code, onChange, language, settings, status,idPrefix
   const lineTop=14+(settings.wordWrap?lineHeights.slice(0,cursor.line-1).reduce((sum,n)=>sum+n,0):(cursor.line-1)*24)-scroll.top;
   const matches=focused&&cursor.start===cursor.end?matchingBrackets(code,cursor.start,language):null;
   const visibleGuides=!settings.wordWrap?lines.map((line,i)=>({i,top:14+i*24-scroll.top,depth:Math.floor((line.match(/^[ \t]*/)?.[0].replace(/\t/g,' '.repeat(settings.tabSize)).length??0)/settings.tabSize)})).filter(row=>row.depth>0&&row.top>-24&&row.top<viewportHeight):[];
+  const completionLabel=tx('代码补全候选','Code suggestions');
+  const completionKind={identifier:tx('当前代码','In file'),keyword:tx('关键字','Keyword'),builtin:tx('内置','Built-in')};
   return <div className={styles.container} style={editorTheme(settings.theme).tokens as CSSProperties} data-editor-theme={settings.theme} data-od-id={`${idPrefix}-code-editor`}>
     <div className={styles.surface} style={editorStyle}>
       <div ref={numbers} aria-hidden className={styles.numbers}>{Array.from({length:lines.length},(_,index)=><div key={index} className={focused&&index+1===cursor.line?styles.activeNumber:undefined} style={{height:settings.wordWrap?lineHeights[index]??24:24}}>{settings.relativeLineNumbers&&index+1!==cursor.line?Math.abs(index+1-cursor.line):index+1}</div>)}</div>
@@ -196,11 +256,26 @@ export function CodeEditor({ code, onChange, language, settings, status,idPrefix
         {settings.wordWrap&&<div ref={mirror} aria-hidden className={styles.mirror} style={editorStyle}>{lines.map((line,index)=><div key={index}>{line||"\u200b"}</div>)}</div>}
         {vimEnabled&&focused&&!readOnly&&<><div ref={caretMirror} aria-hidden className={`${styles.caretMirror} ${settings.wordWrap?styles.wrap:''}`} style={editorStyle}>{code+' '}</div>{(cursor.start===cursor.end||vim.mode.startsWith('visual'))&&<div className={styles.caretLayer} aria-hidden><span className={`${styles.vimCaret} ${vim.mode!=='insert'?styles.vimBlock:''}`} data-od-id={`${idPrefix}-vim-caret`} data-caret-shape={vim.mode==='insert'?'bar':'block'} style={{left:caretPosition.left,top:caretPosition.top,width:caretPosition.width,height:caretPosition.height}}>{caretPosition.character}</span></div>}</>}
         <textarea readOnly={readOnly||(vimEnabled&&vim.mode!=='insert')} ref={fieldRef} aria-label={inputLabel??`${languageInfo[language].name} ${tx('代码编辑器','code editor')}`} aria-describedby={vimEnabled?`${idPrefix}-vim-status`:undefined} data-vim-mode={vimEnabled?vim.mode:undefined} data-od-id={`${idPrefix}-code-input`} value={code}
-          onChange={event=>{const field=event.target;apply({value:field.value,start:field.selectionStart,end:field.selectionEnd},false);selection(field);}}
-          onFocus={event=>{setFocused(true);selection(event.currentTarget);}} onBlur={()=>setFocused(false)} onSelect={event=>selection(event.currentTarget)} onKeyDown={onKeyDown} onKeyUp={event=>selection(event.currentTarget)} onClick={event=>{if(vimEnabled&&vimRef.current.mode!=='insert'){updateVim({...createVimState(),register:vimRef.current.register,linewise:vimRef.current.linewise});}selection(event.currentTarget);}}
-          onCompositionEnd={event=>selection(event.currentTarget)}
+          aria-autocomplete={vimEnabled&&vim.mode==='insert'&&!readOnly?'list':undefined} aria-controls={visibleMenu?completionId:undefined} aria-activedescendant={visibleMenu?`${completionId}-${visibleMenu.active}`:undefined}
+          onChange={event=>{
+            if(readOnly||(vimEnabled&&vimRef.current.mode!=='insert'))return;
+            const field=event.currentTarget;
+            apply({value:field.value,start:field.selectionStart,end:field.selectionEnd},false);selection(field);
+            const {inputType,isComposing}=event.nativeEvent as InputEvent;
+            if(vimEnabled&&!composing.current&&!isComposing&&(inputType==='insertText'||inputType==='deleteContentBackward'))openCompletion(field,true);
+          }}
+          onFocus={event=>{setFocused(true);selection(event.currentTarget);}} onBlur={()=>{setFocused(false);setCompletion(null);composing.current=false;}} onSelect={event=>selection(event.currentTarget)} onKeyDown={onKeyDown} onKeyUp={event=>selection(event.currentTarget)} onClick={event=>{setCompletion(null);if(vimEnabled&&vimRef.current.mode!=='insert'){updateVim({...createVimState(),register:vimRef.current.register,linewise:vimRef.current.linewise});}selection(event.currentTarget);}}
+          onCompositionStart={()=>{composing.current=true;setCompletion(null);}}
+          onCompositionEnd={event=>{composing.current=false;selection(event.currentTarget);}}
           onScroll={event=>{const field=event.currentTarget;setScroll({top:field.scrollTop,left:field.scrollLeft});if(highlight.current){highlight.current.scrollTop=field.scrollTop;highlight.current.scrollLeft=field.scrollLeft;}if(numbers.current)numbers.current.scrollTop=field.scrollTop;}}
           spellCheck={false} autoCapitalize="none" autoComplete="off" wrap={settings.wordWrap?"soft":"off"} className={`${styles.input} ${vimEnabled?styles.vimInput:''} ${settings.wordWrap?styles.wrappedInput+' '+styles.wrap:''}`} style={editorStyle}/>
+        {visibleMenu&&<div ref={completionList} id={completionId} role="listbox" aria-label={completionLabel} className={styles.completions}
+          style={{width:menuWidth,maxHeight:menuHeight,left:Math.max(8,Math.min(caretPosition.left,viewport.width-menuWidth-8)),...(menuAbove?{bottom:viewport.height-caretPosition.top+4}:{top:caretPosition.top+caretPosition.height+4})}}>
+          {visibleMenu.candidates.map((candidate,index)=><button key={candidate.label} id={`${completionId}-${index}`} type="button" role="option" tabIndex={-1} aria-selected={visibleMenu.active===index} className={styles.completionOption}
+            onMouseDown={event=>event.preventDefault()} onClick={()=>{if(fieldRef.current)acceptCompletion(fieldRef.current,visibleMenu,index);}}>
+            <span className={styles.completionText} title={candidate.label}>{candidate.label}</span><span className={styles.completionKind}>{completionKind[candidate.kind]}</span>
+          </button>)}
+        </div>}
       </div>
     </div>
     <div className={styles.status}><span className="flex flex-wrap items-center gap-3">{vimEnabled&&<span id={`${idPrefix}-vim-status`} role="status" className="font-mono font-semibold">VIM · {vim.query!==null?`/${vim.query}`:({normal:tx('普通','NORMAL'),insert:tx('插入','INSERT'),visual:tx('可视','VISUAL'),'visual-line':tx('可视行','VISUAL LINE')}[vim.mode])}{vim.query===null&&` ${vim.operator}${vim.count}${vim.pending}`}</span>}<span aria-live="off">{locale==='en'?`Line ${cursor.line}, column ${cursor.column}`:`行 ${cursor.line}，列 ${cursor.column}`}</span><span>{status??tx('草稿保存在当前浏览器会话','Draft saved in this browser session')}</span></span>{actions&&<div className="flex shrink-0 items-center gap-2" data-od-id="editor-run-actions">{actions}</div>}</div>

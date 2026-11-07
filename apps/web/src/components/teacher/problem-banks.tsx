@@ -1,5 +1,6 @@
 "use client";
 import { ProblemPublicationStatus, PublicationGuide } from "@/components/problem-publication-status";
+import { BankRenameDialog } from "@/components/bank-rename-dialog";
 import {ProblemFilter} from "./problem-filter";
 import { useProblemSelection } from "./use-problem-selection";
 import { courseProblemOrder } from "./assignment-problem-order";
@@ -107,6 +108,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
     [filterStatus, setFilterStatus] = useState(""),
     [confirmPublish, setConfirmPublish] = useState(false),
     [create, setCreate] = useState(false),
+    [renamingBank, setRenamingBank] = useState<Bank | null>(null),
     [deletingBank, setDeletingBank] = useState<Bank | null>(null),
     [archivingBank, setArchivingBank] = useState<Bank | null>(null),
     [manage, setManage] = useState<{ ids: string[]; bankId: string } | null>(
@@ -294,6 +296,9 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                     )}
                     {item.permission === "owner" && !item.isSystem && (
                       <>
+                        <button type="button" className={link} onClick={() => setRenamingBank(item)}>
+                          {tr("重命名", "Rename")}
+                        </button>
                         {(item.visibility === "private" || user.roles.includes("admin")) && <button type="button" className={link} onClick={() => setArchivingBank(item)}>
                           {item.archivedAt ? tr("恢复", "Restore") : tr("归档", "Archive")}
                         </button>}
@@ -502,6 +507,10 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
             </Table>
           </section>
         </div>
+      )}
+      {renamingBank && (
+        <BankRenameDialog bank={renamingBank} onClose={() => setRenamingBank(null)}
+          onRenamed={() => { setRenamingBank(null); banks.reload(); }} />
       )}
       {create && (
         <CreateBank

@@ -1,6 +1,7 @@
 "use client";
 
 import { AppLink as Link } from "@/components/navigation";
+import { BankRenameDialog } from "@/components/bank-rename-dialog";
 import { useState } from "react";
 import {
   CheckSquare2,
@@ -48,6 +49,7 @@ export function TeacherBankDetail({ id }: { id: string }) {
     } | null>(null),
     [groupAdmin, setGroupAdmin] = useState(false),
     [adding, setAdding] = useState(false),
+    [renamingBank, setRenamingBank] = useState(false),
     [editGroup, setEditGroup] = useState<Group | null>(null),
     action = useAction();
   const all = problems.data?.items.filter((p) => p.bankId === id) ?? [],
@@ -112,6 +114,11 @@ export function TeacherBankDetail({ id }: { id: string }) {
         description={bank?.description || tr("教师创建的课程练习题库", "A teacher-created course practice bank")}
         action={
           <div className="flex flex-wrap gap-2">
+            {bank && bank.permission === "owner" && !bank.isSystem && (
+              <Button variant="secondary" onClick={() => setRenamingBank(true)}>
+                {tr("重命名题库", "Rename bank")}
+              </Button>
+            )}
             <Button
               variant="secondary"
               disabled={!canContribute}
@@ -144,6 +151,10 @@ export function TeacherBankDetail({ id }: { id: string }) {
       <State resource={problems} />
       <State resource={groups} />
       <Feedback action={action} />
+      {bank && renamingBank && (
+        <BankRenameDialog bank={bank} onClose={() => setRenamingBank(false)}
+          onRenamed={() => { setRenamingBank(false); banks.reload(); }} />
+      )}
       <div className="mt-5 grid grid-cols-[230px_minmax(0,1fr)] gap-5 max-md:grid-cols-1">
         <aside className={`${panel} self-start`}>
           <div className="flex items-center justify-between border-b border-border px-4 py-3">

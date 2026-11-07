@@ -1,6 +1,7 @@
 "use client";
 
 import { ProblemPublicationStatus } from "@/components/problem-publication-status";
+import { BankRenameDialog } from "@/components/bank-rename-dialog";
 import { useState } from "react";
 import { Archive, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { AppLink } from "@/components/navigation";
@@ -61,6 +62,7 @@ export function AdminProblemBanks() {
   const action = useMutation();
   const [selectedId, setSelectedId] = useState("");
   const [bankAction, setBankAction] = useState<BankAction | null>(null);
+  const [renamingBank, setRenamingBank] = useState<ManagedBank | null>(null);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
@@ -125,6 +127,7 @@ export function AdminProblemBanks() {
             <div><h2 className="text-lg font-bold">{selectedBank.name}</h2><p className="mt-1 text-sm text-muted-foreground">{selectedBank.ownerName} · {selectedBank.visibility === "school" ? tr("校内题库", "School bank") : tr("教师私有题库", "Teacher-private bank")}{selectedBank.archivedAt ? ` · ${tr("已归档", "Archived")}` : ""}</p>
               {selectedBank.description && <p className="mt-2 text-sm text-muted-foreground">{selectedBank.description}</p>}</div>
             <div className="flex flex-wrap gap-2">
+              {!selectedBank.isSystem && <Button size="sm" variant="secondary" onClick={() => setRenamingBank(selectedBank)}>{tr("重命名题库", "Rename bank")}</Button>}
               {!selectedBank.archivedAt && !selectedBank.isSystem && <Button size="sm" variant="secondary" onClick={() => setBankAction({ bank: selectedBank, kind: selectedBank.visibility === "private" ? "school" : "private" })}>{selectedBank.visibility === "private" ? tr("纳入校内审核", "Enable school review") : tr("改为私有", "Make private")}</Button>}
               {!selectedBank.isSystem && <Button size="sm" variant="secondary" onClick={() => setBankAction({ bank: selectedBank, kind: selectedBank.archivedAt ? "restore" : "archive" })}>{selectedBank.archivedAt ? <RotateCcw size={14} aria-hidden="true" /> : <Archive size={14} aria-hidden="true" />}{selectedBank.archivedAt ? tr("恢复题库", "Restore bank") : tr("归档题库", "Archive bank")}</Button>}
               {!selectedBank.isSystem && <Button size="sm" variant="secondary" disabled={selectedBank.problemCount + selectedBank.archivedProblemCount > 0} title={selectedBank.problemCount + selectedBank.archivedProblemCount > 0 ? tr("题库有题目时请使用归档", "Archive banks that contain problems") : undefined} onClick={() => setBankAction({ bank: selectedBank, kind: "delete" })}><Trash2 size={14} aria-hidden="true" />{tr("删除空题库", "Delete empty bank")}</Button>}
@@ -136,6 +139,8 @@ export function AdminProblemBanks() {
         <ManagedProblemList key={activeId} bank={selectedBank} onChanged={banks.reload} />
       </div>}
     </div>
+    {renamingBank && <BankRenameDialog bank={renamingBank} onClose={() => setRenamingBank(null)}
+      onRenamed={() => { setRenamingBank(null); banks.reload(); action.success(tr("题库名称已更新。", "Bank name updated.")); }} />}
     {bankAction && <Modal title={bankAction.kind === "delete" ? tr("永久删除空题库", "Permanently delete empty bank") : bankAction.kind === "archive" ? tr("归档题库", "Archive bank") : bankAction.kind === "restore" ? tr("恢复题库", "Restore bank") : tr("调整题库范围", "Change bank visibility")}
       description={bankAction.kind === "delete" ? tr("只有没有任何题目、分组或导入记录的题库能永久删除；有内容时请归档。", "Only banks with no problems, groups, or import records can be permanently deleted. Archive banks with content.") : bankAction.kind === "archive" ? tr("归档后不再供新练习选用，题目版本、提交和成绩保留。若题库有公开版本或被课程、训练引用，系统会阻止归档。", "The bank will no longer be available for new practice. Versions, submissions, and grades remain. Public versions or course/practice references block archiving.") : bankAction.kind === "restore" ? tr("恢复题库不会自动重新公开已撤下题目，也不会补发积分。", "Restoring the bank does not republish withdrawn problems or grant past points.") : tr("调整范围不会自动通过题目审核。已公开版本或活动引用可能阻止缩小范围。", "Changing visibility does not approve problems. Existing public versions or activity references may block reducing visibility.")}
       onClose={() => setBankAction(null)}>

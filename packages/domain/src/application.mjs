@@ -32,7 +32,7 @@ import {publicProblemMetadata,studentPublicStatementRows} from './problem-public
 import { handleSystem, assertJudgeAdmission, getSettings } from './system.mjs';
 import { handlePeopleAlignment, handleFavorites, bindPendingTeacherClasses } from './alignment.mjs';
 import { handleAssignmentAuthoring } from './assignment-authoring.mjs';
-import { loadSubmissionCaseFeedback } from './submission-feedback.mjs';
+import { loadSubmissionResult } from './submission-feedback.mjs';
 import { assignmentGradeRows } from './assignment-grades.mjs';
 import {activityClasses,handleTeachingAudience,handleClassHub} from './activity-audience.mjs';
 import { submissionHistory,problemOwnProgress,emptyOwnProgress } from './submission-history.mjs';
@@ -668,7 +668,7 @@ export async function createDomainServices(pool,config) {
     });return respond(201,submissionShape(await timed.maskSubmission(pool,user,result)));
    }
    m=route.match(/^\/submissions\/([^/]+)$/);
-   if(m&&method==='GET'){const sub=await submissionAccess(pool,user,m[1]);const reviews=(await pool.query(`${reviewEntryQuery} WHERE s.id=$1 ORDER BY r.created_at,r.id`,[sub.id])).rows.filter(r=>reviewEntryVisible(user,r)).map(reviewNoteShape);let pendingRejudge=null;if(sub.pending_judge_run_id){pendingRejudge={runId:sub.pending_judge_run_id};if(await canReviewActivitySubmission(pool,user,sub,{readOnly:true})){const candidate=(await pool.query('SELECT r.status,r.score,r.passed,r.total,r.created_at,t.reason FROM judge_runs r JOIN judge_tasks t ON t.id=r.task_id WHERE r.id=$1',[sub.pending_judge_run_id])).rows[0];if(candidate)pendingRejudge={...pendingRejudge,status:candidate.status,score:candidate.score===null?null:Number(candidate.score),passed:candidate.passed,total:candidate.total,createdAt:candidate.created_at,reason:candidate.reason};}}const masked=await timed.maskSubmission(pool,user,sub);const testResults=await loadSubmissionCaseFeedback(pool,sub,masked);return respond(200,{...submissionShape(masked),reviews,pendingRejudge,testResults});}
+   if(m&&method==='GET'){const sub=await submissionAccess(pool,user,m[1]);const reviews=(await pool.query(`${reviewEntryQuery} WHERE s.id=$1 ORDER BY r.created_at,r.id`,[sub.id])).rows.filter(r=>reviewEntryVisible(user,r)).map(reviewNoteShape);let pendingRejudge=null;if(sub.pending_judge_run_id){pendingRejudge={runId:sub.pending_judge_run_id};if(await canReviewActivitySubmission(pool,user,sub,{readOnly:true})){const candidate=(await pool.query('SELECT r.status,r.score,r.passed,r.total,r.created_at,t.reason FROM judge_runs r JOIN judge_tasks t ON t.id=r.task_id WHERE r.id=$1',[sub.pending_judge_run_id])).rows[0];if(candidate)pendingRejudge={...pendingRejudge,status:candidate.status,score:candidate.score===null?null:Number(candidate.score),passed:candidate.passed,total:candidate.total,createdAt:candidate.created_at,reason:candidate.reason};}}const masked=await timed.maskSubmission(pool,user,sub);const result=await loadSubmissionResult(pool,sub,masked);return respond(200,{...submissionShape(masked),reviews,pendingRejudge,...result});}
    m=route.match(/^\/review-notebook\/([^/]+)$/);
    if(m&&method==='GET'){
     const entry=row(await pool.query(`${reviewEntryQuery} WHERE r.id=$1`,[uuid(m[1],'笔记 ID')]));

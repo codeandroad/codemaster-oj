@@ -32,8 +32,12 @@ export function problemSubmissionsUrl(endpoint: string, query: SubmissionPageQue
   return `${path}?${params}`;
 }
 
-export function submissionMeasurement(value: number | null | undefined, unit: "ms" | "KiB", locale: string) {
-  return value == null || !Number.isFinite(value) || value < 0 ? "—" : `${new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value)} ${unit}`;
+export function submissionMeasurement(value: number | null | undefined, sourceUnit: "ms" | "KiB", locale: string) {
+  if (value == null || !Number.isFinite(value) || value < 0) return "—";
+  const format = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
+  if (sourceUnit === "ms") return `${format.format(value)} ms`;
+  const mib = value / 1024;
+  return mib > 0 && mib < 0.01 ? `<${format.format(0.01)} MiB` : `${format.format(mib)} MiB`;
 }
 
 export function submissionOwnDetailHref(row: ProblemSubmissionMetadata, allowLegacyDetails: boolean) {

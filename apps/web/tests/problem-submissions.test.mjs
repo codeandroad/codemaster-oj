@@ -30,7 +30,9 @@ test('missing performance measurements are not presented as measured zero', () =
   assert.equal(submissionMeasurement(NaN, 'ms', 'en'), '—');
   assert.equal(submissionMeasurement(-1, 'ms', 'en'), '—');
   assert.equal(submissionMeasurement(0, 'ms', 'en'), '0 ms');
-  assert.equal(submissionMeasurement(1024, 'KiB', 'en'), '1,024 KiB');
+  assert.equal(submissionMeasurement(0, 'KiB', 'en'), '0 MiB');
+  assert.equal(submissionMeasurement(1, 'KiB', 'en'), '<0.01 MiB');
+  assert.equal(submissionMeasurement(6268, 'KiB', 'en'), '6.12 MiB');
 });
 
 test('metadata belonging to someone else never links to private submission details', () => {

@@ -44,6 +44,10 @@ test('problem submission metadata: real Nest, scoped runtime DB, no private reco
   await t.test('formal exact-version metadata sorts/paginates without student code or identities',async()=>{
    const data=(await req(route+'&sort=runtimeMs&order=asc&pageSize=1')).data;safe(data);assert.equal(data.total,2);assert.equal(data.hasMore,true);assert.equal(data.solved,false);assert.equal(data.items[0].id,'SUB'+peer.id);assert.equal(data.items[0].isOwn,false);assert.equal(data.items[0].memoryKb,2);
    const second=(await req(route+'&sort=runtimeMs&order=asc&pageSize=1&page=2')).data;assert.equal(second.items[0].id,'SUB'+own.id);assert.equal(second.items[0].runtimeMs,8);assert.equal(second.items[0].memoryKb,4);assert.equal(second.hasMore,false);
+   const detail=(await req('/submissions/SUB'+own.id)).data;
+   assert.deepEqual([detail.runtimeMs,detail.memoryKb],[second.items[0].runtimeMs,second.items[0].memoryKb]);
+   assert.deepEqual(detail.testResults.map(result=>[result.timeMs,result.memoryKb]),[[3,2],[5,4]]);
+   assert.doesNotMatch(JSON.stringify(detail.testResults),/SECRET/);
    assert.equal((await req(`/problems/${problem}?versionId=${v}`)).data.solved,false);
    await req('/submissions/SUB'+peer.id,{status:403});
    await req(route,{user:'anonymous',status:401});
@@ -107,13 +111,17 @@ test('problem submission metadata: real Nest, scoped runtime DB, no private reco
    assert.equal(feedback.feedbackPending,true);
    await req('/review-notebook/'+feedback.id,{status:404});
    assert.equal((await req('/review-notebook')).data.items.some(entry=>entry.id===feedback.id),false);
-   assert.equal((await req('/submissions/SUB'+held.id)).data.reviews.some(entry=>entry.id===feedback.id),false);
+   const masked=(await req('/submissions/SUB'+held.id)).data;
+   assert.equal(masked.reviews.some(entry=>entry.id===feedback.id),false);
+   assert.deepEqual([masked.runtimeMs,masked.memoryKb,masked.testResults],[null,null,[]]);
    assert.equal((await req('/student-notifications')).data.unreadCount,0);
    await req('/student-notifications/read-all',{method:'POST'});
    await pool.query('UPDATE timed_practices SET results_published_at=now() WHERE id=$1',[practice]);
    assert.equal((await req('/student-notifications')).data.unreadCount,1);
    assert.equal((await req('/review-notebook/'+feedback.id)).data.note,'Review after release');
    const data=(await req(route)).data;assert.equal(data.total,2);assert.equal(data.solved,true);assert.equal(data.items.find(r=>r.id==='SUB'+held.id).runtimeMs,0);
+   const released=(await req('/submissions/SUB'+held.id)).data;
+   assert.deepEqual([released.runtimeMs,released.memoryKb],[0,0]);
    assert.equal((await req(`/problems/${problem}?versionId=${v}`)).data.solved,true);
   });
   await t.test('latest per stable student precedes sorting and pagination; a newer WA keeps historical solved',async()=>{
@@ -137,6 +145,8 @@ test('problem submission metadata: real Nest, scoped runtime DB, no private reco
    await pool.query("INSERT INTO audit_events(actor_account_id,action,resource_id,metadata) VALUES($1,'submission.rejudge_confirm',$2,$3)",[users.admin.id,String(hidden.id),{runId:hidden.runId}]);
    assert.equal((await req(route)).data.items.find(r=>r.id==='SUB'+hidden.id).runtimeMs,900);
    const partial=await submission('peer',{status:'WA',metrics:[{cpuMs:1,memoryBytes:1024},{}]});data=(await req(route)).data;item=data.items.find(r=>r.id==='SUB'+partial.id);assert.equal(item.runtimeMs,null);assert.equal(item.memoryKb,null);assert.equal(data.total,2);assert.ok(!data.items.some(r=>r.id==='SUB'+hidden.id));
+   const detail=(await req('/submissions/SUB'+partial.id,{user:'peer'})).data;
+   assert.deepEqual([detail.runtimeMs,detail.memoryKb],[null,null]);
   });
   await t.test('bank made private retains only accessible activity history despite old publication timestamp',async()=>{
    const assignments=[];

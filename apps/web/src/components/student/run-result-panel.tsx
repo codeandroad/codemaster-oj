@@ -6,6 +6,7 @@ import { useLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
 import { isPending, type SubmissionLanguage } from "@/lib/production-api";
 import type { DetailedSubmission } from "./shared";
+import { submissionMeasurement } from "./problem-submissions-model";
 import { codeLocationOffset, defaultResultCase, outputDifference, readableDiagnostic, type CodeLocation, type DiffPart } from "./result-feedback";
 import styles from "./run-result-panel.module.css";
 
@@ -64,7 +65,10 @@ function ResultContent({ result, reload, currentCode, currentLanguage, onLocate 
       <div className={styles.verdict} data-tone={pending ? "pending" : failed ? "error" : "success"} role="status">
         {pending && <LoaderCircle size={20} className="animate-spin"/>}<h3>{label(result.status)}</h3>
       </div>
-      <div className={styles.metrics}>{active?.timeMs != null && <span><Clock3 size={13}/>{tx("用时", "Runtime")}: {active.timeMs} ms</span>}{active?.memoryKb != null && <span>{tx("内存", "Memory")}: {(active.memoryKb / 1024).toFixed(1)} MB</span>}</div>
+      {!pending && result.resultsVisible !== false && <div className={styles.metrics}>
+        <span><Clock3 size={13} aria-hidden="true"/>{tx("总用时", "Total runtime")}: {submissionMeasurement(result.runtimeMs, "ms", locale)}</span>
+        <span>{tx("峰值内存", "Peak memory")}: {submissionMeasurement(result.memoryKb, "KiB", locale)}</span>
+      </div>}
       {canDiff && <button type="button" className={styles.diffButton} aria-pressed={diff} onClick={() => setDiff(value => !value)}><ArrowLeftRight size={14}/>{tx("差异", "Diff")}</button>}
     </div>
     <p className={styles.summary}>{result.kind === "samples" ? tx("公开样例自测", "Public sample run") : result.kind === "custom" ? tx("自定义运行 · 不判断正确性", "Custom run · correctness is not checked") : tx("正式评测", "Formal evaluation")}
@@ -81,6 +85,9 @@ function ResultContent({ result, reload, currentCode, currentLanguage, onLocate 
     </button>)}</div>}
     <div id={`${id}-detail`} role={active ? "tabpanel" : undefined} aria-labelledby={active ? `${id}-case-${index}` : undefined} className={styles.detail}>
       {active && <span className="sr-only">{label(active.status)}</span>}
+      {active && cases.length > 1 && (active.timeMs != null || active.memoryKb != null) && <p className={styles.summary}>
+        {tx(`用例 ${active.position}`, `Case ${active.position}`)} · {tx("用时", "Runtime")}: {submissionMeasurement(active.timeMs, "ms", locale)} · {tx("内存", "Memory")}: {submissionMeasurement(active.memoryKb, "KiB", locale)}
+      </p>}
       {hint && !pending && <p className={styles.hint} data-tone={status === "RE" ? "error" : undefined}>{hint}</p>}
       {diagnostic.text && <div className={styles.diagnostic}><div className={styles.diagnosticHeader}><strong>{tx("错误详情", "Error details")}</strong>{location && (onLocate ? <button type="button" disabled={stale} title={stale ? tx("代码已修改，请重新运行后定位", "Run the changed code again before locating the error") : undefined} onClick={() => onLocate(location)}><MapPin size={14}/>{location.file}:{location.line}{location.column ? `:${location.column}` : ""}</button> : <span>{location.file}:{location.line}</span>)}</div><pre>{diagnostic.text}</pre></div>}
       {publicCase && <>

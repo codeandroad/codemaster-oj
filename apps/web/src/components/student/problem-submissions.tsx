@@ -49,8 +49,8 @@ export function ProblemSubmissionsTable({ feed, allowLegacyDetails = false, open
     { key: "createdAt", label: tx("提交时间", "Submitted") },
     { key: "status", label: tx("状态", "Status") },
     { key: "language", label: tx("语言", "Language") },
-    { key: "runtimeMs", label: tx("运行时间", "Runtime"), title: tx("全部测试的 CPU 运行时间合计；未测量时显示 —", "Total measured CPU time across tests; — when unavailable") },
-    { key: "memoryKb", label: tx("内存", "Memory"), title: tx("峰值内存（KiB）；未测量时显示 —", "Peak memory in KiB; — when unavailable") },
+    { key: "runtimeMs", label: tx("总用时", "Total runtime"), title: tx("全部测试的 CPU 运行时间合计；未测量时显示 —", "Total measured CPU time across tests; — when unavailable") },
+    { key: "memoryKb", label: tx("峰值内存", "Peak memory"), title: tx("峰值内存（MiB）；未测量时显示 —", "Peak memory in MiB; — when unavailable") },
   ];
   const total = feed.data?.total ?? 0;
   const page = feed.data?.page ?? feed.query.page;

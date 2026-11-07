@@ -260,6 +260,9 @@ test('school and public practice Nest transport requires scoped membership, CSRF
     assert.equal(formal.status,'AC');assert.equal(formal.score,100);assert.equal(formal.caseFeedback[0].input,undefined);
     assert.equal(formal.caseFeedback[0].expected,undefined);assert.equal(formal.caseFeedback[0].output,undefined);
     assert.ok(Number.isFinite(formal.runtimeMs)&&formal.runtimeMs>=0);assert.ok(Number.isFinite(formal.memoryKb)&&formal.memoryKb>0);
+    const {items:[latest]}=(await request(`/practice/problems/${p.id}/submissions`,{auth:auth.personal})).data;
+    assert.equal(latest.id,formal.id);
+    assert.deepEqual([latest.runtimeMs,latest.memoryKb],[formal.runtimeMs,formal.memoryKb]);
     const progress=(await request(`/practice/problems/${p.id}`,{auth:auth.personal})).data;
     assert.equal(progress.solved,true);assert.equal(progress.attempts,1);
     assert.equal((await request(`/practice/problems/${p.id}`,{auth:auth.student})).data.solved,false);

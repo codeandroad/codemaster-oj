@@ -1,5 +1,6 @@
 import { schoolActivityJobVisibleSql } from './school-activities.mjs';
 import { enumValue, integer, uuid, fail } from './security.mjs';
+import { submissionMeasurements, submissionMeasurementsSql } from './submission-feedback.mjs';
 
 // Public submission history exposes a safe display name, never identity IDs, code, output,
 // case data, score, teacher feedback, or link to another user's private record.
@@ -22,20 +23,14 @@ export async function metadataPage(db, source, params, url, { schoolProgress = f
   SELECT id,received_id,created_at,language,status,is_own,display_name,
    CASE WHEN status NOT IN ('Waiting','Judging','System Error') THEN m.runtime_ms END runtime_ms,
    CASE WHEN status NOT IN ('Waiting','Judging','System Error') THEN m.memory_kb END memory_kb
-  FROM latest LEFT JOIN LATERAL (
-   SELECT CASE WHEN count(*)>0 AND count(*)=count(cpu) THEN sum(cpu) END runtime_ms,
-    CASE WHEN count(*)>0 AND count(*)=count(memory) THEN ceil(max(memory)/1024) END memory_kb
-   FROM (SELECT CASE WHEN jsonb_typeof(item->'cpuMs')='number' AND (item->>'cpuMs')::numeric>=0 THEN (item->>'cpuMs')::numeric END cpu,
-    CASE WHEN jsonb_typeof(item->'memoryBytes')='number' AND (item->>'memoryBytes')::numeric>=0 THEN (item->>'memoryBytes')::numeric END memory
-    FROM jsonb_array_elements(CASE WHEN jsonb_typeof(private_results)='array' THEN private_results ELSE '[]'::jsonb END) item) measurements
-  ) m ON true)`;
+  FROM latest r CROSS JOIN LATERAL (${submissionMeasurementsSql}) m)`;
  const summary=(await db.query(`${base} SELECT (SELECT count(*)::int FROM latest) total,
   EXISTS(SELECT 1 FROM visible WHERE ${schoolProgress?'is_current_student':'is_own'} AND status='AC') solved`,params)).rows[0];
  const rows=(await db.query(`${base} SELECT id,created_at,language,status,is_own,display_name,runtime_ms,memory_kb FROM measured
   ORDER BY ${columns[sort]} ${order.toUpperCase()} NULLS LAST,created_at DESC,received_id DESC
   LIMIT $${params.length+1} OFFSET $${params.length+2}`,[...params,pageSize,(page-1)*pageSize])).rows;
  return {items:rows.map(r=>({id:String(r.id),createdAt:r.created_at,language:r.language,status:r.status,isOwn:r.is_own,displayName:r.display_name,
-  runtimeMs:r.runtime_ms===null||!Number.isFinite(Number(r.runtime_ms))?null:Number(r.runtime_ms),memoryKb:r.memory_kb===null||!Number.isFinite(Number(r.memory_kb))?null:Number(r.memory_kb)})),
+  ...submissionMeasurements(r)})),
   page,pageSize,total:summary.total,hasMore:page*pageSize<summary.total,solved:summary.solved};
 }
 

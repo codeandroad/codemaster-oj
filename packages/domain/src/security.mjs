@@ -29,7 +29,8 @@ export const verifyPassword = (hash,value) => argon2.verify(hash,value);
 export function parseCookie(header='') {
  const result={}; for(const item of header.split(';')) { const i=item.indexOf('=');if(i>0){try{result[item.slice(0,i).trim()]=decodeURIComponent(item.slice(i+1));}catch{}} } return result;
 }
-export function sessionCookie(token,{secure=true,maxAge=604800}={}) { return `campus_session=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure?'; Secure':''}`; }
+const sessionCookieMaxAge = 400 * 24 * 60 * 60;
+export function sessionCookie(token,{secure=true,maxAge=sessionCookieMaxAge}={}) { return `campus_session=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure?'; Secure':''}`; }
 export function checkMutation(req,session,origins) {
  const origin=req.headers.origin;
  if(!origin||!origins.includes(origin)) fail(403,'ORIGIN','请求来源未授权');

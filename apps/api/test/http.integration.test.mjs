@@ -6,7 +6,7 @@ import {createPool} from '../../../packages/domain/src/db.mjs';
 import {migrate} from '../../../packages/domain/src/migrate.mjs';
 import {bootstrap} from '../../../packages/domain/src/bootstrap.mjs';
 import {loadConfig} from '../../../packages/domain/src/application.mjs';
-import {canonicalHash} from '../../../packages/domain/src/security.mjs';
+import {canonicalHash,parseCookie,sessionHash} from '../../../packages/domain/src/security.mjs';
 
 test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limits and JSON errors',
   {skip: !process.env.TEST_DATABASE_URL, timeout: 60000}, async t => {
@@ -22,8 +22,9 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
   try {
     await migrate(pool);
     const adminId=await bootstrap(pool,{name:'Nest管理员',number:'ADMIN',username:'nest-admin',password:adminPassword});
+    const sessionSecret=randomBytes(32).toString('base64url');
     app=await createApiApplication({databaseUrl:connection.toString(),logger:false,
-      config:loadConfig({SESSION_SECRET:randomBytes(32).toString('base64url'),APP_ORIGIN:'http://school.test',COOKIE_SECURE:'false'})});
+      config:loadConfig({SESSION_SECRET:sessionSecret,APP_ORIGIN:'http://school.test',COOKIE_SECURE:'false'})});
     await app.listen(0,'127.0.0.1');
     const base=await app.getUrl();
     const request=async(path,{method='GET',body,auth,headers={},raw}={})=>{
@@ -53,6 +54,34 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
     assert.equal(admin.status,200);assert.equal(admin.data.user.id,adminId);
     assert.match(admin.headers.get('set-cookie'),/HttpOnly/);assert.match(admin.headers.get('set-cookie'),/SameSite=Strict/);
     assert.equal((await request('/api/v1/auth/me',{auth:admin})).data.user.username,'nest-admin');
+    await t.test('login persists and renews valid legacy sessions without reviving expired sessions', async () => {
+      const tokenHash=auth=>sessionHash(parseCookie(auth.cookie).campus_session,sessionSecret);
+      const expiry=async auth=>(await pool.query('SELECT expires_at::text FROM sessions WHERE token_hash=$1',[tokenHash(auth)])).rows[0]?.expires_at;
+      const persistentCookie=/; Max-Age=34560000(?:;|$)/;
+      assert.match(admin.headers.get('set-cookie'),persistentCookie);
+      assert.equal(await expiry(admin),'infinity');
+      await pool.query("UPDATE sessions SET created_at=clock_timestamp()-interval '8 days' WHERE token_hash=$1",[tokenHash(admin)]);
+      assert.equal((await request('/api/v1/auth/me',{auth:admin})).status,200);
+
+      await pool.query("UPDATE sessions SET expires_at=clock_timestamp()+interval '1 hour' WHERE token_hash=$1",[tokenHash(admin)]);
+      const renewed=await request('/api/v1/auth/me',{auth:admin});
+      assert.equal(renewed.status,200);
+      assert.equal(renewed.cookie,admin.cookie);
+      assert.equal(renewed.csrfToken,admin.csrfToken);
+      assert.match(renewed.headers.get('set-cookie'),persistentCookie);
+      assert.match(renewed.headers.get('set-cookie'),/HttpOnly; SameSite=Strict/);
+      assert.equal(renewed.headers.get('cache-control'),'no-store');
+      assert.equal(await expiry(admin),'infinity');
+
+      const otherDevice=await request('/api/v1/auth/login',{method:'POST',body:credentials});
+      assert.equal(otherDevice.status,200);
+      await pool.query("UPDATE sessions SET expires_at=clock_timestamp()-interval '1 second' WHERE token_hash=$1",[tokenHash(otherDevice)]);
+      const expiredAt=await expiry(otherDevice);
+      const expired=await request('/api/v1/auth/me',{auth:otherDevice});
+      assert.equal(expired.status,401);
+      assert.equal(expired.headers.get('set-cookie'),null);
+      assert.equal(await expiry(otherDevice),expiredAt);
+    });
     const csrf=await request('/api/v1/auth/profile',{method:'PATCH',body:{email:'nest@example.test'},auth:admin,headers:{'X-CSRF-Token':'wrong'}});
     assert.equal(csrf.status,403);assert.equal(csrf.data.error.code,'CSRF');
     assert.equal((await request(`/api/v1/accounts/${adminId}`,{method:'PATCH',body:{disabled:true},auth:admin})).data.error.code,'LAST_ADMIN');
@@ -77,7 +106,12 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
       assert.equal(replacement.status,200);
       assert.equal((await redeem(first.data.resetCode)).data.error.code,'RESET_FAILED');
       const copied=`\u200B${replacement.data.resetCode.slice(0,12)}\u200E ${replacement.data.resetCode.slice(12)}\u2060`;
-      assert.equal((await redeem(copied)).status,200);
+      const reset=await redeem(copied);
+      assert.equal(reset.status,200);
+      assert.match(reset.headers.get('set-cookie'),/; Max-Age=0(?:;|$)/);
+      const revoked=await request('/api/v1/auth/me',{auth:student});
+      assert.equal(revoked.status,401);
+      assert.equal(revoked.headers.get('set-cookie'),null);
       assert.equal((await redeem(replacement.data.resetCode)).data.error.code,'RESET_FAILED');
       assert.equal((await request('/api/v1/auth/login',{method:'POST',body:{username:'nest-student',password:studentPassword}})).data.error.code,'LOGIN_FAILED');
       const again=await request('/api/v1/auth/login',{method:'POST',body:{username:'nest-student',password:newPassword}});
@@ -263,8 +297,12 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
     assert.equal(disabledLogin.status,403);assert.deepEqual(disabledLogin.data.error,{code:'ACCOUNT_DISABLED',message:'账号已禁用'});
     const wrongDisabledLogin=await request('/api/v1/auth/login',{method:'POST',body:{username:'nest-student',password:randomBytes(24).toString('base64url')}});
     assert.equal(wrongDisabledLogin.status,401);assert.equal(wrongDisabledLogin.data.error.code,'LOGIN_FAILED');
-    assert.equal((await request('/api/v1/auth/logout',{method:'POST',body:{},auth:admin})).status,200);
-    assert.equal((await request('/api/v1/auth/me',{auth:admin})).status,401);
+    const logout=await request('/api/v1/auth/logout',{method:'POST',body:{},auth:admin});
+    assert.equal(logout.status,200);
+    assert.match(logout.headers.get('set-cookie'),/; Max-Age=0(?:;|$)/);
+    const revoked=await request('/api/v1/auth/me',{auth:admin});
+    assert.equal(revoked.status,401);
+    assert.equal(revoked.headers.get('set-cookie'),null);
   } finally {
     if(app)await app.close();
     await pool.end();

@@ -107,7 +107,7 @@ export async function createDomainServices(pool,config) {
  }
  async function session(db,accountId) {
   const token=randomToken(),csrfToken=randomToken();
-  await db.query("INSERT INTO sessions(token_hash,account_id,csrf_token,expires_at) VALUES($1,$2,$3,now()+interval '7 days')",[sessionHash(token,config.secret),accountId,csrfToken]);
+  await db.query("INSERT INTO sessions(token_hash,account_id,csrf_token,expires_at) VALUES($1,$2,$3,'infinity')",[sessionHash(token,config.secret),accountId,csrfToken]);
   return {body:{user:await findUser(db,accountId),csrfToken},cookie:sessionCookie(token,config)};
  }
  async function classAccess(db,user,id) {
@@ -272,7 +272,15 @@ export async function createDomainServices(pool,config) {
   const {route,method,body,url,user,sess,ip}=context;
   let m;
    if(route==='/auth/activation-schools'&&method==='GET'){ipLimiter.check(`activation-schools:${ip}`);return respond(200,await activationSchools(pool));}
-   if(route==='/auth/me'&&method==='GET'){if(!user)fail(401,'UNAUTHENTICATED','请先登录');return respond(200,{user,csrfToken:sess.csrf_token});}
+   if(route==='/auth/me'&&method==='GET'){
+    if(!user)fail(401,'UNAUTHENTICATED','请先登录');
+    // Upgrade a legacy session only while its original credential is valid.
+    if(sess.expires_at!==Infinity){
+     const upgraded=await pool.query("UPDATE sessions SET expires_at='infinity' WHERE token_hash=$1 AND expires_at>statement_timestamp()",[sess.token_hash]);
+     if(!upgraded.rowCount)fail(401,'UNAUTHENTICATED','请先登录');
+    }
+    return respond(200,{user,csrfToken:sess.csrf_token},context.renewedCookie);
+   }
    if(route==='/auth/login'&&method==='POST') {
     ipLimiter.check(`login:${ip}`);const login=username(body.username),secret=password(body.password);authLimiter.check(`login:${login}`);
     // Verify the secret before disclosing a disabled account. Released bindings
@@ -784,7 +792,8 @@ export async function createDomainServices(pool,config) {
   if(!['GET','HEAD','OPTIONS'].includes(method))checkMutation({headers},sess,config.origins);
   if(!user&&!['/auth/login','/auth/register','/auth/register-personal','/auth/reset','/auth/verify-identity','/site-info'].includes(route)&&!(route==='/auth/activation-schools'&&method==='GET'))fail(401,'UNAUTHENTICATED','请先登录');
   await requireLegacyWorkspaceAccess(pool,user,route,method);
-  return {pool,user,sess,route,method,body,url,ip,config,helpers};
+  const renewedCookie=route==='/auth/me'&&method==='GET'&&user?sessionCookie(rawToken,config):undefined;
+  return {pool,user,sess,route,method,body,url,ip,config,helpers,renewedCookie};
  }
  return {
   prepareRequest,

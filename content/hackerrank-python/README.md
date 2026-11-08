@@ -4,7 +4,7 @@
 
 ## 文件
 
-- `course.md`：17 章可导入课程，独立概念讲解、示例、自测重点和全部原题链接。
+- `course.md`：17 章可导入教材，按 Python 概念和语法组织讲解、独立示例与知识自测。练习来源和覆盖关系单独保存在映射文件中。
 - `source-catalogue.json`：公开目录元数据快照，不含原站题面或答案。
 - `coverage.json` / `coverage.csv`：原站稳定 ID、来源链接和章节映射。
 - `native-catalogue.csv`：本站原创题名、接口和来源条目的逐题清单。

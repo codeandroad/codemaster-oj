@@ -17,7 +17,9 @@ for (const [index, p] of problems.entries()) {
   assert.equal(p.courseKey, mapping.courseKey);
   assert.equal(p.chapterNumber, mapping.chapterNumber);
   assert.ok(p.source.includes(mapping.sourceUrl));
-  assert.ok(p.statement.includes('independently authored'));
+  assert.match(p.statement, /^## Task\n/);
+  assert.match(p.statement, /^## Interface\n/m);
+  assert.doesNotMatch(p.statement, /^#+\s+Notes\s*$/mi);
   assert.equal(p.samples.length, 2);
   assert.equal(p.tests.length, 5);
   assert.equal(p.tests.reduce((s, t) => s + t.weight, 0), 100);

@@ -2,6 +2,7 @@ import {moveGroupMembers} from './group-move.mjs';
 import { assertJudgeAdmission } from './system.mjs';
 import { transaction } from './db.mjs';
 import { fail, field, uuid, enumValue, canonicalHash } from './security.mjs';
+import { legacyProblemStatement } from './problem-statement-display.mjs';
 
 export async function canReviewActivitySubmission(db,user,submission,{readOnly=false}={}){
  if(submission.original_submission_id&&!submission.assignment_id&&!submission.timed_attempt_id){
@@ -263,11 +264,11 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
   const p=required(await pool.query(`SELECT p.id,p.archived_at,p.current_version_id,b.id bank_id,b.name bank_name,b.visibility bank_visibility,
    COALESCE(i.name,'管理员') owner_name FROM problems p JOIN problem_banks b ON b.id=p.bank_id
    LEFT JOIN accounts a ON a.id=p.owner_account_id LEFT JOIN identities i ON i.id=a.identity_id WHERE p.id=$1`,[problemId]));
-  const versions=(await pool.query(`SELECT id,title,statement,validation_status,published_at,school_visible_at,
+  const versions=(await pool.query(`SELECT id,title,statement,source,validation_status,published_at,school_visible_at,
    rank_review_status,created_at FROM problem_versions WHERE problem_id=$1 ORDER BY created_at DESC,id DESC`,[problemId])).rows;
   return result({id:p.id,bankId:p.bank_id,bankName:p.bank_name,bankVisibility:p.bank_visibility,ownerName:p.owner_name,
    archivedAt:p.archived_at,currentVersionId:p.current_version_id,
-   versions:versions.map(v=>({id:v.id,title:v.title,statement:v.statement,
+   versions:versions.map(v=>({id:v.id,title:v.title,statement:legacyProblemStatement(v),
     validationStatus:v.validation_status,publishedAt:v.published_at,schoolVisibleAt:v.school_visible_at,
     rankReviewStatus:v.rank_review_status,createdAt:v.created_at}))});
  }

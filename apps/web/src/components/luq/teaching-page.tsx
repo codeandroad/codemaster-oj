@@ -17,8 +17,8 @@ import {
   useAction,
   useData,
 } from "@/components/teacher/shared";
-import { LessonContent } from "@/components/student/shared";
-import { productionApi, type ProductionProblem } from "@/lib/production-api";
+import { date, LessonContent } from "@/components/student/shared";
+import { productionApi, type Assignment, type ProductionProblem } from "@/lib/production-api";
 import type {
   Paper4Paper,
   Paper4PaperSummary,
@@ -875,23 +875,43 @@ function UsageList({
 export function StudentLuqRule({
   activityType,
   activityId,
+  assignmentContext,
 }: {
   activityType: ActivityType;
   activityId: string;
+  assignmentContext?: Pick<Assignment, "title" | "dueAt">;
 }) {
+  const { locale } = useLocale();
   const tx = useText(),
     rule = useData<RuleResponse>(
       `luq/reward-rules?${new URLSearchParams({ activityType, activityId })}`,
     );
   const r = rule.data?.rule;
-  if (rule.loading || rule.error || !r || r.amount <= 0) return null;
+  if (rule.loading || rule.error || !r || r.amount <= 0) return assignmentContext?.title ?? null;
+  const deadline = assignmentContext && (
+    <time dateTime={assignmentContext.dueAt}>{date(assignmentContext.dueAt, locale)}</time>
+  );
   return (
-    <details key={`${activityType}:${activityId}`} className="my-1 text-xs leading-5 text-muted-foreground">
-      <summary className="w-fit cursor-pointer rounded-sm py-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
-        <span className="font-semibold text-foreground">{r.requireAll ? tx("作业完成奖励", "Completion reward") : tx("额外奖励", "Extra reward")} +{r.amount} {tx("奖学金", "scholarship")}</span>
-        <span className="ml-2">{tx("奖励条件", "Conditions")}</span>
+    <details key={`${activityType}:${activityId}`} className={assignmentContext ? "text-xs leading-5" : "my-1 text-xs leading-5 text-muted-foreground"}>
+      <summary className={`w-fit cursor-pointer rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${assignmentContext ? "" : "py-1"}`}>
+        {assignmentContext ? (
+          <>
+            {assignmentContext.title}{tx("（", " (")}
+            <strong className="font-semibold">
+              {locale === "en"
+                ? <>{r.requireAll ? "Complete by " : "Qualify by "}{deadline} for +{r.amount} scholarship</>
+                : <>{deadline}{r.requireAll ? "前完成" : "前达标"} +{r.amount} 奖学金</>}
+            </strong>
+            {tx("）", ")")}
+          </>
+        ) : (
+          <>
+            <span className="font-semibold text-foreground">{r.requireAll ? tx("作业完成奖励", "Completion reward") : tx("额外奖励", "Extra reward")} +{r.amount} {tx("奖学金", "scholarship")}</span>
+            <span className="ml-2">{tx("奖励条件", "Conditions")}</span>
+          </>
+        )}
       </summary>
-      <p className="mt-1">
+      <p className="mt-1 text-muted-foreground">
         {r.requireAll
           ? tx("在截止前通过本作业全部必做题的正式判题。", "Pass every required problem through formal submissions received in this assignment by the deadline.")
           : <>

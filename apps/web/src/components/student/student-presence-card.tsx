@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Check, ChevronDown } from "lucide-react";
 import { useLocale } from "@/components/locale-context";
 import { ScholarshipIcon } from "@/components/luq/scholarship-icon";
+import { AppLink } from "@/components/navigation";
 import { ProfileAvatar } from "@/components/profile-hero";
 import { ApiError, productionApi } from "@/lib/production-api";
 import styles from "./student-presence.module.css";
@@ -15,11 +16,13 @@ type PresencePreview = {
 };
 
 /** Fetch only the server-filtered preview; never prefetch full profiles or submissions. */
-export function StudentPresenceCard({ identityId, onBack, onMinimize, endpoint = "presence" }: {
+export function StudentPresenceCard({ identityId, onBack, onMinimize, endpoint = "presence", backLabel, profileHref }: {
   identityId: string;
   onBack: () => void;
-  onMinimize: () => void;
+  onMinimize?: () => void;
   endpoint?: "presence" | "practice/presence";
+  backLabel?: string;
+  profileHref?: string;
 }) {
   const { locale } = useLocale();
   const tx = (zh: string, en: string) => locale === "zh" ? zh : en;
@@ -53,16 +56,24 @@ export function StudentPresenceCard({ identityId, onBack, onMinimize, endpoint =
   const formatDate = (date: string, compact: boolean) => new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en", {
     month: "short", day: "numeric", ...(compact ? {} : { year: "numeric", hour: "2-digit", minute: "2-digit" } as const),
   }).format(new Date(date));
+  const avatar = result && <ProfileAvatar avatar={result.student.avatar} nickname={result.student.displayName}/>;
+  const backText = backLabel ?? tx("返回在线列表", "Back to online students");
   return <>
     <div className={styles.toolbar}>
-      <button ref={back} type="button" className={styles.minimize} onClick={onBack} aria-label={tx("返回在线列表", "Back to online students")} title={tx("返回", "Back")}><ArrowLeft size={15}/></button>
+      <button ref={back} type="button" className={styles.minimize} onClick={onBack} aria-label={backText} title={backLabel ?? tx("返回", "Back")}><ArrowLeft size={15}/></button>
       <span className={styles.cardTitle}>{tx("学习近况", "Recent activity")}</span>
-      <button type="button" className={styles.minimize} onClick={onMinimize} aria-label={tx("最小化在线列表", "Minimize online list")} title={tx("最小化", "Minimize")}><ChevronDown size={16}/></button>
+      {onMinimize && <button type="button" className={styles.minimize} onClick={onMinimize} aria-label={tx("最小化在线列表", "Minimize online list")} title={tx("最小化", "Minimize")}><ChevronDown size={16}/></button>}
     </div>
     <div className={styles.cardBody} aria-busy={!result && !error}>
       {error ? <p role="status" className={styles.message}>{error === "unavailable" ? tx("无法查看这位学生的近况。", "This student's activity is unavailable.") : tx("暂时无法获取近况。", "Activity is unavailable right now.")} {error === "failed" && <button type="button" onClick={() => { setError(null); setRetry(value => value + 1); }}>{tx("重试", "Retry")}</button>}</p> : !result ? <p role="status" className={styles.message}>{tx("加载中…", "Loading…")}</p> : <>
         <div className={styles.cardPerson}>
-          <ProfileAvatar avatar={result.student.avatar} nickname={result.student.displayName}/>
+          {profileHref ? <AppLink
+            href={profileHref}
+            prefetch={false}
+            className={styles.profileLink}
+            aria-label={tx(`打开 ${result.student.displayName} 的个人主页`, `Open ${result.student.displayName}'s profile`)}
+            title={tx("打开个人主页", "Open profile")}
+          >{avatar}</AppLink> : avatar}
           <span className={styles.name} title={result.student.displayName}>{result.student.displayName}</span>
           {result.student.isSelf && <span className={styles.you}>{tx("我", "You")}</span>}
         </div>

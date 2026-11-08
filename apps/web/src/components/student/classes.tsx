@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, ChevronRight, ClipboardList, FileText, Users } from "lucide-react";
 import { AppLink } from "@/components/navigation";
@@ -9,6 +9,7 @@ import { ProfileAvatar } from "@/components/profile-hero";
 import { useLocale } from "@/components/locale-context";
 import { buttonVariants } from "@/components/ui/button";
 import { Empty, LessonContent, State, useData } from "./shared";
+import { StudentPresenceCard } from "./student-presence-card";
 
 interface StudentClassSummary {
   id: string;
@@ -92,13 +93,57 @@ export function StudentClass({ id }: { id: string }) {
 function ClassRoster({ members }: { members: ClassMember[] }) {
   const { locale } = useLocale();
   const [search, setSearch] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const list = useRef<HTMLUListElement>(null);
+  const returnTo = useRef<{ button: HTMLButtonElement; scrollTop: number } | null>(null);
   const tx = (zh: string, en: string) => locale === "en" ? en : zh;
   const query = search.trim().toLocaleLowerCase(locale);
   const visible = query ? members.filter(member => member.displayName.toLocaleLowerCase(locale).includes(query)) : members;
-  return <section aria-labelledby="class-students-heading" className={`${surface} order-first xl:order-last`}>
-    <div className="flex items-center justify-between border-b border-border px-3 py-2.5"><h2 id="class-students-heading" className="text-sm font-semibold">{tx("班级同学", "Students")}</h2><span className="text-xs tabular-nums text-muted-foreground">{members.length}</span></div>
-    {members.length > 0 && <div className="p-2"><input type="search" aria-label={tx("搜索班级同学", "Search classmates")} placeholder={tx("搜索同学", "Search students")} value={search} onChange={event => setSearch(event.target.value)} className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary"/></div>}
-    {visible.length ? <ul className="max-h-64 overflow-y-auto overscroll-contain xl:max-h-96">{visible.map(member => <li key={member.id}><AppLink href={`/student/people/${encodeURIComponent(member.id)}`} className="flex min-h-12 items-center gap-2.5 border-t border-border px-3 py-2 hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2"><ProfileAvatar avatar={member.avatar} nickname={member.displayName}/><span className="min-w-0 flex-1 break-words text-sm font-medium text-primary">{member.displayName}</span><ChevronRight size={15} aria-hidden="true" className="shrink-0 text-muted-foreground"/></AppLink></li>)}</ul> : <p className="px-3 py-4 text-sm text-muted-foreground">{members.length ? tx("没有匹配的同学", "No matching students") : tx("暂无已激活的学生主页", "No student profiles available yet")}</p>}
+  const selectedMember = members.find(member => member.id === selectedId);
+  useEffect(() => {
+    if (selectedMember || !returnTo.current) return;
+    const { button, scrollTop } = returnTo.current;
+    returnTo.current = null;
+    if (list.current) list.current.scrollTop = scrollTop;
+    button.focus({ preventScroll: true });
+  }, [selectedMember]);
+  return <section aria-label={tx("班级同学", "Students")} className={`${surface} order-first xl:order-last`} onKeyDown={event => {
+    if (selectedMember && event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      setSelectedId(null);
+    }
+  }}>
+    <div hidden={!!selectedMember}>
+      <div className="flex items-center justify-between border-b border-border px-3 py-2.5"><h2 className="text-sm font-semibold">{tx("班级同学", "Students")}</h2><span className="text-xs tabular-nums text-muted-foreground">{members.length}</span></div>
+      {members.length > 0 && <div className="p-2"><input type="search" aria-label={tx("搜索班级同学", "Search classmates")} placeholder={tx("搜索同学", "Search students")} value={search} onChange={event => setSearch(event.target.value)} className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary"/></div>}
+      {visible.length ? <ul ref={list} className="max-h-64 overflow-y-auto overscroll-contain xl:max-h-96">
+        {visible.map(member => <li key={member.id}>
+          <button
+            type="button"
+            aria-label={tx(`查看 ${member.displayName} 的学习近况`, `View recent activity for ${member.displayName}`)}
+            className="flex min-h-12 w-full cursor-pointer items-center gap-2.5 border-t border-border px-3 py-2 text-left hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2"
+            onClick={event => {
+              returnTo.current = { button: event.currentTarget, scrollTop: list.current?.scrollTop ?? 0 };
+              setSelectedId(member.id);
+            }}
+          >
+            <ProfileAvatar avatar={member.avatar} nickname={member.displayName}/>
+            <span className="min-w-0 flex-1 break-words text-sm font-medium text-primary">{member.displayName}</span>
+            <ChevronRight size={15} aria-hidden="true" className="shrink-0 text-muted-foreground"/>
+          </button>
+        </li>)}
+      </ul> : <p className="px-3 py-4 text-sm text-muted-foreground">{members.length ? tx("没有匹配的同学", "No matching students") : tx("暂无已激活的学生主页", "No student profiles available yet")}</p>}
+    </div>
+    {selectedMember && <div className="flex max-h-[min(280px,60dvh)] flex-col text-xs">
+      <StudentPresenceCard
+        key={selectedMember.id}
+        identityId={selectedMember.id}
+        onBack={() => setSelectedId(null)}
+        backLabel={tx("返回同学列表", "Back to classmates")}
+        profileHref={`/student/people/${encodeURIComponent(selectedMember.id)}`}
+      />
+    </div>}
   </section>;
 }
 

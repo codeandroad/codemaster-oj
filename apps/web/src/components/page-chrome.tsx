@@ -21,7 +21,7 @@ export function PageHeader({ title, action, className }: {
   );
 }
 
-export function StatusPill({ status }: { status: string }) {
+export function StatusPill({ status, icon }: { status: string; icon?: ReactNode }) {
   const {t,locale}=useLocale();
   const label = status === "NotPassed" ? (locale === "en" ? "Not passed" : "未通过") : status === "NeedsReview" ? (locale === "en" ? "Needs review" : "待复核") : t(status);
   const positive = /^(AC|Solved)(?:\b|\s|·)/.test(status) || ["已发布", "可用", "完成", "Available", "Active", "Completed", "Published", "已公开", "Public", "已布置", "Assigned"].includes(status);
@@ -31,5 +31,5 @@ export function StatusPill({ status }: { status: string }) {
     : warning
       ? "border-warning/25 bg-warning-soft text-warning"
       : "border-border bg-muted text-muted-foreground";
-  return <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${colors}`}><span aria-hidden>●</span>{label}</span>;
+  return <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${colors}`}><span aria-hidden className="shrink-0">{icon ?? "●"}</span>{label}</span>;
 }

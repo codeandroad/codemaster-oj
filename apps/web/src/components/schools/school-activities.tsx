@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ArrowRight, Download, Plus, RefreshCw } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Download, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { StatusPill } from "@/components/page-chrome";
 import { useLocale } from "@/components/locale-context";
 import { StudentAssignmentCard, StudentTimedPracticeCard, StudentTimedPracticeTabs, timedPracticeCategoryLabel } from "@/components/student/activity-cards";
+import { Progress } from "@/components/student/dashboard-view";
 import { date, Empty, Feedback, State, useData, useMutation } from "@/components/student/shared";
 import { productionApi } from "@/lib/production-api";
 import { PracticeProblem } from "./school-practice";
@@ -101,7 +102,8 @@ function SchoolStudentActivityCards({
         href={href(activity.id)}
         status={text(...(labels[activity.phase] ?? [activity.phase, activity.phase]))}
         dueAt={activity.endsAt}
-        percent={activity.problems.length ? (activity.grade?.solved ?? 0) / activity.problems.length * 100 : 0}
+        archived={activity.phase === "Archived"}
+        problemCount={activity.problems.length}
         score={activity.grade?.score ?? null}
         maxScore={activity.grade?.total ?? activity.problems.reduce((sum, problem) => sum + problem.points, 0)}
         attempted={activity.grade?.items.filter(item => item.activityAttempts > 0).length ?? 0}
@@ -132,8 +134,33 @@ function SchoolActivityDetails({ activity: a, base, onBack, onEdit, onReport, on
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
   const start = () => void action.run(async () => { await productionApi(`${base}/${a.id}/start`, { method: "POST" }); reload(); });
   const canEnter = a.canManage || a.phase !== "Upcoming" && (a.kind === "assignment" || !!a.resultsPublishedAt || a.phase === "Open" && !!a.attempt && !a.attempt.finishedAt && (!a.attempt.deadlineAt || now < +new Date(a.attempt.deadlineAt)));
+  const problemCount = a.problems.length;
+  const complete = a.kind === "assignment" && problemCount > 0 && a.grade?.solved === problemCount;
   return <div className="space-y-4"><div className="flex flex-wrap items-center justify-between gap-2"><Button size="sm" variant="ghost" onClick={onBack}><ArrowLeft size={15}/>{text(kindLabel(a.kind), a.kind === "timed" ? "限时训练" : "作业")}</Button><div className="flex flex-wrap gap-2">{a.canManage && <><Button size="sm" variant="secondary" onClick={onReport}>{text("Report", "报告")}</Button>{a.state === "Draft" && <><Button size="sm" variant="secondary" onClick={onEdit}>{text("Edit draft", "编辑草稿")}</Button><Button size="sm" onClick={() => setConfirmation("publish")}>{text("Publish", "发布")}</Button></>}{a.kind === "timed" && a.state === "Published" && !a.resultsPublishedAt && <><Button size="sm" variant="secondary" disabled={a.phase !== "Open"} onClick={() => setConfirmation("end")}>{text("End activity", "结束活动")}</Button><Button size="sm" disabled={a.phase !== "Ended"} onClick={() => setConfirmation("publish-results")}>{text("Publish results", "公布成绩")}</Button></>}{a.state !== "Archived" && <Button size="sm" variant="ghost" disabled={a.kind === "timed" && a.state === "Published" && !a.resultsPublishedAt} onClick={() => setConfirmation("archive")}>{text("Archive", "归档")}</Button>}</>}<Button size="sm" variant="ghost" onClick={reload} aria-label={text("Refresh activity", "刷新活动")}><RefreshCw size={15}/></Button></div></div><Feedback action={action}/>
-    <section className={`${panel} p-5`}><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase text-primary">{a.id.slice(0, 8)}</p><h1 className="mt-1 text-2xl font-bold">{a.title}</h1><p className="mt-2 text-sm text-muted-foreground">{text(...(labels[a.phase] ?? [a.phase, a.phase]))} · {a.problems.length} {text("problems", "道题")} · {text("Due", "截止")} {date(a.endsAt, locale)}{a.kind === "timed" && ` · ${a.durationMinutes} ${text("min", "分钟")}`}</p></div>{a.grade && <div className="text-right"><b className="text-3xl">{a.grade.score}/{a.grade.total}</b><p className="mt-1 text-sm text-muted-foreground">{a.grade.solved}/{a.problems.length} {text("solved", "已通过")}</p></div>}</div>{a.description && <p className="mt-4 whitespace-pre-wrap text-sm leading-6">{a.description}</p>}{a.grade && <progress className="mt-4 h-2 w-full accent-primary" value={a.grade.solved} max={Math.max(1, a.problems.length)}/>}</section>
+    <section className={`${panel} p-5`}>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase text-primary">{a.id.slice(0, 8)}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <h1 className="min-w-0 text-2xl font-bold [overflow-wrap:anywhere]">{a.title}</h1>
+            {complete && <StatusPill status="Completed" icon={<Check size={13} />} />}
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {(!complete || a.state === "Archived") && <>{text(...(labels[a.phase] ?? [a.phase, a.phase]))} · </>}
+            {problemCount} {text("problems", "道题")} · {text("Due", "截止")} {date(a.endsAt, locale)}
+            {a.kind === "timed" && ` · ${a.durationMinutes} ${text("min", "分钟")}`}
+          </p>
+        </div>
+        {a.grade && <div className="text-right">
+          <b className="text-3xl">{a.grade.score}/{a.grade.total}</b>
+          <p className="mt-1 text-sm text-muted-foreground">{a.grade.solved}/{problemCount} {text("solved", "已通过")}</p>
+        </div>}
+      </div>
+      {a.description && <p className="mt-4 whitespace-pre-wrap text-sm leading-6">{a.description}</p>}
+      {a.grade && (a.kind === "assignment"
+        ? <div className="mt-4"><Progress percent={problemCount ? a.grade.solved / problemCount * 100 : 0} complete={complete} label={text("Required problem progress", "必做题进度")} /></div>
+        : <progress className="mt-4 h-2 w-full accent-primary" value={a.grade.solved} max={Math.max(1, problemCount)} />)}
+    </section>
     <SchoolActivityScholarshipRule schoolId={a.schoolId} activityId={a.id} editable={a.canManage && a.state === "Draft"}/>
     {!a.canManage && a.kind === "timed" && <section className={`${panel} flex flex-wrap items-center justify-between gap-3 px-4 py-3`}><p className="text-sm">{a.resultsPublishedAt ? text("Results published", "成绩已公布") : a.attempt?.finishedAt ? text("Attempt finished. Awaiting published results.", "答题已结束，等待教师公布成绩。") : a.attempt ? `${text("Your deadline", "个人截止时间")}: ${date(a.attempt.deadlineAt, locale)}` : text("Start when you are ready. Your personal timer starts immediately.", "准备好后开始，个人计时随即启动。")}</p>{!a.attempt && a.phase === "Open" && <Button size="sm" disabled={action.busy} onClick={start}>{text("Start timed practice", "开始限时训练")}</Button>}{a.attempt && !a.attempt.finishedAt && a.phase === "Open" && <Button size="sm" variant="secondary" onClick={() => setConfirmation("finish")}>{text("Finish attempt", "结束答题")}</Button>}</section>}
     <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_280px]"><section className={panel}><header className="border-b border-border px-4 py-3 font-semibold">{text("Required problems", "必做题目")}</header><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-surface-subtle text-muted-foreground"><tr><th className={th}>#</th><th className={th}>{text("Problem", "题目")}</th><th className={th}>{text("Status", "状态")}</th><th className={th}>{text("Best", "最高分")}</th><th className={th}>{text("Attempts", "提交次数")}</th><th className={th}>{text("Action", "操作")}</th></tr></thead><tbody>{a.problems.map(p => { const g = a.grade?.items.find(item => item.id === p.id); return <tr key={p.id} className="border-t border-border"><td className={td}>{p.position}</td><td className={td}><button className="text-left font-semibold text-primary hover:underline disabled:cursor-default disabled:text-muted-foreground disabled:no-underline" disabled={!canEnter} onClick={() => onProblem(p.id)}>{p.title}</button></td><td className={td}>{g ? <><StatusPill status={g.status}/>{g.inherited && <p className="mt-1 max-w-48 text-xs text-muted-foreground">{text("Passed elsewhere; no repeat required", "已在其他入口通过，无需重复作答")}</p>}</> : "—"}</td><td className={td}>{g ? g.score : "—"}/{p.points}</td><td className={td}>{g ? <span title={text(`${g.activityAttempts} submissions in this activity`, `本活动提交 ${g.activityAttempts} 次`)}>{g.attempts}</span> : "—"}</td><td className={td}><Button size="sm" variant="ghost" disabled={!canEnter} onClick={() => onProblem(p.id)}>{text("Open", "打开")}</Button></td></tr>; })}</tbody></table></div></section><aside className={`${panel} space-y-3 p-4 text-sm leading-6 text-muted-foreground`}><h2 className="font-semibold text-foreground">{text("Activity rules", "活动规则")}</h2><p>{text("Sample and custom runs do not affect grades. Hidden tests remain private.", "样例与自定义运行不计成绩，隐藏测试保持私有。")}</p><p>{a.kind === "assignment" ? text("Best formal score before the deadline. Same-version formal AC elsewhere gives full credit without a new submission or an activity bonus.", "取截止前正式提交最高分。同版本在其他入口正式 AC 可计满分，不产生新提交或活动奖励。") : text("One attempt per student. The server applies your personal deadline. Formal results appear only after the teacher publishes them.", "每位学生一次答题，服务器执行个人有效截止时间，正式结果在教师公布后显示。")}</p><p>{text("Attempts include relevant formal submissions; hover to see how many were made in this activity.", "次数包含有效正式提交，悬停可查看本活动中的提交次数。")}</p></aside></div>

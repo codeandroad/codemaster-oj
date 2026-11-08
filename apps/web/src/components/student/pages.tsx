@@ -10,7 +10,7 @@ import { LearnerResourceScope } from "@/components/schools/learner-resource-scop
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Bookmark, CalendarClock, CheckCircle2, CircleAlert, Code2, KeyRound, MessageSquareText, NotebookPen, Pencil, ShieldCheck, X } from "lucide-react";
+import { ArrowRight, Bookmark, CalendarClock, Check, CheckCircle2, CircleAlert, Code2, KeyRound, MessageSquareText, NotebookPen, Pencil, ShieldCheck, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
@@ -61,9 +61,12 @@ function formal(items: Submission[]) { return items.filter(s => ["submit", "corr
 function gradeFor(assignment: Assignment, identityId?: string) { return assignment.grades?.find(g => !identityId || g.identityId === identityId); }
 function assignmentProgress(assignment: Assignment, identityId?: string) {
   const grade = gradeFor(assignment, identityId), max = assignment.problems.reduce((sum, p) => sum + p.points, 0);
-  const attempted = grade?.problems.filter(p => p.assignmentAttempts != null ? p.assignmentAttempts > 0 : p.hasAssignmentSubmission ?? Boolean(p.submissionId)).length ?? 0;
-  const solved = grade?.problems.filter(p => p.status === "AC").length ?? 0;
-  return { grade, max, attempted, solved, percent: assignment.problems.length ? solved / assignment.problems.length * 100 : 0 };
+  const results = new Map(grade?.problems.map(problem => [problem.problemId, problem]));
+  const required = assignment.problems.map(problem => results.get(problem.problemId));
+  const attempted = required.filter(p => p && (p.assignmentAttempts != null ? p.assignmentAttempts > 0 : p.hasAssignmentSubmission ?? Boolean(p.submissionId))).length;
+  const solved = required.filter(p => p?.status === "AC").length;
+  const complete = required.length > 0 && solved === required.length;
+  return { grade, max, attempted, solved, complete, percent: required.length ? solved / required.length * 100 : 0 };
 }
 function sourceLabel(submission: Submission, assignments: Assignment[] = [], locale: AppLocale = "en") { return submission.originalSubmissionId ? ui(locale, "订正", "Correction") : submission.assignmentId ? assignments.find(a => a.id === submission.assignmentId)?.title ?? ui(locale, "作业", "Assignment") : submission.timedPracticeId ? ui(locale, "限时训练", "Timed Practice") : ui(locale, "题库练习", "Practice library"); }
 function score(submission: Submission) { return submission.score == null || isPending(submission.status) || /system.?error/i.test(submission.status) ? "—" : `${Number(submission.score).toFixed(2)}/100`; }
@@ -80,7 +83,7 @@ export function StudentDashboard({ user }: { user: CampusUser }) {
   const current = ownAssignments.filter(a => new Date(a.dueAt).getTime() >= now)
     .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())[0] ?? ownAssignments[0];
   const progress = current ? assignmentProgress(current, user.identityId) : null;
-  const next = current?.problems.find(p => progress?.grade?.problems.find(g => g.problemId === p.problemId)?.status !== "AC") ?? current?.problems[0];
+  const next = current?.problems.find(p => progress?.grade?.problems.find(g => g.problemId === p.problemId)?.status !== "AC");
   const path = paths.data?.items.find(p => p.completedChapters < p.chapterCount) ?? paths.data?.items[0];
   const practice = timed.data?.items.find(p => ["Published", "Running"].includes(p.status) && !p.attempt);
   const pathDetail = useData<LearningPath>(path ? `learning-paths/${path.id}` : "");
@@ -190,27 +193,32 @@ export function StudentAssignments({ user }: { user: CampusUser }) {
   return <>
     <PageHeader title={ui(locale, "作业", "Assignments")} />
     <div className="mt-5 flex gap-2" role="group" aria-label={ui(locale, "作业状态", "Assignment status")}>
-      <Button variant={showArchived ? "secondary" : "primary"} onClick={() => setShowArchived(false)}>{ui(locale, "当前作业", "Current")}</Button>
-      <Button variant={showArchived ? "primary" : "secondary"} onClick={() => setShowArchived(true)}>{ui(locale, "历史归档", "Archived")}</Button>
+      <Button variant={showArchived ? "secondary" : "primary"} aria-pressed={!showArchived} onClick={() => setShowArchived(false)}>{ui(locale, "当前作业", "Current")}</Button>
+      <Button variant={showArchived ? "primary" : "secondary"} aria-pressed={showArchived} onClick={() => setShowArchived(true)}>{ui(locale, "历史归档", "Archived")}</Button>
     </div>
     <State data={assignments} empty={assignments.data && !assignments.data.items.length ? ui(locale, "暂无作业", "No assignments yet") : undefined}>
       <div className="mt-5 grid gap-4">
         {visible.map(assignment => {
           const progress = assignmentProgress(assignment, user.identityId);
           const ended = new Date(assignment.dueAt).getTime() < now;
+          const status = assignment.archived ? ui(locale, "已归档", "Archived")
+            : progress.grade?.pending ? "Judging"
+            : ended ? ui(locale, "已截止", "Ended")
+            : ui(locale, "进行中", "Open");
           return <StudentAssignmentCard
             key={assignment.id}
             title={assignment.title}
             href={`/student/assignments/${assignment.id}`}
-            status={assignment.archived ? ui(locale, "已归档", "Archived") : ended ? ui(locale, "已截止", "Ended") : ui(locale, "进行中", "Open")}
+            status={status}
+            archived={assignment.archived}
             audience={assignment.classNames?.join(" / ") || assignment.classes?.map(item => item.name).join(" / ") ||
               assignment.className || classes.data?.items.find(c => c.id === assignment.classId)?.name || ui(locale, "按学生名单布置", "Direct assignment")}
             course={assignment.coursePathId && assignment.courseTitle ? {
               href: `/student/learning-paths/${assignment.coursePathId}`, title: assignment.courseTitle,
             } : undefined}
             dueAt={assignment.dueAt}
-            active={!ended}
-            percent={progress.percent}
+            active={!assignment.archived && !ended}
+            problemCount={assignment.problems.length}
             score={progress.grade?.score ?? null}
             maxScore={progress.max}
             pending={progress.grade?.pending}
@@ -242,7 +250,10 @@ export function StudentAssignment({ id, user }: { id: string; user: CampusUser }
       <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto]">
         <div>
           <p className="text-xs font-semibold uppercase text-primary">{shortId(a.id)}</p>
-          <h1 className="mt-1 text-2xl font-bold">{a.title}</h1>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <h1 className="min-w-0 text-2xl font-bold [overflow-wrap:anywhere]">{a.title}</h1>
+            {p.complete && <StatusPill status="Completed" icon={<Check size={13} />} />}
+          </div>
           {a.coursePathId && a.courseTitle && <p className="mt-2 text-sm"><AppLink href={`/student/learning-paths/${a.coursePathId}`} className="font-semibold text-primary hover:underline focus-visible:underline">{ui(locale, "关联课程：", "Course: ")}{a.courseTitle} →</AppLink></p>}
           <p className="mt-2 text-sm leading-6 text-muted-foreground">{a.classNames?.join(" / ") || a.classes?.map(item => item.name).join(" / ") || a.className || classes.data?.items.find(c => c.id === a.classId)?.name || ui(locale, "按学生名单布置", "Direct assignment")} · {ui(locale, "截止", "Due")} {displayDate(a.dueAt, locale)} Asia/Shanghai</p>
         </div>
@@ -251,7 +262,7 @@ export function StudentAssignment({ id, user }: { id: string; user: CampusUser }
           <div className="text-xs text-muted-foreground">{p.attempted}/{a.problems.length} {ui(locale, "本作业已提交", "submitted here")} · {p.solved}/{a.problems.length} {ui(locale, "已解决", "solved")}</div>
         </div>
       </div>
-      <div className="mt-5"><Progress percent={p.percent}/></div>
+      <div className="mt-5"><Progress percent={p.percent} complete={p.complete} label={ui(locale, "必做题进度", "Required problem progress")} /></div>
     </section>
     <div className="@container mt-6">
       <div className="grid items-start gap-5 @min-[73rem]:grid-cols-[minmax(0,1fr)_17rem]">

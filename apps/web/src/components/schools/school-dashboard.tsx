@@ -45,8 +45,7 @@ export function SchoolStudentDashboard({ school, user }: { school: School; user:
   const deadline = (activity: SchoolActivity) => activity.endsAt ? Date.parse(activity.endsAt) : Infinity;
   const assignment = assignmentItems.filter(item => item.phase === "Open")
     .sort((a, b) => deadline(a) - deadline(b))[0] ?? assignmentItems[0];
-  const next = assignment?.problems.find(problem => !assignment.grade?.items.find(item => item.id === problem.id)?.solved)
-    ?? assignment?.problems[0];
+  const next = assignment?.problems.find(problem => !assignment.grade?.items.find(item => item.id === problem.id)?.solved);
   const path = courses.data?.items.find(item => item.completedChapters < item.chapterCount) ?? courses.data?.items[0];
   const pathDetail = useData<CourseDetail>(path ? `${base}/courses/${path.id}` : "");
   const practice = timed.data?.items.filter(item => ["Upcoming", "Open"].includes(item.phase) && !item.attempt)

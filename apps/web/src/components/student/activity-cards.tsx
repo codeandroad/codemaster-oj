@@ -1,4 +1,4 @@
-import { ArrowRight, CalendarClock, ClipboardList, Clock3 } from "lucide-react";
+import { ArrowRight, CalendarClock, Check, ClipboardList, Clock3 } from "lucide-react";
 import { useLocale, type AppLocale } from "@/components/locale-context";
 import { AppLink } from "@/components/navigation";
 import { StatusPill } from "@/components/page-chrome";
@@ -41,10 +41,11 @@ type ActivityCard = {
 };
 
 export function StudentAssignmentCard({
-  title, href, status, audience, course, active, dueAt, percent, score, maxScore, pending, attempted, solved,
+  title, href, status, audience, course, active, archived, dueAt, problemCount, score, maxScore, pending, attempted, solved,
 }: ActivityCard & {
   dueAt: string | null;
-  percent: number;
+  archived?: boolean;
+  problemCount: number;
   score: number | null;
   maxScore: number;
   pending?: boolean;
@@ -53,23 +54,37 @@ export function StudentAssignmentCard({
 }) {
   const { locale } = useLocale();
   const text = (zh: string, en: string) => locale === "en" ? en : zh;
-  return <section className="grid items-center gap-5 border border-border bg-surface p-5 panel-shadow md:grid-cols-[minmax(0,1fr)_180px_auto]">
+  const complete = problemCount > 0 && solved === problemCount;
+  const percent = problemCount ? solved / problemCount * 100 : 0;
+  return <section className="grid items-center gap-4 border border-border bg-surface p-5 panel-shadow md:grid-cols-[minmax(0,1fr)_200px_auto] md:gap-5">
     <div className="min-w-0">
       <div className="flex flex-wrap items-center gap-2">
-        <ClipboardList size={17} className="text-primary" />
-        <h2 className="font-bold"><AppLink href={href} className="hover:text-primary hover:underline focus-visible:underline">{title}</AppLink></h2>
-        <StatusPill status={status} />
+        <h2 className="min-w-0 font-bold">
+          <AppLink href={href} className="flex items-start gap-2 hover:text-primary hover:underline focus-visible:underline">
+            <ClipboardList size={17} aria-hidden className="mt-0.5 shrink-0 text-primary" />
+            <span className="min-w-0 [overflow-wrap:anywhere]">{title}</span>
+          </AppLink>
+        </h2>
+        {complete && <StatusPill status="Completed" icon={<Check size={13} />} />}
+        {(!complete || archived) && <StatusPill status={status} />}
       </div>
       {audience && <p className="mt-1 text-sm text-muted-foreground">{audience}</p>}
       {course && <p className="mt-1 text-sm"><AppLink href={course.href} className="font-medium text-primary hover:underline focus-visible:underline">{text("关联课程：", "Course: ")}{course.title}</AppLink></p>}
-      <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"><CalendarClock size={14} />{text("截止", "Due")} {date(dueAt, locale)} · Asia/Shanghai</p>
+      <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"><CalendarClock size={14} aria-hidden className="shrink-0" />{text("截止", "Due")} {date(dueAt, locale)} · Asia/Shanghai</p>
     </div>
-    <div>
-      <Progress percent={percent} />
-      <div className="mt-2 text-sm font-semibold">{score == null && pending ? text("等待有效结果", "Waiting for valid result") : score ?? 0}/{maxScore}</div>
-      <div className="text-xs text-muted-foreground">{attempted} {text("本作业已提交", "submitted here")} · {solved} {text("已解决", "solved")}</div>
+    <div className="min-w-0">
+      <p className={`mb-1.5 text-sm font-semibold tabular-nums ${complete ? "text-success" : ""}`}>
+        {text(`${solved}/${problemCount} 题已通过`, `${solved}/${problemCount} required problems passed`)}
+      </p>
+      <Progress percent={percent} complete={complete} label={text("必做题进度", "Required problem progress")} />
+      <div className="mt-2 text-xs tabular-nums text-muted-foreground">
+        <p>{text("成绩", "Score")} <span className="font-semibold text-foreground">{score == null && pending ? "—" : score ?? 0}/{maxScore}</span></p>
+        <p className="mt-0.5">{text(`本作业已提交 ${attempted}/${problemCount} 题`, `${attempted}/${problemCount} problems submitted here`)}</p>
+      </div>
     </div>
-    <AppLink href={href} className={buttonVariants({ variant: active ? "primary" : "secondary" })}>{text("打开", "Open")} <ArrowRight size={15} /></AppLink>
+    <AppLink href={href} className={`${buttonVariants({ variant: active && !complete ? "primary" : "secondary" })} ${locale === "en" ? "md:w-40" : "md:w-28"}`}>
+      {complete ? text("查看作业", "View assignment") : text("打开", "Open")} <ArrowRight size={15} aria-hidden />
+    </AppLink>
   </section>;
 }
 

@@ -1,4 +1,4 @@
-import { ArrowRight, CalendarClock, CheckCircle2, ChevronRight, CircleAlert, Clock3 } from "lucide-react";
+import { ArrowRight, CalendarClock, Check, CheckCircle2, ChevronRight, CircleAlert, Clock3 } from "lucide-react";
 import { useLocale } from "@/components/locale-context";
 import { AppLink } from "@/components/navigation";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
@@ -37,8 +37,14 @@ type DashboardSubmission = DashboardItem & {
   sourceLabel?: string;
 };
 
-export function Progress({ percent }: { percent: number }) {
-  return <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full bg-primary" style={{ width: `${Math.max(0, Math.min(100, percent))}%` }} /></div>;
+export function Progress({ percent, label, complete = false }: { percent: number; label?: string; complete?: boolean }) {
+  const value = Math.max(0, Math.min(100, percent));
+  return <div
+    className="h-2 overflow-hidden rounded-full bg-muted"
+    role={label ? "progressbar" : undefined}
+    aria-label={label}
+    aria-valuenow={label ? Math.round(value) : undefined}
+  ><div className={`h-full ${complete ? "bg-success" : "bg-primary"}`} style={{ width: `${value}%` }} /></div>;
 }
 
 export function StudentDashboardView({
@@ -66,6 +72,8 @@ export function StudentDashboardView({
   const needsReview = latest.filter(row => !["AC", "Submitted"].includes(row.status) && !isPending(row.status) && !/system.?error/i.test(row.status));
   const review = needsReview[0];
   const percent = assignment?.count ? assignment.solved / assignment.count * 100 : 0;
+  const complete = Boolean(assignment && assignment.count > 0 && assignment.solved === assignment.count);
+  const continueHref = complete ? undefined : assignment?.continueHref;
   const statusLabel = (status: string) => locale === "zh"
     ? ({ Waiting: "等待中", Judging: "评测中", "System Error": "系统错误", Submitted: "已提交" }[status] ?? status)
     : status;
@@ -75,15 +83,18 @@ export function StudentDashboardView({
       <div className="space-y-6">
         <State data={assignmentState}>
           {assignment ? <section className="border border-border bg-surface panel-shadow">
-            <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <div>
-                <p className="text-xs font-semibold uppercase text-primary">{text("继续学习", "Continue learning")}</p>
-                <h2 className="mt-1 text-lg font-bold"><AppLink href={assignment.href} className="hover:text-primary hover:underline focus-visible:underline">{assignment.title}</AppLink></h2>
+            <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-muted-foreground">{text("作业进度", "Assignment progress")}</p>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <h2 className="min-w-0 text-lg font-bold [overflow-wrap:anywhere]"><AppLink href={assignment.href} className="hover:text-primary hover:underline focus-visible:underline">{assignment.title}</AppLink></h2>
+                  {complete && <StatusPill status="Completed" icon={<Check size={13} />} />}
+                </div>
               </div>
-              <span className="text-sm font-semibold text-primary">{Math.round(percent)}%</span>
+              <span className={`shrink-0 text-sm font-semibold tabular-nums ${complete ? "text-success" : "text-primary"}`}>{Math.round(percent)}%</span>
             </div>
             <div className="p-5">
-              <Progress percent={percent} />
+              <Progress percent={percent} complete={complete} label={text("必做题进度", "Required problem progress")} />
               <div className="mt-3 flex flex-wrap justify-between gap-2 text-sm text-muted-foreground">
                 <span>{assignment.solved}/{assignment.count} {text("必做题已解决", "required solved")} · {assignment.attempted}/{assignment.count} {text("本作业已提交", "submitted here")}</span>
                 <span>{assignment.score == null && assignment.pending ? text("等待有效结果", "Waiting for valid result") : assignment.score ?? 0}/{assignment.maxScore} {text("分", "points")}</span>
@@ -91,8 +102,11 @@ export function StudentDashboardView({
               <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
                 <span className="flex items-center gap-2 text-sm"><CalendarClock size={16} className="text-warning" />{text("截止", "Due")} {displayDate(assignment.dueAt)} · Asia/Shanghai</span>
                 <div className="flex gap-2">
-                  <AppLink href={assignment.href} className={buttonVariants({ variant: "secondary" })}>{text("查看作业", "Open assignment")}</AppLink>
-                  {assignment.continueHref && <AppLink href={assignment.continueHref} className={buttonVariants()}>{text("继续", "Continue")} <ArrowRight size={15} /></AppLink>}
+                  <AppLink href={assignment.href} className={buttonVariants({ variant: complete ? "primary" : "secondary" })}>
+                    {text("查看作业", "View assignment")}
+                    {complete && <ArrowRight size={15} aria-hidden />}
+                  </AppLink>
+                  {continueHref && <AppLink href={continueHref} className={buttonVariants()}>{text("继续做题", "Continue")} <ArrowRight size={15} aria-hidden /></AppLink>}
                 </div>
               </div>
             </div>

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { ScholarshipIcon } from "./scholarship-icon";
-import { AppLink } from "@/components/navigation";
+import { ScholarshipPopover } from "./scholarship-popover";
 import { useLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
 import {
@@ -58,23 +58,34 @@ function useText() {
   return (zh: string, en: string) => (locale === "en" ? en : zh);
 }
 
-export function LuqBalance({ identityId, endpoint = "luq/me", href = "/student/luq" }: {
+type BalanceProps = {
   identityId: string;
   endpoint?: "luq/me" | "practice/luq/me";
   href?: string;
-}) {
+};
+
+export function LuqBalance(props: BalanceProps) {
+  return <LuqBalanceContent key={`${props.identityId}:${props.endpoint ?? "luq/me"}`} {...props}/>;
+}
+
+function LuqBalanceContent({ endpoint = "luq/me", href = "/student/luq" }: BalanceProps) {
   const tx = useText(),
     [account, setAccount] = useState<LuqAccount | null>(null),
+    [error, setError] = useState(""),
     [notice, setNotice] = useState("");
   const seen = useRef<string | null | undefined>(undefined);
+  const refreshAccount = useRef<() => void>(() => {});
   useEffect(() => {
-    let alive = true;
+    let controller: AbortController | undefined;
     seen.current = undefined;
     async function refresh() {
       if (document.visibilityState === "hidden") return;
+      controller?.abort();
+      const request = new AbortController();
+      controller = request;
       try {
-        const next = await productionApi<LuqAccount>(endpoint);
-        if (!alive) return;
+        const next = await productionApi<LuqAccount>(endpoint, { signal: request.signal });
+        if (request.signal.aborted) return;
         const latest = next.items?.[0]?.id ?? null;
         if (seen.current !== undefined && latest !== seen.current) {
           const index = next.items.findIndex(
@@ -88,32 +99,27 @@ export function LuqBalance({ identityId, endpoint = "luq/me", href = "/student/l
         }
         seen.current = latest;
         setAccount(next);
-      } catch {
-        /* The ledger page exposes actionable errors; the badge must not interrupt editing. */
+        setError("");
+      } catch (reason) {
+        if (!request.signal.aborted) setError(apiMessage(reason));
       }
     }
-    void refresh();
-    const timer = setInterval(() => void refresh(), 15000);
     const refreshEvent = () => void refresh();
+    refreshAccount.current = refreshEvent;
+    refreshEvent();
+    const timer = setInterval(refreshEvent, 15000);
     window.addEventListener("focus", refreshEvent);
     window.addEventListener("campus-judge:luq-changed", refreshEvent);
     return () => {
-      alive = false;
+      controller?.abort();
       clearInterval(timer);
       window.removeEventListener("focus", refreshEvent);
       window.removeEventListener("campus-judge:luq-changed", refreshEvent);
     };
-  }, [identityId, endpoint]);
+  }, [endpoint]);
   return (
-    <span className="inline-flex items-center gap-2 text-xs">
-      <AppLink
-        href={href}
-        className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-border px-2 font-semibold hover:bg-surface-subtle"
-        aria-label={tx("奖学金余额与流水", "Scholarship balance and history")}
-      >
-        <ScholarshipIcon size={18} />
-        {account ? account.balance : "—"}
-      </AppLink>
+    <div className="inline-flex items-center gap-2 text-xs">
+      <ScholarshipPopover balance={account?.balance} entries={account?.items} href={href} error={error} onRefresh={() => refreshAccount.current()}/>
       {notice && (
         <button
           type="button"
@@ -124,7 +130,7 @@ export function LuqBalance({ identityId, endpoint = "luq/me", href = "/student/l
           <span role="status">{notice} {tx("奖学金", "scholarship")}</span>
         </button>
       )}
-    </span>
+    </div>
   );
 }
 

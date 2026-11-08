@@ -266,7 +266,7 @@ export function SchoolsPage({
             }
             account={
               <div className="flex items-center gap-2">
-              {!teaching && <SchoolScholarshipBalance schoolId={selected.id} onClick={() => router.push(href("scholarship"))}/>}
+              {!teaching && <SchoolScholarshipBalance key={`${user.id}:${selected.id}`} schoolId={selected.id} href={href("scholarship")}/>}
               <NotificationDropdown key={`${user.id}:${selected.id}:${workspaceRole}`} schoolId={selected.id}
                 workspace={teaching ? "staff" : "student"} scholarshipHref={href("scholarship")}/>
               <AccountMenu

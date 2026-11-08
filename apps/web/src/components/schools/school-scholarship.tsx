@@ -10,6 +10,8 @@ import { SolutionContent } from "@/components/luq/solution-content";
 import { MathContent } from "@/components/math-content";
 import { apiMessage, productionApi, productionId } from "@/lib/production-api";
 import { ScholarshipIcon } from "@/components/luq/scholarship-icon";
+import { ScholarshipPopover } from "@/components/luq/scholarship-popover";
+import { useData as useStudentData } from "@/components/student/shared";
 
 export type SchoolAssistanceTarget = {
   type: "problem" | "paper4";
@@ -1103,19 +1105,14 @@ function ScholarshipGrant({ schoolId }: { schoolId: string }) {
 }
 export function SchoolScholarshipBalance({
   schoolId,
-  onClick,
+  href,
 }: {
   schoolId: string;
-  onClick?: () => void;
+  href: string;
 }) {
-  const tx = useText(),
-    data = useData<{ balance: number }>(`${prefix(schoolId)}/wallet`);
-  const reload = useRef(data.reload);
+  const { data, reload } = useStudentData<{ balance: number }>(`${prefix(schoolId)}/wallet`);
   useEffect(() => {
-    reload.current = data.reload;
-  }, [data.reload]);
-  useEffect(() => {
-    const refresh = () => reload.current();
+    const refresh = () => { if (document.visibilityState === "visible") reload(); };
     window.addEventListener("codemaster:school-scholarship-changed", refresh);
     const timer = window.setInterval(refresh, 45000);
     return () => {
@@ -1125,20 +1122,8 @@ export function SchoolScholarshipBalance({
       );
       clearInterval(timer);
     };
-  }, []);
-  if (!data.data) return null;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-sm font-semibold"
-      aria-label={tx("奖学金余额", "Scholarship balance")}
-    >
-      <ScholarshipIcon className="size-4" />
-      {data.data.balance}
-      <span className="hidden sm:inline">{tx("奖学金", "Scholarship")}</span>
-    </button>
-  );
+  }, [reload]);
+  return <ScholarshipPopover balance={data?.balance} ledgerPath={`${prefix(schoolId)}/ledger`} href={href} onRefresh={reload}/>;
 }
 function ScholarshipContents({
   schoolId,

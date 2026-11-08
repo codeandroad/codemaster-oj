@@ -3,16 +3,24 @@ import Image from "next/image";
 import {usePathname} from "next/navigation";
 import {productionApi} from "@/lib/production-api";
 import {useEffect,useRef,useState} from "react";
-import {Settings,LogOut,ChevronDown,UserRound,Trophy} from "lucide-react";
+import {Settings,LogOut,ChevronDown,UserRound,Trophy,GraduationCap,ShieldCheck,BookOpen} from "lucide-react";
 import {AppLink} from "@/components/navigation";
 import type {CampusUser,CampusRole} from "@/lib/production-api";
 import {useLocale} from "@/components/locale-context";
+
+const legacyWorkspaces = {
+ admin: {href:"/admin", label:"管理工作区", Icon:ShieldCheck},
+ teacher: {href:"/teacher", label:"教学工作区", Icon:GraduationCap},
+ student: {href:"/", label:"学生工作区", Icon:BookOpen},
+} as const;
 
 export function AccountMenu({user,role,busy,onLogout,settingsHref,profileHref,leaderboardHref}:{user:CampusUser;role?:CampusRole;busy:boolean;onLogout:()=>void;settingsHref?:string;profileHref?:string;leaderboardHref?:string}) {
  const {t}=useLocale();
  const pathname=usePathname();
  const settingsPath=settingsHref??(pathname.startsWith("/platform")?"/platform?section=settings":pathname.startsWith("/schools")?"/schools?section=personal-settings":role==="admin"?"/admin/personal-settings":role?`/${role}/settings`:"/practice/settings");
  const profilePath=profileHref??(pathname.startsWith("/platform")?"/platform?section=profile":pathname.startsWith("/schools")?"/schools?section=profile":role?`/${role}/profile`:"/practice/profile");
+ const workspaceRoles = role || pathname === "/platform" ? (Object.keys(legacyWorkspaces) as CampusRole[]).filter(candidate =>
+  candidate !== role && (user.roles.includes(candidate) || candidate === "teacher" && user.roles.includes("admin"))) : [];
  const [open,setOpen]=useState(false),[points,setPoints]=useState<number|null>(null);
  useEffect(()=>{if(!open||role!=="student")return;let active=true;void productionApi<{points:number}>("points/me").then(r=>{if(active)setPoints(r.points);}).catch(()=>{if(active)setPoints(null);});return()=>{active=false;};},[open,role]);const root=useRef<HTMLDivElement>(null);const trigger=useRef<HTMLButtonElement>(null);
  const close=()=>{setOpen(false);trigger.current?.focus();};
@@ -30,6 +38,7 @@ export function AccountMenu({user,role,busy,onLogout,settingsHref,profileHref,le
  <div className="border-b border-border px-2.5 py-2.5"><p className="break-words font-semibold">{user.nickname||user.name}</p><p className="break-all text-xs text-muted-foreground">{user.username}</p>{role==="student"&&<p className="mt-2 text-sm">{t("累计积分")}：{points??t("暂不可用")}</p>}</div><AppLink role="menuitem" href={profilePath} className={item} onNavigate={()=>setOpen(false)}><UserRound size={16} aria-hidden="true"/>{t("个人资料")}</AppLink>
  <AppLink role="menuitem" href={settingsPath} className={item} onNavigate={()=>setOpen(false)}><Settings size={16} aria-hidden="true"/>{t("个人设置")}</AppLink>
  {(role||leaderboardHref)&&<AppLink role="menuitem" href={leaderboardHref??`/${role}/points`} className={item} onNavigate={()=>setOpen(false)}><Trophy size={16} aria-hidden="true"/>{t("积分排行榜")}</AppLink>}
+ {workspaceRoles.map(candidate=>{const {href,label,Icon}=legacyWorkspaces[candidate];return <AppLink role="menuitem" key={candidate} href={href} className={item} onNavigate={()=>setOpen(false)}><Icon size={16} aria-hidden="true"/>{t(label)}</AppLink>;})}
  <button role="menuitem" type="button" className={item} disabled={busy} onClick={onLogout}><LogOut size={16}/>{t(busy?"正在退出…":"退出登录")}</button>
  </div>}
  </div>;

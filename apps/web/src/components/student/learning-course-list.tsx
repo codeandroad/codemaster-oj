@@ -36,7 +36,7 @@ export function LearningCourseRow({ course, title, source, status, reading, prac
     ? { beginner: "Beginner", intermediate: "Intermediate", advanced: "Advanced" }[course.difficulty]
     : courseDifficulties[course.difficulty]);
   const metadata = [source, course.category, difficulty].filter(Boolean).join(" · ");
-  return <li className="grid min-w-0 gap-x-4 gap-y-3 px-4 py-4 transition-colors hover:bg-surface-subtle sm:grid-cols-[88px_minmax(0,1fr)] lg:grid-cols-[88px_minmax(0,1fr)_240px] lg:items-center">
+  return <li className="grid min-w-0 gap-x-4 gap-y-3 px-4 py-4 transition-colors hover:bg-surface-subtle sm:grid-cols-[88px_minmax(0,1fr)] lg:grid-cols-[88px_minmax(0,1fr)_21rem] lg:items-center">
     <div aria-hidden="true" className="hidden h-[50px] w-[88px] overflow-hidden rounded border border-border bg-surface-subtle sm:block">
       <LearningCover coverKey={course.coverKey} coverImage={course.coverImage} />
     </div>
@@ -47,7 +47,7 @@ export function LearningCourseRow({ course, title, source, status, reading, prac
     </div>
     <div className="min-w-0 space-y-2 sm:col-start-2 lg:col-auto">
       {status && <p className="text-xs font-medium text-muted-foreground lg:text-right">{status}</p>}
-      {(reading || practice) && <div className={practice ? "grid grid-cols-2 gap-3" : undefined}
+      {(reading || practice) && <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))] gap-3"
         role="group" aria-label={text("课程进度", "Course progress")}>
         {reading && <CourseProgress label={text("章节阅读", "Chapters read")} empty={text("暂无章节", "No chapters")} count={reading} />}
         {practice && <CourseProgress label={text("练习完成", "Practice completed")} empty={text("暂无练习", "No practice")} count={practice} />}
@@ -58,7 +58,7 @@ export function LearningCourseRow({ course, title, source, status, reading, prac
 
 function CourseProgress({ label, empty, count }: { label: string; empty: string; count: ProgressCount }) {
   return <div className="min-w-0 text-xs">
-    <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+    <div className="flex items-center justify-between gap-2 whitespace-nowrap">
       <span className="text-muted-foreground">{label}</span>
       <span className="shrink-0 font-medium">{count.total ? `${count.value}/${count.total}` : empty}</span>
     </div>

@@ -31,12 +31,13 @@ async function auditPlatform(db, actorId, action, { schoolId = null, accountId =
     VALUES ($1, $2, $3, $4, $5::jsonb)`, [actorId, action, schoolId, accountId, JSON.stringify(detail)]);
 }
 
-async function findActiveAccount(db, rawUsername, { exclusive = false } = {}) {
-  const login = username(rawUsername);
+async function findActiveAccount(db, rawUsername, { exclusive = false, accountId } = {}) {
+  const byId = accountId !== undefined;
+  const target = byId ? uuid(accountId, '账号 ID') : username(rawUsername);
   if (exclusive) {
     const { rows: [candidate] } = await db.query(`
       SELECT id,identity_id FROM accounts WHERE username=$1
-        AND binding_released_at IS NULL AND disabled_at IS NULL`, [login]);
+        AND binding_released_at IS NULL AND disabled_at IS NULL`, [target]);
     if (!candidate) fail(404, 'ACCOUNT_NOT_FOUND', '未找到有效的指定账号');
     // Match legacy identity editing/unbinding: identity first, credential next.
     // Separate statements make the lock order independent of the query plan.
@@ -46,15 +47,15 @@ async function findActiveAccount(db, rawUsername, { exclusive = false } = {}) {
     const { rows: [account] } = await db.query(`
       SELECT id AS "accountId",username FROM accounts WHERE id=$1 AND identity_id=$2
         AND username=$3 AND binding_released_at IS NULL AND disabled_at IS NULL FOR UPDATE`,
-    [candidate.id,candidate.identity_id,login]);
+    [candidate.id,candidate.identity_id,target]);
     if (!account) fail(404, 'ACCOUNT_NOT_FOUND', '未找到有效的指定账号');
     return { ...account,name:identity.name };
   }
   const { rows: [account] } = await db.query(`
     SELECT a.id AS "accountId", a.username, i.name FROM accounts a
     JOIN identities i ON i.id = a.identity_id
-    WHERE a.username = $1 AND a.binding_released_at IS NULL AND a.disabled_at IS NULL
-      AND i.archived_at IS NULL FOR SHARE OF a, i`, [login]);
+    WHERE a.${byId ? 'id' : 'username'} = $1 AND a.binding_released_at IS NULL AND a.disabled_at IS NULL
+      AND i.archived_at IS NULL FOR SHARE OF a, i`, [target]);
   if (!account) fail(404, 'ACCOUNT_NOT_FOUND', '未找到有效的指定账号');
   return account;
 }
@@ -118,8 +119,25 @@ async function listSchools(db, url) {
   return result({ items, page, hasMore: rows.length > 50 });
 }
 
+async function searchSchoolAdminCandidates(db, url) {
+  const term = field(url.searchParams.get('q') ?? '', '搜索内容', { min: 0, max: 100 }).toLowerCase();
+  if (term.length < 2) return result({ items: [] });
+  const { rows } = await db.query(`
+    SELECT a.id AS "accountId", i.name, a.username
+    FROM accounts a JOIN identities i ON i.id = a.identity_id
+    WHERE a.disabled_at IS NULL AND a.binding_released_at IS NULL AND i.archived_at IS NULL
+      AND (strpos(a.username, $1) > 0 OR strpos(lower(i.name), $1) > 0)
+    ORDER BY (a.username = $1) DESC, (lower(i.name) = $1) DESC, a.username
+    LIMIT 12`, [term]);
+  return result({ items: rows });
+}
+
 function validateSchool(body) {
-  const slug = field(body.slug, '学校标识', { min: 3, max: 50 });
+  // The form sends a stable request ID so a lost response can be retried
+  // against the same generated code. Existing clients can still supply a slug.
+  const slug = body.slug === undefined
+    ? `school-${uuid(body.requestId, '请求 ID').toLowerCase()}`
+    : field(body.slug, '学校标识', { min: 3, max: 50 });
   if (!/^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/.test(slug) || slug === 'legacy-school') {
     fail(400, 'VALIDATION', '学校标识须使用 3–50 个小写字母、数字或短横线');
   }
@@ -128,7 +146,7 @@ function validateSchool(body) {
 
 async function createSchool(db, actorId, body) {
   const { slug, name } = validateSchool(body);
-  const account = await findActiveAccount(db, body.adminUsername);
+  const account = await findActiveAccount(db, body.adminUsername, { accountId: body.adminAccountId });
   // The unique slug doubles as the create request's stable idempotency key.
   await db.query("SELECT pg_advisory_xact_lock(hashtextextended('school-provision:' || $1, 0))", [slug]);
   const { rows: [existing] } = await db.query(`SELECT ${schoolFields} FROM schools WHERE slug=$1`, [slug]);
@@ -186,11 +204,13 @@ async function appointAdministrator(db, actorId, schoolId, body) {
 }
 
 export async function handlePlatformGovernance({ pool,user,route,method,body,url }) {
+  const searching = route === '/platform/school-admin-candidates' && method === 'GET';
   const match = route.match(/^\/platform\/schools(?:\/([^/]+)(?:\/(administrators))?)?$/);
-  if (!match) return null;
-  const schoolId = match[1] ? uuid(match[1], '学校 ID') : null;
+  if (!searching && !match) return null;
+  const schoolId = match?.[1] ? uuid(match[1], '学校 ID') : null;
   return transaction(pool, async db => {
     await requirePlatformAdministrator(db, user.id);
+    if (searching) return searchSchoolAdminCandidates(db,url);
     if (!schoolId && method === 'GET') return listSchools(db,url);
     if (!schoolId && method === 'POST') return createSchool(db,user.id,body);
     if (schoolId && !match[2] && method === 'PATCH') return renameSchool(db,user.id,schoolId,body);

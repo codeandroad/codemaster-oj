@@ -39,12 +39,12 @@ export function usePlatformError() {
         "需要平台管理员权限。你的权限可能已变更，请刷新页面。",
       ),
       ACCOUNT_NOT_FOUND: text(
-        "No active account matches this username. Check it with the intended administrator.",
-        "未找到此用户名对应的有效账号，请向拟任命的管理员核对。",
+        "This account is no longer available or the username does not match an active account. Choose or check the account and try again.",
+        "该账号已不可用，或用户名未匹配到有效账号。请重新选择或核对后重试。",
       ),
       CONFLICT: text(
-        "This school code is already in use. Refresh the list before trying again.",
-        "学校标识已被使用，请先刷新列表再试。",
+        "This create request conflicts with an existing school. Check the school list before starting a new request.",
+        "此次建校请求与已有学校冲突，请先检查学校列表，再重新发起。",
       ),
       STALE_SCHOOL: text(
         "The school name changed while this form was open. Close this form and refresh before renaming it.",
@@ -55,8 +55,8 @@ export function usePlatformError() {
         "这所学校的既有管理员角色在原工作区维护。",
       ),
       VALIDATION: text(
-        "Check the school name, school code and username. Use 3–50 lowercase letters, digits or hyphens for the school code.",
-        "请检查学校名称、学校标识和用户名。学校标识须为 3–50 位小写字母、数字或连字符。",
+        "Check the fields and try again.",
+        "请检查填写内容后重试。",
       ),
       UNAUTHENTICATED: text(
         "Your session has expired. Sign in again.",

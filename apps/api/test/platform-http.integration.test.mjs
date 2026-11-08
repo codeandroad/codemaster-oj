@@ -182,11 +182,37 @@ test('explicit platform governance preserves teaching roles and enforces authori
           method: 'POST', body: { username: 'independent-founder', displayName: 'Independent founder', password },
         });
         assert.equal(founder.status, 201);
-        const slug = `school-${randomBytes(6).toString('hex')}`;
-        const fresh = await request('/platform/schools', {
-          method: 'POST', auth: platform, body: { slug, name: 'New school', adminUsername: 'independent-founder' },
+        assert.deepEqual((await request('/schools', { auth: founder })).data.items, []);
+        const candidates = '/platform/school-admin-candidates';
+        assert.equal((await request(`${candidates}?q=founder`)).status, 401);
+        for (const auth of [legacy, firstAdmin, founder]) {
+          assert.equal((await request(`${candidates}?q=founder`, { auth })).status, 403);
+        }
+        for (const query of ['Independent%20founder', 'INDEPENDENT-FOUNDER']) {
+          const found = await request(`${candidates}?q=${query}`, { auth: platform });
+          assert.equal(found.status, 200);
+          assert.deepEqual(found.data.items, [{
+            accountId: founder.data.user.id, name: 'Independent founder', username: 'independent-founder',
+          }]);
+        }
+        for (const query of ['', 'f', '%25%25', 'disabled-target']) {
+          const found = await request(`${candidates}?q=${query}`, { auth: platform });
+          assert.equal(found.status, 200);
+          assert.deepEqual(found.data.items, []);
+        }
+        const requestId = randomUUID();
+        const create = { method: 'POST', auth: platform, body: {
+          requestId, name: 'New school', adminAccountId: founder.data.user.id,
+        } };
+        const stale = await request('/platform/schools', {
+          ...create, body: { ...create.body, adminAccountId: disabled.data.user.id },
         });
-        assert.equal(fresh.status, 201);
+        assert.equal(stale.status, 404);
+        const attempts = await Promise.all([request('/platform/schools', create), request('/platform/schools', create)]);
+        assert.deepEqual(attempts.map(response => response.status).sort(), [200, 201]);
+        const [fresh, retry] = attempts;
+        assert.equal(fresh.data.id, retry.data.id);
+        assert.equal(fresh.data.slug, `school-${requestId}`);
         const prefix = `/schools/${fresh.data.id}`;
         const memberships = await request('/schools', { auth: founder });
         assert.equal(memberships.status, 200);

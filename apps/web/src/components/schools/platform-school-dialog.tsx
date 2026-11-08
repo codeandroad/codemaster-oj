@@ -10,9 +10,10 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { productionApi } from "@/lib/production-api";
+import { ApiError, productionApi } from "@/lib/production-api";
 import { useSchoolText } from "./school-ui";
-import { usePlatformError, type PlatformSchoolAction } from "./platform-ui";
+import { PlatformAccountPicker, type PlatformAccountCandidate } from "./platform-account-picker";
+import { usePlatformError, type PlatformSchool, type PlatformSchoolAction } from "./platform-ui";
 
 export function PlatformSchoolDialog({
   action,
@@ -33,10 +34,14 @@ export function PlatformSchoolDialog({
   const [name, setName] = useState(
     action.mode === "rename" ? action.school.name : "",
   );
-  const [slug, setSlug] = useState("");
+  const requestId = useRef<string | null>(null);
+  const [administrator, setAdministrator] = useState<PlatformAccountCandidate | null>(null);
   const [username, setUsername] = useState("");
   const creating = action.mode === "create";
   const assigning = action.mode === "administrator";
+  const ready = assigning
+    ? !!username.trim()
+    : !!name.trim() && (!creating || !!administrator);
   const title = creating
     ? text("Create school", "创建学校")
     : assigning
@@ -44,8 +49,8 @@ export function PlatformSchoolDialog({
       : text("Rename school", "修改学校名称");
   const description = creating
     ? text(
-        "Create a school and assign an existing account as its administrator.",
-        "创建学校，并将一个已有账号指定为学校管理员。",
+        "Choose the first administrator. The school code is generated automatically.",
+        "请选择首任学校管理员。学校标识将自动生成。",
       )
     : assigning
       ? text(
@@ -59,21 +64,29 @@ export function PlatformSchoolDialog({
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (inFlight.current) return;
+    if (inFlight.current || !ready) return;
     inFlight.current = true;
     try {
       await mutation.run(async () => {
         try {
           if (action.mode === "create") {
-            await productionApi("platform/schools", {
+            if (!administrator) return;
+            requestId.current ??= crypto.randomUUID();
+            const school = await productionApi<PlatformSchool>("platform/schools", {
               method: "POST",
               body: {
                 name: name.trim(),
-                slug: slug.trim(),
-                adminUsername: username.trim(),
+                requestId: requestId.current,
+                adminAccountId: administrator.accountId,
               },
             });
-          } else if (action.mode === "rename") {
+            onSaved(text(
+              `School created: ${school.name} (${school.slug}).`,
+              `学校已创建：${school.name}（${school.slug}）。`,
+            ));
+            return;
+          }
+          if (action.mode === "rename") {
             await productionApi(`platform/schools/${action.school.id}`, {
               method: "PATCH",
               body: { name: name.trim(), expectedName: action.school.name },
@@ -85,22 +98,20 @@ export function PlatformSchoolDialog({
             );
           }
           onSaved(
-            creating
+            assigning
               ? text(
-                  `School created: ${name.trim()}.`,
-                  `学校已创建：${name.trim()}。`,
+                  `Administrator access assigned to ${username.trim()}.`,
+                  `已向 ${username.trim()} 授予学校管理权限。`,
                 )
-              : assigning
-                ? text(
-                    `Administrator access assigned to ${username.trim()}.`,
-                    `已向 ${username.trim()} 授予学校管理权限。`,
-                  )
-                : text(
-                    `School renamed to ${name.trim()}.`,
-                    `学校名称已改为 ${name.trim()}。`,
-                  ),
+              : text(
+                  `School renamed to ${name.trim()}.`,
+                  `学校名称已改为 ${name.trim()}。`,
+                ),
           );
         } catch (error) {
+          if (creating && error instanceof ApiError && error.code === "ACCOUNT_NOT_FOUND") {
+            setAdministrator(null);
+          }
           throw localError(error);
         }
       });
@@ -123,7 +134,8 @@ export function PlatformSchoolDialog({
           firstInput.current?.focus();
         }}
         onEscapeKeyDown={(event) => {
-          if (inFlight.current) event.preventDefault();
+          if (inFlight.current || (event.target instanceof HTMLElement &&
+            event.target.hasAttribute("data-account-search-open"))) event.preventDefault();
         }}
         onPointerDownOutside={(event) => {
           if (inFlight.current) event.preventDefault();
@@ -148,7 +160,7 @@ export function PlatformSchoolDialog({
           </Button>
         </div>
         <DialogDescription>{description}</DialogDescription>
-        <form className="space-y-3" onSubmit={(event) => void submit(event)}>
+        <form noValidate className="space-y-3" onSubmit={(event) => void submit(event)}>
           <fieldset className="space-y-3" disabled={mutation.busy}>
             {!assigning && (
               <label className="block text-sm font-medium">
@@ -164,38 +176,12 @@ export function PlatformSchoolDialog({
                 />
               </label>
             )}
-            {creating && (
-              <label className="block text-sm font-medium">
-                {text("School code", "学校标识")}
-                <input
-                  className={`${inputClass} mt-1`}
-                  value={slug}
-                  onChange={(event) => setSlug(event.target.value)}
-                  required
-                  minLength={3}
-                  maxLength={50}
-                  pattern="[a-z0-9][a-z0-9\-]{1,48}[a-z0-9]"
-                  autoComplete="off"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  aria-describedby="platform-school-code-hint"
-                />
-                <span
-                  id="platform-school-code-hint"
-                  className="mt-1 block text-xs font-normal text-muted-foreground"
-                >
-                  {text(
-                    "3–50 lowercase letters, digits or hyphens.",
-                    "3–50 位小写字母、数字或连字符。",
-                  )}
-                </span>
-              </label>
-            )}
-            {(creating || assigning) && (
+            {creating && <PlatformAccountPicker value={administrator} onChange={setAdministrator} />}
+            {assigning && (
               <label className="block text-sm font-medium">
                 {text("Administrator username", "管理员用户名")}
                 <input
-                  ref={assigning ? firstInput : undefined}
+                  ref={firstInput}
                   className={`${inputClass} mt-1`}
                   value={username}
                   onChange={(event) => setUsername(event.target.value)}
@@ -220,11 +206,7 @@ export function PlatformSchoolDialog({
             </Button>
             <Button
               type="submit"
-              disabled={
-                mutation.busy ||
-                (!assigning && !name.trim()) ||
-                ((creating || assigning) && !username.trim())
-              }
+              disabled={mutation.busy || !ready}
             >
               {mutation.busy
                 ? text("Saving…", "保存中…")

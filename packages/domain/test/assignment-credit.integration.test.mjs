@@ -112,6 +112,56 @@ test('ordinary assignments recognize prior formal AC without copying submissions
    await student.api(`/assignments/${id}`, undefined, 'GET', 403);
   });
 
+  await t.test('course links and completion stats follow qualifying grades and already-posted rewards', async () => {
+   const p = await problem(), q = await problem();
+   const courseId = (await pool.query("INSERT INTO learning_paths(owner_account_id,title,published_at) VALUES($1,'Completion course',now()) RETURNING id", [teacher.id])).rows[0].id;
+   const id = await assignment([p,q]);
+   await pool.query('UPDATE assignments SET course_path_id=$2 WHERE id=$1',[id,courseId]);
+   const courseLink = async () => (await student.api(`/learning-paths/${courseId}`)).assignments.find(item => item.id === id);
+   const completions = (source, user=student, status=200) => user.api(`/submissions/SUB${source}/assignment-completions`, undefined, 'GET', status);
+
+   assert.equal((await result(id)).completion, null);
+   assert.deepEqual(await courseLink(), {id,title:'Credit homework',dueAt:deadline,completedProblems:0,totalProblems:2,completed:false});
+   const first = await submit(p, {assignmentId:id});
+   const waiting = await submit(q, {assignmentId:id,status:'Waiting'});
+   assert.deepEqual(await completions(waiting), {items:[]});
+   assert.equal((await courseLink()).completedProblems, 1);
+   assert.equal((await result(id)).completion, null);
+
+   await pool.query("UPDATE submissions SET status='AC',score=100 WHERE id=$1",[waiting]);
+   const before = await counts();
+   const {completion} = await result(id);
+   const {created_at} = (await pool.query('SELECT created_at FROM submissions WHERE id=$1',[first])).rows[0];
+   assert.equal(completion.completedBySubmissionId, `SUB${waiting}`);
+   assert.equal(completion.elapsedMs, Date.parse(completion.completedAt)-created_at.getTime());
+   assert.equal(completion.completedProblems, 2);
+   assert.equal(completion.totalProblems, 2);
+   assert.deepEqual(completion.rewards, {firstAc:8,assignment:6,total:14});
+   assert.equal((await courseLink()).completed, true);
+   assert.deepEqual(await completions(waiting), {items:[{id,title:'Credit homework',completion}]});
+   assert.deepEqual(await completions(first), {items:[]});
+   assert.equal((await teacher.api(`/assignments/${id}`)).completion, undefined);
+   await completions(waiting, other, 404);
+   await completions(waiting, teacher, 403);
+   assert.deepEqual(await counts(), before, 'reading stats or completion events never changes grades or grants awards');
+   const repeat = await submit(q, {assignmentId:id});
+   assert.deepEqual(await completions(repeat), {items:[]});
+   assert.deepEqual((await result(id)).completion, completion);
+  });
+
+  await t.test('a newly accepted course submission can finish a linked assignment without earning an assignment reward', async () => {
+   const p = await problem(), id = await assignment([p]);
+   const own = await submit(p);
+   const {completion} = await result(id);
+   assert.equal(completion.completedBySubmissionId, null);
+   assert.equal(completion.elapsedMs, null);
+   assert.deepEqual(completion.rewards, {firstAc:0,assignment:0,total:0});
+   const url = `/submissions/SUB${own}/assignment-completions`;
+   assert.deepEqual(await student.api(url), {items:[{id,title:'Credit homework',completion}]});
+   await pool.query('UPDATE assignment_participants SET exempt=true WHERE assignment_id=$1',[id]);
+   assert.deepEqual(await student.api(url), {items:[]});
+  });
+
   await t.test('stable identity and the exact assigned version are required', async () => {
    const old = await problem(), latest = await problem(old.id);
    await submit(old);

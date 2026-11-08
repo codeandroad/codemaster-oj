@@ -7,6 +7,7 @@ import { fail, field, uuid, bytes, integer,enumValue } from './security.mjs';
 import { getTimedPracticeResult } from './timed.mjs';
 import { avatarForIdentity } from './avatars.mjs';
 import {readableCourseIds,courseClasses,courseProperties,saveCourseProperties,assertCoursePublicationAccess} from './course-access.mjs';
+import { assignmentProgressById } from './assignment-grades.mjs';
 
 const staff = user => user.roles.includes('teacher') || user.roles.includes('admin');
 const administrator = user => user.roles.includes('admin');
@@ -77,8 +78,9 @@ async function pathResult(ctx, id, db = ctx.pool, allowArchived = false) {
  const state=p.canEdit&&bundle.length?(await db.query('SELECT id,validation_status,published_at FROM problem_versions WHERE id=ANY($1::uuid[])',[bundle.map(x=>x.versionId)])).rows:[];
  const status=new Map(state.map(v=>[v.id,v]));
  const linkedAssignments=p.published_at&&ctx.user.roles.includes('student')?(await db.query(`SELECT a.id,a.title,a.due_at FROM assignments a WHERE a.course_path_id=$1 AND a.state='Published' AND a.archived_at IS NULL AND EXISTS(SELECT 1 FROM assignment_participants ap WHERE ap.assignment_id=a.id AND ap.identity_id=$2 AND NOT ap.exempt) ORDER BY a.due_at DESC,a.created_at DESC`,[id,ctx.user.identityId])).rows:[];
+ const assignmentProgress=await assignmentProgressById(db,linkedAssignments.map(a=>a.id),ctx.user.identityId);
  return { ...pathShape({ ...p, task_count:versions.length+paper4Total.taskCount,completed_tasks:solved.size+paper4Total.completedTasks,chapter_count: chapters.length, completed_chapters: chapters.filter(c => c.completed).length }),
-  assignments:linkedAssignments.map(a=>({id:a.id,title:a.title,dueAt:a.due_at})),
+  assignments:linkedAssignments.map(a=>({id:a.id,title:a.title,dueAt:a.due_at,...assignmentProgress.get(a.id)})),
   practiceBundle:p.canEdit?bundle.map(x=>({...x,validationStatus:status.get(x.versionId)?.validation_status??'Unknown',published:!!status.get(x.versionId)?.published_at})):undefined,
   chapters: chapters.map(c => ({ id: c.id, title: c.title, content: c.content, position: c.position, completed: c.completed,objective:c.objective,checkpoint:c.checkpoint,checkpointAnswer:c.checkpoint_answer, paper4Links:chapterPaper4Links(paper4,c.id,ctx.user.identityId,{includeUnavailable:p.canEdit}),taskCount:(visible.get(c.id)??[]).length+paper4Progress(paper4,'chapter',c.id,ctx.user.identityId).taskCount,completedTasks:(visible.get(c.id)??[]).filter(l=>solved.has(l.versionId)).length+paper4Progress(paper4,'chapter',c.id,ctx.user.identityId).completedTasks,problems: (visible.get(c.id) ?? []).map(l=>({...l,completed:solved.has(l.versionId)})) })) };
 }

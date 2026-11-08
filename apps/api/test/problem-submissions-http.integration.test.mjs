@@ -162,6 +162,24 @@ test('problem submission metadata: real Nest, scoped runtime DB, no private reco
    const data=(await req(route+'&assignmentId='+assignments[0])).data;safe(data);assert.ok(data.items.some(r=>r.id==='SUB'+visible.id));assert.ok(!data.items.some(r=>r.id==='SUB'+invisible.id));assert.ok(!data.items.some(r=>r.id==='SUB'+peer.id));
    await req(route+'&assignmentId='+assignments[1],{status:403});
   });
+  await t.test('assignment completion lookup serves only the submitting learner through the restricted Nest runtime',async()=>{
+   const pinned=await version();
+   const {id:assignment}=(await pool.query(`INSERT INTO assignments(title,class_id,owner_account_id,due_at,state,published_at)
+    VALUES('Completion',$1,$2,now()+interval '1 day','Published',now()) RETURNING id`,[cls,users.admin.id])).rows[0];
+   await pool.query('INSERT INTO assignment_problems(assignment_id,problem_id,version_id,points,position) VALUES($1,$2,$3,100,1)',[assignment,problem,pinned]);
+   await pool.query('INSERT INTO assignment_participants(assignment_id,identity_id) VALUES($1,$2)',[assignment,users.student.identityId]);
+   const attempt=await submission('student',{assignment,versionId:pinned});
+   const path=`/submissions/SUB${attempt.id}/assignment-completions`;
+   const {data}=await req(path);
+   assert.equal(data.items.length,1);
+   assert.equal(data.items[0].id,assignment);
+   assert.equal(data.items[0].completion.completedBySubmissionId,`SUB${attempt.id}`);
+   assert.equal(data.items[0].completion.completedProblems,1);
+   assert.doesNotMatch(JSON.stringify(data),/SECRET/);
+   await req(path,{user:'peer',status:404});
+   await req(path,{user:'admin',status:403});
+   await req(path,{user:'anonymous',status:401});
+  });
   const school=await provisionSchool(pool,{slug:'history-alpha',name:'History alpha',adminUsername:'newadmin'}),beta=await provisionSchool(pool,{slug:'history-beta',name:'History beta',adminUsername:'outsider'});
   for(const who of ['newstudent','newpeer'])await pool.query("INSERT INTO school_memberships(school_id,account_id,role) VALUES($1,$2,'student')",[school.id,users[who].id]);
   const bank=(await pool.query("INSERT INTO school_problem_banks(school_id,owner_account_id,name,request_id) VALUES($1,$2,'Bank',$3) RETURNING id",[school.id,users.newadmin.id,randomUUID()])).rows[0].id;

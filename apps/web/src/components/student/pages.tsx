@@ -22,6 +22,7 @@ import { StudentTimedDetail, StudentTimedList, type TimedPractice } from "./time
 import { StudentWorkspace } from "./workspace";
 import { Progress, StudentDashboardView } from "./dashboard-view";
 import { StudentAssignmentCard } from "./activity-cards";
+import { AssignmentCompletionDialog } from "./assignment-completion";
 export { Progress } from "./dashboard-view";
 import { ProblemCatalogSearch } from "./problem-catalog-search";
 import problemStyles from "./problems-page.module.css";
@@ -241,10 +242,13 @@ export function StudentAssignments({ user }: { user: CampusUser }) {
 }
 export function StudentAssignment({ id, user }: { id: string; user: CampusUser }) {
   const { locale } = useLocale();
+  const [completionOpen, setCompletionOpen] = useState(false);
   const assignment = useData<Assignment>(`assignments/${id}`), submissions = useData<{ items: Submission[] }>(`submissions?assignmentId=${encodeURIComponent(id)}&identityId=${user.identityId}&kind=submit,correction`), classes = useData<{ items: SchoolClass[] }>("classes");
   const a = assignment.data, p = a ? assignmentProgress(a, user.identityId) : null, formalSubmissions = formal(submissions.data?.items ?? []);
   const needsCorrection = formalSubmissions.find(s => s.kind === "submit" && s.status === "WA" && p?.grade?.problems.find(g => g.problemId === s.problemId)?.status !== "AC");
   return <State data={assignment}>{a && p && <>
+    {completionOpen && a.completion && <AssignmentCompletionDialog assignment={{ id: a.id, title: a.title, completion: a.completion }}
+      onDismiss={() => setCompletionOpen(false)} />}
     <StudentLuqRule activityType="assignment" activityId={id}/>
     <section className={panel}>
       <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto]">
@@ -253,6 +257,9 @@ export function StudentAssignment({ id, user }: { id: string; user: CampusUser }
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <h1 className="min-w-0 text-2xl font-bold [overflow-wrap:anywhere]">{a.title}</h1>
             {p.complete && <StatusPill status="Completed" icon={<Check size={13} />} />}
+            {p.complete && a.completion && <Button type="button" size="sm" variant="ghost" onClick={() => setCompletionOpen(true)}>
+              {ui(locale, "查看完成统计", "View completion stats")}
+            </Button>}
           </div>
           {a.coursePathId && a.courseTitle && <p className="mt-2 text-sm"><AppLink href={`/student/learning-paths/${a.coursePathId}`} className="font-semibold text-primary hover:underline focus-visible:underline">{ui(locale, "关联课程：", "Course: ")}{a.courseTitle} →</AppLink></p>}
           <p className="mt-2 text-sm leading-6 text-muted-foreground">{a.classNames?.join(" / ") || a.classes?.map(item => item.name).join(" / ") || a.className || classes.data?.items.find(c => c.id === a.classId)?.name || ui(locale, "按学生名单布置", "Direct assignment")} · {ui(locale, "截止", "Due")} {displayDate(a.dueAt, locale)} Asia/Shanghai</p>

@@ -85,6 +85,13 @@ export interface ProductionProblem {
   rankReviewStatus?: "pending" | "approved" | "rejected" | "revoked" | null;
   rankApprovedAt?: string | null;
 }
+export interface AssignmentCompletion {
+  completedAt: string;
+  elapsedMs: number | null;
+  completedProblems: number;
+  totalProblems: number;
+  rewards: { firstAc: number; assignment: number; total: number };
+}
 export interface Assignment {
   id: string;
   title: string;
@@ -100,6 +107,7 @@ export interface Assignment {
   courseAvailable?: boolean;
   problemOrder?: "course" | "custom";
   dueAt: string;
+  completion?: AssignmentCompletion | null;
   problems: { problemId: string; points: number; title?: string; versionId?: string; position?: number; firstAcPoints?: number; rewardPoints?: number; difficulty?: string | null }[];
   participants: string[];
   participantDetails?: { identityId: string; name: string; exempt: boolean; hasActivity?: boolean }[];

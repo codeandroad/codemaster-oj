@@ -38,6 +38,7 @@ import {clearProductionSession,ApiError} from "@/lib/production-api";
 import {ProblemListDrawer} from "./problem-list-drawer";
 import {ProblemHeading} from "./problem-heading";
 import {ProblemTutorial, useProblemTutorial, type ProblemTutorialContent} from "./problem-tutorial";
+import { AssignmentCompletionDialog, useAssignmentCelebrations } from "./assignment-completion";
 import {problemNavigation,navigationHref,type NavigationProblem} from "./problem-navigation";
 import { validateFunctionInput } from "@/lib/function-input";
 
@@ -113,6 +114,11 @@ export function ProblemWorkspace({ problem, user, original = null, adapter }: { 
   const [draftSaved,setDraftSaved]=useState(false);
   const action = useMutation(), polling = useSubmission(submissionId, adapter && submissionId ? adapter.submissionPath(submissionId) : undefined, adapter?.normalizeSubmission), keys = useRef(new Map<string, string>()), timedSession = useStudentTimedSession(timedPracticeId);
   const [problemListOpen,setProblemListOpen]=useState(false);
+  const formalResult = polling.result;
+  const finishingSubmissionId = !adapter && !timedPracticeId && formalResult?.id === submissionId
+    && formalResult.kind === "submit" && formalResult.status === "AC" ? formalResult.id : null;
+  const celebrations = useAssignmentCelebrations(user.id, finishingSubmissionId);
+  const celebration = !settingsOpen && !confirm && !layoutOpen && !problemListOpen ? celebrations.current : undefined;
   const library=useData<{items:ProductionProblem[]}>(!adapter&&!learningPathId&&!assignmentId&&!timedPracticeId?"problems":""),assignment=useData<Assignment>(assignmentId?`assignments/${encodeURIComponent(assignmentId)}`:"");
   const assignmentProblem = assignment.data?.problems.find(p => p.problemId === problem.id && p.versionId === problem.versionId);
   const assignmentValid = Boolean(assignmentProblem);
@@ -212,7 +218,7 @@ export function ProblemWorkspace({ problem, user, original = null, adapter }: { 
   useEffect(() => { runRef.current = run; });
   useEffect(() => {
     function shortcut(event: globalThis.KeyboardEvent) {
-      if (settingsOpen || confirm || layoutOpen) return;
+      if (settingsOpen || confirm || layoutOpen || celebration) return;
       if(event.defaultPrevented||event.isComposing)return;
       const key=event.code.startsWith("Key")?event.code.slice(3).toLowerCase():event.key.toLowerCase();
       if(event.altKey&&!event.ctrlKey&&!event.metaKey&&(["+","=","Add"].includes(event.key)||event.code==="Equal"||event.code==="NumpadAdd")){event.preventDefault();dispatch({type:"toggle-maximize",panel:activePanel});return;}
@@ -228,7 +234,7 @@ export function ProblemWorkspace({ problem, user, original = null, adapter }: { 
     }
     window.addEventListener("keydown", shortcut);
     return () => window.removeEventListener("keydown", shortcut);
-  }, [activePanel, settingsOpen, formatEditor, confirm, layoutOpen, dispatch, toggleFullscreen, settings.runShortcut, settings.submitShortcut, pending, unavailable, code, receivedCode, storageKey, originalId, problem.samples.length,tx,language,saveWorkspaceDraft]);
+  }, [activePanel, settingsOpen, formatEditor, confirm, layoutOpen, celebration, dispatch, toggleFullscreen, settings.runShortcut, settings.submitShortcut, pending, unavailable, code, receivedCode, storageKey, originalId, problem.samples.length,tx,language,saveWorkspaceDraft]);
   function resizeStart(event: PointerEvent<HTMLDivElement>) {
     if (!mainRef.current) return;
     const bounds = mainRef.current.getBoundingClientRect();
@@ -405,6 +411,9 @@ export function ProblemWorkspace({ problem, user, original = null, adapter }: { 
 
     {layoutMessage&&<div className={styles.notice} role="status">{layoutMessage}</div>}
     {navigationError&&<span className="sr-only" role="status">{tx("题目列表加载失败：","Failed to load problem list: ")}{navigationError}</span>}
+
+    {celebration && <AssignmentCompletionDialog key={celebration.id} assignment={celebration} celebrate
+      href={`/student/assignments/${encodeURIComponent(celebration.id)}`} onDismiss={celebrations.dismiss} />}
 
     <Dialog open={layoutOpen} onOpenChange={setLayoutOpen}><DialogContent className={styles.layoutMenu}><DialogTitle>{tx("布局与面板","Layout and panels")}</DialogTitle><DialogDescription>{tx("分别显示、折叠或最大化各操作区域。","Show, collapse, or maximize each panel.")}</DialogDescription>{panelIds.map(panel => <button key={panel} type="button" onClick={() => dispatch({ type:"show",panel })}>{panelName(panel)}<span className="text-xs text-muted-foreground">{layout.panels[panel] === "open" ? tx("已显示","Shown") : tx("恢复显示","Show")}</span></button>)}<button type="button" onClick={() => { void toggleFullscreen();setLayoutOpen(false); }}>{tx("浏览器全屏","Browser full screen")}<Maximize2 size={15}/></button></DialogContent></Dialog>
     <Dialog open={confirm !== null} onOpenChange={open => { if (!open) setConfirm(null); }}><DialogContent><DialogTitle>{confirm === "leave" ? tx("离开答题页面？","Leave workspace?") : confirm === "reset" ? tx("重置初始代码？","Reset starter code?") : tx("答题帮助","Workspace help")}</DialogTitle><DialogDescription>{confirm === "leave" ? tx("草稿保留在当前浏览器会话中，但尚未正式提交，离开不会自动交卷。","The draft remains in this browser session but has not been submitted. Leaving will not submit it.") : confirm === "reset" ? tx("当前草稿将替换为题目初始代码；服务器已接收的提交仍保留。","Your current draft will be replaced with the starter code. Existing submissions remain on the server.") : tx("运行仅测试公开样例；自定义输入只运行程序，不判断正确性；提交才创建正式记录。Ctrl / ⌘ + 单引号运行样例，Ctrl / ⌘ + Enter 正式提交，Ctrl / ⌘ + S 保存草稿，代码区按 Esc 启用或返回 Vim 普通模式；其他区域按 Esc 退出面板最大化。","Run checks only the public samples; custom input runs without checking correctness. Submit creates a formal record. Ctrl / ⌘ + apostrophe runs samples, Ctrl / ⌘ + Enter submits, Ctrl / ⌘ + S saves the draft, and Esc enables or returns to Vim normal mode in the code editor. Outside the editor, Esc exits panel maximization.")}</DialogDescription><DialogFooter><Button variant="secondary" onClick={() => setConfirm(null)}>{confirm === "leave" ? tx("继续编辑","Keep editing") : tx("关闭","Close")}</Button>{confirm === "leave" && <Button variant="danger" onClick={() => { const destination=pendingDestination??returnTo;setConfirm(null);router.push(destination); }}>{tx("离开，不提交","Leave without submitting")}</Button>}{confirm === "reset" && <Button onClick={() => { setCode(starterFor(problem,language));setConfirm(null); }}>{tx("重置代码","Reset code")}</Button>}</DialogFooter></DialogContent></Dialog>

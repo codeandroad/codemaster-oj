@@ -12,8 +12,9 @@ import { filterCourseCatalog } from "./learning-course-search-model";
 import { AppLink } from "@/components/navigation";
 import { LearningCourseReader } from "./learning-course-reader";
 
+import { Check, ChevronDown, ClipboardList } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { PageHeader } from "@/components/page-chrome";
+import { PageHeader, StatusPill } from "@/components/page-chrome";
 import { productionApi } from "@/lib/production-api";
 import { State, useData } from "./shared";
 import {useLocale,type AppLocale} from "@/components/locale-context";
@@ -27,7 +28,16 @@ export interface LearningChapter {
   paper4Links?: CoursePaper4Link[];
   problems: { problemId: string; title: string; versionId: string;completed?:boolean }[];
 }
-export interface LearningPath extends CourseAccessMetadata { id: string; title: string; description: string; category: string; published: boolean; chapterCount: number; completedChapters: number; canEdit: boolean;difficulty?:keyof typeof courseDifficulties;coverKey?:string;taskCount?:number;completedTasks?:number; chapters?: LearningChapter[]; assignments?: { id: string; title: string; dueAt: string }[]; }
+type CourseAssignment = {
+  id: string;
+  title: string;
+  dueAt: string;
+  completed?: boolean;
+  completedProblems?: number;
+  totalProblems?: number;
+};
+
+export interface LearningPath extends CourseAccessMetadata { id: string; title: string; description: string; category: string; published: boolean; chapterCount: number; completedChapters: number; canEdit: boolean;difficulty?:keyof typeof courseDifficulties;coverKey?:string;taskCount?:number;completedTasks?:number; chapters?: LearningChapter[]; assignments?: CourseAssignment[]; }
 export function StudentLearningList(){
  const {locale}=useLocale();
  const paths=useData<{items:LearningPath[]}>("learning-paths");
@@ -64,7 +74,7 @@ export function StudentLearningDetail({ id, chapterId }: { id: string; chapterId
     })) }))}
     selectedChapterId={selected} chapterHref={chapterHref} scrollKey={id}
     metadata={<CourseAccessSummary course={path.data} showAuthor/>}
-    relatedActivities={<CourseAssignmentLinks items={path.data.assignments ?? []} locale={locale}/>}
+    relatedActivities={<CourseAssignmentLinks key={id} items={path.data.assignments ?? []} locale={locale}/>}
     extraPractice={chapterId => {
       const chapter = path.data?.chapters?.find(item => item.id === chapterId);
       return chapter?.paper4Links?.length ? <CoursePaper4Practice links={chapter.paper4Links} pathId={id} chapterId={chapterId}/> : null;
@@ -75,10 +85,43 @@ export function StudentLearningDetail({ id, chapterId }: { id: string; chapterId
     }}
   />}</State>;
 }
-function CourseAssignmentLinks({ items, locale }: { items: NonNullable<LearningPath["assignments"]>; locale: AppLocale }) {
- if (!items.length) return null;
- return <section className="mt-5 border border-border bg-surface panel-shadow" aria-label={ui(locale,"相关作业","Related assignments")}>
-  <h2 className="border-b border-border px-4 py-3 font-semibold">{ui(locale,"相关作业","Related assignments")}</h2>
-  <div className="divide-y divide-border">{items.map(item => <AppLink key={item.id} href={`/student/assignments/${item.id}`} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm hover:bg-surface-subtle focus-visible:bg-surface-subtle"><span className="font-semibold text-primary">{item.title}</span><span className="text-muted-foreground">{ui(locale,"截止","Due")} {new Intl.DateTimeFormat(locale==="en"?"en-US":"zh-CN",{dateStyle:"medium",timeStyle:"short",timeZone:"Asia/Shanghai"}).format(new Date(item.dueAt))}</span></AppLink>)}</div>
- </section>;
+function CourseAssignmentLinks({ items, locale }: { items: CourseAssignment[]; locale: AppLocale }) {
+  if (!items.length) return null;
+
+  const title = ui(locale, "相关作业", "Related assignments");
+  const completed = items.filter(item => item.completed).length;
+  const hasCompletion = items.every(item => item.completed !== undefined);
+  const summary = hasCompletion
+    ? ui(locale, `已完成 ${completed}/${items.length}`, `${completed}/${items.length} completed`)
+    : ui(locale, `共 ${items.length} 项`, `${items.length} total`);
+  const dueDate = new Intl.DateTimeFormat(locale === "en" ? "en-US" : "zh-CN", {
+    dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Shanghai",
+  });
+
+  return <details className="group mt-5 border border-border bg-surface panel-shadow" data-od-id="course-related-assignments">
+    <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 text-sm hover:bg-surface-subtle focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring sm:gap-3 sm:px-4 [&::-webkit-details-marker]:hidden">
+      <ClipboardList size={17} aria-hidden="true" className="shrink-0 text-primary"/>
+      <span className="min-w-0 flex-1 truncate font-semibold">{title}</span>
+      <span className={`shrink-0 whitespace-nowrap text-xs font-medium tabular-nums ${completed === items.length ? "text-success" : "text-muted-foreground"}`}>{summary}</span>
+      <ChevronDown size={17} aria-hidden="true" className="shrink-0 text-muted-foreground group-open:rotate-180"/>
+    </summary>
+    <ul className="max-h-[min(14rem,40dvh)] divide-y divide-border overflow-y-auto border-t border-border" data-od-id="course-assignment-links">
+      {items.map(item => <li key={item.id}>
+        <AppLink href={`/student/assignments/${item.id}`} className="grid min-h-11 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 px-3 py-2 text-sm hover:bg-surface-subtle focus-visible:bg-surface-subtle focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring sm:grid-cols-[minmax(0,1fr)_auto_12rem] sm:px-4">
+          <span className="min-w-0 font-semibold text-primary [overflow-wrap:anywhere]">{item.title}</span>
+          <span className="flex flex-wrap items-center justify-end gap-2">
+            {item.completed === true && <StatusPill status="Completed" icon={<Check size={13}/>}/>}
+            {item.completed === false && <span className="whitespace-nowrap text-xs text-muted-foreground">{ui(locale, "未完成", "Incomplete")}</span>}
+            {!item.completed && item.completedProblems !== undefined && (item.totalProblems ?? 0) > 0 &&
+              <span className="hidden whitespace-nowrap text-xs tabular-nums text-muted-foreground sm:inline">
+                {ui(locale, `${item.completedProblems}/${item.totalProblems} 题已通过`, `${item.completedProblems}/${item.totalProblems} passed`)}
+              </span>}
+          </span>
+          <span className="col-span-2 text-xs text-muted-foreground sm:col-span-1 sm:text-right">
+            {ui(locale, "截止", "Due")} <time dateTime={item.dueAt}>{dueDate.format(new Date(item.dueAt))}</time>
+          </span>
+        </AppLink>
+      </li>)}
+    </ul>
+  </details>;
 }

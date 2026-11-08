@@ -36,6 +36,7 @@ import { handlePeopleAlignment, handleFavorites, bindPendingTeacherClasses } fro
 import { handleAssignmentAuthoring } from './assignment-authoring.mjs';
 import { loadSubmissionResult } from './submission-feedback.mjs';
 import { assignmentGradeRows } from './assignment-grades.mjs';
+import { learnerAssignmentCompletion, learnerSubmissionAssignmentCompletions } from './assignment-completion.mjs';
 import {activityClasses,handleTeachingAudience,handleClassHub} from './activity-audience.mjs';
 import { submissionHistory,problemOwnProgress,emptyOwnProgress } from './submission-history.mjs';
 import { legacyProblemSubmissions, legacyProblemSolved } from './problem-submissions.mjs';
@@ -200,7 +201,7 @@ export async function createDomainServices(pool,config) {
   const canManage=rolesInclude(user,'admin')||(rolesInclude(user,'teacher')&&a.owner_account_id===user.id);
   if(a.state==='Draft'&&!canManage)fail(404,'NOT_FOUND','作业尚未发布');if(!isParticipant&&!canManage)fail(403,'FORBIDDEN','未分配该作业或无权管理');if(a.state==='Draft'&&!canManage)fail(404,'NOT_FOUND','作业尚未发布');return {...a,isParticipant:isParticipant&&a.state==='Published',canManage};
  }
- async function assignmentResult(db,user,id) {
+ async function assignmentResult(db,user,id,{includeCompletion=false}={}) {
   const a=await assignmentAccess(db,user,id);
   const ps=(await db.query(`SELECT ap.problem_id,ap.version_id,ap.points,ap.position,v.title,v.metadata->'difficulty' difficulty,
    COALESCE(global_reward.points,10) first_ac_points,COALESCE(assignment_reward.points,0) reward_points
@@ -230,7 +231,11 @@ export async function createDomainServices(pool,config) {
    if(a.canManage)result.participantDetails=(await db.query('SELECT part.identity_id,i.name,part.exempt FROM assignment_participants part JOIN identities i ON i.id=part.identity_id WHERE assignment_id=$1 ORDER BY i.name',[id])).rows.map(p=>({identityId:p.identity_id,name:p.name,exempt:p.exempt,hasActivity:protectedParticipantIds.includes(p.identity_id)}));
    const grades=await assignmentGradeRows(db,a,a.canManage?null:user.identityId);
    const byStudent=new Map();for(const g of grades){let s=byStudent.get(g.identity_id);if(!s){s={identityId:g.identity_id,name:g.name,score:0,maxScore:0,pending:false,hasScore:false,problems:[]};byStudent.set(g.identity_id,s);}const points=Number(g.points),score=g.score===null?null:Number(g.score);s.score+=score===null?0:score*points/100;s.maxScore+=points;s.pending ||= g.unresolved;s.hasScore ||= score!==null;s.problems.push({problemId:g.problem_id,submissionId:g.submission_id?`SUB${g.submission_id}`:null,score,status:g.status||'NotSubmitted',pending:g.unresolved,pendingStatus:g.pending_status,completionSource:g.credited_ac?'other_entry':null,creditedAt:g.credited_at??null,hasAssignmentSubmission:g.has_assignment_submission,assignmentAttempts:Number(g.assignment_attempts)});}result.grades=[...byStudent.values()].map(({hasScore,...g})=>({...g,score:g.pending&&!hasScore?null:Math.round(g.score*100)/100}));const graded=result.grades.filter(g=>!g.pending&&g.problems.some(p=>(p.submissionId||p.completionSource==='other_entry')&&p.score!==null));result.applicableCount=a.canManage?result.participantDetails.filter(p=>!p.exempt).length:1;result.exemptCount=a.canManage?result.participantDetails.filter(p=>p.exempt).length:0;result.averagePercent=graded.length?Math.round(graded.reduce((total,g)=>total+(g.maxScore?100*g.score/g.maxScore:0),0)/graded.length*100)/100:null;result.submittedStudents=result.grades.filter(g=>g.problems.some(p=>p.hasAssignmentSubmission)).length;result.completedStudents=result.grades.filter(g=>g.problems.length&&g.problems.every(p=>p.status==='AC')).length;
-  }return result;
+  }
+  if (includeCompletion && a.isParticipant && !a.canManage) {
+   result.completion = result.completedStudents === 1 ? await learnerAssignmentCompletion(db,id,user.identityId) : null;
+  }
+  return result;
  }
  function problemInput(body) {
   const savingDraft=body.saveDraft===true||body.state==='Draft';const mode=enumValue(body.mode,['stdio','function'],'题目类型'),title=field(body.title,'题名',{max:200}),statement=field(body.statement??'','题面',{min:savingDraft?0:1,max:262144});
@@ -580,7 +585,7 @@ export async function createDomainServices(pool,config) {
     const rows=(await pool.query(`SELECT a.* FROM assignments a WHERE (a.archived_at IS NOT NULL)=$6 AND ($1 OR $2 AND a.owner_account_id=$3 OR $4 AND a.state='Published' AND EXISTS(SELECT 1 FROM assignment_participants p WHERE p.assignment_id=a.id AND p.identity_id=$5 AND NOT p.exempt)) ORDER BY a.created_at DESC LIMIT 200`,[rolesInclude(user,'admin'),rolesInclude(user,'teacher'),user.id,rolesInclude(user,'student'),user.identityId,archived])).rows;const items=[];for(const a of rows)items.push(await assignmentResult(pool,user,a.id));return respond(200,{items,serverNow:row(await pool.query('SELECT clock_timestamp() AS server_now')).server_now});
    }
    m=route.match(/^\/assignments\/([^/]+)$/);
-   if(m&&method==='GET')return respond(200,await assignmentResult(pool,user,m[1]));
+   if(m&&method==='GET')return respond(200,await assignmentResult(pool,user,m[1],{includeCompletion:true}));
    m=route.match(/^\/assignments\/([^/]+)\/(archive|restore)$/);
    if(m&&method==='POST'){
     staff(user);const id=uuid(m[1],'作业 ID'),action=m[2];
@@ -689,6 +694,8 @@ export async function createDomainServices(pool,config) {
      const s=row(await db.query('INSERT INTO submissions(account_id,identity_id,problem_id,version_id,assignment_id,kind,original_submission_id,code,language,custom_input,idempotency_key,request_hash,created_at,timed_attempt_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *',[user.id,user.identityId,problemId,v.id,assignmentId,kind,originalId,code,language,customInput,key,requestHash,acceptedAt,timedContext?.timedAttemptId||null]));await db.query("INSERT INTO judge_tasks(submission_id,version_id,purpose) VALUES($1,$2,'submission')",[s.id,v.id]);if(kind==='correction')await db.query('INSERT INTO review_entries(submission_id,author_account_id,note) VALUES($1,$2,$3)',[s.id,user.id,'已提交订正']);return {...s,problem_title:v.title};
     });return respond(201,submissionShape(await timed.maskSubmission(pool,user,result)));
    }
+   m=route.match(/^\/submissions\/([^/]+)\/assignment-completions$/);
+   if(m&&method==='GET')return respond(200,{items:await learnerSubmissionAssignmentCompletions(pool,user,m[1])});
    m=route.match(/^\/submissions\/([^/]+)$/);
    if(m&&method==='GET'){const sub=await submissionAccess(pool,user,m[1]);const reviews=(await pool.query(`${reviewEntryQuery} WHERE s.id=$1 ORDER BY r.created_at,r.id`,[sub.id])).rows.filter(r=>reviewEntryVisible(user,r)).map(reviewNoteShape);let pendingRejudge=null;if(sub.pending_judge_run_id){pendingRejudge={runId:sub.pending_judge_run_id};if(await canReviewActivitySubmission(pool,user,sub,{readOnly:true})){const candidate=(await pool.query('SELECT r.status,r.score,r.passed,r.total,r.created_at,t.reason FROM judge_runs r JOIN judge_tasks t ON t.id=r.task_id WHERE r.id=$1',[sub.pending_judge_run_id])).rows[0];if(candidate)pendingRejudge={...pendingRejudge,status:candidate.status,score:candidate.score===null?null:Number(candidate.score),passed:candidate.passed,total:candidate.total,createdAt:candidate.created_at,reason:candidate.reason};}}const masked=await timed.maskSubmission(pool,user,sub);const result=await loadSubmissionResult(pool,sub,masked,{revealFormalFailure:sub.identity_id===user.identityId});return respond(200,{...submissionShape(masked),reviews,pendingRejudge,...result});}
    m=route.match(/^\/review-notebook\/([^/]+)$/);

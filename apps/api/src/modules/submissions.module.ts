@@ -24,6 +24,11 @@ export class SubmissionsController {
     return applyResponse(response, await this.domain.execute('submissions', request.domainContext));
   }
 
+  @Get('submissions/:id/assignment-completions')
+  async assignmentCompletions(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('submissions', request.domainContext));
+  }
+
   @Post('submissions/:id/rejudge')
   async rejudge(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('submissions', request.domainContext));

@@ -587,15 +587,15 @@ function AssignmentEditorForm({
                 <div>
                   <b className="text-sm">{ui(locale, "已选题目", "Selected problems")}</b>
                   <p className="text-xs text-muted-foreground">
-                    {selected.length} 道题 · 作业总分 {total} 分 · 本作业额外奖励 {rewardTotal} / 100 积分。
+                    {selected.length} 道题 · 作业总分 {total} 分 · 本作业额外奖励 {rewardTotal} / 100 奖学金。
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    每题首次正式 AC 默认奖励 10 积分（管理员可调整）；本作业额外奖励在此逐题设置，只有首次通过该作业题目时追加。
+                    计入排行的首次正式 AC 默认奖励 10 积分（管理员可调整）。作业奖学金按题设置，首次通过该作业题目时发放。
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">作业额外奖励只计个人积分；校级排名积分只来自管理员审核公开题的有效首次正式 AC。</p>
+                  <p className="mt-1 text-xs text-muted-foreground">作业额外奖励以奖学金入账。</p>
                   {rewardTotal > 100 && (
                     <p role="alert" className="mt-1 text-xs text-destructive">
-                      本作业额外奖励合计最多 100 积分，请减少逐题奖励。
+                      本作业额外奖励合计最多 100 奖学金，请减少逐题奖励。
                     </p>
                   )}
                   {published && hasSubmissions && (
@@ -732,7 +732,7 @@ function AssignmentEditorForm({
                     </td>
                     <td>
                       <input
-                        aria-label={`${p.title} 本作业额外奖励积分`}
+                        aria-label={`${p.title} 本作业额外奖学金`}
                         type="number"
                         step={1}
                         min={0}
@@ -847,7 +847,7 @@ function AssignmentEditorForm({
                   </tr>
                 ))}
               </Table>}
-              <p className="mt-2 text-xs text-muted-foreground">作业额外奖励计入个人积分，不计入校级积分排行榜。</p>
+              <p className="mt-2 text-xs text-muted-foreground">作业额外奖励以奖学金入账。</p>
               <p className="mt-4 text-xs text-muted-foreground">
                 只有已勾选的学生看到作业、截止时间和进度；公开样例运行不会改变作业成绩。
               </p>
@@ -880,7 +880,7 @@ function AssignmentEditorForm({
       {publish && (
         <Modal title={ui(locale, "确认布置作业", "Assign this work")} onClose={() => setPublish(false)}>
           <p className="text-sm leading-6">
-            {ui(locale, `向已选择的 ${participants.length} 名学生布置 ${selected.length} 道题，总分 ${total} 分、额外奖励上限 ${rewardTotal} 积分。未选择的学生不会看到作业。`, `Assign ${selected.length} problems to ${participants.length} selected students, with ${total} marks and up to ${rewardTotal} bonus points. Other students will not see it.`)}
+            {ui(locale, `向已选择的 ${participants.length} 名学生布置 ${selected.length} 道题，总分 ${total} 分、额外奖励上限 ${rewardTotal} 奖学金。未选择的学生不会看到作业。`, `Assign ${selected.length} problems to ${participants.length} selected students, with ${total} marks and up to ${rewardTotal} Scholarship in bonuses. Other students will not see it.`)}
           </p>
           <Feedback action={action} />
           <div className="mt-5 flex justify-end gap-2">

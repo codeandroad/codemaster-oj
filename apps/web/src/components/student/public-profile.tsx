@@ -17,7 +17,7 @@ interface PublicProfile {
   avatar: string | null;
   bio: string | null;
   points: number;
-  rankPoints: number;
+  scholarship?: number;
   solvedProblems: number;
   isSelf: boolean;
 }
@@ -96,6 +96,11 @@ export function StudentPublicProfile({ identityId, viewer, embedded = false, wor
   const person = profile.data?.profile;
   const own = person?.isSelf ?? identityId === viewer.identityId;
   const publicHref = `/${workspace}/people/${encodeURIComponent(identityId)}`;
+  const stats = person && <dl className={`mt-5 grid max-w-xl ${person.scholarship === undefined ? "grid-cols-2" : "grid-cols-3"} gap-3 border-t border-border pt-4 text-sm`}>
+    <div><dt className="text-xs text-muted-foreground">{ui(locale, "积分", "Points")}</dt><dd className="mt-1 text-lg font-bold tabular-nums">{person.points}</dd></div>
+    {person.scholarship !== undefined && <div><dt className="text-xs text-muted-foreground">{ui(locale, "奖学金", "Scholarship")}</dt><dd className="mt-1 text-lg font-bold tabular-nums">{person.scholarship}</dd></div>}
+    <div><dt className="text-xs text-muted-foreground">{ui(locale, "已解题目", "Solved problems")}</dt><dd className="mt-1 text-lg font-bold tabular-nums">{person.solvedProblems}</dd></div>
+  </dl>;
 
 
   return <div className={embedded ? "mt-6 space-y-5" : "space-y-5"}>
@@ -109,8 +114,9 @@ export function StudentPublicProfile({ identityId, viewer, embedded = false, wor
     )}
 
     <State data={profile}>
+      {embedded && stats}
       {person && !embedded && <ProfileHero avatar={person.avatar} nickname={person.nickname} bio={person.bio} self={person.isSelf} selfLabel={ui(locale, "我的资料", "My profile")} actions={person.isSelf ? <AppLink href={`/${workspace}/profile`} className={buttonVariants({ variant: "outline" })}>{ui(locale, "编辑个人资料", "Edit profile")}</AppLink> : undefined}>
-        <dl className="mt-5 grid max-w-xl grid-cols-3 gap-3 border-t border-border pt-4 text-sm"><div><dt className="text-xs text-muted-foreground">{ui(locale, "累计积分", "Total points")}</dt><dd className="mt-1 text-lg font-bold tabular-nums">{person.points}</dd></div><div><dt className="text-xs text-muted-foreground">{ui(locale, "排行榜积分", "Leaderboard points")}</dt><dd className="mt-1 text-lg font-bold tabular-nums">{person.rankPoints}</dd></div><div><dt className="text-xs text-muted-foreground">{ui(locale, "已解题目", "Solved problems")}</dt><dd className="mt-1 text-lg font-bold tabular-nums">{person.solvedProblems}</dd></div></dl>
+        {stats}
       </ProfileHero>}
     </State>
 
@@ -121,7 +127,7 @@ export function StudentPublicProfile({ identityId, viewer, embedded = false, wor
         <State data={activity}>
           {activity.data?.items.length ? <ol className="mt-4 space-y-3">{activity.data.items.map(item => <li key={item.id} className="relative border-l-2 border-primary/25 py-1 pl-4">
             <span aria-hidden="true" className="absolute -left-[5px] top-2 size-2 rounded-full bg-primary"/>
-            <p className="break-words text-sm">{ui(locale, "首次通过", "First AC on")} <span className="font-semibold">{item.problemTitle}</span><span className="ml-2 font-semibold text-success">+{item.points} {ui(locale, "分", "points")}</span></p>
+            <p className="break-words text-sm">{ui(locale, "首次通过", "First AC on")} <span className="font-semibold">{item.problemTitle}</span>{item.points > 0 && <span className="ml-2 font-semibold text-success">+{item.points} {ui(locale, "分", "points")}</span>}</p>
             <time className="mt-1 block text-xs text-muted-foreground" dateTime={item.createdAt}>{date(item.createdAt, locale)}</time>
           </li>)}</ol> : <p className="mt-5 rounded-md bg-surface-subtle p-4 text-sm text-muted-foreground">{ui(locale, "暂无公开解题动态，完成首道题目后会出现在这里。", "No public solving activity yet. Your first solved problem will appear here.")}</p>}
           <Pagination label={ui(locale, "解题动态", "Solving activity")} locale={locale} page={activityPage} total={activity.data?.total ?? 0} onChange={setActivityPage}/>

@@ -276,7 +276,7 @@ function LeaderboardTable({
             </div>
             {showRules && (
               <div id="leaderboard-rules" className={styles.disclosure}>
-                <p>{ui(locale, "积分来自审核公开题目的首次有效 AC，以及 Paper 4 正式交卷后每道大题首次全部自动测试通过的 10 分。作业与训练额外奖励只计入个人累计积分。积分相同时比较未四舍五入的首解 AC 率，暂无有效统计样本者排在已有比率者之后。积分和首解 AC 率均相同时比较当前奖学金余额，三项均相同则并列。", "Points come from the first valid AC on approved public problems, plus 10 points for each Paper 4 question that first passes all automatic tests after formal submission. Assignment and practice bonuses count only toward personal totals. When points match, higher unrounded first-solve AC rates rank first. Students without results included in the rate rank below those with a rate. Current scholarship balance breaks any remaining tie. Students with all three values equal share a rank.")}</p>
+                <p>{ui(locale, "积分来自审核公开题目的首次有效 AC，以及 Paper 4 正式交卷后每道大题首次全部自动测试通过的 10 分。作业与训练额外奖励以奖学金入账。积分相同时比较未四舍五入的首解 AC 率，暂无有效统计样本者排在已有比率者之后。积分和首解 AC 率均相同时比较当前奖学金余额，三项均相同则并列。", "Points come from the first valid AC on approved public problems, plus 10 points for each Paper 4 question that first passes all automatic tests after formal submission. Assignment and practice bonuses are paid as Scholarship. When points match, higher unrounded first-solve AC rates rank first. Students without results included in the rate rank below those with a rate. Current scholarship balance breaks any remaining tie. Students with all three values equal share a rank.")}</p>
                 {optionalCount > 0 && <p className="mt-1">{ui(locale, "解题数按获榜分的不同题目统计。首解 AC 率是纳入统计的有效判题结果中 AC 的比例。普通练习和作业按接收顺序计至同一题目版本的首次有效 AC，之后的重交仍计入提交次数。限时训练按正式提交统计，Paper 4 每次交卷中每道大题各计一次。", "Solved counts distinct questions earning leaderboard points. The first-solve AC rate is the share of included judging results that passed. For practice and assignments, results count in submission order through the first valid AC on each problem version. Later resubmissions still count as attempts. Timed practice counts formal submissions, and Paper 4 counts each question per formal submission.")}</p>}
               </div>
             )}
@@ -386,7 +386,7 @@ function LeaderboardTable({
 function Leaderboard({ user, staff, workspace }: { user: CampusUser; staff: boolean; workspace: CampusRole }) {
   const { locale } = useLocale();
   const { version, refresh } = useRefreshOnReturn();
-  const me = useData<{ points: number; rankPoints: number }>(staff ? "" : "points/me", version);
+  const me = useData<{ points: number }>(staff ? "" : "points/me", version);
   const personalPoints = me.data;
   const contexts = useData<LeaderboardContextsResponse>("points/leaderboard/contexts");
   const searchParams = useSearchParams();
@@ -409,8 +409,7 @@ function Leaderboard({ user, staff, workspace }: { user: CampusUser; staff: bool
       <PageHeader title={ui(locale, "积分排行榜", "Leaderboard")}/>
       {!staff && <div className={styles.summaryBar}>
         <div className={styles.personalSummary}>
-          <span>{ui(locale, "累计积分", "Total points")}<strong>{personalPoints ? rankNumber.format(personalPoints.points) : "…"}</strong></span>
-          <span>{ui(locale, "排行积分", "Leaderboard points")}<strong>{personalPoints ? rankNumber.format(personalPoints.rankPoints) : "…"}</strong></span>
+          <span>{ui(locale, "积分", "Points")}<strong>{personalPoints ? rankNumber.format(personalPoints.points) : "…"}</strong></span>
         </div>
       </div>}
       <State data={contexts}>
@@ -451,7 +450,7 @@ export function PointsPage({ user, student = true, workspace = "student" }: { us
         <section className="mt-6 rounded border border-border bg-surface p-5">
           <h2 className="font-semibold">{ui(locale, "作业额外奖励", "Assignment bonuses")}</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            {ui(locale, "作业奖励在题目首次 AC 积分之外追加，每题最多 20 分、每份作业合计最多 100 分，学生每周任务奖励最多 200 分。已入账积分不变；设置请在对应作业的 Problems 页完成。", "Assignment bonuses are added to first-AC points: up to 20 per problem, 100 per assignment, and 200 per student each week. Points already awarded do not change. Set bonuses on the assignment's Problems tab.")}
+            {ui(locale, "作业额外奖励以奖学金发放。每题最多 20、每份作业合计最多 100，每位学生每周最多领取 200。请在作业的题目页设置。", "Assignment bonuses are paid as Scholarship, up to 20 per problem, 100 per assignment, and 200 per student each week. Set bonuses on the assignment's Problems tab.")}
           </p>
           <State data={assignments}>
             <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -468,7 +467,7 @@ export function PointsPage({ user, student = true, workspace = "student" }: { us
             </div>
             {assignment && (
               <div className="mt-4 overflow-x-auto rounded border border-border">
-                <p className="border-b border-border bg-surface-subtle p-3 text-sm font-semibold">{ui(locale, `当前额外奖励合计 ${assignmentBonus} / 100 积分`, `Current bonus total: ${assignmentBonus} / 100 points`)}</p>
+                <p className="border-b border-border bg-surface-subtle p-3 text-sm font-semibold">{ui(locale, `当前额外奖励合计 ${assignmentBonus} / 100 奖学金`, `Current bonus total: ${assignmentBonus} / 100 Scholarship`)}</p>
                 <table className="w-full text-left text-sm">
                   <thead><tr><th className="p-3">{ui(locale, "题目", "Problem")}</th><th>{ui(locale, "首次 AC 积分", "First-AC points")}</th><th>{ui(locale, "本作业额外奖励", "Assignment bonus")}</th></tr></thead>
                   <tbody>

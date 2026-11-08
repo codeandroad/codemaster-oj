@@ -144,6 +144,7 @@ test('fewer attempts and faster AC earn more; samples are excluded from attempt 
   assert.deepEqual([score.formalAttempts,score.elapsedSeconds,score.speedBonusPointsEarned,
     score.attemptBonusPointsEarned,score.totalRewardPoints], [3,45,5,4,17]);
   assert.deepEqual((await ledger(student, practice)).map((entry) => entry.points), [17]);
+  assert.deepEqual((await pool.query("SELECT delta FROM luq_ledger WHERE identity_id=$1 AND metadata->>'activityId'=$2 AND source_key LIKE 'legacy-point-bonus:%'",[student.identityId,practice.id])).rows,[{delta:17}]);
 });
 
 test('earlier AC followed by final WA still earns global first AC, but no timed bonus', { skip: !url }, async () => {

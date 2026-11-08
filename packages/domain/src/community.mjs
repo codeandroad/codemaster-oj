@@ -61,15 +61,16 @@ const visibleMessageSql = `FROM student_guestbook_messages m
 async function profile(ctx, identityId) {
  const p = await visibleProfile(ctx.pool, ctx.user, identityId);
  const totals = (await ctx.pool.query(`SELECT
-  ((SELECT COALESCE(sum(points),0) FROM point_ledger WHERE identity_id=$1)
+  ((SELECT COALESCE(sum(points),0) FROM school_rank_ledger WHERE identity_id=$1)
    +(SELECT COALESCE(sum(points),0) FROM paper4_rank_ledger WHERE identity_id=$1))::int points,
   ((SELECT count(DISTINCT problem_id) FROM point_ledger WHERE identity_id=$1 AND reason='first_ac')
-   +(SELECT count(*) FROM paper4_rank_ledger WHERE identity_id=$1))::int solved_problems`, [identityId])).rows[0];
- const rankPoints=(await ctx.pool.query(`SELECT
-  ((SELECT COALESCE(sum(points),0) FROM school_rank_ledger WHERE identity_id=$1)
-   +(SELECT COALESCE(sum(points),0) FROM paper4_rank_ledger WHERE identity_id=$1))::int points`,[identityId])).rows[0].points;
+   +(SELECT count(*) FROM paper4_rank_ledger WHERE identity_id=$1))::int solved_problems,
+  CASE WHEN $2::boolean OR COALESCE((SELECT show_luq_balance FROM leaderboard_settings WHERE id=true),true)
+   THEN COALESCE((SELECT balance FROM luq_accounts WHERE identity_id=$1),0)::int END scholarship`,
+ [identityId,ctx.user.identityId===p.id || ctx.user.roles.some(role=>role==='admin'||role==='teacher')])).rows[0];
  return response({profile:{id:p.id,nickname:p.nickname,avatar:avatarForIdentity(p.avatar,p.id),bio:p.bio,
-  points:totals.points,rankPoints,solvedProblems:totals.solved_problems,isSelf:ctx.user.identityId===p.id}});
+  points:totals.points,rankPoints:totals.points,solvedProblems:totals.solved_problems,isSelf:ctx.user.identityId===p.id,
+  ...(totals.scholarship===null?{}:{scholarship:totals.scholarship})}});
 }
 
 async function activity(ctx, identityId) {
@@ -92,7 +93,8 @@ async function activity(ctx, identityId) {
     WHERE ta.id=s.timed_attempt_id AND tp.results_published_at IS NOT NULL))`;
  const params = [identityId,ctx.user.identityId===identityId];
  const total = (await ctx.pool.query(`SELECT count(*)::int total ${visibility}`,params)).rows[0].total;
- const rows = (await ctx.pool.query(`SELECT l.id,l.problem_id,v.title,l.points,l.created_at
+ const rows = (await ctx.pool.query(`SELECT l.id,l.problem_id,v.title,
+  COALESCE((SELECT r.points FROM school_rank_ledger r WHERE r.submission_id=l.submission_id),0) points,l.created_at
   ${visibility} ORDER BY l.created_at DESC,l.id DESC LIMIT $3 OFFSET $4`,
   [...params,pageSize,(page-1)*pageSize])).rows;
  return response({items:rows.map(r=>({id:String(r.id),type:'first_ac',problemId:r.problem_id,

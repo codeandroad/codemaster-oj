@@ -3,8 +3,8 @@ import { fail,field,uuid,enumValue,integer } from './security.mjs';
 import {audienceClasses,audienceStudents,defaultClassStudents,replaceAudienceClasses} from './activity-audience.mjs';
 const staff=u=>{if(!u.roles.some(r=>['teacher','admin'].includes(r)))fail(403,'FORBIDDEN','需要教师权限');};
 const row=r=>{if(!r.rowCount)fail(404,'NOT_FOUND','资源不存在');return r.rows[0];};
-const rewardPoints=(value,fallback=0)=>value===undefined?fallback:integer(value,0,20,'作业每题额外积分');
-function checkRewardBudget(problems){if(problems.reduce((sum,problem)=>sum+problem.rewardPoints,0)>100)fail(400,'REWARD_BUDGET','每份作业奖励总额最多 100 分');}
+const rewardPoints=(value,fallback=0)=>value===undefined?fallback:integer(value,0,20,'作业每题额外奖学金');
+function checkRewardBudget(problems){if(problems.reduce((sum,problem)=>sum+problem.rewardPoints,0)>100)fail(400,'REWARD_BUDGET','每份作业额外奖学金最多 100');}
 async function coursePathId(db,value){
  if(value===null||value==='')return null;
  const id=uuid(value,'关联课程 ID');

@@ -131,6 +131,12 @@ test('Nest school leaderboard routes enforce admin-only visibility, cross-class 
    assert.equal(after.data.me.attempts,0);
    assert.equal(Object.hasOwn(after.data.me,'acRate'),false);
    for(const item of [...after.data.items,after.data.me]) assert.equal(Object.hasOwn(item,'luqBalance'),false,'hidden balance is absent from HTTP payload');
+   const ownProfile=await request(`/api/v1/profiles/${identityId}`,{auth:student});
+   const peerProfile=await request(`/api/v1/profiles/${identityId}`,{auth:otherStudent});
+   assert.equal(ownProfile.status,200);
+   assert.equal(ownProfile.data.profile.scholarship,100);
+   assert.equal(peerProfile.status,200);
+   assert.equal(Object.hasOwn(peerProfile.data.profile,'scholarship'),false);
    const staffBalance=await request(leaderboard,{auth:teacher});
    assert.equal(staffBalance.data.items[0].luqBalance,100);
    assert.equal(Object.hasOwn(after.data.me,'publicTag'),false);

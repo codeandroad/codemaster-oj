@@ -11,7 +11,7 @@ const date = (value, name) => { const parsed = new Date(value); if (typeof value
 const now = async (db) => row(await db.query('SELECT clock_timestamp() AS time')).time;
 const audit = (db, user, action, id, metadata = {}) => db.query('INSERT INTO audit_events(actor_account_id,action,resource_type,resource_id,metadata) VALUES($1,$2,$3,$4,$5)', [user.id, action, 'timed_practice', id, metadata]);
 const BONUS_FIELDS = [
-  ['rewardPoints', 'reward_points', '固定奖励积分'],
+  ['rewardPoints', 'reward_points', '固定奖学金'],
   ['speedBonusPoints', 'speed_bonus_points', '用时奖励上限'],
   ['attemptBonusPoints', 'attempt_bonus_points', '尝试奖励上限']
 ];
@@ -21,7 +21,7 @@ function rewardCaps(entry, previous = {}) {
 }
 function rewardBudget(problems) {
   const budget = problems.reduce((total, problem) => total + problem.rewardPoints + problem.speedBonusPoints + problem.attemptBonusPoints, 0);
-  if (budget > 100) fail(400, 'REWARD_BUDGET', '每场训练的额外奖励上限总和最多 100 分');
+  if (budget > 100) fail(400, 'REWARD_BUDGET', '每场训练的额外奖学金上限合计最多 100');
 }
 function rewardForSubmission(problem, practice, submission, startedAt, formalAttempts) {
   if (submission?.status !== 'AC' || !Number.isInteger(formalAttempts) || formalAttempts < 1 || !startedAt) {

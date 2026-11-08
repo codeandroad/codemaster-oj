@@ -325,11 +325,9 @@ export async function handleEducation(ctx) {
  if(route==='/points/me'&&method==='GET'){
   if(!user.roles.includes('student'))fail(403,'FORBIDDEN','积分仅适用于学生');
   const totals=(await pool.query(`SELECT
-   ((SELECT COALESCE(sum(points),0) FROM point_ledger WHERE identity_id=$1)
-    +(SELECT COALESCE(sum(points),0) FROM paper4_rank_ledger WHERE identity_id=$1))::int points,
    ((SELECT COALESCE(sum(points),0) FROM school_rank_ledger WHERE identity_id=$1)
-    +(SELECT COALESCE(sum(points),0) FROM paper4_rank_ledger WHERE identity_id=$1))::int rank_points`,[user.identityId])).rows[0];
-  return result({points:totals.points,rankPoints:totals.rank_points,rankingPolicy});
+    +(SELECT COALESCE(sum(points),0) FROM paper4_rank_ledger WHERE identity_id=$1))::int points`,[user.identityId])).rows[0];
+  return result({points:totals.points,rankPoints:totals.points,rankingPolicy});
  }
  if(route==='/points/leaderboard/contexts'&&method==='GET')return result(await leaderboardContexts(pool,user));
  if(route==='/points/leaderboard/settings'&&method==='GET')return result({visibleFields:await leaderboardVisibility(pool)});

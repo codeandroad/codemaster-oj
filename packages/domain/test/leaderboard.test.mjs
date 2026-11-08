@@ -236,7 +236,7 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
    const awarded=(await pool.query('SELECT submission_id,points FROM school_rank_ledger WHERE identity_id=$1 AND problem_id=$2',[beta.identityId,reviewedLater.id])).rows[0];
    assert.equal(awarded.submission_id,publicAcId);
    assert.equal(awarded.points,15,'ranked award snapshots the admin-set default reward');
-   assert.equal((await pointsMe(pool,beta)).body.points,personalBeforeReview.points,'personal first-AC reward is not repeated');
+   assert.equal((await pointsMe(pool,beta)).body.points,personalBeforeReview.points+15,'displayed points use the ranked award');
    assert.equal((await pointsMe(pool,beta)).body.rankPoints,personalBeforeReview.rankPoints+15);
    await pool.query('UPDATE point_rewards SET points=20 WHERE problem_id=$1 AND assignment_id IS NULL',[reviewedLater.id]);
    assert.equal((await pointsMe(pool,beta)).body.rankPoints,personalBeforeReview.rankPoints+15,'later reward edits cannot rewrite an earned rank');
@@ -254,7 +254,7 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
    assert.equal((await pointsMe(pool,beta)).body.rankPoints,personalBeforeReview.rankPoints+15,'an awarded school rank is frozen after a visibility change');
    assert.equal((await leaderboard(pool,teacher)).body.items.find(item=>item.id===beta.identityId).points,personalBeforeReview.rankPoints+15);
 
-   // Assignment bonuses remain personal and never change school rank points.
+   // Assignment bonuses credit Scholarship and never add points.
    const assignmentId=(await pool.query(`INSERT INTO assignments(title,class_id,owner_account_id,due_at,state)
     VALUES('Bonus assignment',$1,$2,now()+interval '1 day','Draft') RETURNING id`,[classId,teacher.id])).rows[0].id;
    await pool.query('INSERT INTO assignment_problems(assignment_id,problem_id,version_id,points,position) VALUES($1,$2,$3,100,1)',[assignmentId,first.id,first.versionId]);
@@ -264,8 +264,9 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
    const beforeBonus=(await pointsMe(pool,alpha)).body;
    await submission(alpha,first,'submit','AC',new Date(),null,assignmentId,'cpp');
    const afterBonus=(await pointsMe(pool,alpha)).body;
-   assert.equal(afterBonus.points,beforeBonus.points+7);
+   assert.equal(afterBonus.points,beforeBonus.points);
    assert.equal(afterBonus.rankPoints,beforeBonus.rankPoints);
+   assert.deepEqual((await pool.query("SELECT delta FROM luq_ledger WHERE identity_id=$1 AND metadata->>'activityId'=$2 AND source_key LIKE 'legacy-point-bonus:%'",[alpha.identityId,assignmentId])).rows,[{delta:7}]);
    const afterAssignment=(await leaderboard(pool,teacher)).body.items.find(item=>item.id===alpha.identityId);
    assert.equal(afterAssignment.attempts,6);
    assert.equal(afterAssignment.acRate,66.7,'a different language and ordinary assignment still share the same first solve');

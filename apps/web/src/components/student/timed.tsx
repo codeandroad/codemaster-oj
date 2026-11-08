@@ -45,9 +45,9 @@ function TimedRewardRules({ practice }: { practice: TimedPractice }) {
   const {locale}=useLocale();
   const cap = practice.problems.reduce((sum, problem) => sum + (problem.rewardPoints ?? 0) + (problem.speedBonusPoints ?? 0) + (problem.attemptBonusPoints ?? 0), 0);
   return <div className="mt-4 rounded-md border border-primary/20 bg-primary/5 p-4 text-sm leading-6">
-    <h3 className="font-semibold">{ui(locale,"积分奖励 · 本训练上限","Point rewards · maximum for this practice")} +{cap}</h3>
+    <h3 className="font-semibold">{ui(locale,"奖学金奖励 · 本训练上限","Scholarship rewards · maximum for this practice")} +{cap}</h3>
     <p className="mt-1 text-muted-foreground">{ui(locale,"最终计分提交须在个人截止前 AC。首次发布成绩时，训练奖励按每题计算：固定 AC 奖励 + ⌊速度上限 × max(0, 预设训练时长 − 实际用时) ÷ 预设训练时长⌋ + ⌊尝试上限 ÷ 本题正式提交次数⌋。实际用时从服务器记录的训练开始到最终计分的有效 AC 提交接收计算，不使用截止倒计时余量；提交次数包含这次 AC。越早完成、尝试越少，奖励越多；未 AC 无训练奖励。","The final scored submission must be accepted before your deadline. When results are first published, each problem earns a fixed AC reward plus a speed bonus and an attempt bonus. Speed is measured from the server-recorded start to the accepted submission; the accepted attempt counts toward attempts. Faster solutions with fewer attempts earn more. A problem without AC earns no practice reward.")}</p>
-    <p className="mt-1 text-muted-foreground">{ui(locale,"每题还有全站首次 AC 个人积分，已领取的不重复。训练额外奖励只进个人积分，不计入校级榜；本训练中的普通题须经管理员公开审核，首次有效 AC 才有排名积分。","Each problem also has first-AC personal points, awarded only once site-wide. Practice bonuses count only toward personal points; ordinary problems in this practice need administrator approval for their first valid AC to count toward the leaderboard.")}</p>
+    <p className="mt-1 text-muted-foreground">{ui(locale,"训练额外奖励以奖学金发放。经管理员公开审核的题目，其首次有效 AC 可获得排行积分。","Practice bonuses are paid as Scholarship. The first valid AC on an administrator-approved problem can earn leaderboard points.")}</p>
     <div className="mt-3 divide-y divide-border border-t border-border">
       {practice.problems.map(problem => <div key={problem.problemId} className="flex flex-wrap justify-between gap-x-4 py-2"><span className="font-medium">{problem.title}</span><span>{ui(locale,"首次 AC","First AC")} +{problem.firstAcPoints ?? 10} {ui(locale,"（全站一次）","(once site-wide)")} · {ui(locale,"训练固定","Fixed practice")} +{problem.rewardPoints ?? 0} · {ui(locale,"速度最多","Speed up to")} +{problem.speedBonusPoints ?? 0} · {ui(locale,"少尝试最多","Attempt bonus up to")} +{problem.attemptBonusPoints ?? 0}</span></div>)}
     </div>
@@ -56,16 +56,16 @@ function TimedRewardRules({ practice }: { practice: TimedPractice }) {
 function TimedRewardResults({ practice }: { practice: TimedPractice }) {
   const {locale}=useLocale();
   if (!practice.resultsPublished || !practice.grade) return null;
-  if (practice.grade.pending || practice.grade.score === null) return <p className="mt-5 text-sm text-muted-foreground">{ui(locale,"积分奖励等待有效判题结果，当前不显示为 0。","Point rewards await a valid judging result and are not displayed as zero.")}</p>;
+  if (practice.grade.pending || practice.grade.score === null) return <p className="mt-5 text-sm text-muted-foreground">{ui(locale,"奖学金奖励等待有效判题结果。","Scholarship rewards await a valid judging result.")}</p>;
   const rows = practice.problems.map(problem => ({ problem, reward: practice.grade?.problems?.find(result => result.problemId === problem.problemId) }));
   const total = rows.reduce((sum, row) => sum + (row.reward?.totalRewardPoints ?? 0), 0);
   return <section className="mt-5 rounded-md border border-border bg-surface-subtle p-4 text-sm">
-    <h2 className="font-semibold">{ui(locale,"本次训练获得积分：","Points earned in this practice:")}+{total}</h2>
-    <p className="mt-1 text-xs text-muted-foreground">{ui(locale,"这里只显示本次训练的个人额外奖励，不计入校级榜；每题首次 AC 个人积分另计，已领过的不重复。","This shows only personal practice bonuses, which do not affect the school leaderboard. First-AC personal points are counted separately and are not awarded twice.")}</p>
+    <h2 className="font-semibold">{ui(locale,"本次训练获得奖学金：","Scholarship earned in this practice:")}+{total}</h2>
+    <p className="mt-1 text-xs text-muted-foreground">{ui(locale,"这里显示本次训练发放的额外奖学金。","This shows the bonus Scholarship earned in this practice.")}</p>
     <div className="mt-3 divide-y divide-border">
       {rows.map(({ problem, reward }) => <div key={problem.problemId} className="grid gap-1 py-3 sm:grid-cols-[minmax(0,1fr)_auto]">
         <b>{problem.title}</b>
-        <span className="sm:text-right">+{reward?.totalRewardPoints ?? 0} {ui(locale,"积分","points")}</span>
+        <span className="sm:text-right">+{reward?.totalRewardPoints ?? 0} {ui(locale,"奖学金","Scholarship")}</span>
         <p className="text-xs text-muted-foreground sm:col-span-2">{ui(locale,"固定","Fixed")} +{reward?.rewardPoints ?? 0} · {ui(locale,"速度","Speed")} +{reward?.speedBonusPointsEarned ?? 0} · {ui(locale,"少尝试","Fewer attempts")} +{reward?.attemptBonusPointsEarned ?? 0}{reward?.elapsedSeconds != null ? ui(locale,` · 用时 ${Math.floor(reward.elapsedSeconds / 60)} 分 ${reward.elapsedSeconds % 60} 秒`,` · Time ${Math.floor(reward.elapsedSeconds / 60)} min ${reward.elapsedSeconds % 60} sec`) : ""}{reward?.formalAttempts ? ui(locale,` · 本题正式提交 ${reward.formalAttempts} 次`,` · ${reward.formalAttempts} formal attempts`) : ""}</p>
       </div>)}
     </div>

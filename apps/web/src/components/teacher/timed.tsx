@@ -72,10 +72,10 @@ function rewardCap(problem: TimedProblem) {
 }
 function validateTimedRewards(problems: TimedProblem[]) {
   if (problems.some((problem) => rewardFields.some((field) => !Number.isInteger(problem[field] ?? 0) || (problem[field] ?? 0) < 0 || (problem[field] ?? 0) > 20))) {
-    throw new Error("每题的固定、速度和尝试奖励上限都须为 0–20 的整数积分。");
+    throw new Error("每题的固定、速度和尝试奖励上限都须为 0–20 的整数奖学金。");
   }
   if (problems.reduce((sum, problem) => sum + rewardCap(problem), 0) > 100) {
-    throw new Error("本次训练全部题目的奖励上限合计最多 100 积分。");
+    throw new Error("本次训练全部题目的奖励上限合计最多 100 奖学金。");
   }
 }
 interface Practice {
@@ -430,13 +430,13 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
               </Button>
               <div className="text-right text-sm">
                 <b>{problems.length} {tr("题", "problems")} · {problems.reduce((n, p) => n + p.points, 0)} {tr("分", "points")}</b>
-                <p className="mt-1 text-xs text-muted-foreground">{tr("训练奖励上限", "Practice reward cap")} +{problems.reduce((sum, p) => sum + rewardCap(p), 0)} / 100 {tr("积分", "points")}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{tr("训练奖励上限", "Practice reward cap")} +{problems.reduce((sum, p) => sum + rewardCap(p), 0)} / 100 {tr("奖学金", "Scholarship")}</p>
               </div>
             </div>
             <div className="mb-4 rounded-md border border-primary/20 bg-primary/5 p-4 text-sm leading-6">
               <p className="font-semibold">{tr("限时训练积分规则", "Timed-practice point rules")}</p>
-              <p className="mt-1 text-muted-foreground">{tr("每题首次 AC 积分是全站一次性奖励，已在别处领取则不会重复；本训练的奖励仅在个人截止前 AC 且首次发布成绩时结算。训练奖励 = 固定 AC 奖励 + ⌊速度上限 × max(0, 预设训练时长 − 实际用时) ÷ 预设训练时长⌋ + ⌊尝试上限 ÷ 本题正式提交次数⌋。实际用时从服务器记录的训练开始到最终计分的有效 AC 提交接收计算，不使用截止倒计时余量；提交次数包括这次 AC。未 AC 不得训练奖励。三项上限跨全部题合计最多 100 积分，和训练成绩分值分开。", "First-AC points for each problem are awarded once across the site. Practice rewards settle only for AC before the individual deadline, when results are first published. Reward = fixed AC reward + floor(speed cap × max(0, planned duration − elapsed time) / planned duration) + floor(attempt cap / formal submission count). Elapsed time runs from the server-recorded start to receipt of the valid scored AC; it does not use countdown time remaining. Attempts include the AC submission. No AC means no practice reward. The combined cap across all problems is 100 points, separate from practice scores.")}</p>
-              <p className="mt-1 text-muted-foreground">{tr("训练固定、速度及少尝试奖励只计个人积分；校级排名积分只来自管理员审核公开题的有效首次正式 AC，训练成绩公布后才结算。", "Fixed, speed, and attempt rewards count toward personal points only. School leaderboard points come only from valid first formal ACs on administrator-approved public problems, and settle after practice results are published.")}</p>
+              <p className="mt-1 text-muted-foreground">{tr("每题首次 AC 积分是全站一次性奖励，已在别处领取则不会重复；本训练的奖励仅在个人截止前 AC 且首次发布成绩时结算。训练奖励 = 固定 AC 奖励 + ⌊速度上限 × max(0, 预设训练时长 − 实际用时) ÷ 预设训练时长⌋ + ⌊尝试上限 ÷ 本题正式提交次数⌋。实际用时从服务器记录的训练开始到最终计分的有效 AC 提交接收计算，不使用截止倒计时余量；提交次数包括这次 AC。未 AC 不得训练奖励。三项上限跨全部题合计最多 100 奖学金，和训练成绩分值分开。", "First-AC points for each problem are awarded once across the site. Practice rewards settle only for AC before the individual deadline, when results are first published. Reward = fixed AC reward + floor(speed cap × max(0, planned duration − elapsed time) / planned duration) + floor(attempt cap / formal submission count). Elapsed time runs from the server-recorded start to receipt of the valid scored AC; it does not use countdown time remaining. Attempts include the AC submission. No AC means no practice reward. The combined cap across all problems is 100 points, separate from practice scores.")}</p>
+              <p className="mt-1 text-muted-foreground">{tr("训练固定、速度及少尝试奖励以奖学金发放，首次公布训练成绩时结算。", "Fixed, speed, and attempt bonuses are paid as Scholarship when results are first released.")}</p>
             </div>
             <Table headers={[tr("顺序", "Order"), tr("题目", "Problem"), tr("分值", "Score"), tr("首次 AC", "First AC"), tr("训练 AC 奖励", "Practice AC reward"), tr("速度上限", "Speed cap"), tr("尝试上限", "Attempt cap"), tr("操作", "Actions")]} min={1100}>
               {problems.map((p, i) => (
@@ -475,7 +475,7 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
                   {rewardColumns.map(({ field, title }) => (
                     <td key={field}>
                       <input
-                        aria-label={`${p.title} ${tr(title, title === "训练 AC 奖励" ? "practice AC reward" : title === "速度上限" ? "speed cap" : "attempt cap")} ${tr("积分", "points")}`}
+                        aria-label={`${p.title} ${tr(title, title === "训练 AC 奖励" ? "practice AC reward" : title === "速度上限" ? "speed cap" : "attempt cap")} ${tr("奖学金", "Scholarship")}`}
                         disabled={published || action.busy}
                         type="number"
                         step={1}
@@ -670,16 +670,16 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
             </div>
             <div>
               <dt className="text-muted-foreground">{tr("训练奖励上限", "Practice reward cap")}</dt>
-              <dd>+{problems.reduce((sum, problem) => sum + rewardCap(problem), 0)} {tr("积分（首次 AC 奖励另计）", "points (first-AC rewards separate)")}</dd>
+              <dd>+{problems.reduce((sum, problem) => sum + rewardCap(problem), 0)} {tr("奖学金（首解积分另计）", "Scholarship (first-AC points separate)")}</dd>
             </div>
           </dl>
           <div className="mt-4 border-t border-border pt-3 text-sm">
             {problems.map((problem) => <p key={problem.problemId} className="py-1">{problem.title}: {tr("首次 AC", "first AC")} +{problem.firstAcPoints ?? 10} {tr("（全站一次）；训练固定", "(once site-wide); fixed practice reward")} +{problem.rewardPoints ?? 0}, {tr("速度最多", "speed up to")} +{problem.speedBonusPoints ?? 0}, {tr("少尝试最多", "fewer attempts up to")} +{problem.attemptBonusPoints ?? 0}</p>)}
           </div>
           <p className="mt-4 text-sm leading-6 text-muted-foreground">
-            {tr("确认开始后固定个人截止时间，统一窗口与预设训练时长中先到的时间为准。草稿和自测不会计分。只有个人截止前最终计分的有效 AC 才能在首次发布成绩时领取训练奖励：固定积分 + ⌊速度上限 × max(0, 预设训练时长 − 实际用时) ÷ 预设训练时长⌋ + ⌊尝试上限 ÷ 本题正式提交次数⌋。实际用时按服务器开始到 AC 接收计算，不使用截止倒计时余量。首次 AC 积分全站只领取一次；成绩由教师另行发布。", "Starting fixes the individual deadline at the earlier of the activity window and planned duration. Drafts and self-tests do not score. Only a valid scored AC before the individual deadline earns practice rewards when results are first published: fixed points + floor(speed cap × max(0, planned duration − elapsed time) / planned duration) + floor(attempt cap / formal submission count). Elapsed time uses server start and AC receipt, not countdown time remaining. First-AC points are awarded only once site-wide; teachers publish results separately.")}
+            {tr("确认开始后固定个人截止时间，统一窗口与预设训练时长中先到的时间为准。草稿和自测不会计分。只有个人截止前最终计分的有效 AC 才能在首次发布成绩时领取训练奖励：固定奖学金 + ⌊速度上限 × max(0, 预设训练时长 − 实际用时) ÷ 预设训练时长⌋ + ⌊尝试上限 ÷ 本题正式提交次数⌋。实际用时按服务器开始到 AC 接收计算，不使用截止倒计时余量。首次 AC 积分全站只领取一次；成绩由教师另行发布。", "Starting fixes the individual deadline at the earlier of the activity window and planned duration. Drafts and self-tests do not score. Only a valid scored AC before the individual deadline earns practice rewards when results are first published: fixed points + floor(speed cap × max(0, planned duration − elapsed time) / planned duration) + floor(attempt cap / formal submission count). Elapsed time uses server start and AC receipt, not countdown time remaining. First-AC points are awarded only once site-wide; teachers publish results separately.")}
           </p>
-          <p className="mt-2 text-sm text-muted-foreground">{tr("上述训练额外奖励只进入个人积分，不计入校级积分排行榜。", "Practice bonuses count toward personal points only, not the school leaderboard.")}</p>
+          <p className="mt-2 text-sm text-muted-foreground">{tr("上述训练额外奖励以奖学金入账。", "Practice bonuses are paid as Scholarship.")}</p>
           <Feedback action={action} />
           <div className="mt-5 flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setModal(null)}>
@@ -809,7 +809,7 @@ export function TeacherTimedProgress({ id }: { id: string }) {
                 tr("活动状态", "Activity status"),
                 tr("已接收提交", "Received submissions"),
                 tr("最后正式接收时间", "Last formal receipt"),
-                tr("训练奖励积分", "Practice reward points"),
+                tr("训练奖励奖学金", "Practice Scholarship"),
                 tr("需要处理", "Needs action"),
               ]}
               min={900}

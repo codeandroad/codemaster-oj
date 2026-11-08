@@ -3,8 +3,8 @@ export function validateActivity({title,problems,participants,publish=false,time
  if(!title.trim())throw new Error('请填写活动名称。');
  if(problems.length>50||new Set(problems.map(p=>p.problemId)).size!==problems.length)throw new Error('最多选择 50 道题目，同一题目不能重复。');
  if(problems.some(p=>!Number.isFinite(p.points)||p.points<=0||p.points>1000||Math.abs(p.points*100-Math.round(p.points*100))>0.00001))throw new Error('题目分值须大于 0、不超过 1000，最多两位小数。');
- if(problems.some(p=>p.rewardPoints!==undefined&&(!Number.isInteger(p.rewardPoints)||p.rewardPoints<0||p.rewardPoints>20)))throw new Error('本作业额外奖励须为 0–20 的整数积分。');
- if(problems.reduce((sum,p)=>sum+(p.rewardPoints??0),0)>100)throw new Error('本作业额外奖励合计最多 100 积分。');
+ if(problems.some(p=>p.rewardPoints!==undefined&&(!Number.isInteger(p.rewardPoints)||p.rewardPoints<0||p.rewardPoints>20)))throw new Error('本作业额外奖励须为 0–20 的整数奖学金。');
+ if(problems.reduce((sum,p)=>sum+(p.rewardPoints??0),0)>100)throw new Error('本作业额外奖励合计最多 100 奖学金。');
  if((publish||timed)&&!problems.length)throw new Error('请至少选择一道已发布题目。');if((publish||timed)&&!participants.length)throw new Error('请至少选择一名适用学生。');
  if(participants.length>500)throw new Error('适用学生最多 500 名。');
 }

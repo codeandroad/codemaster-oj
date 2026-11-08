@@ -17,7 +17,7 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
   connection.searchParams.set('options',`-csearch_path=${schema}`);
   const pool=createPool(connection.toString());
   const adminPassword=randomBytes(24).toString('base64url');
-  const studentPassword=randomBytes(24).toString('base64url');
+  let studentPassword=randomBytes(24).toString('base64url');
   let app;
   try {
     await migrate(pool);
@@ -65,6 +65,25 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
     const forbidden=await request('/api/v1/accounts',{auth:student});
     assert.equal(forbidden.status,403);assert.equal(forbidden.data.error.code,'FORBIDDEN');
     assert.equal((await request('/api/v1/classes',{auth:student})).status,200);
+    await t.test('a replacement reset code works after the previous code expires', async () => {
+      const issue=()=>request(`/api/v1/people/${person.data.person.id}/reset`,{method:'POST',auth:admin});
+      const newPassword=randomBytes(24).toString('base64url');
+      const redeem=resetCode=>request('/api/v1/auth/reset',{method:'POST',body:{username:'nest-student',resetCode,password:newPassword}});
+      const first=await issue();
+      assert.equal(first.status,200);
+      await pool.query("UPDATE reset_tokens SET expires_at=clock_timestamp()-interval '1 second' WHERE account_id=$1",[student.data.user.id]);
+      assert.equal((await redeem(first.data.resetCode)).data.error.code,'RESET_FAILED');
+      const replacement=await issue();
+      assert.equal(replacement.status,200);
+      assert.equal((await redeem(first.data.resetCode)).data.error.code,'RESET_FAILED');
+      assert.equal((await redeem(replacement.data.resetCode)).status,200);
+      assert.equal((await redeem(replacement.data.resetCode)).data.error.code,'RESET_FAILED');
+      assert.equal((await request('/api/v1/auth/login',{method:'POST',body:{username:'nest-student',password:studentPassword}})).data.error.code,'LOGIN_FAILED');
+      const again=await request('/api/v1/auth/login',{method:'POST',body:{username:'nest-student',password:newPassword}});
+      assert.equal(again.status,200);
+      studentPassword=newPassword;
+      Object.assign(student,again);
+    });
     const problem=(await pool.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id',[adminId])).rows[0];
     const version=(await pool.query("INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code,validation_status,school_visible_at) VALUES($1,'笔记测试题','stdio','输出一',1000,64,'print(1)','AC',now()) RETURNING id",[problem.id])).rows[0];
     const formalCase=(await pool.query("INSERT INTO test_cases(version_id,position,input,expected,weight) VALUES($1,1,'217','1',100) RETURNING id",[version.id])).rows[0];

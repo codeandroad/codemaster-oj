@@ -51,6 +51,7 @@ export function ProductionApp() {
   const search = useSearchParams();
   const [user, setUser] = useState<CampusUser | null>(null);
   const joinIntent = search.get("join") === "1";
+  const resetIntent = pathname === "/login" && search.get("reset") === "1";
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [check, setCheck] = useState(0);
@@ -139,8 +140,7 @@ export function ProductionApp() {
     );
   if (pathname === "/activate") return <ProductionRegisterPage />;
   if (pathname === "/register") return <PersonalRegisterPage onRegistered={loggedIn} joinIntent={joinIntent}/>;
-  if (!user) return <ProductionLoginPage onLogin={loggedIn} joinIntent={joinIntent} />;
-  if (pathname === "/login") return <ProductionLoginPage onLogin={loggedIn} joinIntent={joinIntent} />;
+  if (!user || pathname === "/login") return <ProductionLoginPage key={resetIntent ? "reset" : "login"} onLogin={loggedIn} joinIntent={joinIntent} resetIntent={resetIntent} />;
   if (pathname === "/platform") return <PlatformPage key={user.id} user={user} onUserSaved={setUser} onLogout={() => {
     setUser(null);
     clearProductionSession();

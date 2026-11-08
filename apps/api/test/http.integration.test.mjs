@@ -76,7 +76,8 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
       const replacement=await issue();
       assert.equal(replacement.status,200);
       assert.equal((await redeem(first.data.resetCode)).data.error.code,'RESET_FAILED');
-      assert.equal((await redeem(replacement.data.resetCode)).status,200);
+      const copied=`\u200B${replacement.data.resetCode.slice(0,12)}\u200E ${replacement.data.resetCode.slice(12)}\u2060`;
+      assert.equal((await redeem(copied)).status,200);
       assert.equal((await redeem(replacement.data.resetCode)).data.error.code,'RESET_FAILED');
       assert.equal((await request('/api/v1/auth/login',{method:'POST',body:{username:'nest-student',password:studentPassword}})).data.error.code,'LOGIN_FAILED');
       const again=await request('/api/v1/auth/login',{method:'POST',body:{username:'nest-student',password:newPassword}});

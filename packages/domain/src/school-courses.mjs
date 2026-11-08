@@ -84,13 +84,15 @@ async function saveClasses(db,schoolId,courseId,ids){
 async function studentIdentity(db,schoolId,userId){
  return (await db.query("SELECT id FROM school_identities WHERE school_id=$1 AND account_id=$2 AND kind='student'",[schoolId,userId])).rows[0]?.id??null;
 }
-export async function loadSchoolCourse(db,schoolId,id,user,role){
+export async function loadSchoolCourse(db,schoolId,id,user,role,{publishedOnly=false}={}){
  const course=(await db.query('SELECT * FROM school_courses WHERE school_id=$1 AND id=$2',[schoolId,id])).rows[0];
  if(!course)fail(404,'NOT_FOUND','课程不存在或不可访问');
- if(manages(course,user,role))return {course,view:course,canManage:true,identityId:null};
- if(role!=='student'||!course.published||course.archived_at)fail(404,'NOT_FOUND','课程不存在或不可访问');
+ const canManage=manages(course,user,role);
+ if(canManage&&!publishedOnly)return {course,view:course,canManage,identityId:null};
+ if((!canManage&&role!=='student')||!course.published||course.archived_at)fail(404,'NOT_FOUND','课程不存在或不可访问');
  const view=(await db.query('SELECT * FROM school_course_publications WHERE school_id=$1 AND course_id=$2 AND revision=$3',[schoolId,id,course.published_revision])).rows[0];
  if(!view)fail(404,'NOT_FOUND','课程不存在或不可访问');
+ if(canManage)return {course,view,canManage,identityId:null};
  const identityId=await studentIdentity(db,schoolId,user.id);
  if(view.access_scope==='classes'){
   const {rowCount}=await db.query(`SELECT 1 FROM school_course_publication_classes pc JOIN school_class_roster r

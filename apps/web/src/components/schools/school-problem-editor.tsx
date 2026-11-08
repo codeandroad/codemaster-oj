@@ -11,6 +11,7 @@ import { CopyCodeButton } from "@/components/student/copy-code-button";
 import { defaultWorkspaceSettings } from "@/components/student/workspace-settings";
 import { Feedback, useMutation } from "@/components/student/shared";
 import { Field, Table, input, area } from "@/components/teacher/shared";
+import { ProblemTutorialEditor } from "@/components/teacher/problem-tutorial-editor";
 import { MathEditor } from "@/components/teacher/math-editor";
 import { productionApi } from "@/lib/production-api";
 import type { Bank, Definition, Problem } from "./school-practice-types";
@@ -42,6 +43,10 @@ export function SchoolProblemEditor({ problem, banks, bankId, base, close, saved
     <DialogContent className="flex max-h-[92vh] max-w-6xl flex-col gap-3 overflow-hidden p-4 sm:p-6">
       <DialogTitle className="pr-9">{problem ? tx("Edit problem", "编辑题目") : tx("New problem", "新建题目")}</DialogTitle>
       <DialogDescription>{tx("Save the draft, then validate its reference program and review it for publication from the problem list.", "保存草稿后，可在题目列表验证参考程序并审核发布。")}</DialogDescription>
+      {problem?.canManageTutorial && <div className="shrink-0">
+        <ProblemTutorialEditor endpoint={`${base}/problems/${encodeURIComponent(problem.id)}/tutorial`}
+          problemTitle={problem.title} disabled={action.busy} />
+      </div>}
       <form noValidate className="flex min-h-0 flex-1 flex-col" onSubmit={event => {
         event.preventDefault();
         if (pending.current || !canEdit) return;

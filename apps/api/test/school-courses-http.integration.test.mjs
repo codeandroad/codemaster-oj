@@ -297,12 +297,13 @@ test('school course HTTP lifecycle preserves published boundaries and stable lea
    });
 
    await t.test('chapter practice pins the approved school version and uses stable identity formal AC', async () => {
-    const bank=randomUUID(),problem=randomUUID(),version=randomUUID(),nextVersion=randomUUID();
+    const bank=randomUUID(),problem=randomUUID(),unpublished=randomUUID(),version=randomUUID(),nextVersion=randomUUID();
     const definition=normalizeSchoolProblem({title:'Safe title',statement:'Read an integer and output it.',mode:'stdio',referenceCode:'print(input()) # PRIVATE_CODE',samples:[{input:'1',expected:'1'}],tests:[{input:'SECRET_TEST',expected:'SECRET_TEST',weight:100}]});
     await transaction(pool,async db=>{
      await db.query("SELECT set_config('campus.school_id',$1,true)",[alpha.id]);
      await db.query('INSERT INTO school_problem_banks(school_id,id,owner_account_id,name,request_id) VALUES($1,$2,$3,$4,$5)',[alpha.id,bank,teacher.id,'Practice fixtures',randomUUID()]);
      await db.query('INSERT INTO school_problems(school_id,id,bank_id,owner_account_id,draft,request_id) VALUES($1,$2,$3,$4,$5,$6)',[alpha.id,problem,bank,teacher.id,definition,randomUUID()]);
+     await db.query('INSERT INTO school_problems(school_id,id,bank_id,owner_account_id,draft,request_id) VALUES($1,$2,$3,$4,$5,$6)',[alpha.id,unpublished,bank,teacher.id,definition,randomUUID()]);
      await db.query('INSERT INTO school_problem_versions(school_id,id,problem_id,draft_revision,definition) VALUES($1,$2,$3,1,$4)',[alpha.id,version,problem,definition]);
      await db.query('UPDATE school_problems SET published=true,published_version_id=$3 WHERE school_id=$1 AND id=$2',[alpha.id,problem,version]);
     });
@@ -312,6 +313,34 @@ test('school course HTTP lifecycle preserves published boundaries and stable lea
     c=(await post(cp+'/publish',teacher,{expectedRevision:c.revision},200)).data;
     let view=(await request(cp,{auth:student})).data;assert.equal(view.totalExercises,1);assert.equal(view.completedExercises,0);
     assert.equal(JSON.stringify(view).includes('PRIVATE_CODE'),false);assert.equal(JSON.stringify(view).includes('SECRET_TEST'),false);
+    const tutorialPath=school(alpha.id,`problems/${problem}/tutorial`);
+    const tutorialView=tutorialPath+'?'+new URLSearchParams({versionId:version,courseId:c.id,chapterId:chapterA.id});
+    const originalTutorial={source:'course',courseTitle:ci.title,title:chapterA.title,body:chapterA.body};
+    assert.deepEqual((await request(tutorialView,{auth:student})).data.tutorial,originalTutorial);
+    c=(await patch(cp,teacher,{...ci,chapters:[{...ci.chapters[0],body:'UNPUBLISHED_CHAPTER'}],expectedRevision:c.revision})).data;
+    assert.deepEqual((await request(tutorialView,{auth:student})).data.tutorial,originalTutorial);
+    assert.deepEqual((await request(tutorialView,{auth:teacher})).data.tutorial,originalTutorial);
+    await request(tutorialView,{auth:betaAdmin,status:404});
+    await request(tutorialPath+'?manage=true',{auth:student,status:403});
+    const settings={mode:'custom',body:'## Independent tutorial',expectedRevision:0};
+    const problemPath=school(alpha.id,`problems/${problem}`);
+    const peerProblem=(await request(problemPath,{auth:otherTeacher})).data;
+    assert.equal(peerProblem.canManage,false);
+    assert.equal(peerProblem.canManageTutorial,true);
+    assert.equal(peerProblem.definition.referenceCode,undefined);
+    const peerRow=(await request(school(alpha.id,'problems'),{auth:otherTeacher})).data.items.find(item=>item.id===problem);
+    assert.equal(peerRow.canManageTutorial,true);
+    assert.equal((await request(problemPath,{auth:student})).data.canManageTutorial,false);
+    await patch(problemPath,otherTeacher,{...definition,expectedRevision:1},403);
+    await patch(school(alpha.id,`problems/${unpublished}/tutorial`),otherTeacher,settings,404);
+    await patch(tutorialPath,betaAdmin,settings,404);
+    assert.equal((await request(tutorialPath+'?manage=true',{auth:otherTeacher})).data.revision,0);
+    assert.equal((await patch(tutorialPath,otherTeacher,settings)).data.revision,1);
+    assert.deepEqual((await request(tutorialView,{auth:student})).data.tutorial,{source:'custom',body:settings.body});
+    assert.equal((await patch(tutorialPath,admin,{mode:'none',expectedRevision:1})).data.revision,2);
+    assert.equal((await request(tutorialView,{auth:student})).data.tutorial,null);
+    await patch(tutorialPath,teacher,{mode:'course',expectedRevision:2});
+    assert.deepEqual((await request(tutorialView,{auth:student})).data.tutorial,originalTutorial);
     const addJob=async(kind,state='completed')=>pool.query(`INSERT INTO school_judge_jobs(school_id,problem_id,version_id,account_id,identity_id,request_id,request_hash,kind,access_context,payload,state,result) VALUES($1,$2,$3,$4,$5,$6,'fixture',$7,'school','{}',$8,'{"status":"AC"}')`,[alpha.id,problem,version,student.id,studentIdentity.id,randomUUID(),kind,state]);
     await addJob('samples');await addJob('submit','queued');assert.equal((await request(cp,{auth:student})).data.completedExercises,0);
     const submitted=(await post(school(alpha.id,`problems/${problem}/submissions`),student,{requestId:randomUUID(),kind:'submit',language:'python',code:'print(input())'},202)).data;

@@ -8,7 +8,7 @@ import type {LearningPath} from "./learning";
 import { AppLink, useNavigationBlocker } from "@/components/navigation";
 import { useLocale } from "@/components/locale-context";
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, Shuffle, List, House, Code2, BookOpen, FileText, HelpCircle, History, LayoutPanelLeft, Maximize2, Play, RotateCcw, Send, Settings, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ import {NotificationDropdown} from "./notification-dropdown";
 import {clearProductionSession,ApiError} from "@/lib/production-api";
 import {ProblemListDrawer} from "./problem-list-drawer";
 import {ProblemHeading} from "./problem-heading";
+import {ProblemTutorial, useProblemTutorial, type ProblemTutorialContent} from "./problem-tutorial";
 import {problemNavigation,navigationHref,type NavigationProblem} from "./problem-navigation";
 import { validateFunctionInput } from "@/lib/function-input";
 
@@ -65,6 +66,7 @@ export type ProblemWorkspaceAdapter = {
   homeHref: string;
   navigation: { items: NavigationProblem[]; loading: boolean; error: string; reload: () => void; href: (problem: NavigationProblem) => string; title: string; description?: string };
   chapter?: { courseTitle: string; title: string; position: number; completed: boolean };
+  tutorial?: ProblemTutorialContent;
   submissionsPath: string;
   submit: (input: { kind: Submission["kind"]; code: string; language: SubmissionLanguage; customInput: string; requestId: string }) => Promise<{id: string}>;
   submissionPath: (id: string) => string;
@@ -82,6 +84,11 @@ export function ProblemWorkspace({ problem, user, original = null, adapter }: { 
   const router = useRouter();
   const params = useSearchParams(), assignmentId = original || adapter ? null : params.get("assignmentId"), timedPracticeId = original || adapter ? null : params.get("timedPracticeId"), originalId = original ? original.originalSubmissionId ?? original.id : null;
   const learningPathId=!adapter&&!assignmentId&&!timedPracticeId&&!originalId?params.get("learningPathId"):null,chapterId=params.get("chapterId");
+  const tutorialEndpoint = !adapter && problem.versionId ? `problems/${encodeURIComponent(problem.id)}/tutorial?${new URLSearchParams({
+    versionId: problem.versionId, ...(learningPathId && chapterId ? { courseId: learningPathId, chapterId } : {}),
+  })}` : "";
+  const tutorial = useProblemTutorial(tutorialEndpoint, adapter?.tutorial);
+  const statementId = useId();
   const course=useData<LearningPath>(learningPathId?`learning-paths/${encodeURIComponent(learningPathId)}`:"");
   const courseChapter=course.data?.chapters?.find(c=>c.id===chapterId);
   const courseValid=!!courseChapter?.problems.some(p=>p.problemId===problem.id&&p.versionId===problem.versionId);
@@ -281,6 +288,15 @@ export function ProblemWorkspace({ problem, user, original = null, adapter }: { 
   function randomProblem(){if(!navigation.random.length)return;switchProblem(navigation.random[Math.floor(Math.random()*navigation.random.length)]);}
   const chapterContext = adapter?.chapter ?? (courseValid ? {courseTitle: course.data!.title, title: courseChapter!.title, position: courseChapter!.position, completed: Boolean(courseChapter?.problems.find(p=>p.problemId===problem.id)?.completed)} : undefined);
   const sample = problem.samples[selectedSample] ?? problem.samples[0];
+  const assistanceAvailable = !adapter || Boolean(adapter.assistance);
+  const statementTabs = [
+    { value: "Problem", label: tx("题目描述", "Problem"), icon: FileText },
+    ...(assistanceAvailable ? [{ value: "Translation", label: tx("中文题面", "Translation"), icon: BookOpen }] : []),
+    ...(tutorial ? [{ value: "Tutorial", label: tx("教程", "Tutorial"), icon: BookOpen }] : []),
+    ...(assistanceAvailable ? [{ value: "Solution", label: tx("参考答案", "Solution"), icon: BookOpen }] : []),
+    { value: "Submissions", label: tx("提交记录", "Submissions"), icon: History },
+  ];
+  const statementTab = statementTabs.some(tab => tab.value === leftTab) ? leftTab : "Problem";
   const mainClass = [styles.main, layout.panels.statement === "hidden" ? styles.leftHidden : layout.panels.statement === "collapsed" ? styles.leftCollapsed : "", layout.panels.editor === "hidden" && layout.panels.testing === "hidden" ? styles.onlyStatement : "", layout.maximized ? styles.maximized : "", layout.maximized === "statement" ? styles.statementMax : ""].join(" ");
   const rightClass = [styles.right, layout.panels.editor === "hidden" ? styles.editorHidden : layout.panels.editor === "collapsed" ? styles.editorCollapsed : "", layout.panels.testing === "hidden" ? styles.testingHidden : layout.panels.testing === "collapsed" ? styles.testingCollapsed : ""].join(" ");
   const panelClass = (panel: WorkspacePanel) => [styles.panel, styles[panel], layout.panels[panel] === "collapsed" ? styles.collapsed : "", layout.maximized === panel ? styles.maxPanel : ""].join(" ");
@@ -322,15 +338,40 @@ export function ProblemWorkspace({ problem, user, original = null, adapter }: { 
     <nav className={styles.mobileTabs} aria-label={tx("答题分区","Workspace panels")}>{panelIds.map(panel => <button key={panel} type="button" aria-pressed={layout.mobilePanel === panel} onClick={() => dispatch({ type: "mobile", panel })} data-od-id={`mobile-${panel}`}>{panel === "statement" ? tx("题目","Problem") : panel === "editor" ? tx("代码","Code") : tx("测试","Tests")}</button>)}</nav>
     <main ref={mainRef} className={mainClass} data-mobile={layout.mobilePanel} style={{ "--workspace-left": `${settings.panelPercent}%` } as CSSProperties}>
       <section className={panelClass("statement")} data-od-id="statement-panel" onMouseEnter={()=>setActivePanel("statement")} onFocusCapture={()=>setActivePanel("statement")}>
-        <header className={styles.panelHeader}><div className={styles.tabs} role="tablist" aria-label={tx("题目内容","Problem content")}>{[{value:"Problem",label:tx("题目描述","Problem"),icon:FileText},{value:"Translation",label:tx("中文题面","Translation"),icon:BookOpen},{value:"Solution",label:tx("参考答案","Solution"),icon:BookOpen},{value:"Submissions",label:tx("提交记录","Submissions"),icon:History}].filter(tab=>!adapter||adapter.assistance||!["Translation","Solution"].includes(tab.value)).map(({value,label,icon:Icon}) => <button key={value} type="button" className={styles.tab} role="tab" aria-selected={leftTab === value} onClick={() => setLeftTab(value)}><Icon size={15}/>{label}</button>)}</div>{panelActions("statement")}</header>
-        <div className={styles.panelBody} role="tabpanel">
-{leftTab === "Problem" ? <><div className="flex items-start justify-between gap-4"><div className="min-w-0"><ProblemHeading title={problem.title} difficulty={problem.difficulty} tags={problem.tags}/></div><SolvedStatus solved={submissions.data?.solved ?? problem.solved ?? false}/></div><article className="max-w-2xl text-base leading-7">
+        <header className={styles.panelHeader}>
+          <div className={styles.tabs} role="tablist" aria-label={tx("题目内容", "Problem content")}
+            aria-orientation={layout.panels.statement === "collapsed" ? "vertical" : "horizontal"}>
+            {statementTabs.map(({ value, label, icon: Icon }, index) => (
+              <button key={value} id={`${statementId}-${value}`} type="button" className={styles.tab} role="tab"
+                aria-selected={statementTab === value} aria-controls={`${statementId}-panel`}
+                tabIndex={statementTab === value ? 0 : -1} onClick={() => setLeftTab(value)}
+                onKeyDown={event => {
+                  const vertical = layout.panels.statement === "collapsed";
+                  const next = event.key === "Home" ? 0 : event.key === "End" ? statementTabs.length - 1
+                    : event.key === (vertical ? "ArrowDown" : "ArrowRight") ? (index + 1) % statementTabs.length
+                    : event.key === (vertical ? "ArrowUp" : "ArrowLeft") ? (index - 1 + statementTabs.length) % statementTabs.length : -1;
+                  if (next < 0) return;
+                  event.preventDefault();
+                  const nextTab = statementTabs[next].value;
+                  setLeftTab(nextTab);
+                  document.getElementById(`${statementId}-${nextTab}`)?.focus();
+                }}>
+                <Icon size={15} aria-hidden="true"/>{label}
+              </button>
+            ))}
+          </div>
+          {panelActions("statement")}
+        </header>
+        <div key={statementTab === "Tutorial" ? "tutorial" : "statement"} id={`${statementId}-panel`}
+          className={styles.panelBody} role="tabpanel" aria-labelledby={`${statementId}-${statementTab}`}
+          tabIndex={statementTab === "Tutorial" ? 0 : undefined}>
+{statementTab === "Problem" ? <><div className="flex items-start justify-between gap-4"><div className="min-w-0"><ProblemHeading title={problem.title} difficulty={problem.difficulty} tags={problem.tags}/></div><SolvedStatus solved={submissions.data?.solved ?? problem.solved ?? false}/></div><article className="max-w-2xl text-base leading-7">
           {problemReward > 0 && (
             <p className="my-1 py-1 text-xs font-semibold leading-5">
               {tx(`本题额外奖励 +${problemReward}`, `Extra reward for this problem +${problemReward}`)}
             </p>
           )}
-          {assignmentId && assignment.data?.grades?.find(grade => grade.identityId === user.identityId)?.problems.some(item => item.problemId === problem.id && item.completionSource === "other_entry") && <p className="mt-3 text-sm text-success">{tx("本题已在其他入口通过，已计入作业满分，无需重复提交。", "You passed this version elsewhere. Full assignment credit is recorded; no repeat submission is needed.")}</p>}{timedPracticeId && <StudentLuqRule activityType="timed" activityId={timedPracticeId}/>}<div className="mt-5"><LessonContent content={problem.statement}/></div>{problemWithHints.objective && <section className="mt-7 border-t border-border pt-5"><h2 className="mb-3 text-lg font-bold">{tx("学习目标","Learning objectives")}</h2><p>{problemWithHints.objective}</p></section>}{problem.mode === "stdio" ? <>{problemWithHints.inputDescription && <section className="mt-7 border-t border-border pt-5"><h2 className="mb-3 text-lg font-bold">{tx("输入","Input")}</h2><LessonContent content={problemWithHints.inputDescription}/></section>}{problemWithHints.outputDescription && <section className="mt-7 border-t border-border pt-5"><h2 className="mb-3 text-lg font-bold">{tx("输出","Output")}</h2><LessonContent content={problemWithHints.outputDescription}/></section>}</> : <section className="mt-7 border-t border-border pt-5"><h2 className="mb-3 text-lg font-bold">{tx("函数接口","Function interface")}</h2><code className="rounded bg-muted px-1.5 py-1 font-mono text-sm">{signature}</code>{language === "cpp" && <p className="mt-2 text-xs leading-5 text-muted-foreground">{tx("C++ 使用 ","C++ uses ")}<code>nlohmann::json</code>{tx("；","; ")}<code>args</code>{tx(" 是 JSON 参数数组，"," is a JSON argument array, ")}<code>kwargs</code>{tx(" 是命名参数对象，返回可序列化的 JSON 值。"," is an object of named arguments. Return a JSON-serializable value.")}</p>}{language === "javascript" && <p className="mt-2 text-xs leading-5 text-muted-foreground">{tx("JavaScript 按位置展开 JSON ","JavaScript expands JSON ")}<code>args</code>{tx("；非空 "," as positional arguments; nonempty ")}<code>kwargs</code>{tx(" 作为最后一个对象参数传入。"," is passed as the final object argument.")}</p>}<dl className="mt-3 grid grid-cols-[92px_1fr] gap-y-2 text-sm">{problemWithHints.parameters?.map((parameter, index) => <div key={index} className="contents"><dt className="font-semibold">{tx("参数","Parameter")}</dt><dd>{typeof parameter === "string" ? parameter : `${parameter.name} — ${parameter.type}${parameter.description ? ` · ${parameter.description}` : ""}`}</dd></div>)}{problemWithHints.returnType && <><dt className="font-semibold">{tx("返回值","Return value")}</dt><dd>{problemWithHints.returnType}</dd></>}</dl></section>}<p className="mt-5 text-xs text-muted-foreground">{problem.timeLimitMs} ms / test · {language === "javascript" ? locale === "en" ? `JavaScript sandbox ${problem.languageLimits?.javascript?.effectiveMemoryMb ?? Math.max(problem.memoryLimitMb, 128)} MB (Node.js runtime floor ${problem.languageLimits?.javascript?.runtimeMemoryFloorMb ?? 128} MB; problem limit ${problem.memoryLimitMb} MB)` : `JavaScript 沙箱 ${problem.languageLimits?.javascript?.effectiveMemoryMb ?? Math.max(problem.memoryLimitMb, 128)} MB（Node.js 运行时最低 ${problem.languageLimits?.javascript?.runtimeMemoryFloorMb ?? 128} MB；题目设定 ${problem.memoryLimitMb} MB）` : `${problem.memoryLimitMb} MB`}</p><section className="mt-7 border-t border-border pt-5"><h2 className="mb-3 text-lg font-bold">{tx("示例","Examples")}</h2>{problem.samples.map((sample, index) => <div key={index} className="mb-3 border border-border"><div className="bg-surface-subtle px-3 py-2 text-xs font-semibold text-muted-foreground">{tx("示例","Example")} {index + 1}</div><div className="grid grid-cols-2 divide-x divide-border"><div className="min-w-0 p-3"><span className="text-xs text-muted-foreground">{tx("输入","Input")}</span><pre className="mt-1 overflow-auto font-mono text-sm">{sample.input.replace(/(?:\r?\n)+$/, "")}</pre></div><div className="min-w-0 p-3"><span className="text-xs text-muted-foreground">{tx("返回值 / 输出","Return value / output")}</span><pre className="mt-1 overflow-auto font-mono text-sm">{sample.expected.replace(/(?:\r?\n)+$/, "")}</pre></div></div></div>)}</section></article></> : leftTab === "Translation" || leftTab === "Solution" ? adapter ? adapter.assistance?.(leftTab === "Translation" ? "FULL_TRANSLATION" : "FULL_SOLUTION") : <LuqAssistance key={leftTab} target={assistanceTarget} kind={leftTab === "Translation" ? "FULL_TRANSLATION" : "FULL_SOLUTION"}/> : <ProblemSubmissionsTable feed={submissions} allowLegacyDetails={!adapter} openInNewTab={settings.openResultsNewTab}/>}
+          {assignmentId && assignment.data?.grades?.find(grade => grade.identityId === user.identityId)?.problems.some(item => item.problemId === problem.id && item.completionSource === "other_entry") && <p className="mt-3 text-sm text-success">{tx("本题已在其他入口通过，已计入作业满分，无需重复提交。", "You passed this version elsewhere. Full assignment credit is recorded; no repeat submission is needed.")}</p>}{timedPracticeId && <StudentLuqRule activityType="timed" activityId={timedPracticeId}/>}<div className="mt-5"><LessonContent content={problem.statement}/></div>{problemWithHints.objective && <section className="mt-7 border-t border-border pt-5"><h2 className="mb-3 text-lg font-bold">{tx("学习目标","Learning objectives")}</h2><p>{problemWithHints.objective}</p></section>}{problem.mode === "stdio" ? <>{problemWithHints.inputDescription && <section className="mt-7 border-t border-border pt-5"><h2 className="mb-3 text-lg font-bold">{tx("输入","Input")}</h2><LessonContent content={problemWithHints.inputDescription}/></section>}{problemWithHints.outputDescription && <section className="mt-7 border-t border-border pt-5"><h2 className="mb-3 text-lg font-bold">{tx("输出","Output")}</h2><LessonContent content={problemWithHints.outputDescription}/></section>}</> : <section className="mt-7 border-t border-border pt-5"><h2 className="mb-3 text-lg font-bold">{tx("函数接口","Function interface")}</h2><code className="rounded bg-muted px-1.5 py-1 font-mono text-sm">{signature}</code>{language === "cpp" && <p className="mt-2 text-xs leading-5 text-muted-foreground">{tx("C++ 使用 ","C++ uses ")}<code>nlohmann::json</code>{tx("；","; ")}<code>args</code>{tx(" 是 JSON 参数数组，"," is a JSON argument array, ")}<code>kwargs</code>{tx(" 是命名参数对象，返回可序列化的 JSON 值。"," is an object of named arguments. Return a JSON-serializable value.")}</p>}{language === "javascript" && <p className="mt-2 text-xs leading-5 text-muted-foreground">{tx("JavaScript 按位置展开 JSON ","JavaScript expands JSON ")}<code>args</code>{tx("；非空 "," as positional arguments; nonempty ")}<code>kwargs</code>{tx(" 作为最后一个对象参数传入。"," is passed as the final object argument.")}</p>}<dl className="mt-3 grid grid-cols-[92px_1fr] gap-y-2 text-sm">{problemWithHints.parameters?.map((parameter, index) => <div key={index} className="contents"><dt className="font-semibold">{tx("参数","Parameter")}</dt><dd>{typeof parameter === "string" ? parameter : `${parameter.name} — ${parameter.type}${parameter.description ? ` · ${parameter.description}` : ""}`}</dd></div>)}{problemWithHints.returnType && <><dt className="font-semibold">{tx("返回值","Return value")}</dt><dd>{problemWithHints.returnType}</dd></>}</dl></section>}<p className="mt-5 text-xs text-muted-foreground">{problem.timeLimitMs} ms / test · {language === "javascript" ? locale === "en" ? `JavaScript sandbox ${problem.languageLimits?.javascript?.effectiveMemoryMb ?? Math.max(problem.memoryLimitMb, 128)} MB (Node.js runtime floor ${problem.languageLimits?.javascript?.runtimeMemoryFloorMb ?? 128} MB; problem limit ${problem.memoryLimitMb} MB)` : `JavaScript 沙箱 ${problem.languageLimits?.javascript?.effectiveMemoryMb ?? Math.max(problem.memoryLimitMb, 128)} MB（Node.js 运行时最低 ${problem.languageLimits?.javascript?.runtimeMemoryFloorMb ?? 128} MB；题目设定 ${problem.memoryLimitMb} MB）` : `${problem.memoryLimitMb} MB`}</p><section className="mt-7 border-t border-border pt-5"><h2 className="mb-3 text-lg font-bold">{tx("示例","Examples")}</h2>{problem.samples.map((sample, index) => <div key={index} className="mb-3 border border-border"><div className="bg-surface-subtle px-3 py-2 text-xs font-semibold text-muted-foreground">{tx("示例","Example")} {index + 1}</div><div className="grid grid-cols-2 divide-x divide-border"><div className="min-w-0 p-3"><span className="text-xs text-muted-foreground">{tx("输入","Input")}</span><pre className="mt-1 overflow-auto font-mono text-sm">{sample.input.replace(/(?:\r?\n)+$/, "")}</pre></div><div className="min-w-0 p-3"><span className="text-xs text-muted-foreground">{tx("返回值 / 输出","Return value / output")}</span><pre className="mt-1 overflow-auto font-mono text-sm">{sample.expected.replace(/(?:\r?\n)+$/, "")}</pre></div></div></div>)}</section></article></> : statementTab === "Tutorial" && tutorial ? <ProblemTutorial tutorial={tutorial}/> : statementTab === "Translation" || statementTab === "Solution" ? adapter ? adapter.assistance?.(statementTab === "Translation" ? "FULL_TRANSLATION" : "FULL_SOLUTION") : <LuqAssistance key={statementTab} target={assistanceTarget} kind={statementTab === "Translation" ? "FULL_TRANSLATION" : "FULL_SOLUTION"}/> : <ProblemSubmissionsTable feed={submissions} allowLegacyDetails={!adapter} openInNewTab={settings.openResultsNewTab}/>}
         </div>
         {adapter ? adapter.presence : <OnlineStudents identityId={user.identityId}/>}
       </section>

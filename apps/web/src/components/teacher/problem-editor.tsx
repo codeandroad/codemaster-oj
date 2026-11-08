@@ -1,5 +1,7 @@
 "use client";
 
+import { ProblemTutorialEditor } from "./problem-tutorial-editor";
+
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useNavigationBlocker } from "@/components/navigation";
@@ -73,9 +75,10 @@ const tabs = [
   "测试数据",
   "判题设置",
   "解答与提示",
+  "教程",
   "版本与发布",
 ];
-const englishTabs: Record<string,string> = { "题面":"Statement", "接口与模板":"Interface and templates", "测试数据":"Test data", "判题设置":"Judge settings", "解答与提示":"Solution and hints", "版本与发布":"Versions and publication" };
+const englishTabs: Record<string,string> = { "题面":"Statement", "接口与模板":"Interface and templates", "测试数据":"Test data", "判题设置":"Judge settings", "解答与提示":"Solution and hints", "教程":"Tutorial", "版本与发布":"Versions and publication" };
 const blank: EditorProblem = {
   id: "new",
   title: "",
@@ -165,9 +168,12 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
       initial ?? { ...blank, bankId: search.get("bankId") ?? "" },
     ),
     [saved, setSaved] = useState<EditorProblem | null>(initial),
-    [tab, setTab] = useState(
-      search.get("tab") === "tests" ? "测试数据" : "题面",
-    ),
+    [requestedTab, setTab] = useState(() => {
+      if (search.get("tab") === "tests") return "测试数据";
+      if (search.get("tab") === "tutorial") return "教程";
+      return "题面";
+    }),
+    [tutorialVisited, setTutorialVisited] = useState(() => search.get("tab") === "tutorial"),
     [templateLanguage,setTemplateLanguage]=useState<SubmissionLanguage>("python"),
     [preview, setPreview] = useState(false),
     [manage, setManage] = useState(false),
@@ -179,6 +185,9 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
     [publish, setPublish] = useState(false),
     [impact, setImpact] = useState(false),
     action = useAction();
+  const showTutorial = !saved || saved.canManageTutorial === true;
+  const visibleTabs = showTutorial ? tabs : tabs.filter(item => item !== "教程");
+  const tab = visibleTabs.includes(requestedTab) ? requestedTab : "题面";
   const dirty =
       editableSnapshot(problem) !==
       editableSnapshot(
@@ -250,7 +259,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
     setProblem(result);
     if (!initial && navigate)
       router.replace(
-        `/teacher/problems/${result.id}/edit?returnTo=${encodeURIComponent(back)}`,
+        `/teacher/problems/${result.id}/edit?returnTo=${encodeURIComponent(back)}${tab === "教程" ? "&tab=tutorial" : ""}`,
       );
     return result;
   };
@@ -318,8 +327,12 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
       </div>
       {!saved?.id&&<p className="text-xs text-muted-foreground">{tr("整理分组时先保存题目草稿；没有分组可在弹窗中直接新建。", "Save the problem draft before organizing groups. You can create a group in the dialog.")}</p>}
       <State resource={groups}/>
-      <Tabs value={tr(tab, englishTabs[tab] ?? tab)} onChange={value => setTab(tabs.find(item => tr(item, englishTabs[item] ?? item) === value) ?? tabs[0]!)} items={tabs.map(item => tr(item, englishTabs[item] ?? item))} />
-      <section className={`${panel} ${styles.body}`} data-od-id="teacher-editor-tab-content"><fieldset disabled={!editable || action.busy}>
+      <Tabs value={tr(tab, englishTabs[tab] ?? tab)} onChange={value => {
+        const next = visibleTabs.find(item => tr(item, englishTabs[item] ?? item) === value) ?? "题面";
+        if (next === "教程") setTutorialVisited(true);
+        setTab(next);
+      }} items={visibleTabs.map(item => tr(item, englishTabs[item] ?? item))} />
+      <section className={`${panel} ${styles.body}`} hidden={tab === "教程"} data-od-id="teacher-editor-tab-content"><fieldset disabled={!editable || action.busy}>
         {tab === "题面" && (
           <div className="grid grid-cols-[minmax(0,1fr)_260px] gap-5 max-lg:grid-cols-1">
             <div className="space-y-4">
@@ -761,6 +774,11 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
           </div>
         )}
       </fieldset></section>
+      {showTutorial && tutorialVisited && <section className={`${panel} ${styles.body}`}
+        role="tabpanel" aria-label={tr("教程", "Tutorial")} hidden={tab !== "教程"}>
+        {saved ? <ProblemTutorialEditor key={saved.id} endpoint={`problems/${encodeURIComponent(saved.id)}/tutorial`} inline disabled={action.busy} /> :
+          <p className="text-sm text-muted-foreground">{tr("先保存题目草稿，即可在这里设置教程。", "Save the problem draft to set up its tutorial here.")}</p>}
+      </section>}
       {test && (
         <TestDrawer
           key={`${test.kind}-${test.index}`}

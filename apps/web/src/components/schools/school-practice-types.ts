@@ -32,6 +32,7 @@ export type Problem = {
   published: boolean;
   versionId: string | null;
   canManage: boolean;
+  canManageTutorial?: boolean;
   definition?: Definition;
   validation?: { id: string; state: string; status: string | null } | null;
   schoolName?: string;

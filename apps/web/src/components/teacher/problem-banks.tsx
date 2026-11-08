@@ -12,6 +12,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Archive,
   ArrowRight,
+  BookOpen,
   BookOpenCheck,
   CheckSquare2,
   FolderPlus,
@@ -484,18 +485,22 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                     <p className="mt-1 max-w-52 text-xs leading-5 text-muted-foreground">{reviewVisibilityLabel(problem, banks.data?.items.find((x) => x.id === problem.bankId)?.visibility, locale)}</p>
                   </td>
                   <td>
-                    <Link
-                      href={`/teacher/problems/${problem.id}/edit?returnTo=${encodeURIComponent(bankId ? `/teacher/problems/banks/${bankId}` : "/teacher/problems?tab=all")}`}
-                      className="inline-flex items-center gap-1 font-semibold text-primary"
-                    >
-                      {tr("编辑", "Edit")} <ArrowRight size={14} />
-                    </Link>
-                    <button
-                      className={`${link} ml-3`}
-                      onClick={() => openManage([problem.id])}
-                    >
-                      {tr("整理分组", "Organize groups")}
-                    </button>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <Link
+                        href={`/teacher/problems/${problem.id}/edit?returnTo=${encodeURIComponent(bankId ? `/teacher/problems/banks/${bankId}` : "/teacher/problems?tab=all")}`}
+                        className="inline-flex items-center gap-1 font-semibold text-primary"
+                      >
+                        {problem.canEdit === false ? tr("查看", "View") : tr("编辑", "Edit")} <ArrowRight size={14} />
+                      </Link>
+                      {problem.canManageTutorial && <Link className={buttonVariants({ size: "sm", variant: "ghost" })}
+                        href={`/teacher/problems/${problem.id}/edit?tab=tutorial&returnTo=${encodeURIComponent(bankId ? `/teacher/problems/banks/${bankId}` : "/teacher/problems?tab=all")}`}
+                        aria-label={tr(`编辑教程 · ${problem.title}`, `Edit tutorial for ${problem.title}`)}>
+                        <BookOpen size={15} aria-hidden="true" />{tr("编辑教程", "Edit tutorial")}
+                      </Link>}
+                      <button className={link} onClick={() => openManage([problem.id])}>
+                        {tr("整理分组", "Organize groups")}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

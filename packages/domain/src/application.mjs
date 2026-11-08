@@ -12,6 +12,7 @@ import {courseMetadataForUser} from './course-access.mjs';
 import { transaction } from './db.mjs';
 import { parseFunctionInput, parseJsonValue } from './function-input.mjs';
 import { handleLibrary, bankAccess, problemPermissions, restoreIdentityBindings, canReviewActivitySubmission, SCHOOL_BANK } from './library.mjs';
+import { canManageLegacyTutorial, schoolPublishedTutorialProblemSql } from './problem-tutorials.mjs';
 import { handleEducation } from './education.mjs';
 import { handleCommunity } from './community.mjs';
 import { notifyStudent } from './student-notifications.mjs';
@@ -168,6 +169,7 @@ export async function createDomainServices(pool,config) {
   const {p,v,owner,permissions}=await versionAccess(db,user,problemId,versionId);
   const presented=isStaff(user)?v:(await studentPublicStatementRows(db,[v]))[0];
   const result=problemShape(presented,{includeDisabledSamples:owner});result.publishedVersionId=owner?p.current_version_id:v.id;result.publishedTitle=owner?result.publishedTitle:v.title;result.bankId=p.bank_id;result.bankVisibility=(await db.query('SELECT visibility FROM problem_banks WHERE id=$1',[p.bank_id])).rows[0]?.visibility;result.canEdit=owner;result.canPublish=owner&&result.canPublish;
+  result.canManageTutorial=await canManageLegacyTutorial(db,user,p,owner);
   result.firstAcPoints=(await db.query('SELECT COALESCE((SELECT points FROM point_rewards WHERE problem_id=$1 AND assignment_id IS NULL),10) first_ac_points',[problemId])).rows[0].first_ac_points;
   if(owner){Object.assign(result,v.metadata||{});result.referenceCode=v.reference_code;result.tests=(await db.query('SELECT input,expected,weight,name,enabled FROM test_cases WHERE version_id=$1 ORDER BY position',[v.id])).rows.map(t=>({...t,weight:Number(t.weight)}));result.formalTestCount=result.tests.filter(t=>t.enabled).length;}else {
    // Student assistance is explicitly published and served only by the Luq
@@ -456,7 +458,8 @@ export async function createDomainServices(pool,config) {
       THEN pv.title ELSE v.title END published_title,
      CASE WHEN $2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit'))
       THEN pv.metadata->'difficulty' ELSE v.metadata->'difficulty' END published_difficulty,
-     ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission='edit')) can_edit
+     ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission='edit')) can_edit,
+     ($3 AND (${schoolPublishedTutorialProblemSql})) shared_tutorial
     FROM problems p JOIN problem_banks bank ON bank.id=p.bank_id
     LEFT JOIN bank_permissions bp ON bp.bank_id=bank.id AND bp.account_id=$1
     JOIN LATERAL (
@@ -493,6 +496,7 @@ export async function createDomainServices(pool,config) {
      ...problemShape(r,{includeDisabledSamples:!!r.can_edit}),
      ...(staffView?{publishedDifficulty:typeof r.published_difficulty==='string'?r.published_difficulty:null}:{}),
      bankId:r.bank_id,canEdit:!!r.can_edit,canPublish:!!r.can_edit&&r.validation_status==='AC'&&!r.published_at,
+     canManageTutorial:!!(r.can_edit||r.shared_tutorial),
      firstAcPoints:firstAcPoints.get(r.problem_id)??10,ownProgress:ownProgress.get(r.problem_id)||emptyOwnProgress(),
     }))});
    }

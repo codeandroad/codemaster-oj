@@ -4,6 +4,7 @@ import { AppLink as Link } from "@/components/navigation";
 import { BankRenameDialog } from "@/components/bank-rename-dialog";
 import { useState } from "react";
 import {
+  BookOpen,
   CheckSquare2,
   FilePlus2,
   FolderPlus,
@@ -381,13 +382,18 @@ export function TeacherBankDetail({ id }: { id: string }) {
                         <p className="mt-1 max-w-52 text-xs leading-5 text-muted-foreground">{reviewVisibilityLabel(p, bank?.visibility, locale)}</p>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                           <Link
                             className={link}
                             href={`/teacher/problems/${p.id}/edit?returnTo=${encodeURIComponent(`/teacher/problems/banks/${id}`)}`}
                           >
-                            {tr("编辑", "Edit")}
+                            {p.canEdit === false ? tr("查看", "View") : tr("编辑", "Edit")}
                           </Link>
+                          {p.canManageTutorial && <Link className={buttonVariants({ size: "sm", variant: "ghost" })}
+                            href={`/teacher/problems/${p.id}/edit?tab=tutorial&returnTo=${encodeURIComponent(`/teacher/problems/banks/${id}`)}`}
+                            aria-label={tr(`编辑教程 · ${p.title}`, `Edit tutorial for ${p.title}`)}>
+                            <BookOpen size={15} aria-hidden="true" />{tr("编辑教程", "Edit tutorial")}
+                          </Link>}
                           <button
                             className="text-muted-foreground"
                             title={tr("整理分组", "Organize groups")}

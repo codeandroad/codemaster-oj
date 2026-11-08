@@ -1,5 +1,6 @@
 "use client";
 
+import { ProblemTutorialEditor } from "@/components/teacher/problem-tutorial-editor";
 import { ProblemPublicationStatus } from "@/components/problem-publication-status";
 import { BankRenameDialog } from "@/components/bank-rename-dialog";
 import { useState } from "react";
@@ -210,17 +211,18 @@ function ManagedProblemList({ bank, onChanged }: { bank: ManagedBank; onChanged:
       <p className="font-semibold">{candidate.problem.title}</p><Feedback action={action} />
       <div className="mt-5 flex justify-end gap-2"><Button variant="secondary" onClick={() => setCandidate(null)}>{tr("取消", "Cancel")}</Button><Button disabled={action.busy} onClick={() => void updateProblem()}>{tr("确认", "Confirm")}</Button></div>
     </Modal>}
-    {detailId && <ManagedProblemDetail id={detailId} onClose={() => setDetailId(null)} />}
+    {detailId && <ManagedProblemDetail id={detailId} bankArchived={Boolean(bank.archivedAt)} onClose={() => setDetailId(null)} />}
   </section>;
 }
 
-function ManagedProblemDetail({ id, onClose }: { id: string; onClose: () => void }) {
+function ManagedProblemDetail({ id, bankArchived, onClose }: { id: string; bankArchived: boolean; onClose: () => void }) {
   const { locale } = useLocale();
   const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
   const detail = useData<ManagedProblemHistory>(`admin/problems/${encodeURIComponent(id)}`);
   return <Drawer title={detail.data?.versions[0]?.title ?? tr("题目详情", "Problem details")} eyebrow={tr("题目档案", "PROBLEM HISTORY")} onClose={onClose} wide>
     <Loading resource={detail}>{detail.data && <div className="space-y-4 text-sm">
       <p className="text-muted-foreground">{detail.data.bankName} · {detail.data.ownerName} · {detail.data.versions.length} {tr("个历史版本", "versions")}</p>
+      {!bankArchived && !detail.data.archivedAt && <ProblemTutorialEditor endpoint={`problems/${encodeURIComponent(id)}/tutorial`}/>}
       {detail.data.versions.map(version => <section key={version.id} className="rounded-md border border-border p-4">
         <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{version.title}{version.id === detail.data?.currentVersionId ? ` · ${tr("当前版本", "Current version")}` : ""}</h3><ProblemPublicationStatus problem={version} bankVisibility={detail.data?.bankVisibility}/></div>
         <p className="mt-2 whitespace-pre-wrap leading-6">{version.statement || tr("暂无题面", "No statement")}</p>

@@ -10,6 +10,8 @@ import { schoolProblemSubmissions } from './problem-submissions.mjs';
 import { publicProblemMetadata } from './problem-public-statements.mjs';
 import { handlePublicPracticeRecords } from './public-practice-records.mjs';
 import { publicPracticeLeaderboard } from './public-practice-leaderboard.mjs';
+import { customTutorial, saveTutorial, tutorialContext, tutorialSettings } from './problem-tutorials.mjs';
+import { loadSchoolCourse } from './school-courses.mjs';
 import {
  decideLegacyPublicProblem, handleLegacyPublicProblemRequest, legacyPublicProblemPresentation,
  listLegacyPublicProblemReviews, previewLegacyPublicProblem,
@@ -17,8 +19,27 @@ import {
 
 const reply=(body,status=200)=>({status,body});
 const canManage=(p,u,role)=>role==='school_admin'||role==='teacher'&&p.owner_account_id===u.id;
+const canManageTutorial=(p,u,role)=>!p.archived&&(canManage(p,u,role)||role==='teacher'&&p.published&&!!p.published_version_id);
 const scope=(db,id)=>db.query("SELECT set_config('campus.school_id',$1,true)",[id]);
 const revision=(body,row)=>{if(integer(body.expectedRevision,1,2147483646,'Revision')!==row.revision)fail(409,'REVISION_CONFLICT','This item has changed. Refresh before saving.');};
+
+async function schoolCourseTutorial(db,problem,user,role,url) {
+ const {courseId,chapterId}=tutorialContext(url);
+ const link={problemId:problem.id,versionId:problem.published_version_id};
+ const {rows}=await db.query(`SELECT c.id FROM school_courses c
+  JOIN school_course_publications p ON p.school_id=c.school_id AND p.course_id=c.id AND p.revision=c.published_revision
+  WHERE c.school_id=$1 AND c.published AND c.archived_at IS NULL AND p.chapters @> $2::jsonb
+  ORDER BY (c.id=$3) DESC NULLS LAST,c.id`,[problem.school_id,JSON.stringify([{problems:[link]}]),courseId]);
+ for(const {id} of rows){
+  let view;
+  try { ({view}=await loadSchoolCourse(db,problem.school_id,id,user,role,{publishedOnly:true})); }
+  catch(error){ if(error.code==='NOT_FOUND')continue; throw error; }
+  const eligible=view.chapters.filter(chapter=>chapter.body.trim()&&chapter.problems?.some(item=>item.problemId===link.problemId&&item.versionId===link.versionId));
+  const chapter=(id===courseId&&eligible.find(chapter=>chapter.id===chapterId))||eligible[0];
+  if(chapter)return {source:'course',courseTitle:view.title,title:chapter.title,body:chapter.body};
+ }
+ return null;
+}
 
 export function normalizeSchoolProblem(body){
  const mode=enumValue(body.mode??'stdio',['stdio','function'],'Mode');
@@ -61,7 +82,7 @@ async function shapeProblem(db,p,user,role,{detail=false,publicOnly=false,access
  [p.school_id,p.id,user.id,version?.id??null,accessContext,progressIdentity])).rows[0];
  const publication = !publicOnly && role === 'school_admin' && version && p.published && !p.archived
   ? await publicProblemStatus(db, p, version.id) : undefined;
- return {attempts:progress.attempts,solved:progress.solved===true,hasDraftChanges:!!version&&version.draft_revision!==p.revision,id:p.id,schoolId:p.school_id,bankId:p.bank_id,bankName:p.bank_name,title:def.title,revision:p.revision,published:p.published,versionId:version?.id??null,canManage:manage,validation:validation??null,...publication,...(detail?{definition:manage?draftDefinition(def):publicDefinition({...def,statement:p.public_statement??def.statement,metadata:p.public_metadata??def.metadata,tags:p.public_tags??def.tags})}:{})};
+ return {attempts:progress.attempts,solved:progress.solved===true,hasDraftChanges:!!version&&version.draft_revision!==p.revision,id:p.id,schoolId:p.school_id,bankId:p.bank_id,bankName:p.bank_name,title:def.title,revision:p.revision,published:p.published,versionId:version?.id??null,canManage:manage,canManageTutorial:!publicOnly&&canManageTutorial(p,user,role),validation:validation??null,...publication,...(detail?{definition:manage?draftDefinition(def):publicDefinition({...def,statement:p.public_statement??def.statement,metadata:p.public_metadata??def.metadata,tags:p.public_tags??def.tags})}:{})};
 }
 async function publicProblemStatus(db, problem, versionId) {
  const { rows: [state] } = await db.query(`
@@ -224,7 +245,7 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
    await db.query('INSERT INTO platform_audit_events(actor_account_id,action,school_id,detail) VALUES($1,$2,$3,$4)',[user.id,'problem.'+decision,schoolId,JSON.stringify({problemId,versionId})]);return reply({ok:true});
   }return null;
  });
- const m=route.match(/^\/schools\/([^/]+)\/(problem-banks|problems|judge-status|judge-jobs|submissions)(?:\/([^/]+)(?:\/(validate|publish|unpublish|submissions|public-request))?)?$/);
+ const m=route.match(/^\/schools\/([^/]+)\/(problem-banks|problems|judge-status|judge-jobs|submissions)(?:\/([^/]+)(?:\/(validate|publish|unpublish|submissions|public-request|tutorial))?)?$/);
  if(!m)return null;const schoolId=uuid(m[1]);if(schoolId===LEGACY_SCHOOL_ID)fail(404,'NOT_FOUND','Use the existing school workspace.');
  return transaction(pool,async db=>{
   await lockSchoolTeaching(db,schoolId,{shared:method==='GET'});const role=await schoolRole(db,schoolId,user.id);await scope(db,schoolId);const id=m[3]?uuid(m[3]):null;
@@ -248,9 +269,20 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
    if(method==='PATCH'&&id){const bank=(await db.query('SELECT * FROM school_problem_banks WHERE school_id=$1 AND id=$2 FOR UPDATE',[schoolId,id])).rows[0];if(!bank||!canManage(bank,user,role))fail(404,'NOT_FOUND','Bank unavailable.');revision(body,bank);const name=field(body.name??bank.name,'Bank name',{max:120});const archived=body.archived??bank.archived;if(typeof archived!=='boolean')fail(400,'VALIDATION','Invalid archive flag.');await db.query('UPDATE school_problem_banks SET name=$3,archived=$4,revision=revision+1 WHERE school_id=$1 AND id=$2',[schoolId,id,name,archived]);await auditSchool(db,schoolId,user.id,'school.bank.update',id);return reply({id,name,archived,revision:bank.revision+1});}return null;
   }
   if(m[2]!=='problems')return null;
-  if(method==='GET'&&!id){const bankId=url.searchParams.get('bankId');if(bankId)uuid(bankId);const rows=(await db.query(`SELECT p.*,b.name AS bank_name FROM school_problems p JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id WHERE p.school_id=$1 AND ($4::uuid IS NULL OR p.bank_id=$4) AND ($3='school_admin' OR p.owner_account_id=$2 AND $3='teacher' OR p.published AND NOT b.archived) ORDER BY p.created_at,p.id LIMIT 500`,[schoolId,user.id,role,bankId])).rows;const items=[];for(const p of rows)items.push(await shapeProblem(db,p,user,role));return reply({items});}
+  if(method==='GET'&&!id){const bankId=url.searchParams.get('bankId');if(bankId)uuid(bankId);const rows=(await db.query(`SELECT p.*,b.name AS bank_name,b.archived FROM school_problems p JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id WHERE p.school_id=$1 AND ($4::uuid IS NULL OR p.bank_id=$4) AND ($3='school_admin' OR p.owner_account_id=$2 AND $3='teacher' OR p.published AND NOT b.archived) ORDER BY p.created_at,p.id LIMIT 500`,[schoolId,user.id,role,bankId])).rows;const items=[];for(const p of rows)items.push(await shapeProblem(db,p,user,role));return reply({items});}
   if(method==='POST'&&!id){if(!['teacher','school_admin'].includes(role))fail(403,'FORBIDDEN','Teaching role required.');const bankId=uuid(body.bankId),bank=(await db.query('SELECT * FROM school_problem_banks WHERE school_id=$1 AND id=$2',[schoolId,bankId])).rows[0];if(!bank||bank.archived||!canManage(bank,user,role))fail(404,'NOT_FOUND','Bank unavailable.');const requestId=uuid(body.requestId),old=(await db.query('SELECT * FROM school_problems WHERE school_id=$1 AND owner_account_id=$2 AND request_id=$3',[schoolId,user.id,requestId])).rows[0];const definition=normalizeSchoolProblem(body);if(old){if(old.bank_id!==bankId||canonicalHash(draftDefinition(old.draft))!==canonicalHash(draftDefinition(definition)))fail(409,'REQUEST_CONFLICT','Request ID already used.');return reply(await shapeProblem(db,await loadProblem(db,schoolId,old.id,user,role),user,role,{detail:true}));}const p=(await db.query('INSERT INTO school_problems(school_id,bank_id,owner_account_id,draft,request_id) VALUES($1,$2,$3,$4,$5) RETURNING id',[schoolId,bankId,user.id,JSON.stringify(definition),requestId])).rows[0];await auditSchool(db,schoolId,user.id,'school.problem.create',p.id);return reply(await shapeProblem(db,await loadProblem(db,schoolId,p.id,user,role),user,role,{detail:true}),201);}
   if(!id)return null;const p=await loadProblem(db,schoolId,id,user,role);
+  if(m[4]==='tutorial'&&['GET','PATCH'].includes(method)){
+   if(method==='PATCH'||url.searchParams.get('manage')==='true'){
+    if(!canManageTutorial(p,user,role))fail(403,'FORBIDDEN','You cannot edit this problem’s tutorial.');
+    return reply(method==='GET'?tutorialSettings(p):await saveTutorial(db,p,body,
+     metadata=>auditSchool(db,schoolId,user.id,'school.problem.tutorial_update',p.id,metadata)));
+   }
+   await schoolActivityProblemAccess(db,{schoolId,problemId:p.id,user});
+   const requested=url.searchParams.get('versionId');
+   if(!p.published||p.archived||requested&&uuid(requested)!==p.published_version_id)return reply({tutorial:null});
+   return reply({tutorial:p.tutorial_mode==='course'?await schoolCourseTutorial(db,p,user,role,url):customTutorial(p)});
+  }
   if (method === 'POST' && m[4] === 'public-request') {
    if (role !== 'school_admin') fail(403,'FORBIDDEN','School administrator required.');
    if (!p.published || p.archived || uuid(body.versionId) !== p.published_version_id)

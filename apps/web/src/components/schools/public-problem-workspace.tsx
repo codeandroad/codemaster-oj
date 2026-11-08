@@ -15,7 +15,7 @@ import { ApiError, clearProductionSession, productionApi, type CampusUser } from
 import type { Problem } from "./school-practice-types";
 import { publicDraftStorage, publicPracticeHref, publicPracticeReturnHref, publicWorkspaceProblem } from "./public-workspace-model";
 
-type PublicChapter = {id:string;title:string;position?:number;problems:{problemId:string;versionId:string;title:string;solved:boolean}[]};
+type PublicChapter = {id:string;title:string;body:string;position?:number;problems:{problemId:string;versionId:string;title:string;solved:boolean}[]};
 type PublicCourse = {title:string;chapters:PublicChapter[]};
 const normalizeJob = (result: DetailedSubmission) => ({...result, testResults: (result as DetailedSubmission & {caseFeedback?:ResultCase[]}).caseFeedback ?? []});
 const unavailableStorage = {getItem: () => null, setItem: () => { throw new Error("Storage unavailable"); }};
@@ -50,6 +50,7 @@ function PublicWorkspace({user, problem, catalog}:{user:CampusUser;problem:Probl
         description: validChapter ? `${course.data?.title} › ${chapter?.title}` : undefined,
       },
       chapter: validChapter ? {courseTitle:course.data!.title,title:chapter!.title,position:chapter!.position??course.data!.chapters.indexOf(chapter!),completed:chapter!.problems.find(item=>item.problemId===problem.id)!.solved} : undefined,
+      tutorial: validChapter && chapter?.body.trim() ? {source:"course",courseTitle:course.data!.title,title:chapter.title,body:chapter.body} : undefined,
       submissionsPath: `${path}/submissions?${new URLSearchParams({versionId:problem.versionId!})}`,
       submit: ({kind,code,language,customInput,requestId})=>productionApi(`${path}/submissions`, {method:"POST",body:{kind,code,language,input:customInput,requestId,versionId:problem.versionId}}),
       submissionPath: id=>`${path}/submissions/${encodeURIComponent(id)}`, normalizeSubmission:normalizeJob,

@@ -2,6 +2,7 @@ import {moveGroupMembers} from './group-move.mjs';
 import { assertJudgeAdmission } from './system.mjs';
 import { transaction } from './db.mjs';
 import { fail, field, uuid, enumValue, canonicalHash } from './security.mjs';
+import { handleProblemTutorial } from './problem-tutorials.mjs';
 import { legacyProblemStatement } from './problem-statement-display.mjs';
 
 export async function canReviewActivitySubmission(db,user,submission,{readOnly=false}={}){
@@ -85,6 +86,8 @@ export async function restoreIdentityBindings(db,identityId,newAccountId,{restor
 }
 
 export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
+ const tutorial=await handleProblemTutorial({pool,user,route,method,body,url,helpers});
+ if(tutorial)return tutorial;
  const {audit,versionAccess,submissionAccess}=helpers;
  const result=body=>({status:200,body});
  const bankShape=a=>({id:a.bank.id,name:a.bank.name,description:a.bank.description,course:a.bank.course,updatedAt:a.bank.updated_at,createdAt:a.bank.created_at,archivedAt:a.bank.archived_at,problemCount:a.bank.problemCount??0,archivedProblemCount:a.bank.archivedProblemCount??0,visibility:a.bank.visibility,permission:a.permission,canEdit:a.canEdit,canContribute:a.canContribute,isSystem:a.bank.is_system});

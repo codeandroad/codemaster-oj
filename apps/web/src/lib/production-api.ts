@@ -78,6 +78,7 @@ export interface ProductionProblem {
   returnType?: string;
   source?: string;
   canEdit?: boolean;
+  canManageTutorial?: boolean;
   firstAcPoints?: number;
   bankVisibility?: "school" | "private";
   schoolVisibleAt?: string | null;

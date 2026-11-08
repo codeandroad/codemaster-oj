@@ -17,7 +17,29 @@ export const input = "h-10 min-w-0 w-full rounded-md border border-input bg-back
 export const textarea = "w-full rounded-md border border-input bg-background p-3 text-sm outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/30";
 export const date = (value?: string | null, locale:AppLocale="en") => value ? new Intl.DateTimeFormat(locale==="en"?"en-US":"zh-CN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Shanghai" }).format(new Date(value)) : "—";
 export const shortId = (value: string) => value.startsWith("SUB") ? value : value.slice(0, 8);
-export function useData<T>(path: string) {
+export function useRefreshOnReturn() {
+  const [version, setVersion] = useState(0);
+  const refresh = useCallback(() => setVersion(current => current + 1), []);
+  useEffect(() => {
+    let frame = 0;
+    const schedule = () => {
+      if (frame || document.visibilityState !== "visible") return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        refresh();
+      });
+    };
+    window.addEventListener("focus", schedule);
+    document.addEventListener("visibilitychange", schedule);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("focus", schedule);
+      document.removeEventListener("visibilitychange", schedule);
+    };
+  }, [refresh]);
+  return { version, refresh };
+}
+export function useData<T>(path: string, refreshVersion = 0) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(Boolean(path));
   const [error, setError] = useState("");
@@ -29,7 +51,7 @@ export function useData<T>(path: string) {
     setLoading(true); setError("");
     productionApi<T>(path, { signal: controller.signal }).then(next => { if (!controller.signal.aborted) setData(next); }).catch(reason => { if (!controller.signal.aborted) setError(apiMessage(reason)); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [path, revision]);
+  }, [path, revision, refreshVersion]);
   return { data, loading, error, reload };
 }
 export function useMutation() {

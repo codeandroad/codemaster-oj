@@ -386,10 +386,6 @@
   font-size: 15px;
   font-weight: 650;
 }
-.tableHeading > span {
-  font-size: 12px;
-  color: var(--muted-foreground);
-}
 .tableScroll {
   max-width: 100%;
   overflow-x: auto;

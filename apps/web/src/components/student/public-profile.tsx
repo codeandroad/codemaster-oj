@@ -9,7 +9,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { useLocale, type AppLocale } from "@/components/locale-context";
 import { productionApi, type CampusRole, type CampusUser } from "@/lib/production-api";
-import { Feedback, State, date, panel, textarea, useData, useMutation } from "./shared";
+import { Feedback, State, date, panel, textarea, useData, useMutation, useRefreshOnReturn } from "./shared";
 
 interface PublicProfile {
   id: string;
@@ -80,10 +80,11 @@ function Pagination({ page, total, onChange, label, locale }: { page: number; to
 export function StudentPublicProfile({ identityId, viewer, embedded = false, workspace = "student" }: { identityId: string; viewer: CampusUser; embedded?: boolean; workspace?: CampusRole }) {
   const { locale } = useLocale();
   const base = `profiles/${encodeURIComponent(identityId)}`;
-  const profile = useData<{ profile: PublicProfile }>(base);
+  const { version, refresh } = useRefreshOnReturn();
+  const profile = useData<{ profile: PublicProfile }>(base, version);
   const [activityPage, setActivityPage] = useState(1);
   const [messagePage, setMessagePage] = useState(1);
-  const activity = useData<Page<ProfileActivity>>(`${base}/activity?page=${activityPage}&pageSize=${pageSize}`);
+  const activity = useData<Page<ProfileActivity>>(`${base}/activity?page=${activityPage}&pageSize=${pageSize}`, version);
   const messages = useData<Page<GuestbookMessage>>(`${base}/messages?page=${messagePage}&pageSize=${pageSize}`);
   const [draft, setDraft] = useState("");
   const [selected, setSelected] = useState<GuestbookMessage | null>(null);
@@ -115,7 +116,7 @@ export function StudentPublicProfile({ identityId, viewer, embedded = false, wor
 
     {person && <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
       <section className={`${panel} min-w-0`} aria-labelledby="profile-activity-heading">
-        <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><Award size={18} className="text-primary"/><h3 id="profile-activity-heading" className="font-bold">{ui(locale, "解题动态", "Solving activity")}</h3></div><Button size="sm" variant="ghost" disabled={activity.loading} onClick={activity.reload}>{ui(locale, "刷新", "Refresh")}</Button></div>
+        <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><Award size={18} className="text-primary"/><h3 id="profile-activity-heading" className="font-bold">{ui(locale, "解题动态", "Solving activity")}</h3></div><Button size="sm" variant="ghost" disabled={profile.loading || activity.loading} onClick={refresh}>{ui(locale, "刷新", "Refresh")}</Button></div>
         <p className="mt-1 text-xs leading-5 text-muted-foreground">{ui(locale, "每道题首次 AC 后显示一条动态；未公布的限时训练成绩不会提前展示，非公开题目动态仅本人可见。", "A first AC creates one activity entry per problem. Unreleased timed-practice results stay hidden; private-problem activity is visible only to you.")}</p>
         <State data={activity}>
           {activity.data?.items.length ? <ol className="mt-4 space-y-3">{activity.data.items.map(item => <li key={item.id} className="relative border-l-2 border-primary/25 py-1 pl-4">

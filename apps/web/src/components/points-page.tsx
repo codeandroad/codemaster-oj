@@ -19,7 +19,7 @@ import {
   type CampusUser,
   type ProductionProblem,
 } from "@/lib/production-api";
-import { State, useData } from "./student/shared";
+import { State, useData, useRefreshOnReturn } from "./student/shared";
 
 interface RankedStudent {
   id: string;
@@ -158,7 +158,7 @@ function LeaderboardRow({ person, current, pinned = false, visibleFields, worksp
 }
 
 function LeaderboardTable({
-  user, classId, classes, onClassChange, configuredFields, canManage, staff, workspace, onSettingsUpdated,
+  user, classId, classes, onClassChange, configuredFields, canManage, staff, workspace, onSettingsUpdated, refreshVersion, refresh, refreshingPoints,
 }: {
   user: CampusUser;
   classId: string;
@@ -169,6 +169,9 @@ function LeaderboardTable({
   staff: boolean;
   workspace: CampusRole;
   onSettingsUpdated: () => void;
+  refreshVersion: number;
+  refresh: () => void;
+  refreshingPoints: boolean;
 }) {
   const { locale } = useLocale();
   const [period, setPeriod] = useState<RankingPeriod>("all");
@@ -190,8 +193,8 @@ function LeaderboardTable({
   const [showRules, setShowRules] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const pageSize = 10;
-  const ranking = useData<LeaderboardResponse>(`points/leaderboard?${new URLSearchParams({ ...(classId ? { classId } : {}), period, page: String(page), pageSize: String(pageSize) })}`);
-  const leaders = useData<LeaderboardResponse>(`points/leaderboard?${new URLSearchParams({ ...(classId ? { classId } : {}), period, page: "1", pageSize: "3" })}`);
+  const ranking = useData<LeaderboardResponse>(`points/leaderboard?${new URLSearchParams({ ...(classId ? { classId } : {}), period, page: String(page), pageSize: String(pageSize) })}`, refreshVersion);
+  const leaders = useData<LeaderboardResponse>(`points/leaderboard?${new URLSearchParams({ ...(classId ? { classId } : {}), period, page: "1", pageSize: "3" })}`, refreshVersion);
   const total = ranking.data?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const start = total ? (page - 1) * pageSize + 1 : 0;
@@ -320,7 +323,10 @@ function LeaderboardTable({
       <section className={styles.rankingsPanel} aria-labelledby="leaderboard-list-heading">
         <div className={styles.tableHeading}>
           <h2 id="leaderboard-list-heading">{ui(locale, "全部排名", "All rankings")}</h2>
-          <span>{ui(locale, `${rankNumber.format(total)} 名学生`, `${rankNumber.format(total)} students`)}</span>
+          <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span>{ui(locale, `${rankNumber.format(total)} 名学生`, `${rankNumber.format(total)} students`)}</span>
+            <Button type="button" size="sm" variant="ghost" disabled={ranking.loading || leaders.loading || refreshingPoints} onClick={refresh}>{ui(locale, "刷新", "Refresh")}</Button>
+          </div>
         </div>
         <State data={ranking}>
           {ranking.loading ? (
@@ -334,7 +340,7 @@ function LeaderboardTable({
                       <th scope="col" className={styles.rankCell}>{ui(locale, "排名", "Rank")}</th>
                       <th scope="col" className={styles.studentCell}>{ui(locale, "学生", "Student")}</th>
                       <th scope="col" className={styles.numberCell}>{ui(locale, "积分", "Points")}</th>
-                      {visibleFields.solvedProblems && <th scope="col" className={styles.numberCell}>{fieldName(locale, "solvedProblems")}</th>}
+                      {visibleFields.solvedProblems && <th scope="col" className={styles.numberCell}><abbr title={ui(locale, "仅统计所选时间范围内计入排行榜的解题记录。", "Counts only solves that earned leaderboard credit in the selected period.")}>{fieldName(locale, "solvedProblems")}<CircleHelp size={12} aria-hidden="true" /></abbr></th>}
                       {visibleFields.attempts && <th scope="col" className={styles.numberCell}>{fieldName(locale, "attempts")}</th>}
                       {visibleFields.acRate && <th scope="col" className={styles.numberCell}>
                         <abbr title={ui(locale, "纳入统计的 AC 数 ÷ 有效判题数。普通练习和作业计至同一版本首次有效 AC，限时训练和 Paper 4 按正式提交统计。", "Accepted results ÷ valid results included in the rate. Practice and assignments count through the first valid AC per version. Timed practice and Paper 4 count formal submissions.")}>{fieldName(locale, "acRate")}<CircleHelp size={12} aria-hidden="true" /></abbr>
@@ -377,8 +383,11 @@ function LeaderboardTable({
   );
 }
 
-function Leaderboard({ user, staff, workspace, personalPoints }: { user: CampusUser; staff: boolean; workspace: CampusRole; personalPoints?: { points: number; rankPoints: number } | null }) {
+function Leaderboard({ user, staff, workspace }: { user: CampusUser; staff: boolean; workspace: CampusRole }) {
   const { locale } = useLocale();
+  const { version, refresh } = useRefreshOnReturn();
+  const me = useData<{ points: number; rankPoints: number }>(staff ? "" : "points/me", version);
+  const personalPoints = me.data;
   const contexts = useData<LeaderboardContextsResponse>("points/leaderboard/contexts");
   const searchParams = useSearchParams();
   const requestedClassId = searchParams.get("classId");
@@ -406,7 +415,7 @@ function Leaderboard({ user, staff, workspace, personalPoints }: { user: CampusU
       </div>}
       <State data={contexts}>
         {contexts.data && (
-          <LeaderboardTable user={user} classId={effectiveClassId} classes={classes} onClassChange={selectClass} configuredFields={contexts.data.visibleFields} canManage={workspace === "admin" && contexts.data.canManage} staff={staff} workspace={workspace} onSettingsUpdated={contexts.reload} />
+          <LeaderboardTable user={user} classId={effectiveClassId} classes={classes} onClassChange={selectClass} configuredFields={contexts.data.visibleFields} canManage={workspace === "admin" && contexts.data.canManage} staff={staff} workspace={workspace} onSettingsUpdated={contexts.reload} refreshVersion={version} refresh={refresh} refreshingPoints={me.loading} />
         )}
       </State>
     </section>
@@ -423,7 +432,6 @@ function assignmentProblemHref(assignmentId: string, problem: Assignment["proble
 
 export function PointsPage({ user, student = true, workspace = "student" }: { user: CampusUser; student?: boolean; workspace?: CampusRole }) {
   const { locale } = useLocale();
-  const me = useData<{ points: number; rankPoints: number }>(student ? "points/me" : "");
   const staff = !student && (workspace === "teacher" || workspace === "admin") && user.roles.some((role) => role === "teacher" || role === "admin");
   const admin = workspace === "admin" && user.roles.includes("admin");
   const problems = useData<{ items: ProductionProblem[] }>(admin ? "problems" : "");
@@ -438,7 +446,7 @@ export function PointsPage({ user, student = true, workspace = "student" }: { us
 
   return (
     <>
-      <Leaderboard user={user} staff={!student} workspace={workspace} personalPoints={student ? me.data : undefined} />
+      <Leaderboard user={user} staff={!student} workspace={workspace} />
       {staff && (
         <section className="mt-6 rounded border border-border bg-surface p-5">
           <h2 className="font-semibold">{ui(locale, "作业额外奖励", "Assignment bonuses")}</h2>

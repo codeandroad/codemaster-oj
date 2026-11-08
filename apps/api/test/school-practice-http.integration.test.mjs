@@ -78,18 +78,18 @@ test('school and public practice Nest transport requires scoped membership, CSRF
   assert.equal((await request(`${prefix}/submissions`,{auth:auth.admin})).data.items.length,0);
   const beta=await provisionSchool(pool,{slug:'http-other-school',name:'Other school',adminUsername:'platform'});
   await request(`/schools/${beta.id}/submissions`,{auth:auth.student,status:404});
-  // The new personal detail screen reuses this endpoint. Only the owner in the
-  // same school may receive code, and formal feedback must redact private data.
-  const completed={status:'WA',score:0,passed:0,total:1,publicMessage:'',privateResults:[{position:1,status:'WA',cpuMs:3,memoryBytes:2048,input:'HIDDEN_INPUT',expected:'HIDDEN_EXPECTED',stdout:'HIDDEN_STDOUT',stderr:'TEACHER_PRIVATE_NOTE'}]};
-  await processSchoolOne({pool:worker,judge:{judge:async()=>completed}});
-  await processSchoolOne({pool:worker,judge:{judge:async()=>completed}});
+  const mismatch={judge:async task=>({status:'WA',score:0,passed:0,total:1,publicMessage:'',privateResults:[{position:1,status:'WA',testId:task.tests[0].id,cpuMs:3,memoryBytes:2048,input:'SPOOFED_INPUT',expected:'SPOOFED_EXPECTED',returned:'0',stdout:'PRIVATE_STDOUT',stderr:'TEACHER_PRIVATE_NOTE'}]})};
+  await processSchoolOne({pool:worker,judge:mismatch});
+  await processSchoolOne({pool:worker,judge:mismatch});
   const detail=await request(`${prefix}/judge-jobs/${formal.id}`,{auth:auth.student});
   assert.equal(detail.data.id,formal.id);assert.equal(detail.data.status,'WA');
   assert.deepEqual([detail.data.versionId,detail.data.runtimeMs,detail.data.memoryKb],[published.versionId,3,2]);
   assert.match(detail.data.code,/private student code/);
-  assert.deepEqual(detail.data.caseFeedback,[{position:1,status:'WA',timeMs:3,memoryKb:2}]);
+  const [failed]=detail.data.caseFeedback;
+  assert.deepEqual([failed.position,failed.status,failed.timeMs,failed.memoryKb],[1,'WA',3,2]);
+  assert.deepEqual([failed.input,failed.output,failed.expected],['[937]','0','1874']);
   assert.match(detail.headers.get('cache-control')??'',/no-store/);
-  for(const secret of ['HIDDEN_INPUT','HIDDEN_EXPECTED','HIDDEN_STDOUT','TEACHER_PRIVATE_NOTE','"1874"'])assert.ok(!JSON.stringify(detail.data).includes(secret));
+  assert.doesNotMatch(JSON.stringify(detail.data),/SPOOFED_|PRIVATE_STDOUT|TEACHER_PRIVATE_NOTE/);
   for(const viewer of ['teacher','admin','platform','personal'])await request(`${prefix}/judge-jobs/${formal.id}`,{auth:auth[viewer],status:404});
   for(const [viewer,attempts] of [['personal',1],['student',0]]){
    const {items:[row]}=(await request('/practice/problems?page=1&q=Double',{auth:auth[viewer]})).data;
@@ -99,6 +99,10 @@ test('school and public practice Nest transport requires scoped membership, CSRF
   await request('/practice/submissions',{status:401});
   assert.deepEqual((await request('/practice/submissions',{auth:auth.personal})).data.items.map(job=>job.id),[publicRun.id]);
   assert.equal((await request('/practice/submissions',{auth:auth.student})).data.items.length,0);
+  for(const path of [publicDetail,`/practice/problems/${problem.id}/submissions/${publicRun.id}`]){
+   const {data}=await request(path,{auth:auth.personal});
+   assert.deepEqual(data.caseFeedback,detail.data.caseFeedback);
+  }
   await request(`/practice/submissions/${school.id}/${formal.id}`,{auth:auth.student,status:404});
   await request(publicDetail,{auth:auth.student,status:404});
   await request(`${publicDetail}/note`,{auth:auth.student,method:'PATCH',body:{note:'Unauthorized'},status:404});
@@ -177,8 +181,8 @@ test('school and public practice Nest transport requires scoped membership, CSRF
   assert.deepEqual((await request('/practice/problems?page=1&q=Double',{auth:auth.personal})).data.items,[]);
   const archivedPublicRecord = (await request(publicDetail,{auth:auth.personal})).data;
   assert.equal(archivedPublicRecord.note,'Check the return type');
-  for(const secret of ['HIDDEN_INPUT','HIDDEN_EXPECTED','HIDDEN_STDOUT','TEACHER_PRIVATE_NOTE','"1874"'])
-   assert.ok(!JSON.stringify(archivedPublicRecord).includes(secret));
+  assert.deepEqual(archivedPublicRecord.caseFeedback,detail.data.caseFeedback);
+  assert.doesNotMatch(JSON.stringify(archivedPublicRecord),/SPOOFED_|PRIVATE_STDOUT|TEACHER_PRIVATE_NOTE/);
   await request(`${prefix}/judge-jobs/${formal.id}`,{status:401});
   await pool.query("INSERT INTO school_memberships(school_id,account_id,role) VALUES($1,$2,'student')",[beta.id,users.student.id]);
   await request(`/schools/${beta.id}/judge-jobs/${formal.id}`,{auth:auth.student,status:404});
@@ -244,8 +248,10 @@ test('school and public practice Nest transport requires scoped membership, CSRF
      const response=await request(`/practice/problems/${p.id}/submissions/${job.id}`,{auth:auth.personal});
      assert.equal(response.data.state,'completed');assert.equal(response.data.versionId,published.versionId);
      assert.match(response.headers.get('cache-control')??'',/no-store/);
-     assert.ok(!JSON.stringify(response.data).includes(fixture.hidden));
-     assert.ok(!JSON.stringify(response.data).includes(fixture.expected));
+     if(response.data.status!=='WA'){
+      assert.ok(!JSON.stringify(response.data).includes(fixture.hidden));
+      assert.ok(!JSON.stringify(response.data).includes(fixture.expected));
+     }
      return response.data;
     };
     const samples=await run('samples',fixture.code);
@@ -256,6 +262,11 @@ test('school and public practice Nest transport requires scoped membership, CSRF
     assert.equal(custom.caseFeedback[0].expected,undefined);assert.match(custom.caseFeedback[0].output,/22/);
     const runtimeError=await run('samples',`${fixture.mode==='function'?'def solve(data):\n    ':''}raise ValueError("public diagnostic fixture")`);
     assert.equal(runtimeError.status,'RE');assert.match(runtimeError.caseFeedback[0].stderr,/ValueError/);
+    const mismatch=await run('submit',fixture.mode==='function'?'def solve(data): return 0':'print(0)');
+    assert.equal(mismatch.status,'WA');
+    assert.equal(mismatch.caseFeedback[0].input,fixture.hidden);
+    assert.equal(mismatch.caseFeedback[0].expected,fixture.expected);
+    assert.equal(mismatch.caseFeedback[0].output.trim(),'0');
     const formal=await run('submit',fixture.code);
     assert.equal(formal.status,'AC');assert.equal(formal.score,100);assert.equal(formal.caseFeedback[0].input,undefined);
     assert.equal(formal.caseFeedback[0].expected,undefined);assert.equal(formal.caseFeedback[0].output,undefined);
@@ -264,7 +275,7 @@ test('school and public practice Nest transport requires scoped membership, CSRF
     assert.equal(latest.id,formal.id);
     assert.deepEqual([latest.runtimeMs,latest.memoryKb],[formal.runtimeMs,formal.memoryKb]);
     const progress=(await request(`/practice/problems/${p.id}`,{auth:auth.personal})).data;
-    assert.equal(progress.solved,true);assert.equal(progress.attempts,1);
+    assert.equal(progress.solved,true);assert.equal(progress.attempts,2);
     assert.equal((await request(`/practice/problems/${p.id}`,{auth:auth.student})).data.solved,false);
    }
   });

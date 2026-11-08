@@ -17,6 +17,7 @@ export interface ResultCase {
 }
 export interface CodeLocation { line: number; column?: number; file: string }
 export interface DiffPart { text: string; changed: boolean }
+export const MAX_CUSTOM_INPUT_LENGTH = 262144;
 
 export function defaultResultCase(cases: ResultCase[], status?: string) {
   if (status === "RE") {

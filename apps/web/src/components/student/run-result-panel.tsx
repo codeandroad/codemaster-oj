@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { isPending, type SubmissionLanguage } from "@/lib/production-api";
 import type { DetailedSubmission } from "./shared";
 import { submissionMeasurement } from "./problem-submissions-model";
-import { codeLocationOffset, defaultResultCase, outputDifference, readableDiagnostic, type CodeLocation, type DiffPart } from "./result-feedback";
+import { codeLocationOffset, defaultResultCase, MAX_CUSTOM_INPUT_LENGTH, outputDifference, readableDiagnostic, type CodeLocation, type DiffPart } from "./result-feedback";
 import styles from "./run-result-panel.module.css";
 
 const titles: Record<string, [string, string]> = {
@@ -17,7 +17,7 @@ const titles: Record<string, [string, string]> = {
   "System Error": ["评测服务异常", "Judge Unavailable"], NotRun: ["尚未运行", "Not Run"], Submitted: ["已提交", "Submitted"],
 };
 const hints: Record<string, [string, string]> = {
-  WA: ["程序已运行，但结果与预期不一致。请检查失败用例。", "Your program ran, but its result does not match the expected answer. Check the failed case."],
+  WA: ["程序输出与预期结果不一致。", "Your output does not match the expected result."],
   RE: ["程序在运行过程中发生异常。请检查错误信息和对应代码。", "Your program stopped with an exception. Check the error and the corresponding code."],
   CE: ["代码未通过编译或函数接口检查，请检查语法、函数名称和参数。", "Compilation or function interface checks failed. Check syntax, the function name and parameters."],
   TLE: ["程序未在时间限制内完成，请检查循环终止条件和算法复杂度。", "The program did not finish in time. Check loop termination and algorithm complexity."],
@@ -27,7 +27,7 @@ const hints: Record<string, [string, string]> = {
   "System Error": ["评测服务暂不可用，这不是零分。请稍后刷新结果。", "The judge is temporarily unavailable. This is not a zero score. Refresh the result later."],
 };
 
-type Props = { result: DetailedSubmission | null; error: string; reload: () => void; loading?: boolean; currentCode?: string; currentLanguage?: SubmissionLanguage; onLocate?: (location: CodeLocation) => void };
+type Props = { result: DetailedSubmission | null; error: string; reload: () => void; loading?: boolean; currentCode?: string; currentLanguage?: SubmissionLanguage; onLocate?: (location: CodeLocation) => void; onUseCase?: (input: string) => void };
 export function RunResultPanel(props: Props) {
   const { locale } = useLocale();
   const tx = (zh: string, en: string) => locale === "en" ? en : zh;
@@ -37,19 +37,20 @@ export function RunResultPanel(props: Props) {
   </section>;
 }
 
-function ResultContent({ result, reload, currentCode, currentLanguage, onLocate }: Props & { result: DetailedSubmission }) {
+function ResultContent({ result, reload, currentCode, currentLanguage, onLocate, onUseCase }: Props & { result: DetailedSubmission }) {
   const { locale } = useLocale(), id = useId();
   const tx = (zh: string, en: string) => locale === "en" ? en : zh;
   const label = (status: string) => titles[status]?.[locale === "en" ? 1 : 0] ?? status;
   const [selected, setSelected] = useState<number | null>(null), [diff, setDiff] = useState(true);
   const caseList = useRef<HTMLDivElement>(null);
-  const cases = result.testResults ?? [], index = selected == null ? defaultResultCase(cases, result.status) : Math.min(selected, cases.length - 1), active = cases[index];
+  const cases = result.resultsVisible === false ? [] : result.testResults ?? [], index = selected == null ? defaultResultCase(cases, result.status) : Math.min(selected, cases.length - 1), active = cases[index];
   useEffect(() => {
     const list = caseList.current, tab = list?.querySelector<HTMLElement>('[aria-selected="true"]');
     if (!list || !tab) return;
     if (tab.offsetLeft < list.scrollLeft || tab.offsetLeft + tab.offsetWidth > list.scrollLeft + list.clientWidth) list.scrollLeft = Math.max(0, tab.offsetLeft - (list.clientWidth - tab.offsetWidth) / 2);
   }, [index, cases.length]);
-  const pending = isPending(result.status), hidden = !["samples", "custom"].includes(result.kind), publicCase = active?.visibility === "public";
+  const pending = isPending(result.status), formal = !["samples", "custom"].includes(result.kind), publicCase = active?.visibility === "public";
+  const reusableInput = formal && publicCase && active.status === "WA" && typeof active.input === "string" && active.input.length <= MAX_CUSTOM_INPUT_LENGTH ? active.input : null;
   const status = active?.status ?? result.status;
   const caseDiagnostic = publicCase ? active.stderr : active?.status === "RE" ? active.runtimeError : undefined;
   const diagnosticText = result.resultsVisible === false ? "" : caseDiagnostic || (result.status === "CE" ? result.message ?? "" : "");
@@ -73,7 +74,7 @@ function ResultContent({ result, reload, currentCode, currentLanguage, onLocate 
     </div>
     <p className={styles.summary}>{result.kind === "samples" ? tx("公开样例自测", "Public sample run") : result.kind === "custom" ? tx("自定义运行 · 不判断正确性", "Custom run · correctness is not checked") : tx("正式评测", "Formal evaluation")}
       {result.passed != null && result.total != null && <> · {result.passed}/{result.total} {tx("通过", "passed")}</>}
-      {hidden && result.score != null && <> · {Number(result.score).toFixed(2)}/100</>}
+      {formal && result.score != null && <> · {Number(result.score).toFixed(2)}/100</>}
     </p>
     {stale && <p className={styles.notice}>{tx("当前代码已修改，以下结果对应上次运行的代码。", "Your code has changed. These results belong to the previous run.")}</p>}
     {pending && <p className={styles.notice}>{tx("任务已接收，结果会自动更新。", "Your run was received. Results update automatically.")} <button type="button" onClick={reload} className="text-primary hover:underline">{tx("刷新", "Refresh")}</button></p>}
@@ -88,9 +89,10 @@ function ResultContent({ result, reload, currentCode, currentLanguage, onLocate 
       {active && cases.length > 1 && (active.timeMs != null || active.memoryKb != null) && <p className={styles.summary}>
         {tx(`用例 ${active.position}`, `Case ${active.position}`)} · {tx("用时", "Runtime")}: {submissionMeasurement(active.timeMs, "ms", locale)} · {tx("内存", "Memory")}: {submissionMeasurement(active.memoryKb, "KiB", locale)}
       </p>}
-      {hint && !pending && <p className={styles.hint} data-tone={status === "RE" ? "error" : undefined}>{hint}</p>}
+      {hint && !pending && <p className={styles.hint} data-tone={status === "WA" || status === "RE" ? "error" : undefined}>{hint}</p>}
       {diagnostic.text && <div className={styles.diagnostic}><div className={styles.diagnosticHeader}><strong>{tx("错误详情", "Error details")}</strong>{location && (onLocate ? <button type="button" disabled={stale} title={stale ? tx("代码已修改，请重新运行后定位", "Run the changed code again before locating the error") : undefined} onClick={() => onLocate(location)}><MapPin size={14}/>{location.file}:{location.line}{location.column ? `:${location.column}` : ""}</button> : <span>{location.file}:{location.line}</span>)}</div><pre>{diagnostic.text}</pre></div>}
       {publicCase && <>
+        {onUseCase && reusableInput !== null && <Button type="button" variant="secondary" size="sm" onClick={() => onUseCase(reusableInput)}>{tx("用此输入自测", "Use as custom input")}</Button>}
         <Value label={tx("输入", "Input")} value={active.input ?? ""}/>
         {active.mode === "function" && active.stdout && <Value label={tx("标准输出 / 调试日志", "Stdout / debug log")} value={active.stdout}/>}
         {active.output != null && <Value label={active.mode === "function" ? tx("返回值", "Output / return value") : tx("实际输出", "Output")} value={active.output} parts={difference?.actual} tone="actual"/>}
@@ -98,8 +100,9 @@ function ResultContent({ result, reload, currentCode, currentLanguage, onLocate 
       </>}
       {active?.truncated && (publicCase || diagnostic.text) && <p className={styles.notice}>{tx("输出或日志较长，仅显示保存的前段内容。", "The output or log is long. Only the retained beginning is shown.")}</p>}
       {canDiff && diff && <p className={styles.summary}>{tx("高亮表示不同内容；差异中的空格、制表符和换行分别显示为 ·、⇥、↵。", "Highlights show differences; changed spaces, tabs and newlines appear as ·, ⇥ and ↵.")}</p>}
-      {(hidden || result.resultsVisible === false) && !pending && <p className={styles.privacy}><LockKeyhole size={14}/>{result.resultsVisible === false ? tx("详细成绩尚未公布，不代表零分。", "Detailed results have not been released. This is not a zero score.") : <span>{tx("正式测试的输入和预期结果不公开。", "Formal test inputs and expected results are private.")}{status === "RE" && !diagnostic.text && tx(" 可运行公开样例或自定义输入来查看异常详情。", " Run public samples or custom input to inspect error details.")}</span>}</p>}
-      {!cases.length && result.publicOutput && !hidden && result.resultsVisible !== false && <Value label={tx("运行输出", "Run output")} value={result.publicOutput}/>}
+      {result.resultsVisible === false && !pending && <p className={styles.privacy}><LockKeyhole size={14} aria-hidden="true"/>{tx("详细成绩尚未公布，不代表零分。", "Detailed results have not been released. This is not a zero score.")}</p>}
+      {formal && !pending && !publicCase && result.resultsVisible !== false && (status === "WA" || status === "RE" && !diagnostic.text) && <p className={styles.summary}>{tx("可运行公开样例或自定义输入来排查问题。", "Run a public sample or custom input to investigate.")}</p>}
+      {!cases.length && result.publicOutput && !formal && result.resultsVisible !== false && <Value label={tx("运行输出", "Run output")} value={result.publicOutput}/>}
     </div>
   </>;
 }

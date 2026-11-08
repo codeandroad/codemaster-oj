@@ -4,7 +4,7 @@ import { submissionCaseFeedback } from '../src/submission-feedback.mjs';
 
 const version={mode:'function',comparator:'json',samples:[{input:'DISABLED',expected:'SECRET',enabled:false},{input:'[[1,2]]',expected:'[2,3]'}],reference_code:'PRIVATE_REFERENCE'};
 const logs=[{position:1,status:'WA',cpuMs:3,memoryBytes:1025,stdout:'debug',stderr:'Error',returned:'[2,4]',testId:'PRIVATE_ID',secret:'PRIVATE_OTHER'}];
-test('formal and correction logs omit output and protect unresolved or timed runtime errors',()=>{
+test('unresolved formal and correction logs omit output and protect unresolved or timed runtime errors',()=>{
  for(const kind of ['submit','correction','unknown'])assert.deepEqual(submissionCaseFeedback({kind},version,logs),[{position:1,status:'WA',timeMs:3,memoryKb:2}]);
  const runtime=[{...logs[0],status:'RE'}];
  for(const submission of [
@@ -16,6 +16,23 @@ test('formal and correction logs omit output and protect unresolved or timed run
   {kind:'unknown',context_resolved:true},
  ])assert.deepEqual(submissionCaseFeedback(submission,version,runtime),[{position:1,status:'RE',timeMs:3,memoryKb:2}]);
  assert.deepEqual(submissionCaseFeedback({kind:'samples',results_visible:false},version,logs),[]);
+});
+test('a resolved ordinary wrong answer exposes only the first failed formal case',()=>{
+ const formalTests=[{id:'PRIVATE_ID',input:'[[3,5]]',expected:'[4,6]'}, {id:'SECOND_ID',input:'SECOND_INPUT',expected:'SECOND_EXPECTED'}];
+ const results=[{...logs[0],input:'SPOOFED_INPUT',expected:'SPOOFED_EXPECTED'},{...logs[0],position:2,testId:'SECOND_ID',returned:'SECOND_OUTPUT'}];
+ const context={kind:'submit',status:'WA',context_resolved:true};
+ const projected=submissionCaseFeedback(context,version,results,{formalTests});
+ assert.equal(projected[0].visibility,'public');
+ assert.equal(projected[0].mode,'function');
+ assert.equal(projected[0].comparator,'json');
+ assert.deepEqual([projected[0].input,projected[0].output,projected[0].expected],['[[3,5]]','[2,4]','[4,6]']);
+ assert.deepEqual(projected[1],{position:2,status:'WA',timeMs:3,memoryKb:2});
+ assert.doesNotMatch(JSON.stringify(projected),/SPOOFED|SECOND_|PRIVATE_|debug|Error/);
+ for(const restricted of [{timed_attempt_id:'timed'}, {access_timed_attempt_id:'timed'}, {context_resolved:false}, {status:'RE'}, {kind:'correction'}]){
+  const hidden=submissionCaseFeedback({...context,...restricted},version,results,{formalTests});
+  assert.deepEqual(hidden.map(result=>result.input),[undefined,undefined]);
+ }
+ assert.deepEqual(submissionCaseFeedback({...context,results_visible:false},version,results,{formalTests}),[]);
 });
 test('ordinary formal and correction runtime errors expose only retained stderr and its truncation',()=>{
  const results=[logs[0],{...logs[0],position:2,status:'RE',stderr:'ValueError: bad argument'},{...logs[0],position:3,status:'RE',stderr:'x'.repeat(9000)},{position:4,status:'RE'}];

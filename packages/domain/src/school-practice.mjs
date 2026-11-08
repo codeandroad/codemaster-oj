@@ -1,5 +1,5 @@
 import {publicScholarshipOperation} from './public-scholarship.mjs';
-import { activityJobVisible, schoolActivityJobVisibleSql, schoolActivityProblemAccess } from './school-activities.mjs';
+import { schoolActivityJobVisibleSql, schoolActivityProblemAccess, schoolJobFeedback } from './school-activities.mjs';
 import { randomUUID } from 'node:crypto';
 import { transaction } from './db.mjs';
 import { activeAccount, auditSchool, LEGACY_SCHOOL_ID, lockSchoolTeaching, schoolRole } from './schools.mjs';
@@ -7,7 +7,6 @@ import { isPlatformAdministrator } from './platform-governance.mjs';
 import { bytes, canonicalHash, enumValue, fail, field, integer, uuid } from './security.mjs';
 import { validateTask } from '../judge.mjs';
 import { schoolProblemSubmissions } from './problem-submissions.mjs';
-import { submissionCaseFeedback } from './submission-feedback.mjs';
 import { publicProblemMetadata } from './problem-public-statements.mjs';
 import { handlePublicPracticeRecords } from './public-practice-records.mjs';
 import { publicPracticeLeaderboard } from './public-practice-leaderboard.mjs';
@@ -90,11 +89,10 @@ async function enqueue(db,{schoolId,p,version,user,kind,body,accessContext}){
  return job;
 }
 async function projectJob(db,job){
- const visible=await activityJobVisible(db,job);
- if(!visible)return {id:job.id,problemId:job.problem_id,versionId:job.version_id,problemTitle:job.payload.version.title,code:job.payload.code,language:job.payload.language,kind:job.kind,state:job.state,createdAt:job.created_at,status:'Submitted',score:null,passed:0,total:0,runtimeMs:null,memoryKb:null,message:'Results will be available after publication.',caseFeedback:[]};
+ const feedback=await schoolJobFeedback(db,job);
+ if(!feedback.resultsVisible)return {id:job.id,problemId:job.problem_id,versionId:job.version_id,problemTitle:job.payload.version.title,code:job.payload.code,language:job.payload.language,kind:job.kind,state:job.state,createdAt:job.created_at,status:'Submitted',score:null,passed:0,total:0,runtimeMs:null,memoryKb:null,message:'Results will be available after publication.',...feedback};
  const r=job.result;
- // Aggregate resource measurements only. Formal-case inputs, expected answers,
- // judge internals and private annotations must never enter this response.
+ // Aggregate resource measurements over the full saved run.
  const measurements=job.state==='completed'&&r?.status!=='System Error'&&Array.isArray(r?.privateResults)?r.privateResults:[];
  const runtimeMs=measurements.length&&measurements.every(item=>Number.isFinite(item?.cpuMs)&&item.cpuMs>=0)
   ?measurements.reduce((total,item)=>total+item.cpuMs,0):null;
@@ -103,7 +101,7 @@ async function projectJob(db,job){
  return {id:job.id,problemId:job.problem_id,versionId:job.version_id,problemTitle:job.payload.version.title,code:job.payload.code,language:job.payload.language,kind:job.kind,state:job.state,createdAt:job.created_at,
   status:r?.status??(job.state==='failed'?'System Error':job.state==='leased'?'Judging':'Waiting'),score:r?.score??null,passed:r?.passed??0,total:r?.total??0,
   runtimeMs,memoryKb,
-  message:r?.publicMessage??'',caseFeedback:submissionCaseFeedback({kind:job.kind,custom_input:job.payload.tests?.[0]?.input},job.payload.version,r?.privateResults)};
+  message:r?.publicMessage??'',...feedback};
 }
 async function publicLoaded(db,user,id){
  await activeAccount(db,user.id);

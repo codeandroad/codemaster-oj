@@ -29,10 +29,28 @@ export function schoolActivityJobVisibleSql(alias = 'j') {
     WHERE activity_visibility.school_id=${alias}.school_id AND activity_visibility.id=${alias}.activity_id
       AND (activity_visibility.kind='assignment' OR activity_visibility.results_published_at IS NOT NULL)))`;
 }
+async function jobActivity(db, job) {
+  if (!job.activity_id || job.kind !== 'submit') return null;
+  return (await db.query('SELECT kind,results_published_at FROM school_activities WHERE school_id=$1 AND id=$2', [job.school_id, job.activity_id])).rows[0];
+}
+const jobResultsVisible = (job, activity) => !job.activity_id || job.kind !== 'submit' ||
+  Boolean(activity && (activity.kind === 'assignment' || activity.results_published_at));
+
 export async function activityJobVisible(db, job) {
-  if (!job.activity_id || job.kind !== 'submit') return true;
-  const activity = (await db.query('SELECT kind,results_published_at FROM school_activities WHERE school_id=$1 AND id=$2', [job.school_id, job.activity_id])).rows[0];
-  return Boolean(activity && (activity.kind === 'assignment' || activity.results_published_at));
+  return jobResultsVisible(job, await jobActivity(db, job));
+}
+
+export async function schoolJobFeedback(db, job, activity) {
+  const context = activity ?? await jobActivity(db, job);
+  const resultsVisible = jobResultsVisible(job, context);
+  if (!resultsVisible) return { resultsVisible, caseFeedback: [] };
+  const r = job.result;
+  const showWrongAnswer = job.kind === 'submit' && job.state === 'completed' && r?.status === 'WA' &&
+    (!job.activity_id || context?.kind === 'assignment');
+  const caseFeedback = submissionCaseFeedback({ kind: job.kind, status: r?.status, context_resolved: showWrongAnswer,
+    custom_input: job.payload.tests?.[0]?.input }, job.payload.version, r?.privateResults,
+  { formalTests: showWrongAnswer ? job.payload.tests : [] });
+  return { resultsVisible, caseFeedback };
 }
 /** A live timed attempt cannot be bypassed through a course/public/practice URL. */
 export async function schoolActivityProblemAccess(db, { schoolId, problemId, user, activityId = null }) {
@@ -195,13 +213,15 @@ async function enqueueActivity(db, loaded, problemId, user, body) {
     activity_id,activity_attempt_id,activity_deadline_at,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'school',$9,$10,$11,$12,$13) RETURNING id,state`,
   [a.school_id, problemId, p.version_id, user.id, student.id, requestId, hash, kind, JSON.stringify(payload), a.id, t.id, t.deadline_at, received])).rows[0];
 }
-function projectJob(job, visible) {
+async function projectJob(db, job, activity) {
+  const feedback = await schoolJobFeedback(db, job, activity);
+  const visible = feedback.resultsVisible;
   const r = visible ? job.result : null;
   return { id: job.id, problemId: job.problem_id, problemTitle: job.payload.version.title, code: job.payload.code, language: job.payload.language,
     kind: job.kind, state: job.state, createdAt: job.created_at, status: visible ? r?.status ?? (job.state === 'failed' ? 'System Error' : job.state === 'leased' ? 'Judging' : 'Waiting') : 'Submitted',
     score: visible ? r?.score ?? null : null, passed: visible ? r?.passed ?? 0 : 0, total: visible ? r?.total ?? 0 : 0,
     message: visible ? r?.publicMessage ?? '' : 'Formal results will be available after the teacher publishes them.',
-    caseFeedback: visible ? submissionCaseFeedback({ kind: job.kind, custom_input: job.payload.tests?.[0]?.input }, job.payload.version, r?.privateResults) : [] };
+    ...feedback };
 }
 async function options(db, schoolId) {
   const items = (await db.query(`SELECT p.id AS "problemId",p.published_version_id AS "versionId",v.definition->>'title' AS title,b.name AS "bankName",b.id AS "bankId"
@@ -366,7 +386,7 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
     } else if (action === 'jobs' && match[4] && method === 'GET') {
       const job = (await db.query('SELECT * FROM school_judge_jobs WHERE school_id=$1 AND activity_id=$2 AND id=$3 AND account_id=$4', [schoolId, a.id, uuid(match[4]), user.id])).rows[0];
       if (!job) fail(404, 'NOT_FOUND', 'Submission not found.');
-      return reply(projectJob(job, a.kind !== 'timed' || Boolean(a.results_published_at) || job.kind !== 'submit'));
+      return reply(await projectJob(db, job, a));
     } else return null;
     return reply(await detail(db, await load(db, schoolId, activityId, user, role), user));
   });

@@ -70,12 +70,14 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
     const bank = (await request(prefix + '/problem-banks', { auth: auth.teacher, method: 'POST', status: 201, body: { name: 'Bank', requestId: randomUUID() } })).data;
     const p = (await request(prefix + '/problems', { auth: auth.teacher, method: 'POST', status: 201, body: { bankId: bank.id, requestId: randomUUID(), title: 'Double', statement: 'Return twice the integer.', mode: 'function', functionName: 'solve', referenceCode: 'def solve(data):\n return data*2 # PRIVATE_REFERENCE', samples: [{ input: '[2]', expected: '4' }], tests: [{ input: '[937]', expected: '1874', weight: 100 }] } })).data;
     const completed = { status: 'AC', score: 100, passed: 1, total: 1, publicMessage: '', privateResults: [{ position: 1, status: 'AC', cpuMs: 5, memoryBytes: 4096, stdout: 'PRIVATE_OUTPUT', stderr: 'PRIVATE_NOTE' }] };
+    const mismatch = { judge: async task => ({ ...completed, status: 'WA', score: 0, passed: 0,
+      privateResults: [{ ...completed.privateResults[0], testId: task.tests[0].id, status: 'WA', returned: '0' }] }) };
     await request(prefix + '/problems/' + p.id + '/validate', { auth: auth.teacher, method: 'POST', status: 202, body: { expectedRevision: 1, requestId: randomUUID() } });
     await processSchoolOne({ pool: worker, judge: { judge: async () => completed } });
     const published = (await request(prefix + '/problems/' + p.id + '/publish', { auth: auth.admin, method: 'POST', body: { expectedRevision: 1 } })).data;
     await request('/platform/problem-publications', { auth: auth.admin, method: 'POST', body: { schoolId: school.id, problemId: p.id, versionId: published.versionId } });
     const config = { kind: 'timed', title: 'Timed assessment', description: '', startsAt: new Date(Date.now() - 60000).toISOString(), endsAt: new Date(Date.now() + 3600000).toISOString(), durationMinutes: 30, problems: [{ problemId: p.id, versionId: published.versionId, points: 50 }], identityIds: [ids.student, ids.peer], requestId: randomUUID() };
-    let activity, job;
+    let activity, failedJob;
     await t.test('session, CSRF, role, other-school and draft access checks', async () => {
       await request(activities, { status: 401 });
       await request(activities, { auth: auth.outside, status: 404 });
@@ -108,13 +110,15 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       const problem = await request(activityPath() + '/problems/' + p.id, { auth: auth.student });
       assert.equal(problem.cache, 'no-store'); assert.equal(problem.data.activity.canSubmit, true);
       for (const secret of ['PRIVATE_REFERENCE', '1874', '937']) assert.ok(!JSON.stringify(problem.data).includes(secret));
-      job = (await request(activityPath() + '/problems/' + p.id + '/submissions', { auth: auth.student, method: 'POST', status: 202, body: { kind: 'submit', code: 'def solve(data):\n return data*2', requestId: randomUUID(), deadlineAt: '2099-01-01' } })).data;
+      await request(activityPath() + '/problems/' + p.id + '/submissions', { auth: auth.student, method: 'POST', status: 202, body: { kind: 'submit', code: 'def solve(data):\n return data*2', requestId: randomUUID(), deadlineAt: '2099-01-01' } });
       await processSchoolOne({ pool: worker, judge: { judge: async () => completed } });
+      failedJob = (await request(activityPath() + '/problems/' + p.id + '/submissions', { auth: auth.student, method: 'POST', status: 202, body: { kind: 'submit', code: 'def solve(data): return 0', requestId: randomUUID() } })).data;
+      await processSchoolOne({ pool: worker, judge: mismatch });
       for (const path of [prefix + '/problems/' + p.id, '/practice/problems/' + p.id]) {
         await request(path, { auth: auth.student, status: 403 });
         await request(path + '/submissions', { auth: auth.student, method: 'POST', status: 403, body: { kind: 'submit', code: 'pass', requestId: randomUUID() } });
       }
-      for (const path of [activityPath() + '/jobs/' + job.id, prefix + '/judge-jobs/' + job.id]) {
+      for (const path of [activityPath() + '/jobs/' + failedJob.id, prefix + '/judge-jobs/' + failedJob.id]) {
         const r = await request(path, { auth: auth.student });
         assert.equal(r.data.status, 'Submitted'); assert.equal(r.data.score, null); assert.deepEqual(r.data.caseFeedback, []); assert.equal(r.cache, 'no-store');
         for (const secret of ['PRIVATE_OUTPUT', 'PRIVATE_NOTE']) assert.ok(!JSON.stringify(r.data).includes(secret));
@@ -126,7 +130,7 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       const ownFeed = (await request(activityPath() + '/problems/' + p.id + '/submissions', { auth: auth.student })).data;
       assert.equal(ownFeed.items[0].status, 'Submitted'); assert.equal(ownFeed.items[0].runtimeMs, null); assert.equal(ownFeed.solved, false);
       await request(activityPath() + '/report', { auth: auth.student, status: 404 });
-      await request(activityPath() + '/jobs/' + job.id, { auth: auth.peer, status: 404 });
+      await request(activityPath() + '/jobs/' + failedJob.id, { auth: auth.peer, status: 404 });
     });
     await t.test('closing rejects new submissions; first result publication exposes only safe final metadata', async () => {
       await request(activityPath() + '/end', { auth: auth.teacher, method: 'POST' });
@@ -136,14 +140,42 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       assert.deepEqual(completedList.map(item => [item.id, item.grade]), [[activity.id, null]]);
       await request(activityPath() + '/publish-results', { auth: auth.teacher, method: 'POST' });
       const final = (await request(activityPath(), { auth: auth.student })).data;
-      assert.equal(final.grade.score, 50); assert.equal(final.grade.items[0].activityAttempts, 1);
+      assert.equal(final.grade.score, 50); assert.equal(final.grade.items[0].activityAttempts, 2);
       const problem = (await request(activityPath() + '/problems/' + p.id, { auth: auth.student })).data;
       assert.equal(problem.solved, true); assert.equal(problem.activity.canSubmit, false);
       const feed = (await request(activityPath() + '/problems/' + p.id + '/submissions', { auth: auth.peer })).data;
-      assert.equal(feed.total, 1); assert.equal(feed.items[0].status, 'AC'); assert.equal(feed.items[0].runtimeMs, 5); assert.equal(feed.items[0].memoryKb, 4);
+      assert.equal(feed.total, 1);
+      const [latest] = feed.items;
+      assert.equal(latest.id, failedJob.id); assert.equal(latest.status, 'WA'); assert.equal(latest.runtimeMs, 5); assert.equal(latest.memoryKb, 4);
       assert.ok(!JSON.stringify(feed).includes('PRIVATE_'));
-      assert.equal((await request(prefix + '/submissions', { auth: auth.student })).data.items.length, 1);
+      assert.equal((await request(prefix + '/submissions', { auth: auth.student })).data.items.length, 2);
+      for (const path of [activityPath() + '/jobs/' + failedJob.id, prefix + '/judge-jobs/' + failedJob.id]) {
+        const { data } = await request(path, { auth: auth.student });
+        assert.equal(data.status, 'WA');
+        assert.deepEqual(data.caseFeedback, [{ position: 1, status: 'WA', timeMs: 5, memoryKb: 4 }]);
+        assert.doesNotMatch(JSON.stringify(data), /PRIVATE_|\[937\]|1874/);
+      }
       await request(prefix + '/problems/' + p.id, { auth: auth.student });
+    });
+    await t.test('ordinary homework exposes the failed comparison in both authorized detail routes', async () => {
+      const { data: assignment } = await request(activities, { auth: auth.teacher, method: 'POST', status: 201, body: {
+        ...config, kind: 'assignment', title: 'Debugging homework', identityIds: [ids.peer], requestId: randomUUID(),
+      } });
+      const path = activities + '/' + assignment.id;
+      await request(path + '/publish', { auth: auth.teacher, method: 'POST', body: { expectedRevision: 1 } });
+      const { data: submitted } = await request(path + '/problems/' + p.id + '/submissions', { auth: auth.peer, method: 'POST', status: 202, body: {
+        kind: 'submit', code: 'def solve(data): return 0', requestId: randomUUID(),
+      } });
+      await processSchoolOne({ pool: worker, judge: mismatch });
+      for (const detail of [path + '/jobs/' + submitted.id, prefix + '/judge-jobs/' + submitted.id]) {
+        const { data, cache } = await request(detail, { auth: auth.peer });
+        assert.equal(data.status, 'WA');
+        const [failed] = data.caseFeedback;
+        assert.deepEqual([failed.input, failed.output, failed.expected], ['[937]', '0', '1874']);
+        assert.doesNotMatch(JSON.stringify(data), /PRIVATE_/);
+        assert.equal(cache, 'no-store');
+        await request(detail, { auth: auth.student, status: 404 });
+      }
     });
   } finally {
     await server?.close(); await worker?.end(); await pool.end(); await owner.query('DROP SCHEMA IF EXISTS ' + schema + ' CASCADE'); await owner.end();

@@ -66,7 +66,9 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
     assert.equal(forbidden.status,403);assert.equal(forbidden.data.error.code,'FORBIDDEN');
     assert.equal((await request('/api/v1/classes',{auth:student})).status,200);
     const problem=(await pool.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id',[adminId])).rows[0];
-    const version=(await pool.query("INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code,validation_status,published_at,school_visible_at) VALUES($1,'笔记测试题','stdio','输出一',1000,64,'print(1)','AC',now(),now()) RETURNING id",[problem.id])).rows[0];
+    const version=(await pool.query("INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code,validation_status,school_visible_at) VALUES($1,'笔记测试题','stdio','输出一',1000,64,'print(1)','AC',now()) RETURNING id",[problem.id])).rows[0];
+    const formalCase=(await pool.query("INSERT INTO test_cases(version_id,position,input,expected,weight) VALUES($1,1,'217','1',100) RETURNING id",[version.id])).rows[0];
+    await pool.query('UPDATE problem_versions SET published_at=now() WHERE id=$1',[version.id]);
     await pool.query('UPDATE problems SET current_version_id=$1 WHERE id=$2',[version.id,problem.id]);
     const historical=await request(`/api/v1/problems/${problem.id}`,{auth:student});
     assert.equal(historical.status,200);assert.equal(historical.data.referenceLanguage,'python');
@@ -148,7 +150,7 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
     assert.equal((await request('/api/v1/problem-groups/move',{method:'POST',auth:admin,body:move,headers:{'X-CSRF-Token':'invalid'}})).status,403);
     const moved=await request('/api/v1/problem-groups/move',{method:'POST',auth:admin,body:move});assert.equal(moved.status,200,JSON.stringify(moved.data));assert.equal(moved.data.moved,1);
     const afterGroups=(await request('/api/v1/problem-groups',{auth:admin})).data.items;assert(!afterGroups.find(g=>g.id===groups[0].id).problemIds.includes(sampleDraft.data.id));assert(afterGroups.find(g=>g.id===groups[1].id).problemIds.includes(sampleDraft.data.id));
-    await t.test('ordinary runtime diagnostics reach the owner while timed attempts and their corrections stay private', async () => {
+    await t.test('ordinary diagnostics reach the owner while timed attempts and their corrections stay private', async () => {
       const runtimeError = 'ValueError: diagnostic sentinel';
       const measurements = [{position:1,status:'RE',timeMs:5,memoryKb:2048},{position:2,status:'NotRun'}];
       const rawResults = [
@@ -156,13 +158,13 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
           stdout:'PRIVATE_STDOUT',returned:'PRIVATE_RETURN',input:'PRIVATE_INPUT',expected:'PRIVATE_EXPECTED',testId:'PRIVATE_ID'},
         {position:2,status:'NotRun'},
       ];
-      async function recordFailure(submissionId) {
+      async function recordFailure(submissionId, status='RE', results=rawResults) {
         const id = submissionId.slice(3);
         await pool.query(`WITH completed AS (
           UPDATE judge_tasks SET state='completed' WHERE submission_id=$1 RETURNING id,version_id
         ) INSERT INTO judge_runs(task_id,lease_id,submission_id,version_id,status,score,passed,total,private_results,environment_version)
-          SELECT id,gen_random_uuid(),$1,version_id,'RE',0,0,2,$2,'nest-feedback-test' FROM completed`, [id,JSON.stringify(rawResults)]);
-        await pool.query("UPDATE submissions SET status='RE',score=0,passed=0,total=2 WHERE id=$1",[id]);
+          SELECT id,gen_random_uuid(),$1,version_id,$3,0,0,2,$2,'nest-feedback-test' FROM completed`, [id,JSON.stringify(results),status]);
+        await pool.query('UPDATE submissions SET status=$2,score=0,passed=0,total=2 WHERE id=$1',[id,status]);
       }
       const detail = (id, auth) => request(`/api/v1/submissions/${id}`,{auth});
 
@@ -222,6 +224,17 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
         assert.deepEqual(result.data.testResults, measurements);
         assert.doesNotMatch(JSON.stringify(result.data), /diagnostic sentinel|PRIVATE_/);
       }
+      const wrongAnswer=[{...rawResults[0],testId:formalCase.id,status:'WA',stdout:'2\n'},rawResults[1]];
+      await recordFailure(inAssignment.data.id,'WA',wrongAnswer);
+      const graded=await detail(inAssignment.data.id,student);
+      assert.equal(graded.status,200);
+      const [failed]=graded.data.testResults;
+      assert.deepEqual([failed.input,failed.output,failed.expected],['217','2\n','1']);
+      assert.doesNotMatch(JSON.stringify(graded.data),/PRIVATE_|diagnostic sentinel/);
+      await recordFailure(timed.data.id,'WA',wrongAnswer);
+      const contest=await detail(timed.data.id,student);
+      assert.equal(contest.data.resultsVisible,true);
+      assert.deepEqual(contest.data.testResults,[{...measurements[0],status:'WA'},measurements[1]]);
     });
     const unknown=await request('/api/v1/does-not-exist',{auth:admin});
     assert.equal(unknown.status,404);assert.equal(unknown.data.error.code,'NOT_FOUND');

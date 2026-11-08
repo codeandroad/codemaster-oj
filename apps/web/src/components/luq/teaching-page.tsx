@@ -62,7 +62,7 @@ interface PolicyResponse {
   canManage: boolean;
   frozen: boolean;
 }
-interface RewardRule {
+export interface RewardRule {
   id?: string;
   amount: number;
   minimumAc: number;
@@ -72,7 +72,7 @@ interface RewardRule {
   allowSolutionAssisted: boolean;
   version: number;
 }
-interface RuleResponse {
+export interface RuleResponse {
   rule: RewardRule;
   frozen: boolean;
   canManage: boolean;
@@ -693,102 +693,7 @@ function RewardForm({
         disabled={locked || action.busy}
         className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
       >
-        <Field label={tx("任务类型", "Task type")}>
-          <select
-            className={input}
-            value={rule.taskKind}
-            onChange={(event) =>
-              setRule({
-                ...rule,
-                taskKind: event.target.value as RewardRule["taskKind"],
-                allowSolutionAssisted:
-                  event.target.value === "challenge"
-                    ? false
-                    : rule.allowSolutionAssisted,
-              })
-            }
-          >
-            <option value="challenge">{tx("挑战", "Challenge")}</option>
-            <option value="learning">{tx("学习", "Learning")}</option>
-            <option value="correction">{tx("订正", "Correction")}</option>
-          </select>
-        </Field>
-        <Field label={tx("额外奖学金", "Extra scholarship")}>
-          <input
-            className={input}
-            type="number"
-            min={0}
-            max={data.cap}
-            step={1}
-            value={rule.amount}
-            onChange={(event) =>
-              setRule({ ...rule, amount: Number(event.target.value) })
-            }
-          />
-        </Field>
-        {activityType === "assignment" && (
-          <Field label={tx("发放条件", "Award condition")}>
-            <select className={input} value={rule.requireAll ? "complete" : "threshold"} onChange={event => setRule({ ...rule, requireAll: event.target.value === "complete" })}>
-              <option value="complete">{tx("通过全部必做题", "Pass every required problem")}</option>
-              <option value="threshold">{tx("达到指定题数和得分", "Meet a problem and score threshold")}</option>
-            </select>
-          </Field>
-        )}
-        {!rule.requireAll && (<>
-          <Field label={tx("至少 AC 题数", "Minimum accepted problems")}>
-            <input
-              className={input}
-              type="number"
-              min={1}
-              max={50}
-              step={1}
-              value={rule.minimumAc}
-              onChange={(event) =>
-                setRule({ ...rule, minimumAc: Number(event.target.value) })
-              }
-            />
-          </Field>
-          <Field
-            label={
-              activityType === "paper4_activity"
-                ? tx(
-                    "\u6700\u4f4e\u5927\u9898 AC \u6bd4\u4f8b\uff08%\uff09",
-                    "Minimum accepted-question percentage",
-                  )
-                : tx(
-                    "\u6700\u4f4e\u5f97\u5206\u767e\u5206\u6bd4",
-                    "Minimum score (%)",
-                  )
-            }
-          >
-            <input
-              className={input}
-              type="number"
-              min={0}
-              max={100}
-              step={0.01}
-              value={rule.minimumScore}
-              onChange={(event) =>
-                setRule({ ...rule, minimumScore: Number(event.target.value) })
-              }
-            />
-          </Field>
-        </>)}
-        <label className="flex items-center gap-2 text-sm sm:col-span-2">
-          <input
-            type="checkbox"
-            className="accent-primary"
-            disabled={rule.taskKind === "challenge"}
-            checked={rule.allowSolutionAssisted}
-            onChange={(event) =>
-              setRule({ ...rule, allowSolutionAssisted: event.target.checked })
-            }
-          />
-          {tx(
-            "允许已获得本站完整答案的提交参与活动奖励（仅学习 / 订正）",
-            "Allow solution-assisted submissions for this activity reward (learning/correction only)",
-          )}
-        </label>
+        <ActivityRewardFields activityType={activityType} rule={rule} onChange={setRule} amountCap={data.cap} />
       </fieldset>
       <p className="text-xs text-muted-foreground">
         {tx(
@@ -808,6 +713,122 @@ function RewardForm({
       )}
       <Feedback action={action} />
     </form>
+  );
+}
+
+export function ActivityRewardFields({
+  activityType,
+  rule,
+  onChange,
+  amountCap,
+}: {
+  activityType: ActivityType;
+  rule: RewardRule;
+  onChange: (rule: RewardRule) => void;
+  amountCap?: number;
+}) {
+  const tx = useText();
+  return (
+    <>
+      <Field label={tx("任务类型", "Task type")}>
+        <select
+          className={input}
+          value={rule.taskKind}
+          onChange={(event) =>
+            onChange({
+              ...rule,
+              taskKind: event.target.value as RewardRule["taskKind"],
+              allowSolutionAssisted:
+                event.target.value === "challenge"
+                  ? false
+                  : rule.allowSolutionAssisted,
+            })
+          }
+        >
+          <option value="challenge">{tx("挑战", "Challenge")}</option>
+          <option value="learning">{tx("学习", "Learning")}</option>
+          <option value="correction">{tx("订正", "Correction")}</option>
+        </select>
+      </Field>
+      {amountCap !== undefined && (
+        <Field label={tx("额外奖学金", "Extra scholarship")}>
+          <input
+            className={input}
+            type="number"
+            min={0}
+            max={amountCap}
+            step={1}
+            value={rule.amount}
+            onChange={(event) =>
+              onChange({ ...rule, amount: Number(event.target.value) })
+            }
+          />
+        </Field>
+      )}
+      {activityType === "assignment" && (
+        <Field label={tx("发放条件", "Award condition")}>
+          <select className={input} value={rule.requireAll ? "complete" : "threshold"} onChange={event => onChange({ ...rule, requireAll: event.target.value === "complete" })}>
+            <option value="complete">{tx("通过全部必做题", "Pass every required problem")}</option>
+            <option value="threshold">{tx("达到指定题数和得分", "Meet a problem and score threshold")}</option>
+          </select>
+        </Field>
+      )}
+      {!rule.requireAll && (<>
+        <Field label={tx("至少 AC 题数", "Minimum accepted problems")}>
+          <input
+            className={input}
+            type="number"
+            min={1}
+            max={50}
+            step={1}
+            value={rule.minimumAc}
+            onChange={(event) =>
+              onChange({ ...rule, minimumAc: Number(event.target.value) })
+            }
+          />
+        </Field>
+        <Field
+          label={
+            activityType === "paper4_activity"
+              ? tx(
+                  "\u6700\u4f4e\u5927\u9898 AC \u6bd4\u4f8b\uff08%\uff09",
+                  "Minimum accepted-question percentage",
+                )
+              : tx(
+                  "\u6700\u4f4e\u5f97\u5206\u767e\u5206\u6bd4",
+                  "Minimum score (%)",
+                )
+          }
+        >
+          <input
+            className={input}
+            type="number"
+            min={0}
+            max={100}
+            step={0.01}
+            value={rule.minimumScore}
+            onChange={(event) =>
+              onChange({ ...rule, minimumScore: Number(event.target.value) })
+            }
+          />
+        </Field>
+      </>)}
+      <label className="flex items-center gap-2 text-sm sm:col-span-2">
+        <input
+          type="checkbox"
+          className="accent-primary"
+          disabled={rule.taskKind === "challenge"}
+          checked={rule.allowSolutionAssisted}
+          onChange={(event) =>
+            onChange({ ...rule, allowSolutionAssisted: event.target.checked })
+          }
+        />
+        {tx(
+          "允许已获得本站完整答案的提交参与活动奖励（仅学习 / 订正）",
+          "Allow solution-assisted submissions for this activity reward (learning/correction only)",
+        )}
+      </label>
+    </>
   );
 }
 

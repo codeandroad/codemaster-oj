@@ -199,7 +199,8 @@ export async function createDomainServices(pool,config) {
  }
  async function assignmentResult(db,user,id) {
   const a=await assignmentAccess(db,user,id);
-  const ps=(await db.query(`SELECT ap.problem_id,ap.version_id,ap.points,ap.position,v.title,COALESCE(global_reward.points,10) first_ac_points,COALESCE(assignment_reward.points,0) reward_points
+  const ps=(await db.query(`SELECT ap.problem_id,ap.version_id,ap.points,ap.position,v.title,v.metadata->'difficulty' difficulty,
+   COALESCE(global_reward.points,10) first_ac_points,COALESCE(assignment_reward.points,0) reward_points
    FROM assignment_problems ap JOIN problem_versions v ON v.id=ap.version_id
    LEFT JOIN point_rewards global_reward ON global_reward.problem_id=ap.problem_id AND global_reward.assignment_id IS NULL
    LEFT JOIN point_rewards assignment_reward ON assignment_reward.problem_id=ap.problem_id AND assignment_reward.assignment_id=ap.assignment_id
@@ -211,7 +212,12 @@ export async function createDomainServices(pool,config) {
   const linkedCourse=await courseMetadataForUser(db,user,a.course_path_id);
   const visibleCourse=Boolean(linkedCourse?.published_at&&!linkedCourse.archived_at);
   const linkedClasses=await activityClasses(db,id);
-  const result={id:a.id,title:a.title,canManage:a.canManage,classIds:linkedClasses.map(c=>c.id),classes:linkedClasses,classId:a.class_id,className:(await db.query('SELECT name FROM classes WHERE id=$1',[a.class_id])).rows[0]?.name,state:a.state,archived:!!a.archived_at,description:a.description,course:a.course,coursePathId:linkedCourse?.id??null,courseTitle:linkedCourse?.title??null,courseAvailable:visibleCourse,problemOrder:a.problem_order,published:a.state==='Published',publishedAt:a.published_at,createdAt:a.created_at,dueAt:a.due_at,editRevision:a.edit_revision,problems:ps.map(p=>({problemId:p.problem_id,versionId:p.version_id,position:p.position,title:p.title,points:Number(p.points),firstAcPoints:Number(p.first_ac_points),rewardPoints:Number(p.reward_points)}))};
+  const problems=ps.map(p=>({
+   problemId:p.problem_id,versionId:p.version_id,position:p.position,title:p.title,
+   points:Number(p.points),firstAcPoints:Number(p.first_ac_points),rewardPoints:Number(p.reward_points),
+   ...(a.canManage&&typeof p.difficulty==='string'?{difficulty:p.difficulty}:{}),
+  }));
+  const result={id:a.id,title:a.title,canManage:a.canManage,classIds:linkedClasses.map(c=>c.id),classes:linkedClasses,classId:a.class_id,className:(await db.query('SELECT name FROM classes WHERE id=$1',[a.class_id])).rows[0]?.name,state:a.state,archived:!!a.archived_at,description:a.description,course:a.course,coursePathId:linkedCourse?.id??null,courseTitle:linkedCourse?.title??null,courseAvailable:visibleCourse,problemOrder:a.problem_order,published:a.state==='Published',publishedAt:a.published_at,createdAt:a.created_at,dueAt:a.due_at,editRevision:a.edit_revision,problems};
   {
    const protectedParticipantIds=a.canManage?(await db.query('SELECT DISTINCT identity_id FROM submissions WHERE assignment_id=$1',[id])).rows.map(person=>person.identity_id):[];
    if(a.canManage)result.protectedParticipantIds=protectedParticipantIds;
@@ -447,6 +453,8 @@ export async function createDomainServices(pool,config) {
       THEN p.current_version_id ELSE v.id END published_version_id,
      CASE WHEN $2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit'))
       THEN pv.title ELSE v.title END published_title,
+     CASE WHEN $2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit'))
+      THEN pv.metadata->'difficulty' ELSE v.metadata->'difficulty' END published_difficulty,
      ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission='edit')) can_edit
     FROM problems p JOIN problem_banks bank ON bank.id=p.bank_id
     LEFT JOIN bank_permissions bp ON bp.bank_id=bank.id AND bp.account_id=$1
@@ -478,8 +486,14 @@ export async function createDomainServices(pool,config) {
     const problemIds=rows.map(r=>r.problem_id),ownProgress=await problemOwnProgress(pool,user,problemIds);
     const configured=(await pool.query('SELECT problem_id,points FROM point_rewards WHERE assignment_id IS NULL AND problem_id=ANY($1::uuid[])',[problemIds])).rows;
     const firstAcPoints=new Map(configured.map(reward=>[reward.problem_id,reward.points]));
-    const presented=isStaff(user)?rows:await studentPublicStatementRows(pool,rows);
-    return respond(200,{items:presented.map(r=>({...problemShape(r,{includeDisabledSamples:!!r.can_edit}),bankId:r.bank_id,canEdit:!!r.can_edit,canPublish:!!r.can_edit&&r.validation_status==='AC'&&!r.published_at,firstAcPoints:firstAcPoints.get(r.problem_id)??10,ownProgress:ownProgress.get(r.problem_id)||emptyOwnProgress()}))});
+    const staffView=isStaff(user);
+    const presented=staffView?rows:await studentPublicStatementRows(pool,rows);
+    return respond(200,{items:presented.map(r=>({
+     ...problemShape(r,{includeDisabledSamples:!!r.can_edit}),
+     ...(staffView?{publishedDifficulty:typeof r.published_difficulty==='string'?r.published_difficulty:null}:{}),
+     bankId:r.bank_id,canEdit:!!r.can_edit,canPublish:!!r.can_edit&&r.validation_status==='AC'&&!r.published_at,
+     firstAcPoints:firstAcPoints.get(r.problem_id)??10,ownProgress:ownProgress.get(r.problem_id)||emptyOwnProgress(),
+    }))});
    }
    if(route==='/problems'&&method==='POST'){
     staff(user);const input=problemInput(body);const v=await transaction(pool,async db=>{const access=await bankAccess(db,user,input.bankId);if(!access.canContribute)fail(403,'FORBIDDEN','无权向该题库添加题目');const p=row(await db.query('INSERT INTO problems(owner_account_id,bank_id) VALUES($1,$2) RETURNING id',[user.id,input.bankId]));return insertVersion(db,user,p.id,input);});return respond(201,await problemResult(pool,user,v.problem_id,v.id));

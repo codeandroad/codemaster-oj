@@ -1,7 +1,7 @@
 "use client";
 
 import { AppLink as Link } from "@/components/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ComponentProps } from "react";
 import {activityDate,validateActivity,activeParticipants} from "./activity-validation";
 import {useActivityDraft} from "./use-activity-draft";
 import { courseProblemOrder, savedProblemOrder } from "./assignment-problem-order";
@@ -19,7 +19,8 @@ import {
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
-import { ActivityRewardEditor } from "@/components/luq/teaching-page";
+import { ScholarshipIcon } from "@/components/luq/scholarship-icon";
+import { ActivityRewardFields, type RewardRule, type RuleResponse } from "@/components/luq/teaching-page";
 import { useLocale, type AppLocale } from "@/components/locale-context";
 import {
   productionApi,
@@ -54,6 +55,17 @@ import {
 } from "./shared";
 
 const ui = (locale: AppLocale, zh: string, en: string) => locale === "zh" ? zh : en;
+const completionRewardInputId = "assignment-completion-scholarship";
+
+function ScholarshipAmountInput({ ref, ...props }: ComponentProps<"input">) {
+  return (
+    <span className="relative inline-flex w-28">
+      <ScholarshipIcon size={16} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2" />
+      <input ref={ref} type="number" min={0} step={1} className={`${input} pl-9 tabular-nums disabled:opacity-60`} {...props} />
+    </span>
+  );
+}
+
 const assignmentTabLabel: Record<string, [string, string]> = {
   "Basic information": ["基本信息", "Basic information"],
   Problems: ["题目与分值", "Problems"],
@@ -175,13 +187,18 @@ interface SelectedProblem {
   points: number;
   firstAcPoints: number;
   rewardPoints: number;
+  difficulty?: string | null;
   mode?: string;
   versionId?: string;
 }
 interface LatestProblemVersion {
   versionId: string;
   title: string;
+  difficulty: string | null;
 }
+const getProblemVersion = (problemId: string, versionId: string) =>
+  productionApi<ProductionProblem>(`problems/${encodeURIComponent(problemId)}?versionId=${encodeURIComponent(versionId)}`);
+
 const assignmentTabs = [
   "Basic information",
   "Problems",
@@ -215,6 +232,10 @@ function AssignmentEditorForm({
   onReload: () => void;
 }) {
   const { locale } = useLocale();
+  const [rewardEdit, setRewardEdit] = useState<RewardRule | null>(null);
+  const [rewardConflict, setRewardConflict] = useState(false);
+  const rewardInput = useRef<HTMLInputElement>(null);
+  const focusReward = useRef(false);
   const router = useRouter(),
     searchParams = useSearchParams(),
     classes = useData<{ items: SchoolClass[] }>("classes"),
@@ -234,6 +255,7 @@ function AssignmentEditorForm({
         title: x.title ?? "题目",
         firstAcPoints: x.firstAcPoints ?? 10,
         rewardPoints: x.rewardPoints ?? 0,
+        difficulty: x.difficulty ?? null,
       })),
     ),
     [participants, setParticipants] = useState(
@@ -251,6 +273,7 @@ function AssignmentEditorForm({
     [versionError, setVersionError] = useState(""),
     [stale, setStale] = useState(false),
     action = useAction();
+  const rewardResource = useData<RuleResponse>(`luq/reward-rules?activityType=assignment${saved ? `&activityId=${encodeURIComponent(saved.id)}` : ""}`);
   const courseOutline = useData<{ id: string; chapters: { problems: { problemId: string }[] }[] }>(coursePathId ? `learning-paths/${coursePathId}` : null);
   const needsCourseOrder = problemOrder === "course" && Boolean(coursePathId);
   const matchingCourseOutline = courseOutline.data?.id === coursePathId;
@@ -292,15 +315,43 @@ function AssignmentEditorForm({
 
   const total = selected.reduce((sum, x) => sum + x.points, 0);
   const rewardTotal = selected.reduce((sum, x) => sum + x.rewardPoints, 0);
+  const rewardReady = Boolean(rewardResource.data && !rewardResource.loading && !rewardResource.error);
+  const storedReward = rewardResource.data?.rule;
+  const baseReward = storedReward && !published && storedReward.version === 0
+    ? { ...storedReward, requireAll: true }
+    : storedReward;
+  const completionReward = published ? baseReward : rewardEdit ?? baseReward;
+  const completionLabel = ui(locale, "按时完成奖学金", "On-time completion scholarship");
+  const perProblemLabel = ui(locale, "单题奖学金", "Per-problem scholarship");
+  const rewardUnit = ui(locale, "奖学金", "Scholarship");
+  const setRewardLabel = ui(locale, "设置按时完成奖学金", "Set on-time completion scholarship");
+  const rewardCap = rewardResource.data?.cap;
+  const changedReward = !published && rewardEdit !== null && JSON.stringify(rewardEdit) !== JSON.stringify(baseReward);
+  const rewardAmountInvalid = changedReward && rewardCap !== undefined &&
+    (!Number.isInteger(rewardEdit.amount) || rewardEdit.amount < 0 || rewardEdit.amount > rewardCap);
+  const rewardAmountError = ui(locale, `请输入 0–${rewardCap} 的整数。`, `Enter a whole number from 0 to ${rewardCap}.`);
+  const rewardCondition = completionReward && (completionReward.requireAll
+    ? ui(locale, "通过本作业全部题目，以截止前收到的正式提交为准。", "Pass every problem using formal submissions received in this assignment by the deadline.")
+    : ui(locale, `在截止前至少通过 ${completionReward.minimumAc} 题，且得分达到 ${completionReward.minimumScore}%。`,
+      `Pass at least ${completionReward.minimumAc} problems and score ${completionReward.minimumScore}% or more by the deadline.`));
+  const rewardLocked = published || Boolean(rewardResource.data?.frozen || rewardResource.data?.canManage === false);
+  const showCompletionReward = () => {
+    focusReward.current = true;
+    setTab("Basic information");
+  };
+  useEffect(() => {
+    if (tab === "Basic information" && focusReward.current && rewardInput.current && !rewardInput.current.disabled) {
+      rewardInput.current.focus();
+      focusReward.current = false;
+    }
+  }, [tab, rewardReady]);
   const checkLatestVersion = async (problemId: string) => {
     setCheckingVersion(problemId);
     setVersionError("");
     try {
       const problem = await productionApi<ProductionProblem>(`problems/${problemId}`);
       const published = problem.publishedVersionId
-        ? await productionApi<ProductionProblem>(
-            `problems/${problemId}?versionId=${encodeURIComponent(problem.publishedVersionId)}`,
-          )
+        ? await getProblemVersion(problemId, problem.publishedVersionId)
         : null;
       setLatestVersions((current) => ({
         ...current,
@@ -308,6 +359,7 @@ function AssignmentEditorForm({
           ? {
               versionId: problem.publishedVersionId,
               title: published.title,
+              difficulty: published.difficulty ?? null,
             }
           : null,
       }));
@@ -326,7 +378,50 @@ function AssignmentEditorForm({
     if (problem.versionId) query.set("versionId", problem.versionId);
     return `/teacher/problems/${problem.problemId}/edit?${query.toString()}`;
   };
-  const draft=useActivityDraft({storageKey:`campus-judge:activity-draft:v1:${userId}:assignment:${initial?.id??"new"}`,editable:true,noticeText:published?"改动已临时保存在当前浏览器；点击“保存修改”后才会更新已发布作业。":undefined,snapshot:{title,description,course,coursePathId,problemOrder,classId,classIds,due,problems:selected,participants},recoveryDefaults:{coursePathId:"",problemOrder:"course",classIds:[]},onRestore:v=>{setTitle(v.title);setDescription(v.description);setCourse(v.course);setCoursePathId(v.coursePathId??"");setProblemOrder(v.problemOrder==="custom"?"custom":"course");setDue(v.due);setSelected(v.problems.map(problem=>({...problem,firstAcPoints:initial?.problems.find(item=>item.problemId===problem.problemId)?.firstAcPoints??problem.firstAcPoints??10,rewardPoints:problem.rewardPoints??initial?.problems.find(item=>item.problemId===problem.problemId)?.rewardPoints??0})));setParticipants(v.participants);}});
+  const draft = useActivityDraft({
+    storageKey: `campus-judge:activity-draft:v1:${userId}:assignment:${initial?.id ?? "new"}`,
+    editable: true,
+    noticeText: published ? "改动已临时保存在当前浏览器；点击“保存修改”后才会更新已发布作业。" : undefined,
+    snapshot: { title, description, course, coursePathId, problemOrder, classId, classIds, due, problems: selected, participants, rewardEdit },
+    recoveryDefaults: { coursePathId: "", problemOrder: "course", classIds: [], rewardEdit: null },
+    onRestore: (value) => {
+      setTitle(value.title);
+      setDescription(value.description);
+      setCourse(value.course);
+      setCoursePathId(value.coursePathId ?? "");
+      setProblemOrder(value.problemOrder === "custom" ? "custom" : "course");
+      setDue(value.due);
+      const restored = value.problems.map((problem) => {
+        const original = initial?.problems.find((item) => item.problemId === problem.problemId);
+        const recoveredDifficulty = typeof problem.difficulty === "string" || problem.difficulty === null
+          ? problem.difficulty
+          : undefined;
+        return {
+          ...problem,
+          firstAcPoints: original?.firstAcPoints ?? problem.firstAcPoints ?? 10,
+          rewardPoints: problem.rewardPoints ?? original?.rewardPoints ?? 0,
+          difficulty: original && original.versionId === problem.versionId
+            ? original.difficulty ?? null
+            : recoveredDifficulty,
+        };
+      });
+      setSelected(restored);
+      // Browser drafts saved before this column have a version ID but no difficulty.
+      for (const { problemId, versionId, difficulty } of restored) {
+        if (difficulty !== undefined || typeof versionId !== "string" || !versionId) continue;
+        void getProblemVersion(problemId, versionId).then(
+          (version) => setSelected((current) => current.map((item) =>
+            item.problemId === problemId && item.versionId === versionId && item.difficulty === undefined
+              ? { ...item, difficulty: version.difficulty ?? null }
+              : item,
+          )),
+          () => {},
+        );
+      }
+      setParticipants(value.participants);
+      if (!published) setRewardEdit(value.rewardEdit);
+    },
+  });
   const changedProblems = JSON.stringify(
     selected.map((x) => ({ problemId: x.problemId, points: x.points, versionId: x.versionId, rewardPoints: x.rewardPoints })),
   ) !== JSON.stringify(
@@ -351,12 +446,15 @@ function AssignmentEditorForm({
     return original && original.versionId !== problem.versionId;
   });
   const hasChanges = changedTitle || changedDescription || changedCourse || changedCoursePath ||
-    changedClass || changedDue || changedProblems || changedParticipants || changedProblemOrder;
+    changedClass || changedDue || changedProblems || changedParticipants || changedProblemOrder || changedReward;
   useDirty(hasChanges);
-  const save = async () => {
+  const save = async (assign = false) => {
     if (published && !hasChanges)
       throw new Error("没有需要保存的修改。");
-    validateActivity({title,classId,problems:selected,participants});
+    validateActivity({title,classId,problems:selected,participants,publish:assign});
+    if ((assign || changedReward) && (!rewardReady || !baseReward || rewardConflict))
+      throw new Error(ui(locale, "请先重新加载完成奖学金规则。", "Reload the completion scholarship rule before continuing."));
+    if (rewardAmountInvalid) throw new Error(rewardAmountError);
     if (published && !selected.length)
       throw new Error("已发布作业须保留至少一道题目。");
     if (published && !participants.length && (saved?.participants?.length ?? 0) > 0)
@@ -372,10 +470,12 @@ function AssignmentEditorForm({
     if (published && participants.some((identityId) => exemptStudentIds.has(identityId)))
       throw new Error("恢复已豁免学生请在作业进度页操作。");
     if (published && hasSubmissions && changedProblems)
-      throw new Error("已有正式提交，题目、分值、顺序和奖励积分不能修改。可修改说明、截止时间或适用学生。");
+      throw new Error("已有正式提交，题目、分值、顺序和单题奖学金不能修改。可修改说明、截止时间或适用学生。");
     if (published && hasActivity && changedPinnedVersions)
       throw new Error("已有运行或提交记录，不能切换作业题目的固定版本。");
     const dueAt=activityDate(due,'截止时间');
+    if (assign && Date.parse(dueAt) <= Date.now())
+      throw new Error(ui(locale, "发布前请设置晚于当前时间的截止时间。", "Choose a future deadline before assigning."));
     if (published && changedParticipants && Date.parse(dueAt) <= Date.now())
       throw new Error("作业已截止。调整学生名单前，请先将截止时间延至未来。");
     if (published && changedDue) {
@@ -420,34 +520,81 @@ function AssignmentEditorForm({
           problemOrder,
           problems: problemPayload,
           participants,
+          ...(changedReward
+            ? { completionReward: { ...rewardEdit, expectedVersion: rewardEdit.version } }
+            : assign ? { expectedCompletionRewardVersion: baseReward?.version } : {}),
         };
-    let result: TeacherAssignment;
+    const endpoint = saved ? `assignments/${saved.id}${assign ? "/publish" : ""}` : "assignments";
+    let result: TeacherAssignment & { completionReward?: RuleResponse };
     try {
-      result = await productionApi<TeacherAssignment>(
-        saved ? `assignments/${saved.id}` : "assignments",
-        {
-          method: saved ? "PATCH" : "POST",
-          body,
-        },
-      );
+      result = await productionApi<typeof result>(endpoint, {
+        method: saved && !assign ? "PATCH" : "POST",
+        body,
+      });
+      if (assign && !saved) {
+        // Keep the new draft ID so a publication failure can be retried on the same assignment.
+        draft.clear();
+        setSaved(result);
+        setRewardEdit(null);
+        if (result.completionReward) rewardResource.setData(result.completionReward);
+        result = await productionApi<typeof result>(`assignments/${result.id}/publish`, {
+          method: "POST",
+          body: {
+            expectedRevision: result.editRevision,
+            expectedCompletionRewardVersion: result.completionReward?.rule.version,
+          },
+        });
+      }
     } catch (error) {
-      if (error instanceof ApiError && error.code === "ASSIGNMENT_REVISION_CONFLICT")
-        setStale(true);
+      if (error instanceof ApiError) {
+        if (error.code === "ASSIGNMENT_REVISION_CONFLICT" || error.code === "PUBLISHED_ASSIGNMENT") {
+          setStale(true);
+          setPublish(false);
+        }
+        if (error.code === "LUQ_RULE_CONFLICT" || error.code === "LUQ_RULE_FROZEN") {
+          setRewardConflict(true);
+          setPublish(false);
+          showCompletionReward();
+        }
+      }
       throw error;
     }
     draft.clear();
     setSaved(result);
+    if (result.completionReward) rewardResource.setData(result.completionReward);
+    setRewardEdit(null);
     setProblemOrder(result.problemOrder ?? "course");
     setSelected(savedProblemOrder(result.problems).map((problem) => ({
       ...problem,
       title: problem.title ?? selected.find((item) => item.problemId === problem.problemId)?.title ?? "题目",
       firstAcPoints: problem.firstAcPoints ?? selected.find((item) => item.problemId === problem.problemId)?.firstAcPoints ?? 10,
       rewardPoints: problem.rewardPoints ?? selected.find((item) => item.problemId === problem.problemId)?.rewardPoints ?? 0,
+      difficulty: problem.difficulty ?? null,
       mode: selected.find((item) => item.problemId === problem.problemId)?.mode,
     })));
-    if (!saved) router.replace(`/teacher/assignments/${result.id}/edit`);
+    if (!initial && !assign) router.replace(`/teacher/assignments/${result.id}/edit`);
     return result;
   };
+  const rewardSummary = (
+    <dl className="mt-3 space-y-1 text-sm">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4">
+        <dt>{ui(locale, "单题奖学金合计", "Total per-problem scholarships")}</dt>
+        <dd className="inline-flex items-center gap-1.5 font-semibold tabular-nums">
+          <ScholarshipIcon size={16} />
+          {rewardTotal}
+          <span className="sr-only">{rewardUnit}</span>
+        </dd>
+      </div>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4">
+        <dt>{completionLabel}</dt>
+        <dd className="inline-flex items-center gap-1.5 font-semibold tabular-nums">
+          <ScholarshipIcon size={16} />
+          {rewardReady ? completionReward?.amount : "—"}
+          <span className="sr-only">{rewardUnit}</span>
+        </dd>
+      </div>
+    </dl>
+  );
   return (
     <>
       <PageHeader
@@ -458,7 +605,7 @@ function AssignmentEditorForm({
           <div className="flex flex-wrap gap-2">
             <Button
               variant="secondary"
-              disabled={action.busy || (published && !hasChanges)}
+              disabled={action.busy || (published ? !hasChanges : stale)}
               onClick={() => {
                 if (published) {
                   setConfirmUpdate(true);
@@ -481,7 +628,7 @@ function AssignmentEditorForm({
               </Link>
             ) : (
               <Button
-                disabled={action.busy}
+                disabled={action.busy || stale}
                 onClick={() => setPublish(true)}
               >
                 <Send size={15} />
@@ -493,12 +640,21 @@ function AssignmentEditorForm({
       />
       <Feedback action={action} />
       {draft.notice}
+      {!published && stale && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+          <p>{ui(locale, "作业已更新。请重新加载后核对。", "The assignment changed. Reload it to review the current version.")}</p>
+          <Button type="button" variant="secondary" size="sm" onClick={() => {
+            if (!initial && saved) router.replace(`/teacher/assignments/${saved.id}/edit`);
+            else onReload();
+          }}>{ui(locale, "重新加载作业", "Reload assignment")}</Button>
+        </div>
+      )}
       {published && (
         <p className="mt-3 border border-info-soft bg-info-soft p-3 text-sm">
           {ui(locale, "作业已布置。可以修改标题、说明、截止时间和指定学生；截止时间只能延后。", "This work is assigned. You can update the title, description, selected students, and extend the deadline.")}
           {hasSubmissions
-            ? "已有正式提交，题目、分值、顺序和奖励积分已固定。"
-            : "尚无正式提交，可以调整题目、分值、顺序和奖励积分。"}
+            ? ui(locale, "已有正式提交，题目、分值、顺序和单题奖学金已固定。", "Formal submissions lock the problems, marks, order, and per-problem scholarships.")
+            : ui(locale, "尚无正式提交，可以调整题目、分值、顺序和单题奖学金。", "Before the first formal submission, you can edit the problems, marks, order, and per-problem scholarships.")}
           {hasActivity
             ? "已有运行或提交记录，题目固定版本不可替换；有记录的学生不能从名单中移除。"
             : "尚无运行记录，可在检查后明确选择题库的新发布版本。"}
@@ -569,6 +725,43 @@ function AssignmentEditorForm({
                   </span>
                 )}
               </Field>
+              <div>
+                <Field label={completionLabel}>
+                  <ScholarshipAmountInput
+                    id={completionRewardInputId}
+                    ref={rewardInput}
+                    max={rewardCap}
+                    value={rewardReady ? completionReward?.amount ?? "" : ""}
+                    disabled={!rewardReady || rewardLocked || action.busy || rewardConflict}
+                    aria-describedby="assignment-completion-scholarship-help"
+                    aria-invalid={rewardAmountInvalid || undefined}
+                    onChange={(event) => {
+                      if (completionReward) setRewardEdit({ ...completionReward, amount: Number(event.target.value) });
+                    }}
+                  />
+                </Field>
+                <p id="assignment-completion-scholarship-help" className={`mt-2 text-xs ${rewardAmountInvalid ? "text-destructive" : "text-muted-foreground"}`}>
+                  {rewardReady && (rewardAmountInvalid ? rewardAmountError : <>
+                    {(!rewardLocked || Boolean(completionReward?.amount)) && <>{rewardCondition}{" "}</>}
+                    {rewardLocked
+                      ? ui(locale, "布置后，此奖学金规则已锁定。", "This scholarship rule is locked after assignment.")
+                      : ui(locale, `每名学生自动发放一次。金额为 0–${rewardCap}，设为 0 则不发放。`, `Awarded automatically once per student. Enter 0–${rewardCap}, with 0 turning it off.`)}
+                  </>)}
+                </p>
+                <State resource={rewardResource} />
+                {rewardConflict && (
+                  <div className="mt-2 text-sm">
+                    <p>{ui(locale, "奖学金规则已变更或锁定。请刷新规则后核对。", "The scholarship rule changed or was locked. Reload it to review the current rule.")}</p>
+                    <Button type="button" variant="secondary" size="sm" className="mt-2" onClick={() => {
+                      setRewardEdit(null);
+                      setRewardConflict(false);
+                      rewardResource.reload();
+                    }}>
+                      {ui(locale, "放弃奖学金改动并刷新", "Discard scholarship edits and reload")}
+                    </Button>
+                  </div>
+                )}
+              </div>
               <Field label={ui(locale, "教师说明", "Teacher note")}>
                 <textarea
                   disabled={action.busy}
@@ -586,16 +779,19 @@ function AssignmentEditorForm({
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <b className="text-sm">{ui(locale, "已选题目", "Selected problems")}</b>
-                  <p className="text-xs text-muted-foreground">
-                    {selected.length} 道题 · 作业总分 {total} 分 · 本作业额外奖励 {rewardTotal} / 100 奖学金。
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    <span>{ui(locale, `${selected.length} 道题 · 作业总分 ${total} 分`, `${selected.length} problems · ${total} total marks`)}</span>
+                    <span className="inline-flex items-center gap-1.5 tabular-nums">
+                      <ScholarshipIcon size={15} />
+                      {ui(locale, `单题奖学金合计 ${rewardTotal} / 100`, `Per-problem scholarships ${rewardTotal} / 100`)}
+                    </span>
+                  </div>
+                  <p id="assignment-per-problem-scholarship-help" className="mt-1 text-xs text-muted-foreground">
+                    {ui(locale, "在本作业中首次通过该题时发放，每题 0–20。首次 AC 积分单独计入排行。", "Awarded for the first pass on that problem in this assignment. Set 0–20 per problem. First-AC points count separately toward the leaderboard.")}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    计入排行的首次正式 AC 默认奖励 10 积分（管理员可调整）。作业奖学金按题设置，首次通过该作业题目时发放。
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">作业额外奖励以奖学金入账。</p>
                   {rewardTotal > 100 && (
                     <p role="alert" className="mt-1 text-xs text-destructive">
-                      本作业额外奖励合计最多 100 奖学金，请减少逐题奖励。
+                      {ui(locale, "单题奖学金合计最多 100，请减少单题金额。", "Per-problem scholarships total at most 100. Reduce the amounts.")}
                     </p>
                   )}
                   {published && hasSubmissions && (
@@ -605,11 +801,11 @@ function AssignmentEditorForm({
                   )}
                   {published && hasActivity && !hasSubmissions && (
                     <p className="mt-1 text-xs text-muted-foreground">
-                      已有运行记录，可调整题目、分值和奖励积分，但不能替换已固定的题目版本。
+                      {ui(locale, "已有运行记录，可调整题目、分值和单题奖学金；已固定的题目版本保持锁定。", "Run history locks the pinned versions. Problems, marks, and per-problem scholarships remain editable.")}
                     </p>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button disabled={!canEditProblems || action.busy || !courseOrderReady} onClick={() => setPicker(true)}>
                     <Plus size={15} />
                     从题库与分组选择
@@ -622,6 +818,18 @@ function AssignmentEditorForm({
                     导入题目
                   </Link>
                 </div>
+              </div>
+              <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-y border-border py-2 text-sm">
+                <span className="inline-flex items-center gap-1.5 font-medium">
+                  <ScholarshipIcon size={16} />
+                  {completionLabel}
+                  <span className="tabular-nums">{rewardReady ? completionReward?.amount : "—"}</span>
+                </span>
+                {!rewardLocked && (
+                  <Button type="button" variant="link" size="sm" onClick={showCompletionReward} className="px-0">
+                    {setRewardLabel}
+                  </Button>
+                )}
               </div>
               <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
                 <label htmlFor="assignment-problem-order" className="font-medium">{ui(locale, "题目顺序", "Problem order")}</label>
@@ -639,7 +847,11 @@ function AssignmentEditorForm({
                   {versionError}
                 </p>
               )}
-              {courseOrderReady && <Table headers={["顺序", "题目", "接口", "作业分值", "首次 AC 积分", "本作业额外奖励", "操作"]}>
+              {courseOrderReady && <Table headers={[
+                ui(locale, "顺序", "Order"), ui(locale, "题目", "Problem"), ui(locale, "接口", "Interface"),
+                ui(locale, "作业分值", "Assignment marks"), ui(locale, "首次 AC 积分", "First-AC points"),
+                ui(locale, "题目难度", "Difficulty"), perProblemLabel, ui(locale, "操作", "Actions"),
+              ]} min={930}>
                 {orderedSelected.map((p, i) => (
                   <tr key={p.problemId}>
                     <td>{i + 1}</td>
@@ -681,6 +893,7 @@ function AssignmentEditorForm({
                                           ...item,
                                           versionId: latestVersions[p.problemId]!.versionId,
                                           title: latestVersions[p.problemId]!.title,
+                                          difficulty: latestVersions[p.problemId]!.difficulty,
                                         }
                                       : item,
                                   ))}
@@ -730,15 +943,24 @@ function AssignmentEditorForm({
                     <td>
                       <span className="font-medium">+{p.firstAcPoints}</span>
                     </td>
+                    <td className="relative text-muted-foreground">
+                      {p.difficulty?.trim() ? (
+                        <span className="block max-w-32 truncate" title={p.difficulty}>{p.difficulty}</span>
+                      ) : (
+                        <>
+                          <span aria-hidden="true">—</span>
+                          <span className="sr-only">{p.difficulty === undefined
+                            ? ui(locale, "难度不可用", "Difficulty unavailable")
+                            : ui(locale, "未标注难度", "Difficulty not set")}</span>
+                        </>
+                      )}
+                    </td>
                     <td>
-                      <input
-                        aria-label={`${p.title} 本作业额外奖学金`}
-                        type="number"
-                        step={1}
-                        min={0}
+                      <ScholarshipAmountInput
+                        aria-label={`${p.title} · ${perProblemLabel}`}
+                        aria-describedby="assignment-per-problem-scholarship-help"
                         max={20}
                         disabled={!canEditProblems || action.busy}
-                        className={`${input} w-24`}
                         value={p.rewardPoints}
                         onChange={(event) => setSelected((current) =>
                           current.map((item) => item.problemId === p.problemId
@@ -793,17 +1015,42 @@ function AssignmentEditorForm({
                   </tr>
                 ))}
                 {!selected.length && (
-                  <Empty columns={7}>从题库与分组选择已发布题目。</Empty>
+                  <Empty columns={8}>从题库与分组选择已发布题目。</Empty>
                 )}
               </Table>}
             </>
           )}
           {tab === "Applicable list" && <StudentAudienceSelector students={students} classes={audienceClasses} selectedIds={participants} onChange={setParticipants} loading={audience.loading} error={audience.error} onReload={audience.reload} disabled={action.busy} lockedIds={lockedIds} exemptIds={exemptStudentIds}/>}
-          {tab === "Rules" && <div className="mb-4">
-            {saved
-              ? <ActivityRewardEditor key={`${saved.id}:${saved.state}`} activityType="assignment" activityId={saved.id} />
-              : <p className="text-sm text-muted-foreground">{ui(locale, "保存草稿后可设置作业完成奖学金。", "Save the draft to set an assignment completion scholarship.")}</p>}
-          </div>}
+          {tab === "Rules" && (
+            <section className={`${panel} mb-4 space-y-3 p-4`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="inline-flex items-center gap-2 text-sm font-semibold"><ScholarshipIcon size={16} />{completionLabel}</h2>
+                {!rewardLocked && (
+                  <Button type="button" variant="link" size="sm" className="px-0" onClick={showCompletionReward}>
+                    {setRewardLabel}
+                  </Button>
+                )}
+              </div>
+              <State resource={rewardResource} />
+              {rewardReady && completionReward && (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    {rewardCondition}{" "}
+                    {rewardLocked
+                      ? ui(locale, "布置后规则锁定。", "The rule is locked after assignment.")
+                      : ui(locale, "默认通过全部作业题目。规则随作业保存，布置后锁定。", "The default is to pass every assigned problem. The rule saves with the assignment and locks on publication.")}
+                  </p>
+                  <fieldset
+                    aria-label={ui(locale, "完成奖学金发放条件", "Completion scholarship eligibility")}
+                    disabled={rewardLocked || action.busy || rewardConflict}
+                    className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+                  >
+                    <ActivityRewardFields activityType="assignment" rule={completionReward} onChange={setRewardEdit} />
+                  </fieldset>
+                </>
+              )}
+            </section>
+          )}
           {tab === "Rules" && (
             <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
               {[
@@ -833,7 +1080,10 @@ function AssignmentEditorForm({
               {coursePathId && <p className="mt-2 text-sm text-primary">{ui(locale, "关联课程：", "Linked course: ")}{courses.data?.items.find(item => item.id === coursePathId)?.title ?? initial?.courseTitle ?? ui(locale, "课程不可用", "Course unavailable")}</p>}
               <p className="mt-4 whitespace-pre-wrap text-sm">{description}</p>
               {!courseOrderReady && <State resource={courseOrderState} />}
-              {courseOrderReady && <Table headers={["题目", "作业分值", "首次 AC 积分", "本作业额外奖励"]} min={400}>
+              {courseOrderReady && <Table headers={[
+                ui(locale, "题目", "Problem"), ui(locale, "作业分值", "Assignment marks"),
+                ui(locale, "首次 AC 积分", "First-AC points"), perProblemLabel,
+              ]} min={400}>
                 {orderedSelected.map((p) => (
                   <tr key={p.problemId}>
                     <td>
@@ -843,11 +1093,14 @@ function AssignmentEditorForm({
                     </td>
                     <td>{p.points}</td>
                     <td>+{p.firstAcPoints}</td>
-                    <td>+{p.rewardPoints}</td>
+                    <td><span className="inline-flex items-center gap-1.5 tabular-nums"><ScholarshipIcon size={15} />{p.rewardPoints}</span></td>
                   </tr>
                 ))}
               </Table>}
-              <p className="mt-2 text-xs text-muted-foreground">作业额外奖励以奖学金入账。</p>
+              <div className="border-t border-border">
+                {rewardSummary}
+                {rewardReady && Boolean(completionReward?.amount) && <p className="mt-1 text-xs text-muted-foreground">{rewardCondition}</p>}
+              </div>
               <p className="mt-4 text-xs text-muted-foreground">
                 只有已勾选的学生看到作业、截止时间和进度；公开样例运行不会改变作业成绩。
               </p>
@@ -869,6 +1122,9 @@ function AssignmentEditorForm({
                 points: 100,
                 firstAcPoints: p.firstAcPoints ?? 10,
                 rewardPoints: 0,
+                difficulty: p.publishedDifficulty !== undefined
+                  ? p.publishedDifficulty
+                  : p.versionId === p.publishedVersionId ? p.difficulty : undefined,
                 mode: p.mode,
                 versionId: p.publishedVersionId ?? undefined,
               })),
@@ -878,18 +1134,23 @@ function AssignmentEditorForm({
         />
       )}
       {publish && (
-        <Modal title={ui(locale, "确认布置作业", "Assign this work")} onClose={() => setPublish(false)}>
+        <Modal title={ui(locale, "确认布置作业", "Assign this work")} onClose={() => { if (!action.busy) setPublish(false); }}>
           <p className="text-sm leading-6">
-            {ui(locale, `向已选择的 ${participants.length} 名学生布置 ${selected.length} 道题，总分 ${total} 分、额外奖励上限 ${rewardTotal} 奖学金。未选择的学生不会看到作业。`, `Assign ${selected.length} problems to ${participants.length} selected students, with ${total} marks and up to ${rewardTotal} Scholarship in bonuses. Other students will not see it.`)}
+            {ui(locale, `向已选择的 ${participants.length} 名学生布置 ${selected.length} 道题，总分 ${total} 分。`, `Assign ${selected.length} problems worth ${total} marks to ${participants.length} selected students.`)}
           </p>
+          {rewardSummary}
+          {rewardReady && Boolean(completionReward?.amount) && <p className="mt-2 text-xs text-muted-foreground">{rewardCondition}</p>}
+          <State resource={rewardResource} />
           <Feedback action={action} />
           <div className="mt-5 flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setPublish(false)}>
-              取消
+            <Button variant="secondary" disabled={action.busy} onClick={() => setPublish(false)}>
+              {ui(locale, "取消", "Cancel")}
             </Button>
             <Button
               disabled={
                 action.busy ||
+                !rewardReady ||
+                rewardConflict ||
                 !participants.length ||
                 !selected.length ||
                 !title.trim() ||
@@ -897,13 +1158,7 @@ function AssignmentEditorForm({
               }
               onClick={() =>
                 void action.run(async () => {
-                  validateActivity({title,classId,problems:selected,participants,publish:true});
-                  if(Date.parse(activityDate(due,"截止时间"))<=Date.now())throw new Error("发布前请设置晚于当前时间的截止时间。");
-                  const result = await save();
-                  await productionApi(`assignments/${result.id}/publish`, {
-                    method: "POST",
-                    body: { expectedRevision: result.editRevision },
-                  });
+                  const result = await save(true);
                   setPublish(false);
                   router.push(`/teacher/assignments/${result.id}/progress`);
                   return ui(locale, "作业已布置。", "Assignment created for the selected students.");
@@ -919,7 +1174,7 @@ function AssignmentEditorForm({
         <Modal title={ui(locale, "确认修改已布置作业", "Save changes to assigned work")} onClose={() => setConfirmUpdate(false)}>
           <p className="text-sm leading-6">
             修改将立即影响已布置给 {participants.length} 名学生的作业。
-            {changedProblems && "题目、分值、顺序或奖励积分有变更。"}
+            {changedProblems && "题目、分值、顺序或单题奖学金有变更。"}
             {changedParticipants && "学生名单有变更，未勾选学生将看不到作业。"}
             {due !== localInput(saved?.dueAt) && "截止时间将延后。"}
             已有提交和历史成绩会保留。

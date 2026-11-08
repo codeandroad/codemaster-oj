@@ -69,6 +69,7 @@ export interface ProductionProblem {
   canPublish?: boolean;
   publishedVersionId?: string | null;
   publishedTitle?: string | null;
+  publishedDifficulty?: string | null;
   bankId?: string | null;
   tags?: string[];
   difficulty?: string;
@@ -98,7 +99,7 @@ export interface Assignment {
   courseAvailable?: boolean;
   problemOrder?: "course" | "custom";
   dueAt: string;
-  problems: { problemId: string; points: number; title?: string; versionId?: string; position?: number; firstAcPoints?: number; rewardPoints?: number }[];
+  problems: { problemId: string; points: number; title?: string; versionId?: string; position?: number; firstAcPoints?: number; rewardPoints?: number; difficulty?: string | null }[];
   participants: string[];
   participantDetails?: { identityId: string; name: string; exempt: boolean; hasActivity?: boolean }[];
   grades?: {

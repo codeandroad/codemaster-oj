@@ -8,7 +8,7 @@ import {hashPassword} from '../../../packages/domain/src/security.mjs';
 import {loadConfig} from '../../../packages/domain/src/application.mjs';
 
 test('Luq real Nest transport: role/CSRF boundary, idempotent grants, content privacy and frozen rules',
- {skip:!process.env.TEST_DATABASE_URL,timeout:90000},async()=>{
+ {skip:!process.env.TEST_DATABASE_URL,timeout:90000},async t=>{
  const connection=new URL(process.env.TEST_DATABASE_URL);
  assert.ok(['127.0.0.1','localhost','[::1]'].includes(connection.hostname)&&/^\/campus_(qa|test)(_[a-z0-9_]+)?$/i.test(connection.pathname),'Use a dedicated local QA database');
  const manager=createPool(connection.href),schema=`luq_http_${randomBytes(6).toString('hex')}`;
@@ -94,5 +94,68 @@ test('Luq real Nest transport: role/CSRF boundary, idempotent grants, content pr
   await other.call('/luq/reward-rules?'+new URLSearchParams({activityType:'assignment',activityId:assignmentId}),{expected:403});
   await teacher.call('/luq/reward-rules',{method:'POST',body:{...rule,expectedVersion:1},expected:409});
   const oldPoints=await pool.query('SELECT count(*)::int n FROM point_ledger');assert.equal(oldPoints.rows[0].n,0,'Luq purchases never write the old points ledger');
+
+  await t.test('assignment completion rules save and publish atomically with their draft',async()=>{
+   const rulesUrl='/luq/reward-rules?activityType=assignment';
+   await anonymous(rulesUrl,{expected:401});
+   await student.call(rulesUrl,{expected:403});
+   const defaults=await teacher.call(rulesUrl);
+   assert.equal(defaults.canManage,true);
+   assert.equal(defaults.frozen,false);
+   assert.equal(defaults.rule.requireAll,true);
+   assert.equal(defaults.rule.version,0);
+   assert.equal(defaults.cap,(await admin.call('/luq/settings')).activityRewardCap);
+
+   const completionReward={amount:15,requireAll:true,taskKind:'challenge',allowSolutionAssisted:false,expectedVersion:0};
+   const body={title:'Completion reward draft',state:'Draft',dueAt:new Date(Date.now()+3600000).toISOString(),
+    problems:[{problemId,points:100,rewardPoints:3}],participants:[student.identityId],completionReward};
+   await teacher.call('/assignments',{method:'POST',body,badCsrf:true,expected:403});
+   await student.call('/assignments',{method:'POST',body,expected:403});
+   await teacher.call('/assignments',{method:'POST',body:{...body,completionReward:{...completionReward,amount:defaults.cap+1}},expected:400});
+   assert.equal((await pool.query('SELECT id FROM assignments WHERE title=$1',[body.title])).rowCount,0);
+
+   const draft=await teacher.call('/assignments',{method:'POST',body,expected:201});
+   const draftUrl=`/assignments/${draft.id}`;
+   const draftRulesUrl=`${rulesUrl}&activityId=${draft.id}`;
+   assert.equal(draft.completionReward.rule.amount,15);
+   assert.equal(draft.completionReward.rule.requireAll,true);
+   assert.equal(draft.completionReward.rule.version,1);
+   assert.equal(draft.completionReward.frozen,false);
+   assert.equal(draft.problems[0].rewardPoints,3);
+   const change={expectedRevision:draft.editRevision,title:'Saved completion reward',completionReward:{...completionReward,amount:16,expectedVersion:1}};
+   await stranger.call(draftUrl,{method:'PATCH',body:change,expected:404});
+   const revised=await teacher.call(draftUrl,{method:'PATCH',body:change});
+   assert.equal(revised.completionReward.rule.version,2);
+   assert.equal(revised.completionReward.rule.amount,16);
+   const publishUrl=`${draftUrl}/publish`;
+   const incomplete=await teacher.call(publishUrl,{method:'POST',body:{expectedRevision:revised.editRevision,participants:[],
+    completionReward:{...completionReward,amount:17,expectedVersion:2}},expected:409});
+   assert.equal(incomplete.error.code,'INCOMPLETE');
+   const fresh=await teacher.call(draftUrl);
+   assert.equal(fresh.editRevision,revised.editRevision);
+   assert.equal(fresh.state,'Draft');
+   assert.deepEqual(fresh.participants,[student.identityId]);
+   assert.deepEqual((await teacher.call(draftRulesUrl)).rule,revised.completionReward.rule);
+
+   const concurrentEdit=await teacher.call('/luq/reward-rules',{method:'POST',body:{...completionReward,amount:18,
+    activityType:'assignment',activityId:draft.id,expectedVersion:2}});
+   assert.equal(concurrentEdit.rule.version,3);
+   const stale=await teacher.call(publishUrl,{method:'POST',body:{expectedRevision:revised.editRevision,expectedCompletionRewardVersion:2},expected:409});
+   assert.equal(stale.error.code,'LUQ_RULE_CONFLICT');
+   assert.equal((await teacher.call(draftUrl)).state,'Draft');
+   const published=await teacher.call(publishUrl,{method:'POST',body:{expectedRevision:revised.editRevision,expectedCompletionRewardVersion:3}});
+   assert.equal(published.state,'Published');
+   assert.equal(published.completionReward.frozen,true);
+   assert.deepEqual(published.completionReward.rule,concurrentEdit.rule);
+   const frozen=await teacher.call(draftUrl,{method:'PATCH',body:{expectedRevision:published.editRevision,
+    completionReward:{...completionReward,expectedVersion:3}},expected:409});
+   assert.equal(frozen.error.code,'LUQ_RULE_FROZEN');
+   assert.deepEqual((await student.call(draftRulesUrl)).rule,concurrentEdit.rule);
+
+   const direct=await teacher.call('/assignments',{method:'POST',body:{...body,title:'Publish with completion reward',state:'Published'},expected:201});
+   assert.equal(direct.state,'Published');
+   assert.equal(direct.completionReward.frozen,true);
+   assert.equal(direct.completionReward.rule.amount,15);
+  });
  }finally{if(app)await app.close();await pool.end();await manager.query(`DROP SCHEMA ${schema} CASCADE`);await manager.end();}
 });

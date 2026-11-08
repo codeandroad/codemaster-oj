@@ -1,6 +1,8 @@
 import { transaction } from './db.mjs';
 import { fail,field,uuid,enumValue,integer } from './security.mjs';
 import {audienceClasses,audienceStudents,defaultClassStudents,replaceAudienceClasses} from './activity-audience.mjs';
+import {getLuqSettings} from './luq-ledger.mjs';
+import {checkLuqRuleVersion,readLuqRule,saveLuqRule} from './luq-rules.mjs';
 const staff=u=>{if(!u.roles.some(r=>['teacher','admin'].includes(r)))fail(403,'FORBIDDEN','需要教师权限');};
 const row=r=>{if(!r.rowCount)fail(404,'NOT_FOUND','资源不存在');return r.rows[0];};
 const rewardPoints=(value,fallback=0)=>value===undefined?fallback:integer(value,0,20,'作业每题额外奖学金');
@@ -35,6 +37,19 @@ async function apply(db,id,i,accountId){
  await syncRewards(db,id,i.problems,accountId);
 }
 async function publishable(db,i){if(i.dueAt<=new Date())fail(400,'VALIDATION','截止时间须晚于现在');if(!i.problems.length||!i.participants.length)fail(409,'INCOMPLETE','发布作业前须选择题目和适用学生');if(i.coursePathId)await coursePathId(db,i.coursePathId);}
+
+async function assignmentCompletionReward(ctx,db,id,frozen){
+ const {completionReward,expectedCompletionRewardVersion}=ctx.body;
+ if(expectedCompletionRewardVersion===undefined&&completionReward===undefined)return undefined;
+ let rule;
+ if(expectedCompletionRewardVersion!==undefined){
+  rule=await readLuqRule(db,'assignment',id);
+  checkLuqRuleVersion(rule,expectedCompletionRewardVersion);
+ }
+ if(completionReward!==undefined)return {...await saveLuqRule(db,ctx,'assignment',id,completionReward),frozen};
+ const {activityRewardCap:cap}=await getLuqSettings(db);
+ return {rule,canManage:true,frozen,cap};
+}
 
 // Published work remains editable without changing the version or score of an
 // existing submission. Every edit takes the assignment row lock first; student
@@ -131,11 +146,53 @@ async function editPublished(ctx,db,id,old,body){
  await ctx.helpers.audit(db,ctx.user.id,'assignment.published_edit','assignment',id,{...(reason?{reason}:{}),fields,revision:versionChanges,previousDueAt:dueChanged?old.due_at:undefined,dueAt:dueChanged?dueAt.toISOString():undefined,added:added.length,participants:participants.length});
 }
 export async function handleAssignmentAuthoring(ctx){
- const {route,method,body,pool,user,helpers}=ctx;let match;
+ const {route,method,body,pool,user,helpers}=ctx;
  if(route==='/assignments'&&method==='POST'){
-  staff(user);const state=enumValue(body.state??'Published',['Draft','Published'],'作业状态');const id=await transaction(pool,async db=>{const i=await input(ctx,db,body);if(state==='Published')await publishable(db,i);const a=row(await db.query("INSERT INTO assignments(title,class_id,owner_account_id,due_at,description,state) VALUES($1,$2,$3,$4,$5,'Draft') RETURNING id",[i.title,i.classId,user.id,i.dueAt,i.description]));await apply(db,a.id,i,user.id);if(state==='Published')await db.query("UPDATE assignments SET state='Published',published_at=now() WHERE id=$1",[a.id]);await helpers.audit(db,user.id,state==='Draft'?'assignment.draft_create':'assignment.create','assignment',a.id);return a.id;});return {status:201,body:await helpers.assignmentResult(pool,user,id)};
+  staff(user);
+  const published=enumValue(body.state??'Published',['Draft','Published'],'作业状态')==='Published';
+  const result=await transaction(pool,async db=>{
+   const i=await input(ctx,db,body);
+   if(published)await publishable(db,i);
+   const {id}=row(await db.query("INSERT INTO assignments(title,class_id,owner_account_id,due_at,description,state) VALUES($1,$2,$3,$4,$5,'Draft') RETURNING id",[i.title,i.classId,user.id,i.dueAt,i.description]));
+   await apply(db,id,i,user.id);
+   const completionReward=await assignmentCompletionReward(ctx,db,id,published);
+   if(published)await db.query("UPDATE assignments SET state='Published',published_at=now() WHERE id=$1",[id]);
+   await helpers.audit(db,user.id,published?'assignment.create':'assignment.draft_create','assignment',id);
+   const assignment=await helpers.assignmentResult(db,user,id);
+   return completionReward?{...assignment,completionReward}:assignment;
+  });
+  return {status:201,body:result};
  }
- match=route.match(/^\/assignments\/([^/]+)(?:\/(publish))?$/);
+ const match=route.match(/^\/assignments\/([^/]+)(?:\/(publish))?$/);
  if(!match||!(method==='PATCH'&&!match[2]||method==='POST'&&match[2]==='publish'))return null;
- staff(user);const id=uuid(match[1]);await transaction(pool,async db=>{row(await db.query('SELECT id FROM assignments WHERE id=$1 FOR UPDATE',[id]));const a=await helpers.assignmentAccess(db,user,id);if(!a.canManage)fail(403,'FORBIDDEN','无权编辑此作业');if(a.archived_at)fail(409,'ARCHIVED','已归档作业不能修改，请先恢复');if(a.state==='Published'){if(match[2])fail(409,'PUBLISHED_ASSIGNMENT','作业已经发布');await editPublished(ctx,db,id,a,body);return;}if(body.expectedRevision!==undefined){if(!Number.isSafeInteger(body.expectedRevision)||body.expectedRevision<0)fail(400,'VALIDATION','作业编辑版本无效');if(body.expectedRevision!==a.edit_revision)fail(409,'ASSIGNMENT_REVISION_CONFLICT','作业已被其他操作修改，请刷新后核对再保存');}const i=await input(ctx,db,body,a);await apply(db,id,i,user.id);if(match[2]){await publishable(db,i);await db.query("UPDATE assignments SET state='Published',published_at=now() WHERE id=$1",[id]);}await db.query('UPDATE assignments SET edit_revision=edit_revision+1 WHERE id=$1',[id]);await helpers.audit(db,user.id,match[2]?'assignment.publish':'assignment.draft_edit','assignment',id);});return {status:200,body:await helpers.assignmentResult(pool,user,id)};
+ staff(user);
+ const id=uuid(match[1]),publishing=match[2]==='publish';
+ const result=await transaction(pool,async db=>{
+  row(await db.query('SELECT id FROM assignments WHERE id=$1 FOR UPDATE',[id]));
+  const a=await helpers.assignmentAccess(db,user,id);
+  if(!a.canManage)fail(403,'FORBIDDEN','无权编辑此作业');
+  if(a.archived_at)fail(409,'ARCHIVED','已归档作业不能修改，请先恢复');
+  if(a.state==='Published'){
+   if(publishing)fail(409,'PUBLISHED_ASSIGNMENT','作业已经发布');
+   if(body.completionReward!==undefined)fail(409,'LUQ_RULE_FROZEN','奖励规则已经冻结；请在作业发布前设置');
+   await editPublished(ctx,db,id,a,body);
+   return helpers.assignmentResult(db,user,id);
+  }
+  if(body.expectedRevision!==undefined){
+   if(!Number.isSafeInteger(body.expectedRevision)||body.expectedRevision<0)fail(400,'VALIDATION','作业编辑版本无效');
+   if(body.expectedRevision!==a.edit_revision)fail(409,'ASSIGNMENT_REVISION_CONFLICT','作业已被其他操作修改，请刷新后核对再保存');
+  }
+  const i=await input(ctx,db,body,a);
+  await apply(db,id,i,user.id);
+  const completionReward=await assignmentCompletionReward(ctx,db,id,publishing);
+  if(publishing){
+   await publishable(db,i);
+   await db.query("UPDATE assignments SET state='Published',published_at=now() WHERE id=$1",[id]);
+  }
+  await db.query('UPDATE assignments SET edit_revision=edit_revision+1 WHERE id=$1',[id]);
+  await helpers.audit(db,user.id,publishing?'assignment.publish':'assignment.draft_edit','assignment',id);
+  const assignment=await helpers.assignmentResult(db,user,id);
+  return completionReward?{...assignment,completionReward}:assignment;
+ });
+ return {status:200,body:result};
 }

@@ -48,15 +48,19 @@ export async function saveTutorial(db, problem, body, audit) {
 
 async function legacyCourseTutorial(db, user, problem, version, url) {
  const {courseId,chapterId} = tutorialContext(url);
+ // A chapter teaches the problem across revisions. Its text is read from
+ // the published course while both version references retain their access checks.
  const {rows} = await db.query(`SELECT p.id AS course_id,p.title AS course_title,c.id AS chapter_id,
   c.title,c.content FROM chapter_problems link
   JOIN learning_chapters c ON c.id=link.chapter_id AND c.archived_at IS NULL
   JOIN learning_paths p ON p.id=c.path_id AND p.published_at IS NOT NULL AND p.archived_at IS NULL
   JOIN problem_versions v ON v.id=link.version_id AND v.problem_id=link.problem_id
+  JOIN problem_versions requested ON requested.id=$2 AND requested.problem_id=link.problem_id
+   AND requested.published_at IS NOT NULL AND requested.school_visible_at IS NOT NULL AND requested.rank_review_status='approved'
   JOIN problem_banks b ON b.id=$5 AND b.visibility='school' AND b.archived_at IS NULL
-  WHERE link.problem_id=$1 AND link.version_id=$2 AND v.published_at IS NOT NULL
+  WHERE link.problem_id=$1 AND v.published_at IS NOT NULL
    AND v.school_visible_at IS NOT NULL AND v.rank_review_status='approved' AND btrim(c.content)<>''
-  ORDER BY (p.id=$3 AND c.id=$4) DESC NULLS LAST,p.id,c.position,c.id`,
+  ORDER BY (p.id=$3 AND c.id=$4) DESC NULLS LAST,(link.version_id=$2) DESC,p.id,c.position,c.id`,
  [problem.id,version.id,courseId,chapterId,problem.bank_id]);
  const readable = await readableCourseIds(db,user,[...new Set(rows.map(row=>row.course_id))]);
  const chapter = rows.find(row=>readable.has(row.course_id) && row.content.trim());

@@ -112,8 +112,39 @@ test('problem tutorials allow school teachers to teach with approved shared prob
    source:'course',courseTitle:'Authorized course',title:'Patterns',body:'### General technique',
   });
   assert.equal((await view()).tutorial?.body,'### General technique','a direct problem entry can find its linked course');
+  const {rows:[revision]}=await pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,
+   reference_code,validation_status,published_at,school_visible_at,rank_review_status,rank_approved_at)
+   SELECT problem_id,title,mode,'Revised statement.',time_limit_ms,memory_limit_mb,reference_code,
+    validation_status,now(),now(),'approved',now() FROM problem_versions WHERE id=$1 RETURNING id`,[version.id]);
+  await pool.query('UPDATE problems SET current_version_id=$1 WHERE id=$2',[revision.id,problem.id]);
+  // This is the tutorial request made by an assignment workspace pinned to the newer version.
+  const revisedTutorial=(auth=student,extra='')=>call(endpoint+'?versionId='+revision.id+extra,{auth});
+  assert.equal((await revisedTutorial()).tutorial?.body,'### General technique');
+  await pool.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,status,score,code,idempotency_key,request_hash)
+   VALUES($1,$2,$3,$4,'submit','AC',100,'print(0)','course-ac','course-ac')`,[student.user.id,student.identityId,problem.id,version.id]);
+  const courseView=await call('/learning-paths/'+course.id,{auth:student});
+  const exercise=courseView.chapters.find(item=>item.id===chapter.id).problems[0];
+  assert.equal(exercise.versionId,revision.id,'published course opens the newest approved version');
+  assert.equal(exercise.completed,true,'existing course completion is preserved');
+  assert.equal(courseView.completedTasks,1);
+  const {rows:[exactChapter]}=await pool.query(`INSERT INTO learning_chapters(path_id,title,content,position,checkpoint_answer)
+   VALUES($1,'Revised patterns','### Updated technique',1,'') RETURNING id`,[course.id]);
+  await pool.query('INSERT INTO chapter_problems(chapter_id,problem_id,version_id,position) VALUES($1,$2,$3,0)',[exactChapter.id,problem.id,revision.id]);
+  assert.equal((await revisedTutorial()).tutorial?.body,'### Updated technique','exact links take priority without a chapter context');
+  assert.equal((await revisedTutorial(student,selected)).tutorial?.body,'### General technique','course entry keeps its own chapter');
+  await pool.query('DELETE FROM chapter_problems WHERE chapter_id=$1',[exactChapter.id]);
+  await pool.query("UPDATE learning_paths SET access_scope='classes' WHERE id=$1",[course.id]);
+  assert.equal((await revisedTutorial(student,selected)).tutorial,null,'fallback must respect course audience');
+  await pool.query("UPDATE learning_paths SET access_scope='school' WHERE id=$1",[course.id]);
+  await pool.query("UPDATE problem_versions SET school_visible_at=NULL,rank_review_status='revoked' WHERE id=$1",[version.id]);
+  assert.equal((await revisedTutorial()).tutorial,null,'fallback cannot use a non-school-visible chapter link');
+  await pool.query("UPDATE problem_versions SET school_visible_at=now(),rank_review_status='approved' WHERE id=$1",[version.id]);
+  await pool.query("UPDATE problem_versions SET school_visible_at=NULL,rank_review_status='revoked' WHERE id=$1",[revision.id]);
+  assert.equal((await revisedTutorial(teacher)).tutorial,null,'the requested version must also be school-visible');
+  await pool.query("UPDATE problem_versions SET school_visible_at=now(),rank_review_status='approved' WHERE id=$1",[revision.id]);
   await pool.query('UPDATE learning_paths SET published_at=NULL WHERE id=$1',[course.id]);
   assert.equal((await view()).tutorial,null);
+  assert.equal((await revisedTutorial()).tutorial,null);
   await pool.query('UPDATE learning_paths SET published_at=now() WHERE id=$1',[course.id]);
   const contenders=await Promise.all([
    save(teacher,{mode:'custom',body:'New content',expectedRevision:2},null),
@@ -123,7 +154,7 @@ test('problem tutorials allow school teachers to teach with approved shared prob
   const result=await save(admin,{mode:'none',expectedRevision:3});
   assert.equal(result.body,'');
   assert.equal((await view(student,selected)).tutorial,null);
-  assert.equal((await pool.query('SELECT count(*)::int AS total FROM problem_versions WHERE problem_id=$1',[problem.id])).rows[0].total,1);
+  assert.equal((await pool.query('SELECT count(*)::int AS total FROM problem_versions WHERE problem_id=$1',[problem.id])).rows[0].total,2);
  } finally {
   await app?.close();
   await pool.end();

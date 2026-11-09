@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { APP_LOCALE_COOKIE, APP_LOCALE_STORAGE_KEY, DEFAULT_APP_LOCALE, resolveAppLocale, type AppLocale } from "@/lib/app-locale";
+import { accountLocaleStorageKey, DEFAULT_APP_LOCALE, resolveAppLocale, type AppLocale } from "@/lib/app-locale";
 
 export type { AppLocale } from "@/lib/app-locale";
 
@@ -27,7 +27,7 @@ const english: Record<string, string> = {
   "暂不可用": "Unavailable", "页面外观": "Appearance", "颜色主题": "Color theme",
   "跟随系统": "System", "浅色": "Light", "深色": "Dark",
   "选择主页面的颜色主题，设置保存在当前浏览器中。": "Choose the site's color theme. This preference is saved in this browser.",
-  "界面语言": "Interface language", "默认英文。可在此切换为中文，语言设置保存在当前浏览器中，不翻译题目与用户填写的内容。": "English is the default. Select Chinese here if preferred. This preference is saved in this browser; problems and user content are not translated.",
+  "界面语言": "Interface language", "语言偏好按账号保存在当前浏览器中，默认英文。此设置只影响界面文字。": "English is the default. This browser saves the interface language separately for each account.",
   "站点默认语言为历史配置；当前界面以个人设置中的语言选择为准，未设置时显示英文。修改时区不重新计算或篡改已有活动时间。": "The site language setting is retained for compatibility. Your choice in Settings controls the interface, with English as the default. Changing the timezone does not alter existing activity times.",
   "简体中文": "Simplified Chinese", "英语": "English",
   "管理工作台": "Admin dashboard",
@@ -200,26 +200,29 @@ const chineseAliases: Record<string, string> = {
 type LocaleContextValue = { locale: AppLocale; setLocale: (locale: AppLocale) => void; t: (text: string) => string };
 const LocaleContext = createContext<LocaleContextValue | null>(null);
 
-export function AppLocaleProvider({ initialLocale, children }: { initialLocale: AppLocale; children: ReactNode }) {
-  const [locale, setCurrentLocale] = useState<AppLocale>(initialLocale);
+export function AppLocaleProvider({ accountId, children }: { accountId: string; children: ReactNode }) {
+  const storageKey = accountLocaleStorageKey(accountId);
+  const [locale, setCurrentLocale] = useState<AppLocale>(() => {
+    try { return resolveAppLocale(localStorage.getItem(storageKey)); }
+    catch { return DEFAULT_APP_LOCALE; }
+  });
   useEffect(() => {
     document.documentElement.lang = locale === "en" ? "en" : "zh-CN";
+    return () => { document.documentElement.lang = DEFAULT_APP_LOCALE; };
   }, [locale]);
   useEffect(() => {
     const sync = (event: StorageEvent) => {
-      if (event.key === APP_LOCALE_STORAGE_KEY || event.key === null) {
+      if (event.storageArea === localStorage && (event.key === storageKey || event.key === null)) {
         setCurrentLocale(resolveAppLocale(event.newValue));
-        if (event.newValue === null) document.cookie = `${APP_LOCALE_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
       }
     };
     window.addEventListener("storage", sync);
     return () => window.removeEventListener("storage", sync);
-  }, []);
+  }, [storageKey]);
   const setLocale = useCallback((next: AppLocale) => {
     setCurrentLocale(next);
-    document.cookie = `${APP_LOCALE_COOKIE}=${next}; Path=/; Max-Age=31536000; SameSite=Lax`;
-    try { localStorage.setItem(APP_LOCALE_STORAGE_KEY, next); } catch { /* Keep the selection for this session. */ }
-  }, []);
+    try { localStorage.setItem(storageKey, next); } catch { /* Keep the selection for this session. */ }
+  }, [storageKey]);
   const t = useCallback((text: string) => {
     const chinese = chineseAliases[text] ?? text;
     return locale === "en" ? english[chinese] ?? text : chinese;

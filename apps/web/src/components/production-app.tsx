@@ -40,12 +40,11 @@ import { StudentPublicProfile } from "@/components/student/public-profile";
 import {useWorkspaceSettings} from "@/components/student/workspace-settings";
 import {WorkspaceThemeProvider} from "@/components/ui/theme-context";
 import {PersonalAppearanceProvider, PersonalAppearanceSettings} from "@/components/personal-appearance-settings";
-import {useLocale} from "@/components/locale-context";
+import {AppLocaleProvider,useLocale} from "@/components/locale-context";
 import { TeacherPages } from "@/components/teacher/teacher-pages";
 import { ApiError, apiMessage, clearProductionSession, productionApi, roleHome, type AuthResponse, type CampusRole, type CampusUser } from "@/lib/production-api";
 
 export function ProductionApp() {
-  const { locale } = useLocale();
   const pathname = usePathname();
   const router = useRouter();
   const search = useSearchParams();
@@ -111,18 +110,18 @@ export function ProductionApp() {
   };
   if (!isCampusRoute(pathname)) return null;
   const authPage = pathname === "/login" || pathname === "/register" || pathname === "/activate";
-  if (loading && authPage) return <AuthNotice title={locale === "en" ? pathname === "/register" ? "Create account" : "Sign in" : pathname === "/register" ? "注册账号" : "登录"} message={locale === "en" ? "Connecting to CodeMaster…" : "正在连接 CodeMaster…"} />;
+  if (loading && authPage) return <AuthNotice title={pathname === "/register" ? "Create account" : "Sign in"} message="Connecting to CodeMaster…" />;
   if (loading)
     return (
       <main className="grid min-h-screen place-items-center bg-background">
-        <p role="status">{locale === "en" ? "Connecting to CodeMaster…" : "正在连接 CodeMaster…"}</p>
+        <p role="status">Connecting to CodeMaster…</p>
       </main>
     );
-  if (error && authPage) return <AuthNotice error title={locale === "en" ? "Unable to connect" : "暂时无法连接服务"} message={error}><Button className="mt-5 w-fit" onClick={() => { setLoading(true); setError(""); setCheck(value => value + 1); }}>{locale === "en" ? "Retry" : "重试"}</Button></AuthNotice>;
+  if (error && authPage) return <AuthNotice error title="Unable to connect" message={error}><Button className="mt-5 w-fit" onClick={() => { setLoading(true); setError(""); setCheck(value => value + 1); }}>Retry</Button></AuthNotice>;
   if (error)
     return (
       <main className="mx-auto max-w-lg p-8">
-        <h1 className="text-xl font-bold">暂时无法连接服务</h1>
+        <h1 className="text-xl font-bold">Unable to connect</h1>
         <p role="alert" className="mt-3 text-sm text-destructive">
           {error}
         </p>
@@ -134,28 +133,35 @@ export function ProductionApp() {
             setCheck((value) => value + 1);
           }}
         >
-          重试
+          Retry
         </Button>
       </main>
     );
   if (pathname === "/activate") return <ProductionRegisterPage />;
   if (pathname === "/register") return <PersonalRegisterPage onRegistered={loggedIn} joinIntent={joinIntent}/>;
   if (!user || pathname === "/login") return <ProductionLoginPage key={resetIntent ? "reset" : "login"} onLogin={loggedIn} joinIntent={joinIntent} resetIntent={resetIntent} />;
-  if (pathname === "/platform") return <PlatformPage key={user.id} user={user} onUserSaved={setUser} onLogout={() => {
+  const logout = () => {
     setUser(null);
     clearProductionSession();
     router.replace("/login");
-  }} />;
-  if (pathname === "/schools") return <SchoolsPage key={user.id} user={user} onUserSaved={setUser} onLogout={() => {
-    setUser(null);
-    clearProductionSession();
-    router.replace("/login");
-  }} />;
+  };
+  return <AppLocaleProvider key={user.id} accountId={user.id}>
+    <AuthenticatedWorkspace user={user} pathname={pathname} search={search} profileVersion={profileVersion}
+      onUserSaved={setUser} onProfileSaved={(next) => { setUser(next); setProfileVersion(value => value + 1); }} onLogout={logout}/>
+  </AppLocaleProvider>;
+}
+
+function AuthenticatedWorkspace({user,pathname,search,profileVersion,onUserSaved,onProfileSaved,onLogout}: {
+  user: CampusUser; pathname: string; search: Pick<URLSearchParams, "get">; profileVersion: number;
+  onUserSaved: (user: CampusUser) => void; onProfileSaved: (user: CampusUser) => void; onLogout: () => void;
+}) {
+  if (pathname === "/platform") return <PlatformPage user={user} onUserSaved={onUserSaved} onLogout={onLogout} />;
+  if (pathname === "/schools") return <SchoolsPage user={user} onUserSaved={onUserSaved} onLogout={onLogout} />;
   if (!user.roles.length && (pathname === "/" || pathname.startsWith("/student/"))) {
     const publicBookmark = resolvePublicLearningBookmark(pathname, search);
     return <LearnerWorkspaceRedirect href={publicBookmark ?? (user.platformAdmin ? "/platform" : "/schools")}/>;
   }
-  if (pathname.startsWith("/practice")) return <PracticePage user={user} pathname={pathname} onUserSaved={setUser} onLogout={() => { setUser(null); clearProductionSession(); router.replace("/login"); }}/>;
+  if (pathname.startsWith("/practice")) return <PracticePage user={user} pathname={pathname} onUserSaved={onUserSaved} onLogout={onLogout}/>;
   const requestedRole: CampusRole = pathname.startsWith("/admin")
     ? "admin"
     : pathname.startsWith("/teacher")
@@ -175,14 +181,10 @@ export function ProductionApp() {
       user={user}
       role={role}
       pathname={pathname}
-      onLogout={() => {
-        setUser(null);
-        clearProductionSession();
-        router.replace("/login");
-      }}
+      onLogout={onLogout}
     >
       {allowed ? (
-        <ProductionView key={viewKey(pathname)} pathname={pathname} role={role} user={user} profileVersion={profileVersion} onProfileSaved={(next) => { setUser(next); setProfileVersion(value => value + 1); }} />
+        <ProductionView key={viewKey(pathname)} pathname={pathname} role={role} user={user} profileVersion={profileVersion} onProfileSaved={onProfileSaved} />
       ) : (
         <div className={panel}>
           <h1 className="text-xl font-bold">没有访问权限</h1>

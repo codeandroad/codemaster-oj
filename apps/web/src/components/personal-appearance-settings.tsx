@@ -45,7 +45,7 @@ export function PersonalAppearanceSettings() {
     </fieldset>
     <fieldset className="mt-6 border-t border-border pt-5">
       <legend className="font-semibold">{t("界面语言")}</legend>
-      <p className="mt-1 text-sm text-muted-foreground">{t("默认英文。可在此切换为中文，语言设置保存在当前浏览器中，不翻译题目与用户填写的内容。")}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{t("语言偏好按账号保存在当前浏览器中，默认英文。此设置只影响界面文字。")}</p>
       <div className="mt-3 flex flex-wrap gap-3">
         {(["en","zh"] as const).map(value=><label key={value} className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-4 text-sm font-semibold focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primary ${locale===value?"border-primary bg-info-soft text-primary":"border-border hover:bg-muted"}`}>
           <input type="radio" name="personal-locale" value={value} checked={locale===value} onChange={()=>setLocale(value)} className="sr-only"/>

@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense, type ReactNode } from "react";
 import { ProductionApp } from "@/components/production-app";
-import { AppLocaleProvider } from "@/components/locale-context";
-import { APP_LOCALE_COOKIE, resolveAppLocale } from "@/lib/app-locale";
-import {cookies} from "next/headers";
+import { DEFAULT_APP_LOCALE } from "@/lib/app-locale";
 import "katex/dist/katex.min.css";
 import "./globals.css";
 
@@ -12,7 +10,6 @@ export const metadata: Metadata = {
   description: "Learn Python, C++ and JavaScript through courses, coding practice, assignments and timed challenges.",
 };
 
-export default async function RootLayout({ children }: { children: ReactNode }) {
-  const initialLocale=resolveAppLocale((await cookies()).get(APP_LOCALE_COOKIE)?.value);
-  return <html lang={initialLocale==="en"?"en":"zh-CN"}><body><AppLocaleProvider initialLocale={initialLocale}><Suspense fallback={<main className="grid min-h-screen place-items-center" role="status">{initialLocale==="en"?"Connecting to campus services…":"正在连接校内服务…"}</main>}><ProductionApp /></Suspense>{children}</AppLocaleProvider></body></html>;
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return <html lang={DEFAULT_APP_LOCALE}><body><Suspense fallback={<main className="grid min-h-screen place-items-center" role="status">Connecting to campus services…</main>}><ProductionApp /></Suspense>{children}</body></html>;
 }

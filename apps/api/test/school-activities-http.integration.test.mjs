@@ -9,6 +9,7 @@ import { provisionSchool } from '../../../packages/domain/src/schools.mjs';
 import { hashPassword } from '../../../packages/domain/src/security.mjs';
 import { loadConfig } from '../../../packages/domain/src/application.mjs';
 import { processSchoolOne } from '../../../packages/domain/school-worker.mjs';
+import { GoJudge } from '../../../packages/domain/judge.mjs';
 
 test('school activity HTTP transport and alternate-entry assessment isolation', { skip: !process.env.TEST_DATABASE_URL, timeout: 120000 }, async t => {
   const url = new URL(process.env.TEST_DATABASE_URL);
@@ -77,6 +78,61 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
     const published = (await request(prefix + '/problems/' + p.id + '/publish', { auth: auth.admin, method: 'POST', body: { expectedRevision: 1 } })).data;
     await request('/platform/problem-publications', { auth: auth.admin, method: 'POST', body: { schoolId: school.id, problemId: p.id, versionId: published.versionId } });
     const config = { kind: 'timed', title: 'Timed assessment', description: '', startsAt: new Date(Date.now() - 60000).toISOString(), endsAt: new Date(Date.now() + 3600000).toISOString(), durationMinutes: 30, problems: [{ problemId: p.id, versionId: published.versionId, points: 50 }], identityIds: [ids.student, ids.peer], requestId: randomUUID() };
+    await t.test('teacher practice and assignment previews are isolated from formal student outcomes', async () => {
+      const teacher = { auth: auth.teacher };
+      const judge = process.env.GO_JUDGE_TEST_URL
+        ? new GoJudge({ url: process.env.GO_JUDGE_TEST_URL, token: process.env.GO_JUDGE_TEST_TOKEN, environmentVersion: 'assignment-preview-qa' })
+        : { judge: async () => completed };
+      const draft = { ...config, kind: 'assignment', title: 'Preview homework', requestId: randomUUID() };
+      const { data: assignment } = await request(activities, { ...teacher, method: 'POST', status: 201, body: draft });
+      assert.equal(assignment.canPreview, true);
+      const path = activities + '/' + assignment.id;
+      const preview = path + '/preview';
+      const problem = preview + '/problems/' + p.id;
+      await request(preview, { auth: auth.student, status: 404 });
+      await request(preview, { auth: auth.outside, status: 404 });
+      const { data: view } = await request(problem, teacher);
+      assert.equal(view.activity.preview, true);
+      assert.equal(view.versionId, published.versionId);
+      assert.doesNotMatch(JSON.stringify(view), /PRIVATE_REFERENCE|1874|937/);
+      const submission = { method: 'POST', status: 202, ...teacher, body: {
+        kind: 'submit', code: 'def solve(data):\n return data*2', requestId: randomUUID(),
+        versionId: view.versionId, expectedRevision: view.activity.revision,
+      } };
+      const tables = ['school_activity_attempts', 'school_activity_results', 'school_scholarship_ledger',
+        'school_scholarship_receipts', 'school_rank_awards', 'luq_ledger'];
+      const snapshots = async () => Promise.all(tables.map(async table => (await pool.query(
+        `SELECT to_jsonb(t) AS row FROM ${table} t ORDER BY to_jsonb(t)::text`,
+      )).rows));
+      const before = await snapshots();
+      const { data: job } = await request(problem + '/submissions', submission);
+      assert.equal((await request(problem + '/submissions', submission)).data.id, job.id);
+      await processSchoolOne({ pool: worker, judge });
+      const jobPath = preview + '/jobs/' + job.id;
+      assert.equal((await request(jobPath, teacher)).data.status, 'AC');
+      await request(jobPath, { auth: auth.admin, status: 404 });
+      await request(prefix + '/judge-jobs/' + job.id, { ...teacher, status: 404 });
+      assert.equal((await request(preview, teacher)).data.grade.score, 50);
+      assert.equal((await request(problem + '/submissions', teacher)).data.total, 1);
+      assert.equal((await request(path + '/report', teacher)).data.items[0].grade.score, 0);
+      await request(path, { ...teacher, method: 'PATCH', body: { ...draft, expectedRevision: assignment.revision } });
+      await request(problem + '/submissions', { ...submission, status: 409 });
+      assert.equal((await request(preview, teacher)).data.grade.score, 0);
+      await request(path + '/publish', { ...teacher, method: 'POST', body: { expectedRevision: assignment.revision + 1 } });
+      assert.equal((await request(path, { auth: auth.student })).data.grade.score, 0);
+
+      const practice = prefix + '/problems/' + p.id;
+      const { data: personal } = await request(practice + '/submissions', {
+        ...submission, body: { ...submission.body, requestId: randomUUID() },
+      });
+      await processSchoolOne({ pool: worker, judge });
+      assert.equal((await request(prefix + '/judge-jobs/' + personal.id, teacher)).data.status, 'AC');
+      assert.equal((await request(practice + '/submissions', teacher)).data.solved, true);
+      assert.deepEqual((await request(practice + '/submissions', { auth: auth.student })).data.items, []);
+      assert.deepEqual((await request(prefix + '/submissions', teacher)).data.items.map(item => item.id), [personal.id]);
+      assert.deepEqual(await snapshots(), before);
+      assert.equal((await request(path, { auth: auth.student })).data.grade.score, 0);
+    });
     let activity, failedJob;
     await t.test('session, CSRF, role, other-school and draft access checks', async () => {
       await request(activities, { status: 401 });

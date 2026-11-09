@@ -8,6 +8,7 @@ import { metadataPage } from './problem-submissions.mjs';
 const reply = (body, status = 200) => ({ status, body });
 const scope = (db, schoolId) => db.query("SELECT set_config('campus.school_id',$1,true)", [schoolId]);
 const manages = (activity, user, role) => role === 'school_admin' || role === 'teacher' && activity.owner_account_id === user.id;
+const canPreview = a => a.kind === 'assignment' && a.state !== 'Archived';
 const instant = value => value == null || value === '' ? null : (() => {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) fail(400, 'VALIDATION', 'Invalid activity date.');
@@ -109,12 +110,15 @@ export async function calculateSchoolActivityGrade(db, a, studentId) {
     LEFT JOIN school_judge_jobs j ON j.school_id=p.school_id AND j.problem_id=p.problem_id AND j.version_id=p.version_id
       AND j.identity_id=$3 AND j.access_context='school' AND j.kind='submit'
     WHERE a.school_id=$1 AND a.id=$2 GROUP BY p.problem_id`, [a.school_id, a.id, studentId])).rows;
+  return activityGrade(entries, rows, a.kind);
+}
+function activityGrade(entries, rows, kind) {
   const items = entries.map(p => {
     const r = rows.find(item => item.problem_id === p.id);
     const solved = Boolean(r?.accepted || r?.inherited);
     const percentage = solved ? 100 : Math.max(0, Math.min(100, Number(r?.best ?? 0)));
     return { ...p, status: solved ? 'AC' : r?.activity_attempts ? 'NotPassed' : 'NotStarted', solved,
-      score: Math.round(percentage * p.points) / 100, attempts: a.kind === 'assignment' ? r?.all_attempts ?? 0 : r?.activity_attempts ?? 0,
+      score: Math.round(percentage * p.points) / 100, attempts: kind === 'assignment' ? r?.all_attempts ?? 0 : r?.activity_attempts ?? 0,
       activityAttempts: r?.activity_attempts ?? 0, inherited: Boolean(r?.inherited && !r?.accepted) };
   });
   return { items, score: Math.round(items.reduce((n, p) => n + p.score, 0) * 100) / 100,
@@ -131,7 +135,8 @@ async function detail(db, loaded, user) {
   const participantCount = (await db.query('SELECT count(*)::int AS n FROM school_activity_participants WHERE school_id=$1 AND activity_id=$2', [a.school_id, a.id])).rows[0].n;
   return { id: a.id, schoolId: a.school_id, kind: a.kind, title: a.title, description: a.description,
     state: a.state, phase: phase(a), revision: a.revision, startsAt: a.starts_at, endsAt: effectiveEnd(a), durationMinutes: a.duration_minutes,
-    publishedAt: a.published_at, resultsPublishedAt: a.results_published_at, canManage, participantCount, problems: items,
+    publishedAt: a.published_at, resultsPublishedAt: a.results_published_at, canManage,
+    canPreview: canManage && canPreview(a) && items.length > 0, participantCount, problems: items,
     attempt: publicAttempt(ownAttempt), grade,
     ...(canManage ? { identityIds: (await db.query('SELECT identity_id FROM school_activity_participants WHERE school_id=$1 AND activity_id=$2 ORDER BY identity_id', [a.school_id, a.id])).rows.map(r => r.identity_id),
       classIds: (await db.query('SELECT class_id FROM school_activity_classes WHERE school_id=$1 AND activity_id=$2 ORDER BY class_id', [a.school_id, a.id])).rows.map(r => r.class_id) } : {}) };
@@ -182,24 +187,35 @@ async function start(db, a, student, user) {
 function requireOpenAttempt(a, t) {
   if (!t || t.finished_at || phase(a) !== 'Open' || t.deadline_at && Date.now() >= +new Date(t.deadline_at)) fail(409, 'ATTEMPT_CLOSED', 'This attempt has ended. Your saved submissions are preserved.');
 }
-async function enqueueActivity(db, loaded, problemId, user, body) {
-  const { a, student } = loaded;
-  if (!student) fail(403, 'STUDENT_REQUIRED', 'Only assigned students can submit.');
+async function activityProblem(db, a, problemId) {
   const p = (await db.query(`SELECT p.*,v.definition FROM school_activity_problems p JOIN school_problem_versions v
     ON v.school_id=p.school_id AND v.problem_id=p.problem_id AND v.id=p.version_id
     WHERE p.school_id=$1 AND p.activity_id=$2 AND p.problem_id=$3`, [a.school_id, a.id, problemId])).rows[0];
   if (!p) fail(404, 'NOT_FOUND', 'Problem not assigned.');
+  return p;
+}
+async function enqueueActivity(db, loaded, problemId, user, body, { preview = false } = {}) {
+  const { a, student } = loaded;
+  if (!preview && !student) fail(403, 'STUDENT_REQUIRED', 'Only assigned students can submit.');
+  const p = await activityProblem(db, a, problemId);
+  if (preview && (integer(body.expectedRevision, 1, 2147483647, 'Revision') !== a.revision || uuid(body.versionId) !== p.version_id)) {
+    fail(409, 'REVISION_CONFLICT', 'The assignment changed. Reopen the preview to use its saved version.');
+  }
   const kind = enumValue(body.kind, ['submit', 'samples', 'custom'], 'Run type');
   const requestId = uuid(body.requestId), language = enumValue(body.language ?? 'python', ['python', 'cpp', 'javascript'], 'Language');
   const code = bytes(body.code, 'Code'), customInput = kind === 'custom' ? bytes(body.input ?? '', 'Input', 262144) : null;
-  const hash = canonicalHash({ activityId: a.id, problemId, versionId: p.version_id, identityId: student.id, kind, language, code, customInput });
+  const hash = canonicalHash({ activityId: a.id, problemId, versionId: p.version_id, identityId: student?.id ?? null, kind, language, code, customInput,
+    ...(preview && { previewRevision: a.revision }) });
   await db.query("SELECT pg_advisory_xact_lock(hashtextextended('school-submit:'||$1,0))", [user.id]);
   const old = (await db.query('SELECT id,state,request_hash FROM school_judge_jobs WHERE account_id=$1 AND request_id=$2', [user.id, requestId])).rows[0];
   if (old) { if (old.request_hash !== hash) fail(409, 'REQUEST_CONFLICT', 'Request ID already used.'); return { id: old.id, state: old.state }; }
   await schoolActivityProblemAccess(db, { schoolId: a.school_id, problemId, user, activityId: a.id });
-  let t = await attempt(db, a, student.id);
-  if (!t && a.kind === 'assignment') t = await start(db, a, student, user);
-  requireOpenAttempt(a, t);
+  let t = null;
+  if (!preview) {
+    t = await attempt(db, a, student.id);
+    if (!t && a.kind === 'assignment') t = await start(db, a, student, user);
+    requireOpenAttempt(a, t);
+  }
   const counts = (await db.query(`SELECT count(*) FILTER(WHERE state IN ('queued','leased'))::int AS pending,
     count(*) FILTER(WHERE created_at>clock_timestamp()-interval '5 minutes')::int AS recent FROM school_judge_jobs WHERE account_id=$1`, [user.id])).rows[0];
   if (counts.pending >= 5 || counts.recent >= 60) fail(429, 'RATE_LIMIT', 'Too many judge requests. Please wait.');
@@ -208,10 +224,12 @@ async function enqueueActivity(db, loaded, problemId, user, body) {
   try { validateTask(payload); } catch { fail(400, 'INVALID_CASES', 'Invalid code, language or input.'); }
   // Capture time only after locks/validation. Client timestamps and deadlines are never trusted.
   const received = (await db.query('SELECT clock_timestamp() AS now')).rows[0].now;
-  if (t.deadline_at && +new Date(received) >= +new Date(t.deadline_at) || effectiveEnd(a) && +new Date(received) >= +new Date(effectiveEnd(a))) fail(409, 'ATTEMPT_CLOSED', 'The submission arrived after your deadline.');
+  if (!preview && (t.deadline_at && +new Date(received) >= +new Date(t.deadline_at) || effectiveEnd(a) && +new Date(received) >= +new Date(effectiveEnd(a)))) fail(409, 'ATTEMPT_CLOSED', 'The submission arrived after your deadline.');
   return (await db.query(`INSERT INTO school_judge_jobs(school_id,problem_id,version_id,account_id,identity_id,request_id,request_hash,kind,access_context,payload,
-    activity_id,activity_attempt_id,activity_deadline_at,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'school',$9,$10,$11,$12,$13) RETURNING id,state`,
-  [a.school_id, problemId, p.version_id, user.id, student.id, requestId, hash, kind, JSON.stringify(payload), a.id, t.id, t.deadline_at, received])).rows[0];
+    activity_id,activity_attempt_id,activity_deadline_at,created_at,preview_activity_id,preview_revision)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id,state`,
+  [a.school_id, problemId, p.version_id, user.id, student?.id ?? null, requestId, hash, kind, preview ? 'assignment_preview' : 'school', JSON.stringify(payload),
+    preview ? null : a.id, t?.id ?? null, t?.deadline_at ?? null, received, preview ? a.id : null, preview ? a.revision : null])).rows[0];
 }
 async function projectJob(db, job, activity) {
   const feedback = await schoolJobFeedback(db, job, activity);
@@ -222,6 +240,54 @@ async function projectJob(db, job, activity) {
     score: visible ? r?.score ?? null : null, passed: visible ? r?.passed ?? 0 : 0, total: visible ? r?.total ?? 0 : 0,
     message: visible ? r?.publicMessage ?? '' : 'Formal results will be available after the teacher publishes them.',
     ...feedback };
+}
+async function assignmentPreview(db, { a, user, method, action, id, submissions, body, url }) {
+  if (!canPreview(a)) fail(404, 'NOT_FOUND', 'This assignment is not available for preview.');
+  const parameters = [a.school_id, a.id, user.id];
+  const ownPreview = "j.school_id=$1 AND j.preview_activity_id=$2 AND j.account_id=$3 AND j.access_context='assignment_preview'";
+  if (action === 'jobs' && method === 'GET') {
+    const { rows: [job] } = await db.query(`SELECT j.* FROM school_judge_jobs j WHERE ${ownPreview} AND j.id=$4`, [...parameters, uuid(id)]);
+    if (!job) fail(404, 'NOT_FOUND', 'Preview submission not found.');
+    return reply(await projectJob(db, job, a));
+  }
+  const problemId = id ? uuid(id) : null;
+  if (action === 'problems' && submissions && method === 'POST') {
+    return reply(await enqueueActivity(db, { a, student: null }, problemId, user, body, { preview: true }), 202);
+  }
+  if (method !== 'GET') return null;
+  const entries = await problems(db, a);
+  if (problemId && !entries.some(problem => problem.id === problemId)) fail(404, 'NOT_FOUND', 'Problem not assigned.');
+  const { rows } = await db.query(`SELECT j.problem_id, count(*)::int AS activity_attempts, count(*)::int AS all_attempts,
+    max((j.result->>'score')::numeric) FILTER(WHERE j.state='completed') AS best,
+    bool_or(j.state='completed' AND j.result->>'status'='AC') AS accepted
+    FROM school_judge_jobs j WHERE ${ownPreview} AND j.preview_revision=$4 AND j.kind='submit'
+    GROUP BY j.problem_id`, [...parameters, a.revision]);
+  const grade = activityGrade(entries, rows, a.kind);
+  if (!action) return reply({
+    id: a.id, schoolId: a.school_id, kind: a.kind, title: a.title, description: a.description,
+    state: a.state, phase: 'Open', revision: a.revision, startsAt: a.starts_at, endsAt: a.ends_at,
+    durationMinutes: null, publishedAt: a.published_at, resultsPublishedAt: null, canManage: false,
+    participantCount: 0, problems: entries, attempt: null, grade, preview: true,
+  });
+  const solved = Boolean(grade.items.find(item => item.id === problemId)?.solved);
+  if (submissions) {
+    const page = await metadataPage(db, `SELECT j.id::text,j.id received_id,j.account_id actor_key,j.created_at,
+      coalesce(j.payload->>'language','python') language,
+      CASE WHEN j.state='completed' THEN coalesce(j.result->>'status','System Error')
+        WHEN j.state='failed' THEN 'System Error' WHEN j.state='leased' THEN 'Judging' ELSE 'Waiting' END status,
+      true is_own, CASE WHEN j.state='completed' THEN j.result->'privateResults' END private_results,
+      $6::text display_name
+      FROM school_judge_jobs j WHERE ${ownPreview} AND j.preview_revision=$4 AND j.problem_id=$5 AND j.kind='submit'`,
+    [...parameters, a.revision, problemId, user.name], url);
+    return reply({ ...page, solved });
+  }
+  const p = await activityProblem(db, a, problemId);
+  return reply({
+    id: problemId, schoolId: a.school_id, versionId: p.version_id, title: p.definition.title,
+    published: true, canManage: false, definition: safeDefinition(p.definition), solved,
+    activity: { id: a.id, title: a.title, kind: a.kind, phase: 'Open', attempt: null,
+      resultsPublishedAt: null, canSubmit: true, preview: true, revision: a.revision },
+  });
 }
 async function options(db, schoolId) {
   const items = (await db.query(`SELECT p.id AS "problemId",p.published_version_id AS "versionId",v.definition->>'title' AS title,b.name AS "bankName",b.id AS "bankId"
@@ -251,7 +317,8 @@ async function publishResults(db, loaded, user) {
 
 export async function schoolActivitiesOperation({ pool, user, route, url, method, body = {} }) {
   route ??= url.pathname.replace(/^\/api\/v1/, '');
-  const match = route.match(/^\/schools\/([^/]+)\/activities(?:\/(options|[^/]+)(?:\/(publish|archive|start|finish|end|publish-results|report|problems|jobs)(?:\/([^/]+)(?:\/(submissions))?)?)?)?$/);
+  const preview = route.match(/^\/schools\/([^/]+)\/activities\/([^/]+)\/preview(?:\/(problems|jobs)\/([^/]+)(?:\/(submissions))?)?$/);
+  const match = preview ?? route.match(/^\/schools\/([^/]+)\/activities(?:\/(options|[^/]+)(?:\/(publish|archive|start|finish|end|publish-results|report|problems|jobs)(?:\/([^/]+)(?:\/(submissions))?)?)?)?$/);
   if (!match) return null;
   const schoolId = uuid(match[1]);
   if (schoolId === LEGACY_SCHOOL_ID) fail(404, 'NOT_FOUND', 'Use the existing school workspace.');
@@ -260,6 +327,10 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
     await lockSchoolTeaching(db, schoolId, { shared: method === 'GET' });
     const role = await schoolRole(db, schoolId, user.id);
     await scope(db, schoolId);
+    if (preview) {
+      const { a } = await load(db, schoolId, uuid(preview[2]), user, role, { management: true });
+      return assignmentPreview(db, { a, user, method, action: preview[3], id: preview[4], submissions: preview[5], body, url });
+    }
     const staff = role === 'school_admin' || role === 'teacher';
     if (match[2] === 'options' && method === 'GET') {
       if (!staff) fail(403, 'FORBIDDEN', 'Teaching role required.');
@@ -376,8 +447,7 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
           if (a.kind === 'timed' && !a.results_published_at) requireOpenAttempt(a, student ? await attempt(db, a, student.id) : null);
         }
         await schoolActivityProblemAccess(db, { schoolId, problemId, user, activityId: a.id });
-        const p = (await db.query(`SELECT p.*,v.definition FROM school_activity_problems p JOIN school_problem_versions v ON v.school_id=p.school_id AND v.problem_id=p.problem_id AND v.id=p.version_id WHERE p.school_id=$1 AND p.activity_id=$2 AND p.problem_id=$3`, [schoolId, a.id, problemId])).rows[0];
-        if (!p) fail(404, 'NOT_FOUND', 'Problem not assigned.');
+        const p = await activityProblem(db, a, problemId);
         const d = await detail(db, loaded, user);
         return reply({ id: problemId, schoolId, versionId: p.version_id, title: p.definition.title, published: true, canManage: false, definition: safeDefinition(p.definition),
           solved: d.grade?.items.find(item => item.id === problemId)?.solved ?? false, activity: { id: a.id, title: a.title, kind: a.kind, phase: phase(a), attempt: d.attempt, resultsPublishedAt: a.results_published_at, canSubmit: !canManage && phase(a) === 'Open' && !d.attempt?.finishedAt && (!d.attempt?.deadlineAt || Date.now() < +new Date(d.attempt.deadlineAt)) } });

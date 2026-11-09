@@ -8,6 +8,7 @@ export type SchoolActivity = {
   state: "Draft" | "Published" | "Archived"; phase: string; revision: number;
   startsAt: string | null; endsAt: string | null; durationMinutes: number | null;
   publishedAt: string | null; resultsPublishedAt: string | null; canManage: boolean; participantCount: number;
+  canPreview?: boolean; preview?: boolean;
   problems: ActivityProblem[]; attempt: ActivityAttempt | null; grade: ActivityGrade | null; identityIds?: string[]; classIds?: string[];
 };
 export type ActivityOptions = {

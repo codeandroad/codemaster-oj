@@ -19,6 +19,7 @@ import {
 
 const reply=(body,status=200)=>({status,body});
 const canManage=(p,u,role)=>role==='school_admin'||role==='teacher'&&p.owner_account_id===u.id;
+const practiceContext=role=>role==='student'?'school':'staff_practice';
 const canManageTutorial=(p,u,role)=>!p.archived&&(canManage(p,u,role)||role==='teacher'&&p.published&&!!p.published_version_id);
 const scope=(db,id)=>db.query("SELECT set_config('campus.school_id',$1,true)",[id]);
 const revision=(body,row)=>{if(integer(body.expectedRevision,1,2147483646,'Revision')!==row.revision)fail(409,'REVISION_CONFLICT','This item has changed. Refresh before saving.');};
@@ -69,6 +70,7 @@ async function loadProblem(db,schoolId,id,user,role,{publicOnly=false}={}){
  return p;
 }
 async function shapeProblem(db,p,user,role,{detail=false,publicOnly=false,accessContext='school',catalogQuery=''}={}){
+ if(accessContext==='school')accessContext=practiceContext(role);
  const manage=!publicOnly&&canManage(p,user,role);
  const version=p.published_version_id?(await db.query('SELECT * FROM school_problem_versions WHERE school_id=$1 AND id=$2',[p.school_id,p.published_version_id])).rows[0]:null;
  const def=manage?p.draft:version?.definition;
@@ -77,12 +79,13 @@ async function shapeProblem(db,p,user,role,{detail=false,publicOnly=false,access
  const validation=manage?(await db.query(`SELECT j.id,j.state,j.result->>'status' AS status FROM school_judge_jobs j JOIN school_problem_versions v ON v.school_id=j.school_id AND v.id=j.version_id WHERE j.school_id=$1 AND j.problem_id=$2 AND v.draft_revision=$3 AND j.kind='validation' ORDER BY j.created_at DESC LIMIT 1`,[p.school_id,p.id,p.revision])).rows[0]:null;
  const progressIdentity=accessContext==='school'?(await db.query('SELECT id FROM school_identities WHERE school_id=$1 AND account_id=$2',[p.school_id,user.id])).rows[0]?.id??null:null;
  const progress=(await db.query(`SELECT count(*)::integer AS attempts,bool_or(state='completed' AND result->>'status'='AC') AS solved FROM school_judge_jobs j
-  WHERE ${schoolActivityJobVisibleSql('j')} AND school_id=$1 AND problem_id=$2 AND kind='submit' AND version_id=$4 AND access_context=$5
-   AND CASE WHEN $5='public' THEN account_id=$3 WHEN $6::uuid IS NOT NULL THEN identity_id=$6 ELSE identity_id IS NULL AND account_id=$3 END`,
+  WHERE ${schoolActivityJobVisibleSql('j')} AND school_id=$1 AND problem_id=$2 AND kind='submit' AND version_id=$4
+   AND (access_context=$5 OR $5='staff_practice' AND access_context='school' AND activity_id IS NULL)
+   AND CASE WHEN $5 IN ('public','staff_practice') THEN account_id=$3 WHEN $6::uuid IS NOT NULL THEN identity_id=$6 ELSE identity_id IS NULL AND account_id=$3 END`,
  [p.school_id,p.id,user.id,version?.id??null,accessContext,progressIdentity])).rows[0];
  const publication = !publicOnly && role === 'school_admin' && version && p.published && !p.archived
   ? await publicProblemStatus(db, p, version.id) : undefined;
- return {attempts:progress.attempts,solved:progress.solved===true,hasDraftChanges:!!version&&version.draft_revision!==p.revision,id:p.id,schoolId:p.school_id,bankId:p.bank_id,bankName:p.bank_name,title:def.title,revision:p.revision,published:p.published,versionId:version?.id??null,canManage:manage,canManageTutorial:!publicOnly&&canManageTutorial(p,user,role),validation:validation??null,...publication,...(detail?{definition:manage?draftDefinition(def):publicDefinition({...def,statement:p.public_statement??def.statement,metadata:p.public_metadata??def.metadata,tags:p.public_tags??def.tags})}:{})};
+ return {attempts:progress.attempts,solved:progress.solved===true,hasDraftChanges:!!version&&version.draft_revision!==p.revision,id:p.id,schoolId:p.school_id,bankId:p.bank_id,bankName:p.bank_name,title:def.title,revision:p.revision,published:p.published,versionId:version?.id??null,canManage:manage,canManageTutorial:!publicOnly&&canManageTutorial(p,user,role),validation:validation??null,...publication,...(detail?{staffPractice:accessContext==='staff_practice',definition:manage?draftDefinition(def):publicDefinition({...def,statement:p.public_statement??def.statement,metadata:p.public_metadata??def.metadata,tags:p.public_tags??def.tags})}:{})};
 }
 async function publicProblemStatus(db, problem, versionId) {
  const { rows: [state] } = await db.query(`
@@ -252,7 +255,7 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
   if(m[2]==='submissions'&&method==='GET'&&!id){
    const page=integer(Number(url.searchParams.get('page')??1),1,100000,'Page');
    const rows=(await db.query(`SELECT id,problem_id,payload->'version'->>'title' AS title,payload->>'language' AS language,state,created_at,result->>'status' AS status,result->>'score' AS score
-    FROM school_judge_jobs j WHERE ${schoolActivityJobVisibleSql('j')} AND school_id=$1 AND account_id=$2 AND access_context='school' AND kind='submit'
+    FROM school_judge_jobs j WHERE ${schoolActivityJobVisibleSql('j')} AND school_id=$1 AND account_id=$2 AND access_context IN ('school','staff_practice') AND kind='submit'
     ORDER BY created_at DESC,id LIMIT 26 OFFSET $3`,[schoolId,user.id,(page-1)*25])).rows;
    return reply({page,hasMore:rows.length>25,items:rows.slice(0,25).map(j=>({id:j.id,problemId:j.problem_id,problemTitle:j.title,language:j.language,state:j.state,createdAt:j.created_at,status:j.status??(j.state==='failed'?'System Error':j.state==='leased'?'Judging':'Waiting'),score:j.score===null?null:Number(j.score)}))});
   }
@@ -261,7 +264,7 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
    const counts=(await db.query("SELECT count(*) FILTER(WHERE state='queued')::integer AS queued,count(*) FILTER(WHERE state='leased')::integer AS running,count(*) FILTER(WHERE state='failed')::integer AS failed,count(*) FILTER(WHERE state='completed')::integer AS completed FROM school_judge_jobs WHERE school_id=$1",[schoolId])).rows[0];
    const ready=(await db.query("SELECT EXISTS(SELECT 1 FROM judge_nodes WHERE executor_ready AND heartbeat_at>now()-interval '45 seconds') AS ready")).rows[0].ready;return reply({...counts,ready});
   }
-  if(m[2]==='judge-jobs'&&method==='GET'&&id){const job=(await db.query('SELECT * FROM school_judge_jobs WHERE school_id=$1 AND id=$2 AND account_id=$3',[schoolId,id,user.id])).rows[0];if(!job)fail(404,'NOT_FOUND','Submission not found.');return reply(await projectJob(db,job));}
+  if(m[2]==='judge-jobs'&&method==='GET'&&id){const job=(await db.query("SELECT * FROM school_judge_jobs WHERE school_id=$1 AND id=$2 AND account_id=$3 AND access_context<>'assignment_preview'",[schoolId,id,user.id])).rows[0];if(!job)fail(404,'NOT_FOUND','Submission not found.');return reply(await projectJob(db,job));}
   if(m[2]==='problem-banks'){
    if(method==='GET'){return reply({items:(await db.query(`SELECT id,name,revision,archived,owner_account_id=$2 OR $3='school_admin' AS "canManage" FROM school_problem_banks WHERE school_id=$1 AND ($3='school_admin' OR owner_account_id=$2 OR NOT archived AND EXISTS(SELECT 1 FROM school_problems p WHERE p.school_id=$1 AND p.bank_id=school_problem_banks.id AND p.published)) ORDER BY name,id`,[schoolId,user.id,role])).rows});}
    if(!['teacher','school_admin'].includes(role))fail(403,'FORBIDDEN','Teaching role required.');
@@ -300,11 +303,11 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
    return reply({platformPublished:false,publicRequestStatus:'pending'});
   }
   if(method==='GET'||m[4]==='submissions')await schoolActivityProblemAccess(db,{schoolId,problemId:p.id,user});
-  if(method==='GET'&&m[4]==='submissions')return reply(await schoolProblemSubmissions(db,p,user,url,'school'));
+  if(method==='GET'&&m[4]==='submissions')return reply(await schoolProblemSubmissions(db,p,user,url,practiceContext(role)));
   if(method==='GET'){const practice=url.searchParams.get('view')==='practice';if(practice&&(!p.published||p.archived))fail(404,'NOT_FOUND','Problem unavailable.');return reply(await shapeProblem(db,p,user,role,{detail:true,publicOnly:practice}));}
   if(m[4]==='submissions'&&method==='POST'){
    if(!p.published||p.archived)fail(409,'NOT_PUBLISHED','Publish the problem before student practice.');
-   const version=(await db.query('SELECT * FROM school_problem_versions WHERE school_id=$1 AND id=$2',[schoolId,p.published_version_id])).rows[0];return reply(await enqueue(db,{schoolId,p,version,user,kind:enumValue(body.kind,['samples','custom','submit'],'Run type'),body,accessContext:'school'}),202);
+   const version=(await db.query('SELECT * FROM school_problem_versions WHERE school_id=$1 AND id=$2',[schoolId,p.published_version_id])).rows[0];return reply(await enqueue(db,{schoolId,p,version,user,kind:enumValue(body.kind,['samples','custom','submit'],'Run type'),body,accessContext:practiceContext(role)}),202);
   }
   if(!canManage(p,user,role))fail(403,'FORBIDDEN','You cannot manage this problem.');revision(body,p);
   if(method==='PATCH'&&!m[4]){const definition=normalizeSchoolProblem(body);await db.query('UPDATE school_problems SET draft=$3,revision=revision+1,updated_at=clock_timestamp() WHERE school_id=$1 AND id=$2',[schoolId,id,JSON.stringify(definition)]);await auditSchool(db,schoolId,user.id,'school.problem.update',id);return reply(await shapeProblem(db,await loadProblem(db,schoolId,id,user,role),user,role,{detail:true}));}

@@ -169,14 +169,17 @@ function SchoolPracticeContents({ schoolId, role, initialProblemId }: { schoolId
 type PracticeProblemProps = { path: string; jobPath: (id: string) => string; onBack: () => void; backLabel?: string; navigation?: PracticeNavigation; expectedVersionId?: string };
 export function PracticeProblem({path,jobPath,onBack,backLabel,navigation,expectedVersionId}:PracticeProblemProps){
  const query = new URLSearchParams({ view: "practice", ...(expectedVersionId && { versionId: expectedVersionId }) });
- const data=useData<Problem>(`${path}?${query}`),auth=useData<{user:CampusUser}>("auth/me");return <>{(!data.data?.definition||!auth.data?.user)&&<PracticeToolbar title={data.data?.title??""} onBack={onBack} backLabel={backLabel} navigation={navigation}/>}<State data={data}><State data={auth}>{data.data?.definition&&auth.data?.user&&<PracticeEditor key={`${path}:${data.data.versionId}`} problem={data.data} userId={auth.data.user.id} path={path} jobPath={jobPath} onBack={onBack} backLabel={backLabel} navigation={navigation} expectedVersionId={expectedVersionId}/>}</State></State></>;
+ const data=useData<Problem>(`${path}?${query}`),auth=useData<{user:CampusUser}>("auth/me");return <>{(!data.data?.definition||!auth.data?.user)&&<PracticeToolbar title={data.data?.title??""} onBack={onBack} backLabel={backLabel} navigation={navigation}/>}<State data={data}><State data={auth}>{data.data?.definition&&auth.data?.user&&<PracticeEditor key={`${path}:${data.data.versionId}:${data.data.activity?.revision ?? ""}`} problem={data.data} userId={auth.data.user.id} path={path} jobPath={jobPath} onBack={onBack} backLabel={backLabel} navigation={navigation} expectedVersionId={expectedVersionId}/>}</State></State></>;
 }
 function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation,expectedVersionId}:PracticeProblemProps&{problem:Problem;userId:string}){
  const {locale}=useLocale(),tx=(zh:string,en:string)=>locale==="zh"?zh:en,workspace=useWorkspaceSettings(userId),action=useMutation(),def=problem.definition!;
- const key=`codemaster:school-practice:${userId}:${problem.schoolId}:${problem.id}:${problem.versionId}`;
+ const preview=problem.activity?.preview===true;
+ const key=preview
+   ? `codemaster:assignment-preview:${userId}:${problem.schoolId}:${problem.activity?.id}:${problem.activity?.revision}:${problem.id}:${problem.versionId}`
+   : `codemaster:school-practice:${userId}:${problem.schoolId}:${problem.id}:${problem.versionId}`;
  const [code,setCode]=useState(def.starterCode),[loaded,setLoaded]=useState(false),[settingsOpen,setSettingsOpen]=useState(false),[job,setJob]=useState<Job|null>(null),[jobId,setJobId]=useState<string|null>(null),[custom,setCustom]=useState(""),[pollError,setPollError]=useState("");
  const search=useSearchParams(),courseId=search.get("courseId"),chapterId=search.get("chapterId");
- const canReadTutorial=problem.activity?.kind!=="timed"||Boolean(problem.activity.resultsPublishedAt);
+ const canReadTutorial=!preview&&(problem.activity?.kind!=="timed"||Boolean(problem.activity.resultsPublishedAt));
  const tutorialEndpoint=canReadTutorial&&problem.versionId?`schools/${encodeURIComponent(problem.schoolId)}/problems/${encodeURIComponent(problem.id)}/tutorial?${new URLSearchParams({
    versionId:problem.versionId,...(courseId&&chapterId?{courseId,chapterId}:{}),
  })}`:"";
@@ -190,7 +193,7 @@ function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation
    requestAnimationFrame(() => customInputRef.current?.focus());
  }
  const jobEndpoint=jobId?jobPath(jobId):"";
- useEffect(()=>{if(job?.kind==="submit"&&!["queued","leased"].includes(job.state))window.dispatchEvent(new Event("codemaster:school-scholarship-changed"));},[job?.id,job?.kind,job?.state]);
+ useEffect(()=>{if(!preview&&!problem.staffPractice&&job?.kind==="submit"&&!["queued","leased"].includes(job.state))window.dispatchEvent(new Event("codemaster:school-scholarship-changed"));},[job?.id,job?.kind,job?.state,preview,problem.staffPractice]);
  const [leftTab, setLeftTab] = useState<"problem" | "translation" | "tutorial" | "solution" | "submissions">("problem");
  const activeTab = leftTab === "tutorial" && !tutorial ? "problem" : leftTab;
  function selectTab(tab: typeof leftTab) {
@@ -206,7 +209,7 @@ function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation
  const deadline=problem.activity?.attempt?.deadlineAt;
  const remaining=deadline?Math.max(0,Math.ceil((Date.parse(deadline)-clock)/1000)):null;
  const closed=problem.activity?.canSubmit===false||problem.activity?.kind==="timed"&&(!!problem.activity.attempt?.finishedAt||remaining===0||!!problem.activity.resultsPublishedAt);
- const hasAssistance = !path.startsWith("practice/");
+ const hasAssistance = !preview && !problem.staffPractice && !path.startsWith("practice/");
  const tabItems = [
    { id: "problem", label: tx("题目描述", "Problem"), icon: BookOpen },
    ...(hasAssistance ? [{ id: "translation", label: tx("中文题面", "Translation"), icon: Languages }] as const : []),
@@ -215,8 +218,8 @@ function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation
    { id: "submissions", label: tx("提交记录", "Submissions"), icon: History },
  ] as const;
  const pending=action.busy||!!jobId&&(!job||["queued","leased"].includes(job.state));
- const run=(kind:"samples"|"custom"|"submit")=>void action.run(async()=>{const next=await productionApi<{id:string}>(`${path}/submissions`,{method:"POST",body:{kind,code,language:"python",input:custom,requestId:crypto.randomUUID(),...(expectedVersionId&&{versionId:expectedVersionId})}});setJob(null);setJobId(next.id);});
- return <div className="space-y-3"><PracticeToolbar title={problem.title} onBack={onBack} backLabel={backLabel} navigation={navigation}/>{problem.activity&&<div className="flex flex-wrap items-center justify-between gap-2 text-sm"><span className="font-medium">{problem.activity.title}</span><div className="flex items-center gap-3"><SchoolActivityScholarshipRule schoolId={problem.schoolId} activityId={problem.activity.id}/>{remaining!==null&&<span className={`font-mono tabular-nums ${remaining<300?"text-destructive":"text-muted-foreground"}`} role="timer" aria-label={tx("剩余时间","Time remaining")}>{closed?tx("已结束","Ended"):`${Math.floor(remaining/3600).toString().padStart(2,"0")}:${Math.floor(remaining%3600/60).toString().padStart(2,"0")}:${(remaining%60).toString().padStart(2,"0")}`}</span>}</div></div>}<div className="grid min-w-0 gap-3 xl:grid-cols-2"><section className="min-w-0 rounded-lg border border-border bg-surface">
+ const run=(kind:"samples"|"custom"|"submit")=>void action.run(async()=>{const next=await productionApi<{id:string}>(`${path}/submissions`,{method:"POST",body:{kind,code,language:"python",input:custom,requestId:crypto.randomUUID(),...(preview ? {versionId:problem.versionId,expectedRevision:problem.activity?.revision} : expectedVersionId&&{versionId:expectedVersionId})}});setJob(null);setJobId(next.id);});
+ return <div className="space-y-3"><PracticeToolbar title={problem.title} onBack={onBack} backLabel={backLabel} navigation={navigation}/>{problem.staffPractice&&<p className="text-sm text-muted-foreground">{tx("教师练习 · 结果仅供个人查看，不计入学生成绩、奖学金或排名。","Teacher practice · Results are personal and do not count toward student grades, scholarship or rankings.")}</p>}{problem.activity&&<div className="flex flex-wrap items-center justify-between gap-2 text-sm"><span className="font-medium">{problem.activity.title}</span><div className="flex items-center gap-3">{!preview&&<SchoolActivityScholarshipRule schoolId={problem.schoolId} activityId={problem.activity.id}/>}{remaining!==null&&<span className={`font-mono tabular-nums ${remaining<300?"text-destructive":"text-muted-foreground"}`} role="timer" aria-label={tx("剩余时间","Time remaining")}>{closed?tx("已结束","Ended"):`${Math.floor(remaining/3600).toString().padStart(2,"0")}:${Math.floor(remaining%3600/60).toString().padStart(2,"0")}:${(remaining%60).toString().padStart(2,"0")}`}</span>}</div></div>}<div className="grid min-w-0 gap-3 xl:grid-cols-2"><section className="min-w-0 rounded-lg border border-border bg-surface">
     <div className="flex items-center gap-1 overflow-x-auto border-b border-border px-2" role="tablist" aria-label={tx("题目内容", "Problem content")}>
       {tabItems.map(({ id, label, icon: Icon }, index) => (
         <button type="button" key={id} id={`school-practice-tab-${id}`} role="tab"

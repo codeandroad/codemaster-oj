@@ -101,18 +101,20 @@ export async function schoolProblemSubmissions(db,p,user,url,accessContext) {
  // ownership from a later school-account binding. Unlinked history remains an
  // account bucket; owning that history does not transfer its AC to a new pupil.
  return metadataPage(db,`SELECT j.id::text,j.id received_id,
-  CASE WHEN $5='public' THEN 'person:'||a.identity_id::text WHEN j.identity_id IS NOT NULL THEN 'school:'||j.identity_id::text ELSE 'account:'||j.account_id::text END actor_key,
+  CASE WHEN $5='public' THEN 'person:'||a.identity_id::text WHEN $5<>'staff_practice' AND j.identity_id IS NOT NULL THEN 'school:'||j.identity_id::text ELSE 'account:'||j.account_id::text END actor_key,
   j.created_at,COALESCE(j.payload->>'language','python') language,
   CASE WHEN j.state='completed' THEN COALESCE(j.result->>'status','System Error') WHEN j.state='failed' THEN 'System Error' WHEN j.state='leased' THEN 'Judging' ELSE 'Waiting' END status,
   (j.account_id=$6 OR j.identity_id=$7::uuid) IS TRUE is_own,
-  CASE WHEN $5='public' THEN a.identity_id=$4 WHEN $7::uuid IS NOT NULL THEN j.identity_id=$7 ELSE j.identity_id IS NULL AND j.account_id=$6 END is_current_student,
+  CASE WHEN $5='public' THEN a.identity_id=$4 WHEN $5='staff_practice' THEN j.account_id=$6 WHEN $7::uuid IS NOT NULL THEN j.identity_id=$7 ELSE j.identity_id IS NULL AND j.account_id=$6 END is_current_student,
   CASE WHEN j.state='completed' THEN j.result->'privateResults' END private_results,
   CASE WHEN $5='public' OR person.id IS NULL THEN COALESCE(NULLIF(btrim(a.nickname),''),a.username)
    ELSE COALESCE(CASE WHEN profile.leaderboard_use_nickname THEN NULLIF(btrim(profile.nickname),'') END,NULLIF(btrim(person.name),''),'Student') END display_name
   FROM school_judge_jobs j JOIN accounts a ON a.id=j.account_id
   LEFT JOIN school_identities person ON person.school_id=j.school_id AND person.id=j.identity_id
   LEFT JOIN accounts profile ON profile.id=person.account_id
-  WHERE j.school_id=$1 AND j.problem_id=$2 AND j.version_id=$3 AND j.kind='submit' AND j.access_context=$5 AND ${schoolActivityJobVisibleSql('j')}`,
+  WHERE j.school_id=$1 AND j.problem_id=$2 AND j.version_id=$3 AND j.kind='submit'
+   AND (j.access_context=$5 OR $5='staff_practice' AND j.access_context='school' AND j.activity_id IS NULL)
+   AND ($5<>'staff_practice' OR j.account_id=$6) AND ${schoolActivityJobVisibleSql('j')}`,
  [p.school_id,p.id,p.published_version_id,user.identityId,accessContext,user.id,identityId],url,{schoolProgress:true});
 }
 

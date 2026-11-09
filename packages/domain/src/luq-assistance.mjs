@@ -2,7 +2,7 @@ import {transaction} from './db.mjs';
 import {fail,field,uuid,enumValue,canonicalHash,integer} from './security.mjs';
 import {postLuqEntry,getLuqSettings} from './luq-ledger.mjs';
 import {luqActivityAccess} from './luq-rules.mjs';
-import {assistanceKind,assistanceLanguage,resolveAssistanceTarget,resolveAssistancePolicy,assistancePolicyTarget,lockLuqAssistance,isLuqStaff} from './luq-access.mjs';
+import {assistanceKind,assistanceLanguage,resolveAssistanceTarget,resolveAssistancePolicy,assistancePolicyTarget,hasLegacyPracticeAc,lockLuqAssistance,isLuqStaff} from './luq-access.mjs';
 
 const response=(body,status=200)=>({status,body});
 const one=result=>{if(!result.rowCount)fail(404,'NOT_FOUND','辅助内容不存在');return result.rows[0];};
@@ -26,6 +26,10 @@ async function aidState(db,user,input,helpers){
   WHERE identity_id=$1 AND subject_key=$2 AND kind=$3 AND language=$4`,[user.identityId,target.subjectKey,kind,language])).rows[0];
  const settings=await getLuqSettings(db);
  const basePrice=policy.price??(kind==='FULL_TRANSLATION'?settings.translationPrice:settings.solutionPrice);
+ const freeAfterAc=!!content&&kind==='FULL_SOLUTION'&&policy.mode==='paid'&&basePrice>0&&!!target.problemId
+  &&!target.contextId&&!policy.activityPaid&&!restriction?.activityPaid
+  &&await (helpers.hasPracticeAc??hasLegacyPracticeAc)(db,user,target);
+ if(freeAfterAc)policy.mode='free';
  if(policy.mode==='paid'&&basePrice===0)policy.mode='free';
  let translationPurchase=null;
  if(content&&kind==='FULL_SOLUTION'&&policy.mode==='paid'&&!entitlement){

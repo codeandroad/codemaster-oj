@@ -65,6 +65,23 @@ test('school scholarships: real roles, atomic rewards, consumption, timing and i
   await t.test('free task assistance has no permanent entitlement and assisted learning rules are explicit',async()=>{const x=await problem('Free learning');await content(x,'FULL_SOLUTION');const a=await activity(x,{}, {taskKind:'learning',allowSolutionAssisted:true,assistance:{translation:{mode:'paid'},solution:{mode:'free'}}});const before=(await call('two','wallet')).balance;assert.equal((await quote('two',{...x,activityId:a.id},'FULL_SOLUTION')).mode,'free');await provide('two',{...x,activityId:a.id},'FULL_SOLUTION');assert.equal((await quote('two',x,'FULL_SOLUTION')).unlocked,false);assert.equal((await quote('two',x,'FULL_SOLUTION')).mode,'paid');await activitySubmit('two',a,x);await finish();assert.equal((await call('two','wallet')).balance,before+7);const receipt=(await owner.query('SELECT assisted FROM school_scholarship_receipts WHERE activity_id=$1',[a.id])).rows[0];assert.equal(receipt.assisted,true);});
   await t.test('disabled task policy applies through free-practice URLs and prior entitlements',async()=>{const x=await problem('Disabled activity');await content(x,'FULL_TRANSLATION');await unlock('one',x,'FULL_TRANSLATION');await activity(x,{}, {assistance:{translation:{mode:'disabled'},solution:{mode:'paid'}}});assert.equal((await quote('one',x,'FULL_TRANSLATION')).available,false);await assert.rejects(provide('one',x,'FULL_TRANSLATION'),e=>e.code==='ASSISTANCE_UNAVAILABLE');});
   await t.test('two students completing the same activity concurrently settle without inverted wallet locks',async()=>{const x=await problem('Concurrent activity'),a=await activity(x);const before=[(await call('one','wallet')).balance,(await call('two','wallet')).balance];await Promise.all([activitySubmit('one',a,x),activitySubmit('two',a,x)]);const first=await claimSchoolTask(worker),second=await claimSchoolTask(worker);assert.ok(first&&second);const result={status:'AC',score:100,total:1,passed:1,privateResults:[]};await Promise.all([finishSchoolTask(worker,first,result),finishSchoolTask(worker,second,result)]);assert.equal((await call('one','wallet')).balance,before[0]+11);assert.equal((await call('two','wallet')).balance,before[1]+11);});
+  await t.test('practice AC grants free reviewed solution access while an assigned assessment can still block it',async()=>{
+   const x=await problem('Free after formal AC');await content(x,'FULL_SOLUTION');
+   const before=(await call('one','wallet')).balance;
+   await submit('one',x);await finish('WA');
+   await assert.rejects(provide('one',x,'FULL_SOLUTION'),e=>e.code==='PAYMENT_REQUIRED');
+   await submit('one',x);await finish();
+   const free=await quote('one',x,'FULL_SOLUTION');
+   assert.deepEqual([free.mode,free.price,free.requiresConfirmation],['free',0,false]);
+   assert.equal((await quote('two',x,'FULL_SOLUTION')).mode,'paid');
+   assert.equal((await provide('one',x,'FULL_SOLUTION')).body,'Student-facing reviewed content');
+   assert.equal((await call('one','wallet')).balance,before+4);
+   const a=await activity(x,{kind:'timed',startsAt:new Date(Date.now()-10000).toISOString(),endsAt:new Date(Date.now()+3600000).toISOString(),durationMinutes:30});
+   assert.equal((await quote('one',x,'FULL_SOLUTION')).available,false);
+   await assert.rejects(provide('one',x,'FULL_SOLUTION'),e=>e.code==='ASSISTANCE_UNAVAILABLE');
+   await act('teacher',a.id+'/end','POST');await act('teacher',a.id+'/publish-results','POST');
+   assert.equal((await quote('one',x,'FULL_SOLUTION')).mode,'free');
+  });
   await t.test('Paper 4 uses actual stage marks, keeps stable first-AC and supports delayed examination awards',async()=>{
    const paperId=randomUUID(),versionId=randomUUID(),questions=[{key:'Q1',title:'First',stages:[{id:'s1',judgeMode:'auto',maxMarks:20}]},{key:'Q2',title:'Second',stages:[{id:'s2',judgeMode:'auto',maxMarks:40},{id:'s3',judgeMode:'auto',maxMarks:40}]}],content={title:'Mark proportions',definition:{questions}};
    await owner.query('INSERT INTO school_paper4_papers(school_id,id,owner_account_id,draft) VALUES($1,$2,$3,$4)',[alpha.id,paperId,users.teacher.id,content]);await owner.query('INSERT INTO school_paper4_versions(school_id,id,paper_id,draft_revision,content) VALUES($1,$2,$3,1,$4)',[alpha.id,versionId,paperId,content]);await owner.query('UPDATE school_paper4_papers SET published=true,published_version_id=$3 WHERE school_id=$1 AND id=$2',[alpha.id,paperId,versionId]);

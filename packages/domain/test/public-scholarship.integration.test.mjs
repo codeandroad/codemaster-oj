@@ -66,6 +66,16 @@ test('public scholarship reuses stable wallets and reviewed contents safely',{sk
    await buy(unlockOnly,p3);job=await submit(unlockOnly,p3);await finish(job);assert.equal(await balance(unlockOnly),96,'buying without delivery is not answer usage');
    const translated=await seedPublicScholarshipLearner(owner),p4=await seedPublicScholarshipProblem(owner);await buy(translated,p4,'FULL_TRANSLATION');await aid(translated,p4,'provide','FULL_TRANSLATION');job=await submit(translated,p4);await finish(job);assert.equal(await balance(translated),101,'translation preserves first AC reward');
   });
+  await t.test('a public formal AC enables free delivery without charging or creating a purchase entitlement',async()=>{
+   const learner=await seedPublicScholarshipLearner(owner),question=await seedPublicScholarshipProblem(owner);
+   await finish(await submit(learner,question,'samples'));
+   assert.equal((await aid(learner,question,'quote')).price,8);
+   await finish(await submit(learner,question));
+   assert.equal((await aid(learner,question,'quote')).mode,'free');
+   assert.match((await aid(learner,question,'provide')).body,/print\(5\)/);
+   assert.equal(await balance(learner),104);
+   assert.equal((await owner.query('SELECT 1 FROM luq_assistance_entitlements WHERE identity_id=$1',[learner.identityId])).rowCount,0);
+  });
   await t.test('answer delivered while an accepted submission waits for the assistance lock is not retroactive',async()=>{
    const learner=await seedPublicScholarshipLearner(owner),question=await seedPublicScholarshipProblem(owner);await buy(learner,question);
    const blocker=await owner.connect();let jobPromise;

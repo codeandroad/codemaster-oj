@@ -95,6 +95,21 @@ test('Luq real Nest transport: role/CSRF boundary, idempotent grants, content pr
   await teacher.call('/luq/reward-rules',{method:'POST',body:{...rule,expectedVersion:1},expected:409});
   const oldPoints=await pool.query('SELECT count(*)::int n FROM point_ledger');assert.equal(oldPoints.rows[0].n,0,'Luq purchases never write the old points ledger');
 
+  await t.test('a formal AC allows the owner to read reviewed content without purchasing it',async()=>{
+   const before=await other.call('/luq/assistance/quote',{method:'POST',body:input});
+   assert.equal(before.price,8);
+   const {rows:[submission]}=await pool.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,code,idempotency_key,request_hash)
+    VALUES($1,$2,$3,$4,'submit','print(1)',$5,'fixture') RETURNING id`,[other.id,other.identityId,problemId,versionId,randomUUID()]);
+   assert.equal((await other.call('/luq/assistance/quote',{method:'POST',body:input})).mode,'paid');
+   await pool.query("UPDATE submissions SET status='AC',score=100 WHERE id=$1",[submission.id]);
+   const free=await other.call('/luq/assistance/quote',{method:'POST',body:input});
+   assert.deepEqual([free.mode,free.price,free.requiresConfirmation,free.body],['free',0,false,undefined]);
+   const stale=await other.call('/luq/assistance/unlock',{method:'POST',body:{...unlock,requestKey:randomUUID()}});
+   assert.equal(stale.charged,0);
+   assert.equal((await other.call('/luq/assistance/provide',{method:'POST',body:input})).body,'REVIEWED_SOLUTION_SENTINEL');
+   assert.equal((await pool.query('SELECT 1 FROM luq_assistance_entitlements WHERE identity_id=$1',[other.identityId])).rowCount,0);
+  });
+
   await t.test('assignment completion rules save and publish atomically with their draft',async()=>{
    const rulesUrl='/luq/reward-rules?activityType=assignment';
    await anonymous(rulesUrl,{expected:401});

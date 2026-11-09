@@ -91,6 +91,17 @@ test('public scholarship respects school assessment and submission assistance bo
    assert.equal(await finishSchoolTask(worker,claimed,{status:'AC',score:100,total:1,passed:1,privateResults:[]}),true);
   }
   async function freeSchoolContent(f){await owner.query("INSERT INTO school_scholarship_policies(school_id,target_type,target_key,kind,mode) VALUES($1,'subject',$2,'FULL_SOLUTION','free')",[f.schoolId,'problem:'+f.problemId]);}
+  await t.test('public AC enables the reviewed public solution while preserving school content policy',async()=>{
+   const f=await fixture();
+   await owner.query("INSERT INTO luq_assistance_policies(target_type,target_id,kind,mode,rule_version,created_by) VALUES('problem',$1,'FULL_SOLUTION','paid',2,$2)",[f.problemId,f.author.id]);
+   assert.equal((await publicAid(f,'quote')).price,8);
+   await finish(await submit(f,'public'));
+   assert.equal((await publicAid(f,'quote')).price,0);
+   assert.equal((await publicAid(f,'provide')).body,'Reviewed solution');
+   assert.equal((await schoolAid(f,'quote')).price,8);
+   await assessment(f);
+   await assertPublicBlocked(f);
+  });
   await t.test('a public solution delivery also excludes the later school submission reward',async()=>{
    const f=await fixture();assert.equal((await publicAid(f,'provide')).body,'Reviewed solution');
    const job=await submit(f);await finish(job);

@@ -1,6 +1,7 @@
 import { transaction } from './db.mjs';
 import { auditSchool, LEGACY_SCHOOL_ID, lockSchoolTeaching, schoolRole } from './schools.mjs';
 import { lockLuqAssistance } from './luq-access.mjs';
+import { schoolActivityJobVisibleSql } from './school-activities.mjs';
 import { canonicalHash, enumValue, fail, field, integer, uuid } from './security.mjs';
 
 const reply=(body,status=200)=>({status,body});
@@ -42,7 +43,7 @@ async function target(db,s,u,role,b,{management=false}={}){
  return {type,p,v,subject,activityId,activityType};
 }
 // A public mirror must honor the source school's restrictions too. No school
-// content or financial data is exposed: only a blocking policy is returned.
+// content or financial data is exposed: only activity policy restrictions are returned.
 export async function publicSchoolAssistanceRestriction(db,s,u,problemId,kind){
  if(s===LEGACY_SCHOOL_ID)return null;
  const assigned=(await db.query(`SELECT a.id,a.kind,a.results_published_at FROM school_activities a
@@ -53,10 +54,13 @@ export async function publicSchoolAssistanceRestriction(db,s,u,problemId,kind){
    AND (a.starts_at IS NULL OR a.starts_at<=clock_timestamp())
    AND (a.ends_at IS NULL OR a.ends_at>=clock_timestamp() OR a.kind='timed' AND a.results_published_at IS NULL)`,[s,problemId,u.id])).rows;
  if(assigned.some(a=>a.kind==='timed'&&!a.results_published_at))return {mode:'disabled',reason:'Assistance is unavailable until this assessment releases its results.'};
- const blocked=(await db.query(`SELECT 1 FROM school_scholarship_policies WHERE school_id=$1 AND kind=$2
-  AND (target_type='subject' AND target_key=$3 OR target_type='activity' AND target_key=ANY($4::text[]))
-  AND (mode='disabled' OR opens_at>clock_timestamp()) LIMIT 1`,[s,kind,'problem:'+problemId,assigned.map(a=>a.id)])).rowCount;
- return blocked?{mode:'disabled',reason:'This assistance is not open under the current school activity rules.'}:null;
+ const {rows:[rules]}=await db.query(`SELECT
+   coalesce(bool_or(mode='disabled' OR opens_at>clock_timestamp()),false) blocked,
+   coalesce(bool_or(target_type='activity' AND mode='paid'),false) activity_paid
+  FROM school_scholarship_policies WHERE school_id=$1 AND kind=$2
+   AND (target_type='subject' AND target_key=$3 OR target_type='activity' AND target_key=ANY($4::text[]))`,[s,kind,'problem:'+problemId,assigned.map(a=>a.id)]);
+ if(rules.blocked)return {mode:'disabled',reason:'This assistance is not open under the current school activity rules.'};
+ return rules.activity_paid?{activityPaid:true}:null;
 }
 async function currentAssistance(db,s,u,role,b){
  const k=kindOf(b),language=languageOf(k),t=await target(db,s,u,role,b),i=await studentIdentity(db,s,u),cfg=await schoolScholarshipSettings(db,s);
@@ -71,6 +75,13 @@ async function currentAssistance(db,s,u,role,b){
  if(exam){mode='disabled';reason='Assistance is unavailable until this assessment releases its results.';}
  if(mode==='paid'&&price===0)mode='free';
  const content=(await db.query(`SELECT id,revision FROM school_scholarship_contents WHERE school_id=$1 AND subject_key=$2 AND version_id=$3 AND kind=$4 AND language=$5 AND status='published' FOR SHARE`,[s,t.subject,t.v.id,k,language])).rows[0];
+ const freeAfterAc=!!content&&k==='FULL_SOLUTION'&&mode==='paid'&&t.type==='problem'&&!t.activityId
+  &&!policies.some(p=>p.target_type==='activity'&&p.mode==='paid')
+  &&(await db.query(`SELECT EXISTS(SELECT 1 FROM school_judge_jobs j
+   WHERE j.school_id=$1 AND j.identity_id=$2 AND j.problem_id=$3 AND j.version_id=$4
+    AND j.access_context='school' AND j.kind='submit' AND j.state='completed' AND j.result->>'status'='AC'
+    AND ${schoolActivityJobVisibleSql('j')}) accepted`,[s,i.id,t.p.id,t.v.id])).rows[0].accepted;
+ if(freeAfterAc)mode='free';
  const entitlement=(await db.query('SELECT * FROM school_scholarship_entitlements WHERE school_id=$1 AND identity_id=$2 AND subject_key=$3 AND kind=$4 AND language=$5',[s,i.id,t.subject,k,language])).rows[0];
  let translationCredit=0,creditLedger=null;
  if(k==='FULL_SOLUTION'&&mode==='paid'&&!entitlement){const paid=(await db.query(`SELECT l.id,-l.delta AS amount FROM school_scholarship_entitlements e JOIN school_scholarship_ledger l ON l.school_id=e.school_id AND l.id=e.ledger_id WHERE e.school_id=$1 AND e.identity_id=$2 AND e.subject_key=$3 AND e.kind='FULL_TRANSLATION' AND e.language='zh-CN' AND NOT EXISTS(SELECT 1 FROM school_scholarship_ledger r WHERE r.school_id=l.school_id AND r.refund_of=l.id)`,[s,i.id,t.subject])).rows[0];if(paid){translationCredit=Math.min(price,paid.amount);creditLedger=paid.id;}}

@@ -195,6 +195,25 @@ test('Luq active exam restrictions beat balance, prior purchase, old versions an
  assert.equal((await f.quote(f.student,target)).available,true);assert.ok((await f.provide(f.student,target)).body);
 }));
 
+test('free after AC respects the student, exact version and paid activity policy',options,async()=>fixture(async f=>{
+ const target=await f.problem(),newer=await f.version(target.problemId);
+ await f.publish(target);await f.publish(newer);await f.publish(target,'FULL_TRANSLATION','中文题面');
+ const ac=await f.submit(f.student,target);
+ await f.pool.query("UPDATE submissions SET status='AC',score=100 WHERE id=$1",[ac.id]);
+ assert.equal((await f.quote(f.student,target)).mode,'free');
+ assert.equal((await f.quote(f.student,newer)).mode,'paid');
+ assert.equal((await f.quote(f.otherStudent,target)).mode,'paid');
+ assert.equal((await f.quote(f.student,target,'FULL_TRANSLATION')).price,3);
+ const {rows:[assignment]}=await f.pool.query(`INSERT INTO assignments(title,owner_account_id,due_at,state)
+  VALUES('Paid policy',$1,now()+interval '1 hour','Draft') RETURNING id`,[f.teacher.id]);
+ await f.pool.query('INSERT INTO assignment_problems(assignment_id,problem_id,version_id,points,position) VALUES($1,$2,$3,100,0)',[assignment.id,target.problemId,target.versionId]);
+ await f.pool.query('INSERT INTO assignment_participants(assignment_id,identity_id) VALUES($1,$2)',[assignment.id,f.student.identityId]);
+ await f.call(f.teacher,'/luq/policies',{targetType:'assignment',targetId:assignment.id,kind:'FULL_SOLUTION',mode:'paid'});
+ await f.pool.query("UPDATE assignments SET state='Published',published_at=now() WHERE id=$1",[assignment.id]);
+ assert.equal((await f.quote(f.student,{...target,assignmentId:assignment.id})).mode,'paid');
+ await rejects(f.provide(f.student,target),'UNLOCK_REQUIRED');
+}));
+
 test('Luq answer provision and submission share an acceptance lock; later viewing cannot revise an earlier snapshot',options,async()=>fixture(async f=>{
  const target=await f.problem();await f.publish(target);await f.call(f.teacher,'/luq/policies',{targetType:'problem',targetId:target.problemId,kind:'FULL_SOLUTION',mode:'free'});
  const client=await f.pool.connect();let pending;

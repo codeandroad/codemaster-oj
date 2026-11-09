@@ -26,7 +26,7 @@ async function completedAssignments(db, identityId, assignmentIds, matchedSubmis
    LEFT JOIN LATERAL (
     SELECT min(s.created_at) AS first_at FROM submissions s
     WHERE s.assignment_id=assignment.id AND s.identity_id=part.identity_id AND s.problem_id=ap.problem_id
-     AND s.version_id=ap.version_id AND s.kind='submit' AND s.created_at<=assignment.due_at
+     AND s.version_id IN (ap.version_id,ap.prior_version_id) AND s.kind='submit' AND s.created_at<=assignment.due_at
    ) attempt ON true
    WHERE assignment.id=ANY($1::uuid[]) AND assignment.state='Published'
     AND ($3::bigint IS NULL OR assignment.archived_at IS NULL)
@@ -91,7 +91,7 @@ export async function learnerSubmissionAssignmentCompletions(db, user, id) {
   JOIN assignments a ON a.id=part.assignment_id
   JOIN assignment_problems p ON p.assignment_id=a.id
   WHERE part.identity_id=$1 AND NOT part.exempt AND a.state='Published' AND a.archived_at IS NULL
-   AND p.problem_id=$2 AND p.version_id=$3
+   AND p.problem_id=$2 AND $3 IN (p.version_id,p.prior_version_id)
  `, [user.identityId, own.problem_id, own.version_id])).rows;
  return completedAssignments(db, user.identityId, candidates.map(a => a.id), submissionId(id));
 }

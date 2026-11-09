@@ -94,6 +94,43 @@ test('ordinary assignments recognize prior formal AC without copying submissions
    assert.equal((await result(draft.id)).problems[0].versionId,replacement.id);
   });
 
+  await t.test('an equivalent upgrade preserves old grades and queues new work on the replacement', async () => {
+   const {rows:[{id}]}=await pool.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id',[teacher.id]);
+   async function revision(expected) {
+    const {rows:[{id:versionId}]}=await pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code,validation_status)
+     VALUES($1,'Equivalent task','stdio','Read and print.',500,64,'print(input())','AC') RETURNING id`,[id]);
+    await pool.query('INSERT INTO test_cases(version_id,position,input,expected,weight) VALUES($1,1,$2,$3,100)',[versionId,'1',expected]);
+    await teacher.api(`/problems/${id}/publish`,{versionId});
+    await admin(`/problems/${id}/rank-review`,{versionId,decision:'approved'},'PATCH');
+    return {id,versionId};
+   }
+   const original=await revision('1'), assignmentId=await assignment([original]);
+   const submissionId=await submit(original,{assignmentId});
+   const before=await result(assignmentId);
+   const upgrade=version=>pool.query(`UPDATE assignment_problems SET prior_version_id=version_id,version_id=$3
+    WHERE assignment_id=$1 AND problem_id=$2`,[assignmentId,id,version.versionId]);
+   await assert.rejects(upgrade(await revision('2')),/identical formal test cases/);
+   const latest=await revision('1');
+   await upgrade(latest);
+   const after=await result(assignmentId);
+   assert.equal(after.problems[0].versionId,latest.versionId);
+   assert.deepEqual(after.grades,before.grades);
+   assert.deepEqual(after.completion,before.completion);
+   const historical=await student.api(`/submissions/SUB${submissionId}`);
+   assert.equal(historical.versionId,original.versionId);
+   assert.equal(historical.score,100);
+   const history=await student.api(`/problems/${id}/submissions?assignmentId=${assignmentId}&versionId=${latest.versionId}`);
+   assert.ok(history.items.some(item=>item.id===`SUB${submissionId}`));
+   await other.api(`/problems/${id}/submissions?assignmentId=${assignmentId}&versionId=${latest.versionId}`,undefined,'GET',403);
+   const work={assignmentId,problemId:id,kind:'submit',code:'print(input())'};
+   await student.api('/submissions',{...work,versionId:original.versionId,idempotencyKey:randomUUID()},'POST',409);
+   const retry=await student.api('/submissions',{...work,code:'PRIVATE_STUDENT_CODE_SENTINEL',versionId:latest.versionId,idempotencyKey:randomUUID()},'POST',409);
+   assert.equal(retry.error.code,'SUBMISSION_ALREADY_ACCEPTED');
+   const next=await student.api('/submissions',{...work,versionId:latest.versionId,idempotencyKey:randomUUID()},'POST',201);
+   assert.equal(next.versionId,latest.versionId);
+   assert.equal((await pool.query('SELECT version_id FROM judge_tasks WHERE submission_id=$1',[next.id.replace(/^SUB/,'')])).rows[0].version_id,latest.versionId);
+  });
+
   await t.test('course/free AC before assignment gives full credit in student, teacher and reports, without duplicate rewards', async () => {
    const p = await problem(), source = await submit(p), id = await assignment([p]);
    const before = await counts();

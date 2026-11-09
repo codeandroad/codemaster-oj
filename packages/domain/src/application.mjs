@@ -131,7 +131,7 @@ export async function createDomainServices(pool,config) {
    const selected=await db.query(`SELECT 1 FROM assignment_problems ap
     JOIN assignments a ON a.id=ap.assignment_id
     LEFT JOIN classes c ON c.id=a.class_id
-    WHERE ap.problem_id=$1 AND ap.version_id=$2 AND (
+    WHERE ap.problem_id=$1 AND $2 IN (ap.version_id,ap.prior_version_id) AND (
      $3::boolean
      OR $4::boolean AND a.owner_account_id=$6
      OR $5::boolean AND a.state='Published' AND EXISTS(SELECT 1 FROM assignment_participants part WHERE part.assignment_id=a.id AND part.identity_id=$7 AND NOT part.exempt)
@@ -487,7 +487,7 @@ export async function createDomainServices(pool,config) {
        SELECT 1 FROM assignment_problems ap JOIN assignments assignment
         ON assignment.id=ap.assignment_id AND assignment.state='Published'
        JOIN assignment_participants part ON part.assignment_id=ap.assignment_id
-       WHERE ap.version_id=v.id AND part.identity_id=$4 AND NOT part.exempt)
+       WHERE v.id IN (ap.version_id,ap.prior_version_id) AND part.identity_id=$4 AND NOT part.exempt)
       OR $5 AND v.published_at IS NOT NULL AND EXISTS (
        SELECT 1 FROM timed_practice_problems tp JOIN timed_practices practice ON practice.id=tp.practice_id
        JOIN timed_practice_participants part ON part.practice_id=tp.practice_id
@@ -662,7 +662,7 @@ export async function createDomainServices(pool,config) {
      submitLimiter.check(user.id);
      await assertJudgeAdmission(db);
      if((await db.query("SELECT count(*)::int count FROM submissions WHERE identity_id=$1 AND status IN ('Waiting','Judging')",[user.identityId])).rows[0].count>=5)fail(429,'TOO_MANY_PENDING','最多同时等待 5 个运行，请等待已有结果');
-     let resolvedVersion=requestedVersion,assignment=null;
+     let resolvedVersion=requestedVersion,assignment=null,priorAssignmentVersion=null;
      if(assignmentId){
       // Serialize against teacher edits before reading the pinned version or
       // checking its visibility. A concurrent version switch must yield one
@@ -671,9 +671,11 @@ export async function createDomainServices(pool,config) {
       assignment=await assignmentAccess(db,user,assignmentId);
       if(!assignment.isParticipant)fail(403,'FORBIDDEN','只能作为被分配的学生提交作业，教师请使用练习预览');
       if(assignment.archived_at)fail(409,'ASSIGNMENT_ARCHIVED','作业已归档，不能在此作业中继续运行或提交；可从题库独立练习');
-      const pinned=row(await db.query('SELECT version_id FROM assignment_problems WHERE assignment_id=$1 AND problem_id=$2',[assignmentId,problemId]));
-      if(requestedVersion&&requestedVersion!==pinned.version_id)fail(409,'VERSION_MISMATCH','提交版本与作业固定版本不同，请刷新作业');
-      resolvedVersion=pinned.version_id;
+      const pinned=row(await db.query('SELECT version_id,prior_version_id FROM assignment_problems WHERE assignment_id=$1 AND problem_id=$2',[assignmentId,problemId]));
+      priorAssignmentVersion=pinned.prior_version_id;
+      const correctingPrior=kind==='correction'&&requestedVersion&&requestedVersion===priorAssignmentVersion;
+      if(requestedVersion&&requestedVersion!==pinned.version_id&&!correctingPrior)fail(409,'VERSION_MISMATCH','提交版本与作业固定版本不同，请刷新作业');
+      resolvedVersion=correctingPrior?priorAssignmentVersion:pinned.version_id;
      }
      if(!resolvedVersion&&timedPracticeId)resolvedVersion=row(await db.query('SELECT version_id FROM timed_practice_problems WHERE practice_id=$1 AND problem_id=$2',[timedPracticeId,problemId])).version_id;
      if(!resolvedVersion&&originalId)resolvedVersion=(await submissionAccess(db,user,originalId)).version_id;
@@ -688,7 +690,7 @@ export async function createDomainServices(pool,config) {
       acceptedAt=time.accepted_at;
       if(!time.allowed)fail(409,'DEADLINE_PASSED','作业已截止，可以在练习中继续或提交订正');
      }
-     if(originalId){const original=await submissionAccess(db,user,originalId);if(original.timed_attempt_id&&!(await db.query('SELECT 1 FROM timed_attempts attempt JOIN timed_practices practice ON practice.id=attempt.practice_id WHERE attempt.id=$1 AND practice.results_published_at IS NOT NULL',[original.timed_attempt_id])).rowCount)fail(409,'RESULTS_NOT_RELEASED','计时训练成绩发布后才能提交订正');if(original.identity_id!==user.identityId||original.problem_id!==problemId||!['submit','correction'].includes(original.kind))fail(400,'VALIDATION','只能订正自己的同题正式提交');if(assignmentId&&original.assignment_id!==assignmentId)fail(409,'ASSIGNMENT_CONTEXT_MISMATCH','作业订正须引用本作业的原提交');if(assignmentId&&original.version_id!==resolvedVersion)fail(409,'VERSION_MISMATCH','作业订正须使用当前固定的题目版本');if(requestedVersion&&requestedVersion!==original.version_id)fail(409,'VERSION_MISMATCH','订正版本与原提交不同');v=row(await db.query('SELECT * FROM problem_versions WHERE id=$1',[original.version_id]));}
+     if(originalId){const original=await submissionAccess(db,user,originalId);if(original.timed_attempt_id&&!(await db.query('SELECT 1 FROM timed_attempts attempt JOIN timed_practices practice ON practice.id=attempt.practice_id WHERE attempt.id=$1 AND practice.results_published_at IS NOT NULL',[original.timed_attempt_id])).rowCount)fail(409,'RESULTS_NOT_RELEASED','计时训练成绩发布后才能提交订正');if(original.identity_id!==user.identityId||original.problem_id!==problemId||!['submit','correction'].includes(original.kind))fail(400,'VALIDATION','只能订正自己的同题正式提交');if(assignmentId&&original.assignment_id!==assignmentId)fail(409,'ASSIGNMENT_CONTEXT_MISMATCH','作业订正须引用本作业的原提交');if(assignmentId&&original.version_id!==resolvedVersion&&original.version_id!==priorAssignmentVersion)fail(409,'VERSION_MISMATCH','作业订正须使用原提交的作业题目版本');if(requestedVersion&&requestedVersion!==original.version_id)fail(409,'VERSION_MISMATCH','订正版本与原提交不同');v=row(await db.query('SELECT * FROM problem_versions WHERE id=$1',[original.version_id]));}
      if(!timedPracticeId&&!permissions.canRunFree)fail(403,'TIMED_CONTEXT_REQUIRED','该题目仅授权用于当前计时训练，请从训练工作区提交');const timedContext=await timed.prepareSubmission(db,user,body,v);if(timedContext){v=timedContext.version;acceptedAt=timedContext.acceptedAt;}if(kind==='samples'&&!(v.samples||[]).some(sample=>sample.enabled!==false))fail(409,'NO_PUBLIC_SAMPLES','此版本没有启用的公开样例，请联系教师补齐后运行');if(kind==='custom'&&v.mode==='function'){try{parseFunctionInput(customInput);}catch{fail(400,'VALIDATION','函数自测输入须为 JSON 参数数组或合法的 args/kwargs 对象');}}
      if(kind==='submit'){
       // A new request key cannot create a second attempt for identical code
@@ -696,10 +698,10 @@ export async function createDomainServices(pool,config) {
       const scope=[user.identityId,v.problem_id,v.id,assignment?.id??null,timedContext?.timedAttemptId??null,language];
       await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`submission-code:${canonicalHash([...scope,code])}`]);
       const duplicate=(await db.query(`SELECT status FROM submissions
-        WHERE identity_id=$1 AND problem_id=$2 AND version_id=$3
+        WHERE identity_id=$1 AND problem_id=$2 AND version_id IN ($3,$8)
           AND assignment_id IS NOT DISTINCT FROM $4::uuid AND timed_attempt_id IS NOT DISTINCT FROM $5::uuid
           AND language=$6 AND kind='submit' AND code=$7 AND status IN ('Waiting','Judging','AC')
-        ORDER BY (status='AC') DESC LIMIT 1`,[...scope,code])).rows[0];
+        ORDER BY (status='AC') DESC LIMIT 1`,[...scope,code,priorAssignmentVersion])).rows[0];
       if(duplicate?.status==='AC')fail(409,'SUBMISSION_ALREADY_ACCEPTED','相同代码已通过，不会重复计入提交次数。修改代码后可再次提交。');
       if(duplicate)fail(409,'SUBMISSION_ALREADY_PENDING','相同代码已提交，请等待当前判题结果。');
      }

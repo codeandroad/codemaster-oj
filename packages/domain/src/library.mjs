@@ -56,11 +56,11 @@ export async function problemPermissions(db,user,problem,version) {
  const assignmentTeacherRead=user.roles.includes('teacher')&&!!version.published_at&&!!(await db.query(`
   SELECT 1 FROM assignment_problems ap
   JOIN assignments a ON a.id=ap.assignment_id
-  WHERE a.owner_account_id=$2 AND ap.problem_id=$1 AND ap.version_id=$3 LIMIT 1`,[problem.id,user.id,version.id])).rowCount;
+  WHERE a.owner_account_id=$2 AND ap.problem_id=$1 AND $3 IN (ap.version_id,ap.prior_version_id) LIMIT 1`,[problem.id,user.id,version.id])).rowCount;
  const timedTeacherRead=user.roles.includes('teacher')&&!!version.published_at&&!!(await db.query(`
   SELECT 1 FROM timed_practice_problems tpp JOIN timed_practices tp ON tp.id=tpp.practice_id
   WHERE tp.owner_account_id=$2 AND tpp.problem_id=$1 AND tpp.version_id=$3 LIMIT 1`,[problem.id,user.id,version.id])).rowCount;
- const assignmentRead=user.roles.includes('student')&&!!version.published_at&&!!(await db.query('SELECT 1 FROM assignment_problems ap JOIN assignments assignment ON assignment.id=ap.assignment_id AND assignment.state=\'Published\' JOIN assignment_participants part ON part.assignment_id=ap.assignment_id WHERE ap.version_id=$1 AND part.identity_id=$2 AND NOT part.exempt LIMIT 1',[version.id,user.identityId])).rowCount;
+ const assignmentRead=user.roles.includes('student')&&!!version.published_at&&!!(await db.query('SELECT 1 FROM assignment_problems ap JOIN assignments assignment ON assignment.id=ap.assignment_id AND assignment.state=\'Published\' JOIN assignment_participants part ON part.assignment_id=ap.assignment_id WHERE $1 IN (ap.version_id,ap.prior_version_id) AND part.identity_id=$2 AND NOT part.exempt LIMIT 1',[version.id,user.identityId])).rowCount;
  let timedRead=false,timedReleased=false;
  if(user.roles.includes('student')&&version.published_at&&(await db.query("SELECT to_regclass('timed_practice_problems') existing")).rows[0].existing) {
   const permitted=(await db.query("SELECT practice.results_published_at FROM timed_practice_problems tp JOIN timed_practices practice ON practice.id=tp.practice_id JOIN timed_practice_participants part ON part.practice_id=tp.practice_id LEFT JOIN timed_attempts attempt ON attempt.practice_id=tp.practice_id AND attempt.identity_id=part.identity_id WHERE tp.version_id=$1 AND part.identity_id=$2 AND NOT part.exempt AND (practice.state IN ('Published','ResultsPublished') OR practice.state='Archived' AND practice.results_published_at IS NOT NULL) AND (practice.results_published_at IS NOT NULL OR attempt.id IS NOT NULL) ORDER BY practice.results_published_at DESC NULLS LAST LIMIT 1",[version.id,user.identityId])).rows[0];timedRead=!!permitted;timedReleased=!!permitted?.results_published_at;

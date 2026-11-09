@@ -71,8 +71,25 @@
 .statementMax > .right { display:none; }
 .notice { position:absolute;z-index:40;bottom:12px;left:50%;width:max-content;max-width:min(420px,calc(100% - 24px));transform:translateX(-50%);pointer-events:none;border-radius:6px;background:var(--foreground);color:var(--background);padding:8px 12px;box-shadow:0 4px 20px oklch(0% 0 0 / .2);font-size:12px;line-height:1.5;text-align:center; }
 .warning { color:var(--destructive); }
-.layoutMenu { width:min(440px,95vw); }
-.layoutMenu button { width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;border:1px solid var(--border);border-radius:6px;margin-top:8px;padding:8px 12px; }
+.layoutMenu {
+ width: min(440px, calc(100% - 2rem));
+ max-height: calc(100dvh - 2rem);
+ overflow-y: auto;
+}
+.layoutMenuHeader { min-width: 0; padding-right: 36px; }
+.layoutMenuHeader p { margin-top: 8px; }
+.layoutActions { display: grid; gap: 8px; }
+.layoutActions > button {
+ display: flex;
+ align-items: center;
+ justify-content: space-between;
+ gap: 12px;
+ min-height: 44px;
+ border: 1px solid var(--border);
+ border-radius: 6px;
+ padding: 8px 12px;
+ text-align: left;
+}
 .root :is(button,select,textarea):focus-visible { outline:2px solid var(--ring);outline-offset:2px; }
 @media(max-width:1100px) and (min-width:761px) { .title{max-width:150px}.toolbar{gap:6px;padding:7px 10px}.tab{font-size:12px;padding:0 5px;gap:4px}.panelControls button{width:23px}.panelBody{padding:20px}.back span{max-width:90px}.brand{gap:6px} }
 @media(max-width:760px) {

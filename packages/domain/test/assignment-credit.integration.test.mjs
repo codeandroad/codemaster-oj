@@ -71,6 +71,29 @@ test('ordinary assignments recognize prior formal AC without copying submissions
    (SELECT count(*) FROM point_ledger) points,(SELECT count(*) FROM school_rank_ledger) rank,
    (SELECT count(*) FROM luq_ledger) luq,(SELECT count(*) FROM luq_activity_awards) rewards`)).rows[0];
 
+  await t.test('assignment selection and publishing use the current published version', async () => {
+   const first = await problem();
+   const picker = `/problems?purpose=assignment&problemId=${first.id}`;
+   const versions = async user => (await user.api(picker)).items.map(item => [item.versionId,item.publishedVersionId]);
+   assert.deepEqual(await versions(colleague), [[first.versionId,first.versionId]]);
+   const body = { title:'Version check', state:'Draft', dueAt:deadline, participants:[student.identityId],
+    problems:[{problemId:first.id,versionId:first.versionId,points:20}] };
+   const draft = await teacher.api('/assignments',body,'POST',201);
+   assert.equal(draft.problems[0].versionId,first.versionId);
+   const {rows:[replacement]} = await pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,
+    memory_limit_mb,reference_code,validation_status)
+    VALUES($1,'Latest credit task','stdio','Revised exercise.',500,64,'print(1)','AC') RETURNING id`,[first.id]);
+   assert.deepEqual(await versions(teacher), [[first.versionId,first.versionId]],'an unpublished edit is not selectable');
+   await teacher.api(`/problems/${first.id}/publish`,{versionId:replacement.id});
+   assert.deepEqual(await versions(colleague), [],'the picker never falls back to an older version');
+   await student.api(picker,undefined,'GET',403);
+   await colleague.api('/assignments',body,'POST',404);
+   assert.deepEqual(await versions(teacher), [[replacement.id,replacement.id]]);
+   const published=await teacher.api(`/assignments/${draft.id}/publish`,{expectedRevision:draft.editRevision,problems:body.problems});
+   assert.equal(published.problems[0].versionId,replacement.id,'publishing ignores a stale client version');
+   assert.equal((await result(draft.id)).problems[0].versionId,replacement.id);
+  });
+
   await t.test('course/free AC before assignment gives full credit in student, teacher and reports, without duplicate rewards', async () => {
    const p = await problem(), source = await submit(p), id = await assignment([p]);
    const before = await counts();

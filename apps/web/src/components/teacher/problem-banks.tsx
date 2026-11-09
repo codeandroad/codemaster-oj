@@ -927,19 +927,21 @@ export function ProblemPicker({
   onClose,
   onAdd,
   courseMode,
+  forAssignment,
   orderedProblemIds,
 }: {
   selected: string[];
   onClose: () => void;
   onAdd: (items: ProductionProblem[]) => void;
   courseMode?: "draft" | "published";
+  forAssignment?: boolean;
   orderedProblemIds?: readonly string[];
 }) {
   const { locale } = useLocale();
   const tr = (zh: string, en: string) => localText(locale, zh, en);
   const banks = useData<{ items: Bank[] }>("problem-banks"),
     groups = useData<{ items: Group[] }>("problem-groups"),
-    problems = useData<{ items: ProductionProblem[] }>("problems"),
+    problems = useData<{ items: ProductionProblem[] }>(forAssignment ? "problems?purpose=assignment" : "problems"),
     [bank, setBank] = useState(""),
     [group, setGroup] = useState(""),
     [query, setQuery] = useState(""),
@@ -974,7 +976,9 @@ export function ProblemPicker({
           ? tr("课程草稿可引用校内题库中你能编辑的题目最新版本；发布课程前，关联题须发布并通过管理员公开审核。", "A course draft can link the latest versions you can edit in school banks. Publish and obtain admin approval for linked problems before publishing the course.")
           : courseMode === "published"
             ? tr("课程只能添加已通过管理员审核的校内公开题目。", "Only admin-approved school-wide problems can be added to a published course.")
-            : tr("题库 → 分组 → 题目。多组同题只显示一次，已加入的题目保留选择状态。", "Bank → group → problem. Problems in multiple groups appear once; already added problems stay selected.")}
+            : forAssignment
+              ? tr("每道题只显示当前最新的已发布版本。布置作业时，系统会再次核对最新版并将其用于本次作业判分。", "Each problem shows its latest published version. When you assign the work, the system checks for the latest version again and uses it for grading.")
+              : tr("题库 → 分组 → 题目。多组同题只显示一次，已加入的题目保留选择状态。", "Bank → group → problem. Problems in multiple groups appear once; already added problems stay selected.")}
         {" "}{tr("先勾选一项，再按住 Shift 点击另一项，即可选中当前列表中两者之间的可选题目。", "Select a problem, then Shift-click another to select all eligible problems in between in the current list.")}
       </p>
       <div className="mt-4 grid grid-cols-2 gap-3">
@@ -1058,7 +1062,9 @@ export function ProblemPicker({
                               : tr("待公开审核 · 教学可用", "Awaiting public review · teaching ready")
                           : tr("题目草稿 · 仅在课程草稿中预览", "Problem draft · preview only in the course draft")
                       : available
-                        ? tr("教学可用 · 固定版本", "Teaching ready · fixed version")
+                        ? forAssignment
+                          ? tr("最新已发布版本", "Latest published version")
+                          : tr("教学可用 · 固定版本", "Teaching ready · fixed version")
                         : tr("教师草稿 · 不能进入正式活动", "Teacher draft · unavailable for formal activities")}
                 </p>
               </span>
@@ -1071,7 +1077,9 @@ export function ProblemPicker({
               ? tr("当前范围暂无可编辑的校内题库题目。", "No editable school-bank problems in this scope.")
               : courseMode === "published"
                 ? tr("当前范围暂无校内题库题目。", "No school-bank problems in this scope.")
-              : tr("当前范围暂无题目。", "No problems in this scope.")}
+                : forAssignment
+                  ? tr("当前范围暂无可布置的已发布题目。", "No published problems available to assign in this scope.")
+                  : tr("当前范围暂无题目。", "No problems in this scope.")}
           </p>
         )}
       </div>

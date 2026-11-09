@@ -18,6 +18,13 @@ async function syncRewards(db,id,problems,accountId){
  await db.query('DELETE FROM point_rewards WHERE assignment_id=$1',[id]);
  for(const problem of problems)if(problem.rewardPoints>0)await db.query('INSERT INTO point_rewards(problem_id,assignment_id,points,updated_by) VALUES($1,$2,$3,$4)',[problem.problemId,id,problem.rewardPoints,accountId]);
 }
+async function currentAssignmentVersion(ctx,db,problemId){
+ // Publication and school review lock the same problem row before changing its version.
+ const locked=row(await db.query('SELECT current_version_id,archived_at FROM problems WHERE id=$1 FOR SHARE',[problemId]));
+ const {v}=await ctx.helpers.versionAccess(db,ctx.user,problemId,locked.current_version_id);
+ if(locked.archived_at||!locked.current_version_id||!v.published_at)fail(409,'UNPUBLISHED','只能选择未归档题目的最新已发布版本');
+ return v.id;
+}
 async function input(ctx,db,body,old) {
  const title=body.title===undefined?old?.title:field(body.title,'作业标题');if(!title)fail(400,'VALIDATION','需要作业标题');
  const classIds=await audienceClasses(db,ctx.user,body,old);const classId=classIds[0]??null;
@@ -26,7 +33,8 @@ async function input(ctx,db,body,old) {
  const existingRewards=old?new Map((await db.query('SELECT problem_id,points FROM point_rewards WHERE assignment_id=$1',[old.id])).rows.map(reward=>[reward.problem_id,reward.points])):new Map();
  const problems=body.problems??(old?(await db.query('SELECT problem_id AS "problemId",points FROM assignment_problems WHERE assignment_id=$1 ORDER BY position',[old.id])).rows:[]);
  if(!Array.isArray(problems)||problems.length>50)fail(400,'VALIDATION','作业最多 50 题');const selected=[],seen=new Set();
- for(const p of problems){const problemId=uuid(p.problemId),points=Number(p.points);if(seen.has(problemId))fail(400,'VALIDATION','同一题目只能选择一次');seen.add(problemId);if(!Number.isFinite(points)||points<=0||points>1000||Math.abs(Math.round(points*100)-points*100)>0.00001)fail(400,'VALIDATION','分值须为 0–1000，最多两位小数');const {p:problem}=await ctx.helpers.versionAccess(db,ctx.user,problemId);if(!problem.current_version_id)fail(409,'UNPUBLISHED','只能选择已发布题目');const {v}=await ctx.helpers.versionAccess(db,ctx.user,problemId,problem.current_version_id);if(!v.published_at)fail(409,'UNPUBLISHED','只能选择已发布题目');selected.push({problemId,versionId:v.id,points,rewardPoints:rewardPoints(p.rewardPoints,existingRewards.get(problemId)??0)});}
+ for(const p of problems){const problemId=uuid(p.problemId).toLowerCase(),points=Number(p.points);if(seen.has(problemId))fail(400,'VALIDATION','同一题目只能选择一次');seen.add(problemId);if(!Number.isFinite(points)||points<=0||points>1000||Math.abs(Math.round(points*100)-points*100)>0.00001)fail(400,'VALIDATION','分值须为 0–1000，最多两位小数');selected.push({problemId,points,rewardPoints:rewardPoints(p.rewardPoints,existingRewards.get(problemId)??0)});}
+ for(const problem of [...selected].sort((a,b)=>a.problemId.localeCompare(b.problemId)))problem.versionId=await currentAssignmentVersion(ctx,db,problem.problemId);
  checkRewardBudget(selected);
  const participants=body.participants??(old?(await db.query('SELECT identity_id FROM assignment_participants WHERE assignment_id=$1 AND NOT exempt',[old.id])).rows.map(p=>p.identity_id):await defaultClassStudents(db,classIds));
  const studentIds=await audienceStudents(db,participants);const course=body.course===undefined?old?.course??'Python':field(body.course,'课程标签',{max:100});const linkedCourse=body.coursePathId===undefined?old?.course_path_id??null:await coursePathId(db,body.coursePathId);const problemOrder=enumValue(body.problemOrder??old?.problem_order??'course',['course','custom'],'题目显示顺序');return {title,classId,classIds,dueAt,description,course,coursePathId:linkedCourse,problemOrder,problems:selected,participants:studentIds};
@@ -80,22 +88,18 @@ async function editPublished(ctx,db,id,old,body){
   if(!Array.isArray(body.problems)||!body.problems.length||body.problems.length>50)fail(400,'VALIDATION','已发布作业须包含 1–50 题');
   const seen=new Set();problems=[];
   for(const item of body.problems){
-   const problemId=uuid(item?.problemId,'题目 ID'),points=Number(item.points);
+   const problemId=uuid(item?.problemId,'题目 ID').toLowerCase(),points=Number(item.points);
    if(seen.has(problemId))fail(400,'VALIDATION','同一题目只能选择一次');seen.add(problemId);
    if(!Number.isFinite(points)||points<=0||points>1000||Math.abs(Math.round(points*100)-points*100)>0.00001)fail(400,'VALIDATION','分值须大于 0 且不超过 1000，最多两位小数');
-   let versionId=pinned.get(problemId)?.version_id;
-   if(!versionId||item.versionId!==undefined&&item.versionId!==versionId){
-    const {p}=await ctx.helpers.versionAccess(db,ctx.user,problemId);
-    if(!p.current_version_id)fail(409,'UNPUBLISHED','只能选择已发布题目');
-    // A newer question version is never adopted implicitly. The teacher must
-    // explicitly select the currently published version of the same problem.
-    const requested=item.versionId===undefined?p.current_version_id:uuid(item.versionId,'版本 ID');
-    if(requested!==p.current_version_id)fail(409,'VERSION_MISMATCH','只能明确选择该题当前已发布的最新版本');
-    const {v}=await ctx.helpers.versionAccess(db,ctx.user,problemId,requested);
-    if(!v.published_at)fail(409,'UNPUBLISHED','只能选择已发布题目');
-    versionId=v.id;
-   }
-   problems.push({problemId,versionId,points,rewardPoints:rewardPoints(item.rewardPoints,Number(pinned.get(problemId)?.reward_points??0))});
+   const requestedVersion=item.versionId===undefined?undefined:uuid(item.versionId,'版本 ID').toLowerCase();
+   problems.push({problemId,requestedVersion,versionId:pinned.get(problemId)?.version_id,points,rewardPoints:rewardPoints(item.rewardPoints,Number(pinned.get(problemId)?.reward_points??0))});
+  }
+  for(const problem of [...problems].sort((a,b)=>a.problemId.localeCompare(b.problemId))){
+   const {problemId,versionId,requestedVersion}=problem;
+   if(versionId&&(!requestedVersion||requestedVersion===versionId))continue;
+   const latest=await currentAssignmentVersion(ctx,db,problemId);
+   if(versionId&&requestedVersion!==latest)fail(409,'VERSION_MISMATCH','只能明确选择该题当前已发布的最新版本');
+   problem.versionId=latest;
   }
  }
  checkRewardBudget(problems);

@@ -349,15 +349,14 @@ function AssignmentEditorForm({
     setCheckingVersion(problemId);
     setVersionError("");
     try {
-      const problem = await productionApi<ProductionProblem>(`problems/${problemId}`);
-      const published = problem.publishedVersionId
-        ? await getProblemVersion(problemId, problem.publishedVersionId)
-        : null;
+      const { items: [published] } = await productionApi<{ items: ProductionProblem[] }>(
+        `problems?purpose=assignment&problemId=${encodeURIComponent(problemId)}`,
+      );
       setLatestVersions((current) => ({
         ...current,
-        [problemId]: published && problem.publishedVersionId
+        [problemId]: published?.versionId
           ? {
-              versionId: problem.publishedVersionId,
+              versionId: published.versionId,
               title: published.title,
               difficulty: published.difficulty ?? null,
             }
@@ -1110,6 +1109,7 @@ function AssignmentEditorForm({
       </section>
       {picker && courseOrderReady && (
         <ProblemPicker
+          forAssignment
           selected={selected.map((x) => x.problemId)}
           orderedProblemIds={problemOrder === "course" ? courseProblemIds : undefined}
           onClose={() => setPicker(false)}

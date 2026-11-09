@@ -462,6 +462,9 @@ export async function createDomainServices(pool,config) {
   if(historyMatch&&method==='GET')return respond(200,await transaction(pool,db=>legacyProblemSubmissions(db,user,historyMatch[1],url,{versionAccess,assignmentAccess})));
   for (const handler of [handleFavorites,handleLibrary]) { const result=await handler(context); if(result)return result; }
    if(route==='/problems'&&method==='GET'){
+    const assignmentPicker=url.searchParams.get('purpose')==='assignment';
+    if(assignmentPicker)staff(user);
+    const selectedProblem=assignmentPicker&&url.searchParams.get('problemId');
     const rows=(await pool.query(`SELECT v.*,
      (SELECT count(*) FROM test_cases tc WHERE tc.version_id=v.id AND tc.enabled) formal_test_count,
      p.bank_id,bank.visibility bank_visibility,
@@ -476,7 +479,8 @@ export async function createDomainServices(pool,config) {
     FROM problems p JOIN problem_banks bank ON bank.id=p.bank_id
     LEFT JOIN bank_permissions bp ON bp.bank_id=bank.id AND bp.account_id=$1
     JOIN LATERAL (
-     SELECT * FROM problem_versions v WHERE v.problem_id=p.id AND (
+     SELECT * FROM problem_versions v WHERE v.problem_id=p.id
+     AND (NOT $7::boolean OR v.id=p.current_version_id AND v.published_at IS NOT NULL) AND (
       $2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit'))
       OR v.published_at IS NOT NULL AND bank.visibility='school' AND v.school_visible_at IS NOT NULL
       OR $5 AND v.published_at IS NOT NULL AND EXISTS (
@@ -498,8 +502,8 @@ export async function createDomainServices(pool,config) {
     ) v ON true
     LEFT JOIN problem_versions pv ON pv.id=p.current_version_id AND pv.published_at IS NOT NULL
     WHERE p.archived_at IS NULL AND bank.archived_at IS NULL
-     AND ($6::uuid IS NULL OR bank.id=$6)
-    ORDER BY p.created_at DESC LIMIT 500`,[user.id,rolesInclude(user,'admin'),rolesInclude(user,'teacher'),user.identityId,rolesInclude(user,'student'),url.searchParams.get('bankId')?uuid(url.searchParams.get('bankId')):null])).rows;
+     AND ($6::uuid IS NULL OR bank.id=$6) AND ($8::uuid IS NULL OR p.id=$8)
+    ORDER BY p.created_at DESC LIMIT 500`,[user.id,rolesInclude(user,'admin'),rolesInclude(user,'teacher'),user.identityId,rolesInclude(user,'student'),url.searchParams.get('bankId')?uuid(url.searchParams.get('bankId')):null,assignmentPicker,selectedProblem?uuid(selectedProblem):null])).rows;
     const problemIds=rows.map(r=>r.problem_id),ownProgress=await problemOwnProgress(pool,user,problemIds);
     const configured=(await pool.query('SELECT problem_id,points FROM point_rewards WHERE assignment_id IS NULL AND problem_id=ANY($1::uuid[])',[problemIds])).rows;
     const firstAcPoints=new Map(configured.map(reward=>[reward.problem_id,reward.points]));

@@ -10,7 +10,7 @@ import { useLocale } from "@/components/locale-context";
 
 import { useCallback, useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, Shuffle, List, House, Code2, BookOpen, FileText, HelpCircle, History, LayoutPanelLeft, Maximize2, Play, RotateCcw, Send, Settings, Download } from "lucide-react";
+import { ChevronLeft, ChevronRight, Shuffle, List, House, Code2, BookOpen, FileText, HelpCircle, History, Languages, LayoutPanelLeft, Lightbulb, Maximize2, Play, RotateCcw, Send, Settings, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { ProblemSubmissionsTable, SolvedStatus, useProblemSubmissions } from "./problem-submissions";
@@ -297,9 +297,9 @@ export function ProblemWorkspace({ problem, user, original = null, adapter }: { 
   const assistanceAvailable = !adapter || Boolean(adapter.assistance);
   const statementTabs = [
     { value: "Problem", label: tx("题目描述", "Problem"), icon: FileText },
-    ...(assistanceAvailable ? [{ value: "Translation", label: tx("中文题面", "Translation"), icon: BookOpen }] : []),
     ...(tutorial ? [{ value: "Tutorial", label: tx("教程", "Tutorial"), icon: BookOpen }] : []),
-    ...(assistanceAvailable ? [{ value: "Solution", label: tx("参考答案", "Solution"), icon: BookOpen }] : []),
+    ...(assistanceAvailable ? [{ value: "Translation", label: tx("中文题面", "Translation"), icon: Languages }] : []),
+    ...(assistanceAvailable ? [{ value: "Solution", label: tx("参考答案", "Solution"), icon: Lightbulb }] : []),
     { value: "Submissions", label: tx("提交记录", "Submissions"), icon: History },
   ];
   const statementTab = statementTabs.some(tab => tab.value === leftTab) ? leftTab : "Problem";

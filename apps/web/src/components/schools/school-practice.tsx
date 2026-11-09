@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { BookOpen, History, Languages, RefreshCw, Settings } from "lucide-react";
+import { BookOpen, History, Languages, Lightbulb, RefreshCw, Settings } from "lucide-react";
 import { useLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -212,9 +212,9 @@ function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation
  const hasAssistance = !preview && !problem.staffPractice && !path.startsWith("practice/");
  const tabItems = [
    { id: "problem", label: tx("题目描述", "Problem"), icon: BookOpen },
-   ...(hasAssistance ? [{ id: "translation", label: tx("中文题面", "Translation"), icon: Languages }] as const : []),
    ...(tutorial ? [{ id: "tutorial", label: tx("教程", "Tutorial"), icon: BookOpen }] as const : []),
-   ...(hasAssistance ? [{ id: "solution", label: tx("参考答案", "Solution"), icon: BookOpen }] as const : []),
+   ...(hasAssistance ? [{ id: "translation", label: tx("中文题面", "Translation"), icon: Languages }] as const : []),
+   ...(hasAssistance ? [{ id: "solution", label: tx("参考答案", "Solution"), icon: Lightbulb }] as const : []),
    { id: "submissions", label: tx("提交记录", "Submissions"), icon: History },
  ] as const;
  const pending=action.busy||!!jobId&&(!job||["queued","leased"].includes(job.state));

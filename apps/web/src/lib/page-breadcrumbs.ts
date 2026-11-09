@@ -93,6 +93,7 @@ export function pageBreadcrumbs(pathname: string, role: BreadcrumbRole, locale: 
     }
     return trail;
   }
+  if (/^\/teacher\/assignments\/[^/]+\/preview$/.test(pathname)) return detail("/teacher/assignments", ["作业试做", "Assignment preview"]);
   if (/^\/teacher\/assignments\/[^/]+\/(progress|edit)$/.test(pathname)) return detail("/teacher/assignments", pathname.endsWith("/edit") ? ["编辑作业", "Edit assignment"] : ["作业进度", "Assignment progress"]);
   if (/^\/teacher\/timed-practice\/[^/]+\/(edit|progress)$/.test(pathname)) return detail("/teacher/timed-practice", pathname.endsWith("/edit") ? ["编辑训练", "Edit practice"] : ["训练进度", "Practice progress"]);
   if (/^\/teacher\/(learning|courses)\/[^/]+$/.test(pathname)) return detail("/teacher/courses", ["课程详情", "Course details"]);

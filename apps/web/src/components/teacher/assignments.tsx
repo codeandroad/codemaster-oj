@@ -33,6 +33,7 @@ import {
 } from "@/lib/production-api";
 import { TeacherAssignment } from "./dashboard-classes";
 import { ProblemPicker } from "./problem-banks";
+import { AssignmentPreviewLink } from "./assignment-preview";
 import {
   area,
   date,
@@ -610,6 +611,7 @@ function AssignmentEditorForm({
         description={ui(locale, "基本信息、题目与分值、指定学生名单、规则与学生预览。", "Basic information, problems and scores, selected students, rules, and student preview.")}
         action={
           <div className="flex flex-wrap gap-2">
+            {saved?.canManage && !saved.archived && saved.problems.length > 0 && <AssignmentPreviewLink id={saved.id} from="edit"/>}
             <Button
               variant="secondary"
               disabled={action.busy || (published ? !hasChanges : stale)}
@@ -1259,7 +1261,8 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
             : ui(locale, "正在读取学生进度。", "Loading student progress.")
         }
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {assignment?.canManage && !assignment.archived && assignment.problems.length > 0 && <AssignmentPreviewLink id={id} from="progress"/>}
             <Button variant="secondary" onClick={() => setManage(true)}>
               延期 / 豁免
             </Button>

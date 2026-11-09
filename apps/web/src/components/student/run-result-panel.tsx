@@ -72,7 +72,7 @@ function ResultContent({ result, reload, currentCode, currentLanguage, onLocate,
       </div>}
       {canDiff && <button type="button" className={styles.diffButton} aria-pressed={diff} onClick={() => setDiff(value => !value)}><ArrowLeftRight size={14}/>{tx("差异", "Diff")}</button>}
     </div>
-    <p className={styles.summary}>{result.kind === "samples" ? tx("公开样例自测", "Public sample run") : result.kind === "custom" ? tx("自定义运行 · 不判断正确性", "Custom run · correctness is not checked") : tx("正式评测", "Formal evaluation")}
+    <p className={styles.summary}>{result.kind === "samples" ? tx("公开样例自测", "Public sample run") : result.kind === "custom" ? tx("自定义运行 · 不判断正确性", "Custom run · correctness is not checked") : result.preview ? tx("试做评测", "Preview evaluation") : tx("正式评测", "Formal evaluation")}
       {result.passed != null && result.total != null && <> · {result.passed}/{result.total} {tx("通过", "passed")}</>}
       {formal && result.score != null && <> · {Number(result.score).toFixed(2)}/100</>}
     </p>

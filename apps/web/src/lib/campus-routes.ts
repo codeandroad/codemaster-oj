@@ -19,7 +19,7 @@ const detailPages = [
   /^\/teacher\/paper4\/[^/]+\/review\/[^/]+$/,
   /^\/student\/paper4\/[^/]+$/,
   /^\/teacher\/problems\/[^/]+\/edit$/,
-  /^\/teacher\/assignments\/[^/]+\/(progress|edit)$/,
+  /^\/teacher\/assignments\/[^/]+\/(progress|edit|preview)$/,
   /^\/teacher\/timed-practice\/[^/]+\/(edit|progress)$/,
   /^\/teacher\/(learning|courses|timed-practice)\/[^/]+$/,
   /^\/student\/learning-paths\/[^/]+\/chapters\/[^/]+$/,

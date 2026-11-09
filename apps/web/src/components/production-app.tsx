@@ -174,9 +174,11 @@ function AuthenticatedWorkspace({user,pathname,search,profileVersion,onUserSaved
         : "teacher"
       : requestedRole;
   const allowed = user.roles.includes(role) || (role === "teacher" && user.roles.includes("admin"));
+  const previewWorkspace = /^\/teacher\/assignments\/[^/]+\/preview$/.test(pathname) && Boolean(search.get("problemId"));
   return <>
     {user.roles.includes("student") && <StudentPresenceHeartbeat identityId={user.identityId}/>}
-    {allowed && (/^\/student\/problems\/[^/]+$/.test(pathname) || /^\/student\/paper4\/[^/]+$/.test(pathname)) ? <StudentPages pathname={pathname} user={user}/> :
+    {allowed && previewWorkspace ? <TeacherPages pathname={pathname} user={user}/> :
+    allowed && (/^\/student\/problems\/[^/]+$/.test(pathname) || /^\/student\/paper4\/[^/]+$/.test(pathname)) ? <StudentPages pathname={pathname} user={user}/> :
     <ProductionShell
       user={user}
       role={role}

@@ -85,6 +85,7 @@ export function ResultScore({ result }: { result: Submission }) {
   return <div className="flex flex-wrap items-center gap-2"><StatusPill status={status}/>{!isPending(result.status) && result.score != null && !/system.?error/i.test(result.status) && ["submit", "correction"].includes(result.kind) && <b>{Number(result.score).toFixed(2)} / 100</b>}</div>;
 }
 export interface DetailedSubmission extends Submission {
+  preview?: boolean;
   runtimeMs?: number | null;
   memoryKb?: number | null;
   reviews?: { id: string; note: string; authorName: string; authorIdentityId?: string; teacherFeedback?: boolean; createdAt: string }[];

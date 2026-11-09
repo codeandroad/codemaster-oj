@@ -45,6 +45,17 @@ export class AssignmentsController {
     return applyResponse(response, await this.domain.execute('assignments', request.domainContext));
   }
 
+  @Get(['assignments/:id/preview', 'assignments/:id/preview/problems/:problemId',
+    'assignments/:id/preview/problems/:problemId/submissions', 'assignments/:id/preview/jobs/:jobId'])
+  async preview(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('assignments', request.domainContext));
+  }
+
+  @Post('assignments/:id/preview/problems/:problemId/submissions')
+  async submitPreview(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('assignments', request.domainContext));
+  }
+
   @Patch('assignments/:id/participants/:identityId')
   async exempt(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('assignments', request.domainContext));

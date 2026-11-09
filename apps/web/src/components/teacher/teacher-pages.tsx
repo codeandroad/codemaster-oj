@@ -10,6 +10,7 @@ import { TeacherDashboard, TeacherClasses } from "./dashboard-classes";
 import { TeacherBankDetail } from "./bank-detail";
 import { TeacherBanks } from "./problem-banks";
 import { TeacherProblemEditor } from "./problem-editor";
+import { TeacherAssignmentPreview } from "./assignment-preview";
 import {
   TeacherAssignments,
   TeacherAssignmentEditor,
@@ -48,6 +49,8 @@ export function TeacherPages({
   match = path.match(/^\/teacher\/problems\/([^/]+)\/edit$/);
   if (match) return <TeacherProblemEditor id={match[1]!} user={user} />;
   if (path === "/teacher/assignments") return <TeacherAssignments />;
+  match = path.match(/^\/teacher\/assignments\/([^/]+)\/preview$/);
+  if (match) return <TeacherAssignmentPreview id={match[1]!} user={user}/>;
   match = path.match(/^\/teacher\/assignments\/([^/]+)\/(edit|progress)$/);
   if (match)
     return match[2] === "edit" ? (

@@ -24,6 +24,7 @@ async function saveRun(client, task, result) {
 }
 
 async function applyResult(client, task, result, runId) {
+  if (task.purpose === 'assignment_preview') return; // The private judge run is the complete result.
   if (task.purpose === 'validation') {
     await client.query('UPDATE problem_versions SET validation_status=$2,validation_message=$3 WHERE id=$1', [task.version_id, result.status, result.publicMessage]);
   } else if (task.rejudge) {
@@ -76,7 +77,7 @@ export async function claimTask(pool, { leaseSeconds = DEFAULT_LEASE_SECONDS, ma
     const task = leased.rows[0];
     if (task.purpose === 'validation') {
       await client.query("UPDATE problem_versions SET validation_status='Judging',validation_message=NULL WHERE id=$1", [task.version_id]);
-    } else if (!task.rejudge) {
+    } else if (task.purpose === 'submission' && !task.rejudge) {
       await client.query("UPDATE submissions SET status='Judging',public_message=NULL WHERE id=$1", [task.submission_id]);
     }
     return task;
@@ -96,8 +97,11 @@ export async function loadTask(pool, task) {
   if (!version) throw new InfrastructureError('Task problem version is missing.');
   version.samples=(version.samples||[]).filter(sample=>sample.enabled!==false);
   let submission;
-  if (task.purpose === 'submission') {
-    submission = (await pool.query('SELECT * FROM submissions WHERE id=$1 AND version_id=$2', [task.submission_id, task.version_id])).rows[0];
+  if (task.purpose !== 'validation') {
+    const preview = task.purpose === 'assignment_preview';
+    const source = preview ? 'legacy_assignment_preview_submissions' : 'submissions';
+    submission = (await pool.query(`SELECT kind,code,language,custom_input FROM ${source} WHERE id=$1 AND version_id=$2`,
+      [preview ? task.preview_submission_id : task.submission_id, task.version_id])).rows[0];
     if (!submission) throw new InfrastructureError('Task submission is missing.');
   }
   const kind = task.purpose === 'validation' ? 'validation' : submission.kind;

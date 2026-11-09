@@ -38,6 +38,7 @@ import {
 } from "./shared";
 
 export type TeacherAssignment = Assignment & {
+  canManage?: boolean;
   archived?: boolean;
   state?: string;
   description?: string;

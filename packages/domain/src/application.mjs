@@ -35,6 +35,7 @@ import {legacyProblemStatement} from './problem-statement-display.mjs';
 import { handleSystem, assertJudgeAdmission, getSettings } from './system.mjs';
 import { handlePeopleAlignment, handleFavorites, bindPendingTeacherClasses } from './alignment.mjs';
 import { handleAssignmentAuthoring } from './assignment-authoring.mjs';
+import { handleLegacyAssignmentPreview } from './legacy-assignment-preview.mjs';
 import { loadSubmissionResult } from './submission-feedback.mjs';
 import { assignmentGradeRows } from './assignment-grades.mjs';
 import { learnerAssignmentCompletion, learnerSubmissionAssignmentCompletions } from './assignment-completion.mjs';
@@ -202,9 +203,8 @@ export async function createDomainServices(pool,config) {
   const canManage=rolesInclude(user,'admin')||(rolesInclude(user,'teacher')&&a.owner_account_id===user.id);
   if(a.state==='Draft'&&!canManage)fail(404,'NOT_FOUND','作业尚未发布');if(!isParticipant&&!canManage)fail(403,'FORBIDDEN','未分配该作业或无权管理');if(a.state==='Draft'&&!canManage)fail(404,'NOT_FOUND','作业尚未发布');return {...a,isParticipant:isParticipant&&a.state==='Published',canManage};
  }
- async function assignmentResult(db,user,id,{includeCompletion=false}={}) {
-  const a=await assignmentAccess(db,user,id);
-  const ps=(await db.query(`SELECT ap.problem_id,ap.version_id,ap.points,ap.position,v.title,v.metadata->'difficulty' difficulty,
+ async function assignmentProblemRows(db,a) {
+  return (await db.query(`SELECT ap.problem_id,ap.version_id,ap.points,ap.position,v.title,v.metadata->'difficulty' difficulty,
    COALESCE(global_reward.points,10) first_ac_points,COALESCE(assignment_reward.points,0) reward_points
    FROM assignment_problems ap JOIN problem_versions v ON v.id=ap.version_id
    LEFT JOIN point_rewards global_reward ON global_reward.problem_id=ap.problem_id AND global_reward.assignment_id IS NULL
@@ -213,7 +213,11 @@ export async function createDomainServices(pool,config) {
     FROM chapter_problems cp JOIN learning_chapters chapter ON chapter.id=cp.chapter_id
     WHERE cp.problem_id=ap.problem_id AND chapter.path_id=$2 AND chapter.archived_at IS NULL
     ORDER BY chapter.position,chapter.created_at,chapter.id,cp.position LIMIT 1) course_order ON $3='course'
-   WHERE ap.assignment_id=$1 ORDER BY course_order.chapter_position NULLS LAST,course_order.chapter_created_at NULLS LAST,course_order.chapter_id NULLS LAST,course_order.problem_position NULLS LAST,ap.position,ap.problem_id`,[id,a.course_path_id,a.problem_order])).rows;
+   WHERE ap.assignment_id=$1 ORDER BY course_order.chapter_position NULLS LAST,course_order.chapter_created_at NULLS LAST,course_order.chapter_id NULLS LAST,course_order.problem_position NULLS LAST,ap.position,ap.problem_id`,[a.id,a.course_path_id,a.problem_order])).rows;
+ }
+ async function assignmentResult(db,user,id,{includeCompletion=false}={}) {
+  const a=await assignmentAccess(db,user,id);
+  const ps=await assignmentProblemRows(db,a);
   const linkedCourse=await courseMetadataForUser(db,user,a.course_path_id);
   const visibleCourse=Boolean(linkedCourse?.published_at&&!linkedCourse.archived_at);
   const linkedClasses=await activityClasses(db,id);
@@ -590,6 +594,9 @@ export async function createDomainServices(pool,config) {
  }
 
  async function assignmentsOperation(context) {
+  const preview=await handleLegacyAssignmentPreview(context,{submitLimiter,assignmentProblemRows,
+   projectProblem:async (db,version)=>problemShape((await studentPublicStatementRows(db,[version]))[0])});
+  if(preview)return preview;
   const authored=await handleAssignmentAuthoring(context);if(authored)return authored;
   const {route,method,body,url,user,sess,ip}=context;
   let m;

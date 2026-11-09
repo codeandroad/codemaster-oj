@@ -54,6 +54,9 @@ try {
     GRANT SELECT, INSERT, DELETE ON school_course_classes TO campus_app;
     GRANT SELECT, INSERT ON school_course_publications, school_course_publication_classes TO campus_app;
     GRANT SELECT, UPDATE ON judge_tasks TO campus_worker;
+    REVOKE ALL ON legacy_assignment_preview_submissions FROM PUBLIC, campus_app, campus_worker;
+    GRANT SELECT,INSERT ON legacy_assignment_preview_submissions TO campus_app;
+    GRANT SELECT(id,version_id,kind,code,language,custom_input) ON legacy_assignment_preview_submissions TO campus_worker;
     GRANT SELECT ON site_settings TO campus_worker;
     GRANT SELECT,INSERT,UPDATE ON judge_nodes TO campus_worker;
     GRANT SELECT ON submissions, problem_versions, test_cases TO campus_worker;

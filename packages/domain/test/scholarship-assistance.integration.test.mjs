@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {randomBytes,randomUUID} from 'node:crypto';
 import {createPool,transaction} from '../src/db.mjs';
 import {migrate} from '../src/migrate.mjs';
-import {handleLuqAssistance} from '../src/luq-assistance.mjs';
-import {postLuqEntry} from '../src/luq-ledger.mjs';
+import {handleScholarshipAssistance} from '../src/scholarship-assistance.mjs';
+import {postScholarshipEntry} from '../src/scholarship-ledger.mjs';
 
 const options={skip:!process.env.TEST_DATABASE_URL,timeout:60000};
 async function fixture(run){
@@ -30,18 +30,18 @@ async function fixture(run){
   }
   async function problem(){const p=(await pool.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id',[teacher.id])).rows[0];const target=await version(p.id);await pool.query('UPDATE problems SET current_version_id=$2 WHERE id=$1',[p.id,target.versionId]);return target;}
   async function call(user,route,body,method='POST'){
-   const url=new URL(`http://luq.test${route}`);const result=await handleLuqAssistance({pool,user,route:url.pathname,url,method,body});assert.ok(result);return result.body;
+   const url=new URL(`http://luq.test${route}`);const result=await handleScholarshipAssistance({pool,user,route:url.pathname,url,method,body});assert.ok(result);return result.body;
   }
   async function publish(target,kind='FULL_SOLUTION',text='Published explanation\n```python\nprint(1)\n```'){
-   const draft=await call(teacher,'/luq/contents',{...target,kind,body:text});
-   await call(teacher,`/luq/contents/${draft.id}/publish`,{reviewed:true});return draft;
+   const draft=await call(teacher,'/scholarship/contents',{...target,kind,body:text});
+   await call(teacher,`/scholarship/contents/${draft.id}/publish`,{reviewed:true});return draft;
   }
-  async function grant(user,amount){return transaction(pool,db=>postLuqEntry(db,{identityId:user.identityId,delta:amount,kind:'admin_grant',sourceKey:randomUUID(),reason:'Test grant',actorAccountId:admin.id}));}
-  async function refund(user,entry){return transaction(pool,db=>postLuqEntry(db,{identityId:user.identityId,delta:-entry.delta,kind:'refund',sourceKey:`refund:${entry.id}`,refundOf:entry.id,reason:'Test refund',actorAccountId:admin.id}));}
-  const quote=(user,target,kind='FULL_SOLUTION')=>call(user,'/luq/assistance/quote',{...target,kind});
-  const provide=(user,target,kind='FULL_SOLUTION')=>call(user,'/luq/assistance/provide',{...target,kind});
+  async function grant(user,amount){return transaction(pool,db=>postScholarshipEntry(db,{identityId:user.identityId,delta:amount,kind:'admin_grant',sourceKey:randomUUID(),reason:'Test grant',actorAccountId:admin.id}));}
+  async function refund(user,entry){return transaction(pool,db=>postScholarshipEntry(db,{identityId:user.identityId,delta:-entry.delta,kind:'refund',sourceKey:`refund:${entry.id}`,refundOf:entry.id,reason:'Test refund',actorAccountId:admin.id}));}
+  const quote=(user,target,kind='FULL_SOLUTION')=>call(user,'/scholarship/assistance/quote',{...target,kind});
+  const provide=(user,target,kind='FULL_SOLUTION')=>call(user,'/scholarship/assistance/provide',{...target,kind});
   async function unlock(user,target,kind='FULL_SOLUTION',requestKey=randomUUID()){
-   const q=await quote(user,target,kind);return call(user,'/luq/assistance/unlock',{...target,kind,requestKey,confirmedPrice:q.price,confirmedContentId:q.contentId});
+   const q=await quote(user,target,kind);return call(user,'/scholarship/assistance/unlock',{...target,kind,requestKey,confirmedPrice:q.price,confirmedContentId:q.contentId});
   }
   async function submit(user,target){return (await pool.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,code,idempotency_key,request_hash)
    VALUES($1,$2,$3,$4,'submit','print(1)',$5,'fixture') RETURNING *`,[user.id,user.identityId,target.problemId,target.versionId,randomUUID()])).rows[0];}
@@ -58,12 +58,12 @@ test('Luq solution credit follows the actual paid translation across versions an
  await f.grant(f.student,8);
  const original=await f.quote(f.student,next);
  assert.equal((await f.unlock(f.student,target,'FULL_TRANSLATION')).charged,3);
- await f.call(f.teacher,'/luq/policies',{targetType:'problem',targetId:target.problemId,kind:'FULL_TRANSLATION',mode:'paid',price:7});
+ await f.call(f.teacher,'/scholarship/policies',{targetType:'problem',targetId:target.problemId,kind:'FULL_TRANSLATION',mode:'paid',price:7});
  const discounted=await f.quote(f.student,next);
  assert.deepEqual([discounted.basePrice,discounted.translationCredit,discounted.price,discounted.balanceAfter],[8,3,5,0]);
  assert.equal((await f.quote(f.student,other)).price,8);
  assert.equal((await f.quote(f.otherStudent,next)).price,8);
- await rejects(f.call(f.student,'/luq/assistance/unlock',{...next,kind:'FULL_SOLUTION',requestKey:randomUUID(),
+ await rejects(f.call(f.student,'/scholarship/assistance/unlock',{...next,kind:'FULL_SOLUTION',requestKey:randomUUID(),
   confirmedPrice:original.price,confirmedContentId:original.contentId}),'QUOTE_CHANGED');
  const results=await Promise.all(Array.from({length:3},()=>f.unlock(f.student,next)));
  assert.equal(results.reduce((total,result)=>total+result.charged,0),5);
@@ -84,7 +84,7 @@ test('Luq excludes refunded translations and preserves zero-charge credited unlo
  const refunded=(await f.pool.query("SELECT id,delta FROM luq_ledger WHERE identity_id=$1 AND kind='purchase'",[f.otherStudent.identityId])).rows[0];
  await f.refund(f.otherStudent,refunded);
  assert.deepEqual([(await f.quote(f.otherStudent,target)).price,(await f.quote(f.otherStudent,target)).balance],[8,3]);
- await f.call(f.teacher,'/luq/policies',{targetType:'problem',targetId:target.problemId,kind:'FULL_SOLUTION',mode:'paid',price:2});
+ await f.call(f.teacher,'/scholarship/policies',{targetType:'problem',targetId:target.problemId,kind:'FULL_SOLUTION',mode:'paid',price:2});
  const q=await f.quote(f.student,target);
  assert.deepEqual([q.price,q.translationCredit,q.mode,q.requiresConfirmation],[0,2,'paid',true]);
  await rejects(f.provide(f.student,target),'UNLOCK_REQUIRED');
@@ -92,7 +92,7 @@ test('Luq excludes refunded translations and preserves zero-charge credited unlo
  const first=await f.unlock(f.student,target,'FULL_SOLUTION',requestKey),replay=await f.unlock(f.student,target,'FULL_SOLUTION',requestKey);
  assert.equal(first.unlocked,true);assert.equal(first.charged,0);assert.equal(replay.entitlementId,first.entitlementId);
  await rejects(f.unlock(f.student,other,'FULL_SOLUTION',requestKey),'IDEMPOTENCY_CONFLICT');
- await f.call(f.teacher,'/luq/policies',{targetType:'problem',targetId:target.problemId,kind:'FULL_SOLUTION',mode:'paid',price:8});
+ await f.call(f.teacher,'/scholarship/policies',{targetType:'problem',targetId:target.problemId,kind:'FULL_SOLUTION',mode:'paid',price:8});
  assert.equal((await f.quote(f.student,target)).unlocked,true);assert.ok((await f.provide(f.student,target)).body);
  assert.equal((await f.pool.query("SELECT count(*)::int n FROM luq_ledger WHERE identity_id=$1 AND kind='purchase'",[f.student.identityId])).rows[0].n,1);
  const translation=(await f.pool.query("SELECT id,delta FROM luq_ledger WHERE identity_id=$1 AND kind='purchase'",[f.student.identityId])).rows[0];
@@ -105,7 +105,7 @@ test('Luq serializes a translation refund against spending its credit',options,a
  const translation=(await f.pool.query("SELECT id,delta FROM luq_ledger WHERE identity_id=$1 AND kind='purchase'",[f.student.identityId])).rows[0];
  const q=await f.quote(f.student,target);
  const [purchase,refund]=await Promise.allSettled([
-  f.call(f.student,'/luq/assistance/unlock',{...target,kind:'FULL_SOLUTION',requestKey:randomUUID(),confirmedPrice:q.price,confirmedContentId:q.contentId}),
+  f.call(f.student,'/scholarship/assistance/unlock',{...target,kind:'FULL_SOLUTION',requestKey:randomUUID(),confirmedPrice:q.price,confirmedContentId:q.contentId}),
   f.refund(f.student,translation),
  ]);
  const after=await f.quote(f.student,target);
@@ -122,12 +122,12 @@ test('Luq reviewed assistance has no body in quotes/unlocks, exact funds and con
  const target=await f.problem();
  assert.equal((await f.quote(f.student,target)).available,false);
  await rejects(f.unlock(f.student,target),'ASSISTANCE_UNAVAILABLE');
- const draft=await f.call(f.teacher,'/luq/contents',{...target,kind:'FULL_SOLUTION',body:'APPROVED_ONLY_AFTER_REVIEW'});
+ const draft=await f.call(f.teacher,'/scholarship/contents',{...target,kind:'FULL_SOLUTION',body:'APPROVED_ONLY_AFTER_REVIEW'});
  assert.equal((await f.quote(f.student,target)).available,false);
- await rejects(f.call(f.teacher,`/luq/contents/${draft.id}/publish`,{}),'REVIEW_REQUIRED');
- await f.call(f.teacher,`/luq/contents/${draft.id}/publish`,{reviewed:true});
- await rejects(f.call(f.otherTeacher,`/luq/contents?problemId=${target.problemId}&versionId=${target.versionId}`,undefined,'GET'),'FORBIDDEN');
- await rejects(f.call(f.student,`/luq/contents?problemId=${target.problemId}&versionId=${target.versionId}`,undefined,'GET'),'FORBIDDEN');
+ await rejects(f.call(f.teacher,`/scholarship/contents/${draft.id}/publish`,{}),'REVIEW_REQUIRED');
+ await f.call(f.teacher,`/scholarship/contents/${draft.id}/publish`,{reviewed:true});
+ await rejects(f.call(f.otherTeacher,`/scholarship/contents?problemId=${target.problemId}&versionId=${target.versionId}`,undefined,'GET'),'FORBIDDEN');
+ await rejects(f.call(f.student,`/scholarship/contents?problemId=${target.problemId}&versionId=${target.versionId}`,undefined,'GET'),'FORBIDDEN');
  const q=await f.quote(f.student,target);assert.equal(q.balance,0);assert.equal(q.price,8);assert.equal(JSON.stringify(q).includes('APPROVED_ONLY'),false);
  await rejects(f.unlock(f.student,target),'INSUFFICIENT_LUQ');await rejects(f.provide(f.student,target),'UNLOCK_REQUIRED');
  await f.grant(f.student,8);
@@ -139,7 +139,7 @@ test('Luq reviewed assistance has no body in quotes/unlocks, exact funds and con
  const delivered=await f.provide(f.student,target);assert.equal(delivered.body,'APPROVED_ONLY_AFTER_REVIEW');
  assert.equal((await f.submit(f.student,target)).luq_solution_assisted,true);
  assert.equal((await f.quote(f.student,target)).price,0);
- await rejects(f.call(f.teacher,'/luq/contents',{...target,kind:'FULL_SOLUTION',body:'overwrite'}),'PUBLISHED_CONTENT_IMMUTABLE');
+ await rejects(f.call(f.teacher,'/scholarship/contents',{...target,kind:'FULL_SOLUTION',body:'overwrite'}),'PUBLISHED_CONTENT_IMMUTABLE');
 }));
 
 test('Luq balance competition, request replay, version pinning, refund and cross-version entitlement',options,async()=>fixture(async f=>{
@@ -153,12 +153,12 @@ test('Luq balance competition, request replay, version pinning, refund and cross
  assert.equal((await f.quote(f.student,next)).price,0);assert.equal((await f.provide(f.student,next)).body,'NEW_VERSION_ONLY');
  assert.notEqual((await f.provide(f.student,won)).body,'NEW_VERSION_ONLY');
  const purchase=(await f.pool.query("SELECT id FROM luq_ledger WHERE identity_id=$1 AND kind='purchase'",[f.student.identityId])).rows[0];
- await transaction(f.pool,db=>postLuqEntry(db,{identityId:f.student.identityId,delta:8,kind:'refund',sourceKey:`refund:${purchase.id}`,refundOf:purchase.id,actorAccountId:f.admin.id,reason:'Refund fixture'}));
+ await transaction(f.pool,db=>postScholarshipEntry(db,{identityId:f.student.identityId,delta:8,kind:'refund',sourceKey:`refund:${purchase.id}`,refundOf:purchase.id,actorAccountId:f.admin.id,reason:'Refund fixture'}));
  assert.equal((await f.quote(f.student,won)).unlocked,true,'refund keeps entitlement');
  const requestKey=randomUUID(),q=await f.quote(f.student,lost);
  const body={...lost,kind:'FULL_SOLUTION',requestKey,confirmedPrice:q.price,confirmedContentId:q.contentId};
- await f.call(f.student,'/luq/assistance/unlock',body);await f.call(f.student,'/luq/assistance/unlock',body);
- await rejects(f.call(f.student,'/luq/assistance/unlock',{...body,...won}),'IDEMPOTENCY_CONFLICT');
+ await f.call(f.student,'/scholarship/assistance/unlock',body);await f.call(f.student,'/scholarship/assistance/unlock',body);
+ await rejects(f.call(f.student,'/scholarship/assistance/unlock',{...body,...won}),'IDEMPOTENCY_CONFLICT');
 }));
 
 test('Luq free task content gives no permanent entitlement, translation does not assist AC and activity policies freeze',options,async()=>fixture(async f=>{
@@ -166,19 +166,19 @@ test('Luq free task content gives no permanent entitlement, translation does not
  const assignment=(await f.pool.query("INSERT INTO assignments(title,owner_account_id,due_at,state) VALUES('Learn',$1,now()+interval '1 day','Draft') RETURNING id",[f.teacher.id])).rows[0];
  await f.pool.query('INSERT INTO assignment_problems(assignment_id,problem_id,version_id,points,position) VALUES($1,$2,$3,100,0)',[assignment.id,target.problemId,target.versionId]);
  await f.pool.query('INSERT INTO assignment_participants(assignment_id,identity_id) VALUES($1,$2)',[assignment.id,f.student.identityId]);
- for(const kind of ['FULL_SOLUTION','FULL_TRANSLATION'])await f.call(f.teacher,'/luq/policies',{targetType:'assignment',targetId:assignment.id,kind,mode:'free'});
+ for(const kind of ['FULL_SOLUTION','FULL_TRANSLATION'])await f.call(f.teacher,'/scholarship/policies',{targetType:'assignment',targetId:assignment.id,kind,mode:'free'});
  await f.pool.query("UPDATE assignments SET state='Published',published_at=now() WHERE id=$1",[assignment.id]);
- const publicRules=await f.call(f.student,`/luq/policies?targetType=assignment&targetId=${assignment.id}`,undefined,'GET');
+ const publicRules=await f.call(f.student,`/scholarship/policies?targetType=assignment&targetId=${assignment.id}`,undefined,'GET');
  assert.equal(publicRules.canManage,false);assert.equal(publicRules.frozen,true);assert.equal(publicRules.items.length,2);assert.equal(publicRules.items[0].mode,'free');
  const contextual={...target,assignmentId:assignment.id};
  assert.equal((await f.quote(f.student,contextual)).price,0);
  await f.provide(f.student,contextual,'FULL_TRANSLATION');assert.equal((await f.submit(f.student,target)).luq_solution_assisted,false);
  await f.provide(f.student,contextual);assert.equal((await f.quote(f.student,target)).price,8);
  assert.equal((await f.pool.query('SELECT count(*)::int n FROM luq_assistance_entitlements')).rows[0].n,0);
- await rejects(f.call(f.teacher,'/luq/policies',{targetType:'assignment',targetId:assignment.id,kind:'FULL_SOLUTION',mode:'paid'}),'RULE_FROZEN');
+ await rejects(f.call(f.teacher,'/scholarship/policies',{targetType:'assignment',targetId:assignment.id,kind:'FULL_SOLUTION',mode:'paid'}),'RULE_FROZEN');
  await rejects(f.quote(f.otherStudent,contextual),'NOT_FOUND');
- const usage=await f.call(f.teacher,`/luq/usage?targetType=assignment&targetId=${assignment.id}`,undefined,'GET');assert.equal(usage.items.length,2);
- await rejects(f.call(f.otherTeacher,`/luq/usage?targetType=assignment&targetId=${assignment.id}`,undefined,'GET'),'NOT_FOUND');
+ const usage=await f.call(f.teacher,`/scholarship/usage?targetType=assignment&targetId=${assignment.id}`,undefined,'GET');assert.equal(usage.items.length,2);
+ await rejects(f.call(f.otherTeacher,`/scholarship/usage?targetType=assignment&targetId=${assignment.id}`,undefined,'GET'),'NOT_FOUND');
 }));
 
 test('Luq active exam restrictions beat balance, prior purchase, old versions and free-library entry',options,async()=>fixture(async f=>{
@@ -208,14 +208,14 @@ test('free after AC respects the student, exact version and paid activity policy
   VALUES('Paid policy',$1,now()+interval '1 hour','Draft') RETURNING id`,[f.teacher.id]);
  await f.pool.query('INSERT INTO assignment_problems(assignment_id,problem_id,version_id,points,position) VALUES($1,$2,$3,100,0)',[assignment.id,target.problemId,target.versionId]);
  await f.pool.query('INSERT INTO assignment_participants(assignment_id,identity_id) VALUES($1,$2)',[assignment.id,f.student.identityId]);
- await f.call(f.teacher,'/luq/policies',{targetType:'assignment',targetId:assignment.id,kind:'FULL_SOLUTION',mode:'paid'});
+ await f.call(f.teacher,'/scholarship/policies',{targetType:'assignment',targetId:assignment.id,kind:'FULL_SOLUTION',mode:'paid'});
  await f.pool.query("UPDATE assignments SET state='Published',published_at=now() WHERE id=$1",[assignment.id]);
  assert.equal((await f.quote(f.student,{...target,assignmentId:assignment.id})).mode,'paid');
  await rejects(f.provide(f.student,target),'UNLOCK_REQUIRED');
 }));
 
 test('Luq answer provision and submission share an acceptance lock; later viewing cannot revise an earlier snapshot',options,async()=>fixture(async f=>{
- const target=await f.problem();await f.publish(target);await f.call(f.teacher,'/luq/policies',{targetType:'problem',targetId:target.problemId,kind:'FULL_SOLUTION',mode:'free'});
+ const target=await f.problem();await f.publish(target);await f.call(f.teacher,'/scholarship/policies',{targetType:'problem',targetId:target.problemId,kind:'FULL_SOLUTION',mode:'free'});
  const client=await f.pool.connect();let pending;
  try{
   await client.query('BEGIN');
@@ -231,9 +231,9 @@ test('Luq answer provision and submission share an acceptance lock; later viewin
 
 test('Luq opening time beats owned access and configured zero prices do not create fake purchases',options,async()=>fixture(async f=>{
  const target=await f.problem();await f.publish(target);await f.grant(f.student,8);await f.unlock(f.student,target);
- await f.call(f.teacher,'/luq/policies',{targetType:'problem',targetId:target.problemId,kind:'FULL_SOLUTION',mode:'paid',opensAt:new Date(Date.now()+60_000).toISOString()});
+ await f.call(f.teacher,'/scholarship/policies',{targetType:'problem',targetId:target.problemId,kind:'FULL_SOLUTION',mode:'paid',opensAt:new Date(Date.now()+60_000).toISOString()});
  assert.equal((await f.quote(f.student,target)).available,false);await rejects(f.provide(f.student,target),'ASSISTANCE_LOCKED');
- await f.call(f.teacher,'/luq/policies',{targetType:'problem',targetId:target.problemId,kind:'FULL_SOLUTION',mode:'paid'});
+ await f.call(f.teacher,'/scholarship/policies',{targetType:'problem',targetId:target.problemId,kind:'FULL_SOLUTION',mode:'paid'});
  await f.pool.query('UPDATE luq_settings SET solution_price=0,rule_version=rule_version+1,updated_by=$1 WHERE singleton',[f.admin.id]);
  const q=await f.quote(f.otherStudent,target);assert.equal(q.mode,'free');assert.equal(q.price,0);assert.equal(q.unlocked,false);
  await f.provide(f.otherStudent,target);

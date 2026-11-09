@@ -4,11 +4,11 @@ import {DomainService} from '../domain.service.js';
 import {DomainGuard,type DomainRequest} from '../domain.guard.js';
 import {applyResponse} from '../domain.response.js';
 
-@Controller('api/v1/luq')
+@Controller(['api/v1/scholarship','api/v1/luq'])
 @UseGuards(DomainGuard)
-export class LuqController {
+export class ScholarshipController {
  constructor(private readonly domain:DomainService){}
- private execute(request:DomainRequest,response:Response){return this.domain.execute('luq',request.domainContext).then(result=>applyResponse(response,result));}
+ private execute(request:DomainRequest,response:Response){return this.domain.execute('scholarship',request.domainContext).then(result=>applyResponse(response,result));}
  @Get('me') me(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response){return this.execute(request,response);}
  @Get('ledger') ledger(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response){return this.execute(request,response);}
  @Get('reviews') reviews(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response){return this.execute(request,response);}
@@ -35,5 +35,5 @@ export class LuqController {
  @Get('usage') usage(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response){return this.execute(request,response);}
 }
 
-@Module({controllers:[LuqController]})
-export class LuqModule {}
+@Module({controllers:[ScholarshipController]})
+export class ScholarshipModule {}

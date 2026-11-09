@@ -123,9 +123,9 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
    assert.equal((await contexts(pool,alpha)).body.canManage,false);
    assert.equal((await contexts(pool,teacher)).body.canManage,false);
    assert.equal((await contexts(pool,admin)).body.canManage,true);
-   assert.deepEqual((await contexts(pool,alpha)).body.visibleFields,{solvedProblems:true,attempts:false,acRate:true,luqBalance:true});
+   assert.deepEqual((await contexts(pool,alpha)).body.visibleFields,{solvedProblems:true,attempts:false,acRate:true,scholarshipBalance:true,luqBalance:true});
    const hiddenByDefault=(await leaderboard(pool,alpha,`?classId=${classId}`)).body;
-   assert.deepEqual(hiddenByDefault.visibleFields,{solvedProblems:true,attempts:false,acRate:true,luqBalance:true});
+   assert.deepEqual(hiddenByDefault.visibleFields,{solvedProblems:true,attempts:false,acRate:true,scholarshipBalance:true,luqBalance:true});
    assert.equal(Object.hasOwn(hiddenByDefault.me,'attempts'),false,'hidden student fields must be redacted by the API');
    assert.equal(Object.hasOwn(hiddenByDefault.me,'publicTag'),false);
    assert.equal((await leaderboard(pool,teacher,`?classId=${classId}`)).body.items.find(item=>item.id===alpha.identityId).attempts,5,'teachers retain full metrics');
@@ -202,12 +202,12 @@ test('leaderboard uses actual awards, formal results and Shanghai period boundar
     assert.equal(current.me.luqBalance,all.me.luqBalance,'time filters do not turn the current balance into period earnings');
     assert.deepEqual(current.items.slice(1).map(item => item.rank), [2, 3, 4, 4]);
    }
-   await updateVisibility(pool,admin,{solvedProblems:false,attempts:false,acRate:false,luqBalance:false});
+   await updateVisibility(pool,admin,{solvedProblems:false,attempts:false,acRate:false,scholarshipBalance:false,luqBalance:false});
    const privateMetrics=(await leaderboard(pool,beta,`?classId=${classId}`)).body;
    for(const item of [...privateMetrics.items,privateMetrics.me])
     for(const key of ['solvedProblems','attempts','acRate','luqBalance'])assert.equal(Object.hasOwn(item,key),false);
    assert.equal((await leaderboard(pool,teacher,`?classId=${classId}`)).body.items.find(item=>item.id===alpha.identityId).solvedProblems,2);
-   assert.deepEqual((await leaderboard(pool,alpha)).body.visibleFields,{solvedProblems:false,attempts:false,acRate:false,luqBalance:false},'global visibility applies to all filters');
+   assert.deepEqual((await leaderboard(pool,alpha)).body.visibleFields,{solvedProblems:false,attempts:false,acRate:false,scholarshipBalance:false,luqBalance:false},'global visibility applies to all filters');
    await submission(outsider,first,'submit','AC');
    assert.equal((await leaderboard(pool,alpha)).body.total,5,'default leaderboard includes students from other classes');
    assert.equal((await leaderboard(pool,alpha,`?classId=${classId}`)).body.total,4);
@@ -340,7 +340,7 @@ test('leaderboard orders by points, unrounded AC rate and current Luq balance, p
       CASE WHEN $5::boolean AND n=$6 THEN 'AC' ELSE 'WA' END,CASE WHEN $5 AND n=$6 THEN 100 ELSE 0 END
      FROM generate_series(1,$6::int) n ORDER BY n`, [student.id,student.identityId,item.id,item.versionId,accepted,total]);
    }
-   async function grantLuq(student, amount) {
+   async function grantScholarship(student, amount) {
     await pool.query("SELECT luq_post_entry($1,$2,'admin_grant',$3,$4,'Leaderboard test grant')",
      [student.identityId,amount,randomUUID(),admin.id]);
    }
@@ -355,8 +355,8 @@ test('leaderboard orders by points, unrounded AC rate and current Luq balance, p
    await attempts(equalRatio,newerFirst,true,1000);
    await attempts(lowerRatio,first,true,1001);
    await attempts(zeroRate,first,false,1);
-   await grantLuq(perfect,100);
-   await grantLuq(lowerRatio,200);
+   await grantScholarship(perfect,100);
+   await grantScholarship(lowerRatio,200);
 
    const board = (await leaderboard(pool,teacher,'?pageSize=10')).body;
    assert.equal(board.total,8);
@@ -385,7 +385,7 @@ test('leaderboard orders by points, unrounded AC rate and current Luq balance, p
    assert.equal(secondPage.items[0].rank,3,'a genuine tie remains shared across page boundaries');
    assert.equal(secondPage.me.rank,3,'the current student rank agrees with the full ranking even off-page');
 
-   await grantLuq(equalRatio,7);
+   await grantScholarship(equalRatio,7);
    const balanceBoard = (await leaderboard(pool,teacher,'?pageSize=10')).body;
    assert.equal(balanceBoard.items.find(item=>item.id===equalRatio.identityId).luqBalance,111,'initial 100, first AC 4 and grant 7 are reflected without changing points');
    assert.deepEqual(balanceBoard.items.slice(2,5).map(item=>[item.id,item.rank]),[
@@ -396,7 +396,7 @@ test('leaderboard orders by points, unrounded AC rate and current Luq balance, p
    assert.equal(balanceFirstPage.me.rank,4,'the student rank uses the current balance even off-page');
    assert.equal(balanceFirstPage.me.luqBalance,104,'off-page own row includes the initial grant and first-AC reward');
 
-   await updateVisibility(pool,admin,{solvedProblems:false,attempts:false,acRate:false,luqBalance:false});
+   await updateVisibility(pool,admin,{solvedProblems:false,attempts:false,acRate:false,scholarshipBalance:false,luqBalance:false});
    const privateBoard = (await leaderboard(pool,higherRatio,'?pageSize=10')).body;
    assert.deepEqual(privateBoard.items.map(item=>[item.id,item.rank]),balanceBoard.items.map(item=>[item.id,item.rank]),'field visibility does not change ranking');
    for(const person of [...privateBoard.items,privateBoard.me])
@@ -417,7 +417,7 @@ test('leaderboard orders by points, unrounded AC rate and current Luq balance, p
     {solvedProblems:true,attempts:true,acRate:true,luqBalance:'true'},
     {solvedProblems:true,attempts:true,acRate:true,luqBalance:true,unexpected:true},
    ]) await assert.rejects(updateVisibility(pool,admin,fields),error=>error.status===400);
-   await updateVisibility(pool,admin,{solvedProblems:true,attempts:true,acRate:true,luqBalance:true});
+   await updateVisibility(pool,admin,{solvedProblems:true,attempts:true,acRate:true,scholarshipBalance:true,luqBalance:true});
    const restored=(await leaderboard(pool,higherRatio,'?pageSize=10')).body;
    assert.deepEqual(restored.items.map(item=>[item.id,item.rank]),balanceBoard.items.map(item=>[item.id,item.rank]));
    assert.equal(restored.items.find(item=>item.id===equalRatio.identityId).luqBalance,111,'re-enabling the field restores the real balance');

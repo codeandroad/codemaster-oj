@@ -5,7 +5,7 @@ import { useData } from "@/components/teacher/shared";
 import { inputClass } from "@/components/admin/common";
 import { Button } from "@/components/ui/button";
 import { ProfileAvatar } from "@/components/profile-hero";
-import { ScholarshipIcon } from "@/components/luq/scholarship-icon";
+import { ScholarshipIcon } from "@/components/scholarship/scholarship-icon";
 import { LeaderboardPodium } from "./leaderboard-podium";
 type Entry = {
   rank: number;

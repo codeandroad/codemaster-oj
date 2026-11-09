@@ -24,8 +24,8 @@ import type {
   Paper4PaperSummary,
 } from "@/components/paper4/model";
 import type { AssistanceKind } from "./assistance";
-import { LuqBatchPrices } from "./batch-prices";
-import { LuqBatchReview } from "./batch-review";
+import { ScholarshipBatchPrices } from "./batch-prices";
+import { ScholarshipBatchReview } from "./batch-review";
 
 type TargetType =
   | "problem"
@@ -102,7 +102,7 @@ function kindName(
     : tx("完整题解与参考代码", "Full solution and reference code");
 }
 
-export function TeacherLuqPage() {
+export function TeacherScholarshipPage() {
   const tx = useText(),
     search = useSearchParams();
   const [targetType, setTargetType] = useState<TargetType>(
@@ -248,8 +248,8 @@ export function TeacherLuqPage() {
           </>
         )}
       </section>
-      {mode === "batch" && (targetType === "problem" || targetType === "paper4") && !picker.loading && !picker.error && <LuqBatchPrices key={targetType} targetType={targetType} choices={choices ?? []} initialIds={(search.get("ids") ?? "").split(",").filter(Boolean)} onSaved={() => setPolicyRevision(value => value + 1)}/>}
-      {mode === "review" && (targetType === "problem" || targetType === "paper4") && <LuqBatchReview key={targetType} targetType={targetType}/>}
+      {mode === "batch" && (targetType === "problem" || targetType === "paper4") && !picker.loading && !picker.error && <ScholarshipBatchPrices key={targetType} targetType={targetType} choices={choices ?? []} initialIds={(search.get("ids") ?? "").split(",").filter(Boolean)} onSaved={() => setPolicyRevision(value => value + 1)}/>}
+      {mode === "review" && (targetType === "problem" || targetType === "paper4") && <ScholarshipBatchReview key={targetType} targetType={targetType}/>}
       {single && contentTarget && (
         <ContentEditor
           key={JSON.stringify(contentTarget)}
@@ -293,7 +293,7 @@ function ContentEditor({
 }) {
   const tx = useText(),
     contents = useData<{ items: Content[] }>(
-      `luq/contents?${new URLSearchParams(target)}`,
+      `scholarship/contents?${new URLSearchParams(target)}`,
     ),
     [kind, setKind] = useState<AssistanceKind>(initialKind);
   const content = contents.data?.items.find(
@@ -402,7 +402,7 @@ function ContentForm({
           }
           onClick={() =>
             void action.run(async () => {
-              await productionApi("luq/contents", {
+              await productionApi("scholarship/contents", {
                 method: "POST",
                 body: {
                   ...target,
@@ -455,7 +455,7 @@ function ContentForm({
             onClick={() =>
               void action.run(async () => {
                 await productionApi(
-                  `luq/contents/${encodeURIComponent(content.id)}/publish`,
+                  `scholarship/contents/${encodeURIComponent(content.id)}/publish`,
                   { method: "POST", body: { reviewed: true } },
                 );
                 reload();
@@ -484,7 +484,7 @@ function PolicyEditor({
 }) {
   const tx = useText(),
     policies = useData<PolicyResponse>(
-      `luq/policies?${new URLSearchParams({ targetType, targetId })}`,
+      `scholarship/policies?${new URLSearchParams({ targetType, targetId })}`,
     );
   return (
     <section className={`${panel} space-y-3 p-4`}>
@@ -558,7 +558,7 @@ function PolicyForm({
       onSubmit={(event) => {
         event.preventDefault();
         void action.run(async () => {
-          await productionApi("luq/policies", {
+          await productionApi("scholarship/policies", {
             method: "POST",
             body: {
               targetType,
@@ -616,7 +616,7 @@ export function ActivityRewardEditor({
 }) {
   const tx = useText(),
     rules = useData<RuleResponse>(
-      `luq/reward-rules?${new URLSearchParams({ activityType, activityId })}`,
+      `scholarship/reward-rules?${new URLSearchParams({ activityType, activityId })}`,
     );
   return (
     <section className={`${panel} space-y-3 p-4`}>
@@ -660,7 +660,7 @@ function RewardForm({
       onSubmit={(event) => {
         event.preventDefault();
         void action.run(async () => {
-          await productionApi("luq/reward-rules", {
+          await productionApi("scholarship/reward-rules", {
             method: "POST",
             body: {
               ...rule,
@@ -841,7 +841,7 @@ function UsageList({
 }) {
   const tx = useText(),
     usage = useData<{ items: Usage[] }>(
-      `luq/usage?${new URLSearchParams({ targetType, targetId })}`,
+      `scholarship/usage?${new URLSearchParams({ targetType, targetId })}`,
     );
   return (
     <section className={`${panel} overflow-hidden`}>
@@ -893,7 +893,7 @@ function UsageList({
   );
 }
 
-export function StudentLuqRule({
+export function StudentScholarshipRule({
   activityType,
   activityId,
   assignmentContext,
@@ -905,7 +905,7 @@ export function StudentLuqRule({
   const { locale } = useLocale();
   const tx = useText(),
     rule = useData<RuleResponse>(
-      `luq/reward-rules?${new URLSearchParams({ activityType, activityId })}`,
+      `scholarship/reward-rules?${new URLSearchParams({ activityType, activityId })}`,
     );
   const r = rule.data?.rule;
   if (rule.loading || rule.error || !r || r.amount <= 0) return assignmentContext?.title ?? null;

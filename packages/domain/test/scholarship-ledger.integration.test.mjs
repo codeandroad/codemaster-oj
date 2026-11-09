@@ -4,11 +4,11 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { createPool, transaction } from '../src/db.mjs';
 import { migrate } from '../src/migrate.mjs';
-import { handleLuqLedger, postLuqEntry } from '../src/luq-ledger.mjs';
-import { handleLuqRules } from '../src/luq-rules.mjs';
+import { handleScholarshipLedger, postScholarshipEntry } from '../src/scholarship-ledger.mjs';
+import { handleScholarshipRules } from '../src/scholarship-rules.mjs';
 const url=process.env.TEST_DATABASE_URL;
 let pool,manager,schema,teacher,admin;
-const req=(route,method,user,body={})=>handleLuqLedger({pool,route,method,user,body,url:new URL('http://localhost'+route)});
+const req=(route,method,user,body={})=>handleScholarshipLedger({pool,route,method,user,body,url:new URL('http://localhost'+route)});
 async function account(kind='student') {
  const key=randomUUID(); const identityId=(await pool.query('INSERT INTO identities(kind,number,name) VALUES($1,$2,$2) RETURNING id',[kind,key])).rows[0].id;
  const id=(await pool.query('INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,$2,$2) RETURNING id',[identityId,key])).rows[0].id;
@@ -32,14 +32,14 @@ async function delivery(user,p,kind='FULL_SOLUTION') {
  await pool.query(`INSERT INTO luq_assistance_deliveries(identity_id,subject_key,version_id,kind,content_id,context_type)
  VALUES($1,$2,$3,$4,$5,'problem')`,[user.identityId,'problem:'+p.id,p.versionId,kind,content.id]);
 }
-const balance=async user=>(await req('/luq/me','GET',user)).body.balance;
-const credit=async(user,amount=20)=>req('/luq/grants','POST',admin,{requestId:randomUUID(),identityIds:[user.identityId],amount,reason:'Integration grant'});
-const purchase=async(user,key=randomUUID(),amount=8)=>transaction(pool,db=>postLuqEntry(db,{identityId:user.identityId,delta:-amount,kind:'purchase',sourceKey:'purchase:'+key,reason:'Test purchase',requestHash:key}));
+const balance=async user=>(await req('/scholarship/me','GET',user)).body.balance;
+const credit=async(user,amount=20)=>req('/scholarship/grants','POST',admin,{requestId:randomUUID(),identityIds:[user.identityId],amount,reason:'Integration grant'});
+const purchase=async(user,key=randomUUID(),amount=8)=>transaction(pool,db=>postScholarshipEntry(db,{identityId:user.identityId,delta:-amount,kind:'purchase',sourceKey:'purchase:'+key,reason:'Test purchase',requestHash:key}));
 test.before(async()=>{if(!url)return;manager=createPool(url);schema='luq_'+randomBytes(8).toString('hex');await manager.query(`CREATE SCHEMA ${schema}`);const conn=new URL(url);conn.searchParams.set('options',`-csearch_path=${schema}`);pool=createPool(conn.toString());await migrate(pool);await migrate(pool);await pool.query('UPDATE luq_settings SET initial_grant=0,rule_version=rule_version+1 WHERE singleton');teacher=await account('teacher');admin=await account('admin');});
 test.after(async()=>{if(pool)await pool.end();if(schema)await manager.query(`DROP SCHEMA ${schema} CASCADE`);if(manager)await manager.end();});
 
 test('With initial allowance disabled, Luq starts at zero without converting points and forbids nonadmin adjustments',{skip:!url},async()=>{
- const s=await account();assert.equal(await balance(s),0);await assert.rejects(req('/luq/grants','POST',teacher,{}),e=>e.code==='FORBIDDEN');
+ const s=await account();assert.equal(await balance(s),0);await assert.rejects(req('/scholarship/grants','POST',teacher,{}),e=>e.code==='FORBIDDEN');
  const p=await problem();await submit(s,p);assert.equal(await balance(s),4);
  assert.equal((await pool.query("SELECT sum(points)::int n FROM point_ledger WHERE identity_id=$1 AND reason='first_ac'",[s.identityId])).rows[0].n,10);
 });
@@ -76,18 +76,18 @@ test('competing purchases cannot overdraw, exact balance succeeds, retries debit
 test('bulk grant retries preserve original class membership and reject changed payload',{skip:!url},async()=>{
  const a=await account(),b=await account();const cls=(await pool.query("INSERT INTO classes(name,owner_account_id) VALUES('Luq',$1) RETURNING id",[teacher.id])).rows[0].id;
  await pool.query('INSERT INTO class_members VALUES($1,$2)',[cls,a.identityId]);const body={requestId:randomUUID(),classIds:[cls],amount:7,reason:'Batch'};
- await Promise.all([req('/luq/grants','POST',admin,body),req('/luq/grants','POST',admin,body)]);
- await pool.query('INSERT INTO class_members VALUES($1,$2)',[cls,b.identityId]);await req('/luq/grants','POST',admin,body);
+ await Promise.all([req('/scholarship/grants','POST',admin,body),req('/scholarship/grants','POST',admin,body)]);
+ await pool.query('INSERT INTO class_members VALUES($1,$2)',[cls,b.identityId]);await req('/scholarship/grants','POST',admin,body);
  assert.equal(await balance(a),7);assert.equal(await balance(b),0);
- await assert.rejects(req('/luq/grants','POST',admin,{...body,amount:8}),e=>e.code==='IDEMPOTENCY_CONFLICT');
+ await assert.rejects(req('/scholarship/grants','POST',admin,{...body,amount:8}),e=>e.code==='IDEMPOTENCY_CONFLICT');
 });
 test('refunds are linked and once-only; different retry IDs do not pay twice and entitlement remains',{skip:!url},async()=>{
  const s=await account();await credit(s,8);const debit=await purchase(s);await pool.query("INSERT INTO luq_assistance_entitlements(identity_id,subject_key,kind,ledger_id) VALUES($1,'problem:test','FULL_SOLUTION',$2)",[s.identityId,debit.id]);
- assert.equal((await req('/luq/ledger','GET',admin)).body.items.find(item=>item.id===debit.id).refunded,false);
- const refund=()=>req('/luq/refunds','POST',admin,{requestId:randomUUID(),ledgerId:debit.id,reason:'Refund'});await Promise.all([refund(),refund()]);assert.equal(await balance(s),8);
+ assert.equal((await req('/scholarship/ledger','GET',admin)).body.items.find(item=>item.id===debit.id).refunded,false);
+ const refund=()=>req('/scholarship/refunds','POST',admin,{requestId:randomUUID(),ledgerId:debit.id,reason:'Refund'});await Promise.all([refund(),refund()]);assert.equal(await balance(s),8);
  assert.equal((await pool.query('SELECT count(*)::int n FROM luq_ledger WHERE refund_of=$1',[debit.id])).rows[0].n,1);
  assert.equal((await pool.query('SELECT count(*)::int n FROM luq_assistance_entitlements WHERE identity_id=$1',[s.identityId])).rows[0].n,1);
- const ledger=(await req('/luq/ledger','GET',admin)).body.items;
+ const ledger=(await req('/scholarship/ledger','GET',admin)).body.items;
  assert.equal(ledger.find(item=>item.id===debit.id).refunded,true);
  assert.equal(ledger.find(item=>item.refundOf===debit.id).refunded,false);
 });
@@ -96,8 +96,8 @@ async function assignment(s,problems,amount=6,allow=false,{requireAll=false}={})
  for(const[pindex,p]of problems.entries())await pool.query('INSERT INTO assignment_problems(assignment_id,problem_id,version_id,points,position) VALUES($1,$2,$3,$4,$5)',[id,p.id,p.versionId,100/problems.length,pindex]);
  await pool.query('INSERT INTO assignment_participants VALUES($1,$2,false)',[id,s.identityId]);
  if(requireAll){
-  const route='/luq/reward-rules';
-  const result=await handleLuqRules({route,method:'POST',pool,user:teacher,url:new URL('http://localhost'+route),helpers:{audit:async()=>{}},
+  const route='/scholarship/reward-rules';
+  const result=await handleScholarshipRules({route,method:'POST',pool,user:teacher,url:new URL('http://localhost'+route),helpers:{audit:async()=>{}},
    body:{activityType:'assignment',activityId:id,amount,requireAll,taskKind:'challenge',allowSolutionAssisted:false,expectedVersion:0}});
   assert.equal(result.body.rule.requireAll,true);
  }else{
@@ -167,7 +167,7 @@ test('timed submissions after personal deadline never settle first AC or bonus',
 });
 test('bulk negative adjustment is atomic if any student lacks funds',{skip:!url},async()=>{
  const a=await account(),b=await account();await credit(a,10);await credit(b,2);
- await assert.rejects(req('/luq/adjustments','POST',admin,{requestId:randomUUID(),identityIds:[a.identityId,b.identityId],amount:-5,reason:'Correction'}),e=>e.code==='LUQ_INSUFFICIENT_BALANCE');
+ await assert.rejects(req('/scholarship/adjustments','POST',admin,{requestId:randomUUID(),identityIds:[a.identityId,b.identityId],amount:-5,reason:'Correction'}),e=>e.code==='LUQ_INSUFFICIENT_BALANCE');
  assert.equal(await balance(a),10);assert.equal(await balance(b),2);
 });
 test('old submissions do not backfill Luq or allow a new first AC later',{skip:!url},async()=>{
@@ -279,8 +279,8 @@ test('upgrading preserves old points and consumes historical AC; only the one-ti
  } finally {await old.end();await manager.query(`DROP SCHEMA ${priorSchema} CASCADE`);}
 });
 test('settings changes retain immutable rule versions and activation cutoff',{skip:!url},async()=>{
- const before=(await req('/luq/settings','GET',admin)).body;
- const next=(await req('/luq/settings','PATCH',admin,{translationPrice:5})).body;
+ const before=(await req('/scholarship/settings','GET',admin)).body;
+ const next=(await req('/scholarship/settings','PATCH',admin,{translationPrice:5})).body;
  assert.equal(next.ruleVersion,before.ruleVersion+1);assert.equal(next.translationPrice,5);
  assert.equal((await pool.query('SELECT count(*)::int n FROM luq_setting_versions')).rows[0].n,next.ruleVersion);
  await assert.rejects(pool.query("UPDATE luq_settings SET enabled_at=clock_timestamp(),rule_version=rule_version+1 WHERE singleton"),/immutable/);

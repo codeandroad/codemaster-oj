@@ -45,7 +45,7 @@ test('Nest bulk solution review routes enforce authentication, CSRF, managed inv
     if(data.csrfToken)csrf=data.csrfToken;return data;
    };
   }
-  const inventory='/luq/contents/review?targetType=problem',endpoint='/luq/contents/batch-publish';
+  const inventory='/scholarship/contents/review?targetType=problem',endpoint='/scholarship/contents/batch-publish';
   const anonymous=client();
   await anonymous(inventory,{expected:401});await anonymous(endpoint,{body:{},expected:401});
   for(const [name,actor]of Object.entries(actors)){actor.call=client();await actor.call('/auth/login',{body:{username:`publish-${name}`,password}});}
@@ -56,17 +56,17 @@ test('Nest bulk solution review routes enforce authentication, CSRF, managed inv
   assert.equal(JSON.stringify(initial).includes('Foreign private title'),false);
   const foreignInventory=await other.call(inventory);assert.equal(foreignInventory.total,1);
   assert.equal((await admin.call(inventory)).total,3);
-  const draft=async(actor,target,body)=>actor.call('/luq/contents',{body:{...target,kind:'FULL_SOLUTION',body},expected:201});
+  const draft=async(actor,target,body)=>actor.call('/scholarship/contents',{body:{...target,kind:'FULL_SOLUTION',body},expected:201});
   const firstContent=await draft(teacher,first,'REVIEWED_HTTP_SOLUTION_ONE'),secondContent=await draft(teacher,second,'REVIEWED_HTTP_SOLUTION_TWO'),foreignContent=await draft(other,foreign,'PRIVATE_FOREIGN_DRAFT');
   const review=await teacher.call(inventory),otherReview=await other.call(inventory);
   assert.deepEqual(review.counts,{published:0,draft:2,missing:0,withdrawn:0});
   for(const marker of ['REVIEWED_HTTP_SOLUTION','PRIVATE_REFERENCE','PRIVATE_FOREIGN_DRAFT','"body"'])assert.equal(JSON.stringify(review).includes(marker),false);
   const candidate=row=>({contentId:row.contentId,expectedHash:row.contentHash});
   const items=review.items.map(candidate);
-  const preview=await teacher.call(`/luq/contents?problemId=${first.problemId}&versionId=${first.versionId}`);
+  const preview=await teacher.call(`/scholarship/contents?problemId=${first.problemId}&versionId=${first.versionId}`);
   assert.equal(preview.items[0].body,'REVIEWED_HTTP_SOLUTION_ONE');
   assert.equal(preview.items[0].contentHash,items.find(item=>item.contentId===firstContent.id).expectedHash,'Preview and inventory share the reviewed revision hash');
-  await student.call(`/luq/contents?problemId=${first.problemId}&versionId=${first.versionId}`,{expected:403});
+  await student.call(`/scholarship/contents?problemId=${first.problemId}&versionId=${first.versionId}`,{expected:403});
   const request={requestId:randomUUID(),reviewed:true,items};
   await student.call(endpoint,{body:request,expected:403});
   await teacher.call(endpoint,{body:request,badCsrf:true,expected:403});
@@ -76,7 +76,7 @@ test('Nest bulk solution review routes enforce authentication, CSRF, managed inv
   await teacher.call(endpoint,{body:denied,expected:403});
   assert.equal((await pool.query("SELECT count(*)::int n FROM luq_assistance_contents WHERE status='published'")).rows[0].n,0);
   assert.equal((await pool.query('SELECT count(*)::int n FROM luq_content_batches')).rows[0].n,0);
-  const offeredBefore=await student.call('/luq/assistance/quote',{body:{...first,kind:'FULL_SOLUTION'}});
+  const offeredBefore=await student.call('/scholarship/assistance/quote',{body:{...first,kind:'FULL_SOLUTION'}});
   assert.equal(offeredBefore.available,false);
   const ledgerBefore=(await pool.query('SELECT row_to_json(l) r FROM luq_ledger l ORDER BY id')).rows;
   const saved=await teacher.call(endpoint,{body:request});
@@ -88,13 +88,13 @@ test('Nest bulk solution review routes enforce authentication, CSRF, managed inv
   assert.equal((await pool.query("SELECT count(*)::int n FROM audit_events WHERE action='luq.content_batch_publish'")).rows[0].n,1);
   assert.equal((await pool.query("SELECT count(*)::int n FROM audit_events WHERE action='luq.content_publish'")).rows[0].n,2);
   assert.deepEqual((await pool.query('SELECT row_to_json(l) r FROM luq_ledger l ORDER BY id')).rows,ledgerBefore,'Staff publication never spends or grants student money');
-  const offered=await student.call('/luq/assistance/quote',{body:{...first,kind:'FULL_SOLUTION'}});
+  const offered=await student.call('/scholarship/assistance/quote',{body:{...first,kind:'FULL_SOLUTION'}});
   assert.equal(offered.available,true);assert.equal(offered.price,8);assert.equal(Object.hasOwn(offered,'body'),false);
-  await student.call('/luq/assistance/provide',{body:{...first,kind:'FULL_SOLUTION'},expected:403});
+  await student.call('/scholarship/assistance/provide',{body:{...first,kind:'FULL_SOLUTION'},expected:403});
   const publicProblem=await student.call(`/problems/${first.problemId}?versionId=${first.versionId}`);
   for(const marker of ['REVIEWED_HTTP_SOLUTION','PRIVATE_REFERENCE','PRIVATE_FOREIGN_DRAFT'])assert.equal(JSON.stringify(publicProblem).includes(marker),false);
-  await student.call('/luq/assistance/unlock',{body:{...first,kind:'FULL_SOLUTION',requestKey:randomUUID(),confirmedPrice:offered.price,confirmedContentId:offered.contentId}});
-  assert.equal((await student.call('/luq/assistance/provide',{body:{...first,kind:'FULL_SOLUTION'}})).body,'REVIEWED_HTTP_SOLUTION_ONE');
+  await student.call('/scholarship/assistance/unlock',{body:{...first,kind:'FULL_SOLUTION',requestKey:randomUUID(),confirmedPrice:offered.price,confirmedContentId:offered.contentId}});
+  assert.equal((await student.call('/scholarship/assistance/provide',{body:{...first,kind:'FULL_SOLUTION'}})).body,'REVIEWED_HTTP_SOLUTION_ONE');
   assert.equal((await pool.query('SELECT count(*)::int n FROM luq_assistance_deliveries')).rows[0].n,1);
   assert.notEqual(firstContent.id,secondContent.id);
  }finally{if(app)await app.close();await pool.end();await manager.query(`DROP SCHEMA ${schema} CASCADE`);await manager.end();}

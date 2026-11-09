@@ -6,8 +6,8 @@ import { AccountMenu } from "@/components/account-menu";
 import { useLocale } from "@/components/locale-context";
 import { NotificationDropdown } from "@/components/student/notification-dropdown";
 import { OnlineStudents, StudentPresenceHeartbeat } from "@/components/student/student-presence";
-import { LuqAssistance } from "@/components/luq/assistance";
-import { LuqBalance } from "@/components/luq/account-pages";
+import { ScholarshipAssistance } from "@/components/scholarship/assistance";
+import { ScholarshipBalance } from "@/components/scholarship/account-pages";
 import { ProblemWorkspace, type ProblemWorkspaceAdapter } from "@/components/student/workspace";
 import { State, useData, useMutation, type DetailedSubmission } from "@/components/student/shared";
 import type { ResultCase } from "@/components/student/result-feedback";
@@ -55,9 +55,9 @@ function PublicWorkspace({user, problem, catalog}:{user:CampusUser;problem:Probl
       submit: ({kind,code,language,customInput,requestId})=>productionApi(`${path}/submissions`, {method:"POST",body:{kind,code,language,input:customInput,requestId,versionId:problem.versionId}}),
       submissionPath: id=>`${path}/submissions/${encodeURIComponent(id)}`, normalizeSubmission:normalizeJob,
       ...publicDraftStorage(user.id,problem,storage),
-      assistance: kind=><LuqAssistance key={`${problem.id}:${problem.versionId}:${kind}`} target={{problemId:problem.id,versionId:problem.versionId!}} kind={kind} endpoint="practice/luq/assistance"/>,
+      assistance: kind=><ScholarshipAssistance key={`${problem.id}:${problem.versionId}:${kind}`} target={{problemId:problem.id,versionId:problem.versionId!}} kind={kind} endpoint="practice/scholarship/assistance"/>,
       presence:<><StudentPresenceHeartbeat identityId={user.id} endpoint="practice/presence"/><OnlineStudents identityId={user.id} endpoint="practice/presence"/></>,
-      account:hasUnsavedChanges=><><LuqBalance identityId={user.id} endpoint="practice/luq/me" href="/practice/scholarship"/><NotificationDropdown key={user.id} workspace="public"/><AccountMenu user={user} busy={logout.busy} leaderboardHref="/practice/leaderboard" onLogout={()=>{
+      account:hasUnsavedChanges=><><ScholarshipBalance identityId={user.id} endpoint="practice/scholarship/me" href="/practice/scholarship"/><NotificationDropdown key={user.id} workspace="public"/><AccountMenu user={user} busy={logout.busy} leaderboardHref="/practice/leaderboard" onLogout={()=>{
         if(hasUnsavedChanges&&!window.confirm(locale==="en"?"Your code has not been submitted. The draft remains in this browser. Sign out?":"代码尚未提交，草稿保留在本机。确认退出登录？"))return;
         void logout.run(async()=>{
         try { await productionApi("auth/logout",{method:"POST"}); } catch(error) { if(!(error instanceof ApiError&&error.status===401))throw error; }

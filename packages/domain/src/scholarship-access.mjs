@@ -1,16 +1,16 @@
 import {fail,uuid,field,enumValue} from './security.mjs';
 import {problemPermissions} from './library.mjs';
-import {luqActivityAccess} from './luq-rules.mjs';
+import {scholarshipActivityAccess} from './scholarship-rules.mjs';
 import {LEGACY_SCHOOL_ID} from './schools.mjs';
 
 const one=result=>{if(!result.rowCount)fail(404,'NOT_FOUND','题目或活动不存在');return result.rows[0];};
-export const isLuqStaff=user=>user.roles.includes('admin')||user.roles.includes('teacher');
+export const isScholarshipStaff=user=>user.roles.includes('admin')||user.roles.includes('teacher');
 export const assistanceKind=value=>enumValue(value,['FULL_TRANSLATION','FULL_SOLUTION'],'辅助类型');
 export function assistanceLanguage(kind,value){
  if(kind==='FULL_SOLUTION'){if(value&&value!=='')fail(400,'VALIDATION','完整题解不使用目标语言参数');return '';}
  return enumValue(value??'zh-CN',['zh-CN'],'目标语言');
 }
-export async function lockLuqAssistance(db,identityId){
+export async function lockScholarshipAssistance(db,identityId){
  await db.query("SELECT pg_advisory_xact_lock(hashtextextended('luq-assistance:'||$1::text,0))",[identityId]);
 }
 export async function hasProvidedSolution(db,identityId,subjectKey){
@@ -38,7 +38,7 @@ export async function hasLegacyPracticeAc(db,user,{problemId,versionId}){
 // Read only public statement/version identifiers here; never reference code or judge data.
 export async function resolveAssistanceTarget(db,user,input,{manage=false,helpers={}}={}){
  if(!manage&&!user.roles.includes('student'))fail(403,'FORBIDDEN','仅学生可使用助学内容');
- if(manage&&!isLuqStaff(user))fail(403,'FORBIDDEN','需要教师权限');
+ if(manage&&!isScholarshipStaff(user))fail(403,'FORBIDDEN','需要教师权限');
  if(input.problemId){
   if(input.paper4AttemptId||input.paperId)fail(400,'VALIDATION','只能指定一种题目');
   const problemId=uuid(input.problemId),versionId=uuid(input.versionId);
@@ -99,7 +99,7 @@ export async function resolveAssistanceTarget(db,user,input,{manage=false,helper
 }
 
 export async function assistancePolicyTarget(db,user,targetType,targetId,{write=false}={}){
- if(!isLuqStaff(user))fail(403,'FORBIDDEN','需要教师权限');
+ if(!isScholarshipStaff(user))fail(403,'FORBIDDEN','需要教师权限');
  enumValue(targetType,['problem','paper4','assignment','timed','paper4_activity'],'规则目标');
  uuid(targetId);
  let row;
@@ -110,7 +110,7 @@ export async function assistancePolicyTarget(db,user,targetType,targetId,{write=
   return row;
  }
  if(['assignment','timed','paper4_activity'].includes(targetType)){
-  const access=await luqActivityAccess(db,user,targetType,targetId,{lock:write});
+  const access=await scholarshipActivityAccess(db,user,targetType,targetId,{lock:write});
   if(!access.canManage)fail(403,'FORBIDDEN','只能管理本人负责的活动');
   if(write&&access.frozen)fail(409,'RULE_FROZEN','活动辅助规则已冻结，请在发布或开始前设置');
   return access.activity;

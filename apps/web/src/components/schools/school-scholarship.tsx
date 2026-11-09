@@ -6,11 +6,11 @@ import { useLocale } from "@/components/locale-context";
 import { inputClass } from "@/components/admin/common";
 import { Button } from "@/components/ui/button";
 import { Modal, useData } from "@/components/teacher/shared";
-import { SolutionContent } from "@/components/luq/solution-content";
+import { SolutionContent } from "@/components/scholarship/solution-content";
 import { MathContent } from "@/components/math-content";
 import { apiMessage, productionApi, productionId } from "@/lib/production-api";
-import { ScholarshipIcon } from "@/components/luq/scholarship-icon";
-import { ScholarshipPopover } from "@/components/luq/scholarship-popover";
+import { ScholarshipIcon } from "@/components/scholarship/scholarship-icon";
+import { ScholarshipPopover } from "@/components/scholarship/scholarship-popover";
 import { useData as useStudentData } from "@/components/student/shared";
 
 export type SchoolAssistanceTarget = {

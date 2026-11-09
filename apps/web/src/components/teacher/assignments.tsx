@@ -19,8 +19,8 @@ import {
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
-import { ScholarshipIcon } from "@/components/luq/scholarship-icon";
-import { ActivityRewardFields, type RewardRule, type RuleResponse } from "@/components/luq/teaching-page";
+import { ScholarshipIcon } from "@/components/scholarship/scholarship-icon";
+import { ActivityRewardFields, type RewardRule, type RuleResponse } from "@/components/scholarship/teaching-page";
 import { useLocale, type AppLocale } from "@/components/locale-context";
 import {
   productionApi,
@@ -273,7 +273,7 @@ function AssignmentEditorForm({
     [versionError, setVersionError] = useState(""),
     [stale, setStale] = useState(false),
     action = useAction();
-  const rewardResource = useData<RuleResponse>(`luq/reward-rules?activityType=assignment${saved ? `&activityId=${encodeURIComponent(saved.id)}` : ""}`);
+  const rewardResource = useData<RuleResponse>(`scholarship/reward-rules?activityType=assignment${saved ? `&activityId=${encodeURIComponent(saved.id)}` : ""}`);
   const courseOutline = useData<{ id: string; chapters: { problems: { problemId: string }[] }[] }>(coursePathId ? `learning-paths/${coursePathId}` : null);
   const needsCourseOrder = problemOrder === "course" && Boolean(coursePathId);
   const matchingCourseOutline = courseOutline.data?.id === coursePathId;

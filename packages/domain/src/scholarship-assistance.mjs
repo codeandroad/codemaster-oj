@@ -1,8 +1,8 @@
 import {transaction} from './db.mjs';
 import {fail,field,uuid,enumValue,canonicalHash,integer} from './security.mjs';
-import {postLuqEntry,getLuqSettings} from './luq-ledger.mjs';
-import {luqActivityAccess} from './luq-rules.mjs';
-import {assistanceKind,assistanceLanguage,resolveAssistanceTarget,resolveAssistancePolicy,assistancePolicyTarget,hasLegacyPracticeAc,lockLuqAssistance,isLuqStaff} from './luq-access.mjs';
+import {postScholarshipEntry,getScholarshipSettings} from './scholarship-ledger.mjs';
+import {scholarshipActivityAccess} from './scholarship-rules.mjs';
+import {assistanceKind,assistanceLanguage,resolveAssistanceTarget,resolveAssistancePolicy,assistancePolicyTarget,hasLegacyPracticeAc,lockScholarshipAssistance,isScholarshipStaff} from './scholarship-access.mjs';
 
 const response=(body,status=200)=>({status,body});
 const one=result=>{if(!result.rowCount)fail(404,'NOT_FOUND','辅助内容不存在');return result.rows[0];};
@@ -24,7 +24,7 @@ async function aidState(db,user,input,helpers){
   AND kind=$3 AND language=$4 AND status='published' AND published_at IS NOT NULL`,[target.subjectKey,target.versionId,kind,language])).rows[0];
  const entitlement=(await db.query(`SELECT id,ledger_id FROM luq_assistance_entitlements
   WHERE identity_id=$1 AND subject_key=$2 AND kind=$3 AND language=$4`,[user.identityId,target.subjectKey,kind,language])).rows[0];
- const settings=await getLuqSettings(db);
+ const settings=await getScholarshipSettings(db);
  const basePrice=policy.price??(kind==='FULL_TRANSLATION'?settings.translationPrice:settings.solutionPrice);
  const freeAfterAc=!!content&&kind==='FULL_SOLUTION'&&policy.mode==='paid'&&basePrice>0&&!!target.problemId
   &&!target.contextId&&!policy.activityPaid&&!restriction?.activityPaid
@@ -43,9 +43,10 @@ async function aidState(db,user,input,helpers){
  const currentBalance=await balance(db,user.identityId);
  const price=policy.mode==='free'||entitlement?0:basePrice-translationCredit;
  const available=!!content&&policy.mode!=='disabled';
+ const affectsFirstAcScholarship=kind==='FULL_SOLUTION';
  return {target,kind,language,policy,content,entitlement,translationPurchase,quote:{available,mode:policy.mode,unlocked:!!entitlement,
   price,basePrice,translationCredit,balance:currentBalance,balanceAfter:currentBalance-price,contentId:available?content.id:null,
-  requiresConfirmation:available&&policy.mode==='paid'&&!entitlement,affectsFirstAcLuq:kind==='FULL_SOLUTION',
+  requiresConfirmation:available&&policy.mode==='paid'&&!entitlement,affectsFirstAcScholarship,affectsFirstAcLuq:affectsFirstAcScholarship,
   reason:!content?'此版本尚无已审核发布的辅助内容':policy.reason??null}};
 }
 function assertAvailable(state){
@@ -64,7 +65,7 @@ export async function studentAssistanceOperation(db,user,action,body={},helpers=
  }
  if(action==='unlock'){
   const requestKey=uuid(body.requestKey,'请求键');
-   await lockLuqAssistance(db,user.identityId);
+   await lockScholarshipAssistance(db,user.identityId);
    // Refunds take this wallet lock in luq_post_entry. Keep the credit lookup
    // and entitlement insert in the same wallet transaction as the charge.
    await db.query("SELECT pg_advisory_xact_lock(hashtextextended('luq-account:'||$1::text,0))",[user.identityId]);
@@ -76,11 +77,11 @@ export async function studentAssistanceOperation(db,user,action,body={},helpers=
    if(old&&old.request_hash!==requestHash)fail(409,'IDEMPOTENCY_CONFLICT','同一请求键不能用于不同辅助内容');
    if(state.entitlement||state.policy.mode==='free')return {unlocked:!!state.entitlement,balance:state.quote.balance,charged:0,entitlementId:state.entitlement?.id??null};
    if(body.confirmedContentId!==state.content.id||body.confirmedPrice!==state.quote.price)fail(409,'QUOTE_CHANGED','内容或价格已更新，请重新确认');
-   if(state.quote.balance<state.quote.price)fail(409,'INSUFFICIENT_LUQ','Luq 余额不足');
+   if(state.quote.balance<state.quote.price)fail(409,'INSUFFICIENT_LUQ','奖学金余额不足');
    const {price,basePrice,translationCredit}=state.quote;
    const translationCreditLedgerId=state.translationPurchase?.id??null;
    const priceDetails={basePrice,translationCredit,translationCreditLedgerId};
-   const entry=price>0?await postLuqEntry(db,{identityId:user.identityId,delta:-price,kind:'purchase',
+   const entry=price>0?await postScholarshipEntry(db,{identityId:user.identityId,delta:-price,kind:'purchase',
     sourceKey:`purchase:${user.identityId}:${state.target.subjectKey}:${state.kind}:${state.language}`,
     requestKey:scopedRequestKey,requestHash,actorAccountId:user.id,reason:`解锁 ${state.kind}`,
     metadata:{subjectKey:state.target.subjectKey,kind:state.kind,language:state.language,contentId:state.content.id,...priceDetails}}):null;
@@ -92,7 +93,7 @@ export async function studentAssistanceOperation(db,user,action,body={},helpers=
    return {unlocked:true,balance:entry?.balanceAfter??state.quote.balance,charged:price,entitlementId:entitlement.id};
  }
  if(action==='provide'){
-   await lockLuqAssistance(db,user.identityId);
+   await lockScholarshipAssistance(db,user.identityId);
    const state=await aidState(db,user,body,helpers);assertAvailable(state);
    if(state.policy.mode!=='free'&&!state.entitlement)fail(403,'UNLOCK_REQUIRED','请先确认并解锁辅助内容');
    // Body is fetched only after both current permission and entitlement have passed.
@@ -105,12 +106,12 @@ export async function studentAssistanceOperation(db,user,action,body={},helpers=
  return null;
 }
 
-export async function handleLuqAssistance(ctx){
+export async function handleScholarshipAssistance(ctx){
  const {pool,user,route,method,body={},url,helpers={}}=ctx;
- const studentAction=route.match(/^\/luq\/assistance\/(quote|unlock|provide)$/);
+ const studentAction=route.match(/^\/scholarship\/assistance\/(quote|unlock|provide)$/);
  if(studentAction&&method==='POST')return response(await transaction(pool,db=>studentAssistanceOperation(db,user,studentAction[1],body,helpers)));
- if(route==='/luq/contents/review'&&method==='GET'){
-  if(!isLuqStaff(user))fail(403,'FORBIDDEN','需要教师权限');
+ if(route==='/scholarship/contents/review'&&method==='GET'){
+  if(!isScholarshipStaff(user))fail(403,'FORBIDDEN','需要教师权限');
   const targetType=enumValue(url.searchParams.get('targetType'),['problem','paper4'],'内容目标');
   // Match the existing authoring permissions, including editable shared banks.
   // Only reviewed-content bodies are read internally to identify the exact
@@ -146,8 +147,8 @@ export async function handleLuqAssistance(ctx){
   });
   return response({items,counts,total:items.length});
  }
- if(route==='/luq/contents/batch-publish'&&method==='POST'){
-  if(!isLuqStaff(user))fail(403,'FORBIDDEN','需要教师权限');
+ if(route==='/scholarship/contents/batch-publish'&&method==='POST'){
+  if(!isScholarshipStaff(user))fail(403,'FORBIDDEN','需要教师权限');
   if(body.reviewed!==true)fail(400,'REVIEW_REQUIRED','请确认已审核所选正文，且不含教师私有批注或隐藏测试');
   const requestId=uuid(body.requestId,'请求编号').toLowerCase();
   if(!Array.isArray(body.items)||!body.items.length||body.items.length>500)fail(400,'VALIDATION','每批请选择 1–500 项参考答案');
@@ -195,12 +196,12 @@ export async function handleLuqAssistance(ctx){
    return result;
   }));
  }
- if(route==='/luq/contents'&&method==='GET'){
+ if(route==='/scholarship/contents'&&method==='GET'){
   const target=await resolveAssistanceTarget(pool,user,inputFromUrl(url),{manage:true,helpers});
   const items=(await pool.query('SELECT * FROM luq_assistance_contents WHERE subject_key=$1 AND version_id=$2 ORDER BY kind,language',[target.subjectKey,target.versionId])).rows;
   return response({items:items.map(contentShape)});
  }
- if(route==='/luq/contents'&&method==='POST'){
+ if(route==='/scholarship/contents'&&method==='POST'){
   const kind=assistanceKind(body.kind),language=assistanceLanguage(kind,body.language),content=field(body.body,'辅助正文',{max:200000,trim:false});
   if(!content.trim())fail(400,'VALIDATION','辅助正文不能为空');
   return response(await transaction(pool,async db=>{
@@ -215,7 +216,7 @@ export async function handleLuqAssistance(ctx){
    return contentShape(saved);
   }),201);
  }
- const publish=route.match(/^\/luq\/contents\/([^/]+)\/publish$/);
+ const publish=route.match(/^\/scholarship\/contents\/([^/]+)\/publish$/);
  if(publish&&method==='POST'){
   if(body.reviewed!==true)fail(400,'REVIEW_REQUIRED','请确认已审核正文，且不含教师私有批注或隐藏测试');
   return response(await transaction(pool,async db=>{
@@ -227,11 +228,11 @@ export async function handleLuqAssistance(ctx){
    return contentShape(saved);
   }));
  }
- if(route==='/luq/policies'&&method==='GET'){
+ if(route==='/scholarship/policies'&&method==='GET'){
   const {targetType,targetId}=inputFromUrl(url);
   let target,canManage=true,frozen=false;
   if(['assignment','timed','paper4_activity'].includes(targetType)){
-   const access=await luqActivityAccess(pool,user,targetType,targetId);
+   const access=await scholarshipActivityAccess(pool,user,targetType,targetId);
    target=access.activity;canManage=access.canManage;frozen=access.frozen;
   }else target=await assistancePolicyTarget(pool,user,targetType,targetId);
   const rows=(await pool.query(`SELECT DISTINCT ON(kind) * FROM luq_assistance_policies WHERE target_type=$1 AND target_id=$2 ORDER BY kind,rule_version DESC`,[targetType,targetId])).rows;
@@ -242,7 +243,7 @@ export async function handleLuqAssistance(ctx){
   }),canManage,frozen});
  }
 
- if(route==='/luq/policies'&&method==='POST'){
+ if(route==='/scholarship/policies'&&method==='POST'){
   const {targetType,targetId}=body,kind=assistanceKind(body.kind),mode=enumValue(body.mode,['disabled','paid','free'],'辅助模式');
   if(body.price!==undefined&&body.price!==null&&!['problem','paper4'].includes(targetType))fail(400,'VALIDATION','活动价格沿用题目的解锁价格');
   const requestedPrice=body.price===undefined?undefined:body.price===null?null:integer(body.price,0,1000,'解锁价格');
@@ -258,8 +259,8 @@ export async function handleLuqAssistance(ctx){
    await audit(db,user,'luq.policy_version','luq_policy',row.id,{targetType,targetId,kind,ruleVersion:row.rule_version});return policyShape(row);
   }),201);
  }
- if(route==='/luq/policies/batch-prices'&&method==='POST'){
-  if(!isLuqStaff(user))fail(403,'FORBIDDEN','需要教师权限');
+ if(route==='/scholarship/policies/batch-prices'&&method==='POST'){
+  if(!isScholarshipStaff(user))fail(403,'FORBIDDEN','需要教师权限');
   const requestId=uuid(body.requestId,'请求编号'),targetType=enumValue(body.targetType,['problem','paper4'],'规则目标');
   if(!Array.isArray(body.targetIds)||!body.targetIds.length||body.targetIds.length>500)fail(400,'VALIDATION','每批请选择 1–500 个题目或试卷');
   const targetIds=[...new Set(body.targetIds.map(id=>uuid(id,'题目或试卷')))].sort();
@@ -320,8 +321,8 @@ export async function handleLuqAssistance(ctx){
    return result;
   }));
  }
- if(route==='/luq/usage'&&method==='GET'){
-  if(!isLuqStaff(user))fail(403,'FORBIDDEN','需要教师权限');
+ if(route==='/scholarship/usage'&&method==='GET'){
+  if(!isScholarshipStaff(user))fail(403,'FORBIDDEN','需要教师权限');
   const {targetType,targetId}=inputFromUrl(url);await assistancePolicyTarget(pool,user,targetType,targetId);
   const subject=targetType==='problem'?`problem:${targetId}`:targetType==='paper4'?`paper4:${targetId}:`:null;
   const result=await pool.query(`SELECT d.*,i.name student_name FROM luq_assistance_deliveries d JOIN identities i ON i.id=d.identity_id

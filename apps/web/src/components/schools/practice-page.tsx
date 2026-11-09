@@ -8,7 +8,7 @@ import { AppLink } from "@/components/navigation";
 import { PersonalAppearanceProvider } from "@/components/personal-appearance-settings";
 import { NotificationDropdown } from "@/components/student/notification-dropdown";
 import { StudentPresenceHeartbeat } from "@/components/student/student-presence";
-import { LuqBalance, StudentLuqPage } from "@/components/luq/account-pages";
+import { ScholarshipBalance, StudentScholarshipPage } from "@/components/scholarship/account-pages";
 import { useWorkspaceSettings } from "@/components/student/workspace-settings";
 import { WorkspaceThemeProvider } from "@/components/ui/theme-context";
 import { WorkspaceFrame } from "@/components/workspace-frame";
@@ -66,7 +66,7 @@ export function PracticePage({ user, pathname, onLogout, onUserSaved }: {
       content = <PublicPracticeLeaderboard/>;
       break;
     case "scholarship":
-      content = <StudentLuqPage endpoint="practice/luq/me"/>;
+      content = <StudentScholarshipPage endpoint="practice/scholarship/me"/>;
       break;
     default:
       content = <PublicStudyHome user={user}/>;
@@ -91,7 +91,7 @@ export function PracticePage({ user, pathname, onLogout, onUserSaved }: {
               ...item, href: item.path, active: section === item.section,
             }))}/>}
             account={<>
-              <LuqBalance identityId={user.id} endpoint="practice/luq/me" href="/practice/scholarship"/>
+              <ScholarshipBalance identityId={user.id} endpoint="practice/scholarship/me" href="/practice/scholarship"/>
               <NotificationDropdown key={user.id} workspace="public"/>
               <AccountMenu user={user} busy={logout.busy} onLogout={() => void logout.run(async () => {
                 try {

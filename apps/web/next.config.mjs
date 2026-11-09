@@ -9,6 +9,9 @@ const config = {
   turbopack: { root: webRoot },
   poweredByHeader: false,
   reactStrictMode: true,
+  redirects() {
+    return [{ source: "/:workspace(student|teacher|admin)/luq", destination: "/:workspace/scholarship", permanent: true }];
+  },
   async rewrites() {
     // Production traffic goes through Caddy; only next dev uses this local API bridge.
     if (process.env.NODE_ENV !== "development") return [];

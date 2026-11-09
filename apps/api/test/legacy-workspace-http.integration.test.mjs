@@ -78,7 +78,7 @@ test('legacy business endpoints require original-school ownership on the real Ne
           '/problems/import', '/admin/problem-banks', '/problems/rank-review', '/classes', '/people', '/accounts', '/teaching/audience',
           '/learning-paths', `/learning-paths/${id}`, '/learning-resources', '/assignments', `/assignments/${id}`, '/timed-practices',
           '/submissions', '/submissions/SUB1', '/review-notebook', '/reports', '/reports/export', '/points/me', '/points/leaderboard',
-          '/paper4/papers', `/paper4/papers/${id}`, '/luq/me', '/luq/ledger', '/luq/contents', '/luq/public-statements',
+          '/paper4/papers', `/paper4/papers/${id}`, '/scholarship/me', '/scholarship/ledger', '/scholarship/contents', '/scholarship/public-statements',
           `/profiles/${originalStudent.identityId}`, `/profiles/${originalStudent.identityId}/activity`, '/presence',
           '/student-notifications', '/system-settings', '/audit-events', '/judge-status'];
         for (const auth of [newSchool, platform]) for (const path of paths) {
@@ -97,8 +97,8 @@ test('legacy business endpoints require original-school ownership on the real Ne
         const before = await counts();
         const mutations = [
           ['/problems', 'POST'], ['/problem-banks', 'POST'], ['/assignments', 'POST'], ['/learning-paths', 'POST'],
-          ['/submissions', 'POST'], ['/presence/heartbeat', 'POST'], ['/luq/assistance/quote', 'POST'],
-          ['/luq/assistance/unlock', 'POST'], ['/luq/assistance/provide', 'POST'], ['/system-settings', 'PATCH'],
+          ['/submissions', 'POST'], ['/presence/heartbeat', 'POST'], ['/scholarship/assistance/quote', 'POST'],
+          ['/scholarship/assistance/unlock', 'POST'], ['/scholarship/assistance/provide', 'POST'], ['/system-settings', 'PATCH'],
         ];
         for (const auth of [newSchool, platform]) for (const [path,method] of mutations) {
           const response = await request(path, { auth, method, body: { problemId: problem.id, versionId: version.id } });
@@ -109,7 +109,7 @@ test('legacy business endpoints require original-school ownership on the real Ne
       });
 
       await t.test('original administrator and student retain original-school access', async () => {
-        for (const path of ['/problems', `/problems/${problem.id}?versionId=${version.id}`, '/learning-paths', '/assignments', '/luq/me']) {
+        for (const path of ['/problems', `/problems/${problem.id}?versionId=${version.id}`, '/learning-paths', '/assignments', '/scholarship/me']) {
           assert.equal((await request(path, { auth: student })).status, 200, path);
         }
         for (const path of ['/people', '/accounts', '/system-settings', '/problem-banks']) {

@@ -52,7 +52,7 @@ test('personal registration and reviewed public learning use real grants without
    assert.equal((await owner.query("SELECT count(*)::int count FROM identities WHERE kind='personal'")).rows[0].count,1);
    assert.equal((await owner.query('SELECT count(*)::int count FROM legacy_school_account_ownership WHERE account_id=$1',[personal.id])).rows[0].count,0);
    assert.equal((await request('/schools',{auth:personal})).data.items.length,0);
-   for(const path of ['/people','/problems','/learning-paths','/luq/me','/platform/schools'])await request(path,{auth:personal,status:403});
+   for(const path of ['/people','/problems','/learning-paths','/scholarship/me','/platform/schools'])await request(path,{auth:personal,status:403});
    await request('/auth/profile',{auth:personal,method:'PATCH',body:{nickname:'Learner'},csrf:false,status:403});
    await request('/auth/profile',{auth:personal,method:'PATCH',body:{nickname:'Learner'}});
    const people=await request('/people',{auth:legacy});assert.ok(!people.data.items.some(i=>i.id===personal.identityId));
@@ -388,9 +388,9 @@ test('personal registration and reviewed public learning use real grants without
    await request(practicePath+'?versionId='+draftVersionId,{auth:outsider,status:404});
    // Existing snapshots must adopt the safe presentation for this exact reviewed
    // version, without exposing the author's original metadata or another draft.
-   const source = (await request(`/luq/public-statements?problemId=${first.problemId}&versionId=${first.versionId}`,{auth:legacy})).data;
+   const source = (await request(`/scholarship/public-statements?problemId=${first.problemId}&versionId=${first.versionId}`,{auth:legacy})).data;
    const reviewedMetadata = {...visibleMetadata,objective:'Reviewed learning objective.'};
-   await request('/luq/public-statements',{auth:legacy,method:'POST',status:201,body:{
+   await request('/scholarship/public-statements',{auth:legacy,method:'POST',status:201,body:{
     problemId:first.problemId,versionId:first.versionId,language:'en',reviewed:true,
     statement:'Reviewed public statement.',metadata:reviewedMetadata,sourceHash:source.sourceHash,
    }});

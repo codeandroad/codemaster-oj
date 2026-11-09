@@ -2,7 +2,7 @@
 
 import { useRef, useState, type ChangeEvent } from "react";
 import { useLocale } from "@/components/locale-context";
-import { SolutionContent } from "@/components/luq/solution-content";
+import { SolutionContent } from "@/components/scholarship/solution-content";
 import { Button } from "@/components/ui/button";
 import { useRangeSelection } from "@/components/ui/use-range-selection";
 import { type EditorTheme } from "@/components/student/editor-themes";
@@ -63,7 +63,7 @@ function itemLabel(item: ReviewItem) {
     : item.title;
 }
 function editorHref(item: ReviewItem) {
-  return `/teacher/luq?${new URLSearchParams({
+  return `/teacher/scholarship?${new URLSearchParams({
     targetType: item.targetType,
     targetId: item.targetId,
     versionId: item.versionId,
@@ -76,10 +76,10 @@ function selectable(item: ReviewItem) {
 }
 
 /** The list contains metadata only. Content is fetched on explicit staff preview. */
-export function LuqBatchReview({ targetType }: { targetType: "problem" | "paper4" }) {
+export function ScholarshipBatchReview({ targetType }: { targetType: "problem" | "paper4" }) {
   const { locale } = useLocale();
   const tx: Text = (zh, en) => locale === "en" ? en : zh;
-  const list = useData<ReviewList>(`luq/contents/review?${new URLSearchParams({ targetType })}`);
+  const list = useData<ReviewList>(`scholarship/contents/review?${new URLSearchParams({ targetType })}`);
   const [query, setQuery] = useState(""), [filter, setFilter] = useState<Status | "all">("all");
   const [selected, setSelected] = useState<string[]>([]);
   const [preview, setPreview] = useState<ReviewItem | null>(null);
@@ -147,7 +147,7 @@ export function LuqBatchReview({ targetType }: { targetType: "problem" | "paper4
     const signature = JSON.stringify(entries);
     if (pending.current?.signature !== signature) pending.current = { signature, requestId: crypto.randomUUID() };
     try {
-      const result = await productionApi<PublishResult>("luq/contents/batch-publish", {
+      const result = await productionApi<PublishResult>("scholarship/contents/batch-publish", {
         method: "POST", body: { requestId: pending.current.requestId, reviewed: true, items: entries },
       });
       pending.current = null;
@@ -241,7 +241,7 @@ function SolutionPreview({ item, onClose, onRefresh }: { item: ReviewItem; onClo
   const target: Record<string, string> = item.targetType === "problem"
     ? { problemId: item.targetId, versionId: item.versionId }
     : { paperId: item.targetId, versionId: item.versionId, questionKey: item.questionKey! };
-  const contents = useData<{ items: ReviewContent[] }>(`luq/contents?${new URLSearchParams(target)}`);
+  const contents = useData<{ items: ReviewContent[] }>(`scholarship/contents?${new URLSearchParams(target)}`);
   const content = contents.data?.items.find(value => value.id === item.contentId && value.kind === "FULL_SOLUTION"
     && value.versionId === item.versionId && value.contentHash === item.contentHash);
   return <Modal title={tx("参考答案预览", "Solution preview")} onClose={onClose} wide>

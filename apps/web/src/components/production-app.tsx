@@ -4,8 +4,8 @@ import { PlatformPage } from "./schools/platform-page";
 import { SchoolsPage } from "./schools/schools-page";
 import {ProfileEditor} from "./profile-editor";
 import {PointsPage} from "./points-page";
-import { AdminLuqPage, StudentLuqPage, LuqBalance } from "./luq/account-pages";
-import { TeacherLuqPage } from "./luq/teaching-page";
+import { AdminScholarshipPage, StudentScholarshipPage, ScholarshipBalance } from "./scholarship/account-pages";
+import { TeacherScholarshipPage } from "./scholarship/teaching-page";
 
 import { AppLink } from "@/components/navigation";
 import { isCampusRoute, resolvePublicLearningBookmark } from "@/lib/campus-routes";
@@ -244,7 +244,7 @@ function ProductionShell({
   return <PageHeadingProvider pathname={pathname}><WorkspaceThemeProvider theme={shellTheme}><PersonalAppearanceProvider pageTheme={settings.pageTheme} updatePageTheme={pageTheme=>update({pageTheme})}><div style={{colorScheme:shellTheme}} className={shellTheme === "dark" ? "dark" : ""}>
     <WorkspaceFrame student={role === "student"} schoolName={school ? schoolDisplayName(school, locale) : t("校内学习平台")} navigation={links}
       breadcrumb={<div className="flex min-w-0 items-center"><PageBreadcrumbs pathname={pathname} role={role}/><ShellPageHeading pathname={pathname} role={role}/></div>}
-      account={<>{role === "student" && <LuqBalance identityId={user.identityId}/>}<NotificationDropdown key={`${user.id}:${role}`} workspace={role === "student" ? "student" : "staff"}/><AccountMenu user={user} role={role} busy={action.busy} onLogout={() => action.run(async () => {
+      account={<>{role === "student" && <ScholarshipBalance identityId={user.identityId}/>}<NotificationDropdown key={`${user.id}:${role}`} workspace={role === "student" ? "student" : "staff"}/><AccountMenu user={user} role={role} busy={action.busy} onLogout={() => action.run(async () => {
         try { await productionApi("auth/logout", {method:"POST"}); } catch(reason) { if (!(reason instanceof ApiError && reason.status === 401)) throw reason; } onLogout();
       })}/></>}>
       <Feedback action={action}/>{children}
@@ -254,9 +254,9 @@ function ProductionShell({
 
 
 function ProductionView({pathname,role,user,profileVersion,onProfileSaved}:{pathname:string;role:CampusRole;user:CampusUser;profileVersion:number;onProfileSaved:(next:CampusUser)=>void}) {
-  if (pathname === "/student/luq") return <StudentLuqPage/>;
-  if (pathname === "/teacher/luq") return <TeacherLuqPage/>;
-  if (pathname === "/admin/luq") return <AdminLuqPage/>;
+  if (pathname === "/student/scholarship") return <StudentScholarshipPage/>;
+  if (pathname === "/teacher/scholarship") return <TeacherScholarshipPage/>;
+  if (pathname === "/admin/scholarship") return <AdminScholarshipPage/>;
   if(pathname.endsWith("/points"))return <PointsPage user={user} student={role==="student"} workspace={role}/>;
   if(/^\/(student|teacher|admin)\/people\/[^/]+$/.test(pathname))return <StudentPublicProfile identityId={pathname.split("/")[3]} viewer={user} workspace={role}/>;
   if(pathname==="/student/profile")return <><ProfileEditor user={user} onSaved={onProfileSaved}/><StudentPublicProfile key={profileVersion} identityId={user.identityId} viewer={user} embedded/></>;

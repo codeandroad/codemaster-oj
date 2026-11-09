@@ -1,6 +1,6 @@
 import type {IncomingHttpHeaders} from 'node:http';
 export interface DomainConfig {secret: string; origins: string[]; secure: boolean; bodyLimit: number; codeLimit: number;}
-export type DomainArea='publicPresence'|'schoolScholarship'|'schoolLeaderboard'|'schoolPaper4'|'schoolActivities'|'schoolPractice'|'publicLearning'|'auth'|'people'|'classes'|'library'|'assignments'|'submissions'|'education'|'community'|'presence'|'schools'|'platform'|'system'|'paper4'|'luq';
+export type DomainArea='publicPresence'|'schoolScholarship'|'schoolLeaderboard'|'schoolPaper4'|'schoolActivities'|'schoolPractice'|'publicLearning'|'auth'|'people'|'classes'|'library'|'assignments'|'submissions'|'education'|'community'|'presence'|'schools'|'platform'|'system'|'paper4'|'scholarship';
 export interface DomainResponse {status: number; body: unknown; cookie?: string;}
 export interface DomainContext {route: string; method: string; body: Record<string, unknown>; [key: string]: unknown;}
 export interface DomainServices {

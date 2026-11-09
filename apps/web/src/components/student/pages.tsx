@@ -4,7 +4,7 @@ import {StudentProblemFilter} from "./problem-filter";
 import {StudentSubmissionFilter} from "./submission-filter";
 import dynamic from "next/dynamic";
 
-import { StudentLuqRule } from "@/components/luq/teaching-page";
+import { StudentScholarshipRule } from "@/components/scholarship/teaching-page";
 import { AppLink } from "@/components/navigation";
 import { LearnerResourceScope } from "@/components/schools/learner-resource-scope";
 
@@ -249,7 +249,7 @@ export function StudentAssignment({ id, user }: { id: string; user: CampusUser }
   return <State data={assignment}>{a && p && <>
     {completionOpen && a.completion && <AssignmentCompletionDialog assignment={{ id: a.id, title: a.title, completion: a.completion }}
       onDismiss={() => setCompletionOpen(false)} />}
-    <StudentLuqRule activityType="assignment" activityId={id}/>
+    <StudentScholarshipRule activityType="assignment" activityId={id}/>
     <section className={panel}>
       <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto]">
         <div>

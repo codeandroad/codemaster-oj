@@ -3,7 +3,7 @@
 import { BarChart3, BookOpen, BookOpenCheck, ClipboardList, Clock3, Code2, Database, FileClock, FileCode2, Gauge, Home, LayoutDashboard, Library, NotebookPen, Settings, Trophy, UserRound, Users } from "lucide-react";
 import { AppLink } from "./navigation";
 import { useLocale } from "./locale-context";
-import { ScholarshipIcon } from "./luq/scholarship-icon";
+import { ScholarshipIcon } from "./scholarship/scholarship-icon";
 
 type WorkspaceNavigationItem = {
   section: string;
@@ -24,7 +24,7 @@ export const workspaceNavigation = {
     { section: "paper4", path: "/student/paper4", label: "Paper 4 练习", icon: FileCode2 },
     { section: "submissions", path: "/student/submissions", label: "提交记录", icon: FileClock },
     { section: "review-notebook", path: "/student/review-notebook", label: "订正本", icon: NotebookPen },
-    { section: "scholarship", path: "/student/luq", label: "我的奖学金", shortEnglish: "Scholarship", icon: ScholarshipIcon },
+    { section: "scholarship", path: "/student/scholarship", label: "我的奖学金", shortEnglish: "Scholarship", icon: ScholarshipIcon },
   ],
   teacher: [
     { section: "home", path: "/teacher", label: "教师首页", shortEnglish: "Dashboard", icon: LayoutDashboard },
@@ -35,7 +35,7 @@ export const workspaceNavigation = {
     { section: "timed", path: "/teacher/timed-practice", label: "限时训练", icon: Clock3 },
     { section: "paper4", path: "/teacher/paper4", label: "Paper 4 试卷", shortEnglish: "Paper 4", icon: FileCode2 },
     { section: "reports", path: "/teacher/reports", label: "教学报告", shortEnglish: "Reports", icon: BarChart3 },
-    { section: "scholarship", path: "/teacher/luq", label: "奖学金管理", shortEnglish: "Scholarship", icon: ScholarshipIcon },
+    { section: "scholarship", path: "/teacher/scholarship", label: "奖学金管理", shortEnglish: "Scholarship", icon: ScholarshipIcon },
     { section: "imports", path: "/teacher/imports", label: "导入中心", shortEnglish: "Imports", icon: Database },
   ],
   admin: [
@@ -47,7 +47,7 @@ export const workspaceNavigation = {
     { section: "course-admissions", path: "/admin/course-admissions", label: "课程申请", shortEnglish: "Course applications", icon: ClipboardList },
     { section: "judge", path: "/admin/judge-service", label: "判题服务", icon: Gauge },
     { section: "system-settings", path: "/admin/settings", label: "系统设置", icon: Settings },
-    { section: "scholarship", path: "/admin/luq", label: "奖学金管理", shortEnglish: "Scholarship", icon: ScholarshipIcon },
+    { section: "scholarship", path: "/admin/scholarship", label: "奖学金管理", shortEnglish: "Scholarship", icon: ScholarshipIcon },
   ],
 } as const satisfies Record<string, readonly WorkspaceNavigationItem[]>;
 

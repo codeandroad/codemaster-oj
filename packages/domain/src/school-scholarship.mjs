@@ -1,6 +1,6 @@
 import { transaction } from './db.mjs';
 import { auditSchool, LEGACY_SCHOOL_ID, lockSchoolTeaching, schoolRole } from './schools.mjs';
-import { lockLuqAssistance } from './luq-access.mjs';
+import { lockScholarshipAssistance } from './scholarship-access.mjs';
 import { schoolActivityJobVisibleSql } from './school-activities.mjs';
 import { canonicalHash, enumValue, fail, field, integer, uuid } from './security.mjs';
 
@@ -86,7 +86,8 @@ async function currentAssistance(db,s,u,role,b){
  let translationCredit=0,creditLedger=null;
  if(k==='FULL_SOLUTION'&&mode==='paid'&&!entitlement){const paid=(await db.query(`SELECT l.id,-l.delta AS amount FROM school_scholarship_entitlements e JOIN school_scholarship_ledger l ON l.school_id=e.school_id AND l.id=e.ledger_id WHERE e.school_id=$1 AND e.identity_id=$2 AND e.subject_key=$3 AND e.kind='FULL_TRANSLATION' AND e.language='zh-CN' AND NOT EXISTS(SELECT 1 FROM school_scholarship_ledger r WHERE r.school_id=l.school_id AND r.refund_of=l.id)`,[s,i.id,t.subject])).rows[0];if(paid){translationCredit=Math.min(price,paid.amount);creditLedger=paid.id;}}
  const basePrice=price;price=entitlement||mode!=='paid'?0:Math.max(0,price-translationCredit);const currentBalance=await balance(db,s,i.id),available=!!content&&mode!=='disabled';
- return {t,i,k,language,content,entitlement,creditLedger,quote:{available,mode,unlocked:!!entitlement,price,basePrice,translationCredit,balance:currentBalance,balanceAfter:currentBalance-price,contentId:content?.id,contentRevision:content?.revision,requiresConfirmation:available&&mode==='paid'&&!entitlement,affectsFirstAcLuq:k==='FULL_SOLUTION',reason:reason||(!content?'No reviewed content has been published for this version.':'')}};
+ const affectsFirstAcScholarship=k==='FULL_SOLUTION';
+ return {t,i,k,language,content,entitlement,creditLedger,quote:{available,mode,unlocked:!!entitlement,price,basePrice,translationCredit,balance:currentBalance,balanceAfter:currentBalance-price,contentId:content?.id,contentRevision:content?.revision,requiresConfirmation:available&&mode==='paid'&&!entitlement,affectsFirstAcScholarship,affectsFirstAcLuq:affectsFirstAcScholarship,reason:reason||(!content?'No reviewed content has been published for this version.':'')}};
 }
 async function idempotent(db,s,u,requestId,input,work){
  const id=uuid(requestId),hash=canonicalHash(input);await db.query("SELECT pg_advisory_xact_lock(hashtextextended('school-scholarship-request:'||$1||':'||$2||':'||$3,0))",[s,u.id,id]);
@@ -154,7 +155,7 @@ export async function handleSchoolScholarship({pool,user,route,method,body={},ur
   }
   if(path==='refund'&&method==='POST'){requireAdmin(role);const ledgerId=uuid(body.ledgerId),reason=field(body.reason,'Reason',{max:2000});return reply(await idempotent(db,s,user,body.requestId,{ledgerId,reason},async()=>{const l=(await db.query("SELECT * FROM school_scholarship_ledger WHERE school_id=$1 AND id=$2 AND kind='purchase'",[s,ledgerId])).rows[0];if(!l)fail(404,'NOT_FOUND','Purchase not found.');const refunded=await postSchoolScholarshipEntry(db,{schoolId:s,identityId:l.identity_id,delta:-l.delta,kind:'refund',sourceKey:`refund:${ledgerId}`,actor:user.id,reason,refundOf:ledgerId});return {id:refunded.id,balance:refunded.balance_after};}));}
   if(path.startsWith('assistance/')&&method==='POST'){
-   const i=await studentIdentity(db,s,user);await lockLuqAssistance(db,user.identityId);await walletLock(db,s,i.id);const st=await currentAssistance(db,s,user,role,body);if(path==='assistance/quote')return reply(st.quote);
+   const i=await studentIdentity(db,s,user);await lockScholarshipAssistance(db,user.identityId);await walletLock(db,s,i.id);const st=await currentAssistance(db,s,user,role,body);if(path==='assistance/quote')return reply(st.quote);
    if(!st.quote.available)fail(403,'ASSISTANCE_UNAVAILABLE',st.quote.reason);
    if(path==='assistance/unlock')return reply(await idempotent(db,s,user,body.requestId??body.requestKey,{subject:st.t.subject,kind:st.k,language:st.language},async()=>{
     if(st.entitlement||st.quote.mode==='free')return {balance:st.quote.balance,unlocked:!!st.entitlement};

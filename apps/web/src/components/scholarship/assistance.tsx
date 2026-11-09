@@ -6,7 +6,7 @@ import { useLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/teacher/shared";
 import { LessonContent } from "@/components/student/shared";
-import { SolutionContent } from "@/components/luq/solution-content";
+import { SolutionContent } from "@/components/scholarship/solution-content";
 import { apiMessage, productionApi, productionId } from "@/lib/production-api";
 
 export type AssistanceKind = "FULL_TRANSLATION" | "FULL_SOLUTION";
@@ -29,7 +29,6 @@ interface Quote {
   balanceAfter: number;
   contentId?: string;
   requiresConfirmation: boolean;
-  affectsFirstAcLuq: boolean;
   reason?: string;
 }
 interface Provided {
@@ -41,16 +40,16 @@ interface Provided {
 }
 
 /** Metadata only until the student explicitly confirms. Bodies are never prefetched or persisted. */
-export function LuqAssistance({
+export function ScholarshipAssistance({
   target,
   kind,
   renderBody,
-  endpoint = "luq/assistance",
+  endpoint = "scholarship/assistance",
 }: {
   target: AssistanceTarget;
   kind: AssistanceKind;
   renderBody?: (body: string) => ReactNode;
-  endpoint?: "luq/assistance" | "practice/luq/assistance";
+  endpoint?: "scholarship/assistance" | "practice/scholarship/assistance";
 }) {
   const { locale } = useLocale(),
     tx = (zh: string, en: string) => (locale === "en" ? en : zh);
@@ -114,7 +113,7 @@ export function LuqAssistance({
           balanceAfter: unlock.balance,
           requiresConfirmation: false,
         });
-        window.dispatchEvent(new Event("campus-judge:luq-changed"));
+        window.dispatchEvent(new Event("campus-judge:scholarship-changed"));
       }
       setProvided(
         await productionApi<Provided>(`${endpoint}/provide`, {

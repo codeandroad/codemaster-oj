@@ -108,11 +108,11 @@ test('course-pinned Luq solutions need exact-version reviewed content; pricing n
  // Use the same exact target sent by StudentWorkspace after the chapter link.
  const oldTarget={problemId:linked.problemId,versionId:oldView.versionId,kind:'FULL_SOLUTION'};
  const currentTarget={...oldTarget,versionId:currentView.versionId};
- const quote=target=>student.send('/luq/assistance/quote',target);
- const provide=(target,status=200)=>student.send('/luq/assistance/provide',target,'POST',status);
+ const quote=target=>student.send('/scholarship/assistance/quote',target);
+ const provide=(target,status=200)=>student.send('/scholarship/assistance/provide',target,'POST',status);
  const balance=async()=>Number((await pool.query('SELECT balance FROM luq_accounts WHERE identity_id=$1',[student.user.identityId])).rows[0].balance);
  const balanceBefore=await balance();
- const batch=await teacher.send('/luq/policies/batch-prices',{
+ const batch=await teacher.send('/scholarship/policies/batch-prices',{
   requestId:randomUUID(),targetType:'problem',targetIds:[linked.problemId],prices:{FULL_SOLUTION:6},
  });
  assert.equal(batch.count,1);
@@ -122,10 +122,10 @@ test('course-pinned Luq solutions need exact-version reviewed content; pricing n
  assert.equal(await balance(),balanceBefore);
 
  async function draft(target,body){
-  return teacher.send('/luq/contents',{...target,body},'POST',201);
+  return teacher.send('/scholarship/contents',{...target,body},'POST',201);
  }
  async function publish(content){
-  await teacher.send(`/luq/contents/${content.id}/publish`,{reviewed:true});
+  await teacher.send(`/scholarship/contents/${content.id}/publish`,{reviewed:true});
  }
  const currentBody='Reviewed solution for version 2 only.\n```python\nprint(2)\n```';
  const currentContent=await draft(currentTarget,currentBody);
@@ -136,7 +136,7 @@ test('course-pinned Luq solutions need exact-version reviewed content; pricing n
  const oldBody='Reviewed solution for the course version.\n```python\nprint(1)\n```';
  const oldContent=await draft(oldTarget,oldBody);
  assert.equal((await quote(oldTarget)).available,false,'a draft is not a published solution');
- await teacher.send(`/luq/contents/${oldContent.id}/publish`,{},'POST',400);
+ await teacher.send(`/scholarship/contents/${oldContent.id}/publish`,{},'POST',400);
  await publish(oldContent);
  const priced=await quote(oldTarget);
  assert.equal(priced.available,true);
@@ -147,7 +147,7 @@ test('course-pinned Luq solutions need exact-version reviewed content; pricing n
  await provide(oldTarget,403);
  assert.equal(await balance(),balanceBefore);
  assert.equal((await pool.query('SELECT count(*)::int n FROM luq_assistance_deliveries')).rows[0].n,0);
- const purchase=await student.send('/luq/assistance/unlock',{
+ const purchase=await student.send('/scholarship/assistance/unlock',{
   ...oldTarget,requestKey:randomUUID(),confirmedPrice:priced.price,confirmedContentId:priced.contentId,
  });
  assert.equal(purchase.charged,6);
@@ -167,7 +167,7 @@ test('course-pinned Luq solutions need exact-version reviewed content; pricing n
  await pool.query('INSERT INTO timed_practice_problems(practice_id,problem_id,version_id,points,position) VALUES($1,$2,$3,100,0)',[exam.id,first.id,second.versionId]);
  await pool.query('INSERT INTO timed_practice_participants(practice_id,identity_id) VALUES($1,$2)',[exam.id,student.user.identityId]);
  await pool.query("UPDATE timed_practices SET state='Published' WHERE id=$1",[exam.id]);
- await teacher.send('/luq/policies/batch-prices',{
+ await teacher.send('/scholarship/policies/batch-prices',{
   requestId:randomUUID(),targetType:'problem',targetIds:[first.id],prices:{FULL_SOLUTION:0},
  });
  for(const target of [oldTarget,currentTarget]){

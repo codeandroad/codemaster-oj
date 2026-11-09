@@ -125,12 +125,20 @@ test('Nest school leaderboard routes enforce admin-only visibility, cross-class 
    assert.equal((await request(settings,{method:'PATCH',body:{visibleFields},auth:teacher})).status,403);
    assert.equal((await request(settings,{method:'PATCH',body:{visibleFields},auth:admin,csrf:false})).status,403);
    assert.equal((await request(settings,{method:'PATCH',body:{visibleFields},auth:admin})).status,200);
+   const canonicalFields={solvedProblems:true,attempts:true,acRate:false,scholarshipBalance:false};
+   const fromOldClient=await request(settings,{method:'PATCH',body:{visibleFields:{...canonicalFields,luqBalance:true}},auth:admin});
+   assert.equal(fromOldClient.status,200);
+   assert.equal(fromOldClient.data.visibleFields.scholarshipBalance,true);
+   assert.equal((await request(settings,{method:'PATCH',body:{visibleFields:canonicalFields},auth:admin})).status,200);
    assert.equal((await request(`${contexts}/${classId}`,{method:'PATCH',body:{visibleFields},auth:admin})).status,404);
    const after=await request(leaderboard,{auth:student});
    assert.equal(after.status,200);
    assert.equal(after.data.me.attempts,0);
    assert.equal(Object.hasOwn(after.data.me,'acRate'),false);
-   for(const item of [...after.data.items,after.data.me]) assert.equal(Object.hasOwn(item,'luqBalance'),false,'hidden balance is absent from HTTP payload');
+   for(const item of [...after.data.items,after.data.me]){
+    assert.equal(Object.hasOwn(item,'luqBalance'),false,'hidden balance is absent from HTTP payload');
+    assert.equal(Object.hasOwn(item,'scholarshipBalance'),false);
+   }
    const ownProfile=await request(`/api/v1/profiles/${identityId}`,{auth:student});
    const peerProfile=await request(`/api/v1/profiles/${identityId}`,{auth:otherStudent});
    assert.equal(ownProfile.status,200);
@@ -139,6 +147,7 @@ test('Nest school leaderboard routes enforce admin-only visibility, cross-class 
    assert.equal(Object.hasOwn(peerProfile.data.profile,'scholarship'),false);
    const staffBalance=await request(leaderboard,{auth:teacher});
    assert.equal(staffBalance.data.items[0].luqBalance,100);
+   assert.equal(staffBalance.data.items[0].scholarshipBalance,100);
    assert.equal(Object.hasOwn(after.data.me,'publicTag'),false);
    const otherAfter=await request(`/api/v1/points/leaderboard?classId=${otherClassId}`,{auth:student});
    assert.equal(otherAfter.data.visibleFields.attempts,true,'one admin setting covers all class filters');

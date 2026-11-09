@@ -41,17 +41,19 @@ test('Luq real Nest transport: role/CSRF boundary, idempotent grants, content pr
    if(response.headers.get('set-cookie'))cookie=response.headers.get('set-cookie').split(';')[0];if(data.csrfToken)csrf=data.csrfToken;
    return data;
   };}
-  const anonymous=client();await anonymous('/luq/me',{expected:401});
+  const anonymous=client();await anonymous('/scholarship/me',{expected:401});
+  await anonymous('/luq/me',{expected:401});
   for(const [name,actor] of Object.entries(actors)){actor.call=client();await actor.call('/auth/login',{method:'POST',body:{username:`luq-${name}`,password}});}
   const {admin,teacher,stranger,student,other}=actors;
-  assert.equal((await student.call('/luq/me')).balance,0);
-  await student.call('/luq/ledger',{expected:403});await teacher.call('/luq/ledger',{expected:403});
-  await student.call('/luq/settings',{method:'PATCH',body:{solutionPrice:0},expected:403});
+  assert.equal((await student.call('/scholarship/me')).balance,0);
+  assert.deepEqual(await student.call('/luq/me'),await student.call('/scholarship/me'));
+  await student.call('/scholarship/ledger',{expected:403});await teacher.call('/scholarship/ledger',{expected:403});
+  await student.call('/scholarship/settings',{method:'PATCH',body:{solutionPrice:0},expected:403});
   const grant={requestId:randomUUID(),identityIds:[student.identityId],amount:8,reason:'QA fixture grant'};
-  await admin.call('/luq/grants',{method:'POST',body:grant,badCsrf:true,expected:403});
-  await teacher.call('/luq/grants',{method:'POST',body:grant,expected:403});
-  await admin.call('/luq/grants',{method:'POST',body:grant});await admin.call('/luq/grants',{method:'POST',body:grant});
-  assert.equal((await student.call('/luq/me')).balance,8);
+  await admin.call('/scholarship/grants',{method:'POST',body:grant,badCsrf:true,expected:403});
+  await teacher.call('/scholarship/grants',{method:'POST',body:grant,expected:403});
+  await admin.call('/scholarship/grants',{method:'POST',body:grant});await admin.call('/scholarship/grants',{method:'POST',body:grant});
+  assert.equal((await student.call('/scholarship/me')).balance,8);
   const inbox=await student.call('/student-notifications');
   assert.equal(inbox.unreadCount,1,'replaying the grant does not resend the notice');
   const [notice]=inbox.items;
@@ -63,50 +65,50 @@ test('Luq real Nest transport: role/CSRF boundary, idempotent grants, content pr
   await student.call(`/student-notifications/${notice.id}/read`,{method:'POST'});
   assert.equal((await student.call('/student-notifications')).unreadCount,0);
 
-  await admin.call('/luq/grants',{method:'POST',body:{...grant,amount:9},expected:409});
-  assert.equal((await other.call('/luq/me')).balance,0);
+  await admin.call('/scholarship/grants',{method:'POST',body:{...grant,amount:9},expected:409});
+  assert.equal((await other.call('/scholarship/me')).balance,0);
   const input={problemId,versionId,kind:'FULL_SOLUTION',language:''};
   const details=await student.call(`/problems/${problemId}?versionId=${versionId}`);
   for(const secret of ['PRIVATE_REFERENCE_SENTINEL','LEGACY_EDITORIAL_SENTINEL','LEGACY_HINT_SENTINEL'])assert.equal(JSON.stringify(details).includes(secret),false);
-  await student.call('/luq/contents?'+new URLSearchParams({problemId,versionId}),{expected:403});
-  await stranger.call('/luq/contents',{method:'POST',body:{...input,body:'UNAUTHORIZED'},expected:403});
-  const content=await teacher.call('/luq/contents',{method:'POST',body:{...input,body:'REVIEWED_SOLUTION_SENTINEL'},expected:201});
-  let quote=await student.call('/luq/assistance/quote',{method:'POST',body:input});assert.equal(quote.available,false);
-  await student.call('/luq/assistance/provide',{method:'POST',body:input,expected:404});
-  await teacher.call(`/luq/contents/${content.id}/publish`,{method:'POST',body:{reviewed:true}});
-  quote=await student.call('/luq/assistance/quote',{method:'POST',body:input});
+  await student.call('/scholarship/contents?'+new URLSearchParams({problemId,versionId}),{expected:403});
+  await stranger.call('/scholarship/contents',{method:'POST',body:{...input,body:'UNAUTHORIZED'},expected:403});
+  const content=await teacher.call('/scholarship/contents',{method:'POST',body:{...input,body:'REVIEWED_SOLUTION_SENTINEL'},expected:201});
+  let quote=await student.call('/scholarship/assistance/quote',{method:'POST',body:input});assert.equal(quote.available,false);
+  await student.call('/scholarship/assistance/provide',{method:'POST',body:input,expected:404});
+  await teacher.call(`/scholarship/contents/${content.id}/publish`,{method:'POST',body:{reviewed:true}});
+  quote=await student.call('/scholarship/assistance/quote',{method:'POST',body:input});
   assert.equal(quote.price,8);assert.equal(quote.balanceAfter,0);assert.equal(JSON.stringify(quote).includes('REVIEWED_SOLUTION_SENTINEL'),false);
-  await student.call('/luq/assistance/provide',{method:'POST',body:input,expected:403});
+  await student.call('/scholarship/assistance/provide',{method:'POST',body:input,expected:403});
   const unlock={...input,requestKey:randomUUID(),confirmedPrice:8,confirmedContentId:content.id};
-  await student.call('/luq/assistance/unlock',{method:'POST',body:{...unlock,confirmedPrice:0},expected:409});
-  const bought=await student.call('/luq/assistance/unlock',{method:'POST',body:unlock});assert.equal(bought.balance,0);
+  await student.call('/scholarship/assistance/unlock',{method:'POST',body:{...unlock,confirmedPrice:0},expected:409});
+  const bought=await student.call('/scholarship/assistance/unlock',{method:'POST',body:unlock});assert.equal(bought.balance,0);
   assert.equal(JSON.stringify(bought).includes('REVIEWED_SOLUTION_SENTINEL'),false);
   assert.equal((await pool.query('SELECT count(*)::int n FROM luq_assistance_deliveries')).rows[0].n,0,'purchase is not answer delivery');
-  assert.equal((await student.call('/luq/assistance/provide',{method:'POST',body:input})).body,'REVIEWED_SOLUTION_SENTINEL');
-  await other.call('/luq/assistance/provide',{method:'POST',body:input,expected:403});
+  assert.equal((await student.call('/scholarship/assistance/provide',{method:'POST',body:input})).body,'REVIEWED_SOLUTION_SENTINEL');
+  await other.call('/scholarship/assistance/provide',{method:'POST',body:input,expected:403});
   const rule={activityType:'assignment',activityId:assignmentId,amount:5,minimumAc:1,minimumScore:100,taskKind:'challenge',allowSolutionAssisted:false,expectedVersion:0};
-  await stranger.call('/luq/reward-rules',{method:'POST',body:rule,expected:404});
-  const saved=await teacher.call('/luq/reward-rules',{method:'POST',body:rule});assert.equal(saved.rule.version,1);
-  await teacher.call('/luq/reward-rules',{method:'POST',body:rule,expected:409});
+  await stranger.call('/scholarship/reward-rules',{method:'POST',body:rule,expected:404});
+  const saved=await teacher.call('/scholarship/reward-rules',{method:'POST',body:rule});assert.equal(saved.rule.version,1);
+  await teacher.call('/scholarship/reward-rules',{method:'POST',body:rule,expected:409});
   await pool.query("UPDATE assignments SET state='Published',published_at=clock_timestamp() WHERE id=$1",[assignmentId]);
-  const publicRule=await student.call('/luq/reward-rules?'+new URLSearchParams({activityType:'assignment',activityId:assignmentId}));
+  const publicRule=await student.call('/scholarship/reward-rules?'+new URLSearchParams({activityType:'assignment',activityId:assignmentId}));
   assert.equal(publicRule.rule.amount,5);assert.equal(publicRule.frozen,true);
-  await other.call('/luq/reward-rules?'+new URLSearchParams({activityType:'assignment',activityId:assignmentId}),{expected:403});
-  await teacher.call('/luq/reward-rules',{method:'POST',body:{...rule,expectedVersion:1},expected:409});
+  await other.call('/scholarship/reward-rules?'+new URLSearchParams({activityType:'assignment',activityId:assignmentId}),{expected:403});
+  await teacher.call('/scholarship/reward-rules',{method:'POST',body:{...rule,expectedVersion:1},expected:409});
   const oldPoints=await pool.query('SELECT count(*)::int n FROM point_ledger');assert.equal(oldPoints.rows[0].n,0,'Luq purchases never write the old points ledger');
 
   await t.test('a formal AC allows the owner to read reviewed content without purchasing it',async()=>{
-   const before=await other.call('/luq/assistance/quote',{method:'POST',body:input});
+   const before=await other.call('/scholarship/assistance/quote',{method:'POST',body:input});
    assert.equal(before.price,8);
    const {rows:[submission]}=await pool.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,code,idempotency_key,request_hash)
     VALUES($1,$2,$3,$4,'submit','print(1)',$5,'fixture') RETURNING id`,[other.id,other.identityId,problemId,versionId,randomUUID()]);
-   assert.equal((await other.call('/luq/assistance/quote',{method:'POST',body:input})).mode,'paid');
+   assert.equal((await other.call('/scholarship/assistance/quote',{method:'POST',body:input})).mode,'paid');
    await pool.query("UPDATE submissions SET status='AC',score=100 WHERE id=$1",[submission.id]);
-   const free=await other.call('/luq/assistance/quote',{method:'POST',body:input});
+   const free=await other.call('/scholarship/assistance/quote',{method:'POST',body:input});
    assert.deepEqual([free.mode,free.price,free.requiresConfirmation,free.body],['free',0,false,undefined]);
-   const stale=await other.call('/luq/assistance/unlock',{method:'POST',body:{...unlock,requestKey:randomUUID()}});
+   const stale=await other.call('/scholarship/assistance/unlock',{method:'POST',body:{...unlock,requestKey:randomUUID()}});
    assert.equal(stale.charged,0);
-   assert.equal((await other.call('/luq/assistance/provide',{method:'POST',body:input})).body,'REVIEWED_SOLUTION_SENTINEL');
+   assert.equal((await other.call('/scholarship/assistance/provide',{method:'POST',body:input})).body,'REVIEWED_SOLUTION_SENTINEL');
    assert.equal((await pool.query('SELECT 1 FROM luq_assistance_entitlements WHERE identity_id=$1',[other.identityId])).rowCount,0);
   });
 
@@ -120,7 +122,7 @@ test('Luq real Nest transport: role/CSRF boundary, idempotent grants, content pr
   });
 
   await t.test('assignment completion rules save and publish atomically with their draft',async()=>{
-   const rulesUrl='/luq/reward-rules?activityType=assignment';
+   const rulesUrl='/scholarship/reward-rules?activityType=assignment';
    await anonymous(rulesUrl,{expected:401});
    await student.call(rulesUrl,{expected:403});
    const defaults=await teacher.call(rulesUrl);
@@ -128,7 +130,7 @@ test('Luq real Nest transport: role/CSRF boundary, idempotent grants, content pr
    assert.equal(defaults.frozen,false);
    assert.equal(defaults.rule.requireAll,true);
    assert.equal(defaults.rule.version,0);
-   assert.equal(defaults.cap,(await admin.call('/luq/settings')).activityRewardCap);
+   assert.equal(defaults.cap,(await admin.call('/scholarship/settings')).activityRewardCap);
 
    const completionReward={amount:15,requireAll:true,taskKind:'challenge',allowSolutionAssisted:false,expectedVersion:0};
    const body={title:'Completion reward draft',state:'Draft',dueAt:new Date(Date.now()+3600000).toISOString(),
@@ -161,7 +163,7 @@ test('Luq real Nest transport: role/CSRF boundary, idempotent grants, content pr
    assert.deepEqual(fresh.participants,[student.identityId]);
    assert.deepEqual((await teacher.call(draftRulesUrl)).rule,revised.completionReward.rule);
 
-   const concurrentEdit=await teacher.call('/luq/reward-rules',{method:'POST',body:{...completionReward,amount:18,
+   const concurrentEdit=await teacher.call('/scholarship/reward-rules',{method:'POST',body:{...completionReward,amount:18,
     activityType:'assignment',activityId:draft.id,expectedVersion:2}});
    assert.equal(concurrentEdit.rule.version,3);
    const stale=await teacher.call(publishUrl,{method:'POST',body:{expectedRevision:revised.editRevision,expectedCompletionRewardVersion:2},expected:409});

@@ -28,7 +28,7 @@ import { activationSchools, activationSchoolSlug, handleSchoolActivation, regist
 import { createTimedService } from './timed.mjs';
 import { handleMemberImport } from './member-import.mjs';
 import { handlePaper4 } from './paper4.mjs';
-import { handleLuq } from './luq.mjs';
+import { handleScholarship } from './scholarship.mjs';
 import {publicProblemMetadata,studentPublicStatementRows} from './problem-public-statements.mjs';
 import {legacyProblemStatement} from './problem-statement-display.mjs';
 import { handleSystem, assertJudgeAdmission, getSettings } from './system.mjs';
@@ -173,7 +173,7 @@ export async function createDomainServices(pool,config) {
   result.canManageTutorial=await canManageLegacyTutorial(db,user,p,owner);
   result.firstAcPoints=(await db.query('SELECT COALESCE((SELECT points FROM point_rewards WHERE problem_id=$1 AND assignment_id IS NULL),10) first_ac_points',[problemId])).rows[0].first_ac_points;
   if(owner){Object.assign(result,v.metadata||{});result.referenceCode=v.reference_code;result.tests=(await db.query('SELECT input,expected,weight,name,enabled FROM test_cases WHERE version_id=$1 ORDER BY position',[v.id])).rows.map(t=>({...t,weight:Number(t.weight)}));result.formalTestCount=result.tests.filter(t=>t.enabled).length;}else {
-   // Student assistance is explicitly published and served only by the Luq
+   // Student assistance is explicitly published and served only by the scholarship
    // provide endpoint. Legacy editorials/hints may include full answers and
    // must not leak through detail requests, SSR or background prefetches.
    result.editorial='';result.hints=[];
@@ -786,12 +786,13 @@ export async function createDomainServices(pool,config) {
   return await handleSchoolSettings(context) ?? await handleSchools(context) ?? await handleSchoolActivation(context) ?? await handleSchoolTeaching(context) ?? await handleSchoolIdentityImports(context) ?? await handleSchoolCourses(context);
  }
 
- const operations={publicPresence:handlePublicPresence,schoolScholarship:handleSchoolScholarship,schoolLeaderboard:handleSchoolLeaderboard,schoolPaper4:handleSchoolPaper4,schoolActivities:schoolActivitiesOperation,schoolPractice:schoolPracticeOperation,publicLearning:handlePublicLearning,auth:authOperation,people:peopleOperation,classes:classesOperation,library:libraryOperation,assignments:assignmentsOperation,submissions:submissionsOperation,education:educationOperation,community:handleCommunity,presence:handlePresence,platform:async ctx=>await handlePublicLearning(ctx)??await schoolPracticeOperation(ctx)??await handlePlatformGovernance(ctx),schools:schoolsOperation,system:systemOperation,paper4:handlePaper4,luq:handleLuq};
+ const operations={publicPresence:handlePublicPresence,schoolScholarship:handleSchoolScholarship,schoolLeaderboard:handleSchoolLeaderboard,schoolPaper4:handleSchoolPaper4,schoolActivities:schoolActivitiesOperation,schoolPractice:schoolPracticeOperation,publicLearning:handlePublicLearning,auth:authOperation,people:peopleOperation,classes:classesOperation,library:libraryOperation,assignments:assignmentsOperation,submissions:submissionsOperation,education:educationOperation,community:handleCommunity,presence:handlePresence,platform:async ctx=>await handlePublicLearning(ctx)??await schoolPracticeOperation(ctx)??await handlePlatformGovernance(ctx),schools:schoolsOperation,system:systemOperation,paper4:handlePaper4,scholarship:handleScholarship};
  const helpers={audit,classAccess,versionAccess,submissionAccess,assignmentAccess,assignmentResult,problemResult,problemInput,insertVersion,issueActivation,personShape,maskSubmission:timed.maskSubmission};
  async function prepareRequest({url:rawUrl,method,headers={},body={},ip='unknown'}) {
   const url=new URL(rawUrl,'http://api.local'),path=url.pathname.replace(/\/$/,'');
   if(!path.startsWith(`${BASE}/`))fail(404,'NOT_FOUND','接口不存在');
-  const route=path.slice(BASE.length);
+  // Keep old clients on the same handlers and authorization path.
+  const route=path.slice(BASE.length).replace(/^\/(practice\/)?luq(?=\/|$)/,'/$1scholarship');
   const rawToken=parseCookie(headers.cookie).campus_session;
   const sess=rawToken?(await pool.query('SELECT s.* FROM sessions s JOIN accounts a ON a.id=s.account_id JOIN identities i ON i.id=a.identity_id WHERE s.token_hash=$1 AND s.expires_at>now() AND a.disabled_at IS NULL AND a.binding_released_at IS NULL AND i.archived_at IS NULL',[sessionHash(rawToken,config.secret)])).rows[0]:null;
   const user=sess?await findUser(pool,sess.account_id):null;
@@ -825,7 +826,7 @@ export function resourceArea(route) {
  if(/^\/platform(?:\/|$)/.test(route))return 'platform';
  if(/^\/(schools|school-invitations)(?:\/|$)/.test(route))return 'schools';
  if(/^\/presence(?:\/|$)/.test(route))return 'presence';
- if(/^\/luq(?:\/|$)/.test(route))return 'luq';
+ if(/^\/scholarship(?:\/|$)/.test(route))return 'scholarship';
  if(/^\/paper4(?:\/|$)/.test(route))return 'paper4';
  if(route.startsWith('/auth/'))return 'auth';
  if(/^\/(accounts|people|teachers)(?:\/|$)/.test(route))return 'people';

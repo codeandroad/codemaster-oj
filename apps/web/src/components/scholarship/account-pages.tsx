@@ -27,7 +27,7 @@ import {
   type SchoolClass,
 } from "@/lib/production-api";
 
-export interface LuqEntry {
+export interface ScholarshipEntry {
   id: string;
   identityId: string;
   delta: number;
@@ -39,14 +39,14 @@ export interface LuqEntry {
   refundOf?: string | null;
   refunded?: boolean;
 }
-interface LuqAccount {
+interface ScholarshipAccount {
   balance: number;
-  items: LuqEntry[];
+  items: ScholarshipEntry[];
   total: number;
   page: number;
   pageSize: number;
 }
-interface LuqSettings {
+interface ScholarshipSettings {
   initialGrant: number;
   firstAcReward: number;
   translationPrice: number;
@@ -60,17 +60,17 @@ function useText() {
 
 type BalanceProps = {
   identityId: string;
-  endpoint?: "luq/me" | "practice/luq/me";
+  endpoint?: "scholarship/me" | "practice/scholarship/me";
   href?: string;
 };
 
-export function LuqBalance(props: BalanceProps) {
-  return <LuqBalanceContent key={`${props.identityId}:${props.endpoint ?? "luq/me"}`} {...props}/>;
+export function ScholarshipBalance(props: BalanceProps) {
+  return <ScholarshipBalanceContent key={`${props.identityId}:${props.endpoint ?? "scholarship/me"}`} {...props}/>;
 }
 
-function LuqBalanceContent({ endpoint = "luq/me", href = "/student/luq" }: BalanceProps) {
+function ScholarshipBalanceContent({ endpoint = "scholarship/me", href = "/student/scholarship" }: BalanceProps) {
   const tx = useText(),
-    [account, setAccount] = useState<LuqAccount | null>(null),
+    [account, setAccount] = useState<ScholarshipAccount | null>(null),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
   const seen = useRef<string | null | undefined>(undefined);
@@ -84,7 +84,7 @@ function LuqBalanceContent({ endpoint = "luq/me", href = "/student/luq" }: Balan
       const request = new AbortController();
       controller = request;
       try {
-        const next = await productionApi<LuqAccount>(endpoint, { signal: request.signal });
+        const next = await productionApi<ScholarshipAccount>(endpoint, { signal: request.signal });
         if (request.signal.aborted) return;
         const latest = next.items?.[0]?.id ?? null;
         if (seen.current !== undefined && latest !== seen.current) {
@@ -109,12 +109,12 @@ function LuqBalanceContent({ endpoint = "luq/me", href = "/student/luq" }: Balan
     refreshEvent();
     const timer = setInterval(refreshEvent, 15000);
     window.addEventListener("focus", refreshEvent);
-    window.addEventListener("campus-judge:luq-changed", refreshEvent);
+    window.addEventListener("campus-judge:scholarship-changed", refreshEvent);
     return () => {
       controller?.abort();
       clearInterval(timer);
       window.removeEventListener("focus", refreshEvent);
-      window.removeEventListener("campus-judge:luq-changed", refreshEvent);
+      window.removeEventListener("campus-judge:scholarship-changed", refreshEvent);
     };
   }, [endpoint]);
   return (
@@ -139,9 +139,9 @@ function Ledger({
   names,
   onRefund,
 }: {
-  entries: LuqEntry[];
+  entries: ScholarshipEntry[];
   names?: Map<string, string>;
-  onRefund?: (entry: LuqEntry) => void;
+  onRefund?: (entry: ScholarshipEntry) => void;
 }) {
   const tx = useText();
   const kindLabels: Record<string, string> = {
@@ -253,10 +253,10 @@ function LedgerPager({
   );
 }
 
-export function StudentLuqPage({ endpoint = "luq/me" }: { endpoint?: "luq/me" | "practice/luq/me" } = {}) {
+export function StudentScholarshipPage({ endpoint = "scholarship/me" }: { endpoint?: "scholarship/me" | "practice/scholarship/me" } = {}) {
   const tx = useText(),
     [page, setPage] = useState(1),
-    resource = useData<LuqAccount>(`${endpoint}?page=${page}`);
+    resource = useData<ScholarshipAccount>(`${endpoint}?page=${page}`);
   return (
     <div className="space-y-4">
       <section
@@ -305,7 +305,7 @@ export function StudentLuqPage({ endpoint = "luq/me" }: { endpoint?: "luq/me" | 
   );
 }
 
-export function AdminLuqPage() {
+export function AdminScholarshipPage() {
   const tx = useText(),
     [tab, setTab] = useState("grant"),
     [ids, setIds] = useState<string[]>([]),
@@ -314,17 +314,17 @@ export function AdminLuqPage() {
   const [adjustment, setAdjustment] = useState(false),
     [filter, setFilter] = useState(""),
     [page, setPage] = useState(1),
-    [refund, setRefund] = useState<LuqEntry | null>(null);
+    [refund, setRefund] = useState<ScholarshipEntry | null>(null);
   const people = useData<{ items: Person[] }>("people?kind=student"),
     classes = useData<{ items: SchoolClass[] }>("classes"),
-    settings = useData<LuqSettings>("luq/settings");
+    settings = useData<ScholarshipSettings>("scholarship/settings");
   const ledger = useData<{
-    items: LuqEntry[];
+    items: ScholarshipEntry[];
     total: number;
     page: number;
     pageSize: number;
   }>(
-    `luq/ledger?${new URLSearchParams({ page: String(page), ...(filter ? { identityId: filter } : {}) })}`,
+    `scholarship/ledger?${new URLSearchParams({ page: String(page), ...(filter ? { identityId: filter } : {}) })}`,
   );
   const action = useAction(),
     request = useRef<string | null>(null);
@@ -455,7 +455,7 @@ export function AdminLuqPage() {
               void action.run(async () => {
                 request.current ??= productionId();
                 await productionApi(
-                  `luq/${adjustment ? "adjustments" : "grants"}`,
+                  `scholarship/${adjustment ? "adjustments" : "grants"}`,
                   {
                     method: "POST",
                     body: {
@@ -567,13 +567,13 @@ function SettingsForm({
   initial,
   onSaved,
 }: {
-  initial: LuqSettings;
+  initial: ScholarshipSettings;
   onSaved: () => void;
 }) {
   const tx = useText(),
     [values, setValues] = useState(initial),
     action = useAction();
-  const labels: [keyof LuqSettings, string][] = [
+  const labels: [keyof ScholarshipSettings, string][] = [
     ["initialGrant", tx("每位学生一次性初始发放", "One-time initial student allowance")],
     ["firstAcReward", tx("首次 AC 奖励", "First-AC reward")],
     ["translationPrice", tx("中文题面价格", "Translation price")],
@@ -589,7 +589,7 @@ function SettingsForm({
       onSubmit={(event) => {
         event.preventDefault();
         void action.run(async () => {
-          await productionApi("luq/settings", {
+          await productionApi("scholarship/settings", {
             method: "PATCH",
             body: values,
           });
@@ -645,7 +645,7 @@ function RefundDialog({
   onClose,
   onSaved,
 }: {
-  entry: LuqEntry;
+  entry: ScholarshipEntry;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -695,7 +695,7 @@ function RefundDialog({
             setError("");
             try {
               key.current ??= productionId();
-              await productionApi("luq/refunds", {
+              await productionApi("scholarship/refunds", {
                 method: "POST",
                 body: {
                   requestId: key.current,
@@ -729,7 +729,7 @@ function RejudgeReviews() {
         reason: string;
         createdAt: string;
       }[];
-    }>("luq/reviews");
+    }>("scholarship/reviews");
   return (
     <section className={`${panel} overflow-hidden`}>
       <div className="flex items-center justify-between border-b border-border p-3">

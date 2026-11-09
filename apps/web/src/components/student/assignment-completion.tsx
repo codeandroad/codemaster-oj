@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CircleCheck } from "lucide-react";
 import { useLocale } from "@/components/locale-context";
-import { ScholarshipIcon } from "@/components/luq/scholarship-icon";
+import { ScholarshipIcon } from "@/components/scholarship/scholarship-icon";
 import { AppLink } from "@/components/navigation";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";

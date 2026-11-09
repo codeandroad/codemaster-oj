@@ -62,7 +62,7 @@ test('reviewed public English statements bind exact versions without leaking pai
     if(data.csrfToken)csrf=data.csrfToken;return data;
    };
   }
-  const endpoint='/luq/public-statements',query=target=>`${endpoint}?problemId=${target.problemId}&versionId=${target.versionId}`;
+  const endpoint='/scholarship/public-statements',query=target=>`${endpoint}?problemId=${target.problemId}&versionId=${target.versionId}`;
   await client()(query(first),{expected:401});
   for(const [name,actor]of Object.entries(actors)){actor.call=client();await actor.call('/auth/login',{body:{username:`statement-${name}`,password}});}
   const {teacher,other,student,admin}=actors;
@@ -169,15 +169,15 @@ test('reviewed public English statements bind exact versions without leaking pai
 
   // Chinese remains a distinct reviewed, priced Luq item; presentation publication grants no assistance entitlement.
   const target={...first,kind:'FULL_TRANSLATION',language:'zh-CN'};
-  const translated=await teacher.call('/luq/contents',{body:{...target,body:original},expected:201});
-  await teacher.call(`/luq/contents/${translated.id}/publish`,{body:{reviewed:true}});
-  const quote=await student.call('/luq/assistance/quote',{body:target});assert.equal(quote.price,3);assertSafe(quote);
-  await student.call('/luq/assistance/provide',{body:target,expected:403});
+  const translated=await teacher.call('/scholarship/contents',{body:{...target,body:original},expected:201});
+  await teacher.call(`/scholarship/contents/${translated.id}/publish`,{body:{reviewed:true}});
+  const quote=await student.call('/scholarship/assistance/quote',{body:target});assert.equal(quote.price,3);assertSafe(quote);
+  await student.call('/scholarship/assistance/provide',{body:target,expected:403});
   assert.equal((await pool.query('SELECT count(*)::int n FROM luq_assistance_entitlements')).rows[0].n,0);
   const oldBalance=Number((await pool.query('SELECT balance FROM luq_accounts WHERE identity_id=$1',[student.identityId])).rows[0].balance);
-  const unlocked=await student.call('/luq/assistance/unlock',{body:{...target,requestKey:randomUUID(),confirmedPrice:3,confirmedContentId:quote.contentId}});
+  const unlocked=await student.call('/scholarship/assistance/unlock',{body:{...target,requestKey:randomUUID(),confirmedPrice:3,confirmedContentId:quote.contentId}});
   assert.equal(unlocked.charged,3);assertSafe(unlocked);
-  assert.equal((await student.call('/luq/assistance/provide',{body:target})).body,original);
+  assert.equal((await student.call('/scholarship/assistance/provide',{body:target})).body,original);
   assert.equal(Number((await pool.query('SELECT balance FROM luq_accounts WHERE identity_id=$1',[student.identityId])).rows[0].balance),oldBalance-3);
   assert.equal((await pool.query("SELECT count(*)::int n FROM luq_assistance_deliveries WHERE kind='FULL_SOLUTION'")).rows[0].n,0);
   assert.equal((await student.call(`/problems/${first.problemId}?versionId=${first.versionId}`,{language:'zh-CN'})).statement,english,'Paid Chinese does not silently replace the public English statement');
@@ -186,8 +186,8 @@ test('reviewed public English statements bind exact versions without leaking pai
   await pool.query('INSERT INTO timed_practice_problems(practice_id,problem_id,version_id,points,position) VALUES($1,$2,$3,100,0)',[exam.id,first.problemId,second.versionId]);
   await pool.query('INSERT INTO timed_practice_participants(practice_id,identity_id) VALUES($1,$2)',[exam.id,student.identityId]);
   await pool.query("UPDATE timed_practices SET state='Published' WHERE id=$1",[exam.id]);
-  assert.equal((await student.call('/luq/assistance/quote',{body:target})).mode,'disabled');
-  assert.equal((await student.call('/luq/assistance/provide',{body:target,expected:403})).error.code,'ASSISTANCE_LOCKED');
+  assert.equal((await student.call('/scholarship/assistance/quote',{body:target})).mode,'disabled');
+  assert.equal((await student.call('/scholarship/assistance/provide',{body:target,expected:403})).error.code,'ASSISTANCE_LOCKED');
   assert.equal((await student.call(`/problems/${first.problemId}?versionId=${first.versionId}`)).statement,english,'Course/history still show only public English during a restricted assessment');
  }finally{if(app)await app.close();await pool.end();await manager.query(`DROP SCHEMA ${schema} CASCADE`);await manager.end();}
 });

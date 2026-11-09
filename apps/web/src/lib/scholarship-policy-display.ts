@@ -1,12 +1,12 @@
-export interface LuqPolicyDisplayInput {
+export interface ScholarshipPolicyDisplayInput {
   mode: "disabled" | "paid" | "free";
   opensAt: string | null;
   price?: number | null;
 }
 
 /** Describe the published policy, without guessing whether the current request is authorized. */
-export function luqPolicyDescription(
-  policy: LuqPolicyDisplayInput,
+export function scholarshipPolicyDescription(
+  policy: ScholarshipPolicyDisplayInput,
   locale: string,
 ) {
   const english = locale === "en";

@@ -1,6 +1,6 @@
 import {transaction} from './db.mjs';
 import {canonicalHash,enumValue,fail,field,uuid} from './security.mjs';
-import {isLuqStaff,resolveAssistanceTarget} from './luq-access.mjs';
+import {isScholarshipStaff,resolveAssistanceTarget} from './scholarship-access.mjs';
 
 const textKeys=['objective','inputDescription','outputDescription','returnType','difficulty'];
 const metadataKeys=[...textKeys,'parameters'];
@@ -66,8 +66,8 @@ export async function studentPublicStatementRows(db,rows){
 
 export async function handleProblemPublicStatements(ctx){
  const {route,method,user,pool,helpers={},url,body={}}=ctx;
- if(route!=='/luq/public-statements'||!['GET','POST'].includes(method))return null;
- if(!isLuqStaff(user))fail(403,'FORBIDDEN','需要教师权限');
+ if(route!=='/scholarship/public-statements'||!['GET','POST'].includes(method))return null;
+ if(!isScholarshipStaff(user))fail(403,'FORBIDDEN','需要教师权限');
  const input=method==='GET'?Object.fromEntries(url.searchParams):body;
  const problemId=uuid(input.problemId,'题目 ID').toLowerCase(),versionId=uuid(input.versionId,'版本 ID').toLowerCase();
  if(method==='GET'){

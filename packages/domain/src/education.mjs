@@ -212,11 +212,13 @@ function leaderboardNumber(value, name, min, max) {
 }
 
 function leaderboardFields(row) {
+ const scholarshipBalance = row?.show_luq_balance ?? true;
  return {
   solvedProblems: row?.show_solved_problems ?? true,
   attempts: row?.show_attempts ?? false,
   acRate: row?.show_ac_rate ?? true,
-  luqBalance: row?.show_luq_balance ?? true,
+  scholarshipBalance,
+  luqBalance: scholarshipBalance, // Compatibility with existing leaderboard clients.
  };
 }
 
@@ -231,7 +233,7 @@ const rankingPolicy = Object.freeze({
  retroactive:false,
  order:['points_desc','ac_rate_desc','luq_balance_desc'],
  ties:'equal_points_ac_rate_and_luq_balance',
- description:'排名积分计审核公开的普通题首次有效 AC，以及 Paper 4 正式交卷后每道大题全部自动测试首次 AC 的固定 10 分。作业与计时训练额外奖励只计入个人总积分。积分相同时比较未四舍五入的首解 AC 率，暂无有效统计样本者排在已有首解 AC 率者之后。普通练习与作业按同一学生和题目版本统计至首个有效 AC，限时训练与 Paper 4 按正式提交统计。积分和首解 AC 率均相同时比较当前 Luq 余额，三项均相同则并列。',
+ description:'排名积分计审核公开的普通题首次有效 AC，以及 Paper 4 正式交卷后每道大题全部自动测试首次 AC 的固定 10 分。作业与计时训练额外奖励只计入个人总积分。积分相同时比较未四舍五入的首解 AC 率，暂无有效统计样本者排在已有首解 AC 率者之后。普通练习与作业按同一学生和题目版本统计至首个有效 AC，限时训练与 Paper 4 按正式提交统计。积分和首解 AC 率均相同时比较当前奖学金余额，三项均相同则并列。',
 });
 
 async function leaderboardContexts(pool, user) {
@@ -245,16 +247,19 @@ async function updateLeaderboardVisibility(ctx) {
  const fields = ctx.body?.visibleFields;
  const keys = ['solvedProblems','attempts','acRate'];
  if (!fields || typeof fields !== 'object' || Array.isArray(fields)
-  || Object.keys(fields).some(key => ![...keys,'luqBalance'].includes(key))
+  || Object.keys(fields).some(key => ![...keys,'scholarshipBalance','luqBalance'].includes(key))
   || keys.some(key => typeof fields[key] !== 'boolean')
+  || ('scholarshipBalance' in fields && typeof fields.scholarshipBalance !== 'boolean')
   || ('luqBalance' in fields && typeof fields.luqBalance !== 'boolean'))
   fail(400,'VALIDATION','请选择要显示的积分榜字段');
+ // Older clients echo the returned fields and edit only their legacy key.
+ const scholarshipBalance = fields.luqBalance ?? fields.scholarshipBalance ?? null;
  return transaction(ctx.pool, async db => {
   const {rows:[updated]} = await db.query(`UPDATE leaderboard_settings SET
    show_solved_problems=$1,show_attempts=$2,show_ac_rate=$3,
    show_luq_balance=COALESCE($4::boolean,show_luq_balance),
    updated_by=$5,updated_at=now() WHERE id=true RETURNING *`,
-   [fields.solvedProblems,fields.attempts,fields.acRate,fields.luqBalance ?? null,ctx.user.id]);
+   [fields.solvedProblems,fields.attempts,fields.acRate,scholarshipBalance,ctx.user.id]);
   const visibleFields = leaderboardFields(updated);
   await ctx.helpers.audit(db,ctx.user.id,'leaderboard.fields_update','system','leaderboard',{visibleFields});
   return {visibleFields};
@@ -296,13 +301,13 @@ ${leaderboardPaperAttempts}
    (COALESCE(t.attempts,0)+COALESCE(p4.attempts,0))::int attempts,
    (COALESCE(t.assessed,0)+COALESCE(p4.assessed,0))::int assessed,
    (COALESCE(t.accepted,0)+COALESCE(p4.accepted,0))::int accepted,
-   COALESCE(luq.balance,0) luq_balance
+   COALESCE(wallet.balance,0) scholarship_balance
   FROM identities i
   LEFT JOIN earned e ON e.identity_id=i.id
   JOIN accounts a ON a.identity_id=i.id AND a.disabled_at IS NULL AND a.binding_released_at IS NULL
   LEFT JOIN attempts t ON t.identity_id=i.id
   LEFT JOIN paper4_attempts p4 ON p4.identity_id=i.id
-  LEFT JOIN luq_accounts luq ON luq.identity_id=i.id
+  LEFT JOIN luq_accounts wallet ON wallet.identity_id=i.id
   WHERE i.kind='student' AND i.archived_at IS NULL
    AND ($5::uuid IS NULL OR EXISTS (
     SELECT 1 FROM class_members cm WHERE cm.identity_id=i.id AND cm.class_id=$5::uuid))
@@ -311,8 +316,8 @@ ${leaderboardPaperAttempts}
    SELECT eligible.*,accepted::numeric/NULLIF(assessed,0) ac_ratio FROM eligible
   ), ranked AS (
    SELECT scored.*,
-    rank() OVER (ORDER BY points DESC,ac_ratio DESC NULLS LAST,luq_balance DESC)::int rank,
-    row_number() OVER (ORDER BY points DESC,ac_ratio DESC NULLS LAST,luq_balance DESC,id)::int row_num
+    rank() OVER (ORDER BY points DESC,ac_ratio DESC NULLS LAST,scholarship_balance DESC)::int rank,
+    row_number() OVER (ORDER BY points DESC,ac_ratio DESC NULLS LAST,scholarship_balance DESC,id)::int row_num
    FROM scored
   ), totals AS (
    SELECT count(*)::int total FROM ranked
@@ -324,17 +329,17 @@ ${leaderboardPaperAttempts}
     AND r.row_num<=$2::int*$3::int) OR r.id=$4::uuid
   )
   SELECT s.id,s.name,
-   a.avatar,s.points,s.solved_problems,s.attempts,s.assessed,s.accepted,s.luq_balance,s.rank,s.in_page,t.total
+   a.avatar,s.points,s.solved_problems,s.attempts,s.assessed,s.accepted,s.scholarship_balance,s.rank,s.in_page,t.total
   FROM totals t LEFT JOIN selected s ON TRUE
   LEFT JOIN accounts a ON a.id=s.account_id
   ORDER BY s.in_page DESC NULLS LAST,s.row_num`, [period,page,pageSize,meId,requestedClassId])).rows;
  const redact = !staff(ctx.user);
- const shape = ({id,name,avatar,points,solved_problems,attempts,assessed,accepted,luq_balance,rank}) => ({
+ const shape = ({id,name,avatar,points,solved_problems,attempts,assessed,accepted,scholarship_balance,rank}) => ({
   id,name,avatar:avatarForIdentity(avatar,id),points,rank,
   ...(!redact || contexts.visibleFields.solvedProblems ? {solvedProblems:solved_problems} : {}),
   ...(!redact || contexts.visibleFields.attempts ? {attempts} : {}),
   ...(!redact || contexts.visibleFields.acRate ? {acRate:assessed ? Math.round(accepted * 1000 / assessed) / 10 : null} : {}),
-  ...(!redact || contexts.visibleFields.luqBalance ? {luqBalance:Number(luq_balance)} : {}),
+  ...(!redact || contexts.visibleFields.scholarshipBalance ? {scholarshipBalance:Number(scholarship_balance),luqBalance:Number(scholarship_balance)} : {}),
  });
  const own = meId ? rows.find(row => row.id === meId) : null;
  return {

@@ -1,4 +1,4 @@
-// Local-only, resumable draft import. No publication, school review, Luq grants,
+// Local-only, resumable draft import. No publication, school review, scholarship grants,
 // content publication, student submissions, or production operations.
 import assert from 'node:assert/strict';
 import { randomUUID, createHash } from 'node:crypto';

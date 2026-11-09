@@ -36,7 +36,7 @@ test('Luq batch price Nest endpoint enforces staff/CSRF, atomic authorization an
    const d=await r.json();assert.equal(r.status,expected,`${method} ${path}: ${JSON.stringify(d)}`);assert.equal(r.headers.get('cache-control'),'no-store');
    if(r.headers.get('set-cookie'))cookie=r.headers.get('set-cookie').split(';')[0];if(d.csrfToken)csrf=d.csrfToken;return d;
   };}
-  const endpoint='/luq/policies/batch-prices';
+  const endpoint='/scholarship/policies/batch-prices';
   const anonymous=client();await anonymous(endpoint,{body:{},expected:401});
   for(const [name,actor]of Object.entries(actors)){actor.call=client();await actor.call('/auth/login',{body:{username:'batch-'+name,password}});}
   const {teacher,other,student,admin}=actors;
@@ -49,7 +49,7 @@ test('Luq batch price Nest endpoint enforces staff/CSRF, atomic authorization an
    assert.equal((await pool.query('SELECT count(*)::int n FROM luq_assistance_policies WHERE target_type=$1',[targetType])).rows[0].n,0,'No authorized target is partly updated by a rejected mixed batch');
    assert.equal((await pool.query('SELECT count(*)::int n FROM luq_price_batches WHERE request_id=$1',[mixed.requestId])).rows[0].n,0,'Rejected batch leaves no success record');
    const opensAt=new Date(Date.now()+86_400_000).toISOString();
-   await teacher.call('/luq/policies',{body:{targetType,targetId:first,kind:'FULL_TRANSLATION',mode:'free',opensAt},expected:201});
+   await teacher.call('/scholarship/policies',{body:{targetType,targetId:first,kind:'FULL_TRANSLATION',mode:'free',opensAt},expected:201});
    const [saved,retried]=await Promise.all([teacher.call(endpoint,{body:request}),teacher.call(endpoint,{body:{...request,targetIds:[second,first,first]}})]);
    assert.deepEqual(retried,saved,'Duplicate IDs/order normalize to the same idempotent request');assert.equal(saved.count,2);assert.equal(saved.items.length,4);
    const kept=saved.items.find(item=>item.targetId===first&&item.kind==='FULL_TRANSLATION');assert.equal(kept.mode,'free');assert.equal(kept.opensAt,opensAt);assert.equal(kept.price,2);

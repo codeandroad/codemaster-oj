@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {randomBytes,randomUUID} from 'node:crypto';
 import {createPool} from '../src/db.mjs';
 import {migrate} from '../src/migrate.mjs';
-import {handleLuqAssistance} from '../src/luq-assistance.mjs';
+import {handleScholarshipAssistance} from '../src/scholarship-assistance.mjs';
 import {canonicalHash} from '../src/security.mjs';
 
 const options={skip:!process.env.TEST_DATABASE_URL,timeout:60000};
@@ -32,17 +32,17 @@ async function fixture(run){
    return {paperId:p.id,versionId:v.id,questionKey:'Q1',paper4AttemptId:a.id};
   }
   async function call(user,path,body,method='POST'){
-   const url=new URL(`http://test${path}`);const result=await handleLuqAssistance({pool,user,route:url.pathname,url,method,body});assert.ok(result);return result.body;
+   const url=new URL(`http://test${path}`);const result=await handleScholarshipAssistance({pool,user,route:url.pathname,url,method,body});assert.ok(result);return result.body;
   }
   async function publish(p,kind='FULL_TRANSLATION'){
-   const draft=await call(teacher,'/luq/contents',{paperId:p.paperId,versionId:p.versionId,questionKey:p.questionKey,kind,body:'REVIEWED_CONTENT_ONLY'});
-   await call(teacher,`/luq/contents/${draft.id}/publish`,{reviewed:true});
+   const draft=await call(teacher,'/scholarship/contents',{paperId:p.paperId,versionId:p.versionId,questionKey:p.questionKey,kind,body:'REVIEWED_CONTENT_ONLY'});
+   await call(teacher,`/scholarship/contents/${draft.id}/publish`,{reviewed:true});
   }
-  const batch=(papers,prices,requestId=randomUUID(),user=teacher)=>call(user,'/luq/policies/batch-prices',{requestId,targetType:'paper4',targetIds:papers.map(p=>p.paperId),prices});
+  const batch=(papers,prices,requestId=randomUUID(),user=teacher)=>call(user,'/scholarship/policies/batch-prices',{requestId,targetType:'paper4',targetIds:papers.map(p=>p.paperId),prices});
   const target=p=>({paper4AttemptId:p.paper4AttemptId,questionKey:p.questionKey,kind:'FULL_TRANSLATION'});
-  const quote=p=>call(student,'/luq/assistance/quote',target(p));
-  const policies=p=>call(teacher,`/luq/policies?targetType=paper4&targetId=${p.paperId}`,undefined,'GET');
-  const unlock=(p,q)=>call(student,'/luq/assistance/unlock',{...target(p),requestKey:randomUUID(),confirmedPrice:q.price,confirmedContentId:q.contentId});
+  const quote=p=>call(student,'/scholarship/assistance/quote',target(p));
+  const policies=p=>call(teacher,`/scholarship/policies?targetType=paper4&targetId=${p.paperId}`,undefined,'GET');
+  const unlock=(p,q)=>call(student,'/scholarship/assistance/unlock',{...target(p),requestKey:randomUUID(),confirmedPrice:q.price,confirmedContentId:q.contentId});
   await run({pool,teacher,otherTeacher,student,paper,call,publish,batch,target,quote,policies,unlock});
  }finally{await pool.end();await manager.query(`DROP SCHEMA ${schema} CASCADE`);await manager.end();}
 }
@@ -50,8 +50,8 @@ async function fixture(run){
 test('Luq batch prices are atomic, idempotent under concurrency and retain independently configured policies',options,()=>fixture(async f=>{
  const a=await f.paper(),b=await f.paper(),foreign=await f.paper(f.otherTeacher);
  const opensAt=new Date(Date.now()+3600000).toISOString();
- await f.call(f.teacher,'/luq/policies',{targetType:'paper4',targetId:a.paperId,kind:'FULL_TRANSLATION',mode:'paid',opensAt});
- await f.call(f.teacher,'/luq/policies',{targetType:'paper4',targetId:b.paperId,kind:'FULL_SOLUTION',mode:'disabled'});
+ await f.call(f.teacher,'/scholarship/policies',{targetType:'paper4',targetId:a.paperId,kind:'FULL_TRANSLATION',mode:'paid',opensAt});
+ await f.call(f.teacher,'/scholarship/policies',{targetType:'paper4',targetId:b.paperId,kind:'FULL_SOLUTION',mode:'disabled'});
  const requestId=randomUUID(),prices={FULL_TRANSLATION:5,FULL_SOLUTION:9};
  const results=await Promise.all(Array.from({length:6},()=>f.batch([a,b],prices,requestId)));
  assert.ok(results.every(r=>r.items.length===4));
@@ -83,12 +83,12 @@ test('Luq price changes invalidate old confirmations without double charging pur
  assert.equal(results.reduce((sum,r)=>sum+r.charged,0),4);
  await f.batch([p],{FULL_TRANSLATION:10,FULL_SOLUTION:12});
  assert.equal((await f.quote(p)).price,0);assert.equal((await f.quote(p)).balance,96);
- assert.equal((await f.call(f.student,'/luq/assistance/provide',f.target(p))).body,'REVIEWED_CONTENT_ONLY');
+ assert.equal((await f.call(f.student,'/scholarship/assistance/provide',f.target(p))).body,'REVIEWED_CONTENT_ONLY');
  assert.equal((await f.pool.query("SELECT count(*)::int n FROM luq_assistance_deliveries WHERE kind='FULL_SOLUTION'")).rows[0].n,0);
  const q2={...p,questionKey:'Q2'};await f.publish(q2);assert.equal((await f.quote(q2)).price,10,'price applies to each big question, rights remain separate');
  await f.batch([p],{FULL_TRANSLATION:null});assert.equal((await f.quote(q2)).price,3);
  await f.batch([p],{FULL_TRANSLATION:0});assert.equal((await f.quote(q2)).mode,'free');
- await f.call(f.student,'/luq/assistance/provide',f.target(q2));
+ await f.call(f.student,'/scholarship/assistance/provide',f.target(q2));
  assert.equal((await f.pool.query('SELECT count(*)::int n FROM luq_assistance_entitlements')).rows[0].n,1,'zero-price viewing does not mint permanent purchases');
  const missing=await f.paper();await f.batch([missing],{FULL_TRANSLATION:4});
  assert.equal((await f.quote(missing)).available,false);await rejects(f.unlock(missing,await f.quote(missing)),'ASSISTANCE_UNAVAILABLE');
@@ -102,17 +102,17 @@ test('Luq catalog prices follow immutable activity copies but never bypass exam 
  await f.batch([p],{FULL_TRANSLATION:0});
  for(const entry of [p,activity,exam]){
   assert.equal((await f.quote(entry)).available,false);
-  await rejects(f.call(f.student,'/luq/assistance/provide',f.target(entry)),'ASSISTANCE_LOCKED');
+  await rejects(f.call(f.student,'/scholarship/assistance/provide',f.target(entry)),'ASSISTANCE_LOCKED');
  }
  await f.pool.query('UPDATE paper4_papers SET archived_at=clock_timestamp() WHERE id=$1',[exam.paperId]);
- await f.call(f.teacher,'/luq/policies',{targetType:'paper4',targetId:p.paperId,kind:'FULL_TRANSLATION',mode:'paid',opensAt:new Date(Date.now()+60000).toISOString()});
+ await f.call(f.teacher,'/scholarship/policies',{targetType:'paper4',targetId:p.paperId,kind:'FULL_TRANSLATION',mode:'paid',opensAt:new Date(Date.now()+60000).toISOString()});
  await f.batch([p],{FULL_TRANSLATION:1});
  assert.equal((await f.quote(p)).available,false,'batch price retains future opening');
 }));
 
 test('Luq batch pricing reports safe current-version publication metadata without publishing, leaking bodies or changing replay results',options,()=>fixture(async f=>{
  const paper=await f.paper();
- const draft=await f.call(f.teacher,'/luq/contents',{paperId:paper.paperId,versionId:paper.versionId,questionKey:'Q1',kind:'FULL_SOLUTION',body:'DRAFT_BODY_MUST_NOT_APPEAR'});
+ const draft=await f.call(f.teacher,'/scholarship/contents',{paperId:paper.paperId,versionId:paper.versionId,questionKey:'Q1',kind:'FULL_SOLUTION',body:'DRAFT_BODY_MUST_NOT_APPEAR'});
  await f.publish({...paper,questionKey:'Q2'},'FULL_TRANSLATION');
  const requestId=randomUUID();
  const saved=await f.batch([paper],{FULL_TRANSLATION:3,FULL_SOLUTION:8},requestId);
@@ -125,7 +125,7 @@ test('Luq batch pricing reports safe current-version publication metadata withou
  assert.equal((await f.pool.query('SELECT status FROM luq_assistance_contents WHERE id=$1',[draft.id])).rows[0].status,'draft','Pricing never publishes a draft');
  const serialized=JSON.stringify(saved);
  assert.ok(!serialized.includes('DRAFT_BODY_MUST_NOT_APPEAR')&&!serialized.includes('REVIEWED_CONTENT_ONLY')&&!serialized.includes('"body"'),'Only publication counts and safe target identifiers are returned');
- await f.call(f.teacher,`/luq/contents/${draft.id}/publish`,{reviewed:true});
+ await f.call(f.teacher,`/scholarship/contents/${draft.id}/publish`,{reviewed:true});
  assert.deepEqual(await f.batch([paper],{FULL_TRANSLATION:3,FULL_SOLUTION:8},requestId),saved,'Replay keeps the original publication snapshot');
  const refreshed=await f.batch([paper],{FULL_SOLUTION:8});
  assert.equal(refreshed.publication.length,1,'Report only requested assistance kinds');
@@ -138,10 +138,10 @@ test('Luq batch pricing reports safe current-version publication metadata withou
  await f.pool.query('UPDATE problems SET current_version_id=$2 WHERE id=$1',[problem.id,version.id]);
  const newer=(await f.pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code,created_at)
   VALUES($1,'Newer draft','stdio','Statement',1000,64,'OTHER_PRIVATE_REFERENCE',clock_timestamp()+interval '1 second') RETURNING id`,[problem.id])).rows[0];
- const newerContent=await f.call(f.teacher,'/luq/contents',{problemId:problem.id,versionId:newer.id,kind:'FULL_SOLUTION',body:'UNRELATED_NEWER_VERSION_BODY'});
- await f.call(f.teacher,`/luq/contents/${newerContent.id}/publish`,{reviewed:true});
+ const newerContent=await f.call(f.teacher,'/scholarship/contents',{problemId:problem.id,versionId:newer.id,kind:'FULL_SOLUTION',body:'UNRELATED_NEWER_VERSION_BODY'});
+ await f.call(f.teacher,`/scholarship/contents/${newerContent.id}/publish`,{reviewed:true});
  const request={requestId:randomUUID(),targetType:'problem',targetIds:[problem.id],prices:{FULL_SOLUTION:5}};
- const current=await f.call(f.teacher,'/luq/policies/batch-prices',request);
+ const current=await f.call(f.teacher,'/scholarship/policies/batch-prices',request);
  assert.deepEqual(current.publication,[{kind:'FULL_SOLUTION',total:1,published:0,draft:0,withdrawn:0,missing:1,firstUnpublished:{targetId:problem.id}}],'Newer-version publication must not imply the current version is available');
  assert.ok(!JSON.stringify(current).includes('REFERENCE')&&!JSON.stringify(current).includes('VERSION_BODY'));
  assert.equal((await f.pool.query('SELECT count(*)::int n FROM luq_assistance_contents WHERE version_id=$1',[version.id])).rows[0].n,0,'Pricing neither copies private reference code nor copies another version');
@@ -150,5 +150,5 @@ test('Luq batch pricing reports safe current-version publication metadata withou
  await f.pool.query('INSERT INTO luq_price_batches(request_id,actor_account_id,request_hash,result) VALUES($1,$2,$3,$4)',[
   legacyId,f.teacher.id,canonicalHash({actor:f.teacher.id,targetType:'problem',targetIds:[problem.id],prices:{FULL_SOLUTION:5}}),legacyResult,
  ]);
- assert.deepEqual(await f.call(f.teacher,'/luq/policies/batch-prices',{...request,requestId:legacyId}),legacyResult,'Pre-upgrade idempotency records remain unchanged even without publication metadata');
+ assert.deepEqual(await f.call(f.teacher,'/scholarship/policies/batch-prices',{...request,requestId:legacyId}),legacyResult,'Pre-upgrade idempotency records remain unchanged even without publication metadata');
 }));

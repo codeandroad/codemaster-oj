@@ -40,8 +40,8 @@ test('identity deletion is admin-only, recoverable, atomic and serialized with a
   const cls=await request('/classes',{method:'POST',auth:admin,body:{name:'Deletion QA class'}});assert.equal(cls.status,201);
   const pending=await create('student','PENDING',[cls.data.id]);
   assert.equal(pending.person.canDelete,true);
-  const beforeLuq=(await pool.query('SELECT * FROM luq_ledger WHERE identity_id=$1 ORDER BY id',[pending.person.id])).rows;
-  assert.equal(beforeLuq.length,1);assert.equal(beforeLuq[0].delta,100);
+  const beforeScholarship=(await pool.query('SELECT * FROM luq_ledger WHERE identity_id=$1 ORDER BY id',[pending.person.id])).rows;
+  assert.equal(beforeScholarship.length,1);assert.equal(beforeScholarship[0].delta,100);
   assert.equal((await remove(pending,null)).status,401);
   assert.equal((await remove(pending,teacher)).status,403);
   assert.equal((await remove(pending,student)).status,403);
@@ -81,7 +81,7 @@ test('identity deletion is admin-only, recoverable, atomic and serialized with a
   const restored=await Promise.all([request(`${target(pending)}/restore`,{method:'POST',auth:admin,body:{}}),request(`${target(pending)}/restore`,{method:'POST',auth:admin,body:{}})]);
   assert.deepEqual(restored.map(r=>r.status),[200,200]);
   assert.equal((await pool.query("SELECT 1 FROM audit_events WHERE action='identity.restore' AND resource_id=$1",[pending.person.id])).rowCount,1);
-  assert.deepEqual((await pool.query('SELECT * FROM luq_ledger WHERE identity_id=$1 ORDER BY id',[pending.person.id])).rows,beforeLuq,'restoring must not grant Luq again');
+  assert.deepEqual((await pool.query('SELECT * FROM luq_ledger WHERE identity_id=$1 ORDER BY id',[pending.person.id])).rows,beforeScholarship,'restoring must not grant Luq again');
   assert.equal((await request('/classes',{auth:admin})).data.items.find(c=>c.id===cls.data.id).studentIds.includes(pending.person.id),true);
   assert.equal((await claim(pending,'restored-old-code')).data.error.code,'CLAIM_FAILED');
   const newCode=await request(`${target(pending)}/activation`,{method:'POST',auth:admin,body:{}});assert.equal(newCode.status,200);

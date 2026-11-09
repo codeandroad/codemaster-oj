@@ -1,8 +1,8 @@
 import { transaction } from './db.mjs';
 import { fail,field,uuid,enumValue,integer } from './security.mjs';
 import {audienceClasses,audienceStudents,defaultClassStudents,replaceAudienceClasses} from './activity-audience.mjs';
-import {getLuqSettings} from './luq-ledger.mjs';
-import {checkLuqRuleVersion,readLuqRule,saveLuqRule} from './luq-rules.mjs';
+import {getScholarshipSettings} from './scholarship-ledger.mjs';
+import {checkScholarshipRuleVersion,readScholarshipRule,saveScholarshipRule} from './scholarship-rules.mjs';
 const staff=u=>{if(!u.roles.some(r=>['teacher','admin'].includes(r)))fail(403,'FORBIDDEN','需要教师权限');};
 const row=r=>{if(!r.rowCount)fail(404,'NOT_FOUND','资源不存在');return r.rows[0];};
 const rewardPoints=(value,fallback=0)=>value===undefined?fallback:integer(value,0,20,'作业每题额外奖学金');
@@ -51,11 +51,11 @@ async function assignmentCompletionReward(ctx,db,id,frozen){
  if(expectedCompletionRewardVersion===undefined&&completionReward===undefined)return undefined;
  let rule;
  if(expectedCompletionRewardVersion!==undefined){
-  rule=await readLuqRule(db,'assignment',id);
-  checkLuqRuleVersion(rule,expectedCompletionRewardVersion);
+  rule=await readScholarshipRule(db,'assignment',id);
+  checkScholarshipRuleVersion(rule,expectedCompletionRewardVersion);
  }
- if(completionReward!==undefined)return {...await saveLuqRule(db,ctx,'assignment',id,completionReward),frozen};
- const {activityRewardCap:cap}=await getLuqSettings(db);
+ if(completionReward!==undefined)return {...await saveScholarshipRule(db,ctx,'assignment',id,completionReward),frozen};
+ const {activityRewardCap:cap}=await getScholarshipSettings(db);
  return {rule,canManage:true,frozen,cap};
 }
 

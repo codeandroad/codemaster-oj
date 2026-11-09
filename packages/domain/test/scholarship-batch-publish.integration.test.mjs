@@ -6,7 +6,7 @@ import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
 import {createPool} from '../src/db.mjs';
 import {migrate} from '../src/migrate.mjs';
-import {handleLuqAssistance} from '../src/luq-assistance.mjs';
+import {handleScholarshipAssistance} from '../src/scholarship-assistance.mjs';
 
 const options={skip:!process.env.TEST_DATABASE_URL,timeout:60000};
 const rejects=(promise,status)=>assert.rejects(promise,error=>error.status===status);
@@ -29,7 +29,7 @@ async function fixture(run){
   }
   const teacher=await actor('teacher'),other=await actor('teacher'),student=await actor('student'),admin=await actor('admin');
   async function call(user,path,body,method=body===undefined?'GET':'POST'){
-   const url=new URL(`http://test${path}`),result=await handleLuqAssistance({pool,user,route:url.pathname,url,method,body});
+   const url=new URL(`http://test${path}`),result=await handleScholarshipAssistance({pool,user,route:url.pathname,url,method,body});
    assert.ok(result,`${method} ${path} must be implemented`);return result.body;
   }
   async function problem(owner=teacher,title='Ordinary problem'){
@@ -46,9 +46,9 @@ async function fixture(run){
    await pool.query('UPDATE paper4_papers SET current_version_id=$2 WHERE id=$1',[p.id,v.id]);
    return {paperId:p.id,versionId:v.id};
   }
-  const draft=(target,body='REVIEWED_SOLUTION_SENTINEL',user=teacher,kind='FULL_SOLUTION')=>call(user,'/luq/contents',{...target,kind,body});
-  const list=(type='problem',user=teacher)=>call(user,`/luq/contents/review?targetType=${type}`);
-  const publish=(items,requestId=randomUUID(),user=teacher,extra={})=>call(user,'/luq/contents/batch-publish',{requestId,reviewed:true,items,...extra});
+  const draft=(target,body='REVIEWED_SOLUTION_SENTINEL',user=teacher,kind='FULL_SOLUTION')=>call(user,'/scholarship/contents',{...target,kind,body});
+  const list=(type='problem',user=teacher)=>call(user,`/scholarship/contents/review?targetType=${type}`);
+  const publish=(items,requestId=randomUUID(),user=teacher,extra={})=>call(user,'/scholarship/contents/batch-publish',{requestId,reviewed:true,items,...extra});
   const candidate=item=>({contentId:item.contentId,expectedHash:item.contentHash});
   const getCandidate=async(id,type='problem',user=teacher)=>candidate((await list(type,user)).items.find(item=>item.contentId===id));
   await run({pool,schema,teacher,other,student,admin,call,problem,paper,draft,list,publish,candidate,getCandidate});
@@ -58,14 +58,14 @@ async function fixture(run){
 test('Luq review inventory separates published, draft, missing and withdrawn exact-version solutions without leaking private content',options,()=>fixture(async f=>{
  const published=await f.problem(),draft=await f.problem(),missing=await f.problem(),withdrawn=await f.problem();
  const publishedContent=await f.draft(published),draftContent=await f.draft(draft),withdrawnContent=await f.draft(withdrawn);
- await f.call(f.teacher,`/luq/contents/${publishedContent.id}/publish`,{reviewed:true});
+ await f.call(f.teacher,`/scholarship/contents/${publishedContent.id}/publish`,{reviewed:true});
  await f.pool.query("UPDATE luq_assistance_contents SET status='withdrawn' WHERE id=$1",[withdrawnContent.id]);
  // Neither a translation nor another version's solution satisfies the current solution.
  await f.draft(missing,'TRANSLATION_BODY_DO_NOT_LEAK',f.teacher,'FULL_TRANSLATION');
  const newer=(await f.pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code)
   VALUES($1,'Other version','stdio','Other statement',1000,64,'OTHER_PRIVATE_CODE') RETURNING id`,[missing.problemId])).rows[0];
  const newerContent=await f.draft({...missing,versionId:newer.id},'OTHER_VERSION_BODY');
- await f.call(f.teacher,`/luq/contents/${newerContent.id}/publish`,{reviewed:true});
+ await f.call(f.teacher,`/scholarship/contents/${newerContent.id}/publish`,{reviewed:true});
  const foreign=await f.problem(f.other,'Foreign teacher title');await f.draft(foreign,'FOREIGN_BODY',f.other);
  const archived=await f.problem();await f.pool.query('UPDATE problems SET archived_at=now() WHERE id=$1',[archived.problemId]);
  const overview=await f.list();
@@ -96,7 +96,7 @@ test('Luq review inventory separates published, draft, missing and withdrawn exa
 
  const paper=await f.paper();
  const q1=await f.draft({...paper,questionKey:'Q1'}),q2=await f.draft({...paper,questionKey:'Q2'}),q4=await f.draft({...paper,questionKey:'Q4'});
- await f.call(f.teacher,`/luq/contents/${q1.id}/publish`,{reviewed:true});
+ await f.call(f.teacher,`/scholarship/contents/${q1.id}/publish`,{reviewed:true});
  await f.pool.query("UPDATE luq_assistance_contents SET status='withdrawn' WHERE id=$1",[q4.id]);
  await f.paper(f.other);
  const paperOverview=await f.list('paper4');
@@ -122,7 +122,7 @@ test('Luq review inventory separates published, draft, missing and withdrawn exa
 test('Luq batch publication is reviewed, atomic and idempotent across concurrent calls, while preserving prices, balances and append-only history',options,()=>fixture(async f=>{
  const a=await f.problem(),b=await f.paper(),foreign=await f.problem(f.other);
  const ca=await f.draft(a),cb=await f.draft({...b,questionKey:'Q1'}),cf=await f.draft(foreign,'FOREIGN',f.other);
- await f.call(f.teacher,'/luq/policies/batch-prices',{requestId:randomUUID(),targetType:'problem',targetIds:[a.problemId],prices:{FULL_SOLUTION:5}});
+ await f.call(f.teacher,'/scholarship/policies/batch-prices',{requestId:randomUUID(),targetType:'problem',targetIds:[a.problemId],prices:{FULL_SOLUTION:5}});
  const caItem=await f.getCandidate(ca.id),cbItem=await f.getCandidate(cb.id,'paper4'),cfItem=await f.getCandidate(cf.id,'problem',f.other);
  const before=(await f.pool.query('SELECT row_to_json(p) r FROM luq_assistance_policies p ORDER BY id')).rows;
  const ledgerBefore=(await f.pool.query('SELECT row_to_json(l) r FROM luq_ledger l ORDER BY id')).rows;
@@ -155,7 +155,7 @@ test('Luq batch publication is reviewed, atomic and idempotent across concurrent
  await Promise.all([
   f.publish([candidates[0],candidates[1]]),
   f.publish([candidates[2],candidates[1]]),
-  f.call(f.teacher,`/luq/contents/${concurrent[1].id}/publish`,{reviewed:true}),
+  f.call(f.teacher,`/scholarship/contents/${concurrent[1].id}/publish`,{reviewed:true}),
  ]);
  const audits=(await f.pool.query("SELECT resource_id,count(*)::int n FROM audit_events WHERE action='luq.content_publish' AND resource_id=ANY($1::text[]) GROUP BY resource_id",[concurrent.map(item=>item.id)])).rows;
  assert.equal(audits.length,3);
@@ -213,24 +213,24 @@ test('bulk-published solutions still require student purchase and return only th
  const version2=(await f.pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code,published_at,school_visible_at,rank_review_status,rank_approved_at)
   VALUES($1,'Version two','stdio','Second statement',1000,64,'PRIVATE_V2_CODE',now(),now(),'approved',now()) RETURNING id`,[p.problemId])).rows[0].id;
  const second=await f.draft({...p,versionId:version2},'VERSION_TWO_REVIEWED_SOLUTION');
- const target={...p,kind:'FULL_SOLUTION'},quote=()=>f.call(f.student,'/luq/assistance/quote',target);
+ const target={...p,kind:'FULL_SOLUTION'},quote=()=>f.call(f.student,'/scholarship/assistance/quote',target);
  assert.equal((await quote()).available,false);
  await f.publish([await f.getCandidate(first.id)]);
  assert.equal((await quote()).available,true);
  const secondTarget={...target,versionId:version2};
- assert.equal((await f.call(f.student,'/luq/assistance/quote',secondTarget)).available,false);
- await rejects(f.call(f.student,'/luq/assistance/provide',target),403);
+ assert.equal((await f.call(f.student,'/scholarship/assistance/quote',secondTarget)).available,false);
+ await rejects(f.call(f.student,'/scholarship/assistance/provide',target),403);
  const offered=await quote();
  assert.equal(Object.hasOwn(offered,'body'),false);assert.equal(offered.price,8);
- const unlocked=await f.call(f.student,'/luq/assistance/unlock',{...target,requestKey:randomUUID(),confirmedPrice:offered.price,confirmedContentId:offered.contentId});
+ const unlocked=await f.call(f.student,'/scholarship/assistance/unlock',{...target,requestKey:randomUUID(),confirmedPrice:offered.price,confirmedContentId:offered.contentId});
  assert.equal(unlocked.charged,8);assert.equal(Object.hasOwn(unlocked,'body'),false);
- assert.equal((await f.call(f.student,'/luq/assistance/provide',target)).body,'VERSION_ONE_REVIEWED_SOLUTION');
- await rejects(f.call(f.student,'/luq/assistance/provide',secondTarget),404);
+ assert.equal((await f.call(f.student,'/scholarship/assistance/provide',target)).body,'VERSION_ONE_REVIEWED_SOLUTION');
+ await rejects(f.call(f.student,'/scholarship/assistance/provide',secondTarget),404);
  await f.pool.query('UPDATE problems SET current_version_id=$2 WHERE id=$1',[p.problemId,version2]);
  await f.publish([await f.getCandidate(second.id)]);
- assert.equal((await f.call(f.student,'/luq/assistance/quote',secondTarget)).price,0,'Stable purchase crosses versions; reviewed content remains exact-version');
- assert.equal((await f.call(f.student,'/luq/assistance/provide',secondTarget)).body,'VERSION_TWO_REVIEWED_SOLUTION');
- assert.equal((await f.call(f.student,'/luq/assistance/provide',target)).body,'VERSION_ONE_REVIEWED_SOLUTION');
+ assert.equal((await f.call(f.student,'/scholarship/assistance/quote',secondTarget)).price,0,'Stable purchase crosses versions; reviewed content remains exact-version');
+ assert.equal((await f.call(f.student,'/scholarship/assistance/provide',secondTarget)).body,'VERSION_TWO_REVIEWED_SOLUTION');
+ assert.equal((await f.call(f.student,'/scholarship/assistance/provide',target)).body,'VERSION_ONE_REVIEWED_SOLUTION');
 }));
 
 test('Luq content batch runtime grants allow application append/read only and deny all judge-worker access',options,async()=>{

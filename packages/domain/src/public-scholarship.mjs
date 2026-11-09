@@ -1,9 +1,9 @@
 import {transaction} from './db.mjs';
 import {fail,integer,uuid} from './security.mjs';
 import {activeAccount,LEGACY_SCHOOL_ID} from './schools.mjs';
-import {luqLedgerShape} from './luq-ledger.mjs';
-import {hasLegacyPracticeAc,hasPublicPracticeAc,lockLuqAssistance} from './luq-access.mjs';
-import {studentAssistanceOperation} from './luq-assistance.mjs';
+import {scholarshipLedgerShape} from './scholarship-ledger.mjs';
+import {hasLegacyPracticeAc,hasPublicPracticeAc,lockScholarshipAssistance} from './scholarship-access.mjs';
+import {studentAssistanceOperation} from './scholarship-assistance.mjs';
 import {publicSchoolAssistanceRestriction} from './school-scholarship.mjs';
 import {schoolActivityProblemAccess} from './school-activities.mjs';
 
@@ -18,15 +18,15 @@ async function publicWallet(db,user){
 }
 export async function publicScholarshipOperation(ctx,loadPublicProblem){
  const {pool,user,route,method,url,body={}}=ctx;
- if(route==='/practice/luq/me'&&method==='GET')return transaction(pool,async db=>{
+ if(route==='/practice/scholarship/me'&&method==='GET')return transaction(pool,async db=>{
   await publicWallet(db,user);
   const page=integer(Number(url.searchParams.get('page')??1),1,100000,'Page'),pageSize=50;
   const balance=(await db.query('SELECT balance FROM luq_accounts WHERE identity_id=$1',[user.identityId])).rows[0]?.balance??0;
   const total=Number((await db.query('SELECT count(*) FROM luq_ledger WHERE identity_id=$1',[user.identityId])).rows[0].count);
-  const items=(await db.query('SELECT * FROM luq_ledger WHERE identity_id=$1 ORDER BY id DESC LIMIT $2 OFFSET $3',[user.identityId,pageSize,(page-1)*pageSize])).rows.map(luqLedgerShape);
+  const items=(await db.query('SELECT * FROM luq_ledger WHERE identity_id=$1 ORDER BY id DESC LIMIT $2 OFFSET $3',[user.identityId,pageSize,(page-1)*pageSize])).rows.map(scholarshipLedgerShape);
   return {status:200,body:{balance,items,total,page,pageSize}};
  });
- const action=route.match(/^\/practice\/luq\/assistance\/(quote|unlock|provide)$/);
+ const action=route.match(/^\/practice\/scholarship\/assistance\/(quote|unlock|provide)$/);
  if(!action||method!=='POST')return null;
  return transaction(pool,async db=>{
   // Resolve live publication and assessment rules inside the same transaction
@@ -35,7 +35,7 @@ export async function publicScholarshipOperation(ctx,loadPublicProblem){
   if(uuid(body.versionId).toLowerCase()!==p.published_version_id)fail(404,'NOT_FOUND','This version is no longer available in public practice.');
   if(body.assignmentId||body.timedAttemptId||body.paperId||body.paper4AttemptId)fail(400,'VALIDATION','Public practice does not accept a school activity context.');
   await schoolActivityProblemAccess(db,{schoolId:p.school_id,problemId:p.id,user});
-  await lockLuqAssistance(db,user.identityId);
+  await lockScholarshipAssistance(db,user.identityId);
   await publicWallet(db,user);
   const legacy=p.school_id===LEGACY_SCHOOL_ID;
   const target={subjectKey:legacy?`problem:${p.id}`:`public-school:${p.school_id}:problem:${p.id}`,versionId:p.published_version_id,

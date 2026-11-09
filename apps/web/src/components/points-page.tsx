@@ -6,7 +6,7 @@ import Image from "next/image";
 import { AppLink as Link } from "./navigation";
 import { ChevronLeft, ChevronRight, CircleHelp, Medal, SlidersHorizontal, Trophy, UsersRound } from "lucide-react";
 import styles from "./points-page.module.css";
-import { ScholarshipIcon } from "./luq/scholarship-icon";
+import { ScholarshipIcon } from "./scholarship/scholarship-icon";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { useLocale, type AppLocale } from "./locale-context";
@@ -30,11 +30,11 @@ interface RankedStudent {
   solvedProblems?: number;
   attempts?: number;
   acRate?: number | null;
-  luqBalance?: number;
+  scholarshipBalance?: number;
 }
 
 type RankingPeriod = "all" | "month" | "week";
-type OptionalField = "solvedProblems" | "attempts" | "acRate" | "luqBalance";
+type OptionalField = "solvedProblems" | "attempts" | "acRate" | "scholarshipBalance";
 type VisibleFields = Record<OptionalField, boolean>;
 interface LeaderboardContext {
   id: string;
@@ -55,12 +55,12 @@ interface LeaderboardResponse {
   visibleFields: VisibleFields;
 }
 
-const allFieldsVisible: VisibleFields = { solvedProblems: true, attempts: true, acRate: true, luqBalance: true };
+const allFieldsVisible: VisibleFields = { solvedProblems: true, attempts: true, acRate: true, scholarshipBalance: true };
 const fieldLabels: { field: OptionalField; label: string }[] = [
   { field: "solvedProblems", label: "解题数" },
   { field: "attempts", label: "提交次数" },
   { field: "acRate", label: "首解 AC 率" },
-  { field: "luqBalance", label: "奖学金" },
+  { field: "scholarshipBalance", label: "奖学金" },
 ];
 
 const rankingPeriods: { value: RankingPeriod; label: string }[] = [
@@ -75,7 +75,7 @@ const fieldName = (locale: AppLocale, field: OptionalField) => {
     solvedProblems: ["解题数", "Solved"],
     attempts: ["提交次数", "Attempts"],
     acRate: ["首解 AC 率", "First-solve AC rate"],
-    luqBalance: ["奖学金", "Scholarship"],
+    scholarshipBalance: ["奖学金", "Scholarship"],
   };
   return ui(locale, ...names[field]);
 };
@@ -125,7 +125,7 @@ function LeaderboardPodium({ people, user, workspace, classId, visibleFields }: 
           <StudentAvatar person={person} podium />
           <span className={styles.podiumName}>{person.name}{person.id === user.identityId && <span className={styles.podiumMe}>{ui(locale, "我", "You")}</span>}</span>
           <span className={styles.podiumPoints}>{rankNumber.format(person.points)}<span>{ui(locale, "积分", "points")}</span></span>
-          {visibleFields.luqBalance && person.luqBalance != null && <span className="mt-1 inline-flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground" title={ui(locale, "当前奖学金余额", "Current Scholarship balance")}><ScholarshipIcon size={14} aria-hidden="true" /><span>{rankNumber.format(person.luqBalance)}</span><span className="sr-only">{ui(locale, "奖学金", "Scholarship")}</span></span>}
+          {visibleFields.scholarshipBalance && person.scholarshipBalance != null && <span className="mt-1 inline-flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground" title={ui(locale, "当前奖学金余额", "Current Scholarship balance")}><ScholarshipIcon size={14} aria-hidden="true" /><span>{rankNumber.format(person.scholarshipBalance)}</span><span className="sr-only">{ui(locale, "奖学金", "Scholarship")}</span></span>}
         </Link>
       ))}
     </div>
@@ -152,7 +152,7 @@ function LeaderboardRow({ person, current, pinned = false, visibleFields, worksp
       {visibleFields.solvedProblems && <td className={styles.numberCell}>{person.solvedProblems == null ? "—" : rankNumber.format(person.solvedProblems)}</td>}
       {visibleFields.attempts && <td className={styles.numberCell}>{person.attempts == null ? "—" : rankNumber.format(person.attempts)}</td>}
       {visibleFields.acRate && <td className={`${styles.numberCell} ${person.acRate != null ? styles.rateCell : ""}`}>{person.acRate == null ? "—" : `${Number.isInteger(person.acRate) ? person.acRate : person.acRate.toFixed(1)}%`}</td>}
-      {visibleFields.luqBalance && <td className={styles.numberCell}>{person.luqBalance == null ? "—" : <span className="inline-flex items-center gap-1.5"><ScholarshipIcon size={14} aria-hidden="true" />{rankNumber.format(person.luqBalance)}</span>}</td>}
+      {visibleFields.scholarshipBalance && <td className={styles.numberCell}>{person.scholarshipBalance == null ? "—" : <span className="inline-flex items-center gap-1.5"><ScholarshipIcon size={14} aria-hidden="true" />{rankNumber.format(person.scholarshipBalance)}</span>}</td>}
     </tr>
   );
 }
@@ -211,9 +211,10 @@ function LeaderboardTable({
     setSettingsMessage("");
     setSettingsError(false);
     try {
+      const { solvedProblems, attempts, acRate, scholarshipBalance } = draftFields;
       await productionApi("points/leaderboard/settings", {
         method: "PATCH",
-        body: { visibleFields: draftFields },
+        body: { visibleFields: { solvedProblems, attempts, acRate, scholarshipBalance } },
       });
       setSavedFields({ ...draftFields });
       setSettingsMessage("saved");
@@ -345,7 +346,7 @@ function LeaderboardTable({
                       {visibleFields.acRate && <th scope="col" className={styles.numberCell}>
                         <abbr title={ui(locale, "纳入统计的 AC 数 ÷ 有效判题数。普通练习和作业计至同一版本首次有效 AC，限时训练和 Paper 4 按正式提交统计。", "Accepted results ÷ valid results included in the rate. Practice and assignments count through the first valid AC per version. Timed practice and Paper 4 count formal submissions.")}>{fieldName(locale, "acRate")}<CircleHelp size={12} aria-hidden="true" /></abbr>
                       </th>}
-                      {visibleFields.luqBalance && <th scope="col" className={styles.numberCell}><abbr title={ui(locale, "当前可用余额；不受排行榜时间筛选影响", "Current available balance, independent of the selected time period")}>{fieldName(locale, "luqBalance")}<CircleHelp size={12} aria-hidden="true" /></abbr></th>}
+                      {visibleFields.scholarshipBalance && <th scope="col" className={styles.numberCell}><abbr title={ui(locale, "当前可用余额；不受排行榜时间筛选影响", "Current available balance, independent of the selected time period")}>{fieldName(locale, "scholarshipBalance")}<CircleHelp size={12} aria-hidden="true" /></abbr></th>}
                     </tr>
                   </thead>
                   <tbody>

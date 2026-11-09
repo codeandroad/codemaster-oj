@@ -38,25 +38,30 @@ test('public scholarship HTTP uses shared purchase rules without exposing privat
   };
   const learner=await register('public-aid-learner'),other=await register('public-aid-other');
   const input={problemId:problem.problemId,versionId:problem.versionId,kind:'FULL_TRANSLATION',language:'zh-CN'};
-  const aid=(action,body=input,options={})=>request('/practice/luq/assistance/'+action,{auth:learner,method:'POST',body,...options});
-  const wallet=async (auth=learner)=>(await request('/practice/luq/me',{auth})).data;
+  const aid=(action,body=input,options={})=>request('/practice/scholarship/assistance/'+action,{auth:learner,method:'POST',body,...options});
+  const wallet=async (auth=learner)=>(await request('/practice/scholarship/me',{auth})).data;
   const purchase=async (value,quote)=>aid('unlock',{...value,requestKey:randomUUID(),confirmedContentId:quote.contentId,confirmedPrice:quote.price});
   await t.test('authentication, CSRF and explicit wallet use; one stable initial allowance',async()=>{
-   await request('/practice/luq/me',{status:401});
+   await request('/practice/scholarship/me',{status:401});
    await aid('quote',input,{auth:null,status:401});
    await aid('quote',input,{csrf:false,status:403});
-   await request('/luq/me',{auth:learner,status:403});
+   await request('/scholarship/me',{auth:learner,status:403});
    assert.equal((await owner.query('SELECT count(*)::int n FROM luq_ledger WHERE identity_id=$1',[learner.identityId])).rows[0].n,0);
    const wallets=await Promise.all([wallet(),wallet()]);
    assert.ok(wallets.every(w=>w.balance===100&&w.total===1));
+   assert.deepEqual((await request('/practice/luq/me',{auth:learner})).data,await wallet());
   });
   await t.test('quote and public problem projection never preload reviewed body or private fields',async()=>{
    const shown=(await request('/practice/problems/'+problem.problemId,{auth:learner})).data;
    const quoted=await aid('quote');
+   const oldQuote='/practice/luq/assistance/quote';
+   await request(oldQuote,{auth:learner,method:'POST',body:input,csrf:false,status:403});
+   assert.deepEqual((await request(oldQuote,{auth:learner,method:'POST',body:input})).data,quoted.data);
    const raw=JSON.stringify([shown,quoted.data]);
    for(const secret of ['PRIVATE_REFERENCE','PRIVATE_HIDDEN_INPUT','PRIVATE_TEACHER_NOTE','输出数字五。','Return the required constant.'])assert.ok(!raw.includes(secret));
    assert.equal(quoted.data.price,3);assert.equal(quoted.data.requiresConfirmation,true);
    assert.equal(quoted.data.balanceAfter,97);assert.equal(quoted.data.affectsFirstAcLuq,false);
+   assert.equal(quoted.data.affectsFirstAcScholarship,false);
    await aid('provide',input,{status:403});
    await aid('unlock',{...input,requestKey:randomUUID(),confirmedContentId:quoted.data.contentId,confirmedPrice:0},{status:409});
    await aid('quote',{...input,versionId:randomUUID()},{status:404});
@@ -74,6 +79,7 @@ test('public scholarship HTTP uses shared purchase rules without exposing privat
    const sq=(await aid('quote',solution)).data;
    assert.equal(sq.basePrice,8);assert.equal(sq.translationCredit,3);assert.equal(sq.price,5);
    assert.equal(sq.affectsFirstAcLuq,true);
+   assert.equal(sq.affectsFirstAcScholarship,true);
    assert.equal((await purchase(solution,sq)).data.charged,5);
    const delivered=(await aid('provide',solution)).data;
    assert.match(delivered.body,/```python\nprint\(5\)\n```/);

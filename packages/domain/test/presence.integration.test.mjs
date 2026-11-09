@@ -229,7 +229,7 @@ test('presence TTL, session deduplication, account state and public-name search 
    body: {}, url: new URL(`http://localhost/api/v1${route}${query}`)}).then(response => response.body);
   const heartbeat = auth => call(auth, '/presence/heartbeat', 'POST');
   assert.equal((await call(staff)).onlineCount, 0, 'login alone is not an online heartbeat');
-  const beforeLuq = (await pool.query('SELECT count(*)::int n FROM luq_ledger')).rows[0].n;
+  const beforeScholarship = (await pool.query('SELECT count(*)::int n FROM luq_ledger')).rows[0].n;
   await Promise.all([heartbeat(first), heartbeat(first), heartbeat(second), heartbeat(b)]);
   const seenAt = (await pool.query('SELECT presence_seen_at FROM sessions WHERE token_hash=$1', [first.sess.token_hash])).rows[0].presence_seen_at;
   await heartbeat(first);
@@ -274,7 +274,7 @@ test('presence TTL, session deduplication, account state and public-name search 
   await pool.query('UPDATE accounts SET binding_released_at=NULL WHERE id=$1', [beta.id]);
   await pool.query("DELETE FROM account_roles WHERE account_id=$1 AND role='student'", [beta.id]);
   assert.equal((await call(staff)).onlineCount, 0);
-  assert.equal((await pool.query('SELECT count(*)::int n FROM luq_ledger')).rows[0].n, beforeLuq, 'heartbeats cannot award Luq');
+  assert.equal((await pool.query('SELECT count(*)::int n FROM luq_ledger')).rows[0].n, beforeScholarship, 'heartbeats cannot award Luq');
   assert.equal((await pool.query('SELECT count(*)::int n FROM submissions')).rows[0].n, 0);
  } finally {
   await pool.end();

@@ -99,7 +99,7 @@ function notificationContent(item: Notification, locale: AppLocale, scholarshipH
   }
 }
 
-export function NotificationDropdown({ schoolId, scholarshipHref = "/student/luq", workspace = "student" }: {
+export function NotificationDropdown({ schoolId, scholarshipHref = "/student/scholarship", workspace = "student" }: {
   schoolId?: string;
   scholarshipHref?: string;
   workspace?: "student" | "staff" | "public" | "platform";

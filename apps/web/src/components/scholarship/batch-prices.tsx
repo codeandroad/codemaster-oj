@@ -18,7 +18,7 @@ type PublicationStatus = {
   firstUnpublished: { targetId: string; questionKey?: string } | null;
 };
 
-export function LuqBatchPrices({ targetType, choices, initialIds = [], onSaved }: {
+export function ScholarshipBatchPrices({ targetType, choices, initialIds = [], onSaved }: {
   targetType: "problem" | "paper4";
   choices: { id: string; title: string }[];
   initialIds?: string[];
@@ -81,7 +81,7 @@ export function LuqBatchPrices({ targetType, choices, initialIds = [], onSaved }
         if (solution) prices.FULL_SOLUTION = solutionPrice === "" ? null : Number(solutionPrice);
         const body = { targetType, targetIds: selectedIds, prices }, signature = JSON.stringify(body);
         if (pending.current?.signature !== signature) pending.current = { signature, requestId: crypto.randomUUID() };
-        const result = await productionApi<{ count: number; publication?: PublicationStatus[] }>("luq/policies/batch-prices", { method: "POST", body: { ...body, requestId: pending.current.requestId } });
+        const result = await productionApi<{ count: number; publication?: PublicationStatus[] }>("scholarship/policies/batch-prices", { method: "POST", body: { ...body, requestId: pending.current.requestId } });
         pending.current = null;
         setPublication(result.publication ?? null);
         onSaved?.();
@@ -105,7 +105,7 @@ export function LuqBatchPrices({ targetType, choices, initialIds = [], onSaved }
         <p className="text-muted-foreground">{tx("本次保存时的当前版本内容；课程或活动中固定的旧版本需单独审核。", "Current-version content at the time of this save; older versions pinned in courses or activities need their own review.")}</p>
         {publication.map(item => <div key={item.kind} className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span>{item.kind === "FULL_TRANSLATION" ? tx("中文题面", "Chinese translation") : tx("完整题解", "Full solution")} · {tx(`已发布 ${item.published}/${item.total} · 待审核草稿 ${item.draft} · 未录入 ${item.missing}${item.withdrawn ? ` · 已撤回 ${item.withdrawn}` : ""}`, `Published ${item.published}/${item.total} · Draft ${item.draft} · Missing ${item.missing}${item.withdrawn ? ` · Withdrawn ${item.withdrawn}` : ""}`)}</span>
-          {item.firstUnpublished && <a className="font-medium text-primary hover:underline" href={`/teacher/luq?${new URLSearchParams({ targetType, targetId: item.firstUnpublished.targetId, kind: item.kind, ...(item.firstUnpublished.questionKey ? { questionKey: item.firstUnpublished.questionKey } : {}) })}`}>{tx("录入并审核内容", "Author and review content")}</a>}
+          {item.firstUnpublished && <a className="font-medium text-primary hover:underline" href={`/teacher/scholarship?${new URLSearchParams({ targetType, targetId: item.firstUnpublished.targetId, kind: item.kind, ...(item.firstUnpublished.questionKey ? { questionKey: item.firstUnpublished.questionKey } : {}) })}`}>{tx("录入并审核内容", "Author and review content")}</a>}
         </div>)}
       </div>}
     </form>

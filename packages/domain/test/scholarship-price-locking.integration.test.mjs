@@ -4,7 +4,7 @@ import {randomBytes,randomUUID} from 'node:crypto';
 import {setTimeout as delay} from 'node:timers/promises';
 import {createPool} from '../src/db.mjs';
 import {migrate} from '../src/migrate.mjs';
-import {handleLuqAssistance} from '../src/luq-assistance.mjs';
+import {handleScholarshipAssistance} from '../src/scholarship-assistance.mjs';
 
 test('same-problem single-kind and two-kind price writes lock the target before kind locks, avoiding an advisory-lock cycle',
  {skip:!process.env.TEST_DATABASE_URL,timeout:60000},async()=>{
@@ -23,7 +23,7 @@ test('same-problem single-kind and two-kind price writes lock the target before 
   const problemId=(await pool.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id',[accountId])).rows[0].id;
   await pool.query("INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code) VALUES($1,'Lock QA','stdio','Public question',1000,64,'print(1)')",[problemId]);
   const user={id:accountId,identityId,roles:['teacher']};
-  const request=(connection,route,body)=>handleLuqAssistance({pool:connection,user,route,method:'POST',url:new URL('http://luq-lock.test'+route),body});
+  const request=(connection,route,body)=>handleScholarshipAssistance({pool:connection,user,route,method:'POST',url:new URL('http://luq-lock.test'+route),body});
   async function waitForLock(applicationName){
    const deadline=Date.now()+5000;
    while(Date.now()<deadline){
@@ -38,11 +38,11 @@ test('same-problem single-kind and two-kind price writes lock the target before 
   // Hold the trigger's target-wide lock. The batch first obtains its target
   // row + FULL_SOLUTION lock, then visibly waits for this external lock.
   await blocker.query("SELECT pg_advisory_xact_lock(hashtextextended('luq-policy:problem:'||$1,0))",[problemId]);
-  batchPromise=request(batchPool,'/luq/policies/batch-prices',{requestId:randomUUID(),targetType:'problem',targetIds:[problemId],prices:{FULL_SOLUTION:8,FULL_TRANSLATION:3}});
+  batchPromise=request(batchPool,'/scholarship/policies/batch-prices',{requestId:randomUUID(),targetType:'problem',targetIds:[problemId],prices:{FULL_SOLUTION:8,FULL_TRANSLATION:3}});
   // Attach rejection handlers immediately while deliberately holding locks.
   batchPromise.catch(()=>{});
   const batchWait=await waitForLock('luq_batch_'+suffix);assert.equal(batchWait.wait_event,'advisory');
-  singlePromise=request(singlePool,'/luq/policies',{targetType:'problem',targetId:problemId,kind:'FULL_TRANSLATION',mode:'paid',price:7});
+  singlePromise=request(singlePool,'/scholarship/policies',{targetType:'problem',targetId:problemId,kind:'FULL_TRANSLATION',mode:'paid',price:7});
   singlePromise.catch(()=>{});
   const singleWait=await waitForLock('luq_single_'+suffix);
   await blocker.query('ROLLBACK');blocked=false;blocker.release();blocker=null;

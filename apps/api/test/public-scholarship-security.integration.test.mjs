@@ -45,7 +45,7 @@ test('public scholarship respects school assessment and submission assistance bo
     VALUES($1,$2,$3,'FULL_SOLUTION','','Reviewed school solution',$4,'published',$4,clock_timestamp())`,[school.id,'problem:'+problem.id,version.id,author.id]);
    return {learner,author,schoolId:school.id,identityId:identity.id,problemId:problem.id,versionId:version.id};
   }
-  const publicAid=async(f,action)=>{const route='/practice/luq/assistance/'+action;return(await schoolPracticeOperation({pool:runtime,user:f.learner,route,url:new URL('http://qa.test'+route),method:'POST',body:{problemId:f.problemId,versionId:f.versionId,kind:'FULL_SOLUTION'}})).body;};
+  const publicAid=async(f,action)=>{const route='/practice/scholarship/assistance/'+action;return(await schoolPracticeOperation({pool:runtime,user:f.learner,route,url:new URL('http://qa.test'+route),method:'POST',body:{problemId:f.problemId,versionId:f.versionId,kind:'FULL_SOLUTION'}})).body;};
   const schoolAid=async(f,action)=>{const route=`/schools/${f.schoolId}/scholarship/assistance/${action}`;return(await handleSchoolScholarship({pool:runtime,user:f.learner,route,url:new URL('http://qa.test'+route),method:'POST',body:{type:'problem',problemId:f.problemId,versionId:f.versionId,kind:'FULL_SOLUTION'}})).body;};
   async function assertPublicBlocked(f){
    let quote;
@@ -135,7 +135,7 @@ test('public scholarship respects school assessment and submission assistance bo
    assert.equal((await owner.query('SELECT count(*)::int n FROM luq_assistance_entitlements WHERE identity_id=$1',[f.learner.identityId])).rows[0].n,0,'free public view gives no permanent rights');
    await owner.query("INSERT INTO luq_assistance_policies(target_type,target_id,kind,mode,rule_version,created_by) VALUES('problem',$1,'FULL_SOLUTION','paid',2,$2)",[f.problemId,f.author.id]);
    const q=await publicAid(f,'quote');assert.equal(q.price,8);
-   const route='/practice/luq/assistance/unlock';
+   const route='/practice/scholarship/assistance/unlock';
    await schoolPracticeOperation({pool:runtime,user:f.learner,route,url:new URL('http://qa.test'+route),method:'POST',body:{problemId:f.problemId,versionId:f.versionId,kind:'FULL_SOLUTION',requestKey:randomUUID(),confirmedPrice:q.price,confirmedContentId:q.contentId}});
    assert.equal((await publicAid(f,'quote')).unlocked,true);
    const school=await schoolAid(f,'quote');assert.equal(school.unlocked,false);assert.equal(school.price,8);assert.equal(school.balance,100);

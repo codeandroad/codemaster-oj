@@ -4,7 +4,7 @@ import {randomBytes,randomUUID} from 'node:crypto';
 import {readFile,readdir} from 'node:fs/promises';
 import {createPool,transaction} from '../src/db.mjs';
 import {migrate} from '../src/migrate.mjs';
-import {getLuqSettings,handleLuqLedger,postLuqEntry} from '../src/luq-ledger.mjs';
+import {getScholarshipSettings,handleScholarshipLedger,postScholarshipEntry} from '../src/scholarship-ledger.mjs';
 
 const options={skip:!process.env.TEST_DATABASE_URL,timeout:60000};
 async function fixture(run,{legacy=false}={}){
@@ -30,7 +30,7 @@ async function fixture(run,{legacy=false}={}){
 }
 
 test('initial allowance is 100 once for active stable students before activation, with independent append-only records',options,async()=>fixture(async f=>{
- assert.equal((await getLuqSettings(f.pool)).initialGrant,100);
+ assert.equal((await getScholarshipSettings(f.pool)).initialGrant,100);
  const id=await f.identity();assert.equal(await f.balance(id),100);
  const ledger=await f.entries(id);assert.equal(ledger.length,1);assert.equal(ledger[0].kind,'initial_grant');assert.equal(ledger[0].delta,100);
  assert.equal(ledger[0].source_key,'initial-grant:'+id);assert.equal(ledger[0].actor_account_id,null);
@@ -48,8 +48,8 @@ test('initial allowance is 100 once for active stable students before activation
 
 test('migration backfills active identities additively, leaves existing ledger/account data intact, and reruns do not reissue',options,async()=>fixture(async f=>{
  const old=await f.identity(),unassigned=await f.identity(),archived=await f.identity('student',true),teacher=await f.identity('teacher');
- await transaction(f.pool,db=>postLuqEntry(db,{identityId:old,delta:17,kind:'admin_grant',sourceKey:'legacy-credit',reason:'Existing funds'}));
- await transaction(f.pool,db=>postLuqEntry(db,{identityId:old,delta:-8,kind:'purchase',sourceKey:'legacy-purchase',reason:'Existing purchase'}));
+ await transaction(f.pool,db=>postScholarshipEntry(db,{identityId:old,delta:17,kind:'admin_grant',sourceKey:'legacy-credit',reason:'Existing funds'}));
+ await transaction(f.pool,db=>postScholarshipEntry(db,{identityId:old,delta:-8,kind:'purchase',sourceKey:'legacy-purchase',reason:'Existing purchase'}));
  const before=await f.entries(old),identities=(await f.pool.query('SELECT * FROM identities ORDER BY id')).rows;
  await migrate(f.pool);await migrate(f.pool);
  assert.equal(await f.balance(old),109);assert.equal(await f.balance(unassigned),100);assert.equal(await f.balance(archived),0);assert.equal(await f.balance(teacher),0);
@@ -97,12 +97,12 @@ test('initial allowance settings are admin-only, range validated and versioned; 
  const adminIdentity=await f.identity('admin'),student=await f.identity();
  const adminId=(await f.pool.query('INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,$2,$2) RETURNING id',[adminIdentity,randomUUID()])).rows[0].id;
  const admin={id:adminId,identityId:adminIdentity,roles:['admin']},user={identityId:student,roles:['student']};
- const request=(route,method,actor,body={})=>handleLuqLedger({pool:f.pool,route,method,user:actor,body,url:new URL('http://test'+route)});
- await assert.rejects(request('/luq/settings','PATCH',user,{initialGrant:999}),error=>error.code==='FORBIDDEN');
- for(const amount of [-1,100001,1.5])await assert.rejects(request('/luq/settings','PATCH',admin,{initialGrant:amount}),error=>error.code==='VALIDATION');
- const before=await getLuqSettings(f.pool),next=(await request('/luq/settings','PATCH',admin,{initialGrant:25})).body;
+ const request=(route,method,actor,body={})=>handleScholarshipLedger({pool:f.pool,route,method,user:actor,body,url:new URL('http://test'+route)});
+ await assert.rejects(request('/scholarship/settings','PATCH',user,{initialGrant:999}),error=>error.code==='FORBIDDEN');
+ for(const amount of [-1,100001,1.5])await assert.rejects(request('/scholarship/settings','PATCH',admin,{initialGrant:amount}),error=>error.code==='VALIDATION');
+ const before=await getScholarshipSettings(f.pool),next=(await request('/scholarship/settings','PATCH',admin,{initialGrant:25})).body;
  assert.equal(next.initialGrant,25);assert.equal(next.ruleVersion,before.ruleVersion+1);
  const snapshot=(await f.pool.query('SELECT settings FROM luq_setting_versions WHERE rule_version=$1',[next.ruleVersion])).rows[0];assert.equal(snapshot.settings.initial_grant,25);
- for(let i=0;i<3;i++)assert.equal((await request('/luq/me','GET',user)).body.balance,100);
+ for(let i=0;i<3;i++)assert.equal((await request('/scholarship/me','GET',user)).body.balance,100);
  assert.equal((await f.entries(student)).length,1);assert.equal(await f.balance(await f.identity()),25);
 }));

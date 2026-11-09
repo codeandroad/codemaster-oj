@@ -110,6 +110,15 @@ test('Luq real Nest transport: role/CSRF boundary, idempotent grants, content pr
    assert.equal((await pool.query('SELECT 1 FROM luq_assistance_entitlements WHERE identity_id=$1',[other.identityId])).rowCount,0);
   });
 
+  await t.test('disabling a ranked account hides its identity until re-enabled',async()=>{
+   const rank=async()=> (await admin.call('/points/leaderboard')).items.find(item=>item.id===other.identityId);
+   const before=await rank();assert.ok(before);
+   await admin.call(`/accounts/${other.id}`,{method:'PATCH',body:{disabled:true}});
+   assert.equal(await rank(),undefined);
+   await admin.call(`/accounts/${other.id}`,{method:'PATCH',body:{disabled:false}});
+   assert.equal((await rank()).points,before.points);
+  });
+
   await t.test('assignment completion rules save and publish atomically with their draft',async()=>{
    const rulesUrl='/luq/reward-rules?activityType=assignment';
    await anonymous(rulesUrl,{expected:401});

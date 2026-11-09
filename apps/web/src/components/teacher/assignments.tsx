@@ -326,7 +326,9 @@ function AssignmentEditorForm({
   const rewardUnit = ui(locale, "奖学金", "Scholarship");
   const setRewardLabel = ui(locale, "设置按时完成奖学金", "Set on-time completion scholarship");
   const rewardCap = rewardResource.data?.cap;
-  const changedReward = !published && rewardEdit !== null && JSON.stringify(rewardEdit) !== JSON.stringify(baseReward);
+  const rewardChanged = (value: RewardRule | null) =>
+    !published && value !== null && JSON.stringify(value) !== JSON.stringify(baseReward);
+  const changedReward = rewardEdit !== null && rewardChanged(rewardEdit);
   const rewardAmountInvalid = changedReward && rewardCap !== undefined &&
     (!Number.isInteger(rewardEdit.amount) || rewardEdit.amount < 0 || rewardEdit.amount > rewardCap);
   const rewardAmountError = ui(locale, `请输入 0–${rewardCap} 的整数。`, `Enter a whole number from 0 to ${rewardCap}.`);
@@ -377,12 +379,37 @@ function AssignmentEditorForm({
     if (problem.versionId) query.set("versionId", problem.versionId);
     return `/teacher/problems/${problem.problemId}/edit?${query.toString()}`;
   };
+  const snapshot = { title, description, course, coursePathId, problemOrder, due, problems: selected, participants, rewardEdit };
+  const savedProblems = savedProblemOrder(saved?.problems ?? []);
+  const savedParticipants = activeParticipants(saved?.participantDetails, saved?.participants ?? []);
+  const problemEdits = (problems: typeof savedProblems) => JSON.stringify(
+    problems.map(({ problemId, points, versionId, rewardPoints }) => ({
+      problemId, points, versionId, rewardPoints: rewardPoints ?? 0,
+    })),
+  );
+  const changesFor = (value: typeof snapshot) => ({
+    changedTitle: value.title.trim() !== (saved?.title ?? "").trim(),
+    changedDescription: value.description.trim() !== (saved?.description ?? "").trim(),
+    changedCourse: value.course.trim() !== (saved?.course ?? "Python").trim(),
+    changedCoursePath: value.coursePathId !== (saved?.coursePathId ?? ""),
+    changedProblemOrder: value.problemOrder !== (saved?.problemOrder ?? "course"),
+    changedDue: value.due !== localInput(saved?.dueAt),
+    changedProblems: problemEdits(value.problems) !== problemEdits(savedProblems),
+    changedParticipants: JSON.stringify([...value.participants].sort()) !== JSON.stringify([...savedParticipants].sort()),
+    changedReward: rewardChanged(value.rewardEdit),
+  });
+  const changes = changesFor(snapshot);
+  const {
+    changedTitle, changedDescription, changedCourse, changedCoursePath, changedProblemOrder,
+    changedDue, changedProblems, changedParticipants,
+  } = changes;
   const draft = useActivityDraft({
     storageKey: `campus-judge:activity-draft:v1:${userId}:assignment:${initial?.id ?? "new"}`,
     editable: true,
-    noticeText: published ? "改动已临时保存在当前浏览器；点击“保存修改”后才会更新已发布作业。" : undefined,
-    snapshot: { title, description, course, coursePathId, problemOrder, classId, classIds, due, problems: selected, participants, rewardEdit },
-    recoveryDefaults: { coursePathId: "", problemOrder: "course", classIds: [], rewardEdit: null },
+    published,
+    snapshot,
+    hasChanges: value => Object.values(changesFor(value)).some(Boolean),
+    recoveryDefaults: { coursePathId: "", problemOrder: "course", rewardEdit: null },
     onRestore: (value) => {
       setTitle(value.title);
       setDescription(value.description);
@@ -421,31 +448,12 @@ function AssignmentEditorForm({
       if (!published) setRewardEdit(value.rewardEdit);
     },
   });
-  const changedProblems = JSON.stringify(
-    selected.map((x) => ({ problemId: x.problemId, points: x.points, versionId: x.versionId, rewardPoints: x.rewardPoints })),
-  ) !== JSON.stringify(
-    savedProblemOrder(saved?.problems ?? []).map((x) => ({
-      problemId: x.problemId,
-      points: x.points,
-      versionId: x.versionId,
-      rewardPoints: x.rewardPoints ?? 0,
-    })),
-  );
-  const changedParticipants = JSON.stringify([...participants].sort()) !==
-    JSON.stringify(activeParticipants(saved?.participantDetails,saved?.participants ?? []).sort());
-  const changedTitle = title !== (saved?.title ?? "");
-  const changedDescription = description !== (saved?.description ?? "");
-  const changedCourse = course !== (saved?.course ?? "Python");
-  const changedCoursePath = coursePathId !== (saved?.coursePathId ?? "");
-  const changedProblemOrder = problemOrder !== (saved?.problemOrder ?? "course");
-  const changedClass = JSON.stringify(classIds) !== JSON.stringify([...(saved?.classIds ?? (saved?.classId ? [saved.classId] : []))].sort());
-  const changedDue = due !== localInput(saved?.dueAt);
+  const changedClass = JSON.stringify([...classIds].sort()) !== JSON.stringify([...(saved?.classIds ?? (saved?.classId ? [saved.classId] : []))].sort());
   const changedPinnedVersions = selected.some((problem) => {
     const original = saved?.problems.find((item) => item.problemId === problem.problemId);
     return original && original.versionId !== problem.versionId;
   });
-  const hasChanges = changedTitle || changedDescription || changedCourse || changedCoursePath ||
-    changedClass || changedDue || changedProblems || changedParticipants || changedProblemOrder || changedReward;
+  const hasChanges = changedClass || Object.values(changes).some(Boolean);
   useDirty(hasChanges);
   const save = async (assign = false) => {
     if (published && !hasChanges)

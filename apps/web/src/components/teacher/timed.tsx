@@ -307,34 +307,53 @@ function TimedEditor({ initial,userId }: { initial: Practice | null;userId:strin
       if (!saved) router.replace(`/teacher/timed-practice/${result.id}/edit`);
       return result;
     };
-  const draft=useActivityDraft({storageKey:`campus-judge:activity-draft:v1:${userId}:timed:${initial?.id??"new"}`,editable:!published,snapshot:{title,description,coursePathId,classId,classIds,startsAt,endsAt,duration,showVerdict,problems,participants},recoveryDefaults:{classIds:[],coursePathId:""},onRestore:v=>{setTitle(v.title);setDescription(v.description);setCoursePathId(v.coursePathId??"");setStarts(v.startsAt);setEnds(v.endsAt);setDuration(v.duration);setShowVerdict(v.showVerdict);setProblems(v.problems.map(problem=>({...problem,firstAcPoints:problem.firstAcPoints??10,rewardPoints:problem.rewardPoints??0,speedBonusPoints:problem.speedBonusPoints??0,attemptBonusPoints:problem.attemptBonusPoints??0})));setParticipants(v.participants);}});
-  useDirty(
-    !published &&
-      (title !== (saved?.title ?? "") ||
-        description !== (saved?.description ?? "") ||
-        coursePathId !== (saved?.coursePathId ?? "") ||
-        JSON.stringify(classIds) !== JSON.stringify([...(saved?.classIds ?? (saved?.classId ? [saved.classId] : []))].sort()) ||
-        startsAt !== localInput(saved?.startsAt) ||
-        endsAt !== localInput(saved?.endsAt) ||
-        duration !== (saved?.durationMinutes ?? 60) ||
-        showVerdict !== (saved?.showVerdict ?? false) ||
-        JSON.stringify(
-          problems.map((p) => ({ problemId: p.problemId, points: p.points, rewardPoints: p.rewardPoints ?? 0, speedBonusPoints: p.speedBonusPoints ?? 0, attemptBonusPoints: p.attemptBonusPoints ?? 0 })),
-        ) !==
-          JSON.stringify(
-            (saved?.problems ?? []).map((p) => ({
-              problemId: p.problemId,
-              points: p.points,
-              rewardPoints: p.rewardPoints ?? 0,
-              speedBonusPoints: p.speedBonusPoints ?? 0,
-              attemptBonusPoints: p.attemptBonusPoints ?? 0,
-            })),
-          ) ||
-        JSON.stringify([...participants].sort()) !==
-          JSON.stringify(
-            activeParticipants(saved?.participants).sort(),
-          )),
+  const snapshot = { title, description, coursePathId, startsAt, endsAt, duration, showVerdict, problems, participants };
+  const problemEdits = (items: TimedProblem[]) => JSON.stringify(
+    items.map(problem => ({
+      problemId: problem.problemId,
+      points: problem.points,
+      versionId: problem.versionId,
+      rewardPoints: problem.rewardPoints ?? 0,
+      speedBonusPoints: problem.speedBonusPoints ?? 0,
+      attemptBonusPoints: problem.attemptBonusPoints ?? 0,
+    })),
   );
+  const hasDraftChanges = (value: typeof snapshot) =>
+    value.title.trim() !== (saved?.title ?? "").trim() ||
+    value.description.trim() !== (saved?.description ?? "").trim() ||
+    value.coursePathId !== (saved?.coursePathId ?? "") ||
+    value.startsAt !== localInput(saved?.startsAt) ||
+    value.endsAt !== localInput(saved?.endsAt) ||
+    value.duration !== (saved?.durationMinutes ?? 60) ||
+    value.showVerdict !== (saved?.showVerdict ?? false) ||
+    problemEdits(value.problems) !== problemEdits(saved?.problems ?? []) ||
+    JSON.stringify([...value.participants].sort()) !== JSON.stringify(activeParticipants(saved?.participants).sort());
+  const draft = useActivityDraft({
+    storageKey: `campus-judge:activity-draft:v1:${userId}:timed:${initial?.id ?? "new"}`,
+    editable: !published,
+    snapshot,
+    hasChanges: hasDraftChanges,
+    recoveryDefaults: { coursePathId: "" },
+    onRestore: value => {
+      setTitle(value.title);
+      setDescription(value.description);
+      setCoursePathId(value.coursePathId);
+      setStarts(value.startsAt);
+      setEnds(value.endsAt);
+      setDuration(value.duration);
+      setShowVerdict(value.showVerdict);
+      setProblems(value.problems.map(problem => ({
+        ...problem,
+        firstAcPoints: problem.firstAcPoints ?? 10,
+        rewardPoints: problem.rewardPoints ?? 0,
+        speedBonusPoints: problem.speedBonusPoints ?? 0,
+        attemptBonusPoints: problem.attemptBonusPoints ?? 0,
+      })));
+      setParticipants(value.participants);
+    },
+  });
+  useDirty(!published && (hasDraftChanges(snapshot) ||
+    JSON.stringify([...classIds].sort()) !== JSON.stringify([...(saved?.classIds ?? (saved?.classId ? [saved.classId] : []))].sort())));
   return (
     <>
       <PageHeader

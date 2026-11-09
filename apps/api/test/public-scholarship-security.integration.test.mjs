@@ -45,6 +45,7 @@ test('public scholarship respects school assessment and submission assistance bo
     VALUES($1,$2,$3,'FULL_SOLUTION','','Reviewed school solution',$4,'published',$4,clock_timestamp())`,[school.id,'problem:'+problem.id,version.id,author.id]);
    return {learner,author,schoolId:school.id,identityId:identity.id,problemId:problem.id,versionId:version.id};
   }
+  const enablePublicScholarship=f=>schoolPracticeOperation({pool:runtime,user:f.learner,route:'/practice/preferences',method:'PATCH',body:{scholarshipEnabled:true}});
   const publicAid=async(f,action)=>{const route='/practice/scholarship/assistance/'+action;return(await schoolPracticeOperation({pool:runtime,user:f.learner,route,url:new URL('http://qa.test'+route),method:'POST',body:{problemId:f.problemId,versionId:f.versionId,kind:'FULL_SOLUTION'}})).body;};
   const schoolAid=async(f,action)=>{const route=`/schools/${f.schoolId}/scholarship/assistance/${action}`;return(await handleSchoolScholarship({pool:runtime,user:f.learner,route,url:new URL('http://qa.test'+route),method:'POST',body:{type:'problem',problemId:f.problemId,versionId:f.versionId,kind:'FULL_SOLUTION'}})).body;};
   async function assertPublicBlocked(f){
@@ -116,14 +117,14 @@ test('public scholarship respects school assessment and submission assistance bo
    assert.equal(schoolReceipt.assisted,false);
    const schoolBalance=(await owner.query('SELECT balance FROM school_scholarship_accounts WHERE school_id=$1 AND identity_id=$2',[schoolFirst.schoolId,schoolFirst.identityId])).rows[0].balance;
    assert.equal(schoolBalance,104);
-   const publicFirst=await fixture();await freeSchoolContent(publicFirst);await publicAid(publicFirst,'quote');
+   const publicFirst=await fixture();await enablePublicScholarship(publicFirst);await freeSchoolContent(publicFirst);await publicAid(publicFirst,'quote');
    job=await submit(publicFirst,'public');await schoolAid(publicFirst,'provide');await finish(job);
    const publicReceipt=(await owner.query('SELECT solution_assisted FROM public_luq_receipts WHERE school_id=$1 AND job_id=$2',[publicFirst.schoolId,job.id])).rows[0];
    assert.equal(publicReceipt.solution_assisted,false);
    assert.equal((await owner.query('SELECT balance FROM luq_accounts WHERE identity_id=$1',[publicFirst.learner.identityId])).rows[0].balance,104);
   });
   await t.test('an earlier school solution excludes public first-AC without merging wallets',async()=>{
-   const f=await fixture();await freeSchoolContent(f);await schoolAid(f,'provide');
+   const f=await fixture();await enablePublicScholarship(f);await freeSchoolContent(f);await schoolAid(f,'provide');
    await publicAid(f,'quote');const job=await submit(f,'public');await finish(job);
    const receipt=(await owner.query('SELECT solution_assisted FROM public_luq_receipts WHERE school_id=$1 AND job_id=$2',[f.schoolId,job.id])).rows[0];
    assert.equal(receipt.solution_assisted,true);
@@ -131,7 +132,7 @@ test('public scholarship respects school assessment and submission assistance bo
    assert.equal((await owner.query('SELECT balance FROM school_scholarship_accounts WHERE school_id=$1 AND identity_id=$2',[f.schoolId,f.identityId])).rows[0].balance,100);
   });
   await t.test('public free views and purchases never create school rights or spend school money',async()=>{
-   const f=await fixture();await publicAid(f,'provide');
+   const f=await fixture();await enablePublicScholarship(f);await publicAid(f,'provide');
    assert.equal((await owner.query('SELECT count(*)::int n FROM luq_assistance_entitlements WHERE identity_id=$1',[f.learner.identityId])).rows[0].n,0,'free public view gives no permanent rights');
    await owner.query("INSERT INTO luq_assistance_policies(target_type,target_id,kind,mode,rule_version,created_by) VALUES('problem',$1,'FULL_SOLUTION','paid',2,$2)",[f.problemId,f.author.id]);
    const q=await publicAid(f,'quote');assert.equal(q.price,8);

@@ -7,19 +7,41 @@ import {studentAssistanceOperation} from './scholarship-assistance.mjs';
 import {publicSchoolAssistanceRestriction} from './school-scholarship.mjs';
 import {schoolActivityProblemAccess} from './school-activities.mjs';
 
-// Personal identity is stable across school memberships. Legacy public mirrors
-// retain their original problem/version IDs and therefore their paid rights.
-async function publicWallet(db,user){
+export async function recordPublicPracticeStaffExposure(db,accountId,problemId){
+ await db.query(`INSERT INTO public_practice_staff_exposure(account_id,problem_id)
+  VALUES($1,$2) ON CONFLICT DO NOTHING`,[accountId,problemId]);
+}
+
+async function publicPracticePreferences(db,user,changes){
  await activeAccount(db,user.id);
- const identity=(await db.query(`SELECT i.id FROM accounts a JOIN identities i ON i.id=a.identity_id
-  WHERE a.id=$1 AND i.id=$2 AND i.kind IN ('student','personal') AND i.archived_at IS NULL`,[user.id,user.identityId])).rows[0];
- if(!identity)fail(403,'STUDENT_IDENTITY_REQUIRED','A learner account is required.');
- await db.query('SELECT luq_grant_initial($1)',[identity.id]);
+ if(changes){
+  const {scholarshipEnabled,rankingEnabled}=changes;
+  if((scholarshipEnabled===undefined&&rankingEnabled===undefined)||
+     (scholarshipEnabled!==undefined&&typeof scholarshipEnabled!=='boolean')||
+     (rankingEnabled!==undefined&&typeof rankingEnabled!=='boolean')){
+   fail(400,'VALIDATION','Choose whether to enable scholarship or public ranking.');
+  }
+  await db.query("SELECT pg_advisory_xact_lock(hashtextextended('public-practice:'||$1::uuid::text,0))",[user.id]);
+  await db.query(`INSERT INTO public_practice_preferences(account_id,scholarship_enabled,ranking_enabled)
+   VALUES($1,COALESCE($2,false),COALESCE($3,false))
+   ON CONFLICT(account_id) DO UPDATE SET
+    scholarship_enabled=COALESCE($2,public_practice_preferences.scholarship_enabled),
+    ranking_enabled=COALESCE($3,public_practice_preferences.ranking_enabled)`,
+  [user.id,scholarshipEnabled,rankingEnabled]);
+  if(scholarshipEnabled===true)await db.query('SELECT luq_grant_initial($1)',[user.identityId]);
+ }
+ const {rows:[preferences]}=await db.query(`SELECT
+  scholarship_enabled AS "scholarshipEnabled",ranking_enabled AS "rankingEnabled"
+  FROM public_practice_preferences WHERE account_id=$1`,[user.id]);
+ return {status:200,body:preferences??{scholarshipEnabled:false,rankingEnabled:false}};
 }
 export async function publicScholarshipOperation(ctx,loadPublicProblem){
  const {pool,user,route,method,url,body={}}=ctx;
+ if(route==='/practice/preferences'&&(method==='GET'||method==='PATCH')){
+  return transaction(pool,db=>publicPracticePreferences(db,user,method==='PATCH'?body:null));
+ }
  if(route==='/practice/scholarship/me'&&method==='GET')return transaction(pool,async db=>{
-  await publicWallet(db,user);
+  await activeAccount(db,user.id);
   const page=integer(Number(url.searchParams.get('page')??1),1,100000,'Page'),pageSize=50;
   const balance=(await db.query('SELECT balance FROM luq_accounts WHERE identity_id=$1',[user.identityId])).rows[0]?.balance??0;
   const total=Number((await db.query('SELECT count(*) FROM luq_ledger WHERE identity_id=$1',[user.identityId])).rows[0].count);
@@ -36,7 +58,6 @@ export async function publicScholarshipOperation(ctx,loadPublicProblem){
   if(body.assignmentId||body.timedAttemptId||body.paperId||body.paper4AttemptId)fail(400,'VALIDATION','Public practice does not accept a school activity context.');
   await schoolActivityProblemAccess(db,{schoolId:p.school_id,problemId:p.id,user});
   await lockScholarshipAssistance(db,user.identityId);
-  await publicWallet(db,user);
   const legacy=p.school_id===LEGACY_SCHOOL_ID;
   const target={subjectKey:legacy?`problem:${p.id}`:`public-school:${p.school_id}:problem:${p.id}`,versionId:p.published_version_id,
    problemId:p.id,title:p.public_metadata?.title??'',baseType:'problem',baseId:p.id,contextType:'public',contextId:null};

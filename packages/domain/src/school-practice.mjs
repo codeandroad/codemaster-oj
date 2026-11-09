@@ -1,4 +1,4 @@
-import {publicScholarshipOperation} from './public-scholarship.mjs';
+import {publicScholarshipOperation,recordPublicPracticeStaffExposure} from './public-scholarship.mjs';
 import { schoolActivityJobVisibleSql, schoolActivityProblemAccess, schoolJobFeedback } from './school-activities.mjs';
 import { randomUUID } from 'node:crypto';
 import { transaction } from './db.mjs';
@@ -73,6 +73,7 @@ async function shapeProblem(db,p,user,role,{detail=false,publicOnly=false,access
  if(accessContext==='school')accessContext=practiceContext(role);
  const manage=!publicOnly&&canManage(p,user,role);
  const version=p.published_version_id?(await db.query('SELECT * FROM school_problem_versions WHERE school_id=$1 AND id=$2',[p.school_id,p.published_version_id])).rows[0]:null;
+ if(manage&&detail)await recordPublicPracticeStaffExposure(db,user.id,p.id);
  const def=manage?p.draft:version?.definition;
  if(!def)fail(404,'NOT_FOUND','Problem is unavailable.');
  if(catalogQuery && !`${p.id} ${def.title} ${p.bank_name}`.toLowerCase().includes(catalogQuery)) return null;

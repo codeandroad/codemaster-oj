@@ -47,6 +47,13 @@ test('public scholarship HTTP uses shared purchase rules without exposing privat
    await aid('quote',input,{csrf:false,status:403});
    await request('/scholarship/me',{auth:learner,status:403});
    assert.equal((await owner.query('SELECT count(*)::int n FROM luq_ledger WHERE identity_id=$1',[learner.identityId])).rows[0].n,0);
+   assert.deepEqual((await request('/practice/preferences',{auth:learner})).data,{scholarshipEnabled:false,rankingEnabled:false});
+   assert.equal((await wallet()).balance,0);
+   assert.equal((await aid('quote')).data.balance,0);
+   const enable={method:'PATCH',auth:learner,body:{scholarshipEnabled:true}};
+   await request('/practice/preferences',{...enable,csrf:false,status:403});
+   const results=await Promise.all([request('/practice/preferences',enable),request('/practice/preferences',enable)]);
+   assert.ok(results.every(r=>r.data.scholarshipEnabled&&!r.data.rankingEnabled));
    const wallets=await Promise.all([wallet(),wallet()]);
    assert.ok(wallets.every(w=>w.balance===100&&w.total===1));
    assert.deepEqual((await request('/practice/luq/me',{auth:learner})).data,await wallet());
@@ -84,9 +91,10 @@ test('public scholarship HTTP uses shared purchase rules without exposing privat
    const delivered=(await aid('provide',solution)).data;
    assert.match(delivered.body,/```python\nprint\(5\)\n```/);
    assert.ok(!JSON.stringify(delivered).includes('PRIVATE_'));
+   await request('/practice/preferences',{method:'PATCH',auth:learner,body:{scholarshipEnabled:false}});
    assert.equal((await aid('quote',solution)).data.price,0);
    await aid('provide',solution);assert.equal((await wallet()).balance,92);
-   assert.equal((await wallet(other)).balance,100);
+   assert.equal((await wallet(other)).balance,0);
    await aid('provide',solution,{auth:other,status:403});
    assert.equal((await owner.query("SELECT count(*)::int n FROM luq_ledger WHERE identity_id=$1 AND kind='purchase'",[learner.identityId])).rows[0].n,2);
   });

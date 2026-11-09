@@ -57,22 +57,27 @@ export function PublicPracticeLeaderboard() {
           </h2>
           <p className="text-sm text-muted-foreground">
             {ranking.data ? text(
-              `Earn ${number.format(ranking.data.pointsPerSolved)} points for each public problem you solve. Higher AC rate breaks ties.`,
-              `每通过一道公开练习题得 ${number.format(ranking.data.pointsPerSolved)} 分。同分时按 AC 率排序。`,
-            ) : text("Solve public practice problems to earn points.", "通过公开练习题即可获得积分。")}
+              `With ranking enabled, each eligible solved problem earns ${number.format(ranking.data.pointsPerSolved)} points. Higher AC rate breaks ties.`,
+              `开启排名后，每通过一道符合条件的题得 ${number.format(ranking.data.pointsPerSolved)} 分。同分时按 AC 率排序。`,
+            ) : text("Public ranking is optional.", "公开练习排名可自主开启。")}
           </p>
         </div>
-        <AppLink className={buttonVariants({ size: "sm" })} href="/practice/problems">
-          {text("Practice problems", "去做题")}
-        </AppLink>
+        <div className="flex flex-wrap items-center gap-2">
+          <AppLink className={buttonVariants({ size: "sm", variant: "secondary" })} href="/practice/settings#public-practice">
+            {text("Manage ranking", "管理排名")}
+          </AppLink>
+          <AppLink className={buttonVariants({ size: "sm" })} href="/practice/problems">
+            {text("Practice problems", "去做题")}
+          </AppLink>
+        </div>
       </div>
 
       {own && (
-        <dl aria-label={text("My public practice progress", "我的公开练习进度")} className="grid grid-cols-3 divide-x divide-border rounded-lg border border-border bg-surface">
+        <dl aria-label={text("My public ranking stats", "我的公开排名数据")} className="grid grid-cols-3 divide-x divide-border rounded-lg border border-border bg-surface">
           {[
             { label: text("My rank", "我的排名"), value: own.rank === null ? text("Unranked", "暂未上榜") : `#${number.format(own.rank)}` },
             { label: text("My points", "我的积分"), value: number.format(own.points) },
-            { label: text("Solved", "已解题"), value: number.format(own.solved) },
+            { label: text("Ranked solves", "计入排名的解题数"), value: number.format(own.solved) },
           ].map(metric => (
             <div key={metric.label} className="space-y-1 px-3 py-3 sm:px-4">
               <dt className="text-xs text-muted-foreground">{metric.label}</dt>

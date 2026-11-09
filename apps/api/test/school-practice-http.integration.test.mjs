@@ -116,14 +116,20 @@ test('school and public practice Nest transport requires scoped membership, CSRF
    assert.match(before.headers.get('cache-control')??'',/no-store/);
    assert.deepEqual(before.data.items,[]);
    assert.equal(before.data.own.rank,null);
-   assert.equal(before.data.own.attempts,1);
-   assert.equal(before.data.own.acRate,0);
+   assert.equal(before.data.own.attempts,0);
+   assert.equal(before.data.own.acRate,null);
    assert.match(before.data.own.name,/^Learner-[0-9A-F]{8}$/);
 
    const accepted={status:'AC',score:100,passed:1,total:1,publicMessage:'',privateResults:[]};
    // Complete the queued school sample, then a real public submission using
    // the application's normal transport and restricted worker role.
    await processSchoolOne({pool:worker,judge:{judge:async()=>accepted}});
+   for(const account of ['personal','teacher','platform']) {
+    await request('/practice/preferences',{auth:auth[account],method:'PATCH',body:{rankingEnabled:true}});
+   }
+   await request(`/practice/problems/${problem.id}/submissions`,{auth:auth.personal,method:'POST',
+    body:{kind:'submit',code:'def solve(data):\n return 0',requestId:randomUUID()},status:202});
+   await processSchoolOne({pool:worker,judge:{judge:async()=>({...accepted,status:'WA',score:0,passed:0})}});
    const acceptedRun=(await request(`/practice/problems/${problem.id}/submissions`,{auth:auth.personal,method:'POST',
     body:{kind:'submit',code:'def solve(data):\n return data*2',requestId:randomUUID()},status:202})).data;
    await processSchoolOne({pool:worker,judge:{judge:async()=>accepted}});
@@ -150,11 +156,11 @@ test('school and public practice Nest transport requires scoped membership, CSRF
    await pool.query("UPDATE accounts SET nickname='Private Nickname',leaderboard_use_nickname=false WHERE id=$1",[users.personal.id]);
 
    const ranking=(await request('/practice/leaderboard',{auth:auth.personal})).data;
-   assert.equal(ranking.total,3);
+   assert.equal(ranking.total,1);
    assert.equal(ranking.pointsPerSolved,10);
-   assert.deepEqual(ranking.items.map(row=>row.rank),[1,1,3]);
-   assert.equal(ranking.items.filter(row=>row.name==='Shared Nickname').length,1);
-   assert.deepEqual(ranking.own,{...before.data.own,rank:3,points:10,solved:1,attempts:2,acRate:0.5});
+   assert.deepEqual(ranking.items.map(row=>row.rank),[1]);
+   assert.equal(ranking.items.filter(row=>row.name==='Shared Nickname').length,0);
+   assert.deepEqual(ranking.own,{...before.data.own,rank:1,points:10,solved:1,attempts:2,acRate:0.5});
    assert.deepEqual(ranking.items.filter(row=>row.isOwn),[ranking.own]);
    assert.doesNotMatch(JSON.stringify(ranking),/Private Nickname|PRIVATE_LEADERBOARD_CODE|HIDDEN_LEADERBOARD_CASE|accountId|schoolId|problemId/);
 
@@ -165,8 +171,14 @@ test('school and public practice Nest transport requires scoped membership, CSRF
    const outsidePage=(await request('/practice/leaderboard?page=2',{auth:auth.personal})).data;
    assert.deepEqual(outsidePage.items,[]);
    assert.deepEqual(outsidePage.own,ranking.own);
-   assert.equal(outsidePage.total,3);
+   assert.equal(outsidePage.total,1);
    assert.equal(outsidePage.hasMore,false);
+   await request('/practice/preferences',{auth:auth.personal,method:'PATCH',body:{rankingEnabled:false}});
+   const hidden=(await request('/practice/leaderboard',{auth:auth.personal})).data;
+   assert.deepEqual(hidden.items,[]);
+   assert.equal(hidden.own.rank,null);
+   await request('/practice/preferences',{auth:auth.personal,method:'PATCH',body:{rankingEnabled:true}});
+   assert.equal((await request('/practice/leaderboard',{auth:auth.personal})).data.own.points,10);
    await assert.rejects(worker.query('SELECT * FROM public_practice_leaderboard($1,1,50)',[users.personal.id]),{code:'42501'});
    const app=createPool(runtime.href);
    try {
@@ -218,11 +230,8 @@ test('school and public practice Nest transport requires scoped membership, CSRF
   assert.deepEqual(olderSearch.items,third.items);assert.equal(olderSearch.hasMore,false);
   assert.equal((await pool.query('SELECT count(*)::int n FROM submissions')).rows[0].n,0);
   assert.deepEqual((await pool.query(`SELECT a.username,l.kind,l.delta FROM luq_ledger l
-   JOIN accounts a ON a.identity_id=l.identity_id ORDER BY a.username`)).rows,[
-   {username:'personal',kind:'first_ac',delta:4},
-   {username:'platform',kind:'first_ac',delta:4},
-   {username:'teacher',kind:'first_ac',delta:4},
-  ],'only eligible first formal public ACs receive a reward; school AC, samples, custom runs and retries do not credit the public wallet');
+   JOIN accounts a ON a.identity_id=l.identity_id ORDER BY a.username`)).rows,[],
+   'ranking opt-in does not enable scholarship or initialize a wallet');
   await t.test('public workspace executes samples, custom input and formal submissions in the isolated executor', {skip:!process.env.GO_JUDGE_TEST_URL}, async()=>{
    const judge=new GoJudge({url:process.env.GO_JUDGE_TEST_URL,token:process.env.GO_JUDGE_TEST_TOKEN,environmentVersion:'public-workspace-qa'});
    await judge.ready();

@@ -18,6 +18,7 @@ import { PersonalWorkspaceProfile } from "./personal-workspace-profile";
 import { PersonalWorkspaceSettings } from "./personal-workspace-settings";
 import { PublicCourseCatalog, PublicCoursePage } from "./public-course-catalog";
 import { PublicPracticeLeaderboard } from "./public-practice-leaderboard";
+import { PublicPracticePreferences } from "./public-practice-preferences";
 import { PublicReviewNotebook, PublicSubmissions } from "./public-study-records";
 import { PublicPractice } from "./school-practice";
 import { useSchoolText, type School } from "./school-ui";
@@ -45,7 +46,10 @@ export function PracticePage({ user, pathname, onLogout, onUserSaved }: {
   let content;
   switch (section) {
     case "settings":
-      content = <PersonalWorkspaceSettings user={user} onUserSaved={onUserSaved}/>;
+      content = <div className="space-y-4">
+        <PublicPracticePreferences key={user.id}/>
+        <PersonalWorkspaceSettings user={user} onUserSaved={onUserSaved}/>
+      </div>;
       break;
     case "profile":
       content = <PersonalWorkspaceProfile user={user} onUserSaved={onUserSaved} publicLeaderboard/>;
@@ -66,7 +70,12 @@ export function PracticePage({ user, pathname, onLogout, onUserSaved }: {
       content = <PublicPracticeLeaderboard/>;
       break;
     case "scholarship":
-      content = <StudentScholarshipPage endpoint="practice/scholarship/me"/>;
+      content = <div className="space-y-3">
+        <AppLink href="/practice/settings#public-practice" className="text-sm font-medium text-primary hover:underline">
+          {text("Manage public practice scholarship", "管理公开练习奖学金")}
+        </AppLink>
+        <StudentScholarshipPage endpoint="practice/scholarship/me"/>
+      </div>;
       break;
     default:
       content = <PublicStudyHome user={user}/>;

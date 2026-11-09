@@ -1,3 +1,4 @@
+import { recordPublicPracticeStaffExposure } from './public-scholarship.mjs';
 import {handlePublicPresence} from './public-presence.mjs';
 import { handleSchoolScholarship } from './school-scholarship.mjs';
 import { handleSchoolLeaderboard } from './school-leaderboard.mjs';
@@ -172,7 +173,7 @@ export async function createDomainServices(pool,config) {
   const result=problemShape(presented,{includeDisabledSamples:owner});result.publishedVersionId=owner?p.current_version_id:v.id;result.publishedTitle=owner?result.publishedTitle:v.title;result.bankId=p.bank_id;result.bankVisibility=(await db.query('SELECT visibility FROM problem_banks WHERE id=$1',[p.bank_id])).rows[0]?.visibility;result.canEdit=owner;result.canPublish=owner&&result.canPublish;
   result.canManageTutorial=await canManageLegacyTutorial(db,user,p,owner);
   result.firstAcPoints=(await db.query('SELECT COALESCE((SELECT points FROM point_rewards WHERE problem_id=$1 AND assignment_id IS NULL),10) first_ac_points',[problemId])).rows[0].first_ac_points;
-  if(owner){Object.assign(result,v.metadata||{});result.referenceCode=v.reference_code;result.tests=(await db.query('SELECT input,expected,weight,name,enabled FROM test_cases WHERE version_id=$1 ORDER BY position',[v.id])).rows.map(t=>({...t,weight:Number(t.weight)}));result.formalTestCount=result.tests.filter(t=>t.enabled).length;}else {
+  if(owner){await recordPublicPracticeStaffExposure(db,user.id,p.id);Object.assign(result,v.metadata||{});result.referenceCode=v.reference_code;result.tests=(await db.query('SELECT input,expected,weight,name,enabled FROM test_cases WHERE version_id=$1 ORDER BY position',[v.id])).rows.map(t=>({...t,weight:Number(t.weight)}));result.formalTestCount=result.tests.filter(t=>t.enabled).length;}else {
    // Student assistance is explicitly published and served only by the scholarship
    // provide endpoint. Legacy editorials/hints may include full answers and
    // must not leak through detail requests, SSR or background prefetches.

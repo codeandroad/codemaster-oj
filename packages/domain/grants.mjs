@@ -15,6 +15,9 @@ try {
     REVOKE UPDATE, DELETE ON luq_admin_batches, luq_price_batches, luq_content_batches, problem_public_statements, luq_activity_rules,
       luq_assistance_entitlements, luq_assistance_deliveries, luq_assistance_policies FROM campus_app;
     REVOKE ALL ON public_luq_receipts,public_luq_results FROM PUBLIC,campus_app,campus_worker;
+    REVOKE ALL ON public_practice_preferences,public_practice_ranked_jobs,public_practice_staff_exposure FROM PUBLIC,campus_app,campus_worker;
+    GRANT SELECT,INSERT,UPDATE ON public_practice_preferences TO campus_app;
+    GRANT INSERT ON public_practice_staff_exposure TO campus_app;
     GRANT EXECUTE ON FUNCTION luq_grant_initial(uuid) TO campus_app;
     REVOKE ALL ON FUNCTION luq_grant_initial(uuid) FROM campus_worker;
     GRANT EXECUTE ON FUNCTION luq_post_entry(uuid,integer,text,text,uuid,text,jsonb,bigint,text,text) TO campus_app;

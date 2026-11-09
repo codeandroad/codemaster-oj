@@ -21,17 +21,50 @@ test('public scholarship reuses stable wallets and reviewed contents safely',{sk
   const asRole=role=>{const u=new URL(scoped);u.searchParams.set('options',`-crole=${role} -csearch_path=${schema}`);return createPool(u.href);};app=asRole('campus_app');worker=asRole('campus_worker');
   const call=async(user,route,body,method=body?'POST':'GET')=>(await schoolPracticeOperation({pool:app,user,route:route.split('?')[0],url:new URL('http://unit.test'+route),method,body:body??{}})).body;
   const aid=(user,p,action,kind='FULL_SOLUTION',more={})=>call(user,`/practice/scholarship/assistance/${action}`,{problemId:p.problemId,versionId:p.versionId,kind,...(kind==='FULL_TRANSLATION'?{language:'zh-CN'}:{}),...more});
-  const buy=async(user,p,kind='FULL_SOLUTION')=>{const q=await aid(user,p,'quote',kind);return aid(user,p,'unlock',kind,{requestKey:randomUUID(),confirmedPrice:q.price,confirmedContentId:q.contentId});};
+  const enable=user=>call(user,'/practice/preferences',{scholarshipEnabled:true},'PATCH');
+  const buy=async(user,p,kind='FULL_SOLUTION')=>{await enable(user);const q=await aid(user,p,'quote',kind);return aid(user,p,'unlock',kind,{requestKey:randomUUID(),confirmedPrice:q.price,confirmedContentId:q.contentId});};
   const submit=(user,p,kind='submit')=>call(user,`/practice/problems/${p.problemId}/submissions`,{requestId:randomUUID(),kind,code:'print(5)'});
   const finish=async(job,status='AC')=>{const claimed=await claimSchoolTask(worker);assert.equal(claimed.id,job.id);assert.equal(await finishSchoolTask(worker,claimed,{status,score:status==='AC'?100:0,total:1,passed:status==='AC'?1:0,privateResults:[]}),true);return claimed;};
   const balance=async user=>Number((await owner.query('SELECT balance FROM luq_accounts WHERE identity_id=$1',[user.identityId])).rows[0]?.balance??0);
   let user,p;
-  await t.test('wallet initializes only on use, once concurrently, with no school-local wallet',async()=>{
+  await t.test('wallet initializes only by explicit opt-in, once concurrently, with no school-local wallet',async()=>{
    user=await seedPublicScholarshipLearner(owner);p=await seedPublicScholarshipProblem(owner);
    assert.equal((await owner.query('SELECT count(*)::int n FROM luq_ledger WHERE identity_id=$1',[user.identityId])).rows[0].n,0);
+   assert.equal((await call(user,'/practice/scholarship/me')).balance,0);
+   await Promise.all(Array.from({length:4},()=>enable(user)));
    const results=await Promise.all(Array.from({length:4},()=>call(user,'/practice/scholarship/me')));assert.ok(results.every(r=>r.balance===100&&r.items.length===1));
    assert.equal((await owner.query('SELECT count(*)::int n FROM luq_initial_grants WHERE identity_id=$1',[user.identityId])).rows[0].n,1);
    assert.equal((await owner.query('SELECT count(*)::int n FROM school_scholarship_accounts')).rows[0].n,0);
+  });
+  await t.test('staff keep private ACs and previously unlocked content across independent preference changes',async()=>{
+   const teacher=await seedPublicScholarshipLearner(owner,{kind:'teacher'});
+   const privateProblem=await seedPublicScholarshipProblem(owner);
+   const rankedProblem=await seedPublicScholarshipProblem(owner);
+   const ownProblem=await seedPublicScholarshipProblem(owner,{authorId:teacher.id});
+   const oldJob=await submit(teacher,privateProblem);
+   await enable(teacher);
+   await finish(oldJob);
+   assert.equal(await balance(teacher),100,'enabling while queued does not pay for a private submission');
+   assert.equal((await owner.query('SELECT 1 FROM luq_first_ac_claims WHERE identity_id=$1',[teacher.identityId])).rowCount,0);
+   await finish(await submit(teacher,privateProblem));
+   assert.equal(await balance(teacher),100,'a private first AC is not paid on a repeat solve');
+
+   await buy(teacher,rankedProblem,'FULL_TRANSLATION');
+   const preferences={scholarshipEnabled:true,rankingEnabled:true};
+   await call(teacher,'/practice/preferences',preferences,'PATCH');
+   await finish(await submit(teacher,ownProblem));
+   assert.equal((await call(teacher,'/practice/leaderboard')).own.rank,null);
+   assert.equal(await balance(teacher),97);
+   const ranked=await submit(teacher,rankedProblem);
+   await call(teacher,'/practice/preferences',{scholarshipEnabled:false,rankingEnabled:false},'PATCH');
+   await finish(ranked);
+   assert.equal(await balance(teacher),101,'an eligible queued result retains its admission rules');
+   assert.equal((await call(teacher,'/practice/leaderboard')).own.rank,null);
+   assert.equal((await aid(teacher,rankedProblem,'provide','FULL_TRANSLATION')).body,'输出数字五。');
+   await call(teacher,'/practice/preferences',preferences,'PATCH');
+   assert.equal((await call(teacher,'/practice/leaderboard')).own.solved,1);
+   assert.equal(await balance(teacher),101);
+   assert.equal((await owner.query('SELECT count(*)::int n FROM luq_initial_grants WHERE identity_id=$1',[teacher.identityId])).rows[0].n,1);
   });
   await t.test('reviewed exact content, transaction-safe translation credit, replay and body separation',async()=>{
    const q=await aid(user,p,'quote','FULL_TRANSLATION');assert.equal(q.price,3);assert.equal(q.available,true);assert.equal(q.body,undefined);
@@ -49,7 +82,7 @@ test('public scholarship reuses stable wallets and reviewed contents safely',{sk
    await assert.rejects(aid(user,p,'quote','FULL_SOLUTION',{assignmentId:randomUUID()}),e=>e.status===400);
   });
   await t.test('competing purchases cannot overdraw and a refund is exactly once while rights remain',async()=>{
-   const learner=await seedPublicScholarshipLearner(owner);await call(learner,'/practice/scholarship/me');
+   const learner=await seedPublicScholarshipLearner(owner);await enable(learner);
    await owner.query("SELECT luq_post_entry($1,-92,'admin_adjustment',$2,NULL,'fixture balance')",[learner.identityId,randomUUID()]);
    const left=await seedPublicScholarshipProblem(owner),right=await seedPublicScholarshipProblem(owner);
    const responses=await Promise.allSettled([buy(learner,left),buy(learner,right)]);assert.equal(responses.filter(r=>r.status==='fulfilled').length,1);assert.equal(responses.filter(r=>r.status==='rejected'&&r.reason.code==='INSUFFICIENT_LUQ').length,1);assert.equal(await balance(learner),0);
@@ -68,6 +101,7 @@ test('public scholarship reuses stable wallets and reviewed contents safely',{sk
   });
   await t.test('a public formal AC enables free delivery without charging or creating a purchase entitlement',async()=>{
    const learner=await seedPublicScholarshipLearner(owner),question=await seedPublicScholarshipProblem(owner);
+   await enable(learner);
    await finish(await submit(learner,question,'samples'));
    assert.equal((await aid(learner,question,'quote')).price,8);
    await finish(await submit(learner,question));
@@ -98,12 +132,13 @@ test('public scholarship reuses stable wallets and reviewed contents safely',{sk
   await t.test('free solution delivery still snapshots assistance without creating a purchased right',async()=>{
    const learner=await seedPublicScholarshipLearner(owner),question=await seedPublicScholarshipProblem(owner);
    await owner.query("INSERT INTO luq_assistance_policies(target_type,target_id,kind,mode,price,rule_version,created_by) VALUES('problem',$1,'FULL_SOLUTION','paid',0,1,$2)",[question.problemId,question.authorId]);
+   await enable(learner);
    assert.equal((await aid(learner,question,'quote')).mode,'free');await aid(learner,question,'provide');const job=await submit(learner,question);await finish(job);assert.equal(await balance(learner),100);
    assert.equal((await owner.query('SELECT 1 FROM luq_assistance_entitlements WHERE identity_id=$1',[learner.identityId])).rowCount,0);
    assert.equal((await owner.query('SELECT solution_assisted FROM public_luq_receipts WHERE job_id=$1',[job.id])).rows[0].solution_assisted,true);
   });
   await t.test('concurrent AC, duplicate callbacks and cross-entry historical claims cannot mint twice',async()=>{
-   const learner=await seedPublicScholarshipLearner(owner),question=await seedPublicScholarshipProblem(owner);await call(learner,'/practice/scholarship/me');
+   const learner=await seedPublicScholarshipLearner(owner),question=await seedPublicScholarshipProblem(owner);await enable(learner);
    const jobs=await Promise.all([1,2].map(()=>submit(learner,question)));const claimed=await Promise.all([1,2].map(()=>claimSchoolTask(worker)));assert.deepEqual(new Set(claimed.map(j=>j.id)),new Set(jobs.map(j=>j.id)));
    const result={status:'AC',score:100,total:1,passed:1,privateResults:[]};await Promise.all(claimed.map(j=>finishSchoolTask(worker,j,result)));assert.equal(await balance(learner),104);assert.equal(await finishSchoolTask(worker,claimed[0],result),false);assert.equal(await balance(learner),104);
    await owner.query("UPDATE school_judge_jobs SET result=jsonb_set(result,'{status}','\"WA\"') WHERE school_id=$1 AND id=$2",[claimed[0].school_id,claimed[0].id]);
@@ -133,7 +168,7 @@ test('public scholarship reuses stable wallets and reviewed contents safely',{sk
    await assert.rejects(handleScholarshipLedger({pool:app,user:admin,route:'/scholarship/refunds',method:'POST',body:{ledgerId:String(purchase.id),requestId:randomUUID(),reason:'outside scope'}}),e=>e.status===404);
   });
   await t.test('worker cannot read or write money, assistance or immutable receipt tables',async()=>{
-   for(const table of ['luq_ledger','luq_accounts','luq_assistance_contents','luq_assistance_deliveries','public_luq_receipts','public_luq_results'])await assert.rejects(worker.query(`SELECT * FROM ${table}`),{code:'42501'});
+   for(const table of ['luq_ledger','luq_accounts','luq_assistance_contents','luq_assistance_deliveries','public_luq_receipts','public_luq_results','public_practice_preferences','public_practice_ranked_jobs','public_practice_staff_exposure'])await assert.rejects(worker.query(`SELECT * FROM ${table}`),{code:'42501'});
    await assert.rejects(worker.query('SELECT luq_grant_initial($1)',[user.identityId]),{code:'42501'});
    for(const table of ['public_luq_receipts','public_luq_results'])await assert.rejects(app.query(`SELECT * FROM ${table}`),{code:'42501'});
   });
@@ -147,7 +182,7 @@ test('public scholarship migration consumes old AC without touching money or stu
  try{
   await manager.query(`CREATE SCHEMA ${schema}`);
   await owner.query('CREATE TABLE schema_migrations(name text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');
-  await owner.query("INSERT INTO schema_migrations(name) VALUES('080_public_scholarship.sql')");await migrate(owner);
+  await owner.query("INSERT INTO schema_migrations(name) VALUES('080_public_scholarship.sql'),('085_public_practice_preferences.sql')");await migrate(owner);
   const learner=await seedPublicScholarshipLearner(owner),question=await seedPublicScholarshipProblem(owner),pendingQuestion=await seedPublicScholarshipProblem(owner);
   const enqueue=async(p,completed)=>(await owner.query(`INSERT INTO school_judge_jobs(school_id,problem_id,version_id,account_id,request_id,request_hash,kind,access_context,payload,state,result,completed_at)
    VALUES($1,$2,$3,$4,$5,'historical-fixture','submit','public','{}',$6,$7,CASE WHEN $6='completed' THEN clock_timestamp() ELSE NULL END) RETURNING *`,[LEGACY_SCHOOL_ID,p.problemId,p.versionId,learner.id,randomUUID(),completed?'completed':'queued',completed?{status:'AC',score:100}:null])).rows[0];
@@ -161,5 +196,18 @@ test('public scholarship migration consumes old AC without touching money or stu
   await owner.query(`UPDATE school_judge_jobs SET state='completed',completed_at=clock_timestamp(),result='{"status":"AC","score":100}' WHERE school_id=$1 AND id=$2`,[LEGACY_SCHOOL_ID,pending.id]);
   claim=(await owner.query('SELECT * FROM luq_first_ac_claims WHERE identity_id=$1 AND subject_key=$2',[learner.identityId,'problem:'+pendingQuestion.problemId])).rows[0];assert.equal(claim.reason,'historical_public_submission');assert.equal(claim.eligible,false);
   assert.deepEqual((await owner.query('SELECT * FROM luq_ledger ORDER BY id')).rows,money);
+  await owner.query('SELECT luq_grant_initial($1)',[learner.identityId]);
+  const subject='problem:'+question.problemId;
+  const {rows:[purchase]}=await owner.query("SELECT (luq_post_entry($1,-3,'purchase',$2,$3,'Historical translation')).id",
+   [learner.identityId,'historical-purchase:'+randomUUID(),learner.id]);
+  await owner.query(`INSERT INTO luq_assistance_entitlements(identity_id,subject_key,kind,language,ledger_id)
+   VALUES($1,$2,'FULL_TRANSLATION','zh-CN',$3)`,[learner.identityId,subject,purchase.id]);
+  const snapshots=async()=>Promise.all(['luq_accounts','luq_ledger','luq_initial_grants','luq_assistance_entitlements','school_judge_jobs']
+   .map(async table=>(await owner.query(`SELECT to_jsonb(t) AS row FROM ${table} t ORDER BY to_jsonb(t)::text`)).rows));
+  const before=await snapshots();
+  await owner.query("DELETE FROM schema_migrations WHERE name='085_public_practice_preferences.sql'");await migrate(owner);
+  assert.deepEqual(await snapshots(),before);
+  assert.equal((await owner.query('SELECT balance FROM luq_accounts WHERE identity_id=$1',[learner.identityId])).rows[0].balance,97);
+  assert.equal((await owner.query('SELECT count(*)::int n FROM public_practice_preferences')).rows[0].n,0);
  }finally{await owner.end();await manager.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);await manager.end();}
 });

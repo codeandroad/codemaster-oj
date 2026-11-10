@@ -38,13 +38,16 @@ test('presentation-only repair keeps grading versions, submissions, points and j
     delete original.programming.solution;
     original.slug = 'acsl-presentation-source';
     const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aG3sAAAAASUVORK5CYII=', 'base64');
+    const translatedPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
     original.assets = [{ id: 'old-question-crop', path: 'old.png', sha256: createHash('sha256').update(png).digest('hex'), mimeType: 'image/png', width: 1, height: 1,
       source: { path: 'source.pdf', sha256: '0'.repeat(64), page: 1, bbox: [0, 0, 1, 1] } }];
+    original.assets.push({ ...original.assets[0], id: 'old-program-zh', path: 'old-zh.png', sha256: createHash('sha256').update(translatedPng).digest('hex') });
     original.questions[0].statementAssets = { en: ['old-question-crop'], zh: [] };
-    original.programming.statementAssets = { en: ['old-question-crop'], zh: [] };
+    original.programming.statementAssets = { en: ['old-question-crop'], zh: ['old-program-zh'] };
     const paper = await importAcslPaper(pool, { schoolId: LEGACY_SCHOOL_ID, ownerAccountId: users.actor.id, content: original,
-      assets: [{ id: 'old-question-crop', content: png }], enablePoints: true });
+      assets: [{ id: 'old-question-crop', content: png }, { id: 'old-program-zh', content: translatedPng }], enablePoints: true });
     const otherContent = structuredClone(original); otherContent.slug = 'acsl-presentation-second'; otherContent.division = 'Elementary'; otherContent.programming = null;
+    otherContent.assets.pop();
     const other = await importAcslPaper(pool, { schoolId: LEGACY_SCHOOL_ID, ownerAccountId: users.actor.id, content: otherContent, assets: [{ id: 'old-question-crop', content: png }] });
     const asRole = role => { const url = new URL(scoped); url.searchParams.set('options', `-crole=${role} -csearch_path=${schema}`); return url.href; };
     app = createPool(asRole('campus_app')); worker = createPool(asRole('campus_worker'));
@@ -60,6 +63,18 @@ test('presentation-only repair keeps grading versions, submissions, points and j
     const auth = {};
     for (const name of Object.keys(users)) { const login = await request('/auth/login', { method: 'POST', body: { username: name, password } }); auth[name] = { cookie: login.cookie, csrfToken: login.data.csrfToken }; }
     const path = `/schools/${LEGACY_SCHOOL_ID}/acsl/${paper.id}`;
+    await t.test('private Chinese source images require the same translation entitlement', async () => {
+      const asset = `${path}/assets/old-program-zh?versionId=${paper.versionId}`;
+      await request(asset, { auth: auth.pending, status: 403 });
+      const translate = (action, body = {}) => request(`${path}/programming/translation/${action}`, { auth: auth.pending, method: 'POST', body });
+      const quote = (await translate('quote')).data;
+      await translate('unlock', { requestKey: randomUUID(), confirmedContentId: quote.contentId, confirmedPrice: quote.price });
+      assert.ok((await translate('provide')).data.body.includes(asset));
+      const response = await fetch(`${host}/api/v1${asset}`, { headers: { Origin: origin, Cookie: auth.pending.cookie } });
+      assert.equal(response.status, 200);
+      assert.deepEqual(Buffer.from(await response.arrayBuffer()), translatedPng);
+      await request(asset, { auth: auth.student, status: 403 });
+    });
     for (const question of original.questions) await request(`${path}/questions/${question.id}/draft`, { auth: auth.student, method: 'PATCH', body: { versionId: paper.versionId, expectedRevision: 0, selectedOptionIds: question.correctOptionIds } });
     await request(`${path}/questions/q1/draft`, { auth: auth.pending, method: 'PATCH', body: { versionId: paper.versionId, expectedRevision: 0, selectedOptionIds: ['A'] } });
     const grade = (await request(`${path}/submit`, { auth: auth.student, method: 'POST', body: { versionId: paper.versionId, revisions: Object.fromEntries(original.questions.map(q => [q.id, 1])) } })).data;
@@ -130,7 +145,14 @@ test('presentation-only repair keeps grading versions, submissions, points and j
       const english = (await request(`${path}/programming?language=en`, { auth: auth.student })).data;
       assert.equal(english.statement, native.programming.definition.statement); assert.equal(english.title, native.programming.definition.title); assert.deepEqual(english.statementDiagrams, diagram.en);
       const chinese = (await request(`${path}/programming?language=zh`, { auth: auth.student })).data;
-      assert.equal(chinese.statement, native.programming.statementZh); assert.deepEqual(chinese.statementDiagrams, []);
+      assert.equal(chinese.statement, english.statement); assert.deepEqual(chinese.statementDiagrams, diagram.en);
+      const translate = (action, body = {}, status = 200) => request(`${path}/programming/translation/${action}`,
+        { auth: auth.student, method: 'POST', body: { paperVersionId: paper.versionId, ...body }, status });
+      await translate('provide', {}, 403);
+      const quote = (await translate('quote')).data;
+      await translate('unlock', { requestKey: randomUUID(), confirmedContentId: quote.contentId, confirmedPrice: quote.price });
+      const translated = (await translate('provide')).data;
+      assert.equal(translated.body, native.programming.statementZh); assert.deepEqual(translated.statementDiagrams, diagram.zh);
       assert.equal(english.versionId, programming.versionId); assert.deepEqual(english.samples, programming.samples);
       assert.ok(!JSON.stringify(english).includes('referenceCode')); assert.ok(!JSON.stringify(english).includes('"tests"'));
       const second = (await request(`/schools/${LEGACY_SCHOOL_ID}/acsl/${other.id}`, { auth: auth.student })).data;

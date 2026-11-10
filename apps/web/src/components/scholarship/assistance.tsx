@@ -17,7 +17,8 @@ export type AssistanceTarget =
       assignmentId?: string;
       timedAttemptId?: string;
     }
-  | { paper4AttemptId: string; questionKey: string };
+  | { paper4AttemptId: string; questionKey: string }
+  | { paperVersionId: string; contentLanguage?: "en" | "zh" };
 interface Quote {
   available: boolean;
   mode: "disabled" | "paid" | "free";
@@ -30,31 +31,34 @@ interface Quote {
   contentId?: string;
   requiresConfirmation: boolean;
   reason?: string;
+  affectsFirstAcScholarship?: boolean;
 }
 interface Provided {
   body: string;
   kind: AssistanceKind;
   language: string;
-  providedAt: string;
+  providedAt?: string;
   contentId: string;
 }
 
 /** Metadata only until the student explicitly confirms. Bodies are never prefetched or persisted. */
-export function ScholarshipAssistance({
+export function ScholarshipAssistance<Content extends Provided = Provided>({
   target,
   kind,
   renderBody,
+  description,
   endpoint = "scholarship/assistance",
 }: {
   target: AssistanceTarget;
   kind: AssistanceKind;
-  renderBody?: (body: string) => ReactNode;
-  endpoint?: "scholarship/assistance" | "practice/scholarship/assistance";
+  renderBody?: (body: string, content: Content) => ReactNode;
+  description?: string;
+  endpoint?: "scholarship/assistance" | "practice/scholarship/assistance" | `schools/${string}/acsl/${string}/programming/${"translation" | "solution"}`;
 }) {
   const { locale } = useLocale(),
     tx = (zh: string, en: string) => (locale === "en" ? en : zh);
   const [quote, setQuote] = useState<Quote | null>(null),
-    [provided, setProvided] = useState<Provided | null>(null);
+    [provided, setProvided] = useState<Content | null>(null);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const lock = useRef(false),
@@ -116,7 +120,7 @@ export function ScholarshipAssistance({
         window.dispatchEvent(new Event("campus-judge:scholarship-changed"));
       }
       setProvided(
-        await productionApi<Provided>(`${endpoint}/provide`, {
+        await productionApi<Content>(`${endpoint}/provide`, {
           method: "POST",
           body,
         }),
@@ -134,23 +138,23 @@ export function ScholarshipAssistance({
       {provided ? (
         <>
           {renderBody ? (
-            renderBody(provided.body)
+            renderBody(provided.body, provided)
           ) : kind === "FULL_SOLUTION" ? (
             <SolutionContent body={provided.body} />
           ) : (
             <LessonContent content={provided.body} />
           )}
           <p className="text-xs text-muted-foreground">
-            {tx(
+            {provided.providedAt ? tx(
               "本次提供已记录；已解锁内容可免费重看，仍受活动开放规则约束。",
               "Delivery recorded. Unlocked content can be viewed again free, subject to activity access rules.",
-            )}
+            ) : tx("已解锁的内容可免费重看。", "Unlocked content can be viewed again free.")}
           </p>
         </>
       ) : (
         <>
           <p className="text-sm text-muted-foreground">
-            {kind === "FULL_TRANSLATION"
+            {description ?? (kind === "FULL_TRANSLATION"
               ? tx(
                   "查看已审核的中文题面。翻译不影响首次 AC 的奖学金奖励。",
                   "Read the reviewed Chinese statement. Translation does not affect first-AC scholarship rewards.",
@@ -158,7 +162,7 @@ export function ScholarshipAssistance({
               : tx(
                   "查看已发布的题解。提交前查看完整答案会影响本题首次 AC 的奖学金奖励；成绩和排行榜积分不变。",
                   "Read the published solution. Viewing a full solution before submitting affects first-AC scholarship rewards for this problem; grades and leaderboard points are unchanged.",
-                )}
+                ))}
           </p>
           <Button
             size="sm"
@@ -246,7 +250,7 @@ export function ScholarshipAssistance({
                           "Pay once per problem and assistance type. Revisit published content for the relevant version across pages and activities.",
                         )}
                 </p>
-                {kind === "FULL_SOLUTION" && (
+                {kind === "FULL_SOLUTION" && quote.affectsFirstAcScholarship !== false && (
                   <p className="rounded-md border border-warning/30 bg-warning/5 p-3">
                     {tx(
                       "确认后本站会提供完整答案并记录提供时间。此后提交不领取本题首次 AC 奖学金；此前已提交、正在判题的答案及已经到账的奖励不受影响。挑战任务通常也不奖励看过答案后的提交。",

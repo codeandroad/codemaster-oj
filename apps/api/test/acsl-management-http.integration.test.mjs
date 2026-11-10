@@ -111,6 +111,59 @@ test('ACSL teacher management authorizes local staff and preserves grades, expor
       }
     });
 
+    await t.test('solution prices default to 12 and only local teaching staff may change a paper price', async () => {
+      const pricePath = `${manage}/solution-price`, otherPricePath = `${otherManage}/solution-price`;
+      const defaultPrice = { price: null, defaultPrice: 12, effectivePrice: 12, revision: 0 };
+      for (const [target, actor] of [[pricePath, auth.teacher], [otherPricePath, auth.schoolteacher]]) {
+        const result = await request(target, { auth: actor });
+        assert.deepEqual(result.data, defaultPrice); assert.match(result.cache, /private.*no-store/);
+      }
+      await request(pricePath, { status: 401 });
+      for (const name of ['historical', 'pending', 'outsider']) {
+        await request(pricePath, { auth: auth[name], status: 403 });
+        await request(pricePath, { auth: auth[name], method: 'PATCH', body: { price: 1, expectedRevision: 0 }, status: 403 });
+      }
+      await request(otherPricePath, { auth: auth.teacher, method: 'PATCH', body: { price: 1, expectedRevision: 0 }, status: 403 });
+      await request(otherPricePath, { auth: auth.admin, status: 404 });
+      await request(`${root}/manage/${other.id}/solution-price`, { auth: auth.teacher, status: 404 });
+      await request(pricePath, { auth: auth.teacher, method: 'PATCH', csrf: false, body: { price: 18, expectedRevision: 0 }, status: 403 });
+      const before = (await pool.query('SELECT * FROM acsl_papers ORDER BY id')).rows;
+      const changed = (await request(pricePath, { auth: auth.teacher, method: 'PATCH', body: { price: 18, expectedRevision: 0 } })).data;
+      assert.deepEqual(changed, { price: 18, defaultPrice: 12, effectivePrice: 18, revision: 1 });
+      assert.deepEqual((await request(pricePath, { auth: auth.teacher, method: 'PATCH', body: { price: 18, expectedRevision: 1 } })).data, changed);
+      await request(pricePath, { auth: auth.teacher, method: 'PATCH', body: { price: 18, expectedRevision: 0 }, status: 409 });
+      assert.deepEqual((await request(otherPricePath, { auth: auth.schoolteacher })).data, defaultPrice);
+      assert.equal((await request(otherPricePath, { auth: auth.schoolteacher, method: 'PATCH', body: { price: 9, expectedRevision: 0 } })).data.effectivePrice, 9);
+      assert.equal((await request(pricePath, { auth: auth.admin })).data.effectivePrice, 18);
+      assert.deepEqual((await pool.query('SELECT * FROM acsl_papers ORDER BY id')).rows, before, 'pricing must not revise questions, grades or judge versions');
+      assert.equal((await pool.query("SELECT count(*)::int n FROM school_audit_events WHERE action='acsl.solution_price'")).rows[0].n, 2);
+      await assert.rejects(worker.query('SELECT * FROM school_scholarship_policies'), { code: '42501' });
+    });
+
+    await t.test('price validation, free access, default reset and concurrent edits preserve the current policy', async () => {
+      const pricePath = `${manage}/solution-price`;
+      for (const price of [-1, 1001, 1.5, '12', false, {}, []]) {
+        await request(pricePath, { auth: auth.teacher, method: 'PATCH', body: { price, expectedRevision: 1 }, status: 400 });
+      }
+      for (const body of [{ expectedRevision: 1 }, { price: 12 }, { price: 12, expectedRevision: '1' },
+        { price: 12, expectedRevision: 1, mode: 'disabled' }]) {
+        await request(pricePath, { auth: auth.teacher, method: 'PATCH', body, status: 400 });
+      }
+      assert.equal((await request(pricePath, { auth: auth.teacher })).data.revision, 1);
+      assert.deepEqual((await request(pricePath, { auth: auth.teacher, method: 'PATCH', body: { price: 0, expectedRevision: 1 } })).data,
+        { price: 0, defaultPrice: 12, effectivePrice: 0, revision: 2 });
+      assert.deepEqual((await request(pricePath, { auth: auth.admin, method: 'PATCH', body: { price: null, expectedRevision: 2 } })).data,
+        { price: null, defaultPrice: 12, effectivePrice: 12, revision: 3 });
+      const results = await Promise.all([
+        request(pricePath, { auth: auth.teacher, method: 'PATCH', body: { price: 7, expectedRevision: 3 }, status: [200, 409] }),
+        request(pricePath, { auth: auth.admin, method: 'PATCH', body: { price: 22, expectedRevision: 3 }, status: [200, 409] }),
+      ]);
+      assert.deepEqual(results.map(result => result.status).sort(), [200, 409]);
+      const saved = (await request(pricePath, { auth: auth.teacher })).data;
+      assert.deepEqual(saved, results.find(result => result.status === 200).data); assert.equal(saved.revision, 4);
+      assert.equal((await pool.query("SELECT count(*)::int n FROM school_audit_events WHERE action='acsl.solution_price' AND school_id=$1", [LEGACY_SCHOOL_ID])).rows[0].n, 4);
+    });
+
     await t.test('unknown fields, structural edits, invalid answer sets and judge data are rejected before any write', async () => {
       const edit = { expectedContentHash: current.contentHash, requestId: randomUUID(), reason: 'Reviewed teaching correction' };
       for (const patch of [ { questions: [{ id: 'q1', type: 'multiple' }] }, { questions: [{ id: 'new', statement: { en: 'X', zh: 'X' } }] },
@@ -165,6 +218,8 @@ test('ACSL teacher management authorizes local staff and preserves grades, expor
       await pool.query('UPDATE school_memberships SET revoked_at=clock_timestamp() WHERE school_id=$1 AND account_id=$2', [school.id, users.schoolteacher.id]);
       await request(otherManage, { auth: auth.schoolteacher, status: 404 });
       await request(`${otherManage}/export?include=package`, { auth: auth.schoolteacher, status: 404 });
+      await request(`${otherManage}/solution-price`, { auth: auth.schoolteacher, status: 404 });
+      await request(`${otherManage}/solution-price`, { auth: auth.schoolteacher, method: 'PATCH', body: { price: 2, expectedRevision: 1 }, status: 404 });
     });
 
     await t.test('the definer enforces roles and immutable judge/structure constraints even for direct runtime calls', async () => {

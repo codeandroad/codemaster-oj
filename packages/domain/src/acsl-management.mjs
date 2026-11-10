@@ -2,6 +2,7 @@ import { transaction } from './db.mjs';
 import { activeAccount, LEGACY_SCHOOL_ID, lockSchoolTeaching, schoolRole } from './schools.mjs';
 import { enumValue, fail, field, uuid } from './security.mjs';
 import { validatePaperDefinition } from './acsl-grading.mjs';
+import { readAcslSolutionPrice, updateAcslSolutionPrice } from './acsl-pricing.mjs';
 
 const reply = body => ({ status: 200, body });
 const questionFields = ['topic', 'statement', 'statementDiagrams', 'correctOptionIds', 'explanation', 'explanationDiagrams'];
@@ -127,7 +128,8 @@ export function acslExportDocument(content, include, language) {
 
 export async function handleAcslManagement({ pool, user, schoolId, tail, method, body, url }) {
   const parts = (tail ?? '').split('/').filter(Boolean);
-  if (parts.length > 2 || parts.length === 2 && parts[1] !== 'export' || !['GET', 'PATCH'].includes(method) || method === 'PATCH' && parts.length !== 1) return null;
+  if (parts.length > 2 || parts.length === 2 && !['export', 'solution-price'].includes(parts[1]) || !['GET', 'PATCH'].includes(method) ||
+      method === 'PATCH' && !(parts.length === 1 || parts.length === 2 && parts[1] === 'solution-price')) return null;
   return transaction(pool, async db => {
     await staffAccess(db, schoolId, user, method === 'PATCH');
     if (!parts.length) {
@@ -135,6 +137,10 @@ export async function handleAcslManagement({ pool, user, schoolId, tail, method,
       return reply({ enabled: papers.length > 0, items: papers.map(catalogItem) });
     }
     let paper = await load(db, schoolId, parts[0]);
+    if (parts[1] === 'solution-price') {
+      if (!paper.programming_problem_id) fail(404, 'NOT_FOUND', 'This ACSL paper has no programming section.');
+      return reply(method === 'GET' ? await readAcslSolutionPrice(db, paper) : await updateAcslSolutionPrice(db, paper, user, body));
+    }
     if (parts[1] === 'export') {
       const include = enumValue(url.searchParams.get('include') ?? 'questions', ['questions', 'answers', 'package'], 'Export content');
       const language = enumValue(url.searchParams.get('language') ?? 'en', ['en', 'zh'], 'Export language');

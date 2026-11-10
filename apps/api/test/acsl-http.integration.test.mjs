@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createApiApplication } from '../dist/application.js';
-import { createPool } from '../../../packages/domain/src/db.mjs';
+import { createPool, transaction } from '../../../packages/domain/src/db.mjs';
 import { migrate } from '../../../packages/domain/src/migrate.mjs';
 import { LEGACY_SCHOOL_ID, provisionSchool } from '../../../packages/domain/src/schools.mjs';
 import { hashPassword } from '../../../packages/domain/src/security.mjs';
@@ -32,6 +32,7 @@ test('ACSL real Nest lifecycle protects answers, histories, drafts, school scope
     }
     const school = await provisionSchool(pool, { slug: 'acsl-school', name: 'ACSL school', adminUsername: 'admin' });
     await pool.query("INSERT INTO school_memberships(school_id,account_id,role) VALUES($1,$2,'student')", [school.id,users.student.id]);
+    const schoolStudentIdentity = (await pool.query("INSERT INTO school_identities(school_id,kind,number,name,account_id) VALUES($1,'student','learner','Learner',$2) RETURNING id", [school.id,users.student.id])).rows[0];
     for (const [name, actor] of Object.entries(users)) {
       if (!name.startsWith('legacy')) continue;
       await pool.query("INSERT INTO account_roles(account_id,role) VALUES($1,'student')", [actor.id]);
@@ -134,9 +135,13 @@ test('ACSL real Nest lifecycle protects answers, histories, drafts, school scope
     await t.test('multi-select snapshots and simultaneous save/turn-in serialize without losing an acknowledged edit', async () => {
       const fixture = structuredClone(content);
       fixture.slug = 'acsl-test-multiple';
+      fixture.programming.tutorial = { en: 'Trace the cards one at a time.', zh: '逐张检查牌的移动。' };
       fixture.questions[0].type = 'multiple'; fixture.questions[0].correctOptionIds = ['C','D'];
       const multiple = await importAcslPaper(pool, { schoolId: school.id, ownerAccountId: users.admin.id, content: fixture });
       const multiplePath = `${root}/${multiple.id}`;
+      const guided = (await request(`${multiplePath}/programming?language=zh`, { auth: auth.student })).data;
+      assert.deepEqual(guided.tutorial, { source: 'custom', body: fixture.programming.tutorial.zh });
+      assert.equal(guided.statement, fixture.programming.definition.statement);
       for (const item of fixture.questions) await request(`${multiplePath}/questions/${item.id}/draft`, { auth: auth.admin, method: 'PATCH', body: { versionId: multiple.versionId, expectedRevision: 0, selectedOptionIds: [...item.correctOptionIds].reverse() } });
       const revisions = Object.fromEntries(fixture.questions.map(question => [question.id,1]));
       const raced = await Promise.all([
@@ -152,15 +157,23 @@ test('ACSL real Nest lifecycle protects answers, histories, drafts, school scope
       assert.equal((await request(multiplePath, { auth: auth.student })).data.graded, false, 'grade is owned by the submitting account');
     });
     let programming, job;
+    const referencePath = `${path}/programming?view=solution`;
     await t.test('programming reuses queue with private feedback and owner-scoped results', async () => {
       programming = (await request(`${path}/programming`, { auth: auth.student })).data;
       assert.ok(!JSON.stringify(programming).includes('referenceCode')); assert.ok(!JSON.stringify(programming).includes('"tests"'));
+      assert.equal(programming.referenceAvailable, true);
+      assert.equal(programming.tutorial, undefined);
+      await request(referencePath, { status: 401 });
+      await request(referencePath, { auth: auth.outsider, status: 404 });
+      await request(referencePath, { auth: auth.student, status: 403 });
       const body = { versionId: programming.versionId, kind: 'submit', language: 'python', code: 'print(0)', requestId: randomUUID() };
       job = (await request(`${path}/programming/submissions`, { auth: auth.student, method: 'POST', body, status: 202 })).data;
       assert.equal((await request(`${path}/programming/submissions`, { auth: auth.student, method: 'POST', body, status: 202 })).data.id, job.id);
+      await request(referencePath, { auth: auth.student, status: 403 });
       await processSchoolOne({ pool: worker, judge: { judge: async () => ({ status: 'WA', score: 0, passed: 0, total: 1, publicMessage: '', privateResults: [{ position: 1, status: 'WA', stdout: 'PRIVATE', expected: 'SECRET', input: 'HIDDEN' }] }) } });
       const result = (await request(`${path}/programming/submissions/${job.id}`, { auth: auth.student })).data;
       assert.equal(result.status, 'WA'); for (const secret of ['PRIVATE','SECRET','HIDDEN']) assert.ok(!JSON.stringify(result).includes(secret));
+      await request(referencePath, { auth: auth.student, status: 403 });
       const resume = `${path}/programming/submissions?view=resume&versionId=${programming.versionId}`;
       assert.deepEqual((await request(resume, { auth: auth.student })).data, { submission: { code: body.code, language: body.language } });
       assert.deepEqual((await request(resume, { auth: auth.admin })).data, { submission: null });
@@ -168,18 +181,70 @@ test('ACSL real Nest lifecycle protects answers, histories, drafts, school scope
       await request(`${path}/programming/submissions/${job.id}`, { auth: auth.admin, status: 404 });
       await request(`/schools/${school.id}/judge-jobs/${job.id}`, { auth: auth.student, status: 404 });
       assert.equal((await request(`/schools/${school.id}/submissions`, { auth: auth.student })).data.items.length, 0);
-      assert.equal((await pool.query('SELECT count(*)::int n FROM school_scholarship_ledger')).rows[0].n, 0);
+      assert.equal((await pool.query('SELECT count(*)::int n FROM school_scholarship_ledger WHERE kind<>\'initial_grant\'')).rows[0].n, 0);
     });
     await t.test('real isolated executor validates official sample and test cases', { skip: !process.env.GO_JUDGE_TEST_URL }, async () => {
       const judge = new GoJudge({ url: process.env.GO_JUDGE_TEST_URL, token: process.env.GO_JUDGE_TEST_TOKEN, environmentVersion: process.env.JUDGE_ENVIRONMENT_VERSION ?? 'acsl-integration' });
       await judge.ready();
-      for (const kind of ['samples','submit']) {
-        const body = { versionId: programming.versionId, kind, language: 'python', code: content.programming.definition.referenceCode, requestId: randomUUID() };
+      for (const kind of ['samples','custom','submit']) {
+        const body = { versionId: programming.versionId, kind, language: 'python', code: content.programming.definition.referenceCode,
+          requestId: randomUUID(), ...(kind === 'custom' ? { input: programming.samples[0].input } : {}) };
         const queued = (await request(`${path}/programming/submissions`, { auth: auth.student, method: 'POST', body, status: 202 })).data;
+        await request(referencePath, { auth: auth.student, status: 403 });
         await processSchoolOne({ pool: worker, judge });
         const result = (await request(`${path}/programming/submissions/${queued.id}`, { auth: auth.student })).data;
-        assert.equal(result.status, 'AC', JSON.stringify(result)); assert.equal(result.passed, 6);
+        assert.equal(result.status, kind === 'custom' ? 'Executed' : 'AC', JSON.stringify(result));
+        if (kind !== 'custom') assert.equal(result.passed, 6);
+        if (kind !== 'submit') await request(referencePath, { auth: auth.student, status: 403 });
       }
+      const implementation = content.programming.solution;
+      for (const language of ['en', 'zh']) {
+        const reference = await request(`${referencePath}&language=${language}&paperVersionId=${paper.versionId}`, { auth: auth.student });
+        assert.match(reference.headers.get('cache-control'), /no-store/);
+        assert.deepEqual(reference.data, { language: 'python', code: implementation.code,
+          explanation: implementation.explanation[language], complexity: implementation.complexity[language] });
+      }
+      const after = (await request(`${path}/programming`, { auth: auth.student })).data;
+      assert.equal(after.solved, true);
+      assert.equal(after.solution, undefined);
+      assert.equal(after.code, undefined);
+      await request(referencePath, { auth: auth.admin, status: 403 });
+      await request(`${referencePath}&paperVersionId=${randomUUID()}`, { auth: auth.student, status: 409 });
+    });
+    await t.test('ACSL Translation uses each school wallet, confirms price, and charges only once', async () => {
+      const identity = schoolStudentIdentity;
+      const legacyPath = `/schools/${LEGACY_SCHOOL_ID}/acsl/${legacyPaper.id}`;
+      for (const [target, actor, versionId, ledger, student] of [
+        [path, auth.student, paper.versionId, 'school_scholarship_ledger', identity.id],
+        [legacyPath, auth.legacy, legacyPaper.versionId, 'luq_ledger', users.legacy.identity],
+      ]) {
+        const translation = `${target}/programming/translation`;
+        const post = (action, body = {}, status = 200) => request(`${translation}/${action}`,
+          { auth: actor, method: 'POST', body: { paperVersionId: versionId, ...body }, status });
+        const direct = (await request(`${target}/programming?language=zh`, { auth: actor })).data;
+        assert.equal(direct.statement, content.programming.definition.statement);
+        await post('provide', {}, 403);
+        await request(`${translation}/unlock`, { auth: actor, csrf: false, method: 'POST', body: {}, status: 403 });
+        const quote = (await post('quote')).data;
+        assert.equal(quote.available, true);
+        assert.ok(quote.price > 0 && quote.balance >= quote.price);
+        assert.equal(quote.body, undefined);
+        const confirmation = { requestKey: randomUUID(), confirmedContentId: quote.contentId, confirmedPrice: quote.price };
+        await post('unlock', { ...confirmation, confirmedPrice: quote.price + 1 }, 409);
+        await post('unlock', { ...confirmation, confirmedContentId: 'stale' }, 409);
+        const purchases = await Promise.all([post('unlock', confirmation), post('unlock', confirmation), post('unlock', { ...confirmation, requestKey: randomUUID() })]);
+        assert.ok(purchases.every(purchase => purchase.data.unlocked && purchase.data.balance === quote.balanceAfter));
+        const translated = (await post('provide')).data;
+        assert.equal(translated.body, content.programming.statementZh);
+        assert.deepEqual(translated.statementDiagrams, content.programming.statementDiagrams?.zh);
+        assert.equal(translated.code, undefined);
+        assert.deepEqual((await post('provide')).data, translated);
+        assert.equal((await post('quote')).data.price, 0);
+        const entries = (await pool.query(`SELECT delta FROM ${ledger} WHERE identity_id=$1 AND kind='purchase'`, [student])).rows;
+        assert.deepEqual(entries, [{ delta: -quote.price }]);
+      }
+      await request(`${path}/programming/translation/provide`, { auth: auth.outsider, method: 'POST', body: {}, status: 404 });
+      await request(`${legacyPath}/programming/translation/provide`, { auth: auth['legacy-pending'], method: 'POST', body: {}, status: 403 });
     });
     await t.test('enabled legacy ACSL rewards post written and first-AC points once without scholarship or retroactive credit', async () => {
       const legacyPath = `/schools/${LEGACY_SCHOOL_ID}/acsl/${legacyPaper.id}`;
@@ -264,16 +329,21 @@ test('ACSL real Nest lifecycle protects answers, histories, drafts, school scope
 
       assert.equal((await finishProgram(await queueProgram('legacy', 'samples', referenceCode), 'AC')).practicePointsAwarded, undefined);
       assert.equal((await finishProgram(await queueProgram('legacy', 'custom', 'print(1)'), 'Executed')).practicePointsAwarded, undefined);
+      await request(`${legacyPath}/programming?view=solution`, { auth: auth.legacy, status: 403 });
       assert.equal((await finishProgram(await queueProgram('legacy', 'submit', 'print(0)'), 'WA')).practicePointsAwarded, undefined);
+      await request(`${legacyPath}/programming?view=solution`, { auth: auth.legacy, status: 403 });
       const beforeFormalAC = (await request(legacyPath, { auth: auth.legacy })).data;
       assert.equal(beforeFormalAC.programmingSolved, false); assert.equal(beforeFormalAC.programmingPointsAwarded, undefined);
       assert.equal((await awardsFor('legacy')).length, 1, 'sample, custom and incorrect formal runs cannot earn coding points');
       const accepted = await queueProgram('legacy', 'submit', referenceCode);
+      await request(`${legacyPath}/programming?view=solution`, { auth: auth.legacy, status: 403 });
       const repeatEnqueues = await Promise.all(Array.from({ length: 2 }, () => request(`${legacyPath}/programming/submissions`,
         { auth: auth.legacy, method: 'POST', body: accepted.body, status: 202 })));
       assert.ok(repeatEnqueues.every(result => result.data.id === accepted.id));
       const result = await finishProgram(accepted, 'AC');
       assert.equal(result.practicePointsAwarded, 10);
+      assert.equal((await request(`${legacyPath}/programming?view=solution`, { auth: auth.legacy })).data.code, content.programming.solution.code);
+      await request(`${legacyPath}/programming?view=solution`, { auth: auth['legacy-zero'], status: 403 });
       const rewardedDetail = (await request(legacyPath, { auth: auth.legacy })).data;
       const rewardedCatalog = (await request(`/schools/${LEGACY_SCHOOL_ID}/acsl`, { auth: auth.legacy })).data.items.find(item => item.id === legacyPaper.id);
       const rewardedReplay = (await request(`${legacyPath}/submit`, { auth: auth.legacy, method: 'POST', body: written })).data;
@@ -308,6 +378,7 @@ test('ACSL real Nest lifecycle protects answers, histories, drafts, school scope
       assert.equal((await finishProgram(codingOnly, 'AC')).practicePointsAwarded, 10);
       const ungraded = (await request(legacyPath, { auth: auth['legacy-coding-only'] })).data;
       assert.equal(ungraded.programmingPointsAwarded, 10); assert.equal(ungraded.programmingSolved, true);
+      assert.equal((await request(`${legacyPath}/programming?view=solution`, { auth: auth['legacy-coding-only'] })).data.code, content.programming.solution.code);
       assert.equal(ungraded.graded, false); assert.equal(ungraded.score, null); assert.equal(ungraded.writtenPointsAwarded, undefined);
       assert.ok(ungraded.questions.every(question => question.lastSubmission === null));
       assert.doesNotMatch(JSON.stringify(ungraded), /correctOptionIds|explanationDiagrams|"explanation"/);
@@ -326,11 +397,143 @@ test('ACSL real Nest lifecycle protects answers, histories, drafts, school scope
       assert.equal(replacementDetail.programmingPointsAwarded, 10, 'the same stable student identity retains its actual existing award');
       assert.equal(replacementDetail.programmingSolved, false, 'the replacement account has no own formal AC');
       assert.equal(replacementDetail.graded, false); assert.equal(replacementDetail.writtenPointsAwarded, undefined);
+      await request(`${legacyPath}/programming?view=solution`, { auth: replacementAuth, status: 403 });
       await request(`${legacyPath}/questions/q1/explanation?versionId=${legacyPaper.versionId}`, { auth: replacementAuth, status: 403 });
       await request(legacyPath, { auth: auth['legacy-coding-only'], status: 401 });
       assert.deepEqual((await pool.query('SELECT to_jsonb(a) row FROM acsl_point_awards a ORDER BY id')).rows, awardedBeforeReplacement,
         'refresh and account replacement do not rewrite or duplicate past awards');
       assert.deepEqual(await scholarshipSnapshot(), scholarshipBefore, 'ACSL awards change points only, preserving every scholarship balance and ledger row');
+    });
+    for (const [scope, schoolId, actor, identityId] of [
+      ['school', school.id, auth.student, (await pool.query('SELECT id FROM school_identities WHERE school_id=$1 AND account_id=$2', [school.id,users.student.id])).rows[0].id],
+      ['legacy', LEGACY_SCHOOL_ID, auth['legacy-zero'], users['legacy-zero'].identity],
+    ]) await t.test(`${scope} ACSL solutions can be purchased before submitting with configurable prices and actual translation credit`, async () => {
+      const ledger = scope === 'legacy' ? 'luq_ledger' : 'school_scholarship_ledger';
+      const entitlements = scope === 'legacy' ? 'luq_assistance_entitlements' : 'school_scholarship_entitlements';
+      const creditColumn = scope === 'legacy' ? 'translation_credit_ledger_id' : 'credit_ledger_id';
+      const settings = scope === 'legacy' ? 'luq_settings' : 'school_scholarship_settings';
+      const where = scope === 'legacy' ? 'singleton' : 'school_id=$1';
+      const params = scope === 'legacy' ? [] : [schoolId];
+      const originalTranslationPrice = (await pool.query(`SELECT translation_price FROM ${settings} WHERE ${where}`, params)).rows[0].translation_price;
+      const translationPrice = amount => pool.query(`UPDATE ${settings} SET translation_price=${amount}${scope === 'legacy' ? ',rule_version=rule_version+1' : ''} WHERE ${where}`, params);
+      const makePaper = async suffix => {
+        const fixture = structuredClone(content); fixture.slug = `acsl-payment-${scope}-${suffix}`;
+        const imported = await importAcslPaper(pool, { schoolId, ownerAccountId: users.admin.id, content: fixture });
+        const target = `/schools/${schoolId}/acsl/${imported.id}`;
+        const post = (kind, action, body = {}, status = 200) => request(`${target}/programming/${kind}/${action}`,
+          { auth: actor, method: 'POST', body: { paperVersionId: imported.versionId, contentLanguage: 'zh', ...body }, status });
+        const setPrice = async price => {
+          if (scope === 'school') {
+            const endpoint = `/schools/${schoolId}/acsl/manage/${imported.id}/solution-price`;
+            const current = (await request(endpoint, { auth: auth.admin })).data;
+            return request(endpoint, { auth: auth.admin, method: 'PATCH', body: { price, expectedRevision: current.revision } });
+          }
+          return pool.query(`INSERT INTO school_scholarship_policies(school_id,target_type,target_key,kind,mode,price)
+            VALUES($1,'subject',$2,'FULL_SOLUTION','paid',$3) ON CONFLICT(school_id,target_type,target_key,kind)
+            DO UPDATE SET price=EXCLUDED.price,revision=school_scholarship_policies.revision+1`, [schoolId,`acsl:${imported.id}`,price]);
+        };
+        const purchase = async (kind, quote, requestKey = randomUUID(), status = 200) => post(kind, 'unlock',
+          { requestKey, confirmedContentId: quote.contentId, confirmedPrice: quote.price }, status);
+        const entries = () => pool.query(`SELECT * FROM ${ledger} WHERE identity_id=$1 AND kind='purchase' AND metadata->>'subjectKey'=$2 ORDER BY created_at`,
+          [identityId, `acsl:${imported.id}`]);
+        return { ...imported, target, post, setPrice, purchase, entries };
+      };
+      try {
+        await translationPrice(3);
+        const direct = await makePaper('direct');
+        const initial = (await direct.post('solution', 'quote')).data;
+        assert.equal(initial.available, true); assert.equal(initial.basePrice, 12); assert.equal(initial.price, 12);
+        assert.equal(initial.translationCredit, 0); assert.equal(initial.body, undefined); assert.equal(initial.solution, undefined);
+        assert.equal((await request(`${direct.target}/programming`, { auth: actor })).data.attempts, 0);
+        await direct.post('solution', 'provide', {}, 403);
+        await request(`${direct.target}/programming?view=solution`, { auth: actor, status: 403 });
+        await request(`${direct.target}/programming/solution/unlock`, { auth: actor, method: 'POST', body: {}, csrf: false, status: 403 });
+        await request(`${direct.target}/programming/solution/provide`, { auth: auth.outsider, method: 'POST', body: {}, status: 404 });
+        const key = randomUUID();
+        const bought = await Promise.all([direct.purchase('solution', initial, key), direct.purchase('solution', initial, key), direct.purchase('solution', initial)]);
+        assert.ok(bought.every(item => item.data.unlocked && item.data.balance === initial.balanceAfter));
+        assert.deepEqual((await direct.entries()).rows.map(row => row.delta), [-12]);
+        for (const language of ['en', 'zh']) {
+          const delivered = (await direct.post('solution', 'provide', { contentLanguage: language })).data;
+          assert.equal(delivered.solution.code, content.programming.solution.code);
+          assert.equal(delivered.solution.explanation, content.programming.solution.explanation[language]);
+          assert.equal(delivered.solution.complexity, content.programming.solution.complexity[language]);
+          assert.equal((await request(`${direct.target}/programming?view=solution&language=${language}`, { auth: actor })).data.code, content.programming.solution.code);
+        }
+        const unentitledActor = scope === 'school' ? auth.admin : auth.legacy;
+        await request(`${direct.target}/programming?view=solution`, { auth: unentitledActor, status: 403 });
+        await request(`${direct.target}/programming/solution/provide`, { auth: unentitledActor, method: 'POST', body: { paperVersionId: direct.versionId }, status: 403 });
+        await direct.setPrice(20);
+        assert.equal((await direct.post('solution', 'quote')).data.price, 0, 'existing purchases are not charged again after a price increase');
+        assert.equal((await request(`${direct.target}/programming`, { auth: actor })).data.attempts, 0);
+
+        const discounted = await makePaper('discounted');
+        const translation = (await discounted.post('translation', 'quote')).data;
+        assert.equal(translation.price, 3);
+        await discounted.purchase('translation', translation);
+        await translationPrice(9);
+        const beforePriceChange = (await discounted.post('solution', 'quote')).data;
+        assert.equal(beforePriceChange.basePrice, 12); assert.equal(beforePriceChange.translationCredit, 3); assert.equal(beforePriceChange.price, 9);
+        await discounted.setPrice(14);
+        await discounted.purchase('solution', beforePriceChange, randomUUID(), 409);
+        const adjusted = (await discounted.post('solution', 'quote')).data;
+        assert.equal(adjusted.basePrice, 14); assert.equal(adjusted.translationCredit, 3); assert.equal(adjusted.price, 11);
+        await discounted.purchase('solution', adjusted);
+        assert.deepEqual((await discounted.entries()).rows.map(row => row.delta), [-3, -11]);
+        const credited = (await pool.query(`SELECT ${creditColumn} credit FROM ${entitlements}
+          WHERE identity_id=$1 AND subject_key=$2 AND kind='FULL_SOLUTION'`, [identityId,`acsl:${discounted.id}`])).rows[0];
+        assert.equal(String(credited.credit), String((await discounted.entries()).rows[0].id));
+        assert.equal((await discounted.post('solution', 'quote')).data.price, 0);
+        const translationEntry = (await discounted.entries()).rows[0];
+        const refund = entry => scope === 'legacy'
+          ? pool.query("SELECT * FROM luq_post_entry($1,$2,'refund',$3,$4,$5,$6,$7)",
+            [identityId,-entry.delta,`test-refund:${randomUUID()}`,users.admin.id,'Refund translation',{},entry.id])
+          : transaction(pool, async db => {
+            await db.query("SELECT set_config('campus.school_id',$1,true)", [schoolId]);
+            return db.query("SELECT * FROM school_scholarship_entry($1,$2,$3,'refund',$4,$5,$6,$7,$8)",
+              [schoolId,identityId,-entry.delta,`test-refund:${randomUUID()}`,users.admin.id,'Refund translation',{},entry.id]);
+          });
+        await assert.rejects(refund(translationEntry), /(?:SCHOLARSHIP_CREDIT_USED|LUQ_TRANSLATION_CREDIT_USED)/,
+          'credited translation cannot be refunded separately from its solution');
+
+        const refunded = await makePaper('refunded');
+        await refunded.purchase('translation', (await refunded.post('translation', 'quote')).data);
+        await refund((await refunded.entries()).rows[0]);
+        const afterRefund = (await refunded.post('solution', 'quote')).data;
+        assert.equal(afterRefund.translationCredit, 0, 'refunded payments cannot be spent again as translation credit');
+        assert.equal(afterRefund.price, 12);
+
+        const covered = await makePaper('covered');
+        await covered.purchase('translation', (await covered.post('translation', 'quote')).data);
+        await covered.setPrice(2);
+        const coveredQuote = (await covered.post('solution', 'quote')).data;
+        assert.equal(coveredQuote.basePrice, 2); assert.equal(coveredQuote.translationCredit, 2); assert.equal(coveredQuote.price, 0);
+        const coveredKey = randomUUID();
+        await Promise.all([covered.purchase('solution', coveredQuote, coveredKey), covered.purchase('solution', coveredQuote, coveredKey)]);
+        assert.deepEqual((await covered.entries()).rows.map(row => row.delta), [-9], 'a fully credited solution creates no zero-valued money entry');
+        await covered.setPrice(18);
+        assert.equal((await covered.post('solution', 'quote')).data.price, 0, 'zero-charge credit grants a durable entitlement');
+        assert.equal((await covered.post('solution', 'provide')).data.solution.code, content.programming.solution.code);
+        await covered.purchase('translation', { contentId: coveredQuote.contentId, price: 0 }, coveredKey, 409);
+
+        const free = await makePaper('free');
+        await free.setPrice(0);
+        const freeQuote = (await free.post('solution', 'quote')).data;
+        assert.equal(freeQuote.mode, 'free'); assert.equal(freeQuote.price, 0);
+        assert.equal((await free.post('solution', 'provide')).data.solution.code, content.programming.solution.code);
+        assert.equal((await free.entries()).rowCount, 0);
+        await free.setPrice(null);
+        assert.equal((await free.post('solution', 'quote')).data.basePrice, 12);
+
+        const expensive = await makePaper('insufficient');
+        await expensive.setPrice(1000);
+        const expensiveQuote = (await expensive.post('solution', 'quote')).data;
+        assert.ok(expensiveQuote.balance < expensiveQuote.price);
+        await expensive.purchase('solution', expensiveQuote, randomUUID(), 409);
+        assert.equal((await expensive.entries()).rowCount, 0);
+        await expensive.post('solution', 'provide', {}, 403);
+        await request(`${expensive.target}/programming?view=solution`, { auth: actor, status: 403 });
+      } finally { await translationPrice(originalTranslationPrice); }
     });
     await t.test('runtime grants isolate answers and worker, withdrawal blocks further access', async () => {
       for (const table of ['acsl_papers','acsl_drafts','acsl_submissions','acsl_paper_grades']) {
@@ -353,6 +556,7 @@ test('ACSL real Nest lifecycle protects answers, histories, drafts, school scope
       await assert.rejects(app.query('UPDATE acsl_papers SET definition=definition'), { code: '42501' });
       await pool.query('UPDATE school_memberships SET revoked_at=now() WHERE school_id=$1 AND account_id=$2', [school.id,users.student.id]);
       await request(path, { auth: auth.student, status: 404 });
+      await request(referencePath, { auth: auth.student, status: 404 });
       await pool.query('UPDATE acsl_papers SET enabled=false WHERE school_id=$1', [school.id]);
       assert.equal((await request(root, { auth: auth.admin })).data.enabled, false);
       await request(path, { auth: auth.admin, status: 404 });

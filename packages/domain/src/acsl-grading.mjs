@@ -85,6 +85,9 @@ export function validatePaperDefinition(content) {
   }
   paperAssetPurposes(content);
   validateAcslDiagrams(programming?.statementDiagrams);
+  if (programming?.tutorial !== undefined && !localizedText(programming.tutorial, 100000)) {
+    throw new Error('Invalid ACSL programming tutorial.');
+  }
   if (programming?.solution !== undefined) validateAcslProgrammingSolution(programming.solution);
   if (Buffer.byteLength(JSON.stringify(content)) > 2000000) {
     throw new Error('ACSL paper package exceeds 2 MB.');

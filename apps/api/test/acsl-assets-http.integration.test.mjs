@@ -157,7 +157,10 @@ test('ACSL batch imports preserve editions and protect original images through t
       const codingPaper = await importAcslPaper(pool, { schoolId: school.id, ownerAccountId: users.admin.id, content: official });
       const codingPath = `${root}/${codingPaper.id}/programming`;
       const coding = (await request(codingPath, { auth: auth.student })).data;
-      assert.ok(!JSON.stringify(coding).includes('reference')); assert.ok(!JSON.stringify(coding).includes('"tests"'));
+      assert.equal(coding.referenceAvailable, true);
+      for (const field of ['referenceCode', 'reference_code', 'solution', 'code', 'tests']) assert.equal(coding[field], undefined);
+      assert.ok(!JSON.stringify(coding).includes('"tests"'));
+      await request(`${codingPath}?view=solution`, { auth: auth.student, status: 403 });
       const definition = (await pool.query('SELECT v.definition FROM school_problem_versions v JOIN acsl_papers p ON p.school_id=v.school_id AND p.programming_version_id=v.id WHERE p.id=$1', [codingPaper.id])).rows[0].definition;
       assert.equal(Object.hasOwn(definition, 'reference_code'), false);
       const queued = (await request(`${codingPath}/submissions`, { auth: auth.student, method: 'POST', body: { paperVersionId: codingPaper.versionId, versionId: coding.versionId, kind: 'submit', language: 'python', code: sample.programming.definition.referenceCode, requestId: randomUUID() }, status: 202 })).data;

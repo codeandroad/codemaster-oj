@@ -19,6 +19,11 @@ export async function schoolScholarshipSettings(db,s){
 async function studentIdentity(db,s,user){const i=(await db.query("SELECT id,name FROM school_identities WHERE school_id=$1 AND account_id=$2 AND kind='student'",[s,user.id])).rows[0];if(!i)fail(403,'STUDENT_IDENTITY_REQUIRED','A linked school student identity is required.');return i;}
 async function walletLock(db,s,i){await db.query("SELECT pg_advisory_xact_lock(hashtextextended('school-scholarship:'||$1||':'||$2,0))",[s,i]);}
 async function balance(db,s,i){return (await db.query('SELECT balance FROM school_scholarship_accounts WHERE school_id=$1 AND identity_id=$2',[s,i])).rows[0]?.balance??0;}
+export async function schoolScholarshipWallet(db, schoolId, user, { lock = false } = {}) {
+ const identity = await studentIdentity(db, schoolId, user);
+ if (lock) await walletLock(db, schoolId, identity.id);
+ return { identityId: identity.id, balance: await balance(db, schoolId, identity.id) };
+}
 export async function postSchoolScholarshipEntry(db,{schoolId,identityId,delta,kind,sourceKey,actor=null,reason,metadata={},refundOf=null,requestHash=null}){
  try{return(await db.query('SELECT * FROM school_scholarship_entry($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',[schoolId,identityId,delta,kind,sourceKey,actor,reason,JSON.stringify(metadata),refundOf,requestHash])).rows[0];}
  catch(e){const text=String(e.message);if(text.includes('SCHOLARSHIP_INSUFFICIENT'))fail(409,'INSUFFICIENT_BALANCE','Insufficient scholarship balance.');if(text.includes('SCHOLARSHIP_REQUEST_CONFLICT'))fail(409,'REQUEST_CONFLICT','This request has already been used.');if(text.includes('SCHOLARSHIP_CREDIT_USED'))fail(409,'TRANSLATION_CREDIT_USED','This translation payment was used toward a solution and cannot be refunded independently.');throw e;}
@@ -94,6 +99,7 @@ async function idempotent(db,s,u,requestId,input,work){
  const old=(await db.query('SELECT * FROM school_scholarship_requests WHERE school_id=$1 AND actor_account_id=$2 AND request_id=$3',[s,u.id,id])).rows[0];if(old){if(old.request_hash!==hash)fail(409,'REQUEST_CONFLICT','This request has already been used.');return old.response;}
  const response=await work(hash);await db.query('INSERT INTO school_scholarship_requests(school_id,actor_account_id,request_id,request_hash,response) VALUES($1,$2,$3,$4,$5)',[s,u.id,id,hash,JSON.stringify(response)]);return response;
 }
+export { idempotent as schoolScholarshipRequest };
 async function activity(db,s,id,type,u,role,{editing=false}={}){
  const table=type==='paper4_activity'?'school_paper4_activities':'school_activities';const a=(await db.query(`SELECT * FROM ${table} WHERE school_id=$1 AND id=$2 FOR UPDATE`,[s,uuid(id)])).rows[0];if(!a)fail(404,'NOT_FOUND','Activity is unavailable.');
  if(editing&&!manage(a,u,role))fail(403,'FORBIDDEN','Only the responsible teacher or school administrator may edit this rule.');

@@ -6,6 +6,7 @@ import { validateTask } from '../judge.mjs';
 import { LANGUAGES, languageLimitsFor, starterCodesFor } from './languages.mjs';
 import { submissionCaseFeedback } from './submission-feedback.mjs';
 import { handleAcslManagement } from './acsl-management.mjs';
+import { acslTranslation, acslSolution, requireAcslTranslation } from './acsl-translation.mjs';
 
 const reply = (body, status = 200) => ({ status, body });
 
@@ -228,26 +229,45 @@ function jobResult(job) {
       custom_input: job.kind === 'custom' ? job.payload.tests[0]?.input : undefined }, job.payload.version, result?.privateResults) };
 }
 
+function programmingStatement(paper, language) {
+  const programming = paper.definition.programming;
+  const native = language === 'zh' ? programming.statementZh : programming.definition.statement;
+  const images = assetUrls(paper, programming.statementAssets)?.[language] ?? [];
+  return { statement: [native, ...images.map((src, index) =>
+    `![ACSL ${language === 'zh' ? '原题' : 'original statement'} ${index + 1}](${src})`)].join('\n\n'),
+    ...(programming.statementDiagrams ? { statementDiagrams: programming.statementDiagrams[language] } : {}) };
+}
+
 async function programmingOperation(db, paper, user, tail, method, body, url) {
   if (!paper.programming_problem_id) fail(404, 'NOT_FOUND', 'This ACSL paper has no programming section.');
+  const translation = tail?.match(/^translation\/(quote|unlock|provide)$/);
+  if (translation && method === 'POST') return reply(await acslTranslation(db, paper, user, translation[1], body, () => {
+    const { statement, statementDiagrams } = programmingStatement(paper, 'zh');
+    return { body: statement, statementDiagrams };
+  }));
+  if (!tail && method === 'GET' && url.searchParams.get('view') === 'solution') {
+    const coding = await codingProgress(db, paper, user.id);
+    const provided = await acslSolution(db, paper, user, 'provide', { contentLanguage: url.searchParams.get('language') }, coding.solved);
+    return reply(provided.solution);
+  }
+  const solution = tail?.match(/^solution\/(quote|unlock|provide)$/);
+  if (solution && method === 'POST') {
+    const coding = await codingProgress(db, paper, user.id);
+    return reply(await acslSolution(db, paper, user, solution[1], body, coding.solved));
+  }
   const version = (await db.query('SELECT definition FROM school_problem_versions WHERE school_id=$1 AND id=$2', [paper.school_id, paper.programming_version_id])).rows[0].definition;
   if (!tail && method === 'GET') {
     const coding = await codingProgress(db, paper, user.id);
-    const language = url.searchParams.get('language') === 'zh' ? 'zh' : 'en';
     const programming = paper.definition.programming;
-    const nativeStatement = language === 'zh' ? programming.statementZh : programming.definition.statement;
-    // During the reviewed rollout, only editions not yet transcribed retain their existing private source pages.
-    const oldImages = assetUrls(paper, programming.statementAssets)?.[language] ?? [];
-    const statement = [nativeStatement, ...oldImages.map((src, index) =>
-      `![ACSL ${language === 'zh' ? '原题' : 'original statement'} ${index + 1}](${src})`)].join('\n\n');
+    const tutorialLanguage = url.searchParams.get('language') === 'zh' ? 'zh' : 'en';
     return reply({ id: paper.programming_problem_id, versionId: paper.programming_version_id, paperVersionId: paper.version_id,
-      title: programming.definition.title, statement,
-      ...(programming.statementDiagrams ? { statementDiagrams: programming.statementDiagrams[language] } : {}),
+      title: programming.definition.title, ...programmingStatement(paper, 'en'),
+      ...(programming.tutorial?.[tutorialLanguage] ? { tutorial: { source: 'custom', body: programming.tutorial[tutorialLanguage] } } : {}),
       mode: version.mode, functionName: version.function_name, comparator: version.comparator,
       timeLimitMs: version.time_limit_ms, memoryLimitMb: version.memory_limit_mb, supportedLanguages: LANGUAGES,
       languageLimits: languageLimitsFor(version), starterCode: version.starter_code, starterCodes: starterCodesFor(version),
       samples: version.samples.map(({ input, expected }) => ({ input, expected })), tags: ['ACSL', paper.definition.division],
-      solved: coding.solved, attempts: coding.attempts, published: true });
+      solved: coding.solved, referenceAvailable: Boolean(programming.solution), attempts: coding.attempts, published: true });
   }
   if (tail === 'submissions' && method === 'GET') {
     const formalJobs = `FROM school_judge_jobs WHERE school_id=$1 AND problem_id=$2 AND version_id=ANY($3::uuid[])
@@ -342,12 +362,17 @@ export async function handleAcsl({ pool, user, route, method, body = {}, url }) 
       if (asset.purpose === 'explanation' && !(await loadGrade(db, paper, user.id))) {
         fail(403, 'PAPER_NOT_GRADED', 'Turn in the written section before viewing explanations.');
       }
+      const translated = paper.definition.programming?.statementAssets;
+      if (translated?.zh.includes(assetMatch[1]) && !translated.en.includes(assetMatch[1]) &&
+          !paper.definition.questions.some(q => q.statementAssets?.en.includes(assetMatch[1]) || q.statementAssets?.zh.includes(assetMatch[1]))) {
+        await requireAcslTranslation(db, paper, user);
+      }
       return reply({ content: asset.content });
     }
     if (match[3] === 'submit' && method === 'POST') return submitPaper(db, paper, user, body);
     const question = match[3]?.match(/^questions\/([^/]+)\/(draft|submissions|explanation)$/);
     if (question) return questionOperation(db, paper, user, question[1], question[2], method, body, url);
-    const programming = match[3]?.match(/^programming(?:\/(submissions(?:\/[^/]+)?))?$/);
+    const programming = match[3]?.match(/^programming(?:\/(submissions(?:\/[^/]+)?|(?:translation|solution)\/(?:quote|unlock|provide)))?$/);
     if (programming) {
       const paperVersionId = method === 'GET' ? url.searchParams.get('paperVersionId') : body.paperVersionId;
       if (paperVersionId) checkVersion(paper, paperVersionId);

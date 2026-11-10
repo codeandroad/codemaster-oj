@@ -26,6 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { ScholarshipAssistance } from "@/components/scholarship/assistance";
 import {
   ApiError,
   apiMessage,
@@ -37,9 +38,24 @@ import {
 import { acslHref, type AcslLanguage, type AcslPaper } from "./model";
 import { AcslRichContent } from "./rich-content";
 import type { AcslDiagram } from "./diagram-model";
+import { AcslStudentProgrammingSolution } from "./student-programming-solution";
+import type { ProblemTutorialContent } from "@/components/student/problem-tutorial";
+
+type AcslProgrammingPath = `schools/${string}/acsl/${string}/programming`;
 
 type AcslProgrammingProblem = ProductionProblem & {
   paperVersionId: string;
+  attempts: number;
+  referenceAvailable: boolean;
+  statementDiagrams?: AcslDiagram[];
+  tutorial?: ProblemTutorialContent;
+};
+
+type AcslTranslation = {
+  body: string;
+  kind: "FULL_TRANSLATION";
+  language: string;
+  contentId: string;
   statementDiagrams?: AcslDiagram[];
 };
 
@@ -64,7 +80,7 @@ export function AcslProgramming({
   onShowResults: () => void;
   stageDialog: ReactNode;
 }) {
-  const path = `schools/${schoolId}/acsl/${encodeURIComponent(paper.id)}/programming`;
+  const path: AcslProgrammingPath = `schools/${schoolId}/acsl/${encodeURIComponent(paper.id)}/programming`;
   const problem = useData<AcslProgrammingProblem>(
     `${path}?${new URLSearchParams({ language, paperVersionId: paper.versionId })}`,
   );
@@ -104,7 +120,7 @@ function ProgrammingWorkspace({
   user: CampusUser;
   problem: AcslProgrammingProblem;
   paper: AcslPaper;
-  path: string;
+  path: AcslProgrammingPath;
   baseHref: string;
   language: AcslLanguage;
   returnQuestionId?: string;
@@ -162,6 +178,7 @@ function ProgrammingWorkspace({
   );
   const adapter = useMemo<ProblemWorkspaceAdapter>(() => {
     const context = `acsl:${path}:${paper.versionId}`;
+    const solved = Boolean(paper.programmingSolved || problem.solved);
     const query = new URLSearchParams({
       versionId: problem.versionId!,
       paperVersionId: paper.versionId,
@@ -189,21 +206,41 @@ function ProgrammingWorkspace({
       submissionsPath: `${path}/submissions?${query}`,
       resumeSubmission: true,
       submissionsTitle: locale === "en" ? "My submissions" : "我的提交",
+      tutorial: problem.tutorial,
       renderStatement: () => (
         <AcslRichContent
           content={problem.statement}
           diagrams={problem.statementDiagrams}
-          language={language}
+          language="en"
         />
       ),
-      submit: ({
+      assistance: kind => kind === "FULL_TRANSLATION" ? (
+        <ScholarshipAssistance<AcslTranslation>
+          key="translation"
+          target={{ paperVersionId: paper.versionId }}
+          endpoint={`${path}/translation`}
+          kind={kind}
+          renderBody={(body, content) => (
+            <AcslRichContent content={body} diagrams={content.statementDiagrams} language="zh" />
+          )}
+        />
+      ) : (
+        <AcslStudentProgrammingSolution
+          key="solution"
+          path={path}
+          paperVersionId={paper.versionId}
+          language={language}
+          available={problem.referenceAvailable}
+        />
+      ),
+      submit: async ({
         kind,
         code,
         language: codeLanguage,
         customInput,
         requestId,
-      }) =>
-        productionApi(`${path}/submissions`, {
+      }) => {
+        const job = await productionApi<{ id: string }>(`${path}/submissions`, {
           method: "POST",
           body: {
             kind,
@@ -214,7 +251,9 @@ function ProgrammingWorkspace({
             versionId: problem.versionId,
             paperVersionId: paper.versionId,
           },
-        }),
+        });
+        return job;
+      },
       submissionPath: (id) =>
         `${path}/submissions/${encodeURIComponent(id)}?${query}`,
       normalizeSubmission: (result: DetailedSubmission) => ({
@@ -226,7 +265,7 @@ function ProgrammingWorkspace({
       onSubmissionCompleted,
       statusBanner: (
         <>
-          {(paper.graded || paper.programmingSolved || progressError) && (
+          {(paper.graded || solved || progressError) && (
             <div
               className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-surface px-4 py-2"
               data-od-id="acsl-programming-stage"
@@ -237,7 +276,7 @@ function ProgrammingWorkspace({
                 </p>
               ) : (
                 <p className="text-sm">
-                  {paper.programmingSolved
+                  {solved
                     ? locale === "en"
                       ? "Programming passed"
                       : "编程题已通过"

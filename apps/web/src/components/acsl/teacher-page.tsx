@@ -11,6 +11,7 @@ import type { CampusUser } from "@/lib/production-api";
 import { AcslCatalogFilters, useAcslCatalogState } from "./catalog-filters";
 import { acslCatalogHref, acslRoundLabel, type AcslLanguage } from "./model";
 import { AcslTeacherEditor } from "./teacher-editor";
+import { AcslSolutionPrice } from "./solution-price";
 import {
   AcslTeacherExportDialog,
   AcslTeacherPrintPage,
@@ -446,10 +447,13 @@ function TeacherPaper({
             />
           )}{" "}
           {selected === "programming" && paper.programming && (
-            <AcslTeacherProgrammingPreview
-              programming={paper.programming}
-              language={language}
-            />
+            <div className="space-y-4">
+              {paper.canEdit && <AcslSolutionPrice schoolId={schoolId} paperId={paper.id} />}
+              <AcslTeacherProgrammingPreview
+                programming={paper.programming}
+                language={language}
+              />
+            </div>
           )}
         </div>
       </div>

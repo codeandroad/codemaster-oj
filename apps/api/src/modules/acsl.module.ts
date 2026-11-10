@@ -9,13 +9,13 @@ import { DomainService } from '../domain.service.js';
 export class AcslController {
   constructor(private readonly domain: DomainService) {}
 
-  @Get(['manage', 'manage/:paperId', 'manage/:paperId/export'])
+  @Get(['manage', 'manage/:paperId', 'manage/:paperId/export', 'manage/:paperId/solution-price'])
   async manageRead(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
     response.setHeader('Cache-Control', 'private, no-store');
     return applyResponse(response, await this.domain.execute('acsl', request.domainContext));
   }
 
-  @Patch('manage/:paperId')
+  @Patch(['manage/:paperId', 'manage/:paperId/solution-price'])
   async manageSave(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
     response.setHeader('Cache-Control', 'private, no-store');
     return applyResponse(response, await this.domain.execute('acsl', request.domainContext));
@@ -39,7 +39,7 @@ export class AcslController {
     return applyResponse(response, await this.domain.execute('acsl', request.domainContext));
   }
 
-  @Post([':paperId/submit', ':paperId/questions/:questionId/submissions', ':paperId/programming/submissions'])
+  @Post([':paperId/submit', ':paperId/questions/:questionId/submissions', ':paperId/programming/submissions', ':paperId/programming/translation/:action', ':paperId/programming/solution/:action'])
   async submit(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
     return applyResponse(response, await this.domain.execute('acsl', request.domainContext));
   }

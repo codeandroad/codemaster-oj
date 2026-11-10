@@ -1,0 +1,1521 @@
+{
+  "checkedAt": "2026-11-10T17:14:40.376Z",
+  "executor": "isolated go-judge / Python 3.12",
+  "problems": 72,
+  "cases": 1036,
+  "passed": true,
+  "results": [
+    {
+      "slug": "acsl-2020-2021-intermediate-1",
+      "codeSha256": "b56d1b0368a8578f319fc56f2b7cf459ef34facc20a0830cd96f2f86ee0057d9",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 18,
+          "total": 18
+        }
+      }
+    },
+    {
+      "slug": "acsl-2020-2021-intermediate-2",
+      "codeSha256": "d043dabe6579b83bf52f9a133ca74fc262346d14625d280f8bcc4cf804ddd1cb",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 12,
+          "total": 12
+        }
+      }
+    },
+    {
+      "slug": "acsl-2020-2021-intermediate-3",
+      "codeSha256": "6fd839acc6cb6b505b382a39f6335a9c79a7a0f766d44a8774c9471f87233657",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 3,
+          "total": 3
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2020-2021-intermediate-4",
+      "codeSha256": "b8573da101c165e861c5252dd85d44a3f7df7d9214691b5ec421734a5d6a6fd4",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 14,
+          "total": 14
+        }
+      }
+    },
+    {
+      "slug": "acsl-2020-2021-junior-1",
+      "codeSha256": "7d61576e4102d5f2e4ca386c40e1095dc3351053d62feb8a0b59dddbc4e20bca",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 18,
+          "total": 18
+        }
+      }
+    },
+    {
+      "slug": "acsl-2020-2021-junior-2",
+      "codeSha256": "7f299227e4bd4c3a68169eb2f40575923b451da7eacc9bd7f6265beab72bb54b",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2020-2021-junior-3",
+      "codeSha256": "72516b361492a7e1edacdab9fee85b9cbec1f928a589515e3c68bbefe91fa91c",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2020-2021-junior-4",
+      "codeSha256": "6322304e1b46dd22a7ed0bcb4a615a66914feb6ae0c902aa8d73a0a109674521",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 3,
+          "total": 3
+        }
+      }
+    },
+    {
+      "slug": "acsl-2020-2021-senior-1",
+      "codeSha256": "277c48e0c1b35d2d9118ab1c866758b0dd06eb496d1d71ef6237c5a5066cbf13",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 18,
+          "total": 18
+        }
+      }
+    },
+    {
+      "slug": "acsl-2020-2021-senior-2",
+      "codeSha256": "347eaccedcc6b41943b682d7708d76c83ca1c2609c7d551fbabe1a12bc23361d",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2020-2021-senior-3",
+      "codeSha256": "fe41287197862d81ed49d5741e3e5643f23a95d9de6bc2318593a5795b62a80a",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 3,
+          "total": 3
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2020-2021-senior-4",
+      "codeSha256": "4e206212ed4a81aa49d378f878e3fb9f251620d77618f3e7bd77c842cb16205d",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 15,
+          "total": 15
+        }
+      }
+    },
+    {
+      "slug": "acsl-2021-2022-intermediate-1",
+      "codeSha256": "dfc5943f462265c9f3d139e692396137bebf2767aca94e64c63e9583c095d1e8",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2021-2022-intermediate-2",
+      "codeSha256": "d0ea1a12488a931ec133315f059a187e45c0635903d6165e4928ea3890270080",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 3,
+          "total": 3
+        }
+      }
+    },
+    {
+      "slug": "acsl-2021-2022-intermediate-3",
+      "codeSha256": "216d0d07a8438190b91b488d262bd7010b316ad592b49db9814f37d2c8161e2f",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 15,
+          "total": 15
+        }
+      }
+    },
+    {
+      "slug": "acsl-2021-2022-intermediate-4",
+      "codeSha256": "cbf10a725e89fb1ce8370c005bc028cb674994e8d1f8e49c5a661d4ef1c77537",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 3,
+          "total": 3
+        }
+      }
+    },
+    {
+      "slug": "acsl-2021-2022-junior-1",
+      "codeSha256": "49547f4a38f9b2f021ea101b735d33d3cc35e8c988d4584f70f615d9b3fa1a75",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2021-2022-junior-2",
+      "codeSha256": "2859efabcab8f8e6b66c541bf79d64b195b4a5af9f306c20b012d2c79f70a215",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2021-2022-junior-3",
+      "codeSha256": "4675343eaca37431168fe8dd4173ba5aebb5d062b7311f3674b156d07e250137",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 15,
+          "total": 15
+        }
+      }
+    },
+    {
+      "slug": "acsl-2021-2022-junior-4",
+      "codeSha256": "d9cba1c1e925fa1a8f334a3d60b21339d03052919e12047c03d12df52e023d15",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 3,
+          "total": 3
+        }
+      }
+    },
+    {
+      "slug": "acsl-2021-2022-senior-1",
+      "codeSha256": "a090291ed0952862ea17ff30161e6435f69196e7195789392e29a5f9ea16e7d4",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2021-2022-senior-2",
+      "codeSha256": "54ceb8db6c926f7671f49079740ff4ff956c67e0446cd15bf239951f231bc366",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 3,
+          "total": 3
+        }
+      }
+    },
+    {
+      "slug": "acsl-2021-2022-senior-3",
+      "codeSha256": "b046e5be2a1a07a04749ef3ed900e540313174d52e15457e8e563c46820da577",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 15,
+          "total": 15
+        }
+      }
+    },
+    {
+      "slug": "acsl-2021-2022-senior-4",
+      "codeSha256": "7715e924009e00cb10ce6dad56e0f16f36ca8c87aca427b76bf57f24d51218be",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2022-2023-intermediate-1",
+      "codeSha256": "8e21835b3b17d9f29a61f127357170da2fe694d8e36c322c10a1709b2c9253f9",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2022-2023-intermediate-2",
+      "codeSha256": "30872dbda8ee85d8218b214a0ad31960fd26de94552ba169d84a283c95b370a4",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2022-2023-intermediate-3",
+      "codeSha256": "9c32df08e996e660ae6ef3b5e815ddccc252166dd37e8f30b824441a95324eae",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2022-2023-intermediate-4",
+      "codeSha256": "d317d92fd118bde473d044c820a29a1dbf5a78008cb6850fede7d17696a0e175",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2022-2023-junior-1",
+      "codeSha256": "548b17fcc79fd6cf4bf6454fd14606f4c2bac4b74f35b07c3382533d769ad085",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2022-2023-junior-2",
+      "codeSha256": "f221a0bed2327ab638476d71d204b8df009220c09484346ca3d5536ff7bd40d1",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2022-2023-junior-3",
+      "codeSha256": "f445ff19f3bc2aee6d596902944b624c910905c4c9640e41dc578cdb50a8a478",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2022-2023-junior-4",
+      "codeSha256": "af1b0f266919c9a5b6d9f3066dedf18ce810a88d94606ade9a85c3fc8f50654d",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2022-2023-senior-1",
+      "codeSha256": "0bc1da07490d0832c08e7c13e9fa275bdfa0eb66b801799348c91def6c7db601",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2022-2023-senior-2",
+      "codeSha256": "e864c2d8f06de75338afa968b4a765ccb8d4b0548bded8f648665ccd14c3f4ce",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2022-2023-senior-3",
+      "codeSha256": "7d5bfc5d592545a65f160cbf71575976fda9856f79ecd598ee24f3850a8415d6",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2022-2023-senior-4",
+      "codeSha256": "772afbe78878a46ce36f174813398feafc5008d245ca9289ad9f55b560c91386",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2023-2024-intermediate-1",
+      "codeSha256": "22f1d86a7d4e6ca286a853457007e1eba5f8aca8ec2afee727a7876d69c9c125",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2023-2024-intermediate-2",
+      "codeSha256": "951e3ae8e55fe6ad2de82c4bd338bd5c3cfa34b6e1bea6c0176660af10e026ce",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2023-2024-intermediate-3",
+      "codeSha256": "4d2f32accad14d4d365da946988946a5c41c3160d8039e187df42df35ec5a8da",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2023-2024-intermediate-4",
+      "codeSha256": "d86e5e20a335b36cb11ffe4a9b5484ba73be140ad98fb132ff61fc1052562bcd",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2023-2024-junior-1",
+      "codeSha256": "61b1cad69b32b28338e4ec3dcc35076a65b435f1ca6d497c20d1f71058be25af",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2023-2024-junior-2",
+      "codeSha256": "951e3ae8e55fe6ad2de82c4bd338bd5c3cfa34b6e1bea6c0176660af10e026ce",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2023-2024-junior-3",
+      "codeSha256": "b4e232c05ded37c159419c50a4412335250d030353f862bbfb691e0388084986",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2023-2024-junior-4",
+      "codeSha256": "2668a60e1ce206f5315ad15b92d457dd4fac542e2fb169fda9c3683ec9f3ca53",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2023-2024-senior-1",
+      "codeSha256": "b4646ed8738d8b95dd69b3ec58b13b7a6903bfc7d324dcec8a9879a235cc3250",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2023-2024-senior-2",
+      "codeSha256": "88dc1f7d2cff2c453ccb61245e9b7ed340c22a724ba51e964e40760b12c38130",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2023-2024-senior-3",
+      "codeSha256": "8a757e2f3f254c3e43c7fc0504f665641ad4da0138e4dbdb155912971f8669d1",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2023-2024-senior-4",
+      "codeSha256": "face9632074156aeed727d754d1396690799ad1387792fc7626b0ddc6c769484",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "official": {
+          "status": "AC",
+          "passed": 5,
+          "total": 5
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 1,
+          "total": 1
+        }
+      }
+    },
+    {
+      "slug": "acsl-2024-2025-intermediate-1",
+      "codeSha256": "c306640c48ed89efb6fcbff70deddd7ce43ab73ac831600e3987ef1afdfe2d87",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2024-2025-intermediate-2",
+      "codeSha256": "cf50aa64cd475744527b6ad852993cea87cc48ce2c968326a17dea9eea65a354",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2024-2025-intermediate-3",
+      "codeSha256": "2cfb37b45e521beec57639fbc2d7e25abda27e2263e244e6bc6251f19ba0a30d",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2024-2025-intermediate-4",
+      "codeSha256": "fad4cbd4961c9c553906e3b28b2144515403db8cb8be66212a80c21a7304c644",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 4,
+          "total": 4
+        }
+      }
+    },
+    {
+      "slug": "acsl-2024-2025-junior-1",
+      "codeSha256": "f6e1c690c20b38483b6540c77c8dadd48933fa644e1aceca493243435539c16b",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2024-2025-junior-2",
+      "codeSha256": "cf50aa64cd475744527b6ad852993cea87cc48ce2c968326a17dea9eea65a354",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2024-2025-junior-3",
+      "codeSha256": "f0dd0cfdfae23d614f1b0b87927946a9cf44c5cf272d1a99e22da479b8eb8508",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2024-2025-junior-4",
+      "codeSha256": "4f6fdce4bc7507269d81df4d758dc938bea248551a41226f7ac0f3a03891e3b3",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 4,
+          "total": 4
+        }
+      }
+    },
+    {
+      "slug": "acsl-2024-2025-senior-1",
+      "codeSha256": "515ce0e7bf99715df5b479a2c10c4b5133272f412bbd705c5cb7203026f8e819",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2024-2025-senior-2",
+      "codeSha256": "eba61337f9f8136f80bb38ce4a5bbe79efd7252de39d408bab175ae663bc42d9",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2024-2025-senior-3",
+      "codeSha256": "843d9bf7caa2497888109495a82313c0c22a2816dd6c9e1c836c107bf55819d9",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2024-2025-senior-4",
+      "codeSha256": "1ecdd389e6af3af2c8b67eeb72bc0b242e85e0cc06c16bbd8d643bddd2cf107c",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 4,
+          "total": 4
+        }
+      }
+    },
+    {
+      "slug": "acsl-2025-2026-intermediate-1",
+      "codeSha256": "cff512cde0dc7c87874a5361066f1654b857b66f5729e99f58c09718257545ef",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2025-2026-intermediate-2",
+      "codeSha256": "37576fb228b1ca3e56a9c8c57342bba6eb9706013a2d69dc384dc8a5f8591b78",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 14,
+          "total": 14
+        }
+      }
+    },
+    {
+      "slug": "acsl-2025-2026-intermediate-3",
+      "codeSha256": "a6410e3f828f8ced4b34f013eb4f9cc3d9809631170a8aeb9ae2a2bc389073a1",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2025-2026-intermediate-4",
+      "codeSha256": "77cde2508d3d732acf8f74da1c5b9fcbd84778314d116d4ecc35cc8580d3287f",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2025-2026-junior-1",
+      "codeSha256": "65d5c99c315441b9952d3234a3af0096370753673605557e2e7c966bcb2e6e14",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2025-2026-junior-2",
+      "codeSha256": "ba1f3799d40db708a3d9c13ffe0c120c31f66225199e99f1ef8f2e7766b28d61",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        }
+      }
+    },
+    {
+      "slug": "acsl-2025-2026-junior-3",
+      "codeSha256": "bffafb02f614a43ccaa0b2316b00a01a52ee673251b5056c8b40130b50bc4ab1",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2025-2026-junior-4",
+      "codeSha256": "77cde2508d3d732acf8f74da1c5b9fcbd84778314d116d4ecc35cc8580d3287f",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2025-2026-senior-1",
+      "codeSha256": "02f81b753096a276c9360a5b1cfe1fd807072980e42f142fde1277a988951841",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2025-2026-senior-2",
+      "codeSha256": "523e3e662424edec2b95f621e1daf159b291bb7b720e874bfcaa29688522b7eb",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 3,
+          "total": 3
+        }
+      }
+    },
+    {
+      "slug": "acsl-2025-2026-senior-3",
+      "codeSha256": "5a7855ef153f54c066a9835be306113a3d5af23777fa628a21a51bee569eae99",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 2,
+          "total": 2
+        }
+      }
+    },
+    {
+      "slug": "acsl-2025-2026-senior-4",
+      "codeSha256": "a8ea1f4122f95fbb15e17b44894b03da312460d4b9463644f67d7b5e22d588c5",
+      "groups": {
+        "samples": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "official": {
+          "status": "AC",
+          "passed": 6,
+          "total": 6
+        },
+        "boundary": {
+          "status": "AC",
+          "passed": 4,
+          "total": 4
+        }
+      }
+    }
+  ]
+}

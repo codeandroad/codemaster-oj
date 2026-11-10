@@ -418,27 +418,27 @@
         {
           "input": "G R W B B\n",
           "expected": "09:45\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "R B B W G\n",
           "expected": "04:40\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "W W W W W\n",
           "expected": "00:00\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "B W W G R\n",
           "expected": "06:20\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "W B B B B\n",
           "expected": "11:55\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -713,6 +713,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\n\ncolors = ''.join(sys.stdin.read().split())\nweights = (1, 1, 2, 3, 5)\nhours = sum(w for w, c in zip(weights, colors) if c in 'RB')\nminutes = 5 * sum(w for w, c in zip(weights, colors) if c in 'GB')\nprint(f'{hours:02d}:{minutes:02d}')\n",
+      "explanation": {
+        "en": "Pair the five colors with side lengths 1,1,2,3,5 in their given order. Red and blue contribute their side length to the hour; green and blue contribute five times the side length to minutes; white contributes nothing. Add these independent contributions and format both numbers to two digits. Use side lengths, not square areas. The input is guaranteed already valid for the Junior version, so no time conversion is needed.",
+        "zh": "按输入顺序，将五种颜色分别对应边长 1、1、2、3、5。红色、蓝色向小时数贡献边长；绿色、蓝色向分钟数贡献边长的 5 倍；白色不贡献。将各格贡献独立相加，再把小时和分钟都补足两位输出。这里使用边长，不是正方形面积。初级组保证输入已对应合法时间，无须做进位或 12 小时制归一化。"
+      },
+      "complexity": {
+        "en": "O(1) time and space: exactly five squares are examined.",
+        "zh": "时间 O(1)，空间 O(1)，只检查固定的五个方格。"
+      }
     }
   }
 }

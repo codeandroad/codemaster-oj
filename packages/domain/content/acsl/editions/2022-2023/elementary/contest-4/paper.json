@@ -100,8 +100,8 @@
         "en": [
           {
             "id": "figure-e2b9a8ad3cc6916c",
-            "width": 300,
-            "height": 247,
+            "width": 300.0,
+            "height": 247.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -131,8 +131,8 @@
         "zh": [
           {
             "id": "figure-e2b9a8ad3cc6916c",
-            "width": 300,
-            "height": 247,
+            "width": 300.0,
+            "height": 247.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -302,8 +302,8 @@
         "en": [
           {
             "id": "figure-50e26615fd4a968d",
-            "width": 373,
-            "height": 296,
+            "width": 373.0,
+            "height": 296.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -339,8 +339,8 @@
         "zh": [
           {
             "id": "figure-50e26615fd4a968d",
-            "width": 373,
-            "height": 296,
+            "width": 373.0,
+            "height": 296.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -447,8 +447,8 @@
         "en": [
           {
             "id": "figure-3fd64f1fc6039f68",
-            "width": 382,
-            "height": 300,
+            "width": 382.0,
+            "height": 300.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -490,8 +490,8 @@
         "zh": [
           {
             "id": "figure-3fd64f1fc6039f68",
-            "width": 382,
-            "height": 300,
+            "width": 382.0,
+            "height": 300.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -604,8 +604,8 @@
         "en": [
           {
             "id": "figure-aa82b070f92442d9",
-            "width": 455,
-            "height": 350,
+            "width": 455.0,
+            "height": 350.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -653,8 +653,8 @@
         "zh": [
           {
             "id": "figure-aa82b070f92442d9",
-            "width": 455,
-            "height": 350,
+            "width": 455.0,
+            "height": 350.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"

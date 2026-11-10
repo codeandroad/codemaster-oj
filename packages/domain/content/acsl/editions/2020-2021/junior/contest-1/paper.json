@@ -424,27 +424,27 @@
         {
           "input": "599 23 43\n",
           "expected": "218\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "4326 1234 80\n",
           "expected": "399\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "704 1776 200\n",
           "expected": "1003\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "6283 185 31\n",
           "expected": "154\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "3141 59 26\n",
           "expected": "126\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -1456,6 +1456,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nfrom math import gcd\n\ns, d, r = map(int, sys.stdin.read().split())\n# Exactly r*(r-1)//2 terms precede the requested row.\nfirst = s + d * (r * (r - 1) // 2)\nperiod = 9 // gcd(d, 9)\nroots = [1 + (first + i * d - 1) % 9 for i in range(period)]\nwhole, remainder = divmod(r, period)\nprint(whole * sum(roots) + sum(roots[:remainder]))\n",
+      "explanation": {
+        "en": "The row begins after r(r−1)/2 terms, so its first unreduced value is s+d·r(r−1)/2. For a positive integer x, repeated decimal digit addition is its digital root 1+(x−1) mod 9. Along the arithmetic progression these roots repeat every 9/gcd(d,9) terms, at most nine. Sum complete periods and the remaining prefix. This skips every earlier row and avoids even scanning the requested row. The index formula locates exactly its terms; the digital-root identity preserves each displayed value; the period decomposition includes each of the r terms once.",
+        "zh": "第 r 行之前共有 r(r−1)/2 个数，因此该行第一个尚未缩减的数为 s+d·r(r−1)/2。正整数 x 的十进制数根是 1+(x−1) mod 9，无须反复拆位相加。等差数列的数根每隔 9/gcd(d,9) 项重复一次，周期至多为 9。先求一个周期的和，再乘完整周期数，加上剩余前缀即可。起点公式定位目标行，数根公式得到每个格中的值，周期分解恰好统计该行 r 项，因此结果正确。"
+      },
+      "complexity": {
+        "en": "O(1) arithmetic operations and O(1) space: at most nine digital roots are evaluated. Python integers retain exact arithmetic.",
+        "zh": "时间 O(1)，空间 O(1)：最多计算 9 个数根；Python 整数保证精确运算。"
+      }
     }
   }
 }

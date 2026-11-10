@@ -534,7 +534,7 @@
       "en": [
         {
           "id": "p-3c22715601ec2cfb",
-          "width": 720,
+          "width": 720.0,
           "height": 95.51,
           "alt": {
             "en": "Worked-example diagram.",
@@ -1619,8 +1619,8 @@
         },
         {
           "id": "p-2604c282a8691ecd",
-          "width": 103,
-          "height": 134,
+          "width": 103.0,
+          "height": 134.0,
           "alt": {
             "en": "Worked-example diagram.",
             "zh": "题目例示图。"
@@ -1810,7 +1810,7 @@
         },
         {
           "id": "p-8cd082d7d031ea65",
-          "width": 720,
+          "width": 720.0,
           "height": 89.68,
           "alt": {
             "en": "Worked-example diagram.",
@@ -3255,7 +3255,7 @@
         },
         {
           "id": "p-5ad33449475d01ce",
-          "width": 720,
+          "width": 720.0,
           "height": 126.41,
           "alt": {
             "en": "Worked-example diagram.",
@@ -5390,7 +5390,7 @@
         },
         {
           "id": "p-a378387f264530ca",
-          "width": 720,
+          "width": 720.0,
           "height": 116.16,
           "alt": {
             "en": "Worked-example diagram.",
@@ -7213,7 +7213,7 @@
         },
         {
           "id": "p-be06d12e12c36ccb",
-          "width": 720,
+          "width": 720.0,
           "height": 116.16,
           "alt": {
             "en": "Worked-example diagram.",
@@ -9018,7 +9018,7 @@
         },
         {
           "id": "p-fa4473884e9738b4",
-          "width": 720,
+          "width": 720.0,
           "height": 115.3,
           "alt": {
             "en": "Worked-example diagram.",
@@ -10679,7 +10679,7 @@
         },
         {
           "id": "p-6fcc4ecc004ddc50",
-          "width": 720,
+          "width": 720.0,
           "height": 116.16,
           "alt": {
             "en": "Worked-example diagram.",
@@ -12352,7 +12352,7 @@
         },
         {
           "id": "p-ae3ad4aa46d7e259",
-          "width": 720,
+          "width": 720.0,
           "height": 116.16,
           "alt": {
             "en": "Worked-example diagram.",
@@ -13581,7 +13581,7 @@
         },
         {
           "id": "p-13adcb528967ede3",
-          "width": 720,
+          "width": 720.0,
           "height": 89.68,
           "alt": {
             "en": "Worked-example diagram.",
@@ -15608,7 +15608,7 @@
         },
         {
           "id": "p-8d5f0b4da231cc13",
-          "width": 720,
+          "width": 720.0,
           "height": 116.16,
           "alt": {
             "en": "Worked-example diagram.",
@@ -18091,7 +18091,7 @@
         },
         {
           "id": "p-eee806452b5dce0e",
-          "width": 720,
+          "width": 720.0,
           "height": 116.16,
           "alt": {
             "en": "Worked-example diagram.",
@@ -20250,7 +20250,7 @@
         },
         {
           "id": "p-ce265eff4df1fc50",
-          "width": 720,
+          "width": 720.0,
           "height": 137.51,
           "alt": {
             "en": "Worked-example diagram.",
@@ -22091,7 +22091,7 @@
         },
         {
           "id": "p-2e63f3862fb7d6e5",
-          "width": 720,
+          "width": 720.0,
           "height": 116.16,
           "alt": {
             "en": "Worked-example diagram.",
@@ -23988,7 +23988,7 @@
       "zh": [
         {
           "id": "p-3c22715601ec2cfb",
-          "width": 720,
+          "width": 720.0,
           "height": 95.51,
           "alt": {
             "en": "Worked-example diagram.",
@@ -25073,8 +25073,8 @@
         },
         {
           "id": "p-2604c282a8691ecd",
-          "width": 103,
-          "height": 134,
+          "width": 103.0,
+          "height": 134.0,
           "alt": {
             "en": "Worked-example diagram.",
             "zh": "题目例示图。"
@@ -25264,7 +25264,7 @@
         },
         {
           "id": "p-8cd082d7d031ea65",
-          "width": 720,
+          "width": 720.0,
           "height": 89.68,
           "alt": {
             "en": "Worked-example diagram.",
@@ -26709,7 +26709,7 @@
         },
         {
           "id": "p-5ad33449475d01ce",
-          "width": 720,
+          "width": 720.0,
           "height": 126.41,
           "alt": {
             "en": "Worked-example diagram.",
@@ -28844,7 +28844,7 @@
         },
         {
           "id": "p-a378387f264530ca",
-          "width": 720,
+          "width": 720.0,
           "height": 116.16,
           "alt": {
             "en": "Worked-example diagram.",
@@ -30667,7 +30667,7 @@
         },
         {
           "id": "p-be06d12e12c36ccb",
-          "width": 720,
+          "width": 720.0,
           "height": 116.16,
           "alt": {
             "en": "Worked-example diagram.",
@@ -32472,7 +32472,7 @@
         },
         {
           "id": "p-fa4473884e9738b4",
-          "width": 720,
+          "width": 720.0,
           "height": 115.3,
           "alt": {
             "en": "Worked-example diagram.",
@@ -34133,7 +34133,7 @@
         },
         {
           "id": "p-6fcc4ecc004ddc50",
-          "width": 720,
+          "width": 720.0,
           "height": 116.16,
           "alt": {
             "en": "Worked-example diagram.",
@@ -35806,7 +35806,7 @@
         },
         {
           "id": "p-ae3ad4aa46d7e259",
-          "width": 720,
+          "width": 720.0,
           "height": 116.16,
           "alt": {
             "en": "Worked-example diagram.",
@@ -37035,7 +37035,7 @@
         },
         {
           "id": "p-13adcb528967ede3",
-          "width": 720,
+          "width": 720.0,
           "height": 89.68,
           "alt": {
             "en": "Worked-example diagram.",
@@ -39062,7 +39062,7 @@
         },
         {
           "id": "p-8d5f0b4da231cc13",
-          "width": 720,
+          "width": 720.0,
           "height": 116.16,
           "alt": {
             "en": "Worked-example diagram.",
@@ -41545,7 +41545,7 @@
         },
         {
           "id": "p-eee806452b5dce0e",
-          "width": 720,
+          "width": 720.0,
           "height": 116.16,
           "alt": {
             "en": "Worked-example diagram.",
@@ -43704,7 +43704,7 @@
         },
         {
           "id": "p-ce265eff4df1fc50",
-          "width": 720,
+          "width": 720.0,
           "height": 137.51,
           "alt": {
             "en": "Worked-example diagram.",
@@ -45545,7 +45545,7 @@
         },
         {
           "id": "p-2e63f3862fb7d6e5",
-          "width": 720,
+          "width": 720.0,
           "height": 116.16,
           "alt": {
             "en": "Worked-example diagram.",
@@ -47439,6 +47439,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nfrom collections import deque\n\ndef matches(a, b):\n    if len(a) == 1 or len(b) == 1:\n        return a in b or b in a\n    return sum(x == y for x, y in zip(a, b)) == 2\n\nlines = sys.stdin.read().splitlines()\ntops = lines[0].split()\nhand = lines[1].split()\ndraw = deque(' '.join(lines[2:]).split())\nwhile True:\n    chosen = None\n    for i, card in enumerate(hand):\n        for p in range(2):\n            if matches(card, tops[p]):\n                chosen = p\n                tops[p] = hand.pop(i)\n                break\n        if chosen is not None:\n            break\n    if chosen is not None:\n        while hand:\n            for i, card in enumerate(hand):\n                if matches(card, tops[chosen]):\n                    tops[chosen] = hand.pop(i)\n                    break\n            else:\n                break\n    # Draw only after a complete turn, retaining hand order.\n    added = 0\n    while draw and len(hand) < 7:\n        hand.append(draw.popleft())\n        added += 1\n    if chosen is None and added == 0:\n        break\nprint(len(hand), *tops)\n",
+      "explanation": {
+        "en": "A normal pair matches in exactly two positions. When either card is wild, its single characteristic must occur in the other card. Find the leftmost playable hand card, preferring pile 1 for that card; keep that pile for the whole turn. Restart the leftmost scan after every play, then refill to seven from a queue. Stop only when a turn changes neither the hand nor the draw queue. Thus every transition follows the stated turn order, including the last turns after the draw queue empties.",
+        "zh": "普通牌需恰好两个属性相同；任一牌为万能牌时，它的唯一属性必须出现在另一张牌中。先找手牌中最左侧可出的牌，同一张牌能去两堆时优先第一堆，之后该回合只在选中堆上出牌。每次出牌后重新从左检查，回合末按抽牌顺序补至七张。只有整回合既没出牌也没补牌才停止，因此抽牌堆为空后仍会完成可进行的回合。"
+      },
+      "complexity": {
+        "en": "Time: O(N h), where N is the total cards and h ≤ 7; hence O(N). Auxiliary space: O(N) for the draw queue and input.",
+        "zh": "时间：O(N h)，N 为总牌数、h ≤ 7，因此为 O(N)。辅助空间：O(N) 用于抽牌队列与输入。"
+      }
     }
   }
 }

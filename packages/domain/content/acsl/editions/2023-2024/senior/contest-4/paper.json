@@ -106,8 +106,8 @@
         "en": [
           {
             "id": "figure-4f15776fd9dd74f0",
-            "width": 397,
-            "height": 277,
+            "width": 397.0,
+            "height": 277.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -161,8 +161,8 @@
         "zh": [
           {
             "id": "figure-4f15776fd9dd74f0",
-            "width": 397,
-            "height": 277,
+            "width": 397.0,
+            "height": 277.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -287,8 +287,8 @@
         "en": [
           {
             "id": "figure-d944ac67a008fd3d",
-            "width": 427,
-            "height": 314,
+            "width": 427.0,
+            "height": 314.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -336,8 +336,8 @@
         "zh": [
           {
             "id": "figure-d944ac67a008fd3d",
-            "width": 427,
-            "height": 314,
+            "width": 427.0,
+            "height": 314.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -456,7 +456,7 @@
         "en": [
           {
             "id": "figure-29ca2a329f2a6fea",
-            "width": 720,
+            "width": 720.0,
             "height": 306.9,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -493,7 +493,7 @@
         "zh": [
           {
             "id": "figure-29ca2a329f2a6fea",
-            "width": 720,
+            "width": 720.0,
             "height": 306.9,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -601,7 +601,7 @@
         "en": [
           {
             "id": "figure-1002bae901e846cb",
-            "width": 720,
+            "width": 720.0,
             "height": 420.16,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -638,7 +638,7 @@
         "zh": [
           {
             "id": "figure-1002bae901e846cb",
-            "width": 720,
+            "width": 720.0,
             "height": 420.16,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -744,7 +744,9 @@
       }
     }
   ],
-  "contentNotes": [],
+  "contentNotes": [
+    "Programming Test 5 correction: the final output token is 2048. The original English source on page 6 truncates this token to 204; the Chinese test output on page 12 prints the complete 2048. The three-round rules also produce 2048. All other tokens and cases are unchanged. 编程测试 5 勘误：最后一个输出数字应为 2048。原 PDF 第 6 页英文测试输出将该数字截为 204，第 12 页中文测试输出完整印为 2048，按三轮游戏规则计算也得到 2048。其余数字及用例保持不变。"
+  ],
   "programming": {
     "id": "acsl-2248",
     "definition": {
@@ -781,27 +783,27 @@
         {
           "input": "2 2 32 16 2 2 8 256 2 128 32 16 64 16 32 8 8 4 16 4 8 8 32 64 2 64 8 64 8 256 128 256 16 8 32 16 2 2 128 2\n",
           "expected": "1024 1024 512 256 64 32 512 128 64 1024 512 16 256 32 128 1024 256 8 16 32 128 16 256 128 512 64 8 32 8 32 128 8 64 8 256 16 256 16 128 32\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "2 4 256 128 4 256 32 8 64 64 64 128 16 256 64 64 4 4 64 64 64 4 8 64 2 32 4 2 128 256 16 64 64 2 8 256 32 32 32 2\n",
           "expected": "4096 2048 1024 512 256 256 128 64 32 2048 4096 2048 1024 512 256 4096 2048 1024 512 64 128 64 32 4096 1024 1024 512 1024 512 128 256 32 128 64 4096 256 2048 32 128 1024\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "32 4 128 128 4 2 128 16 2 128 8 256 256 16 256 256 128 8 256 2 64 64 256 64 128 64 16 8 8 64 256 256 16 2 8 2 64 256 32 256\n",
           "expected": "32768 16384 8192 4096 2048 1024 512 256 32768 16384 8192 4096 2048 1024 512 256 32768 16384 8192 512 32768 4096 2048 1024 8192 512 256 4096 2048 1024 2048 256 256 2048 1024 256 256 256 8192 256\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "2 2 32 32 8 2 32 128 256 32 64 128 64 32 32 64 128 16 8 64 8 4 256 64 64 64 256 64 64 4 8 128 64 32 256 256 256 128 64 8\n",
           "expected": "16384 8192 4096 2048 1024 512 256 128 16384 8192 4096 2048 1024 512 256 128 16384 8192 4096 1024 2048 1024 512 256 256 1024 256 128 2048 2048 16384 2048 1024 512 1024 512 2048 2048 256 256\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "256 128 64 32 16 64 4 64 64 64 16 64 32 4 64 256 128 8 16 16 16 64 32 8 64 8 2 2 128 128 128 4 64 256 8 64 256 8 128 256\n",
-          "expected": "8192 4096 2048 1024 512 256 128 64 8192 4096 2048 1024 512 256 128 128 64 8192 256 2048 2048 4096 2048 128 256 64 1024 1024 128 64 8192 512 512 256 64 256 256 512 128 204\n",
-          "weight": 20
+          "expected": "8192 4096 2048 1024 512 256 128 64 8192 4096 2048 1024 512 256 128 128 64 8192 256 2048 2048 4096 2048 128 256 64 1024 1024 128 64 8192 512 512 256 64 256 256 512 128 2048\n",
+          "weight": 20.0
         }
       ]
     },
@@ -16228,6 +16230,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nboard = list(map(int, sys.stdin.read().split()))\n\ndef longest_path(board):\n    size = len(board)\n    adjacent, equal = [0] * size, [0] * size\n    for i in range(size):\n        r, c = divmod(i, 5)\n        for rr in range(max(0, r - 1), min(8, r + 2)):\n            for cc in range(max(0, c - 1), min(5, c + 2)):\n                j = rr * 5 + cc\n                if j != i:\n                    if board[j] == board[i]:\n                        equal[i] |= 1 << j\n                    if board[j] in (board[i], 2 * board[i]):\n                        adjacent[i] |= 1 << j\n    best, path, seen = [], [], set()\n\n    def search(last, used):\n        nonlocal best\n        if len(path) > len(best):\n            best = path.copy()\n        if len(best) == size:\n            return\n        state = (used << 6) | last\n        if state in seen:\n            return\n        # The cache only prunes repeated states, never truncates search.\n        # Clearing it bounds memory without changing the result.\n        if len(seen) >= 100000:\n            seen.clear()\n        seen.add(state)\n        allowed = ((1 << size) - 1) ^ used\n        frontier, reachable = adjacent[last] & allowed, 0\n        while frontier:\n            bit = frontier & -frontier\n            frontier ^= bit\n            if reachable & bit:\n                continue\n            reachable |= bit\n            j = bit.bit_length() - 1\n            frontier |= adjacent[j] & allowed & ~reachable\n        # Every continuation is a subset of these reachable unused cells.\n        if len(path) + reachable.bit_count() <= len(best):\n            return\n        choices = adjacent[last] & allowed\n        while choices:\n            bit = choices & -choices\n            choices ^= bit\n            j = bit.bit_length() - 1\n            path.append(j)\n            search(j, used | bit)\n            path.pop()\n            if len(best) == size:\n                return\n\n    # Ascending indices equal lexicographic order of fixed-width coordinates.\n    for first in range(size):\n        choices = equal[first]\n        while choices:\n            bit = choices & -choices\n            choices ^= bit\n            second = bit.bit_length() - 1\n            path[:] = [first, second]\n            search(second, (1 << first) | bit)\n            if len(best) == size:\n                return best\n    return best\n\ndef collapse(board, path, adaptive):\n    merged = 1 << (sum(board[i] for i in path) - 1).bit_length()\n    largest = max(max(board), merged) if adaptive else 256\n    for i in path:\n        board[i] = 0\n    board[path[-1]] = merged\n    if adaptive:\n        minimum = largest // 128\n        board = [value if value >= minimum else 0 for value in board]\n    # Preserve relative vertical order while packing each column downward.\n    for c in range(5):\n        column = [board[r * 5 + c] for r in range(8) if board[r * 5 + c]]\n        column = [0] * (8 - len(column)) + column\n        for r, value in enumerate(column):\n            board[r * 5 + c] = value\n    next_value = largest\n    for i in range(40):\n        if board[i] == 0:\n            board[i] = next_value\n            next_value //= 2\n            if next_value < largest // 128:\n                next_value = largest\n    return board\n\nfor _ in range(3):\n    path = longest_path(board)\n    if not path:\n        break\n    board = collapse(board, path, True)\nprint(*board)\n",
+      "explanation": {
+        "en": "Find the exact longest valid simple path with depth-first search, using a bitmask of visited cells. The first edge must join equal values; all later edges join equal or doubled values. Visit starting cells and neighbors in coordinate order and replace the best path only when strictly longer, so equal-length ties retain the lexicographically first path. Prune when the number of reachable unused cells cannot beat the best length. Reaching a previously explored (last cell, visited set) is also safe to prune: all continuations are identical and the earlier prefix is lexicographically smaller. The bounded memo cache may be cleared, which affects speed only. Merge, remove obsolete small tiles, drop columns, and refill before finding the next round’s path. Repeat three times. Exact longest simple path search has exponential worst-case cost; this is an exact branch-and-bound implementation, not a polynomial-time claim.",
+        "zh": "用访问位集进行深度优先搜索，精确寻找最长不重复路径。第一步必须等值，后续允许等值或翻倍。起点和邻居均按坐标递增遍历，仅长度严格增加时更新最佳路径，因此等长时保留字典序最小者。若当前长度加上所有可达未访问格数也不能超过最佳长度，就剪枝；同一（末格、访问集合）再次出现时，后续选择完全相同，而较早遍历的前缀字典序更小，也可剪枝。缓存达到容量后清空只影响速度，不影响正确性。每轮找出路径后依次合并、删除过小牌、下落、补充，再对新棋盘求下一轮，共三轮。最长简单路径精确搜索在最坏情况下仍为指数复杂度，此实现不会用贪心近似代替题目要求。"
+      },
+      "complexity": {
+        "en": "For V cells and maximum degree Δ≤8, conservative worst-case time is O(V²·Δ^V) across a constant three rounds. Reachability and memo pruning reduce practical search substantially. Auxiliary space is O(V²+K), with at most K=100000 cached states and recursion depth V; V=40. No polynomial worst-case guarantee is claimed.",
+        "zh": "V 个格子、最大邻接度 Δ≤8，三轮为常数，保守最坏时间 O(V²·Δ^V)。可达上界和状态缓存用于减少实际搜索。额外空间 O(V²+K)，K=100000 为缓存上限，递归深度 V；本题 V=40。不能保证多项式最坏时间。"
+      }
     }
   }
 }

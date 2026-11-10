@@ -106,8 +106,8 @@
         "en": [
           {
             "id": "figure-b4bc3765af8db59b",
-            "width": 378,
-            "height": 300,
+            "width": 378.0,
+            "height": 300.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -155,8 +155,8 @@
         "zh": [
           {
             "id": "figure-b4bc3765af8db59b",
-            "width": 378,
-            "height": 300,
+            "width": 378.0,
+            "height": 300.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -275,8 +275,8 @@
         "en": [
           {
             "id": "figure-92c9408c65ad9049",
-            "width": 476,
-            "height": 268,
+            "width": 476.0,
+            "height": 268.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -330,8 +330,8 @@
         "zh": [
           {
             "id": "figure-92c9408c65ad9049",
-            "width": 476,
-            "height": 268,
+            "width": 476.0,
+            "height": 268.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -456,7 +456,7 @@
         "en": [
           {
             "id": "figure-52f60127388d2fed",
-            "width": 720,
+            "width": 720.0,
             "height": 282.93,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -493,7 +493,7 @@
         "zh": [
           {
             "id": "figure-52f60127388d2fed",
-            "width": 720,
+            "width": 720.0,
             "height": 282.93,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -601,8 +601,8 @@
         "en": [
           {
             "id": "figure-5d682eeaece4ef40",
-            "width": 710,
-            "height": 369,
+            "width": 710.0,
+            "height": 369.0,
             "alt": {
               "en": "Digital Electronics diagram.",
               "zh": "Digital Electronics 图示。"
@@ -638,8 +638,8 @@
         "zh": [
           {
             "id": "figure-5d682eeaece4ef40",
-            "width": 710,
-            "height": 369,
+            "width": 710.0,
+            "height": 369.0,
             "alt": {
               "en": "Digital Electronics diagram.",
               "zh": "Digital Electronics 图示。"
@@ -781,27 +781,27 @@
         {
           "input": "9\n11 14 17 22 24 26 31 33 35 37 45 41 53 57 62 64 66 71 77\n",
           "expected": "45\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "7\n15 23 24 25 32 35 31 45 55 44\n",
           "expected": "31\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "6\n11 22 33 44 14 23 41\n",
           "expected": "11 14 22 33 41 44\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "10\n71 82 63 54 45 56 75 77 88 21 24 26 27 28 12 13 15 34 35 33 37\n",
           "expected": "63\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "5\n11 12 13 21 22 23 31 32 33\n",
           "expected": "11 13 31 33\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -1362,6 +1362,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nfrom collections import defaultdict\nvalues = sys.stdin.read().split()\nn = int(values[0])\ntargets = sorted(set(values[1:]))\nhits = {cell: 0 for cell in targets}\n# For each horizontal, vertical, and diagonal line, only the two\n# extreme targets are visible from the border in the two directions.\nfor family in range(4):\n    extremes = {}\n    for cell in targets:\n        r, c = int(cell[0]), int(cell[1])\n        key = (r, c, r - c, r + c)[family]\n        if key not in extremes:\n            extremes[key] = [cell, cell]\n        else:\n            extremes[key][0] = min(extremes[key][0], cell)\n            extremes[key][1] = max(extremes[key][1], cell)\n    for first, last in extremes.values():\n        hits[first] += 1\n        hits[last] += 1  # A singleton is hit from both ends.\nbest = max(hits.values())\nprint(' '.join(cell for cell in targets if hits[cell] == best))\n",
+      "explanation": {
+        "en": "Group targets by row, column, row−column, and row+column. These four line families account for all eight arrow directions. On each line, only its two extreme targets are visible from the corresponding two border ends, because an arrow stops at the first target. Give one hit to each extreme (two to a singleton), then report all maximum-count targets in row-column order.",
+        "zh": "分别按行、列、行减列、行加列将目标分组，这四种直线涵盖八个方向。箭头遇到第一个目标就停止，因此一条线只有两端目标能被相应边界射线击中；每端加一次，只有一个目标的线加两次。统计后按行列顺序输出所有最大值。该计数与逐条射线检查一一对应。"
+      },
+      "complexity": {
+        "en": "O(T log T) time including output ordering and O(T) space. The four visibility scans take O(T); T≤64.",
+        "zh": "含输出排序的时间 O(T log T)，空间 O(T)；四轮可见性扫描为 O(T)，T≤64。"
+      }
     }
   }
 }

@@ -424,27 +424,27 @@
         {
           "input": "4567 7 65\n",
           "expected": "1038\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "3141 5 26\n",
           "expected": "429\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "765 43 21\n",
           "expected": "329\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "704 1776 20\n",
           "expected": "374\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "77 7 100\n",
           "expected": "1547\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -1456,6 +1456,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\n\ndef floor_sum(n, m, a, b):\n    \"\"\"Sum floor((a*i+b)/m), 0 <= i < n, using Euclidean reduction.\"\"\"\n    answer = 0\n    while True:\n        qa, a = divmod(a, m)\n        qb, b = divmod(b, m)\n        answer += qa * n * (n - 1) // 2 + qb * n\n        top = a * n + b\n        if top < m:\n            return answer\n        n, b = divmod(top, m)\n        m, a = a, m\n\ns_text, d_text, r_text = sys.stdin.read().split()\ns, d, r = int(s_text, 8), int(d_text, 8), int(r_text)\nfirst = s + d * (r * (r - 1) // 2)\nlast = first + (r - 1) * d\nanswer = r * (first + last) // 2\n# digit_sum_base8(x) = x - 7 * sum(floor(x/8**k), k >= 1).\npower = 8\nwhile power <= last:\n    answer -= 7 * floor_sum(r, power, d, first)\n    power *= 8\nprint(answer)\n",
+      "explanation": {
+        "en": "Parse s and d in base 8, but parse the row number r in decimal. The requested row is the arithmetic progression starting at first=s+d·r(r−1)/2 with r terms. For any nonnegative x, its octal digit sum equals x−7Σ floor(x/8^k), where k≥1. This follows by writing x in powers of eight: the subtraction leaves coefficient 1 for each octal digit. Sum this identity over the row. Its first term is the arithmetic-series sum; each remaining sum is floor_sum(r,8^k,d,first). The helper removes the integer quotient parts of a and b, then exchanges the two axes of the remaining lattice-point count, reducing its modulus as in Euclid’s algorithm. Thus it computes each floor sum exactly without enumerating r values, giving the required decimal total.",
+        "zh": "s、d 按八进制解析，行号 r 按十进制解析。目标行是首项 first=s+d·r(r−1)/2、长度 r、公差 d 的等差数列。对非负整数 x，八进制各位数字之和等于 x−7Σ floor(x/8^k)，k 从 1 开始；把 x 展开为八进制位权后，可验证每一位最终只保留一次。把此式对整行求和，第一项用等差数列求和公式，后续每项用 floor_sum(r,8^k,d,first) 求出。floor_sum 先取出 a、b 的整商贡献，再交换剩余格点计数的两个坐标轴，使模数像欧几里得算法一样递减。由此精确计算全部整除和，不必逐个构造该行整数，最终直接输出十进制答案。"
+      },
+      "complexity": {
+        "en": "With M the largest number in the row, O(log₈ M · log M) arithmetic operations and O(1) auxiliary space; unlike direct digit enumeration, time does not grow linearly with r.",
+        "zh": "设 M 为目标行最大值，时间 O(log₈ M · log M) 次整数运算，额外空间 O(1)；不需要对 r 个数逐项拆位。"
+      }
     }
   }
 }

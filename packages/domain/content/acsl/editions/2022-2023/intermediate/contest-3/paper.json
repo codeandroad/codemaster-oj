@@ -244,8 +244,8 @@
         "en": [
           {
             "id": "figure-0e89e5d755de20a0",
-            "width": 703,
-            "height": 481,
+            "width": 703.0,
+            "height": 481.0,
             "alt": {
               "en": "Data Structures diagram.",
               "zh": "Data Structures 图示。"
@@ -353,8 +353,8 @@
         "zh": [
           {
             "id": "figure-0e89e5d755de20a0",
-            "width": 703,
-            "height": 481,
+            "width": 703.0,
+            "height": 481.0,
             "alt": {
               "en": "Data Structures diagram.",
               "zh": "Data Structures 图示。"
@@ -637,27 +637,27 @@
         {
           "input": "MOTHER\n",
           "expected": "HT O\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "ACSLCONTEST\n",
           "expected": "T A\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "SUPERCALIFRAGILISTIC\n",
           "expected": "CIILU FG\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "JAVAPROGRAMMING\n",
           "expected": "AORV NONE\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "ABDFHKMOQTVWYZ\n",
           "expected": "NONE ABDFHKMOQTVWY\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -675,6 +675,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nfrom collections import deque\ntext = sys.stdin.readline().strip()\nn = len(text)\n# Inorder is alphabetical; new duplicates precede older duplicates.\nbuckets = [[] for _ in range(26)]\nfor i, ch in enumerate(text):\n    buckets[ord(ch) - ord('A')].append(i)\norder = [i for bucket in buckets for i in reversed(bucket)]\nleft, right = [-1] * n, [-1] * n\nstack = []\nfor i in order:\n    last = -1\n    # Earlier insertion (smaller original index) must be the ancestor.\n    while stack and stack[-1] > i:\n        last = stack.pop()\n    if stack:\n        right[stack[-1]] = i\n    left[i] = last\n    stack.append(i)\nroot = stack[0]\n\na = ''.join(text[i] for i in order if left[i] != -1 and right[i] == -1)\nb = ''.join(text[i] for i in order if right[i] != -1 and left[i] == -1)\nprint(a or 'NONE', b or 'NONE')\n",
+      "explanation": {
+        "en": "The assigned values are exactly depths in the binary search tree obtained by inserting the letters, with duplicate letters going left. Equivalently, this is the min Cartesian tree whose inorder keys are (letter, −insertion index) and whose priorities are insertion indices. The first inserted node is the root of each interval, so its child depths reproduce 1+max(neighbor depths). Build the sorted keys with 26 buckets, then construct that tree with a monotone stack: each node is pushed and popped once. A matching depth+1 to the left/right before any lower depth is precisely a left/right child. In inorder order, output nodes with only a left child and nodes with only a right child; nodes with both children are excluded.",
+        "zh": "题目赋予的数值就是逐字插入二叉搜索树后的深度，重复字母放左侧。等价地，将节点按（字母、插入序号的相反数）排序，再以插入序号为最小堆优先级构造笛卡尔树。每个区间最先插入的节点成为根，因此子树深度符合相邻已有节点深度最大值加一的规则。用 26 个桶获得中序顺序，单调栈建树，每个节点只入栈、出栈一次。向左或向右在遇到更小深度前找到深度加一的节点，分别等价于存在左孩子或右孩子。按中序顺序分别输出只有左孩子、只有右孩子的节点；双孩子节点不进入任何串。"
+      },
+      "complexity": {
+        "en": "O(n+26) time and O(n+26) space, including construction and traversal; n≤80.",
+        "zh": "建树及遍历共 O(n+26) 时间、O(n+26) 空间，n≤80。"
+      }
     }
   }
 }

@@ -175,8 +175,8 @@
         "en": [
           {
             "id": "figure-41157935d0d95032",
-            "width": 684,
-            "height": 525,
+            "width": 684.0,
+            "height": 525.0,
             "alt": {
               "en": "Data Structures diagram.",
               "zh": "Data Structures 图示。"
@@ -296,8 +296,8 @@
         "zh": [
           {
             "id": "figure-41157935d0d95032",
-            "width": 684,
-            "height": 525,
+            "width": 684.0,
+            "height": 525.0,
             "alt": {
               "en": "Data Structures diagram.",
               "zh": "Data Structures 图示。"
@@ -557,8 +557,8 @@
         "en": [
           {
             "id": "figure-2860d75d7846cbe4",
-            "width": 673,
-            "height": 371,
+            "width": 673.0,
+            "height": 371.0,
             "alt": {
               "en": "FSAs diagram.",
               "zh": "FSAs 图示。"
@@ -630,8 +630,8 @@
         "zh": [
           {
             "id": "figure-2860d75d7846cbe4",
-            "width": 673,
-            "height": 371,
+            "width": 673.0,
+            "height": 371.0,
             "alt": {
               "en": "FSAs diagram.",
               "zh": "FSAs 图示。"
@@ -809,27 +809,27 @@
         {
           "input": "9 140\n74 135 61 45 92 122 14 98 138\n105 60 66 116 5 106 97 85 18 139 96\n",
           "expected": "5 18 61 66 92 97 106 116 138\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "15 75\n27 43 24 9 70 64 3 33 30 63 11 1 25 12 35\n69 15 10 2 34 66 21 49 23 51 5 57 38 40 53\n",
           "expected": "2 43 53 9 23 64 66 10 30 49 51 57 25 34 35\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "11 85\n68 52 8 25 22 18 29 16 74 48 34\n30 43 6 77 7 28 73 9 27 54 71 79 42 49\n",
           "expected": "6 7 8 25 30 43 54 71 74 77 79\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "15 60\n2 10 13 19 20 26 30 34 39 41 47 48 52 58 60\n9 31 50 59 1\n",
           "expected": "2 10 13 19 20 26 30 34 39 41 47 48 52 58 60\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "10 75\n70 65 60 55 50 45 40 35 30 20\n44 10 15 46 23 72 3 68 53 37 52 75 39 51 18 71 73 62\n",
           "expected": "3 10 23 46 50 51 52 53 72 75\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -844,6 +844,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nvalues = list(map(int, sys.stdin.read().split()))\ns, n = values[:2]\nrack, draw = values[2:2 + s], values[2 + s:]\nwidth = (n + s - 1) // s\nbad = sum(a > b for a, b in zip(rack, rack[1:]))\n\ndef after_replacement(slot, x):\n    result = bad\n    if slot:\n        result += (rack[slot - 1] > x) - (rack[slot - 1] > rack[slot])\n    if slot + 1 < s:\n        result += (x > rack[slot + 1]) - (rack[slot] > rack[slot + 1])\n    return result\n\nfor x in draw:\n    if bad == 0:\n        break\n    candidates = []\n    ideal = (x - 1) // width\n    if (rack[ideal] - 1) // width != ideal:\n        candidates.append((after_replacement(ideal, x), 0, ideal))\n    # Strategy B is the first repairable, unsorted adjacent triple.\n    found = False\n    for i in range(s - 2):\n        a, b, c = rack[i:i + 3]\n        if a < b < c:\n            continue\n        for offset, valid in enumerate((x < b < c, a < x < c, a < b < x)):\n            if valid:\n                slot = i + offset\n                candidates.append((after_replacement(slot, x), 1, slot))\n                found = True\n                break\n        if found:\n            break\n    if candidates:\n        score, strategy, slot = min(candidates)\n        if score <= bad:\n            rack[slot], bad = x, score\nprint(*rack)\n",
+      "explanation": {
+        "en": "Compute the ceiling-width ideal interval for every slot. For each draw, obtain at most one candidate from A and the first repairable unsorted triple from B. Evaluate the complete rack heuristic using only the two comparisons adjacent to the replaced slot. Minimize (new descent count, strategy priority), with A priority zero, and accept only if the heuristic does not increase. Keeping candidates separate prevents a trial replacement for A from changing what B sees. Stop as soon as the descent count is zero.",
+        "zh": "按向上取整的区间宽度确定理想槽。每次摸牌分别得到 A 的候选位置以及 B 中第一个可修复的无序三元组。候选都从未修改的当前牌架计算，只需更新替换位置左右两次比较即可得到整架下降数。按（新下降数、策略优先级）最小化，A 优先级为 0；结果不超过原下降数才接受。下降数为零立即停牌。这样不会因试做 A 而改变 B 的输入。"
+      },
+      "complexity": {
+        "en": "O(D·s+s) time and O(D+s) space; each candidate heuristic evaluation is O(1).",
+        "zh": "时间 O(D·s+s)、空间 O(D+s)；每个候选的下降数评估为 O(1)。"
+      }
     }
   }
 }

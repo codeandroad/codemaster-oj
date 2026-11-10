@@ -250,7 +250,7 @@
         "en": [
           {
             "id": "figure-78040318be8be7e0",
-            "width": 720,
+            "width": 720.0,
             "height": 495.93,
             "alt": {
               "en": "Data Structures diagram.",
@@ -341,7 +341,7 @@
         "zh": [
           {
             "id": "figure-78040318be8be7e0",
-            "width": 720,
+            "width": 720.0,
             "height": 495.93,
             "alt": {
               "en": "Data Structures diagram.",
@@ -608,27 +608,27 @@
         {
           "input": "3 1 4 1 5 9 2 6 5 3 5 8 9 7\n9 3 2 3 8 4 6 2 7 9 8 5 3 5 6 2 9 5 1 4 1 3\n6 2 8 3 1 8 5 3 0 6\n",
           "expected": "131\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "31 41 59 26 53 58 97 93 23 84 62 64 33 83 27\n21 32 43 54 65 76 87 98 90 70 50 30 10\n20 40 60 80 12 23 34 45 56 67 78 89\n",
           "expected": "1032\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "8765 4321 9012 3456 7890 321 654 987\n9123 5326 8975 345 789\n7654 6235 5798 6543 4567 32 54 1024 2048 4096\n",
           "expected": "46946\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "-5 -6 -7 -8 -9 -10 -11\n-1 -2 -3 -4 -12 -8 -10 -16 -14 -12 -10 -5\n-6 -9 -1 -2 -10 -7 -9 -21 -15 -10\n",
           "expected": "-86\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "1\n1\n1\n",
           "expected": "1\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -643,6 +643,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nfrom itertools import zip_longest\n\nrows = [list(map(int, sys.stdin.readline().split())) for _ in range(3)]\nprint(sum(max(x for x in column if x is not None)\n          for column in zip_longest(*rows, fillvalue=None)))\n",
+      "explanation": {
+        "en": "Align the three lists by index using zip_longest. Missing positions are represented by None and excluded from the maximum; using zero would be incorrect when all available values are negative. Take the maximum of the values that actually exist at each position and sum them. Every position up to the longest list is visited once, and only its own existing values participate, exactly matching the definition.",
+        "zh": "用 zip_longest 按下标对齐三条列表。缺失位置用 None 表示，并在求最大值时排除；不能用 0 补齐，因为实际数字可能全为负数。逐位置取确实存在的数字中的最大值，再求和。最长列表中的每个位置恰好访问一次，且只比较该位置的实际数字，因此与题意完全一致。"
+      },
+      "complexity": {
+        "en": "O(n) time and O(n) input storage, where n is the total number of input integers; O(1) additional traversal space.",
+        "zh": "设 n 为输入整数总数，时间 O(n)，输入存储 O(n)，遍历额外空间 O(1)。"
+      }
     }
   }
 }

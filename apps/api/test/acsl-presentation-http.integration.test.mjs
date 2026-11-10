@@ -32,6 +32,10 @@ test('presentation-only repair keeps grading versions, submissions, points and j
       await pool.query('INSERT INTO legacy_school_account_ownership(account_id) VALUES($1) ON CONFLICT DO NOTHING', [users[name].id]);
     }
     const original = JSON.parse(await readFile(new URL('../../../packages/domain/content/acsl/sample.json', import.meta.url), 'utf8'));
+    const authoredSolution = original.programming.solution ?? { language: 'python', provenance: 'independent',
+      code: original.programming.definition.referenceCode, explanation: { en: 'Card simulation.', zh: '模拟出牌。' },
+      complexity: { en: 'O(n²) time, O(n) space.', zh: '时间 O(n²)，空间 O(n)。' } };
+    delete original.programming.solution;
     original.slug = 'acsl-presentation-source';
     const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aG3sAAAAASUVORK5CYII=', 'base64');
     original.assets = [{ id: 'old-question-crop', path: 'old.png', sha256: createHash('sha256').update(png).digest('hex'), mimeType: 'image/png', width: 1, height: 1,
@@ -82,6 +86,7 @@ test('presentation-only repair keeps grading versions, submissions, points and j
     native.programming.definition.title = 'Native programming presentation';
     native.programming.definition.statement = 'Native English programming statement.'; native.programming.statementZh = '原生中文编程题干。';
     native.programming.statementDiagrams = diagram;
+    native.programming.solution = authoredSolution;
     const args = { schoolId: LEGACY_SCHOOL_ID, actorAccountId: users.actor.id, reason: 'Reviewed native presentation repair',
       updates: [{ content: native, expectedContentHash: canonicalHash(original) }] };
 

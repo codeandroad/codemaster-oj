@@ -56,6 +56,7 @@ function detail(paper) {
       id: paper.programming_problem_id, title: program.definition.title, statement: program.definition.statement,
       statementZh: program.statementZh, ...(program.statementDiagrams ? { statementDiagrams: program.statementDiagrams } : {}),
       samples: program.definition.samples.map(({ input, expected }) => ({ input, expected })),
+      ...(program.solution ? { solution: program.solution } : {}),
       readOnlyJudge: { mode: program.definition.mode, comparator: program.definition.comparator,
         timeLimitMs: program.definition.timeLimitMs, memoryLimitMb: program.definition.memoryLimitMb, testCount: program.definition.tests.length },
     } : null };
@@ -118,7 +119,10 @@ export function acslExportDocument(content, include, language) {
       ...(solutions ? { correctOptionIds: question.correctOptionIds, explanation: question.explanation[language], explanationDiagrams: question.explanationDiagrams?.[language] ?? [] } : {}),
     })),
     programming: program ? { title: program.definition.title, statement: language === 'zh' ? program.statementZh : program.definition.statement,
-      statementDiagrams: program.statementDiagrams?.[language] ?? [], samples: program.definition.samples.map(({ input, expected }) => ({ input, expected })) } : null };
+      statementDiagrams: program.statementDiagrams?.[language] ?? [], samples: program.definition.samples.map(({ input, expected }) => ({ input, expected })),
+      ...(solutions && program.solution ? { solution: { language: program.solution.language, provenance: program.solution.provenance,
+        code: program.solution.code, explanation: program.solution.explanation[language], complexity: program.solution.complexity[language] } } : {}),
+    } : null };
 }
 
 export async function handleAcslManagement({ pool, user, schoolId, tail, method, body, url }) {

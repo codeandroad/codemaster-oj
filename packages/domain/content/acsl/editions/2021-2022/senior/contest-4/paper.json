@@ -106,8 +106,8 @@
         "en": [
           {
             "id": "figure-aea8aff26e2559ac",
-            "width": 344,
-            "height": 298,
+            "width": 344.0,
+            "height": 298.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -149,8 +149,8 @@
         "zh": [
           {
             "id": "figure-aea8aff26e2559ac",
-            "width": 344,
-            "height": 298,
+            "width": 344.0,
+            "height": 298.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -263,8 +263,8 @@
         "en": [
           {
             "id": "figure-b278f8f89265c1f7",
-            "width": 444,
-            "height": 331,
+            "width": 444.0,
+            "height": 331.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -312,8 +312,8 @@
         "zh": [
           {
             "id": "figure-b278f8f89265c1f7",
-            "width": 444,
-            "height": 331,
+            "width": 444.0,
+            "height": 331.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -432,7 +432,7 @@
         "en": [
           {
             "id": "figure-d05b328d6bc44dd8",
-            "width": 720,
+            "width": 720.0,
             "height": 274.72,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -469,7 +469,7 @@
         "zh": [
           {
             "id": "figure-d05b328d6bc44dd8",
-            "width": 720,
+            "width": 720.0,
             "height": 274.72,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -577,8 +577,8 @@
         "en": [
           {
             "id": "figure-3af24e564c01284d",
-            "width": 618,
-            "height": 303,
+            "width": 618.0,
+            "height": 303.0,
             "alt": {
               "en": "Digital Electronics diagram.",
               "zh": "Digital Electronics 图示。"
@@ -620,8 +620,8 @@
         "zh": [
           {
             "id": "figure-3af24e564c01284d",
-            "width": 618,
-            "height": 303,
+            "width": 618.0,
+            "height": 303.0,
             "alt": {
               "en": "Digital Electronics diagram.",
               "zh": "Digital Electronics 图示。"
@@ -769,27 +769,27 @@
         {
           "input": "-1.5 -1.5 1.5 1.5 0.2\n",
           "expected": "30\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "-0.4 -0.3 0.4 0.3 0.06\n",
           "expected": "127\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "0.175 -0.1 0.235 0.4 0.006\n",
           "expected": "764\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "-0.2 -0.2 0.0 0.5 0.02\n",
           "expected": "388\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "-0.375 -0.1 0.075 0.5 0.025\n",
           "expected": "456\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -1146,6 +1146,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nfrom math import hypot, floor\n\ndef cycle_length(cr, ci):\n    a = b = 0.0\n    seen = {(a, b): 0}\n    for iteration in range(1, 501):\n        a, b = round(a * a - b * b + cr, 3), round(2 * a * b + ci, 3)\n        if hypot(a, b) > 4:\n            return 0\n        state = (a, b)\n        if state in seen:\n            return iteration - seen[state]\n        seen[state] = iteration\n    raise ValueError('The supplied point exceeds the stated 500-iteration bound')\n\nleft, bottom, right, top, step = map(float, sys.stdin.read().split())\nfibonacci = set()\na, b = 1, 2\nwhile a < 500:\n    fibonacci.add(a)\n    a, b = b, a + b\n# An index-based grid avoids cumulative floating-point drift.\ncolumns = floor((right - left) / step + 1e-9) + 1\nrows = floor((top - bottom) / step + 1e-9) + 1\nanswer = 0\nfor y in range(rows):\n    ci = round(bottom + y * step, 3)\n    for x in range(columns):\n        cr = round(left + x * step, 3)\n        answer += cycle_length(cr, ci) in fibonacci\nprint(answer)\n",
+      "explanation": {
+        "en": "Generate grid points by integer row/column indices and round each coordinate to three decimals before iteration. Do not repeatedly add the step, which accumulates floating-point error. Visit only indices whose coordinates do not exceed the upper bounds: some supplied official cases have a final partial interval despite the source’s divisibility wording. The tiny tolerance in the index count compensates only for binary floating-point error at an integral ratio. At each point apply the rounded recurrence, using Python round(value,3) after every update. Store each state’s first iteration; repetition gives the exact cycle length, while modulus greater than 4 gives escape. Count a point only if its cycle length belongs to the precomputed Fibonacci set below 500. Process points independently so only one history is stored at a time.",
+        "zh": "用整数行列下标生成网格坐标，迭代开始前先将坐标舍入到三位小数；不要反复累加步长，以免浮点误差累计。仅遍历不超过右、上边界的点：原资料虽写步长整除区间，但部分官方数据实际有不足一步的末段。计算下标个数时的小容差只用于补偿整倍数附近的二进制浮点误差。每个点按递推式更新，并在每轮对两个分量分别执行 Python round(value,3)。字典保存状态的首次轮次，重复时两次轮次之差即周期长度；模大于 4 则判为逃逸。预先生成小于 500 的斐波那契数集合，只统计周期长度在集合中的点。各网格点独立处理，只保留当前点的历史。"
+      },
+      "complexity": {
+        "en": "O(GT) expected time and O(T) auxiliary space for G grid points and at most T=500 iterations per point.",
+        "zh": "G 个网格点、每点至多 T=500 轮，期望时间 O(GT)，额外空间 O(T)。"
+      }
     }
   }
 }

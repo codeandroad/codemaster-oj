@@ -106,8 +106,8 @@
         "en": [
           {
             "id": "figure-8cde8f9d98bf53b8",
-            "width": 328,
-            "height": 298,
+            "width": 328.0,
+            "height": 298.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -149,8 +149,8 @@
         "zh": [
           {
             "id": "figure-8cde8f9d98bf53b8",
-            "width": 328,
-            "height": 298,
+            "width": 328.0,
+            "height": 298.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -263,8 +263,8 @@
         "en": [
           {
             "id": "figure-8077b201b3cae340",
-            "width": 429,
-            "height": 315,
+            "width": 429.0,
+            "height": 315.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -312,8 +312,8 @@
         "zh": [
           {
             "id": "figure-8077b201b3cae340",
-            "width": 429,
-            "height": 315,
+            "width": 429.0,
+            "height": 315.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -432,8 +432,8 @@
         "en": [
           {
             "id": "figure-e59b5bc15584afb3",
-            "width": 712,
-            "height": 361,
+            "width": 712.0,
+            "height": 361.0,
             "alt": {
               "en": "Digital Electronics diagram.",
               "zh": "Digital Electronics 图示。"
@@ -469,8 +469,8 @@
         "zh": [
           {
             "id": "figure-e59b5bc15584afb3",
-            "width": 712,
-            "height": 361,
+            "width": 712.0,
+            "height": 361.0,
             "alt": {
               "en": "Digital Electronics diagram.",
               "zh": "Digital Electronics 图示。"
@@ -577,7 +577,7 @@
         "en": [
           {
             "id": "figure-a7e9e72d7c89c916",
-            "width": 720,
+            "width": 720.0,
             "height": 332.73,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -614,7 +614,7 @@
         "zh": [
           {
             "id": "figure-a7e9e72d7c89c916",
-            "width": 720,
+            "width": 720.0,
             "height": 332.73,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -759,27 +759,27 @@
         {
           "input": "6\n02 04 10 13 20 33 35 40 44 55\n202204 212122\n00C 05A 22F 25D 32E 50B 51F 53E 54C\n",
           "expected": "34D\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "6\n01 10 20 21 22 23 24 31 45 51\n310123 100441\n03A 04D 05H 13A 34A 43E 44E 53A 54F\n",
           "expected": "50B\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "6\n11 12 13 30 35 41 42 43 45 51 52\n323102 422102\n00G 01G 02G 10G 15D 20D 22D 23G 31D 50C\n",
           "expected": "55A\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "6\n11 20 22 31 32 33 40 42 44 50 51 53\n411132 231114\n00D 01D 04H 05H 15H 21D 30D 43A 45A 52A 55A\n",
           "expected": "41H\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "6\n05 11 20 21 22 23 33 42 43 52 53 54\n321312 401043\n00D 02H 04H 14H 15B 24H 34H 35H 40C 50C 55A\n",
           "expected": "30F\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -795,8 +795,8 @@
       "en": [
         {
           "id": "p-cbccc4a5d2414fb4",
-          "width": 558,
-          "height": 290,
+          "width": 558.0,
+          "height": 290.0,
           "alt": {
             "en": "Worked-example diagram.",
             "zh": "题目例示图。"
@@ -2230,8 +2230,8 @@
       "zh": [
         {
           "id": "p-cbccc4a5d2414fb4",
-          "width": 558,
-          "height": 290,
+          "width": 558.0,
+          "height": 290.0,
           "alt": {
             "en": "Worked-example diagram.",
             "zh": "题目例示图。"
@@ -3662,6 +3662,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nlines = sys.stdin.read().splitlines()\nn = int(lines[0])\ntargets = {tuple(map(int, cell)) for cell in lines[1].split()}\nrow_text, column_text = lines[2].split()\nrows, columns = list(map(int, row_text)), list(map(int, column_text))\narrows = {}\nfor token in lines[3].split() if len(lines) > 3 else []:\n    r, c = int(token[0]), int(token[1])\n    arrows[r, c] = ord(token[2]) - 65\n    rows[r] -= 1\n    columns[c] -= 1\nr, c = rows.index(1), columns.index(1)\ndirections = [(0,-1),(-1,0),(0,1),(1,0),(-1,-1),(-1,1),(1,1),(1,-1)]\n\ndef hit(cell, direction, occupied):\n    dr, dc = directions[direction]\n    rr, cc = cell[0] + dr, cell[1] + dc\n    while 0 <= rr < n and 0 <= cc < n:\n        if (rr, cc) in occupied:\n            return None\n        if (rr, cc) in targets:\n            return rr, cc\n        rr, cc = rr + dr, cc + dc\n    return None\n\noccupied = set(arrows) | {(r, c)}\ncovered = {hit(cell, direction, occupied) for cell, direction in arrows.items()}\nfor direction in range(8):\n    target = hit((r, c), direction, occupied)\n    if target is not None and None not in covered and covered | {target} == targets:\n        print(f'{r}{c}{chr(65 + direction)}')\n        break\n",
+      "explanation": {
+        "en": "Subtract the existing arrow counts from each row and column requirement. Since exactly one arrow is missing, their single positive deficits identify its cell. Trace existing arrows with that cell occupied; a ray stops at its first target or is invalid if an arrow blocks it. Try each direction at the missing cell and select the unique one that supplies the uncovered target while leaving every existing ray valid. This enforces both the row/column counts and target coverage.",
+        "zh": "从各行、各列规定箭头数中扣除已知箭头。仅缺一个箭头，所以唯一的行差额和列差额确定其位置。把该位置视为占用，再追踪所有已有箭头：首先遇到目标即命中，先遇到箭头则无效。枚举缺失箭头八个方向，选择能补齐未覆盖目标且不阻挡已有箭头的唯一方向，同时满足数量和命中约束。"
+      },
+      "complexity": {
+        "en": "O((A+8)n+T) time and O(A+T+n) space, where A is the number of known arrows.",
+        "zh": "A 为已知箭头数、T 为目标数。时间 O((A+8)n+T)，空间 O(A+T+n)。"
+      }
     }
   }
 }

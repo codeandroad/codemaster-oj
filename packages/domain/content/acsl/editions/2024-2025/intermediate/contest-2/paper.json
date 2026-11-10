@@ -534,7 +534,7 @@
       "en": [
         {
           "id": "p-3c22715601ec2cfb",
-          "width": 720,
+          "width": 720.0,
           "height": 95.51,
           "alt": {
             "en": "Worked-example diagram.",
@@ -1619,8 +1619,8 @@
         },
         {
           "id": "p-2604c282a8691ecd",
-          "width": 103,
-          "height": 134,
+          "width": 103.0,
+          "height": 134.0,
           "alt": {
             "en": "Worked-example diagram.",
             "zh": "题目例示图。"
@@ -1810,7 +1810,7 @@
         },
         {
           "id": "p-f5efcb45e6e185a6",
-          "width": 720,
+          "width": 720.0,
           "height": 89.68,
           "alt": {
             "en": "Worked-example diagram.",
@@ -3111,7 +3111,7 @@
         },
         {
           "id": "p-1b757e0ed8fd335f",
-          "width": 720,
+          "width": 720.0,
           "height": 126.41,
           "alt": {
             "en": "Worked-example diagram.",
@@ -5114,7 +5114,7 @@
         },
         {
           "id": "p-a0c7eabb2a5fb99f",
-          "width": 720,
+          "width": 720.0,
           "height": 116.16,
           "alt": {
             "en": "Worked-example diagram.",
@@ -6835,7 +6835,7 @@
         },
         {
           "id": "p-57959de0d2807139",
-          "width": 720,
+          "width": 720.0,
           "height": 116.16,
           "alt": {
             "en": "Worked-example diagram.",
@@ -8538,7 +8538,7 @@
         },
         {
           "id": "p-4951d35b527a44de",
-          "width": 720,
+          "width": 720.0,
           "height": 115.3,
           "alt": {
             "en": "Worked-example diagram.",
@@ -10049,7 +10049,7 @@
         },
         {
           "id": "p-b4269133d5742c66",
-          "width": 720,
+          "width": 720.0,
           "height": 116.16,
           "alt": {
             "en": "Worked-example diagram.",
@@ -11494,7 +11494,7 @@
         },
         {
           "id": "p-f7398c9b5ede436f",
-          "width": 720,
+          "width": 720.0,
           "height": 116.16,
           "alt": {
             "en": "Worked-example diagram.",
@@ -12833,7 +12833,7 @@
       "zh": [
         {
           "id": "p-3c22715601ec2cfb",
-          "width": 720,
+          "width": 720.0,
           "height": 95.51,
           "alt": {
             "en": "Worked-example diagram.",
@@ -13918,8 +13918,8 @@
         },
         {
           "id": "p-2604c282a8691ecd",
-          "width": 103,
-          "height": 134,
+          "width": 103.0,
+          "height": 134.0,
           "alt": {
             "en": "Worked-example diagram.",
             "zh": "题目例示图。"
@@ -14109,7 +14109,7 @@
         },
         {
           "id": "p-f5efcb45e6e185a6",
-          "width": 720,
+          "width": 720.0,
           "height": 89.68,
           "alt": {
             "en": "Worked-example diagram.",
@@ -15410,7 +15410,7 @@
         },
         {
           "id": "p-1b757e0ed8fd335f",
-          "width": 720,
+          "width": 720.0,
           "height": 126.41,
           "alt": {
             "en": "Worked-example diagram.",
@@ -17413,7 +17413,7 @@
         },
         {
           "id": "p-a0c7eabb2a5fb99f",
-          "width": 720,
+          "width": 720.0,
           "height": 116.16,
           "alt": {
             "en": "Worked-example diagram.",
@@ -19134,7 +19134,7 @@
         },
         {
           "id": "p-57959de0d2807139",
-          "width": 720,
+          "width": 720.0,
           "height": 116.16,
           "alt": {
             "en": "Worked-example diagram.",
@@ -20837,7 +20837,7 @@
         },
         {
           "id": "p-4951d35b527a44de",
-          "width": 720,
+          "width": 720.0,
           "height": 115.3,
           "alt": {
             "en": "Worked-example diagram.",
@@ -22348,7 +22348,7 @@
         },
         {
           "id": "p-b4269133d5742c66",
-          "width": 720,
+          "width": 720.0,
           "height": 116.16,
           "alt": {
             "en": "Worked-example diagram.",
@@ -23793,7 +23793,7 @@
         },
         {
           "id": "p-f7398c9b5ede436f",
-          "width": 720,
+          "width": 720.0,
           "height": 116.16,
           "alt": {
             "en": "Worked-example diagram.",
@@ -25129,6 +25129,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\n\ndef matches(a, b):\n    if len(a) == 1 or len(b) == 1:\n        return a in b or b in a\n    return sum(x == y for x, y in zip(a, b)) == 2\n\ndef play(top, cards):\n    hand = list(cards)\n    pile = [top]\n    while hand:\n        for i, card in enumerate(hand):\n            if matches(card, pile[-1]):\n                pile.append(hand.pop(i))\n                break  # Restart at the leftmost remaining card.\n        else:\n            break\n    return pile\nlines = sys.stdin.read().splitlines()\nhand = lines[1].split()\npiles = [play(top, hand) for top in lines[0].split()]\nprint(*max(piles, key=len))  # max keeps the first pile on ties.\n",
+      "explanation": {
+        "en": "Simulate the mandated leftmost-first policy. After each removal restart the scan; stopping means no card matches the current top. Run each starting pile independently with a fresh copy of the hand, choose the longest result, and keep pile 1 on ties. This maximizes the number played among the two legally prescribed turns. The hand has exactly seven cards, so this is constant-size simulation.",
+        "zh": "严格模拟“从左向右取第一张可出牌”的规则，每出一张就重新从剩余手牌的最左侧检查；完整扫描没有匹配时停止。用原始手牌的独立副本分别模拟两个起始牌堆，选择牌数更多的结果，相等时保留第一堆。因此选中的是题目规定策略下可出牌最多的一堆。手牌固定只有七张，模拟开销是常数。"
+      },
+      "complexity": {
+        "en": "Time: O(h²), h = 7 (therefore O(1) under the stated limits). Auxiliary space: O(h), h = 7.",
+        "zh": "时间：O(h²), h = 7 （题目固定七张手牌，因此为 O(1)）。辅助空间：O(h), h = 7。"
+      }
     }
   }
 }

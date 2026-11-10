@@ -986,7 +986,7 @@
         "en": [
           {
             "id": "figure-c5251dd0d25e5e70",
-            "width": 720,
+            "width": 720.0,
             "height": 244.1,
             "alt": {
               "en": "FSAs diagram.",
@@ -1047,7 +1047,7 @@
         "zh": [
           {
             "id": "figure-c5251dd0d25e5e70",
-            "width": 720,
+            "width": 720.0,
             "height": 244.1,
             "alt": {
               "en": "FSAs diagram.",
@@ -1261,6 +1261,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nfrom math import isqrt\ndelta, m, n = map(int, sys.stdin.read().split())\ndef position(x):\n    # S(k) = k + delta*k*(k-1)//2 counts the first k rows.\n    b = 2 - delta\n    k = (isqrt(b*b + 8*delta*x) - b) // (2*delta)\n    if k + delta*k*(k-1)//2 < x:\n        k += 1\n    before = (k-1) + delta*(k-1)*(k-2)//2\n    col = x - before - 1\n    if k % 2 == 0:\n        col = delta*(k-1) - col\n    return k-1, col\na, b = position(m), position(n)\nprint(abs(a[0]-b[0]) + abs(a[1]-b[1]))\n",
+      "explanation": {
+        "en": "The first k row lengths sum to S(k)=k+delta*k*(k−1)/2. Invert this quadratic with integer square root, then increase k once if its cumulative count is still below x. This finds the exact containing row without constructing the triangle. Subtract S(k−1) to find its zero-based column. Even-numbered rows run right to left, so reflect the column in that row. Finally add the absolute row and column differences; these are exactly the two orthogonal components of Manhattan distance.",
+        "zh": "前 k 行共有 S(k)=k+delta*k*(k−1)/2 个数。使用整数平方根反解二次式，再在累计数仍小于 x 时将 k 加 1，可精确找到所在行，无需构造三角形。减去 S(k−1) 得到从零开始的列位置。偶数行从右向左排列，因此再用该行末列减去此列位置。最后相加行差绝对值和列差绝对值，即曼哈顿距离。"
+      },
+      "complexity": {
+        "en": "Time: O(1) arithmetic operations plus integer square root (all inputs ≤ 1000). Auxiliary space: O(1).",
+        "zh": "时间：O(1) 次算术运算及一次整数平方根（输入均不超过 1000）。辅助空间：O(1)。"
+      }
     }
   }
 }

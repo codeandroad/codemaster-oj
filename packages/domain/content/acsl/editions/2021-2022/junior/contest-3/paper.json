@@ -244,7 +244,7 @@
         "en": [
           {
             "id": "figure-a5870963eb84dc6e",
-            "width": 720,
+            "width": 720.0,
             "height": 670.78,
             "alt": {
               "en": "Data Structures diagram.",
@@ -365,7 +365,7 @@
         "zh": [
           {
             "id": "figure-a5870963eb84dc6e",
-            "width": 720,
+            "width": 720.0,
             "height": 670.78,
             "alt": {
               "en": "Data Structures diagram.",
@@ -661,27 +661,27 @@
         {
           "input": "2\n",
           "expected": "1 1\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "55\n",
           "expected": "1 8 21 20 5\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "1597\n",
           "expected": "1 15 91 286 495 462 210 36 1\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "17711\n",
           "expected": "1 20 171 816 2380 4368 5005 3432 1287 220 11\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "832040\n",
           "expected": "1 28 351 2600 12650 42504 100947 170544 203490 167960 92378 31824 6188 560 15\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -697,7 +697,7 @@
       "en": [
         {
           "id": "p-408bdaed1c4f244c",
-          "width": 720,
+          "width": 720.0,
           "height": 367.29,
           "alt": {
             "en": "Worked-example diagram.",
@@ -2474,7 +2474,7 @@
       "zh": [
         {
           "id": "p-408bdaed1c4f244c",
-          "width": 720,
+          "width": 720.0,
           "height": 367.29,
           "alt": {
             "en": "Worked-example diagram.",
@@ -4248,6 +4248,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\n\ndef diagonal(index):\n    # Entries are C(index-k, k), from bottom left to top right.\n    value = 1\n    for k in range(index // 2 + 1):\n        yield value\n        if 2 * (k + 1) <= index:\n            value = (value * (index - 2 * k) * (index - 2 * k - 1)\n                     // ((k + 1) * (index - k)))\n\ntarget = int(sys.stdin.read())\na = b = 1\nindex = 0\nwhile a < target:\n    a, b = b, a + b\n    index += 1\nprint(' '.join(map(str, diagonal(index))))\n",
+      "explanation": {
+        "en": "Find n such that the target is F(n+1), with F1=F2=1. The diagonal entries in the required order are C(n−k,k), for k=0,…,floor(n/2); these are exactly the cells obtained by moving one row upward and one column right from the bottom-left entry. Their sum satisfies the Fibonacci recurrence by Pascal’s identity. Generate consecutive entries from the ratio T(k+1)/T(k)=(n−2k)(n−2k−1)/((k+1)(n−k)), keeping all arithmetic integral. This constructs only the requested diagonal, rather than the entire triangle. For target 1 the output is the single entry 1, identical for either initial Fibonacci occurrence.",
+        "zh": "先找到 target=F(n+1) 对应的 n，其中 F1=F2=1。要求的对角线从左下到右上依次为 C(n−k,k)，k=0,…,⌊n/2⌋：这恰好对应每次向上一行、向右一列的单元格。利用帕斯卡恒等式可证明这些项的和满足斐波那契递推。相邻项满足 T(k+1)/T(k)=(n−2k)(n−2k−1)/((k+1)(n−k))，因此用精确整数乘除逐项生成即可，只构造目标对角线，无须生成整座三角形。输入 1 时输出单个 1，最初两个斐波那契 1 的对角线内容相同。"
+      },
+      "complexity": {
+        "en": "O(log X) arithmetic operations and O(log X) output space for input X; O(1) generator state. Large-integer operation costs depend on operand size.",
+        "zh": "设输入为 X，时间 O(log X) 次整数运算，输出空间 O(log X)，生成器额外状态 O(1)；大整数运算成本随位数增长。"
+      }
     }
   }
 }

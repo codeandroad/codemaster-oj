@@ -35,6 +35,9 @@ test('ACSL teacher management authorizes local staff and preserves grades, expor
     }
     await pool.query('INSERT INTO school_administrators(school_id,account_id,granted_by) VALUES($1,$2,$3)', [school.id, users.overlay.id, users.schooladmin.id]);
     const original = JSON.parse(await readFile(new URL('../../../packages/domain/content/acsl/sample.json', import.meta.url), 'utf8'));
+    original.programming.solution ??= { language: 'python', provenance: 'independent',
+      code: original.programming.definition.referenceCode, explanation: { en: 'Card simulation.', zh: '模拟出牌。' },
+      complexity: { en: 'O(n²) time, O(n) space.', zh: '时间 O(n²)，空间 O(n)。' } };
     original.slug = 'acsl-management-test';
     const paper = await importAcslPaper(pool, { schoolId: LEGACY_SCHOOL_ID, ownerAccountId: users.admin.id, content: original, enablePoints: true });
     const other = await importAcslPaper(pool, { schoolId: school.id, ownerAccountId: users.schooladmin.id, content: original });
@@ -69,6 +72,7 @@ test('ACSL teacher management authorizes local staff and preserves grades, expor
       current = (await request(manage, { auth: auth.teacher })).data;
       assert.equal(current.canEdit, true); assert.equal(current.questions.length, 6); assert.equal(current.contentHash, canonicalHash(original));
       assert.deepEqual(current.questions[0].correctOptionIds, ['D']); assert.equal(current.programming.readOnlyJudge.testCount, 6);
+      assert.deepEqual(current.programming.solution, original.programming.solution);
       assert.doesNotMatch(JSON.stringify(current), /referenceCode|"tests"|account_id|identity_id|gradeId/);
       for (const name of ['historical', 'pending', 'outsider']) for (const target of [`${root}/manage`, manage, `${manage}/export?include=package`]) {
         await request(target, { auth: auth[name], status: 403 });
@@ -90,12 +94,21 @@ test('ACSL teacher management authorizes local staff and preserves grades, expor
         else {
           assert.equal(exported.title, original.title[language]); assert.equal(exported.questions[0].statement, original.questions[0].statement[language]);
           assert.deepEqual(exported.programming.samples, original.programming.definition.samples);
-          assert.doesNotMatch(JSON.stringify(exported), /source|statementAssets|solutionPages|referenceCode|"tests"|account_id|gradeId/);
-          if (include === 'questions') assert.doesNotMatch(JSON.stringify(exported), /correctOptionIds|explanation/);
-          else assert.deepEqual(exported.questions[0].correctOptionIds, ['D']);
+          assert.doesNotMatch(JSON.stringify(exported), /"source"|statementAssets|solutionPages|referenceCode|"tests"|account_id|gradeId/);
+          if (include === 'questions') assert.doesNotMatch(JSON.stringify(exported), /correctOptionIds|explanation|"solution"/);
+          else {
+            assert.deepEqual(exported.questions[0].correctOptionIds, ['D']);
+            assert.equal(exported.programming.solution.code, original.programming.solution.code);
+            assert.equal(exported.programming.solution.explanation, original.programming.solution.explanation[language]);
+          }
         }
       }
       await request(`${manage}/export?include=student-records`, { auth: auth.teacher, status: 400 });
+      for (const route of [path, `${path}/programming`]) {
+        const student = (await request(route, { auth: auth.historical })).data;
+        assert.ok(!JSON.stringify(student).includes(JSON.stringify(original.programming.solution.code).slice(1, -1)));
+        assert.doesNotMatch(JSON.stringify(student), /"solution"|"referenceCode"/);
+      }
     });
 
     await t.test('unknown fields, structural edits, invalid answer sets and judge data are rejected before any write', async () => {

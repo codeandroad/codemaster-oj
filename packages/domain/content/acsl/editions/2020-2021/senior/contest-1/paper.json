@@ -424,27 +424,27 @@
         {
           "input": "ABE CAB 40\n",
           "expected": "5\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "31415 92653 60\n",
           "expected": "F\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "DEAF BED 72\n",
           "expected": "3\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "BAD DAD 100\n",
           "expected": "A\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "704 1776 244\n",
           "expected": "E\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -1445,6 +1445,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\n\ns_text, d_text, r_text = sys.stdin.read().split()\ns, d, r = int(s_text, 16), int(d_text, 16), int(r_text)\nfirst = s + d * (r * (r - 1) // 2)\ntotal = r * (2 * first + (r - 1) * d) // 2\n# A positive base-16 digital root is determined modulo 15.\nprint(format(1 + (total - 1) % 15, 'X'))\n",
+      "explanation": {
+        "en": "Read s and d in hexadecimal and r in decimal. Skip the r(r−1)/2 earlier values to find the first value on row r. Adding all hexadecimal digits and then repeatedly adding digits until one remains has the same result as taking the base-16 digital root of the sum of the original numbers: every power of 16 is congruent to 1 modulo 15. The row sum is r(2·first+(r−1)d)/2. It is positive, so its digital root is 1+(sum−1) mod 15, with multiples of 15 giving F rather than 0. Print that digit in uppercase hexadecimal. This arithmetic formula avoids constructing either the triangle or its final row.",
+        "zh": "s、d 读作十六进制整数，r 读作十进制行号。先跳过前 r(r−1)/2 项，定位第 r 行首项。由于 16 的任何幂对 15 取模都等于 1，先把各数的十六进制位相加，再反复缩减，与直接对这些数的总和取十六进制数根等价。目标行总和为 r(2·first+(r−1)d)/2；它为正数，因此数根为 1+(sum−1) mod 15。特别注意：正的 15 的倍数对应 F，而不是 0。最后按大写十六进制输出，无须构造三角形或枚举整行。"
+      },
+      "complexity": {
+        "en": "O(1) arithmetic operations and O(1) auxiliary space, with exact integer arithmetic.",
+        "zh": "时间 O(1) 次整数运算，额外空间 O(1)，所有计算均为精确整数运算。"
+      }
     }
   }
 }

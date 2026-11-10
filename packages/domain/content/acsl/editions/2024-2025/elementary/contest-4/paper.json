@@ -100,8 +100,8 @@
         "en": [
           {
             "id": "figure-ff8c02764582ef48",
-            "width": 450,
-            "height": 331,
+            "width": 450.0,
+            "height": 331.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -179,8 +179,8 @@
         "zh": [
           {
             "id": "figure-ff8c02764582ef48",
-            "width": 450,
-            "height": 331,
+            "width": 450.0,
+            "height": 331.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -1520,8 +1520,8 @@
         "en": [
           {
             "id": "figure-11fbd0d373e9ee70",
-            "width": 367,
-            "height": 283,
+            "width": 367.0,
+            "height": 283.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -1575,8 +1575,8 @@
         "zh": [
           {
             "id": "figure-11fbd0d373e9ee70",
-            "width": 367,
-            "height": 283,
+            "width": 367.0,
+            "height": 283.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"

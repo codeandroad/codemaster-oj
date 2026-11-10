@@ -419,27 +419,27 @@
         {
           "input": "Peter Piper picked a peck of pickled peppers.\n",
           "expected": "acdefikloprstcdeikprceikprepepepepep\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "Computer Science Teachers Association had a virtual Conference in 2020.\n",
           "expected": "acdefhilmnoprstuvacehinorstuaceinorstaceinorstaceinacece\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "HackerRank.com was used for the ACSL Finals this past year.\n",
           "expected": "acdefhiklmnoprstuwyacefhiklnorstacehrstaersasasa\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "Programming languages include Java, Python, C++, BASIC, and Scratch.\n",
           "expected": "abcdeghijlmnoprstuvyacdeghilmnoprstuacginrsacgnacna\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "COVID-19 is a global pandemic and a virus that changed everything.\n",
           "expected": "abcdeghilmnoprstuvyacdeghilnorstvacdeghintvadeinaia\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -454,6 +454,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nfrom collections import Counter\n\ncounts = Counter(c for c in sys.stdin.readline().lower() if 'a' <= c <= 'z')\nactive = sorted(counts)\nanswer = []\nwhile active:\n    remaining = []\n    for c in active:\n        if not answer or answer[-1] != c:\n            answer.append(c)\n        counts[c] -= 1\n        if counts[c]:\n            remaining.append(c)\n    active = remaining\nprint(''.join(answer))\n",
+      "explanation": {
+        "en": "After discarding nonletters and converting to lowercase, only each letter’s count matters: each pass removes exactly one occurrence of every remaining letter in sorted order. Keep the currently available letters sorted, emit one of each, decrement its count, and retain only positive counts for the next pass. Suppress an emitted letter only when it equals the last output letter; still decrement its count, because duplicate removal occurs after the conceptual sorting. The active list implements exactly one prescribed pass, and the last-character check implements exactly adjacent-duplicate removal, including across pass boundaries.",
+        "zh": "去除非字母并转为小写后，只需保留每个字母的出现次数：每轮按字母序各取一次尚有剩余的字母。维护有序的活跃字母列表，每轮将它们依次输出、次数减一，再仅保留次数仍为正的字母进入下一轮。若本次输出字母与答案末尾相同则不再写入，但仍要减去其次数，因为去重发生在概念上的重排之后。活跃列表精确实现每轮“各取第一次出现”的效果，末尾比较则精确实现相邻去重，也覆盖跨轮边界。"
+      },
+      "complexity": {
+        "en": "O(n) time for a fixed 26-letter alphabet; O(n) output storage and O(1) counting/active-letter space.",
+        "zh": "字母表固定为 26 个字母，时间 O(n)；答案占 O(n) 空间，计数与活跃列表占 O(1) 额外空间。"
+      }
     }
   }
 }

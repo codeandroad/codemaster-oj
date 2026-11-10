@@ -64,6 +64,20 @@ async function lockPaperAnswers(db, paper, accountId) {
   await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [key]);
 }
 
+async function programmingVersions(db, paper) {
+  if (!paper.programmingVersionLineage) {
+    const { rows } = await db.query(`WITH RECURSIVE lineage(id) AS (
+      SELECT $3::uuid
+      UNION
+      SELECT revision.before_programming_version_id FROM acsl_programming_revisions revision
+      JOIN lineage ON lineage.id=revision.after_programming_version_id
+      WHERE revision.school_id=$1 AND revision.paper_id=$2 AND revision.problem_id=$4
+    ) SELECT id FROM lineage`, [paper.school_id, paper.id, paper.programming_version_id, paper.programming_problem_id]);
+    paper.programmingVersionLineage = rows.map(row => row.id);
+  }
+  return paper.programmingVersionLineage;
+}
+
 async function codingProgress(db, paper, accountId) {
   if (!paper.programming_problem_id) return { attempts: 0, solved: false };
   return (await db.query(`SELECT count(*)::integer attempts, coalesce(bool_or(state='completed' AND result->>'status'='AC'),false) solved,
@@ -75,8 +89,8 @@ async function codingProgress(db, paper, accountId) {
       WHERE award.school_id=$1 AND award.paper_id=$5 AND award.version_id=$6 AND award.section='programming'
         AND actor.disabled_at IS NULL AND actor.binding_released_at IS NULL
         AND EXISTS(SELECT 1 FROM account_roles role WHERE role.account_id=actor.id AND role.role='student')) AS "pointsAwarded"
-    FROM school_judge_jobs WHERE school_id=$1 AND problem_id=$2 AND version_id=$3 AND account_id=$4 AND access_context='acsl' AND kind='submit'`,
-    [paper.school_id, paper.programming_problem_id, paper.programming_version_id, accountId, paper.id, paper.version_id])).rows[0];
+    FROM school_judge_jobs WHERE school_id=$1 AND problem_id=$2 AND version_id=ANY($3::uuid[]) AND account_id=$4 AND access_context='acsl' AND kind='submit'`,
+    [paper.school_id, paper.programming_problem_id, await programmingVersions(db, paper), accountId, paper.id, paper.version_id])).rows[0];
 }
 
 async function progress(db, paper, accountId) {
@@ -236,9 +250,9 @@ async function programmingOperation(db, paper, user, tail, method, body, url) {
       solved: coding.solved, attempts: coding.attempts, published: true });
   }
   if (tail === 'submissions' && method === 'GET') {
-    const formalJobs = `FROM school_judge_jobs WHERE school_id=$1 AND problem_id=$2 AND version_id=$3
+    const formalJobs = `FROM school_judge_jobs WHERE school_id=$1 AND problem_id=$2 AND version_id=ANY($3::uuid[])
       AND account_id=$4 AND access_context='acsl' AND kind='submit'`;
-    const scope = [paper.school_id, paper.programming_problem_id, paper.programming_version_id, user.id];
+    const scope = [paper.school_id, paper.programming_problem_id, await programmingVersions(db, paper), user.id];
     if (url.searchParams.get('view') === 'resume') {
       const versionId = url.searchParams.get('versionId');
       if (versionId && uuid(versionId) !== paper.programming_version_id) fail(409, 'VERSION_CONFLICT', 'Programming version changed.');
@@ -265,8 +279,8 @@ async function programmingOperation(db, paper, user, tail, method, body, url) {
     return reply({ items, solved: coding.solved, page, pageSize, total: coding.attempts, attempts: coding.attempts, hasMore: page*pageSize < coding.attempts });
   }
   if (tail?.startsWith('submissions/') && method === 'GET') {
-    const job = (await db.query(`SELECT * FROM school_judge_jobs WHERE school_id=$1 AND problem_id=$2 AND version_id=$3 AND account_id=$4 AND access_context='acsl' AND id=$5`,
-      [paper.school_id, paper.programming_problem_id, paper.programming_version_id, user.id, uuid(tail.split('/')[1])])).rows[0];
+    const job = (await db.query(`SELECT * FROM school_judge_jobs WHERE school_id=$1 AND problem_id=$2 AND version_id=ANY($3::uuid[]) AND account_id=$4 AND access_context='acsl' AND id=$5`,
+      [paper.school_id, paper.programming_problem_id, await programmingVersions(db, paper), user.id, uuid(tail.split('/')[1])])).rows[0];
     if (!job) fail(404, 'NOT_FOUND', 'Submission is unavailable.');
     const result = jobResult(job);
     if (job.kind === 'submit' && job.state === 'completed' && result.status === 'AC') {

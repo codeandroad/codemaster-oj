@@ -532,6 +532,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nPOINTS = {'A': 1, 'R': 1, 'O': 3, 'G': 3, 'B': 6}\ndef score(toss):\n    rings = toss.rstrip('+')\n    return sum(POINTS[c] for c in rings) + (len(rings) == 2) + 2 * toss.endswith('+')\nlines = sys.stdin.read().splitlines()\nscores = [sum(POINTS[c] for c in line.strip()) for line in lines[:2]]\nprint(*sorted(scores, reverse=True))\n",
+      "explanation": {
+        "en": "Scan each player’s tosses once and add the specified ring values. The running sum is exactly the score of the processed prefix, so the two final sums are the complete scores. Sort them in descending order. Each toss must be read, making the linear scan optimal.",
+        "zh": "逐个读取两位玩家的投球颜色，按 A/R=1、O/G=3、B=6 累加。循环中累计值始终等于已处理投球的分数，因此最终得到完整分数；将两分数降序输出。每次投球都必须读取，线性扫描已达到输入规模的下界。"
+      },
+      "complexity": {
+        "en": "Time: O(L), where L is the total input length. Auxiliary space: O(L) including buffered input; O(1) scoring state.",
+        "zh": "时间：O(L)，L 为输入总长度。辅助空间：O(L) （含输入缓存），计分状态仅需 O(1)。"
+      }
     }
   }
 }

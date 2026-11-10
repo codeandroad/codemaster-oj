@@ -417,27 +417,27 @@
         {
           "input": "What was the first computer programming language you learned?\n",
           "expected": "61\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "Lions and Tigers and Bears, Oh My! This is from The Wizard of Oz.\n",
           "expected": "30\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "Knock, knock. Who is there? Hawaii. Hawaii who? I am good, Hawaii you?\n",
           "expected": "64\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "How do you use HackerRank to do each ACSL competition?\n",
           "expected": "33\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "~{w|x|y|z}\n",
           "expected": "20\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -452,6 +452,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\ntext = sys.stdin.readline().rstrip('\\r\\n')\nbits = ''.join(f'{ord(ch):08b}' for ch in text)\nif '0' not in bits:\n    print(-1)\nelse:\n    # For each length, mark all binary windows. Canonical positive\n    # numerals have a leading 1, so their values lie in [2^(k-1), 2^k).\n    length = 1\n    while True:\n        limit = 1 << length\n        seen = bytearray(limit)\n        mask, value = limit - 1, 0\n        for i, ch in enumerate(bits):\n            value = ((value << 1) | (ch == '1')) & mask\n            if i + 1 >= length:\n                seen[value] = 1\n        missing = next((v for v in range(limit // 2, limit) if not seen[v]), None)\n        if missing is not None:\n            print(missing - 1)\n            break\n        length += 1\n",
+      "explanation": {
+        "en": "Preserve all spaces and punctuation and encode every ASCII character with exactly eight bits. For each numeral length, use a rolling bit window to mark all substrings of that length. Check only values with a leading 1; process lengths and values in increasing order. The first absent numeral is exactly the point where the required sequence stops. At length k with 2^(k−1)>L, there are more possible numerals than windows, so a missing one must exist.",
+        "zh": "保留输入中的空格和标点，每个 ASCII 字符固定转换成 8 位。按二进制位数递增，用滑动位窗口标记该长度的所有子串；只检查首位为 1 的规范正整数，并按数值递增查找第一个缺失项。先单独检查 0。第一个找不到的数减一就是答案。若 2^(k−1)>L，该长度可能的数比窗口还多，必有缺失，因此只需处理 O(log L) 种长度。"
+      },
+      "complexity": {
+        "en": "O(L log L) time and O(L) auxiliary space for L=8·text length; no integer-by-integer full-string searches.",
+        "zh": "L 为 8 倍输入字符数。时间 O(L log L)，辅助空间 O(L)。"
+      }
     }
   }
 }

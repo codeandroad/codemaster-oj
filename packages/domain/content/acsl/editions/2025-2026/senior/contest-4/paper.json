@@ -106,8 +106,8 @@
         "en": [
           {
             "id": "figure-0f15525eafc2818a",
-            "width": 523,
-            "height": 279,
+            "width": 523.0,
+            "height": 279.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -167,8 +167,8 @@
         "zh": [
           {
             "id": "figure-0f15525eafc2818a",
-            "width": 523,
-            "height": 279,
+            "width": 523.0,
+            "height": 279.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -299,8 +299,8 @@
         "en": [
           {
             "id": "figure-ead3e4f3629648b1",
-            "width": 491,
-            "height": 425,
+            "width": 491.0,
+            "height": 425.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -354,8 +354,8 @@
         "zh": [
           {
             "id": "figure-ead3e4f3629648b1",
-            "width": 491,
-            "height": 425,
+            "width": 491.0,
+            "height": 425.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -411,8 +411,8 @@
         "en": [
           {
             "id": "figure-df8e1dcbb31756f5",
-            "width": 440,
-            "height": 380,
+            "width": 440.0,
+            "height": 380.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -466,8 +466,8 @@
         "zh": [
           {
             "id": "figure-df8e1dcbb31756f5",
-            "width": 440,
-            "height": 380,
+            "width": 440.0,
+            "height": 380.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -592,7 +592,7 @@
         "en": [
           {
             "id": "figure-10094008348490d2",
-            "width": 720,
+            "width": 720.0,
             "height": 236.44,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -635,7 +635,7 @@
         "zh": [
           {
             "id": "figure-10094008348490d2",
-            "width": 720,
+            "width": 720.0,
             "height": 236.44,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -749,7 +749,7 @@
         "en": [
           {
             "id": "figure-441bc3ec86f21fdf",
-            "width": 720,
+            "width": 720.0,
             "height": 238.42,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -786,7 +786,7 @@
         "zh": [
           {
             "id": "figure-441bc3ec86f21fdf",
-            "width": 720,
+            "width": 720.0,
             "height": 238.42,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -1042,6 +1042,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nvalues = list(map(int, sys.stdin.read().split()))\nn, grid = values[0], values[1:]\nsize = n*n\nholes = [p for p, x in enumerate(grid) if x == 0]\nposition = {x: p for p, x in enumerate(grid) if x}\nmissing = [x for x in range(1, size+1) if x not in position]\nindex = {x: i for i, x in enumerate(missing)}\nm = len(missing)\n\ndef adjacent(a, b):\n    ar, ac = divmod(a, n)\n    br, bc = divmod(b, n)\n    return abs(ar-br) + abs(ac-bc)\n\n# Bit j represents the j-th originally empty cell.\nneighbor_masks = []\nfor p in holes:\n    neighbor_masks.append(sum(1 << j for j, q in enumerate(holes) if adjacent(p, q) == 1))\n\ndomains = []\nfor value in missing:\n    mask = 0\n    for j, p in enumerate(holes):\n        # Every known value is an anchor on the same orthogonal path.\n        if all(adjacent(p, q) <= abs(value-known) and\n               (adjacent(p, q)-abs(value-known)) % 2 == 0\n               for known, q in position.items()):\n            mask |= 1 << j\n    domains.append(mask)\n\nedges = [(index[x], index[x+1]) for x in missing if x+1 in index]\n\ndef supported(mask, other):\n    result = 0\n    while mask:\n        bit = mask & -mask\n        if neighbor_masks[bit.bit_length()-1] & other:\n            result |= bit\n        mask -= bit\n    return result\n\ndef propagate(ds):\n    while True:\n        before = ds[:]\n        singletons = 0\n        for mask in ds:\n            if mask == 0:\n                return False\n            if mask & (mask-1) == 0:\n                if singletons & mask:\n                    return False\n                singletons |= mask\n        for i, mask in enumerate(ds):\n            if mask & (mask-1):\n                ds[i] = mask & ~singletons\n        # Consecutive missing values must occupy adjacent cells.\n        for a, b in edges:\n            ds[a] = supported(ds[a], ds[b])\n            ds[b] = supported(ds[b], ds[a])\n        if any(mask == 0 for mask in ds):\n            return False\n        if ds == before:\n            return True\n\ndef search(ds):\n    if not propagate(ds):\n        return None\n    choices = [i for i, mask in enumerate(ds) if mask & (mask-1)]\n    if not choices:\n        return ds\n    i = min(choices, key=lambda i: bin(ds[i]).count('1'))\n    options = ds[i]\n    while options:\n        bit = options & -options\n        options -= bit\n        branch = ds[:]\n        branch[i] = bit\n        result = search(branch)\n        if result is not None:\n            return result\n    return None\n\nsolution = search(domains)\nfor value, mask in zip(missing, solution):\n    grid[holes[mask.bit_length()-1]] = value\nprint(*(grid[p] for p in holes))\n",
+      "explanation": {
+        "en": "Use one variable for each missing number and a bitset domain of originally empty cells. A path of k orthogonal steps has Manhattan distance at most k and the same parity; filter every domain against all given-number anchors. Repeatedly remove occupied singleton cells from other domains and enforce neighbor support between consecutive missing numbers. If unresolved, branch on the smallest domain and propagate again. No valid solution is removed by distance, parity, distinctness or adjacency constraints. A complete assignment places all missing numbers distinctly and makes every consecutive pair adjacent, so it is a valid Numbrix solution; uniqueness guarantees the requested answer.",
+        "zh": "每个缺失数字是一个变量，候选域用位集表示原始空格。走 k 次正交移动时，曼哈顿距离不能超过 k，且距离与 k 同奇偶；据此用所有已知数字过滤候选。反复传播：已确定的格子从其他候选域删除，连续两个缺失数字的候选必须互有相邻支持。仍有多个候选时，选择候选最少的变量分支并继续传播。距离、奇偶、互异及相邻约束都不会删除合法解；完整赋值恰使全部数字各占一格且相邻数字正交相邻，因而得到完整有效解。题面保证唯一。高级组的一般输入需要搜索，最坏情况仍为指数级。"
+      },
+      "complexity": {
+        "en": "Time: O(n²m² + m!·m⁴) conservative worst-case bound with m ≤ 2n ≤ 18; propagation and minimum-domain branching prune heavily. Auxiliary space: O(n² + m²) including recursion copies and domains.",
+        "zh": "时间：O(n²m² + m!·m⁴) 为保守最坏界，其中 m ≤ 2n ≤ 18；约束传播与最小候选分支会剪除大量状态。辅助空间：O(n² + m²) （包括递归分支副本和候选域）。"
+      }
     }
   }
 }

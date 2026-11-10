@@ -1,6 +1,14 @@
 import type { AcslDiagram, AcslDiagrams } from "./diagram-model";
 import type { AcslLanguage, LocalizedText } from "./model";
 
+export type AcslProgrammingSolution<Text = LocalizedText> = {
+  language: "python";
+  provenance: "independent";
+  code: string;
+  explanation: Text;
+  complexity: Text;
+};
+
 export type AcslTeacherSummary = {
   id: string;
   versionId: string;
@@ -43,6 +51,7 @@ export type AcslTeacherPaper = AcslTeacherSummary & {
     statementZh: string;
     statementDiagrams?: AcslDiagrams;
     samples: { input: string; expected: string }[];
+    solution?: AcslProgrammingSolution;
     readOnlyJudge: {
       mode: string;
       comparator: string;
@@ -144,5 +153,6 @@ export type AcslPrintDocument = {
     statement: string;
     statementDiagrams: AcslDiagram[];
     samples: { input: string; expected: string }[];
+    solution?: AcslProgrammingSolution<string>;
   };
 };

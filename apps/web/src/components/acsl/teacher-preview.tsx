@@ -2,6 +2,7 @@
 
 import { useLocale } from "@/components/locale-context";
 import { AcslRichContent } from "./rich-content";
+import { AcslProgrammingSolutionView } from "./programming-solution";
 import type { AcslLanguage } from "./model";
 import type { AcslTeacherPaper, AcslTeacherQuestion } from "./teacher-model";
 
@@ -123,6 +124,16 @@ export function AcslTeacherProgrammingPreview({
           </div>
         </div>
       ))}
+      {programming.solution && (
+        <AcslProgrammingSolutionView
+          solution={{
+            ...programming.solution,
+            explanation: programming.solution.explanation[language],
+            complexity: programming.solution.complexity[language],
+          }}
+          language={language}
+        />
+      )}
     </section>
   );
 }

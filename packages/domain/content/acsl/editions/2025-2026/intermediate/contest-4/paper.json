@@ -175,10 +175,10 @@
               },
               {
                 "type": "line",
-                "x1": 206,
-                "y1": 150,
-                "x2": 494,
-                "y2": 150,
+                "x1": 206.0,
+                "y1": 150.0,
+                "x2": 494.0,
+                "y2": 150.0,
                 "stroke": "ink",
                 "strokeWidth": 2
               },
@@ -250,10 +250,10 @@
               },
               {
                 "type": "line",
-                "x1": 394,
-                "y1": 285,
-                "x2": 346,
-                "y2": 285,
+                "x1": 394.0,
+                "y1": 285.0,
+                "x2": 346.0,
+                "y2": 285.0,
                 "stroke": "ink",
                 "strokeWidth": 2
               },
@@ -478,10 +478,10 @@
               },
               {
                 "type": "line",
-                "x1": 206,
-                "y1": 150,
-                "x2": 494,
-                "y2": 150,
+                "x1": 206.0,
+                "y1": 150.0,
+                "x2": 494.0,
+                "y2": 150.0,
                 "stroke": "ink",
                 "strokeWidth": 2
               },
@@ -553,10 +553,10 @@
               },
               {
                 "type": "line",
-                "x1": 394,
-                "y1": 285,
-                "x2": 346,
-                "y2": 285,
+                "x1": 394.0,
+                "y1": 285.0,
+                "x2": 346.0,
+                "y2": 285.0,
                 "stroke": "ink",
                 "strokeWidth": 2
               },
@@ -580,7 +580,7 @@
                 "type": "text",
                 "text": "野生蓝莓味",
                 "x": 350,
-                "y": 51,
+                "y": 51.0,
                 "anchor": "middle",
                 "fontSize": 18,
                 "fill": "ink"
@@ -599,7 +599,7 @@
                 "type": "text",
                 "text": "大黄派",
                 "x": 110,
-                "y": 156,
+                "y": 156.0,
                 "anchor": "middle",
                 "fontSize": 18,
                 "fill": "ink"
@@ -618,7 +618,7 @@
                 "type": "text",
                 "text": "烤甜菜味",
                 "x": 590,
-                "y": 156,
+                "y": 156.0,
                 "anchor": "middle",
                 "fontSize": 18,
                 "fill": "ink"
@@ -637,7 +637,7 @@
                 "type": "text",
                 "text": "巧克力蓝莓味",
                 "x": 250,
-                "y": 291,
+                "y": 291.0,
                 "anchor": "middle",
                 "fontSize": 18,
                 "fill": "ink"
@@ -656,7 +656,7 @@
                 "type": "text",
                 "text": "烤阿拉斯加",
                 "x": 490,
-                "y": 291,
+                "y": 291.0,
                 "anchor": "middle",
                 "fontSize": 18,
                 "fill": "ink"
@@ -738,8 +738,8 @@
         "en": [
           {
             "id": "figure-3f280560dc03880a",
-            "width": 500,
-            "height": 401,
+            "width": 500.0,
+            "height": 401.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -805,8 +805,8 @@
         "zh": [
           {
             "id": "figure-3f280560dc03880a",
-            "width": 500,
-            "height": 401,
+            "width": 500.0,
+            "height": 401.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -943,7 +943,7 @@
         "en": [
           {
             "id": "figure-4df687698a121950",
-            "width": 720,
+            "width": 720.0,
             "height": 264.89,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -980,7 +980,7 @@
         "zh": [
           {
             "id": "figure-4df687698a121950",
-            "width": 720,
+            "width": 720.0,
             "height": 264.89,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -1088,7 +1088,7 @@
         "en": [
           {
             "id": "figure-62e86ce28049c6b7",
-            "width": 720,
+            "width": 720.0,
             "height": 329.61,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -1131,7 +1131,7 @@
         "zh": [
           {
             "id": "figure-62e86ce28049c6b7",
-            "width": 720,
+            "width": 720.0,
             "height": 329.61,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -1394,6 +1394,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nvalues = list(map(int, sys.stdin.read().split()))\nn, grid = values[0], values[1:]\npresent = set(grid)\nanswer = []\nfor p, value in enumerate(grid):\n    if value:\n        continue\n    r, c = divmod(p, n)\n    neighbors = []\n    for dr, dc in ((-1,0), (1,0), (0,-1), (0,1)):\n        nr, nc = r+dr, c+dc\n        if 0 <= nr < n and 0 <= nc < n:\n            neighbors.append(grid[nr*n+nc])\n    candidates = {a+1 for a in neighbors if a and a+2 in neighbors and a+1 not in present}\n    # Both adjacent numbers are given; no diagonal holes makes this location unique.\n    answer.append(candidates.pop())\nprint(*answer)\n",
+      "explanation": {
+        "en": "For each zero cell, inspect only its at most four orthogonal neighbors. A missing x must have both x−1 and x+1 among them and must not already occur in the input. The guarantees ensure those neighbors are given. The predecessor and successor can have at most two common neighboring cells; if two, they are diagonal to one another. Because two holes cannot be diagonal, at most one is a hole, so every missing number has a unique location. A valid complete puzzle then gives exactly one candidate per hole. Emit candidates in row-major order without search.",
+        "zh": "逐个检查零格的至多四个上下左右邻居。候选 x 必须尚未出现，且 x−1、x+1 都在这些邻居中；题目保证这两个数均已给出。两个格子的公共正交邻格至多两个，若有两个则它们互为对角，而题目禁止两个空格对角相邻，因此每个缺失数只有一个可放空格。合法完整解保证每个空格恰有一个候选。按行优先顺序输出即可，无需回溯。"
+      },
+      "complexity": {
+        "en": "Time: O(n²), optimal because the whole grid must be read. Auxiliary space: O(n²) for the given-number set and buffered grid.",
+        "zh": "时间：O(n²)，已达到读取全部网格所需的时间下界。辅助空间：O(n²) 用于已知数集合与网格缓存。"
+      }
     }
   }
 }

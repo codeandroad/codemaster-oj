@@ -106,8 +106,8 @@
         "en": [
           {
             "id": "figure-4acb6eccaa2d143a",
-            "width": 305,
-            "height": 298,
+            "width": 305.0,
+            "height": 298.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -149,8 +149,8 @@
         "zh": [
           {
             "id": "figure-4acb6eccaa2d143a",
-            "width": 305,
-            "height": 298,
+            "width": 305.0,
+            "height": 298.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -263,8 +263,8 @@
         "en": [
           {
             "id": "figure-d13214e5a5c50ebb",
-            "width": 480,
-            "height": 260,
+            "width": 480.0,
+            "height": 260.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -312,8 +312,8 @@
         "zh": [
           {
             "id": "figure-d13214e5a5c50ebb",
-            "width": 480,
-            "height": 260,
+            "width": 480.0,
+            "height": 260.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -432,7 +432,7 @@
         "en": [
           {
             "id": "figure-ffe6c2947bacd94a",
-            "width": 720,
+            "width": 720.0,
             "height": 274.66,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -463,7 +463,7 @@
         "zh": [
           {
             "id": "figure-ffe6c2947bacd94a",
-            "width": 720,
+            "width": 720.0,
             "height": 274.66,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -565,7 +565,7 @@
         "en": [
           {
             "id": "figure-a7e9e72d7c89c916",
-            "width": 720,
+            "width": 720.0,
             "height": 332.73,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -602,7 +602,7 @@
         "zh": [
           {
             "id": "figure-a7e9e72d7c89c916",
-            "width": 720,
+            "width": 720.0,
             "height": 332.73,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -745,27 +745,27 @@
         {
           "input": "9\n11 14 17 33 44 24 31 35 37 45 41 53 57 62 64 66 71 77\n",
           "expected": "80F\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "7\n15 23 24 32 35 31 45 55 44\n",
           "expected": "65B\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "6\n43 33 44 14 23 41\n",
           "expected": "03D\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "10\n25 71 82 63 54 45 56 75 77 88 21 24 26 27 28 12 13 15 34 35 33 37\n",
           "expected": "29A\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "8\n12 13 16 21 22 31 34 35 36 45 43 41 52 54 56 66 65 64 63 61\n",
           "expected": "27H\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -1343,6 +1343,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nvalues = sys.stdin.read().split()\nn = int(values[0])\ntargets = {(int(s[0]), int(s[1])) for s in values[1:]}\ndirections = [(0,-1),(-1,0),(0,1),(1,0),(-1,-1),(-1,1),(1,1),(1,-1)]\n\nbest_hits, best_arrow = -1, ''\nfor r in range(n):\n    for c in range(n):\n        if r not in (0, n - 1) and c not in (0, n - 1):\n            continue\n        for direction, (dr, dc) in enumerate(directions):\n            rr, cc, hits = r + dr, c + dc, 0\n            while 0 <= rr < n and 0 <= cc < n and (rr, cc) not in targets:\n                rr, cc = rr + dr, cc + dc\n            while (rr, cc) in targets:\n                hits += 1\n                rr, cc = rr + dr, cc + dc\n            arrow = f'{r}{c}{chr(65 + direction)}'\n            if hits > best_hits:  # Enumeration is already ASCII sorted.\n                best_hits, best_arrow = hits, arrow\nprint(best_arrow)\n",
+      "explanation": {
+        "en": "Enumerate border positions in row-column order and directions A through H. Skip empty cells before the first target, then count the uninterrupted target run and stop at its first gap. The prohibition is on empty cells between targets, as confirmed by official sample 4 (05D) and test 3 (03D); the example wording about leading empty cells is imprecise. Keep only strict improvements. Enumeration is ASCII ordered, so this also implements the tie rule. Every legal arrow is examined exactly once.",
+        "zh": "按行列顺序枚举边界格，再按 A 到 H 枚举方向。先跨过首个目标之前的空格，再数连续目标，开始命中后遇到空格立即停下。原题限制的是目标之间不能有空格；官方样例 4 的 05D 和测试 3 的 03D 均确认允许前导空格，示例部分对此措辞不严谨。只在命中数严格增加时更新答案。枚举顺序就是 ASCII 字典序，因此并列时自然保留最小字符串。所有可选箭头都恰好检查一次。"
+      },
+      "complexity": {
+        "en": "O(n²) time: O(n) border cells, eight directions, at most n cells per ray. O(T) space for T targets.",
+        "zh": "时间 O(n²)：O(n) 个边界格、8 个方向，每射线至多 n 格。目标集合占 O(T) 空间。"
+      }
     }
   }
 }

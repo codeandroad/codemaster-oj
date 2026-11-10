@@ -28,6 +28,17 @@ function localizedText(value, maxLength) {
     text(value.en, maxLength) && text(value.zh, maxLength);
 }
 
+export function validateAcslProgrammingSolution(solution) {
+  if (!solution || typeof solution !== 'object' || Array.isArray(solution) ||
+      Object.keys(solution).some(key => !['language', 'provenance', 'code', 'explanation', 'complexity'].includes(key)) ||
+      solution.language !== 'python' || solution.provenance !== 'independent' ||
+      !text(solution.code, 100000) || !localizedText(solution.explanation, 100000) ||
+      !localizedText(solution.complexity, 10000)) {
+    throw new Error('Invalid ACSL programming solution.');
+  }
+  return solution;
+}
+
 export function validatePaperDefinition(content) {
   if (content?.schemaVersion !== 1 || !text(content.slug, 100) || !/^[a-z0-9-]{3,100}$/.test(content.slug) ||
       !localizedText(content.title, 200) || !['Elementary', 'Junior', 'Intermediate', 'Senior'].includes(content.division) ||
@@ -74,6 +85,7 @@ export function validatePaperDefinition(content) {
   }
   paperAssetPurposes(content);
   validateAcslDiagrams(programming?.statementDiagrams);
+  if (programming?.solution !== undefined) validateAcslProgrammingSolution(programming.solution);
   if (Buffer.byteLength(JSON.stringify(content)) > 2000000) {
     throw new Error('ACSL paper package exceeds 2 MB.');
   }

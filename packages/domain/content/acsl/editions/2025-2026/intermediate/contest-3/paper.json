@@ -244,8 +244,8 @@
         "en": [
           {
             "id": "figure-238c262733341aef",
-            "width": 566,
-            "height": 485,
+            "width": 566.0,
+            "height": 485.0,
             "alt": {
               "en": "Data Structures diagram.",
               "zh": "Data Structures 图示。"
@@ -323,8 +323,8 @@
         "zh": [
           {
             "id": "figure-238c262733341aef",
-            "width": 566,
-            "height": 485,
+            "width": 566.0,
+            "height": 485.0,
             "alt": {
               "en": "Data Structures diagram.",
               "zh": "Data Structures 图示。"
@@ -542,7 +542,7 @@
         "en": [
           {
             "id": "figure-ea9f3cbc9ba533c6",
-            "width": 720,
+            "width": 720.0,
             "height": 149.43,
             "alt": {
               "en": "FSAs and Regular Expressions diagram.",
@@ -609,7 +609,7 @@
         "zh": [
           {
             "id": "figure-ea9f3cbc9ba533c6",
-            "width": 720,
+            "width": 720.0,
             "height": 149.43,
             "alt": {
               "en": "FSAs and Regular Expressions diagram.",
@@ -1756,6 +1756,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nfrom collections import deque\n\nRANK = {r: i for i, r in enumerate('A23456789TJQK', 1)}\ndef fits(card, top):\n    return RANK[card[0]] + 1 == RANK[top[0]] and ((card[1] in 'DH') != (top[1] in 'DH'))\ndef play(hand, piles):\n    moved = False\n    while hand:\n        for i, card in enumerate(hand):\n            if card[0] == 'K':\n                destination = next((p for p in (1, 3, 5, 7) if not piles[p]), None)\n            else:\n                destination = next((p for p in range(8) if piles[p] and fits(card, piles[p][-1])), None)\n            if destination is not None:\n                piles[destination].append(hand.pop(i))\n                moved = True\n                break\n        else:\n            break\n    return moved\nlines = sys.stdin.read().splitlines()\nhands = [lines[0].split(), lines[1].split()]\ndraw = deque(' '.join(lines[2:]).split())\npiles = [[] for _ in range(8)]\nfor p in (0, 2, 4, 6):\n    piles[p].append(draw.popleft())\nplayer = idle = 0\nwhile idle < 2:\n    changed = play(hands[player], piles)\n    if draw:\n        hands[player].append(draw.popleft())\n        changed = True\n    idle = 0 if changed else idle + 1\n    player ^= 1\nprint(*(pile[-1] if pile else 'E' for pile in piles))\n",
+      "explanation": {
+        "en": "Initialize the four original piles from the first four draw cards. Alternate players, repeatedly applying the leftmost-card/clockwise-pile policy and then drawing one card at the end of every turn while available. Keep a count of consecutive turns with no play and no draw. Two such turns mean both hands failed against the same board and the draw pile is empty, so and only so is the game finished.",
+        "zh": "抽牌堆前四张依次建立四个原始堆。两人交替回合，每人按最左手牌、顺时针牌堆的优先级持续出牌，然后在回合末只要抽牌堆非空就抽一张，即使该回合已经出过牌。记录连续既没出牌也没抽牌的回合数；达到两回合说明双方都无法在同一局面继续且抽牌堆已空，此时结束。"
+      },
+      "complexity": {
+        "en": "Time: O(N²) for N ≤ 52 cards, with constant eight-pile scans. Auxiliary space: O(N), N ≤ 52 total cards.",
+        "zh": "时间：O(N²) ，总牌数 N ≤ 52，八个固定牌堆的扫描为常数开销。辅助空间：O(N)，总牌数 N ≤ 52。"
+      }
     }
   }
 }

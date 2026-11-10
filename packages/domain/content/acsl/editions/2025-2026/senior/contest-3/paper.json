@@ -244,8 +244,8 @@
         "en": [
           {
             "id": "figure-be16ccb19b1f84fc",
-            "width": 708,
-            "height": 498,
+            "width": 708.0,
+            "height": 498.0,
             "alt": {
               "en": "Data Structures diagram.",
               "zh": "Data Structures 图示。"
@@ -329,8 +329,8 @@
         "zh": [
           {
             "id": "figure-be16ccb19b1f84fc",
-            "width": 708,
-            "height": 498,
+            "width": 708.0,
+            "height": 498.0,
             "alt": {
               "en": "Data Structures diagram.",
               "zh": "Data Structures 图示。"
@@ -554,8 +554,8 @@
         "en": [
           {
             "id": "figure-0189c2963a4a0b9c",
-            "width": 676,
-            "height": 249,
+            "width": 676.0,
+            "height": 249.0,
             "alt": {
               "en": "FSAs diagram.",
               "zh": "FSAs 图示。"
@@ -639,8 +639,8 @@
         "zh": [
           {
             "id": "figure-0189c2963a4a0b9c",
-            "width": 676,
-            "height": 249,
+            "width": 676.0,
+            "height": 249.0,
             "alt": {
               "en": "FSAs diagram.",
               "zh": "FSAs 图示。"
@@ -2582,6 +2582,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nfrom collections import deque\n\nRANK = {r: i for i, r in enumerate('A23456789TJQK', 1)}\ndef fits(card, top):\n    return RANK[card[0]] + 1 == RANK[top[0]] and ((card[1] in 'DH') != (top[1] in 'DH'))\ndef play(hand, piles):\n    moved = False\n    while hand:\n        for i, card in enumerate(hand):\n            if card[0] == 'K':\n                destination = next((p for p in (1, 3, 5, 7) if not piles[p]), None)\n            else:\n                destination = next((p for p in range(8) if piles[p] and fits(card, piles[p][-1])), None)\n            if destination is not None:\n                piles[destination].append(hand.pop(i))\n                moved = True\n                break\n        else:\n            break\n    return moved\ndeck = sys.stdin.read().split()\nhands = [deck[:14:2], deck[1:14:2]]\npiles = [[] for _ in range(8)]\nfor p, card in zip((0, 2, 4, 6), deck[14:18]):\n    piles[p].append(card)\ndraw = deque(deck[18:])\nplayer = 0\nwhile True:\n    hand = hands[player]\n    moved_pile = False\n    # Source priority precedes target priority, and at most one pile moves.\n    for source in range(8):\n        if not piles[source]:\n            continue\n        for target in range(8):\n            if target != source and piles[target] and fits(piles[source][0], piles[target][-1]):\n                piles[target].extend(piles[source])\n                # min keeps the leftmost of equal minimum ranks.\n                lowest = min(range(len(hand)), key=lambda i: RANK[hand[i][0]])\n                piles[source] = [hand.pop(lowest)]\n                moved_pile = True\n                break\n        if moved_pile:\n            break\n    played = play(hand, piles)\n    if not hand:\n        break\n    if not moved_pile and not played and draw:\n        hand.append(draw.popleft())\n    player ^= 1\nprint(player + 1, *(pile[-1] if pile else 'E' for pile in piles))\n",
+      "explanation": {
+        "en": "Deal the first fourteen cards alternately, then form the four original piles. At each turn search source piles clockwise, then targets clockwise; move at most the first legal pile, comparing its bottom to the target top. Refill its emptied position with the leftmost minimum-rank hand card. Next apply the leftmost-card play loop. A draw occurs only when neither step moved anything. Stop immediately when the current hand empties. Keeping full pile lists preserves the bottom card needed for future pile moves; all priority decisions match the rules.",
+        "zh": "前十四张交替发给双方，接下来的四张建立原始堆。每回合先按源堆、目标堆的顺时针优先级寻找第一组合法整堆移动，比较源堆底牌与目标堆顶牌，只移动一堆；再将手牌中最左侧的最低点数牌放入空出的牌堆。随后持续按最左手牌规则出牌，只有两个步骤都未移动时才抽一张。当前手牌一空立即获胜。保存整堆而非仅堆顶，保证未来整堆移动能正确读取底牌。"
+      },
+      "complexity": {
+        "en": "Time: O(N²) for N ≤ 52 cards: each productive turn removes a hand card or draws a card, and the fixed eight-pile scans are constant-size. Auxiliary space: O(N), N ≤ 52 total cards.",
+        "zh": "时间：O(N²) ，总牌数 N ≤ 52；每个有效回合至少消耗一张手牌或抽一张牌，八个固定牌堆的扫描为常数开销。辅助空间：O(N)，总牌数 N ≤ 52。"
+      }
     }
   }
 }

@@ -1729,10 +1729,10 @@
           "elements": [
             {
               "type": "line",
-              "x1": 79,
-              "y1": 55,
-              "x2": 211,
-              "y2": 55,
+              "x1": 79.0,
+              "y1": 55.0,
+              "x2": 211.0,
+              "y2": 55.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -1743,10 +1743,10 @@
             },
             {
               "type": "line",
-              "x1": 235,
-              "y1": 79,
-              "x2": 235,
-              "y2": 181,
+              "x1": 235.0,
+              "y1": 79.0,
+              "x2": 235.0,
+              "y2": 181.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -1757,10 +1757,10 @@
             },
             {
               "type": "line",
-              "x1": 211,
-              "y1": 205,
-              "x2": 79,
-              "y2": 205,
+              "x1": 211.0,
+              "y1": 205.0,
+              "x2": 79.0,
+              "y2": 205.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -1771,10 +1771,10 @@
             },
             {
               "type": "line",
-              "x1": 55,
-              "y1": 181,
-              "x2": 55,
-              "y2": 79,
+              "x1": 55.0,
+              "y1": 181.0,
+              "x2": 55.0,
+              "y2": 79.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -1898,10 +1898,10 @@
           "elements": [
             {
               "type": "line",
-              "x1": 79,
-              "y1": 55,
-              "x2": 211,
-              "y2": 55,
+              "x1": 79.0,
+              "y1": 55.0,
+              "x2": 211.0,
+              "y2": 55.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -1912,10 +1912,10 @@
             },
             {
               "type": "line",
-              "x1": 235,
-              "y1": 79,
-              "x2": 235,
-              "y2": 181,
+              "x1": 235.0,
+              "y1": 79.0,
+              "x2": 235.0,
+              "y2": 181.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -1926,10 +1926,10 @@
             },
             {
               "type": "line",
-              "x1": 211,
-              "y1": 205,
-              "x2": 79,
-              "y2": 205,
+              "x1": 211.0,
+              "y1": 205.0,
+              "x2": 79.0,
+              "y2": 205.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -1940,10 +1940,10 @@
             },
             {
               "type": "line",
-              "x1": 55,
-              "y1": 181,
-              "x2": 55,
-              "y2": 79,
+              "x1": 55.0,
+              "y1": 181.0,
+              "x2": 55.0,
+              "y2": 79.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -2055,6 +2055,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\n\nvalues = list(map(int, sys.stdin.read().split()))\nkind = values[0]\nedges = {divmod(edge, 10) for edge in values[1:]}\nvertices = {v for edge in edges for v in edge}\noutgoing = {v: set() for v in vertices}\nincoming = {v: 0 for v in vertices}\nfor u, v in edges:\n    outgoing[u].add(v)\n    incoming[v] += 1\nif kind == 1:\n    answer = sum(u == v or (u < v and (v, u) in edges) for u, v in edges)\nelif kind == 2:\n    chosen = min(vertices, key=lambda v: (-len(outgoing[v]), v))\n    answer = sum(10 * chosen + v for v in outgoing[chosen])\nelse:\n    # Each walk has one incoming and one outgoing edge at its middle vertex.\n    answer = sum(incoming[v] * len(outgoing[v]) for v in vertices)\nprint(answer)\n",
+      "explanation": {
+        "en": "Store adjacency as a set so each directed edge occurs once. For characteristic 1, count every self-loop and count an opposite-edge pair only when its first vertex is smaller, preventing double counting. For characteristic 2, maximize outgoing degree and break ties by smallest vertex; sum that vertex’s encoded outgoing edges. For characteristic 3, a length-two walk is uniquely determined by its middle vertex, one incoming edge, and one outgoing edge, so sum indegree(v)·outdegree(v). Loops and repeated vertices remain allowed in this last count. These formulas directly count each required object once.",
+        "zh": "把有向边保存在集合中，每条边只计一次。类型 1：每个自环计一次；一对反向边只在起点小于终点时计数，避免双算。类型 2：选出度最大的顶点，并列选编号最小者，然后对其所有出边的两位数编码求和。类型 3：每条长度为 2 的游走唯一对应一个中间顶点、一条入边和一条出边，因此答案为 Σ 入度(v)×出度(v)。这一类型允许自环和重复顶点，不能套用简单路径的限制。三个分支都精确做到每个目标对象统计一次。"
+      },
+      "complexity": {
+        "en": "O(V+E) expected time and O(V+E) space using hash sets; V≤9.",
+        "zh": "使用哈希集合，期望时间 O(V+E)，空间 O(V+E)，其中 V≤9。"
+      }
     }
   }
 }

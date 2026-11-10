@@ -244,7 +244,7 @@
         "en": [
           {
             "id": "figure-7bcc0e4db5db663f",
-            "width": 720,
+            "width": 720.0,
             "height": 669.01,
             "alt": {
               "en": "Data Structures diagram.",
@@ -353,7 +353,7 @@
         "zh": [
           {
             "id": "figure-7bcc0e4db5db663f",
-            "width": 720,
+            "width": 720.0,
             "height": 669.01,
             "alt": {
               "en": "Data Structures diagram.",
@@ -1131,12 +1131,12 @@
                     150
                   ],
                   [
-                    113,
-                    146
+                    113.0,
+                    146.0
                   ],
                   [
-                    113,
-                    154
+                    113.0,
+                    154.0
                   ],
                   [
                     123,
@@ -1336,12 +1336,12 @@
                     150
                   ],
                   [
-                    463,
-                    146
+                    463.0,
+                    146.0
                   ],
                   [
-                    463,
-                    154
+                    463.0,
+                    154.0
                   ],
                   [
                     473,
@@ -1641,12 +1641,12 @@
                     150
                   ],
                   [
-                    113,
-                    146
+                    113.0,
+                    146.0
                   ],
                   [
-                    113,
-                    154
+                    113.0,
+                    154.0
                   ],
                   [
                     123,
@@ -1846,12 +1846,12 @@
                     150
                   ],
                   [
-                    463,
-                    146
+                    463.0,
+                    146.0
                   ],
                   [
-                    463,
-                    154
+                    463.0,
+                    154.0
                   ],
                   [
                     473,
@@ -2217,6 +2217,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nfrom math import isqrt\nwidth, m, n = map(int, sys.stdin.read().split())\ndef position(x):\n    if width == 1:\n        return x - 1, 0\n    # A complete period has lengths w,w-1,...,1,2,...,w-1.\n    period = 2 * (width - 1)\n    total = width * width - 1\n    cycles, offset = divmod(x - 1, total)\n    x = offset + 1\n    descending = width * (width + 1) // 2\n    if x <= descending:\n        # Find the first k with k*(2*w-k+1)//2 >= x.\n        k = ((2*width+1) - isqrt((2*width+1)**2 - 8*x)) // 2\n        while k*(2*width-k+1)//2 < x:\n            k += 1\n        while k > 1 and (k-1)*(2*width-k+2)//2 >= x:\n            k -= 1\n        row = k - 1\n        length = width - row\n        before = row*(2*width-row+1)//2\n    else:\n        rest = x - descending\n        # Ascending lengths 2,...,j+1 total j*(j+3)//2.\n        j = (isqrt(9 + 8*rest) - 3) // 2\n        if j*(j+3)//2 < rest:\n            j += 1\n        row = width + j - 1\n        length = j + 1\n        before = descending + (j-1)*(j+2)//2\n    col = x - before - 1\n    if row % 2:\n        col = length - 1 - col\n    return cycles*period + row, col\np, q = position(m), position(n)\nprint(abs(p[0]-q[0]) + abs(p[1]-q[1]))\n",
+      "explanation": {
+        "en": "For width w>1, one period has 2(w−1) rows and w²−1 values. Skip complete periods with divmod. Within a period, descending row totals are k(2w−k+1)/2; after the row of width 1, the next j rows total j(j+3)/2. Invert the appropriate quadratic with exact integer square roots and boundary correction. Reflect odd zero-based rows for the zig-zag. A period has an even row count, so skipping periods preserves orientation. Handle width 1 as a vertical column.",
+        "zh": "当宽度 w>1 时，一个周期有 2(w−1) 行、w²−1 个数，先用商和余数跳过完整周期。周期内递减段前 k 行共有 k(2w−k+1)/2 个数；宽度为 1 后递增段前 j 行共有 j(j+3)/2 个数。用整数平方根反解并校正边界得到行号，然后根据奇数行反向排列计算列号。周期行数为偶数，跨周期不会改变方向；w=1 单独处理为竖直一列。"
+      },
+      "complexity": {
+        "en": "Time: O(1) arithmetic operations plus integer square roots (inputs ≤ 1000). Auxiliary space: O(1).",
+        "zh": "时间：O(1) 次算术运算及整数平方根运算（输入均不超过 1000）。辅助空间：O(1)。"
+      }
     }
   }
 }

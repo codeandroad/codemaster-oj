@@ -532,6 +532,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nPOINTS = {'A': 1, 'R': 1, 'O': 3, 'G': 3, 'B': 6}\ndef score(toss):\n    rings = toss.rstrip('+')\n    return sum(POINTS[c] for c in rings) + (len(rings) == 2) + 2 * toss.endswith('+')\nlines = sys.stdin.read().splitlines()\nscores = [sum(score(toss) for toss in line.split()) for line in lines[:3]]\nprint(*sorted(scores, reverse=True))\n",
+      "explanation": {
+        "en": "Split each player’s line into tosses. Add the values of the one or two rings; a two-ring toss earns exactly one additional overlap point. Sum each line and sort the three totals descending. Each toss contributes once, so the computed total equals the game’s scoring rule.",
+        "zh": "将每位玩家的一行按空格分为各次投球。单环计该环分数，双环计两个环分数之和再加 1；每次投球恰好计入一次。分别求三位玩家的总分并降序输出。"
+      },
+      "complexity": {
+        "en": "Time: O(L), where L is the total input length. Auxiliary space: O(L) including buffered input; O(1) scoring state.",
+        "zh": "时间：O(L)，L 为输入总长度。辅助空间：O(L) （含输入缓存），计分状态仅需 O(1)。"
+      }
     }
   }
 }

@@ -1904,10 +1904,10 @@
           "elements": [
             {
               "type": "line",
-              "x1": 79,
-              "y1": 55,
-              "x2": 211,
-              "y2": 55,
+              "x1": 79.0,
+              "y1": 55.0,
+              "x2": 211.0,
+              "y2": 55.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -1918,10 +1918,10 @@
             },
             {
               "type": "line",
-              "x1": 235,
-              "y1": 79,
-              "x2": 235,
-              "y2": 181,
+              "x1": 235.0,
+              "y1": 79.0,
+              "x2": 235.0,
+              "y2": 181.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -1932,10 +1932,10 @@
             },
             {
               "type": "line",
-              "x1": 211,
-              "y1": 205,
-              "x2": 79,
-              "y2": 205,
+              "x1": 211.0,
+              "y1": 205.0,
+              "x2": 79.0,
+              "y2": 205.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -1946,10 +1946,10 @@
             },
             {
               "type": "line",
-              "x1": 55,
-              "y1": 181,
-              "x2": 55,
-              "y2": 79,
+              "x1": 55.0,
+              "y1": 181.0,
+              "x2": 55.0,
+              "y2": 79.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -2059,10 +2059,10 @@
           "elements": [
             {
               "type": "line",
-              "x1": 79,
-              "y1": 55,
-              "x2": 211,
-              "y2": 55,
+              "x1": 79.0,
+              "y1": 55.0,
+              "x2": 211.0,
+              "y2": 55.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -2073,10 +2073,10 @@
             },
             {
               "type": "line",
-              "x1": 235,
-              "y1": 79,
-              "x2": 235,
-              "y2": 181,
+              "x1": 235.0,
+              "y1": 79.0,
+              "x2": 235.0,
+              "y2": 181.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -2087,10 +2087,10 @@
             },
             {
               "type": "line",
-              "x1": 211,
-              "y1": 205,
-              "x2": 79,
-              "y2": 205,
+              "x1": 211.0,
+              "y1": 205.0,
+              "x2": 79.0,
+              "y2": 205.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -2101,10 +2101,10 @@
             },
             {
               "type": "line",
-              "x1": 55,
-              "y1": 181,
-              "x2": 55,
-              "y2": 79,
+              "x1": 55.0,
+              "y1": 181.0,
+              "x2": 55.0,
+              "y2": 79.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -2202,6 +2202,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\n\nedges = {divmod(int(token), 10) for token in sys.stdin.read().split()}\nadj = {v: set() for edge in edges for v in edge}\nfor u, v in edges:\n    adj[u].add(v)\nanswer = 0\nfor a in adj:\n    for b in adj[a]:\n        if b == a:\n            continue\n        for c in adj[b]:\n            if c != a and c != b:\n                answer += 100 * a + 10 * b + c\nprint(answer)\n",
+      "explanation": {
+        "en": "Use adjacency sets, then enumerate a→b and b→c. Reject b=a, c=a, and c=b so all three vertices differ. Each remaining pair of consecutive edges is one simple directed path of length two and contributes its encoded integer 100a+10b+c. Conversely every such simple path appears in exactly one loop iteration, so the sum is complete without duplicates. Self-loops cannot be used in a simple path.",
+        "zh": "先建立邻接集合，再枚举 a→b 及 b→c。排除 b=a、c=a、c=b，确保三个顶点两两不同。剩下的每对连续边恰好构成一条长度为 2 的简单有向路径，其贡献为 100a+10b+c。反过来，每条合法路径也只会在这一组 a、b、c 的循环中出现，因此无遗漏、无重复；自环自然被排除。"
+      },
+      "complexity": {
+        "en": "O(V+E+Σᵥ indegree(v)·outdegree(v)) time, at most O(V³), and O(V+E) space; V≤9.",
+        "zh": "时间 O(V+E+Σᵥ入度(v)×出度(v))，至多 O(V³)，空间 O(V+E)；V≤9。"
+      }
     }
   }
 }

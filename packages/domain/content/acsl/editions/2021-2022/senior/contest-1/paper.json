@@ -418,27 +418,27 @@
         {
           "input": "WGBGR\n",
           "expected": "05:20:10\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "CGRMY\n",
           "expected": "10:35:20\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "MMMMC\n",
           "expected": "07:26:00\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "CCCYY\n",
           "expected": "09:00:20\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "WWWWW\n",
           "expected": "00:00:00\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -979,6 +979,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\n\ncolors = sys.stdin.read().strip()\nweights = (1, 1, 2, 3, 5)\nhours = sum(w for w, c in zip(weights, colors) if c in 'RMY')\nminutes = 5 * sum(w for w, c in zip(weights, colors) if c in 'GCY')\nseconds = 5 * sum(w for w, c in zip(weights, colors) if c in 'BCM')\ntotal = (hours * 3600 + minutes * 60 + seconds) % (12 * 3600)\nhours, remainder = divmod(total, 3600)\nminutes, seconds = divmod(remainder, 60)\nprint(f'{hours:02d}:{minutes:02d}:{seconds:02d}')\n",
+      "explanation": {
+        "en": "Interpret the Venn-diagram memberships directly: R/M/Y contribute to hours, G/C/Y to minutes, B/C/M to seconds, and W to none. Weight the five positions by 1,1,2,3,5; multiply minute/second sums by five. Convert all three components to seconds, reduce modulo 43,200, and split back into hours/minutes/seconds. This automatically carries seconds into minutes, minutes into hours, and wraps the 12-hour cycle, so a raw minute total of 25 and second total of 60 becomes 26:00 rather than 25:00.",
+        "zh": "直接按颜色集合计算：R/M/Y 贡献小时，G/C/Y 贡献分钟，B/C/M 贡献秒，W 不贡献。五个位置的权重为边长 1、1、2、3、5，分钟和秒的权重和各乘 5。把三个分量统一换算为总秒数，对 43200 取模，再拆分为时、分、秒。这样自动处理秒向分进位、分向小时进位及 12 小时回绕；例如原始 25 分 60 秒会正确变成 26 分 00 秒。"
+      },
+      "complexity": {
+        "en": "O(1) time and space.",
+        "zh": "时间 O(1)，空间 O(1)。"
+      }
     }
   }
 }

@@ -250,8 +250,8 @@
         "en": [
           {
             "id": "figure-2e16147902e3de74",
-            "width": 541,
-            "height": 661,
+            "width": 541.0,
+            "height": 661.0,
             "alt": {
               "en": "Data Structures diagram.",
               "zh": "Data Structures 图示。"
@@ -341,8 +341,8 @@
         "zh": [
           {
             "id": "figure-2e16147902e3de74",
-            "width": 541,
-            "height": 661,
+            "width": 541.0,
+            "height": 661.0,
             "alt": {
               "en": "Data Structures diagram.",
               "zh": "Data Structures 图示。"
@@ -600,27 +600,27 @@
         {
           "input": "3 5\n3\n5 3 4 5 6 7 8 9 8 7 6 5 4 3 2\n1 3 5 7 9 7 5 9 1 2 4 3 8 6 4\n3 2 4 5 1 6 5 8 9 2 3 8 1 4 6\n",
           "expected": "17\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "5 3\n5\n8 6 4 2 5 2 4 6 8 7 8 6 4 2 0\n7 9 7 5 3 8 3 6 7 9 1 9 7 5 3\n5 2 3 4 8 6 7 8 9 5 2 3 4 5 6\n9 4 9 2 3 9 1 8 7 6 5 4 3 2 8\n1 5 4 7 8 9 3 2 1 4 5 6 9 8 7\n",
           "expected": "9\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "5 6\n6\n3 1 4 1 5 9 2 6 5 3 5 8 9 7 9 3 2 3 8 4 6 2 6 4 3 3 8 3 2 7\n7 2 3 8 3 3 4 6 2 6 4 8 3 2 3 9 7 9 8 5 3 5 6 2 9 5 1 4 1 3\n6 2 8 3 1 8 5 3 6 7 1 8 6 2 5 3 1 8 5 3 4 7 6 8 6 2 8 3 1 8\n2 7 1 8 2 8 1 8 2 8 4 6 2 7 1 8 2 8 1 8 2 8 4 6 2 7 1 8 2 8\n1 4 1 5 9 2 6 5 3 5 8 9 7 9 3 2 3 8 4 6 2 6 4 3 3 8 3 2 7 3\n4 1 5 9 2 6 5 3 5 8 9 7 9 3 2 3 8 4 6 2 6 4 3 3 8 3 2 7 3 1\n",
           "expected": "14\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "5 4\n4\n11 12 13 14 15 16 17 18 19 20 11 12 13 14 15 16 17 18 19 20\n21 22 23 24 24 14 16 18 20 18 28 38 10 12 14 12 12 12 14 14\n12 11 23 13 15 25 17 27 19 29 11 11 13 13 15 15 17 17 19 19\n21 31 15 27 11 23 27 19 23 29 31 19 18 17 16 15 14 13 12 11\n",
           "expected": "60\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "4 5\n7\n-2 -1 -4 -1 -5 -9 -2 -6 -5 -3 -5 -4 -9 -7 -9 -3 -2 -3 -8 -4\n-6 -2 -6 -4 -3 -3 -8 -3 -2 -7 -1 -2 -4 -8 -4 -2 -1 -1 -3 -9\n-2 -4 -6 -8 -6 -5 -2 -3 -3 -5 -7 -9 -7 -5 -3 -5 -2 -3 -5 -7\n-4 -5 -2 -6 -9 -1 -3 -6 -8 -9 -1 -2 -5 -6 -2 -9 -6 -5 -3 -2\n-3 -1 -4 -1 -5 -9 -2 -6 -5 -3 -5 -8 -9 -7 -9 -3 -2 -3 -8 -4\n-6 -2 -6 -4 -3 -3 -8 -3 -2 -7 -3 -1 -8 -1 -5 -9 -2 -6 -5 -3\n-5 -8 -9 -7 -9 -3 -2 -3 -8 -4 -6 -2 -6 -4 -3 -3 -8 -3 -2 -7\n",
           "expected": "-48\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -635,6 +635,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nfrom collections import Counter\n\nvalues = list(map(int, sys.stdin.read().split()))\nrows, cols, count = values[:3]\nsize = rows * cols\narrays = [values[3 + i * size:3 + (i + 1) * size] for i in range(count)]\nvisited = set()\nr = c = answer = 0\nwhile (r, c) not in visited:\n    visited.add((r, c))\n    answer += min(a[r * cols + c] for a in arrays)\n    candidates = []\n    for dr in (-1, 0, 1):\n        for dc in (-1, 0, 1):\n            nr, nc = r + dr, c + dc\n            if (dr or dc) and 0 <= nr < rows and 0 <= nc < cols:\n                for a in arrays:\n                    candidates.append((a[nr * cols + nc], nr, nc))\n    frequencies = Counter(value for value, _, _ in candidates)\n    # A unique neighboring value is guaranteed by the problem.\n    _, r, c = max(item for item in candidates if frequencies[item[0]] == 1)\nprint(answer)\n",
+      "explanation": {
+        "en": "At each new coordinate, add the minimum value across the N arrays and mark the coordinate visited. Enumerate every valid one of its eight neighboring coordinates in every array. Count value frequencies over that entire multiset, then choose the largest value whose frequency is exactly one; “unique” means appearing once, not merely a distinct value after deduplication. Move to its recorded coordinate. Test for a visited coordinate before adding again, so the repeated terminal location is not counted twice. The enumeration and frequency test implement precisely the stated next move, and the visited set implements precisely its stopping rule.",
+        "zh": "到达一个新坐标后，累计 N 张数组在该坐标的最小值，并标记已访问。枚举全部数组中该坐标周围合法的八邻域数值，统计整个多重集合中每个值的出现次数，再选择出现次数恰为 1 的最大值，移动到它对应的坐标。“唯一”指总共只出现一次，不能简单去重后取最大。每轮先检查坐标是否访问过，因此返回旧位置时立即停止，不会重复计入终点。邻域枚举和频次判断精确实现移动规则，访问集合精确实现停止规则。"
+      },
+      "complexity": {
+        "en": "O(NRC) time and storage, including input: at most RC cells are visited and each examines at most 8N values. O(RC+N) traversal space.",
+        "zh": "包含读取输入，总时间和存储为 O(NRC)：最多访问 RC 个坐标，每步至多检查 8N 个值；遍历额外空间 O(RC+N)。"
+      }
     }
   }
 }

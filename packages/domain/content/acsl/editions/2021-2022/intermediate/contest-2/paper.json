@@ -417,27 +417,27 @@
         {
           "input": "1 2 a Fibonacci cyphers are fun to encode and decode.\n",
           "expected": "364 402 398 417 425 427 453 414 405 356 432 487 442 431 467 438 436 386 403 405 395 329 402 423 425 362 470 426 332 425 443 465 441 427 467 356 418 464 406 323 394 398 399 417 415 431 400\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "4 7 x You may only use C++, Java, and Python in HackerRank.\n",
           "expected": "383 414 432 368 400 442 475 371 444 422 471 436 350 468 424 401 359 412 355 340 338 335 389 433 409 442 398 371 430 422 463 347 398 472 425 404 438 455 344 402 404 335 387 433 390 452 455 453 415 409 473 422 364\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "7 10 p Madam, I'm Adam is one of the most common palindromes.\n",
           "expected": "434 463 409 436 421 359 323 421 342 424 392 404 463 463 424 377 429 448 353 429 467 467 341 450 414 347 407 452 404 347 469 450 478 482 347 444 435 442 430 429 467 398 421 436 420 420 401 448 417 426 469 440 478 412\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "16 9 l What happens when the first number is greater than the second?\n",
           "expected": "381 455 418 464 377 395 409 469 457 401 431 412 326 464 419 437 437 371 458 461 395 383 423 453 459 406 428 389 455 417 430 395 395 459 347 441 442 371 445 471 395 448 437 449 459 323 428 461 442 410 353 413 398 446 347 451 428 438 453 467 394 414\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "11 13 q The ratio of 2 adjacent Fibonacci numbers in the sequence approaches the Golden number, phi, which is approx. 1.618...\n",
           "expected": "378 404 434 326 480 418 464 435 450 362 441 423 344 344 377 397 406 451 409 417 395 410 449 326 436 426 446 441 449 427 429 420 417 326 455 417 415 443 413 432 409 332 438 404 398 437 452 431 371 445 431 434 429 395 455 399 407 377 409 430 406 414 444 391 465 425 449 445 371 446 434 422 344 365 456 408 406 446 422 350 404 417 442 392 467 435 392 362 451 434 435 365 344 413 449 405 405 449 344 423 409 332 430 406 478 435 459 450 385 362 379 367 366 343 401 346 352 391\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -452,6 +452,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\n\nfirst, second, key, message = sys.stdin.readline().rstrip('\\r\\n').split(' ', 3)\nbase = ord(key) - ord('a')\na, b = int(first) % 26, int(second) % 26\noffsets = []\nfor _ in range(20):\n    offsets.append(a)\n    a, b = b, (a + b) % 26\nencoded = []\nfor i, c in enumerate(message):\n    shift_letter = ord('a') + (base + offsets[i % 20]) % 26\n    encoded.append(str(ord(c) + 3 * shift_letter))\nprint(' '.join(encoded))\n",
+      "explanation": {
+        "en": "Split only the three header separators so spaces in the message remain intact. Generate the first twenty Fibonacci residues modulo 26 from the supplied starting values. Character i (zero based) uses residue i mod 20, implementing the required restart at characters 21,41,… rather than continuing the sequence. Shift the key forward modulo 26 and add three times the shifted letter’s ASCII value to the message character. Keeping residues is exact because only the alphabet position uses Fibonacci values. There is no need to compute or retain large Fibonacci numbers.",
+        "zh": "只拆分前三个参数分隔符，保留消息中的空格。根据输入的两个初值，预先生成前 20 个斐波那契项对 26 的余数。从 0 编号的字符 i 使用 offsets[i mod 20]，从而让第 21、41……个字符重新使用首项，不能持续递推而忘记每 20 字符重置。把密钥按该偏移向后循环移动，得到字母后取其 ASCII 值的 3 倍，再加上消息字符的 ASCII 值。由于偏移只依赖模 26 余数，这种递推与使用完整大整数完全等价。"
+      },
+      "complexity": {
+        "en": "O(n) time and O(n) output storage; the twenty offsets take O(1) auxiliary space.",
+        "zh": "时间 O(n)，输出存储 O(n)；固定 20 项偏移表占 O(1) 额外空间。"
+      }
     }
   }
 }

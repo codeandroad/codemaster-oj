@@ -530,6 +530,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nplate = sys.stdin.read().strip()\nletters, digits = plate[:3], plate[3:]\nflags = set()\nif all(c <= 'M' for c in letters):\n    flags.add('B')\nif all(c >= 'N' for c in letters):\n    flags.add('E')\ndef direction(s):\n    steps = [ord(b)-ord(a) for a,b in zip(s, s[1:])]\n    if all(d == 1 for d in steps):\n        return 'I'\n    if all(d == -1 for d in steps):\n        return 'D'\n    return None\nld, dd = direction(letters), direction(digits)\nif (ld is None) != (dd is None):\n    flags.add(ld or dd)\nif all('A' <= c <= 'F' for c in letters):\n    flags.add('H')\nif digits[0] != '0' and all('0' <= c <= '7' for c in digits):\n    flags.add('O')\nif letters == letters[::-1] or digits == digits[::-1]:\n    flags.add('P')\nif len(set(letters)) < 3 or len(set(digits)) < 4:\n    flags.add('R')\nnumbers = list(map(int, digits))\nif any(2*d == sum(numbers) for d in numbers):\n    flags.add('S')\nprint(''.join(sorted(flags)) or 'NONE')\n",
+      "explanation": {
+        "en": "Evaluate the seven independent predicates on the three-letter prefix and four-digit suffix. For consecutiveness, compute every adjacent difference and accept only all +1 or all −1; add a direction flag only when exactly one of the two parts is consecutive, even if their directions differ. Preserve leading zeroes for palindrome and octal checks. The digit-sum rule is equivalent to twice one digit equalling the total sum. Collect flags in a set and alphabetize once.",
+        "zh": "分别判断七条独立规则。连续性必须所有相邻差均为 +1 或均为 −1，而且字母段和数字段恰好只有一段满足才输出 I/D；两段都连续时即使方向不同也不输出。保留原始数字字符串的前导零用于回文及八进制判断。“三个数字之和等于另一数字”等价于某个数字的两倍等于四数字总和。最后将标记去重、按字母序输出。"
+      },
+      "complexity": {
+        "en": "Time: O(1): the plate always has seven characters. Auxiliary space: O(1).",
+        "zh": "时间：O(1)：车牌固定七个字符。辅助空间：O(1)。"
+      }
     }
   }
 }

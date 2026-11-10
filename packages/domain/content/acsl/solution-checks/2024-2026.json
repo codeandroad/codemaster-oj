@@ -1,0 +1,440 @@
+[
+  {
+    "slug": "acsl-2024-2025-junior-1",
+    "input": "A\nR\n",
+    "expected": "1 1\n",
+    "reason": "单次投球同分。"
+  },
+  {
+    "slug": "acsl-2024-2025-junior-1",
+    "input": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\nGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG\n",
+    "expected": "600 300\n",
+    "reason": "两行达到100字符上限，区分黑环与绿环分值。"
+  },
+  {
+    "slug": "acsl-2024-2025-intermediate-1",
+    "input": "AO\nGR\nB\n",
+    "expected": "6 5 5\n",
+    "reason": "重叠环奖励恰为一分，两个玩家同分。"
+  },
+  {
+    "slug": "acsl-2024-2025-intermediate-1",
+    "input": "OB BG\nA R\nO G\n",
+    "expected": "20 6 2\n",
+    "reason": "分别覆盖两种十分重叠环、低分单环和三分单环。"
+  },
+  {
+    "slug": "acsl-2024-2025-senior-1",
+    "input": "3\nB\nO O\nA A A A A A\n",
+    "expected": "1-6 2-6 3-6\n",
+    "reason": "同分但1、2、6次投球，所有平局均可按题意打破。"
+  },
+  {
+    "slug": "acsl-2024-2025-senior-1",
+    "input": "2\nOA+ GB+\nRG BO\n",
+    "expected": "1-19 2-15\n",
+    "reason": "逆序表示的重叠环及远投奖励。"
+  },
+  {
+    "slug": "acsl-2024-2025-junior-2",
+    "input": "R1X\nG2S G3S G4S B2T B3T B4T Y2S\n",
+    "expected": "R1X\n",
+    "reason": "无匹配牌；中级组同时验证零次出牌平局选第一堆。"
+  },
+  {
+    "slug": "acsl-2024-2025-junior-2",
+    "input": "R1X\nB1O B1X R2X G2X G2T G3T Y3T\n",
+    "expected": "R1X B1X B1O\n",
+    "reason": "首次跳过左侧牌，出牌后必须重新从最左检查。"
+  },
+  {
+    "slug": "acsl-2024-2025-intermediate-2",
+    "input": "R1X R1O\nG2S G3S G4S B2T B3T B4T Y2S\n",
+    "expected": "R1X\n",
+    "reason": "无匹配牌；中级组同时验证零次出牌平局选第一堆。"
+  },
+  {
+    "slug": "acsl-2024-2025-intermediate-2",
+    "input": "R1X Y4O\nB1O B1X R2X G2X G2T G3T Y3T\n",
+    "expected": "R1X B1X B1O\n",
+    "reason": "首次跳过左侧牌，出牌后必须重新从最左检查。"
+  },
+  {
+    "slug": "acsl-2024-2025-senior-2",
+    "input": "R1X R1O\nG2S G3S G4S B2T B3T B4T Y2S\n\n",
+    "expected": "7 R1X R1O\n",
+    "reason": "抽牌堆最初为空且无牌可出。"
+  },
+  {
+    "slug": "acsl-2024-2025-senior-2",
+    "input": "R1X Y4O\nB1O B1X R2X G2X G2T G3T Y3T\n\n",
+    "expected": "5 B1O Y4O\n",
+    "reason": "抽牌为空，仍执行完整回合；重启扫描回到左侧B1O。"
+  },
+  {
+    "slug": "acsl-2024-2025-junior-3",
+    "input": "1 456 906\n",
+    "expected": "31\n",
+    "reason": "独立逐格构造三角形的坐标，覆盖宽度/增量边界。"
+  },
+  {
+    "slug": "acsl-2024-2025-junior-3",
+    "input": "50 116 700\n",
+    "expected": "134\n",
+    "reason": "独立逐格构造三角形的坐标，覆盖宽度/增量边界。"
+  },
+  {
+    "slug": "acsl-2024-2025-intermediate-3",
+    "input": "1 475 269\n",
+    "expected": "14\n",
+    "reason": "独立逐格构造三角形的坐标，覆盖宽度/增量边界。"
+  },
+  {
+    "slug": "acsl-2024-2025-intermediate-3",
+    "input": "50 463 243\n",
+    "expected": "98\n",
+    "reason": "独立逐格构造三角形的坐标，覆盖宽度/增量边界。"
+  },
+  {
+    "slug": "acsl-2024-2025-senior-3",
+    "input": "1 177 620\n",
+    "expected": "443\n",
+    "reason": "独立逐格构造三角形的坐标，覆盖宽度/增量边界。"
+  },
+  {
+    "slug": "acsl-2024-2025-senior-3",
+    "input": "50 267 834\n",
+    "expected": "20\n",
+    "reason": "独立逐格构造三角形的坐标，覆盖宽度/增量边界。"
+  },
+  {
+    "slug": "acsl-2024-2025-junior-4",
+    "input": "A\n",
+    "expected": "\n",
+    "reason": "独立逐次插入BST核验：单结点、重复键或极度偏斜树。"
+  },
+  {
+    "slug": "acsl-2024-2025-intermediate-4",
+    "input": "A\nA\n",
+    "expected": "0 L\n",
+    "reason": "独立逐次插入BST核验路径，包含相等字母走左侧。"
+  },
+  {
+    "slug": "acsl-2024-2025-senior-4",
+    "input": "A\n",
+    "expected": "0 0 1 0 2\n",
+    "reason": "独立插入树统计，以外部路径长度=内部路径长度+2n交叉核对。"
+  },
+  {
+    "slug": "acsl-2024-2025-junior-4",
+    "input": "AAAAAAAAAAAAAAAAAAAA\n",
+    "expected": "0 1 3 7 15 31 63 127 255 511 1023 2047 4095 8191 16383 32767 65535 131071 262143\n",
+    "reason": "独立逐次插入BST核验：单结点、重复键或极度偏斜树。"
+  },
+  {
+    "slug": "acsl-2024-2025-intermediate-4",
+    "input": "AAAAAAAAAAAAAAAAAAAA\nA\n",
+    "expected": "0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 L\n",
+    "reason": "独立逐次插入BST核验路径，包含相等字母走左侧。"
+  },
+  {
+    "slug": "acsl-2024-2025-senior-4",
+    "input": "AAAAAAAAAAAAAAAAAAAA\n",
+    "expected": "19 0 1 190 230\n",
+    "reason": "独立插入树统计，以外部路径长度=内部路径长度+2n交叉核对。"
+  },
+  {
+    "slug": "acsl-2024-2025-junior-4",
+    "input": "ABCDEFGHIJKLMNOPQRST\n",
+    "expected": "1 3 7 15 31 63 127 255 511 1023 2047 4095 8191 16383 32767 65535 131071 262143 524287\n",
+    "reason": "独立逐次插入BST核验：单结点、重复键或极度偏斜树。"
+  },
+  {
+    "slug": "acsl-2024-2025-intermediate-4",
+    "input": "ABCDEFGHIJKLMNOPQRST\nZ\n",
+    "expected": "0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 R\n",
+    "reason": "独立逐次插入BST核验路径，包含相等字母走左侧。"
+  },
+  {
+    "slug": "acsl-2024-2025-senior-4",
+    "input": "ABCDEFGHIJKLMNOPQRST\n",
+    "expected": "0 19 1 190 230\n",
+    "reason": "独立插入树统计，以外部路径长度=内部路径长度+2n交叉核对。"
+  },
+  {
+    "slug": "acsl-2024-2025-junior-4",
+    "input": "TSRQPONMLKJIHGFEDCBA\n",
+    "expected": "0 1 3 7 15 31 63 127 255 511 1023 2047 4095 8191 16383 32767 65535 131071 262143\n",
+    "reason": "独立逐次插入BST核验：单结点、重复键或极度偏斜树。"
+  },
+  {
+    "slug": "acsl-2024-2025-intermediate-4",
+    "input": "TSRQPONMLKJIHGFEDCBA\nA\n",
+    "expected": "0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 L\n",
+    "reason": "独立逐次插入BST核验路径，包含相等字母走左侧。"
+  },
+  {
+    "slug": "acsl-2024-2025-senior-4",
+    "input": "TSRQPONMLKJIHGFEDCBA\n",
+    "expected": "19 0 1 190 230\n",
+    "reason": "独立插入树统计，以外部路径长度=内部路径长度+2n交叉核对。"
+  },
+  {
+    "slug": "acsl-2025-2026-junior-1",
+    "input": "99\n0\n",
+    "expected": "99 99\n",
+    "reason": "零距离及右下边界，候选需去重。"
+  },
+  {
+    "slug": "acsl-2025-2026-junior-1",
+    "input": "0\n5\n",
+    "expected": "5 50\n",
+    "reason": "顶左角，位移含零且交换方向。"
+  },
+  {
+    "slug": "acsl-2025-2026-intermediate-1",
+    "input": "00\n0\n",
+    "expected": "00 00\n",
+    "reason": "零距离且必须保留两位十六进制格式。"
+  },
+  {
+    "slug": "acsl-2025-2026-intermediate-1",
+    "input": "FF\nF\n",
+    "expected": "0F F0\n",
+    "reason": "最大距离及右下角，固定两位大写十六进制。"
+  },
+  {
+    "slug": "acsl-2025-2026-senior-1",
+    "input": "0000 0000\nFFFF FFFF\n0010 0010\n",
+    "expected": "(00,00)\n",
+    "reason": "零距离观测将交集固定在左上角。"
+  },
+  {
+    "slug": "acsl-2025-2026-senior-1",
+    "input": "FFFF 0000\n0000 FFFF\nFF00 00FF\n",
+    "expected": "(FF,FF)\n",
+    "reason": "右下角唯一交集及字节前导零。"
+  },
+  {
+    "slug": "acsl-2025-2026-junior-2",
+    "input": "A.AB9999\nSunday\n",
+    "expected": "fortunate\n",
+    "reason": "独立核验完整格式、递增/递减窗口及分类优先级。"
+  },
+  {
+    "slug": "acsl-2025-2026-junior-2",
+    "input": "A.88999\nSunday\n",
+    "expected": "lucky\n",
+    "reason": "独立核验完整格式、递增/递减窗口及分类优先级。"
+  },
+  {
+    "slug": "acsl-2025-2026-junior-2",
+    "input": "A.13579\nMonday\n",
+    "expected": "blue\n",
+    "reason": "独立核验完整格式、递增/递减窗口及分类优先级。"
+  },
+  {
+    "slug": "acsl-2025-2026-junior-2",
+    "input": "a.12345\nMonday\n",
+    "expected": "invalid\n",
+    "reason": "独立核验完整格式、递增/递减窗口及分类优先级。"
+  },
+  {
+    "slug": "acsl-2025-2026-junior-2",
+    "input": "A.123450\nSunday\n",
+    "expected": "fortunate\n",
+    "reason": "独立核验完整格式、递增/递减窗口及分类优先级。"
+  },
+  {
+    "slug": "acsl-2025-2026-junior-2",
+    "input": "A.898765\nMonday\n",
+    "expected": "fortunate\n",
+    "reason": "独立核验完整格式、递增/递减窗口及分类优先级。"
+  },
+  {
+    "slug": "acsl-2025-2026-intermediate-2",
+    "input": "123456\n",
+    "expected": "G6A\n",
+    "reason": "逐条按题面独立构造类别样例，覆盖全部类别和非法分隔符。"
+  },
+  {
+    "slug": "acsl-2025-2026-intermediate-2",
+    "input": "ABC-A12\n",
+    "expected": "G6B\n",
+    "reason": "逐条按题面独立构造类别样例，覆盖全部类别和非法分隔符。"
+  },
+  {
+    "slug": "acsl-2025-2026-intermediate-2",
+    "input": "ABC-123\n",
+    "expected": "G6C\n",
+    "reason": "逐条按题面独立构造类别样例，覆盖全部类别和非法分隔符。"
+  },
+  {
+    "slug": "acsl-2025-2026-intermediate-2",
+    "input": "123-ABC\n",
+    "expected": "G6D\n",
+    "reason": "逐条按题面独立构造类别样例，覆盖全部类别和非法分隔符。"
+  },
+  {
+    "slug": "acsl-2025-2026-intermediate-2",
+    "input": "1234567\n",
+    "expected": "G7A\n",
+    "reason": "逐条按题面独立构造类别样例，覆盖全部类别和非法分隔符。"
+  },
+  {
+    "slug": "acsl-2025-2026-intermediate-2",
+    "input": "ABC-1D23\n",
+    "expected": "G7B\n",
+    "reason": "逐条按题面独立构造类别样例，覆盖全部类别和非法分隔符。"
+  },
+  {
+    "slug": "acsl-2025-2026-intermediate-2",
+    "input": "1234ABC\n",
+    "expected": "G7C\n",
+    "reason": "逐条按题面独立构造类别样例，覆盖全部类别和非法分隔符。"
+  },
+  {
+    "slug": "acsl-2025-2026-intermediate-2",
+    "input": "ABC1234\n",
+    "expected": "G7D\n",
+    "reason": "逐条按题面独立构造类别样例，覆盖全部类别和非法分隔符。"
+  },
+  {
+    "slug": "acsl-2025-2026-intermediate-2",
+    "input": "AB-12345\n",
+    "expected": "G7E\n",
+    "reason": "逐条按题面独立构造类别样例，覆盖全部类别和非法分隔符。"
+  },
+  {
+    "slug": "acsl-2025-2026-intermediate-2",
+    "input": "A1B2C34\n",
+    "expected": "G7F\n",
+    "reason": "逐条按题面独立构造类别样例，覆盖全部类别和非法分隔符。"
+  },
+  {
+    "slug": "acsl-2025-2026-intermediate-2",
+    "input": "AA\n",
+    "expected": "V\n",
+    "reason": "逐条按题面独立构造类别样例，覆盖全部类别和非法分隔符。"
+  },
+  {
+    "slug": "acsl-2025-2026-intermediate-2",
+    "input": "AB C123\n",
+    "expected": "V\n",
+    "reason": "逐条按题面独立构造类别样例，覆盖全部类别和非法分隔符。"
+  },
+  {
+    "slug": "acsl-2025-2026-intermediate-2",
+    "input": "AB--12\n",
+    "expected": "IV\n",
+    "reason": "逐条按题面独立构造类别样例，覆盖全部类别和非法分隔符。"
+  },
+  {
+    "slug": "acsl-2025-2026-intermediate-2",
+    "input": "A1BC234\n",
+    "expected": "G7F\n",
+    "reason": "逐条按题面独立构造类别样例，覆盖全部类别和非法分隔符。"
+  },
+  {
+    "slug": "acsl-2025-2026-senior-2",
+    "input": "ABC1234\n",
+    "expected": "BHO\n",
+    "reason": "分别验证双段同时连续排除方向标记、无特征及零与重复字符。"
+  },
+  {
+    "slug": "acsl-2025-2026-senior-2",
+    "input": "ANZ9814\n",
+    "expected": "NONE\n",
+    "reason": "分别验证双段同时连续排除方向标记、无特征及零与重复字符。"
+  },
+  {
+    "slug": "acsl-2025-2026-senior-2",
+    "input": "AAA0000\n",
+    "expected": "BHPRS\n",
+    "reason": "分别验证双段同时连续排除方向标记、无特征及零与重复字符。"
+  },
+  {
+    "slug": "acsl-2025-2026-junior-3",
+    "input": "KC QH JC TH 9C 8H 7C\nAD 2D 3D 4D\n",
+    "expected": "AD 7C 2D E 3D E 4D E\n",
+    "reason": "手牌依次构成一条异色降序链，可全部放入第一个角堆。"
+  },
+  {
+    "slug": "acsl-2025-2026-junior-3",
+    "input": "AC\nAD 2C 3H 4S\n",
+    "expected": "AD E 2C E 3H E 4S E\n",
+    "reason": "一张手牌无法匹配：同色2C不允许接AC。"
+  },
+  {
+    "slug": "acsl-2025-2026-intermediate-3",
+    "input": "KC QH JC TH 9C 8H 7C\nAC 2C 3C 4C 5C 6C 8C\nAD 2D 3D 4D\n",
+    "expected": "AD 7C AC E 2C E 3C E\n",
+    "reason": "抽牌堆仅有初始牌，需在抽牌已空时继续双方回合。"
+  },
+  {
+    "slug": "acsl-2025-2026-intermediate-3",
+    "input": "AC 2C 3C 4C 5C 6C 7C\nAS 2S 3S 4S 5S 6S 7S\n8C 9C TC JC\n",
+    "expected": "8C E 9C E TC E JC E\n",
+    "reason": "双方与所有初始牌同色，连续两个空回合即结束。"
+  },
+  {
+    "slug": "acsl-2025-2026-senior-3",
+    "input": "KC AC QH 2C JC 3C TH 4C 9C 5C 8H 6C 7C 8C AD 2D 3D 4D\n",
+    "expected": "1 AD 7C 2D E 3D E 4D E\n",
+    "reason": "交替发牌后第一位玩家在首回合清空整条降序链。"
+  },
+  {
+    "slug": "acsl-2025-2026-senior-3",
+    "input": "KH AH QS 2H JH 3H TS 4H 9H 5H 8S 6H 7H 8H AC 2C 3C 4C\n",
+    "expected": "1 AC 7H 2C E 3C E 4C E\n",
+    "reason": "整体交换红黑两色，合法出牌关系及首回合胜利保持不变。"
+  },
+  {
+    "slug": "acsl-2025-2026-junior-4",
+    "input": "4\n1 0 3 4 8 7 6 5 9 10 0 12 16 15 14 13\n",
+    "expected": "2 11\n",
+    "reason": "独立蛇形完整路径移除非相邻、非对角数字，端点均保留。"
+  },
+  {
+    "slug": "acsl-2025-2026-junior-4",
+    "input": "4\n1 2 0 4 8 7 6 5 9 0 11 12 16 15 14 13\n",
+    "expected": "3 10\n",
+    "reason": "独立蛇形完整路径移除非相邻、非对角数字，端点均保留。"
+  },
+  {
+    "slug": "acsl-2025-2026-intermediate-4",
+    "input": "4\n1 0 3 4 8 7 6 5 9 10 0 12 16 15 14 13\n",
+    "expected": "2 11\n",
+    "reason": "独立蛇形完整路径移除非相邻、非对角数字，端点均保留。"
+  },
+  {
+    "slug": "acsl-2025-2026-intermediate-4",
+    "input": "4\n1 2 0 4 8 7 6 5 9 0 11 12 16 15 14 13\n",
+    "expected": "3 10\n",
+    "reason": "独立蛇形完整路径移除非相邻、非对角数字，端点均保留。"
+  },
+  {
+    "slug": "acsl-2025-2026-senior-4",
+    "input": "4\n1 0 3 4 8 7 6 5 9 10 0 12 16 15 14 13\n",
+    "expected": "2 11\n",
+    "reason": "独立蛇形完整路径移除非相邻、非对角数字，端点均保留。"
+  },
+  {
+    "slug": "acsl-2025-2026-senior-4",
+    "input": "4\n1 2 0 4 8 7 6 5 9 0 11 12 16 15 14 13\n",
+    "expected": "3 10\n",
+    "reason": "独立蛇形完整路径移除非相邻、非对角数字，端点均保留。"
+  },
+  {
+    "slug": "acsl-2025-2026-senior-4",
+    "input": "4\n1 0 0 4 8 7 6 5 9 10 11 12 16 15 14 13\n",
+    "expected": "2 3\n",
+    "reason": "连续两个缺失数字，需要候选间相邻约束，不能只查已知邻居。"
+  },
+  {
+    "slug": "acsl-2025-2026-senior-4",
+    "input": "7\n0 2 1 42 43 44 49 0 0 6 41 0 45 48 9 0 0 38 0 46 47 0 17 18 37 36 35 0 11 0 0 0 21 32 33 12 15 24 23 22 31 30 0 14 25 26 27 28 29\n",
+    "expected": "3 4 5 40 8 7 39 10 34 16 19 20 13\n",
+    "reason": "从完整路径移除数字构造；独立按数值顺序的DFS计数确认唯一解，并确认位集传播后必须进入回溯分支。"
+  }
+]

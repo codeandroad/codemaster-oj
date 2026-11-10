@@ -4795,6 +4795,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\n\ndef matches(a, b):\n    if len(a) == 1 or len(b) == 1:\n        return a in b or b in a\n    return sum(x == y for x, y in zip(a, b)) == 2\n\ndef play(top, cards):\n    hand = list(cards)\n    pile = [top]\n    while hand:\n        for i, card in enumerate(hand):\n            if matches(card, pile[-1]):\n                pile.append(hand.pop(i))\n                break  # Restart at the leftmost remaining card.\n        else:\n            break\n    return pile\nlines = sys.stdin.read().splitlines()\nhand = lines[1].split()\npiles = [play(top, hand) for top in lines[0].split()]\nprint(*max(piles, key=len))  # max keeps the first pile on ties.\n",
+      "explanation": {
+        "en": "Simulate the mandated leftmost-first policy. After each removal restart the scan; stopping means no card matches the current top. Record each top card in order, including the initial card. The resulting list is exactly the pile from bottom to top. The hand has exactly seven cards, so this is constant-size simulation.",
+        "zh": "严格模拟“从左向右取第一张可出牌”的规则，每出一张就重新从剩余手牌的最左侧检查；完整扫描没有匹配时停止。按出牌顺序记录每一张牌，并保留最初的明牌，即得到从底到顶的牌堆。手牌固定只有七张，模拟开销是常数。"
+      },
+      "complexity": {
+        "en": "Time: O(h²), h = 7 (therefore O(1) under the stated limits). Auxiliary space: O(h), h = 7.",
+        "zh": "时间：O(h²), h = 7 （题目固定七张手牌，因此为 O(1)）。辅助空间：O(h), h = 7。"
+      }
     }
   }
 }

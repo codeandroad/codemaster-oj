@@ -1,0 +1,1046 @@
+[
+  {
+    "slug": "acsl-2020-2021-junior-1",
+    "input": "9 9 99999\n",
+    "expected": "899991\n",
+    "reason": "Step divisible by nine keeps every digital root equal to nine, including a large row."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-1",
+    "input": "1 1 1\n",
+    "expected": "1\n",
+    "reason": "First row contains only its starting value."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-1",
+    "input": "7 1 2\n",
+    "expected": "3\n",
+    "reason": "Second row contains octal 10 and 11; their digit sums are one and two."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-1",
+    "input": "77 1 2\n",
+    "expected": "3\n",
+    "reason": "A carry across two octal digits produces 100 and 101."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-1",
+    "input": "F F 1\n",
+    "expected": "F\n",
+    "reason": "A positive multiple of fifteen has digital root F, not zero."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-1",
+    "input": "FF 1 2\n",
+    "expected": "3\n",
+    "reason": "Second row contains hexadecimal 100 and 101, with total digit sum three."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-2",
+    "input": "ZZZ a! 12\n",
+    "expected": "az\n",
+    "reason": "The last two passes repeat z and are suppressed across pass boundaries."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-2",
+    "input": "!!! 123\n",
+    "expected": "\n",
+    "reason": "No letters survive filtering."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-2",
+    "input": "AABA 2\n",
+    "expected": "AAB\n",
+    "reason": "Original run lengths sort AA before singleton A and B; adjacent A groups merge then cap at two."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-2",
+    "input": "AABBBAA 1\n",
+    "expected": "BA\n",
+    "reason": "The length-three B run precedes both length-two A runs before capping."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-2",
+    "input": "aaBB11!!\n",
+    "expected": "21Ba\n",
+    "reason": "Equal-frequency digits, uppercase and lowercase follow ASCII order."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-2",
+    "input": "aaaBBccD\n",
+    "expected": "3a,2cB,1D\n",
+    "reason": "Alternating direction advances for nonempty frequency groups only."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-3",
+    "input": "-8 -3\n-5\n-9 -7 -4\n",
+    "expected": "-12\n",
+    "reason": "Missing values must not be padded by zero when every list is negative."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-3",
+    "input": "2\n3\n1\n",
+    "expected": "3\n",
+    "reason": "One aligned position contributes its maximum once."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-3",
+    "input": "1 2\n8 100\n3 200\n5 300\n",
+    "expected": "3\n",
+    "reason": "A start on the last row stops immediately and includes the starting minimum."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-3",
+    "input": "2 2\n1 9 2 7\n2 9 3 8\n3 4 5 6\n",
+    "expected": "7\n",
+    "reason": "Two maxima in the same right-hand coordinate in different arrays still force diagonal movement."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-3",
+    "input": "1 2\n1\n5 9\n",
+    "expected": "14\n",
+    "reason": "A two-cell cycle adds both cells once, excluding the repeated starting cell."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-4",
+    "input": "1 11 12 21 22\n",
+    "expected": "3\n",
+    "reason": "Two loops and one opposite-edge pair count as three cycles."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-4",
+    "input": "3 11 12 21 22\n",
+    "expected": "8\n",
+    "reason": "Every middle vertex has two incoming and two outgoing edges; repeated vertices are allowed."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-4",
+    "input": "2 12 21\n",
+    "expected": "12\n",
+    "reason": "Equal outgoing degree chooses the smaller vertex."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-4",
+    "input": "11 12 21 22\n",
+    "expected": "0\n",
+    "reason": "Two vertices cannot form a simple path with three distinct vertices."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-4",
+    "input": "12 23\n",
+    "expected": "123\n",
+    "reason": "A directed chain has exactly one length-two path."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-4",
+    "input": "2 11 12 21 22\n",
+    "expected": "0\n",
+    "reason": "Repeated vertices and self-loops are excluded by the mask."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-4",
+    "input": "3 12 23 34\n",
+    "expected": "1234\n",
+    "reason": "A four-vertex chain has exactly one length-three path."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-4",
+    "input": "4 12 23 34\n",
+    "expected": "0\n",
+    "reason": "A simple path cannot contain more vertices than the graph."
+  },
+  {
+    "slug": "acsl-2021-2022-junior-1",
+    "input": "W W W W W\n",
+    "expected": "00:00\n",
+    "reason": "All white contributes zero and requires leading zeros."
+  },
+  {
+    "slug": "acsl-2021-2022-junior-1",
+    "input": "R G W W W\n",
+    "expected": "01:05\n",
+    "reason": "The two distinct unit squares contribute independently."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-1",
+    "input": "B B B B B\n",
+    "expected": "01:00\n",
+    "reason": "Raw 12:60 carries once then wraps the twelve-hour clock."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-1",
+    "input": "W W W W W\n",
+    "expected": "00:00\n",
+    "reason": "Zero time remains zero after normalization."
+  },
+  {
+    "slug": "acsl-2021-2022-senior-1",
+    "input": "CCCCC\n",
+    "expected": "01:01:00\n",
+    "reason": "Raw 00:60:60 requires both second and minute carries."
+  },
+  {
+    "slug": "acsl-2021-2022-senior-1",
+    "input": "MMMMM\n",
+    "expected": "00:01:00\n",
+    "reason": "Raw 12:00:60 wraps hours and carries seconds."
+  },
+  {
+    "slug": "acsl-2021-2022-junior-2",
+    "input": "z A A \n",
+    "expected": "162 130 164 133\n",
+    "reason": "Alphabet wrapping and spaces, including a trailing space, each consume one Fibonacci term."
+  },
+  {
+    "slug": "acsl-2021-2022-junior-2",
+    "input": "a !\n",
+    "expected": "131\n",
+    "reason": "The first shift is one, not zero."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-2",
+    "input": "0 0 a A A \n",
+    "expected": "356 323 356 323\n",
+    "reason": "Zero starting terms keep the offset zero; trailing spaces are encoded."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-2",
+    "input": "26 26 z !\n",
+    "expected": "399\n",
+    "reason": "Large starting values that are multiples of 26 preserve the key."
+  },
+  {
+    "slug": "acsl-2021-2022-senior-2",
+    "input": "E 1 2 a A A \n",
+    "expected": "359 395 365 386\n",
+    "reason": "Even positions shift backward and all spaces are retained."
+  },
+  {
+    "slug": "acsl-2021-2022-senior-2",
+    "input": "D 1 2 a 359 395 365 386\n",
+    "expected": "A A \n",
+    "reason": "Decoding restores the trailing space exactly."
+  },
+  {
+    "slug": "acsl-2021-2022-senior-2",
+    "input": "E 0 0 z !\n",
+    "expected": "399\n",
+    "reason": "Zero offsets remain zero for either direction."
+  },
+  {
+    "slug": "acsl-2021-2022-junior-3",
+    "input": "1\n",
+    "expected": "1\n",
+    "reason": "The first Fibonacci diagonal is the singleton one."
+  },
+  {
+    "slug": "acsl-2021-2022-junior-3",
+    "input": "3\n",
+    "expected": "1 2\n",
+    "reason": "The third distinct sum comes from one and two."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-3",
+    "input": "1\n",
+    "expected": "1 0 1\n",
+    "reason": "One is odd and also the maximum."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-3",
+    "input": "3\n",
+    "expected": "1 1 2\n",
+    "reason": "The diagonal one,two contains one odd and one even value."
+  },
+  {
+    "slug": "acsl-2021-2022-senior-3",
+    "input": "2\n",
+    "expected": "0\n",
+    "reason": "Every cell through the diagonal summing to two equals one, so no value is unique."
+  },
+  {
+    "slug": "acsl-2021-2022-senior-3",
+    "input": "3\n",
+    "expected": "1\n",
+    "reason": "Only two occurs once through the diagonal summing to three."
+  },
+  {
+    "slug": "acsl-2021-2022-junior-4",
+    "input": "0 0\n",
+    "expected": "0.000\n",
+    "reason": "The zero fixed point remains bounded, retaining all output zeros."
+  },
+  {
+    "slug": "acsl-2021-2022-junior-4",
+    "input": "4 0\n",
+    "expected": "ESCAPES 2\n",
+    "reason": "A modulus exactly four at the first iteration does not escape."
+  },
+  {
+    "slug": "acsl-2021-2022-junior-4",
+    "input": "5 0\n",
+    "expected": "ESCAPES 1\n",
+    "reason": "Escape is detected immediately after the first update."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-4",
+    "input": "0 0\n",
+    "expected": "1\n",
+    "reason": "Zero is a fixed point, so cycle length is one."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-4",
+    "input": "-1 0\n",
+    "expected": "2\n",
+    "reason": "The sequence alternates minus one and zero."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-4",
+    "input": "4 0\n",
+    "expected": "ESCAPES 2\n",
+    "reason": "Escape threshold is strict even after component rounding."
+  },
+  {
+    "slug": "acsl-2021-2022-senior-4",
+    "input": "-0.1 -0.1 0.1 0.1 0.1\n",
+    "expected": "9\n",
+    "reason": "All nine points in this small central grid converge to fixed points."
+  },
+  {
+    "slug": "acsl-2021-2022-senior-4",
+    "input": "2 2 3 3 0.5\n",
+    "expected": "0\n",
+    "reason": "All nine points escape and must be excluded."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-1",
+    "input": "911 69 45\n",
+    "expected": "225\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-1",
+    "input": "321 118 41\n",
+    "expected": "207\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-1",
+    "input": "1641 167 75\n",
+    "expected": "375\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-1",
+    "input": "227 47 10\n",
+    "expected": "47\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-1",
+    "input": "88 122 62\n",
+    "expected": "308\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-1",
+    "input": "514 37 37\n",
+    "expected": "181\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-1",
+    "input": "743 30 79\n",
+    "expected": "395\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-1",
+    "input": "558 143 26\n",
+    "expected": "126\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-1",
+    "input": "155 163 26\n",
+    "expected": "133\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-1",
+    "input": "1503 21 7\n",
+    "expected": "45\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-1",
+    "input": "965 174 41\n",
+    "expected": "208\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-1",
+    "input": "179 29 47\n",
+    "expected": "229\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-1",
+    "input": "871 161 31\n",
+    "expected": "160\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-1",
+    "input": "514 78 63\n",
+    "expected": "252\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-1",
+    "input": "960 184 60\n",
+    "expected": "294\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-junior-1",
+    "input": "1406 34 26\n",
+    "expected": "133\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-1",
+    "input": "526 53 54\n",
+    "expected": "1140\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-1",
+    "input": "1327 60 61\n",
+    "expected": "1496\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-1",
+    "input": "1756 61 53\n",
+    "expected": "860\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-1",
+    "input": "2534 112 5\n",
+    "expected": "58\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-1",
+    "input": "433 233 35\n",
+    "expected": "819\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-1",
+    "input": "1631 150 19\n",
+    "expected": "345\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-1",
+    "input": "3621 40 35\n",
+    "expected": "525\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-1",
+    "input": "3643 10 51\n",
+    "expected": "749\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-1",
+    "input": "1413 244 9\n",
+    "expected": "167\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-1",
+    "input": "1252 274 70\n",
+    "expected": "1652\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-1",
+    "input": "3120 247 28\n",
+    "expected": "483\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-1",
+    "input": "1764 62 58\n",
+    "expected": "1201\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-1",
+    "input": "1302 200 53\n",
+    "expected": "966\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-1",
+    "input": "2501 112 29\n",
+    "expected": "575\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-1",
+    "input": "42 100 45\n",
+    "expected": "905\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-1",
+    "input": "2131 173 35\n",
+    "expected": "630\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-1",
+    "input": "F AB 27\n",
+    "expected": "3\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-1",
+    "input": "4AE 29 52\n",
+    "expected": "4\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-1",
+    "input": "16C C4 66\n",
+    "expected": "9\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-1",
+    "input": "4BF B7 40\n",
+    "expected": "F\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-1",
+    "input": "F0 62 71\n",
+    "expected": "F\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-1",
+    "input": "20F 49 64\n",
+    "expected": "8\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-1",
+    "input": "36C F 10\n",
+    "expected": "F\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-1",
+    "input": "502 19 45\n",
+    "expected": "F\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-1",
+    "input": "507 87 3\n",
+    "expected": "6\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-1",
+    "input": "F5 A6 36\n",
+    "expected": "F\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-1",
+    "input": "D9 30 60\n",
+    "expected": "F\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-1",
+    "input": "15F 86 33\n",
+    "expected": "6\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-1",
+    "input": "787 12 58\n",
+    "expected": "7\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-1",
+    "input": "556 2F 50\n",
+    "expected": "5\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-1",
+    "input": "45F BF 36\n",
+    "expected": "9\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-1",
+    "input": "241 45 14\n",
+    "expected": "8\n",
+    "reason": "Differential oracle explicitly builds the requested row and repeatedly sums digits, independent of period/floor-sum/modulo formulas."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-4",
+    "input": "21 22 31 35 42 53\n",
+    "expected": "952\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-4",
+    "input": "5 21 22 31 35 42 53\n",
+    "expected": "0\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-4",
+    "input": "21 22\n",
+    "expected": "0\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-4",
+    "input": "1 21 22\n",
+    "expected": "21\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-4",
+    "input": "13 16 17 22 23 27 32 42 43 44 57 62 66 67 72 74\n",
+    "expected": "8640\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-4",
+    "input": "6 13 16 17 22 23 27 32 42 43 44 57 62 66 67 72 74\n",
+    "expected": "0\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-4",
+    "input": "11 13 23 33\n",
+    "expected": "0\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-4",
+    "input": "3 11 13 23 33\n",
+    "expected": "0\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-4",
+    "input": "22 35 43 52 54\n",
+    "expected": "1684\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-4",
+    "input": "2 22 35 43 52 54\n",
+    "expected": "1684\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-4",
+    "input": "14 15 21 23 24 34 35 52 61 62 66\n",
+    "expected": "6067\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-4",
+    "input": "1 14 15 21 23 24 34 35 52 61 62 66\n",
+    "expected": "341\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-4",
+    "input": "12\n",
+    "expected": "0\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-4",
+    "input": "2 12\n",
+    "expected": "0\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-4",
+    "input": "11 23 34 42 47 51 53 55 56 57 64 74\n",
+    "expected": "5049\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-4",
+    "input": "7 11 23 34 42 47 51 53 55 56 57 64 74\n",
+    "expected": "0\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-4",
+    "input": "12 23 32\n",
+    "expected": "123\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-4",
+    "input": "2 12 23 32\n",
+    "expected": "123\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-4",
+    "input": "11 14 43\n",
+    "expected": "143\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-4",
+    "input": "2 11 14 43\n",
+    "expected": "143\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-4",
+    "input": "11 21\n",
+    "expected": "0\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-4",
+    "input": "3 11 21\n",
+    "expected": "0\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-4",
+    "input": "12 14 23 32 33 34 41 42 43\n",
+    "expected": "2592\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-senior-4",
+    "input": "1 12 14 23 32 33 34 41 42 43\n",
+    "expected": "241\n",
+    "reason": "Differential oracle enumerates vertex permutations and validates each consecutive edge, independent of adjacency walk aggregation."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-2",
+    "input": "BACBABCBCCAABA 13\n",
+    "expected": "AACCAAABBBBBCC\n",
+    "reason": "Differential oracle literally sorts original maximal runs, concatenates them, then truncates final runs."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-2",
+    "input": "CCAAABBBBCABABABBCA 6\n",
+    "expected": "BBBBAAABBCCAAAABBCC\n",
+    "reason": "Differential oracle literally sorts original maximal runs, concatenates them, then truncates final runs."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-2",
+    "input": "A 1\n",
+    "expected": "A\n",
+    "reason": "Differential oracle literally sorts original maximal runs, concatenates them, then truncates final runs."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-2",
+    "input": "CAABCBABBCBBBBCBCCBA 5\n",
+    "expected": "BBBBAABBCCAABBBBCCCC\n",
+    "reason": "Differential oracle literally sorts original maximal runs, concatenates them, then truncates final runs."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-2",
+    "input": "ABBABABABBCCAABABCCBC 4\n",
+    "expected": "AABBBBCCCCAAAABBBBC\n",
+    "reason": "Differential oracle literally sorts original maximal runs, concatenates them, then truncates final runs."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-2",
+    "input": "CCBABCCBCCCABAAACCBA 8\n",
+    "expected": "AAACCCCCCCCAAABBBBB\n",
+    "reason": "Differential oracle literally sorts original maximal runs, concatenates them, then truncates final runs."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-2",
+    "input": "ACACCCABCBABAAACBAC 11\n",
+    "expected": "AAACCCAAAAABBBBCCCC\n",
+    "reason": "Differential oracle literally sorts original maximal runs, concatenates them, then truncates final runs."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-2",
+    "input": "CBBBCCAAACBBAABACCCBCAA 1\n",
+    "expected": "ABCABCABC\n",
+    "reason": "Differential oracle literally sorts original maximal runs, concatenates them, then truncates final runs."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-2",
+    "input": "AAB 1\n",
+    "expected": "AB\n",
+    "reason": "Differential oracle literally sorts original maximal runs, concatenates them, then truncates final runs."
+  },
+  {
+    "slug": "acsl-2020-2021-intermediate-2",
+    "input": "ABCAACACBBABBB 1\n",
+    "expected": "BABABC\n",
+    "reason": "Differential oracle literally sorts original maximal runs, concatenates them, then truncates final runs."
+  },
+  {
+    "slug": "acsl-2021-2022-junior-3",
+    "input": "2\n",
+    "expected": "1 1\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-3",
+    "input": "2\n",
+    "expected": "2 0 1\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-senior-3",
+    "input": "2\n",
+    "expected": "0\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-junior-3",
+    "input": "3\n",
+    "expected": "1 2\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-3",
+    "input": "3\n",
+    "expected": "1 1 2\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-senior-3",
+    "input": "3\n",
+    "expected": "1\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-junior-3",
+    "input": "5\n",
+    "expected": "1 3 1\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-3",
+    "input": "5\n",
+    "expected": "3 0 3\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-senior-3",
+    "input": "5\n",
+    "expected": "2\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-junior-3",
+    "input": "8\n",
+    "expected": "1 4 3\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-3",
+    "input": "8\n",
+    "expected": "2 1 4\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-senior-3",
+    "input": "8\n",
+    "expected": "2\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-junior-3",
+    "input": "13\n",
+    "expected": "1 5 6 1\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-3",
+    "input": "13\n",
+    "expected": "3 1 6\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-senior-3",
+    "input": "13\n",
+    "expected": "4\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-junior-3",
+    "input": "21\n",
+    "expected": "1 6 10 4\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-3",
+    "input": "21\n",
+    "expected": "1 3 10\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-senior-3",
+    "input": "21\n",
+    "expected": "3\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-junior-3",
+    "input": "34\n",
+    "expected": "1 7 15 10 1\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-3",
+    "input": "34\n",
+    "expected": "4 1 15\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-senior-3",
+    "input": "34\n",
+    "expected": "4\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-junior-3",
+    "input": "55\n",
+    "expected": "1 8 21 20 5\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-3",
+    "input": "55\n",
+    "expected": "3 2 21\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-senior-3",
+    "input": "55\n",
+    "expected": "6\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-junior-3",
+    "input": "89\n",
+    "expected": "1 9 28 35 15 1\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-3",
+    "input": "89\n",
+    "expected": "5 1 35\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-senior-3",
+    "input": "89\n",
+    "expected": "8\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-junior-3",
+    "input": "144\n",
+    "expected": "1 10 36 56 35 6\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-3",
+    "input": "144\n",
+    "expected": "2 4 56\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-senior-3",
+    "input": "144\n",
+    "expected": "9\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-junior-3",
+    "input": "233\n",
+    "expected": "1 11 45 84 70 21 1\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-3",
+    "input": "233\n",
+    "expected": "5 2 84\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-senior-3",
+    "input": "233\n",
+    "expected": "12\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-junior-3",
+    "input": "377\n",
+    "expected": "1 12 55 120 126 56 7\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-3",
+    "input": "377\n",
+    "expected": "3 4 126\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-senior-3",
+    "input": "377\n",
+    "expected": "14\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-junior-3",
+    "input": "610\n",
+    "expected": "1 13 66 165 210 126 28 1\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-3",
+    "input": "610\n",
+    "expected": "4 4 210\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-senior-3",
+    "input": "610\n",
+    "expected": "16\n",
+    "reason": "Differential oracle builds Pascal rows by addition and reads actual diagonal cells, independently checking multiplicative generation."
+  },
+  {
+    "slug": "acsl-2021-2022-intermediate-2",
+    "input": "1 1 a ABCDEFGHIJKLMNOPQRSTUV\n",
+    "expected": "359 360 364 368 375 385 401 426 388 374 399 409 443 408 406 446 405 403 437 390 379 380\n",
+    "reason": "A 22-character message checks reset at character 21 against a full-integer Fibonacci oracle."
+  }
+]

@@ -106,8 +106,8 @@
         "en": [
           {
             "id": "figure-656785abe6590006",
-            "width": 459,
-            "height": 270,
+            "width": 459.0,
+            "height": 270.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -155,8 +155,8 @@
         "zh": [
           {
             "id": "figure-656785abe6590006",
-            "width": 459,
-            "height": 270,
+            "width": 459.0,
+            "height": 270.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -275,8 +275,8 @@
         "en": [
           {
             "id": "figure-1b32f3ea77d5fa1d",
-            "width": 637,
-            "height": 240,
+            "width": 637.0,
+            "height": 240.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -318,8 +318,8 @@
         "zh": [
           {
             "id": "figure-1b32f3ea77d5fa1d",
-            "width": 637,
-            "height": 240,
+            "width": 637.0,
+            "height": 240.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -432,7 +432,7 @@
         "en": [
           {
             "id": "figure-32b26936dd69e8c8",
-            "width": 720,
+            "width": 720.0,
             "height": 355.85,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -469,7 +469,7 @@
         "zh": [
           {
             "id": "figure-32b26936dd69e8c8",
-            "width": 720,
+            "width": 720.0,
             "height": 355.85,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -577,7 +577,7 @@
         "en": [
           {
             "id": "figure-c98e849f67456b9f",
-            "width": 720,
+            "width": 720.0,
             "height": 301.5,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -614,7 +614,7 @@
         "zh": [
           {
             "id": "figure-c98e849f67456b9f",
-            "width": 720,
+            "width": 720.0,
             "height": 301.5,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -870,6 +870,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nvalues = list(map(int, sys.stdin.read().split()))\nn, grid = values[0], values[1:]\npresent = set(grid)\nanswer = []\nfor p, value in enumerate(grid):\n    if value:\n        continue\n    r, c = divmod(p, n)\n    neighbors = []\n    for dr, dc in ((-1,0), (1,0), (0,-1), (0,1)):\n        nr, nc = r+dr, c+dc\n        if 0 <= nr < n and 0 <= nc < n:\n            neighbors.append(grid[nr*n+nc])\n    candidates = {a+1 for a in neighbors if a and a+2 in neighbors and a+1 not in present}\n    # Both adjacent numbers are given; no diagonal holes makes this location unique.\n    answer.append(candidates.pop())\nprint(*answer)\n",
+      "explanation": {
+        "en": "For each zero cell, inspect only its at most four orthogonal neighbors. A missing x must have both x−1 and x+1 among them and must not already occur in the input. The guarantees ensure those neighbors are given. The predecessor and successor can have at most two common neighboring cells; if two, they are diagonal to one another. Because two holes cannot be diagonal, at most one is a hole, so every missing number has a unique location. A valid complete puzzle then gives exactly one candidate per hole. Emit candidates in row-major order without search.",
+        "zh": "逐个检查零格的至多四个上下左右邻居。候选 x 必须尚未出现，且 x−1、x+1 都在这些邻居中；题目保证这两个数均已给出。两个格子的公共正交邻格至多两个，若有两个则它们互为对角，而题目禁止两个空格对角相邻，因此每个缺失数只有一个可放空格。合法完整解保证每个空格恰有一个候选。按行优先顺序输出即可，无需回溯。"
+      },
+      "complexity": {
+        "en": "Time: O(n²), optimal because the whole grid must be read. Auxiliary space: O(n²) for the given-number set and buffered grid.",
+        "zh": "时间：O(n²)，已达到读取全部网格所需的时间下界。辅助空间：O(n²) 用于已知数集合与网格缓存。"
+      }
     }
   }
 }

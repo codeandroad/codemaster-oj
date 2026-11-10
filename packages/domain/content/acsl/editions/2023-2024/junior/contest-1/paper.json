@@ -417,27 +417,27 @@
         {
           "input": "3972\n18 17 65 61 37 51 57 38 72 92 54 59 43 41 31 28\n",
           "expected": "56\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "9146\n95 74 51 19 75 26 32 39 35 31 25 73\n",
           "expected": "0\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "7918\n63 18 56 98 48 52 26 92 83 13 17 58 91 67 58\n",
           "expected": "59\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "9758\n52 14 51 27 77 62 76 82 96 56 46 49 87\n",
           "expected": "48\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "7169\n71 56 15 65 98 71 89 71 11 55 77 17 66 51\n",
           "expected": "14\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -2240,6 +2240,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nvalues = sys.stdin.read().split()\nends = list(map(int, values[0].zfill(4)))\nlast, locked, discarded = -1, False, 0\nfor value in values[1:]:\n    a, b = divmod(int(value), 10)\n    rows = range(4)\n\n    for row in rows:\n        if ends[row] in (a, b):\n            ends[row] = b if ends[row] == a else a\n            last, locked = row, a == b\n            break\n    else:\n        discarded += a + b\nprint(discarded)\n",
+      "explanation": {
+        "en": "Only the exposed endpoint of each of the four rows can influence future moves, so store four digits. For each tile, check the permitted rows in exactly the prescribed order, orient it to match, and replace the exposed endpoint by its other digit. If no permitted row matches, add both digits to the discard total. Always try rows top to bottom.",
+        "zh": "以后能否放牌只取决于四行最右端的数字，因此只存四个端点。依规定顺序尝试当前牌，匹配后把端点换为牌的另一端，无法匹配则把两位数字加入弃牌和。每张牌始终从最上方一行向下尝试。"
+      },
+      "complexity": {
+        "en": "O(T) time and O(1) simulation state for T tiles (the parsed input occupies O(T) space).",
+        "zh": "T 为牌数。时间 O(T)，模拟状态 O(1)；读入全部输入另占 O(T) 空间。"
+      }
     }
   }
 }

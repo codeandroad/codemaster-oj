@@ -1492,6 +1492,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nguess, distance = map(int, sys.stdin.read().split())\nr, c = divmod(guess, 10)\na, b = divmod(distance, 10)\ncells = set()\nfor dr, dc in ((a, b), (b, a)):\n    for sr in (-1, 1):\n        for sc in (-1, 1):\n            row, col = r + sr*dr, c + sc*dc\n            if 0 <= row < 10 and 0 <= col < 10:\n                cells.add(10*row + col)\nprint(min(cells), max(cells))\n",
+      "explanation": {
+        "en": "The distance digits may be assigned to the row and column in either order and each displacement may have either sign. Enumerate these eight possibilities, discard off-grid cells, and deduplicate zero/equal displacements with a set. This enumerates exactly every allowed location; take the minimum and maximum numeric labels.",
+        "zh": "距离的两个数字可分别作为行位移和列位移，也可互换；两个方向各有正负。枚举这八种组合，过滤越界位置，用集合去除零位移或相等位移造成的重复，恰好得到所有合法位置，再取编号最小值和最大值。"
+      },
+      "complexity": {
+        "en": "Time: O(1). Auxiliary space: O(1).",
+        "zh": "时间：O(1)。辅助空间：O(1)。"
+      }
     }
   }
 }

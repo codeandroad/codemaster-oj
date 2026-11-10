@@ -2587,10 +2587,10 @@
           "elements": [
             {
               "type": "line",
-              "x1": 79,
-              "y1": 55,
-              "x2": 211,
-              "y2": 55,
+              "x1": 79.0,
+              "y1": 55.0,
+              "x2": 211.0,
+              "y2": 55.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -2601,10 +2601,10 @@
             },
             {
               "type": "line",
-              "x1": 235,
-              "y1": 79,
-              "x2": 235,
-              "y2": 181,
+              "x1": 235.0,
+              "y1": 79.0,
+              "x2": 235.0,
+              "y2": 181.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -2615,10 +2615,10 @@
             },
             {
               "type": "line",
-              "x1": 211,
-              "y1": 205,
-              "x2": 79,
-              "y2": 205,
+              "x1": 211.0,
+              "y1": 205.0,
+              "x2": 79.0,
+              "y2": 205.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -2629,10 +2629,10 @@
             },
             {
               "type": "line",
-              "x1": 55,
-              "y1": 181,
-              "x2": 55,
-              "y2": 79,
+              "x1": 55.0,
+              "y1": 181.0,
+              "x2": 55.0,
+              "y2": 79.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -2742,10 +2742,10 @@
           "elements": [
             {
               "type": "line",
-              "x1": 79,
-              "y1": 55,
-              "x2": 211,
-              "y2": 55,
+              "x1": 79.0,
+              "y1": 55.0,
+              "x2": 211.0,
+              "y2": 55.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -2756,10 +2756,10 @@
             },
             {
               "type": "line",
-              "x1": 235,
-              "y1": 79,
-              "x2": 235,
-              "y2": 181,
+              "x1": 235.0,
+              "y1": 79.0,
+              "x2": 235.0,
+              "y2": 181.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -2770,10 +2770,10 @@
             },
             {
               "type": "line",
-              "x1": 211,
-              "y1": 205,
-              "x2": 79,
-              "y2": 205,
+              "x1": 211.0,
+              "y1": 205.0,
+              "x2": 79.0,
+              "y2": 205.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -2784,10 +2784,10 @@
             },
             {
               "type": "line",
-              "x1": 55,
-              "y1": 181,
-              "x2": 55,
-              "y2": 79,
+              "x1": 55.0,
+              "y1": 181.0,
+              "x2": 55.0,
+              "y2": 79.0,
               "stroke": "ink",
               "strokeWidth": 2
             },
@@ -2885,6 +2885,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\n\nvalues = list(map(int, sys.stdin.read().split()))\nlength = values[0]\nedges = {divmod(edge, 10) for edge in values[1:]}\nlabels = sorted({v for edge in edges for v in edge})\nindex = {v: i for i, v in enumerate(labels)}\nadj = [[] for _ in labels]\nfor u, v in edges:\n    adj[index[u]].append(index[v])\n# Each state stores (number of paths, sum of their decimal encodings).\nstates = {(1 << i, i): (1, v) for i, v in enumerate(labels)}\nif length >= len(labels):\n    print(0)\nelse:\n    for _ in range(length):\n        following = {}\n        for (mask, last), (count, total) in states.items():\n            for nxt in adj[last]:\n                if mask & (1 << nxt):\n                    continue\n                key = (mask | (1 << nxt), nxt)\n                old_count, old_sum = following.get(key, (0, 0))\n                following[key] = (old_count + count,\n                                  old_sum + 10 * total + labels[nxt] * count)\n        states = following\n    print(sum(total for count, total in states.values()))\n",
+      "explanation": {
+        "en": "A state is (visited-vertex bitmask, last vertex). Aggregate both how many partial paths reach it and the sum of their decimal encodings; the internal order of each path is unnecessary after these two quantities are retained. Start with every one-vertex path. Append only an adjacent vertex absent from the mask. Appending digit d to count paths with total S changes their total to 10S+d·count. Merge equal states by adding counts and sums. After n extensions, sum the states’ totals. The bitmask enforces simplicity; induction on path length proves every legal path is generated once and its numeric contribution is preserved. With V≤9 this subset dynamic program avoids factorial path enumeration. If n≥V no simple path can exist.",
+        "zh": "状态为“已访问顶点的位掩码、最后一个顶点”，同时保存到达该状态的路径数及路径十进制编码之和。保留这两个量后，无须逐条保留路径顺序。以所有单顶点路径初始化，只沿边追加尚未访问的顶点。若已有 count 条路径、编码和为 S，追加数字 d 后总和为 10S+d×count；相同状态把计数与总和相加。扩展 n 次后汇总所有状态。位掩码保证顶点不重复，按长度归纳可知每条合法路径恰生成一次且数值贡献准确。V≤9，子集动态规划避免了阶乘级逐路径枚举；若 n≥V，简单路径必不存在，直接输出 0。"
+      },
+      "complexity": {
+        "en": "O(2^V·(V+E)) worst-case time and O(V·2^V) space, with V≤9. Only one path-length layer is retained.",
+        "zh": "最坏时间 O(2^V·(V+E))，空间 O(V·2^V)，其中 V≤9；只保留当前路径长度的一层状态。"
+      }
     }
   }
 }

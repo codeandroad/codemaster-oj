@@ -900,6 +900,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nvalues = sys.stdin.read().split()\ncommon = None\nfor guess, distance in zip(values[::2], values[1::2]):\n    r, c = int(guess[:2], 16), int(guess[2:], 16)\n    a, b = int(distance[:2], 16), int(distance[2:], 16)\n    cells = set()\n    for dr, dc in ((a, b), (b, a)):\n        for sr in (-1, 1):\n            for sc in (-1, 1):\n                row, col = r + sr*dr, c + sc*dc\n                if 0 <= row < 256 and 0 <= col < 256:\n                    cells.add((row, col))\n    common = cells if common is None else common & cells\nrow, col = next(iter(common))  # The statement guarantees one common cell.\nprint(f'({row:02X},{col:02X})')\n",
+      "explanation": {
+        "en": "For each guess, enumerate both assignments of the two distance bytes and both signs for each axis; at most eight cells are possible. Discard out-of-bounds candidates and intersect all three sets. A location belongs to the intersection exactly when it satisfies every observation; the guaranteed unique result is printed as two hexadecimal bytes.",
+        "zh": "对每次猜测，把距离的两个字节分别作为行、列位移并交换，枚举正负方向，得到至多八个候选位置，过滤越界后取三组候选的交集。属于交集当且仅当满足全部三次观测，题面保证唯一；按两位十六进制行、列输出。"
+      },
+      "complexity": {
+        "en": "Time: O(1). Auxiliary space: O(1).",
+        "zh": "时间：O(1)。辅助空间：O(1)。"
+      }
     }
   }
 }

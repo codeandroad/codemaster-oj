@@ -417,27 +417,27 @@
         {
           "input": "COVID-19 is a global pandemic and a virus that changed everything in the entire world.\n",
           "expected": "7ae,6ni,5t,4rhd,3gl,2vsoc,119CDIOVbmpuwy\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "The Computer Science Teacher Association had a virtual Conference in 2020.\n",
           "expected": "9e,5nica,4or,3th,202CTsu,1vpmlfdSA\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "The digits of PI are 3.14159265358979323846264778327, not rounded.\n",
           "expected": "53,472,345689deo,2trni1,1IPTafghsu\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "Peter Piper picked a peck of pickled peppers. How many pickled peppers did Peter Piper pick?\n",
           "expected": "14e,13p,7i,6r,5cdk,4P,2alost,1ywnmfH\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "There are 10 kinds of people: those who know binary and those who don't.\n",
           "expected": "8o,7e,5hn,3wtsrda,2ikp,1ylfbT10\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -452,6 +452,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nfrom collections import Counter\nimport string\n\nalphabet = string.digits + string.ascii_uppercase + string.ascii_lowercase\ncounts = Counter(c for c in sys.stdin.readline() if c in alphabet)\n# Store only frequencies that occur: at most one group per distinct symbol.\ngroups = {}\nfor c in alphabet:\n    if counts[c]:\n        groups.setdefault(counts[c], []).append(c)\nparts = []\nfor group_index, frequency in enumerate(sorted(groups, reverse=True)):\n    letters = groups[frequency]\n    if group_index % 2:\n        letters.reverse()\n    parts.append(str(frequency) + ''.join(letters))\nprint(','.join(parts))\n",
+      "explanation": {
+        "en": "Count each ASCII alphanumeric character, preserving case. Sorting the original characters first would put all copies of a character together, so a block’s length is exactly its frequency. Visit the fixed alphabet in ASCII order (digits, uppercase, lowercase) and append each present character to the dictionary group for its frequency. This stores only frequencies that actually occur, rather than allocating entries up to the largest count. Sort these at most 62 frequency keys descending, then use ascending character order in the first group, descending in the second, and continue alternating. Group indices count only existing groups, so missing frequencies never change the direction. Prefix each group with its frequency and join with commas. Every surviving character belongs to exactly one group and its multiplicity is encoded by that group’s prefix.",
+        "zh": "区分大小写统计 ASCII 字母和数字。若先对原字符排序，同一字符的全部副本会相邻，因此其段长就是总出现次数。按 ASCII 顺序遍历固定字符表（数字、大写字母、小写字母），将每个出现的字符加入以频次为键的字典分组，只保存实际存在的频次，不再按最大出现次数分配空桶。将至多 62 个频次键降序排列，第一组字符升序，第二组降序，之后交替；组号只统计实际分组，不存在的频次不会改变方向。每组前加频次，组间用逗号连接。每个保留字符恰好归入一组，重复次数由该组前缀准确表达。"
+      },
+      "complexity": {
+        "en": "With input length n and σ≤62 distinct permitted characters, O(n+σ log σ) time and O(σ) auxiliary storage, excluding input/output. For the fixed ASCII alphanumeric alphabet this is O(n) time and O(1) auxiliary space; no allocation grows with the largest frequency.",
+        "zh": "设输入长度为 n，合法不同字符数为 σ≤62，时间 O(n+σ log σ)，不含输入输出的辅助空间为 O(σ)。固定 ASCII 字母数字表下即为 O(n) 时间、O(1) 辅助空间，不再分配随最大频次增长的存储。"
+      }
     }
   }
 }

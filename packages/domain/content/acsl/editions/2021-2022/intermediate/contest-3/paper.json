@@ -1047,27 +1047,27 @@
         {
           "input": "55\n",
           "expected": "3 2 21\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "1597\n",
           "expected": "5 4 495\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "832040\n",
           "expected": "4 11 203490\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "9227465\n",
           "expected": "9 9 2042975\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "1836311903\n",
           "expected": "7 16 354817320\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -2258,6 +2258,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\n\ndef diagonal(index):\n    # Entries are C(index-k, k), from bottom left to top right.\n    value = 1\n    for k in range(index // 2 + 1):\n        yield value\n        if 2 * (k + 1) <= index:\n            value = (value * (index - 2 * k) * (index - 2 * k - 1)\n                     // ((k + 1) * (index - k)))\n\ntarget = int(sys.stdin.read())\na = b = 1\nindex = 0\nwhile a < target:\n    a, b = b, a + b\n    index += 1\n\nodd = even = largest = 0\nfor value in diagonal(index):\n    odd += value % 2\n    even += 1 - value % 2\n    largest = max(largest, value)\nprint(odd, even, largest)\n",
+      "explanation": {
+        "en": "Locate the target’s Fibonacci index n+1. Pascal’s diagonal is C(n−k,k) for k=0,…,floor(n/2). Generate it using the exact recurrence T(k+1)=T(k)(n−2k)(n−2k−1)/((k+1)(n−k)), starting at 1. For each generated entry, increment the odd or even counter and update the maximum. Pascal’s identity proves these entries sum to the chosen Fibonacci number; visiting them once proves the parity counts and maximum are complete. No triangle or list of diagonal entries needs to be stored.",
+        "zh": "先定位输入对应的斐波那契下标 n+1。所求帕斯卡对角线为 C(n−k,k)，k 从 0 到 ⌊n/2⌋。首项为 1，之后按精确递推 T(k+1)=T(k)(n−2k)(n−2k−1)/((k+1)(n−k)) 生成。每得到一项即更新奇数数目、偶数数目和最大值。帕斯卡恒等式保证这些项恰好组成目标斐波那契数的对角线；每项访问一次保证统计完整。既不存储整座三角形，也不必存储整条对角线。"
+      },
+      "complexity": {
+        "en": "O(log X) arithmetic operations and O(1) auxiliary variables for input X, apart from integer bit storage.",
+        "zh": "设输入为 X，时间 O(log X) 次整数运算，除整数自身的位存储外，额外变量数为 O(1)。"
+      }
     }
   }
 }

@@ -417,27 +417,27 @@
         {
           "input": "1453\n24 63 52 9 85 43 6 77 19\n1 33 47 57 46 21 13 84 56 82 39 50 55 16 92 70\n",
           "expected": "38\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "655\n23 55 55 45 94 99 12 99 89 32\n0\n",
           "expected": "13\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "2594\n53 44 48 68 93 95 12 3 0 87 81 74 91 15 23 63\n72 24 83 5 76 33 26 29 7 34 8 64 16\n",
           "expected": "11\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "51\n84 4 70 32 58 17 38 63 51 56 27\n60 43 0 99 50 95 20 82 25 88 10 64 14 45 66 81 53\n",
           "expected": "67\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "0\n93 70 65 9 66 14 46 68 20 63 21 71 88 30 31 1 75\n80 84 85 47 19 89 37 26 4 76 79 92 49 51 45 53 78\n",
           "expected": "0\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -3534,6 +3534,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nfrom collections import deque\nlines = sys.stdin.read().splitlines()\nends = list(map(int, lines[0].strip().zfill(4)))\nhand = [divmod(int(x), 10) for x in lines[1].split()]\ndraw = [divmod(int(x), 10) for x in lines[2].split()] if len(lines) > 2 else []\ntiles = hand + draw\nby_digit = [deque() for _ in range(10)]\nalive = [False] * len(tiles)\n\ndef activate(i):\n    alive[i] = True\n    a, b = tiles[i]\n    by_digit[a].append(i)\n    if b != a:\n        by_digit[b].append(i)\n\nfor i in range(len(hand)):\n    activate(i)\nnext_draw, remaining = len(hand), len(hand)\nlast, locked = -1, False\nwhile remaining:\n    rows = [last] if locked else [(last + step) % 4 for step in range(1, 5)]\n    first = len(tiles)\n    for row in rows:\n        queue = by_digit[ends[row]]\n        while queue and not alive[queue[0]]:\n            queue.popleft()\n        if queue:\n            first = min(first, queue[0])\n    if first == len(tiles):\n        if next_draw == len(tiles):\n            break\n        activate(next_draw)\n        next_draw += 1\n        remaining += 1\n        continue\n    a, b = tiles[first]\n    for row in rows:\n        if ends[row] in (a, b):\n            ends[row] = b if ends[row] == a else a\n            last, locked = row, a == b\n            break\n    alive[first] = False\n    remaining -= 1\nprint(sum(a + b for i, (a, b) in enumerate(tiles) if alive[i]))\n",
+      "explanation": {
+        "en": "Maintain the four endpoints and the double-lock state. Give tiles increasing indices in hand/draw order. For each digit, a queue lists active or previously removed tiles containing that digit; lazily remove inactive queue heads. Among all permitted endpoints, the smallest queue-head index is exactly the first playable tile in the hand. Place it on the first permitted matching row. If none is playable, activate the next drawn tile; if the hand becomes empty, stop before drawing again. Each tile enters at most two queues and leaves each once, so repeated rescanning of the hand is unnecessary.",
+        "zh": "维护四个端点以及双数牌锁定状态。按初始手牌及摸牌顺序给牌编号，十个队列分别记录含有对应数字的牌；队首若已放出就延迟删除。对允许放牌的各端点，取队首编号最小者，即手牌中最先可放的一张，再按规定行顺序确定落点。没有可放牌才激活下一张摸牌；手牌一旦清空立即结束，不再摸牌。每张牌最多进入两个队列并各出队一次，因此无需反复扫描整个手牌。"
+      },
+      "complexity": {
+        "en": "O(H+D) time and O(H+D) space for H initial hand tiles and D drawn-pile tiles.",
+        "zh": "H 为初始手牌数、D 为摸牌堆大小。时间、空间均 O(H+D)。"
+      }
     }
   }
 }

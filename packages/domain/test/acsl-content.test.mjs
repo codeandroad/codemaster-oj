@@ -73,3 +73,16 @@ test('every written and programming presentation is native, has valid math and r
   }
   assert.ok(mathCount > 100, 'the complete collection retains its mathematical expressions as native KaTeX');
 });
+
+test('the reviewed 2248 source correction changes only the truncated final output token', () => {
+  const correction = JSON.parse(readFileSync(new URL('audit/programming-correction-2026-11-11.json', directory), 'utf8'));
+  const paper = papers.find(p => p.slug === correction.slug);
+  const contract = structuredClone(acslGradingContract(paper));
+  const digest = value => createHash('sha256').update(JSON.stringify(stable(value))).digest('hex');
+  assert.equal(digest(contract), correction.afterGradingContract);
+  assert.match(contract.programming.definition.tests[4].expected, /\b2048\n$/);
+  contract.programming.definition.tests[4].expected = contract.programming.definition.tests[4].expected.replace(/2048\n$/, '204\n');
+  assert.equal(digest(contract), correction.beforeGradingContract);
+  const source = readFileSync(new URL(`../../../../${correction.source.path}`, directory));
+  assert.equal(createHash('sha256').update(source).digest('hex'), correction.source.sha256);
+});

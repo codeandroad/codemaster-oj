@@ -244,8 +244,8 @@
         "en": [
           {
             "id": "figure-4612fb902faddb62",
-            "width": 630,
-            "height": 481,
+            "width": 630.0,
+            "height": 481.0,
             "alt": {
               "en": "Data Structures diagram.",
               "zh": "Data Structures 图示。"
@@ -335,8 +335,8 @@
         "zh": [
           {
             "id": "figure-4612fb902faddb62",
-            "width": 630,
-            "height": 481,
+            "width": 630.0,
+            "height": 481.0,
             "alt": {
               "en": "Data Structures diagram.",
               "zh": "Data Structures 图示。"
@@ -601,27 +601,27 @@
         {
           "input": "9\n140\n74 135 61 45 92 122 14 98 138\n105 60 66 116 5 106 97 85 18 139 96\n",
           "expected": "713\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "15\n70\n27 43 24 9 70 64 3 33 30 63 11 1 25 12 35\n69 15 10 2 34 66 21 49 23 51 5 57 38 40 53\n",
           "expected": "0\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "11\n80\n68 52 8 25 22 18 29 16 74 48 34\n30 43 6 7 54 73 11 27 28 71 47 42 50\n",
           "expected": "285\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "15\n60\n2 10 13 19 20 26 30 34 39 41 47 48 52 58 60\n9 31 50 59 1\n",
           "expected": "499\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "10\n75\n70 65 60 55 50 45 40 35 30 10\n44 8 15 46 23 72 3 68 53 37 75 39\n",
           "expected": "411\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -636,6 +636,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nvalues = list(map(int, sys.stdin.read().split()))\ns, n = values[:2]\nrack, draw = values[2:2 + s], values[2 + s:]\n\ndef descents():\n    return sum(a > b for a, b in zip(rack, rack[1:]))\n\nbad = descents()\nfor x in draw:\n    if bad == 0:\n        break\n    slot = None\n    # Rule priority is global: exhaust a rule before trying the next one.\n    for i in range(1, s):\n        if x == rack[i] - 1:\n            slot = i - 1\n            break\n    if slot is None:\n        for i in range(s - 1):\n            if x == rack[i] + 1:\n                slot = i + 1\n                break\n    if slot is None:\n        for i in range(1, s - 1):\n            if not rack[i - 1] < rack[i] < rack[i + 1] and rack[i - 1] < x < rack[i + 1]:\n                slot = i\n                break\n    if slot is None and s > 1 and x < rack[1] < rack[0]:\n        slot = 0\n    if slot is None and s > 1 and x > rack[-2] > rack[-1]:\n        slot = s - 1\n    if slot is not None:\n        # Only the two edges next to the replaced slot can change.\n        edges = range(max(0, slot - 1), min(s - 1, slot + 1))\n        bad -= sum(rack[i] > rack[i + 1] for i in edges)\n        rack[slot] = x\n        bad += sum(rack[i] > rack[i + 1] for i in edges)\nprint(sum(rack) if bad == 0 else 0)\n",
+      "explanation": {
+        "en": "Process draws in order, stopping immediately once no adjacent descent remains. Test the five placement rules in their stated priority, scanning left to right within a rule, and perform at most one replacement per draw. Keep a descent counter: a replacement affects only its two adjacent comparisons. Thus the counter always equals the actual number of step-downs. When sorted, output the rack sum; otherwise output zero.",
+        "zh": "依摸牌顺序处理，下降次数一旦为零立即结束。严格按五条规则的先后顺序尝试，同一规则从前向后检查，每次摸牌最多替换一个位置。维护相邻下降计数，替换只会改变左右两个比较，因此可常数时间更新且始终与真实下降数一致。有序时输出牌值总和，否则输出 0。"
+      },
+      "complexity": {
+        "en": "O(D·s+s) time and O(D+s) space for D drawn cards and s rack slots; s≤20. Each replacement updates its score in O(1).",
+        "zh": "D 为摸牌数、s 为槽位数且 s≤20。时间 O(D·s+s)，输入及状态占 O(D+s) 空间；每次替换的下降数更新为 O(1)。"
+      }
     }
   }
 }

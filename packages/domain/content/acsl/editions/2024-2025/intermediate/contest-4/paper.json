@@ -106,8 +106,8 @@
         "en": [
           {
             "id": "figure-2595653587a7842d",
-            "width": 324,
-            "height": 313,
+            "width": 324.0,
+            "height": 313.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -155,8 +155,8 @@
         "zh": [
           {
             "id": "figure-2595653587a7842d",
-            "width": 324,
-            "height": 313,
+            "width": 324.0,
+            "height": 313.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -275,8 +275,8 @@
         "en": [
           {
             "id": "figure-e5a920e32f02d56b",
-            "width": 397,
-            "height": 322,
+            "width": 397.0,
+            "height": 322.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -324,8 +324,8 @@
         "zh": [
           {
             "id": "figure-e5a920e32f02d56b",
-            "width": 397,
-            "height": 322,
+            "width": 397.0,
+            "height": 322.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -2253,6 +2253,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nwords = sys.stdin.read().split()\nkeys = words[0]\nn = len(keys)\nleft, right = [-1]*n, [-1]*n\n# Inorder order: increasing letter, and later duplicates first (equal goes left).\nbuckets = [[] for _ in range(26)]\nfor i, ch in enumerate(keys):\n    buckets[ord(ch)-ord('A')].append(i)\nstack = []\nfor bucket in buckets:\n    for i in reversed(bucket):\n        last = -1\n        while stack and stack[-1] > i:\n            last = stack.pop()\n        left[i] = last\n        if stack:\n            right[stack[-1]] = i\n        stack.append(i)\ntarget = words[1]\nnode, path = 0, []\nwhile True:\n    path.append(str(node))\n    side = 'L' if target <= keys[node] else 'R'\n    child = left[node] if side == 'L' else right[node]\n    if child == -1:\n        path.append(side)\n        break\n    node = child\nprint(*path)\n",
+      "explanation": {
+        "en": "Build the exact unbalanced insertion tree in linear time using a Cartesian tree. Inorder keys are alphabetically increasing, with equal letters ordered by decreasing insertion index because equality goes left. Bucket the fixed uppercase alphabet to obtain this order. Insertion index is the heap priority: the earliest inserted key must be root of each interval. The monotone stack constructs this unique min-priority Cartesian tree; each node is pushed and popped at most once. Follow the new letter from root index 0, using the left child for equality. Record each existing node index and finish with the direction of the first absent child; these are precisely the insertion comparisons.",
+        "zh": "用笛卡尔树在线性时间构建与逐次插入完全相同的非平衡二叉搜索树。中序顺序是字母升序；相同字母按插入下标降序，因为相等时走左侧。用 26 个字母桶得到该顺序，再把插入下标当作最小堆优先级：每个区间最早插入的元素必为该子树根。单调栈据此构建唯一的笛卡尔树，每个结点最多入栈、出栈各一次。从根的输入下标 0 开始比较新字母，小于等于走左孩子，否则走右孩子。记录沿途输入下标，在首次遇到空孩子时输出 L 或 R，即完整插入路径。"
+      },
+      "complexity": {
+        "en": "Time: O(n + h), where h is the insertion path length; hence O(n) for the fixed 26-letter alphabet. Auxiliary space: O(n); array-position integers use at most n bits.",
+        "zh": "时间：O(n + h)，h 为插入路径长度；字母表固定为 26 个字母，因此总时间为 O(n)。辅助空间：O(n)；数组位置整数至多使用 n 个二进制位。"
+      }
     }
   }
 }

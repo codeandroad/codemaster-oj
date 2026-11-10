@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { apiMessage, productionApi } from "@/lib/production-api";
 import { AcslRichContent } from "./rich-content";
+import { AcslProgrammingSolutionView } from "./programming-solution";
 import type { AcslLanguage } from "./model";
 import {
   acslTeacherHref,
@@ -308,6 +309,13 @@ function PrintDocument({ paper }: { paper: AcslPrintDocument }) {
               </div>
             </div>
           ))}
+          {paper.kind === "answers" && paper.programming.solution && (
+            <AcslProgrammingSolutionView
+              solution={paper.programming.solution}
+              language={paper.language}
+              printable
+            />
+          )}
         </section>
       )}
     </article>

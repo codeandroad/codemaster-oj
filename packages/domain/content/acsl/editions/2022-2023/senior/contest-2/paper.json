@@ -417,27 +417,27 @@
         {
           "input": "ACSL is 45 years old and going strong.\n",
           "expected": "6\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "What was the first computer programming language you learned?\n",
           "expected": "9\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "Lions and Tigers and Bears, Oh My! This is from The Wizard of Oz.\n",
           "expected": "9\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "zyxwvutsrqponmlkjihgfedcba\n",
           "expected": "2\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "~{w|x|y|z}\n",
           "expected": "-1\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -452,6 +452,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\ntext = sys.stdin.readline().rstrip('\\r\\n')\nbits = ''.join(f'{ord(ch):08b}' for ch in text)\n\ndef delete_sequence(text, spec):\n    value = 0\n    while True:\n        pattern = format(value, spec)\n        first = text.find(pattern)\n        if first < 0:\n            return text, value - 1\n        text = text[:first] + text[first + len(pattern):]\n        # Search the updated string; the first deletion can create a match.\n        last = text.rfind(pattern)\n        if last >= 0:\n            text = text[:last] + text[last + len(pattern):]\n        value += 1\n\nremaining, _ = delete_sequence(bits, \"b\")\noctal = format(int(remaining or \"0\", 2), \"o\")\n_, last = delete_sequence(octal, \"o\")\nprint(last)\n",
+      "explanation": {
+        "en": "Encode each character with exactly eight bits. For each consecutive integer, remove the leftmost occurrence of its numeral, then search the modified string and remove the rightmost occurrence if one remains. Only a failed first search terminates the sequence; finding one occurrence is sufficient. This directly preserves the required string after every deletion. Convert the remaining binary value to canonical octal (zero is written 0), then run the same deletion process with octal numerals. Print −1 if its initial 0 is absent.",
+        "zh": "每个字符固定转成 8 位。对连续整数依次先删除最左匹配，再在已经修改的串中删除最右匹配；第二次搜索可能遇到刚拼接出来的新匹配。只在第一次搜索失败时停止，某数仅出现一次也算成功。每次更新都严格对应题意，循环不变式是当前串恰好等于之前所有删除后的结果。将剩余二进制串转为无前导零的八进制数（数值零写为 0），再次用八进制序列执行同一删除过程；初始 0 不存在时输出 −1。"
+      },
+      "complexity": {
+        "en": "O(L²) worst-case time and O(L) auxiliary space, where L=8·text length<1600. Each successful round removes at least one character; searches and slices are linear.",
+        "zh": "L=8×输入字符数，且 L<1600。最坏时间 O(L²)，辅助空间 O(L)；每轮至少删一字符，查找及切片为线性。"
+      }
     }
   }
 }

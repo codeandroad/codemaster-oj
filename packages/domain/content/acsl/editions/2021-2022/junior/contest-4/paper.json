@@ -106,8 +106,8 @@
         "en": [
           {
             "id": "figure-584702e04f51981f",
-            "width": 403,
-            "height": 300,
+            "width": 403.0,
+            "height": 300.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -155,8 +155,8 @@
         "zh": [
           {
             "id": "figure-584702e04f51981f",
-            "width": 403,
-            "height": 300,
+            "width": 403.0,
+            "height": 300.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -275,8 +275,8 @@
         "en": [
           {
             "id": "figure-9dcd9f012a782a8d",
-            "width": 301,
-            "height": 253,
+            "width": 301.0,
+            "height": 253.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -318,8 +318,8 @@
         "zh": [
           {
             "id": "figure-9dcd9f012a782a8d",
-            "width": 301,
-            "height": 253,
+            "width": 301.0,
+            "height": 253.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -432,7 +432,7 @@
         "en": [
           {
             "id": "figure-ba8cfaec72e4c03a",
-            "width": 720,
+            "width": 720.0,
             "height": 285.87,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -469,7 +469,7 @@
         "zh": [
           {
             "id": "figure-ba8cfaec72e4c03a",
-            "width": 720,
+            "width": 720.0,
             "height": 285.87,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -577,7 +577,7 @@
         "en": [
           {
             "id": "figure-8d1e850e4922384a",
-            "width": 720,
+            "width": 720.0,
             "height": 253.47,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -608,7 +608,7 @@
         "zh": [
           {
             "id": "figure-8d1e850e4922384a",
-            "width": 720,
+            "width": 720.0,
             "height": 253.47,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -745,27 +745,27 @@
         {
           "input": "0.45 -0.56\n",
           "expected": "2.153\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "-0.325 0.765\n",
           "expected": "1.057\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "0.561 -0.456\n",
           "expected": "ESCAPES 5\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "-0.213 0.729\n",
           "expected": "0.834\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "-0.053 0.0\n",
           "expected": "0.050\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -784,6 +784,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nfrom math import hypot\n\ncr, ci = map(float, sys.stdin.read().split())\na = b = 0.0\nfor iteration in range(1, 6):\n    a, b = a * a - b * b + cr, 2 * a * b + ci\n    magnitude = hypot(a, b)\n    if magnitude > 4:\n        print('ESCAPES', iteration)\n        break\nelse:\n    print(f'{magnitude:.3f}')\n",
+      "explanation": {
+        "en": "Represent z as real/imaginary components (a,b). Compute the next pair simultaneously as (a²−b²+Cr,2ab+Ci), so both expressions use the old values. Retain double precision throughout; this division does not round intermediate components. After every iteration compute the modulus and stop only when it is strictly greater than 4. If all five iterations remain bounded, format the fifth modulus with exactly three decimal digits. This is the defining recurrence and stopping test applied in their required order; equality to 4 does not escape.",
+        "zh": "将 z 表示为实部、虚部 (a,b)，同时更新为 (a²−b²+Cr,2ab+Ci)，保证两个表达式都使用旧值。全程保留双精度，不对中间分量取三位小数；初级组只在最终输出时格式化。每轮更新后求模，严格大于 4 才输出 ESCAPES 和当前迭代次数。五轮均未逃逸时，将第五轮的模输出为恰好三位小数，包括末尾零。该过程直接按定义的先更新、后检查顺序执行，模恰为 4 时不会误判逃逸。"
+      },
+      "complexity": {
+        "en": "O(1) time and O(1) space: at most five iterations.",
+        "zh": "时间 O(1)，空间 O(1)，最多执行五轮。"
+      }
     }
   }
 }

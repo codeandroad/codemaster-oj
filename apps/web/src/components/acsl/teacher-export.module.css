@@ -124,6 +124,13 @@
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
+  .document :global([data-od-id="acsl-programming-solution"]) {
+    break-inside: auto;
+  }
+  .document :global([data-od-id="acsl-programming-solution"]) pre {
+    break-inside: auto;
+    font-size: 8pt;
+  }
   .document table {
     width: 100%;
     table-layout: auto;

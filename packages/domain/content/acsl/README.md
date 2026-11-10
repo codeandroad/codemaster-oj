@@ -33,7 +33,7 @@ historical/
 
 编程题复用现有隔离判题模块。题面、数学公式、表格及独立例图均为原生内容；公开样例与正式测试分别保存，正式测试及参考程序不进入学生题面。
 
-71 份新编程题按官方样例／测试及来源元数据导入；原有样板继续保留参考程序。未提供参考程序的试题不伪造参考实现。具体标准输入格式以系统中的输入约定为准，原卷中的“多组数据”列表按独立测试用例组织。任何参考程序或学生程序都只能交给隔离判题器执行。
+72 道编程题均提供 Python 3 参考实现，存放于 `programming.solution`，包含代码、双语算法说明和复杂度。官方样例／正式测试及原有样板判题程序保持不变。来源记录保留在内部元数据，界面及答案解析版统一标为“参考实现”。具体标准输入格式以系统中的输入约定为准，原卷中的“多组数据”列表按独立测试用例组织。任何参考程序或学生程序都只能交给隔离判题器执行。
 
 2020–2021 第四轮的三份编程 PDF 为扫描版；公开样例及正式测试输入输出已对照原图逐项转录，未直接采用 OCR 的数字结果。三份资料各有五组公开样例及五组正式测试。
 
@@ -79,3 +79,9 @@ node packages/domain/src/acsl-presentation.mjs --school-id SCHOOL_UUID --actor-a
 ```
 
 内容回归检查：`node --test packages/domain/test/acsl-content.test.mjs`。
+
+### 参考实现校验与发布
+
+`solution-checks/` 保存各题另行推导的边界用例及用例目的。运行 `node scripts/validate-acsl-solutions.mjs --report PRIVATE_REPORT_PATH`，通过现有隔离 go-judge 校验全部代码；可用 `--season` 或 `--slug` 定位单题。校验报告记录每份实现的代码 SHA-256、执行器、时间和实际结果。
+
+实现作为教学材料单独存储，不替换现有判题版本中的 `referenceCode`，不改变正式测试。`packages/domain/src/acsl-solutions.mjs` 从现存学校内容合并参考实现，保留教师笔试修改，并使用展示修正审计事务保存前后内容。详见 `docs/acsl-practice.md`。

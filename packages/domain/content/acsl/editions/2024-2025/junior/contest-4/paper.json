@@ -106,8 +106,8 @@
         "en": [
           {
             "id": "figure-ac0be1bd6f94562b",
-            "width": 459,
-            "height": 360,
+            "width": 459.0,
+            "height": 360.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -161,8 +161,8 @@
         "zh": [
           {
             "id": "figure-ac0be1bd6f94562b",
-            "width": 459,
-            "height": 360,
+            "width": 459.0,
+            "height": 360.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -287,8 +287,8 @@
         "en": [
           {
             "id": "figure-2a4da62989850cd0",
-            "width": 305,
-            "height": 255,
+            "width": 305.0,
+            "height": 255.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -330,8 +330,8 @@
         "zh": [
           {
             "id": "figure-2a4da62989850cd0",
-            "width": 305,
-            "height": 255,
+            "width": 305.0,
+            "height": 255.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -444,7 +444,7 @@
         "en": [
           {
             "id": "figure-a97ef3a65aa273e9",
-            "width": 720,
+            "width": 720.0,
             "height": 319.63,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -481,7 +481,7 @@
         "zh": [
           {
             "id": "figure-a97ef3a65aa273e9",
-            "width": 720,
+            "width": 720.0,
             "height": 319.63,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -520,7 +520,7 @@
         "en": [
           {
             "id": "figure-a97ef3a65aa273e9",
-            "width": 720,
+            "width": 720.0,
             "height": 319.63,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -557,7 +557,7 @@
         "zh": [
           {
             "id": "figure-a97ef3a65aa273e9",
-            "width": 720,
+            "width": 720.0,
             "height": 319.63,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -665,7 +665,7 @@
         "en": [
           {
             "id": "figure-69e514928f88f54d",
-            "width": 720,
+            "width": 720.0,
             "height": 318.55,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -702,7 +702,7 @@
         "zh": [
           {
             "id": "figure-69e514928f88f54d",
-            "width": 720,
+            "width": 720.0,
             "height": 318.55,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -1291,6 +1291,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nfrom collections import deque\nwords = sys.stdin.read().split()\nkeys = words[0]\nn = len(keys)\nleft, right = [-1]*n, [-1]*n\n# Inorder order: increasing letter, and later duplicates first (equal goes left).\nbuckets = [[] for _ in range(26)]\nfor i, ch in enumerate(keys):\n    buckets[ord(ch)-ord('A')].append(i)\nstack = []\nfor bucket in buckets:\n    for i in reversed(bucket):\n        last = -1\n        while stack and stack[-1] > i:\n            last = stack.pop()\n        left[i] = last\n        if stack:\n            right[stack[-1]] = i\n        stack.append(i)\npositions = []\ntodo = deque([(0, 0)])\nwhile todo:\n    node, pos = todo.popleft()\n    positions.append(pos)\n    if left[node] != -1:\n        todo.append((left[node], 2*pos+1))\n    if right[node] != -1:\n        todo.append((right[node], 2*pos+2))\nprint(*(b-a-1 for a, b in zip(positions, positions[1:])))\n",
+      "explanation": {
+        "en": "Build the exact unbalanced insertion tree in linear time using a Cartesian tree. Inorder keys are alphabetically increasing, with equal letters ordered by decreasing insertion index because equality goes left. Bucket the fixed uppercase alphabet to obtain this order. Insertion index is the heap priority: the earliest inserted key must be root of each interval. The monotone stack constructs this unique min-priority Cartesian tree; each node is pushed and popped at most once. Visit the tree in breadth-first order, enqueuing the left child before the right. Array positions 0, 2i+1, 2i+2 then arrive in increasing order without sorting. Subtract consecutive positions minus one; storing only occupied positions avoids an exponentially sparse array.",
+        "zh": "用笛卡尔树在线性时间构建与逐次插入完全相同的非平衡二叉搜索树。中序顺序是字母升序；相同字母按插入下标降序，因为相等时走左侧。用 26 个字母桶得到该顺序，再把插入下标当作最小堆优先级：每个区间最早插入的元素必为该子树根。单调栈据此构建唯一的笛卡尔树，每个结点最多入栈、出栈各一次。用队列按层遍历，每次先加入左孩子再加入右孩子。根编号 0、左右孩子编号 2i+1 和 2i+2，所得编号自然递增，无需排序。相邻编号之差减一就是空位数，仅存已占用编号可避免为稀疏数组分配指数级空间。"
+      },
+      "complexity": {
+        "en": "Time: O(n) arithmetic operations for the fixed 26-letter alphabet. Space: O(n) integers, whose array positions use at most n bits (n ≤ 20).",
+        "zh": "时间：字母表固定为 26 个字母，需 O(n) 次算术运算。空间：O(n) 个整数，其中数组位置整数至多使用 n 个二进制位（n ≤ 20）。"
+      }
     }
   }
 }

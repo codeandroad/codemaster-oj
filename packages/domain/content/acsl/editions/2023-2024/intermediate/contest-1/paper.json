@@ -417,27 +417,27 @@
         {
           "input": "5179\n14 92 71 51 42 19 18 28 89 29 96 46 13 57 78 27\n",
           "expected": "16\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "4287\n69 36 21 93 94 35 83 62 88 97 18 72 42 73 75 31 28 52 66 87\n",
           "expected": "114\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "1745\n21 37 92 42 93 96 19 72 78 18 71 36 56 85 99 97 31 98 23\n",
           "expected": "61\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "6655\n23 55 55 45 94 99 12 99 89 32 77 65 58 57 66 27 16 76\n",
           "expected": "36\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "3333\n43 35 55 34 37 53 23 49 13 22 98 12 33 11 53 79 57 39 77 43 72 22 12 48 17 15 75\n",
           "expected": "67\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -2416,6 +2416,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nvalues = sys.stdin.read().split()\nends = list(map(int, values[0].zfill(4)))\nlast, locked, discarded = -1, False, 0\nfor value in values[1:]:\n    a, b = divmod(int(value), 10)\n    rows = [last] if locked else [(last + step) % 4 for step in range(1, 5)]\n\n    for row in rows:\n        if ends[row] in (a, b):\n            ends[row] = b if ends[row] == a else a\n            last, locked = row, a == b\n            break\n    else:\n        discarded += a + b\nprint(discarded)\n",
+      "explanation": {
+        "en": "Only the exposed endpoint of each of the four rows can influence future moves, so store four digits. For each tile, check the permitted rows in exactly the prescribed order, orient it to match, and replace the exposed endpoint by its other digit. If no permitted row matches, add both digits to the discard total. After a double, keep the row locked even when subsequent tiles are discarded; a successfully placed non-double releases the lock. Otherwise start just after the last successful row, wrapping around.",
+        "zh": "以后能否放牌只取决于四行最右端的数字，因此只存四个端点。依规定顺序尝试当前牌，匹配后把端点换为牌的另一端，无法匹配则把两位数字加入弃牌和。双数牌之后锁定该行，弃掉不匹配的牌不会解除锁定；成功放置非双数牌才解锁。未锁定时从上次成功行的下一行开始，循环检查。"
+      },
+      "complexity": {
+        "en": "O(T) time and O(1) simulation state for T tiles (the parsed input occupies O(T) space).",
+        "zh": "T 为牌数。时间 O(T)，模拟状态 O(1)；读入全部输入另占 O(T) 空间。"
+      }
     }
   }
 }

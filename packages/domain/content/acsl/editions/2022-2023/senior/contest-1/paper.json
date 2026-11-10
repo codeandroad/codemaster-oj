@@ -417,27 +417,27 @@
         {
           "input": "50 4 12\n",
           "expected": "42\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "75 9 384\n",
           "expected": "88\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "500 14 9CBA\n",
           "expected": "336\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "700 11 AAA0\n",
           "expected": "940\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "25 2 110000111010\n",
           "expected": "165\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -452,6 +452,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\n\nn_text, base_text, start_text = sys.stdin.read().split()\nn, base = int(n_text), int(base_text)\nstart = int(start_text, base)\n\ndef counts_through(x):\n    \"\"\"Digit frequencies in canonical base-b representations of 0..x.\"\"\"\n    count = [0] * base\n    if x < 0:\n        return count\n    count[0] = 1  # The number zero is written with one zero digit.\n    place = 1\n    while place <= x:\n        high, rest = divmod(x, place * base)\n        digit, low = divmod(rest, place)\n        for d in range(1, base):\n            count[d] += high * place\n            if digit > d:\n                count[d] += place\n            elif digit == d:\n                count[d] += low + 1\n        # Leading zeroes are not digits: discard the first zero block.\n        if high:\n            count[0] += (high - 1) * place\n            count[0] += low + 1 if digit == 0 else place\n        place *= base\n    return count\n\nhi, lo = counts_through(start + n - 1), counts_through(start - 1)\nfrequency = [a - b for a, b in zip(hi, lo)]\n\nprint(max(frequency))\n",
+      "explanation": {
+        "en": "Convert the starting numeral to an integer and count digits in the interval [s, s+n−1] by subtracting two prefix counts. At position p, each complete cycle of b·p numbers contains p occurrences of every digit. The high/current/low parts give the contribution of the partial cycle. Remove the leading-zero block, but count the numeral 0 itself once. Each represented digit belongs to exactly one position, so the resulting frequencies are exact. Take the largest frequency over all digits, including zero.",
+        "zh": "先把起始串按指定进制转换为整数。区间 [s,s+n−1] 的数字频数等于两个前缀频数之差。对于位权 p，每 b·p 个整数形成一轮，每个数字在这一位出现 p 次；再按高位、当前位和低位计算不足一轮的贡献。0 必须扣除前导零，只把整数 0 本身计作一个 0。每个实际书写的数字恰好归入一个位权，因此不会漏计或重复。取包括 0 在内所有数字出现次数的最大值。"
+      },
+      "complexity": {
+        "en": "O(b log_b(s+n)) arithmetic operations and O(b) counters; b≤16. Python integers avoid overflow. Bit-operation costs grow with the integer lengths.",
+        "zh": "O(b log_b(s+n)) 次整数运算、O(b) 个计数器，b≤16；Python 大整数避免溢出。若按位计算成本，还需计入整数位数。"
+      }
     }
   }
 }

@@ -106,8 +106,8 @@
         "en": [
           {
             "id": "figure-35a3ef6d9023f9c0",
-            "width": 438,
-            "height": 320,
+            "width": 438.0,
+            "height": 320.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -167,8 +167,8 @@
         "zh": [
           {
             "id": "figure-35a3ef6d9023f9c0",
-            "width": 438,
-            "height": 320,
+            "width": 438.0,
+            "height": 320.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -299,8 +299,8 @@
         "en": [
           {
             "id": "figure-215e84bdf10f7fcc",
-            "width": 427,
-            "height": 326,
+            "width": 427.0,
+            "height": 326.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -348,8 +348,8 @@
         "zh": [
           {
             "id": "figure-215e84bdf10f7fcc",
-            "width": 427,
-            "height": 326,
+            "width": 427.0,
+            "height": 326.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -468,8 +468,8 @@
         "en": [
           {
             "id": "figure-75b7b016914c4df4",
-            "width": 720,
-            "height": 288,
+            "width": 720.0,
+            "height": 288.0,
             "alt": {
               "en": "Digital Electronics diagram.",
               "zh": "Digital Electronics 图示。"
@@ -505,8 +505,8 @@
         "zh": [
           {
             "id": "figure-75b7b016914c4df4",
-            "width": 720,
-            "height": 288,
+            "width": 720.0,
+            "height": 288.0,
             "alt": {
               "en": "Digital Electronics diagram.",
               "zh": "Digital Electronics 图示。"
@@ -613,7 +613,7 @@
         "en": [
           {
             "id": "figure-e88006a00c9c5870",
-            "width": 720,
+            "width": 720.0,
             "height": 290.75,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -650,7 +650,7 @@
         "zh": [
           {
             "id": "figure-e88006a00c9c5870",
-            "width": 720,
+            "width": 720.0,
             "height": 290.75,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -1239,6 +1239,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nwords = sys.stdin.read().split()\nkeys = words[0]\nn = len(keys)\nleft, right = [-1]*n, [-1]*n\n# Inorder order: increasing letter, and later duplicates first (equal goes left).\nbuckets = [[] for _ in range(26)]\nfor i, ch in enumerate(keys):\n    buckets[ord(ch)-ord('A')].append(i)\nstack = []\nfor bucket in buckets:\n    for i in reversed(bucket):\n        last = -1\n        while stack and stack[-1] > i:\n            last = stack.pop()\n        left[i] = last\n        if stack:\n            right[stack[-1]] = i\n        stack.append(i)\nonly_left = only_right = leaves = internal = external = 0\ntodo = [(0, 0)]\nwhile todo:\n    node, depth = todo.pop()\n    l, r = left[node], right[node]\n    only_left += l != -1 and r == -1\n    only_right += l == -1 and r != -1\n    leaves += l == -1 and r == -1\n    internal += depth\n    for child in (l, r):\n        if child == -1:\n            external += depth + 1\n        else:\n            todo.append((child, depth + 1))\nprint(only_left, only_right, leaves, internal, external)\n",
+      "explanation": {
+        "en": "Build the exact unbalanced insertion tree in linear time using a Cartesian tree. Inorder keys are alphabetically increasing, with equal letters ordered by decreasing insertion index because equality goes left. Bucket the fixed uppercase alphabet to obtain this order. Insertion index is the heap priority: the earliest inserted key must be root of each interval. The monotone stack constructs this unique min-priority Cartesian tree; each node is pushed and popped at most once. Visit each node with its depth. Its child flags identify left-only, right-only and leaf nodes. Sum real-node depths for internal path length and depth+1 for each absent child for external path length.",
+        "zh": "用笛卡尔树在线性时间构建与逐次插入完全相同的非平衡二叉搜索树。中序顺序是字母升序；相同字母按插入下标降序，因为相等时走左侧。用 26 个字母桶得到该顺序，再把插入下标当作最小堆优先级：每个区间最早插入的元素必为该子树根。单调栈据此构建唯一的笛卡尔树，每个结点最多入栈、出栈各一次。遍历每个结点并记录深度，根据左右孩子是否存在计数仅左孩子、仅右孩子和叶结点。真实结点深度之和是内部路径长度，每个空孩子贡献父结点深度加一，得到外部路径长度。"
+      },
+      "complexity": {
+        "en": "Time: O(n) for the fixed 26-letter alphabet. Auxiliary space: O(n); array-position integers use at most n bits.",
+        "zh": "时间：O(n) ，字母表固定为 26 个字母。辅助空间：O(n)；数组位置整数至多使用 n 个二进制位。"
+      }
     }
   }
 }

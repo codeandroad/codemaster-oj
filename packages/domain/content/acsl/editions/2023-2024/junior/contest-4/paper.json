@@ -106,8 +106,8 @@
         "en": [
           {
             "id": "figure-b39e0e3ac5c6f7e4",
-            "width": 305,
-            "height": 273,
+            "width": 305.0,
+            "height": 273.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -155,8 +155,8 @@
         "zh": [
           {
             "id": "figure-b39e0e3ac5c6f7e4",
-            "width": 305,
-            "height": 273,
+            "width": 305.0,
+            "height": 273.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -275,8 +275,8 @@
         "en": [
           {
             "id": "figure-b39e0e3ac5c6f7e4",
-            "width": 305,
-            "height": 273,
+            "width": 305.0,
+            "height": 273.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -324,8 +324,8 @@
         "zh": [
           {
             "id": "figure-b39e0e3ac5c6f7e4",
-            "width": 305,
-            "height": 273,
+            "width": 305.0,
+            "height": 273.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -444,7 +444,7 @@
         "en": [
           {
             "id": "figure-31c53c2d4a523eaa",
-            "width": 720,
+            "width": 720.0,
             "height": 307.1,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -481,7 +481,7 @@
         "zh": [
           {
             "id": "figure-31c53c2d4a523eaa",
-            "width": 720,
+            "width": 720.0,
             "height": 307.1,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -589,7 +589,7 @@
         "en": [
           {
             "id": "figure-44c7f1f5e97da9d8",
-            "width": 720,
+            "width": 720.0,
             "height": 366.99,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -626,7 +626,7 @@
         "zh": [
           {
             "id": "figure-44c7f1f5e97da9d8",
-            "width": 720,
+            "width": 720.0,
             "height": 366.99,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -769,27 +769,27 @@
         {
           "input": "2 2 32 32 8 2 4 128 256 2 64 128 64 32 8 64 128 16 8 16 8 4 256 64 64 64 256 64 64 4 8 128 64 32 256 256 256 128 64 8\n54 55 64 63 73 72 83 82 81\n",
           "expected": "2 256 128 64 32 2 16 8 4 8 64 2 2 32 2 64 4 32 256 8 8 128 128 32 16 64 128 64 8 4 8 4 16 32 256 2048 256 256 64 8\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "128 8 16 2 4 32 32 8 256 128 16 8 128 4 4 32 2 4 16 128 16 64 2 128 64 128 2 8 4 64 128 2 128 64 32 16 128 256 16 2\n12 23 32 31 41 52 61 71 82 83\n",
           "expected": "256 128 64 2 4 32 16 16 256 128 8 4 128 4 4 2 256 4 16 128 128 32 2 128 64 32 2 8 4 64 16 2 128 64 32 16 2 1024 16 2\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "2 128 4 8 64 8 128 32 2 64 128 256 256 2 4 8 32 8 4 16 8 32 16 32 4 128 256 16 256 256 256 32 8 16 16 2 8 64 2 32\n24 34 35 44 43 53 63 74 75 85\n",
           "expected": "2 128 256 128 64 8 128 32 16 8 128 256 4 2 64 8 32 4 256 64 8 32 32 8 16 128 256 256 32 4 256 32 8 256 256 2 8 64 2 128\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "2 2 32 32 8 2 4 128 256 32 64 128 8 32 32 64 128 16 8 64 8 4 256 64 64 64 256 64 64 4 8 128 64 32 256 256 256 128 64 8\n13 14 25 34 45 54 55 64 63 73 72 83 82 81\n",
           "expected": "2 256 128 64 32 2 16 8 4 2 64 2 256 128 64 64 4 32 16 8 8 128 128 256 32 64 128 8 8 4 8 4 16 32 256 2048 256 256 64 8\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "16 4 8 2 16 256 128 256 32 16 32 256 128 32 64 256 256 8 128 256 4 2 64 128 4 32 32 256 256 64 128 32 32 256 4 16 256 8 256 8\n15 25 24 34 35 44 54 63 64 74 84\n",
           "expected": "16 4 256 128 64 256 128 8 32 16 32 256 256 8 4 256 256 128 2 256 4 2 8 256 4 32 32 64 128 64 128 32 32 2 4 16 256 8 2048 8\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -7150,6 +7150,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nlines = sys.stdin.read().splitlines()\nboard = list(map(int, lines[0].split()))\npath = [(int(token[0]) - 1) * 5 + int(token[1]) - 1 for token in lines[1].split()]\n\ndef collapse(board, path, adaptive):\n    merged = 1 << (sum(board[i] for i in path) - 1).bit_length()\n    largest = max(max(board), merged) if adaptive else 256\n    for i in path:\n        board[i] = 0\n    board[path[-1]] = merged\n    if adaptive:\n        minimum = largest // 128\n        board = [value if value >= minimum else 0 for value in board]\n    # Preserve relative vertical order while packing each column downward.\n    for c in range(5):\n        column = [board[r * 5 + c] for r in range(8) if board[r * 5 + c]]\n        column = [0] * (8 - len(column)) + column\n        for r, value in enumerate(column):\n            board[r * 5 + c] = value\n    next_value = largest\n    for i in range(40):\n        if board[i] == 0:\n            board[i] = next_value\n            next_value //= 2\n            if next_value < largest // 128:\n                next_value = largest\n    return board\n\nprint(*collapse(board, path, False))\n",
+      "explanation": {
+        "en": "Convert each one-based row-column path location to an array index. Compute its sum before deleting anything. The required merged value is 1 shifted left by bit_length(sum−1), which preserves an exact power-of-two sum. Remove the path, keep the merged tile at its last location, and stably pack each column toward the bottom. Fill zero cells in row-major order using the fixed cycle 256,128,…,2; Junior does not remove low-valued tiles when the merged tile exceeds 256.",
+        "zh": "将路径的一基行列坐标转换为一维下标，先求路径和再删除。最小的不小于总和的二次幂为 1 左移 bit_length(总和−1)，总和本身是二次幂时不会误升一级。路径末格保留合并值，各列保持原先上下相对次序向下紧缩，再按行优先顺序以固定的 256、128、…、2 循环填空。初级组即便合并值超过 256，也不额外删除低值牌。"
+      },
+      "complexity": {
+        "en": "O(R·C+P) time and O(R) auxiliary space for an R×C board and P path cells; here R=8,C=5.",
+        "zh": "一般 R×C 棋盘、P 个路径格：时间 O(R·C+P)，额外空间 O(R)；本题 R=8、C=5。"
+      }
     }
   }
 }

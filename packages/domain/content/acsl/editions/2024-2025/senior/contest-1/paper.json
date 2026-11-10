@@ -532,6 +532,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nPOINTS = {'A': 1, 'R': 1, 'O': 3, 'G': 3, 'B': 6}\ndef score(toss):\n    rings = toss.rstrip('+')\n    return sum(POINTS[c] for c in rings) + (len(rings) == 2) + 2 * toss.endswith('+')\nlines = sys.stdin.read().splitlines()\nn = int(lines[0])\nresults = []\nfor player, line in enumerate(lines[1:n + 1], 1):\n    tosses = line.split()\n    results.append((sum(score(t) for t in tosses), len(tosses), player))\nresults.sort(key=lambda item: (-item[0], item[1]))\nprint(*(f'{player}-{total}' for total, count, player in results))\n",
+      "explanation": {
+        "en": "Score a toss by summing ring values, adding one for two rings, and adding two for a trailing plus sign. Record each player’s total and toss count. Sorting by negative total and then toss count implements both ranking rules exactly; the statement guarantees no unresolved tie.",
+        "zh": "每次投球累加环的分值，双环额外加 1，末尾有 + 再加 2。保存玩家编号、总分和投球次数，按总分降序、次数升序排序，严格对应题目的排名规则；题面保证这些条件能打破所有平局。"
+      },
+      "complexity": {
+        "en": "Time: O(L + p log p), where p is the number of players and L is input length. Auxiliary space: O(L + p).",
+        "zh": "时间：O(L + p log p)，p 为玩家人数，L 为输入长度。辅助空间：O(L + p)。"
+      }
     }
   }
 }

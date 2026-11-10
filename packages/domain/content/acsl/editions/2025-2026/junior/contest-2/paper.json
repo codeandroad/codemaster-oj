@@ -536,6 +536,19 @@
         "programming"
       ],
       "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nimport re\nplate = sys.stdin.readline().strip()\nday = sys.stdin.readline().strip()\ndef classify(plate, day):\n    if re.fullmatch(r'[A-Z]\\.[A-Z0-9]{6}', plate):\n        color = 'green'\n    elif re.fullmatch(r'[A-Z]\\.[A-Z0-9]{4}[0-9]', plate):\n        color = 'blue'\n    else:\n        return 'invalid'\n    body = plate[2:]\n    for i in range(len(body)-1):\n        a, b = body[i:i+2]\n        if 'A' <= a <= 'Z' and 'A' <= b <= 'Z' and abs(ord(a)-ord(b)) == 1:\n            return 'fortunate'\n    for i in range(len(body)-2):\n        chunk = body[i:i+3]\n        if chunk.isdigit() and ord(chunk[1])-ord(chunk[0]) == ord(chunk[2])-ord(chunk[1]) in (-1, 1):\n            return 'fortunate'\n    if any(pair in body for pair in ('66', '88', '99')):\n        return 'lucky'\n    if color == 'blue' and int(body[-1]) % 2 and day in ('Sunday', 'Tuesday', 'Thursday', 'Saturday'):\n        return 'restricted'\n    return color\nprint(classify(plate, day))\n",
+      "explanation": {
+        "en": "Validate the complete plate first using ASCII uppercase-letter and digit ranges. Only a valid blue/green plate can receive a special label. Scan the suffix for adjacent letters differing by one or three digits with a common difference of +1 or −1. Then check lucky pairs and the odd-final-digit restriction in the required priority order. Longer qualifying runs contain one of these short windows, so checking windows is sufficient.",
+        "zh": "先用完整匹配检查字母、点号、长度及蓝牌最后一位必须为数字的规则。只对合法车牌分类；后缀中相邻两字母差为 ±1，或相邻三数字连续且同向差为 ±1，即为 fortunate。更长的连续段必含这样的小窗口。之后依次检查 66/88/99 和指定日期的蓝牌奇数尾号，严格按优先级返回结果。"
+      },
+      "complexity": {
+        "en": "Time: O(L), L is plate length (at most 8 for valid input). Auxiliary space: O(L) for the input; O(1) classification state.",
+        "zh": "时间：O(L)，L 为车牌长度（合法输入至多八个字符）。辅助空间：O(L) 用于输入；分类状态仅需 O(1)。"
+      }
     }
   }
 }

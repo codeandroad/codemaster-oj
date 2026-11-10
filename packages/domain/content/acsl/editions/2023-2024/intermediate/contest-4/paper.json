@@ -106,8 +106,8 @@
         "en": [
           {
             "id": "figure-66f246440970a18f",
-            "width": 438,
-            "height": 384,
+            "width": 438.0,
+            "height": 384.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -161,8 +161,8 @@
         "zh": [
           {
             "id": "figure-66f246440970a18f",
-            "width": 438,
-            "height": 384,
+            "width": 438.0,
+            "height": 384.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -287,8 +287,8 @@
         "en": [
           {
             "id": "figure-0030b9ec90261ca0",
-            "width": 607,
-            "height": 369,
+            "width": 607.0,
+            "height": 369.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -336,8 +336,8 @@
         "zh": [
           {
             "id": "figure-0030b9ec90261ca0",
-            "width": 607,
-            "height": 369,
+            "width": 607.0,
+            "height": 369.0,
             "alt": {
               "en": "Graph Theory diagram.",
               "zh": "Graph Theory 图示。"
@@ -456,7 +456,7 @@
         "en": [
           {
             "id": "figure-734d193e9de23d6c",
-            "width": 720,
+            "width": 720.0,
             "height": 361.56,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -493,7 +493,7 @@
         "zh": [
           {
             "id": "figure-734d193e9de23d6c",
-            "width": 720,
+            "width": 720.0,
             "height": 361.56,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -601,7 +601,7 @@
         "en": [
           {
             "id": "figure-d599664ab2eba0af",
-            "width": 720,
+            "width": 720.0,
             "height": 425.03,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -638,7 +638,7 @@
         "zh": [
           {
             "id": "figure-d599664ab2eba0af",
-            "width": 720,
+            "width": 720.0,
             "height": 425.03,
             "alt": {
               "en": "Digital Electronics diagram.",
@@ -783,27 +783,27 @@
         {
           "input": "2 2 32 16 2 2 8 256 2 128 4 16 64 16 32 8 8 4 16 4 8 8 32 64 2 64 8 64 8 256 128 256 16 8 32 16 32 64 128 2\n",
           "expected": "512 256 128 64 32 16 8 4 16 512 256 128 32 16 64 32 16 256 16 128 8 4 64 64 32 64 8 4 8 4 128 16 32 8 256 16 256 64 512 32\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "2 4 256 128 4 256 32 8 64 64 64 128 16 256 64 64 4 4 64 64 64 4 8 64 2 32 4 2 128 256 16 64 64 2 8 256 32 32 32 2\n",
           "expected": "1024 512 256 128 64 256 32 16 8 1024 64 512 256 256 128 64 64 8 32 16 64 32 16 8 1024 32 128 8 128 512 16 64 64 256 1024 256 32 32 32 8\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "256 8 4 16 128 64 4 32 256 256 8 32 8 4 2 64 8 8 2 8 64 16 64 16 128 4 4 4 32 64 64 2 8 8 32 128 128 128 64 4\n",
           "expected": "256 128 64 16 128 256 32 16 256 256 64 8 32 4 2 64 32 8 2 8 64 64 64 16 128 4 4 4 32 64 64 2 8 8 32 128 128 128 64 4\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "256 16 256 2 32 2 32 2 16 8 32 2 256 64 16 4 2 128 2 32 8 8 32 256 2 2 4 8 32 128 16 16 32 64 256 4 16 128 4 8\n",
           "expected": "256 128 64 32 32 16 8 4 16 8 2 256 256 64 16 256 16 256 2 32 2 32 128 256 2 32 2 32 32 128 2 4 32 64 256 4 128 128 4 8\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "2 64 32 32 8 32 32 128 256 32 64 128 64 32 32 64 128 16 8 64 8 4 256 64 64 64 256 64 64 4 8 128 64 32 256 256 256 128 64 8\n",
           "expected": "1024 512 256 128 64 32 32 16 8 1024 64 512 256 256 8 64 64 128 8 32 8 32 16 64 64 64 1024 64 64 64 8 128 64 32 256 256 256 128 64 8\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -7368,6 +7368,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nboard = list(map(int, sys.stdin.read().split()))\n\ndef find_path(board):\n    def neighbor(i, dr, dc):\n        r, c = divmod(i, 5)\n        r, c = r + dr, c + dc\n        return r * 5 + c if 0 <= r < 8 and 0 <= c < 5 else -1\n    path = []\n    for i in range(40):\n        for dr, dc in ((0, 1), (1, -1), (1, 0), (1, 1)):\n            j = neighbor(i, dr, dc)\n            if j != -1 and board[j] == board[i]:\n                path = [i, j]\n                break\n        if path:\n            break\n    used = set(path)\n    while path:\n        i = path[-1]\n        for dr, dc in ((0, -1), (0, 1), (1, -1), (1, 0), (1, 1)):\n            j = neighbor(i, dr, dc)\n            if j != -1 and j not in used and board[j] in (board[i], 2 * board[i]):\n                path.append(j)\n                used.add(j)\n                break\n        else:\n            break\n    return path\n\ndef collapse(board, path, adaptive):\n    merged = 1 << (sum(board[i] for i in path) - 1).bit_length()\n    largest = max(max(board), merged) if adaptive else 256\n    for i in path:\n        board[i] = 0\n    board[path[-1]] = merged\n    if adaptive:\n        minimum = largest // 128\n        board = [value if value >= minimum else 0 for value in board]\n    # Preserve relative vertical order while packing each column downward.\n    for c in range(5):\n        column = [board[r * 5 + c] for r in range(8) if board[r * 5 + c]]\n        column = [0] * (8 - len(column)) + column\n        for r, value in enumerate(column):\n            board[r * 5 + c] = value\n    next_value = largest\n    for i in range(40):\n        if board[i] == 0:\n            board[i] = next_value\n            next_value //= 2\n            if next_value < largest // 128:\n                next_value = largest\n    return board\n\nprint(*collapse(board, find_path(board), True))\n",
+      "explanation": {
+        "en": "Choose the first equal starting pair using the required cell and neighbor order. Thereafter take the first unused neighbor in ←,→,↙,↓,↘ order whose value is equal or doubled; direction priority comes before value preference. Track visited cells to prevent reuse. Merge the resulting maximal greedy path, raise the replenishment maximum if necessary, and remove values below maximum/128. Stably drop each column and fill in row-major order with the eight decreasing powers, cycling after the eighth. These phases follow the prescribed state transitions in order.",
+        "zh": "按规定的格子及邻居顺序选第一个等值起点对；之后依左、右、左下、下、右下顺序取第一个未用且等值或翻倍的邻格，方向优先，不能先全盘找等值再找翻倍。用访问集合禁止复用。贪心路径无法延长后合并，必要时提高补充牌的上限，删除低于上限除以 128 的牌，再各列稳定下落，按行优先使用八个递减二次幂循环补空。各阶段严格按题目顺序执行。"
+      },
+      "complexity": {
+        "en": "O(R·C) time and O(R·C) auxiliary space; each path cell is used once and has at most five candidates. Here R·C=40.",
+        "zh": "时间、额外空间 O(R·C)；每个路径格最多访问一次并检查五个候选，本题 R·C=40。"
+      }
     }
   }
 }

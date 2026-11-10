@@ -417,27 +417,27 @@
         {
           "input": "BOOOKEEEPEERBBBBUZZZOOKEEEEPEER 2\n",
           "expected": "BBEEOOZZEEOOBKKPPRRU\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "MASSACHUSETTSVSMISSISSIPPI 2\n",
           "expected": "PPSSTTAACEHIIMMSSUV\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "OOOOZESSPPOOOOOYYYSSSUPY 4\n",
           "expected": "OOOOSSSYYYPPSSEPUYZ\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "SHESELLSSEASHELLSANDBALLOONS 3\n",
           "expected": "LLLOOSSAAABDEEEHHNNSSS\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "HHHGGRDDCFFFGGGTTTYUIKJHHH 1\n",
           "expected": "FGHTDGCIJKRUY\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -452,6 +452,19 @@
     "statementDiagrams": {
       "en": [],
       "zh": []
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\nfrom itertools import groupby\n\nword, cap_text = sys.stdin.readline().split()\ncap = int(cap_text)\n# Bucket by ORIGINAL maximal run length, then by letter.\nbuckets = [[0] * 26 for _ in range(len(word) + 1)]\nfor c, run in groupby(word):\n    length = sum(1 for _ in run)\n    buckets[length][ord(c) - ord('A')] += length\nanswer = []\nprevious, kept = None, 0\nfor length in range(len(word), 0, -1):\n    for letter, count in enumerate(buckets[length]):\n        if not count:\n            continue\n        c = chr(ord('A') + letter)\n        if c != previous:\n            previous, kept = c, 0\n        take = min(count, cap - kept)\n        answer.append(c * take)\n        kept += take\nprint(''.join(answer))\n",
+      "explanation": {
+        "en": "First identify maximal equal-letter runs in the original string. Their original lengths determine sorting, even if the output cap m is smaller. Bucket the total number of characters by (run length, letter); traverse lengths descending and letters ascending. Multiple equal runs can be merged in their bucket because they are adjacent after sorting. While emitting, track the current output letter and its retained count, allowing at most m consecutive copies. Keep this tracking across bucket boundaries: runs of the same letter from different original lengths can become adjacent too. This produces exactly the prescribed sorted-run string followed by run truncation, without incorrectly re-sorting truncated runs.",
+        "zh": "先识别原串中连续相同字母组成的极大段，排序依据必须是它们的原始长度，不能先按 m 截短。按“原段长度、字母”建桶，累计字符数量；之后按长度从大到小、字母从小到大遍历。同一桶里的多个段在排序后相邻，因此可直接合并。输出时记录当前字母已保留的连续数量，最多保留 m 个；该状态不能在换桶时清空，因为不同原长度的相同字母也可能在排序后相邻。由此恰好实现题目要求的段排序和最终连续段截短。"
+      },
+      "complexity": {
+        "en": "O(n) time and O(n) space for the fixed 26-letter alphabet (26(n+1) bucket entries); output length is at most n.",
+        "zh": "固定 26 字母表下，时间 O(n)、空间 O(n)；桶有 26(n+1) 项，输出长度不超过 n。"
+      }
     }
   }
 }

@@ -22,7 +22,7 @@ export function acslGradingContract(content) {
     options: question.options.map(option => without(option, ['text', 'diagrams'])),
   }));
   if (content.programming != null) contract.programming = {
-    ...without(content.programming, ['statementZh', 'statementAssets', 'statementDiagrams', 'source']),
+    ...without(content.programming, ['statementZh', 'statementAssets', 'statementDiagrams', 'source', 'solution']),
     definition: without(content.programming.definition, ['title', 'statement']),
   };
   return contract;

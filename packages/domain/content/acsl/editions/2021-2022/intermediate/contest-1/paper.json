@@ -418,27 +418,27 @@
         {
           "input": "G R W B B\n",
           "expected": "09:45\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "G G B G B\n",
           "expected": "08:00\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "R R R R R\n",
           "expected": "00:00\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "G G G G G\n",
           "expected": "01:00\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "W B B B B\n",
           "expected": "11:55\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -713,6 +713,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\n\ncolors = ''.join(sys.stdin.read().split())\nweights = (1, 1, 2, 3, 5)\nhours = sum(w for w, c in zip(weights, colors) if c in 'RB')\nminutes = 5 * sum(w for w, c in zip(weights, colors) if c in 'GB')\n\n# Normalize via total minutes, including a possible minute carry.\ntotal = (hours * 60 + minutes) % (12 * 60)\nhours, minutes = divmod(total, 60)\nprint(f'{hours:02d}:{minutes:02d}')\n",
+      "explanation": {
+        "en": "Use side lengths 1,1,2,3,5. Red/blue contribute to hours, and green/blue contribute five times their lengths to minutes. Convert the raw result to total minutes and take modulo 720 (12 hours), then divide by 60. This handles both a minute total of 60 and an hour total of at least 12 in one operation, including simultaneous overflow such as 12:60→01:00. Each square is counted exactly in its prescribed components; total-minute conversion preserves the represented instant modulo the 12-hour clock.",
+        "zh": "边长依次为 1、1、2、3、5。红色和蓝色计入小时；绿色和蓝色的边长之和乘 5 得分钟。将原始结果转换为总分钟数，再对 720（12 小时）取模，最后除以 60 分解为时、分。这样一次处理分钟等于 60、小时至少为 12 的情况，包括 12:60→01:00 的同时进位。每个方格只计入它应贡献的分量，总分钟转换保证所得时刻与原始表示在 12 小时周期内等价。"
+      },
+      "complexity": {
+        "en": "O(1) time and space: five squares and a fixed number of arithmetic operations.",
+        "zh": "时间 O(1)，空间 O(1)，处理五个方格并做常数次运算。"
+      }
     }
   }
 }

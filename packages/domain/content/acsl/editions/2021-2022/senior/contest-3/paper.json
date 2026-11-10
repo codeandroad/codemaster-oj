@@ -245,7 +245,7 @@
         "en": [
           {
             "id": "figure-dbdc0951b814ff2f",
-            "width": 720,
+            "width": 720.0,
             "height": 655.28,
             "alt": {
               "en": "Data Structures diagram.",
@@ -432,7 +432,7 @@
         "zh": [
           {
             "id": "figure-dbdc0951b814ff2f",
-            "width": 720,
+            "width": 720.0,
             "height": 655.28,
             "alt": {
               "en": "Data Structures diagram.",
@@ -795,27 +795,27 @@
         {
           "input": "55\n",
           "expected": "6\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "1597\n",
           "expected": "21\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "832040\n",
           "expected": "67\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "9227465\n",
           "expected": "96\n",
-          "weight": 20
+          "weight": 20.0
         },
         {
           "input": "1836311903\n",
           "expected": "171\n",
-          "weight": 20
+          "weight": 20.0
         }
       ]
     },
@@ -831,7 +831,7 @@
       "en": [
         {
           "id": "p-408bdaed1c4f244c",
-          "width": 720,
+          "width": 720.0,
           "height": 367.29,
           "alt": {
             "en": "Worked-example diagram.",
@@ -2608,7 +2608,7 @@
       "zh": [
         {
           "id": "p-408bdaed1c4f244c",
-          "width": 720,
+          "width": 720.0,
           "height": 367.29,
           "alt": {
             "en": "Worked-example diagram.",
@@ -4382,6 +4382,19 @@
           ]
         }
       ]
+    },
+    "solution": {
+      "language": "python",
+      "provenance": "independent",
+      "code": "import sys\n\ndef diagonal(index):\n    # Entries are C(index-k, k), from bottom left to top right.\n    value = 1\n    for k in range(index // 2 + 1):\n        yield value\n        if 2 * (k + 1) <= index:\n            value = (value * (index - 2 * k) * (index - 2 * k - 1)\n                     // ((k + 1) * (index - k)))\n\ntarget = int(sys.stdin.read())\na = b = 1\nindex = 0\nwhile a < target:\n    a, b = b, a + b\n    index += 1\n\nfrequencies = {}\nfor n in range(index + 1):\n    for value in diagonal(n):\n        # Only zero, one, or at least two occurrences matter.\n        frequencies[value] = min(2, frequencies.get(value, 0) + 1)\nprint(sum(count == 1 for count in frequencies.values()))\n",
+      "explanation": {
+        "en": "Locate the target Fibonacci diagonal n. Enumerate that diagonal and every earlier diagonal; diagonal j consists of C(j−k,k). Generate adjacent entries by their exact multiplicative recurrence, so no full Pascal triangle is needed. Record each value’s occurrence count, saturated at two: later occurrences cannot change whether a value occurs exactly once. Finally count dictionary entries equal to one. Every relevant Pascal cell belongs to exactly one of these diagonals, so the frequency table has exactly the required multiplicities. For the value 1, use the first diagonal; its sole entry occurs once.",
+        "zh": "先找到目标斐波那契对角线编号 n，再枚举编号 0 到 n 的全部对角线；第 j 条对角线包含 C(j−k,k)。利用相邻项的精确乘除递推生成，不必存储完整帕斯卡三角形。用字典统计数值出现次数，计数达到 2 后保持为 2 即可，因为再多次出现也不可能恢复为“恰好一次”。最后统计计数为 1 的字典项。每个应统计的帕斯卡单元格都恰好属于一条被枚举的对角线，所以得到的频数与题意一致。输入 1 时取最早的对角线，其唯一一项出现一次。"
+      },
+      "complexity": {
+        "en": "O((log X)²) arithmetic operations and O((log X)²) stored distinct values in the worst case for input X; counts are capped at two.",
+        "zh": "设输入为 X，时间 O((log X)²) 次整数运算，最多保存 O((log X)²) 个不同数值，频次只保留到 2。"
+      }
     }
   }
 }

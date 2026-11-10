@@ -103,6 +103,16 @@ GRANT SELECT,INSERT,DELETE ON school_activity_problems,school_activity_participa
 GRANT SELECT,INSERT ON school_activity_results TO campus_app;
 GRANT SELECT,INSERT,UPDATE ON school_problem_banks,school_problems,school_problem_publications TO campus_app;
 GRANT SELECT,INSERT ON school_problem_versions,school_judge_jobs TO campus_app;
+REVOKE ALL ON acsl_papers,acsl_drafts,acsl_submissions FROM PUBLIC,campus_app,campus_worker;
+GRANT SELECT ON acsl_papers TO campus_app;
+GRANT SELECT,INSERT,UPDATE ON acsl_drafts TO campus_app;
+GRANT SELECT ON acsl_submissions TO campus_app;
+REVOKE ALL ON acsl_paper_grades FROM PUBLIC,campus_app,campus_worker;
+GRANT SELECT,INSERT ON acsl_paper_grades TO campus_app;
+REVOKE ALL ON acsl_point_rules,acsl_point_awards,acsl_programming_point_receipts FROM PUBLIC,campus_app,campus_worker;
+GRANT SELECT ON acsl_point_rules,acsl_point_awards TO campus_app;
+REVOKE ALL ON acsl_assets FROM PUBLIC,campus_app,campus_worker;
+GRANT SELECT ON acsl_assets TO campus_app;
 GRANT SELECT ON school_judge_jobs TO campus_worker;
 GRANT UPDATE(state,attempts,lease_id,lease_expires_at,node_id,available_at,result,completed_at) ON school_judge_jobs TO campus_worker;
 `);

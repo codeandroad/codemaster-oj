@@ -75,6 +75,18 @@ export async function legacyProblemSubmissions(db,user,problemId,url,helpers) {
  await db.query('SELECT b.id FROM problem_banks b JOIN problems p ON p.bank_id=b.id WHERE p.id=$1 FOR SHARE OF b',[problemId]);
  await db.query('SELECT id FROM problem_versions WHERE problem_id=$1 FOR SHARE',[problemId]);
  const {p,v,permissions}=await helpers.versionAccess(db,user,problemId,versionId);
+ // The editor reads private source separately from the paginated metadata.
+ if(url.searchParams.get('view')==='resume'){
+  const {rows}=await db.query(`SELECT s.code,COALESCE(s.language,'python') language
+   FROM submissions s JOIN legacy_school_identity_ownership own_scope ON own_scope.identity_id=s.identity_id
+   LEFT JOIN timed_attempts ta ON ta.id=s.timed_attempt_id
+   LEFT JOIN timed_practices tp ON tp.id=ta.practice_id
+   WHERE s.problem_id=$1 AND s.version_id=$2 AND s.identity_id=$3 AND s.kind='submit'
+    AND CASE WHEN $4::uuid IS NOT NULL THEN tp.id=$4
+     ELSE s.timed_attempt_id IS NULL OR tp.results_published_at IS NOT NULL END
+   ORDER BY s.created_at DESC,s.id DESC LIMIT 1`,[p.id,v.id,user.identityId,practiceId]);
+  return {submission:rows[0]??null};
+ }
  const bank=(await db.query('SELECT visibility,archived_at FROM problem_banks WHERE id=$1',[p.bank_id])).rows[0];
  const schoolVisible=!!v.published_at&&!!v.school_visible_at&&bank?.visibility==='school'&&!bank.archived_at&&!p.archived_at;
  return metadataPage(db,`SELECT 'SUB'||s.id::text id,s.id received_id,s.identity_id actor_key,s.created_at,COALESCE(s.language,'python') language,s.status,s.identity_id=$3 is_own,r.private_results,
@@ -96,6 +108,15 @@ export async function schoolProblemSubmissions(db,p,user,url,accessContext) {
  const requested=url.searchParams.get('versionId');
  if(requested&&uuid(requested)!==p.published_version_id)fail(404,'NOT_FOUND','This version is not available.');
  if(!p.published||!p.published_version_id||p.archived)fail(404,'NOT_FOUND','Problem is unavailable.');
+ if(accessContext==='public'&&url.searchParams.get('view')==='resume'){
+  const {rows}=await db.query(`SELECT j.payload->>'code' code,COALESCE(j.payload->>'language','python') language
+   FROM school_judge_jobs j
+   WHERE j.school_id=$1 AND j.problem_id=$2 AND j.version_id=$3 AND j.account_id=$4
+    AND j.access_context='public' AND j.kind='submit'
+    AND ${schoolActivityJobVisibleSql('j')}
+   ORDER BY j.created_at DESC,j.id DESC LIMIT 1`,[p.school_id,p.id,p.published_version_id,user.id]);
+  return {submission:rows[0]??null};
+ }
  const identityId=accessContext==='school'?(await db.query('SELECT id FROM school_identities WHERE school_id=$1 AND account_id=$2',[p.school_id,user.id])).rows[0]?.id??null:null;
  // The job's identity is a receipt-time snapshot. Never infer historical
  // ownership from a later school-account binding. Unlinked history remains an

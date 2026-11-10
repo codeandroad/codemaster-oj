@@ -1,5 +1,40 @@
 export interface StudentDraft { code: string; receivedCode: string; updatedAt: string; }
 import type { SubmissionLanguage } from "@/lib/production-api";
+import { submissionLanguage, supportedLanguages } from "./languages.ts";
+
+export type WorkspaceSubmission = { code: string; language: string | null };
+
+export function initialWorkspaceLanguage(
+  selected: SubmissionLanguage | null,
+  latest: WorkspaceSubmission | null,
+  fallback: SubmissionLanguage,
+  read: (language: SubmissionLanguage) => StudentDraft | null,
+): SubmissionLanguage {
+  if (latest) {
+    const languages = selected ? [selected, ...supportedLanguages.filter(language => language !== selected)] : supportedLanguages;
+    const unsaved = languages.find(language => {
+      const draft = read(language);
+      return draft && draft.code !== draft.receivedCode;
+    });
+    return unsaved ?? submissionLanguage(latest.language);
+  }
+  return selected ?? fallback;
+}
+
+export function workspaceEditorCode(
+  language: SubmissionLanguage,
+  draft: StudentDraft | null,
+  latest: WorkspaceSubmission | null,
+  starter: string,
+): Pick<StudentDraft, "code" | "receivedCode"> {
+  if (latest && language === submissionLanguage(latest.language)) {
+    return {
+      code: draft && draft.code !== draft.receivedCode ? draft.code : latest.code,
+      receivedCode: latest.code,
+    };
+  }
+  return { code: draft?.code ?? starter, receivedCode: draft?.receivedCode ?? starter };
+}
 const prefix = "campus-judge:draft:";
 const selectionPrefix = "campus-judge:draft-language:";
 export function workspaceDraftContext({ originalSubmissionId, timedPracticeId, assignmentId, learningPathId, chapterId }: {

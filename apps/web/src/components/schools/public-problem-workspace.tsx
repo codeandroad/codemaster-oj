@@ -52,6 +52,7 @@ function PublicWorkspace({user, problem, catalog}:{user:CampusUser;problem:Probl
       chapter: validChapter ? {courseTitle:course.data!.title,title:chapter!.title,position:chapter!.position??course.data!.chapters.indexOf(chapter!),completed:chapter!.problems.find(item=>item.problemId===problem.id)!.solved} : undefined,
       tutorial: validChapter && chapter?.body.trim() ? {source:"course",courseTitle:course.data!.title,title:chapter.title,body:chapter.body} : undefined,
       submissionsPath: `${path}/submissions?${new URLSearchParams({versionId:problem.versionId!})}`,
+      resumeSubmission: true,
       submit: ({kind,code,language,customInput,requestId})=>productionApi(`${path}/submissions`, {method:"POST",body:{kind,code,language,input:customInput,requestId,versionId:problem.versionId}}),
       submissionPath: id=>`${path}/submissions/${encodeURIComponent(id)}`, normalizeSubmission:normalizeJob,
       ...publicDraftStorage(user.id,problem,storage),

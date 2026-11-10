@@ -51,6 +51,9 @@ test('problem submission metadata: real Nest, scoped runtime DB, no private reco
    assert.equal((await req(`/problems/${problem}?versionId=${v}`)).data.solved,false);
    await req('/submissions/SUB'+peer.id,{status:403});
    await req(route,{user:'anonymous',status:401});
+   assert.deepEqual((await req(route+'&view=resume')).data,{submission:{code:'SECRET student code',language:'python'}});
+   assert.deepEqual((await req(route+'&view=resume',{user:'admin'})).data,{submission:null});
+   await req(route+'&view=resume',{user:'anonymous',status:401});
    await req(route+'&sort=code',{status:400});await req(route+'&sort=status');await req(route+'&pageSize=101',{status:400});await req(route+'&order=desc%3Bdrop',{status:400});
    await req(route,{user:'outsider',status:403});
   });
@@ -102,7 +105,11 @@ test('problem submission metadata: real Nest, scoped runtime DB, no private reco
   const timed=(await pool.query("INSERT INTO timed_attempts(practice_id,identity_id,account_id,started_at,deadline_at) VALUES($1,$2,$3,now(),now()+interval '30 minutes') RETURNING id",[practice,users.student.identityId,users.student.id])).rows[0].id;
   const held=await submission('student',{timed,metrics:[{cpuMs:0,memoryBytes:0}]});
   await t.test('unreleased exams stay absent across free/assignment/timed entry; solved is persistent formal current-version only',async()=>{
+   await pool.query("UPDATE submissions SET code='timed own code' WHERE id=$1",[held.id]);
    for(const path of [route,route+'&timedPracticeId='+practice]){const data=(await req(path)).data;assert.equal(data.total,2);assert.equal(data.solved,false);assert.ok(!data.items.some(r=>r.id==='SUB'+held.id));}
+   assert.deepEqual((await req(route+'&view=resume')).data,{submission:{code:'SECRET student code',language:'python'}});
+   assert.deepEqual((await req(route+'&timedPracticeId='+practice+'&view=resume')).data,{submission:{code:'timed own code',language:'python'}});
+   await req(route+'&timedPracticeId='+practice+'&view=resume',{user:'peer',status:404});
    await req(route+'&timedPracticeId='+practice,{user:'peer',status:404});
    await req(route+'&assignmentId='+randomUUID(),{status:404});
    const {data:feedback}=await req('/review-notebook',{
@@ -127,6 +134,7 @@ test('problem submission metadata: real Nest, scoped runtime DB, no private reco
   await t.test('latest per stable student precedes sorting and pagination; a newer WA keeps historical solved',async()=>{
    await pool.query("UPDATE submissions SET created_at=now()-interval '1 day' WHERE problem_id=$1 AND version_id=$2",[problem,v]);
    const mine=await submission('student',{status:'WA',language:'javascript',metrics:[{cpuMs:5,memoryBytes:4096}]}),oldPeer=await submission('peer',{status:'WA',metrics:[{cpuMs:800,memoryBytes:1024}]}),latestPeer=await submission('peer',{status:'WA',metrics:[{cpuMs:900,memoryBytes:2048}]});
+   await pool.query("UPDATE submissions SET code='latest own WA' WHERE id=$1",[mine.id]);
    // The numeric ID breaks equal server-received timestamps, independently of
    // the requested sort; a later inserted but backdated fixture is not latest.
    await pool.query('UPDATE submissions SET created_at=(SELECT created_at FROM submissions WHERE id=$1) WHERE id=$2',[oldPeer.id,latestPeer.id]);
@@ -135,6 +143,7 @@ test('problem submission metadata: real Nest, scoped runtime DB, no private reco
    const first=(await req(route+'&sort=runtimeMs&order=asc&pageSize=1')).data;safe(first);assert.equal(first.total,2);assert.equal(first.solved,true);assert.equal(first.items[0].id,'SUB'+mine.id);assert.equal(first.items[0].isOwn,true);assert.equal(first.items[0].status,'WA');assert.equal(first.hasMore,true);
    const second=(await req(route+'&sort=runtimeMs&order=asc&pageSize=1&page=2')).data;assert.equal(second.items[0].id,'SUB'+latestPeer.id);assert.equal(second.items[0].isOwn,false);assert.equal(second.items[0].runtimeMs,900);assert.equal(second.hasMore,false);
    assert.deepEqual((await req(route+'&pageSize=1&page=3')).data.items,[]);
+   assert.deepEqual((await req(route+'&view=resume&pageSize=1&page=3')).data,{submission:{code:'latest own WA',language:'javascript'}});
    const asPeer=(await req(route+'&sort=language&order=asc',{user:'peer'})).data;assert.equal(asPeer.solved,true);assert.equal(asPeer.items.filter(r=>r.isOwn).length,1);assert.equal(asPeer.items.find(r=>r.isOwn).id,'SUB'+latestPeer.id);
    assert.equal((await req(`/problems/${problem}?versionId=${v}`)).data.solved,true);
    assert.equal((await pool.query("SELECT count(*)::integer n FROM submissions WHERE problem_id=$1 AND version_id=$2 AND kind='submit'",[problem,v])).rows[0].n,before);
@@ -222,6 +231,9 @@ test('problem submission metadata: real Nest, scoped runtime DB, no private reco
    await schoolJob('newpeer','public','AC','submit',{cpuMs:1});
    const mine=await schoolJob('newstudent','public','WA','submit',{cpuMs:5}),other=await schoolJob('newpeer','public','WA','submit',{cpuMs:30});
    await schoolJob('newstudent','public','AC','samples',{cpuMs:0});
+   assert.deepEqual((await req(pr+'?view=resume',{user:'newstudent'})).data.submission,
+    {code:(await req(`/practice/problems/${sp}/submissions/${mine}`,{user:'newstudent'})).data.code,language:'python'});
+   assert.deepEqual((await req(pr+'?view=resume',{user:'outsider'})).data,{submission:null});
    const first=(await req(pr+'?sort=runtimeMs&order=asc&pageSize=1',{user:'newstudent'})).data;safe(first);assert.equal(first.total,2);assert.equal(first.solved,true);assert.equal(first.items[0].id,mine);assert.equal(first.items[0].isOwn,true);assert.equal(first.items[0].status,'WA');
    const second=(await req(pr+'?sort=runtimeMs&order=asc&pageSize=1&page=2',{user:'newstudent'})).data;assert.equal(second.items[0].id,other);assert.equal(second.items[0].isOwn,false);assert.equal(second.hasMore,false);
    const peerView=(await req(pr,{user:'newpeer'})).data;assert.equal(peerView.solved,true);assert.equal(peerView.items.find(r=>r.isOwn).id,other);

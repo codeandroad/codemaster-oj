@@ -116,15 +116,20 @@ test('public presence isolates explicitly present learners and public achievemen
    });
    fixtures.push(fixture);
   }
-  async function seedJob(fixture,{context='public',kind='submit',status='AC',state='completed',at,versionId=fixture.versionId}={}) {
+  async function seedJob(fixture,{context='public',kind='submit',status='AC',state='completed',at,versionId=fixture.versionId,account=learner}={}) {
    return transaction(owner,async db=>{
     await db.query("SELECT set_config('campus.school_id',$1,true)",[fixture.schoolId]);
-    await db.query(`INSERT INTO school_judge_jobs(school_id,problem_id,version_id,account_id,request_id,request_hash,kind,access_context,payload,state,result,created_at)
-     VALUES($1,$2,$3,$4,gen_random_uuid(),'fixture',$5,$6,'{"code":"PRIVATE_STUDENT_CODE"}',$7,$8,$9)`,
-    [fixture.schoolId,fixture.problemId,versionId,learner.id,kind,context,state,{status,privateResults:['PRIVATE_RESULT']},at??'2026-01-01T00:00:00Z']);
+    // Admission snapshots the current ranking choice before the worker settles
+    // the result, just as it does for a real submission.
+    const {rows:[job]}=await db.query(`INSERT INTO school_judge_jobs(school_id,problem_id,version_id,account_id,request_id,request_hash,kind,access_context,payload,state,created_at)
+     VALUES($1,$2,$3,$4,gen_random_uuid(),'fixture',$5,$6,'{"code":"PRIVATE_STUDENT_CODE"}','queued',$7) RETURNING id`,
+    [fixture.schoolId,fixture.problemId,versionId,account.id,kind,context,at??'2026-01-01T00:00:00Z']);
+    await db.query('UPDATE school_judge_jobs SET state=$3,result=$4 WHERE school_id=$1 AND id=$2',
+     [fixture.schoolId,job.id,state,{status,privateResults:['PRIVATE_RESULT']}]);
    });
   }
   await t.test('public metrics exclude school results, samples, failures and post-AC attempts',async()=>{
+   await request('/practice/preferences',{auth:first,method:'PATCH',body:{rankingEnabled:true}});
    await seedJob(fixtures[0],{status:'WA',at:'2026-01-01T00:01:00Z'});
    await seedJob(fixtures[0],{at:'2026-01-01T00:02:00Z'});
    await seedJob(fixtures[0],{status:'WA',at:'2026-01-01T00:03:00Z'});
@@ -153,6 +158,23 @@ test('public presence isolates explicitly present learners and public achievemen
    assert.equal((await runtime.query('SELECT count(*)::int n FROM school_judge_jobs')).rows[0].n,0,'runtime still cannot query another school directly');
    await assert.rejects(worker.query('SELECT public_practice_presence_stats($1)',[learner.id]),/permission denied/);
    await assert.rejects(worker.query('SELECT public_presence_seen_at FROM sessions'),/permission denied/);
+  });
+  await t.test('ranking choices affect the leaderboard without erasing public practice history',async()=>{
+   const before=(await card(learner)).data;
+   await request('/practice/preferences',{auth:first,method:'PATCH',body:{rankingEnabled:false}});
+   assert.equal((await request('/practice/leaderboard',{auth:first})).data.own.points,0);
+   assert.deepEqual((await card(learner)).data,before,'opting out of ranking preserves public learning activity');
+   await request('/practice/preferences',{auth:first,method:'PATCH',body:{rankingEnabled:true}});
+   assert.equal((await request('/practice/leaderboard',{auth:first})).data.own.points,20);
+
+   await seedJob(fixtures[0],{account:nicknamed});
+   const unranked=(await card(nicknamed)).data;
+   assert.deepEqual(unranked.stats,{points:10,solvedProblems:1,acRate:100,scholarship:0});
+   assert.equal(unranked.activity[0].problemTitle,'Public exercise 0');
+   assert.equal((await request('/practice/leaderboard',{auth:other})).data.own.points,0);
+   await request('/practice/preferences',{auth:other,method:'PATCH',body:{rankingEnabled:true}});
+   assert.equal((await request('/practice/leaderboard',{auth:other})).data.own.points,0,'enabling ranking does not backfill earlier submissions');
+   assert.deepEqual((await card(nicknamed)).data,unranked);
   });
   await t.test('recent activity hides withdrawn, archived and superseded editions',async()=>{
    await owner.query('UPDATE school_problem_publications SET withdrawn_at=now() WHERE problem_id=$1',[fixtures[1].problemId]);

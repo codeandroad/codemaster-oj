@@ -7,6 +7,7 @@ import { AppLink, useNavigationBlocker } from "@/components/navigation";
 import { useLocale } from "@/components/locale-context";
 import { Loading } from "@/components/admin/common";
 import { useData } from "@/components/student/shared";
+import { useWorkspaceData } from "@/components/workspace-data";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
@@ -41,39 +42,14 @@ import {
 } from "./model";
 
 export function useAcslEnabled(schoolId?: string, management = false) {
-  const [state, setState] = useState({
-    schoolId: "",
-    management: false,
-    enabled: false,
-  });
-  useEffect(() => {
-    if (!schoolId) return;
-    const controller = new AbortController();
-    productionApi<Pick<AcslCatalog, "enabled">>(
-      `schools/${schoolId}/acsl${management ? "/manage" : ""}`,
-      {
-        signal: controller.signal,
-      },
-    )
-      .then((data) => {
-        if (!controller.signal.aborted)
-          setState({ schoolId, management, enabled: data.enabled });
-      })
-      .catch(() => {
-        if (!controller.signal.aborted)
-          setState({ schoolId, management, enabled: false });
-      });
-    return () => controller.abort();
-  }, [schoolId, management]);
-  return (
-    state.schoolId === schoolId &&
-    state.management === management &&
-    state.enabled
+  const catalog = useWorkspaceData<Pick<AcslCatalog, "enabled">>(
+    schoolId ? `schools/${schoolId}/acsl${management ? "/manage" : ""}` : "",
   );
+  return catalog.data?.enabled === true;
 }
 
 export function LegacyAcslPage({ user }: { user: CampusUser }) {
-  const schools = useData<{ items: School[] }>("schools");
+  const schools = useWorkspaceData<{ items: School[] }>("schools");
   const school = schools.data?.items.find((item) => item.legacy);
   return (
     <Loading resource={schools}>
@@ -83,6 +59,7 @@ export function LegacyAcslPage({ user }: { user: CampusUser }) {
           schoolId={school.id}
           user={user}
           baseHref="/student/acsl"
+          legacySchool={school.legacy}
         />
       )}
     </Loading>
@@ -93,10 +70,12 @@ export function AcslPage({
   schoolId,
   user,
   baseHref,
+  legacySchool = false,
 }: {
   schoolId: string;
   user: CampusUser;
   baseHref: string;
+  legacySchool?: boolean;
 }) {
   const params = useSearchParams();
   const { locale } = useLocale();
@@ -104,7 +83,7 @@ export function AcslPage({
     params.get("contentLanguage") === "zh" ? "zh" : "en";
   const paperId = params.get("paperId");
   const catalogHref = acslCatalogHref(baseHref, params);
-  const catalog = useData<AcslCatalog>(
+  const catalog = useWorkspaceData<AcslCatalog>(
     paperId ? "" : `schools/${schoolId}/acsl`,
   );
   if (paperId)
@@ -116,6 +95,7 @@ export function AcslPage({
         user={user}
         baseHref={catalogHref}
         language={language}
+        legacySchool={legacySchool}
       />
     );
   const tx = (en: string, zh: string) => (locale === "en" ? en : zh);
@@ -146,12 +126,14 @@ function PaperLoader({
   user,
   baseHref,
   language,
+  legacySchool,
 }: {
   schoolId: string;
   paperId: string;
   user: CampusUser;
   baseHref: string;
   language: AcslLanguage;
+  legacySchool: boolean;
 }) {
   const paper = useData<AcslPaper>(
     `schools/${schoolId}/acsl/${encodeURIComponent(paperId)}`,
@@ -165,6 +147,7 @@ function PaperLoader({
           user={user}
           baseHref={baseHref}
           language={language}
+          legacySchool={legacySchool}
         />
       )}
     </Loading>
@@ -177,12 +160,14 @@ function PaperView({
   user,
   baseHref,
   language,
+  legacySchool,
 }: {
   schoolId: string;
   initialPaper: AcslPaper;
   user: CampusUser;
   baseHref: string;
   language: AcslLanguage;
+  legacySchool: boolean;
 }) {
   const [paper, setPaper] = useState(initialPaper);
   const [questionRevision, setQuestionRevision] = useState(0);
@@ -399,6 +384,7 @@ function PaperView({
     return (
       <>
         <AcslProgramming
+          legacySchool={legacySchool}
           schoolId={schoolId}
           paper={paper}
           user={user}

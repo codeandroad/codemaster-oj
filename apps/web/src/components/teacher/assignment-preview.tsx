@@ -57,6 +57,7 @@ export function TeacherAssignmentPreview({ id, user }: { id: string; user: Campu
     const key = (language: SubmissionLanguage) => draftKey(user.id, problem.id, problem.versionId, context, language);
     const adapter: ProblemWorkspaceAdapter = {
       context, returnTo, returnLabel: en ? "Back to preview" : "返回试做", homeHref: returnTo,
+      presence: null,
       navigation: {
         items: overview.data.problems, loading: overview.loading, error: overview.error, reload: overview.reload,
         href: target => previewHref(id, from, target.problemId), title: en ? "Assignment problems" : "作业题目",

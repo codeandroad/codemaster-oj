@@ -1,4 +1,5 @@
 "use client";
+import { WorkspaceDataProvider, useWorkspaceData } from "./workspace-data";
 import { useAcslEnabled } from "./acsl/acsl-page";
 import { LegacyAcslTeacherPage } from "./acsl/teacher-entry";
 import { StudentPresenceHeartbeat } from "./student/student-presence";
@@ -36,7 +37,7 @@ import { legacyCourseAdmissionsHref, legacyCourseAdmissionsSchoolId, SchoolCours
 import { AdminImportPage } from "@/components/admin/import-page";
 import { AdminProblemBanks } from "@/components/admin/problem-banks";
 import { AdminJudgePage, AdminSettingsPage } from "@/components/admin/system-pages";
-import { Feedback, panelClass as panel, useData as useResource, useMutation as useAction } from "@/components/admin/common";
+import { Feedback, panelClass as panel, useMutation as useAction } from "@/components/admin/common";
 import { StudentPages, AlignedProfile } from "@/components/student/pages";
 import { StudentPublicProfile } from "@/components/student/public-profile";
 import {useWorkspaceSettings} from "@/components/student/workspace-settings";
@@ -147,10 +148,10 @@ export function ProductionApp() {
     clearProductionSession();
     router.replace("/login");
   };
-  return <AppLocaleProvider key={user.id} accountId={user.id}>
+  return <AppLocaleProvider key={user.id} accountId={user.id}><WorkspaceDataProvider key={`${user.id}:${user.identityId}:${user.roles.join(",")}`}>
     <AuthenticatedWorkspace user={user} pathname={pathname} search={search} profileVersion={profileVersion}
       onUserSaved={setUser} onProfileSaved={(next) => { setUser(next); setProfileVersion(value => value + 1); }} onLogout={logout}/>
-  </AppLocaleProvider>;
+  </WorkspaceDataProvider></AppLocaleProvider>;
 }
 
 function AuthenticatedWorkspace({user,pathname,search,profileVersion,onUserSaved,onProfileSaved,onLogout}: {
@@ -232,7 +233,7 @@ function ProductionShell({
   const {locale,t}=useLocale();
   const {settings,update,resolvedPageTheme}=useWorkspaceSettings(user.id);
   const shellTheme=resolvedPageTheme;
-  const schoolList = useResource<{items:School[]}>("schools");
+  const schoolList = useWorkspaceData<{items:School[]}>("schools");
   useEffect(() => {
     window.addEventListener("codemaster:schools-changed", schoolList.reload);
     return () => window.removeEventListener("codemaster:schools-changed", schoolList.reload);

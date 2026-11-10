@@ -17,6 +17,7 @@ import {
   type ProblemWorkspaceAdapter,
 } from "@/components/student/workspace";
 import { draftKey, readDraft, saveDraft } from "@/components/student/drafts";
+import { OnlineStudents } from "@/components/student/student-presence";
 import { useData, type DetailedSubmission } from "@/components/student/shared";
 import type { ResultCase } from "@/components/student/result-feedback";
 import {
@@ -61,6 +62,7 @@ type AcslTranslation = {
 
 export function AcslProgramming({
   schoolId,
+  legacySchool,
   paper,
   user,
   baseHref,
@@ -71,6 +73,7 @@ export function AcslProgramming({
   stageDialog,
 }: {
   schoolId: string;
+  legacySchool: boolean;
   paper: AcslPaper;
   user: CampusUser;
   baseHref: string;
@@ -90,6 +93,7 @@ export function AcslProgramming({
         <ProgrammingWorkspace
           key={`${schoolId}:${paper.versionId}:${problem.data.versionId}`}
           user={user}
+          legacySchool={legacySchool}
           problem={problem.data}
           paper={paper}
           path={path}
@@ -107,6 +111,7 @@ export function AcslProgramming({
 
 function ProgrammingWorkspace({
   user,
+  legacySchool,
   problem,
   paper,
   path,
@@ -118,6 +123,7 @@ function ProgrammingWorkspace({
   stageDialog,
 }: {
   user: CampusUser;
+  legacySchool: boolean;
   problem: AcslProgrammingProblem;
   paper: AcslPaper;
   path: AcslProgrammingPath;
@@ -206,6 +212,11 @@ function ProgrammingWorkspace({
       submissionsPath: `${path}/submissions?${query}`,
       resumeSubmission: true,
       submissionsTitle: locale === "en" ? "My submissions" : "我的提交",
+      // The legacy workspace already owns the heartbeat. Other schools must
+      // not inherit its roster or the unrelated public-practice audience.
+      presence: legacySchool && user.roles.includes("student")
+        ? <OnlineStudents identityId={user.identityId}/>
+        : null,
       tutorial: problem.tutorial,
       renderStatement: () => (
         <AcslRichContent
@@ -340,6 +351,7 @@ function ProgrammingWorkspace({
     };
   }, [
     user,
+    legacySchool,
     problem,
     paper,
     path,

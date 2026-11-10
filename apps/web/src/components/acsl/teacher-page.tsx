@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useWorkspaceData } from "@/components/workspace-data";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Download, Pencil } from "lucide-react";
 import { Loading, useData } from "@/components/admin/common";
@@ -81,7 +82,7 @@ function TeacherCatalogLoader(props: {
   baseHref: string;
   language: AcslLanguage;
 }) {
-  const resource = useData<{ items: AcslTeacherSummary[] }>(
+  const resource = useWorkspaceData<{ items: AcslTeacherSummary[] }>(
     `schools/${props.schoolId}/acsl/manage`,
   );
   return (

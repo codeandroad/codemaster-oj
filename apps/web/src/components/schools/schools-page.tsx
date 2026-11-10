@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useWorkspaceData } from "@/components/workspace-data";
 import { AcslPage, useAcslEnabled } from "@/components/acsl/acsl-page";
 import { AcslTeacherPage } from "@/components/acsl/teacher-page";
 import { Eye, EyeOff } from "lucide-react";
@@ -90,7 +91,7 @@ export function SchoolsPage({
   const router = useRouter();
   const search = useSearchParams();
   const localError = useSchoolError();
-  const schools = useData<{ items: School[] }>("schools");
+  const schools = useWorkspaceData<{ items: School[] }>("schools");
   const logout = useMutation();
   const { settings, update, resolvedPageTheme } = useWorkspaceSettings(user.id);
   const [refreshRevision, setRefreshRevision] = useState(0);

@@ -80,7 +80,8 @@ export type ProblemWorkspaceAdapter = {
   readDraft: (language: SubmissionLanguage) => ReturnType<typeof readDraft>;
   saveDraft: (language: SubmissionLanguage, draft: NonNullable<ReturnType<typeof readDraft>>) => boolean;
   account: (hasUnsavedChanges: boolean) => ReactNode;
-  presence?: ReactNode;
+  /** Every adapter explicitly chooses its authorized audience, or null. */
+  presence: ReactNode;
   statusBanner?: ReactNode;
   assistance?: (kind: "FULL_TRANSLATION" | "FULL_SOLUTION") => ReactNode;
 };

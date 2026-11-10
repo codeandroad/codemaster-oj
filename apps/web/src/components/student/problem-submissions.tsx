@@ -37,10 +37,11 @@ export function useProblemSubmissions(endpoint: string, refreshKey = "") {
   return { data: state.endpoint === endpoint ? state.data : null, loading: Boolean(endpoint) && (state.url !== url || state.loading), error: state.endpoint === endpoint ? state.error : "", reload, query, setQuery };
 }
 
-export function ProblemSubmissionsTable({ feed, allowLegacyDetails = false, openInNewTab = false }: {
+export function ProblemSubmissionsTable({ feed, allowLegacyDetails = false, openInNewTab = false, title }: {
   feed: ReturnType<typeof useProblemSubmissions>;
   allowLegacyDetails?: boolean;
   openInNewTab?: boolean;
+  title?: string;
 }) {
   const { locale } = useLocale();
   const tx = (zh: string, en: string) => locale === "en" ? en : zh;
@@ -59,7 +60,7 @@ export function ProblemSubmissionsTable({ feed, allowLegacyDetails = false, open
   const end = Math.min(page * pageSize, total);
   const sort = (key: SubmissionSort) => feed.setQuery(current => ({ ...current, page: 1, sort: key, order: current.sort === key && current.order === "desc" ? "asc" : "desc" }));
   return <section className="min-w-0 text-sm" aria-label={tx("本题提交记录", "Problem submissions")} data-od-id="problem-submissions">
-    <div className="mb-2 flex items-center justify-between gap-2"><h2 className="font-semibold">{tx("每人最新提交", "Latest submission per student")}</h2><Button type="button" size="sm" variant="ghost" disabled={feed.loading} onClick={feed.reload} aria-label={tx("刷新提交记录", "Refresh submissions")}><RefreshCw size={14} aria-hidden="true" /></Button></div>
+    <div className="mb-2 flex items-center justify-between gap-2"><h2 className="font-semibold">{title ?? tx("每人最新提交", "Latest submission per student")}</h2><Button type="button" size="sm" variant="ghost" disabled={feed.loading} onClick={feed.reload} aria-label={tx("刷新提交记录", "Refresh submissions")}><RefreshCw size={14} aria-hidden="true" /></Button></div>
     <State data={feed}>
       <div className="overflow-x-auto rounded-md border border-border" aria-busy={feed.loading}>
         <table className="w-full min-w-[680px] text-left text-xs">

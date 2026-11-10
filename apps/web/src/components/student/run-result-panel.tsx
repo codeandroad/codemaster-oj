@@ -76,6 +76,13 @@ function ResultContent({ result, reload, currentCode, currentLanguage, onLocate,
       {result.passed != null && result.total != null && <> · {result.passed}/{result.total} {tx("通过", "passed")}</>}
       {formal && result.score != null && <> · {Number(result.score).toFixed(2)}/100</>}
     </p>
+    {!pending && formal && result.resultsVisible !== false
+      && typeof result.practicePointsAwarded === "number"
+      && Number.isFinite(result.practicePointsAwarded) && result.practicePointsAwarded > 0 && (
+      <p role="status" className="mt-1 text-sm font-medium text-success" data-od-id="practice-points-earned">
+        {tx("获得积分", "Points earned")} +{new Intl.NumberFormat(locale).format(result.practicePointsAwarded)}
+      </p>
+    )}
     {stale && <p className={styles.notice}>{tx("当前代码已修改，以下结果对应上次运行的代码。", "Your code has changed. These results belong to the previous run.")}</p>}
     {pending && <p className={styles.notice}>{tx("任务已接收，结果会自动更新。", "Your run was received. Results update automatically.")} <button type="button" onClick={reload} className="text-primary hover:underline">{tx("刷新", "Refresh")}</button></p>}
     {!!cases.length && <div ref={caseList} className={styles.cases} role="tablist" aria-label={tx("测试结果用例", "Result test cases")} onKeyDown={event => {

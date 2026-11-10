@@ -113,6 +113,12 @@ REVOKE ALL ON acsl_point_rules,acsl_point_awards,acsl_programming_point_receipts
 GRANT SELECT ON acsl_point_rules,acsl_point_awards TO campus_app;
 REVOKE ALL ON acsl_assets FROM PUBLIC,campus_app,campus_worker;
 GRANT SELECT ON acsl_assets TO campus_app;
+REVOKE ALL ON acsl_presentation_updates FROM PUBLIC,campus_app,campus_worker;
+REVOKE ALL ON acsl_grade_question_snapshots,acsl_submission_question_snapshots FROM PUBLIC,campus_app,campus_worker;
+GRANT SELECT ON acsl_grade_question_snapshots TO campus_app;
+REVOKE ALL ON acsl_management_updates FROM PUBLIC,campus_app,campus_worker;
+REVOKE ALL ON FUNCTION acsl_edit_paper(uuid,uuid,uuid,text,text) FROM PUBLIC,campus_app,campus_worker;
+GRANT EXECUTE ON FUNCTION acsl_edit_paper(uuid,uuid,uuid,text,text) TO campus_app;
 GRANT SELECT ON school_judge_jobs TO campus_worker;
 GRANT UPDATE(state,attempts,lease_id,lease_expires_at,node_id,available_at,result,completed_at) ON school_judge_jobs TO campus_worker;
 `);

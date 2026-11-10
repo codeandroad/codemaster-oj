@@ -102,7 +102,9 @@ test('ACSL real Nest lifecycle protects answers, histories, drafts, school scope
       const partial = (await request(path, { auth: auth.student })).data;
       assert.equal(partial.answeredCount, 1); assert.equal(partial.correctCount, null); assert.equal(partial.questions[0].lastSubmission, null);
       assert.deepEqual(partial.questions[0].draft.selectedOptionIds, ['A']);
-      assert.equal((await request(root, { auth: auth.student })).data.items[0].correctCount, null);
+      const partialCatalog = (await request(root, { auth: auth.student })).data.items[0];
+      assert.equal(partialCatalog.correctCount, null); assert.equal(partialCatalog.answeredCount, 1);
+      for (const [key, value] of Object.entries(partialCatalog)) assert.deepEqual(value, partial[key], key);
       await request(`${question}/explanation?versionId=${paper.versionId}`, { auth: auth.student, status: 403 });
     });
     await t.test('whole-paper turn-in grades a saved snapshot once, concurrent replays agree and drafts then lock', async () => {
@@ -397,6 +399,8 @@ test('ACSL real Nest lifecycle protects answers, histories, drafts, school scope
       assert.equal(replacementDetail.programmingPointsAwarded, 10, 'the same stable student identity retains its actual existing award');
       assert.equal(replacementDetail.programmingSolved, false, 'the replacement account has no own formal AC');
       assert.equal(replacementDetail.graded, false); assert.equal(replacementDetail.writtenPointsAwarded, undefined);
+      const replacementCatalog = (await request(`/schools/${LEGACY_SCHOOL_ID}/acsl`, { auth: replacementAuth })).data.items.find(item => item.id === legacyPaper.id);
+      for (const [key, value] of Object.entries(replacementCatalog)) assert.deepEqual(value, replacementDetail[key], key);
       await request(`${legacyPath}/programming?view=solution`, { auth: replacementAuth, status: 403 });
       await request(`${legacyPath}/questions/q1/explanation?versionId=${legacyPaper.versionId}`, { auth: replacementAuth, status: 403 });
       await request(legacyPath, { auth: auth['legacy-coding-only'], status: 401 });

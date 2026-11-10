@@ -7,6 +7,7 @@ import { LANGUAGES, languageLimitsFor, starterCodesFor } from './languages.mjs';
 import { submissionCaseFeedback } from './submission-feedback.mjs';
 import { handleAcslManagement } from './acsl-management.mjs';
 import { acslTranslation, acslSolution, requireAcslTranslation } from './acsl-translation.mjs';
+import { acslCatalog } from './acsl-catalog.mjs';
 
 const reply = (body, status = 200) => ({ status, body });
 
@@ -343,9 +344,7 @@ export async function handleAcsl({ pool, user, route, method, body = {}, url }) 
   return transaction(pool, async db => {
     await access(db, schoolId, user);
     if (!match[2] && method === 'GET') {
-      const papers = (await db.query('SELECT * FROM acsl_papers WHERE school_id=$1 AND enabled ORDER BY slug', [schoolId])).rows;
-      const items = [];
-      for (const paper of papers) items.push(summary(paper, await progress(db, paper, user.id)));
+      const items = await acslCatalog(db, schoolId, user.id);
       return reply({ enabled: items.length > 0, items });
     }
     const paper = await loadPaper(db, schoolId, match[2]);

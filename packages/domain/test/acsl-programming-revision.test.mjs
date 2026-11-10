@@ -59,6 +59,8 @@ test('audited programming revision preserves immutable versions, lineage, writte
       const path = `/schools/${LEGACY_SCHOOL_ID}/acsl/${paper.id}`;
       const request = (user, suffix = '', method = 'GET', body = {}) => handleAcsl({ pool: app, user: users[user],
         route: path + suffix.split('?')[0], method, body, url: new URL(`http://acsl.test${path}${suffix}`) });
+      const catalog = async user => (await handleAcsl({ pool: app, user: users[user], method: 'GET',
+        route: `/schools/${LEGACY_SCHOOL_ID}/acsl`, url: new URL(`http://acsl.test/schools/${LEGACY_SCHOOL_ID}/acsl`) })).body.items[0];
       const programming = (await request('accepted', '/programming')).body;
       for (const question of original.questions) await request('accepted', `/questions/${question.id}/draft`, 'PATCH',
         { versionId: paper.versionId, expectedRevision: 0, selectedOptionIds: question.correctOptionIds });
@@ -122,6 +124,7 @@ test('audited programming revision preserves immutable versions, lineage, writte
         assert.equal(current.solved, true); assert.equal(current.attempts, 1); assert.equal(current.versionId, revision.afterProgrammingVersionId);
         const reviewed = (await request('accepted')).body;
         assert.equal(reviewed.gradeId, grade.gradeId); assert.equal(reviewed.score, grade.score); assert.equal(reviewed.programmingPointsAwarded, 10);
+        for (const [key, value] of Object.entries(await catalog('accepted'))) assert.deepEqual(value, reviewed[key], key);
         const history = (await request('accepted', '/programming/submissions')).body;
         assert.equal(history.total, 1); assert.equal(history.items[0].id, acceptedJob.id);
         assert.equal((await request('accepted', `/programming/submissions/${acceptedJob.id}`)).body.versionId, programming.versionId);
@@ -154,6 +157,9 @@ test('audited programming revision preserves immutable versions, lineage, writte
         const alienJob = (await pool.query(`INSERT INTO school_judge_jobs(school_id,problem_id,version_id,account_id,request_id,request_hash,kind,access_context,payload,state,result)
           SELECT school_id,problem_id,$2,account_id,$3,'unlinked-qa-version',kind,access_context,payload,state,result
           FROM school_judge_jobs WHERE id=$1 RETURNING id`, [acceptedJob.id, alienVersion.id, randomUUID()])).rows[0];
+        await pool.query(`INSERT INTO school_judge_jobs(school_id,problem_id,version_id,account_id,request_id,request_hash,kind,access_context,payload,state,result)
+          SELECT school_id,problem_id,$2,$4,$3,'other-unlinked-qa-version',kind,access_context,payload,state,result
+          FROM school_judge_jobs WHERE id=$1`, [acceptedJob.id, alienVersion.id, randomUUID(), users.other.id]);
         assert.equal((await request('accepted', '/programming/submissions')).body.total, 1);
         await assert.rejects(request('accepted', `/programming/submissions/${alienJob.id}`), error => error.status === 404);
         // A second expected-only revision (whitespace-equivalent under tokens)
@@ -169,6 +175,8 @@ test('audited programming revision preserves immutable versions, lineage, writte
         assert.equal(pendingHistory.items[0].id, pendingJob.id);
         const otherHistory = (await request('other', '/programming/submissions')).body;
         assert.equal(otherHistory.total, 1, 'the intermediate reviewed version is retained as well');
+        assert.equal((await catalog('accepted')).programmingSolved, true, 'catalog retains audited ancestor AC');
+        assert.equal((await catalog('other')).programmingSolved, false, 'pending jobs and an unaudited AC do not become catalog AC');
         await assert.rejects(submit('other', revision.afterProgrammingVersionId), error => error.status === 409);
       });
       await t.test('only tenant-scoped lineage columns are readable by the application; worker has no audit access', async () => {

@@ -3,6 +3,7 @@ import { activeAccount, LEGACY_SCHOOL_ID, lockSchoolTeaching, schoolRole } from 
 import { enumValue, fail, field, uuid } from './security.mjs';
 import { validatePaperDefinition } from './acsl-grading.mjs';
 import { readAcslSolutionPrice, updateAcslSolutionPrice } from './acsl-pricing.mjs';
+import { acslManagementCatalog } from './acsl-catalog.mjs';
 
 const reply = body => ({ status: 200, body });
 const questionFields = ['topic', 'statement', 'statementDiagrams', 'correctOptionIds', 'explanation', 'explanationDiagrams'];
@@ -133,8 +134,8 @@ export async function handleAcslManagement({ pool, user, schoolId, tail, method,
   return transaction(pool, async db => {
     await staffAccess(db, schoolId, user, method === 'PATCH');
     if (!parts.length) {
-      const papers = (await db.query('SELECT * FROM acsl_papers WHERE school_id=$1 ORDER BY slug', [schoolId])).rows;
-      return reply({ enabled: papers.length > 0, items: papers.map(catalogItem) });
+      const items = await acslManagementCatalog(db, schoolId);
+      return reply({ enabled: items.length > 0, items });
     }
     let paper = await load(db, schoolId, parts[0]);
     if (parts[1] === 'solution-price') {

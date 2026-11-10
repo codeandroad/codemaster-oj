@@ -172,7 +172,8 @@ export function PracticeProblem({path,jobPath,onBack,backLabel,navigation,expect
  const data=useData<Problem>(`${path}?${query}`),auth=useData<{user:CampusUser}>("auth/me");return <>{(!data.data?.definition||!auth.data?.user)&&<PracticeToolbar title={data.data?.title??""} onBack={onBack} backLabel={backLabel} navigation={navigation}/>}<State data={data}><State data={auth}>{data.data?.definition&&auth.data?.user&&<PracticeEditor key={`${path}:${data.data.versionId}:${data.data.activity?.revision ?? ""}`} problem={data.data} userId={auth.data.user.id} path={path} jobPath={jobPath} onBack={onBack} backLabel={backLabel} navigation={navigation} expectedVersionId={expectedVersionId}/>}</State></State></>;
 }
 function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation,expectedVersionId}:PracticeProblemProps&{problem:Problem;userId:string}){
- const {locale}=useLocale(),tx=(zh:string,en:string)=>locale==="zh"?zh:en,workspace=useWorkspaceSettings(userId),action=useMutation(),def=problem.definition!;
+ const {locale,t}=useLocale(),tx=(zh:string,en:string)=>locale==="zh"?zh:en,workspace=useWorkspaceSettings(userId),action=useMutation(),def=problem.definition!;
+ const activity=problem.activity;
  const preview=problem.activity?.preview===true;
  const key=preview
    ? `codemaster:assignment-preview:${userId}:${problem.schoolId}:${problem.activity?.id}:${problem.activity?.revision}:${problem.id}:${problem.versionId}`
@@ -205,8 +206,8 @@ function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation
  useEffect(()=>{if(loaded)try{localStorage.setItem(key,code);}catch{}},[key,code,loaded]);
  useEffect(()=>{if(!jobEndpoint)return;let stopped=false,timer:ReturnType<typeof setTimeout>;const poll=()=>productionApi<Job>(jobEndpoint).then(value=>{if(stopped)return;setJob(value);setPollError("");if(["queued","leased"].includes(value.state))timer=setTimeout(()=>void poll(),1000);}).catch(error=>{if(!stopped){setPollError(apiMessage(error));timer=setTimeout(()=>void poll(),3000);}});void poll();return()=>{stopped=true;clearTimeout(timer);};},[jobEndpoint]);
  const [clock,setClock]=useState(()=>Date.now());
- useEffect(()=>{if(!problem.activity?.attempt?.deadlineAt)return;const timer=setInterval(()=>setClock(Date.now()),1000);return()=>clearInterval(timer);},[problem.activity?.attempt?.deadlineAt]);
- const deadline=problem.activity?.attempt?.deadlineAt;
+ const deadline=activity?.kind==="timed"?activity.attempt?.deadlineAt:null;
+ useEffect(()=>{if(!deadline)return;const timer=setInterval(()=>setClock(Date.now()),1000);return()=>clearInterval(timer);},[deadline]);
  const remaining=deadline?Math.max(0,Math.ceil((Date.parse(deadline)-clock)/1000)):null;
  const closed=problem.activity?.canSubmit===false||problem.activity?.kind==="timed"&&(!!problem.activity.attempt?.finishedAt||remaining===0||!!problem.activity.resultsPublishedAt);
  const hasAssistance = !preview && !problem.staffPractice && !path.startsWith("practice/");
@@ -219,7 +220,21 @@ function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation
  ] as const;
  const pending=action.busy||!!jobId&&(!job||["queued","leased"].includes(job.state));
  const run=(kind:"samples"|"custom"|"submit")=>void action.run(async()=>{const next=await productionApi<{id:string}>(`${path}/submissions`,{method:"POST",body:{kind,code,language:"python",input:custom,requestId:crypto.randomUUID(),...(preview ? {versionId:problem.versionId,expectedRevision:problem.activity?.revision} : expectedVersionId&&{versionId:expectedVersionId})}});setJob(null);setJobId(next.id);});
- return <div className="space-y-3"><PracticeToolbar title={problem.title} onBack={onBack} backLabel={backLabel} navigation={navigation}/>{problem.staffPractice&&<p className="text-sm text-muted-foreground">{tx("教师练习 · 结果仅供个人查看，不计入学生成绩、奖学金或排名。","Teacher practice · Results are personal and do not count toward student grades, scholarship or rankings.")}</p>}{problem.activity&&<div className="flex flex-wrap items-center justify-between gap-2 text-sm"><span className="font-medium">{problem.activity.title}</span><div className="flex items-center gap-3">{!preview&&<SchoolActivityScholarshipRule schoolId={problem.schoolId} activityId={problem.activity.id}/>}{remaining!==null&&<span className={`font-mono tabular-nums ${remaining<300?"text-destructive":"text-muted-foreground"}`} role="timer" aria-label={tx("剩余时间","Time remaining")}>{closed?tx("已结束","Ended"):`${Math.floor(remaining/3600).toString().padStart(2,"0")}:${Math.floor(remaining%3600/60).toString().padStart(2,"0")}:${(remaining%60).toString().padStart(2,"0")}`}</span>}</div></div>}<div className="grid min-w-0 gap-3 xl:grid-cols-2"><section className="min-w-0 rounded-lg border border-border bg-surface">
+ return <div className="space-y-3">
+  <PracticeToolbar title={problem.title} onBack={onBack} backLabel={backLabel} navigation={navigation}/>
+  {problem.staffPractice&&<p className="text-sm text-muted-foreground">{tx("教师练习 · 结果仅供个人查看，不计入学生成绩、奖学金或排名。","Teacher practice · Results are personal and do not count toward student grades, scholarship or rankings.")}</p>}
+  {activity&&<div className="flex flex-wrap items-start justify-between gap-2 text-sm">
+    <div className="min-w-0">
+      <span className="font-medium">{activity.title}</span>
+      {activity.kind==="assignment"&&activity.canSubmit&&activity.endsAt&&!preview&&
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{t("截止后仍可提交并查看判题结果。补交不计入作业成绩，也不发放作业完成奖学金等作业奖励。")}</p>}
+    </div>
+    <div className="flex items-center gap-3">
+      {!preview&&<SchoolActivityScholarshipRule schoolId={problem.schoolId} activityId={activity.id}/>}
+      {remaining!==null&&<span className={`font-mono tabular-nums ${remaining<300?"text-destructive":"text-muted-foreground"}`} role="timer" aria-label={tx("剩余时间","Time remaining")}>{closed?tx("已结束","Ended"):`${Math.floor(remaining/3600).toString().padStart(2,"0")}:${Math.floor(remaining%3600/60).toString().padStart(2,"0")}:${(remaining%60).toString().padStart(2,"0")}`}</span>}
+    </div>
+  </div>}
+  <div className="grid min-w-0 gap-3 xl:grid-cols-2"><section className="min-w-0 rounded-lg border border-border bg-surface">
     <div className="flex items-center gap-1 overflow-x-auto border-b border-border px-2" role="tablist" aria-label={tx("题目内容", "Problem content")}>
       {tabItems.map(({ id, label, icon: Icon }, index) => (
         <button type="button" key={id} id={`school-practice-tab-${id}`} role="tab"

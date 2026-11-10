@@ -122,6 +122,7 @@ function SchoolStudentActivityCards({
         title={activity.title}
         href={href(activity.id)}
         status={text(...(labels[activity.phase] ?? [activity.phase, activity.phase]))}
+        overdue={activity.phase === "Ended" && activity.endsAt ? { canSubmit: activity.canSubmit === true } : undefined}
         dueAt={activity.endsAt}
         archived={activity.phase === "Archived"}
         problemCount={activity.problems.length}
@@ -149,7 +150,7 @@ function SchoolStudentActivityCards({
 function SchoolActivityDetails({ activity: a, base, onBack, onEdit, onReport, onPreview, onProblem, reload }: {
   activity: SchoolActivity; base: string; onBack: () => void; onEdit: () => void; onReport: () => void; onPreview: () => void; onProblem: (id: string) => void; reload: () => void;
 }) {
-  const text = useSchoolText(), { locale } = useLocale(), action = useMutation();
+  const text = useSchoolText(), { locale, t } = useLocale(), action = useMutation();
   const [confirmation, setConfirmation] = useState<"publish" | "archive" | "end" | "finish" | "publish-results" | null>(null);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
@@ -167,10 +168,17 @@ function SchoolActivityDetails({ activity: a, base, onBack, onEdit, onReport, on
             {complete && <StatusPill status="Completed" icon={<Check size={13} />} />}
           </div>
           <p className="mt-2 text-sm text-muted-foreground">
-            {!a.preview && (!complete || a.state === "Archived") && <>{text(...(labels[a.phase] ?? [a.phase, a.phase]))} · </>}
+            {!a.preview && (!complete || a.state === "Archived") && <>
+              {a.kind === "assignment" && a.phase === "Ended" && a.canSubmit
+                ? t("已截止，可补交")
+                : text(...(labels[a.phase] ?? [a.phase, a.phase]))} · </>
+            }
             {problemCount} {text("problems", "道题")} · {text("Due", "截止")} {date(a.endsAt, locale)}
             {a.kind === "timed" && ` · ${a.durationMinutes} ${text("min", "分钟")}`}
           </p>
+          {a.kind === "assignment" && a.canSubmit && a.endsAt && !a.preview && (
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">{t("截止后仍可提交并查看判题结果。补交不计入作业成绩，也不发放作业完成奖学金等作业奖励。")}</p>
+          )}
         </div>
         {a.grade && <div className="text-right">
           {a.preview && <p className="text-sm text-muted-foreground">{text("Preview score", "试做得分")}</p>}

@@ -290,6 +290,73 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
       assert.equal(contest.data.resultsVisible,true);
       assert.deepEqual(contest.data.testResults,[{...measurements[0],status:'WA'},measurements[1]]);
     });
+    await t.test('homework accepts late submissions without awarding completion or changing the official grade', async () => {
+      const identityId=person.data.person.id;
+      async function homework(title, overdue) {
+        const {rows:[p]}=await pool.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id',[adminId]);
+        const {rows:[v]}=await pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,
+          reference_code,validation_status,published_at,rank_review_status,rank_approved_at,school_visible_at)
+          VALUES($1,$2,'stdio','Output 1.',1000,64,'print(1)','AC',now(),'approved',now(),now()) RETURNING id`,[p.id,title]);
+        await pool.query('UPDATE problems SET current_version_id=$2 WHERE id=$1',[p.id,v.id]);
+        const {rows:[a]}=await pool.query(`INSERT INTO assignments(title,owner_account_id,due_at,state)
+          VALUES($1,$2,clock_timestamp()+$3::interval,'Draft') RETURNING id`,[title,adminId,overdue?'-1 minute':'1 hour']);
+        await pool.query('INSERT INTO assignment_problems(assignment_id,problem_id,version_id,points,position) VALUES($1,$2,$3,100,1)',[a.id,p.id,v.id]);
+        await pool.query('INSERT INTO assignment_participants(assignment_id,identity_id) VALUES($1,$2)',[a.id,identityId]);
+        await pool.query('INSERT INTO point_rewards(problem_id,assignment_id,points,updated_by) VALUES($1,$2,5,$3)',[p.id,a.id,adminId]);
+        await pool.query(`INSERT INTO luq_activity_rules(activity_type,activity_id,rule_version,amount,require_all,created_by)
+          VALUES('assignment',$1,1,12,true,$2)`,[a.id,adminId]);
+        await pool.query("UPDATE assignments SET state='Published',published_at=now() WHERE id=$1",[a.id]);
+        return { assignmentId:a.id, problemId:p.id, versionId:v.id, kind:'submit', code:'print(1)', idempotencyKey:randomBytes(12).toString('hex') };
+      }
+      const submit=(body,auth=student)=>request('/api/v1/submissions',{method:'POST',body,auth});
+      const homeworkDetail=async body=>(await request('/api/v1/assignments/'+body.assignmentId,{auth:student})).data;
+      const completionAwards=async body=>(await pool.query(`SELECT ledger.delta FROM luq_activity_awards award
+        JOIN luq_ledger ledger ON ledger.id=award.ledger_id WHERE award.activity_type='assignment' AND award.activity_id=$1 AND award.identity_id=$2`,
+        [body.assignmentId,identityId])).rows;
+      async function accept(id) {
+        await pool.query("UPDATE judge_tasks SET state='completed' WHERE submission_id=$1",[id.slice(3)]);
+        await pool.query("UPDATE submissions SET status='AC',score=100,passed=1,total=1 WHERE id=$1",[id.slice(3)]);
+      }
+
+      const late=await homework('Overdue homework',true);
+      assert.equal((await submit(late,admin)).status,403);
+      const queued=await submit(late);
+      assert.equal(queued.status,201,JSON.stringify(queued.data));
+      assert.equal(queued.data.assignmentId,late.assignmentId);
+      assert.equal((await submit(late)).data.id,queued.data.id);
+      const {rows:[job]}=await pool.query(`SELECT j.state,s.created_at>s.luq_activity_deadline AS late FROM judge_tasks j
+        JOIN submissions s ON s.id=j.submission_id WHERE s.id=$1`,[queued.data.id.slice(3)]);
+      assert.deepEqual(job,{state:'queued',late:true});
+      await accept(queued.data.id);
+      const history=await request('/api/v1/submissions?context=assignment&assignmentId='+late.assignmentId,{auth:student});
+      assert.deepEqual(history.data.items.map(s=>[s.id,s.status]),[[queued.data.id,'AC']]);
+      const overdue=await homeworkDetail(late);
+      assert.equal(overdue.grades[0].score,0);
+      assert.equal(overdue.completion,null);
+      const event=await request('/api/v1/submissions/'+queued.data.id+'/assignment-completions',{auth:student});
+      assert.equal(event.status,200);
+      assert.deepEqual(event.data.items,[]);
+      assert.deepEqual(await completionAwards(late),[]);
+      assert.deepEqual((await pool.query('SELECT reason FROM point_ledger WHERE submission_id=$1',[queued.data.id.slice(3)])).rows,
+        [{reason:'first_ac'}]);
+      const archived=await request('/api/v1/assignments/'+late.assignmentId+'/archive',{method:'POST',auth:admin,body:{}});
+      assert.equal(archived.status,200,JSON.stringify(archived.data));
+      const blocked=await submit({...late,idempotencyKey:randomBytes(12).toString('hex'),code:'print(1) # archived'});
+      assert.equal(blocked.status,409);
+      assert.equal(blocked.data.error.code,'ASSIGNMENT_ARCHIVED');
+
+      const timely=await homework('Homework judged after cutoff',false);
+      const pending=await submit(timely);
+      assert.equal(pending.status,201,JSON.stringify(pending.data));
+      // Move the fixture's cutoff between acceptance and the asynchronous verdict.
+      await pool.query("UPDATE assignments SET due_at=clock_timestamp() WHERE id=$1",[timely.assignmentId]);
+      assert.deepEqual(await completionAwards(timely),[]);
+      await accept(pending.data.id);
+      const graded=await homeworkDetail(timely);
+      assert.equal(graded.grades[0].score,100);
+      assert.equal(graded.completion.rewards.assignment,12);
+      assert.deepEqual(await completionAwards(timely),[{delta:12}]);
+    });
     const unknown=await request('/api/v1/does-not-exist',{auth:admin});
     assert.equal(unknown.status,404);assert.equal(unknown.data.error.code,'NOT_FOUND');
     assert.equal((await request(`/api/v1/accounts/${student.data.user.id}`,{method:'PATCH',body:{disabled:true},auth:admin})).status,200);

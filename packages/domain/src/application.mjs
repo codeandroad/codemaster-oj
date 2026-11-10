@@ -693,12 +693,9 @@ export async function createDomainServices(pool,config) {
      // awaits review. Submit exactly the version that access checked.
      const submissionVersion=resolvedVersion||(permissions.canEdit||!accessibleVersion.published_at?p.current_version_id:accessibleVersion.id);
      let v=row(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND published_at IS NOT NULL',[submissionVersion]),'学生运行需要已发布题目');
-     let acceptedAt=row(await db.query('SELECT clock_timestamp() AS accepted_at')).accepted_at;
-     if(assignment&&kind==='submit'){
-      const time=row(await db.query('SELECT clock_timestamp() AS accepted_at,clock_timestamp() <= $1 AS allowed',[assignment.due_at]));
-      acceptedAt=time.accepted_at;
-      if(!time.allowed)fail(409,'DEADLINE_PASSED','作业已截止，可以在练习中继续或提交订正');
-     }
+     // The homework deadline limits official grades and activity rewards,
+     // not admission to the judge. Persist the server's receipt time as usual.
+     let acceptedAt=row(await db.query('SELECT clock_timestamp()::text AS accepted_at')).accepted_at;
      if(originalId){const original=await submissionAccess(db,user,originalId);if(original.timed_attempt_id&&!(await db.query('SELECT 1 FROM timed_attempts attempt JOIN timed_practices practice ON practice.id=attempt.practice_id WHERE attempt.id=$1 AND practice.results_published_at IS NOT NULL',[original.timed_attempt_id])).rowCount)fail(409,'RESULTS_NOT_RELEASED','计时训练成绩发布后才能提交订正');if(original.identity_id!==user.identityId||original.problem_id!==problemId||!['submit','correction'].includes(original.kind))fail(400,'VALIDATION','只能订正自己的同题正式提交');if(assignmentId&&original.assignment_id!==assignmentId)fail(409,'ASSIGNMENT_CONTEXT_MISMATCH','作业订正须引用本作业的原提交');if(assignmentId&&original.version_id!==resolvedVersion&&original.version_id!==priorAssignmentVersion)fail(409,'VERSION_MISMATCH','作业订正须使用原提交的作业题目版本');if(requestedVersion&&requestedVersion!==original.version_id)fail(409,'VERSION_MISMATCH','订正版本与原提交不同');v=row(await db.query('SELECT * FROM problem_versions WHERE id=$1',[original.version_id]));}
      if(!timedPracticeId&&!permissions.canRunFree)fail(403,'TIMED_CONTEXT_REQUIRED','该题目仅授权用于当前计时训练，请从训练工作区提交');const timedContext=await timed.prepareSubmission(db,user,body,v);if(timedContext){v=timedContext.version;acceptedAt=timedContext.acceptedAt;}if(kind==='samples'&&!(v.samples||[]).some(sample=>sample.enabled!==false))fail(409,'NO_PUBLIC_SAMPLES','此版本没有启用的公开样例，请联系教师补齐后运行');if(kind==='custom'&&v.mode==='function'){try{parseFunctionInput(customInput);}catch{fail(400,'VALIDATION','函数自测输入须为 JSON 参数数组或合法的 args/kwargs 对象');}}
      if(kind==='submit'){

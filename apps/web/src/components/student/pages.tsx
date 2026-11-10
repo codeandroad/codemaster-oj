@@ -207,7 +207,6 @@ export function StudentAssignments({ user }: { user: CampusUser }) {
           const ended = new Date(assignment.dueAt).getTime() < now;
           const status = assignment.archived ? ui(locale, "已归档", "Archived")
             : progress.grade?.pending ? "Judging"
-            : ended ? ui(locale, "已截止", "Ended")
             : ui(locale, "进行中", "Open");
           return <StudentAssignmentCard
             key={assignment.id}
@@ -215,6 +214,7 @@ export function StudentAssignments({ user }: { user: CampusUser }) {
             href={`/student/assignments/${assignment.id}`}
             status={status}
             archived={assignment.archived}
+            overdue={ended && !assignment.archived ? { canSubmit: true } : undefined}
             audience={assignment.classNames?.join(" / ") || assignment.classes?.map(item => item.name).join(" / ") ||
               assignment.className || classes.data?.items.find(c => c.id === assignment.classId)?.name || ui(locale, "按学生名单布置", "Direct assignment")}
             course={assignment.coursePathId && assignment.courseTitle ? {
@@ -244,7 +244,7 @@ export function StudentAssignments({ user }: { user: CampusUser }) {
   </>;
 }
 export function StudentAssignment({ id, user }: { id: string; user: CampusUser }) {
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const [completionOpen, setCompletionOpen] = useState(false);
   const assignment = useData<Assignment>(`assignments/${id}`), submissions = useData<{ items: Submission[] }>(`submissions?assignmentId=${encodeURIComponent(id)}&identityId=${user.identityId}&kind=submit,correction`), classes = useData<{ items: SchoolClass[] }>("classes");
   const a = assignment.data, p = a ? assignmentProgress(a, user.identityId) : null, formalSubmissions = formal(submissions.data?.items ?? []);
@@ -266,6 +266,7 @@ export function StudentAssignment({ id, user }: { id: string; user: CampusUser }
           </div>
           {a.coursePathId && a.courseTitle && <p className="mt-2 text-sm"><AppLink href={`/student/learning-paths/${a.coursePathId}`} className="font-semibold text-primary hover:underline focus-visible:underline">{ui(locale, "关联课程：", "Course: ")}{a.courseTitle} →</AppLink></p>}
           <p className="mt-2 text-sm leading-6 text-muted-foreground">{a.classNames?.join(" / ") || a.classes?.map(item => item.name).join(" / ") || a.className || classes.data?.items.find(c => c.id === a.classId)?.name || ui(locale, "按学生名单布置", "Direct assignment")} · {ui(locale, "截止", "Due")} {displayDate(a.dueAt, locale)} Asia/Shanghai</p>
+          {!a.archived && <p className="mt-1 text-sm leading-6 text-muted-foreground">{t("截止后仍可提交并查看判题结果。补交不计入作业成绩，也不发放作业完成奖学金等作业奖励。")}</p>}
         </div>
         <div className="sm:text-right">
           <div className="text-3xl font-bold">{p.grade?.score == null && p.grade?.pending ? ui(locale, "等待判题", "Waiting for judging") : p.grade?.score ?? 0}/{p.max}</div>

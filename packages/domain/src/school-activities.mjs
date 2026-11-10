@@ -70,7 +70,7 @@ async function identity(db, schoolId, accountId) {
   return (await db.query("SELECT id,name,number FROM school_identities WHERE school_id=$1 AND account_id=$2 AND kind='student'", [schoolId, accountId])).rows[0];
 }
 async function load(db, schoolId, activityId, user, role, { management = false } = {}) {
-  const a = (await db.query('SELECT * FROM school_activities WHERE school_id=$1 AND id=$2 FOR UPDATE', [schoolId, activityId])).rows[0];
+  const a = (await db.query('SELECT *,ends_at::text AS exact_ends_at FROM school_activities WHERE school_id=$1 AND id=$2 FOR UPDATE', [schoolId, activityId])).rows[0];
   if (!a) fail(404, 'NOT_FOUND', 'Activity not found.');
   const canManage = manages(a, user, role);
   const student = role === 'student' ? await identity(db, schoolId, user.id) : null;
@@ -85,6 +85,15 @@ function phase(a, now = Date.now()) {
   if (a.starts_at && now < +new Date(a.starts_at)) return 'Upcoming';
   if (effectiveEnd(a) && now >= +new Date(effectiveEnd(a))) return 'Ended';
   return 'Open';
+}
+function acceptsActivityWork(a, now) {
+  const currentPhase = phase(a, now);
+  if (a.kind === 'timed') return currentPhase === 'Open';
+  return !a.forced_ended_at && !a.results_published_at && (currentPhase === 'Open' || currentPhase === 'Ended');
+}
+function canSubmitActivityWork(a, attempt, now = Date.now()) {
+  return acceptsActivityWork(a, now) && !attempt?.finishedAt && (a.kind === 'assignment' ||
+    Boolean(attempt && (!attempt.deadlineAt || now < +new Date(attempt.deadlineAt))));
 }
 async function problems(db, a) {
   return (await db.query(`SELECT p.problem_id AS id,p.version_id AS "versionId",p.position,p.points,
@@ -133,11 +142,12 @@ async function detail(db, loaded, user) {
     grade = a.kind === 'timed' ? (await db.query('SELECT grade FROM school_activity_results WHERE school_id=$1 AND activity_id=$2 AND identity_id=$3', [a.school_id, a.id, student.id])).rows[0]?.grade ?? null : await calculateSchoolActivityGrade(db, a, student.id);
   }
   const participantCount = (await db.query('SELECT count(*)::int AS n FROM school_activity_participants WHERE school_id=$1 AND activity_id=$2', [a.school_id, a.id])).rows[0].n;
+  const now = Date.now(), attemptView = publicAttempt(ownAttempt);
   return { id: a.id, schoolId: a.school_id, kind: a.kind, title: a.title, description: a.description,
-    state: a.state, phase: phase(a), revision: a.revision, startsAt: a.starts_at, endsAt: effectiveEnd(a), durationMinutes: a.duration_minutes,
+    state: a.state, phase: phase(a, now), revision: a.revision, startsAt: a.starts_at, endsAt: effectiveEnd(a), durationMinutes: a.duration_minutes,
     publishedAt: a.published_at, resultsPublishedAt: a.results_published_at, canManage,
     canPreview: canManage && canPreview(a) && items.length > 0, participantCount, problems: items,
-    attempt: publicAttempt(ownAttempt), grade,
+    attempt: attemptView, canSubmit: Boolean(student) && canSubmitActivityWork(a, attemptView, now), grade,
     ...(canManage ? { identityIds: (await db.query('SELECT identity_id FROM school_activity_participants WHERE school_id=$1 AND activity_id=$2 ORDER BY identity_id', [a.school_id, a.id])).rows.map(r => r.identity_id),
       classIds: (await db.query('SELECT class_id FROM school_activity_classes WHERE school_id=$1 AND activity_id=$2 ORDER BY class_id', [a.school_id, a.id])).rows.map(r => r.class_id) } : {}) };
 }
@@ -177,15 +187,21 @@ async function start(db, a, student, user) {
   if (!student) fail(403, 'STUDENT_REQUIRED', 'A selected student identity is required.');
   const old = await attempt(db, a, student.id);
   if (old) return old;
-  if (phase(a) !== 'Open') fail(409, 'ACTIVITY_CLOSED', 'This activity is not open.');
   const now = (await db.query('SELECT clock_timestamp() AS now')).rows[0].now;
+  if (!acceptsActivityWork(a, +new Date(now))) fail(409, 'ACTIVITY_CLOSED', 'This activity is not open.');
   const end = effectiveEnd(a);
-  const deadline = a.kind === 'timed' ? new Date(Math.min(+new Date(end), +new Date(now) + a.duration_minutes * 60000)) : end;
+  let deadline = end;
+  if (a.kind === 'timed') {
+    deadline = new Date(Math.min(+new Date(end), +new Date(now) + a.duration_minutes * 60000));
+  } else if (end && +new Date(now) > +new Date(end)) {
+    // A new attempt cannot have a deadline before its start. The judge job still records the assignment deadline.
+    deadline = null;
+  }
   return (await db.query(`INSERT INTO school_activity_attempts(school_id,activity_id,identity_id,account_id,started_at,deadline_at)
     VALUES($1,$2,$3,$4,$5,$6) RETURNING *`, [a.school_id, a.id, student.id, user.id, now, deadline])).rows[0];
 }
 function requireOpenAttempt(a, t) {
-  if (!t || t.finished_at || phase(a) !== 'Open' || t.deadline_at && Date.now() >= +new Date(t.deadline_at)) fail(409, 'ATTEMPT_CLOSED', 'This attempt has ended. Your saved submissions are preserved.');
+  if (!t || !canSubmitActivityWork(a, publicAttempt(t))) fail(409, 'ATTEMPT_CLOSED', 'This attempt has ended. Your saved submissions are preserved.');
 }
 async function activityProblem(db, a, problemId) {
   const p = (await db.query(`SELECT p.*,v.definition FROM school_activity_problems p JOIN school_problem_versions v
@@ -222,14 +238,18 @@ async function enqueueActivity(db, loaded, problemId, user, body, { preview = fa
   const payload = { kind, version: { ...p.definition, reference_code: undefined, tests: undefined }, code, language,
     tests: kind === 'custom' ? [{ position: 1, input: customInput }] : kind === 'samples' ? p.definition.samples : p.definition.tests };
   try { validateTask(payload); } catch { fail(400, 'INVALID_CASES', 'Invalid code, language or input.'); }
-  // Capture time only after locks/validation. Client timestamps and deadlines are never trusted.
-  const received = (await db.query('SELECT clock_timestamp() AS now')).rows[0].now;
-  if (!preview && (t.deadline_at && +new Date(received) >= +new Date(t.deadline_at) || effectiveEnd(a) && +new Date(received) >= +new Date(effectiveEnd(a)))) fail(409, 'ATTEMPT_CLOSED', 'The submission arrived after your deadline.');
+  // Use one server receipt time at full database precision after locks and validation.
+  const timed = !preview && a.kind === 'timed';
+  const { received_at: receivedAt, closed } = (await db.query(`WITH receipt AS (SELECT clock_timestamp() AS received_at)
+    SELECT received_at::text AS received_at, received_at>=least($1::timestamptz,$2::timestamptz) AS closed FROM receipt`,
+  timed ? [t.deadline_at, effectiveEnd(a)] : [null, null])).rows[0];
+  if (closed) fail(409, 'ATTEMPT_CLOSED', 'The submission arrived after your deadline.');
+  const jobDeadline = !preview && a.kind === 'assignment' ? a.exact_ends_at : t?.deadline_at ?? null;
   return (await db.query(`INSERT INTO school_judge_jobs(school_id,problem_id,version_id,account_id,identity_id,request_id,request_hash,kind,access_context,payload,
     activity_id,activity_attempt_id,activity_deadline_at,created_at,preview_activity_id,preview_revision)
     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id,state`,
   [a.school_id, problemId, p.version_id, user.id, student?.id ?? null, requestId, hash, kind, preview ? 'assignment_preview' : 'school', JSON.stringify(payload),
-    preview ? null : a.id, t?.id ?? null, t?.deadline_at ?? null, received, preview ? a.id : null, preview ? a.revision : null])).rows[0];
+    preview ? null : a.id, t?.id ?? null, jobDeadline, receivedAt, preview ? a.id : null, preview ? a.revision : null])).rows[0];
 }
 async function projectJob(db, job, activity) {
   const feedback = await schoolJobFeedback(db, job, activity);
@@ -450,7 +470,7 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
         const p = await activityProblem(db, a, problemId);
         const d = await detail(db, loaded, user);
         return reply({ id: problemId, schoolId, versionId: p.version_id, title: p.definition.title, published: true, canManage: false, definition: safeDefinition(p.definition),
-          solved: d.grade?.items.find(item => item.id === problemId)?.solved ?? false, activity: { id: a.id, title: a.title, kind: a.kind, phase: phase(a), attempt: d.attempt, resultsPublishedAt: a.results_published_at, canSubmit: !canManage && phase(a) === 'Open' && !d.attempt?.finishedAt && (!d.attempt?.deadlineAt || Date.now() < +new Date(d.attempt.deadlineAt)) } });
+          solved: d.grade?.items.find(item => item.id === problemId)?.solved ?? false, activity: { id: a.id, title: a.title, kind: a.kind, phase: d.phase, endsAt: d.endsAt, attempt: d.attempt, resultsPublishedAt: a.results_published_at, canSubmit: d.canSubmit } });
       }
       return null;
     } else if (action === 'jobs' && match[4] && method === 'GET') {

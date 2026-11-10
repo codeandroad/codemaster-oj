@@ -161,7 +161,7 @@ test('real PostgreSQL + HTTP: atomic identities, permissions, immutable versions
    const notes=(await request('/review-notebook','GET',null,student)).data.items;assert(notes.some(n=>n.note==='请检查输入边界'&&n.problemId===draft.data.id&&n.authorIdentityId===teacherPerson.person.id));
    const detail=(await request(`/submissions/${sub.data.id}`,'GET',null,student)).data;assert(detail.reviews.some(n=>n.note==='请检查输入边界'&&n.authorIdentityId===teacherPerson.person.id));
   });
-  await t.test('versions pinned to assignments and late admission rejected, existing retries accepted',async()=>{
+  await t.test('late submissions use the pinned assignment version and preserve existing retries',async()=>{
    const revision=await request(`/problems/${draft.data.id}/versions`,'POST',{...input,title:'求和二'},teacher);assert.equal(revision.status,201);
    await assert.rejects(()=>pool.query('UPDATE test_cases SET version_id=$1 WHERE version_id=$2',[draft.data.versionId,revision.data.versionId]),/immutable/);
    await pool.query("UPDATE problem_versions SET validation_status='AC' WHERE id=$1",[revision.data.versionId]);
@@ -170,7 +170,12 @@ test('real PostgreSQL + HTTP: atomic identities, permissions, immutable versions
    assert.equal((await request('/submissions','POST',{...subBody,versionId:revision.data.versionId,idempotencyKey:randomUUID()},student)).status,409);
    assert.equal((await request(`/assignments/${a.data.id}`,'GET',null,student)).data.problems[0].versionId,draft.data.versionId);
    await pool.query("UPDATE assignments SET due_at=clock_timestamp()-interval '1 second' WHERE id=$1",[a.data.id]);
-   assert.equal((await request('/submissions','POST',{...subBody,idempotencyKey:randomUUID()},student)).status,409);
+   const late=await request('/submissions','POST',{...subBody,idempotencyKey:randomUUID()},student);
+   assert.equal(late.status,201);assert.equal(late.data.versionId,draft.data.versionId);
+   const {rows:[receipt]}=await pool.query(`SELECT s.created_at>s.luq_activity_deadline AS late,t.state
+    FROM submissions s JOIN judge_tasks t ON t.submission_id=s.id WHERE s.id=$1`,[late.data.id.slice(3)]);
+   assert.deepEqual(receipt,{late:true,state:'queued'});
+   await pool.query("UPDATE submissions SET status='WA',score=0 WHERE id=$1",[late.data.id.slice(3)]);
    assert.equal((await request('/submissions','POST',subBody,student)).data.id,sub.data.id);
   });
   await t.test('function protocol errors are rejected before a submission or judge task is created',async()=>{

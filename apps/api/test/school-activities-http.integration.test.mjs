@@ -233,6 +233,64 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
         await request(detail, { auth: auth.student, status: 404 });
       }
     });
+    await t.test('homework accepts a first late attempt without awarding completion or changing the official grade', async () => {
+      const teacher = { auth: auth.teacher };
+      const judge = process.env.GO_JUDGE_TEST_URL
+        ? new GoJudge({ url: process.env.GO_JUDGE_TEST_URL, token: process.env.GO_JUDGE_TEST_TOKEN, environmentVersion: 'assignment-cutoff-qa' })
+        : { judge: async () => completed };
+      const { data: assignment } = await request(activities, { ...teacher, method: 'POST', status: 201, body: {
+        ...config, kind: 'assignment', title: 'Homework cutoff', requestId: randomUUID(),
+      } });
+      const path = activities + '/' + assignment.id, problem = path + '/problems/' + p.id;
+      await request(prefix + '/scholarship/activity-rule', { ...teacher, method: 'POST', body: {
+        activityId: assignment.id, amount: 12, requireAll: true, expectedRevision: 0,
+      } });
+      await request(path + '/publish', { ...teacher, method: 'POST', body: { expectedRevision: 1 } });
+      const submit = (student, body, status = 202) => request(problem + '/submissions', {
+        auth: auth[student], method: 'POST', status, body,
+      });
+      const solution = { kind: 'submit', code: 'def solve(data): return data*2' };
+      const { data: onTime } = await submit('student', { ...solution, requestId: randomUUID() });
+      const awards = async () => (await pool.query(`SELECT award.identity_id, ledger.delta FROM school_scholarship_activity_awards award
+        JOIN school_scholarship_ledger ledger ON ledger.school_id=award.school_id AND ledger.id=award.ledger_id
+        WHERE award.school_id=$1 AND award.activity_id=$2`, [school.id, assignment.id])).rows;
+      assert.deepEqual(await awards(), []);
+      // Let the cutoff pass while the on-time submission is still queued.
+      await pool.query('UPDATE school_activities SET ends_at=clock_timestamp() WHERE school_id=$1 AND id=$2', [school.id, assignment.id]);
+      await processSchoolOne({ pool: worker, judge });
+      assert.equal((await request(path + '/jobs/' + onTime.id, { auth: auth.student })).data.status, 'AC');
+      assert.deepEqual(await awards(), [{ identity_id: ids.student, delta: 12 }]);
+
+      const peer = { auth: auth.peer };
+      const view = (await request(problem, peer)).data;
+      assert.equal(view.activity.phase, 'Ended');
+      assert.equal(view.activity.canSubmit, true);
+      const lateBody = { ...solution, requestId: randomUUID() };
+      await submit('outside', lateBody, 404);
+      const { data: late } = await submit('peer', lateBody);
+      assert.equal((await submit('peer', lateBody)).data.id, late.id);
+      const { rows: [receipt] } = await pool.query(`SELECT j.created_at>a.ends_at AS late, j.activity_deadline_at=a.ends_at AS cutoff,
+        t.started_at>a.ends_at AS started_late FROM school_judge_jobs j
+        JOIN school_activities a ON a.school_id=j.school_id AND a.id=j.activity_id
+        JOIN school_activity_attempts t ON t.school_id=j.school_id AND t.id=j.activity_attempt_id
+        WHERE j.school_id=$1 AND j.id=$2`, [school.id, late.id]);
+      assert.deepEqual(receipt, { late: true, cutoff: true, started_late: true });
+      await processSchoolOne({ pool: worker, judge });
+      const verdict = (await request(path + '/jobs/' + late.id, peer)).data;
+      assert.equal(verdict.status, 'AC');
+      const history = (await request(problem + '/submissions', peer)).data;
+      assert.ok(history.items.some(item => item.id === late.id && item.status === 'AC'));
+      const { grade } = (await request(path, peer)).data;
+      assert.equal(grade.score, 0);
+      assert.equal(grade.items[0].activityAttempts, 0);
+      assert.deepEqual(await awards(), [{ identity_id: ids.student, delta: 12 }]);
+
+      await request(path + '/finish', { ...peer, method: 'POST' });
+      assert.equal((await request(problem, peer)).data.activity.canSubmit, false);
+      await submit('peer', { ...solution, requestId: randomUUID() }, 409);
+      await request(path + '/archive', { ...teacher, method: 'POST' });
+      await submit('student', { ...solution, requestId: randomUUID() }, 404);
+    });
   } finally {
     await server?.close(); await worker?.end(); await pool.end(); await owner.query('DROP SCHEMA IF EXISTS ' + schema + ' CASCADE'); await owner.end();
   }

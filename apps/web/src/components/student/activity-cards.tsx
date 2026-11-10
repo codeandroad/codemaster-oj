@@ -41,10 +41,11 @@ type ActivityCard = {
 };
 
 export function StudentAssignmentCard({
-  title, href, status, audience, course, active, archived, dueAt, problemCount, score, maxScore, pending, attempted, solved,
+  title, href, status, audience, course, active, archived, overdue, dueAt, problemCount, score, maxScore, pending, attempted, solved,
 }: ActivityCard & {
   dueAt: string | null;
   archived?: boolean;
+  overdue?: { canSubmit: boolean };
   problemCount: number;
   score: number | null;
   maxScore: number;
@@ -55,6 +56,11 @@ export function StudentAssignmentCard({
   const { locale } = useLocale();
   const text = (zh: string, en: string) => locale === "en" ? en : zh;
   const complete = problemCount > 0 && solved === problemCount;
+  let overdueStatus: string | undefined;
+  if (overdue && !archived && !complete) {
+    if (pending) overdueStatus = overdue.canSubmit ? "已截止，可补交" : "已截止";
+    else overdueStatus = overdue.canSubmit ? "已截止，未完成 · 可补交" : "已截止，未完成";
+  }
   const percent = problemCount ? solved / problemCount * 100 : 0;
   return <section className="grid items-center gap-4 border border-border bg-surface p-5 panel-shadow md:grid-cols-[minmax(0,1fr)_200px_auto] md:gap-5">
     <div className="min-w-0">
@@ -66,7 +72,8 @@ export function StudentAssignmentCard({
           </AppLink>
         </h2>
         {complete && <StatusPill status="Completed" icon={<Check size={13} />} />}
-        {(!complete || archived) && <StatusPill status={status} />}
+        {(!complete || archived) && <StatusPill status={overdueStatus ?? status} tone={overdueStatus ? "warning" : undefined} />}
+        {overdueStatus && pending && <StatusPill status="Judging" />}
       </div>
       {audience && <p className="mt-1 text-sm text-muted-foreground">{audience}</p>}
       {course && <p className="mt-1 text-sm"><AppLink href={course.href} className="font-medium text-primary hover:underline focus-visible:underline">{text("关联课程：", "Course: ")}{course.title}</AppLink></p>}

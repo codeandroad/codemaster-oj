@@ -24,6 +24,7 @@ import {
 } from "./timed";
 import { TeacherReports } from "./reports";
 import { TeacherProblemImports } from "./imports";
+import { LegacyAcslTeacherPage } from "@/components/acsl/teacher-entry";
 const TeacherPaper4List = dynamic(() => import("@/components/paper4/teacher-paper4").then(module => module.TeacherPaper4List));
 const TeacherPaper4Editor = dynamic(() => import("@/components/paper4/teacher-paper4").then(module => module.TeacherPaper4Editor));
 const TeacherPaper4Review = dynamic(() => import("@/components/paper4/teacher-paper4").then(module => module.TeacherPaper4Review));
@@ -37,6 +38,7 @@ export function TeacherPages({
 }) {
   const path = pathname.replace(/\/$/, "");
   if (path === "/teacher") return <TeacherDashboard />;
+  if (path === "/teacher/acsl") return <LegacyAcslTeacherPage user={user} />;
   if (path === "/teacher/paper4") return <TeacherPaper4List />;
   let paper4Match = path.match(/^\/teacher\/paper4\/([^/]+)\/review\/([^/]+)$/);
   if (paper4Match) return <TeacherPaper4Review attemptId={paper4Match[2]!} />;

@@ -1,4 +1,6 @@
 "use client";
+import { useAcslEnabled } from "./acsl/acsl-page";
+import { LegacyAcslTeacherPage } from "./acsl/teacher-entry";
 import { StudentPresenceHeartbeat } from "./student/student-presence";
 import { PlatformPage } from "./schools/platform-page";
 import { SchoolsPage } from "./schools/schools-page";
@@ -178,7 +180,7 @@ function AuthenticatedWorkspace({user,pathname,search,profileVersion,onUserSaved
   return <>
     {user.roles.includes("student") && <StudentPresenceHeartbeat identityId={user.identityId}/>}
     {allowed && previewWorkspace ? <TeacherPages pathname={pathname} user={user}/> :
-    allowed && (/^\/student\/problems\/[^/]+$/.test(pathname) || /^\/student\/paper4\/[^/]+$/.test(pathname)) ? <StudentPages pathname={pathname} user={user}/> :
+    allowed && ((pathname === "/student/acsl" && search.get("coding") === "1") || /^\/student\/problems\/[^/]+$/.test(pathname) || /^\/student\/paper4\/[^/]+$/.test(pathname)) ? <StudentPages pathname={pathname} user={user}/> :
     <ProductionShell
       user={user}
       role={role}
@@ -236,13 +238,14 @@ function ProductionShell({
     return () => window.removeEventListener("codemaster:schools-changed", schoolList.reload);
   }, [schoolList.reload]);
   const school = schoolList.data?.items.find(item => item.legacy);
+  const acslEnabled = useAcslEnabled(school?.id, role !== "student");
   useEffect(() => { if (school) writeSchoolPreference(user.id, school.id); }, [school, user.id]);
   const action = useAction();
   const activePath = (path: string) =>
     ["/", "/teacher", "/admin"].includes(path)
       ? pathname === path
       : pathname === path || pathname.startsWith(`${path}/`);
-  const links = <WorkspaceNavigation items={workspaceNavigation[role].map((item) => ({ ...item, href: item.path, active: activePath(item.path) }))}/>;
+  const links = <WorkspaceNavigation items={workspaceNavigation[role].filter(item => item.section !== "acsl" || acslEnabled).map((item) => ({ ...item, href: item.path, active: activePath(item.path) }))}/>;
   return <PageHeadingProvider pathname={pathname}><WorkspaceThemeProvider theme={shellTheme}><PersonalAppearanceProvider pageTheme={settings.pageTheme} updatePageTheme={pageTheme=>update({pageTheme})}><div style={{colorScheme:shellTheme}} className={shellTheme === "dark" ? "dark" : ""}>
     <WorkspaceFrame student={role === "student"} schoolName={school ? schoolDisplayName(school, locale) : t("校内学习平台")} navigation={links}
       breadcrumb={<div className="flex min-w-0 items-center"><PageBreadcrumbs pathname={pathname} role={role}/><ShellPageHeading pathname={pathname} role={role}/></div>}
@@ -256,6 +259,7 @@ function ProductionShell({
 
 
 function ProductionView({pathname,role,user,profileVersion,onProfileSaved}:{pathname:string;role:CampusRole;user:CampusUser;profileVersion:number;onProfileSaved:(next:CampusUser)=>void}) {
+  if (pathname === "/admin/acsl") return <LegacyAcslTeacherPage user={user} baseHref="/admin/acsl" />;
   if (pathname === "/student/scholarship") return <StudentScholarshipPage/>;
   if (pathname === "/teacher/scholarship") return <TeacherScholarshipPage/>;
   if (pathname === "/admin/scholarship") return <AdminScholarshipPage/>;

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { AcslPage, useAcslEnabled } from "@/components/acsl/acsl-page";
+import { AcslTeacherPage } from "@/components/acsl/teacher-page";
 import { Eye, EyeOff } from "lucide-react";
 import { WorkspaceFrame } from "@/components/workspace-frame";
 import { AccountMenu } from "@/components/account-menu";
@@ -119,8 +121,12 @@ export function SchoolsPage({
   const admin = workspaceRole === "admin";
   const teaching = workspaceRole !== "student";
   const role = selected?.roles.includes("school_admin") ? "school_admin" : workspaceRole === "teacher" ? "teacher" : "student";
-  const sections = workspaceNavigation[workspaceRole];
-  const active = requestedSection === "leaderboard" ? {section: "leaderboard", label: "积分排行榜", shortEnglish: "Leaderboard"} as const
+  const acslEnabled = useAcslEnabled(!selected?.legacy ? selected?.id : undefined, teaching);
+  const sections = workspaceNavigation[workspaceRole].filter(item => item.section !== "acsl" || acslEnabled);
+  const active = requestedSection === "acsl" ? (teaching
+    ? {section: "acsl", label: "ACSL 题库", shortEnglish: "ACSL papers"} as const
+    : {section: "acsl", label: "ACSL 真题练习", shortEnglish: "ACSL practice"} as const)
+    : requestedSection === "leaderboard" ? {section: "leaderboard", label: "积分排行榜", shortEnglish: "Leaderboard"} as const
     : sections.find(item => item.section === requestedSection) ?? sections[0];
   const navigationLabel = useWorkspaceNavigationLabel();
   const publicBookmark = lostSchool ? resolvePublicLearningBookmark("/schools", search) : null;
@@ -210,6 +216,7 @@ export function SchoolsPage({
     refreshRevision={refreshRevision}
     onRefresh={refresh}
   />;
+  if (!teaching && active.section === "acsl" && search.get("coding") === "1") return <AcslPage key={selected.id} schoolId={selected.id} user={user} baseHref={href("acsl")} />;
   const problems = <SchoolPractice
     key={search.get("problemId") ?? "list"}
     schoolId={selected.id}
@@ -313,6 +320,9 @@ export function SchoolsPage({
                   <SchoolStudentDashboard school={selected} user={user}/>
                 ) : active.section === "assignments" || active.section === "timed" ? (
                   <SchoolActivities school={selected} kind={active.section === "timed" ? "timed" : "assignment"} />
+                ) : active.section === "acsl" ? (
+                  teaching ? <AcslTeacherPage schoolId={selected.id} user={user} baseHref={href("acsl")} />
+                    : <AcslPage schoolId={selected.id} user={user} baseHref={href("acsl")} />
                 ) : active.section === "paper4" ? (
                   <SchoolPaper4 schoolId={selected.id} role={role} user={user} />
                 ) : active.section === "scholarship" ? (

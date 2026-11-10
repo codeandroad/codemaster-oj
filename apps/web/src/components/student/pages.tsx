@@ -1,5 +1,7 @@
 "use client";
 
+import { LegacyAcslPage } from "@/components/acsl/acsl-page";
+
 import {StudentProblemFilter} from "./problem-filter";
 import {StudentSubmissionFilter} from "./submission-filter";
 import dynamic from "next/dynamic";
@@ -47,6 +49,7 @@ export function StudentPages({ pathname, user }: { pathname: string; user: Campu
   const { locale } = useLocale();
   const parts = pathname.split("/").filter(Boolean);
   if (pathname === "/") return <StudentDashboard user={user}/>;
+  if (pathname === "/student/acsl") return <LegacyAcslPage user={user}/>;
   if (pathname === "/student/profile" || pathname === "/teacher/profile") return <AlignedProfile user={user} teacher={pathname.startsWith("/teacher")}/>;
   if (parts[1] === "problems") return parts[2] ? <StudentWorkspace id={parts[2]} user={user}/> : <LearnerResourceScope section="problems" schoolHref="/student/problems"><StudentProblems/></LearnerResourceScope>;
   if (parts[1] === "paper4") return parts[2] ? <StudentPaper4Detail paperId={parts[2]} user={user}/> : <StudentPaper4List/>;

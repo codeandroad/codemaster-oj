@@ -3,6 +3,9 @@ export type BreadcrumbLocale = "zh" | "en";
 export type PageBreadcrumb = { label: string; href: string };
 type Label = readonly [zh: string, en: string];
 const sections: Record<string, Label> = {
+  "/student/acsl": ["ACSL 真题练习", "ACSL practice"],
+  "/teacher/acsl": ["ACSL 题库", "ACSL papers"],
+  "/admin/acsl": ["ACSL 题库", "ACSL papers"],
   "/practice": ["公开学习", "Public learning"],
   "/practice/courses": ["课程", "Courses"],
   "/practice/problems": ["题目", "Problems"],

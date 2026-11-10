@@ -1,4 +1,6 @@
 const availablePages = new Set([
+  "/student/acsl",
+  "/teacher/acsl", "/admin/acsl",
   "/student/scholarship", "/teacher/scholarship", "/admin/scholarship",
   "/practice/scholarship",
   "/student/settings", "/teacher/settings", "/admin/personal-settings",

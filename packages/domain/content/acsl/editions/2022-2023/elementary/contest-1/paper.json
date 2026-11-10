@@ -1,0 +1,378 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2022-2023-elementary-1",
+  "division": "Elementary",
+  "season": "2022-2023",
+  "round": 1,
+  "roundLabel": {
+    "en": "Contest 1",
+    "zh": "第一轮"
+  },
+  "title": {
+    "en": "ACSL 2022-2023 Elementary · Contest 1",
+    "zh": "ACSL 2022-2023 Elementary · 第一轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Elementary/2022-2023/第一轮/c_1_elem（中英文版本）.pdf",
+      "sha256": "4459936e63fb4a42876bbbe50775783a53f45454a3f9dba4be962978417db191",
+      "pages": 2
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Elementary/2022-2023/第一轮/c_1_elem_soln.pdf",
+      "sha256": "8225a222ecb44ac7526e255be81c650df728aa865d962f92b12754c12e7867a3",
+      "pages": 2
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Convert $1B8_{16}$ to base 10.",
+        "zh": "请将 $1B8_{16}$ 转换为十进制数。"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "335",
+            "zh": "335"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "409",
+            "zh": "409"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "430",
+            "zh": "430"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "440",
+            "zh": "440"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "450",
+            "zh": "450"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Answer: **D**.\n\nThe place values in $1B8_{16}$ are $16^2$, $16$, and $1$. The letter B represents eleven, so $1\\cdot256+11\\cdot16+8=440$.",
+        "zh": "答案：**D**。\n\n$1B8_{16}$ 从左到右的位权是 $16^2$、$16$、$1$，B 表示十一。因此 $1\\times256+11\\times16+8=440$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Which of the following has the most number of 1s in its binary representation?\n\n$$\nABE_{16}\\qquad CDF_{16}\\qquad 7531_{8}\\qquad 6420_{8}\n$$",
+        "zh": "下面哪个数字转换成二进制数后,含有数字1的数量最多?\n\n$$\nABE_{16}\\qquad CDF_{16}\\qquad 7531_{8}\\qquad 6420_{8}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "$ABE_{16}$",
+            "zh": "$ABE_{16}$"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "$CDF_{16}$",
+            "zh": "$CDF_{16}$"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "$7531_{8}$",
+            "zh": "$7531_{8}$"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "$6420_{8}$",
+            "zh": "$6420_{8}$"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "more than 1 answer",
+            "zh": "不止一个"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Answer: **B**.\n\n| Number | Binary | Number of 1s |\n|---|---|---|\n| $ABE_{16}$ | 1010 1011 1110 | 8 |\n| $CDF_{16}$ | 1100 1101 1111 | 9 |\n| $7531_8$ | 111 101 011 001 | 8 |\n| $6420_8$ | 110 100 010 000 | 4 |\n\n$CDF_{16}$ has the most 1s.",
+        "zh": "答案：**B**。\n\n十六进制每位展开为四位，八进制每位展开为三位。$ABE_{16}$ 的三组有 2、3、3 个 1，共 8 个；$CDF_{16}$ 有 2、3、4 个，共 9 个；$7531_8$ 和 $6420_8$ 分别有 8 和 4 个，所以 $CDF_{16}$ 最多。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "The year 2022 is $3746_8$. How many years remain until the year $5072_8$? Express the difference in octal.",
+        "zh": "年份 2022 的八进制表示是 $3746_8$。距离年份 $5072_8$ 还有多少年？请用八进制表示年数。"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "1023",
+            "zh": "1023"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "1124",
+            "zh": "1124"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "1326",
+            "zh": "1326"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "2336",
+            "zh": "2336"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "10020",
+            "zh": "10020"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Answer: **B**.\n\n$$\\begin{array}{r}5072_8\\\\-\\;3746_8\\\\\\hline1124_8\\end{array}$$\n\nBorrow 8 when needed. The ones digit is $10-6=4$, the eights digit is $6-4=2$, the next is $8-7=1$, and the leading digit is $4-3=1$.",
+        "zh": "答案：**B**。\n\n计算 $5072_8-3746_8$。个位借一个 8，得 $10-6=4$，八位剩 6，减 4 得 2。六十四位的 0 从左侧借位后成十进制 8，减 7 得 1；最左位剩 $4-3=1$。结果 $1124_8$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Place the following numbers in increasing order:\n\n$$\na)1101010_{2}\\qquad b)5F_{16}\\qquad c)124_{8}\\qquad d)100_{10}\n$$",
+        "zh": "请将以下数字从小到大进行排列:\n\n$$\na)1101010_{2}\\qquad b)5F_{16}\\qquad c)124_{8}\\qquad d)100_{10}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "b, c, a, d",
+            "zh": "b, c, a, d"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "b, c, d, a",
+            "zh": "b, c, d, a"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "c, b, d, a",
+            "zh": "c, b, d, a"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "c, d, a, b",
+            "zh": "c, d, a, b"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "d, a, c, b",
+            "zh": "d, a, c, b"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Answer: **C**.\n\nConverting each number to base 10 in order to compare them is:\n\n$$\na)1101010_{2}=2+8+32+64=106\n$$\n\n$$\nb)5F_{16}=15+5*16=15+80=95\n$$\n\n$$\nc)124_{8}=4+2*8+1*64=4+16+64=84\n$$\n\n$$\nd)100_{10}\n$$\n\nTherefore, the order is 84, 95, 100, 106 or c, b, d, a.\n\nSource correction: the extra “106” in the original $5F_{16}$ conversion is a typographical error.",
+        "zh": "答案：**C**。\n\n先把不同进制统一成十进制。a 是 $64+32+8+2=106$，b 是 $5\\times16+15=95$，c 是 $64+2\\times8+4=84$，d 是 100。按 $84<95<100<106$ 排列为 c、b、d、a。原解析在 b 的换算后多写了 106，实际为 95。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Compare each RGB component of the hexadecimal colors “#409AF7” and “#348DE9”. What is the difference in hexadecimal for the component that has the smallest difference in value?",
+        "zh": "比较十六进制数表示的颜色“#409AF7”和“#348DE9”中每个RGB部分。差值最小的部分转换为十六进制后的差是多少?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "0A",
+            "zh": "0A"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "0B",
+            "zh": "0B"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "0C",
+            "zh": "0C"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "0D",
+            "zh": "0D"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "0E",
+            "zh": "0E"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Answer: **C**.\n\nThe red components are 40 and 34 and the difference is 16 - 4 = 12 or 0C. The green components are 9A and 8D and the difference is 26 - 13 = 13 or 0D. The blue components are F7 and E9 and the difference is 23 - 9 = 14 or 0E. The smallest difference is 0C.",
+        "zh": "答案：**C**。\n\n将两种颜色各拆成三个通道，逐通道比较。红色 $40_{16}-34_{16}=0C_{16}$，绿色 $9A_{16}-8D_{16}=0D_{16}$，蓝色 $F7_{16}-E9_{16}=0E_{16}$。三项高位均为 0，比较末位即可，最小是红色差值 $0C_{16}$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": []
+}

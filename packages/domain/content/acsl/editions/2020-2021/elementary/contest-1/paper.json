@@ -1,0 +1,379 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2020-2021-elementary-1",
+  "division": "Elementary",
+  "season": "2020-2021",
+  "round": 1,
+  "roundLabel": {
+    "en": "Contest 1",
+    "zh": "第一轮"
+  },
+  "title": {
+    "en": "ACSL 2020-2021 Elementary · Contest 1",
+    "zh": "ACSL 2020-2021 Elementary · 第一轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Elementary/2020-2021/第一轮/Final_c_1_elem中英文.pdf",
+      "sha256": "e1392a432a332d458ac32c8b94ba284b53f3bc881abd9625cca3d32cb4bddcf7",
+      "pages": 2
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Elementary/2020-2021/第一轮/c_1_elem_sol.pdf",
+      "sha256": "1903f8d079afa0695f41c2f98572f5d4bc8ba01bcd435756dbb0c43994e2011a",
+      "pages": 2
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "What is the base 16 equivalent for $41375_{8}$?",
+        "zh": "如何用十六进制表示八进制数 $41375_{8}$?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "$42FD_{16}$",
+            "zh": "$42FD_{16}$"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "$413FA_{16}$",
+            "zh": "$413FA_{16}$"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "$85F5_{16}$",
+            "zh": "$85F5_{16}$"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "$42DF_{16}$",
+            "zh": "$42DF_{16}$"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "$4300_{16}$",
+            "zh": "$4300_{16}$"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "Answer: **A**.\n\nEach octal digit represents three bits. Expand the five digits as `100 001 011 111 101`, then regroup into fours from the right: `0100 0010 1111 1101`. The leftmost group was padded with a zero. The groups give `4, 2, F, D`, so the result is $42FD_{16}$.",
+        "zh": "答案：**A**。\n\n八进制每位对应三位二进制，依次展开为 `100 001 011 111 101`。从右往左每四位重新分组，在最左侧补一个 0，得到 `0100 0010 1111 1101`。各组对应 `4、2、F、D`，结果为 $42FD_{16}$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Which of the following is the smallest number?\n\n$$\n100101110_{2}\\qquad 457_{8}\\qquad 12D_{16}\n$$",
+        "zh": "下列数值中最小的是?\n\n$$\n100101110_{2}\\qquad 457_{8}\\qquad 12D_{16}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "$100101110_{2}$",
+            "zh": "$100101110_{2}$"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "$457_{8}$",
+            "zh": "$457_{8}$"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "$12D_{16}$",
+            "zh": "$12D_{16}$"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "2 of them are the smallest",
+            "zh": "其中两个数值最小"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "all 3 are the same",
+            "zh": "三个数值大小都一样"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Answer: **C**.\n\nCompare the values in the same base. Group $100101110_2$ from the right into fours to get `0001 0010 1110`, or $12E_{16}$. Expand $457_8$ as `100 101 111` and regroup into fours to get $12F_{16}$. The three hexadecimal values share the prefix `12`, so compare $D<E<F$. The smallest is $12D_{16}$.",
+        "zh": "答案：**C**。\n\n把三项换成同一种进制再比较。$100101110_2=456_8=12E_{16}$，$457_8=12F_{16}$。于是只需比较十六进制的 $12D$、$12E$ 和 $12F$，前两位相同，末位 $D<E<F$，所以 $12D_{16}$ 最小。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Evaluate: $6023_{8}$ + $757_{8}$ + $1757_{8}$ Express the answer in octal.",
+        "zh": "计算 $6023_{8}$ + $757_{8}$ + $1757_{8}$并将计算结果用八进制表示。"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "$8759_{8}$",
+            "zh": "$8759_{8}$"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "$10761_{8}$",
+            "zh": "$10761_{8}$"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "$10527_{8}$",
+            "zh": "$10527_{8}$"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "$1761_{8}$",
+            "zh": "$1761_{8}$"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "$10771_{8}$",
+            "zh": "$10771_{8}$"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Add the first two numbers in base 8. The units total 10 in decimal, so write 2 and carry 1. The next two columns each total 8, carrying into the thousands column.\n\n$$\n\\begin{array}{rcccc}\n & {\\scriptstyle 1} & {\\scriptstyle 1} & {\\scriptstyle 1} &  \\\\\n & 6 & 0 & 2 & 3 \\\\\n+ &   & 7 & 5 & 7 \\\\\n\\hline\n & 7 & 0 & 0 & 2\n\\end{array}\n$$\n\nAdd the third number to that subtotal. In the leftmost occupied column, $7+1=10_8$, so a new leading digit appears.\n\n$$\n\\begin{array}{rccccc}\n &  &  &  & {\\scriptstyle 1} &  \\\\\n &   & 7 & 0 & 0 & 2 \\\\\n+ &   & 1 & 7 & 5 & 7 \\\\\n\\hline\n & 1 & 0 & 7 & 6 & 1\n\\end{array}\n$$\n\nThe total is $10761_8$ (option B).",
+        "zh": "先把前两个八进制数相加。个位和为十进制 10，写 2 进 1。接下来的两列都恰好满 8，继续向左进位。\n\n$$\n\\begin{array}{rcccc}\n & {\\scriptstyle 1} & {\\scriptstyle 1} & {\\scriptstyle 1} &  \\\\\n & 6 & 0 & 2 & 3 \\\\\n+ &   & 7 & 5 & 7 \\\\\n\\hline\n & 7 & 0 & 0 & 2\n\\end{array}\n$$\n\n再加上第三个数。最左侧的有效列 $7+1=10_8$，结果多出一个最高位。\n\n$$\n\\begin{array}{rccccc}\n &  &  &  & {\\scriptstyle 1} &  \\\\\n &   & 7 & 0 & 0 & 2 \\\\\n+ &   & 1 & 7 & 5 & 7 \\\\\n\\hline\n & 1 & 0 & 7 & 6 & 1\n\\end{array}\n$$\n\n总和为 $10761_8$，选 B。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "How many more 1’s are there in the binary numbers from $26_{10}$ to $35_{10}$ than the binary numbers from $16_{10}$ to $25_{10}$?",
+        "zh": "把从 $26_{10}$ 到 $35_{10}$ 的十进制数和从 $16_{10}$ 到 $25_{10}$ 的十进制数分别转换为二进制的表示形式后,前者含有数字1的总个数与后者含有数字1的总个数相差多少?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "5",
+            "zh": "5"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "7",
+            "zh": "7"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Answer: **C**.\n\n| Decimal | Binary | Decimal | Binary |\n|---|---|---|---|\n| 16 | 10000 | 26 | 11010 |\n| 17 | 10001 | 27 | 11011 |\n| 18 | 10010 | 28 | 11100 |\n| 19 | 10011 | 29 | 11101 |\n| 20 | 10100 | 30 | 11110 |\n| 21 | 10101 | 31 | 11111 |\n| 22 | 10110 | 32 | 100000 |\n| 23 | 10111 | 33 | 100001 |\n| 24 | 11000 | 34 | 100010 |\n| 25 | 11001 | 35 | 100011 |\n\nThere are 25 ones from 16 to 25 and 31 ones from 26 to 35. The difference is $31-25=6$.\n\nSource correction: the original solution labels $11110_2$ as 31; it represents 30.",
+        "zh": "答案：**C**。\n\n把区间两端都算进去，逐个统计二进制表示中 1 的个数。16 至 25 的计数依次为 1、2、2、3、2、3、3、4、2、3，共 25 个。26 至 35 的计数依次为 3、4、3、4、4、5、1、2、2、3，共 31 个。相差 $31-25=6$。原解析把 $11110_2$ 标成了 31，实际等于 30。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "What is the positive difference between the hexadecimal values of the blue components represented by the color values $25A8F6_{16}$ and $C2D9AB_{16}$?",
+        "zh": "由十六进制数 $25A8F6_{16}$ 和 $C2D9AB_{16}$ 表示的颜色值,其中代表蓝色部分的差值是多少?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "$4B_{16}$",
+            "zh": "$4B_{16}$"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "$2A_{16}$",
+            "zh": "$2A_{16}$"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "$9D_{16}$",
+            "zh": "$9D_{16}$"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "$45_{16}$",
+            "zh": "$45_{16}$"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "$5B_{16}$",
+            "zh": "$5B_{16}$"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "Answer: **A**.\n\nRGB colors use the final two hexadecimal digits for blue. The blue components are $F6_{16}$ and $AB_{16}$, so their difference is $F6_{16}-AB_{16}=4B_{16}$.",
+        "zh": "答案：**A**。\n\nRGB 颜色按 `RR GG BB` 分成三组，只取最后一组蓝色。两项的蓝色值为 $F6_{16}$ 和 $AB_{16}$。个位不够减，从高位借 1 个 16，得 $22-11=11$，即 B；高位得 $14-10=4$，所以差为 $4B_{16}$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1,
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": []
+}

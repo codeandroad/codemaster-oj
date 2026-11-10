@@ -1,0 +1,457 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2022-2023-junior-1",
+  "division": "Junior",
+  "season": "2022-2023",
+  "round": 1,
+  "roundLabel": {
+    "en": "Contest 1",
+    "zh": "第一轮"
+  },
+  "title": {
+    "en": "ACSL 2022-2023 Junior · Contest 1",
+    "zh": "ACSL 2022-2023 Junior · 第一轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Junior/2022-2023/第一轮/c_1_jr（中英文版本）.pdf",
+      "sha256": "a35e67ad8f4d0a7da6228bd7473c89a4d915928ab297cd8f59a6273e99905fe2",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Junior/2022-2023/第一轮/c_1_jr_soln.pdf",
+      "sha256": "61ff4b01ffc0724ea9158f8deff205626924ea0f5d0c0a1310cbb0351c04d577",
+      "pages": 1
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Junior/2022-2023/第一轮/c_1_Next Base_jr（含答案）.pdf",
+      "sha256": "9f76be96f6426003fd9cf8ca295669646900250bf7872d7779f4a5e952e8c089",
+      "pages": 4
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Convert $2023_{10}$ to octal.",
+        "zh": "将$2023_{10}$ 转换为八进制数。"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "2023",
+            "zh": "2023"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "3747",
+            "zh": "3747"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "4040",
+            "zh": "4040"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "4511",
+            "zh": "4511"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "4737",
+            "zh": "4737"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Write the decimal value as a sum of powers of8:\n\n$$2023_{10}=3\\cdot8^3+7\\cdot8^2+4\\cdot8+7=3747_8.$$\n\nSuccessive division by 8 gives $2023=8\\cdot252+7$, $252=8\\cdot31+4$, $31=8\\cdot3+7$, and $3=8\\cdot0+3$. The remainders are generated from the least significant digit, so read them upward: 3, 7, 4, 7. Reading them downward would reverse the answer.\n\n**Answer: B.**",
+        "zh": "将十进制数写成8的各次幂之和：\n\n$$2023_{10}=3\\cdot8^3+7\\cdot8^2+4\\cdot8+7=3747_8.$$\n\n连续除以 8：$2023=8\\cdot252+7$，$252=8\\cdot31+4$，$31=8\\cdot3+7$，$3=8\\cdot0+3$。余数是从最低位开始产生的，因此要从最后一个余数向上读，得到 3、7、4、7；不能按产生顺序直接拼接。\n\n**答案：B。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "What is the value of $657383_{16}$ − $654321_{16}$ in base 8?",
+        "zh": "$657383_{16}$ − $654321_{16}$ 的值用八进制表示是多少?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "30242",
+            "zh": "30242"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "31142",
+            "zh": "31142"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "30152",
+            "zh": "30152"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "30142",
+            "zh": "30142"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "30132",
+            "zh": "30132"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Subtract in hexadecimal, then group the binary digits in threes from the right:\n\n$$657383_{16}-654321_{16}=3062_{16}=11000001100010_2.$$\n\n$$11\\,000\\,001\\,100\\,010_2=30142_8.$$\n\nEach hexadecimal digit supplies four binary bits: $3062_{16}=0011\\ 0000\\ 0110\\ 0010_2$. Regroup the same bits, padding only at the left if needed: `011 000 001 100 010`. These groups have values 3, 0, 1, 4, 2. Grouping from the left before aligning the units position would change place values.\n\n**Answer: D.**",
+        "zh": "先进行十六进制减法，再将二进制数从右向左每三位分组：\n\n$$657383_{16}-654321_{16}=3062_{16}=11000001100010_2.$$\n\n$$11\\,000\\,001\\,100\\,010_2=30142_8.$$\n\n每个十六进制数字对应四位二进制：$3062_{16}=0011\\ 0000\\ 0110\\ 0010_2$。保留相同的位串，从最右端每三位重新分组，最左侧可补 0，得到 `011 000 001 100 010`，对应 3、0、1、4、2。必须先对齐个位，不能直接从左端随意分组。\n\n**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find $f(18)$ given:\n\n$$\nf(x)=\\begin{cases} f(x-3)+1 & \\text{if }x\\ge10\\\\ f(x-2)-3 & \\text{if }5<x<10\\\\ x^2 & \\text{if }x\\le5 \\end{cases}\n$$",
+        "zh": "如果给定下列式子,请计算 $f(18)$\n\n$$\nf(x)=\\begin{cases} f(x-3)+1 & \\text{if }x\\ge10\\\\ f(x-2)-3 & \\text{if }5<x<10\\\\ x^2 & \\text{if }x\\le5 \\end{cases}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "18",
+            "zh": "18"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "19",
+            "zh": "19"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "20",
+            "zh": "20"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "21",
+            "zh": "21"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "22",
+            "zh": "22"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "$$\nf(18)=f(18-3)+1=f(15)+1=21+1=22\n$$\n\n$$\nf(15)=f(15-3)+1=f(12)+1=20+1=21\n$$\n\n$$\nf(12)=f(12-3)+1=f(9)+1=19+1=20\n$$\n\n$$\nf(9)=f(9-2)-3=f(7)-3=22-3=19\n$$\n\n$$\nf(7)=f(7-2)-3=f(5)-3=25-3=22\n$$\n\n$f(5)=25$ Now substitute backwards.\n\nThe arguments follow $18\\to15\\to12\\to9\\to7\\to5$. At 9 the rule switches from subtracting 3 from the argument to subtracting 2. The base value is $f(5)=25$; returning through the calls gives $25-3-3+1+1+1=22$. The changes to the argument and to the returned value are different quantities.\n\n**Answer: E.**",
+        "zh": "原卷解析：\n\n$$\nf(18)=f(18-3)+1=f(15)+1=21+1=22\n$$\n\n$$\nf(15)=f(15-3)+1=f(12)+1=20+1=21\n$$\n\n$$\nf(12)=f(12-3)+1=f(9)+1=19+1=20\n$$\n\n$$\nf(9)=f(9-2)-3=f(7)-3=22-3=19\n$$\n\n$$\nf(7)=f(7-2)-3=f(5)-3=25-3=22\n$$\n\n$f(5)=25$ 然后向上回代。\n\n参数链为 $18\\to15\\to12\\to9\\to7\\to5$。到 9 时，参数的递减量由 3 改成 2。基本值是 $f(5)=25$；回代时对返回值做的运算是 $25-3-3+1+1+1=22$。要区分“参数减多少”和“函数返回值加减多少”。\n\n**答案：E。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find $f(12,21)$ given:\n\n$$\nf(x,y)=\\begin{cases} f(x-1,y+2)-3 & \\text{if }x>y\\\\ f(y-1,x+2)+1 & \\text{if }x<y\\\\ x & \\text{if }x=y \\end{cases}\n$$",
+        "zh": "如果给定下列式子,请计算 $f(12,21)$\n\n$$\nf(x,y)=\\begin{cases} f(x-1,y+2)-3 & \\text{if }x>y\\\\ f(y-1,x+2)+1 & \\text{if }x<y\\\\ x & \\text{if }x=y \\end{cases}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "13",
+            "zh": "13"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "18",
+            "zh": "18"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "20",
+            "zh": "20"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "15",
+            "zh": "15"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "12",
+            "zh": "12"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "$$\nf(12,21)=f(21-1,12+2)+1=f(20,14)+1=12+1=13\n$$\n\n$$\nf(20,14)=f(20-1,14+2)-3=f(19,16)-3=15-3=12\n$$\n\n$$\nf(19,16)=f(19-1,16+2)-3=f(18,18)-3=18-3=15\n$$\n\n$f(18,18)=18$ Now substitute backwards.\n\nThe first branch used is the $x<y$ branch, which swaps the roles of the parameters: $(12,21)$ becomes $(20,14)$, not $(11,23)$. The next two calls use $x>y$, ending at the equal pair $(18,18)$. Return $18-3-3+1=13$.\n\n**Answer: A.**",
+        "zh": "原卷解析：\n\n$$\nf(12,21)=f(21-1,12+2)+1=f(20,14)+1=12+1=13\n$$\n\n$$\nf(20,14)=f(20-1,14+2)-3=f(19,16)-3=15-3=12\n$$\n\n$$\nf(19,16)=f(19-1,16+2)-3=f(18,18)-3=18-3=15\n$$\n\n$f(18,18)=18$ 然后向上回代。\n\n第一次满足的是 $x<y$，该分支交换了参数的角色，所以 $(12,21)$ 变成 $(20,14)$，而不是 $(11,23)$。随后两次满足 $x>y$，最终到达相等的 $(18,18)$。回代得到 $18-3-3+1=13$。\n\n**答案：A。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "What is the output for this program given the following inputs:\n\n`a = 4, b = 5, c = 7`\n\n```text\ninput a, b, c\nif a^2 + b^2 == c^2 then\n    ans = a * b / 2\nelse\n    s = (a + b + c) / 2\n    ans = sqrt(s * (s-a) * (s-b) * (s-c))\nend if\noutput int(ans)\n```",
+        "zh": "给定以下输入的值,该程序会输出什么:\n\n`a = 4, b = 5, c = 7`\n\n```text\ninput a, b, c\nif a^2 + b^2 == c^2 then\n    ans = a * b / 2\nelse\n    s = (a + b + c) / 2\n    ans = sqrt(s * (s-a) * (s-b) * (s-c))\nend if\noutput int(ans)\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "96",
+            "zh": "96"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "9",
+            "zh": "9"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "10",
+            "zh": "10"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "9.8",
+            "zh": "9.8"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "14",
+            "zh": "14"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Since $4^2+5^2=41\\ne49=7^2$, the `else` branch uses Heron’s formula. The semiperimeter is $s=(4+5+7)/2=8$.\n\n$$\\mathrm{ans}=\\sqrt{8(8-4)(8-5)(8-7)}=\\sqrt{96}\\approx9.798.$$\n\nThe integer part is **9**.\n\n`int` is applied after taking the square root. Since $9^2=81<96<100=10^2$, the positive square root lies strictly between 9 and 10. Dropping its fractional part yields 9; this is not rounding to the nearest integer, and the intermediate radicand 96 is not the output.\n\n**Answer: B.**",
+        "zh": "因为 $4^2+5^2=41\\ne49=7^2$，程序进入 `else` 分支并使用海伦公式。半周长为 $s=(4+5+7)/2=8$。\n\n$$\\mathrm{ans}=\\sqrt{8(8-4)(8-5)(8-7)}=\\sqrt{96}\\approx9.798.$$\n\n取整数部分，得到 **9**。\n\n`int` 作用于开平方之后的结果。由于 $9^2=81<96<100=10^2$，正平方根位于 9 与 10 之间；去掉小数部分后得到 9。这里不是四舍五入，根号内的中间值 96 也不是输出。\n\n**答案：B。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [],
+  "programming": {
+    "id": "next-base",
+    "definition": {
+      "title": "Next Base",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Use the line structure shown in the test-case input below.\n\n### Problem\n\nGiven 3 positive integers, n, b, and s, generate the next n numbers in base b starting with s in the given base. We guarantee that the b will be between 2 and 9 inclusive. We guarantee that s is a valid number in base b. Find the base 10 sum of all of the digits in the numbers generated.\n\n### Example\n\nIf n=15, b=8, and s=2, the base 8 numbers generated are 2, 3, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15, 16, 17, 20. The base 10 sum of all of their digits is 65.\n\n### Input\n\nThere will be three integers representing the number of values to be found, the base to be used between 2 and 9 inclusive, and the starting value in the base given which will be no longer than 16 digits. We guarantee that the b will be between 2 and 9 inclusive.\n\n### Output\n\nFor each set of 3 input values, output a base 10 number representing the sum of all of the digits generated.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "15 8 2\n",
+          "expected": "65\n"
+        },
+        {
+          "input": "20 3 12\n",
+          "expected": "64\n"
+        },
+        {
+          "input": "25 5 324\n",
+          "expected": "189\n"
+        },
+        {
+          "input": "13 9 1652\n",
+          "expected": "212\n"
+        },
+        {
+          "input": "45 2 1111011\n",
+          "expected": "170\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "1000 8 10\n",
+          "expected": "10948\n",
+          "weight": 20
+        },
+        {
+          "input": "50 4 13\n",
+          "expected": "225\n",
+          "weight": 20
+        },
+        {
+          "input": "75 9 384\n",
+          "expected": "876\n",
+          "weight": 20
+        },
+        {
+          "input": "100 6 555\n",
+          "expected": "675\n",
+          "weight": 20
+        },
+        {
+          "input": "25 2 1100001110\n",
+          "expected": "121\n",
+          "weight": 20
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。输入按下方测试用例展示的行结构读取。\n\n### 问题\n\n给定 3 个正整数 n、b 和 s,生成以给定进制的数字 s 开始的接下来 n 个 b 进制数字。我们确保数字 b 介于 2 和 9 之间(含 2 和 9) 并且 s 是一个 b 进制的有效数字。求生成数字的各个数位上所有数字之和的十进制数。\n\n### 示例\n\n如果 n = 15, b = 8 且 s = 2,生成的八进制数字有 2、 3、 4、 5、 6、 7、10、11、12、 13、14、15、 16、 17、20。这些数字的各个数位上所有数字之和的十进制数是 65。\n\n### 输入\n\n将会有三个整数，分别表示生成值的数量，要使用的进制 (介于 2 和 9 之间，包含 2 和 9),给定进制的起始值(不超过 16 位)。我们保证 b 介于 2 和 9 之间 (含 2 和 9)。\n\n### 输出\n\n对于每组 3 个输入值，输出一个十进制数字，表示生成数字的各个数位上所有数字之和。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [],
+      "zh": []
+    }
+  }
+}

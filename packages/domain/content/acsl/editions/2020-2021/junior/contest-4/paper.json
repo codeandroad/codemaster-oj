@@ -1,0 +1,2060 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2020-2021-junior-4",
+  "division": "Junior",
+  "season": "2020-2021",
+  "round": 4,
+  "roundLabel": {
+    "en": "Contest 4",
+    "zh": "第四轮"
+  },
+  "title": {
+    "en": "ACSL 2020-2021 Junior · Contest 4",
+    "zh": "ACSL 2020-2021 Junior · 第四轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Junior/2020-2021/第四轮/初级-笔试.pdf",
+      "sha256": "851efd5c8b8d563c2955efb5078537df144a062af32f2743bcbbb4fb4a15376c",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Junior/2020-2021/第四轮/初级-笔试答案.pdf",
+      "sha256": "3271cad1abe27612f477ee7b36ad6ecef6ae1c53279e782c0abda3c6506067b2",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Junior/2020-2021/第四轮/初级-编程（含答案）.pdf",
+      "sha256": "59bb0df27263ad3adad3fe493cae6025b1de9e504f525faaff6e4ab557cbf56c",
+      "pages": 4
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Graph Theory",
+        "zh": "图论"
+      },
+      "statement": {
+        "en": "Given the set of vertices: $\\{A,B,C,D,E\\}$ and the set of directed edges: $\\{AB,BE,AD,EA,CB,DB,BA,BC\\}$, how many paths are there of length 2 from Vertex B?",
+        "zh": "给定顶点集合 $\\{A,B,C,D,E\\}$ 和有向边集合 $\\{AB,BE,AD,EA,CB,DB,BA,BC\\}$，从顶点 B 出发、长度为 2 的路径有多少条？"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "1",
+            "zh": "1"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "2",
+            "zh": "2"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "3",
+            "zh": "3"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "5",
+            "zh": "5"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Starting from B, the first edge can go to A, C or E. From A the next edge can go to B or D; from C it goes to B; from E it goes to A. The four length-2 paths are BAB, BAD, BCB and BEA. Answer D.\n\nLength counts edges, not vertices: a length-2 route is written with three vertex labels. The problem counts routes such as BAB and BCB that return to B after two steps. Do not reverse an edge unless its reverse is separately listed.",
+        "zh": "从 B 出发，第一条边可到 A、C 或 E。到 A 后可再到 B 或 D；到 C 后可再到 B；到 E 后可再到 A。因此长度为 2 的路径为 BAB、BAD、BCB、BEA，共 4 条，选 D。\n\n长度统计边数而非顶点数，所以长度为 2 的路线要写出三个顶点标签。本题把 BAB、BCB 这种两步后回到 B 的路线也计入。边是有向的，除非反向边也在集合中，否则不能反着走。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Graph Theory",
+        "zh": "图论"
+      },
+      "statement": {
+        "en": "Given the following directed graph, how many cycles are there from A?\n\n{{diagram:junior-q2-graph}}",
+        "zh": "在下列有向图中，从 A 出发的环有多少个？\n\n{{diagram:junior-q2-graph}}"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "7",
+            "zh": "7"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "5",
+            "zh": "5"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "3",
+            "zh": "3"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "The cycles beginning and ending at A are ABA, ACA, ABCA, ABDA and ABDCA. There are 5 in total. Answer C.\n\nGroup by the first edge from A. Starting $A\\to C$ gives only ACA. Starting $A\\to B$ gives ABA, ABCA, ABDA, and ABDCA. Each closes at A without revisiting another vertex. A repeated traversal of a shorter cycle is not a new simple cycle.",
+        "zh": "从 A 出发并回到 A 的环为 ABA、ACA、ABCA、ABDA、ABDCA，共 5 个，选 C。\n\n按 A 的第一条出边分类：从 $A\\to C$ 出发只有 ACA；从 $A\\to B$ 出发得到 ABA、ABCA、ABDA、ABDCA。每条环都回到 A，且中途不重复其他顶点。把同一个小环重复走多次不算新的简单环。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      },
+      "statementDiagrams": {
+        "en": [
+          {
+            "id": "junior-q2-graph",
+            "width": 380,
+            "height": 325,
+            "alt": {
+              "en": "Directed graph. Vertices: A, B, C, D. Edges: D → A, A → B, B → A, A → C, C → A, B → D, B → C, D → C.",
+              "zh": "有向图。顶点：A, B, C, D。边：D → A, A → B, B → A, A → C, C → A, B → D, B → C, D → C。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 45,
+                "y1": 165,
+                "x2": 190,
+                "y2": 40
+              },
+              {
+                "type": "path",
+                "d": "M 179.396 49.141 L 174.434 58.700 L 169.210 52.641 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "line",
+                "x1": 190,
+                "y1": 40,
+                "x2": 330,
+                "y2": 165
+              },
+              {
+                "type": "path",
+                "d": "M 319.557 155.676 L 309.433 151.999 L 314.762 146.032 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "path",
+                "d": "M 200.443 49.324 L 210.567 53.001 L 205.238 58.968 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "line",
+                "x1": 190,
+                "y1": 40,
+                "x2": 190,
+                "y2": 285
+              },
+              {
+                "type": "path",
+                "d": "M 190.000 271.000 L 186.000 261.000 L 194.000 261.000 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "path",
+                "d": "M 190.000 54.000 L 194.000 64.000 L 186.000 64.000 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "line",
+                "x1": 330,
+                "y1": 165,
+                "x2": 45,
+                "y2": 165
+              },
+              {
+                "type": "path",
+                "d": "M 59.000 165.000 L 69.000 161.000 L 69.000 169.000 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "line",
+                "x1": 330,
+                "y1": 165,
+                "x2": 190,
+                "y2": 285
+              },
+              {
+                "type": "path",
+                "d": "M 200.630 275.889 L 205.619 266.344 L 210.825 272.418 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "line",
+                "x1": 45,
+                "y1": 165,
+                "x2": 190,
+                "y2": 285
+              },
+              {
+                "type": "path",
+                "d": "M 179.214 276.074 L 168.960 272.780 L 174.061 266.617 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "circle",
+                "cx": 190,
+                "cy": 40,
+                "r": 14,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 190,
+                "y": 46,
+                "text": "A",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 330,
+                "cy": 165,
+                "r": 14,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 330,
+                "y": 171,
+                "text": "B",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 190,
+                "cy": 285,
+                "r": 14,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 190,
+                "y": 291,
+                "text": "C",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 45,
+                "cy": 165,
+                "r": 14,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 45,
+                "y": 171,
+                "text": "D",
+                "fontSize": 20,
+                "anchor": "middle"
+              }
+            ]
+          }
+        ],
+        "zh": [
+          {
+            "id": "junior-q2-graph",
+            "width": 380,
+            "height": 325,
+            "alt": {
+              "en": "Directed graph. Vertices: A, B, C, D. Edges: D → A, A → B, B → A, A → C, C → A, B → D, B → C, D → C.",
+              "zh": "有向图。顶点：A, B, C, D。边：D → A, A → B, B → A, A → C, C → A, B → D, B → C, D → C。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 45,
+                "y1": 165,
+                "x2": 190,
+                "y2": 40
+              },
+              {
+                "type": "path",
+                "d": "M 179.396 49.141 L 174.434 58.700 L 169.210 52.641 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "line",
+                "x1": 190,
+                "y1": 40,
+                "x2": 330,
+                "y2": 165
+              },
+              {
+                "type": "path",
+                "d": "M 319.557 155.676 L 309.433 151.999 L 314.762 146.032 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "path",
+                "d": "M 200.443 49.324 L 210.567 53.001 L 205.238 58.968 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "line",
+                "x1": 190,
+                "y1": 40,
+                "x2": 190,
+                "y2": 285
+              },
+              {
+                "type": "path",
+                "d": "M 190.000 271.000 L 186.000 261.000 L 194.000 261.000 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "path",
+                "d": "M 190.000 54.000 L 194.000 64.000 L 186.000 64.000 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "line",
+                "x1": 330,
+                "y1": 165,
+                "x2": 45,
+                "y2": 165
+              },
+              {
+                "type": "path",
+                "d": "M 59.000 165.000 L 69.000 161.000 L 69.000 169.000 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "line",
+                "x1": 330,
+                "y1": 165,
+                "x2": 190,
+                "y2": 285
+              },
+              {
+                "type": "path",
+                "d": "M 200.630 275.889 L 205.619 266.344 L 210.825 272.418 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "line",
+                "x1": 45,
+                "y1": 165,
+                "x2": 190,
+                "y2": 285
+              },
+              {
+                "type": "path",
+                "d": "M 179.214 276.074 L 168.960 272.780 L 174.061 266.617 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "circle",
+                "cx": 190,
+                "cy": 40,
+                "r": 14,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 190,
+                "y": 46,
+                "text": "A",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 330,
+                "cy": 165,
+                "r": 14,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 330,
+                "y": 171,
+                "text": "B",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 190,
+                "cy": 285,
+                "r": 14,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 190,
+                "y": 291,
+                "text": "C",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 45,
+                "cy": 165,
+                "r": 14,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 45,
+                "y": 171,
+                "text": "D",
+                "fontSize": 20,
+                "anchor": "middle"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Digital Electronics",
+        "zh": "数字电路"
+      },
+      "statement": {
+        "en": "Simplify the Boolean expression represented by the following digital circuit:\n\n{{diagram:junior-q3-circuit}}",
+        "zh": "化简下列数字电路所表示的布尔表达式：\n\n{{diagram:junior-q3-circuit}}"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "$A$",
+            "zh": "$A$"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "$A+B$",
+            "zh": "$A+B$"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "$B$",
+            "zh": "$B$"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "$AB$",
+            "zh": "$AB$"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "$1$",
+            "zh": "$1$"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "The circuit represents $A+(AB+B)$. By absorption, $AB+B=B$, so the result is $A+B$. Answer B.\n\nRead the gates from left to right. The AND gate gives AB; the first OR gate gives $AB+B$. If B is 1, that OR is already 1; if B is 0, both terms are 0. Thus $AB+B=B$, and the final OR with A gives $A+B$.",
+        "zh": "电路对应 $A+(AB+B)$。由吸收律，$AB+B=B$，因此化简为 $A+B$，选 B。\n\n从左向右逐门分析：与门输出 AB，接着的或门输出 $AB+B$。当 B 为 1 时，该或门必为 1；当 B 为 0 时，两项都为 0，所以这一部分等于 B。最后再与 A 做 OR，得到 $A+B$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      },
+      "statementDiagrams": {
+        "en": [
+          {
+            "id": "junior-q3-circuit",
+            "width": 490,
+            "height": 280,
+            "alt": {
+              "en": "Digital circuit: A and B enter an AND gate; its output and B enter an OR gate; that output and A enter the final OR gate.",
+              "zh": "数字电路：A、B 输入与门；其输出与 B 输入或门；该输出再与 A 输入最后的或门。"
+            },
+            "elements": [
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    40,
+                    121
+                  ],
+                  [
+                    60,
+                    121
+                  ],
+                  [
+                    90,
+                    121
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    60,
+                    121
+                  ],
+                  [
+                    60,
+                    53
+                  ],
+                  [
+                    387,
+                    53
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    40,
+                    220
+                  ],
+                  [
+                    60,
+                    220
+                  ],
+                  [
+                    60,
+                    145
+                  ],
+                  [
+                    90,
+                    145
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    150,
+                    133
+                  ],
+                  [
+                    190,
+                    133
+                  ],
+                  [
+                    190,
+                    216
+                  ],
+                  [
+                    252,
+                    216
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    60,
+                    220
+                  ],
+                  [
+                    60,
+                    240
+                  ],
+                  [
+                    252,
+                    240
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    305,
+                    228
+                  ],
+                  [
+                    330,
+                    228
+                  ],
+                  [
+                    330,
+                    77
+                  ],
+                  [
+                    387,
+                    77
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    440,
+                    65
+                  ],
+                  [
+                    470,
+                    65
+                  ]
+                ]
+              },
+              {
+                "type": "path",
+                "d": "M 90 108 L 120 108 C 160 108 160 158 120 158 L 90 158 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 245 203 Q 280 203 305 228 Q 280 253 245 253 Q 263 228 245 203 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 380 40 Q 415 40 440 65 Q 415 90 380 90 Q 398 65 380 40 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 20,
+                "y": 127,
+                "text": "A",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "text",
+                "x": 20,
+                "y": 226,
+                "text": "B",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 60,
+                "cy": 121,
+                "r": 3,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "circle",
+                "cx": 60,
+                "cy": 220,
+                "r": 3,
+                "fill": "ink",
+                "stroke": "none"
+              }
+            ]
+          }
+        ],
+        "zh": [
+          {
+            "id": "junior-q3-circuit",
+            "width": 490,
+            "height": 280,
+            "alt": {
+              "en": "Digital circuit: A and B enter an AND gate; its output and B enter an OR gate; that output and A enter the final OR gate.",
+              "zh": "数字电路：A、B 输入与门；其输出与 B 输入或门；该输出再与 A 输入最后的或门。"
+            },
+            "elements": [
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    40,
+                    121
+                  ],
+                  [
+                    60,
+                    121
+                  ],
+                  [
+                    90,
+                    121
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    60,
+                    121
+                  ],
+                  [
+                    60,
+                    53
+                  ],
+                  [
+                    387,
+                    53
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    40,
+                    220
+                  ],
+                  [
+                    60,
+                    220
+                  ],
+                  [
+                    60,
+                    145
+                  ],
+                  [
+                    90,
+                    145
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    150,
+                    133
+                  ],
+                  [
+                    190,
+                    133
+                  ],
+                  [
+                    190,
+                    216
+                  ],
+                  [
+                    252,
+                    216
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    60,
+                    220
+                  ],
+                  [
+                    60,
+                    240
+                  ],
+                  [
+                    252,
+                    240
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    305,
+                    228
+                  ],
+                  [
+                    330,
+                    228
+                  ],
+                  [
+                    330,
+                    77
+                  ],
+                  [
+                    387,
+                    77
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    440,
+                    65
+                  ],
+                  [
+                    470,
+                    65
+                  ]
+                ]
+              },
+              {
+                "type": "path",
+                "d": "M 90 108 L 120 108 C 160 108 160 158 120 158 L 90 158 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 245 203 Q 280 203 305 228 Q 280 253 245 253 Q 263 228 245 203 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 380 40 Q 415 40 440 65 Q 415 90 380 90 Q 398 65 380 40 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 20,
+                "y": 127,
+                "text": "A",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "text",
+                "x": 20,
+                "y": 226,
+                "text": "B",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 60,
+                "cy": 121,
+                "r": 3,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "circle",
+                "cx": 60,
+                "cy": 220,
+                "r": 3,
+                "fill": "ink",
+                "stroke": "none"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Digital Electronics",
+        "zh": "数字电路"
+      },
+      "statement": {
+        "en": "Identify all possible ordered triples that make the following digital circuit TRUE.\n\n{{diagram:junior-q4-circuit}}",
+        "zh": "找出使下列数字电路输出为真的所有有序三元组。\n\n{{diagram:junior-q4-circuit}}"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "$(\\ast,\\ast,0)$",
+            "zh": "$(\\ast,\\ast,0)$"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "$(\\ast,0,1)$",
+            "zh": "$(\\ast,0,1)$"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "$(\\ast,\\ast,1)$",
+            "zh": "$(\\ast,\\ast,1)$"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "$(0,\\ast,1)$",
+            "zh": "$(0,\\ast,1)$"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "$(0,\\ast,\\ast)$",
+            "zh": "$(0,\\ast,\\ast)$"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "The output is $\\overline{(A+B)(BC)}\\,\\overline C$. If $C=1$, the last factor is 0. If $C=0$, then $BC=0$, the NAND outputs 1 and $\\overline C=1$, regardless of A and B. Thus the output is $\\overline C$, and the triples are $(\\ast,\\ast,0)$. Here $\\ast$ means either 0 or 1. Answer A.",
+        "zh": "输出为 $\\overline{(A+B)(BC)}\\,\\overline C$。若 $C=1$，最后的因子为 0；若 $C=0$，则 $BC=0$，与非门输出 1，且 $\\overline C=1$，与 A、B 的值无关。因此输出等于 $\\overline C$，满足条件的三元组为 $(\\ast,\\ast,0)$，其中 $\\ast$ 表示 0 或 1 均可，选 A。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      },
+      "statementDiagrams": {
+        "en": [
+          {
+            "id": "junior-q4-circuit",
+            "width": 510,
+            "height": 310,
+            "alt": {
+              "en": "Inputs A and B feed an OR gate; B and C feed an AND gate. These outputs feed a NAND gate. Its output is ANDed with NOT C.",
+              "zh": "A、B 输入或门，B、C 输入与门；这两个输出输入与非门。与非门输出再与非 C 输入最后的与门。"
+            },
+            "elements": [
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    40,
+                    43
+                  ],
+                  [
+                    102,
+                    43
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    40,
+                    125
+                  ],
+                  [
+                    65,
+                    125
+                  ],
+                  [
+                    65,
+                    67
+                  ],
+                  [
+                    102,
+                    67
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    65,
+                    125
+                  ],
+                  [
+                    65,
+                    158
+                  ],
+                  [
+                    95,
+                    158
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    40,
+                    235
+                  ],
+                  [
+                    65,
+                    235
+                  ],
+                  [
+                    65,
+                    182
+                  ],
+                  [
+                    95,
+                    182
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    65,
+                    235
+                  ],
+                  [
+                    65,
+                    270
+                  ],
+                  [
+                    245,
+                    270
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    155,
+                    55
+                  ],
+                  [
+                    200,
+                    55
+                  ],
+                  [
+                    200,
+                    88
+                  ],
+                  [
+                    245,
+                    88
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    155,
+                    170
+                  ],
+                  [
+                    210,
+                    170
+                  ],
+                  [
+                    210,
+                    112
+                  ],
+                  [
+                    245,
+                    112
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    315,
+                    100
+                  ],
+                  [
+                    355,
+                    100
+                  ],
+                  [
+                    355,
+                    188
+                  ],
+                  [
+                    400,
+                    188
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    295,
+                    270
+                  ],
+                  [
+                    365,
+                    270
+                  ],
+                  [
+                    365,
+                    212
+                  ],
+                  [
+                    400,
+                    212
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    460,
+                    200
+                  ],
+                  [
+                    490,
+                    200
+                  ]
+                ]
+              },
+              {
+                "type": "path",
+                "d": "M 95 30 Q 130 30 155 55 Q 130 80 95 80 Q 113 55 95 30 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 95 145 L 125 145 C 165 145 165 195 125 195 L 95 195 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 245 75 L 275 75 C 315 75 315 125 275 125 L 245 125 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "circle",
+                "cx": 310,
+                "cy": 100,
+                "r": 5,
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 245 250 L 245 290 L 285 270 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "circle",
+                "cx": 290,
+                "cy": 270,
+                "r": 5,
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 400 175 L 430 175 C 470 175 470 225 430 225 L 400 225 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 20,
+                "y": 49,
+                "text": "A",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "text",
+                "x": 20,
+                "y": 131,
+                "text": "B",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "text",
+                "x": 20,
+                "y": 241,
+                "text": "C",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 65,
+                "cy": 125,
+                "r": 3,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "circle",
+                "cx": 65,
+                "cy": 235,
+                "r": 3,
+                "fill": "ink",
+                "stroke": "none"
+              }
+            ]
+          }
+        ],
+        "zh": [
+          {
+            "id": "junior-q4-circuit",
+            "width": 510,
+            "height": 310,
+            "alt": {
+              "en": "Inputs A and B feed an OR gate; B and C feed an AND gate. These outputs feed a NAND gate. Its output is ANDed with NOT C.",
+              "zh": "A、B 输入或门，B、C 输入与门；这两个输出输入与非门。与非门输出再与非 C 输入最后的与门。"
+            },
+            "elements": [
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    40,
+                    43
+                  ],
+                  [
+                    102,
+                    43
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    40,
+                    125
+                  ],
+                  [
+                    65,
+                    125
+                  ],
+                  [
+                    65,
+                    67
+                  ],
+                  [
+                    102,
+                    67
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    65,
+                    125
+                  ],
+                  [
+                    65,
+                    158
+                  ],
+                  [
+                    95,
+                    158
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    40,
+                    235
+                  ],
+                  [
+                    65,
+                    235
+                  ],
+                  [
+                    65,
+                    182
+                  ],
+                  [
+                    95,
+                    182
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    65,
+                    235
+                  ],
+                  [
+                    65,
+                    270
+                  ],
+                  [
+                    245,
+                    270
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    155,
+                    55
+                  ],
+                  [
+                    200,
+                    55
+                  ],
+                  [
+                    200,
+                    88
+                  ],
+                  [
+                    245,
+                    88
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    155,
+                    170
+                  ],
+                  [
+                    210,
+                    170
+                  ],
+                  [
+                    210,
+                    112
+                  ],
+                  [
+                    245,
+                    112
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    315,
+                    100
+                  ],
+                  [
+                    355,
+                    100
+                  ],
+                  [
+                    355,
+                    188
+                  ],
+                  [
+                    400,
+                    188
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    295,
+                    270
+                  ],
+                  [
+                    365,
+                    270
+                  ],
+                  [
+                    365,
+                    212
+                  ],
+                  [
+                    400,
+                    212
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    460,
+                    200
+                  ],
+                  [
+                    490,
+                    200
+                  ]
+                ]
+              },
+              {
+                "type": "path",
+                "d": "M 95 30 Q 130 30 155 55 Q 130 80 95 80 Q 113 55 95 30 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 95 145 L 125 145 C 165 145 165 195 125 195 L 95 195 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 245 75 L 275 75 C 315 75 315 125 275 125 L 245 125 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "circle",
+                "cx": 310,
+                "cy": 100,
+                "r": 5,
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 245 250 L 245 290 L 285 270 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "circle",
+                "cx": 290,
+                "cy": 270,
+                "r": 5,
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 400 175 L 430 175 C 470 175 470 225 430 225 L 400 225 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 20,
+                "y": 49,
+                "text": "A",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "text",
+                "x": 20,
+                "y": 131,
+                "text": "B",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "text",
+                "x": 20,
+                "y": 241,
+                "text": "C",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 65,
+                "cy": 125,
+                "r": 3,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "circle",
+                "cx": 65,
+                "cy": 235,
+                "r": 3,
+                "fill": "ink",
+                "stroke": "none"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "What is the length of the longest substring of B in which the elements are in ascending alphabetical order?\n\n```text\na = \"FOURTHACSLCONTEST\"\nb = \"\"\nfor x = 1 to len(a) - 2\n    if a[x] > \"O\" then\n        b = b + a[x+1]\n    end if\n    if a[x] < \"O\" then\n        b = a[x-1] + b\n    end if\nnext x\n```",
+        "zh": "B 中按字母升序排列的最长子串，其长度是多少？\n\n```text\na = \"FOURTHACSLCONTEST\"\nb = \"\"\nfor x = 1 to len(a) - 2\n    if a[x] > \"O\" then\n        b = b + a[x+1]\n    end if\n    if a[x] < \"O\" then\n        b = a[x-1] + b\n    end if\nnext x\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "2",
+            "zh": "2"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "3",
+            "zh": "3"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "5",
+            "zh": "5"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "The loop examines the second through the next-to-last characters of a (indexing starts at 0). If a character follows O, append its next character to b; if it precedes O, prepend its previous character; skip O itself. This produces `TOLSAHTRTHLET`. The longest contiguous ascending substring is `AHT`, of length 3. Answer B.\n\nFor a shorter trace, the characters prepended at indices $5,6,7,9,10,12$ are `T,H,A,S,L,O`; each new one goes in front, producing `OLSAHT`. Index 14 prepends T, yielding `TOLSAHT` at the front. The appended characters give `RTHLET`. In the final string, the increasing runs are `T | O | LS | AHT | RT | HL | ET`, with maximum length 3. A substring must be contiguous, unlike a subsequence.",
+        "zh": "字符串下标从 0 开始，循环检查 a 的第二个到倒数第二个字符。若当前字符在 O 之后，将其后一个字符追加到 b 末尾；若在 O 之前，将其前一个字符放到 b 开头；若等于 O 则跳过。最终得到 `TOLSAHTRTHLET`，其中按字母升序排列的最长连续子串为 `AHT`，长度为 3，选 B。\n\n可分别追踪两端：在下标 $5,6,7,9,10,12$ 处先后前插 `T,H,A,S,L,O`，每个新字符都放在最前，形成 `OLSAHT`；下标 14 再前插 T，前半部分为 `TOLSAHT`。追加到末尾的字符依次组成 `RTHLET`。最终字符串的连续升序段为 `T | O | LS | AHT | RT | HL | ET`，最大长度为 3。子串必须连续，不能跳过中间字符组成子序列。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [],
+  "programming": {
+    "id": "graphs",
+    "definition": {
+      "title": "Graphs",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Use the line structure shown in the test-case input below.\n\n### Directed graphs\n\nA directed edge is represented by a two-digit integer: the first digit is its starting vertex and the second its ending vertex. The graph contains at most nine vertices. The input gives its directed edges separated by spaces.\n\n{{diagram:graphs-example}}\n\n### Problem\n\nGiven a directed graph, create its adjacency matrix to compute one of the following characteristics. The first input integer selects which characteristic:\n\n1. Count cycles of length one or two. A self-loop is a cycle of length one; a pair of edges in opposite directions is one cycle of length two.\n2. Find the vertex with the most outgoing edges. Break ties by choosing the smallest numbered vertex. Output the sum of the two-digit edge numbers leaving that vertex.\n3. Count all directed paths of length two. A path consists of two consecutive edges; repeated vertices are permitted for this characteristic.\n\n### Example\n\nThe illustrated graph has edges `12 13 23 31 34 41`. For characteristic 1, the answer is `1`: the cycle formed by `13` and `31`. For characteristic 2, vertices 1 and 3 both have two outgoing edges; choose vertex 1 and output `12 + 13 = 25`. For characteristic 3, the ten paths are `123 131 134 231 234 313 312 341 412 413`, so output `10`.\n\n### Input\n\nA characteristic number from 1 through 3, followed by the two-digit directed edges. Vertex labels are single digits from 1 through 9.\n\n### Output\n\nThe requested integer characteristic.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "2 12 13 23 31 34 41\n",
+          "expected": "25\n"
+        },
+        {
+          "input": "1 12 23 34 11 21 32 45 53 95 43 99 29 91\n",
+          "expected": "5\n"
+        },
+        {
+          "input": "3 12 23 34 41 31 52 45 61 14 21 33 55 13 54 32 56 36\n",
+          "expected": "49\n"
+        },
+        {
+          "input": "1 12 11 33 34 43 55 52 41 31 25 88 79 98 45 13 42 87 35 51 21 14 78\n",
+          "expected": "10\n"
+        },
+        {
+          "input": "2 12 11 33 34 43 55 52 41 31 25 88 79 98 45 13 42 87 35 51 21 14 78\n",
+          "expected": "50\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "1 12 31 41 42 43 45 51 63 64 56 16\n",
+          "expected": "0\n",
+          "weight": 20
+        },
+        {
+          "input": "2 12 13 22 23 24 34 42 98 71 87 17 96 67\n",
+          "expected": "42\n",
+          "weight": 20
+        },
+        {
+          "input": "3 12 14 21 24 25 32 41 43 59 65 91 87 76 95\n",
+          "expected": "24\n",
+          "weight": 20
+        },
+        {
+          "input": "2 11 12 14 15 23 25 31 43 45 51 52 68 79 87 89\n",
+          "expected": "52\n",
+          "weight": 20
+        },
+        {
+          "input": "3 55 77 45 54\n",
+          "expected": "6\n",
+          "weight": 20
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。输入按下方测试用例展示的行结构读取。\n\n### 有向图\n\n用两位整数表示一条有向边：第一位是起点，第二位是终点。图最多有九个顶点，输入中的有向边用空格分隔。\n\n{{diagram:graphs-example}}\n\n### 题目\n\n给定一个有向图，创建其邻接矩阵以计算下列特征之一。输入中的第一个整数指定要计算的特征：\n\n1. 统计长度为一或二的环。自环的长度为一；一对方向相反的边组成一个长度为二的环。\n2. 找出出边最多的顶点。若并列，选择编号最小的顶点。输出从该顶点出发的所有两位边编号之和。\n3. 统计全部长度为二的有向路径。一条这样的路径由连续两条边组成；本项允许重复经过顶点。\n\n### 示例\n\n图中的边为 `12 13 23 31 34 41`。对于特征 1，答案为 `1`，即 `13` 和 `31` 组成的环。对于特征 2，顶点 1 和 3 都有两条出边，选择顶点 1，输出 `12 + 13 = 25`。对于特征 3，共有十条路径：`123 131 134 231 234 313 312 341 412 413`，因此输出 `10`。\n\n### 输入\n\n一个 1 到 3 之间的特征编号，后接若干两位有向边编号。顶点编号为 1 到 9 之间的一位数字。\n\n### 输出\n\n所求特征的整数值。\n",
+    "testProvenance": "official",
+    "source": {
+      "path": "resource/acsl-problems/Junior/2020-2021/第四轮/初级-编程（含答案）.pdf",
+      "sha256": "59bb0df27263ad3adad3fe493cae6025b1de9e504f525faaff6e4ab557cbf56c",
+      "samplePages": [
+        1
+      ],
+      "testPages": [
+        2
+      ],
+      "normalization": "One official case per execution. Manually transcribed and visually verified."
+    },
+    "statementDiagrams": {
+      "en": [
+        {
+          "id": "graphs-example",
+          "width": 290,
+          "height": 260,
+          "alt": {
+            "en": "Directed graph with edges 12, 23, 34, 41, 31, 13",
+            "zh": "有向图，边为 12, 23, 34, 41, 31, 13"
+          },
+          "elements": [
+            {
+              "type": "line",
+              "x1": 79,
+              "y1": 55,
+              "x2": 211,
+              "y2": 55,
+              "stroke": "ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 211.0 55.0 L 201.0 50.0 L 201.0 60.0 Z",
+              "fill": "ink"
+            },
+            {
+              "type": "line",
+              "x1": 235,
+              "y1": 79,
+              "x2": 235,
+              "y2": 181,
+              "stroke": "ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 235.0 181.0 L 240.0 171.0 L 230.0 171.0 Z",
+              "fill": "ink"
+            },
+            {
+              "type": "line",
+              "x1": 211,
+              "y1": 205,
+              "x2": 79,
+              "y2": 205,
+              "stroke": "ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 79.0 205.0 L 89.0 210.0 L 89.0 200.0 Z",
+              "fill": "ink"
+            },
+            {
+              "type": "line",
+              "x1": 55,
+              "y1": 181,
+              "x2": 55,
+              "y2": 79,
+              "stroke": "ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 55.0 79.0 L 50.0 89.0 L 60.0 89.0 Z",
+              "fill": "ink"
+            },
+            {
+              "type": "line",
+              "x1": 221.04398008731434,
+              "y1": 184.25802545087086,
+              "x2": 77.91860150798837,
+              "y2": 64.98687663476588,
+              "stroke": "ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 77.91860150798837 64.98687663476588 L 82.39989230563972 75.22982702939755 L 88.80173630228452 67.5476142334238 Z",
+              "fill": "ink"
+            },
+            {
+              "type": "line",
+              "x1": 68.95601991268566,
+              "y1": 75.74197454912914,
+              "x2": 212.08139849201163,
+              "y2": 195.01312336523412,
+              "stroke": "ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 212.08139849201163 195.01312336523412 L 207.60010769436028 184.77017297060243 L 201.19826369771548 192.4523857665762 Z",
+              "fill": "ink"
+            },
+            {
+              "type": "circle",
+              "cx": 55,
+              "cy": 55,
+              "r": 20,
+              "stroke": "ink",
+              "fill": "surface",
+              "strokeWidth": 2
+            },
+            {
+              "type": "text",
+              "x": 55,
+              "y": 61,
+              "text": "1",
+              "fontSize": 18,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "circle",
+              "cx": 235,
+              "cy": 55,
+              "r": 20,
+              "stroke": "ink",
+              "fill": "surface",
+              "strokeWidth": 2
+            },
+            {
+              "type": "text",
+              "x": 235,
+              "y": 61,
+              "text": "2",
+              "fontSize": 18,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "circle",
+              "cx": 235,
+              "cy": 205,
+              "r": 20,
+              "stroke": "ink",
+              "fill": "surface",
+              "strokeWidth": 2
+            },
+            {
+              "type": "text",
+              "x": 235,
+              "y": 211,
+              "text": "3",
+              "fontSize": 18,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "circle",
+              "cx": 55,
+              "cy": 205,
+              "r": 20,
+              "stroke": "ink",
+              "fill": "surface",
+              "strokeWidth": 2
+            },
+            {
+              "type": "text",
+              "x": 55,
+              "y": 211,
+              "text": "4",
+              "fontSize": 18,
+              "anchor": "middle",
+              "fill": "ink"
+            }
+          ]
+        }
+      ],
+      "zh": [
+        {
+          "id": "graphs-example",
+          "width": 290,
+          "height": 260,
+          "alt": {
+            "en": "Directed graph with edges 12, 23, 34, 41, 31, 13",
+            "zh": "有向图，边为 12, 23, 34, 41, 31, 13"
+          },
+          "elements": [
+            {
+              "type": "line",
+              "x1": 79,
+              "y1": 55,
+              "x2": 211,
+              "y2": 55,
+              "stroke": "ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 211.0 55.0 L 201.0 50.0 L 201.0 60.0 Z",
+              "fill": "ink"
+            },
+            {
+              "type": "line",
+              "x1": 235,
+              "y1": 79,
+              "x2": 235,
+              "y2": 181,
+              "stroke": "ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 235.0 181.0 L 240.0 171.0 L 230.0 171.0 Z",
+              "fill": "ink"
+            },
+            {
+              "type": "line",
+              "x1": 211,
+              "y1": 205,
+              "x2": 79,
+              "y2": 205,
+              "stroke": "ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 79.0 205.0 L 89.0 210.0 L 89.0 200.0 Z",
+              "fill": "ink"
+            },
+            {
+              "type": "line",
+              "x1": 55,
+              "y1": 181,
+              "x2": 55,
+              "y2": 79,
+              "stroke": "ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 55.0 79.0 L 50.0 89.0 L 60.0 89.0 Z",
+              "fill": "ink"
+            },
+            {
+              "type": "line",
+              "x1": 221.04398008731434,
+              "y1": 184.25802545087086,
+              "x2": 77.91860150798837,
+              "y2": 64.98687663476588,
+              "stroke": "ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 77.91860150798837 64.98687663476588 L 82.39989230563972 75.22982702939755 L 88.80173630228452 67.5476142334238 Z",
+              "fill": "ink"
+            },
+            {
+              "type": "line",
+              "x1": 68.95601991268566,
+              "y1": 75.74197454912914,
+              "x2": 212.08139849201163,
+              "y2": 195.01312336523412,
+              "stroke": "ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 212.08139849201163 195.01312336523412 L 207.60010769436028 184.77017297060243 L 201.19826369771548 192.4523857665762 Z",
+              "fill": "ink"
+            },
+            {
+              "type": "circle",
+              "cx": 55,
+              "cy": 55,
+              "r": 20,
+              "stroke": "ink",
+              "fill": "surface",
+              "strokeWidth": 2
+            },
+            {
+              "type": "text",
+              "x": 55,
+              "y": 61,
+              "text": "1",
+              "fontSize": 18,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "circle",
+              "cx": 235,
+              "cy": 55,
+              "r": 20,
+              "stroke": "ink",
+              "fill": "surface",
+              "strokeWidth": 2
+            },
+            {
+              "type": "text",
+              "x": 235,
+              "y": 61,
+              "text": "2",
+              "fontSize": 18,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "circle",
+              "cx": 235,
+              "cy": 205,
+              "r": 20,
+              "stroke": "ink",
+              "fill": "surface",
+              "strokeWidth": 2
+            },
+            {
+              "type": "text",
+              "x": 235,
+              "y": 211,
+              "text": "3",
+              "fontSize": 18,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "circle",
+              "cx": 55,
+              "cy": 205,
+              "r": 20,
+              "stroke": "ink",
+              "fill": "surface",
+              "strokeWidth": 2
+            },
+            {
+              "type": "text",
+              "x": 55,
+              "y": 211,
+              "text": "4",
+              "fontSize": 18,
+              "anchor": "middle",
+              "fill": "ink"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

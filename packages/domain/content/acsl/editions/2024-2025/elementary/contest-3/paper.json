@@ -1,0 +1,447 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2024-2025-elementary-3",
+  "division": "Elementary",
+  "season": "2024-2025",
+  "round": 3,
+  "roundLabel": {
+    "en": "Contest 3",
+    "zh": "第三轮"
+  },
+  "title": {
+    "en": "ACSL 2024-2025 Elementary · Contest 3",
+    "zh": "ACSL 2024-2025 Elementary · 第三轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Elementary/2024-2025/第三轮/c_3_elem.pdf",
+      "sha256": "e1605d09f29babd4cd443cbc4c050be2186d416d133b23faf52b95b058006cdc",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Elementary/2024-2025/第三轮/c_3_elem_sol.pdf",
+      "sha256": "cd1227ef2766ef015f50c6363bc97a2449562a0306420636810a5d4785106403",
+      "pages": 2
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "Of the numbers between 20 and 27 inclusive, how many make this Boolean expression TRUE?\n\n$$\n\\;\\mathrm{NOT}\\;(x\\le 24)\\;\\mathrm{OR}\\;(x<23)\n$$",
+        "zh": "在20到27(包括20和27)之间的数字中,请问有多少个数字可以使得下列布尔表达式的结果为真?\n\n$$\n\\;\\mathrm{NOT}\\;(x\\le 24)\\;\\mathrm{OR}\\;(x<23)\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "0",
+            "zh": "0"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "2",
+            "zh": "2"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Answer: **D**.\n\nThe Boolean expression $NOT(x\\le 24)OR(x<23)$ is TRUE for the integers that are either greater than 24 or less than 23. They are 20, 21, 22, 25, 26, 27 which is 6 of the 8 numbers between 20 and 27 inclusive.",
+        "zh": "答案：**D**。\n\n取反 $x\\le24$ 等价于 $x>24$。题给的 20 至 27 中，左半式接受 25、26、27，右半式 $x<23$ 接受 20、21、22。两个集合不重叠，共 6 个。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "Which ordered pair(s) make the following expression TRUE?\n\n$$\n\\sim B*(A+B)\n$$",
+        "zh": "请问哪个有序对可以使得下列表达式的结果为真?\n\n$$\n\\sim B*(A+B)\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "(0,0)",
+            "zh": "(0,0)"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "(0,1)",
+            "zh": "(0,1)"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "(1,0)",
+            "zh": "(1,0)"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "(1,1)",
+            "zh": "(1,1)"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "None of them",
+            "zh": "上述答案均不正确"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Answer: **C**.\n\nA Truth Table could be used, but it’s easier to recognize that $\\sim B*(A+B)$ = $\\sim B*A+\\sim B*B$ = $A*\\sim B+0$ = $A*\\sim B$ which is only TRUE for the ordered pair (1,0).",
+        "zh": "答案：**C**。\n\n分配 $\\sim B(A+B)$ 得 $A\\sim B+B\\sim B$，后一项为 0，故只剩 $A\\sim B$。同时满足 $A=1$ 和 $B=0$ 的只有 $(1,0)$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "Fill in the columns in the following Truth Table. Give the answer as the last column from top to bottom.\n\n| $A$ | $B$ | $A*B$ | $\\sim A$ | $\\sim A+A*B$ | $\\sim B$ | $(\\sim A+A*B)*\\sim B$ |\n| --- | --- | --- | --- | --- | --- | --- |\n| 0 | 0 |  |  |  |  |  |\n| 0 | 1 |  |  |  |  |  |\n| 1 | 0 |  |  |  |  |  |\n| 1 | 1 |  |  |  |  |  |",
+        "zh": "填写以下真值表，将最后一列的内容按照从上到下的顺序依次写出结果。\n\n| $A$ | $B$ | $A*B$ | $\\sim A$ | $\\sim A+A*B$ | $\\sim B$ | $(\\sim A+A*B)*\\sim B$ |\n| --- | --- | --- | --- | --- | --- | --- |\n| 0 | 0 |  |  |  |  |  |\n| 0 | 1 |  |  |  |  |  |\n| 1 | 0 |  |  |  |  |  |\n| 1 | 1 |  |  |  |  |  |"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "1000",
+            "zh": "1000"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "1100",
+            "zh": "1100"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "0001",
+            "zh": "0001"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "1001",
+            "zh": "1001"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "1010",
+            "zh": "1010"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "Answer: **A**.\n\nThe completed truth table is:\n\n| $A$ | $B$ | $A*B$ | $\\sim A$ | $\\sim A+A*B$ | $\\sim B$ | $(\\sim A+A*B)*\\sim B$ |\n| --- | --- | --- | --- | --- | --- | --- |\n| 0 | 0 | 0 | 1 | 1 | 1 | 1 |\n| 0 | 1 | 0 | 1 | 1 | 0 | 0 |\n| 1 | 0 | 0 | 0 | 0 | 1 | 0 |\n| 1 | 1 | 1 | 0 | 1 | 0 | 0 |\n\nReading the final column from top to bottom gives `1000`.",
+        "zh": "答案：**A**。\n\n若 $B=1$，最后一项乘上 $\\sim B=0$，整式为 0；若 $B=0$，$AB=0$ 且 $\\sim B=1$，结果等于 $\\sim A$。因此按 $(0,0),(0,1),(1,0),(1,1)$ 排列，结果为 `1000`。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "Simplify the following Boolean expression:\n\n$$\n\\sim A*(A*B+\\sim A*\\sim B)+\\sim B*(A*\\sim B+\\sim A*B)\n$$",
+        "zh": "请简化下列布尔表达式:\n\n$$\n\\sim A*(A*B+\\sim A*\\sim B)+\\sim B*(A*\\sim B+\\sim A*B)\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "$\\sim A*\\sim B$",
+            "zh": "$\\sim A*\\sim B$"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "$A*\\sim B$",
+            "zh": "$A*\\sim B$"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "$\\sim A*B$",
+            "zh": "$\\sim A*B$"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "$\\sim A$",
+            "zh": "$\\sim A$"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "$\\sim B$",
+            "zh": "$\\sim B$"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "Answer: **E**.\n\nSimplify the Boolean expression using the Distributive Property as follows:\n\n$$\n\\sim A*(A*B+\\sim A*\\sim B)+\\sim B*(A*\\sim B+\\sim A*B)\n$$\n\n$$\n=\\sim A*A*B+\\sim A*\\sim A*\\sim B+\\sim B*A*\\sim B+\\sim B*\\sim A*B\n$$\n\n$$\n=0+\\sim A*\\sim B+\\sim B*A+0\n$$\n\n$$\n=\\sim B*(A+\\sim A)\n$$\n\n$$\n=\\sim B*1=\\sim B\n$$",
+        "zh": "答案：**E**。\n\n用分配律展开成四项，含 $\\sim A A$ 或 $\\sim B B$ 的两项消为 0。余下 $\\sim A\\sim B+A\\sim B=(\\sim A+A)\\sim B=\\sim B$，所以只由 $B$ 决定。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "The Boolean algebra operator $A\\oplus B$ is TRUE for the ordered pairs (0,1) and (1,0). Which of the following is equivalent to $\\sim (A\\oplus B)$?\n\n$$\na.A*B+\\sim A*\\sim B\n$$\n\n$$\nb.A*\\sim B+\\sim A*B\n$$\n\n$$\nc.A+\\sim B\n$$\n\n$$\nd.B+\\sim A\n$$\n\n$$\ne.\\sim A+\\sim B+A+B\n$$",
+        "zh": "布尔代数运算符 $A\\oplus B$ 对于有序对(0,1)和(1,0)为真。请问下列哪个表达式与$\\sim(A\\oplus B)$ 等价?\n\n$$\na.A*B+\\sim A*\\sim B\n$$\n\n$$\nb.A*\\sim B+\\sim A*B\n$$\n\n$$\nc.A+\\sim B\n$$\n\n$$\nd.B+\\sim A\n$$\n\n$$\ne.\\sim A+\\sim B+A+B\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "a",
+            "zh": "a"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "b",
+            "zh": "b"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "c",
+            "zh": "c"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "d",
+            "zh": "d"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "e",
+            "zh": "e"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "Answer: **A**.\n\n$\\sim(A\\oplus B)$ is true exactly for (0,0) and (1,1). Comparing all five expressions:\n\n| Expression | Ordered pairs making it TRUE |\n|---|---|\n| a. $A*B+\\sim A*\\sim B$ | (0,0), (1,1) |\n| b. $A*\\sim B+\\sim A*B$ | (0,1), (1,0) |\n| c. $A+\\sim B$ | (0,0), (1,0), (1,1) |\n| d. $B+\\sim A$ | (0,0), (0,1), (1,1) |\n| e. $\\sim A+\\sim B+A+B$ | (0,0), (0,1), (1,0), (1,1) |\n\nOnly expression a matches.",
+        "zh": "答案：**A**。\n\n异或在两变量不同时为真，所以异或取反在两变量相同时为真，恰好为 $(0,0)$ 和 $(1,1)$。a 的 $AB$ 接受后者，$\\sim A\\sim B$ 接受前者，其他表达式的真值集合不同。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q6",
+      "number": 6,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "In many elementary schools, teachers either teach Math (M) and Science (S) or Social Studies (SS) and Language Arts (LA). Which Boolean Algebra expression represents this relationship?",
+        "zh": "在许多小学里,教师要么教授数学(M)和科学(S),要么教授社会研究(SS)和语言艺术(LA)。请问哪个布尔代数表达式可以表示这种关系?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "$M+S*SS+LA$",
+            "zh": "$M+S*SS+LA$"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "$M*S*SS*LA$",
+            "zh": "$M*S*SS*LA$"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "$M+S+SS+LA$",
+            "zh": "$M+S+SS+LA$"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "$M*S+SS*LA$",
+            "zh": "$M*S+SS*LA$"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "$M*S*\\sim (SS*LA)$",
+            "zh": "$M*S*\\sim (SS*LA)$"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Answer: **D**.\n\nTeaching Math (M) and Science (S) or Social Studies (SS) and Language Arts (LA) is represented as $M*S+SS*LA$ given the words being used and the order of operations.",
+        "zh": "答案：**D**。\n\n题意分两组：同时教数学和科学，或同时教社会学科和语言艺术。组内用 AND（乘号），组间用 OR（加号），得到 $M*S+SS*LA$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": []
+}

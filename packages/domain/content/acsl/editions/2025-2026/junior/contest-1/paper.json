@@ -1,0 +1,1497 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2025-2026-junior-1",
+  "division": "Junior",
+  "season": "2025-2026",
+  "round": 1,
+  "roundLabel": {
+    "en": "Contest 1",
+    "zh": "资格轮"
+  },
+  "title": {
+    "en": "ACSL 2025-2026 Junior · Contest 1",
+    "zh": "ACSL 2025-2026 Junior · 资格轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Junior/2025-2026/资格轮/25-26 ACSL 初级组 paper.pdf",
+      "sha256": "415dd6e85061b9f9be435822d9cf4b5d90cebcb148a37a94a9ec0d5441c78191",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Junior/2025-2026/资格轮/25-26 ACSL 初级组 solution.pdf",
+      "sha256": "26ac44800c8938b73fc8535a4b6d1e62b1aae8d58c0909f8660492bb4274024b",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Junior/2025-2026/资格轮/25-26 ACSL 初级组  Creature Capture .pdf",
+      "sha256": "d163309c247d9b35399e6156927b1793df1b2cb1aeafb9452146ff9d4b2eedd2",
+      "pages": 6
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Convert $52326_{16}$ to octal.",
+        "zh": "将 $52326_{16}$ 转换为8进制。"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "336677",
+            "zh": "336677"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "1221446",
+            "zh": "1221446"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "2443112",
+            "zh": "2443112"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "1222045",
+            "zh": "1222045"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "1622045",
+            "zh": "1622045"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Write each hexadecimal digit using four bits, then regroup into groups of three for octal:\n\n$$52326_{16}=0101\\,0010\\,0011\\,0010\\,0110_2=01\\,010\\,010\\,001\\,100\\,100\\,110_2=1221446_8.$$\n\nThe hexadecimal digits 5,2,3,2,6 give `0101 0010 0011 0010 0110`. Starting at the right, make three-bit groups and pad only the leftmost group: `001 010 010 001 100 100 110`. Reading their values yields 1,2,2,1,4,4,6. Hexadecimal digit boundaries need not remain boundaries of the octal groups.\n\n**Answer: B.**",
+        "zh": "先将每个十六进制数字写成四位二进制，再每三位一组转换为八进制：\n\n$$52326_{16}=0101\\,0010\\,0011\\,0010\\,0110_2=01\\,010\\,010\\,001\\,100\\,100\\,110_2=1221446_8.$$\n\n十六进制的 5、2、3、2、6 依次给出 `0101 0010 0011 0010 0110`。从最右端每三位分组，只在最左组补 0，得到 `001 010 010 001 100 100 110`，各组值依次为 1、2、2、1、4、4、6。原来的十六进制数字边界不必与新的八进制分组边界重合。\n\n**答案：B。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "What is the average of the following two numbers in base 10?\n\n$$\n36_{8}\\qquad 74_{8}\n$$",
+        "zh": "以下两个数在十进制下的平均值是多少？\n\n$$\n36_{8}\\qquad 74_{8}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "36",
+            "zh": "36"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "37",
+            "zh": "37"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "45",
+            "zh": "45"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "112",
+            "zh": "112"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "132",
+            "zh": "132"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "First add the two numbers in octal.\n\n$$\n\\begin{array}{rccc}\n &  & {\\scriptstyle 1} &  \\\\\n &   & 3 & 6 \\\\\n+ &   & 7 & 4 \\\\\n\\hline\n & 1 & 3 & 2\n\\end{array}\n$$\n\nConvert the sum: $132_8=64+24+2=90_{10}$. Divide by 2 to get the decimal average $45_{10}$ (option C). A separate check is to convert the two inputs to 30 and 60 before averaging.",
+        "zh": "先按八进制对齐相加。\n\n$$\n\\begin{array}{rccc}\n &  & {\\scriptstyle 1} &  \\\\\n &   & 3 & 6 \\\\\n+ &   & 7 & 4 \\\\\n\\hline\n & 1 & 3 & 2\n\\end{array}\n$$\n\n把和转换成十进制：$132_8=64+24+2=90_{10}$。除以 2 得十进制平均数 $45_{10}$，选 C。也可把两个数分别换成 30 和 60，再求平均核对。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find $f(6)$ given:\n\n$$\nf(x)=\\begin{cases} 2 & \\text{if }x=1\\\\ 2\\cdot f(x-1)+1 & \\text{if }x>1 \\end{cases}\n$$",
+        "zh": "根据下列表达式,求 $f(6)$ :\n\n$$\nf(x)=\\begin{cases} 2 & x=1\\\\ 2\\cdot f(x-1)+1 & x>1 \\end{cases}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "5",
+            "zh": "5"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "11",
+            "zh": "11"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "23",
+            "zh": "23"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "95",
+            "zh": "95"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "191",
+            "zh": "191"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "$$\nf(1)=2\n$$\n\n$$\nf(2)=2*f(2-1)+1=2*f(1)+1=2*2+1=5\n$$\n\n$$\nf(3)=2*f(3-1)+1=2*f(2)+1=2*5+1=11\n$$\n\n$$\nf(4)=2*f(4-1)+1=2*f(3)+1=2*11+1=23\n$$\n\n$$\nf(5)=2*f(5-1)+1=2*f(4)+1=2*23+1=47\n$$\n\n$$\nf(6)=2*f(6-1)+1=2*f(5)+1=2*47+1=95\n$$\n\nThe sequence is $2,5,11,23,47,95,\\ldots$; its nth term is $3\\cdot2^{n-1}-1$.\n\n**Answer: D.**",
+        "zh": "原卷解析：\n\n$$\nf(1)=2\n$$\n\n$$\nf(2)=2*f(2-1)+1=2*f(1)+1=2*2+1=5\n$$\n\n$$\nf(3)=2*f(3-1)+1=2*f(2)+1=2*5+1=11\n$$\n\n$$\nf(4)=2*f(4-1)+1=2*f(3)+1=2*11+1=23\n$$\n\n$$\nf(5)=2*f(5-1)+1=2*f(4)+1=2*23+1=47\n$$\n\n$$\nf(6)=2*f(6-1)+1=2*f(5)+1=2*47+1=95\n$$\n\n数列为 $2,5,11,23,47,95,\\ldots$，第 $n$ 项可写成 $3\\cdot2^{n-1}-1$。\n\n**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find $f(16)$ given:\n\n$$\nf(x)=\\begin{cases} f(x-3)+x & \\text{if }x>10\\\\ 2\\cdot f(x-2) & \\text{if }8\\le x\\le10\\\\ 2x+3 & \\text{if }x<8 \\end{cases}\n$$",
+        "zh": "根据下列表达式,求 $f(16)$ :\n\n$$\nf(x)=\\begin{cases} f(x-3)+x & x>10\\\\ 2\\cdot f(x-2) & 8\\le x\\le10\\\\ 2x+3 & x<8 \\end{cases}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "73",
+            "zh": "73"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "15",
+            "zh": "15"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "60",
+            "zh": "60"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "30",
+            "zh": "30"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "89",
+            "zh": "89"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "$$\nf(16)=f(16-3)+16=f(13)+16=73+16=89\n$$\n\n$$\nf(13)=f(13-3)+13=f(10)+13=60+13=73\n$$\n\n$$\nf(10)=2*f(10-2)=2*f(8)=2*30=60\n$$\n\n$$\nf(8)=2*f(8-2)=2*f(6)=2*15=30\n$$\n\n$$\nf(6)=2*6+3=15\n$$\n\nNow substitute backwards.\n\nThe argument chain is $16\\to13\\to10\\to8\\to6$. Both endpoints 8 and 10 belong to the middle branch, so the base value 15 is doubled twice before adding 13 and 16: $15\\times2\\times2+13+16=89$. The condition is $x<8$ for the base branch, not $x\\le8$.\n\n**Answer: E.**",
+        "zh": "原卷解析：\n\n$$\nf(16)=f(16-3)+16=f(13)+16=73+16=89\n$$\n\n$$\nf(13)=f(13-3)+13=f(10)+13=60+13=73\n$$\n\n$$\nf(10)=2*f(10-2)=2*f(8)=2*30=60\n$$\n\n$$\nf(8)=2*f(8-2)=2*f(6)=2*15=30\n$$\n\n$$\nf(6)=2*6+3=15\n$$\n\n从 $f(6)$ 开始向前代回，即得 $f(16)=89$。\n\n参数链为 $16\\to13\\to10\\to8\\to6$。8 与 10 两个端点都属于中间分支，所以基本值 15 要先乘两次 2，再加 13、16：$15\\times2\\times2+13+16=89$。基本分支的条件是 $x<8$，不是 $x\\le8$。\n\n**答案：E。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "Which of the following input values will print “wrong” when executed?\n\n```text\ninput a, b\na = a ^ 2\nb = b ^ 2\nc = a + b\nd = sqrt(c)\nif d == int(d) then\n    output a, b, c\nelse\n    output \"wrong\"\nend if\n```",
+        "zh": "以下哪个输入值在执行时会输出“wrong”?\n\n```text\ninput a, b\na = a ^ 2\nb = b ^ 2\nc = a + b\nd = sqrt(c)\nif d == int(d) then\n    output a, b, c\nelse\n    output \"wrong\"\nend if\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "a=3, b=4",
+            "zh": "a=3, b=4"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "a=5, b=12",
+            "zh": "a=5, b=12"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "a=5, b=10",
+            "zh": "a=5, b=10"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "a=9, b=12",
+            "zh": "a=9, b=12"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "a=7, b=24",
+            "zh": "a=7, b=24"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "For a=5 and b=10, the squared values sum to $25+100=125$, and $\\sqrt{125}\\approx11.18$ is not an integer. That input prints `wrong`. The other input pairs are the legs of the Pythagorean triples 3–4–5, 5–12–13, 9–12–15 and 7–24–25.\n\nThe condition asks whether the positive square root is an integer. The five squared sums are $25,169,125,225,625$. Four are perfect squares: $5^2,13^2,15^2,25^2$. For the remaining 125, $11^2<125<12^2$, so d differs from its integer part and selects the `else` output.\n\n**Answer: C.**",
+        "zh": "当 a=5、b=10 时，平方和为 $25+100=125$，$\\sqrt{125}\\approx11.18$ 不是整数，因此输出 `wrong`。其余输入对应勾股数组 3–4–5、5–12–13、9–12–15、7–24–25。\n\n条件检查的是正平方根是否为整数。五个输入的平方和依次为 $25,169,125,225,625$；其中四个分别是 $5^2,13^2,15^2,25^2$。剩余的 125 满足 $11^2<125<12^2$，因此 d 不等于它的整数部分，进入输出 `wrong` 的分支。\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q6",
+      "number": 6,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "Run the following program with each number from 1 to 25, inclusive. How many of them are output?\n\n```text\ninput num\nif num % 3 == 0 && num % 4 == 0 then\n    output num\nend if\nif num % 5 == 0 || num % 7 == 0 then\n    output num\nend if\n```",
+        "zh": "用1到25之间的每个数字(含首尾)依次运行以下程序,最终会输出多少个数字?\n\n```text\ninput num\nif num % 3 == 0 && num % 4 == 0 then\n    output num\nend if\nif num % 5 == 0 || num % 7 == 0 then\n    output num\nend if\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "11",
+            "zh": "11"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "10",
+            "zh": "10"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "9",
+            "zh": "9"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "7",
+            "zh": "7"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "From 1 through 25, the numbers divisible by both 3 and 4 are 12 and 24. The numbers divisible by 5 or 7 are 5, 10, 15, 20, 25, 7, 14 and 21. These groups are disjoint, so there are 2+8=10 outputs.\n\nThe first `&&` requires multiples of $\\operatorname{lcm}(3,4)=12$, yielding two numbers. The second `||` accepts the union of multiples of 5 and 7: five plus three numbers; their first common multiple 35 is outside the range. These are two independent `if` statements, but neither 12 nor 24 satisfies the second, so no input is printed twice here.\n\n**Answer: B.**",
+        "zh": "1 到 25 中，同时被 3 和 4 整除的数是 12、24；被 5 或 7 整除的数是 5、10、15、20、25、7、14、21。两组没有重复，因此一共输出 2+8=10 个数。\n\n第一个 `&&` 要求同时满足两个整除条件，即 12 的倍数，共两个。第二个 `||` 取 5 的倍数与 7 的倍数的并集，共五个加三个；二者最小公倍数 35 超出范围，内部没有重复。虽然这是两个独立的 `if`，但 12、24 都不满足第二条件，因此本题没有某个输入被输出两次。\n\n**答案：B。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [
+    "The source directory calls Contest 1 the qualification round; canonical round remains 1."
+  ],
+  "programming": {
+    "id": "creature-capture",
+    "definition": {
+      "title": "Creature Capture",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Use the line structure shown in the test-case input below.\n\n### Problem\n\nA creature is hiding in a cell of a 10x10 grid.\n\n{{diagram:p-15a02b1275b46b1e}}\n\nYou will be given the location of a guess and how far away the creature is from the guess. Find all possible cells where the creature could be located.\n\nEach cell in the grid is represented by a non-negative integer less than 100. The tens digit signifies the row (0-9, from top to bottom), and the units digit indicates the column (0-9, from left to right). An integer less than 10 indicates row 0.\n\nHow far the guess is from the creature’s location is called the distance value. It is a non-negative integer less than 100, where each digit indicates how far away the creature is horizontally or vertically from the guess. A value less than 10 means that one direction is 0.\n\nFor example, a distance value of 35 means that the creature could be 3 rows away and 5 columns away, or 5 rows away and 3 columns away. A distance value of 53 means the same possible locations of the creature as 35 does. The diagram illustrates a guess of 45 and a distance value of 35. The shaded cells with a question mark show the possible locations of the creature.\n\nAfter finding all possible cells in the grid where the creature could be hiding, output a string containing the smallest cell number and the largest cell number, in that order, separated by a single space.\n\n### Example\n\nInput:\n\n```text\n45\n35\n```\n\nOutput:\n\n```text\n10 98\n```\n\nExplanation The location of the guess is 45 and the distance value is 35. Using 3 as vertical and 5 as horizontal, the valid locations are 70 and 10. Using 5 as vertical and 3 as horizontal, the valid locations are 98 and 92. The smallest is 10 and the largest is 98, so output 10 98, in that order.\n\n### Input\n\nInput is two integers, both non-negative integers less than 100. The first is the guessed location. The second is the distance value, indicating how far the creature might be from the guessed location either horizontally or vertically.\n\n### Output\n\nOutput the smallest location where the creature could be hiding and the largest location as a string of these two integers (no leading 0s), separated by a single space.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "45\n35\n",
+          "expected": "10 98\n"
+        },
+        {
+          "input": "56\n42\n",
+          "expected": "14 98\n"
+        },
+        {
+          "input": "46\n5\n",
+          "expected": "41 96\n"
+        },
+        {
+          "input": "47\n42\n",
+          "expected": "5 89\n"
+        },
+        {
+          "input": "85\n10\n",
+          "expected": "75 95\n"
+        },
+        {
+          "input": "64\n32\n",
+          "expected": "32 96\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "34\n25\n",
+          "expected": "19 86\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "45\n2\n",
+          "expected": "25 65\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "5\n24\n",
+          "expected": "21 47\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "57\n12\n",
+          "expected": "36 78\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "46\n32\n",
+          "expected": "14 78\n",
+          "weight": 16.6666
+        },
+        {
+          "input": "63\n31\n",
+          "expected": "32 94\n",
+          "weight": 16.6666
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。输入按下方测试用例展示的行结构读取。\n\n### 问题\n\n一个生物藏在 10×10 网格的某个单元格中,现给出一个猜测位置(生物可能所在的单元格),以及生物实际位置与猜测位置之间的距离,请找出该生物可能藏身的所有单元格。\n\n网格中的每个单元格由一个小于 100 的非负整数表示。十位数字代表行(0-9,从上到下),个位数字代表列 (0-9,从左到右)。小于 10 的整数表示在第 0 行。\n\n猜测位置与生物位置之间的距离称为距离值,该值是一个小于 100 的非负整数,其每位数字分别表示生物在水平方向和垂直方向上与猜测位置的距离。如果距离值小于 10,则表示其中一个方向的距离为 0。\n\n例如,距离值为 35 意味着该生物可能与猜测位置相距 3 行 5 列,或者相距 5 行 3 列。同理可知距离值 53 所代表的可能位置与 35 相同。示意图展示了猜测位置为 45 且距离值为 35 的情况。其中有问号的阴影单元格表示该生物的可能位置。\n\n在找出网格中该生物可能藏身的所有单元格后,请输出一个字符串,包含最小的单元格编号和最大的单元格编号,按从最小到最大的顺序排列,中间用一个空格分隔。\n\n{{diagram:p-15a02b1275b46b1e}}\n\n### 示例\n\n输入：\n\n```text\n45\n35\n```\n\n输出：\n\n```text\n10 98\n```\n\n解析：猜测位置为 45 ,距离值为 35 。 若取垂直距离为 3、水平距离为 5,则有效位置为 70 和 10。若取垂直距离为 5、水平距离为 3,则有效位置为 98 和 92。 其中最小值为 10,最大值为 98,因此输出 10 98(按此顺序)。\n\n### 输入\n\n输入中含有两个小于 100 的非负整数。第一个整数为猜测位置,第二个整数为距离值,表示该生物相对于猜测位置在水平或垂直方向上的距离。\n\n### 输出\n\n输出该生物可能所在位置的最小值和最大值。由这两个整数组成的字符串(不含前导零) 即为输出结果, 两数之间以单个空格分隔。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [
+        {
+          "id": "p-15a02b1275b46b1e",
+          "width": 380,
+          "height": 380,
+          "alt": {
+            "en": "A 10 by 10 numbered grid. Guess G is at row 4, column 5. Question marks are at cells 10, 70, 92 and 98.",
+            "zh": "10×10 编号网格。猜测 G 位于第 4 行第 5 列，问号分别位于单元格 10、70、92、98。"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 40,
+              "y": 72,
+              "width": 32,
+              "height": 32,
+              "fill": "muted",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 56,
+              "y": 94,
+              "text": "?",
+              "fontSize": 20,
+              "fill": "black",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 40,
+              "y": 264,
+              "width": 32,
+              "height": 32,
+              "fill": "muted",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 56,
+              "y": 286,
+              "text": "?",
+              "fontSize": 20,
+              "fill": "black",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 104,
+              "y": 328,
+              "width": 32,
+              "height": 32,
+              "fill": "muted",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 120,
+              "y": 350,
+              "text": "?",
+              "fontSize": 20,
+              "fill": "black",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 296,
+              "y": 328,
+              "width": 32,
+              "height": 32,
+              "fill": "muted",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 312,
+              "y": 350,
+              "text": "?",
+              "fontSize": 20,
+              "fill": "black",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 200,
+              "y": 168,
+              "width": 32,
+              "height": 32,
+              "fill": "green",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 216,
+              "y": 190,
+              "text": "G",
+              "fontSize": 20,
+              "fill": "black",
+              "anchor": "middle"
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 40,
+              "x2": 40,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 40,
+              "x2": 360,
+              "y2": 40,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 72,
+              "y1": 40,
+              "x2": 72,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 72,
+              "x2": 360,
+              "y2": 72,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 104,
+              "y1": 40,
+              "x2": 104,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 104,
+              "x2": 360,
+              "y2": 104,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 136,
+              "y1": 40,
+              "x2": 136,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 136,
+              "x2": 360,
+              "y2": 136,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 168,
+              "y1": 40,
+              "x2": 168,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 168,
+              "x2": 360,
+              "y2": 168,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 200,
+              "y1": 40,
+              "x2": 200,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 200,
+              "x2": 360,
+              "y2": 200,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 232,
+              "y1": 40,
+              "x2": 232,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 232,
+              "x2": 360,
+              "y2": 232,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 264,
+              "y1": 40,
+              "x2": 264,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 264,
+              "x2": 360,
+              "y2": 264,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 296,
+              "y1": 40,
+              "x2": 296,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 296,
+              "x2": 360,
+              "y2": 296,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 328,
+              "y1": 40,
+              "x2": 328,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 328,
+              "x2": 360,
+              "y2": 328,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 360,
+              "y1": 40,
+              "x2": 360,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 360,
+              "x2": 360,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 56,
+              "y": 28,
+              "text": "0",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 22,
+              "y": 62,
+              "text": "0",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 88,
+              "y": 28,
+              "text": "1",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 22,
+              "y": 94,
+              "text": "1",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 120,
+              "y": 28,
+              "text": "2",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 22,
+              "y": 126,
+              "text": "2",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 152,
+              "y": 28,
+              "text": "3",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 22,
+              "y": 158,
+              "text": "3",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 184,
+              "y": 28,
+              "text": "4",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 22,
+              "y": 190,
+              "text": "4",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 216,
+              "y": 28,
+              "text": "5",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 22,
+              "y": 222,
+              "text": "5",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 248,
+              "y": 28,
+              "text": "6",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 22,
+              "y": 254,
+              "text": "6",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 280,
+              "y": 28,
+              "text": "7",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 22,
+              "y": 286,
+              "text": "7",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 312,
+              "y": 28,
+              "text": "8",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 22,
+              "y": 318,
+              "text": "8",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 344,
+              "y": 28,
+              "text": "9",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 22,
+              "y": 350,
+              "text": "9",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            }
+          ]
+        }
+      ],
+      "zh": [
+        {
+          "id": "p-15a02b1275b46b1e",
+          "width": 380,
+          "height": 380,
+          "alt": {
+            "en": "A 10 by 10 numbered grid. Guess G is at row 4, column 5. Question marks are at cells 10, 70, 92 and 98.",
+            "zh": "10×10 编号网格。猜测 G 位于第 4 行第 5 列，问号分别位于单元格 10、70、92、98。"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 40,
+              "y": 72,
+              "width": 32,
+              "height": 32,
+              "fill": "muted",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 56,
+              "y": 94,
+              "text": "?",
+              "fontSize": 20,
+              "fill": "black",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 40,
+              "y": 264,
+              "width": 32,
+              "height": 32,
+              "fill": "muted",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 56,
+              "y": 286,
+              "text": "?",
+              "fontSize": 20,
+              "fill": "black",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 104,
+              "y": 328,
+              "width": 32,
+              "height": 32,
+              "fill": "muted",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 120,
+              "y": 350,
+              "text": "?",
+              "fontSize": 20,
+              "fill": "black",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 296,
+              "y": 328,
+              "width": 32,
+              "height": 32,
+              "fill": "muted",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 312,
+              "y": 350,
+              "text": "?",
+              "fontSize": 20,
+              "fill": "black",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 200,
+              "y": 168,
+              "width": 32,
+              "height": 32,
+              "fill": "green",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 216,
+              "y": 190,
+              "text": "G",
+              "fontSize": 20,
+              "fill": "black",
+              "anchor": "middle"
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 40,
+              "x2": 40,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 40,
+              "x2": 360,
+              "y2": 40,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 72,
+              "y1": 40,
+              "x2": 72,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 72,
+              "x2": 360,
+              "y2": 72,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 104,
+              "y1": 40,
+              "x2": 104,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 104,
+              "x2": 360,
+              "y2": 104,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 136,
+              "y1": 40,
+              "x2": 136,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 136,
+              "x2": 360,
+              "y2": 136,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 168,
+              "y1": 40,
+              "x2": 168,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 168,
+              "x2": 360,
+              "y2": 168,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 200,
+              "y1": 40,
+              "x2": 200,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 200,
+              "x2": 360,
+              "y2": 200,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 232,
+              "y1": 40,
+              "x2": 232,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 232,
+              "x2": 360,
+              "y2": 232,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 264,
+              "y1": 40,
+              "x2": 264,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 264,
+              "x2": 360,
+              "y2": 264,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 296,
+              "y1": 40,
+              "x2": 296,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 296,
+              "x2": 360,
+              "y2": 296,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 328,
+              "y1": 40,
+              "x2": 328,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 328,
+              "x2": 360,
+              "y2": 328,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 360,
+              "y1": 40,
+              "x2": 360,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "line",
+              "x1": 40,
+              "y1": 360,
+              "x2": 360,
+              "y2": 360,
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 56,
+              "y": 28,
+              "text": "0",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 22,
+              "y": 62,
+              "text": "0",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 88,
+              "y": 28,
+              "text": "1",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 22,
+              "y": 94,
+              "text": "1",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 120,
+              "y": 28,
+              "text": "2",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 22,
+              "y": 126,
+              "text": "2",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 152,
+              "y": 28,
+              "text": "3",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 22,
+              "y": 158,
+              "text": "3",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 184,
+              "y": 28,
+              "text": "4",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 22,
+              "y": 190,
+              "text": "4",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 216,
+              "y": 28,
+              "text": "5",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 22,
+              "y": 222,
+              "text": "5",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 248,
+              "y": 28,
+              "text": "6",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 22,
+              "y": 254,
+              "text": "6",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 280,
+              "y": 28,
+              "text": "7",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 22,
+              "y": 286,
+              "text": "7",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 312,
+              "y": 28,
+              "text": "8",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 22,
+              "y": 318,
+              "text": "8",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 344,
+              "y": 28,
+              "text": "9",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "text",
+              "x": 22,
+              "y": 350,
+              "text": "9",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,378 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2022-2023-elementary-3",
+  "division": "Elementary",
+  "season": "2022-2023",
+  "round": 3,
+  "roundLabel": {
+    "en": "Contest 3",
+    "zh": "第三轮"
+  },
+  "title": {
+    "en": "ACSL 2022-2023 Elementary · Contest 3",
+    "zh": "ACSL 2022-2023 Elementary · 第三轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Elementary/2022-2023/第三轮/c_3_elem - 含答案.pdf",
+      "sha256": "414ff67668024028123d90eccff7701bba2d82d46c212795272d39b9599f007f",
+      "pages": 2
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Elementary/2022-2023/第三轮/c_3_elem_soln.pdf",
+      "sha256": "f57b265bcd28ce8a542c54ab87a0e1ca756a80fa249e62beabff5ef4b9d55513",
+      "pages": 1
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "Of the whole numbers 1 through 13 inclusive, how many satisfy this Boolean expression?\n\n$$\n(x\\ge 6)\\;\\mathrm{AND}\\;(x<8)\\;\\mathrm{OR}\\;\\;\\mathrm{NOT}\\;(x<10)\n$$",
+        "zh": "从1到13(包含1和13)中有多少个整数满足以下布尔表达式?\n\n$$\n(x\\ge 6)\\;\\mathrm{AND}\\;(x<8)\\;\\mathrm{OR}\\;\\;\\mathrm{NOT}\\;(x<10)\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "2",
+            "zh": "2"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "5",
+            "zh": "5"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "7",
+            "zh": "7"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "10",
+            "zh": "10"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Answer: **C**.\n\nThe expression $(x\\ge 6)AND(x<8)ORNOT(x<10)$ is TRUE for all integers greater than or equal to 6 and less than 8 which are {6, 7} as well as the integers that are not less than 10 which are {10, 11, 12, 13}. That’s 6 of them.",
+        "zh": "答案：**C**。\n\n先求 AND 连接的条件 $6\\le x<8$，得到 6、7。取反 $x<10$ 相当于 $x\\ge10$，题给范围内有 10、11、12、13。OR 合并两个不重叠的集合，共 $2+4=6$ 个。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "Determine how many ordered pair(s) make the following expression TRUE:\n\n$$\n\\sim (\\sim A\\sim B)+\\sim (A+B)\n$$",
+        "zh": "有多少个有序对使得以下表达式的结果为真?\n\n$$\n\\sim (\\sim A\\sim B)+\\sim (A+B)\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "0",
+            "zh": "0"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "1",
+            "zh": "1"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "2",
+            "zh": "2"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "3",
+            "zh": "3"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "Answer: **E**.\n\nThe Boolean expression $\\sim (\\sim A\\sim B)+\\sim (A+B)$ can be simplified to $A+B+\\sim A\\sim B.$ A is TRUE for (1,1) and (1,0). B is TRUE for (0,1) and (1,1). ~A~B is only TRUE for (0,0). All 4 ordered pairs make it TRUE.",
+        "zh": "答案：**E**。\n\n用德摩根律，第一项 $\\sim(\\sim A\\sim B)=A+B$。令 $X=A+B$，第二项就是 $\\sim X$。整个式子为 $X+\\sim X=1$，所以四组输入全成立。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "Determine which of the following are equivalent Boolean expressions:\n\na. $\\sim B(A\\sim B+A)$\n\nb. $\\sim A(B+A)$\n\nc. $\\sim(A+B)$\n\nd. $\\sim A\\sim B$",
+        "zh": "以下哪些布尔表达式等价？\n\na. $\\sim B(A\\sim B+A)$\n\nb. $\\sim A(B+A)$\n\nc. $\\sim(A+B)$\n\nd. $\\sim A\\sim B$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "a,b,c",
+            "zh": "a,b,c"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "b,c,d",
+            "zh": "b,c,d"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "a,d",
+            "zh": "a,d"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "c,d",
+            "zh": "c,d"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "b,c",
+            "zh": "b,c"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Answer: **D**.\n\n$$\na.\\sim B(A\\sim B+A)=A\\sim B+A\\sim B=A\\sim B\n$$\n\n$$\nb.\\sim A(B+A)=\\sim AB+\\sim AA=\\sim AB+0=\\sim AB\n$$\n\n$$\nc.\\sim (A+B)=\\sim A\\sim B\n$$\n\nTherefore, c is equivalent to d which is already in simplified form.",
+        "zh": "答案：**D**。\n\n先分别化简。a 为 $A\\sim B$，b 为 $\\sim AB$。c 用德摩根律变为 $\\sim A\\sim B$，和 d 一样。a 仅在 $(1,0)$ 为真，b 仅在 $(0,1)$ 为真，c、d 则都只在 $(0,0)$ 为真。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "Simplify the following Boolean expression:\n\n$$\n\\sim AB(\\sim A+\\sim B)+A\\sim B(\\sim A+\\sim B)\n$$",
+        "zh": "化简以下布尔表达式:\n\n$$\n\\sim AB(\\sim A+\\sim B)+A\\sim B(\\sim A+\\sim B)\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "$AB+A\\sim B$",
+            "zh": "$AB+A\\sim B$"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "$A\\sim B+\\sim AB$",
+            "zh": "$A\\sim B+\\sim AB$"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "$AB+\\sim A\\sim B$",
+            "zh": "$AB+\\sim A\\sim B$"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "$A+\\sim B$",
+            "zh": "$A+\\sim B$"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "$\\sim A+B$",
+            "zh": "$\\sim A+B$"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Answer: **B**.\n\nDistribute both products. The terms containing $A\\sim A$ or $B\\sim B$ are zero. The other two terms contain repeated factors, which reduce by $XX=X$. This leaves $\\sim AB+A\\sim B$. It is true exactly when the inputs differ.",
+        "zh": "答案：**B**。\n\n展开两组乘积后，含 $A\\sim A$ 或 $B\\sim B$ 的项为 0。另两项用 $XX=X$ 消去重复因子，得到 $\\sim AB+A\\sim B$。两输入不同时，它才为真。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "Determine which of the following is NOT a tautology:\n\n$$\na.A(\\sim B+B)+\\sim A\\qquad b.\\sim (A+B)+(A+B)\n$$\n\n$$\nc.A(A\\sim B)+B(\\sim AB)\\qquad d.AB+\\sim AB+\\sim B\n$$",
+        "zh": "以下哪项不是重言式?\n\n$$\na.A(\\sim B+B)+\\sim A\\qquad b.\\sim (A+B)+(A+B)\n$$\n\n$$\nc.A(A\\sim B)+B(\\sim AB)\\qquad d.AB+\\sim AB+\\sim B\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "a",
+            "zh": "a"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "b",
+            "zh": "b"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "c",
+            "zh": "c"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "d",
+            "zh": "d"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "They all are.",
+            "zh": "以上全部"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Answer: **C**.\n\nA tautology is always TRUE. The 4 expressions simplify as follows:\n\n$$\na.A(\\sim B+B)+\\sim A=A\\sim B+AB+\\sim A=A(\\sim B+B)+\\sim A\n$$\n\n$$\n=A(1)+\\sim A=A+\\sim A=1\n$$\n\n$$\nb.\\sim (A+B)+(A+B)=\\sim A\\sim B+A+B=1\n$$\n\n$$\nc.A(A\\sim B)+B(\\sim AB)=AA\\sim B+\\sim ABB=A\\sim B+\\sim AB\n$$\n\n$$\nd.AB+\\sim AB+\\sim B=(A+\\sim A)B+\\sim B=(1)B+\\sim B=B+\\sim B\n$$\n\n$$\n=B+\\sim B=1\n$$\n\nAll but c simplifies to 1 which makes the expression always TRUE in a, b, and d.",
+        "zh": "答案：**C**。\n\na 的括号 $\\sim B+B=1$，于是化为 $A+\\sim A=1$；b 是 $\\sim(A+B)+(A+B)=1$；d 提取 $B$ 后是 $B+\\sim B=1$。c 化为 $A\\sim B+\\sim AB$，在 $(0,0)$ 时为假。因此只有 c 不是永真式。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": []
+}

@@ -1,0 +1,457 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2023-2024-junior-2",
+  "division": "Junior",
+  "season": "2023-2024",
+  "round": 2,
+  "roundLabel": {
+    "en": "Contest 2",
+    "zh": "第二轮"
+  },
+  "title": {
+    "en": "ACSL 2023-2024 Junior · Contest 2",
+    "zh": "ACSL 2023-2024 Junior · 第二轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Junior/2023-2024/第二轮/c_2_jr.pdf",
+      "sha256": "2805a2ef4d140fecf5263e98e4b03f3984c29bff485ed3e75d55ab4aee127242",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Junior/2023-2024/第二轮/c_2_jr_soln.pdf",
+      "sha256": "5e8170fc31a49a5f6c939aa6a5ef6e9a2b71f48ee42aea2bce6507f7697d4ed9",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Junior/2023-2024/第二轮/c_2_ACSL Book_jr.pdf",
+      "sha256": "abfc06ffef3d519f632f4c3fe7146e046d36ecee9b8c9aeb4c2ef9badcc86145",
+      "pages": 12
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Evaluate the following prefix expression if all numbers are single digits:\n\n`- + 2 * 3 8 / * 6 2 3`",
+        "zh": "如果下方所有数字都是一位数,请计算下方前缀表达式:\n\n`- + 2 * 3 8 / * 6 2 3`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "12",
+            "zh": "12"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "20",
+            "zh": "20"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "22",
+            "zh": "22"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "25",
+            "zh": "25"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "30",
+            "zh": "30"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "```text\n- + 2 * 3 8 / * 6 2 3\n= - + 2 (* 3 8) / (* 6 2) 3\n= - (+ 2 24) (/ 12 3)\n= - 26 4\n= 22\n```\n\nThe outer minus has left operand $2+3\\times8=26$ and right operand $(6\\times2)/3=4$. Subtract in that order to obtain 22. The exponent operator does not appear here; adjacent single digits remain separate operands.\n\n**Answer: C.**",
+        "zh": "```text\n- + 2 * 3 8 / * 6 2 3\n= - + 2 (* 3 8) / (* 6 2) 3\n= - (+ 2 24) (/ 12 3)\n= - 26 4\n= 22\n```\n\n最外层减号的左操作数是 $2+3\\times8=26$，右操作数是 $(6\\times2)/3=4$，按该顺序相减得 22。题目规定所有数字都是一位数，相邻数字仍是独立操作数，不能拼接成多位数。\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Convert the following infix expression to postfix:\n\n$$\n\\frac{A+B}{C-1}+\\frac{2A-3}{D}\n$$",
+        "zh": "请将下方中缀表达式转换为后缀表达式:\n\n$$\n\\frac{A+B}{C-1}+\\frac{2A-3}{D}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`AB+C1-/2A3*-D/+`",
+            "zh": "`AB+C1-/2A3*-D/+`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`AB+C1-/2A*3-D/+`",
+            "zh": "`AB+C1-/2A*3-D/+`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`ABC1-+/2A*3-D/+`",
+            "zh": "`ABC1-+/2A*3-D/+`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`AB+C1-/2A*3-D+/`",
+            "zh": "`AB+C1-/2A*3-D+/`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`AB+C1-/2A*3D-/+`",
+            "zh": "`AB+C1-/2A*3D-/+`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "The left fraction becomes `AB+C1-/`; the right fraction becomes `2A*3-D/`. Append `+` after both operands:\n\n`AB+C1-/2A*3-D/+`\n\nThe left denominator $C-1$ becomes `C1-`, so `/` must follow both `AB+` and `C1-`. In the right numerator, multiply $2A$ first to obtain `2A*`, then subtract 3 to obtain `2A*3-`, and only then divide by D. The final plus combines the two complete quotients.\n\n**Answer: B.**",
+        "zh": "左侧分式的后缀式为 `AB+C1-/`，右侧分式的后缀式为 `2A*3-D/`。将两个操作数依次写出，最后加上 `+`：\n\n`AB+C1-/2A*3-D/+`\n\n左侧分母 $C-1$ 对应 `C1-`，所以 `/` 要放在 `AB+` 与 `C1-` 两个完整部分之后。右侧分子先乘 $2A$，得 `2A*`，再减 3，得 `2A*3-`，最后才除以 D。末尾的加号合并两个完整的商。\n\n**答案：B。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "比特位操作"
+      },
+      "statement": {
+        "en": "Evaluate:\n\n`00110 OR 01100 XOR 11010`",
+        "zh": "请计算下列表达式:\n\n`00110 OR 01100 XOR 11010`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`01001`",
+            "zh": "`01001`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`11001`",
+            "zh": "`11001`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`00110`",
+            "zh": "`00110`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`01010`",
+            "zh": "`01010`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`10110`",
+            "zh": "`10110`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "`00110 OR 01100 XOR 11010`\n\n`= 00110 OR (01100 XOR 11010)`\n\n`= 00110 OR 10110`\n\n`= 10110`\n\nUnder the precedence used here, evaluate XOR before OR. XOR sets a bit to 1 exactly when the inputs differ: `01100 XOR 11010 = 10110`. The 1s in `00110` are already present in that result, so the final OR leaves `10110` unchanged.\n\n**Answer: E.**",
+        "zh": "原卷解析：\n\n`00110 OR 01100 XOR 11010`\n\n`= 00110 OR (01100 XOR 11010)`\n\n`= 00110 OR 10110`\n\n`= 10110`\n\n本题按 XOR 优先于 OR 的顺序计算。XOR 只有在两输入对应位不同时才得到 1，所以 `01100 XOR 11010 = 10110`。`00110` 中为 1 的位置在该结果中也已经为 1，因此最后 OR 后仍是 `10110`。\n\n**答案：E。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "比特位操作"
+      },
+      "statement": {
+        "en": "Evaluate:\n\n`(LSHIFT-1 01110) AND (RCIRC-2 (10110 OR NOT 10101))`",
+        "zh": "请计算下列表达式:\n\n`(LSHIFT-1 01110) AND (RCIRC-2 (10110 OR NOT 10101))`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`10100`",
+            "zh": "`10100`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`11111`",
+            "zh": "`11111`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`11100`",
+            "zh": "`11100`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`00011`",
+            "zh": "`00011`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`01001`",
+            "zh": "`01001`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "`(LSHIFT-1 01110) AND (RCIRC-2 (10110 OR NOT 10101))`\n\n`= 11100 AND (RCIRC-2 (10110 OR 01010))`\n\n`= 11100 AND (RCIRC-2 11110)`\n\n`= 11100 AND 10111`\n\n`= 10100`\n\nThe left branch is a zero-filled shift: `01110` becomes `11100`. On the right, NOT gives `01010`, so OR produces `11110`; rotating its final two bits `10` to the front produces `10111`. The final AND keeps only positions shared by `11100` and `10111`, namely `10100`.\n\n**Answer: A.**",
+        "zh": "原卷解析：\n\n`(LSHIFT-1 01110) AND (RCIRC-2 (10110 OR NOT 10101))`\n\n`= 11100 AND (RCIRC-2 (10110 OR 01010))`\n\n`= 11100 AND (RCIRC-2 11110)`\n\n`= 11100 AND 10111`\n\n`= 10100`\n\n左侧是补零移位，`01110` 左移一位得 `11100`。右侧先 NOT 得 `01010`，OR 后为 `11110`，再把末尾两位 `10` 循环移到最前，得 `10111`。最后 AND 只保留 `11100` 与 `10111` 共同的 1，结果为 `10100`。\n\n**答案：A。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "What is the following program’s output?\n\n```text\np = .01\nd = 1\nt = .01\nwhile t < d\n    d = d + 1\n    p = p * 2\n    t = t + p\nend while\noutput d\n```",
+        "zh": "请问以下程序的输出值是多少?\n\n```text\np = .01\nd = 1\nt = .01\nwhile t < d\n    d = d + 1\n    p = p * 2\n    t = t + p\nend while\noutput d\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "7",
+            "zh": "7"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "9",
+            "zh": "9"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "10",
+            "zh": "10"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "11",
+            "zh": "11"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "On day $d$, the daily amount is $p=0.01\\times2^{d-1}$, and the accumulated total is $t=0.01(2^d-1)$.\n\nAt day $9$, $t=5.11<9$, so another loop is needed. At day $10$, $t=10.23>10$, so the loop stops. It prints **10**.\n\nThe last three states $(d,p,t)$ are $(8,1.28,2.55)$, $(9,2.56,5.11)$, and $(10,5.12,10.23)$. The while condition is checked before entering each iteration. At day 9 it is still true; the next iteration updates d to 10 and adds the new daily amount before the next check stops the loop.\n\n**Answer: D.**",
+        "zh": "第 $d$ 天的当天金额为 $p=0.01\\times2^{d-1}$，累计金额为 $t=0.01(2^d-1)$。\n\n第 $9$ 天时，$t=5.11<9$，循环继续。第 $10$ 天时，$t=10.23>10$，循环停止并输出 **10**。\n\n最后三个状态 $(d,p,t)$ 为 $(8,1.28,2.55)$、$(9,2.56,5.11)$、$(10,5.12,10.23)$。while 在每轮开始前检查条件：第 9 天仍满足条件，于是下一轮先把 d 增到 10，再把当天新金额加进 t；随后再次判断才退出循环。\n\n**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [],
+  "programming": {
+    "id": "acsl-book",
+    "definition": {
+      "title": "ACSL Book",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Read two lines: the complete book text, then the message or coordinate string.\n\n### Problem\n\nA book cipher is a method of encoding and decoding a message where the sender and the receiver both use the same text. The sender’s message is encoded by replacing each alphanumeric character in the message to be sent with the location of that character in the text using an “s.w.c” format representing the number of the sentence in the text (s), the number of the word in that sentence (w), and the number of the character in that word (c), all indexed starting with 1. The receiver decodes the encoded message by locating the characters in the text specified by each “s.w.c” string.\n\nIn this program, you will be given the text and the encoded message to be decoded. The text will contain alphanumeric characters, spaces, and periods using the following restrictions:\n\n- A word contains only alphanumeric characters\n\n- All words are separated by a single space\n\n- Sentences are terminated with a period and separated by two spaces\n\nThe encoded message will contain multiple “s.w.c” strings, each separated by a single space. Create the decoded message by finding the characters in the text. If an “s.w.c” string doesn’t refer to a character in the text, use a space in the decoded message.\n\n### Example\n\n### Input\n\n```text\nACSL is an international computer science competition among more than 300 schools.  With countrywide and worldwide participants it became the American Computer Science League.  It has been in continuous existence since 1978.  Each yearly competition consists of 4 regular season contests.  All students at each school may compete but the team score is the sum of the best 3 or 5 top scores.  Each contest consists of a written section and a programming section.\n1.5.4 4.2.6 1.10.1 3.2.1 6.11.6 2.9.8 4.10.3 5.18.1\n```\n\n### Output\n\n```text\npython 3\n```\n\nExplanation: The first encoded string “1.5.4” tells you to find the 1st sentence, the 5th word in that sentence which is “computer”, and then the 4th character in that word which is the lowercase letter “p”. All others are done in a similar fashion. The string “4.10.3” is a space because there are only 9 words in the 4th sentence.\n\n### Input\n\nInput a string representing the text to be used in the decoding and another string representing the encoded message to be decoded. The first string will be no more than 2000 characters and the second string will be no longer than 200 characters.\n\n### Output\n\nOutput the decoded message as a string of characters.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "ACSL is an international computer science competition among more than 300 schools.  With countrywide and worldwide participants it became the American Computer Science League.  It has been in continuous existence since 1978.  Each yearly competition consists of 4 regular season contests.  All students at each school may compete but the team score is the sum of the best 3 or 5 top scores.  Each contest consists of a written section and a programming section.\n1.5.4 4.2.6 1.10.1 3.2.1 6.11.6 2.9.8 4.10.3 5.18.1\n",
+          "expected": "python 3\n"
+        },
+        {
+          "input": "To be or not to be that is the question is a quote by William Shakespeare.  2B or not 2B is also a Boolean expression.  Write it both ways.\n2.1.2 1.3.1 1.4.2 2.8.4 1.13.5 2.7.1 2.3.1 1.17.2 1.15.5 1.10.4 4.1.1 1.15.6 2.8.4 3.4.1 1.7.3 3.4.3 1.16.6 3.3.5 1.1.1 1.3.2 1.13.2 1.10.3\n",
+          "expected": "Boolean is always True\n"
+        },
+        {
+          "input": "Programming languages are Java Python Visual BASIC Lisp FORTRAN C SQL.  Javascript is the language of the Internet.  HTML stands for Hypertext Markup Language and is not really a coding language.  There are over 300 languages.  Pick the one you like best.\n2.1.1 1.2.6 2.1.3 1.3.1 1.12.3 2.1.8 2.2.2 4.6.1 3.2.2 4.1.2 2.6.3 5.3.4 3.13.1 3.13.6 3.6.3 3.12.6 3.5.5 1.6.5 3.6.4 3.4.4 6.1.2 4.3.1 3.3.1 1.13.6 1.9.6 1.5.1 3.14.1 1.10.1 1.11.1\n",
+          "expected": "Java is the language of AP CS\n"
+        },
+        {
+          "input": "Four score and seven years ago our fathers brought forth on this continent a new nation conceived in Liberty and dedicated to the proposition that all men are created equal.  Now we are engaged in a great civil war testing whether that nation or any nation so conceived and so dedicated can long endure.  We are met on a great battlefield of that war.  We have come to dedicate a portion of that field as a final resting place for those who here gave their lives that that nation might live.  It is altogether fitting and proper that we should do this.  This was written by Abraham Lincoln in November 1863.\n2.1.1 1.2.3 8.6.3 6.9.1 1.31.1 1.8.7 5.6.1 1.13.7 1.15.2 2.18.1 2.12.2 8.10.4 6.6.5 4.8.2 7.4.1 1.16.2 3.7.5 4.10.4 3.12.1 1.21.7 2.5.1 6.5.7 1.13.7\n",
+          "expected": "No 1 speech of all time\n"
+        },
+        {
+          "input": "There are 10 kinds of people in the world who are those who know binary and those who do not.  Thus you should learn binary.\n1.18.1 2.3.2 2.5.4 1.20.3 3.1.4 1.2.1 1.9.3 1.12.5 1.21.1 2.5.6 1.5.1 2.1.3\n",
+          "expected": "what are you\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "ACSL or the American Computer Science League is an international computer science competition among more than 300 schools.  Originally founded in 1978 as the Rhode Island Computer Science League it then became the New England Computer Science League.  With countrywide and worldwide participants it became the American Computer Science League.  Each yearly competition consists of four regular season contests.  All students at each school may compete but the team score is the sum of the best 3 or 5 top scores.  Each contest consists of a written section and a programming section.  Written topics tested include 12 different CS concepts.\n1.1.1 1.5.3 1.5.7 1.10.5 1.10.9 1.12.6 1.16.3 1.13.11 9.1.1 2.18.1 1.13.2 1.15.1 1.13.4 2.2.3 1.11.6 1.7.2 2.1.2 1.19.1 2.19.1 1.12.2 1.12.3 1.7.6 1.13.11 2.10.2 1.12.4 2.3.3 1.7.1 1.5.7 1.10.7 2.17.3 2.11.5 1.7.6 4.10.5 1.4.1 2.9.1 2.19.1 1.7.1 4.7.8 5.12.1 1.18.7 5.6.4 2.2.1 1.7.5 1.9.2\n",
+          "expected": "American Computer Science League ACSL is fun\n",
+          "weight": 20
+        },
+        {
+          "input": "We hold these truths to be self evident that all men are created equal that they are endowed by their Creator with certain unalienable Rights that among these are Life Liberty and the pursuit of Happiness.  That to secure these rights Governments are instituted among Men deriving their just powers from the consent of the governed.\n1.30.1 1.20.4 1.8.2 2.12.3 3.1.1 1.14.5 1.25.2 1.35.2 1.6.2 3.4.5 1.36.3 1.24.1 1.17.2 1.28.4 2.8.7 1.8.5 1.37.1 1.22.4 1.23.5 1.36.3 1.36.4 1.23.6 1.24.2 1.8.1 1.36.8 1.36.9 2.21.1 1.31.3 1.7.2 2.2.3 1.35.2 1.17.2 1.7.2 1.8.1\n",
+          "expected": "Live life pursue happiness be free\n",
+          "weight": 20
+        },
+        {
+          "input": "The upheavals of Artificial Intelligence can escalate quickly and become scarier and even cataclysmic.  Imagine how a medical robot originally programmed to rid cancer could conclude that the best way to obliterate cancer is to exterminate humans who are genetically prone to the disease.\n1.4.1 2.1.1 3.5.2 2.6.3 1.2.9 1.15.6 2.2.1 2.7.9 1.11.7 2.30.7 2.31.5 1.7.7 1.3.1 3.2.1 1.2.9 1.14.3 2.3.1 2.16.3\n",
+          "expected": "AI is here to stay\n",
+          "weight": 20
+        },
+        {
+          "input": "I am increasingly inclined to think that there should be some regulatory oversight maybe at the national and international level just to make sure that we do not do something very foolish.  I mean with artificial intelligence we are summoning the demon.  This was said by Elon Musk at the MIT AeroAstro Centennial Symposium.\n3.10.1 2.1.1 4.1.2 1.4.1 3.12.6 1.33.3 1.8.5 1.31.1 3.10.2 1.4.6 2.11.1 3.3.1 2.4.7 3.7.1 2.7.2 3.4.2 2.11.7 1.32.1 2.10.4 3.10.8 1.1.2 1.1.1 3.1.1 3.9.4 2.5.8 3.11.5 1.17.1 3.1.3 1.12.4 3.6.3 2.5.12 1.11.1\n",
+          "expected": "AI is even scary for IT geniuses\n",
+          "weight": 20
+        },
+        {
+          "input": "Quadratic equations can be solved by factoring if the discriminant is a perfect square like 49 or 36.  If it is not then there are two irrational roots.  However if the discriminant is less than 0 the roots are 2 imaginary numbers.  In the 1st two cases the parabola crosses the x axis in 1 or 2 places and in the 2nd case it does not.\n4.7.5 5.4.3 1.2.9 1.14.2 1.2.3 3.4.10 2.9.3 3.1.6 1.1.4 1.19.5 3.14.3 2.2.1 3.7.4 1.14.3 4.3.2 2.1.3 1.16.1 4.7.8 3.4.4 5.10.1 2.9.1 4.8.7 4.24.4 4.13.1 1.18.2 1.16.2\n",
+          "expected": "b squared minus 4ac is 169\n",
+          "weight": 20
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。输入两行：完整书本文本，以及消息或坐标字符串。\n\n### 问题\n\n书加密法是一种发送者和接收者使用相同的文本对信息进行编码和解码的方法。发送者对信息进行编码时,使用 \"s.w.c\" 格式将要发送的信息中的每个字母数字字符替换为该字符在文本中的位置。\"s.w.c\" 格式代表文本中句子的编号(s), 句子中单词的编号(w), 单词中字符的编号(c),所有编号均从 1 开始。接收者通过查找每个 \"s.w.c\" 字符串在文本中指定的字符来对编码信息进行解码。\n\n在此程序中,将给定文本以及需解码的编码信息。这个文本包含字母数字字符、空格以及句号,限制条件如下:\n\n- 每个单词只包含字母数字字符\n\n- 每个单词之间用一个空格分隔\n\n- 句子以句号结束,且句子之间用两个空格分隔\n\n编码信息将包含多个 \"s.w.c\" 字符串,每个字符串之间用一个空格分隔。\n\n通过查找文本中的字符来创建解码信息。如果 \"s.w.c\"字符串并不指向文本中的某个字符,则在解码信息中使用一个空格代替。\n\n### 示例\n\n### 输入\n\n```text\nACSL is an international computer science competition among more than 300 schools.  With countrywide and worldwide participants it became the American Computer Science League.  It has been in continuous existence since 1978.  Each yearly competition consists of 4 regular season contests.  All students at each school may compete but the team score is the sum of the best 3 or 5 top scores.  Each contest consists of a written section and a programming section.\n1.5.4 4.2.6 1.10.1 3.2.1 6.11.6 2.9.8 4.10.3 5.18.1\n```\n\n### 输出\n\n```text\npython 3\n```\n\n解释说明: 第一个编码字符串 \"1.5.4\" 告诉你要先查找到第 1 句话,接着找到这句话的第 5 个单词 \"computer\",最后找到这个单词里的第 4 个字符,即小写字母 'p'。所有其它字符的查找方式都与此类似。因为第 4 句话中只有 9 个单词,所以字符串 \"4.10.3\" 是一个空格。\n\n### 输入\n\n输入一个字符串,代表解码时要使用的文本,再输入另一个字符串,代表需解码的编码信息。第一个字符串不超过 2000 个字符,第二个字符串不超过 200 个字符。\n\n### 输出\n\n以字符串的形式输出解码信息。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [],
+      "zh": []
+    }
+  }
+}

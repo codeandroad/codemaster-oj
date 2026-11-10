@@ -1,0 +1,1461 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2020-2021-junior-1",
+  "division": "Junior",
+  "season": "2020-2021",
+  "round": 1,
+  "roundLabel": {
+    "en": "Contest 1",
+    "zh": "第一轮"
+  },
+  "title": {
+    "en": "ACSL 2020-2021 Junior · Contest 1",
+    "zh": "ACSL 2020-2021 Junior · 第一轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Junior/2020-2021/第一轮/Final_c_1_jr中英文.pdf",
+      "sha256": "66d461f99bf53d6a77d4e970ec5b3ac97c7c753c0f69349eebf3ffb92a5a0c2e",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Junior/2020-2021/第一轮/c_1_jr_sol.pdf",
+      "sha256": "a6b0acd8e8354d855f534b40e1c6e420bbe583c5ceb681c55cf0b004461e1314",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Junior/2020-2021/第一轮/Final_c_1_triangle_jr.pdf",
+      "sha256": "7b9ad997eb38e3c8782ed916201ded6720f2c8bda7283f9d792d7ae8db56e0b8",
+      "pages": 2
+    },
+    {
+      "id": "programming-2",
+      "path": "resource/acsl-problems/Junior/2020-2021/第一轮/Final_c_1_triangle_jr（答案）.pdf",
+      "sha256": "4b4ff580dcaa1cf2b800f4273f92ecffe2d65f912336bad2f713913073b11aa0",
+      "pages": 2
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "How many 1’s are there in the binary representation of the decimal numbers from 22 to 32, inclusive?",
+        "zh": "把十进制数22到32(包含22和32)用二进制表示,共会出现多少个数字1?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "34",
+            "zh": "34"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "35",
+            "zh": "35"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "36",
+            "zh": "36"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "37",
+            "zh": "37"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "38",
+            "zh": "38"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "| Decimal | Binary | Number of 1s |\n| --- | --- | --- |\n| 22 | `10110` | 3 |\n| 23 | `10111` | 4 |\n| 24 | `11000` | 2 |\n| 25 | `11001` | 3 |\n| 26 | `11010` | 3 |\n| 27 | `11011` | 4 |\n| 28 | `11100` | 3 |\n| 29 | `11101` | 4 |\n| 30 | `11110` | 4 |\n| 31 | `11111` | 5 |\n| 32 | `100000` | 1 |\n\nThe total number of 1s is **36**.\n\nThe endpoints are included, so count 11 numbers. Add the last column: $3+4+2+3+3+4+3+4+4+5+1=36$. Notice that 32 is `100000`, which contributes only one 1 after the carry from 31.\n\n**Answer: C.**",
+        "zh": "| 十进制 | 二进制 | 1的个数 |\n| --- | --- | --- |\n| 22 | `10110` | 3 |\n| 23 | `10111` | 4 |\n| 24 | `11000` | 2 |\n| 25 | `11001` | 3 |\n| 26 | `11010` | 3 |\n| 27 | `11011` | 4 |\n| 28 | `11100` | 3 |\n| 29 | `11101` | 4 |\n| 30 | `11110` | 4 |\n| 31 | `11111` | 5 |\n| 32 | `100000` | 1 |\n\n数字1共出现 **36** 次。\n\n区间包含两个端点，一共要统计 11 个数。把最后一列相加：$3+4+2+3+3+4+3+4+4+5+1=36$。注意 31 进位到 32 后变成 `100000`，只贡献一个 1。\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Which number is the largest?\n\n$$\n101100000_{2}\\qquad 535_{8}\\qquad 15F_{16}\n$$",
+        "zh": "下列哪个数最大?\n\n$$\n101100000_{2}\\qquad 535_{8}\\qquad 15F_{16}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "$101100000_{2}$",
+            "zh": "$101100000_{2}$"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "$535_{8}$",
+            "zh": "$535_{8}$"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "$15F_{16}$",
+            "zh": "$15F_{16}$"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "2 of them are the largest",
+            "zh": "其中有2个数最大"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "all 3 are the same",
+            "zh": "3个数一样大"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "Converting each to binary makes $101100000_{2}$ the largest:\n\n$$\n101100000_{2}=101100000_{2}\n$$\n\n$$\n535_{8}\\qquad =101011101_{2}\n$$\n\n$$\n15F_{16}\\qquad =101011111_{2}\n$$\n\nAn independent decimal comparison gives $101100000_2=256+64+32=352$, $535_8=5\\times64+3\\times8+5=349$, and $15F_{16}=256+5\\times16+15=351$. Thus $352>351>349$. The number of written digits alone cannot compare numbers in different bases.\n\n**Answer: A.**",
+        "zh": "将三个数转换成二进制：\n\n$$101100000_2=101100000_2,\\quad 535_8=101011101_2,\\quad 15F_{16}=101011111_2.$$\n\n比较可知，$101100000_2$ 最大。\n\n也可统一换成十进制：$101100000_2=256+64+32=352$，$535_8=5\\times64+3\\times8+5=349$，$15F_{16}=256+5\\times16+15=351$。所以 $352>351>349$。不同进制的数不能只比较写出来的位数。\n\n**答案：A。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find f(7) , given:\n\n$$\nf(x)=\\begin{cases} 1 & \\text{if }x=1\\\\ x+f(x-1) & \\text{if }x>1 \\end{cases}\n$$",
+        "zh": "根据以下定义，求 $f(7)$：\n\n$$f(x)=\\begin{cases}1 & x=1\\\\x+f(x-1) & x>1\\end{cases}$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "27",
+            "zh": "27"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "28",
+            "zh": "28"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "30",
+            "zh": "30"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "36",
+            "zh": "36"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "38",
+            "zh": "38"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Evaluate each starting at 1:\n\n$$\n\\begin{aligned} f(1)&=1\\\\ f(2)&=f(1)+2=3\\\\ f(3)&=f(2)+3=6\\\\ f(4)&=f(3)+4=10\\\\ f(5)&=f(4)+5=15\\\\ f(6)&=f(5)+6=21\\\\ f(7)&=f(6)+7=28\\end{aligned}\n$$\n\nNote: the sequence generated is 1, 3, 6, 10, 15, 21, 28, ... These are called triangular numbers - each nth term is the sum of the first n integers. The formula for that sum is $\\frac{n(n+1)}{2}$ . For n = 7 , it is $\\frac{7\\times8}{2}=28$ .\n\n**Answer: B.**",
+        "zh": "从 $f(1)=1$ 开始逐项计算，得到 $1,3,6,10,15,21,28$。\n\n这是三角数数列，第 $n$ 项等于前 $n$ 个正整数之和：\n\n$$f(n)=1+2+\\cdots+n=\\frac{n(n+1)}2.$$\n\n所以 $f(7)=\\frac{7\\times8}{2}=28$。\n\n递推式每次在前一项上加当前参数：$f(2)=1+2=3$，$f(3)=3+3=6$，继续得到 $f(4)=10,f(5)=15,f(6)=21,f(7)=28$。基本情况是 $f(1)$，不是 $f(0)$。\n\n**答案：B。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find f(20) , given:\n\n$$\nf(x)=\\begin{cases} f\\!\\left(\\dfrac{x}{2}\\right)+1 & \\text{if }x\\text{ is even}\\\\ f(x+3)-1 & \\text{if }x\\text{ is odd and }x>3\\\\ \\dfrac{x+1}{2} & \\text{otherwise} \\end{cases}\n$$",
+        "zh": "根据以下定义，求 $f(20)$：\n\n$$f(x)=\\begin{cases}f\\!\\left(\\frac{x}{2}\\right)+1 & x\\text{ 为偶数}\\\\f(x+3)-1 & x\\text{ 为奇数且 }x>3\\\\\\frac{x+1}{2} & \\text{其他情况}\\end{cases}$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "2",
+            "zh": "2"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "3",
+            "zh": "3"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "5",
+            "zh": "5"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Evaluate the function by working forwards, then backwards.\n\n$$\n\\begin{aligned} f(20)&=f\\left(\\frac{20}{2}\\right)+1=f(10)+1=4+1=5\\\\ f(10)&=f\\left(\\frac{10}{2}\\right)+1=f(5)+1=3+1=4\\\\ f(5)&=f(5+3)-1=f(8)-1=4-1=3\\\\ f(8)&=f\\left(\\frac{8}{2}\\right)+1=f(4)+1=3+1=4\\\\ f(4)&=f\\left(\\frac{4}{2}\\right)+1=f(2)+1=2+1=3\\\\ f(2)&=f\\left(\\frac{2}{2}\\right)+1=f(1)+1=1+1=2\\\\ f(1)&=\\frac{1+1}{2}=\\frac{2}{2}=1\\end{aligned}\n$$\n\nThe argument chain is $20\\to10\\to5\\to8\\to4\\to2\\to1$. In particular, the odd argument 5 increases to 8; recursion need not decrease at every call. Only 1 uses the final branch, and the subtraction attached to $f(5)$ must be retained while unwinding.\n\n**Answer: D.**",
+        "zh": "先展开递归，再从基本情况向上回代：\n\n$$\n\\begin{aligned} f(20)&=f\\left(\\frac{20}{2}\\right)+1=f(10)+1=4+1=5\\\\ f(10)&=f\\left(\\frac{10}{2}\\right)+1=f(5)+1=3+1=4\\\\ f(5)&=f(5+3)-1=f(8)-1=4-1=3\\\\ f(8)&=f\\left(\\frac{8}{2}\\right)+1=f(4)+1=3+1=4\\\\ f(4)&=f\\left(\\frac{4}{2}\\right)+1=f(2)+1=2+1=3\\\\ f(2)&=f\\left(\\frac{2}{2}\\right)+1=f(1)+1=1+1=2\\\\ f(1)&=\\frac{1+1}{2}=\\frac{2}{2}=1\\end{aligned}\n$$\n\n参数变化链为 $20\\to10\\to5\\to8\\to4\\to2\\to1$。其中奇数 5 会先增加到 8，不能把递归误认为每一步都必须变小。只有参数 1 进入最后的基本情况；回代到 $f(5)$ 时要保留该层的减 1。\n\n**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "What is the output when this program is executed?\n\n```text\na = 24 : b = 2 : c = 3\nif a / c == b ^ c then\n    b = b * c\nend if\nif c + a / b > b then\n    a = a - b * c\nend if\nb = b + a / 3\nif b > a + c then\n    b = 2 * b\nelse\n    c = a / c\nend if\noutput a + b / c ^ 2.\n```",
+        "zh": "执行以下程序,输出值是多少?\n\n```text\na = 24 : b = 2 : c = 3\nif a / c == b ^ c then\n    b = b * c\nend if\nif c + a / b > b then\n    a = a - b * c\nend if\nb = b + a / 3\nif b > a + c then\n    b = 2 * b\nelse\n    c = a / c\nend if\noutput a + b / c ^ 2.\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "10",
+            "zh": "10"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "22",
+            "zh": "22"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "28",
+            "zh": "28"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "49",
+            "zh": "49"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "Trace the variables in execution order:\n\n| a | b | c |\n| --- | --- | --- |\n| 24 | 2 | 3 |\n| 24 | 6 | 3 |\n| 6 | 6 | 3 |\n| 6 | 8 | 3 |\n| 6 | 8 | 2 |\n\nThe final expression is $6+8/2^2=6+2=8$.\n\nThe first test is $24/3=2^3=8$, so $b=6$. The next test is $3+24/6=7>6$, so $a=6$. After $b=6+6/3=8$, the last test is $8>6+3$, which is false: execute the `else` branch, giving $c=2$. Evaluate the exponent before division in the output.\n\n**Answer: A.**",
+        "zh": "按程序执行顺序记录变量的值：\n\n| a | b | c |\n| --- | --- | --- |\n| 24 | 2 | 3 |\n| 24 | 6 | 3 |\n| 6 | 6 | 3 |\n| 6 | 8 | 3 |\n| 6 | 8 | 2 |\n\n最后的表达式为 $6+8/2^2=6+2=8$。\n\n第一次判断为 $24/3=2^3=8$，成立，故 $b=6$。第二次判断用更新后的 $b$：$3+24/6=7>6$，故 $a=6$。随后 $b=6+6/3=8$。最后判断 $8>6+3$ 不成立，执行 `else`，得到 $c=2$。输出时先计算平方，再除，最后相加。\n\n**答案：A。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          3,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [],
+  "programming": {
+    "id": "numeral-triangles",
+    "definition": {
+      "title": "Numeral Triangles",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Use the line structure shown in the test-case input below.\n\n### Problem\n\nConstruct a Numeral Triangle according to the following rules. You will be given three positive integers: s, a starting number; d, a delta (the amount by which to increase each number in the triangle); and r the number of rows.\n\n1. The first row contains the number s.\n\n2. Each of the next rows has one more number than the previous row.\n\n3. Each number in the triangle is d more than the previous number in the triangle.\n\n4. Before putting a number in the triangle, it is transformed to a single digit. That is, if the number is more than one digit, replace it by the sum of the digits, repeating until the sum is one digit (for example, 1938 ⇒ 21 ⇒ 3).\n\nHere are two examples of Numeral Triangles:\n\nStart=2, delta=3, rows=5:\n\n{{diagram:p-f479b7ea5d002a11}}\n\nStart=221, delta=2, rows=4:\n\n{{diagram:p-b41031bad79178f4}}\n\n### Input\n\nThe input has 3 positive integers, s, d, and r. The numbers are separated by spaces and each is less than 100,000.\n\n### Output\n\nPrint the sum of all numbers on the rth line of the Numeral Triangle.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "2 3 5\n",
+          "expected": "28\n"
+        },
+        {
+          "input": "221 2 4\n",
+          "expected": "17\n"
+        },
+        {
+          "input": "184 231 35\n",
+          "expected": "140\n"
+        },
+        {
+          "input": "71 5 27\n",
+          "expected": "135\n"
+        },
+        {
+          "input": "1 24 100\n",
+          "expected": "397\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "599 23 43\n",
+          "expected": "218\n",
+          "weight": 20
+        },
+        {
+          "input": "4326 1234 80\n",
+          "expected": "399\n",
+          "weight": 20
+        },
+        {
+          "input": "704 1776 200\n",
+          "expected": "1003\n",
+          "weight": 20
+        },
+        {
+          "input": "6283 185 31\n",
+          "expected": "154\n",
+          "weight": 20
+        },
+        {
+          "input": "3141 59 26\n",
+          "expected": "126\n",
+          "weight": 20
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。输入按下方测试用例展示的行结构读取。\n\n### 问题\n\n根据以下规则构造一个数字三角形。 已知三个正整数:起始数 s ;增量 d(三角形中每个数字的增加量);数字三角形行数 r。\n\n1. 第一行由数字 s 组成。\n\n2. 接下来的每一行都比上一行多一个数。\n\n3. 三角形中的每个数字都比前一个数字大 d。\n\n4. 把数填充进三角形之前，会先将它转换为一位数。也就是说，如果要填充的数多于一位，会将这个数替换为它的各位数字之和，不断重复此过程直到各位数字之和为一位数(例如 1938 ⇒ 21 ⇒ 3)。\n\n下面是两个数字三角形示例:\n\n起始数=2，增量=3，行数=5：\n\n{{diagram:p-f479b7ea5d002a11}}\n\n起始数=221，增量=2，行数=4：\n\n{{diagram:p-b41031bad79178f4}}\n\n### 输入\n\n输入包含 3 个正整数 s , d 和 r。数与数之间用空格分隔，且均小于 100,000。\n\n### 输出\n\n打印输出数字三角形第 r 行上所有数的总和。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming",
+        "programming-2"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [
+        {
+          "id": "p-f479b7ea5d002a11",
+          "width": 325,
+          "height": 235,
+          "alt": {
+            "en": "Number triangle: 2; 5 8; 2 5 8; 2 5 8 2; 5 8 2 5 8",
+            "zh": "数字三角形：2；5 8；2 5 8；2 5 8 2；5 8 2 5 8"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 33,
+              "text": "2",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 54,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 77,
+              "text": "5",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 54,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 77,
+              "text": "8",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 121,
+              "text": "2",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 121,
+              "text": "5",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 134,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 161,
+              "y": 121,
+              "text": "8",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 165,
+              "text": "2",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 165,
+              "text": "5",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 134,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 161,
+              "y": 165,
+              "text": "8",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 196,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 223,
+              "y": 165,
+              "text": "2",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 186,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 209,
+              "text": "5",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 186,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 209,
+              "text": "8",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 134,
+              "y": 186,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 161,
+              "y": 209,
+              "text": "2",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 196,
+              "y": 186,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 223,
+              "y": 209,
+              "text": "5",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 258,
+              "y": 186,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 285,
+              "y": 209,
+              "text": "8",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            }
+          ]
+        },
+        {
+          "id": "p-b41031bad79178f4",
+          "width": 263,
+          "height": 191,
+          "alt": {
+            "en": "Number triangle: 5; 7 9; 2 4 6; 8 1 3 5",
+            "zh": "数字三角形：5；7 9；2 4 6；8 1 3 5"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 33,
+              "text": "5",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 54,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 77,
+              "text": "7",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 54,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 77,
+              "text": "9",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 121,
+              "text": "2",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 121,
+              "text": "4",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 134,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 161,
+              "y": 121,
+              "text": "6",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 165,
+              "text": "8",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 165,
+              "text": "1",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 134,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 161,
+              "y": 165,
+              "text": "3",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 196,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 223,
+              "y": 165,
+              "text": "5",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            }
+          ]
+        }
+      ],
+      "zh": [
+        {
+          "id": "p-f479b7ea5d002a11",
+          "width": 325,
+          "height": 235,
+          "alt": {
+            "en": "Number triangle: 2; 5 8; 2 5 8; 2 5 8 2; 5 8 2 5 8",
+            "zh": "数字三角形：2；5 8；2 5 8；2 5 8 2；5 8 2 5 8"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 33,
+              "text": "2",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 54,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 77,
+              "text": "5",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 54,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 77,
+              "text": "8",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 121,
+              "text": "2",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 121,
+              "text": "5",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 134,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 161,
+              "y": 121,
+              "text": "8",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 165,
+              "text": "2",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 165,
+              "text": "5",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 134,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 161,
+              "y": 165,
+              "text": "8",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 196,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 223,
+              "y": 165,
+              "text": "2",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 186,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 209,
+              "text": "5",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 186,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 209,
+              "text": "8",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 134,
+              "y": 186,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 161,
+              "y": 209,
+              "text": "2",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 196,
+              "y": 186,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 223,
+              "y": 209,
+              "text": "5",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 258,
+              "y": 186,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 285,
+              "y": 209,
+              "text": "8",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            }
+          ]
+        },
+        {
+          "id": "p-b41031bad79178f4",
+          "width": 263,
+          "height": 191,
+          "alt": {
+            "en": "Number triangle: 5; 7 9; 2 4 6; 8 1 3 5",
+            "zh": "数字三角形：5；7 9；2 4 6；8 1 3 5"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 33,
+              "text": "5",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 54,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 77,
+              "text": "7",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 54,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 77,
+              "text": "9",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 121,
+              "text": "2",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 121,
+              "text": "4",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 134,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 161,
+              "y": 121,
+              "text": "6",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 165,
+              "text": "8",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 165,
+              "text": "1",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 134,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 161,
+              "y": 165,
+              "text": "3",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 196,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 223,
+              "y": 165,
+              "text": "5",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

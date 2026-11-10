@@ -1,0 +1,457 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2023-2024-senior-2",
+  "division": "Senior",
+  "season": "2023-2024",
+  "round": 2,
+  "roundLabel": {
+    "en": "Contest 2",
+    "zh": "第二轮"
+  },
+  "title": {
+    "en": "ACSL 2023-2024 Senior · Contest 2",
+    "zh": "ACSL 2023-2024 Senior · 第二轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Senior/2023-2024/第二轮/c_2_sr.pdf",
+      "sha256": "fabce70987ede7bd1ef46af983c0fdba4433118bb6e78eb53792652eb99c6d51",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Senior/2023-2024/第二轮/c_2_sr_soln.pdf",
+      "sha256": "a23e43e5ab98f95fc6abd1270d9fa6a0c10b3faa725b50d60d6e83420c372bfe",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Senior/2023-2024/第二轮/c_2_ACSL Book_sr.pdf",
+      "sha256": "cbdc32b376c69ba5677140b7220f63b4e471769b882b9075666772fcd6f1b06f",
+      "pages": 14
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Evaluate the following prefix expression if all numbers are single digits:\n\n`* / + ^ 3 2 6 5 * 4 ^ 2 / / 8 2 2`",
+        "zh": "如果下方所有数字都是一位数,请计算下方前缀表达式:\n\n`* / + ^ 3 2 6 5 * 4 ^ 2 / / 8 2 2`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "9",
+            "zh": "9"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "16",
+            "zh": "16"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "27",
+            "zh": "27"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "42",
+            "zh": "42"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "48",
+            "zh": "48"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "Parse the prefix expression into its two factors:\n\n$$\n\\frac{3^2+6}{5}\\times\\left(4\\times2^{(8/2)/2}\\right)=3\\times16=48\n$$\n\nThe nested division `/ / 8 2 2` means (8/2)/2=2, not 8/(2/2)=8. Thus the right factor is 4×2²=16. The left factor is (9+6)/5=3, giving 48, **option E**. Prefix arity fixes the grouping independently of normal written precedence.",
+        "zh": "按前缀运算符的操作数范围分为两个因子：\n\n$$\n\\frac{3^2+6}{5}\\times\\left(4\\times2^{(8/2)/2}\\right)=3\\times16=48\n$$\n\n所以选 E。\n\n嵌套的 `/ / 8 2 2` 表示 (8/2)/2=2，不是 8/(2/2)=8。因此右因子为 4×2²=16；左因子为 (9+6)/5=3，乘积 48，选 **E**。前缀式由每个运算符需要的操作数数量确定分组。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Define two unary operators:\n\n$$\nn!=n(n-1)(n-2)\\cdots3\\cdot2\\cdot1\n$$\n\nThe postfix operator `|` takes the absolute value: `a |` means $|a|$.\n\nEvaluate the following postfix expression, where every number is a single digit:\n\n`5 ! 2 3 - | * 2 ! / 2 3 ^ | +`",
+        "zh": "定义两个一元运算符：\n\n$$\nn!=n(n-1)(n-2)\\cdots3\\cdot2\\cdot1\n$$\n\n后缀运算符 `|` 表示取绝对值：`a |` 的值为 $|a|$。\n\n计算以下后缀表达式，其中每个数字都是一位数：\n\n`5 ! 2 3 - | * 2 ! / 2 3 ^ | +`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "15",
+            "zh": "15"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "40",
+            "zh": "40"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "52",
+            "zh": "52"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "68",
+            "zh": "68"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "128",
+            "zh": "128"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Applying each unary operator immediately to its preceding operand gives:\n\n$$\n\\frac{5!\\,|2-3|}{2!}+|2^3|=\\frac{120\\times1}{2}+8=68\n$$\n\nA left-to-right stack trace gives intermediate values 5!→120, 2−3→−1, absolute value→1, product→120, 2!→2, quotient→60, 2³→8, absolute value→8, then 60+8=68. Each ! or | consumes only one value; −, *, /, ^ and + consume two. **Answer: D.**",
+        "zh": "将各个一元运算符作用于其前面的操作数，得到：\n\n$$\n\\frac{5!\\,|2-3|}{2!}+|2^3|=\\frac{120\\times1}{2}+8=68\n$$\n\n所以选 D。\n\n从左向右按栈求值，中间结果依次为：5!→120，2−3→−1，绝对值→1，乘积→120，2!→2，商→60，2³→8，绝对值→8，最后 60+8=68。每个 ! 或 | 只消耗一个值，−、*、/、^、+ 则消耗两个值。**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "比特位操作"
+      },
+      "statement": {
+        "en": "Evaluate the following expression:\n\n`(LSHIFT-2 01101) AND (RCIRC-1 (LSHIFT-2 (NOT 11010)))`",
+        "zh": "请计算下列表达式:\n\n`(LSHIFT-2 01101) AND (RCIRC-1 (LSHIFT-2 (NOT 11010)))`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`01010`",
+            "zh": "`01010`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`00101`",
+            "zh": "`00101`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`10101`",
+            "zh": "`10101`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`00000`",
+            "zh": "`00000`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`10100`",
+            "zh": "`10100`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "`(LSHIFT-2 01101) AND (RCIRC-1 (LSHIFT-2 (NOT 11010)))`\n\n`= 10100 AND (RCIRC-1 (LSHIFT-2 00101))`\n\n`= 10100 AND (RCIRC-1 10100)`\n\n`= 10100 AND 01010`\n\n`= 00000`\n\nThe two final operands have 1s in disjoint positions: `10100` has 1s at positions 1 and 3, while `01010` has 1s at positions 2 and 4. AND keeps a 1 only where both operands have 1, so all five output bits are 0. **Answer: D.**",
+        "zh": "保持 5 位：`LSHIFT-2 01101 = 10100`。另一侧先取反得到 `00101`，左移两位得到 `10100`，循环右移一位得到 `01010`。因此 `10100 AND 01010 = 00000`，选 D。\n\n最后两个操作数中，`10100` 的第 1、3 位为 1，`01010` 的第 2、4 位为 1，两者没有共同为 1 的位置。AND 只保留两边同时为 1 的位，所以五位全为 0。**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "比特位操作"
+      },
+      "statement": {
+        "en": "Solve for X, a 5-bit string:\n\n`(RSHIFT-2 01110) OR X AND (LCIRC-1 (LSHIFT-1 10110)) = 01011`",
+        "zh": "X是一个5位的位串,求X。\n\n`(RSHIFT-2 01110) OR X AND (LCIRC-1 (LSHIFT-1 10110)) = 01011`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`10*00`",
+            "zh": "`10*00`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`01***`",
+            "zh": "`01***`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`11011`",
+            "zh": "`11011`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`*0011`",
+            "zh": "`*0011`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`00000`",
+            "zh": "`00000`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "`Let X = abcde`\n\n`LHS = (RSHIFT-2 01110) OR X AND (LCIRC-1 (LSHIFT-1 10110))`\n\n`= 00011 OR abcde AND (LCIRC-1 01100)`\n\n`= 00011 OR (abcde AND 11000)`\n\n`= 00011 OR ab000`\n\n`= ab011`\n\n`RHS = 01011`\n\n`LHS = RHS ⇒ab011 = 01011 ⇒ a = 0, b = 1, c = *, d = *, e = *`\n\nTherefore X = 01***\n\nThe mask `11000` removes any influence of c, d and e. OR with `00011` fixes the last two output bits at 1, but leaves the first two as a and b. Therefore exactly 2³=8 strings match the wildcard answer `01***`, **option B**; X itself need not equal the output 01011.",
+        "zh": "设 `X = abcde`。右移结果为 `00011`；另一侧先左移得到 `01100`，再循环左移得到 `11000`。按 AND 优先于 OR：`00011 OR (abcde AND 11000) = ab011`。要等于 `01011`，必须 `a=0, b=1`，其余三位任意，即 `X = 01***`，选 B。\n\n掩码 `11000` 消去了 c、d、e 的影响，随后与 `00011` 做 OR 把输出末两位固定为 1，而前两位仍是 a、b。因此 `01***` 代表恰好 2³=8 个合法字符串，选 **B**；X 本身不必等于输出 01011。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "LISP",
+        "zh": "LISP"
+      },
+      "statement": {
+        "en": "Evaluate the following sequence of LISP expressions:\n\n```text\n(SETQ X '(1 2 (a (b) c) ((1 a) (2 b) c)))\n(CDADDR X)\n```",
+        "zh": "请计算下列LISP表达式:\n\n```text\n(SETQ X '(1 2 (a (b) c) ((1 a) (2 b) c)))\n(CDADDR X)\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "(a (b) c)",
+            "zh": "(a (b) c)"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "(b)",
+            "zh": "(b)"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "((b) c)",
+            "zh": "((b) c)"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "(a (b))",
+            "zh": "(a (b))"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "(a)",
+            "zh": "(a)"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "CDADDR means CDR of CAR of CDR of CDR. It selects the third top-level sublist and removes that sublist’s first element, producing `((b) c)`.\n\n```lisp\nX = (1 2 (a (b) c) ((1 a) (2 b) c))\n(CDR X)       => (2 (a (b) c) ((1 a) (2 b) c))\n(CDR (CDR X)) => ((a (b) c) ((1 a) (2 b) c))\nCAR           => (a (b) c)\nCDR           => ((b) c)\n```\n\nThe result has two top-level elements: the one-element list `(b)` and the atom c. It is therefore `((b) c)`, not `(b)` and not `(b c)`. The fourth element of X is never selected. **Answer: C.**",
+        "zh": "CDADDR 表示从内到外依次执行 CDR、CDR、CAR、CDR。它取出最外层列表的第三个子表，再去掉该子表的首元素，得到 `((b) c)`。\n\n```lisp\nX = (1 2 (a (b) c) ((1 a) (2 b) c))\n(CDR X)       => (2 (a (b) c) ((1 a) (2 b) c))\n(CDR (CDR X)) => ((a (b) c) ((1 a) (2 b) c))\nCAR           => (a (b) c)\nCDR           => ((b) c)\n```\n\n结果的两个顶层元素分别为单元素列表 `(b)` 和原子 c，所以必须写成 `((b) c)`，不能写成 `(b)` 或 `(b c)`。X 的第四个元素并没有被选中。**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [],
+  "programming": {
+    "id": "acsl-book",
+    "definition": {
+      "title": "ACSL Book",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Read two lines: the complete book text, then the message to encode.\n\n### Problem\n\nA book cipher is a method of encoding and decoding a message where the sender and the receiver both use the same text. The sender’s message is encoded by replacing each alphanumeric character in the message to be sent with the location of that character in the text using an “s.w.c” format representing the number of the sentence in the text (s), the number of the word in that sentence (w), and the number of the character in that word (c), all indexed starting with 1. The receiver decodes the encoded message by locating the characters in the text specified by each “s.w.c” string.\n\nIn this program, you will be given the text and the message to be encoded. Encode the location of each character of the message using the “s.w.c” format. The following rules apply:\n\n- Any keyboard character can be included in the text or the message and all alphabetic characters are case sensitive\n\n- A word in the text contains only alphanumeric characters and all words are separated by a single space or any non-alphanumeric character(s)\n\n- All sentences in the text will end with a period, question mark, or exclamation point and will be separated by exactly 2 spaces\n\n- Only alphanumeric characters in the message will be encoded and all other characters will remain as they are in the encoded message\n\n- If a space occurs in the message, use an underscore (“_”) for that character when encoding it\n\n- For every character in the message to be encoded, find the location of the 1st occurrence in the text of the 1st character in the message, the 2nd occurrence in the text of the 2nd character in the message, the 3rd occurrence in the text of the 3rd character in the message, etc.\n\n- We guarantee that each character in the message will occur at least once in the text\n\n- If there aren’t that many occurrences of a character found in the text, divide the number in half using integer division until that number of occurrences of that character is found (e.g. if there is no 13th occurrence of a character, find the 6th, then the 3rd, then the 1st if needed)\n\n- Each encoded “s.w.c” within a word will be separated by a single space\n\n### Example\n\n### Input\n\n```text\nACSL, or the American Computer Science League, is an international computer science competition among more than 300 schools.  Originally founded in 1978 as the Rhode Island Computer Science League, it then became the New England Computer Science League.\nAmerican Computer Science League (ACSL) is fun!\n```\n\n### Output\n\n```text\n1.1.1 1.5.3 1.5.7 1.10.5 1.10.9 1.12.6 1.16.3 1.13.11_2.18.1 1.18.5 1.14.2 1.13.4 2.11.5 2.18.6 2.6.3 2.9.8_2.19.1 2.10.2 2.1.3 2.11.2 1.16.4 2.14.3 2.14.2_2.11.1 2.15.3 2.17.5 2.20.4 2.18.5 2.19.7_(1.1.1 2.9.1 2.19.1 2.20.1)_1.13.9 1.18.7_2.2.1 2.2.3 2.19.5!\n```\n\nExplanation: The “A” is the 1st character in the message so find the 1st occurrence of “A” in the text (1.1.1). The “m” is the 2nd character in the message so find the 2nd occurrence of “m” in the text. The string “1.5.3” locates that “m” in the 1st sentence, the 5th word, and the 3rd character in that word. The “C’ in “Computer” is the 9th character in the message. There are not 9 occurrences in the text so find the 4th occurrence which is in the 2nd sentence, the 18th word, and the 1st character in the word “Computer” (2.18.1).\n\nThere is a single space between each encoded character in each word and all non-alphanumeric characters are included as they are in the original string except for a space which is encoded as an underscore (“_”).\n\n### Input\n\nInput two strings: the text to be used and the message to be encoded. The text will be no more than 2000 characters and the message will be no more than 400 characters.\n\n### Output\n\nOutput the encoded message as a string of characters.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "ACSL, or the American Computer Science League, is an international computer science competition among more than 300 schools.  Originally founded in 1978 as the Rhode Island Computer Science League, it then became the New England Computer Science League.\nAmerican Computer Science League (ACSL) is fun!\n",
+          "expected": "1.1.1 1.5.3 1.5.7 1.10.5 1.10.9 1.12.6 1.16.3 1.13.11_2.18.1 1.18.5 1.14.2 1.13.4 2.11.5 2.18.6 2.6.3 2.9.8_2.19.1 2.10.2 2.1.3 2.11.2 1.16.4 2.14.3 2.14.2_2.11.1 2.15.3 2.17.5 2.20.4 2.18.5 2.19.7_(1.1.1 2.9.1 2.19.1 2.20.1)_1.13.9 1.18.7_2.2.1 2.2.3 2.19.5!\n"
+        },
+        {
+          "input": "To be or not to be, that is the question - a quote by William Shakespeare.  2B or not 2B - a hexadecimal equivalent!  How would you write it?\nBoolean is always True!\n",
+          "expected": "2.1.2 1.3.1 1.4.2 2.7.7 1.12.5 2.5.1 2.3.1_3.5.1 1.10.4_1.15.9 3.2.4 3.4.1 2.5.1 1.13.2 1.15.6_1.1.1 3.4.2 3.2.3 2.6.2!\n"
+        },
+        {
+          "input": "Various programming languages are: Java, Python, Visual BASIC, C++, Lisp, C#, FORTRAN, R, SQL.  Javascript is the language of the Internet!  HTML stands for Hypertext Markup Language and is not really a coding language!  There are over 300 languages.  Which one do you like best?\nJava is the language of AP CS! Where is Lisp used?\n",
+          "expected": "1.5.1 1.2.6 4.3.2 1.3.6_2.1.8 2.2.2_3.2.2 4.1.2 3.4.7_3.10.5 2.4.2 3.13.3 4.5.7 3.13.5 3.6.2 3.6.7 4.5.8_5.2.1 3.3.1_1.12.6 1.6.1_1.9.1 1.14.1!_5.1.1 5.1.5 4.1.3 4.3.4 4.1.5_3.8.1 3.2.1_3.1.4 3.12.4 3.2.6 3.4.3_4.5.5 3.8.2 5.2.3 5.3.1?\n"
+        },
+        {
+          "input": "Four score and seven years ago our fathers brought forth on this continent, a new nation, conceived in Liberty, and dedicated to the proposition that all men are created equal.  Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived and so dedicated, can long endure.  We are met on a great battle-field of that war.  We have come to dedicate a portion of that field, as a final resting place for those who here gave their lives that that nation might live.  It is altogether fitting and proper that we should do this.  This was written by Abraham Lincoln on 11/19/1863!\nThe #1 speech of all time was less than 8 minutes long!\n",
+          "expected": "6.1.1 1.9.6 1.4.4_#6.10.1_1.12.4 5.6.4 1.15.2 1.17.5 2.18.4 3.10.2_1.22.2 4.10.1_1.30.4 5.9.5 6.6.6_2.7.5 2.21.4 4.26.1 2.2.2_6.3.1 2.15.1 4.14.3_4.22.1 2.10.2 4.17.4 4.22.5_3.7.3 4.18.2 3.7.2 4.13.3_6.10.2_4.26.1 6.1.3 5.4.6 1.30.3 4.14.4 3.7.6 2.20.1_4.13.5 2.18.2 2.15.2 4.20.1!\n"
+        },
+        {
+          "input": "There are 10 kinds of people in the world: those who know binary and those who don't!  Make sure you learn binary.  Computers all use it.\nCould you be the 0 kind or the 1 kind?\n",
+          "expected": "3.1.1 1.6.3 3.1.5 3.2.2 1.9.5_2.5.6 1.15.3 3.3.1_2.5.1 2.2.4_3.1.6 1.16.2 3.3.3_1.3.2_2.1.3 2.5.2 2.5.3 1.17.1_1.17.2 2.2.3_3.1.6 1.15.2 2.4.2_1.3.1_2.1.3 1.13.2 1.17.3 1.14.3?\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "ACSL, or the American Computer Science League, is an international computer science competition among more than 300 schools.  Originally founded in 1978 as the Rhode Island Computer Science League, it then became the New England Computer Science League.  With countrywide and worldwide participants, it became the American Computer Science League.  It has been in continuous existence since 1978.  Each yearly competition consists of four regular-season contests.  All students at each school may compete, but the team score is the sum of the best 3 or 5 top scores.  Each contest consists of 2 parts: a written section (called shorts) and a programming section.  Written topics tested include what does this program do, digital electronics, Boolean algebra, computer numbering systems, recursive functions, data structures (primarily dealing with heaps, binary search trees, stacks, and queues), Lisp programming, regular expressions and Finite State Automata, bit string flicking, graph theory, assembly language programming, and prefix/postfix/infix notation.\nACSL (American Computer Science League) is forty-six years old in '23!\n",
+          "expected": "1.1.1 1.5.1 2.10.1 2.20.1_(8.38.1 1.15.1 1.7.6 2.9.8 2.1.3 2.10.6 2.11.3 2.2.4_2.9.1 2.18.2 6.7.3 8.14.4 6.8.2 3.5.11 2.10.7 6.19.2_3.11.1 4.7.4 4.4.1 2.14.6 4.3.4 5.9.1 2.18.7_2.11.1 2.19.7 7.1.2 8.22.7 6.2.3 3.4.9)_7.14.9 7.11.6_8.49.5 7.4.1 8.21.2 6.17.4 8.44.8-8.11.11 8.11.9 8.50.5_6.6.3 4.6.1 8.22.3 8.34.4 8.20.10_8.14.2 8.45.1 7.12.3_8.32.9 8.29.2_'7.5.1 1.17.1!\n",
+          "weight": 20
+        },
+        {
+          "input": "We hold these truths to be self-evident, that all men are created equal, that they are endowed by their Creator with certain unalienable Rights, that among these are Life, Liberty and the pursuit of Happiness.  That to secure these rights, Governments are instituted among Men, deriving their just powers from the consent of the governed...\nLive life; pursue happiness; be free!\n",
+          "expected": "1.30.1 1.20.4 2.11.5 1.6.2_1.14.5 1.25.2 1.35.2 1.11.2;_2.14.1 1.34.5 1.34.3 2.6.11 2.3.4 1.17.3_2.5.4 1.36.2 2.14.1 2.14.1 1.34.6 2.6.6 1.24.11 2.5.6 2.5.6;_1.24.9 1.30.4_1.35.2 2.5.1 1.36.7 2.3.2!\n",
+          "weight": 20
+        },
+        {
+          "input": "The upheavals [of Artificial Intelligence] can escalate quickly and become scarier and even cataclysmic.  Imagine how a medical robot, originally programmed to rid cancer, could conclude that the best way to obliterate cancer is to exterminate humans who are genetically prone to the disease.  Nick Bilton is a tech columnist who wrote in the New York Times.\nAI is here to stay! If so, how good will it get?\n",
+          "expected": "1.4.1 2.1.1_1.4.8 1.14.8_2.14.2 1.7.1 2.7.5 1.10.2_2.14.1 2.12.2_3.6.8 2.18.5 2.3.1 2.6.10!_1.5.1 1.4.5_2.30.3 3.6.2,_3.5.4 3.8.3 3.8.1_2.26.1 2.17.2 2.18.1 2.11.5_3.11.3 2.18.4 2.26.9 2.26.9_2.22.7 2.22.3_2.7.4 3.5.2 2.26.5?\n",
+          "weight": 20
+        },
+        {
+          "input": "I'm increasingly inclined to think that there should be some regulatory oversight, maybe at the national and international level, just to make sure that we don't do something very foolish.  I mean with artificial intelligence we're summoning the demon.  This was said by Elon Musk at MIT's AeroAstro Centennial Symposium.\nAI is even scary for IT geniuses. Is it to you?\n",
+          "expected": "3.10.1 2.1.1_1.4.1 1.13.5_1.10.2 1.31.1 1.12.2 1.18.2_2.8.1 1.4.3 1.23.2 3.10.8 3.12.2_1.32.1 2.10.4 1.31.3_2.1.1 3.8.3_1.30.9 2.5.4 3.11.3 3.12.7 2.8.2 3.3.1 2.9.3 3.6.3._3.8.2 3.9.1_2.4.6 1.25.1_1.25.1 3.5.3_1.31.4 3.10.4 1.24.2?\n",
+          "weight": 20
+        },
+        {
+          "input": "The quadratic equation x^2-6x-7=0 can be solved by factoring it into (x-7)(x+1)=0.  By setting x-7=0 or x+1=0, the result is that x = 7 or x = -1.  However, if 3x^2-5x+9=0, factoring is not possible because 25-4*3*9<0 so the roots of this equation are 2 imaginary numbers.  In the 1st case, the function crosses the x-axis at 7 and -1.  In the 2nd case, the graph is completely above the x-axis!\nThe roots of x^2+9=0 are +3i and -3i, 2 imaginary numbers.\n",
+          "expected": "1.1.1 2.10.2 1.10.2_2.11.1 2.6.1 2.16.1 2.2.4 3.12.6_3.10.2 4.6.1_4.9.1^3.13.1+3.6.1=2.5.1_4.11.1 3.20.1 4.2.3_+3.15.1 5.12.3_5.12.1 3.27.1 1.11.6_-3.15.1 3.22.3,_3.13.1_3.23.6 5.8.3 4.10.1 3.8.9 3.26.5 5.1.2 4.13.1 3.20.1 5.8.10_3.23.8 3.12.5 3.27.3 3.12.1 4.5.3 3.26.8 5.7.2.\n",
+          "weight": 20
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。输入两行：完整书本文本，以及要编码的消息。\n\n### 问题\n\n书加密法是一种发送者和接收者使用相同的文本对信息进行编码和解码的方法。发送者对信息进行编码时,使用 \"s.w.c\" 格式将要发送的信息中的每个字母数字字符替换为该字符在文本中的位置。\"s.w.c\" 格式代表文本中句子的编号(s), 句子中单词的编号(w), 单词中字符的编号(c),所有编号均从 1 开始。接收者通过查找每个 \"s.w.c\" 字符串在文本中指定的字符来对编码信息进行解码。\n\n在此程序中,将给定文本以及需编码的信息。使用 \"s.w.c\" 格式对信息中每个字符的位置进行编码。规则如下:\n\n- 文本或信息中可包含任意键盘字符,所有字母字符均区分大小写\n\n- 文本中的每个单词只包含字母数字字符,每个单词之间均用一个空格或任意非字母数字字符(一个或多个)分隔\n\n- 文本中的句子均以句号、问号或感叹号结束,且句子之间严格用两个空格分隔\n\n- 仅对信息中的字母数字字符进行编码,其它所有字符均在编码信息中保持其原样不变\n\n- 如果信息中出现空格,则使用下划线 (\"_\") 对其进行编码\n\n- 对于信息中每一个需编码的字符,查找出信息中第 1 个字符在文本里第 1 次出现时的位置;信息中第 2 个字符在文本里第 2 次出现时的位置;信息中第 3 个字符在文本里第 3 次出现时的位置,以此类推\n\n- 我们保证信息中每个字符在文本里至少会出现一次\n\n- 如果发现文本中某个字符出现的次数没有那么多,则使用整数除法将该次数对半分, 直到出现可以查找出该字符的次数为止 (例如,如果某字符没有第 13 次出现,则去查找它第 6 次出现时的位置,如果没有出现第 6 次,就查找它第 3 次出现时的位置,如果还是没有,就再查找出它第 1 次出现时的位置)\n\n- 一个单词内每个\"s.w.c\" 编码之间用一个空格分隔\n\n### 示例\n\n### 输入\n\n```text\nACSL, or the American Computer Science League, is an international computer science competition among more than 300 schools.  Originally founded in 1978 as the Rhode Island Computer Science League, it then became the New England Computer Science League.\nAmerican Computer Science League (ACSL) is fun!\n```\n\n### 输出\n\n```text\n1.1.1 1.5.3 1.5.7 1.10.5 1.10.9 1.12.6 1.16.3 1.13.11_2.18.1 1.18.5 1.14.2 1.13.4 2.11.5 2.18.6 2.6.3 2.9.8_2.19.1 2.10.2 2.1.3 2.11.2 1.16.4 2.14.3 2.14.2_2.11.1 2.15.3 2.17.5 2.20.4 2.18.5 2.19.7_(1.1.1 2.9.1 2.19.1 2.20.1)_1.13.9 1.18.7_2.2.1 2.2.3 2.19.5!\n```\n\n解释说明:\n\n\"A\" 是信息中的第 1 个字符,所以要查找到 \"A\" 在文本中第 1 次出现的位置 (1.1.1)。\"m\"是信息中的第 2 个字符,所以要查找到 \"m\" 在文本中第 2 次出现的位置。 字符串 \"1.5.3\"表示 \"m\" 是第 1 句话中第 5 个单词的第 3 个字符。\"Computer\" 中的 \"C\" 是信息中的第 9个字符,但 \"C\" 在文本中并没有出现 9 次,因此要查找到第 4 次出现的 \"C\",即第 2 句话的第 18 个单词 \"Computer\" 中的第 1 个字符 (2.18.1)。\n\n每个单词中的每一个编码字符之间都有一个空格,编码信息中所有非字母数字字符都保持其在原始字符串中的形式不变,用下划线 (\"_\") 编码的空格除外。\n\n### 输入\n\n输入两个字符串:要使用的文本以及需编码的信息。文本不超过 2000 个字符, 信息不超过 400 个字符。\n\n### 输出\n\n以字符串形式输出编码信息\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [],
+      "zh": []
+    }
+  }
+}

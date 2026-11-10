@@ -1,0 +1,984 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2021-2022-senior-1",
+  "division": "Senior",
+  "season": "2021-2022",
+  "round": 1,
+  "roundLabel": {
+    "en": "Contest 1",
+    "zh": "第一轮"
+  },
+  "title": {
+    "en": "ACSL 2021-2022 Senior · Contest 1",
+    "zh": "ACSL 2021-2022 Senior · 第一轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Senior/2021-2022/第一轮/c_1_sr.pdf",
+      "sha256": "70ddf6a5a605511da4408ad00ca98bb46710387621e4a92901d47d21a4907af4",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Senior/2021-2022/第一轮/c_1_sr_soln.pdf",
+      "sha256": "a8f102e8ca39ac8b1c72f77be465655a810bf6abf5a620e96b4b09cb15a34333",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Senior/2021-2022/第一轮/c_1_FibonacciClock_sr（含答案）.pdf",
+      "sha256": "6f87af3b5e19f75f55db5c762574882b2bf9c32b9e7247f0853e21adc153052d",
+      "pages": 6
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Starting with the year $2122_{10}$ converted to hex, in how many years (in base10) will the year first be represented by a hexadecimal number where all the digits are the same?",
+        "zh": "从转化为十六进制的 $2122_{10}$ 年开始,多少年(十进制)后,十六进制后的年份将由相同的数字组成?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "22",
+            "zh": "22"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "62",
+            "zh": "62"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "260",
+            "zh": "260"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "406",
+            "zh": "406"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "608",
+            "zh": "608"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "$$\n2122_{10}=8*16^{2}+4*16^{1}+10*16^{0}\n$$\n\n$$\n=84A_{16}\n$$\n\nThe next year with all the same hex digits is $888_{16}$\n\n$$\n888_{16}=8*16^{2}+8*16^{1}+8*16^{0}=2184\n$$\n\nSo 2184 - 2122 = 62\n\nA three-digit repeated hexadecimal number has value $d(16^2+16+1)=273d$. Since $777_{16}=1911<2122<2184=888_{16}$, 888 is the first future one; take the difference in decimal years, not hexadecimal digits. **Answer: B, 62 years.**",
+        "zh": "将年份转换为十六进制：$2122_{10}=84A_{16}$。下一个所有数位相同的十六进制数是 $888_{16}=2184_{10}$，所以还需 $2184-2122=62$ 年。\n\n三位数位相同的十六进制数的值为 $d(16^2+16+1)=273d$。因为 $777_{16}=1911<2122<2184=888_{16}$，所以 888 是未来最早的一年；最后要用十进制年份相减。**答案：B，62 年。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "The Fibonacci sequence {0, 1, 1, 2, 3, 5, 8, 13, ...} is formed by adding the two previous terms: 5 + 8 = 13. Which number in the sequence when converted to hexadecimal would have the 2nd occurrence of the substring “0”?",
+        "zh": "斐波那契数列{0, 1, 1, 2, 3, 5, 8, 13, ...}由前两项相加而成,例如:5 +8 = 13。将数列中的每个数字转换为十六进制后,第二次出现子串“0”的是哪个数?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "34",
+            "zh": "34"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "55",
+            "zh": "55"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "89",
+            "zh": "89"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "144",
+            "zh": "144"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "233",
+            "zh": "233"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "The sequence in hexadecimal begins `0, 1, 1, 2, 3, 5, 8, D, 15, 22, 37, 59, 90`. The first occurrence of digit 0 is the initial term 0. The second occurs in $90_{16}=144_{10}$.\n\nThe relevant decimal terms are 34, 55, 89, 144, with hexadecimal forms 22, 37, 59, 90. Their remainders on division by 16 are 2, 7, 9, 0 respectively. Do not omit the initial 0 from the occurrence count. **Answer: D, the decimal term 144.**",
+        "zh": "数列的十六进制表示依次为 `0, 1, 1, 2, 3, 5, 8, D, 15, 22, 37, 59, 90`。第一次出现数字 0 的是首项 0，第二次出现于 $90_{16}=144_{10}$。\n\n相关的十进制项 34、55、89、144 分别转为十六进制 22、37、59、90；它们除以 16 的余数分别为 2、7、9、0。计数时不要漏掉数列首项 0。**答案：D，十进制项 144。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find $f(10)$, given\n\n$$\nf(x)=\\begin{cases} 1 & \\text{if }x=1\\\\ f(x-1)+3x-2 & \\text{if }x>1 \\end{cases}\n$$",
+        "zh": "根据以下条件,求 $f(10)$。\n\n$$\nf(x)=\\begin{cases} 1 & \\text{当 }x=1\\\\ f(x-1)+3x-2 & \\text{当 }x>1 \\end{cases}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "70",
+            "zh": "70"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "92",
+            "zh": "92"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "117",
+            "zh": "117"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "145",
+            "zh": "145"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "176",
+            "zh": "176"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Each step adds $3x-2$. Thus\n\n$$\nf(10)=1+\\sum_{x=2}^{10}(3x-2)=1+3(54)-2(9)=145\n$$\n\nThe first values are 1, 5, 12, 22. The source solution has a typo in the first expression for f(2): the subtracted constant must be 2.\n\nThere are nine increments, for x=2 through 10, and $2+3+\\cdots+10=54$. The initial value $f(1)=1$ is included once, rather than applying the recursive formula at x=1. **Answer: D.**",
+        "zh": "每一步增加 $3x-2$，因此\n\n$$\nf(10)=1+\\sum_{x=2}^{10}(3x-2)=1+3(54)-2(9)=145\n$$\n\n前几项为 1、5、12、22。原卷解析中 f(2) 的第一处表达式有笔误，减去的常数应为 2。\n\n从 x=2 到 x=10 共有九次增量，且 $2+3+\\cdots+10=54$。初值 $f(1)=1$ 只计一次，不应再在 x=1 套用递推分支。**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Number Systems",
+        "zh": "递归数制"
+      },
+      "statement": {
+        "en": "Evaluate $f(100,36)-f(36,100)$ , given\n\n$$\nf(x,y)=\\begin{cases} f\\!\\left(\\left[\\dfrac{x}{2}\\right],\\left[\\dfrac{y}{2}\\right]\\right)+2 & \\text{if }xy\\ge50\\\\ f(2x,y-3)+1 & \\text{if }10<xy<50\\\\ xy-x-y & \\text{if }xy\\le10 \\end{cases}\n$$\n\nwhere [z] returns the greatest integer less than or equal to z",
+        "zh": "根据以下条件,计算 $f(100,36)-f(36,100)$ 。\n\n$$\nf(x,y)=\\begin{cases} f\\!\\left(\\left[\\dfrac{x}{2}\\right],\\left[\\dfrac{y}{2}\\right]\\right)+2 & \\text{当 }xy\\ge50\\\\ f(2x,y-3)+1 & \\text{当 }10<xy<50\\\\ xy-x-y & \\text{当 }xy\\le10 \\end{cases}\n$$\n\n其中[z]返回小于或等于z的最大整数。"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "128",
+            "zh": "128"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "-134",
+            "zh": "-134"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "-1",
+            "zh": "-1"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "-125",
+            "zh": "-125"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "-143",
+            "zh": "-143"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "Evaluate each chain from its base case upward, applying the floor operation before the recursive call:\n\n$$\n\\begin{aligned} f(48,-2)&=-142\\\\ f(24,1)&=-142+1=-141\\\\ f(12,4)&=-141+1=-140\\\\ f(25,9)&=-140+2=-138\\\\ f(50,18)&=-138+2=-136\\\\ f(100,36)&=-136+2=-134\\end{aligned}\n$$\n\n$$\n\\begin{aligned} f(8,1)&=-1\\\\ f(4,4)&=-1+1=0\\\\ f(8,9)&=0+2=2\\\\ f(4,12)&=2+1=3\\\\ f(9,25)&=3+2=5\\\\ f(18,50)&=5+2=7\\\\ f(36,100)&=7+2=9\\end{aligned}\n$$\n\nTherefore $f(100,36)-f(36,100)=-134-9=-143$.\n\nFor example, $(25,9)$ has product 225, so halving and flooring gives $(12,4)$ with a pending +2. But $(12,4)$ has product 48, so it becomes $(24,1)$ with +1. On the other chain, $(8,9)$ has product 72 and must use +2. The base values are $48(-2)-48-(-2)=-142$ and $8-8-1=-1$. Swapping x and y need not preserve f because the middle branch treats them differently. **Answer: E.**",
+        "zh": "先求出各递归链的终止值，再逐层返回；进入递归调用前按要求向下取整：\n\n$$\n\\begin{aligned} f(48,-2)&=-142\\\\ f(24,1)&=-142+1=-141\\\\ f(12,4)&=-141+1=-140\\\\ f(25,9)&=-140+2=-138\\\\ f(50,18)&=-138+2=-136\\\\ f(100,36)&=-136+2=-134\\end{aligned}\n$$\n\n$$\n\\begin{aligned} f(8,1)&=-1\\\\ f(4,4)&=-1+1=0\\\\ f(8,9)&=0+2=2\\\\ f(4,12)&=2+1=3\\\\ f(9,25)&=3+2=5\\\\ f(18,50)&=5+2=7\\\\ f(36,100)&=7+2=9\\end{aligned}\n$$\n\n所以 $f(100,36)-f(36,100)=-134-9=-143$。\n\n例如 $(25,9)$ 的乘积为 225，因此向下取整后变为 $(12,4)$，并保留一次 +2；但 $(12,4)$ 的乘积为 48，下一步应变为 $(24,1)$ 并加 1。另一条链的 $(8,9)$ 乘积为 72，必须使用 +2。两个终止值分别是 $48(-2)-48-(-2)=-142$ 与 $8-8-1=-1$。中间分支对 x、y 的处理不同，交换参数不能假定函数值不变。**答案：E。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "What is the final value of x after this program is executed?\n\n```text\na = 1: b = 2: c = 3: x = 0\nif a < b then\n    x = x + a\nelse\n    x = x + b\nend if\nif b > c && a <= b then\n    x = x + c\nelse\n    x = x + a\nend if\nif !(a < b && a < c) then\n    x = x + a\nend if\nif b < c || c < a then\n    x = x + c\nend if\noutput x\n```",
+        "zh": "该程序执行后,x的最终值是什么?\n\n```text\na = 1: b = 2: c = 3: x = 0\nif a < b then\n    x = x + a\nelse\n    x = x + b\nend if\nif b > c && a <= b then\n    x = x + c\nelse\n    x = x + a\nend if\nif !(a < b && a < c) then\n    x = x + a\nend if\nif b < c || c < a then\n    x = x + c\nend if\noutput x\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "5",
+            "zh": "5"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "7",
+            "zh": "7"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Trace the variables in execution order:\n\n| a | b | c | x |\n| --- | --- | --- | --- |\n| 1 | 2 | 3 | 0 |\n| 1 | 2 | 3 | 1 |\n| 1 | 2 | 3 | 2 |\n| 1 | 2 | 3 | 2 |\n| 1 | 2 | 3 | 5 |\n\nThe successive updates to x are +1, +1, no change and +3. The final value is 5.\n\nThe four conditions evaluate to true; false AND true (false); NOT(true AND true) (false); and true OR false (true). Thus the second IF takes its else branch, while the third IF makes no update. Each IF is separate, so later tests still run. **Answer: B, 5.**",
+        "zh": "按程序执行顺序记录变量的值：\n\n| a | b | c | x |\n| --- | --- | --- | --- |\n| 1 | 2 | 3 | 0 |\n| 1 | 2 | 3 | 1 |\n| 1 | 2 | 3 | 2 |\n| 1 | 2 | 3 | 2 |\n| 1 | 2 | 3 | 5 |\n\nx 依次增加 1、增加 1、保持不变、增加 3，最终为 5。\n\n四个条件依次为：真；假 AND 真（假）；NOT(真 AND 真)（假）；真 OR 假（真）。因此第二个 IF 执行 else 分支，第三个 IF 不修改 x。四个 IF 相互独立，不会因前面有一个成立就跳过后续判断。**答案：B，5。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          3,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [],
+  "programming": {
+    "id": "fibonacci-clock",
+    "definition": {
+      "title": "Fibonacci Clock",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Use the line structure shown in the test-case input below.\n\n### Problem\n\nACSL’s version of Philippe Chretien’s “Fibonacci Clock” displays time by changing the colors displayed in 5 squares, whose side lengths correspond to the first 5 Fibonacci numbers (1, 1, 2, 3, and 5). Given the colors of the squares on the clock face, you must output the time that is represented in hh:mm:ss format. The colors will be given to you as a single string of 5 uppercase characters representing the lower 1x1 square, the upper 1×1 square, the 2×2 square, the 3×3 square, and the 5×5 square in that order. (See https://basbrun.com/2015/05/04/fibonacci-clock/.)\n\nEach square has a color: red, green, blue, cyan, magenta, yellow, or white. All red squares represent only the number of hours; green squares represent only minutes; and blue squares represent only seconds. The intersecting regions in the Venn diagram represent two different values: yellow represents both hours and minutes; magenta represents both hours and seconds; and cyan represents both minutes and seconds. White squares are ignored.\n\n{{diagram:p-34ea6b9a329d1c61}}\n\nFor both minutes and seconds, the sum of the values of the lengths is multiplied by 5 so that the number of minutes and seconds are in intervals of 5 between 0 and 60 inclusive.\n\nHowever, if the number of minutes or seconds is 60 or more and/or if the number of hours is 12 or more, change it to a valid time from 00:00:00 to 11:56:55. For example, 09:60:00 would become 10:00:00 and 12:00:60 would be 00:01:00.\n\nFor example, a clock with a red lower 1×1 square, a white upper 1×1 square, a blue 2×2 square, a green 3×3 square, and a blue 5×5 square displays 01:15:35. The hours are represented by the red 1x1 square. The minutes are represented by the green 3×3 square (3*5=15), and the seconds are represented by the blue 2×2 and the blue 5×5 squares (2+5=7 and 7*5=35).\n\n### Examples\n\n{{diagram:fibonacci-clock-two-examples}}\n\nFor `RWGBG`, the hour is 1, the minutes are $(2+5)\\times5=35$, and the seconds are $3\\times5=15$. The result is `01:35:15`.\n\nFor `RCMGB`, the hours are $1+2=3$, the minutes are $(1+3)\\times5=20$, and the seconds are $(5+1+2)\\times5=40$. The result is `03:20:40`.\n\n### Input\n\nA single five-character uppercase string. Each character is one of `R G B C M Y W`. In order, the characters describe the lower 1×1 square, upper 1×1 square, 2×2 square, 3×3 square, and 5×5 square. The input represents a valid normalized time from `00:00:00` to `11:56:55`.\n\n### Output\n\nPrint the hours, minutes, and seconds in `hh:mm:ss` format. Each component must have two digits.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "RWGBG\n",
+          "expected": "01:35:15\n"
+        },
+        {
+          "input": "RCMGB\n",
+          "expected": "03:20:40\n"
+        },
+        {
+          "input": "BYYGR\n",
+          "expected": "08:30:05\n"
+        },
+        {
+          "input": "MRGBW\n",
+          "expected": "02:10:20\n"
+        },
+        {
+          "input": "YYYYY\n",
+          "expected": "01:00:00\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "WGBGR\n",
+          "expected": "05:20:10\n",
+          "weight": 20
+        },
+        {
+          "input": "CGRMY\n",
+          "expected": "10:35:20\n",
+          "weight": 20
+        },
+        {
+          "input": "MMMMC\n",
+          "expected": "07:26:00\n",
+          "weight": 20
+        },
+        {
+          "input": "CCCYY\n",
+          "expected": "09:00:20\n",
+          "weight": 20
+        },
+        {
+          "input": "WWWWW\n",
+          "expected": "00:00:00\n",
+          "weight": 20
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。输入按下方测试用例展示的行结构读取。\n\n### 问题\n\nACSL 版本的菲利普·克雷蒂安“斐波那契时钟”是通过改变由五种正方形呈现的颜色来显示时间的，它们的边长分别对应斐波那契数字的前五个数(1,1,2,3,5)。你要根据钟面上正方形的颜色，以 hh:mm:ss 的格式输出其对应的时间。这些颜色会以由五个大写字母组成的字符串的方式给到你，它们依次代表下方 1x1正方形，上方 1x1正方形，2x2正方形，3x3正方形，以及5x 5正方形。 (见 https://basbrun.com/2015/05/04/fibonacci-clock/.)\n\n每个正方形都有一种颜色:红色、绿色、蓝色、青色、紫红色、黄色或白色。 所有红色正方形仅表示小时数; 绿色正方形仅表示分钟数; 蓝色正方形仅表示秒数。但是，交叉区域(如维恩图所示)表示两种不同的值:黄色代表小时和分钟;紫红色代表小时和秒;青色代表分钟和秒。白色正方形可以忽略。\n\n{{diagram:p-34ea6b9a329d1c61}}\n\n将正方形边长的值相加再乘以 5 得出分钟和秒，这样分钟数和秒数以 5 为间隔，介于 0 到 60 之间。\n\n但是，若分钟数或者秒数大于等于 60,并且/或者小时数大于等于12,则需要将其变为 00:00:00 到 11:56:55 之间的一个有效时间。例如，09:60:00要变成 10:00:00,12:00:60 要变成 00:01:00。\n\n例如，若下方 1×1 正方形为红色、上方 1×1 为白色、2×2 为蓝色、3×3 为绿色、5×5 为蓝色，则时间为 01:15:35。1x1 的红色正方形表示小时数，3x3 的绿色正方形 (3*5=15)表示分钟数，2x2 的蓝色正方形和 5x5 的蓝色正方形 (2+5=7 和 7*5=35) 表示秒数。\n\n\n\n### 示例\n\n{{diagram:fibonacci-clock-two-examples}}\n\n对于 `RWGBG`，小时数为 1，分钟数为 $(2+5)\\times5=35$，秒数为 $3\\times5=15$，结果为 `01:35:15`。\n\n对于 `RCMGB`，小时数为 $1+2=3$，分钟数为 $(1+3)\\times5=20$，秒数为 $(5+1+2)\\times5=40$，结果为 `03:20:40`。\n\n### 输入\n\n一个由五个大写字母组成的字符串，每个字母均来自 `R G B C M Y W`。这些字母依次表示下方 1×1、上方 1×1、2×2、3×3 和 5×5 正方形的颜色。输入表示的规范化时间介于 `00:00:00` 和 `11:56:55` 之间。\n\n### 输出\n\n按 `hh:mm:ss` 格式输出小时、分钟和秒，每部分均为两位数字。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [
+        {
+          "id": "p-34ea6b9a329d1c61",
+          "width": 400,
+          "height": 350,
+          "alt": {
+            "en": "RGB color Venn diagram: red represents hours, green minutes, and blue seconds. Red plus green is yellow (hours and minutes); red plus blue is magenta (hours and seconds); green plus blue is cyan (minutes and seconds). The intersection of all three is white; white squares are ignored.",
+            "zh": "RGB 三圆颜色图：红色代表小时，绿色代表分钟，蓝色代表秒。红绿重叠为黄色（小时和分钟），红蓝重叠为品红（小时和秒），绿蓝重叠为青色（分钟和秒）。三者交集为白色；题目规定忽略白色方格。"
+          },
+          "elements": [
+            {
+              "type": "circle",
+              "cx": 200,
+              "cy": 120,
+              "r": 100,
+              "fill": "red",
+              "stroke": "none"
+            },
+            {
+              "type": "circle",
+              "cx": 135,
+              "cy": 230,
+              "r": 100,
+              "fill": "green",
+              "stroke": "none"
+            },
+            {
+              "type": "circle",
+              "cx": 265,
+              "cy": 230,
+              "r": 100,
+              "fill": "blue",
+              "stroke": "none"
+            },
+            {
+              "type": "path",
+              "d": "M 104.098 134.894 L 107.856 133.754 L 111.655 132.763 L 115.491 131.921 L 119.357 131.231 L 123.246 130.693 L 127.154 130.308 L 131.074 130.077 L 135.000 130.000 L 138.926 130.077 L 142.846 130.308 L 146.754 130.693 L 150.643 131.231 L 154.509 131.921 L 158.345 132.763 L 162.144 133.754 L 165.902 134.894 L 169.612 136.181 L 173.268 137.612 L 176.866 139.186 L 180.399 140.899 L 183.862 142.750 L 187.250 144.736 L 190.557 146.853 L 193.779 149.098 L 196.909 151.468 L 199.945 153.959 L 202.880 156.568 L 205.711 159.289 L 208.432 162.120 L 211.041 165.055 L 213.532 168.091 L 215.902 171.221 L 218.147 174.443 L 220.264 177.750 L 222.250 181.138 L 224.101 184.601 L 225.814 188.134 L 227.388 191.732 L 228.819 195.388 L 230.106 199.098 L 231.246 202.856 L 232.237 206.655 L 233.079 210.491 L 233.728 214.126 L 230.902 215.106 L 227.144 216.246 L 223.345 217.237 L 219.509 218.079 L 215.643 218.769 L 211.754 219.307 L 207.846 219.692 L 203.926 219.923 L 200.000 220.000 L 196.074 219.923 L 192.154 219.692 L 188.246 219.307 L 184.357 218.769 L 180.491 218.079 L 176.655 217.237 L 172.856 216.246 L 169.098 215.106 L 165.388 213.819 L 161.732 212.388 L 158.134 210.814 L 154.601 209.101 L 151.138 207.250 L 147.750 205.264 L 144.443 203.147 L 141.221 200.902 L 138.091 198.532 L 135.055 196.041 L 132.120 193.432 L 129.289 190.711 L 126.568 187.880 L 123.959 184.945 L 121.468 181.909 L 119.098 178.779 L 116.853 175.557 L 114.736 172.250 L 112.750 168.862 L 110.899 165.399 L 109.186 161.866 L 107.612 158.268 L 106.181 154.612 L 104.894 150.902 L 103.754 147.144 L 102.763 143.345 L 101.921 139.509 L 101.272 135.874 Z",
+              "fill": "yellow",
+              "stroke": "none"
+            },
+            {
+              "type": "path",
+              "d": "M 241.655 132.763 L 245.491 131.921 L 249.357 131.231 L 253.246 130.693 L 257.154 130.308 L 261.074 130.077 L 265.000 130.000 L 268.926 130.077 L 272.846 130.308 L 276.754 130.693 L 280.643 131.231 L 284.509 131.921 L 288.345 132.763 L 292.144 133.754 L 295.902 134.894 L 298.728 135.874 L 298.079 139.509 L 297.237 143.345 L 296.246 147.144 L 295.106 150.902 L 293.819 154.612 L 292.388 158.268 L 290.814 161.866 L 289.101 165.399 L 287.250 168.862 L 285.264 172.250 L 283.147 175.557 L 280.902 178.779 L 278.532 181.909 L 276.041 184.945 L 273.432 187.880 L 270.711 190.711 L 267.880 193.432 L 264.945 196.041 L 261.909 198.532 L 258.779 200.902 L 255.557 203.147 L 252.250 205.264 L 248.862 207.250 L 245.399 209.101 L 241.866 210.814 L 238.268 212.388 L 234.612 213.819 L 230.902 215.106 L 227.144 216.246 L 223.345 217.237 L 219.509 218.079 L 215.643 218.769 L 211.754 219.307 L 207.846 219.692 L 203.926 219.923 L 200.000 220.000 L 196.074 219.923 L 192.154 219.692 L 188.246 219.307 L 184.357 218.769 L 180.491 218.079 L 176.655 217.237 L 172.856 216.246 L 169.098 215.106 L 166.272 214.126 L 166.921 210.491 L 167.763 206.655 L 168.754 202.856 L 169.894 199.098 L 171.181 195.388 L 172.612 191.732 L 174.186 188.134 L 175.899 184.601 L 177.750 181.138 L 179.736 177.750 L 181.853 174.443 L 184.098 171.221 L 186.468 168.091 L 188.959 165.055 L 191.568 162.120 L 194.289 159.289 L 197.120 156.568 L 200.055 153.959 L 203.091 151.468 L 206.221 149.098 L 209.443 146.853 L 212.750 144.736 L 216.138 142.750 L 219.601 140.899 L 223.134 139.186 L 226.732 137.612 L 230.388 136.181 L 234.098 134.894 L 237.856 133.754 Z",
+              "fill": "magenta",
+              "stroke": "none"
+            },
+            {
+              "type": "path",
+              "d": "M 235.000 230.000 L 234.923 233.926 L 234.692 237.846 L 234.307 241.754 L 233.769 245.643 L 233.079 249.509 L 232.237 253.345 L 231.246 257.144 L 230.106 260.902 L 228.819 264.612 L 227.388 268.268 L 225.814 271.866 L 224.101 275.399 L 222.250 278.862 L 220.264 282.250 L 218.147 285.557 L 215.902 288.779 L 213.532 291.909 L 211.041 294.945 L 208.432 297.880 L 205.711 300.711 L 202.880 303.432 L 200.000 305.992 L 197.120 303.432 L 194.289 300.711 L 191.568 297.880 L 188.959 294.945 L 186.468 291.909 L 184.098 288.779 L 181.853 285.557 L 179.736 282.250 L 177.750 278.862 L 175.899 275.399 L 174.186 271.866 L 172.612 268.268 L 171.181 264.612 L 169.894 260.902 L 168.754 257.144 L 167.763 253.345 L 166.921 249.509 L 166.231 245.643 L 165.693 241.754 L 165.308 237.846 L 165.077 233.926 L 165.000 230.000 L 165.077 226.074 L 165.308 222.154 L 165.693 218.246 L 166.231 214.357 L 166.921 210.491 L 167.763 206.655 L 168.754 202.856 L 169.894 199.098 L 171.181 195.388 L 172.612 191.732 L 174.186 188.134 L 175.899 184.601 L 177.750 181.138 L 179.736 177.750 L 181.853 174.443 L 184.098 171.221 L 186.468 168.091 L 188.959 165.055 L 191.568 162.120 L 194.289 159.289 L 197.120 156.568 L 200.000 154.008 L 202.880 156.568 L 205.711 159.289 L 208.432 162.120 L 211.041 165.055 L 213.532 168.091 L 215.902 171.221 L 218.147 174.443 L 220.264 177.750 L 222.250 181.138 L 224.101 184.601 L 225.814 188.134 L 227.388 191.732 L 228.819 195.388 L 230.106 199.098 L 231.246 202.856 L 232.237 206.655 L 233.079 210.491 L 233.769 214.357 L 234.307 218.246 L 234.692 222.154 L 234.923 226.074 Z",
+              "fill": "cyan",
+              "stroke": "none"
+            },
+            {
+              "type": "path",
+              "d": "M 166.921 210.491 L 167.763 206.655 L 168.754 202.856 L 169.894 199.098 L 171.181 195.388 L 172.612 191.732 L 174.186 188.134 L 175.899 184.601 L 177.750 181.138 L 179.736 177.750 L 181.853 174.443 L 184.098 171.221 L 186.468 168.091 L 188.959 165.055 L 191.568 162.120 L 194.289 159.289 L 197.120 156.568 L 200.000 154.008 L 202.880 156.568 L 205.711 159.289 L 208.432 162.120 L 211.041 165.055 L 213.532 168.091 L 215.902 171.221 L 218.147 174.443 L 220.264 177.750 L 222.250 181.138 L 224.101 184.601 L 225.814 188.134 L 227.388 191.732 L 228.819 195.388 L 230.106 199.098 L 231.246 202.856 L 232.237 206.655 L 233.079 210.491 L 233.728 214.126 L 230.902 215.106 L 227.144 216.246 L 223.345 217.237 L 219.509 218.079 L 215.643 218.769 L 211.754 219.307 L 207.846 219.692 L 203.926 219.923 L 200.000 220.000 L 196.074 219.923 L 192.154 219.692 L 188.246 219.307 L 184.357 218.769 L 180.491 218.079 L 176.655 217.237 L 172.856 216.246 L 169.098 215.106 L 166.272 214.126 Z",
+              "fill": "white",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 200,
+              "y": 76,
+              "text": "Red",
+              "fontSize": 18,
+              "anchor": "middle",
+              "font": "sans",
+              "weight": "bold",
+              "fill": "white",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 85,
+              "y": 276,
+              "text": "Green",
+              "fontSize": 18,
+              "anchor": "middle",
+              "font": "sans",
+              "weight": "bold",
+              "fill": "black",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 315,
+              "y": 276,
+              "text": "Blue",
+              "fontSize": 18,
+              "anchor": "middle",
+              "font": "sans",
+              "weight": "bold",
+              "fill": "white",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 130,
+              "y": 171,
+              "text": "Yellow",
+              "fontSize": 18,
+              "anchor": "middle",
+              "font": "sans",
+              "weight": "bold",
+              "fill": "black",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 270,
+              "y": 171,
+              "text": "Magenta",
+              "fontSize": 18,
+              "anchor": "middle",
+              "font": "sans",
+              "weight": "bold",
+              "fill": "black",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 200,
+              "y": 296,
+              "text": "Cyan",
+              "fontSize": 18,
+              "anchor": "middle",
+              "font": "sans",
+              "weight": "bold",
+              "fill": "black",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 200,
+              "y": 205,
+              "text": "White",
+              "fontSize": 18,
+              "anchor": "middle",
+              "font": "sans",
+              "weight": "bold",
+              "fill": "black",
+              "stroke": "none"
+            }
+          ]
+        },
+        {
+          "id": "fibonacci-clock-two-examples",
+          "width": 450,
+          "height": 185,
+          "alt": {
+            "en": "Two Fibonacci clock faces: RWGBG is 01:35:15; RCMGB is 03:20:40.",
+            "zh": "两个斐波那契钟面：RWGBG 为 01:35:15；RCMGB 为 03:20:40。"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 58,
+              "y": 44,
+              "width": 24,
+              "height": 24,
+              "stroke": "black",
+              "fill": "red"
+            },
+            {
+              "type": "rect",
+              "x": 58,
+              "y": 20,
+              "width": 24,
+              "height": 24,
+              "stroke": "black",
+              "fill": "white"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 20,
+              "width": 48,
+              "height": 48,
+              "stroke": "black",
+              "fill": "green"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 68,
+              "width": 72,
+              "height": 72,
+              "stroke": "black",
+              "fill": "blue"
+            },
+            {
+              "type": "rect",
+              "x": 82,
+              "y": 20,
+              "width": 120,
+              "height": 120,
+              "stroke": "black",
+              "fill": "green"
+            },
+            {
+              "type": "text",
+              "x": 106,
+              "y": 165,
+              "text": "RWGBG  01:35:15",
+              "anchor": "middle",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 283,
+              "y": 44,
+              "width": 24,
+              "height": 24,
+              "stroke": "black",
+              "fill": "red"
+            },
+            {
+              "type": "rect",
+              "x": 283,
+              "y": 20,
+              "width": 24,
+              "height": 24,
+              "stroke": "black",
+              "fill": "cyan"
+            },
+            {
+              "type": "rect",
+              "x": 235,
+              "y": 20,
+              "width": 48,
+              "height": 48,
+              "stroke": "black",
+              "fill": "magenta"
+            },
+            {
+              "type": "rect",
+              "x": 235,
+              "y": 68,
+              "width": 72,
+              "height": 72,
+              "stroke": "black",
+              "fill": "green"
+            },
+            {
+              "type": "rect",
+              "x": 307,
+              "y": 20,
+              "width": 120,
+              "height": 120,
+              "stroke": "black",
+              "fill": "blue"
+            },
+            {
+              "type": "text",
+              "x": 331,
+              "y": 165,
+              "text": "RCMGB  03:20:40",
+              "anchor": "middle",
+              "fontSize": 16,
+              "fill": "ink"
+            }
+          ]
+        }
+      ],
+      "zh": [
+        {
+          "id": "p-34ea6b9a329d1c61",
+          "width": 400,
+          "height": 350,
+          "alt": {
+            "en": "RGB color Venn diagram: red represents hours, green minutes, and blue seconds. Red plus green is yellow (hours and minutes); red plus blue is magenta (hours and seconds); green plus blue is cyan (minutes and seconds). The intersection of all three is white; white squares are ignored.",
+            "zh": "RGB 三圆颜色图：红色代表小时，绿色代表分钟，蓝色代表秒。红绿重叠为黄色（小时和分钟），红蓝重叠为品红（小时和秒），绿蓝重叠为青色（分钟和秒）。三者交集为白色；题目规定忽略白色方格。"
+          },
+          "elements": [
+            {
+              "type": "circle",
+              "cx": 200,
+              "cy": 120,
+              "r": 100,
+              "fill": "red",
+              "stroke": "none"
+            },
+            {
+              "type": "circle",
+              "cx": 135,
+              "cy": 230,
+              "r": 100,
+              "fill": "green",
+              "stroke": "none"
+            },
+            {
+              "type": "circle",
+              "cx": 265,
+              "cy": 230,
+              "r": 100,
+              "fill": "blue",
+              "stroke": "none"
+            },
+            {
+              "type": "path",
+              "d": "M 104.098 134.894 L 107.856 133.754 L 111.655 132.763 L 115.491 131.921 L 119.357 131.231 L 123.246 130.693 L 127.154 130.308 L 131.074 130.077 L 135.000 130.000 L 138.926 130.077 L 142.846 130.308 L 146.754 130.693 L 150.643 131.231 L 154.509 131.921 L 158.345 132.763 L 162.144 133.754 L 165.902 134.894 L 169.612 136.181 L 173.268 137.612 L 176.866 139.186 L 180.399 140.899 L 183.862 142.750 L 187.250 144.736 L 190.557 146.853 L 193.779 149.098 L 196.909 151.468 L 199.945 153.959 L 202.880 156.568 L 205.711 159.289 L 208.432 162.120 L 211.041 165.055 L 213.532 168.091 L 215.902 171.221 L 218.147 174.443 L 220.264 177.750 L 222.250 181.138 L 224.101 184.601 L 225.814 188.134 L 227.388 191.732 L 228.819 195.388 L 230.106 199.098 L 231.246 202.856 L 232.237 206.655 L 233.079 210.491 L 233.728 214.126 L 230.902 215.106 L 227.144 216.246 L 223.345 217.237 L 219.509 218.079 L 215.643 218.769 L 211.754 219.307 L 207.846 219.692 L 203.926 219.923 L 200.000 220.000 L 196.074 219.923 L 192.154 219.692 L 188.246 219.307 L 184.357 218.769 L 180.491 218.079 L 176.655 217.237 L 172.856 216.246 L 169.098 215.106 L 165.388 213.819 L 161.732 212.388 L 158.134 210.814 L 154.601 209.101 L 151.138 207.250 L 147.750 205.264 L 144.443 203.147 L 141.221 200.902 L 138.091 198.532 L 135.055 196.041 L 132.120 193.432 L 129.289 190.711 L 126.568 187.880 L 123.959 184.945 L 121.468 181.909 L 119.098 178.779 L 116.853 175.557 L 114.736 172.250 L 112.750 168.862 L 110.899 165.399 L 109.186 161.866 L 107.612 158.268 L 106.181 154.612 L 104.894 150.902 L 103.754 147.144 L 102.763 143.345 L 101.921 139.509 L 101.272 135.874 Z",
+              "fill": "yellow",
+              "stroke": "none"
+            },
+            {
+              "type": "path",
+              "d": "M 241.655 132.763 L 245.491 131.921 L 249.357 131.231 L 253.246 130.693 L 257.154 130.308 L 261.074 130.077 L 265.000 130.000 L 268.926 130.077 L 272.846 130.308 L 276.754 130.693 L 280.643 131.231 L 284.509 131.921 L 288.345 132.763 L 292.144 133.754 L 295.902 134.894 L 298.728 135.874 L 298.079 139.509 L 297.237 143.345 L 296.246 147.144 L 295.106 150.902 L 293.819 154.612 L 292.388 158.268 L 290.814 161.866 L 289.101 165.399 L 287.250 168.862 L 285.264 172.250 L 283.147 175.557 L 280.902 178.779 L 278.532 181.909 L 276.041 184.945 L 273.432 187.880 L 270.711 190.711 L 267.880 193.432 L 264.945 196.041 L 261.909 198.532 L 258.779 200.902 L 255.557 203.147 L 252.250 205.264 L 248.862 207.250 L 245.399 209.101 L 241.866 210.814 L 238.268 212.388 L 234.612 213.819 L 230.902 215.106 L 227.144 216.246 L 223.345 217.237 L 219.509 218.079 L 215.643 218.769 L 211.754 219.307 L 207.846 219.692 L 203.926 219.923 L 200.000 220.000 L 196.074 219.923 L 192.154 219.692 L 188.246 219.307 L 184.357 218.769 L 180.491 218.079 L 176.655 217.237 L 172.856 216.246 L 169.098 215.106 L 166.272 214.126 L 166.921 210.491 L 167.763 206.655 L 168.754 202.856 L 169.894 199.098 L 171.181 195.388 L 172.612 191.732 L 174.186 188.134 L 175.899 184.601 L 177.750 181.138 L 179.736 177.750 L 181.853 174.443 L 184.098 171.221 L 186.468 168.091 L 188.959 165.055 L 191.568 162.120 L 194.289 159.289 L 197.120 156.568 L 200.055 153.959 L 203.091 151.468 L 206.221 149.098 L 209.443 146.853 L 212.750 144.736 L 216.138 142.750 L 219.601 140.899 L 223.134 139.186 L 226.732 137.612 L 230.388 136.181 L 234.098 134.894 L 237.856 133.754 Z",
+              "fill": "magenta",
+              "stroke": "none"
+            },
+            {
+              "type": "path",
+              "d": "M 235.000 230.000 L 234.923 233.926 L 234.692 237.846 L 234.307 241.754 L 233.769 245.643 L 233.079 249.509 L 232.237 253.345 L 231.246 257.144 L 230.106 260.902 L 228.819 264.612 L 227.388 268.268 L 225.814 271.866 L 224.101 275.399 L 222.250 278.862 L 220.264 282.250 L 218.147 285.557 L 215.902 288.779 L 213.532 291.909 L 211.041 294.945 L 208.432 297.880 L 205.711 300.711 L 202.880 303.432 L 200.000 305.992 L 197.120 303.432 L 194.289 300.711 L 191.568 297.880 L 188.959 294.945 L 186.468 291.909 L 184.098 288.779 L 181.853 285.557 L 179.736 282.250 L 177.750 278.862 L 175.899 275.399 L 174.186 271.866 L 172.612 268.268 L 171.181 264.612 L 169.894 260.902 L 168.754 257.144 L 167.763 253.345 L 166.921 249.509 L 166.231 245.643 L 165.693 241.754 L 165.308 237.846 L 165.077 233.926 L 165.000 230.000 L 165.077 226.074 L 165.308 222.154 L 165.693 218.246 L 166.231 214.357 L 166.921 210.491 L 167.763 206.655 L 168.754 202.856 L 169.894 199.098 L 171.181 195.388 L 172.612 191.732 L 174.186 188.134 L 175.899 184.601 L 177.750 181.138 L 179.736 177.750 L 181.853 174.443 L 184.098 171.221 L 186.468 168.091 L 188.959 165.055 L 191.568 162.120 L 194.289 159.289 L 197.120 156.568 L 200.000 154.008 L 202.880 156.568 L 205.711 159.289 L 208.432 162.120 L 211.041 165.055 L 213.532 168.091 L 215.902 171.221 L 218.147 174.443 L 220.264 177.750 L 222.250 181.138 L 224.101 184.601 L 225.814 188.134 L 227.388 191.732 L 228.819 195.388 L 230.106 199.098 L 231.246 202.856 L 232.237 206.655 L 233.079 210.491 L 233.769 214.357 L 234.307 218.246 L 234.692 222.154 L 234.923 226.074 Z",
+              "fill": "cyan",
+              "stroke": "none"
+            },
+            {
+              "type": "path",
+              "d": "M 166.921 210.491 L 167.763 206.655 L 168.754 202.856 L 169.894 199.098 L 171.181 195.388 L 172.612 191.732 L 174.186 188.134 L 175.899 184.601 L 177.750 181.138 L 179.736 177.750 L 181.853 174.443 L 184.098 171.221 L 186.468 168.091 L 188.959 165.055 L 191.568 162.120 L 194.289 159.289 L 197.120 156.568 L 200.000 154.008 L 202.880 156.568 L 205.711 159.289 L 208.432 162.120 L 211.041 165.055 L 213.532 168.091 L 215.902 171.221 L 218.147 174.443 L 220.264 177.750 L 222.250 181.138 L 224.101 184.601 L 225.814 188.134 L 227.388 191.732 L 228.819 195.388 L 230.106 199.098 L 231.246 202.856 L 232.237 206.655 L 233.079 210.491 L 233.728 214.126 L 230.902 215.106 L 227.144 216.246 L 223.345 217.237 L 219.509 218.079 L 215.643 218.769 L 211.754 219.307 L 207.846 219.692 L 203.926 219.923 L 200.000 220.000 L 196.074 219.923 L 192.154 219.692 L 188.246 219.307 L 184.357 218.769 L 180.491 218.079 L 176.655 217.237 L 172.856 216.246 L 169.098 215.106 L 166.272 214.126 Z",
+              "fill": "white",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 200,
+              "y": 76,
+              "text": "Red",
+              "fontSize": 18,
+              "anchor": "middle",
+              "font": "sans",
+              "weight": "bold",
+              "fill": "white",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 85,
+              "y": 276,
+              "text": "Green",
+              "fontSize": 18,
+              "anchor": "middle",
+              "font": "sans",
+              "weight": "bold",
+              "fill": "black",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 315,
+              "y": 276,
+              "text": "Blue",
+              "fontSize": 18,
+              "anchor": "middle",
+              "font": "sans",
+              "weight": "bold",
+              "fill": "white",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 130,
+              "y": 171,
+              "text": "Yellow",
+              "fontSize": 18,
+              "anchor": "middle",
+              "font": "sans",
+              "weight": "bold",
+              "fill": "black",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 270,
+              "y": 171,
+              "text": "Magenta",
+              "fontSize": 18,
+              "anchor": "middle",
+              "font": "sans",
+              "weight": "bold",
+              "fill": "black",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 200,
+              "y": 296,
+              "text": "Cyan",
+              "fontSize": 18,
+              "anchor": "middle",
+              "font": "sans",
+              "weight": "bold",
+              "fill": "black",
+              "stroke": "none"
+            },
+            {
+              "type": "text",
+              "x": 200,
+              "y": 205,
+              "text": "White",
+              "fontSize": 18,
+              "anchor": "middle",
+              "font": "sans",
+              "weight": "bold",
+              "fill": "black",
+              "stroke": "none"
+            }
+          ]
+        },
+        {
+          "id": "fibonacci-clock-two-examples",
+          "width": 450,
+          "height": 185,
+          "alt": {
+            "en": "Two Fibonacci clock faces: RWGBG is 01:35:15; RCMGB is 03:20:40.",
+            "zh": "两个斐波那契钟面：RWGBG 为 01:35:15；RCMGB 为 03:20:40。"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 58,
+              "y": 44,
+              "width": 24,
+              "height": 24,
+              "stroke": "black",
+              "fill": "red"
+            },
+            {
+              "type": "rect",
+              "x": 58,
+              "y": 20,
+              "width": 24,
+              "height": 24,
+              "stroke": "black",
+              "fill": "white"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 20,
+              "width": 48,
+              "height": 48,
+              "stroke": "black",
+              "fill": "green"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 68,
+              "width": 72,
+              "height": 72,
+              "stroke": "black",
+              "fill": "blue"
+            },
+            {
+              "type": "rect",
+              "x": 82,
+              "y": 20,
+              "width": 120,
+              "height": 120,
+              "stroke": "black",
+              "fill": "green"
+            },
+            {
+              "type": "text",
+              "x": 106,
+              "y": 165,
+              "text": "RWGBG  01:35:15",
+              "anchor": "middle",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 283,
+              "y": 44,
+              "width": 24,
+              "height": 24,
+              "stroke": "black",
+              "fill": "red"
+            },
+            {
+              "type": "rect",
+              "x": 283,
+              "y": 20,
+              "width": 24,
+              "height": 24,
+              "stroke": "black",
+              "fill": "cyan"
+            },
+            {
+              "type": "rect",
+              "x": 235,
+              "y": 20,
+              "width": 48,
+              "height": 48,
+              "stroke": "black",
+              "fill": "magenta"
+            },
+            {
+              "type": "rect",
+              "x": 235,
+              "y": 68,
+              "width": 72,
+              "height": 72,
+              "stroke": "black",
+              "fill": "green"
+            },
+            {
+              "type": "rect",
+              "x": 307,
+              "y": 20,
+              "width": 120,
+              "height": 120,
+              "stroke": "black",
+              "fill": "blue"
+            },
+            {
+              "type": "text",
+              "x": 331,
+              "y": 165,
+              "text": "RCMGB  03:20:40",
+              "anchor": "middle",
+              "fontSize": 16,
+              "fill": "ink"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

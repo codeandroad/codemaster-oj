@@ -1,0 +1,378 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2023-2024-elementary-1",
+  "division": "Elementary",
+  "season": "2023-2024",
+  "round": 1,
+  "roundLabel": {
+    "en": "Contest 1",
+    "zh": "第一轮"
+  },
+  "title": {
+    "en": "ACSL 2023-2024 Elementary · Contest 1",
+    "zh": "ACSL 2023-2024 Elementary · 第一轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Elementary/2023-2024/第一轮/c_1_elem.pdf",
+      "sha256": "dfec34a4e23c4bbf7bc08268946a6199dc0a513ba43a3127accd1094519888e0",
+      "pages": 2
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Elementary/2023-2024/第一轮/c_1_elem_soln.pdf",
+      "sha256": "d693d9177ba190609529f0c5659364fe681496601e60ed61660573f6962f4220",
+      "pages": 2
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Convert $1011010_{2}$ to base 10.",
+        "zh": "将 $1011010_{2}$ 转换为10进制。"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "250",
+            "zh": "250"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "132",
+            "zh": "132"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "116",
+            "zh": "116"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "90",
+            "zh": "90"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "45",
+            "zh": "45"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Answer: **D**.\n\n$1011010_{2}$ is converted to base 10 by taking each digit from right to left and multiplying it by increasing powers of 2. Therefore, 0*1 + 1*2 + 0*4 + 1*8 + 1*16 + 0*32 + 1*64 = 2 + 8 + 16 + 64 = 90.",
+        "zh": "答案：**D**。\n\n二进制从右往左的位权是 $1,2,4,8,16,32,64$。只加数字 1 所在的位置，$1011010_2=2+8+16+64=90$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Which of the following has the least number of 0s in its binary representation (not including any leading 0s)?\n\n$$\nBED_{16}\\qquad CAF_{16}\\qquad 7356_{8}\\qquad 2741_{8}\n$$",
+        "zh": "下列哪一项的二进制表达中0的个数最少(不包括任意前导0 )?\n\n$$\nBED_{16}\\qquad CAF_{16}\\qquad 7356_{8}\\qquad 2741_{8}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "BED",
+            "zh": "BED"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "CAF",
+            "zh": "CAF"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "7356",
+            "zh": "7356"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "2741",
+            "zh": "2741"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "more than 1 of them",
+            "zh": "以上选项中有不止一个正确答案"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "Answer: **E**.\n\nRepresent each hexadecimal digit by four bits and each octal digit by three bits, omitting leading zeros.\n\n| Number | Binary | Number of 0s |\n|---|---|---|\n| $BED_{16}$ | 101111101101 | 3 |\n| $CAF_{16}$ | 110010101111 | 4 |\n| $7356_8$ | 111011101110 | 3 |\n| $2741_8$ | 10111100001 | 5 |\n\nBED and 7356 tie for the fewest zeros.",
+        "zh": "答案：**E**。\n\n按十六进制一位四位、八进制一位三位转换。去掉最左侧的补齐 0，再分别统计，BED、CAF、7356、2741 的 0 个数是 3、4、3、5。BED 与 7356 并列最少，因此选择“多于一个”。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "What is the number $980_{10}$ in base 8?",
+        "zh": "$980_{10}$ 用八进制表示是多少?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "640",
+            "zh": "640"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "1724",
+            "zh": "1724"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "4271",
+            "zh": "4271"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "1632",
+            "zh": "1632"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "1742",
+            "zh": "1742"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Answer: **B**.\n\nTo convert $980_{10}$ to base 8, divide by 8 repeatedly and get the remainder each time. Read the remainders from last to first to get the number. Therefore, 980 / 8 = 122 r 4, 122 / 8 = 15 r 2, 15 / 8 = 1 r 7, 1 / 8 = 0 r 1. The remainders create the number 1724 in base 8. Notice remainders must be between 0 and 7 inclusive when dividing by 8.\n\nSource correction: the final division is $1/8=0$ remainder 1, not $7/8$ remainder 7.",
+        "zh": "答案：**B**。\n\n连续除以 8，每次记录余数：$980=8\\times122+4$，$122=8\\times15+2$，$15=8\\times1+7$，$1=8\\times0+1$。第一个余数是个位，从最后一个余数读回去得到 $1724_8$。原解析最后一步被误写为 7 除以 8，应为 1 除以 8。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Given that you are living in a hexadecimal world and you have $4D5C_{16}$ people voting for one candidate and $3FA7_{16}$ voting for the other candidate in the election, how many total people voted for one of these two candidates in the election?",
+        "zh": "假设在一个十六进制的世界中,有 $4D5C_{16}$人给一个选举候选人投票,有 $3FA7_{16}$ 人给另一个选举候选人投票,请问一共有多少人为这两位候选人进行了投票?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "7D03",
+            "zh": "7D03"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "7CF3",
+            "zh": "7CF3"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "8DF3",
+            "zh": "8DF3"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "8D03",
+            "zh": "8D03"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "8C04",
+            "zh": "8C04"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Add the two vote counts in hexadecimal.\n\n$$\n\\begin{array}{rcccc}\n & {\\scriptstyle 1} & {\\scriptstyle 1} & {\\scriptstyle 1} &  \\\\\n & 4 & D & 5 & C \\\\\n+ & 3 & F & A & 7 \\\\\n\\hline\n & 8 & D & 0 & 3\n\\end{array}\n$$\n\nFrom right to left, the column totals including carries are 19, 16, 29 and 8 in decimal. The first three columns each carry 1 and leave digits 3, 0 and D. Read the result from left to right: $8D03_{16}$ (option D).",
+        "zh": "把两位候选人的票数按十六进制对齐相加。\n\n$$\n\\begin{array}{rcccc}\n & {\\scriptstyle 1} & {\\scriptstyle 1} & {\\scriptstyle 1} &  \\\\\n & 4 & D & 5 & C \\\\\n+ & 3 & F & A & 7 \\\\\n\\hline\n & 8 & D & 0 & 3\n\\end{array}\n$$\n\n从右往左，各列含进位的和为十进制 19、16、29、8。前三列各进 1，分别写下 3、0、D。从左往右读得 $8D03_{16}$，选 D。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Colors can be expressed in RGB as either hex characters or decimal values between 0 and 255 inclusive. What are the 3 decimal equivalents to the hexadecimal color code “#241571” for Berry?",
+        "zh": "RGB颜色既可以用十六进制表示,也可以用位于0 - 255之间的(包括0和255)十进制表示。与Berry的十六进制代码“#241571”等值的3个十进制数是多少?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "(36,19,114)",
+            "zh": "(36,19,114)"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "(37,20,112)",
+            "zh": "(37,20,112)"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "(36,21,113)",
+            "zh": "(36,21,113)"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "(35,21,113)",
+            "zh": "(35,21,113)"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "(36,21,112)",
+            "zh": "(36,21,112)"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Answer: **C**.\n\nThe hex code “#241571” for the color Berry is converted to decimal for each 2-digit pair: 24 = 2*16 + 4 = 36, 15 = 1*16 + 5 = 21, 71 = 7*16 + 1 =113. Therefore, the 3-digit decimal equivalent is (36,21,113).",
+        "zh": "答案：**C**。\n\n将 `#241571` 拆成 `24 15 71` 三组，按红、绿、蓝的顺序各自转换。高位乘 16 再加低位，得到 $2\\times16+4=36$、$1\\times16+5=21$、$7\\times16+1=113$，即 $(36,21,113)$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": []
+}

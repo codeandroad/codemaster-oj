@@ -1,0 +1,4800 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2024-2025-junior-2",
+  "division": "Junior",
+  "season": "2024-2025",
+  "round": 2,
+  "roundLabel": {
+    "en": "Contest 2",
+    "zh": "第二轮"
+  },
+  "title": {
+    "en": "ACSL 2024-2025 Junior · Contest 2",
+    "zh": "ACSL 2024-2025 Junior · 第二轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Junior/2024-2025/第二轮/中英c_2_jr.pdf",
+      "sha256": "9a91c195217de0322abb0e1ea8cedc4eb1dda59d26843a84afdd9c8d0247d9c9",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Junior/2024-2025/第二轮/c_2_jr_soln.pdf",
+      "sha256": "2b6a69afdaf722141c7c7c6c294f886a7553aab06b6e3dbb3481af9b14c4f289",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Junior/2024-2025/第二轮/c_2_Uno Duo_jr中英.pdf",
+      "sha256": "efab3712ddb6c56f962cb744077f400bb75e7da409cfa12194b3122d0fcb0f19",
+      "pages": 16
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Convert the following infix expression to prefix:\n\n`3 + 4 * (8 - 4 / 2)`",
+        "zh": "请将下方中缀表达式转换为前缀表达式:\n\n`3 + 4 * (8 - 4 / 2)`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`+ 3 4 * - 8 / 4 2`",
+            "zh": "`+ 3 4 * - 8 / 4 2`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`+ 3 * 4 - 8 / 4 2`",
+            "zh": "`+ 3 * 4 - 8 / 4 2`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`+ 3 * 4 - / 8 4 2`",
+            "zh": "`+ 3 * 4 - / 8 4 2`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`+ 3 * - 4 8 / 4 2`",
+            "zh": "`+ 3 * - 4 8 / 4 2`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`+ * 3 4 - 8 / 4 2`",
+            "zh": "`+ * 3 4 - 8 / 4 2`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "```text\n3 + 4 * (8 - 4 / 2)\n= 3 + 4 * (8 - (/ 4 2))\n= 3 + 4 * (- 8 / 4 2)\n= 3 + (* 4 - 8 / 4 2)\n= + 3 * 4 - 8 / 4 2\n```\n\nBuild from the inside: $4/2$ becomes `/ 4 2`; subtract it from 8 to get `- 8 / 4 2`; multiply that entire result by 4 to get `* 4 - 8 / 4 2`; finally put `+ 3` before it. Each operator precedes its two complete operands.\n\n**Answer: B.**",
+        "zh": "```text\n3 + 4 * (8 - 4 / 2)\n= 3 + 4 * (8 - (/ 4 2))\n= 3 + 4 * (- 8 / 4 2)\n= 3 + (* 4 - 8 / 4 2)\n= + 3 * 4 - 8 / 4 2\n```\n\n从内向外构造：$4/2$ 写成 `/ 4 2`；从 8 减去该结果，得 `- 8 / 4 2`；再将整个差乘 4，得 `* 4 - 8 / 4 2`；最后在前面加上 `+ 3`。每个前缀运算符都位于它的两个完整操作数之前。\n\n**答案：B。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Evaluate the following postfix expression if all numbers are single digits:\n\n`9 8 6 2 - * 2 / + 6 3 / -`",
+        "zh": "如果下方所有数字都是一位数,请计算下方后缀表达式:\n\n`9 8 6 2 - * 2 / + 6 3 / -`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "14",
+            "zh": "14"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "20",
+            "zh": "20"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "23",
+            "zh": "23"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "27",
+            "zh": "27"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "`9 8 6 2 - * 2 / + 6 3 / -`\n\n`= 9 8 (6 2 -) * 2 / + (6 3 /) -`\n\n`= 9 (8 4 *) 2 / + 2 -`\n\n`= 9 (32 2 /) + 2 -`\n\n`= (9 16 +) 2 -`\n\n`= 25 2 -`\n\n= 23\n\nUsing a stack, each operator takes the most recently pushed value as its right operand and the preceding value as its left operand. Thus `6 2 -` is $6-2=4$, and the expression becomes $9+8(6-2)/2-6/3=9+16-2=23$. Reversing popped operands would change subtraction and division.\n\n**Answer: D.**",
+        "zh": "原卷解析：\n\n`9 8 6 2 - * 2 / + 6 3 / -`\n\n`= 9 8 (6 2 -) * 2 / + (6 3 /) -`\n\n`= 9 (8 4 *) 2 / + 2 -`\n\n`= 9 (32 2 /) + 2 -`\n\n`= (9 16 +) 2 -`\n\n`= 25 2 -`\n\n= 23\n\n用栈求值时，先弹出的数是右操作数，再弹出的数是左操作数。因此 `6 2 -` 是 $6-2=4$。整个表达式对应 $9+8(6-2)/2-6/3=9+16-2=23$。减法、除法不能把两次弹出的操作数顺序颠倒。\n\n**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "比特位操作"
+      },
+      "statement": {
+        "en": "Evaluate:\n\n`01011 OR NOT 01101`",
+        "zh": "请计算下方表达式:\n\n`01011 OR NOT 01101`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`11011`",
+            "zh": "`11011`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`01011`",
+            "zh": "`01011`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`10010`",
+            "zh": "`10010`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`01101`",
+            "zh": "`01101`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`11001`",
+            "zh": "`11001`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "`01011 OR NOT 01101`\n\n`= 01011 OR (NOT 01101)`\n\n`= 01011 OR 10010`\n\n`= 11011`\n\nApply NOT only to `01101`, flipping all five positions to `10010`. The final OR is 0 only at positions where both inputs are 0. That occurs only at the third bit, giving `11011`; the leading zero in the first operand does not reduce the width.\n\n**Answer: A.**",
+        "zh": "原卷解析：\n\n`01011 OR NOT 01101`\n\n`= 01011 OR (NOT 01101)`\n\n`= 01011 OR 10010`\n\n`= 11011`\n\nNOT 只作用于 `01101`，逐位翻转五位得 `10010`。最后的 OR 只有在两个对应输入都为 0 时才输出 0；这里只有从左数第 3 位满足，所以结果是 `11011`。第一个操作数开头的 0 仍占一位，不能缩短位串。\n\n**答案：A。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "比特位操作"
+      },
+      "statement": {
+        "en": "Evaluate:\n\n`(LSHIFT-2 01101) OR (RCIRC-3 10110) AND (RSHIFT-1 11011)`",
+        "zh": "请计算下方表达式:\n\n`(LSHIFT-2 01101) OR (RCIRC-3 10110) AND (RSHIFT-1 11011)`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`01000`",
+            "zh": "`01000`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`10100`",
+            "zh": "`10100`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`11100`",
+            "zh": "`11100`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`01101`",
+            "zh": "`01101`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`11010`",
+            "zh": "`11010`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "`(LSHIFT-2 01101) OR (RCIRC-3 10110) AND (RSHIFT-1 11011)`\n\n`= 10100 OR (11010 AND 01101)`\n\n`= 10100 OR 01000`\n\n`= 11100`\n\nLSHIFT removes the leading `01` and appends two zeros, giving `10100`. RCIRC moves the trailing three bits `110` to the front, turning `10110` into `11010`. RSHIFT gives `01101`. AND is evaluated before the outer OR, and its result `01000` adds one new set bit to `10100`.\n\n**Answer: C.**",
+        "zh": "原卷解析：\n\n`(LSHIFT-2 01101) OR (RCIRC-3 10110) AND (RSHIFT-1 11011)`\n\n`= 10100 OR (11010 AND 01101)`\n\n`= 10100 OR 01000`\n\n`= 11100`\n\nLSHIFT 丢弃开头的 `01` 并在末尾补两个 0，得到 `10100`；RCIRC 将末尾三位 `110` 移到最前，使 `10110` 变成 `11010`；RSHIFT 得到 `01101`。先算 AND 得 `01000`，再与 `10100` 做 OR，补上一个新的 1，得到 `11100`。\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "What is output by the following program?\n\n```text\nm = 50\nn = 40\nwhile n != 0\n    r = m % n\n    m = n\n    n = r\nend while\noutput m\n```",
+        "zh": "请问下方程序的输出是什么?\n\n```text\nm = 50\nn = 40\nwhile n != 0\n    r = m % n\n    m = n\n    n = r\nend while\noutput m\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "50",
+            "zh": "50"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "40",
+            "zh": "40"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "20",
+            "zh": "20"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "10",
+            "zh": "10"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "0",
+            "zh": "0"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "This is the Euclidean algorithm. The pairs (m,n) change from (50,40) to (40,10), then to (10,0). The loop ends when n=0 and prints m=10, the greatest common divisor of 50 and 40.\n\nFirst $r=50\\bmod40=10$, so the next pair is $(40,10)$. Then $r=40\\bmod10=0$, so the next pair is $(10,0)$. The condition now fails before another remainder is taken: the program never divides by zero. It outputs m, the last nonzero divisor, not the final n.\n\n**Answer: D.**",
+        "zh": "这是欧几里得算法。(m,n) 从 (50,40) 变为 (40,10)，再变为 (10,0)。当 n=0 时停止，输出 m=10，即 50 和 40 的最大公约数。\n\n先算 $r=50\\bmod40=10$，更新后为 $(40,10)$；再算 $r=40\\bmod10=0$，更新为 $(10,0)$。此时 while 条件不成立，不会再次取余，因此不会除以 0。输出的是最后一个非零除数 m，而不是最终的 n。\n\n**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q6",
+      "number": 6,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "What is output by the following program?\n\n```text\ns = 0\nfor y = 2 to 8 step 2\n    s = s + y / 2\nnext y\nfor z = 3 to 1 step -1\n    s = s + z ^ 2\nnext z\noutput s\n```",
+        "zh": "请问下方程序的输出是什么?\n\n```text\ns = 0\nfor y = 2 to 8 step 2\n    s = s + y / 2\nnext y\nfor z = 3 to 1 step -1\n    s = s + z ^ 2\nnext z\noutput s\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "24",
+            "zh": "24"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "23",
+            "zh": "23"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "22",
+            "zh": "22"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "20",
+            "zh": "20"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "10",
+            "zh": "10"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "The first loop adds $2/2+4/2+6/2+8/2=1+2+3+4=10$. The second loop adds $3^2+2^2+1^2=9+4+1=14$. The final output is 10+14=24.\n\nThe inclusive first loop visits y=2,4,6,8; the inclusive descending loop visits z=3,2,1. The variable s is not reset between the loops. Its running values are $1,3,6,10$ in the first loop, then $19,23,24$ in the second.\n\n**Answer: A.**",
+        "zh": "第一个循环累加 $2/2+4/2+6/2+8/2=1+2+3+4=10$；第二个循环累加 $3^2+2^2+1^2=9+4+1=14$。最终输出 10+14=24。\n\n第一个循环包含端点，依次取 y=2、4、6、8；递减循环也包含端点，依次取 z=3、2、1。两个循环之间没有把 s 清零。第一段的累计值是 $1,3,6,10$，第二段接着变为 $19,23,24$。\n\n**答案：A。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [],
+  "programming": {
+    "id": "uno-duo",
+    "definition": {
+      "title": "Uno Duo",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Use the line structure shown in the test-case input below.\n\n### Problem\n\nThe card game Duo uses cards that have 3 characteristics: a color, number, and symbol. The game starts with two face-up cards and 7 cards in the player’s hand. On a single turn, the player can choose one of the two face-up cards and match as many cards from their hand as possible on that pile. A card can be placed on top of another card if exactly 2 of the characteristics match.\n\nThe ACSL cards use four colors (R=red, Y=yellow, G=green, B=blue), four numbers (1, 2, 3, 4), and four symbols (X=cross, O=circle, S=square, T=triangle). A card is represented by a 3-character string showing the color, number, and symbol, in that order. For example, the card R4S, shown on the left, is red with the number 4 and contains a square. There are 9 cards that could possibly be placed on top of this card: a red square with the number 1, 2, or 3; a yellow, green, or blue square with the number 4; a red cross, circle, or triangle with the number 4.\n\n{{diagram:p-2604c282a8691ecd}}\n\n{{diagram:p-3c22715601ec2cfb}}\n\nIn this version of the game called Uno Duo, your program will play one turn for a single player on a single pile. The turn begins with one face-up card and 7 cards in the hand (think of them as being held from left to right). The following steps make up a turn:\n\n1. Find the leftmost card in your hand that matches the face-up card. Place the matched card on the top, thus creating a face-up pile of cards.\n\n2. Try to match as many cards in your hand to the top card on the pile. Each time, look at your cards starting at the leftmost. If the card is a match, place it on top of the pile of cards.\n\n3. Stop when you cannot play any more cards in your hand.\n\nThe output is a string containing all of the cards on the pile, from bottom to top, each separated by a single space.\n\n### Example\n\n#### Input\n\n```text\nB3O\nR3X B1T B2T R1X B3X B1X Y4O\n```\n\n#### Output\n\n```text\nB3O B3X R3X R1X B1X B1T B2T\n```\n\nExplanation Initially, the face-up card and the 7 cards in the hand are as follows:\n\n{{diagram:p-bbb037253f7e2b07}}\n\nThe first card in the hand that can be played is B3X (matching the color and the number, but not the shape) on the face-up card, thus making a pile.\n\n{{diagram:p-5023e92a0bce9ad4}}\n\nThe remaining moves are as follows:\n\n{{diagram:p-5f66bd5c944067a3}}\n\n{{diagram:p-09101368eee6f2f8}}\n\n{{diagram:p-cbfe27d799ef9cb0}}\n\n{{diagram:p-04b53ec7e7fe6318}}\n\n{{diagram:p-a73fdb124c9ab436}}\n\nAt this point, the only card remaining in the hand is Y4O. It cannot be placed on the pile so the turn ends. The output is the string containing the cards in the pile, from bottom to top: B3O B3X R3X R1X B1X B1T B2T.\n\n### Input\n\nThere will be two strings. The first string is the face-up card. The second string is the 7 cards in the player’s hand. All cards are separated by a single space. There will be no duplicate cards in each data set.\n\n### Output\n\nOutput a string containing all of the cards in the pile from bottom to top, each separated by a single space.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "B3O\nR3X B1T B2T R1X B3X B1X Y4O\n",
+          "expected": "B3O B3X R3X R1X B1X B1T B2T\n"
+        },
+        {
+          "input": "R4S\nR4X B4X B3X B3T G3T G1T R1O\n",
+          "expected": "R4S R4X B4X B3X B3T G3T G1T\n"
+        },
+        {
+          "input": "B1T\nG1O B1O R1T B4T G4O R4O R1X\n",
+          "expected": "B1T B1O G1O G4O R4O\n"
+        },
+        {
+          "input": "G3S\nR3S G1O B4X G2S Y4S G3T G3X\n",
+          "expected": "G3S R3S\n"
+        },
+        {
+          "input": "Y4O\nY1S G4S B4S G2S R1T G2X Y2T\n",
+          "expected": "Y4O\n"
+        },
+        {
+          "input": "G2T\nY1S G4S B4S G2S R1T G2X Y2T\n",
+          "expected": "G2T G2S G4S B4S\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "Y2S\nB2S Y1X G2S R4S G1O Y4T G2T\n",
+          "expected": "Y2S B2S G2S G2T\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "R1S\nG4S B1T G1T B4S Y2X Y1S Y1T\n",
+          "expected": "R1S Y1S Y1T B1T G1T\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "R2X\nY2T Y1T G2T B4O G1X R4X B3S\n",
+          "expected": "R2X R4X\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "G1O\nR1O B3S G1X R3O R4O R4T B3X\n",
+          "expected": "G1O R1O R3O R4O R4T\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "R1S\nG1S B1T G1T Y4S Y2S Y1S Y1T\n",
+          "expected": "R1S G1S G1T B1T Y1T Y1S Y4S Y2S\n",
+          "weight": 16.6666
+        },
+        {
+          "input": "Y4O\nG1X Y1O Y1X R2X B4S B4O R1X\n",
+          "expected": "Y4O Y1O Y1X G1X R1X R2X\n",
+          "weight": 16.6666
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。输入按下方测试用例展示的行结构读取。\n\n### 问题\n\nDuo 卡牌游戏中,每张卡牌有 3 个特征:颜色、数字和符号。游戏开始时,有两张卡牌正面朝上,且玩家手中持有 7 张卡牌。在一轮游戏中,玩家可以从两张正面朝上的卡牌中选择一张,并尽可能多地将手中的卡牌与该牌堆上的卡牌进行匹配。如果两张卡牌恰好有两个特征相匹配,就可以将一张卡牌放在另一张卡牌的上面。\n\nACSL 版卡牌使用四种颜色(R = 红色,Y = 黄色,G = 绿色,B = 蓝色)、四个数字(1、2、3、4)和四种符号(X = 叉号,O = 圆形,S = 正方形,T = 三角形)。每张卡牌用一个包含 3 个字符的字符串表示,并按照颜色、数字、符号的顺序依次排列。\n\n{{diagram:p-2604c282a8691ecd}}\n\n例如,左侧所示的卡牌 R4S 是一张颜色为红色 ,数字为 4,符号为正方形的卡牌。有9 张卡牌可能会被放在这张卡牌的上面:颜色为红色,数字为 1、2 或 3,符号为正方形的卡牌;颜色为黄色、绿色或蓝色,数字为 4 ,符号为正方形的卡牌;颜色为红色,数字为 4 ,符号为叉号、圆形或三角形的卡牌。\n\n{{diagram:p-3c22715601ec2cfb}}\n\n在这个名为 Uno Duo 的游戏版本中,你的程序将模拟单个玩家在一轮游戏中对单个牌堆的操作。这一轮游戏开始时,有一张卡牌正面朝上,且玩家手中持有 7 张卡牌(可将卡牌顺序视为从左至右排列)。一轮游戏的操作按以下步骤进行:\n\n1. 从手牌中找到最左侧一张与正面朝上的卡牌相匹配的牌。将匹配的卡牌放在最上面 ,从而形成一个正面朝上的牌堆。\n\n2. 尝试将手中尽可能多的卡牌与牌堆最上面的卡牌匹配。每次都从最左侧的卡牌开始查看。如果卡牌匹配,就将其放在牌堆最上面。\n\n3. 当手中的卡牌无法再继续匹配时,游戏结束。\n\n输出为一个字符串,包含牌堆中从底部到顶部的所有卡牌,每张卡牌之间用一个空格隔开。\n\n### 示例\n\n#### 输入\n\n```text\nB3O\nR3X B1T B2T R1X B3X B1X Y4O\n```\n\n#### 输出\n\n```text\nB3O B3X R3X R1X B1X B1T B2T\n```\n\n解释说明游戏开始时,正面朝上的卡牌和玩家手中持有的 7 张卡牌如下所示:\n\n{{diagram:p-bbb037253f7e2b07}}\n\n手中可以匹配的第一张卡牌是 B3X(颜色和数字匹配,但符号不匹配),将其放在正面朝上的卡牌上面,从而形成一个牌堆。\n\n{{diagram:p-5023e92a0bce9ad4}}\n\n接下来的卡牌匹配情况如下所示:\n\n{{diagram:p-5f66bd5c944067a3}}\n\n{{diagram:p-09101368eee6f2f8}}\n\n{{diagram:p-cbfe27d799ef9cb0}}\n\n{{diagram:p-04b53ec7e7fe6318}}\n\n{{diagram:p-a73fdb124c9ab436}}\n\n此时，手中唯一剩下的卡牌是 Y4O。它无法放到牌堆上，因此本轮结束。输出一个字符串，按从底部到顶部的顺序列出牌堆中的卡牌：B3O B3X R3X R1X B1X B1T B2T。\n\n### 输入\n\n输入两个字符串。第一个字符串表示正面朝上的卡牌，第二个字符串表示玩家手中的 7 张卡牌。卡牌之间用一个空格分隔。每组数据中没有重复卡牌。\n\n### 输出\n\n输出一个字符串，按从底部到顶部的顺序列出牌堆中的所有卡牌，相邻卡牌之间用一个空格分隔。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed.",
+      "normalizationNotes": [
+        "Remove trailing repeated source section beginning PROBLEM STATEMENT"
+      ]
+    },
+    "statementDiagrams": {
+      "en": [
+        {
+          "id": "p-2604c282a8691ecd",
+          "width": 80,
+          "height": 105,
+          "alt": {
+            "en": "Uno Duo cards: R4S",
+            "zh": "Uno Duo 卡牌：R4S"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 20,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 59,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "rect",
+              "x": 27,
+              "y": 37,
+              "width": 26,
+              "height": 26,
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            }
+          ]
+        },
+        {
+          "id": "p-3c22715601ec2cfb",
+          "width": 632,
+          "height": 105,
+          "alt": {
+            "en": "Uno Duo cards: R1S, R2S, R3S, Y4S, G4S, B4S, R4X, R4O, R4T",
+            "zh": "Uno Duo 卡牌：R1S, R2S, R3S, Y4S, G4S, B4S, R4X, R4O, R4T"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 20,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 59,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "rect",
+              "x": 27,
+              "y": 37,
+              "width": 26,
+              "height": 26,
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 78,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 88,
+              "y": 29,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 127,
+              "y": 81,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "rect",
+              "x": 95,
+              "y": 37,
+              "width": 26,
+              "height": 26,
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 146,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 156,
+              "y": 29,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 195,
+              "y": 81,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "rect",
+              "x": 163,
+              "y": 37,
+              "width": 26,
+              "height": 26,
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 214,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 224,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 263,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "rect",
+              "x": 231,
+              "y": 37,
+              "width": 26,
+              "height": 26,
+              "fill": "yellow",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 282,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 292,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "green",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 331,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "green",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "rect",
+              "x": 299,
+              "y": 37,
+              "width": 26,
+              "height": 26,
+              "fill": "green",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 350,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 360,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 399,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "rect",
+              "x": 367,
+              "y": 37,
+              "width": 26,
+              "height": 26,
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 418,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 428,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 467,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 438 36 L 448 46 L 458 36 L 463 41 L 453 51 L 463 61 L 458 66 L 448 56 L 438 66 L 433 61 L 443 51 L 433 41 Z",
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 486,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 496,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 535,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "circle",
+              "cx": 516,
+              "cy": 50,
+              "r": 14,
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 554,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 564,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 603,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 584 35 L 600 64 L 568 64 Z",
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            }
+          ]
+        },
+        {
+          "id": "p-bbb037253f7e2b07",
+          "width": 620,
+          "height": 105,
+          "alt": {
+            "en": "Uno Duo cards: B3O, R3X, B1T, B2T, R1X, B3X, B1X, Y4O",
+            "zh": "Uno Duo 卡牌：B3O, R3X, B1T, B2T, R1X, B3X, B1X, Y4O"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 20,
+              "y": 29,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 59,
+              "y": 81,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "circle",
+              "cx": 40,
+              "cy": 50,
+              "r": 14,
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 120,
+              "y": 29,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 159,
+              "y": 81,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 130 36 L 140 46 L 150 36 L 155 41 L 145 51 L 155 61 L 150 66 L 140 56 L 130 66 L 125 61 L 135 51 L 125 41 Z",
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 182,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 192,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 231,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 212 35 L 228 64 L 196 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 254,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 264,
+              "y": 29,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 303,
+              "y": 81,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 284 35 L 300 64 L 268 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 326,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 336,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 375,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 346 36 L 356 46 L 366 36 L 371 41 L 361 51 L 371 61 L 366 66 L 356 56 L 346 66 L 341 61 L 351 51 L 341 41 Z",
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 398,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 408,
+              "y": 29,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 447,
+              "y": 81,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 418 36 L 428 46 L 438 36 L 443 41 L 433 51 L 443 61 L 438 66 L 428 56 L 418 66 L 413 61 L 423 51 L 413 41 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 470,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 480,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 519,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 490 36 L 500 46 L 510 36 L 515 41 L 505 51 L 515 61 L 510 66 L 500 56 L 490 66 L 485 61 L 495 51 L 485 41 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 542,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 552,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 591,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "circle",
+              "cx": 572,
+              "cy": 50,
+              "r": 14,
+              "fill": "yellow",
+              "stroke": "black",
+              "strokeWidth": 1
+            }
+          ]
+        },
+        {
+          "id": "p-5023e92a0bce9ad4",
+          "width": 620,
+          "height": 145,
+          "alt": {
+            "en": "Uno Duo cards: B3X, R3X, B1T, B2T, R1X, empty slot, B1X, Y4O",
+            "zh": "Uno Duo 卡牌：B3X, R3X, B1T, B2T, R1X, 空位, B1X, Y4O"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 20,
+              "y": 29,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 59,
+              "y": 81,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 30 36 L 40 46 L 50 36 L 55 41 L 45 51 L 55 61 L 50 66 L 40 56 L 30 66 L 25 61 L 35 51 L 25 41 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 120,
+              "y": 29,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 159,
+              "y": 81,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 130 36 L 140 46 L 150 36 L 155 41 L 145 51 L 155 61 L 150 66 L 140 56 L 130 66 L 125 61 L 135 51 L 125 41 Z",
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 182,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 192,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 231,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 212 35 L 228 64 L 196 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 254,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 264,
+              "y": 29,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 303,
+              "y": 81,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 284 35 L 300 64 L 268 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 326,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 336,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 375,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 346 36 L 356 46 L 366 36 L 371 41 L 361 51 L 371 61 L 366 66 L 356 56 L 346 66 L 341 61 L 351 51 L 341 41 Z",
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 398,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 470,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 480,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 519,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 490 36 L 500 46 L 510 36 L 515 41 L 505 51 L 515 61 L 510 66 L 500 56 L 490 66 L 485 61 L 495 51 L 485 41 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 542,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 552,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 591,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "circle",
+              "cx": 572,
+              "cy": 50,
+              "r": 14,
+              "fill": "yellow",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "circle",
+              "cx": 428,
+              "cy": 50,
+              "r": 3,
+              "fill": "muted",
+              "stroke": "ink"
+            },
+            {
+              "type": "path",
+              "d": "M 428 53 Q 428 140 60 102",
+              "stroke": "ink",
+              "fill": "none",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 60 102 L 71 102 L 66 112 Z",
+              "stroke": "ink",
+              "fill": "ink"
+            }
+          ]
+        },
+        {
+          "id": "p-5f66bd5c944067a3",
+          "width": 620,
+          "height": 145,
+          "alt": {
+            "en": "Uno Duo cards: R3X, empty slot, B1T, B2T, R1X, B1X, Y4O",
+            "zh": "Uno Duo 卡牌：R3X, 空位, B1T, B2T, R1X, B1X, Y4O"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 20,
+              "y": 29,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 59,
+              "y": 81,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 30 36 L 40 46 L 50 36 L 55 41 L 45 51 L 55 61 L 50 66 L 40 56 L 30 66 L 25 61 L 35 51 L 25 41 Z",
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 182,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 192,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 231,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 212 35 L 228 64 L 196 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 254,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 264,
+              "y": 29,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 303,
+              "y": 81,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 284 35 L 300 64 L 268 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 326,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 336,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 375,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 346 36 L 356 46 L 366 36 L 371 41 L 361 51 L 371 61 L 366 66 L 356 56 L 346 66 L 341 61 L 351 51 L 341 41 Z",
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 470,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 480,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 519,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 490 36 L 500 46 L 510 36 L 515 41 L 505 51 L 515 61 L 510 66 L 500 56 L 490 66 L 485 61 L 495 51 L 485 41 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 542,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 552,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 591,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "circle",
+              "cx": 572,
+              "cy": 50,
+              "r": 14,
+              "fill": "yellow",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "circle",
+              "cx": 140,
+              "cy": 50,
+              "r": 3,
+              "fill": "muted",
+              "stroke": "ink"
+            },
+            {
+              "type": "path",
+              "d": "M 140 53 Q 140 140 60 102",
+              "stroke": "ink",
+              "fill": "none",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 60 102 L 71 102 L 66 112 Z",
+              "stroke": "ink",
+              "fill": "ink"
+            }
+          ]
+        },
+        {
+          "id": "p-09101368eee6f2f8",
+          "width": 620,
+          "height": 145,
+          "alt": {
+            "en": "Uno Duo cards: R1X, B1T, B2T, empty slot, B1X, Y4O",
+            "zh": "Uno Duo 卡牌：R1X, B1T, B2T, 空位, B1X, Y4O"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 20,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 59,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 30 36 L 40 46 L 50 36 L 55 41 L 45 51 L 55 61 L 50 66 L 40 56 L 30 66 L 25 61 L 35 51 L 25 41 Z",
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 182,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 192,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 231,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 212 35 L 228 64 L 196 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 254,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 264,
+              "y": 29,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 303,
+              "y": 81,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 284 35 L 300 64 L 268 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 326,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 470,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 480,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 519,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 490 36 L 500 46 L 510 36 L 515 41 L 505 51 L 515 61 L 510 66 L 500 56 L 490 66 L 485 61 L 495 51 L 485 41 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 542,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 552,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 591,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "circle",
+              "cx": 572,
+              "cy": 50,
+              "r": 14,
+              "fill": "yellow",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "circle",
+              "cx": 356,
+              "cy": 50,
+              "r": 3,
+              "fill": "muted",
+              "stroke": "ink"
+            },
+            {
+              "type": "path",
+              "d": "M 356 53 Q 356 140 60 102",
+              "stroke": "ink",
+              "fill": "none",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 60 102 L 71 102 L 66 112 Z",
+              "stroke": "ink",
+              "fill": "ink"
+            }
+          ]
+        },
+        {
+          "id": "p-cbfe27d799ef9cb0",
+          "width": 620,
+          "height": 145,
+          "alt": {
+            "en": "Uno Duo cards: B1X, B1T, B2T, empty slot, Y4O",
+            "zh": "Uno Duo 卡牌：B1X, B1T, B2T, 空位, Y4O"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 20,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 59,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 30 36 L 40 46 L 50 36 L 55 41 L 45 51 L 55 61 L 50 66 L 40 56 L 30 66 L 25 61 L 35 51 L 25 41 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 182,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 192,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 231,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 212 35 L 228 64 L 196 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 254,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 264,
+              "y": 29,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 303,
+              "y": 81,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 284 35 L 300 64 L 268 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 470,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 542,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 552,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 591,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "circle",
+              "cx": 572,
+              "cy": 50,
+              "r": 14,
+              "fill": "yellow",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "circle",
+              "cx": 500,
+              "cy": 50,
+              "r": 3,
+              "fill": "muted",
+              "stroke": "ink"
+            },
+            {
+              "type": "path",
+              "d": "M 500 53 Q 500 140 60 102",
+              "stroke": "ink",
+              "fill": "none",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 60 102 L 71 102 L 66 112 Z",
+              "stroke": "ink",
+              "fill": "ink"
+            }
+          ]
+        },
+        {
+          "id": "p-04b53ec7e7fe6318",
+          "width": 620,
+          "height": 145,
+          "alt": {
+            "en": "Uno Duo cards: B1T, empty slot, B2T, Y4O",
+            "zh": "Uno Duo 卡牌：B1T, 空位, B2T, Y4O"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 20,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 59,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 40 35 L 56 64 L 24 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 182,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 254,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 264,
+              "y": 29,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 303,
+              "y": 81,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 284 35 L 300 64 L 268 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 542,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 552,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 591,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "circle",
+              "cx": 572,
+              "cy": 50,
+              "r": 14,
+              "fill": "yellow",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "circle",
+              "cx": 212,
+              "cy": 50,
+              "r": 3,
+              "fill": "muted",
+              "stroke": "ink"
+            },
+            {
+              "type": "path",
+              "d": "M 212 53 Q 212 140 60 102",
+              "stroke": "ink",
+              "fill": "none",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 60 102 L 71 102 L 66 112 Z",
+              "stroke": "ink",
+              "fill": "ink"
+            }
+          ]
+        },
+        {
+          "id": "p-a73fdb124c9ab436",
+          "width": 620,
+          "height": 145,
+          "alt": {
+            "en": "Uno Duo cards: B2T, empty slot, Y4O",
+            "zh": "Uno Duo 卡牌：B2T, 空位, Y4O"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 20,
+              "y": 29,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 59,
+              "y": 81,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 40 35 L 56 64 L 24 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 254,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 542,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 552,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 591,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "circle",
+              "cx": 572,
+              "cy": 50,
+              "r": 14,
+              "fill": "yellow",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "circle",
+              "cx": 284,
+              "cy": 50,
+              "r": 3,
+              "fill": "muted",
+              "stroke": "ink"
+            },
+            {
+              "type": "path",
+              "d": "M 284 53 Q 284 140 60 102",
+              "stroke": "ink",
+              "fill": "none",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 60 102 L 71 102 L 66 112 Z",
+              "stroke": "ink",
+              "fill": "ink"
+            }
+          ]
+        }
+      ],
+      "zh": [
+        {
+          "id": "p-2604c282a8691ecd",
+          "width": 80,
+          "height": 105,
+          "alt": {
+            "en": "Uno Duo cards: R4S",
+            "zh": "Uno Duo 卡牌：R4S"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 20,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 59,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "rect",
+              "x": 27,
+              "y": 37,
+              "width": 26,
+              "height": 26,
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            }
+          ]
+        },
+        {
+          "id": "p-3c22715601ec2cfb",
+          "width": 632,
+          "height": 105,
+          "alt": {
+            "en": "Uno Duo cards: R1S, R2S, R3S, Y4S, G4S, B4S, R4X, R4O, R4T",
+            "zh": "Uno Duo 卡牌：R1S, R2S, R3S, Y4S, G4S, B4S, R4X, R4O, R4T"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 20,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 59,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "rect",
+              "x": 27,
+              "y": 37,
+              "width": 26,
+              "height": 26,
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 78,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 88,
+              "y": 29,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 127,
+              "y": 81,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "rect",
+              "x": 95,
+              "y": 37,
+              "width": 26,
+              "height": 26,
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 146,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 156,
+              "y": 29,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 195,
+              "y": 81,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "rect",
+              "x": 163,
+              "y": 37,
+              "width": 26,
+              "height": 26,
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 214,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 224,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 263,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "rect",
+              "x": 231,
+              "y": 37,
+              "width": 26,
+              "height": 26,
+              "fill": "yellow",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 282,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 292,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "green",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 331,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "green",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "rect",
+              "x": 299,
+              "y": 37,
+              "width": 26,
+              "height": 26,
+              "fill": "green",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 350,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 360,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 399,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "rect",
+              "x": 367,
+              "y": 37,
+              "width": 26,
+              "height": 26,
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 418,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 428,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 467,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 438 36 L 448 46 L 458 36 L 463 41 L 453 51 L 463 61 L 458 66 L 448 56 L 438 66 L 433 61 L 443 51 L 433 41 Z",
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 486,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 496,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 535,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "circle",
+              "cx": 516,
+              "cy": 50,
+              "r": 14,
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 554,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 564,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 603,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 584 35 L 600 64 L 568 64 Z",
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            }
+          ]
+        },
+        {
+          "id": "p-bbb037253f7e2b07",
+          "width": 620,
+          "height": 105,
+          "alt": {
+            "en": "Uno Duo cards: B3O, R3X, B1T, B2T, R1X, B3X, B1X, Y4O",
+            "zh": "Uno Duo 卡牌：B3O, R3X, B1T, B2T, R1X, B3X, B1X, Y4O"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 20,
+              "y": 29,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 59,
+              "y": 81,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "circle",
+              "cx": 40,
+              "cy": 50,
+              "r": 14,
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 120,
+              "y": 29,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 159,
+              "y": 81,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 130 36 L 140 46 L 150 36 L 155 41 L 145 51 L 155 61 L 150 66 L 140 56 L 130 66 L 125 61 L 135 51 L 125 41 Z",
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 182,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 192,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 231,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 212 35 L 228 64 L 196 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 254,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 264,
+              "y": 29,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 303,
+              "y": 81,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 284 35 L 300 64 L 268 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 326,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 336,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 375,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 346 36 L 356 46 L 366 36 L 371 41 L 361 51 L 371 61 L 366 66 L 356 56 L 346 66 L 341 61 L 351 51 L 341 41 Z",
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 398,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 408,
+              "y": 29,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 447,
+              "y": 81,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 418 36 L 428 46 L 438 36 L 443 41 L 433 51 L 443 61 L 438 66 L 428 56 L 418 66 L 413 61 L 423 51 L 413 41 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 470,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 480,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 519,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 490 36 L 500 46 L 510 36 L 515 41 L 505 51 L 515 61 L 510 66 L 500 56 L 490 66 L 485 61 L 495 51 L 485 41 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 542,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 552,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 591,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "circle",
+              "cx": 572,
+              "cy": 50,
+              "r": 14,
+              "fill": "yellow",
+              "stroke": "black",
+              "strokeWidth": 1
+            }
+          ]
+        },
+        {
+          "id": "p-5023e92a0bce9ad4",
+          "width": 620,
+          "height": 145,
+          "alt": {
+            "en": "Uno Duo cards: B3X, R3X, B1T, B2T, R1X, empty slot, B1X, Y4O",
+            "zh": "Uno Duo 卡牌：B3X, R3X, B1T, B2T, R1X, 空位, B1X, Y4O"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 20,
+              "y": 29,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 59,
+              "y": 81,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 30 36 L 40 46 L 50 36 L 55 41 L 45 51 L 55 61 L 50 66 L 40 56 L 30 66 L 25 61 L 35 51 L 25 41 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 120,
+              "y": 29,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 159,
+              "y": 81,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 130 36 L 140 46 L 150 36 L 155 41 L 145 51 L 155 61 L 150 66 L 140 56 L 130 66 L 125 61 L 135 51 L 125 41 Z",
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 182,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 192,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 231,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 212 35 L 228 64 L 196 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 254,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 264,
+              "y": 29,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 303,
+              "y": 81,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 284 35 L 300 64 L 268 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 326,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 336,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 375,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 346 36 L 356 46 L 366 36 L 371 41 L 361 51 L 371 61 L 366 66 L 356 56 L 346 66 L 341 61 L 351 51 L 341 41 Z",
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 398,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 470,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 480,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 519,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 490 36 L 500 46 L 510 36 L 515 41 L 505 51 L 515 61 L 510 66 L 500 56 L 490 66 L 485 61 L 495 51 L 485 41 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 542,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 552,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 591,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "circle",
+              "cx": 572,
+              "cy": 50,
+              "r": 14,
+              "fill": "yellow",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "circle",
+              "cx": 428,
+              "cy": 50,
+              "r": 3,
+              "fill": "muted",
+              "stroke": "ink"
+            },
+            {
+              "type": "path",
+              "d": "M 428 53 Q 428 140 60 102",
+              "stroke": "ink",
+              "fill": "none",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 60 102 L 71 102 L 66 112 Z",
+              "stroke": "ink",
+              "fill": "ink"
+            }
+          ]
+        },
+        {
+          "id": "p-5f66bd5c944067a3",
+          "width": 620,
+          "height": 145,
+          "alt": {
+            "en": "Uno Duo cards: R3X, empty slot, B1T, B2T, R1X, B1X, Y4O",
+            "zh": "Uno Duo 卡牌：R3X, 空位, B1T, B2T, R1X, B1X, Y4O"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 20,
+              "y": 29,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 59,
+              "y": 81,
+              "text": "3",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 30 36 L 40 46 L 50 36 L 55 41 L 45 51 L 55 61 L 50 66 L 40 56 L 30 66 L 25 61 L 35 51 L 25 41 Z",
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 182,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 192,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 231,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 212 35 L 228 64 L 196 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 254,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 264,
+              "y": 29,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 303,
+              "y": 81,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 284 35 L 300 64 L 268 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 326,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 336,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 375,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 346 36 L 356 46 L 366 36 L 371 41 L 361 51 L 371 61 L 366 66 L 356 56 L 346 66 L 341 61 L 351 51 L 341 41 Z",
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 470,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 480,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 519,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 490 36 L 500 46 L 510 36 L 515 41 L 505 51 L 515 61 L 510 66 L 500 56 L 490 66 L 485 61 L 495 51 L 485 41 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 542,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 552,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 591,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "circle",
+              "cx": 572,
+              "cy": 50,
+              "r": 14,
+              "fill": "yellow",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "circle",
+              "cx": 140,
+              "cy": 50,
+              "r": 3,
+              "fill": "muted",
+              "stroke": "ink"
+            },
+            {
+              "type": "path",
+              "d": "M 140 53 Q 140 140 60 102",
+              "stroke": "ink",
+              "fill": "none",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 60 102 L 71 102 L 66 112 Z",
+              "stroke": "ink",
+              "fill": "ink"
+            }
+          ]
+        },
+        {
+          "id": "p-09101368eee6f2f8",
+          "width": 620,
+          "height": 145,
+          "alt": {
+            "en": "Uno Duo cards: R1X, B1T, B2T, empty slot, B1X, Y4O",
+            "zh": "Uno Duo 卡牌：R1X, B1T, B2T, 空位, B1X, Y4O"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 20,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 59,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "red",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 30 36 L 40 46 L 50 36 L 55 41 L 45 51 L 55 61 L 50 66 L 40 56 L 30 66 L 25 61 L 35 51 L 25 41 Z",
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 182,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 192,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 231,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 212 35 L 228 64 L 196 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 254,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 264,
+              "y": 29,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 303,
+              "y": 81,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 284 35 L 300 64 L 268 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 326,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 470,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 480,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 519,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 490 36 L 500 46 L 510 36 L 515 41 L 505 51 L 515 61 L 510 66 L 500 56 L 490 66 L 485 61 L 495 51 L 485 41 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 542,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 552,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 591,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "circle",
+              "cx": 572,
+              "cy": 50,
+              "r": 14,
+              "fill": "yellow",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "circle",
+              "cx": 356,
+              "cy": 50,
+              "r": 3,
+              "fill": "muted",
+              "stroke": "ink"
+            },
+            {
+              "type": "path",
+              "d": "M 356 53 Q 356 140 60 102",
+              "stroke": "ink",
+              "fill": "none",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 60 102 L 71 102 L 66 112 Z",
+              "stroke": "ink",
+              "fill": "ink"
+            }
+          ]
+        },
+        {
+          "id": "p-cbfe27d799ef9cb0",
+          "width": 620,
+          "height": 145,
+          "alt": {
+            "en": "Uno Duo cards: B1X, B1T, B2T, empty slot, Y4O",
+            "zh": "Uno Duo 卡牌：B1X, B1T, B2T, 空位, Y4O"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 20,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 59,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 30 36 L 40 46 L 50 36 L 55 41 L 45 51 L 55 61 L 50 66 L 40 56 L 30 66 L 25 61 L 35 51 L 25 41 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 182,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 192,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 231,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 212 35 L 228 64 L 196 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 254,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 264,
+              "y": 29,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 303,
+              "y": 81,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 284 35 L 300 64 L 268 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 470,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 542,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 552,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 591,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "circle",
+              "cx": 572,
+              "cy": 50,
+              "r": 14,
+              "fill": "yellow",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "circle",
+              "cx": 500,
+              "cy": 50,
+              "r": 3,
+              "fill": "muted",
+              "stroke": "ink"
+            },
+            {
+              "type": "path",
+              "d": "M 500 53 Q 500 140 60 102",
+              "stroke": "ink",
+              "fill": "none",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 60 102 L 71 102 L 66 112 Z",
+              "stroke": "ink",
+              "fill": "ink"
+            }
+          ]
+        },
+        {
+          "id": "p-04b53ec7e7fe6318",
+          "width": 620,
+          "height": 145,
+          "alt": {
+            "en": "Uno Duo cards: B1T, empty slot, B2T, Y4O",
+            "zh": "Uno Duo 卡牌：B1T, 空位, B2T, Y4O"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 20,
+              "y": 29,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 59,
+              "y": 81,
+              "text": "1",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 40 35 L 56 64 L 24 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 182,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 254,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 264,
+              "y": 29,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 303,
+              "y": 81,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 284 35 L 300 64 L 268 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 542,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 552,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 591,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "circle",
+              "cx": 572,
+              "cy": 50,
+              "r": 14,
+              "fill": "yellow",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "circle",
+              "cx": 212,
+              "cy": 50,
+              "r": 3,
+              "fill": "muted",
+              "stroke": "ink"
+            },
+            {
+              "type": "path",
+              "d": "M 212 53 Q 212 140 60 102",
+              "stroke": "ink",
+              "fill": "none",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 60 102 L 71 102 L 66 112 Z",
+              "stroke": "ink",
+              "fill": "ink"
+            }
+          ]
+        },
+        {
+          "id": "p-a73fdb124c9ab436",
+          "width": 620,
+          "height": 145,
+          "alt": {
+            "en": "Uno Duo cards: B2T, empty slot, Y4O",
+            "zh": "Uno Duo 卡牌：B2T, 空位, Y4O"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 20,
+              "y": 29,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 59,
+              "y": 81,
+              "text": "2",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "blue",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "path",
+              "d": "M 40 35 L 56 64 L 24 64 Z",
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 254,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 542,
+              "y": 10,
+              "width": 60,
+              "height": 80,
+              "rx": 7,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 552,
+              "y": 29,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "text",
+              "x": 591,
+              "y": 81,
+              "text": "4",
+              "fontSize": 20,
+              "anchor": "middle",
+              "fill": "yellow",
+              "stroke": "none",
+              "weight": "bold"
+            },
+            {
+              "type": "circle",
+              "cx": 572,
+              "cy": 50,
+              "r": 14,
+              "fill": "yellow",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "circle",
+              "cx": 284,
+              "cy": 50,
+              "r": 3,
+              "fill": "muted",
+              "stroke": "ink"
+            },
+            {
+              "type": "path",
+              "d": "M 284 53 Q 284 140 60 102",
+              "stroke": "ink",
+              "fill": "none",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 60 102 L 71 102 L 66 112 Z",
+              "stroke": "ink",
+              "fill": "ink"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,459 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2020-2021-junior-2",
+  "division": "Junior",
+  "season": "2020-2021",
+  "round": 2,
+  "roundLabel": {
+    "en": "Contest 2",
+    "zh": "第二轮"
+  },
+  "title": {
+    "en": "ACSL 2020-2021 Junior · Contest 2",
+    "zh": "ACSL 2020-2021 Junior · 第二轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Junior/2020-2021/第二轮/初级笔试 jr.pdf",
+      "sha256": "48d0127dd0caca70e712204e618ac9c7934a3f6917be175f884e5750a7787d0b",
+      "pages": 2
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Junior/2020-2021/第二轮/初级笔试_jr_sol.pdf",
+      "sha256": "9c7e537888e0ed732280ec55dde57fe9709a12ce33989a7bffd35723bb3032ef",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Junior/2020-2021/第二轮/初级编程 lex strings（含答案）.pdf",
+      "sha256": "5be13a84e4356ea20d5e3761f023ddcef5dbe6dc2bb144590431cd2c9d1476f5",
+      "pages": 4
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Evaluate the following prefix expression if all numbers are single digits:\n\n`+ - / * 3 6 2 / + 3 9 4 ^ 2 3`",
+        "zh": "如果所有数都是一位数字,计算以下前缀表达式:\n\n`+ - / * 3 6 2 / + 3 9 4 ^ 2 3`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`-2`",
+            "zh": "`-2`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "12",
+            "zh": "12"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "14",
+            "zh": "14"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "17",
+            "zh": "17"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Evaluate the innermost prefix operations first:\n\n```text\n+ - / * 3 6 2 / + 3 9 4 ^ 2 3\n= + - / (* 3 6) 2 / (+ 3 9) 4 (^ 2 3)\n= + - (/ 18 2) (/ 12 4) 8\n= + (- 9 3) 8\n= + 6 8\n= 14\n```\n\nThe expression has the structure $((3\\times6)/2-(3+9)/4)+2^3$. Prefix operators take the next two complete operands, which can themselves be subexpressions. Therefore the outer subtraction is $9-3$, not $3-9$.\n\n**Answer: D.**",
+        "zh": "先计算最内层的前缀运算：\n\n```text\n+ - / * 3 6 2 / + 3 9 4 ^ 2 3\n= + - / (* 3 6) 2 / (+ 3 9) 4 (^ 2 3)\n= + - (/ 18 2) (/ 12 4) 8\n= + (- 9 3) 8\n= + 6 8\n= 14\n```\n\n这段前缀式对应 $((3\\times6)/2-(3+9)/4)+2^3$。每个运算符接收后面两个完整操作数，操作数也可以是一个子表达式。因此减法的顺序是 $9-3$，不能把两个操作数颠倒。\n\n**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Convert this infix expression to postfix:\n\n$$\n\\frac{A^2+B}{C}+ABC\n$$",
+        "zh": "请将以下中缀表达式转换为后缀表达式:\n\n$$\n\\frac{A^2+B}{C}+ABC\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`A2^B+/CAB*C*+`",
+            "zh": "`A2^B+/CAB*C*+`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`A2^B+C/AB*C*+`",
+            "zh": "`A2^B+C/AB*C*+`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`A2^B+C/A*BC*+`",
+            "zh": "`A2^B+C/A*BC*+`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`A2B^+C/AB*C*+`",
+            "zh": "`A2B^+C/AB*C*+`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`A2^B+C/ABC**+`",
+            "zh": "`A2^B+C/ABC**+`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "The postfix form of $(A^2+B)/C$ is `A2^B+C/`. Multiplication is processed left to right, so the postfix form of $ABC$ is `AB*C*`. Append `+` after both operands:\n\n```text\nA2^B+C/AB*C*+\n```\n\nBuild postfix from the expression tree: $A^2$ gives `A2^`; adding B gives `A2^B+`; division by C gives `A2^B+C/`. The original left-associated product $(AB)C$ gives `AB*C*`. Operators go after both operands; retain this grouping rather than reassociating the multiplication.\n\n**Answer: B.**",
+        "zh": "$(A^2+B)/C$ 的后缀形式为 `A2^B+C/`。乘法按从左到右的顺序处理，因此 $ABC$ 的后缀形式为 `AB*C*`。将两个部分拼接，再加上加法运算符：\n\n```text\nA2^B+C/AB*C*+\n```\n\n按表达式树逐层转换：$A^2$ 写成 `A2^`，加 B 后为 `A2^B+`，再除以 C 得到 `A2^B+C/`。原式从左结合的乘积 $(AB)C$ 写成 `AB*C*`。后缀运算符放在两个操作数之后，并保持原来的结合顺序。\n\n**答案：B。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "比特位操作"
+      },
+      "statement": {
+        "en": "Evaluate the following expression:\n\n`(01011 OR (NOT 10010) AND 00011)`",
+        "zh": "计算以下表达式:\n\n`(01011 OR (NOT 10010) AND 00011)`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`01011`",
+            "zh": "`01011`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`00101`",
+            "zh": "`00101`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`11011`",
+            "zh": "`11011`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`00011`",
+            "zh": "`00011`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`01010`",
+            "zh": "`01010`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "`(01011 OR (NOT 10010) AND 00011)`\n\n`= (01011 OR ((NOT 10010) AND 00011))`\n\n`= (01011 OR (01101 AND 00011))`\n\n`= (01011 OR 00001)`\n\n`= 01011`\n\nUse the precedence NOT, then AND, then OR. Complementing all five bits of `10010` gives `01101`; AND keeps a 1 only where both operands have 1, leaving `00001`. That final 1 is already present in `01011`, so OR does not change it.\n\n**Answer: A.**",
+        "zh": "原卷解析：\n\n`(01011 OR (NOT 10010) AND 00011)`\n\n`= (01011 OR ((NOT 10010) AND 00011))`\n\n`= (01011 OR (01101 AND 00011))`\n\n`= (01011 OR 00001)`\n\n`= 01011`\n\n运算优先级依次是 NOT、AND、OR。将 `10010` 的五位逐位取反得 `01101`；与 `00011` 做 AND，只保留两者都为 1 的最后一位，得到 `00001`。`01011` 的最后一位本来就是 1，因此最后的 OR 不改变结果。\n\n**答案：A。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "比特位操作"
+      },
+      "statement": {
+        "en": "Evaluate the following expression:\n\n`(NOT (RSHIFT-2 (LCIRC-2 10011)))`",
+        "zh": "计算以下表达式:\n\n`(NOT (RSHIFT-2 (LCIRC-2 10011)))`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`11000`",
+            "zh": "`11000`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`00111`",
+            "zh": "`00111`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`10100`",
+            "zh": "`10100`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`11001`",
+            "zh": "`11001`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`11100`",
+            "zh": "`11100`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "`(NOT (RSHIFT-2 (LCIRC-2 10011)))`\n\n`= (NOT (RSHIFT-2 01110))`\n\n`= (NOT 00011)`\n\n`= 11100`\n\nKeep the width at five bits. LCIRC moves the first two bits `10` to the end: `10011` becomes `01110`. RSHIFT instead discards the last two bits and inserts two zeros on the left, giving `00011`. Complement all five positions to obtain `11100`.\n\n**Answer: E.**",
+        "zh": "原卷解析：\n\n`(NOT (RSHIFT-2 (LCIRC-2 10011)))`\n\n`= (NOT (RSHIFT-2 01110))`\n\n`= (NOT 00011)`\n\n`= 11100`\n\n全过程保持五位。LCIRC 把开头的两位 `10` 移到末尾，`10011` 变成 `01110`；RSHIFT 则丢弃末尾两位，并在左边补两个 0，得到 `00011`。最后对五位全部取反得 `11100`。循环移位与补零移位的区别是本题关键。\n\n**答案：E。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "What is the final value of c when this program is executed?\n\n```text\nc = 0\nfor i = 1 to 50\n    if i % 4 == 3 then c = c + 1\nnext i\nfor j = 2 to 50 step 2\n    if j % 6 == 0 && j % 4 != 0 then c = c + 1\n    if j % 7 == 0 then c = c+ 1\nnext j\n```",
+        "zh": "执行以下程序时,c的最终值是多少?\n\n```text\nc = 0\nfor i = 1 to 50\n    if i % 4 == 3 then c = c + 1\nnext i\nfor j = 2 to 50 step 2\n    if j % 6 == 0 && j % 4 != 0 then c = c + 1\n    if j % 7 == 0 then c = c+ 1\nnext j\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "15",
+            "zh": "15"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "17",
+            "zh": "17"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "19",
+            "zh": "19"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "21",
+            "zh": "21"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "23",
+            "zh": "23"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "The first loop counts numbers congruent to $3$ modulo $4$ from $1$ through $50$: $3,7,11,\\ldots,47$, giving $12$ increments.\n\nThe second loop considers only even numbers. Its first condition counts $6,18,30,42$; its second counts $14,28,42$. The two conditions are independent, so $42$ contributes twice.\n\nTherefore $c=12+4+3=\\boxed{19}$.\n\n**Answer: C.**",
+        "zh": "第一个循环统计 $1$ 到 $50$ 中除以 $4$ 余 $3$ 的数：$3,7,11,\\ldots,47$，共使计数增加 $12$ 次。\n\n第二个循环只检查偶数。第一个条件统计 $6,18,30,42$；第二个条件统计 $14,28,42$。两个条件相互独立，所以 $42$ 会计数两次。\n\n最终 $c=12+4+3=\\boxed{19}$。\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [
+    "The solution PDF incorrectly repeats heading 1 for question 2; its right answer column explicitly labels question 2. Crop association follows that answer column and the original question order."
+  ],
+  "programming": {
+    "id": "lex-strings",
+    "definition": {
+      "title": "Lex Strings",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Read one line. Keep spaces and punctuation in the input string.\n\n### Problem\n\nGiven an inputted string, create a new string as follows:\n\n1. Change uppercase letters to lowercase and eliminate all non-letters.\n\n2. Find all first occurrences of each distinct letter and arrange them in sorted order.\n\n3. Append these sorted letters to the end of a new string and remove those distinct letters from the original string.\n\n4. Repeat steps 2 and 3 until the original string is empty.\n\n5. Before outputting the new string, remove adjacent duplicate letters (e.g. \"bboooo\" becomes \"bo\").\n\nFor the string `A good sorting algorithm.`, the passes are:\n\n| Pass | New string | Remaining string |\n| --- | --- | --- |\n| 1 | `adghilmnorst` | `oogagorit` |\n| 2 | `adghilmnorstagiort` | `ogo` |\n| 3 | `adghilmnorstagiortgo` | `o` |\n| 4 | `adghilmnorstagiortgoo` | empty |\n\nAfter removing adjacent duplicate letters, the output is `adghilmnorstagiortgo`.\n\n### Input\n\nYour program will receive a single line of data, each containing a single string that is fewer than 100 characters in length.\n\n### Output\n\nThe new string as specified above.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "A good sorting algorithm.\n",
+          "expected": "adghilmnorstagiortgo\n"
+        },
+        {
+          "input": "Tennessee is the volunteer state.\n",
+          "expected": "aehilnorstuvenstenstestete\n"
+        },
+        {
+          "input": "Einstein was a genius.\n",
+          "expected": "aeginstuwaeinseins\n"
+        },
+        {
+          "input": "Tom Sawyer & the Mississippi River\n",
+          "expected": "aehimoprstvwyeimprsteirsisis\n"
+        },
+        {
+          "input": "She sells seashells by the seashore.\n",
+          "expected": "abehlorstyaehlsehlsehlseseses\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "Peter Piper picked a peck of pickled peppers.\n",
+          "expected": "acdefikloprstcdeikprceikprepepepepep\n",
+          "weight": 20
+        },
+        {
+          "input": "Computer Science Teachers Association had a virtual Conference in 2020.\n",
+          "expected": "acdefhilmnoprstuvacehinorstuaceinorstaceinorstaceinacece\n",
+          "weight": 20
+        },
+        {
+          "input": "HackerRank.com was used for the ACSL Finals this past year.\n",
+          "expected": "acdefhiklmnoprstuwyacefhiklnorstacehrstaersasasa\n",
+          "weight": 20
+        },
+        {
+          "input": "Programming languages include Java, Python, C++, BASIC, and Scratch.\n",
+          "expected": "abcdeghijlmnoprstuvyacdeghilmnoprstuacginrsacgnacna\n",
+          "weight": 20
+        },
+        {
+          "input": "COVID-19 is a global pandemic and a virus that changed everything.\n",
+          "expected": "abcdeghilmnoprstuvyacdeghilnorstvacdeghintvadeinaia\n",
+          "weight": 20
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。读取一行，保留输入字符串内的空格和标点。\n\n### 问题\n\n给定一个输入字符串，按照如下要求输出一个新的字符串:\n\n1. 将大写字母改为小写字母，并删去所有非字母字符。\n\n2. 找出所有首次出现的字母，并按照字母顺序进行排列。\n\n3. 将排列好的字母加到新字符串的末尾，并从原字符串中删除这些字母。\n\n4. 重复步骤 2 和步骤 3 , 直至将原字符串全部清空。\n\n5. 删除相邻的重复字母，然后输出新字符串。 （比如 `bboooo` 变为 `bo`）。\n\n例如，对字符串 `A good sorting algorithm.`，各轮结果如下：\n\n| 轮次 | 新字符串 | 剩余字符串 |\n| --- | --- | --- |\n| 1 | `adghilmnorst` | `oogagorit` |\n| 2 | `adghilmnorstagiort` | `ogo` |\n| 3 | `adghilmnorstagiortgo` | `o` |\n| 4 | `adghilmnorstagiortgoo` | 空 |\n\n删除相邻的重复字母后，输出 `adghilmnorstagiortgo`。\n\n### 输入\n\n你将会接收到一行数据，每行数据包含一个单独的字符串，长度小于 100 个字符。\n\n### 输出\n\n如上所示的新字符串。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [],
+      "zh": []
+    }
+  }
+}

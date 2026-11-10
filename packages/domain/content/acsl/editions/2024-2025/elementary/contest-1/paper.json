@@ -1,0 +1,449 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2024-2025-elementary-1",
+  "division": "Elementary",
+  "season": "2024-2025",
+  "round": 1,
+  "roundLabel": {
+    "en": "Contest 1",
+    "zh": "资格轮"
+  },
+  "title": {
+    "en": "ACSL 2024-2025 Elementary · Contest 1",
+    "zh": "ACSL 2024-2025 Elementary · 资格轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Elementary/2024-2025/资格轮/c_1_elem.pdf",
+      "sha256": "6e7f7d7a33b02473e7dec9b9fafdba88940003a0ff1b3a6c809ecd91cae011ec",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Elementary/2024-2025/资格轮/c_1_elem_sol.pdf",
+      "sha256": "1cb0ed32504b8ff4ed2d56ff36db59b2b271b7cdf0bb79c4f7ed21ed9a16d727",
+      "pages": 2
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Convert $2024_{8}$ to base 10.",
+        "zh": "将 $2024_{8}$ 转换为10进制。"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "532",
+            "zh": "532"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "1022",
+            "zh": "1022"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "1044",
+            "zh": "1044"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "2178",
+            "zh": "2178"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Answer: **D**.\n\nUse the place values $8^3,8^2,8,1$ from left to right. The zero still occupies the $8^2$ place. Thus $2024_8=2\\cdot512+0\\cdot64+2\\cdot8+4=1044_{10}$.",
+        "zh": "答案：**D**。\n\n从左到右的位权为 $8^3,8^2,8,1$。0 虽然对和没有贡献，仍占据 $8^2$ 位。因此 $2024_8=2\\times512+0\\times64+2\\times8+4=1044_{10}$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Convert $A27_{16}$ to base 8.",
+        "zh": "将 $A27_{16}$ 转换为8进制。"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "537",
+            "zh": "537"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "547",
+            "zh": "547"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "5047",
+            "zh": "5047"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "5057",
+            "zh": "5057"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "6037",
+            "zh": "6037"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Answer: **C**.\n\nConvert hexadecimal to binary using four bits per digit, then regroup into three-bit octal digits.\n\n$$A27_{16}=1010\\,0010\\,0111_2=101\\,000\\,100\\,111_2=5047_8.$$\n\nSource correction: the original final base label16 should be8.",
+        "zh": "答案：**C**。\n\n把十六进制各位展开成四位二进制：`1010 0010 0111`。从右向左每三位分组：`101 000 100 111`，分别对应 5、0、4、7，得 $5047_8$。原解析末尾误标为十六进制，正确下标是 8。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "What is the number $198_{10}$ in base 16?",
+        "zh": "$198_{10}$ 用16进制表示是什么?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "126",
+            "zh": "126"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "6C",
+            "zh": "6C"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "B6",
+            "zh": "B6"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "C5",
+            "zh": "C5"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "C6",
+            "zh": "C6"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "Answer: **E**.\n\nConverting $198_{10}$ to base 16 is done by repeatedly dividing by the number 16 and getting the remainder. Reading the remainder from last to first always produces the answer:\n\n198/16 = 12 r 6, 12/16 = 0 r 12 so the answer is C6",
+        "zh": "答案：**E**。\n\n先除以 16，$198=16\\times12+6$，所以个位是 6。再算 $12=16\\times0+12$，第二个余数 12 在十六进制中写作 C。逆序读余数得 $C6_{16}$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "How many 1’s are there in all of the binary numbers from $20_{10}$ to $24_{10}$ inclusive?",
+        "zh": "将 $20_{10}$ 到 $24_{10}$（含两端）的所有数转换为二进制后，总共有多少个 1？"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "13",
+            "zh": "13"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "14",
+            "zh": "14"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "15",
+            "zh": "15"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "16",
+            "zh": "16"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "17",
+            "zh": "17"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Answer: **B**.\n\nCounting in binary from $20_{10}$ to $24_{10}$ is:\n\n20 = 10100, 21 = 10101, 22 = 10110, 23 = 10111, 24 = 11000\n\nThere are a total of 14 1’s.",
+        "zh": "答案：**B**。\n\n将 20 至 24 写成二进制：`10100、10101、10110、10111、11000`。对应 1 的个数是 2、3、3、4、2。将区间两端也计入，共 14 个。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Given the two colors $B0E7C3_{16}$ and $98FDAE_{16}$, what is the largest positive difference between the shades of red, green, or blue in hexadecimal?",
+        "zh": "给定两种颜色 $B0E7C3_{16}$ 和 $98FDAE_{16}$ ,分别计算这两种颜色的红、绿、蓝色阶之间的差值,并用十六进制表示。请问其中最大正数差是多少?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "16",
+            "zh": "16"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "17",
+            "zh": "17"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "18",
+            "zh": "18"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "19",
+            "zh": "19"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "20",
+            "zh": "20"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Answer: **C**.\n\nThe two colors $B0E7C3_{16}$ and $98FDAE_{16}$ represent the red, green, and blue components of 2 different colors.\n\nThe red difference is B0 - 98 = $18_{16}$ because 16 - 8 = 8 and 10 - 9 = 1. The green difference is FD - E7 = $16_{16}$ because 13 - 7 = 6 and 15 - 14 = 1. The blue difference is C3 - AE = $15_{16}$ because 16 + 3 - 14 = 5 and 11 - 10 = 1.\n\nDifferences determine the varying shade of each component. The largest variation is $18_{16}.$",
+        "zh": "答案：**C**。\n\n把颜色分别拆为 `B0 E7 C3` 和 `98 FD AE`，比较每个通道的绝对差。红、绿、蓝的差依次是 $18_{16}$、$16_{16}$、$15_{16}$。三者高位都是 1，比较低位，红色差值 $18_{16}$ 最大。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q6",
+      "number": 6,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "The colors for the Olympic Rings are 0081C8 (water blue), 008651 (shamrock green), 000000 (black), FCB131 (macaroni and cheese), and EE334E (dark carmine pink), how many of the 5 colors do not have a red component?",
+        "zh": "奥运五环的颜色包含0081C8(水蓝)、008651(三叶草绿)、000000(黑色)、FCB131(类似芝士通心粉的黄色)、EE334E(深粉红),请问这5种颜色中有几种颜色不含红色阶?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "0",
+            "zh": "0"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "1",
+            "zh": "1"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "2",
+            "zh": "2"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "3",
+            "zh": "3"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Answer: **D**.\n\nThe red component of any hexadecimal color is based on the first 2 digits only. For the Olympic Rings 0081C8 (water blue), 008651 (shamrock green), 000000 (black), FCB131 (macaroni and cheese), and EE334E (dark carmine pink), the first 2 digits are 00 for 3 of them: blue, green, and black.",
+        "zh": "答案：**D**。\n\n`RRGGBB` 的前两位代表红色。五种颜色的红色值依次是 `00、00、00、FC、EE`。只有蓝色、绿色和黑色三项的红色值为 0。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [
+    "The source directory calls Contest 1 the qualification round; canonical round remains 1."
+  ]
+}

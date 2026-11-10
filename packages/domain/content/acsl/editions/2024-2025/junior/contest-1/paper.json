@@ -1,0 +1,537 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2024-2025-junior-1",
+  "division": "Junior",
+  "season": "2024-2025",
+  "round": 1,
+  "roundLabel": {
+    "en": "Contest 1",
+    "zh": "资格轮"
+  },
+  "title": {
+    "en": "ACSL 2024-2025 Junior · Contest 1",
+    "zh": "ACSL 2024-2025 Junior · 资格轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Junior/2024-2025/资格轮/c_1_jr.pdf",
+      "sha256": "5a0683c3cb22b6571b6ebd838f42bb7d6d8acbe11f905f9b415ac741595ef799",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Junior/2024-2025/资格轮/c_1_jr_soln.pdf",
+      "sha256": "745b93fd8e33200f98309863beed4d033a6e3e6549fbe31813b40a9eab90744f",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Junior/2024-2025/资格轮/c_1_ACSL Rings_jr.pdf",
+      "sha256": "992b406c98aec697fd68db716e362d8762a06167a8ee76e65caee55db7dacb05",
+      "pages": 6
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Convert $2024_{10}$ to octal.",
+        "zh": "将 $2024_{10}$ 转换为8进制。"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "5730",
+            "zh": "5730"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "3814",
+            "zh": "3814"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "3750",
+            "zh": "3750"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "3754",
+            "zh": "3754"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "1044",
+            "zh": "1044"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "$$2024_{10}=1536+448+40+0=3\\cdot8^3+7\\cdot8^2+5\\cdot8+0=3750_8.$$\n\nAlternatively, repeatedly divide by 8 and read the remainders in reverse order.\n\nThe successive quotient/remainder pairs are $(253,0)$, $(31,5)$, $(3,7)$, and $(0,3)$. Read the remainders from the last division to the first to obtain 3750. The final zero is a real units digit and must be retained; 375 would have a different value.\n\n**Answer: C.**",
+        "zh": "$$2024_{10}=1536+448+40+0=3\\cdot8^3+7\\cdot8^2+5\\cdot8+0=3750_8.$$\n\n也可以不断除以 8，再将各次余数逆序排列。\n\n连续除以 8 得到的“商、余数”依次为 $(253,0)$、$(31,5)$、$(3,7)$、$(0,3)$。把余数从最后一次向第一次读，得到 3750。末尾的 0 是有效的个位，不能省略；375 表示的是另一个数。\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "What is the value of $9876_{16}$ + $ABC_{16}$ in base 16?",
+        "zh": "请问 $9876_{16}$ + $ABC_{16}$ 的值用16进制表示是什么?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "9222",
+            "zh": "9222"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "9232",
+            "zh": "9232"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "A322",
+            "zh": "A322"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "A332",
+            "zh": "A332"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "B332",
+            "zh": "B332"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Align the units digits, placing ABC under the last three digits of 9876.\n\n$$\n\\begin{array}{rcccc}\n & {\\scriptstyle 1} & {\\scriptstyle 1} & {\\scriptstyle 1} &  \\\\\n & 9 & 8 & 7 & 6 \\\\\n+ &   & A & B & C \\\\\n\\hline\n & A & 3 & 3 & 2\n\\end{array}\n$$\n\nWith $A=10$, $B=11$, and $C=12$, the column totals from right to left are 18, 19, 19, and 10 in decimal. The first three each carry 1. Their remainders are 2, 3, and 3, and the leftmost digit is A. The result is $A332_{16}$.",
+        "zh": "从个位对齐，把 ABC 放在 9876 的最后三位下方。\n\n$$\n\\begin{array}{rcccc}\n & {\\scriptstyle 1} & {\\scriptstyle 1} & {\\scriptstyle 1} &  \\\\\n & 9 & 8 & 7 & 6 \\\\\n+ &   & A & B & C \\\\\n\\hline\n & A & 3 & 3 & 2\n\\end{array}\n$$\n\n把 A、B、C 分别看作十进制 10、11、12。从右往左，各列含进位的和是十进制 18、19、19、10，前三列各向左进 1，写 2、3、3，最左列写 A。结果为 $A332_{16}$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find $f(5)$ given:\n\n$$\nf(x)=\\begin{cases} 2 & \\text{if }x\\le1\\\\ f(x-1)+x & \\text{if }x>1 \\end{cases}\n$$",
+        "zh": "根据下列表达式,求 $f(5)$ :\n\n$$\nf(x)=\\begin{cases} 2 & x\\le1\\\\ f(x-1)+x & x>1 \\end{cases}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "11",
+            "zh": "11"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "13",
+            "zh": "13"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "16",
+            "zh": "16"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "20",
+            "zh": "20"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "22",
+            "zh": "22"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "$$\nf(1)=2\n$$\n\n$$\nf(2)=f(2-1)+2=f(1)+2=2+2=4\n$$\n\n$$\nf(3)=f(3-1)+3=f(2)+3=4+3=7\n$$\n\n$$\nf(4)=f(4-1)+4=f(3)+4=7+4=11\n$$\n\n$$\nf(5)=f(5-1)+5=f(4)+5=11+5=16\n$$\n\nThe sequence is: 2, 4, 7, 11, 16, 22, 29, 37, 46,... The difference between terms increases by 1.\n\nThe base case contributes 2 rather than 1. Expanding the recursion gives $f(5)=2+2+3+4+5=16$. This differs by 1 from the usual sum $1+2+3+4+5=15$; using the familiar triangular-number formula without adjusting the base case would be wrong.\n\n**Answer: C.**",
+        "zh": "原卷解析：\n\n$$\nf(1)=2\n$$\n\n$$\nf(2)=f(2-1)+2=f(1)+2=2+2=4\n$$\n\n$$\nf(3)=f(3-1)+3=f(2)+3=4+3=7\n$$\n\n$$\nf(4)=f(4-1)+4=f(3)+4=7+4=11\n$$\n\n$$\nf(5)=f(5-1)+5=f(4)+5=11+5=16\n$$\n\n数列为 2、4、7、11、16、22、29、37、46……相邻两项的差每次增加 1。\n\n基本情况的值是 2，不是 1。展开可得 $f(5)=2+2+3+4+5=16$，比通常的 $1+2+3+4+5=15$ 多 1。不能看到连续求和就直接套三角数公式而忽略基本值。\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find $f(f(f(16)))$ given:\n\n$$\nf(x)=\\begin{cases} f(x-4)+1 & \\text{if }x\\ge10\\\\ f(x+1)-5 & \\text{if }6<x<10\\\\ 2x & \\text{if }x\\le6 \\end{cases}\n$$",
+        "zh": "根据下列表达式,求 $f(f(f(16)))$\n\n$$\nf(x)=\\begin{cases} f(x-4)+1 & x\\ge10\\\\ f(x+1)-5 & 6<x<10\\\\ 2x & x\\le6 \\end{cases}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "5",
+            "zh": "5"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "10",
+            "zh": "10"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "12",
+            "zh": "12"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "13",
+            "zh": "13"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "$$\nf(16)=f(16-4)+1=f(12)+1=4+1=5\n$$\n\n$$\nf(12)=f(12-4)+1=f(8)+1=3+1=4\n$$\n\n$$\nf(8)=f(8+1)-5=f(9)-5=8-5=3\n$$\n\n$$\nf(9)=f(9+1)-5=f(10)-5=13-5=8\n$$\n\n$$\nf(10)=f(10-4)+1=f(6)+1=12+1=13\n$$\n\n$$\nf(6)=2*6=12\n$$\n\n$$\nf(f(f(16)))=f(f(5))=f(10)=13\n$$\n\nEvaluate the nested calls from inside out. The innermost result is $f(16)=5$, the next is $f(5)=2\\times5=10$, and the outermost is $f(10)=13$. The three outer function applications are different from the internal recursive calls needed to obtain each value.\n\n**Answer: E.**",
+        "zh": "原卷解析：\n\n$$\nf(16)=f(16-4)+1=f(12)+1=4+1=5\n$$\n\n$$\nf(12)=f(12-4)+1=f(8)+1=3+1=4\n$$\n\n$$\nf(8)=f(8+1)-5=f(9)-5=8-5=3\n$$\n\n$$\nf(9)=f(9+1)-5=f(10)-5=13-5=8\n$$\n\n$$\nf(10)=f(10-4)+1=f(6)+1=12+1=13\n$$\n\n$$\nf(6)=2*6=12\n$$\n\n$$\nf(f(f(16)))=f(f(5))=f(10)=13\n$$\n\n嵌套函数必须从里向外求值：最里面 $f(16)=5$；再求 $f(5)=2\\times5=10$；最后求 $f(10)=13$。题目中的三次外层函数应用，与计算每一个函数值时产生的内部递归调用，要分清层次。\n\n**答案：E。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "What is the output of the following program?\n\n```text\nx = 8\ny = 9\nz = -2\nx = y + z\nz = y - x\ny = y + 1\noutput x, y, z\n```",
+        "zh": "请问下列程序会输出什么?\n\n```text\nx = 8\ny = 9\nz = -2\nx = y + z\nz = y - x\ny = y + 1\noutput x, y, z\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "8, 9, -2",
+            "zh": "8, 9, -2"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "11, 10, 1",
+            "zh": "11, 10, 1"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "7, 8, 2",
+            "zh": "7, 8, 2"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "7, 10, -2",
+            "zh": "7, 10, -2"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "7, 10, 2",
+            "zh": "7, 10, 2"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "Initially x=8, y=9 and z=−2. The assignments change x to y+z=7, then z to y−x=2, and finally y to 10. The output is `7, 10, 2`.\n\nAssignments execute sequentially. After `x = y + z`, the old x=8 is no longer used: the next line computes $z=9-7=2$, not $9-8$. Updating y afterward does not retroactively change x or z. The output order is x, y, z.\n\n**Answer: E.**",
+        "zh": "初始 x=8、y=9、z=−2。依次执行后，x=y+z=7，z=y−x=2，最后 y 增加为 10。因此输出 `7, 10, 2`。\n\n赋值按顺序执行。第一条赋值之后，旧 x=8 已被覆盖，下一行应算 $z=9-7=2$，不能仍用 $9-8$。之后改变 y，不会让已算出的 x、z 自动重算。输出顺序是 x、y、z。\n\n**答案：E。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q6",
+      "number": 6,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "Run the following program with each of the following input values: 42, 35, 67, 81, 75, 24, 60, 70, 20, 16. How many of them are output?\n\n```text\ninput num\nif num % 7 == 0 then\n    output num\nelse\n    if num % 5 == 0 then\n        output num\n    else\n        if num >= 60 && num < 80 then\n            output num\n        end if\n    end if\nend if\n```",
+        "zh": "请将数值42、35、67、81、75、24、60、70、20、16输入下列程序并运行。请问有多少个值可以被输出?\n\n```text\ninput num\nif num % 7 == 0 then\n    output num\nelse\n    if num % 5 == 0 then\n        output num\n    else\n        if num >= 60 && num < 80 then\n            output num\n        end if\n    end if\nend if\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "7",
+            "zh": "7"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "5",
+            "zh": "5"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "The first branch outputs 42, 35 and 70, which are divisible by 7. The next branch outputs 75, 60 and 20, which are divisible by 5. The final branch outputs 67, which is between 60 inclusive and 80 exclusive. Each number is output at most once, for a total of 7.\n\nThe excluded inputs are 81, 24, and 16: none is divisible by 7 or 5, and none lies in $[60,80)$. The nested `else` clauses stop testing once a branch outputs a number; 35 and 70 qualify for both divisibility tests but each contributes only one output.\n\n**Answer: B.**",
+        "zh": "第一个分支输出能被 7 整除的 42、35、70；第二个分支输出能被 5 整除的 75、60、20；最后一个分支输出位于 [60,80) 的 67。每个数最多输出一次，共输出 7 个。\n\n被排除的是 81、24、16：它们既不能被 7 或 5 整除，也不在 $[60,80)$ 内。嵌套的 `else` 使某分支输出后就不再测试后面的条件；35、70 虽同时满足两个整除条件，每个仍只输出一次。\n\n**答案：B。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [
+    "The source directory calls Contest 1 the qualification round; canonical round remains 1."
+  ],
+  "programming": {
+    "id": "rings",
+    "definition": {
+      "title": "Rings",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Use the line structure shown in the test-case input below.\n\n### Problem\n\nACSL Rings is a 2-player game where the object is to score points by tossing a ball through one of the 5 rings. Points are awarded as follows:\n\n- Through the aqua or red ring - 1 point\n\n- Through the orange or green ring - 3 points\n\n- Through the black ring - 6 points\n\nWe will use a single letter to represent each of the colors: aqua (A), red (R), orange (O), green (G), and black (B).\n\nYou will be given 2 strings representing each player’s results for all tosses that go through one of the rings. Output a string containing each player’s score with the larger score first. If both players have the same score, it doesn’t matter which one appears first.\n\n### Example\n\n#### Input\n\n```text\nBRAG\nBOB\n```\n\n#### Output\n\n```text\n15 11\n```\n\nExplanation The first player’s tosses go through the black, red, aqua, and green rings, and the player has a score of 6 + 1 + 1 + 3 = 11.\n\nThe second player’s tosses go through the black, orange, and black rings, and the player has a score of 6 + 3 + 6 = 15.\n\nOutput is the string 15 11 with the larger score first.\n\n### Input\n\nThe input will consist of 2 strings as described above. Each string will be no more than 100 characters.\n\n### Output\n\nOutput the two scores separated by a single space with the larger score first.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "BRAG\nBOB\n",
+          "expected": "15 11\n"
+        },
+        {
+          "input": "AABBOOGG\nBAROBA\n",
+          "expected": "26 18\n"
+        },
+        {
+          "input": "GBORABORBA\nBAAAAOORGGGB\n",
+          "expected": "32 31\n"
+        },
+        {
+          "input": "OORRRGRBBRRAAABB\nAAAAGRRRRGRRRBBOO\n",
+          "expected": "42 35\n"
+        },
+        {
+          "input": "BARROGGBBGO\nBBAAAARRRGGGOOOO\n",
+          "expected": "40 36\n"
+        },
+        {
+          "input": "AAAABBBOOGGGRRR\nRRBBOOOGGGAAAA\n",
+          "expected": "40 36\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "AROBG\nBRAGGROG\n",
+          "expected": "21 14\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "BOBBRAGROB\nBARBAGGRAB\n",
+          "expected": "36 29\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "BBBAAAOOOGGGRRR\nBBBBBAAAAGGGOOR\n",
+          "expected": "50 42\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "RRRRRRBBBBGGGGGGAAAO\nAAAAAAOOOOOORRRBBBBB\n",
+          "expected": "57 54\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "BABAGORBABAGORBABAGORBABAGOR\nGORBAGORBAGORBAGORBAGORBAGORBA\n",
+          "expected": "84 84\n",
+          "weight": 16.6666
+        },
+        {
+          "input": "RRRGGGGBBBBAAOOOBBBAAARRBB\nBBBBAAAAOOOOBBBGGGRRRGOAGOAGO\n",
+          "expected": "90 85\n",
+          "weight": 16.6666
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。输入按下方测试用例展示的行结构读取。\n\n### 问题\n\nACSL Rings 是一种双人游戏,游戏规则是向五个圆环投球,球穿过其中一个圆环即可得分。计分规则如下:\n\n- 球穿过蓝色或红色圆环——得 1 分\n\n- 球穿过橘色或绿色圆环——得 3 分\n\n- 球穿过黑色圆环——得 6 分\n\n我们用单个字母来表示每种颜色的圆环:蓝色(A)、红色(R)、橘色(O)、 绿色(G) 、 黑色(B) 。\n\n给定 2 个字符串分别表示每位玩家投球穿过其中一个圆环的所有结果。将每位玩家的得分按照从高到低的顺序输出为一个字符串。如果两位玩家的得分相同,则不论先后顺序。\n\n### 示例\n\n#### 输入\n\n```text\nBRAG\nBOB\n```\n\n#### 输出\n\n```text\n15 11\n```\n\n第一位玩家投球穿过黑色、红色、蓝色、绿色圆环，得分为 6 + 1 + 1 + 3 = 11。第二位玩家投球穿过黑色、橘色、黑色圆环，得分为 6 + 3 + 6 = 15。输出按分数从大到小排列的 `15 11`。\n\n### 输入\n\n输入如上所述的 2 个字符串。每个字符串不超过 100 个字符。\n\n### 输出\n\n按照从高到低的顺序输出 2 位玩家的得分,且每位玩家的得分之间用一个空格隔开。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [],
+      "zh": []
+    }
+  }
+}

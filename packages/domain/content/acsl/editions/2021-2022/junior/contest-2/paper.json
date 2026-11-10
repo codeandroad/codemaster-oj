@@ -1,0 +1,457 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2021-2022-junior-2",
+  "division": "Junior",
+  "season": "2021-2022",
+  "round": 2,
+  "roundLabel": {
+    "en": "Contest 2",
+    "zh": "第二轮"
+  },
+  "title": {
+    "en": "ACSL 2021-2022 Junior · Contest 2",
+    "zh": "ACSL 2021-2022 Junior · 第二轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Junior/2021-2022/第二轮/c_2_jr.pdf",
+      "sha256": "cb2de7a7933746cb401eabf001051b687f5316f5b4016e11a08561817ef8ffa7",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Junior/2021-2022/第二轮/c_2_jr_soln.pdf",
+      "sha256": "33da232273d7ac51dfffe09f12ba255c244af2951884c140af67bd9aab4c42f9",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Junior/2021-2022/第二轮/c_2_FibonacciCypher_jr（含答案）.pdf",
+      "sha256": "6047ca88fd86467327d811963531f50a2e2acc8aad94399742f868cb098c14fe",
+      "pages": 6
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Evaluate the following prefix expression if all numbers are single digits:\n\n`+ / 9 3 + * 4 - 8 3 ^ 5 2`",
+        "zh": "如果下方所有数字都是一个单独的数值,请计算下方前缀表达式的值:\n\n`+ / 9 3 + * 4 - 8 3 ^ 5 2`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "33",
+            "zh": "33"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "42",
+            "zh": "42"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "48",
+            "zh": "48"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "52",
+            "zh": "52"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "63",
+            "zh": "63"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Evaluate the innermost operations first:\n\n```text\n+ / 9 3 + * 4 - 8 3 ^ 5 2\n= + (/ 9 3) + * 4 (- 8 3) (^ 5 2)\n= + 3 + (* 4 5) 25\n= + 3 (+ 20 25)\n= + 3 45\n= 48\n```\n\nThe outermost `+` adds $9/3$ to the complete right-hand expression $4(8-3)+5^2$. Compute $8-3=5$ and $5^2=25$, then $4\\times5=20$, and finally $3+(20+25)=48$. Prefix notation determines grouping without the usual infix precedence rules.\n\n**Answer: C.**",
+        "zh": "先计算最内层运算：\n\n```text\n+ / 9 3 + * 4 - 8 3 ^ 5 2\n= + (/ 9 3) + * 4 (- 8 3) (^ 5 2)\n= + 3 + (* 4 5) 25\n= + 3 (+ 20 25)\n= + 3 45\n= 48\n```\n\n最外层的 `+` 把 $9/3$ 与右侧完整表达式 $4(8-3)+5^2$ 相加。先求 $8-3=5$、$5^2=25$，再得 $4\\times5=20$，最后 $3+(20+25)=48$。前缀式的分组由运算符和完整操作数的位置决定，不是直接按中缀优先级扫描。\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Convert this infix expression to postfix:\n\n$$\n\\frac{(A^2+B)(B^2-C)}{B+D^2}\n$$",
+        "zh": "请将下方的中缀表达式转换为后缀表达式:\n\n$$\n\\frac{(A^2+B)(B^2-C)}{B+D^2}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`A 2 B ^ + B 2 ^ C - * B D 2 ^ + /`",
+            "zh": "`A 2 B ^ + B 2 ^ C - * B D 2 ^ + /`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`A 2 ^ B + B 2 ^ C - * B D 2 ^ / +`",
+            "zh": "`A 2 ^ B + B 2 ^ C - * B D 2 ^ / +`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`A 2 ^ B + B 2 ^ C - * D B 2 ^ + /`",
+            "zh": "`A 2 ^ B + B 2 ^ C - * D B 2 ^ + /`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`A 2 ^ B + B 2 ^ C - * B D 2 ^ + /`",
+            "zh": "`A 2 ^ B + B 2 ^ C - * B D 2 ^ + /`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`A 2 ^ B + B ^ 2 C - * B D 2 ^ + /`",
+            "zh": "`A 2 ^ B + B ^ 2 C - * B D 2 ^ + /`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Convert each parenthesized part to postfix, then multiply the numerator factors and divide by the denominator:\n\n```text\nA^2+B   → A 2 ^ B +\nB^2-C   → B 2 ^ C -\nB+D^2   → B D 2 ^ +\nResult  → A 2 ^ B + B 2 ^ C - * B D 2 ^ + /\n```\n\n**Answer: D.**",
+        "zh": "先分别转换括号内的表达式，再将分子的两部分相乘，最后除以分母：\n\n```text\nA^2+B   → A 2 ^ B +\nB^2-C   → B 2 ^ C -\nB+D^2   → B D 2 ^ +\n最终结果 → A 2 ^ B + B 2 ^ C - * B D 2 ^ + /\n```\n\n**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "比特位操作"
+      },
+      "statement": {
+        "en": "Evaluate:\n\n`01100 OR 11011 AND 01010`",
+        "zh": "计算下列表达式:\n\n`01100 OR 11011 AND 01010`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`11011`",
+            "zh": "`11011`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`01110`",
+            "zh": "`01110`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`01010`",
+            "zh": "`01010`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`10011`",
+            "zh": "`10011`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`11101`",
+            "zh": "`11101`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "`01100 OR 11011 AND 01010 = 01100 OR (11011 AND 01010)`\n\n`= 01100 OR 01010`\n\n`= 01110`\n\nAND takes precedence over OR. The middle AND retains the second and fourth bits of `01010`, so it equals `01010`. OR with `01100` retains every position that is 1 in either input, producing `01110`.\n\n**Answer: B.**",
+        "zh": "原卷解析：\n\n`01100 OR 11011 AND 01010 = 01100 OR (11011 AND 01010)`\n\n`= 01100 OR 01010`\n\n`= 01110`\n\nAND 的优先级高于 OR。先算 `11011 AND 01010`，保留从左数第 2、4 位，得到 `01010`；再与 `01100` 做 OR，只要任一输入对应位为 1 就置 1，因此得到 `01110`。\n\n**答案：B。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "比特位操作"
+      },
+      "statement": {
+        "en": "Evaluate:\n\n`(LCIRC-2 01100) AND NOT 11010 OR (RSHIFT-1 01100)`",
+        "zh": "计算下列表达式:\n\n`(LCIRC-2 01100) AND NOT 11010 OR (RSHIFT-1 01100)`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`11010`",
+            "zh": "`11010`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`10101`",
+            "zh": "`10101`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`00111`",
+            "zh": "`00111`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`10110`",
+            "zh": "`10110`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`01010`",
+            "zh": "`01010`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "`(LCIRC-2 01100) AND NOT 11010 OR (RSHIFT-1 01100)`\n\n`= 10001 AND 00101 OR 00110`\n\n`= 00001 OR 00110`\n\n`= 00111`\n\nLeft rotation moves the leading `01` of `01100` to the end, giving `10001`. NOT flips `11010` to `00101`; zero-filled right shift changes `01100` to `00110`. Perform AND before OR: only the last bit survives the AND, and OR then supplies the middle two 1s.\n\n**Answer: C.**",
+        "zh": "原卷解析：\n\n`(LCIRC-2 01100) AND NOT 11010 OR (RSHIFT-1 01100)`\n\n`= 10001 AND 00101 OR 00110`\n\n`= 00001 OR 00110`\n\n`= 00111`\n\n左循环移位把 `01100` 开头的 `01` 移到末尾，得到 `10001`；NOT 把 `11010` 变成 `00101`；右移一位丢弃末位、左侧补 0，得到 `00110`。先算 AND，仅保留最后一位的 1；再算 OR，得到 `00111`。\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "What is the final value of x when this program is executed?\n\n```text\nx = 0\nfor a = 1 to 10\n    for b = 1 to a\n        if a % b == 0 then\n            x = x + 1\n        end if\n    next b\nnext a\noutput x\n```",
+        "zh": "当这个程序执行完毕后,请问x的最终输出值是多少?\n\n```text\nx = 0\nfor a = 1 to 10\n    for b = 1 to a\n        if a % b == 0 then\n            x = x + 1\n        end if\n    next b\nnext a\noutput x\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "10",
+            "zh": "10"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "17",
+            "zh": "17"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "27",
+            "zh": "27"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "55",
+            "zh": "55"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "For each $a=1,\\ldots,10$, the inner loop increments $x$ once for every positive divisor $b$ of $a$.\n\nThe divisor counts are $1,2,2,3,2,4,2,4,3,4$. Their sum is $27$, so the program prints **27**.\n\nThe inner upper bound is a, so it includes a itself as a divisor as well as 1. For example, 6 contributes four increments from $b=1,2,3,6$, while 9 contributes three from $b=1,3,9$. This counts divisor occurrences across all ten values, not just primes or the number of outer iterations.\n\n**Answer: D.**",
+        "zh": "对于每个 $a=1,\\ldots,10$，内层循环每找到一个能整除 $a$ 的正整数 $b$，就将 $x$ 增加一次。\n\n这些数的正因数个数依次为 $1,2,2,3,2,4,2,4,3,4$，总和为 $27$，因此输出 **27**。\n\n内层上限是 a，因此既包含因数 1，也包含 a 自身。例如 a=6 时，$b=1,2,3,6$ 贡献 4 次；a=9 时，$b=1,3,9$ 贡献 3 次。这里累加的是十个数各自的因数个数，不是质数个数，也不是外层循环次数。\n\n**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [],
+  "programming": {
+    "id": "fibonacci-cypher",
+    "definition": {
+      "title": "Fibonacci Cypher",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Read one line containing all parameters followed by the message. Keep spaces inside the message.\n\n### Problem\n\nUse this Fibonacci cypher to encode a given message.\n\nThe Fibonacci sequence starts with two non-negative integers and every term after that is the sum of the two previous numbers. Therefore, for this problem, our Fibonacci sequence will be 1, 2, 3, 5, 8, 13, ... so that all terms are unique numbers. A Fibonacci cypher uses these numbers and an inputted ‘key’ (a lower-case letter in the alphabet) to encode a message into a series of numbers. Another person can decipher the message by knowing the ‘key’ that was used. For each character in the message, integers are generated by using the following steps:\n\n1. Find the Fibonacci number with the same index as the character (e.g. the 1st character in the inputted string uses the Fibonacci number 1 and the 5th character uses the number 8).\n\n2. By using the inputted key, find a new letter that is offset by the Fibonacci number found in Step 1. Wrap around to the beginning of the alphabet if necessary (e.g. if the key = ‘p’ and the Fibonacci number is 21, then the new letter is ‘k’).\n\n3. Find the encoded number for each letter in the message by adding the ASCII code of the character in the string and the ASCII code of the letter found in Step 2.\n\n### Example\n\nFor the string “ACSL c2” and the letter ‘h’ the numbers are found as shown:\n\n| Fibonacci offset | Offset ASCII Code | String ASCII code | Calculation |\n| --- | --- | --- | --- |\n| h + 1 = i | i = 105 | A = 65 | 65 + 105 = 170 |\n| h + 2 = j | j = 106 | C = 67 | 67 + 106 = 173 |\n| h + 3 = k | k = 107 | S = 83 | 83 + 107 = 190 |\n| h + 5 = m | m = 109 | L = 76 | 76 + 109 = 185 |\n| h + 8 = p | p = 112 | space = 32 | 32 + 112 = 144 |\n| h + 13 = u | u = 117 | c = 99 | 99 + 117 = 216 |\n| h + 21 = c | c = 99 | 2 = 50 | 50 + 99 = 149 |\n| The encoded message is “170 173 190 185 144 216 149”. |  |  |  |\n\n### Input\n\nThe input contains 2 data values: 1) a lower-case alphabetic character for the ‘key’ and 2) a string for the actual message to be encoded. We guarantee that the message will be no longer than 30 characters. Any typeable character on the keyboard except for double quotes may be included in the message.\n\n### Output\n\nPrint the integers, each separated by a single space, that represent the encoded message.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "h ACSL c2\n",
+          "expected": "170 173 190 185 144 216 149\n"
+        },
+        {
+          "input": "s Python Programming\n",
+          "expected": "196 238 234 224 208 212 142 177 232 211 206 228 199 210 223 205 209 213\n"
+        },
+        {
+          "input": "a Fibonacci Numbers\n",
+          "expected": "168 204 198 213 215 207 217 204 205 140 189 239 219 207 223 222 222\n"
+        },
+        {
+          "input": "j Help ME!\n",
+          "expected": "179 209 217 223 146 196 170 147\n"
+        },
+        {
+          "input": "z It is 9:30 in the morning.\n",
+          "expected": "170 214 131 206 219 141 174 162 150 155 142 226 219 140 237 211 207 149 210 233 215 211 211 221 224 156\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "h ACSL Contest 2\n",
+          "expected": "170 173 190 185 144 184 210 222 223 216 233 219 149 166\n",
+          "weight": 20
+        },
+        {
+          "input": "b Madam, I'm Adam!\n",
+          "expected": "176 197 201 200 215 155 151 179 140 218 144 162 211 207 206 142\n",
+          "weight": 20
+        },
+        {
+          "input": "a Java programs are the best.\n",
+          "expected": "172 196 218 199 137 222 232 216 203 222 208 231 225 141 219 222 208 150 218 201 203 134 205 213 237 227 156\n",
+          "weight": 20
+        },
+        {
+          "input": "d What are we really doing?\n",
+          "expected": "188 206 200 221 140 210 235 209 135 230 215 131 227 213 196 219 218 242 137 200 216 210 220 218 162\n",
+          "weight": 20
+        },
+        {
+          "input": "g This is the Fibonacci Cypher!\n",
+          "expected": "188 209 211 223 143 221 213 143 222 218 218 134 186 220 200 225 223 195 207 202 213 140 180 239 214 221 217 218 150\n",
+          "weight": 20
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。读取一行，按原题顺序包含参数和消息；保留消息内部的空格。\n\n### 题目\n\n使用斐波那契加密方法给以下特定的信息编码加密。\n\n斐波那契数列从两个非负整数开始，后边每一项的值都是前两项的和。本题中所用到的斐波那契数列为 1,2, 3, 5, 8, 13, ...,其中每一项都是不同的数字。斐波那契加密方法使用这些数字和一个输入“密钥”(字母表中的一个小写字母)将一条信息编码成一连串的数字。其他人可通过已使用的“密钥”来破译信息。信息中的每个字符都可以根据以下步骤来生成对应的整数:\n\n1. 找出与该字符具有相同索引的斐波那契数(如输入字符串中的第一个字符用斐波那契数 1 来表示，第五个字符用 8 来表示)。\n\n2. 根据输入的密钥，找出对步骤 1 中斐波那契数进行偏移操作的新字母，如有必要，可以重新绕到字母表的开头处(比如密钥是“p”,斐波那契数是 21,那么新的字母即为“k”)。\n\n3. 通过将字符串中的字符的 ASCII 码与步骤 2 中找到的字母的 ASCII 码相加，找出信息中每个字母的编码数字。\n\n### 示例\n\n对于字符串 “ACSL c2” 和字母 ‘h’ , 可以通过以下方式获得对应的编码数字。\n\n| 斐波那契偏移 | 偏移ASCII 码 | 字符串ASCII 码 | 计算结果 |\n| --- | --- | --- | --- |\n| h + 1 = i | i = 105 | A = 65 | 65 + 105 = 170 |\n| h + 2 = j | j = 106 | C = 67 | 67 + 106 = 173 |\n| h + 3 = k | k = 107 | S = 83 | 83 + 107 = 190 |\n| h + 5 = m | m = 109 | L = 76 | 76 + 109 = 185 |\n| h + 8 = p | p = 112 | space = 32 | 32 + 112 = 144 |\n| h + 13 = u | u = 117 | c = 99 | 99 + 117 = 216 |\n| h + 21 = c | c = 99 | 2 = 50 | 50 + 99 = 149 |\n| 编码后的信息是 “170 173 190 185 144 216 149”。 |  |  |  |\n\n### 输入\n\n输入包含 2 个数据值:1) 一个小写字母用作“密钥”;2) 一条需要编码的字符串信息。我们保证每条信息的长度不会超过 30 个字符。除双引号外，键盘上的任意字符都可能在信息中出现。\n\n### 输出\n\n输出整数，每个整数之间由空格隔开，表示编码后的信息。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [],
+      "zh": []
+    }
+  }
+}

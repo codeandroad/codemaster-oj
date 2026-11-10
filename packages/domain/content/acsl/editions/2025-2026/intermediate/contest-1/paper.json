@@ -1,0 +1,2485 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2025-2026-intermediate-1",
+  "division": "Intermediate",
+  "season": "2025-2026",
+  "round": 1,
+  "roundLabel": {
+    "en": "Contest 1",
+    "zh": "资格轮"
+  },
+  "title": {
+    "en": "ACSL 2025-2026 Intermediate · Contest 1",
+    "zh": "ACSL 2025-2026 Intermediate · 资格轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Intermediate/2025-2026/资格轮/25-26 ACSL 中级组paper.pdf",
+      "sha256": "d88bee74b61733cb6272822a11a1418c4ec9453323b28f12b2bc4f1adc7bbebe",
+      "pages": 6
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Intermediate/2025-2026/资格轮/25-26 ACSL 中级组 solution.pdf",
+      "sha256": "3c2f49d58a3c853a379bfa04793eca422ca6f0311acf889d95d61cb57666d2d9",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Intermediate/2025-2026/资格轮/25-26 ACSL 中级组 Creature Capture paper.pdf",
+      "sha256": "c4d08a8614f705b328554b0143b45874144e085e6a44b9b84ed2c8da6a890aeb",
+      "pages": 8
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Evaluate the following and express the answer in octal.\n\n$$\n2025_{8}-202_{8}+20_{8}/2_{8}\n$$",
+        "zh": "求以下表达式的值,并以八进制表示结果。\n\n$$\n2025_{8}-202_{8}+20_{8}/2_{8}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "1721",
+            "zh": "1721"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "1367",
+            "zh": "1367"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "1633",
+            "zh": "1633"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "1623",
+            "zh": "1623"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "1523",
+            "zh": "1523"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Evaluate in octal:\n\n$$\n2025_{8}-202_{8}+20_{8}/2_{8}=2025_{8}-202_{8}+10_{8}\n$$\n\n$$\n=1623_{8}+10_{8}\n$$\n\n$$\n=1633_{8}\n$$\n\nA decimal check is $2025_8=1045$, $202_8=130$, and $20_8/2_8=16/2=8$. Thus the value is $1045-130+8=923=1\\cdot512+6\\cdot64+3\\cdot8+3$, giving $1633_8$. In octal, $20_8/2_8=10_8$, not the decimal-looking result $10_{10}$.\n\n**Answer: C.**",
+        "zh": "先做除法，再在八进制中相减、相加：\n\n$$\n2025_{8}-202_{8}+20_{8}/2_{8}=2025_{8}-202_{8}+10_{8}\n$$\n\n$$\n=1623_{8}+10_{8}\n$$\n\n$$\n=1633_{8}\n$$\n\n可用十进制核对：$2025_8=1045$，$202_8=130$，$20_8/2_8=16/2=8$。所以结果是 $1045-130+8=923=1\\cdot512+6\\cdot64+3\\cdot8+3$，即 $1633_8$。注意八进制的 $20_8/2_8=10_8$，这里的结果不是十进制的 10。\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "The next number of the Fibonacci sequence is formed by adding the previous two numbers. The numbers are 0, 1, 1, 2, 3, 5, ... How many times does 1 appear in the binary representation of the first 10 Fibonacci numbers starting at 0?",
+        "zh": "斐波那契数列的下一项由前两项相加得到。现有数列: 0、1、1、2、3、5、......从0开始,前10个斐波那契数在二进制表示中“1”出现了多少次?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "10",
+            "zh": "10"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "16",
+            "zh": "16"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "20",
+            "zh": "20"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "22",
+            "zh": "22"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Convert the first 10 Fibonacci numbers to binary and count the 1s:\n\n| Number | Binary | Number of 1s |\n| --- | --- | --- |\n| 0 | `0` | 0 |\n| 1 | `1` | 1 |\n| 1 | `1` | 1 |\n| 2 | `10` | 1 |\n| 3 | `11` | 2 |\n| 5 | `101` | 2 |\n| 8 | `1000` | 1 |\n| 13 | `1101` | 3 |\n| 21 | `10101` | 3 |\n| 34 | `100010` | 2 |\n\nThe total is $0+1+1+1+2+2+1+3+3+2=16$.\n\n**Answer: C.**",
+        "zh": "将前 10 个斐波那契数转换为二进制，并统计 1 的个数：\n\n| 数值 | 二进制 | 1 的个数 |\n| --- | --- | --- |\n| 0 | `0` | 0 |\n| 1 | `1` | 1 |\n| 1 | `1` | 1 |\n| 2 | `10` | 1 |\n| 3 | `11` | 2 |\n| 5 | `101` | 2 |\n| 8 | `1000` | 1 |\n| 13 | `1101` | 3 |\n| 21 | `10101` | 3 |\n| 34 | `100010` | 2 |\n\n合计为 $0+1+1+1+2+2+1+3+3+2=16$。\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Given a 16 cm by 16 cm square. Repeatedly divide the square into 4 equally sized squares by connecting the midpoints of the sides vertically and horizontally.\n\n{{diagram:figure-e5f52b52b24b3e19}}\n\nStop after subdividing the square 5 times. What is the perimeter of the smallest square?",
+        "zh": "已知一个边长为16 cm的正方形。通过在水平方向和垂直方向连接各边的中点,将该正方形反复划分为4个等大的正方形。\n\n{{diagram:figure-e5f52b52b24b3e19}}\n\n在共细分5次后停止。最小正方形的周长是多少?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "0.5",
+            "zh": "0.5"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "1",
+            "zh": "1"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "2",
+            "zh": "2"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "A 16x16 square becomes an 8x8 square, then a 4x4, then a 2x2, then a 1x1, and finally a 0.5x0.5. Therefore, its perimeter is 4*0.5 = 2.\n\nThe number of small squares increases by a factor of 4 at each subdivision, but each side decreases by a factor of 2. Therefore the side after five subdivisions is $16/2^5=0.5$ cm and the perimeter is $4(16/2^5)=2$ cm. The original undivided square is stage 0, so it is not counted as the first subdivision.\n\n**Answer: C.**",
+        "zh": "每次细分后，最小正方形的边长减半：$16\\to8\\to4\\to2\\to1\\to0.5$ 厘米。第五次细分后边长为 $0.5$ 厘米，所以周长为 $4\\times0.5=2$ 厘米。\n\n每次细分，小正方形的数量变成原来的四倍，但边长只减为一半。因此五次后边长为 $16/2^5=0.5$ 厘米，周长为 $4(16/2^5)=2$ 厘米。未划分的原正方形是第 0 阶段，不算第一次细分。\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      },
+      "statementDiagrams": {
+        "en": [
+          {
+            "id": "figure-e5f52b52b24b3e19",
+            "width": 620,
+            "height": 202,
+            "alt": {
+              "en": "Three squares divided into one, four, and sixteen equal cells.",
+              "zh": "三个正方形分别划分为 1、4、16 个相等小正方形。"
+            },
+            "elements": [
+              {
+                "type": "rect",
+                "x": 0,
+                "y": 0,
+                "width": 200,
+                "height": 200,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 210,
+                "y": 0,
+                "width": 100,
+                "height": 100,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 310,
+                "y": 0,
+                "width": 100,
+                "height": 100,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 210,
+                "y": 100,
+                "width": 100,
+                "height": 100,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 310,
+                "y": 100,
+                "width": 100,
+                "height": 100,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 420,
+                "y": 0,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 470,
+                "y": 0,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 520,
+                "y": 0,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 570,
+                "y": 0,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 420,
+                "y": 50,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 470,
+                "y": 50,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 520,
+                "y": 50,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 570,
+                "y": 50,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 420,
+                "y": 100,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 470,
+                "y": 100,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 520,
+                "y": 100,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 570,
+                "y": 100,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 420,
+                "y": 150,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 470,
+                "y": 150,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 520,
+                "y": 150,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 570,
+                "y": 150,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              }
+            ]
+          }
+        ],
+        "zh": [
+          {
+            "id": "figure-e5f52b52b24b3e19",
+            "width": 620,
+            "height": 202,
+            "alt": {
+              "en": "Three squares divided into one, four, and sixteen equal cells.",
+              "zh": "三个正方形分别划分为 1、4、16 个相等小正方形。"
+            },
+            "elements": [
+              {
+                "type": "rect",
+                "x": 0,
+                "y": 0,
+                "width": 200,
+                "height": 200,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 210,
+                "y": 0,
+                "width": 100,
+                "height": 100,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 310,
+                "y": 0,
+                "width": 100,
+                "height": 100,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 210,
+                "y": 100,
+                "width": 100,
+                "height": 100,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 310,
+                "y": 100,
+                "width": 100,
+                "height": 100,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 420,
+                "y": 0,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 470,
+                "y": 0,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 520,
+                "y": 0,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 570,
+                "y": 0,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 420,
+                "y": 50,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 470,
+                "y": 50,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 520,
+                "y": 50,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 570,
+                "y": 50,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 420,
+                "y": 100,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 470,
+                "y": 100,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 520,
+                "y": 100,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 570,
+                "y": 100,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 420,
+                "y": 150,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 470,
+                "y": 150,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 520,
+                "y": 150,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 570,
+                "y": 150,
+                "width": 50,
+                "height": 50,
+                "stroke": "ink",
+                "strokeWidth": 2,
+                "fill": "surface"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find $f(16,12)$ given:\n\n$$\nf(x,y)=\\begin{cases} f(x-2,y+1)+y & \\text{if }x>y\\\\ f(x+1,y)-x & \\text{if }x<y\\\\ \\dfrac{x}{2} & \\text{if }x=y \\end{cases}\n$$",
+        "zh": "根据下列表达式,求$f(16,12)$ :\n\n$$\nf(x,y)=\\begin{cases} f(x-2,y+1)+y & \\text{if }x>y\\\\ f(x+1,y)-x & \\text{if }x<y\\\\ \\dfrac{x}{2} & \\text{if }x=y \\end{cases}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "7",
+            "zh": "7"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "13",
+            "zh": "13"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "14",
+            "zh": "14"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "18",
+            "zh": "18"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "$$\nf(16,12)=f(16-2,12+1)+12=f(14,13)+12=7\n$$\n\n$$\nf(14,13)=f(14-2,13+1)+13=f(12,14)+13=-5\n$$\n\n$$\nf(12,14)=f(12+1,14)-12=f(13,14)-12=-6-12=-18\n$$\n\n$$\nf(13,14)=f(13+1,14)-13=f(14,14)-13=7-13=-6\n$$\n\n$f(14,14)=14/2=7$ Now substitute backwards. Also, $f(16,12)=7-13-12+13+12=7$\n\n**Answer: B.**",
+        "zh": "$$\nf(16,12)=f(16-2,12+1)+12=f(14,13)+12=7\n$$\n\n$$\nf(14,13)=f(14-2,13+1)+13=f(12,14)+13=-5\n$$\n\n$$\nf(12,14)=f(12+1,14)-12=f(13,14)-12=-6-12=-18\n$$\n\n$$\nf(13,14)=f(13+1,14)-13=f(14,14)-13=7-13=-6\n$$\n\n$f(14,14)=14/2=7$ 从基本情况开始反向代入，也可以直接汇总增减量： $f(16,12)=7-13-12+13+12=7$\n\n**答案：B。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          5
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "Which of the following input values of a, b, and c will produce an output of 7, 24, 25?\n\n```text\ninput a, b, c\nif c == 0 then\n    c = sqrt(a^2 + b^2)\nelse\n    if b == 0 then\n        b = sqrt(c^2 - a^2)\n    else\n        a = sqrt(c^2 - b^2)\n    end if\nend if\noutput a, b, c\n```",
+        "zh": "下列哪组a、b和c的输入值会输出7、24、25?\n\n```text\ninput a, b, c\nif c == 0 then\n    c = sqrt(a^2 + b^2)\nelse\n    if b == 0 then\n        b = sqrt(c^2 - a^2)\n    else\n        a = sqrt(c^2 - b^2)\n    end if\nend if\noutput a, b, c\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "0, 24, 25",
+            "zh": "0, 24, 25"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "7, 0, 25",
+            "zh": "7, 0, 25"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "7, 24, 0",
+            "zh": "7, 24, 0"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "All of the above",
+            "zh": "以上所有都能"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "None of the above",
+            "zh": "以上所有都不能"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "The program replaces the zero value with the missing side of a right triangle. Since $7^2+24^2=25^2$, each listed input with one missing side produces 7, 24, 25. Therefore all of the listed inputs work. The original solution notes that this honors Pythagorean Theorem Day on 7/24/25.\n\nCheck all three branches explicitly: A has $c\\ne0,b\\ne0$, so $a=\\sqrt{25^2-24^2}=\\sqrt{49}=7$; B has $c\\ne0,b=0$, so $b=\\sqrt{25^2-7^2}=\\sqrt{576}=24$; C has $c=0$, so $c=\\sqrt{7^2+24^2}=\\sqrt{625}=25$. Each branch changes only the missing side and preserves the other two.\n\n**Answer: D.**",
+        "zh": "程序把为 0 的数替换为直角三角形缺失的边长。因为 $7^2+24^2=25^2$，每一组给定的缺边输入都会得到 7、24、25，所以以上输入都成立。 原卷说明此题纪念 2025 年 7 月 24 日的“勾股定理日”（7/24/25）。\n\n逐个检查实际分支：A 中 $c\\ne0,b\\ne0$，计算 $a=\\sqrt{25^2-24^2}=\\sqrt{49}=7$；B 中 $c\\ne0,b=0$，计算 $b=\\sqrt{25^2-7^2}=\\sqrt{576}=24$；C 中 $c=0$，计算 $c=\\sqrt{7^2+24^2}=\\sqrt{625}=25$。三条分支分别补出缺失的一边，其余两边保持原值。\n\n**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          5
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q6",
+      "number": 6,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "What is output by the following program?\n\n```text\na = 13\nb = 21\nn = 8\nwhile sqrt(b) != int(sqrt(b))\n    n = n + 1\n    c = a + b\n    a = b\n    b = c\nend while\noutput n\n```",
+        "zh": "以下程序的输出是什么?\n\n```text\na = 13\nb = 21\nn = 8\nwhile sqrt(b) != int(sqrt(b))\n    n = n + 1\n    c = a + b\n    a = b\n    b = c\nend while\noutput n\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "12",
+            "zh": "12"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "10",
+            "zh": "10"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "11",
+            "zh": "11"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "16",
+            "zh": "16"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "13",
+            "zh": "13"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "Starting with a=13, b=21 and n=8, the loop advances through the Fibonacci numbers. The successive (b,n) values are (34,9), (55,10), (89,11) and (144,12). Since 144 is a perfect square, the loop stops and prints 12.\n\nThe condition tests whether $\\sqrt b$ has a fractional part. The first three new values lie strictly between consecutive squares: $25<34<36$, $49<55<64$, and $81<89<100$. The next value is $144=12^2$, so the condition becomes false. There are four loop iterations; the requested output is the updated counter $8+4=12$, not the square 144.\n\n**Answer: A.**",
+        "zh": "从 a=13、b=21、n=8 开始，循环依次推进斐波那契数列。(b,n) 依次为 (34,9)、(55,10)、(89,11)、(144,12)。144 是完全平方数，循环停止并输出 12。\n\n条件检查 $\\sqrt b$ 是否带小数部分。前三个新值都夹在相邻平方数之间：$25<34<36$、$49<55<64$、$81<89<100$；接着 $144=12^2$，条件才变为假。一共执行四轮，所输出的是更新后的计数器 $8+4=12$，而不是平方数 144。\n\n**答案：A。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          3,
+          6
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [
+    "The source directory calls Contest 1 the qualification round; canonical round remains 1."
+  ],
+  "programming": {
+    "id": "creature-capture",
+    "definition": {
+      "title": "Creature Capture",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Use the line structure shown in the test-case input below.\n\n### Problem\n\nA creature is hiding in a cell of a 16x16 grid. You will be given the location of a guess and how far away the creature is from the guess. Find all possible cells where the creature could be located.\n\nEach cell in the grid is represented by a 2-digit hexadecimal string (e.g. 7D). The first digit signifies the row (0-F, from top to bottom) and the second digit indicates the column (0-F, from left to right).\n\nHow far the guess is from the creature’s location is called the distance value, given as a hexadecimal character. The distance value is the sum of the horizontal and vertical distances. For example, a distance value of 5 could be 0 rows and 5 columns, 1 row and 4 columns, 2 rows and 3 columns, etc. The following diagram illustrates a distance value of 4 from location C6 with the numbers representing the rows and columns used for that location:\n\n{{diagram:creature-distance}}\n\nAfter finding all possible cells in the grid where the creature could be hiding, output a string containing the smallest cell value and the largest cell value, in that order, separated by a single space.\n\n### Example\n\nInput\n\n```text\nC6\n4\n```\n\nOutput\n\n```text\n86 F7\n```\n\nExplanation The user’s guess is location C6 and the total distance value is 4. Use values of 0 and 4, 1 and 3, 2 and 2, 3 and 1, and 4 and 0. For each of these values, find the following locations that are on the grid:\n\n- For 0 and 4, they are CA, C2.\n\n- For 1 and 3, they are D9, D3, B9, B3.\n\n- For 2 and 2, they are E8, E4, A8, A4.\n\n- For 3 and 1, they are F7, F5, 97, 95.\n\n- For 4 and 0, it is 86. The smallest cell value is 86 and the largest cell value is F7. Output 86 F7.\n\n### Input\n\nInput is two strings. The first is a 2-digit string for the guessed location. The second is a 1-digit string for the distance value, indicating the total distance horizontally and vertically that the creature is away from the guessed location.\n\n### Output\n\nOutput a string containing the smallest cell value where the creature could be hiding and the largest cell value, separated by a single space.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "C6\n4\n",
+          "expected": "86 F7\n"
+        },
+        {
+          "input": "3D\n5\n",
+          "expected": "0B 8D\n"
+        },
+        {
+          "input": "0F\n3\n",
+          "expected": "0C 3F\n"
+        },
+        {
+          "input": "88\n6\n",
+          "expected": "28 E8\n"
+        },
+        {
+          "input": "61\n7\n",
+          "expected": "00 D1\n"
+        },
+        {
+          "input": "45\nA\n",
+          "expected": "0B E5\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "65\n3\n",
+          "expected": "35 95\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "43\n5\n",
+          "expected": "02 93\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "D7\n8\n",
+          "expected": "57 FD\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "5B\n7\n",
+          "expected": "09 CB\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "CA\n9\n",
+          "expected": "3A F4\n",
+          "weight": 16.6666
+        },
+        {
+          "input": "00\n6\n",
+          "expected": "06 60\n",
+          "weight": 16.6666
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。输入按下方测试用例展示的行结构读取。\n\n### 问题\n\n一个生物藏身于一个 16× 16 网格的单元格中 。现给出一个猜测位置 ( 生物可能所在的单元格 ), 以及该生物实际位置与猜测位置的距离, 请找出该生物可能藏身的所有单元格。\n\n网格中的每个单元格由一个 2 位十六进制字符串(例如 7D)表示。 第一位数字代表行号 (0-F, 从上到下 ), 第二位数字代表列号( 0- F,从左到右 )。\n\n猜测位置与生物实际位置之间的距离称为距离值,以一个十六进制字符表示。该距离值是水平距离与垂直距离之和。例如,距离值 5 代表相距 0 行 5 列、1 行 4 列、2 行 3 列,以此类推。下图展示了与位置C6 相距 4 距离值的情况,其中的数字代表了该位置所对应的行和列:\n\n{{diagram:creature-distance}}\n\n在找出网格中该生物可能藏身的所有单元格后 , 请输出一个字符串,包含最小的单元格编号和最大的单元格编号 ,按此顺序排列,中间用一个空格分隔。\n\n### 示例\n\n输入\n\n```text\nC6\n4\n```\n\n输出\n\n```text\n86 F7\n```\n\n解析该用户的猜测位置是 C6, 总计距离值为 4。试用以下数值对 :0 和 4、 1 和 3、 2 和 2、 3 和 1、 4 和 0。 每对数值在网格上的位置如下 :\n\n- 0 和 4 对应的位置是 CA, C2。\n\n- 1 和 3 对应的位置是 D9, D3, B9, B3。\n\n- 2 和 2 对应的位置是 E8, E4, A8, A4。\n\n- 3 和 1 对应的位置是 F7, F5, 97, 95。\n\n- 4 和 0 对应的位置是 86。\n\n最小单元格的值为 86 , 最大单元格的值为 F7 。输出 86 F7。\n\n### 输入\n\n输入为两个字符串。 第一个字符串由两位数字组成, 用来表示猜测位置。 第二个字符串由一位数字组成,用来表示距离值,即生物实际位置与猜测位置之间的水平和垂直总距离。\n\n### 输出\n\n输出一个字符串, 由生物可能藏身单元格的最小值和最大值组成, 两者之间用一个空格分隔。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [
+        {
+          "id": "creature-distance",
+          "width": 440,
+          "height": 440,
+          "alt": {
+            "en": "16 by 16 hexadecimal grid showing all cells at Manhattan distance 4 from C6.",
+            "zh": "16×16 十六进制网格，展示距 C6 曼哈顿距离为 4 的所有位置。"
+          },
+          "elements": [
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 25,
+              "x2": 425,
+              "y2": 25,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 25,
+              "x2": 25,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 50,
+              "x2": 425,
+              "y2": 50,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 50,
+              "y1": 25,
+              "x2": 50,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 75,
+              "x2": 425,
+              "y2": 75,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 75,
+              "y1": 25,
+              "x2": 75,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 100,
+              "x2": 425,
+              "y2": 100,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 100,
+              "y1": 25,
+              "x2": 100,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 125,
+              "x2": 425,
+              "y2": 125,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 125,
+              "y1": 25,
+              "x2": 125,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 150,
+              "x2": 425,
+              "y2": 150,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 150,
+              "y1": 25,
+              "x2": 150,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 175,
+              "x2": 425,
+              "y2": 175,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 175,
+              "y1": 25,
+              "x2": 175,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 200,
+              "x2": 425,
+              "y2": 200,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 200,
+              "y1": 25,
+              "x2": 200,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 225,
+              "x2": 425,
+              "y2": 225,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 225,
+              "y1": 25,
+              "x2": 225,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 250,
+              "x2": 425,
+              "y2": 250,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 250,
+              "y1": 25,
+              "x2": 250,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 275,
+              "x2": 425,
+              "y2": 275,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 275,
+              "y1": 25,
+              "x2": 275,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 300,
+              "x2": 425,
+              "y2": 300,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 300,
+              "y1": 25,
+              "x2": 300,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 325,
+              "x2": 425,
+              "y2": 325,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 325,
+              "y1": 25,
+              "x2": 325,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 350,
+              "x2": 425,
+              "y2": 350,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 350,
+              "y1": 25,
+              "x2": 350,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 375,
+              "x2": 425,
+              "y2": 375,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 375,
+              "y1": 25,
+              "x2": 375,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 400,
+              "x2": 425,
+              "y2": 400,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 400,
+              "y1": 25,
+              "x2": 400,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 425,
+              "x2": 425,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 425,
+              "y1": 25,
+              "x2": 425,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "text",
+              "x": 37.5,
+              "y": 17,
+              "text": "0",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 42,
+              "text": "0",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 62.5,
+              "y": 17,
+              "text": "1",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 67,
+              "text": "1",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 87.5,
+              "y": 17,
+              "text": "2",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 92,
+              "text": "2",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 112.5,
+              "y": 17,
+              "text": "3",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 117,
+              "text": "3",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 137.5,
+              "y": 17,
+              "text": "4",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 142,
+              "text": "4",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 162.5,
+              "y": 17,
+              "text": "5",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 167,
+              "text": "5",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 187.5,
+              "y": 17,
+              "text": "6",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 192,
+              "text": "6",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 212.5,
+              "y": 17,
+              "text": "7",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 217,
+              "text": "7",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 237.5,
+              "y": 17,
+              "text": "8",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 242,
+              "text": "8",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 262.5,
+              "y": 17,
+              "text": "9",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 267,
+              "text": "9",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 287.5,
+              "y": 17,
+              "text": "A",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 292,
+              "text": "A",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 312.5,
+              "y": 17,
+              "text": "B",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 317,
+              "text": "B",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 337.5,
+              "y": 17,
+              "text": "C",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 342,
+              "text": "C",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 362.5,
+              "y": 17,
+              "text": "D",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 367,
+              "text": "D",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 387.5,
+              "y": 17,
+              "text": "E",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 392,
+              "text": "E",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 412.5,
+              "y": 17,
+              "text": "F",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 417,
+              "text": "F",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 187.5,
+              "y": 242,
+              "text": "40",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 162.5,
+              "y": 267,
+              "text": "31",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 212.5,
+              "y": 267,
+              "text": "31",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 137.5,
+              "y": 292,
+              "text": "22",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 237.5,
+              "y": 292,
+              "text": "22",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 112.5,
+              "y": 317,
+              "text": "13",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 262.5,
+              "y": 317,
+              "text": "13",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 87.5,
+              "y": 342,
+              "text": "04",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 287.5,
+              "y": 342,
+              "text": "04",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 112.5,
+              "y": 367,
+              "text": "13",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 262.5,
+              "y": 367,
+              "text": "13",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 137.5,
+              "y": 392,
+              "text": "22",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 237.5,
+              "y": 392,
+              "text": "22",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 162.5,
+              "y": 417,
+              "text": "31",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 212.5,
+              "y": 417,
+              "text": "31",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 187.5,
+              "y": 342,
+              "text": "G",
+              "fontSize": 14,
+              "anchor": "middle",
+              "fill": "red"
+            }
+          ]
+        }
+      ],
+      "zh": [
+        {
+          "id": "creature-distance",
+          "width": 440,
+          "height": 440,
+          "alt": {
+            "en": "16 by 16 hexadecimal grid showing all cells at Manhattan distance 4 from C6.",
+            "zh": "16×16 十六进制网格，展示距 C6 曼哈顿距离为 4 的所有位置。"
+          },
+          "elements": [
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 25,
+              "x2": 425,
+              "y2": 25,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 25,
+              "x2": 25,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 50,
+              "x2": 425,
+              "y2": 50,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 50,
+              "y1": 25,
+              "x2": 50,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 75,
+              "x2": 425,
+              "y2": 75,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 75,
+              "y1": 25,
+              "x2": 75,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 100,
+              "x2": 425,
+              "y2": 100,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 100,
+              "y1": 25,
+              "x2": 100,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 125,
+              "x2": 425,
+              "y2": 125,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 125,
+              "y1": 25,
+              "x2": 125,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 150,
+              "x2": 425,
+              "y2": 150,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 150,
+              "y1": 25,
+              "x2": 150,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 175,
+              "x2": 425,
+              "y2": 175,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 175,
+              "y1": 25,
+              "x2": 175,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 200,
+              "x2": 425,
+              "y2": 200,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 200,
+              "y1": 25,
+              "x2": 200,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 225,
+              "x2": 425,
+              "y2": 225,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 225,
+              "y1": 25,
+              "x2": 225,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 250,
+              "x2": 425,
+              "y2": 250,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 250,
+              "y1": 25,
+              "x2": 250,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 275,
+              "x2": 425,
+              "y2": 275,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 275,
+              "y1": 25,
+              "x2": 275,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 300,
+              "x2": 425,
+              "y2": 300,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 300,
+              "y1": 25,
+              "x2": 300,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 325,
+              "x2": 425,
+              "y2": 325,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 325,
+              "y1": 25,
+              "x2": 325,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 350,
+              "x2": 425,
+              "y2": 350,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 350,
+              "y1": 25,
+              "x2": 350,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 375,
+              "x2": 425,
+              "y2": 375,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 375,
+              "y1": 25,
+              "x2": 375,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 400,
+              "x2": 425,
+              "y2": 400,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 400,
+              "y1": 25,
+              "x2": 400,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 25,
+              "y1": 425,
+              "x2": 425,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "line",
+              "x1": 425,
+              "y1": 25,
+              "x2": 425,
+              "y2": 425,
+              "stroke": "muted",
+              "strokeWidth": 0.7
+            },
+            {
+              "type": "text",
+              "x": 37.5,
+              "y": 17,
+              "text": "0",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 42,
+              "text": "0",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 62.5,
+              "y": 17,
+              "text": "1",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 67,
+              "text": "1",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 87.5,
+              "y": 17,
+              "text": "2",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 92,
+              "text": "2",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 112.5,
+              "y": 17,
+              "text": "3",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 117,
+              "text": "3",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 137.5,
+              "y": 17,
+              "text": "4",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 142,
+              "text": "4",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 162.5,
+              "y": 17,
+              "text": "5",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 167,
+              "text": "5",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 187.5,
+              "y": 17,
+              "text": "6",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 192,
+              "text": "6",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 212.5,
+              "y": 17,
+              "text": "7",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 217,
+              "text": "7",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 237.5,
+              "y": 17,
+              "text": "8",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 242,
+              "text": "8",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 262.5,
+              "y": 17,
+              "text": "9",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 267,
+              "text": "9",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 287.5,
+              "y": 17,
+              "text": "A",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 292,
+              "text": "A",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 312.5,
+              "y": 17,
+              "text": "B",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 317,
+              "text": "B",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 337.5,
+              "y": 17,
+              "text": "C",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 342,
+              "text": "C",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 362.5,
+              "y": 17,
+              "text": "D",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 367,
+              "text": "D",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 387.5,
+              "y": 17,
+              "text": "E",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 392,
+              "text": "E",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 412.5,
+              "y": 17,
+              "text": "F",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 12,
+              "y": 417,
+              "text": "F",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 187.5,
+              "y": 242,
+              "text": "40",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 162.5,
+              "y": 267,
+              "text": "31",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 212.5,
+              "y": 267,
+              "text": "31",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 137.5,
+              "y": 292,
+              "text": "22",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 237.5,
+              "y": 292,
+              "text": "22",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 112.5,
+              "y": 317,
+              "text": "13",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 262.5,
+              "y": 317,
+              "text": "13",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 87.5,
+              "y": 342,
+              "text": "04",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 287.5,
+              "y": 342,
+              "text": "04",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 112.5,
+              "y": 367,
+              "text": "13",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 262.5,
+              "y": 367,
+              "text": "13",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 137.5,
+              "y": 392,
+              "text": "22",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 237.5,
+              "y": 392,
+              "text": "22",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 162.5,
+              "y": 417,
+              "text": "31",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 212.5,
+              "y": 417,
+              "text": "31",
+              "fontSize": 12,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 187.5,
+              "y": 342,
+              "text": "G",
+              "fontSize": 14,
+              "anchor": "middle",
+              "fill": "red"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

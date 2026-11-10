@@ -1,0 +1,553 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2025-2026-junior-3",
+  "division": "Junior",
+  "season": "2025-2026",
+  "round": 3,
+  "title": {
+    "en": "ACSL 2025–2026 Junior · Contest 3",
+    "zh": "ACSL 2025–2026 Junior · 第三轮"
+  },
+  "sources": [
+    {
+      "id": "short-problems",
+      "path": "resource/acsl-problems/Junior/2025-2026/第三轮/25-26 c_3_jr.pdf",
+      "sha256": "c20ee0ce612665aabf07052309754595a07f1e1d78d6207792cf90916f340ee0",
+      "pages": 8
+    },
+    {
+      "id": "short-solutions",
+      "path": "resource/acsl-problems/Junior/2025-2026/第三轮/25-26 c_3_jr_sol.pdf",
+      "sha256": "149201f728fde0db3a0400c9dd9e70ffdad5ff5f9d21bdfbda5ff87142767982",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Junior/2025-2026/第三轮/25-26 c_3_Kings in the Corners_jr.pdf",
+      "sha256": "514028ae04082925e77bf5172a4ffdfb6dba5506115d780d2dbaa0b923c624bd",
+      "pages": 8
+    }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "Which ordered triple makes the following Boolean expression FALSE?\n\n$$\nA\\overline{(B+C)}+\\overline{ABC}\n$$",
+        "zh": "请问哪一个有序三元组可以使得下列表达式的结果为假？\n\n$$\nA\\overline{(B+C)}+\\overline{ABC}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "(1,0,1)",
+            "zh": "(1,0,1)"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "(0,0,0)",
+            "zh": "(0,0,0)"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "(1,1,0)",
+            "zh": "(1,1,0)"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "(1,1,1)",
+            "zh": "(1,1,1)"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "(0,0,1)",
+            "zh": "(0,0,1)"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Apply De Morgan’s laws and absorption.\n\n$$\nA\\overline{B}\\,\\overline{C}+\\overline{A}+\\overline{B}+\\overline{C}=\\overline{A}+\\overline{B}+\\overline{C}\n$$\n\nThe result is false only when all three complemented terms are 0. Therefore A = B = C = 1, giving (1,1,1), option D.\n\nThe term $A\\overline B\\,\\overline C$ is absorbed because whenever it equals 1, the standalone terms $\\overline B$ and $\\overline C$ already make the OR true. To make the remaining OR false, every term must be 0 simultaneously: $\\overline A=\\overline B=\\overline C=0$. Substituting $(1,1,1)$ into the original expression gives $1\\cdot0+0=0$.",
+        "zh": "应用德摩根律和吸收律。\n\n$$\nA\\overline{B}\\,\\overline{C}+\\overline{A}+\\overline{B}+\\overline{C}=\\overline{A}+\\overline{B}+\\overline{C}\n$$\n\n三个取反项都为 0 时，表达式才为假。因此 A = B = C = 1，对应 (1,1,1)，选 D。\n\n$A\\overline B\\,\\overline C$ 可被吸收，因为只要这一项为 1，单独的 $\\overline B$、$\\overline C$ 已经使 OR 为真。要让剩余的 OR 为假，必须同时有 $\\overline A=\\overline B=\\overline C=0$。将 $(1,1,1)$ 代回原式可核查为 $1\\cdot0+0=0$。"
+      },
+      "source": {
+        "statementSource": "short-problems",
+        "statementPages": [
+          3,
+          6
+        ],
+        "solutionSource": "short-solutions",
+        "solutionPages": [
+          1
+        ]
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "Simplify the following Boolean expression.\n\n$$\n\\overline{AB}\\,\\overline{(A+C)}+\\overline{C}\n$$",
+        "zh": "请简化下列布尔表达式。\n\n$$\n\\overline{AB}\\,\\overline{(A+C)}+\\overline{C}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "$\\overline{A}$",
+            "zh": "$\\overline{A}$"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "$\\overline{B}$",
+            "zh": "$\\overline{B}$"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "$\\overline{C}$",
+            "zh": "$\\overline{C}$"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "$\\overline{A} * \\overline{C}$",
+            "zh": "$\\overline{A} * \\overline{C}$"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "$\\overline{A} * \\overline{B} * \\overline{C}$",
+            "zh": "$\\overline{A} * \\overline{B} * \\overline{C}$"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Apply De Morgan’s laws, then use the absorption law X + XY = X.\n\n$$\n(\\overline{A}+\\overline{B})\\overline{A}\\,\\overline{C}+\\overline{C}=\\overline{C}\n$$\n\nThe simplified expression is the complement of C, option C.\n\nAfter De Morgan, the first term contains a factor $\\overline C$. Set $Y=(\\overline A+\\overline B)\\overline A$; the expression is $\\overline C Y+\\overline C=\\overline C(Y+1)=\\overline C$. Hence A and B do not affect the final value; a product with extra A or B restrictions would be too narrow.",
+        "zh": "先应用德摩根律，再使用吸收律 X + XY = X。\n\n$$\n(\\overline{A}+\\overline{B})\\overline{A}\\,\\overline{C}+\\overline{C}=\\overline{C}\n$$\n\n化简结果为 C 的取反，选 C。\n\n使用德摩根定律后，第一项含有公因子 $\\overline C$。令 $Y=(\\overline A+\\overline B)\\overline A$，原式就是 $\\overline C Y+\\overline C=\\overline C(Y+1)=\\overline C$。因此 A、B 不影响最终结果；若化简结果仍对 A 或 B 增加限制，就不等价。"
+      },
+      "source": {
+        "statementSource": "short-problems",
+        "statementPages": [
+          3,
+          6
+        ],
+        "solutionSource": "short-solutions",
+        "solutionPages": [
+          1
+        ]
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Data Structures",
+        "zh": "数据结构"
+      },
+      "statement": {
+        "en": "Build a binary search tree for the string below, using left subtree ≤ root < right subtree.\n\n`MASSACHUSETTS`\n\nHow many nodes have exactly one child?",
+        "zh": "为以下字符串构建一棵二叉搜索树。左子树 ≤ 根，右子树 > 根。\n\n`MASSACHUSETTS`\n\n请问该树中有多少个结点恰好只有一个子结点？"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "3",
+            "zh": "3"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "5",
+            "zh": "5"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "9",
+            "zh": "9"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Insert the letters in order. Repeated letters go to the left. Subscripts distinguish separate nodes with the same letter.\n\n| Node | Left child | Right child |\n| --- | --- | --- |\n| M | A₁ | S₁ |\n| A₁ | A₂ | C |\n| C | — | H |\n| H | E | — |\n| S₁ | S₂ | U |\n| S₂ | S₃ | — |\n| S₃ | S₄ | — |\n| U | T₁ | — |\n| T₁ | T₂ | — |\n\nA₂, E, S₄ and T₂ are leaves. C, H, S₂, S₃, U and T₁ each have exactly one child, giving 6 nodes, option D.",
+        "zh": "按字符串顺序插入各字母，重复字母放入左子树。下标用于区分字母相同的不同结点。\n\n| 结点 | 左子结点 | 右子结点 |\n| --- | --- | --- |\n| M | A₁ | S₁ |\n| A₁ | A₂ | C |\n| C | — | H |\n| H | E | — |\n| S₁ | S₂ | U |\n| S₂ | S₃ | — |\n| S₃ | S₄ | — |\n| U | T₁ | — |\n| T₁ | T₂ | — |\n\nA₂、E、S₄ 和 T₂ 为叶结点。C、H、S₂、S₃、U 和 T₁ 各有且只有一个子结点，共 6 个，选 D。"
+      },
+      "source": {
+        "statementSource": "short-problems",
+        "statementPages": [
+          3,
+          6
+        ],
+        "solutionSource": "short-solutions",
+        "solutionPages": [
+          1
+        ]
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Data Structures",
+        "zh": "数据结构"
+      },
+      "statement": {
+        "en": "Given an initially empty stack and the following commands on the stack, what will be popped next?\n\n```text\nPUSH(\"B\")\nPUSH(\"O\")\nx = POP()\nPUSH(\"S\")\nx = POP()\nPUSH(\"T\")\nPUSH(\"O\")\nx = POP()\nx = POP()\nPUSH(\"N\")\nx = POP()\n```",
+        "zh": "给定一个初始为空的栈，以及对该栈执行的下列操作指令后，请问接下来将会弹出哪个元素？\n\n```text\nPUSH(\"B\")\nPUSH(\"O\")\nx = POP()\nPUSH(\"S\")\nx = POP()\nPUSH(\"T\")\nPUSH(\"O\")\nx = POP()\nx = POP()\nPUSH(\"N\")\nx = POP()\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "S",
+            "zh": "S"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "T",
+            "zh": "T"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "O",
+            "zh": "O"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "N",
+            "zh": "N"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "B",
+            "zh": "B"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "The stack uses last in, first out (LIFO). Its contents after each command, from bottom to top, are\n\n`B → BO → B → BS → B → BT → BTO → BT → B → BN → B`\n\nOnly B remains, so the next POP returns B, option E.",
+        "zh": "栈遵循后进先出原则。每条指令执行后，从栈底到栈顶的内容依次为\n\n`B → BO → B → BS → B → BT → BTO → BT → B → BN → B`\n\n最终只剩 B，下一次 POP 弹出 B，选 E。"
+      },
+      "source": {
+        "statementSource": "short-problems",
+        "statementPages": [
+          3,
+          6
+        ],
+        "solutionSource": "short-solutions",
+        "solutionPages": [
+          1
+        ]
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do? (Arrays)",
+        "zh": "程序理解（数组）"
+      },
+      "statement": {
+        "en": "What is the output when the following program is run using the following values of array arr? Note that arr(0) has a value of 1.\n\n```text\n1  4  9  16  25\n```\n\n```text\nnum = 30\ncount = -1\nwhile count != 3\n    count = 0\n    for y = 0 to 4\n        if num % arr(y) == 0 then\n            count = count + 1\n        end if\n    next y\n    if count != 3 then\n        num = num + 1\n    end if\nend while\noutput num\n```",
+        "zh": "当使用数组 arr 的下列数值运行以下程序时，请问输出结果是什么？注意，arr(0) 的值为 1。\n\n```text\n1  4  9  16  25\n```\n\n```text\nnum = 30\ncount = -1\nwhile count != 3\n    count = 0\n    for y = 0 to 4\n        if num % arr(y) == 0 then\n            count = count + 1\n        end if\n    next y\n    if count != 3 then\n        num = num + 1\n    end if\nend while\noutput num\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "32",
+            "zh": "32"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "24",
+            "zh": "24"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "36",
+            "zh": "36"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "38",
+            "zh": "38"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "40",
+            "zh": "40"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "The loop counts how many values in [1, 4, 9, 16, 25] divide num. At 30 the count is 1, at 31 it is 1, and at 32 it is 3 because 1, 4 and 16 divide 32. The loop stops and outputs 32, option A.\n\nThe counter is reset to 0 for each candidate, so divisors from 30 and 31 do not accumulate. At 32 the successful remainders are $32\\bmod1=32\\bmod4=32\\bmod16=0$, whereas the remainders modulo 9 and 25 are nonzero. Because count is now exactly 3, num is not incremented to 33 before the while loop stops.",
+        "zh": "循环统计 [1, 4, 9, 16, 25] 中有多少个数能整除 num。num 为 30 和 31 时，计数均为 1。num 为 32 时，1、4、16 都能整除它，计数为 3。循环结束并输出 32，选 A。\n\n每次测试新候选数时 count 都重置为 0，不能把 30、31 的计数累计到后面。到 32 时，$32\\bmod1=32\\bmod4=32\\bmod16=0$，除以 9、25 的余数则不为 0。此时 count 恰为 3，不会再把 num 增到 33，while 随即结束。"
+      },
+      "source": {
+        "statementSource": "short-problems",
+        "statementPages": [
+          4,
+          7
+        ],
+        "solutionSource": "short-solutions",
+        "solutionPages": [
+          2
+        ]
+      }
+    },
+    {
+      "id": "q6",
+      "number": 6,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do? (Arrays)",
+        "zh": "程序理解（数组）"
+      },
+      "statement": {
+        "en": "What is the output when the following program is run using the following values of array arr? Note that arr(0,0) has a value of 3.\n\n```text\n3  2   6   4  12   5\n1  7   8   3   5  10\n6  3  14  13   7   4\n```\n\n```text\np = 1\nfor x = 0 to 5\n    m = 2\n    for y = 0 to 1\n        if arr(y,x) < arr(m,x) then\n            m = y\n        end if\n    next y\n    if arr(m,x) < 5 then\n        p = p * arr(m,x)\n    end if\nnext x\noutput p\n```",
+        "zh": "当使用数组 arr 的下列数值运行以下程序时，请问输出结果是什么？注意，arr(0,0) 的值为 3。\n\n```text\n3  2   6   4  12   5\n1  7   8   3   5  10\n6  3  14  13   7   4\n```\n\n```text\np = 1\nfor x = 0 to 5\n    m = 2\n    for y = 0 to 1\n        if arr(y,x) < arr(m,x) then\n            m = y\n        end if\n    next y\n    if arr(m,x) < 5 then\n        p = p * arr(m,x)\n    end if\nnext x\noutput p\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "10",
+            "zh": "10"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "12",
+            "zh": "12"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "18",
+            "zh": "18"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "24",
+            "zh": "24"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "30",
+            "zh": "30"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "For each column, m tracks the row containing its minimum value. The six column minima are 1, 2, 6, 3, 5 and 4. Only minima strictly less than 5 are multiplied, so p = 1 × 2 × 3 × 4 = 24, option D.\n\nm is a row index, not the minimum value itself. In the first column it starts at row 2 with value 6, changes to row 0 with value 3, then to row 1 with value 1. Each later comparison uses the current m. The minimum 5 is excluded by the strict `< 5`, and the starting product 1 is not an extra data value.",
+        "zh": "对每一列，m 记录最小值所在的行。六列的最小值依次是 1、2、6、3、5、4。程序只将严格小于 5 的最小值相乘，因此 p = 1 × 2 × 3 × 4 = 24，选 D。\n\nm 保存的是行下标，不是最小值本身。例如第 0 列先以第 2 行的 6 为候选，比较后改为第 0 行的 3，再改为第 1 行的 1；后续比较始终使用更新后的 m。判断为严格小于 5，所以最小值恰为 5 的那一列也不参与乘积；初始 p=1 只是乘法的起始值。"
+      },
+      "source": {
+        "statementSource": "short-problems",
+        "statementPages": [
+          5,
+          8
+        ],
+        "solutionSource": "short-solutions",
+        "solutionPages": [
+          2
+        ]
+      }
+    }
+  ],
+  "programming": {
+    "id": "kings-in-the-corners",
+    "definition": {
+      "title": "Kings in the Corners",
+      "statement": "Kings in the Corners is a one-person card game that uses a standard deck of 52 playing cards. The game begins with four cards placed face-up on the board, forming four original piles. Four additional corner piles are empty at the start. The player receives a hand of cards.\n\nThe player attempts to play cards from the hand onto one of the 8 piles, each time examining cards from left to right. The first playable card is moved according to these rules.\n\n- If the card is a King, play it onto the next available corner pile. Fill the corners clockwise, starting with the upper-right corner.\n- Otherwise, check the piles clockwise, starting with the topmost pile. A card can be placed on a pile if it is the opposite color and exactly one rank lower than the pile’s top card. For example, a 4 of Clubs can be played on either a 5 of Hearts or a 5 of Diamonds.\n\nAfter playing a card, examine the remaining hand again from left to right. The game ends when no more cards can be played.\n\nEach card is represented by a 2-character string, rank followed by suit. Ranks from high to low are K (king), Q (queen), J (jack), T (ten), 9, 8, 7, 6, 5, 4, 3, 2 and A (ace). Suits are C (clubs), D (diamonds), H (hearts) and S (spades). Clubs and Spades are black. Diamonds and Hearts are red.\n\nThe following diagram names the eight pile positions, starting at the top and proceeding clockwise. Positions 1, 3, 5 and 7 are the four original piles. Positions 2, 4, 6 and 8 are the corners.\n\n```text\n8   1   2\n7       3\n6   5   4\n```\n\n## Input\n\nRead two lines. The first line contains the player’s hand, in order. The second line contains the top cards on the four original piles, starting at the top and proceeding clockwise. Cards are separated by a single space.\n\n## Output\n\nPrint the top card on each of the 8 piles, starting at the top and proceeding clockwise. Print E for an empty pile. Separate cards with a single space.\n\n## Example walkthrough\n\nFor the hand `3D 4C JH KH 8S` and original piles `9H 5S 5H QD`, play proceeds as follows.\n\n| Card played | Remaining hand | Top cards clockwise |\n| --- | --- | --- |\n| — | 3D 4C JH KH 8S | 9H E 5S E 5H E QD E |\n| 4C | 3D JH KH 8S | 9H E 5S E 4C E QD E |\n| 3D | JH KH 8S | 9H E 5S E 3D E QD E |\n| KH | JH 8S | 9H KH 5S E 3D E QD E |\n| 8S | JH | 8S KH 5S E 3D E QD E |\n\nThe remaining JH cannot be played on any pile. Output `8S KH 5S E 3D E QD E`.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 1000,
+      "memoryLimitMb": 128,
+      "referenceCode": "import sys\n\n\ndef play(hand, original_piles):\n    piles = [\"E\"] * 8\n    for index, card in enumerate(original_piles):\n        piles[index * 2] = card\n    ranks = \"A23456789TJQK\"\n\n    while hand:\n        moved = False\n        for hand_index, card in enumerate(hand):\n            destination = None\n            if card[0] == \"K\":\n                for pile_index in (1, 3, 5, 7):\n                    if piles[pile_index] == \"E\":\n                        destination = pile_index\n                        break\n            else:\n                for pile_index, top in enumerate(piles):\n                    if top == \"E\":\n                        continue\n                    opposite_color = (card[1] in \"DH\") != (top[1] in \"DH\")\n                    one_lower = ranks.index(card[0]) + 1 == ranks.index(top[0])\n                    if opposite_color and one_lower:\n                        destination = pile_index\n                        break\n            if destination is not None:\n                piles[destination] = hand.pop(hand_index)\n                moved = True\n                break\n        if not moved:\n            break\n    return piles\n\n\ndef main():\n    hand = sys.stdin.readline().split()\n    original_piles = sys.stdin.readline().split()\n    print(\" \".join(play(hand, original_piles)))\n\n\nif __name__ == \"__main__\":\n    main()\n",
+      "starterCode": "# Read the hand and the four original piles.\n# Print the eight top cards in clockwise order.\n",
+      "samples": [
+        {
+          "input": "3D 4C JH KH 8S\n9H 5S 5H QD\n",
+          "expected": "8S KH 5S E 3D E QD E\n"
+        },
+        {
+          "input": "QD 9D KH 4S 2S 3S JS 2H 8D\n3H 7S TC 3C\n",
+          "expected": "2S KH 7S E 9D E 2H E\n"
+        },
+        {
+          "input": "KS 5H 3H AH 6S KC 7H JC 8S\n9D 5D 3C AC\n",
+          "expected": "5H KS 5D KC 3C E AC E\n"
+        },
+        {
+          "input": "TC AC QS 7D 4H KC 9D 3D 8C KH JH 3C 4C\n5C 7H AH 6C\n",
+          "expected": "3C KC 7H 7D AH E 6C E\n"
+        },
+        {
+          "input": "2D 3S 7S 5S 6S AC 5H 3C 7H 8S QC\nTS JC TH 2C\n",
+          "expected": "TS E JC E TH E 2C E\n"
+        },
+        {
+          "input": "AD 2C 3H 4S JC QH KS JH TC 9D 8S 7D 8C 9H\nTS 5H AH QS\n",
+          "expected": "7D JC AD E AH E 8C E\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "3C TD 9H 4S JD 7D 4H AS KS\n2H 5D JS TS\n",
+          "expected": "AS KS 4S E TD E 9H E\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "5H AH 6S 2H 8S JC 3S QC JS QD KS 9S 3D 6H 4C\n6C QH 4D TS\n",
+          "expected": "3D JS JC E 2H E TS E\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "9S 5D 2S 7S 3C 6H 7D\n4D 8S 9C 8H\n",
+          "expected": "3C E 7D E 9C E 6H E\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "2H KD JD 2S 3D 7C KS QC AC QS 3C\n4C 3S 4D QD\n",
+          "expected": "2S JD AC KS 3C E QD E\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "JD KH 5C QS 8S TH 6H\n4S TC 6C 7S\n",
+          "expected": "4S JD TC E 6C E 5C E\n",
+          "weight": 16.6666
+        },
+        {
+          "input": "3D AH 5C 3C 9D 5S 8H 6S 2D 6H 8D 7C 2C QS 9S\nTH 4C 4H 9C\n",
+          "expected": "8D E AH E 2D E 5C E\n",
+          "weight": 16.6666
+        }
+      ]
+    },
+    "statementZh": "角落国王游戏是一个单人纸牌游戏，使用一副标准的 52 张扑克牌。游戏开始时，桌面上有 4 张牌面朝上放置，形成四个初始牌堆。另外四个角落牌堆初始为空。玩家手中持有若干牌。\n\n玩家需将手中的牌放到 8 个牌堆中的一个。每次操作时，玩家从左到右检查手牌。第一张可以打出的牌遵循以下规则。\n\n- 如果这张牌是 K，将其放入下一个可用的角落牌堆。角落牌堆按顺时针顺序填充，从右上角开始。\n- 如果这张牌不是 K，从最上方的牌堆开始，按顺时针顺序检查所有牌堆。这张牌的颜色必须与牌堆顶牌的颜色相反，且点数比顶牌正好小 1。例如，梅花 4 可以放在红桃 5 或方块 5 上面。\n\n每打出一张牌后，再次从左到右检查剩余手牌。当手中没有可出的牌时，游戏结束。\n\n每张牌用两个字符表示，点数后跟花色。点数从高到低依次为 K、Q、J、T（10）、9、8、7、6、5、4、3、2、A。花色 C、D、H、S 分别表示梅花、方块、红桃、黑桃。梅花和黑桃为黑色，方块和红桃为红色。\n\n下面给八个牌堆编号，从最上方开始顺时针排列。1、3、5、7 是初始牌堆，2、4、6、8 是角落牌堆。\n\n```text\n8   1   2\n7       3\n6   5   4\n```\n\n## 输入\n\n输入两行字符串。第一行是按顺序排列的手牌。第二行是四个初始牌堆的顶牌，从最上方开始按顺时针顺序排列。每张牌之间用一个空格分隔。\n\n## 输出\n\n从最上方的牌堆开始，按顺时针顺序输出 8 个牌堆的顶牌。空牌堆输出 E，每张牌之间用一个空格分隔。\n\n## 示例过程\n\n手牌为 `3D 4C JH KH 8S`，初始牌堆为 `9H 5S 5H QD` 时，出牌过程如下。\n\n| 已出的牌 | 剩余手牌 | 顺时针各牌堆顶牌 |\n| --- | --- | --- |\n| — | 3D 4C JH KH 8S | 9H E 5S E 5H E QD E |\n| 4C | 3D JH KH 8S | 9H E 5S E 4C E QD E |\n| 3D | JH KH 8S | 9H E 5S E 3D E QD E |\n| KH | JH 8S | 9H KH 5S E 3D E QD E |\n| 8S | JH | 8S KH 5S E 3D E QD E |\n\n最后剩余的 JH 无法放入任何牌堆，游戏结束，输出 `8S KH 5S E 3D E QD E`。\n",
+    "source": {
+      "sourceId": "programming",
+      "statementPages": [
+        1,
+        2,
+        5,
+        6
+      ],
+      "samplePages": [
+        3,
+        7
+      ],
+      "testPages": [
+        4,
+        8
+      ]
+    }
+  },
+  "notes": [
+    {
+      "kind": "source-layout",
+      "text": "The first two pages of the short-problems PDF are blank. English questions are on pages 3–5, Chinese questions on pages 6–8."
+    },
+    {
+      "kind": "source-discrepancy",
+      "questionId": "q5",
+      "text": "The problem uses if count != 3, while the solution PDF prints if count < 3. The problem version is preserved. Both give the supplied answer 32 on this trace."
+    },
+    {
+      "kind": "editorial-adaptation",
+      "text": "Chinese explanations are translated from and expanded on the supplied English solution. The tree and card-board figures are represented as an accessible node table and a pile-position diagram. Existing Chinese problem text is normalized for punctuation and whitespace."
+    },
+    {
+      "kind": "reference-code",
+      "text": "The Python reference is locally authored from the problem rules. Only the isolated judge may execute it. Official sample and test expected outputs are transcribed directly."
+    },
+    {
+      "kind": "practice-grading",
+      "text": "The six official tests share 100 points using four-decimal weights 16.6667,16.6667,16.6667,16.6667,16.6666,16.6666. Passing requires all six cases. Time and memory limits are local practice settings."
+    }
+  ]
+}

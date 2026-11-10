@@ -1,0 +1,457 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2020-2021-intermediate-2",
+  "division": "Intermediate",
+  "season": "2020-2021",
+  "round": 2,
+  "roundLabel": {
+    "en": "Contest 2",
+    "zh": "第二轮"
+  },
+  "title": {
+    "en": "ACSL 2020-2021 Intermediate · Contest 2",
+    "zh": "ACSL 2020-2021 Intermediate · 第二轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Intermediate/2020-2021/第二轮/中级笔试 int.pdf",
+      "sha256": "288b19b86272e8e08e76189ab0a89777cc50790346315832da09b91466c38274",
+      "pages": 2
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Intermediate/2020-2021/第二轮/中级笔试_int_sol.pdf",
+      "sha256": "9ad261418d578c48d3aba7495bd554c3e1fc76a191488bd89bc92bdc455fcb01",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Intermediate/2020-2021/第二轮/中级编程 lex strings（含答案）.pdf",
+      "sha256": "3fa81a4f654ecdfb3c04fb8bc1f75877abd4048c7b4310bb4fe69d40e595f0f8",
+      "pages": 4
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Evaluate the following prefix expression if all numbers are single digits:\n\n`- / * 4 + 2 3 * 2 5 / + ^ 6 2 4 8`",
+        "zh": "如果所有数都是一位数字,请计算以下前缀表达式:\n\n`- / * 4 + 2 3 * 2 5 / + ^ 6 2 4 8`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "3",
+            "zh": "3"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "0",
+            "zh": "0"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`-3`",
+            "zh": "`-3`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`-4`",
+            "zh": "`-4`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Evaluate the innermost operations, preserving prefix order:\n\n```text\n- / * 4 + 2 3 * 2 5 / + ^ 6 2 4 8\n= - / * 4 (+ 2 3) (* 2 5) / + (^ 6 2) 4 8\n= - / (* 4 5) 10 / (+ 36 4) 8\n= - (/ 20 10) (/ 40 8)\n= - 2 5\n= -3\n```\n\nThe leading minus separates two complete operands: $\\dfrac{4(2+3)}{2\\cdot5}$ and $\\dfrac{6^2+4}{8}$. They evaluate to 2 and 5, respectively, so the subtraction is $2-5=-3$, not $5-2$.\n\n**Answer: D.**",
+        "zh": "按前缀表达式的顺序，从内层运算开始化简：\n\n```text\n- / * 4 + 2 3 * 2 5 / + ^ 6 2 4 8\n= - / * 4 (+ 2 3) (* 2 5) / + (^ 6 2) 4 8\n= - / (* 4 5) 10 / (+ 36 4) 8\n= - (/ 20 10) (/ 40 8)\n= - 2 5\n= -3\n```\n\n最前面的减号连接两个完整操作数：$\\dfrac{4(2+3)}{2\\cdot5}$ 与 $\\dfrac{6^2+4}{8}$。两者分别是 2 和 5，因此应计算 $2-5=-3$，不能颠倒左右操作数。\n\n**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "The formula for the surface area of a right circular cylinder is:\n\n$$\nA=2πrh+2πr^{2}\n$$\n\nConvert the entire formula to postfix using P for π .",
+        "zh": "直立圆柱体的表面积公式是:\n\n$$\nA=2πrh+2πr^{2}\n$$\n\n用P代替π,把这个公式转换为后缀表达式。"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`A2Pr**h*2P*r2^*+=`",
+            "zh": "`A2Pr**h*2P*r2^*+=`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`A2P*r*h*2P*r2*^+=`",
+            "zh": "`A2P*r*h*2P*r2*^+=`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`A2P*r*h*2P*r2^*+=`",
+            "zh": "`A2P*r*h*2P*r2^*+=`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`A2P*r*h*2P*r2^+*=`",
+            "zh": "`A2P*r*h*2P*r2^+*=`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`A2P*r*h*2Pr2*^*+=`",
+            "zh": "`A2P*r*h*2Pr2*^*+=`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Convert each multiplication and exponentiation to postfix, then the addition and assignment:\n\n```text\nA = 2 * P * r * h + 2 * P * r ^ 2\nA = (2 P *) * r * h + (2 P *) * (r 2 ^)\nA = ((2 P *) r *) * h + ((2 P *) (r 2 ^) *)\nA = (((2 P *) r *) h *) + ((2 P *) (r 2 ^) *)\nA = (2 P * r * h * 2 P * r 2 ^ * +)\n```\n\nThe complete formula is `A 2 P * r * h * 2 P * r 2 ^ * + =`.\n\n**Answer: C.**",
+        "zh": "先把乘法和乘方转换为后缀形式，再处理加法和赋值：\n\n```text\nA = 2 * P * r * h + 2 * P * r ^ 2\nA = (2 P *) * r * h + (2 P *) * (r 2 ^)\nA = ((2 P *) r *) * h + ((2 P *) (r 2 ^) *)\nA = (((2 P *) r *) h *) + ((2 P *) (r 2 ^) *)\nA = (2 P * r * h * 2 P * r 2 ^ * +)\n```\n\n完整的后缀表达式为 `A 2 P * r * h * 2 P * r 2 ^ * + =`。\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "比特位操作"
+      },
+      "statement": {
+        "en": "Evaluate the following expression:\n\n`((LSHIFT-1 11011) OR (RCIRC-2 01101) AND 01111)`",
+        "zh": "计算以下表达式:\n\n`((LSHIFT-1 11011) OR (RCIRC-2 01101) AND 01111)`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`11111`",
+            "zh": "`11111`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`10111`",
+            "zh": "`10111`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`01111`",
+            "zh": "`01111`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`01010`",
+            "zh": "`01010`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`00010`",
+            "zh": "`00010`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "`((LSHIFT-1 11011) OR (RCIRC-2 01101) AND 01111)`\n\n`= (10110 OR (01011 AND 01111))`\n\n`= (10110 OR 01011) = 11111`\n\nA left shift drops the leftmost bit and appends 0: `11011 → 10110`. A right circular shift by two moves the final `01` to the front: `01101 → 01011`. The AND is evaluated before the outer OR; keep all strings at five bits.\n\n**Answer: A.**",
+        "zh": "先计算移位和循环移位，再先 AND 后 OR：\n\n```text\n((LSHIFT-1 11011) OR (RCIRC-2 01101) AND 01111)\n= (10110 OR (01011 AND 01111))\n= (10110 OR 01011)\n= 11111\n```\n\n左移会丢弃最左位并在右端补 0：`11011 → 10110`；右循环移位两位则把末尾的 `01` 移到开头：`01101 → 01011`。先算 AND，再算外层 OR，整个过程始终保留五位。\n\n**答案：A。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "比特位操作"
+      },
+      "statement": {
+        "en": "How many bit strings make the following equation TRUE?\n\n`((LCIRC-3 X) AND 10110) = 10100`",
+        "zh": "有多少个比特串能使以下等式为真?\n\n`((LCIRC-3 X) AND 10110) = 10100`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`2`",
+            "zh": "`2`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`3`",
+            "zh": "`3`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`4`",
+            "zh": "`4`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`5`",
+            "zh": "`5`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`8`",
+            "zh": "`8`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Let `X = abcde`. After rotating left by three positions, `LCIRC-3 X = deabc`.\n\n```text\ndeabc AND 10110 = d0ab0 = 10100\n```\n\nThus `d = 1`, `a = 1`, and `b = 0`; `c` and `e` are unrestricted. The pattern is `10*1*`, giving $2^2=4$ bit strings.\n\nThe four original strings matching `10*1*` are `10010`, `10011`, `10110`, and `10111`. A 0 in the AND mask erases that position, so it does not force the corresponding input bit to be 0.\n\n**Answer: C.**",
+        "zh": "设 `X = abcde`。左循环移位三位后，`LCIRC-3 X = deabc`。\n\n```text\ndeabc AND 10110 = d0ab0 = 10100\n```\n\n因此 `d = 1`、`a = 1`、`b = 0`，而 `c` 和 `e` 可以任取 0 或 1。比特串的形式为 `10*1*`，共 $2^2=4$ 种。\n\n满足原串模式 `10*1*` 的四种情况为 `10010`、`10011`、`10110`、`10111`。AND 掩码中的 0 会抹掉对应输入位，因此不能把该输入位也限定为 0。\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "LISP",
+        "zh": "LISP"
+      },
+      "statement": {
+        "en": "Evaluate the following LISP expression:\n\n```text\n(CDR (CAR ‘((b c d) (e f ) g)))\n```",
+        "zh": "计算以下LISP表达式的值:\n\n```text\n(CDR (CAR ‘((b c d) (e f ) g)))\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "(b)",
+            "zh": "(b)"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "(d)",
+            "zh": "(d)"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "(b c)",
+            "zh": "(b c)"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "(c d)",
+            "zh": "(c d)"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "(b d)",
+            "zh": "(b d)"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "CAR selects the first sublist, `(b c d)`. CDR removes its first element, leaving `(c d)`.\n\n```lisp\n(CAR '((b c d) (e f) g))  => (b c d)\n(CDR '(b c d))           => (c d)\n```\n\n**Answer: D.**",
+        "zh": "CAR 取出第一个子表 `(b c d)`，再用 CDR 去掉它的首元素，得到 `(c d)`。\n\n```lisp\n(CAR '((b c d) (e f) g))  => (b c d)\n(CDR '(b c d))           => (c d)\n```\n\n**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [],
+  "programming": {
+    "id": "lex-strings",
+    "definition": {
+      "title": "Lex Strings",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Read one line. Keep spaces and punctuation in the input string.\n\n### Problem\n\nTransform a given string of all capital letters so that repeated blocks of letters are at the front, arranged such that longer blocks come first and blocks of the same length are in alphabetical order. Each string has an associated number, m. In the final output, all groupings of the same character must be no longer than m. Other than sorting the groups of letters that have the same frequency in the original string, no other rearranging is done.\n\nFor example, in the input line “MBAMMDXXMMMGGMMZ 3”, the string contains one block of 3 letters (the M’s); four blocks of 2 letters (M, X, G, and M), and 5 single letters (M, B, A, D, and Z). The 3-letter block comes first, then the 2-letter blocks (in alphabetical order), and finally, the single letters (in alphabetical order): MMMGGMMMMXXABDMZ. The number 3 requires that there is no substring of a single letter that is longer than 3 characters. In this example, MMMGGMMMXXABDMZ is output.\n\n### Input\n\nYour program will receive a single line of data. Each will contain a string of no more than 100 characters, all uppercase letters followed by a space and a positive integer that will be less than the length of the string.\n\n### Output\n\nPrint each input string in the rearranged order, as described above.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "MBAMMDXXMMMGGMMZ 3\n",
+          "expected": "MMMGGMMMXXABDMZ\n"
+        },
+        {
+          "input": "MHHHHJLDDHHDDD 3\n",
+          "expected": "HHHDDDHHJLM\n"
+        },
+        {
+          "input": "THETENNESSEEVOLUNTEERS 2\n",
+          "expected": "EENNSSEEHLNORSTTUV\n"
+        },
+        {
+          "input": "MISSISSIPPI 3\n",
+          "expected": "PPSSSIIIM\n"
+        },
+        {
+          "input": "BOOOKEEEPEEERR 4\n",
+          "expected": "EEEEOOORRBKP\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "BOOOKEEEPEERBBBBUZZZOOKEEEEPEER 2\n",
+          "expected": "BBEEOOZZEEOOBKKPPRRU\n",
+          "weight": 20
+        },
+        {
+          "input": "MASSACHUSETTSVSMISSISSIPPI 2\n",
+          "expected": "PPSSTTAACEHIIMMSSUV\n",
+          "weight": 20
+        },
+        {
+          "input": "OOOOZESSPPOOOOOYYYSSSUPY 4\n",
+          "expected": "OOOOSSSYYYPPSSEPUYZ\n",
+          "weight": 20
+        },
+        {
+          "input": "SHESELLSSEASHELLSANDBALLOONS 3\n",
+          "expected": "LLLOOSSAAABDEEEHHNNSSS\n",
+          "weight": 20
+        },
+        {
+          "input": "HHHGGRDDCFFFGGGTTTYUIKJHHH 1\n",
+          "expected": "FGHTDGCIJKRUY\n",
+          "weight": 20
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。读取一行，保留输入字符串内的空格和标点。\n\n### 问题\n\n转换给定的所有由大写字母组成的字符串，使重复的字符块位于前面，其中较长的字符块优先排列，长度相同的字符块按照字母顺序排列。 每个字符串都有一个相关数字 m。在最终输出结果中，所有由连续且相同的字符构成的字符块长度不能超过m。除对原字符串中长度相同的连续字母块按字母顺序排序外，不做其他重排。\n\n例如，输入 `MBAMMDXXMMMGGMMZ 3`。字符串中有一个长度为 3 的连续字母块（M），四个长度为 2 的块（M、X、G、M），以及五个单独的字母（M、B、A、D、Z）。先排列长度为 3 的块，再按字母顺序排列长度为 2 的块，最后按字母顺序排列单个字母，得到 `MMMGGMMMMXXABDMZ`。数字 3 要求最终同一字母的连续段不能超过 3 个字符，因此最终输出 `MMMGGMMMXXABDMZ`。\n\n### 输入\n\n你将会接收到一行数据，每行包括一个不超过 100 个字符的字符串，所有大写字母后面紧跟着一个空格和一个小于字符串长度的正整数。\n\n### 输出\n\n如上所述，按照重新排列好的顺序打印输出每个输入的字符串。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [],
+      "zh": []
+    }
+  }
+}

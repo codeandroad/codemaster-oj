@@ -1,0 +1,378 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2021-2022-elementary-1",
+  "division": "Elementary",
+  "season": "2021-2022",
+  "round": 1,
+  "roundLabel": {
+    "en": "Contest 1",
+    "zh": "第一轮"
+  },
+  "title": {
+    "en": "ACSL 2021-2022 Elementary · Contest 1",
+    "zh": "ACSL 2021-2022 Elementary · 第一轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Elementary/2021-2022/第一轮/c_1_elem.pdf",
+      "sha256": "a094b25d94290e36e65c426b393d4c39d4f5f89cbe3c8e22025d6a1e053cdc81",
+      "pages": 2
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Elementary/2021-2022/第一轮/c_1_elem_soln.pdf",
+      "sha256": "3b7389f0bb452c45491ee7bc2bda320a1f2dcaacf04964a46ae659f6ab3c0423",
+      "pages": 1
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Convert $147_{8}$ to base 10.",
+        "zh": "请将 $147_{8}$ 转化为十进制。"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "481",
+            "zh": "481"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "120",
+            "zh": "120"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "114",
+            "zh": "114"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "103",
+            "zh": "103"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "93",
+            "zh": "93"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Answer: **D**.\n\nTo convert $147_{8}$ to base 10, take powers of 8 times each digit in the number:\n\n$$\n7+4*8+1*64=7+32+64=103_{10}\n$$",
+        "zh": "答案：**D**。\n\n从右到左，三个位置的权分别为 $8^0$、$8^1$、$8^2$。$147_8=1\\times64+4\\times8+7=103_{10}$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Which of the following has the fewest number of 1s in its binary representation?\n\n$$\n9A7_{16}\\qquad B14_{16}\\qquad 7431_{8}\\qquad 4265_{8}\n$$",
+        "zh": "将下列数字转化成二进制后,哪一个含有的1最少?\n\n$$\n9A7_{16}\\qquad B14_{16}\\qquad 7431_{8}\\qquad 4265_{8}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "9A7",
+            "zh": "9A7"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "B14",
+            "zh": "B14"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "7431",
+            "zh": "7431"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "4265",
+            "zh": "4265"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "more than 1 answer",
+            "zh": "答案不止一个"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Answer: **B**.\n\n| Number | Binary | Number of 1s |\n|---|---|---|\n| $9A7_{16}$ | 100110100111 | 7 |\n| $B14_{16}$ | 101100010100 | 5 |\n| $7431_8$ | 111100011001 | 7 |\n| $4265_8$ | 100010110101 | 6 |\n\n$B14_{16}$ has the fewest 1s.",
+        "zh": "答案：**B**。\n\n把各位独立展开，再数 1。十六进制一位用四位二进制，八进制一位用三位。四个数 $9A7_{16}$、$B14_{16}$、$7431_8$、$4265_8$ 分别有 7、5、7、6 个 1，因此 $B14_{16}$ 最少。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "If this year is 84A in hexadecimal, what would the hexadecimal year be 3F7 hexadecimal years from now?",
+        "zh": "若今年是 $84A_{16}$,那么从现在起 $3F7_{16}$ 年后以十六进制表示会是哪一年?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "C40",
+            "zh": "C40"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "B31",
+            "zh": "B31"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "D42",
+            "zh": "D42"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "1241",
+            "zh": "1241"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "C41",
+            "zh": "C41"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "Add the elapsed years in hexadecimal. Each column carries at 16.\n\n$$\n\\begin{array}{rccc}\n & {\\scriptstyle 1} & {\\scriptstyle 1} &  \\\\\n & 8 & 4 & A \\\\\n+ & 3 & F & 7 \\\\\n\\hline\n & C & 4 & 1\n\\end{array}\n$$\n\nThe units column gives $10+7=17$ in decimal, so write 1 and carry 1. The next column gives $4+15+1=20$, so write 4 and carry 1. The leftmost column gives $8+3+1=12$, written as C. The year is $C41_{16}$ (option E).",
+        "zh": "把经过的年数按十六进制相加，每列满 16 向左进 1。\n\n$$\n\\begin{array}{rccc}\n & {\\scriptstyle 1} & {\\scriptstyle 1} &  \\\\\n & 8 & 4 & A \\\\\n+ & 3 & F & 7 \\\\\n\\hline\n & C & 4 & 1\n\\end{array}\n$$\n\n个位 $10+7=17$，写 1 进 1。下一列 $4+15+1=20$，写 4 进 1。最高列 $8+3+1=12$，写作 C。因此年份为 $C41_{16}$，选 E。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Determine which of the following is the largest number:\n\n$$\n111001101010_{2}\\qquad E60_{16}\\qquad E69_{16}\\qquad 7147_{8}\\qquad 7150_{8}\n$$",
+        "zh": "下列数字中最大的是哪个?\n\n$$\n111001101010_{2}\\qquad E60_{16}\\qquad E69_{16}\\qquad 7147_{8}\\qquad 7150_{8}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "111001101010",
+            "zh": "111001101010"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "E60",
+            "zh": "E60"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "E69",
+            "zh": "E69"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "7147",
+            "zh": "7147"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "7150",
+            "zh": "7150"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "Answer: **A**.\n\nTo find the largest, you must convert all of them to either base 8 or base 16:\n\n$$\n111001101010_{2}=E6A_{16}\n$$\n\n$E60_{16}$ and $E69_{16}$ are less than that. $7147_{8}$ is less than $7150_{8}$ which is 111 001 101 000 = 1110 0110 1000 which is $E68_{16}.$ It is also less than $E6A_{16}.$",
+        "zh": "答案：**A**。\n\n统一成十六进制。二进制 `1110 0110 1010` 分组得到 $E6A_{16}$；八进制 $7147_8$ 展开为 `111 001 100 111`，重新分组得 $E67_{16}$。比较 $E60$、$E67$、$E69$ 和 $E6A$，只需比末位，A 的值 10 最大。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "What is the base 10 equivalent to the most dominant (the one with the largest value) component in the hexadecimal color “#9FA0B1”?",
+        "zh": "下列十进制的数中,哪一个和十六进制颜色“#9FA0B1”中最大的一部分(值最大)相等?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "193",
+            "zh": "193"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "177",
+            "zh": "177"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "176",
+            "zh": "176"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "160",
+            "zh": "160"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "159",
+            "zh": "159"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Answer: **B**.\n\nThe most dominant component in the hexadecimal color “#9FA0B1” is B1 which is the blue component. In base 10, B1 = 1 + B(11) * 16 = 1 + 176 = $177_{10}$ The RGB color using base 10 numbers (159,160,177) is Santa Grey.",
+        "zh": "答案：**B**。\n\n`#9FA0B1` 的红、绿、蓝分别是 `9F`、`A0`、`B1`。十六进制最高位依次为 9、10、11，故蓝色最大。$B1_{16}=11\\times16+1=177_{10}$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": []
+}

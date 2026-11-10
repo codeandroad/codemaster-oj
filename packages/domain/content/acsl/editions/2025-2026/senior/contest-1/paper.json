@@ -1,0 +1,905 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2025-2026-senior-1",
+  "division": "Senior",
+  "season": "2025-2026",
+  "round": 1,
+  "roundLabel": {
+    "en": "Contest 1",
+    "zh": "资格轮"
+  },
+  "title": {
+    "en": "ACSL 2025-2026 Senior · Contest 1",
+    "zh": "ACSL 2025-2026 Senior · 资格轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Senior/2025-2026/资格轮/25-26 ACSL 高级组 paper.pdf",
+      "sha256": "fb42f4a56928ea868c7840214582626b0c01d79d47a726595182646c081bbf6e",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Senior/2025-2026/资格轮/25-26 ACSL 高级组 solution.pdf",
+      "sha256": "e9405042f222b0e22e6fd52ff79e31c97345a682b3730fcfd876b6013ed898bd",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Senior/2025-2026/资格轮/25-26 ACSL 高级组 Creature Capture paper.pdf",
+      "sha256": "8fc313d3fcd1c1af435bfced3332ac25943a09ed158d0f0add3f689d5d5404ba",
+      "pages": 6
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Evaluate and express the answer in hexadecimal.\n\n$$\n100_{2}\\cdot (42_{8}+375_{8})\n$$",
+        "zh": "求值并以十六进制表示结果。\n\n$$\n100_{2}\\cdot (42_{8}+375_{8})\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "43700",
+            "zh": "43700"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "11F",
+            "zh": "11F"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "437",
+            "zh": "437"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "47C",
+            "zh": "47C"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "2174",
+            "zh": "2174"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "First add inside the parentheses in octal.\n\n$$\n\\begin{array}{rccc}\n & {\\scriptstyle 1} &  &  \\\\\n &   & 4 & 2 \\\\\n+ & 3 & 7 & 5 \\\\\n\\hline\n & 4 & 3 & 7\n\\end{array}\n$$\n\nConvert the sum to binary. Multiplying by $100_2$ shifts it two bits to the left. Regroup the result in fours from the right.\n\n$$437_8=(100\\,011\\,111)_2\\quad\\Longrightarrow\\quad 100_2\\cdot437_8=(0100\\,0111\\,1100)_2=47C_{16}.$$\n\nThe answer is D.",
+        "zh": "先把括号内的数按八进制对齐相加。\n\n$$\n\\begin{array}{rccc}\n & {\\scriptstyle 1} &  &  \\\\\n &   & 4 & 2 \\\\\n+ & 3 & 7 & 5 \\\\\n\\hline\n & 4 & 3 & 7\n\\end{array}\n$$\n\n把和转换成二进制。乘以 $100_2$ 相当于向左移两位，再从右往左每四位一组转成十六进制。\n\n$$437_8=(100\\,011\\,111)_2\\quad\\Longrightarrow\\quad 100_2\\cdot437_8=(0100\\,0111\\,1100)_2=47C_{16}.$$\n\n选 D。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "In what year after $2025_{10}$ will the year, expressed in hexadecimal, first be a palindrome?",
+        "zh": "以16进制表示 $2025_{10}$ 之后的年份,哪一年将首次以回文数表示?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "707",
+            "zh": "707"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "7E7",
+            "zh": "7E7"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "7F7",
+            "zh": "7F7"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "8E8",
+            "zh": "8E8"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "9E9",
+            "zh": "9E9"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "To find the next year after $2025_{10}$ that is a palindrome:\n\n$2025_{10}$ / 16 = 126 r 9, 126 / 16 = 7 r 14, 7 / 16 = 0 r 7 so read the remainders backwards to get $7E9_{16}.$ The next year that is a palindrome is 7F7.\n\nFor a three-digit palindrome with leading digit 7, the final digit must also be 7. Keeping the middle E gives 7E7, already two years before 7E9; increase the middle digit to F to obtain 7F7. It equals $7\\cdot256+15\\cdot16+7=2039$ in decimal. The required option is its hexadecimal representation, **C**.",
+        "zh": "$2025_{10}=7E9_{16}$。三位十六进制回文数的首尾相同；$7E7_{16}$ 已小于当前年份，下一个回文数是 $7F7_{16}$，选 C。\n\n首位为 7 的三位回文数末位也必须为 7。保留中间 E 得 7E7，已比 7E9 早两年；把中间位增至 F 得 7F7，它的十进制值为 $7\\cdot256+15\\cdot16+7=2039$。选项使用十六进制表示，所以选 **C**。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find $f(f(f(7)))$ given:\n\n$$\nf(x)=\\begin{cases} f(x+3)-1 & \\text{if }x\\text{ is a prime number greater than }5\\\\ f(x-1)+2 & \\text{if }x=1\\text{ or }x\\text{ is a multiple of either }3\\text{ or }5\\\\ x-2 & \\text{otherwise} \\end{cases}\n$$",
+        "zh": "已知下列函数，求 $f(f(f(7)))$：\n\n$$\nf(x)=\\begin{cases}f(x+3)-1,&x\\text{ 为大于 5 的质数},\\\\f(x-1)+2,&x=1\\text{ 或 }x\\text{ 为 3 或 5 的倍数},\\\\x-2,&\\text{其他情况}.\\end{cases}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "7",
+            "zh": "7"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "9",
+            "zh": "9"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "10",
+            "zh": "10"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "$$\nf(7)=f(10)-1=10-1=9\n$$\n\n$$\nf(10)=f(9)+2=8+2=10\n$$\n\n$$\nf(9)=f(8)+2=6+2=8\n$$\n\n$f(8)=8-2=6$ Now substitute backwards. Therefore, $f(f(7))=f(9)=8$\n\n$$\nf(f(f(7)))=f(8)=6\n$$\n\n7 uses the prime-greater-than-5 branch, 10 uses the multiple-of-5 branch, and 9 uses the multiple-of-3 branch. The value 8 satisfies none of those tests, so f(8)=6 is the stopping computation. For the outer composition, the three successive returned values are 9→8→6; do not stop after obtaining only f(7). **Answer: A.**",
+        "zh": "先求 $f(8)=8-2=6$，于是 $f(9)=f(8)+2=8$，$f(10)=f(9)+2=10$，$f(7)=f(10)-1=9$。因此 $f(f(f(7)))=f(f(9))=f(8)=6$，选 A。\n\n7 属于大于 5 的质数分支，10 属于 5 的倍数分支，9 属于 3 的倍数分支；8 不满足这些条件，直接计算 f(8)=6。外层三次调用依次返回 9→8→6，不能只算完 f(7) 就停止。**答案：A。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Step 1: Draw a square.\n\nStep 2: Draw new squares at each corner of the original square, each of which has half its side length.\n\n{{diagram:figure-176445737ac91342}}\n\nRepeat Step 2 four more times without using the connected corner. How many squares were added during the final repetition?",
+        "zh": "步骤 1：画一个正方形。\n\n步骤 2：在原正方形的每个顶点处各画一个新正方形，每个新正方形的边长为原正方形的一半。\n\n{{diagram:figure-176445737ac91342}}\n\n不使用已连接的顶点，再重复步骤 2 四次。最后一次重复时增加了多少个正方形？"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "108",
+            "zh": "108"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "243",
+            "zh": "243"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "256",
+            "zh": "256"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "324",
+            "zh": "324"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "1024",
+            "zh": "1024"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "The first added level has 4 squares. Each subsequent level adds 3 squares per square in the preceding level, since the connected corner is not used. The successive counts are 4, 12, 36, 108 and 324. The final repetition therefore adds $4\\cdot3^4=324$ squares.\n\nThe displayed Step 2 has already created the first four squares. “Four more times” supplies four additional factors of 3, because each new square has only three unused corners. The question asks how many are added in the last round, not the total over every round or the original square. **Answer: D, 324.**",
+        "zh": "第一层增加 4 个正方形。此后不再使用已连接的角，因此每个正方形在下一层产生 3 个新正方形。各层新增数量依次为 4、12、36、108、324，最后一次增加 $4\\cdot3^4=324$ 个。\n\n图示的 Step 2 已经生成第一批 4 个正方形；“再重复四次”对应再乘四个 3，因为每个新正方形只有三个尚未连接的角。题目只问最后一轮新增多少，不是各轮累计数量，也不包含原始正方形。**答案：D，324。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      },
+      "statementDiagrams": {
+        "en": [
+          {
+            "id": "figure-176445737ac91342",
+            "width": 260,
+            "height": 260,
+            "alt": {
+              "en": "A central square with four half-size corner squares; smaller squares are added only at unconnected corners.",
+              "zh": "中心正方形四角各接一个半边长正方形；更小的正方形只接在尚未连接的角上。"
+            },
+            "elements": [
+              {
+                "type": "rect",
+                "x": 78,
+                "y": 78,
+                "width": 104,
+                "height": 104,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 26,
+                "y": 26,
+                "width": 52,
+                "height": 52,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "orange"
+              },
+              {
+                "type": "rect",
+                "x": 0,
+                "y": 0,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 78,
+                "y": 0,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 0,
+                "y": 78,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 182,
+                "y": 26,
+                "width": 52,
+                "height": 52,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "orange"
+              },
+              {
+                "type": "rect",
+                "x": 156,
+                "y": 0,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 234,
+                "y": 0,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 234,
+                "y": 78,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 26,
+                "y": 182,
+                "width": 52,
+                "height": 52,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "orange"
+              },
+              {
+                "type": "rect",
+                "x": 0,
+                "y": 156,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 0,
+                "y": 234,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 78,
+                "y": 234,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 182,
+                "y": 182,
+                "width": 52,
+                "height": 52,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "orange"
+              },
+              {
+                "type": "rect",
+                "x": 234,
+                "y": 156,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 156,
+                "y": 234,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 234,
+                "y": 234,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              }
+            ]
+          }
+        ],
+        "zh": [
+          {
+            "id": "figure-176445737ac91342",
+            "width": 260,
+            "height": 260,
+            "alt": {
+              "en": "A central square with four half-size corner squares; smaller squares are added only at unconnected corners.",
+              "zh": "中心正方形四角各接一个半边长正方形；更小的正方形只接在尚未连接的角上。"
+            },
+            "elements": [
+              {
+                "type": "rect",
+                "x": 78,
+                "y": 78,
+                "width": 104,
+                "height": 104,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 26,
+                "y": 26,
+                "width": 52,
+                "height": 52,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "orange"
+              },
+              {
+                "type": "rect",
+                "x": 0,
+                "y": 0,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 78,
+                "y": 0,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 0,
+                "y": 78,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 182,
+                "y": 26,
+                "width": 52,
+                "height": 52,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "orange"
+              },
+              {
+                "type": "rect",
+                "x": 156,
+                "y": 0,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 234,
+                "y": 0,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 234,
+                "y": 78,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 26,
+                "y": 182,
+                "width": 52,
+                "height": 52,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "orange"
+              },
+              {
+                "type": "rect",
+                "x": 0,
+                "y": 156,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 0,
+                "y": 234,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 78,
+                "y": 234,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 182,
+                "y": 182,
+                "width": 52,
+                "height": 52,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "orange"
+              },
+              {
+                "type": "rect",
+                "x": 234,
+                "y": 156,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 156,
+                "y": 234,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              },
+              {
+                "type": "rect",
+                "x": 234,
+                "y": 234,
+                "width": 26,
+                "height": 26,
+                "stroke": "muted",
+                "strokeWidth": 1.5,
+                "fill": "blue"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "What is the output of the following program if array arr is filled with the following values?\n\n| arr(0) | arr(1) | arr(2) | arr(3) | arr(4) | arr(5) | arr(6) |\n| --- | --- | --- | --- | --- | --- | --- |\n| 1000 | 500 | 100 | 50 | 10 | 5 | 1 |\n\n```text\nletters = \"MDCLXVI\"\nnum = 1776\nans = \"\"\nfor x = 0 to 6\n    val = int(num / arr(x))\n    for y = 1 to val\n        ans = ans + letters[x]\n    next y\n    num = num % arr(x)\nnext x\noutput ans\n```",
+        "zh": "若数组 arr 中填入以下数值，该程序的输出结果是什么？\n\n| arr(0) | arr(1) | arr(2) | arr(3) | arr(4) | arr(5) | arr(6) |\n| --- | --- | --- | --- | --- | --- | --- |\n| 1000 | 500 | 100 | 50 | 10 | 5 | 1 |\n\n```text\nletters = \"MDCLXVI\"\nnum = 1776\nans = \"\"\nfor x = 0 to 6\n    val = int(num / arr(x))\n    for y = 1 to val\n        ans = ans + letters[x]\n    next y\n    num = num % arr(x)\nnext x\noutput ans\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "MDCCCLXVI",
+            "zh": "MDCCCLXVI"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "MDCCLXXVI",
+            "zh": "MDCCLXXVI"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "MDCLXXVII",
+            "zh": "MDCLXXVII"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "MDCCXXXVI",
+            "zh": "MDCCXXXVI"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "DDCCLXXVI",
+            "zh": "DDCCLXXVI"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "The program repeatedly takes the largest available Roman-numeral value. $1776=1000+500+100+100+50+10+10+5+1$, which corresponds to `M D C C L X X V I`. The output is `MDCCLXXVI`.\n\nThe quotient at each step tells how many copies of that letter to append:\n\n| Value | Letter | Copies | Remaining num |\n| --- | --- | --- | --- |\n| 1000 | M | 1 | 776 |\n| 500 | D | 1 | 276 |\n| 100 | C | 2 | 76 |\n| 50 | L | 1 | 26 |\n| 10 | X | 2 | 6 |\n| 5 | V | 1 | 1 |\n| 1 | I | 1 | 0 |\n\nThe remainder is reused by the next iteration; do not divide the original 1776 by every value. The appended letters produce **option B**.",
+        "zh": "程序依次取当前可用的最大罗马数字数值。$1776=1000+500+100+100+50+10+10+5+1$，对应 `M D C C L X X V I`，因此输出 `MDCCLXXVI`。\n\n每轮整数商决定该字母追加几次：\n\n| 数值 | 字母 | 次数 | 剩余 num |\n| --- | --- | --- | --- |\n| 1000 | M | 1 | 776 |\n| 500 | D | 1 | 276 |\n| 100 | C | 2 | 76 |\n| 50 | L | 1 | 26 |\n| 10 | X | 2 | 6 |\n| 5 | V | 1 | 1 |\n| 1 | I | 1 | 0 |\n\n每次余数会交给下一轮使用，不能每轮都拿原来的 1776 除以当前数值。按顺序拼接字母，得到 **选项 B**。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q6",
+      "number": 6,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "What is the output of the following program if the function str(n) makes the number n a string value?\n\n```text\nn = 0\nfor x = 1 to 4\n    z = 10 - x\n    a = str(1089 * x)\n    s = \"\"\n    for y = 0 to len(a)-1\n        s = a[y] + s\n    next y\n    if s == str(1089 * z)\n        n = n + 1\n    end if\nnext x\noutput n\n```",
+        "zh": "如果函数str(n)将数字n转换为字符串值,以下程序的输出是什么?\n\n```text\nn = 0\nfor x = 1 to 4\n    z = 10 - x\n    a = str(1089 * x)\n    s = \"\"\n    for y = 0 to len(a)-1\n        s = a[y] + s\n    next y\n    if s == str(1089 * z)\n        n = n + 1\n    end if\nnext x\noutput n\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "3",
+            "zh": "3"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "2",
+            "zh": "2"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "1",
+            "zh": "1"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "0",
+            "zh": "0"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "For x=1, 2, 3 and 4, z is 9, 8, 7 and 6. The corresponding products are reversal pairs: 1089 and 9801; 2178 and 8712; 3267 and 7623; 4356 and 6534. Every comparison succeeds, so n becomes 4.\n\n`s = a[y] + s` prepends the next character, rather than appending it. For a=\"1089\", s progresses through \"1\", \"01\", \"801\", \"9801\". Hence the inner loop reverses the string. Count successful comparisons, not the products themselves; all four succeed, so **answer A**.",
+        "zh": "当 x 依次为 1、2、3、4 时，z 分别为 9、8、7、6。乘积两两互为数字逆序：1089 与 9801、2178 与 8712、3267 与 7623、4356 与 6534。四次比较都成立，因此 n=4。\n\n`s = a[y] + s` 把新字符放在已有字符串前面，而不是后面。a=\"1089\" 时，s 依次为 \"1\"、\"01\"、\"801\"、\"9801\"，因此内层循环确实逆序了字符串。n 累计的是比较成功的次数，不是乘积之和；四次均成功，选 **A**。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [
+    "The source directory calls Contest 1 the qualification round; canonical round remains 1."
+  ],
+  "programming": {
+    "id": "creature-capture",
+    "definition": {
+      "title": "Creature Capture",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Use the line structure shown in the test-case input below.\n\n### Problem\n\nA creature is hiding in a cell of a 256 x 256 grid. You will be given the location of 3 guesses and how far away the creature is from each guess. Finding these possible locations for each guess will produce a common location where the creature is hiding. Find that location.\n\nEach cell in the grid is represented by a 4-digit hexadecimal string. The first 2 digits signify the row (00-FF, from top to bottom), and the last 2 digits signify the column (00-FF, from left to right).\n\nHow far the guess is from the creature’s location is called the distance value. It is a 4-digit hexadecimal string, where the first 2 digits and the last 2 digits indicate how far away the creature is from the guess horizontally or vertically. For example, a distance value of 3A05 means that the creature could be 3A ($58_{10}$) rows away and 5 columns away, or 5 rows away and 3A ($58_{10}$) columns away. There are 8 possible locations, though some of those locations might be off the grid and thus ignored.\n\nAfter finding all possible cells in the grid where the creature could be hiding for each guess, output the location where the creature is hiding in (row,column) format.\n\n### Example\n\n### Input\n\n```text\n4D93 414D\nA566 997A\nF633 EAAD\n```\n\n### Output\n\n```text\n(0C,E0)\n```\n\nExplanation The user’s first guess is location row 4D and column 93. The distance value is 41 rows away and 4D columns away or 4D rows away and 41 columns away from the creature. The other 2 guesses are done the same way.\n\n- For guess (4D,93), the possible locations are (8E,46), (8E,E0), (0C,46), (0C,E0), (9A,52), (9A,D4), (00,52), (00,D4).\n\n- For guess (A5,66), the possible locations are (0C,E0), (2B,FF).\n\n- For guess (F6,33), the only possible location is (0C,E0). The only location that is common for all 3 guesses is (0C,E0). Output (0C,E0).\n\n### Input\n\nThe input will consist of 3 strings representing 3 guesses. Each string consists of two 4-digit hexadecimal numbers, where the first number is the row and column location of the guess and the second is the distance value.\n\n### Output\n\nOutput the ordered pair in (row,column) format representing where the creature is hiding.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "4D93 414D\nA566 997A\nF633 EAAD\n",
+          "expected": "(0C,E0)\n"
+        },
+        {
+          "input": "093C A396\nD675 2A5D\n397E 7354\n",
+          "expected": "(AC,D2)\n"
+        },
+        {
+          "input": "4C0D 3334\n33BB 4C7A\nEC8E 6D4D\n",
+          "expected": "(7F,41)\n"
+        },
+        {
+          "input": "16FA AC24\n57FD 6B27\n63B4 5F22\n",
+          "expected": "(C2,D6)\n"
+        },
+        {
+          "input": "B531 7760\nC8FA 8A69\nF543 B74E\n",
+          "expected": "(3E,91)\n"
+        },
+        {
+          "input": "EF65 207B\n6F4A 6096\n43C8 8C18\n",
+          "expected": "(CF,E0)\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "FB2B 055A\n348E C209\nC50D 3178\n",
+          "expected": "(F6,85)\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "C293 4C25\nF3F5 7D87\nDA02 646C\n",
+          "expected": "(76,6E)\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "809D 6813\n2A9A 1210\nEED9 D64F\n",
+          "expected": "(18,8A)\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "DEA5 A601\n37F3 014D\n5935 2171\n",
+          "expected": "(38,A6)\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "BCD5 3A4F\n3E0B B87B\n3975 BD11\n",
+          "expected": "(F6,86)\n",
+          "weight": 16.6666
+        },
+        {
+          "input": "DB8B 0D26\nBDDE 112D\n22FF AC4E\n",
+          "expected": "(CE,B1)\n",
+          "weight": 16.6666
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。输入按下方测试用例展示的行结构读取。\n\n### 问题\n\n一个生物藏在一个 256×256 网格的某个单元格中 。现给出 3 个猜测位置( 生物可能所在单元格) ,以及该生物分别离这三个猜测位置的距离 。请推算出每次猜测对应的所有可能藏匿位置, 再从中找出所有猜测结果共有的位置。该位置即为目标物的实际藏匿点, 请找出此位置。\n\n网格中的每个单元格由一个 4 位十六进制字符串表示,前两位数字代表行( 00-FF, 从上到下) ,后两位数字代表列(00-FF,从左到右)。\n\n猜测位置与生物实际藏匿位置之间的距离称为距离值。它也是一个 4 位十六进制字符串，其中前两位和后两位分别表示生物在水平或垂直方向上与猜测位置的距离。例如，距离值 3A05 意味着该生物可能相距 3A（十进制 58）行、5 列，或者相距 5 行、3A（十进制 58）列。总共有 8 个可能的坐标位置，不过其中一些位置可能超出网格范围，因此会被忽略。\n\n在找出每个猜测位置对应的所有可能单元格后,请以(行,列)的格式输出该生物的实际藏匿位置。\n\n### 示例\n\n### 输入\n\n```text\n4D93 414D\nA566 997A\nF633 EAAD\n```\n\n### 输出\n\n```text\n(0C,E0)\n```\n\n解析该用户的第一个猜测位置为第 4D 行、第 93 列。距离值表明,该生物的实际藏匿位置可能与该猜测位置相距 41 行 4D 列,或 4D 行 41 列。其余两个猜测位置也按相同方式处理:\n\n- 猜测位置 (4D ,93), 可能的生物位置有 ( 8E,46 ), (8E ,E0),(0C,46), (0C ,E0), ( 9A,52), ( 9A, D4), (00 ,52), (00,D4)。\n\n- 猜测位置 (A5,66) , 可能的生物位置有 (0C,E0), (2B, FF)。\n\n- 猜测位置 (F6,33), 唯一可能的生物位置是 (0C,E0)。三个猜测位置的唯一共同生物位置是(0C ,E0)。输出 (0C,E0).\n\n### 输入\n\n输入将包含 3 个字符串,代表 3 个猜测位置。每个字符串由两个 4 位十六进制数字组成,其中第一个数字表示猜测的行和列位置,第二个数字表示距离值。\n\n### 输出\n\n输出表示生物实际隐藏位置的有序对,格式为 (行,列)。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [],
+      "zh": []
+    }
+  }
+}

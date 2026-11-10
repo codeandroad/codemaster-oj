@@ -1,0 +1,378 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2020-2021-elementary-2",
+  "division": "Elementary",
+  "season": "2020-2021",
+  "round": 2,
+  "roundLabel": {
+    "en": "Contest 2",
+    "zh": "第二轮"
+  },
+  "title": {
+    "en": "ACSL 2020-2021 Elementary · Contest 2",
+    "zh": "ACSL 2020-2021 Elementary · 第二轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Elementary/2020-2021/第二轮/小学笔试 elem.pdf",
+      "sha256": "640e0861e5be50f0b40221ca585b23738e404a7d85e6d10aa9374d2b45294333",
+      "pages": 2
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Elementary/2020-2021/第二轮/小学笔试_elem_sol.pdf",
+      "sha256": "868712d03ccd201542f381660555d7e71077542514ab502a9e5ce02ebf92f666",
+      "pages": 1
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Evaluate the following postfix expression if all numbers are single digits:\n\n`5 3 + 4 2 - * 7 1 / + 9 + 8 /`",
+        "zh": "如果所有数都是一位数字,请计算以下后缀表达式:\n\n`5 3 + 4 2 - * 7 1 / + 9 + 8 /`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "12",
+            "zh": "12"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "16",
+            "zh": "16"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "Answer: **A**.\n\n`5 3 + 4 2 - * 7 1 / + 9 + 8 /`\n\n= ((5 + 3) * (4 − 2) + (7 / 1) + 9) / 8 = (8 * 2 + 7 + 9) / 8 = (16 + 16) / 8 = 32 / 8 = 4",
+        "zh": "答案：**A**。\n\n后缀表达式从左向右扫描。读到数字就入栈，遇到运算符先弹右操作数，再弹左操作数。先算 $5+3=8$ 和 $4-2=2$，相乘得 16。然后加上 $7/1=7$ 和 9 得 32，最后 $32/8=4$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Evaluate the following prefix expression if all numbers are single digits:\n\n`- + / 6 3 ^ * 7 1 2 / + + 8 9 4 7`",
+        "zh": "如果所有数都是一位数字,请计算以下前缀表达式:\n\n`- + / 6 3 ^ * 7 1 2 / + + 8 9 4 7`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "22",
+            "zh": "22"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "48",
+            "zh": "48"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "59",
+            "zh": "59"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "77",
+            "zh": "77"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Answer: **C**.\n\nEach prefix operator takes its next two complete subexpressions as operands. For the outer subtraction, the left side is $6/3+(7\\cdot1)^2=2+49=51$. The right side is $((8+9)+4)/7=21/7=3$. Subtract right from left to get 48.",
+        "zh": "答案：**C**。\n\n每个前缀运算符后面紧跟两个完整子式。最外层减法的左侧为 $6/3+(7\\cdot1)^2=2+49=51$，右侧为 $((8+9)+4)/7=21/7=3$。左减右得 48。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Convert the following infix expression to prefix:\n\n$$\n\\frac{(5-1)\\cdot(4+8)}{7^2-5^2}\n$$",
+        "zh": "请将以下中缀表达式转换为前缀表达式:\n\n$$\n\\frac{(5-1)\\cdot(4+8)}{7^2-5^2}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`/-*51+48-^72^52`",
+            "zh": "`/-*51+48-^72^52`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`*-/51+48^-72^52`",
+            "zh": "`*-/51+48^-72^52`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`/*-51+48-^7252^`",
+            "zh": "`/*-51+48-^7252^`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`/*-51+48-^72^52`",
+            "zh": "`/*-51+48-^72^52`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`*/-51+48-^72^52`",
+            "zh": "`*/-51+48-^72^52`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Answer: **D**.\n\n((− 5 1) * (+ 4 8)) / ((^ 7 2) − (^ 5 2)) = (* − 5 1 + 4 8) / (− ^ 7 2 ^ 5 2) = / * − 5 1 + 4 8 − ^ 7 2 ^ 5 2",
+        "zh": "答案：**D**。\n\n分数线将整道式子分成分子与分母。分子 $(5-1)(4+8)$ 写成 `* - 5 1 + 4 8`，分母 $7^2-5^2$ 写成 `- ^ 7 2 ^ 5 2`。在两段前加上除号，得到 `/ * - 5 1 + 4 8 - ^ 7 2 ^ 5 2`。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Convert the following infix expression to postfix:\n\n((7 − 1 * 5 + 9 / 3) ^ 2 − 7) / 3",
+        "zh": "请将以下中缀表达式转换为后缀表达式:\n\n((7 − 1 * 5 + 9 / 3) ^ 2 − 7) / 3"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`715*-93/^2+7-3/`",
+            "zh": "`715*-93/^2+7-3/`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`715-*93/+2^7-3/`",
+            "zh": "`715-*93/+2^7-3/`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`715*-93/+2^7-3/`",
+            "zh": "`715*-93/+2^7-3/`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`715*-93/+27^-3/`",
+            "zh": "`715*-93/+27^-3/`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`715*-93+/2^7-3/`",
+            "zh": "`715*-93+/2^7-3/`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Answer: **C**.\n\n((7 − 1 * 5 + 9 / 3) ^ 2 − 7) / 3 = ((7 − (1 5 *) + (9 3 /)) 2 ^ 7 −) / 3\n\n`= (7 1 5 * - 9 3 / +) 2 ^ 7 - 3 /`\n\n`= 7 1 5 * - 9 3 / + 2 ^ 7 - 3 /`",
+        "zh": "答案：**C**。\n\n先将乘、除两个子式写成 `1 5 *` 和 `9 3 /`。括号内加减从左往右，得到 `7 1 5 * - 9 3 / +`。整个括号先平方，再减 7，最后除以 3，所以接上 `2 ^ 7 - 3 /`。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Convert the following postfix expression to prefix:\n\n`8 4 * 5 1 / + 5 2 ^ - 2 3 * /`",
+        "zh": "请将以下后缀表达式转换为前缀表达式:\n\n`8 4 * 5 1 / + 5 2 ^ - 2 3 * /`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`/+-*84/51^52*23`",
+            "zh": "`/+-*84/51^52*23`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`-/+*84/51^52*23`",
+            "zh": "`-/+*84/51^52*23`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`/-+*8451/^52*23`",
+            "zh": "`/-+*8451/^52*23`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`*/-+84/51^52*23`",
+            "zh": "`*/-+84/51^52*23`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`/-+*84/51^52*23`",
+            "zh": "`/-+*84/51^52*23`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "Answer: **E**.\n\n`8 4 * 5 1 / + 5 2 ^ - 2 3 * /`\n\n`= (* 8 4) (/ 5 1) + (^ 5 2) - (* 2 3) /`\n\n`= (- (+ * 8 4 / 5 1) ^ 5 2) (* 2 3) /`\n\n= / − + * 8 4 / 5 1 ^ 5 2 * 2 3",
+        "zh": "答案：**E**。\n\n扫描后缀式，遇到二元运算符就把栈顶两个完整表达式合成一棵子树。除法的左子树是 `- + * 8 4 / 5 1 ^ 5 2`，右子树是 `* 2 3`。把除号放在两棵子树之前，得到 `/ - + * 8 4 / 5 1 ^ 5 2 * 2 3`。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": []
+}

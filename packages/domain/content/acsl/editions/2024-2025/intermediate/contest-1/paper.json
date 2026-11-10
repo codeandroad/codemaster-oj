@@ -1,0 +1,537 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2024-2025-intermediate-1",
+  "division": "Intermediate",
+  "season": "2024-2025",
+  "round": 1,
+  "roundLabel": {
+    "en": "Contest 1",
+    "zh": "资格轮"
+  },
+  "title": {
+    "en": "ACSL 2024-2025 Intermediate · Contest 1",
+    "zh": "ACSL 2024-2025 Intermediate · 资格轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Intermediate/2024-2025/资格轮/c_1_int.pdf",
+      "sha256": "0518d352d2989c9f5f5b440fa76122bb7b879e5f974f8e428b1e0596d5906c89",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Intermediate/2024-2025/资格轮/c_1_int_soln.pdf",
+      "sha256": "eaafeadb81968f1549f54c71ff0b1e89282093ae6784bbfef119be12ba5b9924",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Intermediate/2024-2025/资格轮/c_1_ACSL Rings_int.pdf",
+      "sha256": "ba46001e6cf0b7d8da722e683e76ae9584bb4aa4c41ad1509ba670b5a9a0dcc0",
+      "pages": 6
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Convert $2024_{16}$ to base 2.",
+        "zh": "将 $2024_{16}$ 转换为2进制。"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "10000001000100",
+            "zh": "10000001000100"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "10000000100100",
+            "zh": "10000000100100"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "10000000010100",
+            "zh": "10000000010100"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "10010010000000",
+            "zh": "10010010000000"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "10010000000100",
+            "zh": "10010000000100"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Convert each hex digit to binary.\n\n$$\n2024_{16}=0010000000100100_{2}\n$$\n\nNow drop the leading zeros. 10000000100100\n\nThe four substitutions are `2 → 0010`, `0 → 0000`, `2 → 0010`, and `4 → 0100`. Only zeros before the very first 1 may be removed; keep the four zeros representing the second hex digit, as well as the zeros inside the other groups.\n\n**Answer: B.**",
+        "zh": "将每个十六进制位转换为四位二进制：\n\n$$2024_{16}=0010\\,0000\\,0010\\,0100_2.$$\n\n去掉前导零，得到 `10000000100100`。\n\n四次对应替换为 `2 → 0010`、`0 → 0000`、`2 → 0010`、`4 → 0100`。只可去掉整个二进制数最前方的 0；第二个十六进制位对应的四个 0，以及其他分组内部的 0，都必须保留。\n\n**答案：B。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Evaluate and express the answer in octal.\n\n$$4265_8+6524_8$$",
+        "zh": "计算并将答案用八进制表示。\n\n$$4265_8+6524_8$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "10701",
+            "zh": "10701"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "10789",
+            "zh": "10789"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "11001",
+            "zh": "11001"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "13011",
+            "zh": "13011"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "13110",
+            "zh": "13110"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Line up the octal digits by place value. The small digits above the columns show the carries.\n\n$$\n\\begin{array}{rccccc}\n &  & {\\scriptstyle 1} & {\\scriptstyle 1} & {\\scriptstyle 1} &  \\\\\n &   & 4 & 2 & 6 & 5 \\\\\n+ &   & 6 & 5 & 2 & 4 \\\\\n\\hline\n & 1 & 3 & 0 & 1 & 1\n\\end{array}\n$$\n\nStart at the right: $5+4=11_8$, so write 1 and carry 1. Continue one column at a time to get $13011_8$ (option D).",
+        "zh": "按位对齐两个八进制数。上方的小数字表示该列收到的进位。\n\n$$\n\\begin{array}{rccccc}\n &  & {\\scriptstyle 1} & {\\scriptstyle 1} & {\\scriptstyle 1} &  \\\\\n &   & 4 & 2 & 6 & 5 \\\\\n+ &   & 6 & 5 & 2 & 4 \\\\\n\\hline\n & 1 & 3 & 0 & 1 & 1\n\\end{array}\n$$\n\n从个位开始，$5+4=11_8$，写 1，向左进 1。继续逐列相加，得到 $13011_8$，选 D。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find $f(5)$ given:\n\n$$\nf(x)=\\begin{cases} 256 & \\text{if }x\\le1\\\\ \\dfrac{f(x-1)}{2} & \\text{if }x>1 \\end{cases}\n$$",
+        "zh": "根据下列表达式,求 $f(5)$ :\n\n$$\nf(x)=\\begin{cases} 256 & \\text{若 }x\\le1\\\\ \\dfrac{f(x-1)}{2} & \\text{若 }x>1 \\end{cases}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "128",
+            "zh": "128"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "48",
+            "zh": "48"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "100",
+            "zh": "100"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "16",
+            "zh": "16"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "$$\nf(1)=256\n$$\n\n$$\nf(2)=f(2-1)/2=f(1)/2=256/2=128\n$$\n\n$$\nf(3)=f(3-1)/2=f(2)/2=128/2=64\n$$\n\n$$\nf(4)=f(4-1)/2=f(3)/2=64/2=32\n$$\n\n$$\nf(5)=f(5-1)/2=f(4)/2=32/2=16\n$$\n\nThere are four recursive halvings between $f(1)$ and $f(5)$, so equivalently $f(5)=256/2^{5-1}=16$. The base value is already at index 1; dividing five times would be an off-by-one error.\n\n**Answer: E.**",
+        "zh": "从基本情况开始，逐步计算：\n\n$$\nf(1)=256\n$$\n\n$$\nf(2)=f(2-1)/2=f(1)/2=256/2=128\n$$\n\n$$\nf(3)=f(3-1)/2=f(2)/2=128/2=64\n$$\n\n$$\nf(4)=f(4-1)/2=f(3)/2=64/2=32\n$$\n\n$$\nf(5)=f(5-1)/2=f(4)/2=32/2=16\n$$\n\n从 $f(1)$ 到 $f(5)$ 一共递推四次，即减半四次，也可写成 $f(5)=256/2^{5-1}=16$。基本值已经对应第 1 项，不能再除以 2 五次。\n\n**答案：E。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find $f(12,10)$ given:\n\n$$\nf(x,y)=\\begin{cases} f(x-3,y+1)-2 & \\text{if }x>y\\\\ f(x+1,y-4)+1 & \\text{if }x<y\\\\ 2x & \\text{if }x=y \\end{cases}\n$$",
+        "zh": "根据下列表达式,求 $f(12,10)$ :\n\n$$\nf(x,y)=\\begin{cases} f(x-3,y+1)-2 & \\text{若 }x>y\\\\ f(x+1,y-4)+1 & \\text{若 }x<y\\\\ 2x & \\text{若 }x=y \\end{cases}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "7",
+            "zh": "7"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "9",
+            "zh": "9"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "10",
+            "zh": "10"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "$$\nf(12,10)=f(12-3,10+1)-2=f(9,11)-2=8-2=6\n$$\n\n$$\nf(9,11)=f(9+1,11-4)+1=f(10,7)+1=7+1=8\n$$\n\n$$\nf(10,7)=f(10-3,7+1)-2=f(7,8)-2=9-2=7\n$$\n\n$$\nf(7,8)=f(7+1,8-4)+1=f(8,4)+1=8+1=9\n$$\n\n$$\nf(8,4)=f(8-3,4+1)-2=f(5,5)-2=10-2=8\n$$\n\n$f(5,5)=2*5=10$ Now substitute backwards.\n\n**Answer: A.**",
+        "zh": "$$\nf(12,10)=f(12-3,10+1)-2=f(9,11)-2=8-2=6\n$$\n\n$$\nf(9,11)=f(9+1,11-4)+1=f(10,7)+1=7+1=8\n$$\n\n$$\nf(10,7)=f(10-3,7+1)-2=f(7,8)-2=9-2=7\n$$\n\n$$\nf(7,8)=f(7+1,8-4)+1=f(8,4)+1=8+1=9\n$$\n\n$$\nf(8,4)=f(8-3,4+1)-2=f(5,5)-2=10-2=8\n$$\n\n$f(5,5)=2*5=10$ 从基本情况开始反向代入，得到 $f(12,10)=6$。\n\n**答案：A。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "What is the output of the following program?\n\n```text\nh = 200\ny = int(h / 36)\nh = h % 36\nf = int(h / 12)\ni = h % 12\noutput y, f, i\n```",
+        "zh": "请问下列程序会输出什么?\n\n```text\nh = 200\ny = int(h / 36)\nh = h % 36\nf = int(h / 12)\ni = h % 12\noutput y, f, i\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "5, 200, 8",
+            "zh": "5, 200, 8"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "5, 20, 1",
+            "zh": "5, 20, 1"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "5, 1, 8",
+            "zh": "5, 1, 8"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "5, 1, 20",
+            "zh": "5, 1, 20"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "5, 8, 1",
+            "zh": "5, 8, 1"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Integer division gives y=int(200/36)=5. The remainder is h=200 mod 36=20. Then f=int(20/12)=1 and i=20 mod 12=8. The output is `5, 1, 8`. This converts 200 inches to yards, feet and inches: 36 inches make a yard and 12 inches make a foot.\n\n**Answer: C.**",
+        "zh": "整数除法得到 y=int(200/36)=5，余数 h=200 mod 36=20。接着 f=int(20/12)=1，i=20 mod 12=8，输出 `5, 1, 8`。 程序把 200 英寸转换成码、英尺和英寸，其中 36 英寸为 1 码，12 英寸为 1 英尺。\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q6",
+      "number": 6,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "What is output by the following program?\n\n```text\ns = 0\nfor x = 1 to 5\n    s = s + x ^ 2\nnext x\nfor y = 2 to 10 step 2\n    s = s + y / 2\nnext y\nfor z = 5 to 1 step -1\n    s = s - z * 2\nnext z\noutput s\n```",
+        "zh": "请问下列程序会输出什么?\n\n```text\ns = 0\nfor x = 1 to 5\n    s = s + x ^ 2\nnext x\nfor y = 2 to 10 step 2\n    s = s + y / 2\nnext y\nfor z = 5 to 1 step -1\n    s = s - z * 2\nnext z\noutput s\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "40",
+            "zh": "40"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "55",
+            "zh": "55"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "70",
+            "zh": "70"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "30",
+            "zh": "30"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "180",
+            "zh": "180"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "The first loop adds $1^2+2^2+3^2+4^2+5^2=55$. The second adds $1+2+3+4+5=15$, giving 70. The third subtracts $10+8+6+4+2=30$. The final value is 40.\n\nThe loop endpoints are inclusive. The y loop visits `2,4,6,8,10`, and the z loop visits `5,4,3,2,1`; both execute five times. The same accumulator s is carried through all three loops, rather than being reset between them.\n\n**Answer: A.**",
+        "zh": "第一个循环累加 $1^2+2^2+3^2+4^2+5^2=55$；第二个循环增加 $1+2+3+4+5=15$，得到 70；第三个循环减去 $10+8+6+4+2=30$，最终为 40。\n\n循环包含终点。y 依次取 `2、4、6、8、10`，z 依次取 `5、4、3、2、1`，两个循环都执行五次。三个循环共用同一个 s，不能在进入下一循环时把 s 重新清零。\n\n**答案：A。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [
+    "The source directory calls Contest 1 the qualification round; canonical round remains 1."
+  ],
+  "programming": {
+    "id": "rings",
+    "definition": {
+      "title": "Rings",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Use the line structure shown in the test-case input below.\n\n### Problem\n\nACSL Rings is a 3-player game where the object is to score points by tossing a ball through at least one of the 5 rings. Points are awarded as follows:\n\n- Through the aqua or red ring - 1 point\n\n- Through the orange or green ring - 3 points\n\n- Through the black ring - 6 points\n\n- Through the space where 2 rings overlap - the sum of the points for the 2 rings plus 1\n\nWe will use a single letter to represent each of the above colors: aqua (A), red (R), orange (O), green (G) and black (B). The overlapping areas will be given by 2 letters in the order shown: aqua and orange (AO), orange and black (OB), black and green (BG), and green and red (GR).\n\nYou will be given 3 strings representing each player’s results for all tosses that go through at least one ring. The result of each toss will be separated by a single space. Output the 3 players’ scores in descending order separated by a single space. If any of the players have the same score, it doesn’t matter which one of the tied scores appears first.\n\n### Example\n\nInput\n\n```text\nGR A B\nOB BG AO O\nR G\n```\n\nOutput\n\n```text\n28 12 4\n```\n\nExplanation Player 1’s tosses go through the green & red, aqua, and black rings for a score of (3+1+1) + 1 + 6 = 12.\n\nPlayer 2 has a score of (3+6+1) + (6+3+1) + (1+3+1) + 3 = 28.\n\nPlayer 3 has a score of 1 + 3 = 4.\n\nThe output is the string 28 12 4, the scores in descending order.\n\n### Input\n\nThe input will consist of 3 strings as described above. Each string will be no longer than 100 characters.\n\n### Output\n\nOutput the three scores in descending order, each separated by a single space.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "GR A B\nOB BG AO O\nR G\n",
+          "expected": "28 12 4\n"
+        },
+        {
+          "input": "A R O G B\nA A B B\nR O B\n",
+          "expected": "14 14 10\n"
+        },
+        {
+          "input": "AO OB B G A B BG GR\nR R G G AO AO BG BG B\nAO GR A B R G O BG OB\n",
+          "expected": "46 44 44\n"
+        },
+        {
+          "input": "A A A B B R O O O O\nBG BG GR GR O O O A B\nBG BG GR GR O O O B B G\n",
+          "expected": "54 46 28\n"
+        },
+        {
+          "input": "A B B O O G AO OB GR BG\nGR GR BG BG OB AO AO\nB B B G G G A A A GR AO\n",
+          "expected": "52 50 40\n"
+        },
+        {
+          "input": "GR BG OB AO A G B\nA O B AO GR GR BG O GR AO\nO O B G A A GR OB AO BG\n",
+          "expected": "48 47 40\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "A R R B B B G G O\nG R A B B R A G O O\nA R B G O B G A\n",
+          "expected": "30 28 24\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "AO AO BG GR BG OB OB OB AO\nBG BG BG BG AO AO AO GR OB OB\nBG GR AO AO GR BG OB OB\n",
+          "expected": "80 70 60\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "B G O R A B G O O R A B G O R A B G O R A\nAO BG GR OB AO BG GR B A O BG GR OB\nB R A G B OB R A G B O G AO BG BG AO GR\n",
+          "expected": "85 79 59\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "AO GR GR OB O B OB BG B G BG BG AO G R GR OB BG BG\nAO OB G R BG AO O B GR BG AO OB GR BG A GR BG AO OB GR BG\nAO OB GR BG AO OB G R BG R A G OB B AO\n",
+          "expected": "134 127 85\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "AO OB GR BG A B R G O\nOB GR BG AO B R G O A\nGR BG AO OB R G O A B\n",
+          "expected": "44 44 44\n",
+          "weight": 16.6666
+        },
+        {
+          "input": "O BG GR OB OB B A GR BG BG BG OB\nO G A GR OB AO BG BG B G AO OB OB OB BG\nB B B B B B B B B B B B B B B\n",
+          "expected": "101 90 90\n",
+          "weight": 16.6666
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。输入按下方测试用例展示的行结构读取。\n\n### 问题\n\nACSL Rings 是一种 3 人游戏,游戏规则是向 5 个圆环投球,球穿过至少一个圆环即可得分。计分规则如下:\n\n- 球穿过蓝色或红色圆环——得 1 分\n\n- 球穿过橘色或绿色圆环——得 3 分\n\n- 球穿过黑色圆环——得 6 分\n\n- 球穿过两个圆环的重叠区域——得分为两个圆环的得分之和再加 1\n\n我们用单个字母来表示上述每种颜色的圆环:蓝色(A )、红色(R)、橘色(O)、绿色(G)、黑色(B)。两个圆环的重叠区域用两个字母来表示,字母顺序如下:蓝色和橘色圆环重叠区域(AO)、橘色和黑色圆环重叠区域(OB)、黑色和绿色圆环重叠区域(BG)、绿色和红色圆环重叠区域(GR)。\n\n给定 3 个字符串分别表示每位玩家投球穿过至少一个圆环的所有结果。每次投球穿过的圆环之间用一个空格隔开。将 3 位玩家的得分按照降序输出为一个字符串,且每位玩家的得分之间用一个空格隔开。如果任意玩家之间出现相同得分,则相同得分在输出时不论先后顺序。\n\n### 示例\n\n输入\n\n```text\nGR A B\nOB BG AO O\nR G\n```\n\n输出\n\n```text\n28 12 4\n```\n\n解析：1 号玩家的得分为 $(3+1+1)+1+6=12$；2 号玩家的得分为 $(3+6+1)+(6+3+1)+(1+3+1)+3=28$；3 号玩家的得分为 $1+3=4$。将得分降序排列，得到 `28 12 4`。\n\n### 输入\n\n输入如上所述的 3 个字符串。每个字符串不超过 100 个字符。\n\n### 输出\n\n按照降序输出 3 位玩家的得分,且每位玩家的得分之间用一个空格隔开。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [],
+      "zh": []
+    }
+  }
+}

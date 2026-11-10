@@ -1,0 +1,2207 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2020-2021-intermediate-4",
+  "division": "Intermediate",
+  "season": "2020-2021",
+  "round": 4,
+  "roundLabel": {
+    "en": "Contest 4",
+    "zh": "第四轮"
+  },
+  "title": {
+    "en": "ACSL 2020-2021 Intermediate · Contest 4",
+    "zh": "ACSL 2020-2021 Intermediate · 第四轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Intermediate/2020-2021/第四轮/中级-笔试.pdf",
+      "sha256": "da184fc2cc13c41fdffa2a73958491589d655e66c94a611e6a50102f0383260d",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Intermediate/2020-2021/第四轮/中级-笔试答案.pdf",
+      "sha256": "6a6a0dfa292dc167c6155811060470ae74c4a569b93671792284ddcc659d33d1",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Intermediate/2020-2021/第四轮/中级-编程（含答案）.pdf",
+      "sha256": "c2fe1886009c3dede093bf4d698051b0e020dbc447ced4290a1142848a6bb4f8",
+      "pages": 4
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Graph Theory",
+        "zh": "图论"
+      },
+      "statement": {
+        "en": "Given the following adjacency matrix, which vertices do not have a path of length 3 to vertex B?\n\n$$\n\\begin{array}{c|rrrr}\n & A & B & C & D \\\\\n\\hline\nA & 1 & 0 & 0 & 1 \\\\\nB & 0 & 1 & 1 & 0 \\\\\nC & 1 & 0 & 1 & 0 \\\\\nD & 0 & 0 & 1 & 1\n\\end{array}\n$$",
+        "zh": "给定下列邻接矩阵，哪些顶点不存在到顶点 B、长度为 3 的路径？\n\n$$\n\\begin{array}{c|rrrr}\n & A & B & C & D \\\\\n\\hline\nA & 1 & 0 & 0 & 1 \\\\\nB & 0 & 1 & 1 & 0 \\\\\nC & 1 & 0 & 1 & 0 \\\\\nD & 0 & 0 & 1 & 1\n\\end{array}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "A, C, D",
+            "zh": "A, C, D"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "A, B, C",
+            "zh": "A, B, C"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "A, B, D",
+            "zh": "A, B, D"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "C, D",
+            "zh": "C, D"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "A, C",
+            "zh": "A, C"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "Cubing the adjacency matrix counts walks of length 3:\n\n$$M^3=\\begin{pmatrix}2&0&3&3\\\\3&1&3&1\\\\3&0&2&3\\\\3&0&3&2\\end{pmatrix}.$$\n\nIn column B, only row B is nonzero. Thus A, C and D have no path of length 3 to B. Equivalently, the only edge entering B is its self-loop; no other vertex can ever reach B.\n\nSource correction: the original solution prints the top-left entry of $M^3$ as 3; it is 2. This does not change column B or the answer.\n\nMatrix powers count walks, allowing repeated vertices. The only edge entering B is the loop B→B. Therefore a walk starting at A, C, or D cannot enter B at any step, while B→B→B→B is a length-3 walk from B.\n\n**Answer: A.**",
+        "zh": "邻接矩阵的三次方给出长度为 3 的路径数量：\n\n$$M^3=\\begin{pmatrix}2&0&3&3\\\\3&1&3&1\\\\3&0&2&3\\\\3&0&3&2\\end{pmatrix}.$$\n\nB 列中仅 B 行不为零，因此 A、C、D 均不存在长度为 3、终点为 B 的路径。也可以直接观察：进入 B 的边只有它自身的自环，其他顶点根本无法到达 B。\n\n原卷勘误：原解析把 $M^3$ 的左上角写成 3，正确值为 2；这不影响 B 列和本题答案。\n\n邻接矩阵的幂统计允许重复顶点的行走。唯一进入 B 的边是自环 B→B，因此从 A、C、D 出发，无论走多少步都无法进入 B；B→B→B→B 则是从 B 出发的一条长度为 3 的行走。\n\n**答案：A。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Graph Theory",
+        "zh": "图论"
+      },
+      "statement": {
+        "en": "How many cycles are there from vertex B in this directed graph?\n\n{{diagram:intermediate-q2-graph}}",
+        "zh": "下列有向图中，从顶点 B 出发的环有多少个？\n\n{{diagram:intermediate-q2-graph}}"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "5",
+            "zh": "5"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "7",
+            "zh": "7"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "9",
+            "zh": "9"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "The seven cycles from B are BAB, BCAB, BDB, BADB, BAEDB, BCADB and BCAEDB. Answer C.\n\nTo count without omissions, group the simple cycles by the first edge from B. Via A: `BAB`, `BADB`, `BAEDB` (3). Via C: `BCAB`, `BCADB`, `BCAEDB` (3). Via D: `BDB` (1). Thus there are $3+3+1=7$. Do not include routes such as `BAEADB`, because they repeat an interior vertex A before returning to B.\n\n**Answer: C.**",
+        "zh": "从 B 出发的 7 个环为 BAB、BCAB、BDB、BADB、BAEDB、BCADB、BCAEDB，选 C。\n\n按离开 B 的第一条边分类，可以避免漏数。先到 A：`BAB`、`BADB`、`BAEDB`，3 个；先到 C：`BCAB`、`BCADB`、`BCAEDB`，3 个；先到 D：`BDB`，1 个。合计 $3+3+1=7$。例如 `BAEADB` 在回到 B 前重复经过内部顶点 A，不属于这里统计的简单环。\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      },
+      "statementDiagrams": {
+        "en": [
+          {
+            "id": "intermediate-q2-graph",
+            "width": 385,
+            "height": 320,
+            "alt": {
+              "en": "Directed graph. Vertices: A, B, C, D, E. Edges: A → B, B → A, B → C, C → A, A → E, E → A, A → D, E → D, B → D, D → B.",
+              "zh": "有向图。顶点：A, B, C, D, E。边：A → B, B → A, B → C, C → A, A → E, E → A, A → D, E → D, B → D, D → B。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 55,
+                "y1": 75,
+                "x2": 195,
+                "y2": 35
+              },
+              {
+                "type": "path",
+                "d": "M 181.539 38.846 L 173.022 45.439 L 170.825 37.747 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "path",
+                "d": "M 68.461 71.154 L 76.978 64.561 L 79.175 72.253 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "line",
+                "x1": 195,
+                "y1": 35,
+                "x2": 340,
+                "y2": 155
+              },
+              {
+                "type": "path",
+                "d": "M 329.214 146.074 L 318.960 142.780 L 324.061 136.617 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "line",
+                "x1": 340,
+                "y1": 155,
+                "x2": 55,
+                "y2": 75
+              },
+              {
+                "type": "path",
+                "d": "M 68.479 78.784 L 79.188 77.635 L 77.026 85.337 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "line",
+                "x1": 55,
+                "y1": 75,
+                "x2": 60,
+                "y2": 235
+              },
+              {
+                "type": "path",
+                "d": "M 59.563 221.007 L 55.252 211.137 L 63.248 210.887 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "path",
+                "d": "M 55.437 88.993 L 59.748 98.863 L 51.752 99.113 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "line",
+                "x1": 55,
+                "y1": 75,
+                "x2": 205,
+                "y2": 280
+              },
+              {
+                "type": "path",
+                "d": "M 196.733 268.702 L 187.600 262.993 L 194.056 258.269 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "line",
+                "x1": 60,
+                "y1": 235,
+                "x2": 205,
+                "y2": 280
+              },
+              {
+                "type": "path",
+                "d": "M 191.629 275.850 L 180.893 276.707 L 183.264 269.066 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "line",
+                "x1": 195,
+                "y1": 35,
+                "x2": 205,
+                "y2": 280
+              },
+              {
+                "type": "path",
+                "d": "M 204.429 266.012 L 200.025 256.183 L 208.018 255.857 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "path",
+                "d": "M 195.571 48.988 L 199.975 58.817 L 191.982 59.143 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "circle",
+                "cx": 55,
+                "cy": 75,
+                "r": 14,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 55,
+                "y": 81,
+                "text": "A",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 195,
+                "cy": 35,
+                "r": 14,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 195,
+                "y": 41,
+                "text": "B",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 340,
+                "cy": 155,
+                "r": 14,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 340,
+                "y": 161,
+                "text": "C",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 205,
+                "cy": 280,
+                "r": 14,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 205,
+                "y": 286,
+                "text": "D",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 60,
+                "cy": 235,
+                "r": 14,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 60,
+                "y": 241,
+                "text": "E",
+                "fontSize": 20,
+                "anchor": "middle"
+              }
+            ]
+          }
+        ],
+        "zh": [
+          {
+            "id": "intermediate-q2-graph",
+            "width": 385,
+            "height": 320,
+            "alt": {
+              "en": "Directed graph. Vertices: A, B, C, D, E. Edges: A → B, B → A, B → C, C → A, A → E, E → A, A → D, E → D, B → D, D → B.",
+              "zh": "有向图。顶点：A, B, C, D, E。边：A → B, B → A, B → C, C → A, A → E, E → A, A → D, E → D, B → D, D → B。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 55,
+                "y1": 75,
+                "x2": 195,
+                "y2": 35
+              },
+              {
+                "type": "path",
+                "d": "M 181.539 38.846 L 173.022 45.439 L 170.825 37.747 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "path",
+                "d": "M 68.461 71.154 L 76.978 64.561 L 79.175 72.253 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "line",
+                "x1": 195,
+                "y1": 35,
+                "x2": 340,
+                "y2": 155
+              },
+              {
+                "type": "path",
+                "d": "M 329.214 146.074 L 318.960 142.780 L 324.061 136.617 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "line",
+                "x1": 340,
+                "y1": 155,
+                "x2": 55,
+                "y2": 75
+              },
+              {
+                "type": "path",
+                "d": "M 68.479 78.784 L 79.188 77.635 L 77.026 85.337 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "line",
+                "x1": 55,
+                "y1": 75,
+                "x2": 60,
+                "y2": 235
+              },
+              {
+                "type": "path",
+                "d": "M 59.563 221.007 L 55.252 211.137 L 63.248 210.887 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "path",
+                "d": "M 55.437 88.993 L 59.748 98.863 L 51.752 99.113 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "line",
+                "x1": 55,
+                "y1": 75,
+                "x2": 205,
+                "y2": 280
+              },
+              {
+                "type": "path",
+                "d": "M 196.733 268.702 L 187.600 262.993 L 194.056 258.269 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "line",
+                "x1": 60,
+                "y1": 235,
+                "x2": 205,
+                "y2": 280
+              },
+              {
+                "type": "path",
+                "d": "M 191.629 275.850 L 180.893 276.707 L 183.264 269.066 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "line",
+                "x1": 195,
+                "y1": 35,
+                "x2": 205,
+                "y2": 280
+              },
+              {
+                "type": "path",
+                "d": "M 204.429 266.012 L 200.025 256.183 L 208.018 255.857 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "path",
+                "d": "M 195.571 48.988 L 199.975 58.817 L 191.982 59.143 Z",
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "circle",
+                "cx": 55,
+                "cy": 75,
+                "r": 14,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 55,
+                "y": 81,
+                "text": "A",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 195,
+                "cy": 35,
+                "r": 14,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 195,
+                "y": 41,
+                "text": "B",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 340,
+                "cy": 155,
+                "r": 14,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 340,
+                "y": 161,
+                "text": "C",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 205,
+                "cy": 280,
+                "r": 14,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 205,
+                "y": 286,
+                "text": "D",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 60,
+                "cy": 235,
+                "r": 14,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 60,
+                "y": 241,
+                "text": "E",
+                "fontSize": 20,
+                "anchor": "middle"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Digital Electronics",
+        "zh": "数字电路"
+      },
+      "statement": {
+        "en": "How many ordered triples make this circuit TRUE?\n\n{{diagram:intermediate-q3-circuit}}",
+        "zh": "有多少个有序三元组可以使下列电路输出为真？\n\n{{diagram:intermediate-q3-circuit}}"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "0",
+            "zh": "0"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "1",
+            "zh": "1"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "2",
+            "zh": "2"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "3",
+            "zh": "3"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "The output is $C\\,\\overline{A+\\overline{AB}(B+C)}$. If $C=0$, it is 0. If $C=1$ and $A=1$, the NOR is 0. If $C=1$ and $A=0$, then $\\overline{AB}=1$ and $B+C=1$, so the NOR is again 0. The circuit is always false: no triples satisfy it. Answer A.\n\nThe same result follows algebraically:\n\n$$\\begin{aligned}C\\,\\overline{A+\\overline{AB}(B+C)}&=\\overline A C\\,\\overline{\\overline{AB}(B+C)}\\\\&=\\overline A C(AB+\\overline B\\,\\overline C)\\\\&=A\\overline A BC+\\overline A\\,\\overline B C\\overline C\\\\&=0.\\end{aligned}$$\n\n**Answer: A.**",
+        "zh": "输出为 $C\\,\\overline{A+\\overline{AB}(B+C)}$。若 $C=0$，输出就是 0。若 $C=1$ 且 $A=1$，或非门输出为 0；若 $C=1$ 且 $A=0$，则 $\\overline{AB}=1$、$B+C=1$，或非门输出仍为 0。因此电路恒为假，满足条件的三元组有 0 个，选 A。\n\n也可用布尔代数化简：\n\n$$\\begin{aligned}C\\,\\overline{A+\\overline{AB}(B+C)}&=\\overline A C\\,\\overline{\\overline{AB}(B+C)}\\\\&=\\overline A C(AB+\\overline B\\,\\overline C)\\\\&=A\\overline A BC+\\overline A\\,\\overline B C\\overline C\\\\&=0.\\end{aligned}$$\n\n**答案：A。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1,
+          2
+        ],
+        "answerProvenance": "official"
+      },
+      "statementDiagrams": {
+        "en": [
+          {
+            "id": "intermediate-q3-circuit",
+            "width": 580,
+            "height": 330,
+            "alt": {
+              "en": "A and B feed a NAND gate; B and C feed an OR gate. Those outputs feed an AND gate. A and that result feed a NOR gate. The final AND combines its output with C.",
+              "zh": "A、B 输入与非门，B、C 输入或门；两个输出输入与门。该结果与 A 输入或非门，或非门输出再与 C 输入最后的与门。"
+            },
+            "elements": [
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    40,
+                    98
+                  ],
+                  [
+                    65,
+                    98
+                  ],
+                  [
+                    95,
+                    98
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    65,
+                    98
+                  ],
+                  [
+                    65,
+                    43
+                  ],
+                  [
+                    372,
+                    43
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    40,
+                    180
+                  ],
+                  [
+                    65,
+                    180
+                  ],
+                  [
+                    65,
+                    122
+                  ],
+                  [
+                    95,
+                    122
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    65,
+                    180
+                  ],
+                  [
+                    65,
+                    218
+                  ],
+                  [
+                    102,
+                    218
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    40,
+                    285
+                  ],
+                  [
+                    65,
+                    285
+                  ],
+                  [
+                    65,
+                    242
+                  ],
+                  [
+                    102,
+                    242
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    65,
+                    285
+                  ],
+                  [
+                    65,
+                    305
+                  ],
+                  [
+                    450,
+                    305
+                  ],
+                  [
+                    450,
+                    272
+                  ],
+                  [
+                    475,
+                    272
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    165,
+                    110
+                  ],
+                  [
+                    205,
+                    110
+                  ],
+                  [
+                    205,
+                    158
+                  ],
+                  [
+                    240,
+                    158
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    155,
+                    230
+                  ],
+                  [
+                    210,
+                    230
+                  ],
+                  [
+                    210,
+                    182
+                  ],
+                  [
+                    240,
+                    182
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    300,
+                    170
+                  ],
+                  [
+                    335,
+                    170
+                  ],
+                  [
+                    335,
+                    67
+                  ],
+                  [
+                    372,
+                    67
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    435,
+                    55
+                  ],
+                  [
+                    450,
+                    55
+                  ],
+                  [
+                    450,
+                    248
+                  ],
+                  [
+                    475,
+                    248
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    535,
+                    260
+                  ],
+                  [
+                    560,
+                    260
+                  ]
+                ]
+              },
+              {
+                "type": "path",
+                "d": "M 95 85 L 125 85 C 165 85 165 135 125 135 L 95 135 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "circle",
+                "cx": 160,
+                "cy": 110,
+                "r": 5,
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 95 205 Q 130 205 155 230 Q 130 255 95 255 Q 113 230 95 205 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 240 145 L 270 145 C 310 145 310 195 270 195 L 240 195 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 365 30 Q 400 30 425 55 Q 400 80 365 80 Q 383 55 365 30 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "circle",
+                "cx": 430,
+                "cy": 55,
+                "r": 5,
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 475 235 L 505 235 C 545 235 545 285 505 285 L 475 285 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 20,
+                "y": 104,
+                "text": "A",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "text",
+                "x": 20,
+                "y": 186,
+                "text": "B",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "text",
+                "x": 20,
+                "y": 291,
+                "text": "C",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 65,
+                "cy": 98,
+                "r": 3,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "circle",
+                "cx": 65,
+                "cy": 180,
+                "r": 3,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "circle",
+                "cx": 65,
+                "cy": 285,
+                "r": 3,
+                "fill": "ink",
+                "stroke": "none"
+              }
+            ]
+          }
+        ],
+        "zh": [
+          {
+            "id": "intermediate-q3-circuit",
+            "width": 580,
+            "height": 330,
+            "alt": {
+              "en": "A and B feed a NAND gate; B and C feed an OR gate. Those outputs feed an AND gate. A and that result feed a NOR gate. The final AND combines its output with C.",
+              "zh": "A、B 输入与非门，B、C 输入或门；两个输出输入与门。该结果与 A 输入或非门，或非门输出再与 C 输入最后的与门。"
+            },
+            "elements": [
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    40,
+                    98
+                  ],
+                  [
+                    65,
+                    98
+                  ],
+                  [
+                    95,
+                    98
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    65,
+                    98
+                  ],
+                  [
+                    65,
+                    43
+                  ],
+                  [
+                    372,
+                    43
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    40,
+                    180
+                  ],
+                  [
+                    65,
+                    180
+                  ],
+                  [
+                    65,
+                    122
+                  ],
+                  [
+                    95,
+                    122
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    65,
+                    180
+                  ],
+                  [
+                    65,
+                    218
+                  ],
+                  [
+                    102,
+                    218
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    40,
+                    285
+                  ],
+                  [
+                    65,
+                    285
+                  ],
+                  [
+                    65,
+                    242
+                  ],
+                  [
+                    102,
+                    242
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    65,
+                    285
+                  ],
+                  [
+                    65,
+                    305
+                  ],
+                  [
+                    450,
+                    305
+                  ],
+                  [
+                    450,
+                    272
+                  ],
+                  [
+                    475,
+                    272
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    165,
+                    110
+                  ],
+                  [
+                    205,
+                    110
+                  ],
+                  [
+                    205,
+                    158
+                  ],
+                  [
+                    240,
+                    158
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    155,
+                    230
+                  ],
+                  [
+                    210,
+                    230
+                  ],
+                  [
+                    210,
+                    182
+                  ],
+                  [
+                    240,
+                    182
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    300,
+                    170
+                  ],
+                  [
+                    335,
+                    170
+                  ],
+                  [
+                    335,
+                    67
+                  ],
+                  [
+                    372,
+                    67
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    435,
+                    55
+                  ],
+                  [
+                    450,
+                    55
+                  ],
+                  [
+                    450,
+                    248
+                  ],
+                  [
+                    475,
+                    248
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    535,
+                    260
+                  ],
+                  [
+                    560,
+                    260
+                  ]
+                ]
+              },
+              {
+                "type": "path",
+                "d": "M 95 85 L 125 85 C 165 85 165 135 125 135 L 95 135 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "circle",
+                "cx": 160,
+                "cy": 110,
+                "r": 5,
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 95 205 Q 130 205 155 230 Q 130 255 95 255 Q 113 230 95 205 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 240 145 L 270 145 C 310 145 310 195 270 195 L 240 195 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 365 30 Q 400 30 425 55 Q 400 80 365 80 Q 383 55 365 30 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "circle",
+                "cx": 430,
+                "cy": 55,
+                "r": 5,
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 475 235 L 505 235 C 545 235 545 285 505 285 L 475 285 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 20,
+                "y": 104,
+                "text": "A",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "text",
+                "x": 20,
+                "y": 186,
+                "text": "B",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "text",
+                "x": 20,
+                "y": 291,
+                "text": "C",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 65,
+                "cy": 98,
+                "r": 3,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "circle",
+                "cx": 65,
+                "cy": 180,
+                "r": 3,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "circle",
+                "cx": 65,
+                "cy": 285,
+                "r": 3,
+                "fill": "ink",
+                "stroke": "none"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Digital Electronics",
+        "zh": "数字电路"
+      },
+      "statement": {
+        "en": "Identify the ordered triples that make this circuit TRUE:\n\n{{diagram:intermediate-q4-circuit}}",
+        "zh": "找出使下列电路输出为真的有序三元组：\n\n{{diagram:intermediate-q4-circuit}}"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "$(0,\\ast,0)$",
+            "zh": "$(0,\\ast,0)$"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "$(1,\\ast,1)$",
+            "zh": "$(1,\\ast,1)$"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "$(0,\\ast,0),\\ (1,0,1)$",
+            "zh": "$(0,\\ast,0),\\ (1,0,1)$"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "$(1,\\ast,1),\\ (0,1,0)$",
+            "zh": "$(1,\\ast,1),\\ (0,1,0)$"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "$(0,1,0),\\ (1,0,1)$",
+            "zh": "$(0,1,0),\\ (1,0,1)$"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "The output is $(A\\oplus B)(B\\oplus C)$. Both XOR gates must be true, so A differs from B and B differs from C. Therefore A=C, with B taking the opposite value. The two triples are $(0,1,0)$ and $(1,0,1)$. Answer E.\n\n$$\\begin{aligned}(A\\oplus B)(B\\oplus C)&=(\\overline A B+A\\overline B)(\\overline B C+B\\overline C)\\\\&=\\overline A B\\overline C+A\\overline B C.\\end{aligned}$$\n\n**Answer: E.**",
+        "zh": "输出为 $(A\\oplus B)(B\\oplus C)$。两个异或门都必须为真，所以 A 与 B 不同，B 与 C 不同。因此 A=C，且 B 与它们相反，满足条件的三元组为 $(0,1,0)$、$(1,0,1)$，选 E。\n\n$$\\begin{aligned}(A\\oplus B)(B\\oplus C)&=(\\overline A B+A\\overline B)(\\overline B C+B\\overline C)\\\\&=\\overline A B\\overline C+A\\overline B C.\\end{aligned}$$\n\n**答案：E。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      },
+      "statementDiagrams": {
+        "en": [
+          {
+            "id": "intermediate-q4-circuit",
+            "width": 425,
+            "height": 310,
+            "alt": {
+              "en": "A and B enter one XOR gate. B and C enter a second XOR gate. The two outputs enter an AND gate.",
+              "zh": "A、B 输入第一个异或门，B、C 输入第二个异或门，两个异或门的输出再输入与门。"
+            },
+            "elements": [
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    40,
+                    35
+                  ],
+                  [
+                    70,
+                    35
+                  ],
+                  [
+                    70,
+                    53
+                  ],
+                  [
+                    115,
+                    53
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    40,
+                    140
+                  ],
+                  [
+                    70,
+                    140
+                  ],
+                  [
+                    70,
+                    77
+                  ],
+                  [
+                    115,
+                    77
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    70,
+                    140
+                  ],
+                  [
+                    70,
+                    203
+                  ],
+                  [
+                    115,
+                    203
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    40,
+                    285
+                  ],
+                  [
+                    70,
+                    285
+                  ],
+                  [
+                    70,
+                    227
+                  ],
+                  [
+                    115,
+                    227
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    175,
+                    65
+                  ],
+                  [
+                    235,
+                    65
+                  ],
+                  [
+                    235,
+                    128
+                  ],
+                  [
+                    300,
+                    128
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    175,
+                    215
+                  ],
+                  [
+                    235,
+                    215
+                  ],
+                  [
+                    235,
+                    152
+                  ],
+                  [
+                    300,
+                    152
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    360,
+                    140
+                  ],
+                  [
+                    400,
+                    140
+                  ]
+                ]
+              },
+              {
+                "type": "path",
+                "d": "M 115 40 Q 150 40 175 65 Q 150 90 115 90 Q 133 65 115 40 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 107 40 Q 125 65 107 90"
+              },
+              {
+                "type": "path",
+                "d": "M 115 190 Q 150 190 175 215 Q 150 240 115 240 Q 133 215 115 190 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 107 190 Q 125 215 107 240"
+              },
+              {
+                "type": "path",
+                "d": "M 300 115 L 330 115 C 370 115 370 165 330 165 L 300 165 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 20,
+                "y": 41,
+                "text": "A",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "text",
+                "x": 20,
+                "y": 146,
+                "text": "B",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "text",
+                "x": 20,
+                "y": 291,
+                "text": "C",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 70,
+                "cy": 140,
+                "r": 3,
+                "fill": "ink",
+                "stroke": "none"
+              }
+            ]
+          }
+        ],
+        "zh": [
+          {
+            "id": "intermediate-q4-circuit",
+            "width": 425,
+            "height": 310,
+            "alt": {
+              "en": "A and B enter one XOR gate. B and C enter a second XOR gate. The two outputs enter an AND gate.",
+              "zh": "A、B 输入第一个异或门，B、C 输入第二个异或门，两个异或门的输出再输入与门。"
+            },
+            "elements": [
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    40,
+                    35
+                  ],
+                  [
+                    70,
+                    35
+                  ],
+                  [
+                    70,
+                    53
+                  ],
+                  [
+                    115,
+                    53
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    40,
+                    140
+                  ],
+                  [
+                    70,
+                    140
+                  ],
+                  [
+                    70,
+                    77
+                  ],
+                  [
+                    115,
+                    77
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    70,
+                    140
+                  ],
+                  [
+                    70,
+                    203
+                  ],
+                  [
+                    115,
+                    203
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    40,
+                    285
+                  ],
+                  [
+                    70,
+                    285
+                  ],
+                  [
+                    70,
+                    227
+                  ],
+                  [
+                    115,
+                    227
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    175,
+                    65
+                  ],
+                  [
+                    235,
+                    65
+                  ],
+                  [
+                    235,
+                    128
+                  ],
+                  [
+                    300,
+                    128
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    175,
+                    215
+                  ],
+                  [
+                    235,
+                    215
+                  ],
+                  [
+                    235,
+                    152
+                  ],
+                  [
+                    300,
+                    152
+                  ]
+                ]
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    360,
+                    140
+                  ],
+                  [
+                    400,
+                    140
+                  ]
+                ]
+              },
+              {
+                "type": "path",
+                "d": "M 115 40 Q 150 40 175 65 Q 150 90 115 90 Q 133 65 115 40 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 107 40 Q 125 65 107 90"
+              },
+              {
+                "type": "path",
+                "d": "M 115 190 Q 150 190 175 215 Q 150 240 115 240 Q 133 215 115 190 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "path",
+                "d": "M 107 190 Q 125 215 107 240"
+              },
+              {
+                "type": "path",
+                "d": "M 300 115 L 330 115 C 370 115 370 165 330 165 L 300 165 Z",
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 20,
+                "y": 41,
+                "text": "A",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "text",
+                "x": 20,
+                "y": 146,
+                "text": "B",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "text",
+                "x": 20,
+                "y": 291,
+                "text": "C",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 70,
+                "cy": 140,
+                "r": 3,
+                "fill": "ink",
+                "stroke": "none"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "Assembly Language",
+        "zh": "汇编语言"
+      },
+      "statement": {
+        "en": "What is printed when the following program is executed?\n\n```text\nX     DC     21\nY     DC     49\n      LOAD   Y\nTOP   BE     STOP\n      LOAD   X\n      DIV    Y\n      MULT   Y\n      STORE  R\n      LOAD   X\n      SUB    R\n      STORE  R\n      LOAD   Y\n      STORE  X\n      LOAD   R\n      STORE  Y\n      BU     TOP\nSTOP  PRINT  X\n      END\n```",
+        "zh": "执行下列程序时会输出什么？\n\n```text\nX     DC     21\nY     DC     49\n      LOAD   Y\nTOP   BE     STOP\n      LOAD   X\n      DIV    Y\n      MULT   Y\n      STORE  R\n      LOAD   X\n      SUB    R\n      STORE  R\n      LOAD   Y\n      STORE  X\n      LOAD   R\n      STORE  Y\n      BU     TOP\nSTOP  PRINT  X\n      END\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "1",
+            "zh": "1"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "7",
+            "zh": "7"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "14",
+            "zh": "14"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "21",
+            "zh": "21"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "49",
+            "zh": "49"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "DIV uses integer division. Each iteration computes $R=X-\\lfloor X/Y\\rfloor Y$, then replaces $(X,Y)$ with $(Y,R)$. This is the Euclidean algorithm. The pairs are $(21,49)\\to(49,21)\\to(21,7)\\to(7,0)$. It stops when Y=0 and prints X=7. Answer B.\n\nThe integer quotient and remainder pairs are $(0,21)$ for $21/49$, $(2,7)$ for $49/21$, and $(3,0)$ for $21/7$. After the final `LOAD R`, the accumulator is zero, so `BE STOP` exits before any attempt to divide by the new $Y=0$.\n\n**Answer: B.**",
+        "zh": "DIV 使用整数除法。每轮计算 $R=X-\\lfloor X/Y\\rfloor Y$，再令 $(X,Y)=(Y,R)$，即欧几里得算法。数对依次为 $(21,49)\\to(49,21)\\to(21,7)\\to(7,0)$。当 Y=0 时停止并输出 X=7，选 B。\n\n三轮整数商与余数分别为：$21/49$ 得 $(0,21)$，$49/21$ 得 $(2,7)$，$21/7$ 得 $(3,0)$。最后一次 `LOAD R` 令累加器为 0，故 `BE STOP` 会在下一次除法之前终止，不会用新的 $Y=0$ 作除数。\n\n**答案：B。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [],
+  "programming": {
+    "id": "graphs",
+    "definition": {
+      "title": "Graphs",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Use the line structure shown in the test-case input below.\n\n### Directed graphs\n\nA directed edge is represented by a two-digit integer: the first digit is its starting vertex and the second its ending vertex. The graph contains at most nine vertices. The input gives its directed edges separated by spaces.\n\n{{diagram:graphs-example}}\n\n### Problem\n\nFind all simple directed paths of length 2. A simple path never repeats a vertex. Interpret the vertex sequence of each path as a decimal integer, then output the sum of those integers.\n\n### Example\n\nThe graph has edges `12 23 34 41 31`. Its simple paths of length two are `123`, `231`, `234`, `341`, `312`, and `412`. Their sum is `1653`.\n\n### Input\n\nThe two-digit directed edges. Vertices are numbered consecutively starting at 1, and there are at most nine vertices.\n\n### Output\n\nThe sum of the integers represented by all simple paths of the specified length.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "12 23 34 41 31\n",
+          "expected": "1653\n"
+        },
+        {
+          "input": "12 23 34 41 13 32\n",
+          "expected": "1789\n"
+        },
+        {
+          "input": "76 75 12 13 23 31 34 41 56\n",
+          "expected": "2956\n"
+        },
+        {
+          "input": "34 45 56 63 64 61 13\n",
+          "expected": "4515\n"
+        },
+        {
+          "input": "12 21 13 15 53 33\n",
+          "expected": "581\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "12 31 41 42 43 45 51 63 64 56 16\n",
+          "expected": "8478\n",
+          "weight": 20
+        },
+        {
+          "input": "12 13 22 23 24 34 42 98 71 87 17 96 67\n",
+          "expected": "6301\n",
+          "weight": 20
+        },
+        {
+          "input": "12 14 21 24 25 32 41 43 59 65 91 87 76 95\n",
+          "expected": "7880\n",
+          "weight": 20
+        },
+        {
+          "input": "11 12 14 15 23 25 31 43 45 51 52 68 79 87 89\n",
+          "expected": "7249\n",
+          "weight": 20
+        },
+        {
+          "input": "55 77 45 54\n",
+          "expected": "0\n",
+          "weight": 20
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。输入按下方测试用例展示的行结构读取。\n\n### 有向图\n\n用两位整数表示一条有向边：第一位是起点，第二位是终点。图最多有九个顶点，输入中的有向边用空格分隔。\n\n{{diagram:graphs-example}}\n\n### 题目\n\n找出长度为 2 的所有有向简单路径。简单路径不能重复经过顶点。把每条路径的顶点编号序列看作一个十进制整数，输出这些整数之和。\n\n### 示例\n\n图中的边为 `12 23 34 41 31`。长度为二的简单路径为 `123`、`231`、`234`、`341`、`312` 和 `412`，其总和为 `1653`。\n\n### 输入\n\n若干两位有向边编号。顶点从 1 开始连续编号，最多九个。\n\n### 输出\n\n所有指定长度的简单路径所表示的整数之和。\n",
+    "testProvenance": "official",
+    "source": {
+      "path": "resource/acsl-problems/Intermediate/2020-2021/第四轮/中级-编程（含答案）.pdf",
+      "sha256": "c2fe1886009c3dede093bf4d698051b0e020dbc447ced4290a1142848a6bb4f8",
+      "samplePages": [
+        1
+      ],
+      "testPages": [
+        2
+      ],
+      "normalization": "One official case per execution. Manually transcribed and visually verified."
+    },
+    "statementDiagrams": {
+      "en": [
+        {
+          "id": "graphs-example",
+          "width": 290,
+          "height": 260,
+          "alt": {
+            "en": "Directed graph with edges 12, 23, 34, 41, 31",
+            "zh": "有向图，边为 12, 23, 34, 41, 31"
+          },
+          "elements": [
+            {
+              "type": "line",
+              "x1": 79,
+              "y1": 55,
+              "x2": 211,
+              "y2": 55,
+              "stroke": "ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 211.0 55.0 L 201.0 50.0 L 201.0 60.0 Z",
+              "fill": "ink"
+            },
+            {
+              "type": "line",
+              "x1": 235,
+              "y1": 79,
+              "x2": 235,
+              "y2": 181,
+              "stroke": "ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 235.0 181.0 L 240.0 171.0 L 230.0 171.0 Z",
+              "fill": "ink"
+            },
+            {
+              "type": "line",
+              "x1": 211,
+              "y1": 205,
+              "x2": 79,
+              "y2": 205,
+              "stroke": "ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 79.0 205.0 L 89.0 210.0 L 89.0 200.0 Z",
+              "fill": "ink"
+            },
+            {
+              "type": "line",
+              "x1": 55,
+              "y1": 181,
+              "x2": 55,
+              "y2": 79,
+              "stroke": "ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 55.0 79.0 L 50.0 89.0 L 60.0 89.0 Z",
+              "fill": "ink"
+            },
+            {
+              "type": "line",
+              "x1": 216.56268928966298,
+              "y1": 189.6355744080525,
+              "x2": 73.43731071033702,
+              "y2": 70.36442559194751,
+              "stroke": "ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 73.43731071033702 70.36442559194751 L 77.91860150798837 80.60737598657919 L 84.32044550463317 72.92516319060543 Z",
+              "fill": "ink"
+            },
+            {
+              "type": "circle",
+              "cx": 55,
+              "cy": 55,
+              "r": 20,
+              "stroke": "ink",
+              "fill": "surface",
+              "strokeWidth": 2
+            },
+            {
+              "type": "text",
+              "x": 55,
+              "y": 61,
+              "text": "1",
+              "fontSize": 18,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "circle",
+              "cx": 235,
+              "cy": 55,
+              "r": 20,
+              "stroke": "ink",
+              "fill": "surface",
+              "strokeWidth": 2
+            },
+            {
+              "type": "text",
+              "x": 235,
+              "y": 61,
+              "text": "2",
+              "fontSize": 18,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "circle",
+              "cx": 235,
+              "cy": 205,
+              "r": 20,
+              "stroke": "ink",
+              "fill": "surface",
+              "strokeWidth": 2
+            },
+            {
+              "type": "text",
+              "x": 235,
+              "y": 211,
+              "text": "3",
+              "fontSize": 18,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "circle",
+              "cx": 55,
+              "cy": 205,
+              "r": 20,
+              "stroke": "ink",
+              "fill": "surface",
+              "strokeWidth": 2
+            },
+            {
+              "type": "text",
+              "x": 55,
+              "y": 211,
+              "text": "4",
+              "fontSize": 18,
+              "anchor": "middle",
+              "fill": "ink"
+            }
+          ]
+        }
+      ],
+      "zh": [
+        {
+          "id": "graphs-example",
+          "width": 290,
+          "height": 260,
+          "alt": {
+            "en": "Directed graph with edges 12, 23, 34, 41, 31",
+            "zh": "有向图，边为 12, 23, 34, 41, 31"
+          },
+          "elements": [
+            {
+              "type": "line",
+              "x1": 79,
+              "y1": 55,
+              "x2": 211,
+              "y2": 55,
+              "stroke": "ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 211.0 55.0 L 201.0 50.0 L 201.0 60.0 Z",
+              "fill": "ink"
+            },
+            {
+              "type": "line",
+              "x1": 235,
+              "y1": 79,
+              "x2": 235,
+              "y2": 181,
+              "stroke": "ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 235.0 181.0 L 240.0 171.0 L 230.0 171.0 Z",
+              "fill": "ink"
+            },
+            {
+              "type": "line",
+              "x1": 211,
+              "y1": 205,
+              "x2": 79,
+              "y2": 205,
+              "stroke": "ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 79.0 205.0 L 89.0 210.0 L 89.0 200.0 Z",
+              "fill": "ink"
+            },
+            {
+              "type": "line",
+              "x1": 55,
+              "y1": 181,
+              "x2": 55,
+              "y2": 79,
+              "stroke": "ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 55.0 79.0 L 50.0 89.0 L 60.0 89.0 Z",
+              "fill": "ink"
+            },
+            {
+              "type": "line",
+              "x1": 216.56268928966298,
+              "y1": 189.6355744080525,
+              "x2": 73.43731071033702,
+              "y2": 70.36442559194751,
+              "stroke": "ink",
+              "strokeWidth": 2
+            },
+            {
+              "type": "path",
+              "d": "M 73.43731071033702 70.36442559194751 L 77.91860150798837 80.60737598657919 L 84.32044550463317 72.92516319060543 Z",
+              "fill": "ink"
+            },
+            {
+              "type": "circle",
+              "cx": 55,
+              "cy": 55,
+              "r": 20,
+              "stroke": "ink",
+              "fill": "surface",
+              "strokeWidth": 2
+            },
+            {
+              "type": "text",
+              "x": 55,
+              "y": 61,
+              "text": "1",
+              "fontSize": 18,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "circle",
+              "cx": 235,
+              "cy": 55,
+              "r": 20,
+              "stroke": "ink",
+              "fill": "surface",
+              "strokeWidth": 2
+            },
+            {
+              "type": "text",
+              "x": 235,
+              "y": 61,
+              "text": "2",
+              "fontSize": 18,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "circle",
+              "cx": 235,
+              "cy": 205,
+              "r": 20,
+              "stroke": "ink",
+              "fill": "surface",
+              "strokeWidth": 2
+            },
+            {
+              "type": "text",
+              "x": 235,
+              "y": 211,
+              "text": "3",
+              "fontSize": 18,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "circle",
+              "cx": 55,
+              "cy": 205,
+              "r": 20,
+              "stroke": "ink",
+              "fill": "surface",
+              "strokeWidth": 2
+            },
+            {
+              "type": "text",
+              "x": 55,
+              "y": 211,
+              "text": "4",
+              "fontSize": 18,
+              "anchor": "middle",
+              "fill": "ink"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

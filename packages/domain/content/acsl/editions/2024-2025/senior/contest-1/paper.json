@@ -1,0 +1,537 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2024-2025-senior-1",
+  "division": "Senior",
+  "season": "2024-2025",
+  "round": 1,
+  "roundLabel": {
+    "en": "Contest 1",
+    "zh": "资格轮"
+  },
+  "title": {
+    "en": "ACSL 2024-2025 Senior · Contest 1",
+    "zh": "ACSL 2024-2025 Senior · 资格轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Senior/2024-2025/资格轮/c_1_sr.pdf",
+      "sha256": "227e15a0e26f287c524931e86df3f3ae8f9101f1f15243fee2bd76ceaaed8609",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Senior/2024-2025/资格轮/c_1_sr_soln.pdf",
+      "sha256": "38de7f4a710978d561665e6d2188b5ac8ad500279952a96c9bbdca86e43f58c6",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Senior/2024-2025/资格轮/c_1_ACSL Rings_sr.pdf",
+      "sha256": "90fd4ff9f9a10dda9f2d2d0e8a33db98b673577af079f11fd75de679bde32c48",
+      "pages": 12
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Convert $9BD_{16}$ to octal.",
+        "zh": "将 $9BD_{16}$ 转换为8进制。"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "3535",
+            "zh": "3535"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "4575",
+            "zh": "4575"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "4675",
+            "zh": "4675"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "4775",
+            "zh": "4775"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "5775",
+            "zh": "5775"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Replace each hexadecimal digit with four bits, then regroup in threes for octal:\n\n$$\n9BD_{16}=(1001\\,1011\\,1101)_2=(100\\,110\\,111\\,101)_2=4675_8\n$$\n\nHere B=11 and D=13, so their four-bit groups are 1011 and 1101. The three-bit groups 100, 110, 111 and 101 have values 4, 6, 7 and 5. Regroup from the right without changing bit order; **answer C**.",
+        "zh": "每个十六进制数位换成四位二进制，再按三位一组转换为八进制：\n\n$$\n9BD_{16}=(1001\\,1011\\,1101)_2=(100\\,110\\,111\\,101)_2=4675_8\n$$\n\n选 C。\n\n其中 B=11、D=13，对应四位二进制 1011、1101。重新分组后的 100、110、111、101 分别对应 4、6、7、5。注意从右侧分组并保持比特顺序不变。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "What is the base 10 value of $A5C_{16}$?",
+        "zh": "将 $A5C_{16}$ 转换为十进制，结果是什么？"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "2425",
+            "zh": "2425"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "2465",
+            "zh": "2465"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "2562",
+            "zh": "2562"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "2652",
+            "zh": "2652"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "2752",
+            "zh": "2752"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "$$\nA5C_{16}=10*16^2+5*16^1+12*16^0\n$$\n\n= 10 * 256 + 5 * 16 + 12 * 1 = 2560 + 80 + 12 = 2652\n\nThe letters are digit values: A=10 and C=12. From right to left the place values are 1, 16, 256, so the three contributions are 12, 80 and 2560. Do not treat A and C as algebraic variables. **Answer: D.**",
+        "zh": "按位权展开：$A5C_{16}=10\\times16^2+5\\times16+12=2560+80+12=2652$，选 D。\n\nA、C 表示数位值 10、12，不是代数变量。从右向左的位权为 1、16、256，因此三位分别贡献 12、80、2560。相加得 2652。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find $f(10)$ given:\n\n$$\nf(x)=\\begin{cases} 2 & \\text{if }x\\le1\\\\ f(x-1)+3 & \\text{if }x>1\\text{ and }x\\text{ is odd}\\\\ f(x-1)-1 & \\text{if }x>1\\text{ and }x\\text{ is even} \\end{cases}\n$$",
+        "zh": "已知下列函数，求 $f(10)$：\n\n$$\nf(x)=\\begin{cases}2,&x\\le1,\\\\f(x-1)+3,&x>1\\text{ 且 }x\\text{ 为奇数},\\\\f(x-1)-1,&x>1\\text{ 且 }x\\text{ 为偶数}.\\end{cases}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "9",
+            "zh": "9"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "10",
+            "zh": "10"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "11",
+            "zh": "11"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "12",
+            "zh": "12"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "$$\nf(1)=2\n$$\n\n$$\nf(2)=f(2-1)-1=f(1)-1=2-1=1\n$$\n\n$$\nf(3)=f(3-1)+3=f(2)+3=1+3=4\n$$\n\n$$\nf(4)=f(4-1)-1=f(3)-1=4-1=3\n$$\n\n$$\nf(5)=f(5-1)+3=f(4)+3=3+3=6\n$$\n\n$$\nf(6)=f(6-1)-1=f(5)-1=6-1=5\n$$\n\nThe sequence of terms is: 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, ... The pattern is subtract 1, add 3. So the 10th term is 9.\n\nFrom x=2 through 10 there are five even arguments, each subtracting 1, and four odd arguments, each adding 3. Thus $f(10)=2-5+4\\cdot3=9$, **option B**. Decide the branch from the current argument x, not from whether f(x−1) is even or odd.",
+        "zh": "从 $f(1)=2$ 开始，依次减 1、加 3。前十项为 $2,1,4,3,6,5,8,7,10,9$。因此 $f(10)=9$，选 B。\n\n从 x=2 到 10，偶数参数共有五个，各减 1；奇数参数共有四个，各加 3。所以 $f(10)=2-5+4\\cdot3=9$，选 **B**。分支按当前参数 x 的奇偶决定，不按 f(x−1) 的奇偶决定。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find $f(20,12)$ given:\n\n$$\nf(x,y)=\\begin{cases} f(y-2,x-3)+1 & \\text{if }x\\ge12\\\\ f(x+2,y-2)-2 & \\text{if }8\\le x<12\\\\ x+y & \\text{if }x<8 \\end{cases}\n$$",
+        "zh": "已知下列函数，求 $f(20,12)$：\n\n$$\nf(x,y)=\\begin{cases}f(y-2,x-3)+1,&x\\ge12,\\\\f(x+2,y-2)-2,&8\\le x<12,\\\\x+y,&x<8.\\end{cases}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "16",
+            "zh": "16"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "17",
+            "zh": "17"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "18",
+            "zh": "18"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "19",
+            "zh": "19"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "20",
+            "zh": "20"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "$$\nf(20,12)=f(12-2,20-3)+1=f(10,17)+1=17+1=18\n$$\n\n$$\nf(10,17)=f(10+2,17-2)-2=f(12,15)-2=19-2=17\n$$\n\n$$\nf(12,15)=f(15-2,12-3)+1=f(13,9)+1=18+1=19\n$$\n\n$$\nf(13,9)=f(9-2,13-3)+1=f(7,10)+1=17+1=18\n$$\n\n$$\nf(7,10)=7+10=17\n$$\n\nThe tests depend only on x. The x≥12 branch also swaps the roles of x and y: (20,12) becomes (10,17). At x=12 that same branch applies; the middle branch has strict upper bound x<12. At (7,10), x<8 ends recursion even though y is 10. **Answer: C.**",
+        "zh": "递归调用依次为 $ (20,12)\\to(10,17)\\to(12,15)\\to(13,9)\\to(7,10) $。从终止条件回代：\n\n$$\n\\begin{aligned}f(7,10)&=17,\\\\f(13,9)&=17+1=18,\\\\f(12,15)&=18+1=19,\\\\f(10,17)&=19-2=17,\\\\f(20,12)&=17+1=18.\\end{aligned}\n$$\n\n选 C。\n\n分支条件只看 x。x≥12 分支还会交换两个参数的角色，所以 (20,12) 变为 (10,17)。x=12 也属于这一分支，中间分支的上界是严格的 x<12；到 (7,10) 时，虽然 y=10，但 x<8 已满足终止条件。**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "What is the output of the following program?\n\n```text\nm = 369\nb = int(m / 100)\nm = m % 100\nq = int(m / 25)\nm = m % 25\nd = int(m / 10)\nm = m % 10\nn = int(m / 5)\np = m % 5\noutput b, q, d, n, p\n```",
+        "zh": "请问下列程序会输出什么?\n\n```text\nm = 369\nb = int(m / 100)\nm = m % 100\nq = int(m / 25)\nm = m % 25\nd = int(m / 10)\nm = m % 10\nn = int(m / 5)\np = m % 5\noutput b, q, d, n, p\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "300, 20, 10, 1, 4",
+            "zh": "300, 20, 10, 1, 4"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "30, 20, 1, 1, 4",
+            "zh": "30, 20, 1, 1, 4"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "3, 3, 2, 1, 4",
+            "zh": "3, 3, 2, 1, 4"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "3, 2, 1, 1, 0",
+            "zh": "3, 2, 1, 1, 0"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "3, 2, 1, 1, 4",
+            "zh": "3, 2, 1, 1, 4"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "The quotient and remainder steps give b=3 with remainder 69; q=2 with remainder 19; d=1 with remainder 9; n=1 and p=4. The output is `3, 2, 1, 1, 4`.\n\nEach quotient counts units of the current denomination; each remainder is the amount left for smaller denominations. The reconstruction is $3\\cdot100+2\\cdot25+1\\cdot10+1\\cdot5+4=369$. The output contains counts, not the monetary values 300,50,10,5,4. **Answer: E.**",
+        "zh": "依次取商和余数：b=3，余 69；q=2，余 19；d=1，余 9；最后 n=1、p=4。因此输出 `3, 2, 1, 1, 4`。\n\n每次的商表示当前面额的数量，余数交给后续较小面额继续处理。可还原检查：$3\\cdot100+2\\cdot25+1\\cdot10+1\\cdot5+4=369$。程序输出的是数量，而不是对应金额 300、50、10、5、4。**答案：E。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q6",
+      "number": 6,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "What is the output of the following program?\n\n```text\nt = 0\nn = 1\nwhile t != 2024\n    s = 0\n    for y = 1 to n\n        s = s + y\n    next y\n    t = t + s\n    n = n + 1\nend while\noutput n-1\n```",
+        "zh": "请问下列程序会输出什么?\n\n```text\nt = 0\nn = 1\nwhile t != 2024\n    s = 0\n    for y = 1 to n\n        s = s + y\n    next y\n    t = t + s\n    n = n + 1\nend while\noutput n-1\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "16",
+            "zh": "16"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "18",
+            "zh": "18"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "20",
+            "zh": "20"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "22",
+            "zh": "22"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "24",
+            "zh": "24"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Each outer iteration adds the next triangular number to t. After k iterations, $t=k(k+1)(k+2)/6$. At k=22 this equals $22\\cdot23\\cdot24/6=2024$. n has advanced to 23, so the program prints n−1=22.\n\nFor each n, the inner loop computes s=1+2+…+n=n(n+1)/2, then t keeps the sum of all such s values. The first totals are 1, 4, 10. At the end of n=21, t=1771; the next triangular number is 22×23/2=253, giving 1771+253=2024. The increment of n occurs before the next while test, so printing n−1 avoids an off-by-one result of 23. **Answer: D.**",
+        "zh": "每次外层循环都将下一个三角数加入 t。执行 k 轮后，$t=k(k+1)(k+2)/6$。当 k=22 时，$22\\cdot23\\cdot24/6=2024$。此时 n 已增加到 23，所以输出 n−1=22。\n\n每个 n 对应的内层循环得到 s=1+2+…+n=n(n+1)/2，t 则累计这些 s，所以最初几轮的总和是 1、4、10。完成 n=21 的一轮后 t=1771，下一轮三角数为 22×23/2=253，于是 1771+253=2024。再次检查 while 条件之前已执行 n 自增，因此输出 n−1 才是 22，不能误写成 23。**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [
+    "The source directory calls Contest 1 the qualification round; canonical round remains 1."
+  ],
+  "programming": {
+    "id": "rings",
+    "definition": {
+      "title": "Rings",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Use the line structure shown in the test-case input below.\n\n### Problem\n\nACSL Rings is a game where the object is to score points by tossing a ball through one of the 5 rings. Points are awarded as follows:\n\n- Through the aqua or red ring - 1 point\n\n- Through the orange or green ring - 3 points\n\n- Through the black ring - 6 points\n\n- Through the space where 2 rings overlap - the sum of the points for the 2 rings plus 1\n\n- Any toss that is identified with a “+” at the end of the substring is awarded 2 extra points for having been tossed from a long distance\n\nWe will use a single letter to represent each of the above colors: aqua (A), red (R), orange (O), green (G), and black (B). The overlapping areas will be given by 2 letters: aqua and orange (AO or OA), orange and black (OB or BO), black and green (BG or GB), and green and red (GR or RG).\n\nYou will be given an integer, n, indicating the number of players, followed by n separate strings representing each player’s results for all tosses that go through at least one ring. Output a string for each player’s score in descending order using the format “player#-score”, each separated by a single space. Ties are broken based on the number of tosses; the fewer the tosses the better. We guarantee that all ties will be broken.\n\n### Example\n\n### Input\n\n```text\n3\nA R AO+\nB+ GR OA B\nG OB+\n```\n\n### Output\n\n```text\n2-24 3-15 1-9\n```\n\nExplanation Player 1’s tosses go through the aqua, red, and aqua & orange rings for a score of 1 + 1 + (1+3+1+2) = 9.\n\nPlayer 2 has a score of (6+2) + (3+1+1) + (3+1+1) + 6 = 24.\n\nPlayer 3 has a score of 3 + (3+6+1+2) = 15.\n\nPlayer 2 is in first place with 24 points; Player 3 is in second place with 15 points; and Player 1 is in third place with 9 points. The output is the string\n\n```text\n2-24 3-15 1-9\n```\n\n### Input\n\nThe input will consist of an integer representing the number of players followed by a string for each player’s results as described above.\n\n### Output\n\nOutput a string in the format “player#-score” for each player’s score in descending order, each separated by a single space.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "3\nA R AO+\nB+ GR OA B\nG OB+\n",
+          "expected": "2-24 3-15 1-9\n"
+        },
+        {
+          "input": "3\nA B R G O\nAO OA BO OB GR RG BG GB\nA AO B OB R GR B GB\n",
+          "expected": "2-60 3-44 1-14\n"
+        },
+        {
+          "input": "5\nA+ B R+ G O+\nAO OB+ GB RG\nA AO B R GR G GB O BO\nB R A G GR A BG OA R\nBG+ B+ G+ OA+ R+ A+ O+\n",
+          "expected": "3-44 5-43 4-33 2-32 1-20\n"
+        },
+        {
+          "input": "3\nA+ R+ AO+ B+ BG+ R+\nB+ GR+ AO+ B+\nGR+ OB+ R+ AO+ G+ R+\n",
+          "expected": "3-37 1-36 2-30\n"
+        },
+        {
+          "input": "4\nA R+ OA B AO OB BG GR B+\nAO OB B+ G BG BG+ GR+\nB+ G AO+ OB GR O+ B\nB+ B G AO+ AO BG GR G O+ G\n",
+          "expected": "2-55 4-55 1-53 3-44\n"
+        },
+        {
+          "input": "6\nR R G G AO BG GB B\nAO GR+ A B AO+ BG BG BO\nA A R R G G O O\nBG GB GR+ RG O O+ O A+ B\nGR RG A+ A O O+ B G\nA B+ B O G+ G G AO OB GR BG\n",
+          "expected": "6-59 2-56 4-52 1-39 5-31 3-16\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "3\nG R G R B G B G O B O B O B A O A O A O A O\nB B B G G A A A O B A O B G B G A O A O\nG B O A A A A B B B O O O G G G A O O B G R B G\n",
+          "expected": "3-78 1-69 2-66\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "4\nGR RG BG GB OB BO OA AO\nG R O B A GB OA RG OB\nAO\nBG\n",
+          "expected": "1-60 2-44 4-10 3-5\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "5\nA O B+ GR OB R AO+ G R GR+ BG\nAO GR BG+ A R O+ G B AO OB BG GR+ O R R+ B\nBG AO+ BG A A B B G AO AO+ BG GR B G A O A\nAO OB R GR+ B G R AO OB GR O B+ O A B\nB+ O G AO OB B+ G A+ B BG GR A O G R\n",
+          "expected": "3-85 2-83 4-74 5-72 1-56\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "6\nB+ B+ R A O GR+ GR BG BG+ OB OB OB AO AO AO AO+ A R G B B\nAO BG GR GR B B G G+ G A A A GR OB AO BG BG AO+ AO\nA B G+ O R R GR BG OB AO A B B B O O G AO OB+ GR BG B\nGR AO BG A O B+ AO GR BG BG OB+ OB OB AO AO AO AO O G B A\nGR BG AO OB O+ O O B G A A GR OB AO BG+ AO G B B R\nA A+ R R BG G G O O+ O A A R R B B B BG+ G O O\n",
+          "expected": "4-127 1-124 3-113 5-105 2-103 6-76\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "6\nGR AO BG R R G+ G AO AO+ BG BG B R R A A G\nB A O R+ G G AO GR A B R G O BG BG OB B\nBG BG AO GR A A A B B R R G G G O O O O AO BG GR\nA A A B B+ B O O+ O G G G AO OB GR BG O R B O\nR B B G A BG BG GR GR A A A O+ O O B B G\nA R G B+ BG BG+ GR GR O O O A B AO OB BG\n",
+          "expected": "3-88 6-86 4-86 2-79 5-76 1-75\n",
+          "weight": 16.6666
+        },
+        {
+          "input": "7\nA R B G+ O B G O+ A R B+ G AO AO BG GR GR BG OB OB OB AO\nB G O R A AO BG GR OB AO BG GR OB AO BG GR OB AO BG GR+ OB\nB R A G GR A B R OB+ B A R B OB R A G BG+ G AO OB OB OB BG\nOB+ GB+ GR BG+ RG+ BG+ OA+ OB+ G+ B+ GB+ BO+ AO BO+ G\nAO GR GR OB+ OB OB AO GR GR+ OB OB OB BG BG BG BG B R A G O\nAO OB+ GR BG+ OB GR+ OB GR+ BG AO+ OB GR+ BG+ R+ A+ G O+ B+\nBG OA+ GR B+ B R+ RG A+ G G AO O B+ A G GB OB+ BO OA+ O G\n",
+          "expected": "5-148 4-136 6-136 2-136 3-125 7-118 1-118\n",
+          "weight": 16.6666
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。输入按下方测试用例展示的行结构读取。\n\n### 问题\n\nACSL Rings 游戏规则:向 5 个圆环投球,球穿过其中一个圆环即可得分。计分规则如下:\n\n- 球穿过蓝色或红色圆环——得 1 分\n\n- 球穿过橘色或绿色圆环——得 3 分\n\n- 球穿过黑色圆环——得 6 分\n\n- 球穿过两个圆环的重叠区域——得分为两个圆环的得分之和再加 1\n\n- 子串末尾带“+”表示远距离投球——玩家可额外获得 2 分\n\n我们用单个字母来表示上述每种颜色的圆环:蓝色(A)、红色(R)、橘色(O)、 绿色(G)、黑色(B)。两个圆环的重叠区域用两个字母来表示:蓝色和橘色圆环重叠区域( AO 或 OA)、橘色和黑色圆环重叠区域(OB 或 BO)、黑色和绿色圆环重叠区域(BG或 GB)、绿色和红色圆环重叠区域(GR 或 RG)。\n\n给定一个整数 n 表示玩家数量,后跟 n 个独立字符串,分别表示每位玩家投球穿过至少一个圆环的所有结果。将每位玩家的得分按照“玩家序号-得分”的格式降序输出为一个字符串,且每位玩家的得分之间用一个空格隔开。如玩家得分出现平局,则参考每位玩家的投球次数,投球次数更少的玩家优先。我们确定所有平局都可被打破。\n\n### 示例\n\n### 输入\n\n```text\n3\nA R AO+\nB+ GR OA B\nG OB+\n```\n\n### 输出\n\n```text\n2-24 3-15 1-9\n```\n\n解析 1 号玩家投球穿过蓝色圆环、红色圆环、蓝色和橘色圆环的重叠区域, 得分为 1 + 1 + (1+3+1+2) = 9 。\n\n2 号玩家得分为 (6+2) + (3+1+1) + (3+1+1) + 6 = 24 。\n\n3 号玩家得分为 3 + (3+6+1+2) = 15 。\n\n2 号玩家得分为 24 分,排第一位;3 号玩家得分为 15 分,排第二位;\n\n1 号玩家得分为 9 分,排第三位。输出字符串:2-24 3-15 1-9 。\n\n### 输入\n\n输入一个整数,表示玩家数量,后跟字符串,表示每位玩家的投球结果,格式如上所述。\n\n### 输出\n\n将每位玩家的得分按照“玩家序号-得分”的格式降序输出为一个字符串,每位玩家的得分之间用一个空格隔开。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [],
+      "zh": []
+    }
+  }
+}

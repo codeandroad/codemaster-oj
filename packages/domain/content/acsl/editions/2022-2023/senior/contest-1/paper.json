@@ -1,0 +1,457 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2022-2023-senior-1",
+  "division": "Senior",
+  "season": "2022-2023",
+  "round": 1,
+  "roundLabel": {
+    "en": "Contest 1",
+    "zh": "第一轮"
+  },
+  "title": {
+    "en": "ACSL 2022-2023 Senior · Contest 1",
+    "zh": "ACSL 2022-2023 Senior · 第一轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Senior/2022-2023/第一轮/c_1_sr（中英文版本）.pdf",
+      "sha256": "020da6c887fd4a19c0b55ad291dd7ab21921c09b2164b52f6b3b1ee22885ac49",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Senior/2022-2023/第一轮/c_1_sr_soln.pdf",
+      "sha256": "61e94fea4da13dba4f229c508311d21e3521a47ec34e737c3f8d356e19a8a5de",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Senior/2022-2023/第一轮/c_1_Next Base_sr（含答案）.pdf",
+      "sha256": "e6f10098148781c4b95984131d00efc630af8298917f1729401eced1f51edb37",
+      "pages": 4
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "In the sequence of decimal numbers from 100 to 129, inclusive, each converted to octal, how many total times do the digits 5 through 7 occur?",
+        "zh": "从100到129(含100和129)的十进制数字序列中,将每个数字转换为八进制数,请问数字5到7一共出现了多少次?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "36",
+            "zh": "36"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "12",
+            "zh": "12"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "24",
+            "zh": "24"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "48",
+            "zh": "48"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "30",
+            "zh": "30"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "Convert the decimal numbers 100 through 129 to octal:\n\n| Decimal | Octal |\n| --- | --- |\n| 100 | 144 |\n| 101 | 145 |\n| 102 | 146 |\n| 103 | 147 |\n| 104 | 150 |\n| 105 | 151 |\n| 106 | 152 |\n| 107 | 153 |\n| 108 | 154 |\n| 109 | 155 |\n| 110 | 156 |\n| 111 | 157 |\n| 112 | 160 |\n| 113 | 161 |\n| 114 | 162 |\n| 115 | 163 |\n| 116 | 164 |\n| 117 | 165 |\n| 118 | 166 |\n| 119 | 167 |\n| 120 | 170 |\n| 121 | 171 |\n| 122 | 172 |\n| 123 | 173 |\n| 124 | 174 |\n| 125 | 175 |\n| 126 | 176 |\n| 127 | 177 |\n| 128 | 200 |\n| 129 | 201 |\n\nEach of the digits 5, 6 and 7 occurs 12 times, for a total of 36 occurrences.\n\nA shorter count separates positions. For each target digit 5, 6 or 7, the units position contains it four times (in the 14x, 15x, 16x and 17x blocks), and the eights position contains it eight times (150–157, 160–167 or 170–177). Thus each occurs 4+8=12 times and the total is $3\\cdot12=36$, **option A**. A number such as 155 contributes twice, once per position.",
+        "zh": "将十进制的 100 到 129 转为八进制：\n\n| 十进制 | 八进制 |\n| --- | --- |\n| 100 | 144 |\n| 101 | 145 |\n| 102 | 146 |\n| 103 | 147 |\n| 104 | 150 |\n| 105 | 151 |\n| 106 | 152 |\n| 107 | 153 |\n| 108 | 154 |\n| 109 | 155 |\n| 110 | 156 |\n| 111 | 157 |\n| 112 | 160 |\n| 113 | 161 |\n| 114 | 162 |\n| 115 | 163 |\n| 116 | 164 |\n| 117 | 165 |\n| 118 | 166 |\n| 119 | 167 |\n| 120 | 170 |\n| 121 | 171 |\n| 122 | 172 |\n| 123 | 173 |\n| 124 | 174 |\n| 125 | 175 |\n| 126 | 176 |\n| 127 | 177 |\n| 128 | 200 |\n| 129 | 201 |\n\n数字 5、6、7 各出现 12 次，合计出现 36 次。\n\n也可按数位统计：对目标数字 5、6、7 中的每一个，个位在 14x、15x、16x、17x 四段中各出现一次，共 4 次；八位分别在 150–157、160–167 或 170–177 中连续出现 8 次。因此各出现 4+8=12 次，合计 $3\\cdot12=36$，选 **A**。例如 155 要按两个数位贡献两次。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "What is the value of $FA8072_{16}$ − $40E0D0_{16}$ in base 8?",
+        "zh": "$FA8072_{16}$ − $40E0D0_{16}$ 的值用八进制表示是多少?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "56310642",
+            "zh": "56310642"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "56417642",
+            "zh": "56417642"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "56317642",
+            "zh": "56317642"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "56217642",
+            "zh": "56217642"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "46317642",
+            "zh": "46317642"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "$FA8072_{16}$ − $40E0D0_{16}$ = $B99FA2_{16}$ by borrowing 16 if needed.\n\n$$\nB99FA2_{16}=101110011001111110100010_{2}\n$$\n\n$$\n=101110011001111110100010_{2}=56317642_{8}\n$$\n\nThe hexadecimal-to-binary groups are `1011 1001 1001 1111 1010 0010`. Regroup the same bits from the right as `101 110 011 001 111 110 100 010`, which gives octal digits 5,6,3,1,7,6,4,2. Do not group each hexadecimal digit into a separate octal digit: the group sizes are four versus three bits. **Answer: C.**",
+        "zh": "按十六进制减法运算，需要借位时借 16，得到 $FA8072_{16}-40E0D0_{16}=B99FA2_{16}$。再将每个十六进制数位转为四位二进制，并从右侧起每三位一组转换为八进制：\n\n$$\nB99FA2_{16}=101\\,110\\,011\\,001\\,111\\,110\\,100\\,010_2=56317642_8\n$$\n\n十六进制逐位展开得到 `1011 1001 1001 1111 1010 0010`。保持位序不变，从右侧重新按三位分组为 `101 110 011 001 111 110 100 010`，对应八进制数位 5、6、3、1、7、6、4、2。不能把一个十六进制数位直接对应为一个八进制数位，因为它们分别代表四位和三位二进制。**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find $f(17)$ given:\n\n$$\nf(x)=\\begin{cases} f(x-5)+x & \\text{if }x>4\\\\ f(x+2)-x & \\text{if }2\\le x\\le4\\\\ -x & \\text{if }x<2 \\end{cases}\n$$",
+        "zh": "如果给定下列式子,请计算 $f(17)$\n\n$$\nf(x)=\\begin{cases} f(x-5)+x & \\text{当 }x>4\\\\ f(x+2)-x & \\text{当 }2\\le x\\le4\\\\ -x & \\text{当 }x<2 \\end{cases}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "5",
+            "zh": "5"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "18",
+            "zh": "18"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "35",
+            "zh": "35"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "-1",
+            "zh": "-1"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "$$\nf(17)=f(17-5)+17=f(12)+17=18+17=35\n$$\n\n$$\nf(12)=f(12-5)+12=f(7)+12=6+12=18\n$$\n\n$$\nf(7)=f(7-5)+7=f(2)+7=-1+7=6\n$$\n\n$$\nf(2)=f(2+2)-2=f(4)-2=1-2=-1\n$$\n\n$$\nf(4)=f(4+2)-4=f(6)-4=5-4=1\n$$\n\n$$\nf(6)=f(6-5)+6=f(1)+6=-1+6=5\n$$\n\n$$\nf(1)=-1\n$$\n\nThe argument chain is 17→12→7→2→4→6→1. The middle branch can increase x, so reaching x=2 does not end the recursion. Only x<2 uses the base rule; start with f(1)=−1 and work backward through every saved addition or subtraction. The result is 35, **option D**.",
+        "zh": "原卷解析：\n\n$$\nf(17)=f(17-5)+17=f(12)+17=18+17=35\n$$\n\n$$\nf(12)=f(12-5)+12=f(7)+12=6+12=18\n$$\n\n$$\nf(7)=f(7-5)+7=f(2)+7=-1+7=6\n$$\n\n$$\nf(2)=f(2+2)-2=f(4)-2=1-2=-1\n$$\n\n$$\nf(4)=f(4+2)-4=f(6)-4=5-4=1\n$$\n\n$$\nf(6)=f(6-5)+6=f(1)+6=-1+6=5\n$$\n\n$$\nf(1)=-1\n$$\n\n原卷给出的展开链可按参数顺序理解为 17→12→7→2→4→6→1。中间分支会使参数变大，所以到达 x=2 还不能终止；只有 x<2 才使用终止规则。先算 f(1)=−1，再逆序代回各层保存的加减运算，得 35，选 **D**。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find $f(12,18)$ given:\n\n$$\nf(x,y)=\\begin{cases} f(x/2,y-3)-xy & \\text{if }x\\text{ is even}\\\\ f\\!\\left(y+2,\\dfrac{x}{3}\\right)+x & \\text{if }x\\text{ is an odd multiple of }3\\\\ xy & \\text{otherwise} \\end{cases}\n$$",
+        "zh": "如果给定下列式子,请计算 $f(12,18)$\n\n$$\nf(x,y)=\\begin{cases} f(x/2,y-3)-xy & \\text{当 }x\\text{ 为偶数}\\\\ f\\!\\left(y+2,\\dfrac{x}{3}\\right)+x & \\text{当 }x\\text{ 为 3 的奇数倍}\\\\ xy & \\text{其他情况} \\end{cases}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "-115",
+            "zh": "-115"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "-331",
+            "zh": "-331"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "-25",
+            "zh": "-25"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "-216",
+            "zh": "-216"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "-14",
+            "zh": "-14"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Follow the even / odd-multiple-of-3 branches, then substitute back from f(7,−2):\n\n$$\nf(7,-2)=7(-2)=-14\n$$\n\n$$\nf(14,1)=f(7,-2)-14=-28\n$$\n\n$$\nf(3,12)=f(14,1)+3=-25\n$$\n\n$$\nf(6,15)=f(3,12)-90=-115\n$$\n\n$$\nf(12,18)=f(6,15)-216=-331\n$$\n\nUse the original arguments for the arithmetic outside each recursive call. At (12,18), subtract 12×18=216 even though the next call uses (6,15). At (6,15), subtract 90. The x=3 branch is the odd-multiple-of-3 case and adds the old x, namely 3; x=7 reaches the otherwise rule. **Answer: B, −331.**",
+        "zh": "按“偶数”和“3 的奇数倍”分支递归，再从 f(7,−2) 逐层代回：\n\n$$\nf(7,-2)=7(-2)=-14\n$$\n\n$$\nf(14,1)=f(7,-2)-14=-28\n$$\n\n$$\nf(3,12)=f(14,1)+3=-25\n$$\n\n$$\nf(6,15)=f(3,12)-90=-115\n$$\n\n$$\nf(12,18)=f(6,15)-216=-331\n$$\n\n递归调用外的运算使用本层原参数。例如在 (12,18) 处，即使下一次调用改为 (6,15)，仍应减去 12×18=216；在 (6,15) 处减去 90。x=3 属于“3 的奇数倍”分支，加的是本层原 x，即 3；x=7 才使用 otherwise 终止。**答案：B，−331。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "What is the output of the following program if n = 20?\n\n```text\ninput n\nt = 0\nfor x = 3 to n step 3\n        d = 2\n        while d < x\n            t = t + 1\n            d = d * 2\n        end while\nnext x\noutput t\n```",
+        "zh": "当n = 20,以下程序会输出什么?\n\n```text\ninput n\nt = 0\nfor x = 3 to n step 3\n        d = 2\n        while d < x\n            t = t + 1\n            d = d * 2\n        end while\nnext x\noutput t\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "12",
+            "zh": "12"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "13",
+            "zh": "13"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "14",
+            "zh": "14"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "15",
+            "zh": "15"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "16",
+            "zh": "16"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "The outer loop uses $x=3,6,9,12,15,18$. For each $x$, the inner loop counts the powers $2,4,8,\\ldots$ that are strictly less than $x$.\n\n| $x$ | Powers counted | Increments |\n| --- | --- | --- |\n| 3 | 2 | 1 |\n| 6 | 2, 4 | 2 |\n| 9 | 2, 4, 8 | 3 |\n| 12 | 2, 4, 8 | 3 |\n| 15 | 2, 4, 8 | 3 |\n| 18 | 2, 4, 8, 16 | 4 |\n\nThe total is $1+2+3+3+3+4=\\boxed{16}$.\n\nd resets to 2 for every outer iteration, but t is initialized only once and accumulates all counts. The outer step is 3, so 20 is a limit rather than an actual x value; 21 is already past the limit. The inner comparison is strict: the first d at least x is not counted. **Answer: E.**",
+        "zh": "外层循环依次取 $x=3,6,9,12,15,18$。对于每个 $x$，内层循环统计严格小于 $x$ 的 $2,4,8,\\ldots$。\n\n| $x$ | 计入的数 | 增加次数 |\n| --- | --- | --- |\n| 3 | 2 | 1 |\n| 6 | 2, 4 | 2 |\n| 9 | 2, 4, 8 | 3 |\n| 12 | 2, 4, 8 | 3 |\n| 15 | 2, 4, 8 | 3 |\n| 18 | 2, 4, 8, 16 | 4 |\n\n总和为 $1+2+3+3+3+4=\\boxed{16}$。\n\n每轮外层循环都把 d 重置为 2，而 t 只在程序开始初始化一次，负责累计全部次数。外层步长是 3，20 只是上限，不是实际取到的 x；21 已超过上限。内层为严格小于，第一次达到或超过 x 的 d 不再计数。**答案：E。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [],
+  "programming": {
+    "id": "next-base",
+    "definition": {
+      "title": "Next Base",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Use the line structure shown in the test-case input below.\n\n### Problem\n\nGiven 3 positive integers, n, b, and s, generate the next n numbers in base b starting with s in the given base. We guarantee that the base will be between 2 and 16 inclusive. We guarantee that s is a valid number in base b. Find all of the digits in the numbers generated and print the number of times, in base 10, that the most frequently found digit occurs.\n\n### Example\n\nIf n=15, b=8, and s=2, the numbers generated are 2, 3, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15, 16, 17, 20. The digit that occurs most frequently is 1 which occurs 9 times so the output would be 9.\n\n### Input\n\nThere will be three values representing how many numbers to generate, the base to be used between 2 and 16 inclusive, and the starting value in the base given that will be no more than 16 digits long. We guarantee that s is a valid number in base b.\n\n### Output\n\nFor each set of 3 input values, find how many times each digit occurs in the sequence of numbers generated. Then output the number of times the digit that is found the most actually occurs.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "15 8 2\n",
+          "expected": "9\n"
+        },
+        {
+          "input": "25 2 1111011\n",
+          "expected": "105\n"
+        },
+        {
+          "input": "20 12 9AB\n",
+          "expected": "14\n"
+        },
+        {
+          "input": "10 16 ABCDEF\n",
+          "expected": "10\n"
+        },
+        {
+          "input": "1000 2 1\n",
+          "expected": "4938\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "50 4 12\n",
+          "expected": "42\n",
+          "weight": 20
+        },
+        {
+          "input": "75 9 384\n",
+          "expected": "88\n",
+          "weight": 20
+        },
+        {
+          "input": "500 14 9CBA\n",
+          "expected": "336\n",
+          "weight": 20
+        },
+        {
+          "input": "700 11 AAA0\n",
+          "expected": "940\n",
+          "weight": 20
+        },
+        {
+          "input": "25 2 110000111010\n",
+          "expected": "165\n",
+          "weight": 20
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。输入按下方测试用例展示的行结构读取。\n\n### 问题\n\n给定 3 个正整数 n、b 和 s ,生成以给定进制的数字 s 开始的接下来 n 个 b 进制数字。 我们确保进制介于 2 和 16 之间( 含 2 和 16)并且 s 是一个 b 进制的有效数字。找出生成数字的各个数位上的所有数字并打印输出出现频率最高的数字对应出现总次数的十进制数。\n\n### 示例\n\n如果 n = 15, b = 8 且 s = 2,生成的数字是 2、 3、 4、 5、 6、 7、10、11、12、13、 14、15、 16、 17、20。出现频率最高的数字是 1,一共出现了 9 次，所以输出的值是 9。\n\n### 输入\n\n将会有三个整数，分别表示生成值的数量，要使用的进制(介于 2 和 16 之间，包含 2 和 16),给定进制的起始值(不超过 16 位)。我们保证 s 是一个 b 进制下的有效数字。\n\n### 输出\n\n对于每组 3 个输入值，求生成的数列中每个数字出现的次数，输出出现频率最高的数字出现的次数。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [],
+      "zh": []
+    }
+  }
+}

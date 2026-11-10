@@ -1,0 +1,378 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2021-2022-elementary-3",
+  "division": "Elementary",
+  "season": "2021-2022",
+  "round": 3,
+  "roundLabel": {
+    "en": "Contest 3",
+    "zh": "第三轮"
+  },
+  "title": {
+    "en": "ACSL 2021-2022 Elementary · Contest 3",
+    "zh": "ACSL 2021-2022 Elementary · 第三轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Elementary/2021-2022/第三轮/c_3_elem.pdf",
+      "sha256": "69d175bb353831e098145fe3eb0531cb705cc0b2c2569edd760941ef18650e66",
+      "pages": 2
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Elementary/2021-2022/第三轮/c_3_elem_soln.pdf",
+      "sha256": "915764e682d77ac7964faf90fe37df19dcc9697a49312c1102335cc34c780a38",
+      "pages": 1
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "Of the numbers 2, 5, 6, 10, 13, how many satisfy this Boolean expression?\n\n$$\n\\;\\mathrm{NOT}\\;(x=10)\\;\\mathrm{AND}\\;(x\\ge 6)\\;\\mathrm{OR}\\;(x=5)\n$$",
+        "zh": "在2, 5, 6, 10, 13这些数字中,请问有多少个满足以下布尔表达式?\n\n$$\n\\;\\mathrm{NOT}\\;(x=10)\\;\\mathrm{AND}\\;(x\\ge 6)\\;\\mathrm{OR}\\;(x=5)\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "1",
+            "zh": "1"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "2",
+            "zh": "2"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "3",
+            "zh": "3"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "5",
+            "zh": "5"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Answer: **C**.\n\nRemember that the order of Boolean operators is NOT, AND, then OR. If x = 2, NOT (2=10) AND (2≥6) OR (2=5) = (T and F) or F = FALSE. If x = 5, NOT (5=10) AND (5≥6) OR (5=5) = (T and F) or T = TRUE. If x = 6, NOT (6=10) AND (6≥6) OR (6=5) = (T and T) or F = TRUE. If x = 10, NOT (10=10) AND (10 ≥ 6) OR (10=5) = (F and T) or F = FALSE. If x = 13, NOT (13=10) AND (13 ≥ 6) OR (13=5) = (T and T) or F = TRUE. Therefore, the answer is that there are 3 of them that make it TRUE.",
+        "zh": "答案：**C**。\n\n先对 `x=10` 取反，再与 `x≥6` 做 AND，最后与 `x=5` 做 OR。左半式要求 $x\\ge6$ 且 $x\\ne10$，给出的数里 6 和 13 满足。右半式另接受 5，所以一共 3 个。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "Determine which ordered pair(s) make the following expression FALSE:\n\n$$\n\\sim (A\\sim B + \\sim A\\sim B)\n$$",
+        "zh": "判断哪个有序对使下述表达式为假。\n\n$$\n\\sim (A\\sim B + \\sim A\\sim B)\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "(1,1), (1,0)",
+            "zh": "(1,1), (1,0)"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "(1,0), (0,1)",
+            "zh": "(1,0), (0,1)"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "(1,1), (0,1)",
+            "zh": "(1,1), (0,1)"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "(0,0), (0,1)",
+            "zh": "(0,0), (0,1)"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "(1,0), (0,0)",
+            "zh": "(1,0), (0,0)"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "Answer: **E**.\n\nThe ordered pair(s) that make ~(A~B + ~A~B) FALSE, make A~B + ~A~B TRUE. Therefore, the two ordered pairs are A=1, B=0 or A=0, B=0. That gives (1,0) and (0,0).",
+        "zh": "答案：**E**。\n\n括号内两项都有 $\\sim B$，可提取为 $(A+\\sim A)\\sim B=\\sim B$。外层取反后整个式子等于 $B$，因此只要 $B=0$ 就为假，两组是 $(1,0)$ 和 $(0,0)$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "Determine which two of the following are equivalent Boolean expressions:\n\na. $B(A\\sim B + A) $\n\nb. $B $\n\nc. $A\\sim B + A $\n\nd. $AB$",
+        "zh": "判断以下哪两个布尔表达式是等价的。\n\na. $B(A\\sim B + A) $\n\nb. $B $\n\nc. $A\\sim B + A $\n\nd. $AB$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "a, d",
+            "zh": "a, d"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "a, b",
+            "zh": "a, b"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "a, c",
+            "zh": "a, c"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "c, d",
+            "zh": "c, d"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "b, d",
+            "zh": "b, d"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "Apply absorption: $A\\sim B+A=A$. Thus expression a becomes $B(A)=AB$, which is expression d. Expressions b and c reduce to $B$ and $A$, respectively. The equivalent pair is a and d (option A).",
+        "zh": "答案：**A**。\n\n先用吸收律 $A\\sim B+A=A$。因此 a 的外层再乘 $B$ 后等于 $AB$，正好和 d 相同。b、c 分别化为 $B$、$A$。例如取 $(A,B)=(1,0)$ 可以区分 c 和 d。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "Simplify the following Boolean expression:\n\n$$\nA\\sim B(A + \\sim B) + \\sim AB(\\sim A + B)\n$$",
+        "zh": "化简下方的布尔表达式:\n\n$$\nA\\sim B(A + \\sim B) + \\sim AB(\\sim A + B)\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "$\\sim A\\sim B + \\sim AB$",
+            "zh": "$\\sim A\\sim B + \\sim AB$"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "$A\\sim B + \\sim AB$",
+            "zh": "$A\\sim B + \\sim AB$"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "$AB + A\\sim B$",
+            "zh": "$AB + A\\sim B$"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "$\\sim A\\sim B$",
+            "zh": "$\\sim A\\sim B$"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "0",
+            "zh": "0"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Answer: **B**.\n\n$$\nA\\sim B(A + \\sim B) + \\sim AB(\\sim A + B)\n$$\n\n$$\n= A\\sim BA + A\\sim B\\sim B + \\sim AB\\sim A + \\sim ABB\n$$\n\n$$\n= A\\sim B + A\\sim B + \\sim AB + \\sim AB\n$$\n\n$$\n= A\\sim B + \\sim AB\n$$",
+        "zh": "答案：**B**。\n\n展开两处括号。第一处产生 $A\\sim BA$ 和 $A\\sim B\\sim B$，两项都等于 $A\\sim B$；第二处两项都等于 $\\sim AB$。用 $X+X=X$ 合并，得到 $A\\sim B+\\sim AB$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "Determine which of the following is a tautology:\n\na. $A\\sim B + \\sim B + A $\n\nb. $\\sim (A + B) + (A + B)$\n\nc. $\\sim A(A\\sim B) + \\sim B(\\sim AB) $\n\nd. $AB + \\sim AB + A$",
+        "zh": "以下哪项是永真式(重言式)?\n\na. $A\\sim B + \\sim B + A $\n\nb. $\\sim (A + B) + (A + B)$\n\nc. $\\sim A(A\\sim B) + \\sim B(\\sim AB) $\n\nd. $AB + \\sim AB + A$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "$A\\sim B + \\sim B + A$",
+            "zh": "$A\\sim B + \\sim B + A$"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "$\\sim (A + B) + (A + B)$",
+            "zh": "$\\sim (A + B) + (A + B)$"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "$\\sim A(A\\sim B) + \\sim B(\\sim AB)$",
+            "zh": "$\\sim A(A\\sim B) + \\sim B(\\sim AB)$"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "$AB + \\sim AB + A$",
+            "zh": "$AB + \\sim AB + A$"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "None of them",
+            "zh": "均不符合"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Answer: **B**.\n\nA tautology is always TRUE. Each of the expressions simplifies: A~B+~B+A = ~B(A+1)+A = ~B+A is TRUE for (0,0), (1,1), (1,0). ~(A+B) + (A+B) = ~A~B + A + B is TRUE for (0,0), (1,0), (1,1), (0,1). ~A(A~B) + ~B(~AB) = ~AA~B + ~AB~B = 0+ 0=0 is never TRUE. AB+~AB+A = B(A+~A)+A = B(1)+A = B+A is TRUE for (1,1), (0,1), (1,0).",
+        "zh": "答案：**B**。\n\n令 $X=A+B$，选项 B 就是 $\\sim X+X$，始终为真。其余三式各有反例：A 化成 $\\sim B+A$，在 $(0,1)$ 为假；C 化成 0；D 化成 $A+B$，在 $(0,0)$ 为假。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": []
+}

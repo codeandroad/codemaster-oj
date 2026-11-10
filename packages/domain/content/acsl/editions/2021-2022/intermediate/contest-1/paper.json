@@ -1,0 +1,718 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2021-2022-intermediate-1",
+  "division": "Intermediate",
+  "season": "2021-2022",
+  "round": 1,
+  "roundLabel": {
+    "en": "Contest 1",
+    "zh": "第一轮"
+  },
+  "title": {
+    "en": "ACSL 2021-2022 Intermediate · Contest 1",
+    "zh": "ACSL 2021-2022 Intermediate · 第一轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Intermediate/2021-2022/第一轮/c_1_int.pdf",
+      "sha256": "5d677b2734461177fd08bfd282343c0a4b47e5d120514eeec7e99c588c117aaf",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Intermediate/2021-2022/第一轮/c_1_int_soln.pdf",
+      "sha256": "bf1f14c84b271c09d6cbc5ec407f8cb217064e4446ec72657e8ac2171e277013",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Intermediate/2021-2022/第一轮/c_1_FibonacciClock_int（含答案）.pdf",
+      "sha256": "d071ffe5c74c594ef66f3a9ae37f589852da29eac1be6c29f630074cfb539da9",
+      "pages": 6
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Convert $2122_{10}$ to hexadecimal.",
+        "zh": "请将 $2122_{10}$ 转化为十六进制。"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "A48",
+            "zh": "A48"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "B37",
+            "zh": "B37"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "849",
+            "zh": "849"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "84A",
+            "zh": "84A"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "73A",
+            "zh": "73A"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "$$\n2122_{10}=8*16^{2}+4*16^{1}+10*16^{0}\n$$\n\n$$\n=84A_{16}\n$$\n\nDividing successively by 16 gives $2122=132\\cdot16+10$, $132=8\\cdot16+4$, and $8=0\\cdot16+8$. Read the remainders upward: 8, 4, 10. Hexadecimal represents the final digit 10 by A, giving $84A_{16}$.\n\n**Answer: D.**",
+        "zh": "按十六进制位权分解：\n\n$$2122_{10}=8\\cdot16^2+4\\cdot16+10=84A_{16}.$$\n\n依次除以 16：$2122=132\\cdot16+10$，$132=8\\cdot16+4$，$8=0\\cdot16+8$。从最后一个余数向前读，得到 8、4、10；十六进制用 A 表示数字 10，所以结果为 $84A_{16}$。\n\n**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "The Fibonacci sequence {0, 1, 1, 2, 3, 5, 8, 13, ...} is formed by adding the two previous terms: 5 + 8 = 13. Which number in the sequence when converted to octal would have the 6th occurrence of the digit “1” when counting every digit?",
+        "zh": "斐波那契数列{0, 1, 1, 2, 3, 5, 8, 13, ...}由前两项相加而成,比如:5 + 8 =13。转化为八进制后,当每一位都算上时,该数列中第六次出现“1”的是哪个数?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "34",
+            "zh": "34"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "55",
+            "zh": "55"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "89",
+            "zh": "89"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "144",
+            "zh": "144"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "233",
+            "zh": "233"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Convert the Fibonacci terms to octal and count every digit 1:\n\n| Decimal | Octal | Occurrences of 1 so far |\n| --- | --- | --- |\n| 0 | 0 | 0 |\n| 1 | 1 | 1 |\n| 1 | 1 | 2 |\n| 2 | 2 | 2 |\n| 3 | 3 | 2 |\n| 5 | 5 | 2 |\n| 8 | 10 | 3 |\n| 13 | 15 | 4 |\n| 21 | 25 | 4 |\n| 34 | 42 | 4 |\n| 55 | 67 | 4 |\n| 89 | 131 | 6 |\n\nThe fifth and sixth occurrences both appear in $89_{10}=131_8$, so the answer is 89.\n\n**Answer: C.**",
+        "zh": "将斐波那契数列逐项转换为八进制，统计所有数位中的 1：\n\n| 十进制 | 八进制 | 累计出现 1 的次数 |\n| --- | --- | --- |\n| 0 | 0 | 0 |\n| 1 | 1 | 1 |\n| 1 | 1 | 2 |\n| 2 | 2 | 2 |\n| 3 | 3 | 2 |\n| 5 | 5 | 2 |\n| 8 | 10 | 3 |\n| 13 | 15 | 4 |\n| 21 | 25 | 4 |\n| 34 | 42 | 4 |\n| 55 | 67 | 4 |\n| 89 | 131 | 6 |\n\n第五次和第六次出现的 1 都在 $89_{10}=131_8$ 中，因此答案是 89。\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find $f(20)$, given\n\n$$\nf(x)=\\begin{cases} 2*f(x-3)+1 & \\text{if }x\\ge15\\\\ \\left[\\dfrac{f(x+2)}{3}\\right] & \\text{if }12<x<15\\\\ 2*x-3 & \\text{if }x\\le12 \\end{cases}\n$$\n\nwhere [y] returns the greatest integer less than or equal to y",
+        "zh": "根据以下定义，求 $f(20)$：\n\n$$f(x)=\\begin{cases}2f(x-3)+1 & x\\ge15\\\\\\left[\\dfrac{f(x+2)}3\\right] & 12<x<15\\\\2x-3 & x\\le12\\end{cases}$$\n\n其中 $[y]$ 表示小于或等于 $y$ 的最大整数。"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "43",
+            "zh": "43"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "39",
+            "zh": "39"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "19",
+            "zh": "19"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "14",
+            "zh": "14"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "9",
+            "zh": "9"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Evaluate from the terminating case, taking the floor in the middle branch:\n\n$$\nf(12)=2\\cdot12-3=21\n$$\n\n$$\nf(15)=2f(12)+1=43\n$$\n\n$$\nf(13)=\\lfloor f(15)/3\\rfloor=\\lfloor43/3\\rfloor=14\n$$\n\n$$\nf(16)=2f(13)+1=29\n$$\n\n$$\nf(14)=\\lfloor f(16)/3\\rfloor=\\lfloor29/3\\rfloor=9\n$$\n\n$$\nf(17)=2f(14)+1=19\n$$\n\n$$\nf(20)=2f(17)+1=39\n$$\n\n**Answer: B.**",
+        "zh": "从终止分支开始逐层代回；中间分支按题意向下取整：\n\n$$\nf(12)=2\\cdot12-3=21\n$$\n\n$$\nf(15)=2f(12)+1=43\n$$\n\n$$\nf(13)=\\lfloor f(15)/3\\rfloor=\\lfloor43/3\\rfloor=14\n$$\n\n$$\nf(16)=2f(13)+1=29\n$$\n\n$$\nf(14)=\\lfloor f(16)/3\\rfloor=\\lfloor29/3\\rfloor=9\n$$\n\n$$\nf(17)=2f(14)+1=19\n$$\n\n$$\nf(20)=2f(17)+1=39\n$$\n\n**答案：B。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find $f(f(f(f(20))))$, given\n\n$$\nf(x)=\\begin{cases} f\\!\\left(\\dfrac{x-2}{2}\\right)-1 & \\text{if }x\\text{ is even}\\\\ 2*x & \\text{if }x\\text{ is odd} \\end{cases}\n$$",
+        "zh": "根据以下定义，求 $f(f(f(f(20))))$：\n\n$$f(x)=\\begin{cases}f\\!\\left(\\dfrac{x-2}{2}\\right)-1 & x\\text{ 为偶数}\\\\2x & x\\text{ 为奇数}\\end{cases}$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "34",
+            "zh": "34"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "18",
+            "zh": "18"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "17",
+            "zh": "17"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "12",
+            "zh": "12"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "9",
+            "zh": "9"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "Evaluate each nested call, including the intermediate even-argument calls:\n\n$$\\begin{aligned}f(9)&=18,& f(20)&=f(9)-1=17,\\\\f(17)&=34,\\\\f(7)&=14,&f(16)&=f(7)-1=13,\\\\f(34)&=f(16)-1=12,\\\\f(5)&=10,&f(12)&=f(5)-1=9.\\end{aligned}$$\n\n$$f(f(f(f(20))))=f(f(f(17)))=f(f(34))=f(12)=9.$$\n\n**Answer: E.**",
+        "zh": "逐层计算嵌套调用，并展开偶数参数所需的中间调用：\n\n$$\\begin{aligned}f(9)&=18,& f(20)&=f(9)-1=17,\\\\f(17)&=34,\\\\f(7)&=14,&f(16)&=f(7)-1=13,\\\\f(34)&=f(16)-1=12,\\\\f(5)&=10,&f(12)&=f(5)-1=9.\\end{aligned}$$\n\n$$f(f(f(f(20))))=f(f(f(17)))=f(f(34))=f(12)=9.$$\n\n**答案：E。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "What is printed when this program is executed?\n\n```text\na = 10 : b = 4 : c = 0 : d = 6\nif a > b + d then\n    b = b + d\nelse\n    d = a - d\nend if\nif c ^ 2 < c ^ 4 then\n    d = d * 2\nelse\n    c = 1\nend if\nif b / d == c then\n    c = c * 2\nelse\n    a = a / c\nend if\nif b > c && d < b then\n    d = d / 4\nelse\n    a = c ^ 2 / d\nend if\nif d - b < a + b || b + c == d then\n    d = d / 2\nend if\nx = a - b * c + d\noutput x\n```",
+        "zh": "执行这个程序会打印输出什么?\n\n```text\na = 10 : b = 4 : c = 0 : d = 6\nif a > b + d then\n    b = b + d\nelse\n    d = a - d\nend if\nif c ^ 2 < c ^ 4 then\n    d = d * 2\nelse\n    c = 1\nend if\nif b / d == c then\n    c = c * 2\nelse\n    a = a / c\nend if\nif b > c && d < b then\n    d = d / 4\nelse\n    a = c ^ 2 / d\nend if\nif d - b < a + b || b + c == d then\n    d = d / 2\nend if\nx = a - b * c + d\noutput x\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "7",
+            "zh": "7"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "3",
+            "zh": "3"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "1",
+            "zh": "1"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "-5",
+            "zh": "-5"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "-9",
+            "zh": "-9"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Trace the variables in execution order:\n\n| a | b | c | d |\n| --- | --- | --- | --- |\n| 10 | 4 | 0 | 6 |\n| 10 | 4 | 0 | 4 |\n| 10 | 4 | 1 | 4 |\n| 10 | 4 | 2 | 4 |\n| 1 | 4 | 2 | 4 |\n| 1 | 4 | 2 | 2 |\n\nThe final value is $x=1-4\\cdot2+2=-5$.\n\nThe first condition is $10>4+6$, which is false because equality is not greater-than; hence $d=4$. Next $0^2<0^4$ is false, so $c=1$. Since $4/4=1$, double $c$ to 2. In the fourth condition, $4>2$ is true but $4<4$ is false, so the AND fails and $a=2^2/4=1$. Finally $4-4<1+4$ is true, so halve $d$ to 2 before computing $x$.\n\n**Answer: D.**",
+        "zh": "按程序执行顺序记录变量的值：\n\n| a | b | c | d |\n| --- | --- | --- | --- |\n| 10 | 4 | 0 | 6 |\n| 10 | 4 | 0 | 4 |\n| 10 | 4 | 1 | 4 |\n| 10 | 4 | 2 | 4 |\n| 1 | 4 | 2 | 4 |\n| 1 | 4 | 2 | 2 |\n\n最后 $x=1-4\\cdot2+2=-5$。\n\n第一处条件 $10>4+6$ 不成立：相等不满足严格大于，所以 $d=4$。随后 $0^2<0^4$ 不成立，令 $c=1$。由于 $4/4=1$，将 $c$ 加倍为 2。第四处虽然 $4>2$ 成立，但 $4<4$ 不成立，AND 条件失败，故 $a=2^2/4=1$。最后 $4-4<1+4$ 成立，将 $d$ 减半为 2，再计算 x。\n\n**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          3,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [],
+  "programming": {
+    "id": "fibonacci-clock",
+    "definition": {
+      "title": "Fibonacci Clock",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Use the line structure shown in the test-case input below.\n\n### Problem\n\nACSL’s version of Philippe Chretien’s “Fibonacci Clock” displays time by changing the colors displayed in 5 squares, whose side lengths correspond to the first 5 Fibonacci numbers (1, 1, 2, 3, and 5). Given the colors of the squares on the clock face, you must output the time that is represented in hh:mm format. The colors will be given to you as 5 individual characters representing the lower 1x1 square, the upper 1x1 square, the 2x2 square, the 3x3 square, and the 5x5 square in that order. (See https://basbrun.com/2015/05/04/fibonacci-clock/.)\n\nRed squares are used to represent only hours and green squares are used to represent only minutes. Blue squares are used to represent both hours and minutes. White squares are ignored. To find the current hour, add the values of the red and blue squares. To find the current minutes, add the values of the green and blue squares and multiply by 5 so that the number of minutes is a multiple of 5 from 0 through 60.\n\nHowever, if the number of minutes is 60, change it to the next hour with 0 minutes and if the number of hours is 12 or more, change it to a valid time from 00:00 to 11:55. For example, 09:60 would become 10:00 and 12:60 would be 01:00.\n\nFor example, a clock with a red lower 1×1 square, a white upper 1×1 square, a blue 2×2 square, a green 3×3 square, and a blue 5×5 square displays 08:50. The hours are represented by the red 1x1, blue 2x2, and blue 5x5 squares (1+2+5=8). The minutes are represented by the blue 2x2, the green 3x3, and the blue 5x5 squares (2+3+5=10, and 10*5=50).\n\nThe example at the left which uses the inputted characters R, W, G, B, G displays the time 04:50. The hours are represented by the 1x1 red square and the 3x3 blue square: 1+3=4. The minutes are represented by the 2x2 green, the 3x3 blue, and the 5x5 green squares: (2+3+5)*5 = 50. The example at the right which uses the inputted characters W, B, B, G, R displays the time 08:30. The hours are 1+2+5=8 and the minutes are (1+2+3)*5=30.\n\n{{diagram:p-5cf7b957d9eb211f}}\n\n### Input\n\nThe input has 5 uppercase letters (R, W, B, or G) that represent the colors of the lower 1x1, the upper 1x1, the 2x2, the 3x3, and finally the 5x5 square, in that order. We guarantee that the input will represent a valid time from 00:00 to 11:55.\n\n### Output\n\nPrint the time in hours and minutes formatted as hh:mm.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "R W G B G\n",
+          "expected": "04:50\n"
+        },
+        {
+          "input": "W B B G R\n",
+          "expected": "08:30\n"
+        },
+        {
+          "input": "W G B R B\n",
+          "expected": "10:40\n"
+        },
+        {
+          "input": "G G B B B\n",
+          "expected": "11:00\n"
+        },
+        {
+          "input": "W R G G G\n",
+          "expected": "01:50\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "G R W B B\n",
+          "expected": "09:45\n",
+          "weight": 20
+        },
+        {
+          "input": "G G B G B\n",
+          "expected": "08:00\n",
+          "weight": 20
+        },
+        {
+          "input": "R R R R R\n",
+          "expected": "00:00\n",
+          "weight": 20
+        },
+        {
+          "input": "G G G G G\n",
+          "expected": "01:00\n",
+          "weight": 20
+        },
+        {
+          "input": "W B B B B\n",
+          "expected": "11:55\n",
+          "weight": 20
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。输入按下方测试用例展示的行结构读取。\n\n### 问题\n\nACSL 版本的菲利普·克雷蒂安“斐波那契时钟”是通过改变由五种正方形表示的颜色来显示时间的，它们的边长分别对应斐波那契数字的前五个数(1,1,2,3,5)。你要根据钟面上正方形的颜色，以hh:mm的格式输出其对应的时间。这些颜色会以五个字母的方式给出，依次代表下方1×1正方形，上方1×1正方形，2×2正方形，3×3正方形，以及5×5正方形。 (见 https://basbrun.com/2015/05/04/fibonacci-clock/.)\n\n红色正方形只能表示小时，绿色正方形只能表示分钟。蓝色正方形既可以表示小时，也可以表示分钟。白色正方形忽略。将红、蓝色正方形对应的值相加得出当前的小时，将绿、蓝色正方形的值相加再乘以 5 得出当前的分钟，这样分钟数以 5 为间隔，介于 0 到 60 之间。\n\n但是，若分钟数为 60,则将小时数加 1,分钟数变为 0;若小时数大于等于 12,则将其改为 00:00 到 11:55中的一个有效时间。例如，09:60 就会变成 10:00, 12:60 就会变成 01:00。\n\n例如，下方 1×1 为红色、上方 1×1 为白色、2×2 为蓝色、3×3 为绿色、5×5 为蓝色的时钟显示 08:50。1×1的红色正方形，2×2的蓝色正方形以及5×5的蓝色正方形 (1+2+5=8) 表示小时。2×2 的蓝色正方形，3×3 的绿色正方形以及 5×5 的蓝色正方形表示分钟数 (2+3+5=10, 且 10*5=50)。\n\n下图左边的示例通过输入字母 R, W, G, B, G 来显示时间 04:50。用 1×1 的红色正方形和 3×3 的蓝色正方形来表示小时数:1+3=4。用 2×2 的绿色正方形、3×3的蓝色正方形以及 5×5的绿色正方形来表示分钟数: (2+3+5)*5 = 50。右边的示例通过输入字母 W, B, B, G, R 来显示时间 08:30。小时数为:1+2+5=8 ,分钟数为 (1+ 2+3)*5=30。\n\n{{diagram:p-5cf7b957d9eb211f}}\n\n### 输入\n\n输入包含 5 个大写字母(R, W, B, 或 G),这些字母依次表示下方 1×1 正方形，上方 1×1 正方形，2×2 正方形，3×3 正方形，以及最后的 5×5 正方形。确保输入内容能表示 00:00 到 11:55 之间的一个有效时间。\n\n### 输出\n\n打印输出由小时和分钟组成的时间，格式为 hh:mm。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [
+        {
+          "id": "p-5cf7b957d9eb211f",
+          "width": 560,
+          "height": 210,
+          "alt": {
+            "en": "Fibonacci clock examples. R W G B G means 04:50, W B B G R means 08:30",
+            "zh": "斐波那契时钟示例。R W G B G 表示 04:50, W B B G R 表示 08:30"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 80,
+              "y": 40,
+              "width": 30,
+              "height": 30,
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 80,
+              "y": 10,
+              "width": 30,
+              "height": 30,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 20,
+              "y": 10,
+              "width": 60,
+              "height": 60,
+              "fill": "green",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 20,
+              "y": 70,
+              "width": 90,
+              "height": 90,
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 10,
+              "width": 150,
+              "height": 150,
+              "fill": "green",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 140,
+              "y": 190,
+              "text": "R W G B G — 04:50",
+              "fontSize": 15,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 360,
+              "y": 40,
+              "width": 30,
+              "height": 30,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 360,
+              "y": 10,
+              "width": 30,
+              "height": 30,
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 300,
+              "y": 10,
+              "width": 60,
+              "height": 60,
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 300,
+              "y": 70,
+              "width": 90,
+              "height": 90,
+              "fill": "green",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 390,
+              "y": 10,
+              "width": 150,
+              "height": 150,
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 420,
+              "y": 190,
+              "text": "W B B G R — 08:30",
+              "fontSize": 15,
+              "fill": "ink",
+              "anchor": "middle"
+            }
+          ]
+        }
+      ],
+      "zh": [
+        {
+          "id": "p-5cf7b957d9eb211f",
+          "width": 560,
+          "height": 210,
+          "alt": {
+            "en": "Fibonacci clock examples. R W G B G means 04:50, W B B G R means 08:30",
+            "zh": "斐波那契时钟示例。R W G B G 表示 04:50, W B B G R 表示 08:30"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 80,
+              "y": 40,
+              "width": 30,
+              "height": 30,
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 80,
+              "y": 10,
+              "width": 30,
+              "height": 30,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 20,
+              "y": 10,
+              "width": 60,
+              "height": 60,
+              "fill": "green",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 20,
+              "y": 70,
+              "width": 90,
+              "height": 90,
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 10,
+              "width": 150,
+              "height": 150,
+              "fill": "green",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 140,
+              "y": 190,
+              "text": "R W G B G — 04:50",
+              "fontSize": 15,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 360,
+              "y": 40,
+              "width": 30,
+              "height": 30,
+              "fill": "white",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 360,
+              "y": 10,
+              "width": 30,
+              "height": 30,
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 300,
+              "y": 10,
+              "width": 60,
+              "height": 60,
+              "fill": "blue",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 300,
+              "y": 70,
+              "width": 90,
+              "height": 90,
+              "fill": "green",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "rect",
+              "x": 390,
+              "y": 10,
+              "width": 150,
+              "height": 150,
+              "fill": "red",
+              "stroke": "black",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 420,
+              "y": 190,
+              "text": "W B B G R — 08:30",
+              "fontSize": 15,
+              "fill": "ink",
+              "anchor": "middle"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

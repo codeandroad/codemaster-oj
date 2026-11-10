@@ -1,0 +1,535 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2025-2026-intermediate-2",
+  "division": "Intermediate",
+  "season": "2025-2026",
+  "round": 2,
+  "roundLabel": {
+    "en": "Contest 2",
+    "zh": "第二轮"
+  },
+  "title": {
+    "en": "ACSL 2025-2026 Intermediate · Contest 2",
+    "zh": "ACSL 2025-2026 Intermediate · 第二轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Intermediate/2025-2026/第二轮/25-26 中级组 paper.pdf",
+      "sha256": "161969e4f893ca9a8735fc7071faa9eb93b319012999f35be7a2e6f41cdd7710",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Intermediate/2025-2026/第二轮/25-26 中级组 solution.pdf",
+      "sha256": "2233d7f7d84df89a9778aed42a605794ced86a8cc12d7f84ff70abf0265c67aa",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Intermediate/2025-2026/第二轮/25-26 中级组 License Plates (1).pdf",
+      "sha256": "439c01adb89bb4c64156624d7fe75ff37ae19450ff7f7d5281e9364b3daba796",
+      "pages": 8
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Evaluate the following postfix expression if a = 3, b = -2, and c = 1:\n\n`a b * c + a 2 ^ - b c / +`",
+        "zh": "当a = 3, b = -2,且c = 1时,对以下后缀表达式进行求值:\n\n`a b * c + a 2 ^ - b c / +`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`-16`",
+            "zh": "`-16`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`-14`",
+            "zh": "`-14`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "0",
+            "zh": "0"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "14",
+            "zh": "14"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "18",
+            "zh": "18"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "Convert to infix and substitute the given values:\n\n$$ (ab+c)-a^2+\\frac bc=(3(-2)+1)-3^2+\\frac{-2}{1}=-6+1-9-2=-16. $$\n\nA stack trace gives the intermediate results `a b * → −6`, then `+ c → −5`, then subtract `a 2 ^ → 9` to get −14, and finally add `b c / → −2` to get −16. The subtraction operator uses the earlier stack item as the left operand, so it computes −5 − 9 rather than 9 − (−5).\n\n**Answer: A.**",
+        "zh": "先转换为中缀表达式，再代入给定数值：\n\n$$ (ab+c)-a^2+\\frac bc=(3(-2)+1)-3^2+\\frac{-2}{1}=-6+1-9-2=-16. $$\n\n按栈求值，中间结果依次为：`a b * → −6`，加 c 后为 −5，再减去 `a 2 ^ → 9` 得 −14，最后加上 `b c / → −2` 得 −16。减法左操作数是栈中较早的那个结果，所以计算的是 −5 − 9，不是 9 − (−5)。\n\n**答案：A。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Translate the following infix expression into prefix:\n\n$$\n\\frac{y^2z-z^2y}{y+z}\n$$",
+        "zh": "将以下中缀表达式转换为前缀表达式:\n\n$$\n\\frac{y^2z-z^2y}{y+z}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`/ - * ^ 2 y z * ^ 2 z y + z y`",
+            "zh": "`/ - * ^ 2 y z * ^ 2 z y + z y`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`/ - ^ y 2 z * * ^ z 2 y + y z`",
+            "zh": "`/ - ^ y 2 z * * ^ z 2 y + y z`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`- / * ^ y 2 z * ^ z 2 y + y z`",
+            "zh": "`- / * ^ y 2 z * ^ z 2 y + y z`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`/ - * ^ y 2 z * ^ z 2 y + y z`",
+            "zh": "`/ - * ^ y 2 z * ^ z 2 y + y z`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`/ - * ^ * ^ + y 2 z z 2 y y z`",
+            "zh": "`/ - * ^ * ^ + y 2 z z 2 y y z`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Move each operator before its two operands, starting with the innermost expressions.\n\n```text\n((y ^ 2 * z) - (z ^ 2 * y)) / (y + z)\n= (((^ y 2) * z) - ((^ z 2) * y)) / (+ y z)\n= ((* (^ y 2) z) - (* (^ z 2) y)) / (+ y z)\n= (- (* (^ y 2) z) (* (^ z 2) y)) / (+ y z)\n= / (- (* (^ y 2) z) (* (^ z 2) y)) (+ y z)\n= / - * ^ y 2 z * ^ z 2 y + y z\n```\n\nSource correction: several intermediate lines in the official solution use `x` where the given expression requires `z`.\n\n**Answer: D.**",
+        "zh": "从最内层开始，将每个运算符移到它的两个操作数之前。\n\n```text\n((y ^ 2 * z) - (z ^ 2 * y)) / (y + z)\n= (((^ y 2) * z) - ((^ z 2) * y)) / (+ y z)\n= ((* (^ y 2) z) - (* (^ z 2) y)) / (+ y z)\n= (- (* (^ y 2) z) (* (^ z 2) y)) / (+ y z)\n= / (- (* (^ y 2) z) (* (^ z 2) y)) (+ y z)\n= / - * ^ y 2 z * ^ z 2 y + y z\n```\n\n原卷勘误：官方解析的若干中间步骤将题目中的 `z` 误写为 `x`；此处已修正。\n\n**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "比特位操作"
+      },
+      "statement": {
+        "en": "Evaluate:\n\n`(LCIRC-2 (RSHIFT-1 (NOT 01110))) OR (RCIRC-2 10011)`",
+        "zh": "计算:\n\n`(LCIRC-2 (RSHIFT-1 (NOT 01110))) OR (RCIRC-2 10011)`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`11011`",
+            "zh": "`11011`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`11110`",
+            "zh": "`11110`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`11101`",
+            "zh": "`11101`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`10111`",
+            "zh": "`10111`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`01111`",
+            "zh": "`01111`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "`(LCIRC-2 (RSHIFT-1 (NOT 01110))) OR (RCIRC-2 10011)`\n\n`= (LCIRC-2 (RSHIFT-1 10001)) OR 11100`\n\n`= (LCIRC-2 01000) OR 11100`\n\n`= 00001 OR 11100`\n\n`= 11101`\n\n**Answer: C.**",
+        "zh": "先计算括号内的 NOT 和移位，最后逐位 OR：\n\n`(LCIRC-2 (RSHIFT-1 (NOT 01110))) OR (RCIRC-2 10011)`\n\n`= (LCIRC-2 (RSHIFT-1 10001)) OR 11100`\n\n`= (LCIRC-2 01000) OR 11100`\n\n`= 00001 OR 11100`\n\n`= 11101`\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "比特位操作"
+      },
+      "statement": {
+        "en": "Solve the following equation for X if X is a 5-bit string:\n\n`(RCIRC-1 (LSHIFT-2 X AND 01101)) = 00010`",
+        "zh": "已知X为一个5位二进制串,求解下列方程中的X:\n\n`(RCIRC-1 (LSHIFT-2 X AND 01101)) = 00010`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`*1*0*`",
+            "zh": "`*1*0*`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`***01`",
+            "zh": "`***01`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`*0*1*`",
+            "zh": "`*0*1*`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`***10`",
+            "zh": "`***10`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`01***`",
+            "zh": "`01***`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "`(RCIRC-1 (LSHIFT-2 X AND 01101)) = 00010`\n\n`(RCIRC-1 (LSHIFT-2 abcde AND 01101)) = 00010`\n\n`(RCIRC-1 (cde00 AND 01101)) = 00010`\n\n`(RCIRC-1 0de00) = 00010`\n\n`00de0 = 00010`\n\nTherefore, d = 0 and e = 1 which gives `***01`; each `*` can independently be 0 or 1.\n\nThe first two input bits are lost by LSHIFT-2, and the mask `01101` also erases the surviving bit c. Therefore only d and e can affect the result. For example, `X=00001` gives `00100 → 00100 → 00010`, verifying the required suffix 01. The three unrestricted bits give $2^3=8$ possible strings, all represented by `***01`.\n\n**Answer: B.**",
+        "zh": "设 `X = abcde`。左移两位后为 `cde00`，与 `01101` 按位 AND 得到 `0de00`，右循环移位一位后为 `00de0`。\n\n由 `00de0 = 00010` 可得 `d = 0`、`e = 1`。前三位任意，因此 `X = ***01`，每个 `*` 都可独立取 0 或 1。\n\nLSHIFT-2 先丢弃原串前两位，掩码 `01101` 又抹掉仍保留下来的 c 位，因此只有 d、e 能影响结果。例如 `X=00001` 依次得到 `00100 → 00100 → 00010`，验证了末两位必须是 01。前三位自由取值，共有 $2^3=8$ 个解，都由 `***01` 表示。\n\n**答案：B。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "LISP",
+        "zh": "LISP"
+      },
+      "statement": {
+        "en": "Evaluate the following LISP expression:\n\n(ADD (MULT 2 3) (SUB 9 3) (DIV 8 4))",
+        "zh": "对下列LISP表达式进行求值:\n\n(ADD (MULT 2 3) (SUB 9 3) (DIV 8 4))"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "12",
+            "zh": "12"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "13",
+            "zh": "13"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "14",
+            "zh": "14"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "15",
+            "zh": "15"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "16",
+            "zh": "16"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Evaluate `(MULT 2 3) = 6`, `(SUB 9 3) = 6` and `(DIV 8 4) = 2`; the outer `(ADD 6 6 2)` gives **14**.\n\n**Answer: C.**",
+        "zh": "先算出 `(MULT 2 3) = 6`、`(SUB 9 3) = 6`、`(DIV 8 4) = 2`；外层 `(ADD 6 6 2)` 得到 **14**。\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q6",
+      "number": 6,
+      "type": "single",
+      "topic": {
+        "en": "LISP",
+        "zh": "LISP"
+      },
+      "statement": {
+        "en": "Evaluate the following LISP expression:\n\n```text\n(CDR (CAR (REVERSE (CDR (CAR '((a b (c d)) (a b) c))))))\n```",
+        "zh": "对下列LISP表达式进行求值:\n\n```text\n(CDR (CAR (REVERSE (CDR (CAR '((a b (c d)) (a b) c))))))\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "(b (c d))",
+            "zh": "(b (c d))"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "c",
+            "zh": "c"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "d",
+            "zh": "d"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "(d)",
+            "zh": "(d)"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "(c d)",
+            "zh": "(c d)"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Apply the list operations from the inside out:\n\n1. CAR gives `(a b (c d))`.\n2. CDR gives `(b (c d))`.\n3. REVERSE gives `((c d) b)`.\n4. CAR gives `(c d)`.\n5. CDR gives `(d)`, a one-element list.\n\nREVERSE changes the order of the top-level elements b and `(c d)`; it does not reverse the contents of the nested sublist. Also, CDR returns the remaining list, so removing c from `(c d)` gives `(d)` with parentheses, not the atom d.\n\n**Answer: D.**",
+        "zh": "从内向外执行列表操作：\n\n1. CAR 得到 `(a b (c d))`。\n2. CDR 得到 `(b (c d))`。\n3. REVERSE 得到 `((c d) b)`。\n4. CAR 得到 `(c d)`。\n5. CDR 得到 `(d)`，这是一个仅含一个元素的列表。\n\nREVERSE 仅交换外层两个元素 b 和 `(c d)` 的顺序，不会把子表内部的 c、d 也倒过来。CDR 返回的是剩余列表，因此去掉 `(c d)` 的首元素 c 后得到带括号的 `(d)`，不是原子 d。\n\n**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [],
+  "programming": {
+    "id": "license-plates",
+    "definition": {
+      "title": "License Plates",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Use the line structure shown in the test-case input below.\n\n### Problem\n\nAll states in the United States and countries around the world have rules that are used to determine if license plates are valid. In this program, you will determine if a license plate is valid and if so, print its category code. All letters will be uppercase.\n\nGeneric-6:\n\n- (G6A) 6 digits (e.g. 534671)\n\n- (G6B) 4 letters and 2 digits with 3 letters, a dash, and finally a letter and 2 digits in any order (e.g. ABC-34D)\n\n- (G6C) 3 letters and 3 digits with 3 letters, a dash, 3 digits (e.g. ABC-671)\n\n- (G6D) 3 letters and 3 digits with 3 digits, a dash, 3 letters (e.g. 455-CCD)\n\nGeneric-7:\n\n- (G7A) 7 digits (e.g. 2345617)\n\n- (G7B) 3 letters, dash, 1 letter and 3 digits in any order (e.g. ABC-D456)\n\n- (G7C) 3 letters and 4 digits with all of the digits first (e.g. 1089MTL)\n\n- (G7D) 3 letters and 4 digits with all of the letters first (e.g. MTL1089)\n\n- (G7E) 2 letters and 5 digits with 2 letters, a dash, and 5 digits (e.g. CB-32758)\n\n- (G7F) 3 letters and 4 digits in any order if none of the above (e.g. 4A6BC79)\n\nVanity (V):\n\n- Starts with at least two letters\n\n- Contains a maximum of 7 alphanumeric characters\n\n- Allows a single dash or a single space anywhere\n\nYou will be given a string representing a license plate number and you will output one of the above codes: G6A, G6B, G6C, G6D, G7A, G7B, G7C, G7D, G7E, G7F, V if none of the other codes work and it satisfies the rules for a vanity plate, or IV (for invalid) if none of the above formats is valid.\n\n### Example\n\nInput FIB-2358\n\nOutput V\n\nExplanation This satisfies the criteria for a vanity plate so output a V. It includes 3 letters and 4 digits, but it is not any of the other formats listed above.\n\n### Input\n\nThere will be one string representing a license plate. All letters will be uppercase.\n\n### Output\n\nOutput a string representing a category code or IV.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "FIB-2358\n",
+          "expected": "V\n"
+        },
+        {
+          "input": "ABC-3D4\n",
+          "expected": "G6B\n"
+        },
+        {
+          "input": "401-PRO\n",
+          "expected": "G6D\n"
+        },
+        {
+          "input": "7211948\n",
+          "expected": "G7A\n"
+        },
+        {
+          "input": "JFK1963\n",
+          "expected": "G7D\n"
+        },
+        {
+          "input": "CLB-EHS\n",
+          "expected": "V\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "4256139\n",
+          "expected": "G7A\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "FB-61529\n",
+          "expected": "G7E\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "PAL-5W5\n",
+          "expected": "G6B\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "1C9L2B9\n",
+          "expected": "G7F\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "JMJC-ACSL\n",
+          "expected": "IV\n",
+          "weight": 16.6666
+        },
+        {
+          "input": "IN-VALID\n",
+          "expected": "V\n",
+          "weight": 16.6666
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。输入按下方测试用例展示的行结构读取。\n\n### 问题\n\n美国各州以及世界各国都有各自的规则来判定车牌是否有效 。在本程序中 ,你需要判断一个车牌是否有效,如果有效,请输出其对应的类别代码。所有的字母均为大写。\n\n标准型车牌 - 6:\n\n- (G6A)6 个数字(例如:534671)\n\n- (G6B)4 个字母和 2 个数字:具体结构为 3 个字母,一个短横线,最后是顺序不限的 1 个字母和 2 个数字(例如:ABC-34D)\n\n- (G6C)3 个字母和 3 个数字:具体结构为 3 个字母,一个短横线,3 个数字 (例如:ABC-671)\n\n- (G6D)3 个字母和 3 个数字:具体结构为 3 个数字,一个短横线,3 个字母 ( 例如:455-CCD )\n\n标准型车牌 - 7:\n\n- (G7A ) 7 个数字( 例如:2345617)\n\n- (G7B ) 3 个字母, 一个短横线 , 以及 1 个字母和 3 个数字(顺序不限)(例如 :ABC-D456)\n\n- (G7C ) 3 个字母和 4 个数字: 所有的数字都在前 (例如:1089MTL)\n\n- (G7D)3 个字母和 4 个数字:所有的字母都在前(例如:MTL1089)\n\n- (G7E)2 个字母和 5 个数字:具体结构为 2 个字母,一个短横线,5 个数字 (例如:CB-32758)\n\n- (G7F)3 个字母和 4 个数字:顺序不限,且不满足上述任何一种情况 (例如:4A6BC79)\n\n个性化车牌(V):\n\n- 以至少两个字母开头\n\n- 包含最多 7 个字母数字字符\n\n- 允许在任意位置包含一个短横线或一个空格\n\n给到一个代表车牌号码的字符串,请输出上述对应的类别代码之一:G6A,G6B,G6C, G6D,G7A,G7B,G7C,G7D,G7E,G7F。如果车牌不符合上述任何“标准型车牌”类别代码,但满足“个性化车牌”的规则,则输出 V。如果上述所有格式均不满足,则输出 IV(代表 invalid,无效)。\n\n### 示例\n\n| 输入 | FIB-2358 |\n| --- | --- |\n| 输出 | V |\n| 解析 | 该车牌满足个性化车牌的标准,因此输出 V。它包含 3 个字母和 4 个 数字,但它不符合上述列出的任何一种“标准型车牌”类别代码。 |\n\n### 输入\n\n输入一个代表车牌号码的字符串。所有字母均为大写。\n\n### 输出\n\n输出一个代表类别代码或 IV的字符串。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [],
+      "zh": []
+    }
+  }
+}

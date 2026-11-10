@@ -1,0 +1,3307 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2025-2026-elementary-4",
+  "division": "Elementary",
+  "season": "2025-2026",
+  "round": 4,
+  "roundLabel": {
+    "en": "Contest 4",
+    "zh": "第四轮"
+  },
+  "title": {
+    "en": "ACSL 2025-2026 Elementary · Contest 4",
+    "zh": "ACSL 2025-2026 Elementary · 第四轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Elementary/2025-2026/第四轮/c_4_elem.pdf",
+      "sha256": "f1f1a7005c89b064937ceb32c87295dde7683476cf1813b36b5c93bc16c158c1",
+      "pages": 6
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Elementary/2025-2026/第四轮/c_4_elem_sol.pdf",
+      "sha256": "6c808ffdbf6e00acd474ce4e94249884d17a10222cd47d68c62eecd0abfe23ba",
+      "pages": 2
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Graph Theory",
+        "zh": "图论"
+      },
+      "statement": {
+        "en": "One application of graph theory is coloring graphs so that each vertex is assigned a color. If no two vertices that share an edge are assigned the same color, what is the minimum number of different colors that is required for the graph below?\n\n{{diagram:figure-2db36ea5e42ad8aa}}",
+        "zh": "图论的一个应用是对图进行着色,即为每个顶点分配一种颜色。如果图中任意共享一条边的两个顶点颜色都不相同,那么下图最少需要多少种不同的颜色?\n\n{{diagram:figure-2db36ea5e42ad8aa}}"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "1",
+            "zh": "1"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "2",
+            "zh": "2"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "3",
+            "zh": "3"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "5",
+            "zh": "5"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Answer: **C**.\n\nThe triangle A–E–C–A forces three different colors. Three also suffice: color A red, B and C green, and D and E blue. Checking each drawn edge, its endpoints have different colors. The lower and upper bounds both equal 3.",
+        "zh": "答案：**C**。\n\n三角形 A–E–C–A 的三个顶点两两相邻，至少需要三种颜色。令 A 为红色，B、C 为绿色，D、E 为蓝色，核对每条边的两端颜色均不同。这说明三种已经足够。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      },
+      "statementDiagrams": {
+        "en": [
+          {
+            "id": "figure-2db36ea5e42ad8aa",
+            "width": 440,
+            "height": 270,
+            "alt": {
+              "en": "Graph Theory diagram.",
+              "zh": "Graph Theory 图示。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 60,
+                "y1": 35,
+                "x2": 210,
+                "y2": 65,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 60,
+                "y1": 35,
+                "x2": 300,
+                "y2": 150,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 60,
+                "y1": 35,
+                "x2": 80,
+                "y2": 150,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 80,
+                "y1": 150,
+                "x2": 300,
+                "y2": 150,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 210,
+                "y1": 65,
+                "x2": 210,
+                "y2": 235,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 210,
+                "y1": 235,
+                "x2": 300,
+                "y2": 150,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "circle",
+                "cx": 60,
+                "cy": 35,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 35,
+                "y": 35,
+                "text": "A",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 210,
+                "cy": 65,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 218,
+                "y": 57,
+                "text": "B",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 300,
+                "cy": 150,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 308,
+                "y": 142,
+                "text": "C",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 210,
+                "cy": 235,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 210,
+                "y": 255,
+                "text": "D",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 80,
+                "cy": 150,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 55,
+                "y": 150,
+                "text": "E",
+                "fontSize": 16
+              }
+            ]
+          }
+        ],
+        "zh": [
+          {
+            "id": "figure-2db36ea5e42ad8aa",
+            "width": 440,
+            "height": 270,
+            "alt": {
+              "en": "Graph Theory diagram.",
+              "zh": "Graph Theory 图示。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 60,
+                "y1": 35,
+                "x2": 210,
+                "y2": 65,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 60,
+                "y1": 35,
+                "x2": 300,
+                "y2": 150,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 60,
+                "y1": 35,
+                "x2": 80,
+                "y2": 150,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 80,
+                "y1": 150,
+                "x2": 300,
+                "y2": 150,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 210,
+                "y1": 65,
+                "x2": 210,
+                "y2": 235,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 210,
+                "y1": 235,
+                "x2": 300,
+                "y2": 150,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "circle",
+                "cx": 60,
+                "cy": 35,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 35,
+                "y": 35,
+                "text": "A",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 210,
+                "cy": 65,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 218,
+                "y": 57,
+                "text": "B",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 300,
+                "cy": 150,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 308,
+                "y": 142,
+                "text": "C",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 210,
+                "cy": 235,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 210,
+                "y": 255,
+                "text": "D",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 80,
+                "cy": 150,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 55,
+                "y": 150,
+                "text": "E",
+                "fontSize": 16
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Graph Theory",
+        "zh": "图论"
+      },
+      "statement": {
+        "en": "The following image shows two constellations that are always seen in the night sky. We can think of it as a graph. Suppose one additional edge is added that connects the star Dubhe with Polaris as shown by the arrow below. This becomes a connected graph that could be traversable. Which existing edge must be removed for that new graph to be traversable?\n\n{{diagram:figure-4d493bd0d7021914}}",
+        "zh": "下图展示了夜空中始终可见的两个星座。我们可以将其视为一张图。假设增加一条边,如箭头所示,连接恒星Dubhe与Polaris,这样便构成一个可遍历的连通图。为了使得新图可遍历,必须移除哪一条现有边?\n\n{{diagram:figure-4d493bd0d7021914}}"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "Dubhe to Megrez",
+            "zh": "从Dubhe到Megrez"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "Megrez to Pheoda",
+            "zh": "从Megrez到Pheoda"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "Merak to Dubhe",
+            "zh": "从Merak到Dubhe"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "Kochab to Pharkad",
+            "zh": "从Kochab到Pharkad"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "Merak to Pheoda",
+            "zh": "从Merak到Pheoda"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "Answer: **A**.\n\nAfter adding Dubhe–Polaris, removing Dubhe–Megrez changes both Dubhe and Megrez from odd degree to even degree. The only odd-degree vertices remaining are Alkaid and Kochab, so an Euler trail runs between them.\n\nSource correction: the original solution calls the lower Little Dipper vertex unnamed, but it is labeled Kochab in the diagram.",
+        "zh": "答案：**A**。\n\n加上 Dubhe–Polaris 后，删去 Dubhe–Megrez 会把 Dubhe 和 Megrez 的度数都从奇数变成偶数。剩下的两个奇度顶点为 Alkaid 与 Kochab，可作为一笔走的端点。原解析把小北斗图的下方点称为未命名，题图标签为 Kochab。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      },
+      "statementDiagrams": {
+        "en": [
+          {
+            "id": "figure-4d493bd0d7021914",
+            "width": 780,
+            "height": 420,
+            "alt": {
+              "en": "The Big Dipper and Little Dipper as a graph. A blue arrow adds the edge from Dubhe to Polaris.",
+              "zh": "北斗七星和小北斗组成的图，蓝色箭头表示从 Dubhe 到 Polaris 新增的边。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 100,
+                "y1": 87,
+                "x2": 182,
+                "y2": 140,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 182,
+                "y1": 140,
+                "x2": 199,
+                "y2": 197,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 199,
+                "y1": 197,
+                "x2": 229,
+                "y2": 263,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 229,
+                "y1": 263,
+                "x2": 203,
+                "y2": 317,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 203,
+                "y1": 317,
+                "x2": 280,
+                "y2": 389,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 280,
+                "y1": 389,
+                "x2": 338,
+                "y2": 347,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 338,
+                "y1": 347,
+                "x2": 229,
+                "y2": 263,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 445,
+                "y1": 25,
+                "x2": 517,
+                "y2": 10,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 517,
+                "y1": 10,
+                "x2": 523,
+                "y2": 50,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 523,
+                "y1": 50,
+                "x2": 459,
+                "y2": 65,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 459,
+                "y1": 65,
+                "x2": 445,
+                "y2": 25,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 523,
+                "y1": 50,
+                "x2": 591,
+                "y2": 68,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 591,
+                "y1": 68,
+                "x2": 631,
+                "y2": 110,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 631,
+                "y1": 110,
+                "x2": 659,
+                "y2": 154,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 348,
+                "y1": 340,
+                "x2": 645,
+                "y2": 164,
+                "stroke": "accent",
+                "strokeWidth": 2
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    627,
+                    165
+                  ],
+                  [
+                    645,
+                    164
+                  ],
+                  [
+                    638,
+                    181
+                  ]
+                ],
+                "stroke": "accent",
+                "strokeWidth": 2,
+                "fill": "none"
+              },
+              {
+                "type": "circle",
+                "cx": 100,
+                "cy": 87,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 80,
+                "y": 71,
+                "text": "Alkaid",
+                "fontSize": 18,
+                "fill": "ink"
+              },
+              {
+                "type": "circle",
+                "cx": 182,
+                "cy": 140,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 194,
+                "y": 142,
+                "text": "Mizar",
+                "fontSize": 18,
+                "fill": "ink"
+              },
+              {
+                "type": "circle",
+                "cx": 199,
+                "cy": 197,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 211,
+                "y": 199,
+                "text": "Alioth",
+                "fontSize": 18,
+                "fill": "ink"
+              },
+              {
+                "type": "circle",
+                "cx": 229,
+                "cy": 263,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 241,
+                "y": 265,
+                "text": "Megrez",
+                "fontSize": 18,
+                "fill": "ink"
+              },
+              {
+                "type": "circle",
+                "cx": 203,
+                "cy": 317,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 126,
+                "y": 325,
+                "text": "Phecda",
+                "fontSize": 18,
+                "fill": "ink"
+              },
+              {
+                "type": "circle",
+                "cx": 280,
+                "cy": 389,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 257,
+                "y": 413,
+                "text": "Merak",
+                "fontSize": 18,
+                "fill": "ink"
+              },
+              {
+                "type": "circle",
+                "cx": 338,
+                "cy": 347,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 350,
+                "y": 361,
+                "text": "Dubhe",
+                "fontSize": 18,
+                "fill": "ink"
+              },
+              {
+                "type": "circle",
+                "cx": 445,
+                "cy": 25,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 363,
+                "y": 20,
+                "text": "Pherkad",
+                "fontSize": 18,
+                "fill": "ink"
+              },
+              {
+                "type": "circle",
+                "cx": 517,
+                "cy": 10,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "circle",
+                "cx": 523,
+                "cy": 50,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "circle",
+                "cx": 459,
+                "cy": 65,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 391,
+                "y": 88,
+                "text": "Kochab",
+                "fontSize": 18,
+                "fill": "ink"
+              },
+              {
+                "type": "circle",
+                "cx": 591,
+                "cy": 68,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "circle",
+                "cx": 631,
+                "cy": 110,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "circle",
+                "cx": 659,
+                "cy": 154,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 671,
+                "y": 174,
+                "text": "Polaris",
+                "fontSize": 18,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 40,
+                "y": 232,
+                "text": "BIG DIPPER",
+                "fontSize": 22,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 550,
+                "y": 280,
+                "text": "LITTLE DIPPER",
+                "fontSize": 22,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 672,
+                "y": 200,
+                "text": "North Star",
+                "fontSize": 16,
+                "fill": "muted"
+              }
+            ]
+          }
+        ],
+        "zh": [
+          {
+            "id": "figure-4d493bd0d7021914",
+            "width": 780,
+            "height": 420,
+            "alt": {
+              "en": "The Big Dipper and Little Dipper as a graph. A blue arrow adds the edge from Dubhe to Polaris.",
+              "zh": "北斗七星和小北斗组成的图，蓝色箭头表示从 Dubhe 到 Polaris 新增的边。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 100,
+                "y1": 87,
+                "x2": 182,
+                "y2": 140,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 182,
+                "y1": 140,
+                "x2": 199,
+                "y2": 197,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 199,
+                "y1": 197,
+                "x2": 229,
+                "y2": 263,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 229,
+                "y1": 263,
+                "x2": 203,
+                "y2": 317,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 203,
+                "y1": 317,
+                "x2": 280,
+                "y2": 389,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 280,
+                "y1": 389,
+                "x2": 338,
+                "y2": 347,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 338,
+                "y1": 347,
+                "x2": 229,
+                "y2": 263,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 445,
+                "y1": 25,
+                "x2": 517,
+                "y2": 10,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 517,
+                "y1": 10,
+                "x2": 523,
+                "y2": 50,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 523,
+                "y1": 50,
+                "x2": 459,
+                "y2": 65,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 459,
+                "y1": 65,
+                "x2": 445,
+                "y2": 25,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 523,
+                "y1": 50,
+                "x2": 591,
+                "y2": 68,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 591,
+                "y1": 68,
+                "x2": 631,
+                "y2": 110,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 631,
+                "y1": 110,
+                "x2": 659,
+                "y2": 154,
+                "stroke": "ink",
+                "strokeWidth": 2.4
+              },
+              {
+                "type": "line",
+                "x1": 348,
+                "y1": 340,
+                "x2": 645,
+                "y2": 164,
+                "stroke": "accent",
+                "strokeWidth": 2
+              },
+              {
+                "type": "polyline",
+                "points": [
+                  [
+                    627,
+                    165
+                  ],
+                  [
+                    645,
+                    164
+                  ],
+                  [
+                    638,
+                    181
+                  ]
+                ],
+                "stroke": "accent",
+                "strokeWidth": 2,
+                "fill": "none"
+              },
+              {
+                "type": "circle",
+                "cx": 100,
+                "cy": 87,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 80,
+                "y": 71,
+                "text": "Alkaid",
+                "fontSize": 18,
+                "fill": "ink"
+              },
+              {
+                "type": "circle",
+                "cx": 182,
+                "cy": 140,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 194,
+                "y": 142,
+                "text": "Mizar",
+                "fontSize": 18,
+                "fill": "ink"
+              },
+              {
+                "type": "circle",
+                "cx": 199,
+                "cy": 197,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 211,
+                "y": 199,
+                "text": "Alioth",
+                "fontSize": 18,
+                "fill": "ink"
+              },
+              {
+                "type": "circle",
+                "cx": 229,
+                "cy": 263,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 241,
+                "y": 265,
+                "text": "Megrez",
+                "fontSize": 18,
+                "fill": "ink"
+              },
+              {
+                "type": "circle",
+                "cx": 203,
+                "cy": 317,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 126,
+                "y": 325,
+                "text": "Phecda",
+                "fontSize": 18,
+                "fill": "ink"
+              },
+              {
+                "type": "circle",
+                "cx": 280,
+                "cy": 389,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 257,
+                "y": 413,
+                "text": "Merak",
+                "fontSize": 18,
+                "fill": "ink"
+              },
+              {
+                "type": "circle",
+                "cx": 338,
+                "cy": 347,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 350,
+                "y": 361,
+                "text": "Dubhe",
+                "fontSize": 18,
+                "fill": "ink"
+              },
+              {
+                "type": "circle",
+                "cx": 445,
+                "cy": 25,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 363,
+                "y": 20,
+                "text": "Pherkad",
+                "fontSize": 18,
+                "fill": "ink"
+              },
+              {
+                "type": "circle",
+                "cx": 517,
+                "cy": 10,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "circle",
+                "cx": 523,
+                "cy": 50,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "circle",
+                "cx": 459,
+                "cy": 65,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 391,
+                "y": 88,
+                "text": "Kochab",
+                "fontSize": 18,
+                "fill": "ink"
+              },
+              {
+                "type": "circle",
+                "cx": 591,
+                "cy": 68,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "circle",
+                "cx": 631,
+                "cy": 110,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "circle",
+                "cx": 659,
+                "cy": 154,
+                "r": 4.5,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 671,
+                "y": 174,
+                "text": "Polaris",
+                "fontSize": 18,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 40,
+                "y": 232,
+                "text": "BIG DIPPER",
+                "fontSize": 22,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 550,
+                "y": 280,
+                "text": "LITTLE DIPPER",
+                "fontSize": 22,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 672,
+                "y": 200,
+                "text": "North Star",
+                "fontSize": 16,
+                "fill": "muted"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Graph Theory",
+        "zh": "图论"
+      },
+      "statement": {
+        "en": "With the advent of AI, it has become more commonplace for students to submit very similar coding solutions. The plagiarism detection algorithm discovered the following pairs of students submitted similar code:\n\nAlex and Chris, Barb and Chris, Barb and Dave, Fran and Chris, Dave and Alex, Chris and Erin, Barb and Alex, Erin and Fran.\n\nDraw a graph that includes each of these edges. A “ring” is formed when more than 2 students form a cycle. How many different “rings” of collaborators have exactly 3 students?",
+        "zh": "随着人工智能的出现,学生提交高度相似的编程作业变得越来越普遍。某抄袭检测算法发现以下几组学生提交了相似代码:\n\nAlex与Chris, Barb与Chris, Barb与Dave, Fran与Chris,Dave与Alex, Chris与Erin, Barb与Alex, Erin与Fran.\n\n请画出包含上述所有边的图。当超过2名学生构成一个环(cycle)时,即形成一个“圈”(ring)。请问有多少个正好由3名学生组成的圈?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "0",
+            "zh": "0"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "1",
+            "zh": "1"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "2",
+            "zh": "2"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "3",
+            "zh": "3"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Answer: **D**.\n\nThe graph looks like the following:\n\n{{diagram:figure-3690905be707896f}}\n\nAfter drawing the graph, there are 3 different cycles of 3 people: ABC, CEF, ABD.",
+        "zh": "答案：**D**。\n\n三人环要求三人两两相连。按图列出 ABC、CEF、ABD；改变起点或反向走仍是同一组三人，因此一共有三组。\n\n{{diagram:figure-3690905be707896f}}"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          5
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      },
+      "explanationDiagrams": {
+        "en": [
+          {
+            "id": "figure-3690905be707896f",
+            "width": 440,
+            "height": 270,
+            "alt": {
+              "en": "Graph Theory diagram.",
+              "zh": "Graph Theory 图示。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 235,
+                "y1": 220,
+                "x2": 210,
+                "y2": 95,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 350,
+                "y1": 185,
+                "x2": 210,
+                "y2": 95,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 350,
+                "y1": 185,
+                "x2": 310,
+                "y2": 55,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 85,
+                "y1": 180,
+                "x2": 210,
+                "y2": 95,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 310,
+                "y1": 55,
+                "x2": 235,
+                "y2": 220,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 210,
+                "y1": 95,
+                "x2": 65,
+                "y2": 40,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 350,
+                "y1": 185,
+                "x2": 235,
+                "y2": 220,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 65,
+                "y1": 40,
+                "x2": 85,
+                "y2": 180,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "circle",
+                "cx": 65,
+                "cy": 40,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 45,
+                "y": 25,
+                "text": "Erin",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 85,
+                "cy": 180,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 65,
+                "y": 205,
+                "text": "Fran",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 210,
+                "cy": 95,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 190,
+                "y": 75,
+                "text": "Chris",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 235,
+                "cy": 220,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 220,
+                "y": 245,
+                "text": "Alex",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 310,
+                "cy": 55,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 290,
+                "y": 35,
+                "text": "Dave",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 350,
+                "cy": 185,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 355,
+                "y": 195,
+                "text": "Barb",
+                "fontSize": 16
+              }
+            ]
+          }
+        ],
+        "zh": [
+          {
+            "id": "figure-3690905be707896f",
+            "width": 440,
+            "height": 270,
+            "alt": {
+              "en": "Graph Theory diagram.",
+              "zh": "Graph Theory 图示。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 235,
+                "y1": 220,
+                "x2": 210,
+                "y2": 95,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 350,
+                "y1": 185,
+                "x2": 210,
+                "y2": 95,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 350,
+                "y1": 185,
+                "x2": 310,
+                "y2": 55,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 85,
+                "y1": 180,
+                "x2": 210,
+                "y2": 95,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 310,
+                "y1": 55,
+                "x2": 235,
+                "y2": 220,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 210,
+                "y1": 95,
+                "x2": 65,
+                "y2": 40,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 350,
+                "y1": 185,
+                "x2": 235,
+                "y2": 220,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 65,
+                "y1": 40,
+                "x2": 85,
+                "y2": 180,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "circle",
+                "cx": 65,
+                "cy": 40,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 45,
+                "y": 25,
+                "text": "Erin",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 85,
+                "cy": 180,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 65,
+                "y": 205,
+                "text": "Fran",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 210,
+                "cy": 95,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 190,
+                "y": 75,
+                "text": "Chris",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 235,
+                "cy": 220,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 220,
+                "y": 245,
+                "text": "Alex",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 310,
+                "cy": 55,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 290,
+                "y": 35,
+                "text": "Dave",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 350,
+                "cy": 185,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 355,
+                "y": 195,
+                "text": "Barb",
+                "fontSize": 16
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Graph Theory",
+        "zh": "图论"
+      },
+      "statement": {
+        "en": "Given the graph below that represents a railroad network among 6 Italian cities (Milan, Naples, Pompeii, Rome, Sorrento, and Turin), how many ways can a person get from Milan to Rome without visiting a city twice?\n\n{{diagram:figure-04821ef863f2a044}}",
+        "zh": "下图表示意大利六座城市(米兰、那不勒斯、庞贝、罗马、索伦托、都灵)之间的铁路网络。从米兰到罗马,不重复经过同一座城市,有多少种不同的路线?\n\n{{diagram:figure-04821ef863f2a044}}"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "3",
+            "zh": "3"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "5",
+            "zh": "5"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "7",
+            "zh": "7"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "Answer: **E**.\n\nGroup the routes by their first step from M. Starting with P gives MPR, MPSR, and MPNTSR. Starting with T gives MTSR, MTSPR, MTNPR, and MTNPSR. These disjoint groups contain $3+4=7$ routes.",
+        "zh": "答案：**E**。\n\n按离开 M 的第一步分类。走 P 后有 MPR、MPSR、MPNTSR；走 T 后有 MTSR、MTSPR、MTNPR、MTNPSR。每条都按图的边连到 R，共 7 条。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          5
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      },
+      "statementDiagrams": {
+        "en": [
+          {
+            "id": "figure-04821ef863f2a044",
+            "width": 480,
+            "height": 300,
+            "alt": {
+              "en": "Graph Theory diagram.",
+              "zh": "Graph Theory 图示。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 320,
+                "y1": 245,
+                "x2": 355,
+                "y2": 120,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 320,
+                "y1": 245,
+                "x2": 175,
+                "y2": 255,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 175,
+                "y1": 255,
+                "x2": 270,
+                "y2": 35,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 175,
+                "y1": 255,
+                "x2": 65,
+                "y2": 185,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 270,
+                "y1": 35,
+                "x2": 355,
+                "y2": 120,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 65,
+                "y1": 185,
+                "x2": 355,
+                "y2": 120,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 65,
+                "y1": 185,
+                "x2": 125,
+                "y2": 75,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 125,
+                "y1": 75,
+                "x2": 355,
+                "y2": 120,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "circle",
+                "cx": 125,
+                "cy": 75,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 70,
+                "y": 70,
+                "text": "Rome",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 270,
+                "cy": 35,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 205,
+                "y": 35,
+                "text": "Naples",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 355,
+                "cy": 120,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 365,
+                "y": 120,
+                "text": "Pompeii",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 65,
+                "cy": 185,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 5,
+                "y": 173,
+                "text": "Sorrento",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 175,
+                "cy": 255,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 160,
+                "y": 280,
+                "text": "Turin",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 320,
+                "cy": 245,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 320,
+                "y": 270,
+                "text": "Milan",
+                "fontSize": 16
+              }
+            ]
+          }
+        ],
+        "zh": [
+          {
+            "id": "figure-04821ef863f2a044",
+            "width": 480,
+            "height": 300,
+            "alt": {
+              "en": "Graph Theory diagram.",
+              "zh": "Graph Theory 图示。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 320,
+                "y1": 245,
+                "x2": 355,
+                "y2": 120,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 320,
+                "y1": 245,
+                "x2": 175,
+                "y2": 255,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 175,
+                "y1": 255,
+                "x2": 270,
+                "y2": 35,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 175,
+                "y1": 255,
+                "x2": 65,
+                "y2": 185,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 270,
+                "y1": 35,
+                "x2": 355,
+                "y2": 120,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 65,
+                "y1": 185,
+                "x2": 355,
+                "y2": 120,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 65,
+                "y1": 185,
+                "x2": 125,
+                "y2": 75,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 125,
+                "y1": 75,
+                "x2": 355,
+                "y2": 120,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "circle",
+                "cx": 125,
+                "cy": 75,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 70,
+                "y": 70,
+                "text": "Rome",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 270,
+                "cy": 35,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 205,
+                "y": 35,
+                "text": "Naples",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 355,
+                "cy": 120,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 365,
+                "y": 120,
+                "text": "Pompeii",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 65,
+                "cy": 185,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 5,
+                "y": 173,
+                "text": "Sorrento",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 175,
+                "cy": 255,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 160,
+                "y": 280,
+                "text": "Turin",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 320,
+                "cy": 245,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 320,
+                "y": 270,
+                "text": "Milan",
+                "fontSize": 16
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "Graph Theory",
+        "zh": "图论"
+      },
+      "statement": {
+        "en": "Any mapping app on your phone finds the shortest route between a starting point and a destination using the roads that exist between them. In the following graph, how many miles is the shortest route between Ann’s house and Fran’s house assuming that each edge is 5 miles long?\n\n{{diagram:figure-59e819aefa493eb2}}",
+        "zh": "手机上的任意一款地图软件都会利用现有道路,计算起点到终点的最短路径。在下图中,假设每条边长度均为5英里,那么Ann家与Fran家之间的最短路径是多少英里?\n\n{{diagram:figure-59e819aefa493eb2}}"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "5 miles",
+            "zh": "5英里"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "10 miles",
+            "zh": "10英里"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "15 miles",
+            "zh": "15英里"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "20 miles",
+            "zh": "20英里"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "25 miles",
+            "zh": "25英里"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Answer: **C**.\n\nEach edge costs five miles, so minimize the edge count. A and F share no edge or common neighbor, ruling out one- and two-edge routes. ABCF and AEDF use three edges, so the minimum distance is $3\\cdot5=15$ miles.",
+        "zh": "答案：**C**。\n\n每条边同为 5 英里，因此只需比较经过的边数。A 到 F 没有直连，也没有共同邻居，两条边以内不可达。ABCF 或 AEDF 都只需三条边，所以最短为 $3\\times5=15$ 英里。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          3,
+          6
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      },
+      "statementDiagrams": {
+        "en": [
+          {
+            "id": "figure-59e819aefa493eb2",
+            "width": 510,
+            "height": 360,
+            "alt": {
+              "en": "Graph Theory diagram.",
+              "zh": "Graph Theory 图示。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 75,
+                "y1": 50,
+                "x2": 250,
+                "y2": 50,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 75,
+                "y1": 50,
+                "x2": 230,
+                "y2": 315,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 250,
+                "y1": 50,
+                "x2": 360,
+                "y2": 145,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 360,
+                "y1": 145,
+                "x2": 445,
+                "y2": 250,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 360,
+                "y1": 145,
+                "x2": 45,
+                "y2": 195,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 445,
+                "y1": 250,
+                "x2": 45,
+                "y2": 195,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 445,
+                "y1": 250,
+                "x2": 230,
+                "y2": 315,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "path",
+                "d": "M50 32 L75 10 L100 32 Z",
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 47,
+                "y": 32,
+                "width": 56,
+                "height": 36,
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 75,
+                "y": 55,
+                "text": "Ann",
+                "anchor": "middle",
+                "fontSize": 15
+              },
+              {
+                "type": "path",
+                "d": "M225 32 L250 10 L275 32 Z",
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 222,
+                "y": 32,
+                "width": 56,
+                "height": 36,
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 250,
+                "y": 55,
+                "text": "Bill",
+                "anchor": "middle",
+                "fontSize": 15
+              },
+              {
+                "type": "path",
+                "d": "M335 127 L360 105 L385 127 Z",
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 332,
+                "y": 127,
+                "width": 56,
+                "height": 36,
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 360,
+                "y": 150,
+                "text": "Cal",
+                "anchor": "middle",
+                "fontSize": 15
+              },
+              {
+                "type": "path",
+                "d": "M420 232 L445 210 L470 232 Z",
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 417,
+                "y": 232,
+                "width": 56,
+                "height": 36,
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 445,
+                "y": 255,
+                "text": "Deb",
+                "anchor": "middle",
+                "fontSize": 15
+              },
+              {
+                "type": "path",
+                "d": "M205 297 L230 275 L255 297 Z",
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 202,
+                "y": 297,
+                "width": 56,
+                "height": 36,
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 230,
+                "y": 320,
+                "text": "Evan",
+                "anchor": "middle",
+                "fontSize": 15
+              },
+              {
+                "type": "path",
+                "d": "M20 177 L45 155 L70 177 Z",
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 17,
+                "y": 177,
+                "width": 56,
+                "height": 36,
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 45,
+                "y": 200,
+                "text": "Fran",
+                "anchor": "middle",
+                "fontSize": 15
+              }
+            ]
+          }
+        ],
+        "zh": [
+          {
+            "id": "figure-59e819aefa493eb2",
+            "width": 510,
+            "height": 360,
+            "alt": {
+              "en": "Graph Theory diagram.",
+              "zh": "Graph Theory 图示。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 75,
+                "y1": 50,
+                "x2": 250,
+                "y2": 50,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 75,
+                "y1": 50,
+                "x2": 230,
+                "y2": 315,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 250,
+                "y1": 50,
+                "x2": 360,
+                "y2": 145,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 360,
+                "y1": 145,
+                "x2": 445,
+                "y2": 250,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 360,
+                "y1": 145,
+                "x2": 45,
+                "y2": 195,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 445,
+                "y1": 250,
+                "x2": 45,
+                "y2": 195,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 445,
+                "y1": 250,
+                "x2": 230,
+                "y2": 315,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "path",
+                "d": "M50 32 L75 10 L100 32 Z",
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 47,
+                "y": 32,
+                "width": 56,
+                "height": 36,
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 75,
+                "y": 55,
+                "text": "Ann",
+                "anchor": "middle",
+                "fontSize": 15
+              },
+              {
+                "type": "path",
+                "d": "M225 32 L250 10 L275 32 Z",
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 222,
+                "y": 32,
+                "width": 56,
+                "height": 36,
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 250,
+                "y": 55,
+                "text": "Bill",
+                "anchor": "middle",
+                "fontSize": 15
+              },
+              {
+                "type": "path",
+                "d": "M335 127 L360 105 L385 127 Z",
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 332,
+                "y": 127,
+                "width": 56,
+                "height": 36,
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 360,
+                "y": 150,
+                "text": "Cal",
+                "anchor": "middle",
+                "fontSize": 15
+              },
+              {
+                "type": "path",
+                "d": "M420 232 L445 210 L470 232 Z",
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 417,
+                "y": 232,
+                "width": 56,
+                "height": 36,
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 445,
+                "y": 255,
+                "text": "Deb",
+                "anchor": "middle",
+                "fontSize": 15
+              },
+              {
+                "type": "path",
+                "d": "M205 297 L230 275 L255 297 Z",
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 202,
+                "y": 297,
+                "width": 56,
+                "height": 36,
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 230,
+                "y": 320,
+                "text": "Evan",
+                "anchor": "middle",
+                "fontSize": 15
+              },
+              {
+                "type": "path",
+                "d": "M20 177 L45 155 L70 177 Z",
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "rect",
+                "x": 17,
+                "y": 177,
+                "width": 56,
+                "height": 36,
+                "stroke": "ink",
+                "strokeWidth": 1,
+                "fill": "surface"
+              },
+              {
+                "type": "text",
+                "x": 45,
+                "y": 200,
+                "text": "Fran",
+                "anchor": "middle",
+                "fontSize": 15
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q6",
+      "number": 6,
+      "type": "single",
+      "topic": {
+        "en": "Graph Theory",
+        "zh": "图论"
+      },
+      "statement": {
+        "en": "Which of the following graphs have the same set of edges?\n\n{{diagram:figure-dc42ec824f2b19db}}",
+        "zh": "下列哪些图具有相同的边集?\n\n{{diagram:figure-dc42ec824f2b19db}}"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "1, 2",
+            "zh": "1, 2"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "2, 3",
+            "zh": "2, 3"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "1, 3",
+            "zh": "1, 3"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "1, 2, 3",
+            "zh": "1, 2, 3"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "None of them",
+            "zh": "以上均不是"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "Answer: **E**.\n\nThe edge sets are:\n\n- Graph1: {AD, AC, BD, BC}.\n- Graph2: {AB, AC, BD, CD}.\n- Graph3: {AB, BC, AD, CD}.\n\nNo two sets are identical. Source correction: the original solution lists several incorrect edges, including a duplicated BC in Graph2; the sets above follow the question diagrams.",
+        "zh": "答案：**E**。\n\n比较带标签的无向边，而不是图的摆放方式。图 1 有 AD、AC、BD、BC；图 2 有 AB、AC、BD、CD；图 3 有 AB、BC、AD、CD。任意两组都不同。原解析的边列表有误（例如图 2 重复 BC），这里按题图列边。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          3,
+          6
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      },
+      "statementDiagrams": {
+        "en": [
+          {
+            "id": "figure-dc42ec824f2b19db",
+            "width": 780,
+            "height": 220,
+            "alt": {
+              "en": "Graph Theory diagram.",
+              "zh": "Graph Theory 图示。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 80,
+                "y1": 40,
+                "x2": 25,
+                "y2": 195,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 80,
+                "y1": 40,
+                "x2": 150,
+                "y2": 175,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 25,
+                "y1": 195,
+                "x2": 210,
+                "y2": 55,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 210,
+                "y1": 55,
+                "x2": 150,
+                "y2": 175,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "circle",
+                "cx": 80,
+                "cy": 40,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 88,
+                "y": 32,
+                "text": "A",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 210,
+                "cy": 55,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 218,
+                "y": 47,
+                "text": "B",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 150,
+                "cy": 175,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 158,
+                "y": 167,
+                "text": "C",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 25,
+                "cy": 195,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 33,
+                "y": 187,
+                "text": "D",
+                "fontSize": 16
+              },
+              {
+                "type": "text",
+                "x": 5,
+                "y": 25,
+                "text": "1.",
+                "fontSize": 18
+              },
+              {
+                "type": "line",
+                "x1": 355,
+                "y1": 30,
+                "x2": 445,
+                "y2": 105,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 355,
+                "y1": 30,
+                "x2": 395,
+                "y2": 195,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 445,
+                "y1": 105,
+                "x2": 285,
+                "y2": 205,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 395,
+                "y1": 195,
+                "x2": 285,
+                "y2": 205,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "circle",
+                "cx": 355,
+                "cy": 30,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 363,
+                "y": 22,
+                "text": "A",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 445,
+                "cy": 105,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 453,
+                "y": 97,
+                "text": "B",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 395,
+                "cy": 195,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 403,
+                "y": 187,
+                "text": "C",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 285,
+                "cy": 205,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 293,
+                "y": 197,
+                "text": "D",
+                "fontSize": 16
+              },
+              {
+                "type": "text",
+                "x": 265,
+                "y": 25,
+                "text": "2.",
+                "fontSize": 18
+              },
+              {
+                "type": "line",
+                "x1": 740,
+                "y1": 50,
+                "x2": 550,
+                "y2": 75,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 550,
+                "y1": 75,
+                "x2": 695,
+                "y2": 175,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 740,
+                "y1": 50,
+                "x2": 550,
+                "y2": 205,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 550,
+                "y1": 205,
+                "x2": 695,
+                "y2": 175,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "circle",
+                "cx": 550,
+                "cy": 75,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 558,
+                "y": 67,
+                "text": "B",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 740,
+                "cy": 50,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 748,
+                "y": 42,
+                "text": "A",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 550,
+                "cy": 205,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 558,
+                "y": 197,
+                "text": "D",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 695,
+                "cy": 175,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 703,
+                "y": 167,
+                "text": "C",
+                "fontSize": 16
+              },
+              {
+                "type": "text",
+                "x": 525,
+                "y": 25,
+                "text": "3.",
+                "fontSize": 18
+              }
+            ]
+          }
+        ],
+        "zh": [
+          {
+            "id": "figure-dc42ec824f2b19db",
+            "width": 780,
+            "height": 220,
+            "alt": {
+              "en": "Graph Theory diagram.",
+              "zh": "Graph Theory 图示。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 80,
+                "y1": 40,
+                "x2": 25,
+                "y2": 195,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 80,
+                "y1": 40,
+                "x2": 150,
+                "y2": 175,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 25,
+                "y1": 195,
+                "x2": 210,
+                "y2": 55,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 210,
+                "y1": 55,
+                "x2": 150,
+                "y2": 175,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "circle",
+                "cx": 80,
+                "cy": 40,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 88,
+                "y": 32,
+                "text": "A",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 210,
+                "cy": 55,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 218,
+                "y": 47,
+                "text": "B",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 150,
+                "cy": 175,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 158,
+                "y": 167,
+                "text": "C",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 25,
+                "cy": 195,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 33,
+                "y": 187,
+                "text": "D",
+                "fontSize": 16
+              },
+              {
+                "type": "text",
+                "x": 5,
+                "y": 25,
+                "text": "1.",
+                "fontSize": 18
+              },
+              {
+                "type": "line",
+                "x1": 355,
+                "y1": 30,
+                "x2": 445,
+                "y2": 105,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 355,
+                "y1": 30,
+                "x2": 395,
+                "y2": 195,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 445,
+                "y1": 105,
+                "x2": 285,
+                "y2": 205,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 395,
+                "y1": 195,
+                "x2": 285,
+                "y2": 205,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "circle",
+                "cx": 355,
+                "cy": 30,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 363,
+                "y": 22,
+                "text": "A",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 445,
+                "cy": 105,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 453,
+                "y": 97,
+                "text": "B",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 395,
+                "cy": 195,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 403,
+                "y": 187,
+                "text": "C",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 285,
+                "cy": 205,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 293,
+                "y": 197,
+                "text": "D",
+                "fontSize": 16
+              },
+              {
+                "type": "text",
+                "x": 265,
+                "y": 25,
+                "text": "2.",
+                "fontSize": 18
+              },
+              {
+                "type": "line",
+                "x1": 740,
+                "y1": 50,
+                "x2": 550,
+                "y2": 75,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 550,
+                "y1": 75,
+                "x2": 695,
+                "y2": 175,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 740,
+                "y1": 50,
+                "x2": 550,
+                "y2": 205,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "line",
+                "x1": 550,
+                "y1": 205,
+                "x2": 695,
+                "y2": 175,
+                "stroke": "ink",
+                "strokeWidth": 1.5
+              },
+              {
+                "type": "circle",
+                "cx": 550,
+                "cy": 75,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 558,
+                "y": 67,
+                "text": "B",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 740,
+                "cy": 50,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 748,
+                "y": 42,
+                "text": "A",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 550,
+                "cy": 205,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 558,
+                "y": 197,
+                "text": "D",
+                "fontSize": 16
+              },
+              {
+                "type": "circle",
+                "cx": 695,
+                "cy": 175,
+                "r": 4,
+                "fill": "ink",
+                "stroke": "none"
+              },
+              {
+                "type": "text",
+                "x": 703,
+                "y": 167,
+                "text": "C",
+                "fontSize": 16
+              },
+              {
+                "type": "text",
+                "x": 525,
+                "y": 25,
+                "text": "3.",
+                "fontSize": 18
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "contentNotes": []
+}

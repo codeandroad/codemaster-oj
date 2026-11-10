@@ -1,0 +1,449 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2025-2026-elementary-1",
+  "division": "Elementary",
+  "season": "2025-2026",
+  "round": 1,
+  "roundLabel": {
+    "en": "Contest 1",
+    "zh": "资格轮"
+  },
+  "title": {
+    "en": "ACSL 2025-2026 Elementary · Contest 1",
+    "zh": "ACSL 2025-2026 Elementary · 资格轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Elementary/2025-2026/资格轮/c1_elem.pdf",
+      "sha256": "6da0206262ec314a1aca7beb214fb0869bdf120cb909225a5b631d24e5314c62",
+      "pages": 2
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Elementary/2025-2026/资格轮/c1_elem_sol.pdf",
+      "sha256": "a7a33584d5d06f9d3a3b4abb83bded2fa08cd336d2b996d8d9a8db44757b6d33",
+      "pages": 1
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Convert $7654_{8}$ to base 16.",
+        "zh": "将 $7654_{8}$ 转换为16进制。"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "CAF",
+            "zh": "CAF"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "DBE",
+            "zh": "DBE"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "EDB",
+            "zh": "EDB"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "FAC",
+            "zh": "FAC"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "F9C",
+            "zh": "F9C"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Answer: **D**.\n\nConvert each octal digit into three bits, then regroup into four-bit hexadecimal digits.\n\n$$7654_8=111\\,110\\,101\\,100_2=1111\\,1010\\,1100_2=FAC_{16}.$$",
+        "zh": "答案：**D**。\n\n八进制每位展开为三位二进制，得 `111 110 101 100`。从右向左改成四位一组：`1111 1010 1100`，分别对应 F、A、C，结果为 $FAC_{16}$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "What is the value of $125_{16}$ in base 10?",
+        "zh": "将 $125_{16}$ 转换为10进制,其值是多少?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "69",
+            "zh": "69"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "288",
+            "zh": "288"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "293",
+            "zh": "293"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "297",
+            "zh": "297"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "338",
+            "zh": "338"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Answer: **C**.\n\nTo convert from base 16 to base 10, multiply each digit by a power of 16.\n\n$$\n1*16^{2}+2*16+5=256+32+5=293\n$$",
+        "zh": "答案：**C**。\n\n从左到右，三个十六进制位的位权分别为 $16^2$、$16$、$1$，所以 $125_{16}=1\\times256+2\\times16+5=293$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Convert $2025_{10}$ to base 8.",
+        "zh": "将 $2025_{10}$ 转换为8进制。"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "3862",
+            "zh": "3862"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "3751",
+            "zh": "3751"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "1537",
+            "zh": "1537"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "1045",
+            "zh": "1045"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "253",
+            "zh": "253"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Answer: **B**.\n\nTo convert $2025_{10}$ from base 10 to base 8, divide by 8 and use the remainders for the new number. 2025/ 8 = 253 r 1, 253 / 8 = 31 r 5, 31 / 8 = 3 r 7, 3 / 8 = 0 r 3 Reading backwards, the answer is 3751.",
+        "zh": "答案：**B**。\n\n连续除以 8，依次得到商 253、31、3、0，余数 1、5、7、3。第一次余数是个位，逆序读得 $3751_8$。用 $3\\times512+7\\times64+5\\times8+1$ 可验回 2025。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "How many 0s are there in all of the octal numbers when counting from $2025_{8}$ to $2050_{8}$, inclusive?",
+        "zh": "从八进制数 $2025_8$ 数到 $2050_8$（含首尾），这些数中总共有多少个 0？"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "10",
+            "zh": "10"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "12",
+            "zh": "12"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "15",
+            "zh": "15"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "20",
+            "zh": "20"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "23",
+            "zh": "23"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "Answer: **E**.\n\nCount zero digits, including repeated zeros in a single numeral. The numerals 2025–2027 contribute 3. In 2030–2037, each of the eight numerals has a zero in the $8^2$ place, and 2030 has a second zero. That contributes 9. The 2040–2047 block contributes another 9 by the same reasoning. The endpoint 2050 contributes 2. Total: $3+9+9+2=23$.",
+        "zh": "答案：**E**。\n\n题目问的是数字 0 出现了多少次，同一个数里有两个 0 就要计两次。2025 至 2027 共 3 个；2030 至 2037 的八个数各有一个 0 在 $8^2$ 位，2030 的个位还有一个，共 9 个；2040 至 2047 同样共 9 个；末尾 2050 有 2 个。所以总数为 $3+9+9+2=23$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Blending two colors is done by finding the average of each component. Given the two colors #B058C3 and #9864AE, what is the blended green component? Express this in base 10.",
+        "zh": "通过计算两种颜色中每个分量的平均值来实现颜色混合,给定两种颜色#B058C3和#9864AE,混合后绿色的分量是多少?(用10进制来表示结果)"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "92",
+            "zh": "92"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "93",
+            "zh": "93"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "94",
+            "zh": "94"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "95",
+            "zh": "95"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "96",
+            "zh": "96"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Answer: **C**.\n\n58 and 64 are the green components. In base 10, 5*16+8=88 and 6*16+4=100 so (88+100)/2=94. Without doing any math, counting from 58 to 64 in hex is 58, 59, 5A, 5B, 5C, 5D, 5E, 5F, 60, 61, 62, 63, 64. The one in the middle is $5E_{16}$ = 5 * 16 + 14 = $94_{10}.$",
+        "zh": "答案：**C**。\n\n提取中间两位作为绿色值。$58_{16}=5\\times16+8=88$，$64_{16}=6\\times16+4=100$，平均值是 $(88+100)/2=94$。题目要求十进制，虽然同一数值也可写为 $5E_{16}$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q6",
+      "number": 6,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Making a color lighter is done by adding some number to each component. Similarly, making a color darker is done by subtracting some number from each component. What is the color created by subtracting $A_{16}$ from each component of #B9784F?",
+        "zh": "通过向每个颜色分量添加一个数值,可以使颜色变浅。类似地,通过从每个颜色分量减去一个数值,可以使颜色变深。那么,从颜色#B9784F的每个分量中减去 $A_{16}$ 后,会生成什么颜色?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "AF6E45",
+            "zh": "AF6E45"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "AF6845",
+            "zh": "AF6845"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "AA7F45",
+            "zh": "AA7F45"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "A86F45",
+            "zh": "A86F45"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "A96E45",
+            "zh": "A96E45"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "Answer: **A**.\n\nSplit the color into the channels `B9 78 4F` and subtract $A_{16}$ from each one independently. Borrow in the first two channels, where $9<A$ and $8<A$. This gives `AF 6E 45`. The last channel needs no borrow because $F-A=5$. Rejoin the channels to obtain `AF6E45`.",
+        "zh": "答案：**A**。\n\n拆成 `B9 78 4F` 三个通道，分别减去 $A_{16}$。前两组个位不够减要借位，得到 $AF_{16}$、$6E_{16}$，第三组得到 $45_{16}$。按原来的通道顺序拼为 `AF6E45`。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [
+    "The source directory calls Contest 1 the qualification round; canonical round remains 1."
+  ]
+}

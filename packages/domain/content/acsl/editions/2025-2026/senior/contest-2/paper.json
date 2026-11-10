@@ -1,0 +1,535 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2025-2026-senior-2",
+  "division": "Senior",
+  "season": "2025-2026",
+  "round": 2,
+  "roundLabel": {
+    "en": "Contest 2",
+    "zh": "第二轮"
+  },
+  "title": {
+    "en": "ACSL 2025-2026 Senior · Contest 2",
+    "zh": "ACSL 2025-2026 Senior · 第二轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Senior/2025-2026/第二轮/25-26 高级组 Paper .pdf",
+      "sha256": "9d1376640ebdc85a3ab08fbab8b5c9cddeeb57af4fd821b9280e836bb78383a9",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Senior/2025-2026/第二轮/25-26 高级组 solution.pdf",
+      "sha256": "19d102700236c602873551f7c1d88911a1a7f27242036ff789e03eff5a57ff3c",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Senior/2025-2026/第二轮/25-26 高级组 License Plates .pdf",
+      "sha256": "ae63d4ebfd77a93d2222614a9f83541a3449b284b301627ba7344f5e413cb6e1",
+      "pages": 8
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "What is the value of x that makes the following postfix expression evaluate to 2026?\n\n`x x 1 + + x 2 + + x 3 + +`",
+        "zh": "若以下后缀表达式的计算结果为2026,求x的值:\n\n`x x 1 + + x 2 + + x 3 + +`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "404",
+            "zh": "404"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "505",
+            "zh": "505"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "202",
+            "zh": "202"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "1010",
+            "zh": "1010"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "2020",
+            "zh": "2020"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "The postfix expression is $x+(x+1)+(x+2)+(x+3)=4x+6$. Solving $4x+6=2026$ gives $x=505$. Indeed, $505+506+507+508=2026$.\n\nThe first `x x 1 + +` combines x with x+1; the next `x 2 + +` adds x+2 to that running sum; the final group adds x+3. Therefore there are four x terms and constants 1+2+3=6. Subtract 6 before dividing by 4: (2026−6)/4=505, **option B**.",
+        "zh": "后缀表达式表示 $x+(x+1)+(x+2)+(x+3)=4x+6$。解 $4x+6=2026$，得 $x=505$。检验：$505+506+507+508=2026$，选 B。\n\n开头 `x x 1 + +` 将 x 与 x+1 相加；随后 `x 2 + +` 把 x+2 加到已有总和；最后一组再加入 x+3。因此共有四个 x，常量和为 1+2+3=6。先减去 6 再除以 4，即 (2026−6)/4=505，选 **B**。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Evaluate the following postfix expression if all numbers are single digits:\n\n`6 4 + 2 ^ 6 3 / / 8 4 / 4 8 / / +`",
+        "zh": "计算以下后缀表达式的值(所有出现的数字均为单个数字):\n\n`6 4 + 2 ^ 6 3 / / 8 4 / 4 8 / / +`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "5",
+            "zh": "5"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "50",
+            "zh": "50"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "54",
+            "zh": "54"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "104",
+            "zh": "104"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "204",
+            "zh": "204"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Convert each postfix subexpression to infix:\n\n$$\n\\frac{(6+4)^2}{6/3}+\\frac{8/4}{4/8}=\\frac{100}{2}+\\frac{2}{0.5}=50+4=54\n$$\n\nFor the left quotient, the stack first builds (6+4)²=100 and then 6/3=2, so the next / gives 50. For the right quotient it builds 8/4=2 and 4/8=1/2, so dividing the former by the latter gives 4. These are arithmetic divisions, not integer truncation; replacing 4/8 by 0 would be incorrect. **Answer: C.**",
+        "zh": "将各段后缀表达式转为中缀形式：\n\n$$\n\\frac{(6+4)^2}{6/3}+\\frac{8/4}{4/8}=\\frac{100}{2}+\\frac{2}{0.5}=50+4=54\n$$\n\n选 C。\n\n左侧先入栈得到 (6+4)²=100，再得到 6/3=2，随后的 / 计算 100/2=50。右侧分别得到 8/4=2、4/8=1/2，再计算 2/(1/2)=4。这里按数学除法保留分数，不能把 4/8 按整数除法截成 0。**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "比特位操作"
+      },
+      "statement": {
+        "en": "Evaluate and express the answer in octal:\n\n$$\n375_{8}\\;\\operatorname{AND}\\;A4_{16}\\;\\operatorname{OR}\\;01110110_{2}\n$$",
+        "zh": "计算以下表达式，并将结果用八进制表示：\n\n$$\n375_{8}\\;\\operatorname{AND}\\;A4_{16}\\;\\operatorname{OR}\\;01110110_{2}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`244`",
+            "zh": "`244`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`104`",
+            "zh": "`104`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`266`",
+            "zh": "`266`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`366`",
+            "zh": "`366`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`156`",
+            "zh": "`156`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Convert the operands to binary: $375_8=11111101_2$ and $A4_{16}=10100100_2$.\n\n```text\n11111101 AND 10100100 = 10100100\n10100100 OR 01110110 = 11110110\n```\n\nGrouping in threes gives $(11\\,110\\,110)_2=366_8$.\n\nAlign all operands to eight bits, adding leading zeros where needed. AND is evaluated before OR. To convert the final 11110110 to octal, pad on the left and group as `011 110 110`, yielding 3,6,6. Do not report the intermediate AND result 244₈. **Answer: D.**",
+        "zh": "先转换为二进制：$375_8=11111101_2$，$A4_{16}=10100100_2$。\n\n```text\n11111101 AND 10100100 = 10100100\n10100100 OR 01110110 = 11110110\n```\n\n按三位一组转换：$(11\\,110\\,110)_2=366_8$，选 D。\n\n各操作数先对齐为八位，必要时在左侧补零；AND 优先于 OR。最终 11110110 转八进制时，可左补零并分为 `011 110 110`，得到 3、6、6。不要把中间 AND 结果 244₈ 当成最终答案。**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "比特位操作"
+      },
+      "statement": {
+        "en": "Solve the following equation for X if X is a 5-bit string:\n\n`(NOT 01100) OR (LCIRC-1 01101 AND X) = X`",
+        "zh": "已知X为一个5位二进制串(5-bit string),解方程求X:\n\n`(NOT 01100) OR (LCIRC-1 01101 AND X) = X`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`1*011`",
+            "zh": "`1*011`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`10*11`",
+            "zh": "`10*11`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`*0010`",
+            "zh": "`*0010`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`110*1`",
+            "zh": "`110*1`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`1111*`",
+            "zh": "`1111*`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "`(NOT 01100) OR (LCIRC-1 01101 AND X) = X`\n\n`(NOT 01100) OR (LCIRC-1 01101 AND abcde) = abcde`\n\n`10011 OR 11010 AND abcde = abcde`\n\n`10011 OR ab0d0 = abcde`\n\n`1b011 = abcde`\n\nTherefore, a=1, b=*, c=0, d=1, e=1 so the bit string is 1*011.\n\nComparing each position in 1b011 with X=abcde fixes a=1,c=0,d=1,e=1. The second position repeats b on both sides, so it imposes no constraint. Both 10011 and 11011 satisfy the original equation, represented by `1*011`, **option A**.",
+        "zh": "设 `X=abcde`。`NOT 01100 = 10011`，`LCIRC-1 01101 = 11010`。于是左侧为 `10011 OR (11010 AND abcde) = 10011 OR ab0d0 = 1b011`。与 `abcde` 相等要求 a=1、c=0、d=1、e=1，b 任意，即 `1*011`，选 A。\n\n把 1b011 与 X=abcde 逐位对照，固定 a=1、c=0、d=1、e=1；第二位两边都是 b，没有增加限制。因此 10011、11011 都满足原等式，合写为 `1*011`，选 **A**。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "LISP",
+        "zh": "LISP"
+      },
+      "statement": {
+        "en": "Evaluate the following LISP expression:\n\n```lisp\n(MULT 3 (SUB 8 6) (ADD 2 1 4) (DIV 6 2) (SQUARE 2))\n```",
+        "zh": "对下列LISP表达式进行求值:\n\n```lisp\n(MULT 3 (SUB 8 6) (ADD 2 1 4) (DIV 6 2) (SQUARE 2))\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "60",
+            "zh": "60"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "126",
+            "zh": "126"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "252",
+            "zh": "252"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "420",
+            "zh": "420"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "504",
+            "zh": "504"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "The arguments evaluate to 3, 2, 7, 3, and 4. MULT returns their product: $3\\times2\\times7\\times3\\times4=504$.\n\nThe inner calls return SUB(8,6)=2, ADD(2,1,4)=7, DIV(6,2)=3 and SQUARE(2)=4. MULT also includes its first literal argument 3. Multiplying successively gives 6,42,126,504; omitting that first 3 would change the result. **Answer: E.**",
+        "zh": "各参数依次为 3、2、7、3、4。MULT 将它们相乘：$3\\times2\\times7\\times3\\times4=504$，选 E。\n\n内层调用依次返回 SUB(8,6)=2、ADD(2,1,4)=7、DIV(6,2)=3、SQUARE(2)=4；MULT 还包含最前面的字面参数 3。依次相乘得到 6、42、126、504，不能漏掉最前面的 3。**答案：E。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q6",
+      "number": 6,
+      "type": "single",
+      "topic": {
+        "en": "LISP",
+        "zh": "LISP"
+      },
+      "statement": {
+        "en": "Evaluate the following LISP expression:\n\n```text\n(SETQ V '(r (b y) (o (p (g)))))\n(CAR (CDR (CAR (REVERSE (CDR V)))))\n```",
+        "zh": "对下列LISP表达式进行求值:\n\n```text\n(SETQ V '(r (b y) (o (p (g)))))\n(CAR (CDR (CAR (REVERSE (CDR V)))))\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "((g))",
+            "zh": "((g))"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "(b y)",
+            "zh": "(b y)"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "(o)",
+            "zh": "(o)"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "(p (g))",
+            "zh": "(p (g))"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "(o (p (g)))",
+            "zh": "(o (p (g)))"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Apply the nested operations from the inside outward:\n\n```lisp\nCDR     => ((b y) (o (p (g))))\nREVERSE => ((o (p (g))) (b y))\nCAR     => (o (p (g)))\nCDR     => ((p (g)))\nCAR     => (p (g))\n```\n\nREVERSE changes only the order of the two remaining top-level sublists; it does not reverse their contents. After the first CAR, the selected list is `(o (p (g)))`; CDR removes o, giving `((p (g)))`, and the final CAR removes only that outer wrapper. The inner `(g)` stays a sublist. **Answer: D.**",
+        "zh": "从内到外依次执行各操作：\n\n```lisp\nCDR     => ((b y) (o (p (g))))\nREVERSE => ((o (p (g))) (b y))\nCAR     => (o (p (g)))\nCDR     => ((p (g)))\nCAR     => (p (g))\n```\n\n结果为 `(p (g))`，选 D。\n\nREVERSE 只交换剩余两个顶层子表的顺序，不反转子表内部。第一次 CAR 取出 `(o (p (g)))`；CDR 删除 o 后得到 `((p (g)))`，最后的 CAR 仅取出外层包裹中的那个元素，内部 `(g)` 仍是子表。**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [],
+  "programming": {
+    "id": "license-plates",
+    "definition": {
+      "title": "License Plates",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Use the line structure shown in the test-case input below.\n\n### Problem\n\nGiven a valid license plate that contains 3 uppercase letters followed by a 4-digit integer between 0000 and 9999, inclusive, determine all of the following:\n\n1) If the letters are all in the same half of the alphabet, output either “B” for beginning or “E” for ending.\n\n2) If all of the letters are consecutive alphabetically or all of the digits are consecutive numerically, but not both, output “I” for increasing or “D” for decreasing.\n\n3) If the letters could be a hexadecimal number, output “H”.\n\n4) If the digits could be an octal number that has no leading 0s, output “O”.\n\n5) If the letters or the number form a palindrome, output “P”. A string is a palindrome if it is the same forwards as backwards.\n\n6) If there are repeated letters or digits (not necessarily adjacent), output “R”.\n\n7) If the sum of any 3 digits equals the remaining digit, output “S”.\n\nYour output will be a string of these letters (B, D, E, H, I, O, P, R, S) in alphabetical order. Print “NONE” if none are present.\n\n### Example\n\nInput FIB1123\n\nOutput BOR\n\nAll 3 letters are at the beginning of the alphabet. The digits are all 0-7 with no leading 0, and the 1 is repeated, so output BOR. 1123 are not 4 consecutive digits.\n\n### Input\n\nThere will be one string representing a valid license plate.\n\n### Output\n\nOutput a string representing the license plate’s various characteristics.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "FIB1123\n",
+          "expected": "BOR\n"
+        },
+        {
+          "input": "NPR9876\n",
+          "expected": "DE\n"
+        },
+        {
+          "input": "DEF5470\n",
+          "expected": "BHIO\n"
+        },
+        {
+          "input": "CAR2552\n",
+          "expected": "OPR\n"
+        },
+        {
+          "input": "BOB1236\n",
+          "expected": "OPRS\n"
+        },
+        {
+          "input": "HAP0037\n",
+          "expected": "R\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "FAB3278\n",
+          "expected": "BH\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "ALC4335\n",
+          "expected": "BOR\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "FGH1263\n",
+          "expected": "BIOS\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "POP0615\n",
+          "expected": "EPRS\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "ABE4321\n",
+          "expected": "BDHO\n",
+          "weight": 16.6666
+        },
+        {
+          "input": "VUT3456\n",
+          "expected": "EO\n",
+          "weight": 16.6666
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。输入按下方测试用例展示的行结构读取。\n\n### 题目\n\n给定一个有效车牌，包含 3 个大写字母，后接 0000 到 9999（含两端）之间的 4 位整数。判断以下特征：\n\n1. 如果所有字母都位于字母表的同一半，位于前半部分输出 `B`，位于后半部分输出 `E`。\n2. 如果所有字母按字母表顺序连续，或者所有数字按数值连续，但不能两者同时成立，递增时输出 `I`，递减时输出 `D`。\n3. 如果字母部分可以构成十六进制数，输出 `H`。\n4. 如果数字部分可以构成没有前导零的八进制数，输出 `O`。\n5. 如果字母部分或数字部分是回文，输出 `P`。回文指正读和反读相同的字符串。\n6. 如果有重复字母或数字（不必相邻），输出 `R`。\n7. 如果任意 3 个数字之和等于剩余的那个数字，输出 `S`。\n\n将满足条件的字母 `B D E H I O P R S` 按字母顺序组成一个字符串。如果没有满足的条件，输出 `NONE`。\n\n### 示例\n\n输入 `FIB1123`，输出 `BOR`。三个字母都位于字母表前半部分；数字均为 0–7 且没有前导零；数字 1 重复出现。1123 不是四个连续数字，因此没有 `I`。\n\n### 输入\n\n一个表示有效车牌的字符串。\n\n### 输出\n\n一个表示车牌特征的字符串。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [],
+      "zh": []
+    }
+  }
+}

@@ -1,0 +1,1570 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2020-2021-elementary-4",
+  "division": "Elementary",
+  "season": "2020-2021",
+  "round": 4,
+  "roundLabel": {
+    "en": "Contest 4",
+    "zh": "第四轮"
+  },
+  "title": {
+    "en": "ACSL 2020-2021 Elementary · Contest 4",
+    "zh": "ACSL 2020-2021 Elementary · 第四轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Elementary/2020-2021/第四轮/小学-笔试.pdf",
+      "sha256": "79d455fa689a4e2ac35df6ab1059778a8265020aeea25dbf1b8e00ac3fcfbad4",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Elementary/2020-2021/第四轮/小学-笔试答案.pdf",
+      "sha256": "247c5306e0cbb9645e7aecb7931fea28c4bc1e1f629693286b42d98d3babaacb",
+      "pages": 1
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Graph Theory",
+        "zh": "图论"
+      },
+      "statement": {
+        "en": "Draw an undirected graph representing the following information using the first letter of each person’s name. Which person has the most friends?\n\nAnn is friends with Deb and Eve. Eve is friends with Ann and Carol. Deb is friends with Carol and Fran. Fran is friends with Ann and Carol. Carol is friends with Beth and Ann. Beth is friends with Eve and Deb.",
+        "zh": "用每个人姓名的首字母表示顶点，根据以下信息画出无向图。谁的朋友最多？\n\nAnn 与 Deb、Eve 是朋友。Eve 与 Ann、Carol 是朋友。Deb 与 Carol、Fran 是朋友。Fran 与 Ann、Carol 是朋友。Carol 与 Beth、Ann 是朋友。Beth 与 Eve、Deb 是朋友。"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "Ann",
+            "zh": "Ann"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "Beth",
+            "zh": "Beth"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "Carol",
+            "zh": "Carol"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "Deb",
+            "zh": "Deb"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "Eve",
+            "zh": "Eve"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "The undirected edges are $AC, AD, AE, AF, BC, BD, BE, CD, CE, CF, DF$. Count each friendship only once. Carol is adjacent to A, B, D, E and F, so she has 5 friends, the most. Answer C.",
+        "zh": "答案：**C**。\n\n把每一对朋友连成一条无向边。Carol 的邻居是 A、B、D、E、F，因此她的度数是 5。图中只有 6 人，任一人最多有 5 个朋友，核对其余人的邻居可见没有人和她并列。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Graph Theory",
+        "zh": "图论"
+      },
+      "statement": {
+        "en": "For the given graph, how many more edges are needed for this graph to be a complete graph?\n\n{{diagram:elementary-q2-graph}}",
+        "zh": "要使下图成为完全图，还需要添加多少条边？\n\n{{diagram:elementary-q2-graph}}"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "1",
+            "zh": "1"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "2",
+            "zh": "2"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "3",
+            "zh": "3"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "5",
+            "zh": "5"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "A complete graph on 5 vertices has $\\binom{5}{2}=10$ edges. The graph has 7 edges. Add $QR$, $RT$ and $PS$, so 3 more edges are needed. Answer C.",
+        "zh": "答案：**C**。\n\n完全图要求任意两点之间都有边。5 个顶点有 $\\binom{5}{2}=10$ 对，原图已经连了 7 对。缺失的边是 $QR$、$RT$ 和 $PS$，所以要补 3 条。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      },
+      "statementDiagrams": {
+        "en": [
+          {
+            "id": "elementary-q2-graph",
+            "width": 350,
+            "height": 275,
+            "alt": {
+              "en": "Undirected graph. Vertices: P, Q, R, S, T. Edges: P–Q, P–T, P–R, Q–T, Q–S, R–S, S–T.",
+              "zh": "无向图。顶点：P, Q, R, S, T。边：P–Q, P–T, P–R, Q–T, Q–S, R–S, S–T。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 55,
+                "y1": 45,
+                "x2": 255,
+                "y2": 45
+              },
+              {
+                "type": "line",
+                "x1": 55,
+                "y1": 45,
+                "x2": 45,
+                "y2": 195
+              },
+              {
+                "type": "line",
+                "x1": 55,
+                "y1": 45,
+                "x2": 300,
+                "y2": 155
+              },
+              {
+                "type": "line",
+                "x1": 255,
+                "y1": 45,
+                "x2": 45,
+                "y2": 195
+              },
+              {
+                "type": "line",
+                "x1": 255,
+                "y1": 45,
+                "x2": 190,
+                "y2": 240
+              },
+              {
+                "type": "line",
+                "x1": 300,
+                "y1": 155,
+                "x2": 190,
+                "y2": 240
+              },
+              {
+                "type": "line",
+                "x1": 190,
+                "y1": 240,
+                "x2": 45,
+                "y2": 195
+              },
+              {
+                "type": "circle",
+                "cx": 55,
+                "cy": 45,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 55,
+                "y": 33,
+                "text": "P",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 255,
+                "cy": 45,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 255,
+                "y": 33,
+                "text": "Q",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 300,
+                "cy": 155,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 314,
+                "y": 161,
+                "text": "R",
+                "fontSize": 20,
+                "anchor": "start"
+              },
+              {
+                "type": "circle",
+                "cx": 190,
+                "cy": 240,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 190,
+                "y": 264,
+                "text": "S",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 45,
+                "cy": 195,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 31,
+                "y": 201,
+                "text": "T",
+                "fontSize": 20,
+                "anchor": "end"
+              }
+            ]
+          }
+        ],
+        "zh": [
+          {
+            "id": "elementary-q2-graph",
+            "width": 350,
+            "height": 275,
+            "alt": {
+              "en": "Undirected graph. Vertices: P, Q, R, S, T. Edges: P–Q, P–T, P–R, Q–T, Q–S, R–S, S–T.",
+              "zh": "无向图。顶点：P, Q, R, S, T。边：P–Q, P–T, P–R, Q–T, Q–S, R–S, S–T。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 55,
+                "y1": 45,
+                "x2": 255,
+                "y2": 45
+              },
+              {
+                "type": "line",
+                "x1": 55,
+                "y1": 45,
+                "x2": 45,
+                "y2": 195
+              },
+              {
+                "type": "line",
+                "x1": 55,
+                "y1": 45,
+                "x2": 300,
+                "y2": 155
+              },
+              {
+                "type": "line",
+                "x1": 255,
+                "y1": 45,
+                "x2": 45,
+                "y2": 195
+              },
+              {
+                "type": "line",
+                "x1": 255,
+                "y1": 45,
+                "x2": 190,
+                "y2": 240
+              },
+              {
+                "type": "line",
+                "x1": 300,
+                "y1": 155,
+                "x2": 190,
+                "y2": 240
+              },
+              {
+                "type": "line",
+                "x1": 190,
+                "y1": 240,
+                "x2": 45,
+                "y2": 195
+              },
+              {
+                "type": "circle",
+                "cx": 55,
+                "cy": 45,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 55,
+                "y": 33,
+                "text": "P",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 255,
+                "cy": 45,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 255,
+                "y": 33,
+                "text": "Q",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 300,
+                "cy": 155,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 314,
+                "y": 161,
+                "text": "R",
+                "fontSize": 20,
+                "anchor": "start"
+              },
+              {
+                "type": "circle",
+                "cx": 190,
+                "cy": 240,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 190,
+                "y": 264,
+                "text": "S",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 45,
+                "cy": 195,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 31,
+                "y": 201,
+                "text": "T",
+                "fontSize": 20,
+                "anchor": "end"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Graph Theory",
+        "zh": "图论"
+      },
+      "statement": {
+        "en": "In creating a transportation network among the cities of Austin, Boston, Concord, Denver, and Frankford that uses the first letter of each city’s name, how many different routes (or simple paths) are there from Austin to Denver?\n\n{{diagram:elementary-q3-graph}}",
+        "zh": "在 Austin、Boston、Concord、Denver 和 Frankford 之间建立如下交通网络，用各城市的首字母表示顶点。从 Austin 到 Denver 有多少条不同的路线（简单路径）？\n\n{{diagram:elementary-q3-graph}}"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "5",
+            "zh": "5"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "7",
+            "zh": "7"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "A simple path does not repeat a vertex. The 7 paths from A to D are AD, ACD, AFD, ABCD, ABFD, AFBCD and ACBFD. Answer D.",
+        "zh": "答案：**D**。\n\n按从 A 出发的第一步分组，途中遇过的点不能再进。经 D 的只有 AD；经 C 有 ACD、ACBFD；经 F 有 AFD、AFBCD；经 B 有 ABCD、ABFD。共 $1+2+2+2=7$ 条。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      },
+      "statementDiagrams": {
+        "en": [
+          {
+            "id": "elementary-q3-graph",
+            "width": 370,
+            "height": 290,
+            "alt": {
+              "en": "Undirected graph. Vertices: A, B, C, D, F. Edges: F–A, F–B, F–D, A–B, A–C, A–D, B–C, C–D.",
+              "zh": "无向图。顶点：A, B, C, D, F。边：F–A, F–B, F–D, A–B, A–C, A–D, B–C, C–D。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 35,
+                "y1": 260,
+                "x2": 135,
+                "y2": 85
+              },
+              {
+                "type": "line",
+                "x1": 35,
+                "y1": 260,
+                "x2": 285,
+                "y2": 45
+              },
+              {
+                "type": "line",
+                "x1": 35,
+                "y1": 260,
+                "x2": 170,
+                "y2": 225
+              },
+              {
+                "type": "line",
+                "x1": 135,
+                "y1": 85,
+                "x2": 285,
+                "y2": 45
+              },
+              {
+                "type": "line",
+                "x1": 135,
+                "y1": 85,
+                "x2": 330,
+                "y2": 170
+              },
+              {
+                "type": "line",
+                "x1": 135,
+                "y1": 85,
+                "x2": 170,
+                "y2": 225
+              },
+              {
+                "type": "line",
+                "x1": 285,
+                "y1": 45,
+                "x2": 330,
+                "y2": 170
+              },
+              {
+                "type": "line",
+                "x1": 330,
+                "y1": 170,
+                "x2": 170,
+                "y2": 225
+              },
+              {
+                "type": "circle",
+                "cx": 135,
+                "cy": 85,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 121,
+                "y": 91,
+                "text": "A",
+                "fontSize": 20,
+                "anchor": "end"
+              },
+              {
+                "type": "circle",
+                "cx": 285,
+                "cy": 45,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 285,
+                "y": 33,
+                "text": "B",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 330,
+                "cy": 170,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 344,
+                "y": 176,
+                "text": "C",
+                "fontSize": 20,
+                "anchor": "start"
+              },
+              {
+                "type": "circle",
+                "cx": 170,
+                "cy": 225,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 170,
+                "y": 249,
+                "text": "D",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 35,
+                "cy": 260,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 35,
+                "y": 284,
+                "text": "F",
+                "fontSize": 20,
+                "anchor": "middle"
+              }
+            ]
+          }
+        ],
+        "zh": [
+          {
+            "id": "elementary-q3-graph",
+            "width": 370,
+            "height": 290,
+            "alt": {
+              "en": "Undirected graph. Vertices: A, B, C, D, F. Edges: F–A, F–B, F–D, A–B, A–C, A–D, B–C, C–D.",
+              "zh": "无向图。顶点：A, B, C, D, F。边：F–A, F–B, F–D, A–B, A–C, A–D, B–C, C–D。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 35,
+                "y1": 260,
+                "x2": 135,
+                "y2": 85
+              },
+              {
+                "type": "line",
+                "x1": 35,
+                "y1": 260,
+                "x2": 285,
+                "y2": 45
+              },
+              {
+                "type": "line",
+                "x1": 35,
+                "y1": 260,
+                "x2": 170,
+                "y2": 225
+              },
+              {
+                "type": "line",
+                "x1": 135,
+                "y1": 85,
+                "x2": 285,
+                "y2": 45
+              },
+              {
+                "type": "line",
+                "x1": 135,
+                "y1": 85,
+                "x2": 330,
+                "y2": 170
+              },
+              {
+                "type": "line",
+                "x1": 135,
+                "y1": 85,
+                "x2": 170,
+                "y2": 225
+              },
+              {
+                "type": "line",
+                "x1": 285,
+                "y1": 45,
+                "x2": 330,
+                "y2": 170
+              },
+              {
+                "type": "line",
+                "x1": 330,
+                "y1": 170,
+                "x2": 170,
+                "y2": 225
+              },
+              {
+                "type": "circle",
+                "cx": 135,
+                "cy": 85,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 121,
+                "y": 91,
+                "text": "A",
+                "fontSize": 20,
+                "anchor": "end"
+              },
+              {
+                "type": "circle",
+                "cx": 285,
+                "cy": 45,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 285,
+                "y": 33,
+                "text": "B",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 330,
+                "cy": 170,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 344,
+                "y": 176,
+                "text": "C",
+                "fontSize": 20,
+                "anchor": "start"
+              },
+              {
+                "type": "circle",
+                "cx": 170,
+                "cy": 225,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 170,
+                "y": 249,
+                "text": "D",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 35,
+                "cy": 260,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 35,
+                "y": 284,
+                "text": "F",
+                "fontSize": 20,
+                "anchor": "middle"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Graph Theory",
+        "zh": "图论"
+      },
+      "statement": {
+        "en": "In the undirected graph shown below that represents Al’s, Ben’s, Cy’s, Dave’s, and Eli’s houses using the first letter of each name, how many cycles are there?\n\n{{diagram:elementary-q4-graph}}",
+        "zh": "下列无向图用姓名的首字母表示 Al、Ben、Cy、Dave 和 Eli 的房子。图中有多少个环？\n\n{{diagram:elementary-q4-graph}}"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "10",
+            "zh": "10"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "12",
+            "zh": "12"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Following the counting convention in the official solution, opposite traversal directions are counted separately. There are 2 cycles of length 3: ADEA and AEDA; 2 of length 4: ABCEA and AECBA; and 2 of length 5: ABCEDA and ADECBA. Total: $2+2+2=6$. Answer B.",
+        "zh": "答案：**B**。\n\n按原解析口径，起点固定为 A，同一个环的两个方向分别计数。三边环是 ADEA 与 AEDA；四边环是 ABCEA 与 AECBA；五边环是 ABCEDA 与 ADECBA。三个环各有两个方向，所以共 6 种。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      },
+      "statementDiagrams": {
+        "en": [
+          {
+            "id": "elementary-q4-graph",
+            "width": 370,
+            "height": 250,
+            "alt": {
+              "en": "Undirected graph. Vertices: A, B, C, D, E. Edges: A–B, B–C, C–E, E–D, D–A, A–E.",
+              "zh": "无向图。顶点：A, B, C, D, E。边：A–B, B–C, C–E, E–D, D–A, A–E。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 135,
+                "y1": 70,
+                "x2": 35,
+                "y2": 205
+              },
+              {
+                "type": "line",
+                "x1": 35,
+                "y1": 205,
+                "x2": 190,
+                "y2": 210
+              },
+              {
+                "type": "line",
+                "x1": 190,
+                "y1": 210,
+                "x2": 320,
+                "y2": 40
+              },
+              {
+                "type": "line",
+                "x1": 320,
+                "y1": 40,
+                "x2": 325,
+                "y2": 210
+              },
+              {
+                "type": "line",
+                "x1": 325,
+                "y1": 210,
+                "x2": 135,
+                "y2": 70
+              },
+              {
+                "type": "line",
+                "x1": 135,
+                "y1": 70,
+                "x2": 320,
+                "y2": 40
+              },
+              {
+                "type": "circle",
+                "cx": 135,
+                "cy": 70,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 135,
+                "y": 58,
+                "text": "A",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 35,
+                "cy": 205,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 35,
+                "y": 229,
+                "text": "B",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 190,
+                "cy": 210,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 190,
+                "y": 234,
+                "text": "C",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 325,
+                "cy": 210,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 325,
+                "y": 234,
+                "text": "D",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 320,
+                "cy": 40,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 320,
+                "y": 28,
+                "text": "E",
+                "fontSize": 20,
+                "anchor": "middle"
+              }
+            ]
+          }
+        ],
+        "zh": [
+          {
+            "id": "elementary-q4-graph",
+            "width": 370,
+            "height": 250,
+            "alt": {
+              "en": "Undirected graph. Vertices: A, B, C, D, E. Edges: A–B, B–C, C–E, E–D, D–A, A–E.",
+              "zh": "无向图。顶点：A, B, C, D, E。边：A–B, B–C, C–E, E–D, D–A, A–E。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 135,
+                "y1": 70,
+                "x2": 35,
+                "y2": 205
+              },
+              {
+                "type": "line",
+                "x1": 35,
+                "y1": 205,
+                "x2": 190,
+                "y2": 210
+              },
+              {
+                "type": "line",
+                "x1": 190,
+                "y1": 210,
+                "x2": 320,
+                "y2": 40
+              },
+              {
+                "type": "line",
+                "x1": 320,
+                "y1": 40,
+                "x2": 325,
+                "y2": 210
+              },
+              {
+                "type": "line",
+                "x1": 325,
+                "y1": 210,
+                "x2": 135,
+                "y2": 70
+              },
+              {
+                "type": "line",
+                "x1": 135,
+                "y1": 70,
+                "x2": 320,
+                "y2": 40
+              },
+              {
+                "type": "circle",
+                "cx": 135,
+                "cy": 70,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 135,
+                "y": 58,
+                "text": "A",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 35,
+                "cy": 205,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 35,
+                "y": 229,
+                "text": "B",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 190,
+                "cy": 210,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 190,
+                "y": 234,
+                "text": "C",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 325,
+                "cy": 210,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 325,
+                "y": 234,
+                "text": "D",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 320,
+                "cy": 40,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 320,
+                "y": 28,
+                "text": "E",
+                "fontSize": 20,
+                "anchor": "middle"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "Graph Theory",
+        "zh": "图论"
+      },
+      "statement": {
+        "en": "Identify the starting and ending vertices that can be used for the following graph to be traversable.\n\n{{diagram:elementary-q5-graph}}",
+        "zh": "要一笔遍历下图的所有边（每条边恰好经过一次），可以使用哪两个顶点作为起点和终点？\n\n{{diagram:elementary-q5-graph}}"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "GJ",
+            "zh": "GJ"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "DG",
+            "zh": "DG"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "JD",
+            "zh": "JD"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "Any of them",
+            "zh": "任意两个顶点"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "None of them",
+            "zh": "以上都不可以"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "For an Euler trail in a connected graph, either 0 or 2 vertices have odd degree. Here the degrees are C=2, D=4, E=2, F=2, G=3, H=2 and J=3. The two odd-degree vertices, G and J, must be the endpoints. Answer A.",
+        "zh": "答案：**A**。\n\n一次走过每条边时，经过中间顶点需要一进一出，所用的边成对。图中只有 G、J 的度数是奇数（都为 3），其他顶点都是偶数。因此起点和终点必须是 G 和 J。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      },
+      "statementDiagrams": {
+        "en": [
+          {
+            "id": "elementary-q5-graph",
+            "width": 390,
+            "height": 320,
+            "alt": {
+              "en": "Undirected graph. Vertices: C, D, E, F, G, H, J. Edges: J–C, C–G, J–H, H–G, J–D, G–D, D–F, F–E, E–D.",
+              "zh": "无向图。顶点：C, D, E, F, G, H, J。边：J–C, C–G, J–H, H–G, J–D, G–D, D–F, F–E, E–D。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 30,
+                "y1": 125,
+                "x2": 115,
+                "y2": 40
+              },
+              {
+                "type": "line",
+                "x1": 115,
+                "y1": 40,
+                "x2": 160,
+                "y2": 285
+              },
+              {
+                "type": "line",
+                "x1": 30,
+                "y1": 125,
+                "x2": 40,
+                "y2": 250
+              },
+              {
+                "type": "line",
+                "x1": 40,
+                "y1": 250,
+                "x2": 160,
+                "y2": 285
+              },
+              {
+                "type": "line",
+                "x1": 30,
+                "y1": 125,
+                "x2": 250,
+                "y2": 50
+              },
+              {
+                "type": "line",
+                "x1": 160,
+                "y1": 285,
+                "x2": 250,
+                "y2": 50
+              },
+              {
+                "type": "line",
+                "x1": 250,
+                "y1": 50,
+                "x2": 265,
+                "y2": 200
+              },
+              {
+                "type": "line",
+                "x1": 265,
+                "y1": 200,
+                "x2": 355,
+                "y2": 100
+              },
+              {
+                "type": "line",
+                "x1": 355,
+                "y1": 100,
+                "x2": 250,
+                "y2": 50
+              },
+              {
+                "type": "circle",
+                "cx": 115,
+                "cy": 40,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 115,
+                "y": 28,
+                "text": "C",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 250,
+                "cy": 50,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 250,
+                "y": 38,
+                "text": "D",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 355,
+                "cy": 100,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 369,
+                "y": 106,
+                "text": "E",
+                "fontSize": 20,
+                "anchor": "start"
+              },
+              {
+                "type": "circle",
+                "cx": 265,
+                "cy": 200,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 279,
+                "y": 206,
+                "text": "F",
+                "fontSize": 20,
+                "anchor": "start"
+              },
+              {
+                "type": "circle",
+                "cx": 160,
+                "cy": 285,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 160,
+                "y": 309,
+                "text": "G",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 40,
+                "cy": 250,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 40,
+                "y": 274,
+                "text": "H",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 30,
+                "cy": 125,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 16,
+                "y": 131,
+                "text": "J",
+                "fontSize": 20,
+                "anchor": "end"
+              }
+            ]
+          }
+        ],
+        "zh": [
+          {
+            "id": "elementary-q5-graph",
+            "width": 390,
+            "height": 320,
+            "alt": {
+              "en": "Undirected graph. Vertices: C, D, E, F, G, H, J. Edges: J–C, C–G, J–H, H–G, J–D, G–D, D–F, F–E, E–D.",
+              "zh": "无向图。顶点：C, D, E, F, G, H, J。边：J–C, C–G, J–H, H–G, J–D, G–D, D–F, F–E, E–D。"
+            },
+            "elements": [
+              {
+                "type": "line",
+                "x1": 30,
+                "y1": 125,
+                "x2": 115,
+                "y2": 40
+              },
+              {
+                "type": "line",
+                "x1": 115,
+                "y1": 40,
+                "x2": 160,
+                "y2": 285
+              },
+              {
+                "type": "line",
+                "x1": 30,
+                "y1": 125,
+                "x2": 40,
+                "y2": 250
+              },
+              {
+                "type": "line",
+                "x1": 40,
+                "y1": 250,
+                "x2": 160,
+                "y2": 285
+              },
+              {
+                "type": "line",
+                "x1": 30,
+                "y1": 125,
+                "x2": 250,
+                "y2": 50
+              },
+              {
+                "type": "line",
+                "x1": 160,
+                "y1": 285,
+                "x2": 250,
+                "y2": 50
+              },
+              {
+                "type": "line",
+                "x1": 250,
+                "y1": 50,
+                "x2": 265,
+                "y2": 200
+              },
+              {
+                "type": "line",
+                "x1": 265,
+                "y1": 200,
+                "x2": 355,
+                "y2": 100
+              },
+              {
+                "type": "line",
+                "x1": 355,
+                "y1": 100,
+                "x2": 250,
+                "y2": 50
+              },
+              {
+                "type": "circle",
+                "cx": 115,
+                "cy": 40,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 115,
+                "y": 28,
+                "text": "C",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 250,
+                "cy": 50,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 250,
+                "y": 38,
+                "text": "D",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 355,
+                "cy": 100,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 369,
+                "y": 106,
+                "text": "E",
+                "fontSize": 20,
+                "anchor": "start"
+              },
+              {
+                "type": "circle",
+                "cx": 265,
+                "cy": 200,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 279,
+                "y": 206,
+                "text": "F",
+                "fontSize": 20,
+                "anchor": "start"
+              },
+              {
+                "type": "circle",
+                "cx": 160,
+                "cy": 285,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 160,
+                "y": 309,
+                "text": "G",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 40,
+                "cy": 250,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 40,
+                "y": 274,
+                "text": "H",
+                "fontSize": 20,
+                "anchor": "middle"
+              },
+              {
+                "type": "circle",
+                "cx": 30,
+                "cy": 125,
+                "r": 4,
+                "fill": "ink"
+              },
+              {
+                "type": "text",
+                "x": 16,
+                "y": 131,
+                "text": "J",
+                "fontSize": 20,
+                "anchor": "end"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "contentNotes": []
+}

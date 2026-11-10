@@ -1,0 +1,541 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2025-2026-junior-2",
+  "division": "Junior",
+  "season": "2025-2026",
+  "round": 2,
+  "roundLabel": {
+    "en": "Contest 2",
+    "zh": "第二轮"
+  },
+  "title": {
+    "en": "ACSL 2025-2026 Junior · Contest 2",
+    "zh": "ACSL 2025-2026 Junior · 第二轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Junior/2025-2026/第二轮/25-26 初级组 paper .pdf",
+      "sha256": "5eb741011817576275f7b29cc81a7f866c5ffc73ba12cc2fb2a6cfa60d74b009",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Junior/2025-2026/第二轮/25-26 初级组 solution.pdf",
+      "sha256": "07b62832b37fa83e63522860f11370af60e206280ade04f64eff84e4c84f1bee",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Junior/2025-2026/第二轮/25-26 初级组 License Plates .pdf",
+      "sha256": "ad30c97811fd78f1d6207a7add604144d6866c91c02d61e45e77e4a34b5c036f",
+      "pages": 8
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表示法"
+      },
+      "statement": {
+        "en": "Convert the following infix expression to prefix:\n\n$$\n8 - 3 * 2 + 2^{3} - 8 / 2\n$$",
+        "zh": "将以下中缀表达式转换为前缀表达式：\n\n$$\n8 - 3 * 2 + 2^{3} - 8 / 2\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`- + - * ^ / 8 3 2 2 3 8 2`",
+            "zh": "`- + - * ^ / 8 3 2 2 3 8 2`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`- - + 8 * 3 2 ^ 2 3 / 8 2`",
+            "zh": "`- - + 8 * 3 2 ^ 2 3 / 8 2`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`- + - 8 * 3 2 ^ 2 3 / 8 2`",
+            "zh": "`- + - 8 * 3 2 ^ 2 3 / 8 2`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`- + - 8 * 2 3 ^ 3 2 / 2 8`",
+            "zh": "`- + - 8 * 2 3 ^ 3 2 / 2 8`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`- + - 8 ^ 3 2 * 2 3 / 8 2`",
+            "zh": "`- + - 8 ^ 3 2 * 2 3 / 8 2`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "First convert multiplication, exponentiation, and division, then combine the additions and subtractions from left to right. Each operator is placed before its operands.\n\n```text\n8 - (* 3 2) + (^ 2 3) - (/ 8 2)\n(- 8 (* 3 2)) + (^ 2 3) - (/ 8 2)\n(+ (- 8 (* 3 2)) (^ 2 3)) - (/ 8 2)\n- (+ (- 8 (* 3 2)) (^ 2 3)) (/ 8 2)\n```\n\nRemoving the grouping parentheses gives `- + - 8 * 3 2 ^ 2 3 / 8 2`, which is option C.",
+        "zh": "先按优先级处理乘法、乘方和除法，再从左到右组合加减运算。转换为前缀形式时，将每个运算符写在其操作数之前。\n\n```text\n8 - (* 3 2) + (^ 2 3) - (/ 8 2)\n(- 8 (* 3 2)) + (^ 2 3) - (/ 8 2)\n(+ (- 8 (* 3 2)) (^ 2 3)) - (/ 8 2)\n- (+ (- 8 (* 3 2)) (^ 2 3)) (/ 8 2)\n```\n\n去掉用于分组的括号，得到 `- + - 8 * 3 2 ^ 2 3 / 8 2`，对应选项 C。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official",
+        "nativeTranscription": "Manually transcribed from the supplied English and Chinese question pages, with formulas and option layouts checked against rendered source pages. English solution steps follow the official solution; Chinese explanations are translated and clarified."
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表示法"
+      },
+      "statement": {
+        "en": "Evaluate the following postfix expression if $a=3$, $b=-2$, and $c=5$:\n\n```text\na c + a b - * a b - c + / 2 ^\n```",
+        "zh": "当 $a=3$、$b=-2$、$c=5$ 时，计算以下后缀表达式的值：\n\n```text\na c + a b - * a b - c + / 2 ^\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "$\\frac{2}{5}$",
+            "zh": "$\\frac{2}{5}$"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "1",
+            "zh": "1"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "$\\frac{16}{9}$",
+            "zh": "$\\frac{16}{9}$"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "16",
+            "zh": "16"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "-16",
+            "zh": "-16"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "The postfix expression is equivalent to\n\n$$\n\\left(\\frac{(a+c)(a-b)}{a-b+c}\\right)^2.\n$$\n\nSubstitute the given values:\n\n$$\n\\begin{aligned}\n\\left(\\frac{(3+5)(3-(-2))}{3-(-2)+5}\\right)^2\n&=\\left(\\frac{8\\cdot5}{10}\\right)^2\\\\\n&=4^2=16.\n\\end{aligned}\n$$\n\nThe answer is D.",
+        "zh": "将后缀表达式还原为中缀形式，得到\n\n$$\n\\left(\\frac{(a+c)(a-b)}{a-b+c}\\right)^2.\n$$\n\n代入给定数值：\n\n$$\n\\begin{aligned}\n\\left(\\frac{(3+5)(3-(-2))}{3-(-2)+5}\\right)^2\n&=\\left(\\frac{8\\cdot5}{10}\\right)^2\\\\\n&=4^2=16.\n\\end{aligned}\n$$\n\n因此选 D。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official",
+        "nativeTranscription": "Manually transcribed from the supplied English and Chinese question pages, with formulas and option layouts checked against rendered source pages. English solution steps follow the official solution; Chinese explanations are translated and clarified."
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "位运算"
+      },
+      "statement": {
+        "en": "Evaluate:\n\n```text\nNOT (10110 OR 11100 AND NOT 01101)\n```",
+        "zh": "计算：\n\n```text\nNOT (10110 OR 11100 AND NOT 01101)\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`10001`",
+            "zh": "`10001`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`00101`",
+            "zh": "`00101`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`00011`",
+            "zh": "`00011`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`10100`",
+            "zh": "`10100`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`01001`",
+            "zh": "`01001`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "Keep all bit strings five bits long. Apply `NOT` before `AND`, and `AND` before `OR`:\n\n```text\nNOT (10110 OR 11100 AND NOT 01101)\n= NOT (10110 OR 11100 AND 10010)\n= NOT (10110 OR 10000)\n= NOT 10110\n= 01001\n```\n\nThe answer is E.",
+        "zh": "各位串均保持五位。按 `NOT`、`AND`、`OR` 的优先顺序逐位运算：\n\n```text\nNOT (10110 OR 11100 AND NOT 01101)\n= NOT (10110 OR 11100 AND 10010)\n= NOT (10110 OR 10000)\n= NOT 10110\n= 01001\n```\n\n因此选 E。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official",
+        "nativeTranscription": "Manually transcribed from the supplied English and Chinese question pages, with formulas and option layouts checked against rendered source pages. English solution steps follow the official solution; Chinese explanations are translated and clarified."
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "位运算"
+      },
+      "statement": {
+        "en": "Evaluate:\n\n```text\n(RCIRC-3 ((LCIRC-2 01101) AND (RSHIFT-2 11010)))\n```",
+        "zh": "计算：\n\n```text\n(RCIRC-3 ((LCIRC-2 01101) AND (RSHIFT-2 11010)))\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`01100`",
+            "zh": "`01100`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`10000`",
+            "zh": "`10000`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`00100`",
+            "zh": "`00100`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`10001`",
+            "zh": "`10001`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`01010`",
+            "zh": "`01010`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "`LCIRC-2` rotates a five-bit string two positions to the left. `RSHIFT-2` shifts it two positions to the right, filling with zeros. `RCIRC-3` rotates it three positions to the right.\n\n```text\n(RCIRC-3 ((LCIRC-2 01101) AND (RSHIFT-2 11010)))\n= (RCIRC-3 (10101 AND 00110))\n= (RCIRC-3 00100)\n= 10000\n```\n\nThe answer is B.",
+        "zh": "`LCIRC-2` 表示将五位位串循环左移两位；`RSHIFT-2` 表示右移两位，左侧补零；`RCIRC-3` 表示循环右移三位。\n\n```text\n(RCIRC-3 ((LCIRC-2 01101) AND (RSHIFT-2 11010)))\n= (RCIRC-3 (10101 AND 00110))\n= (RCIRC-3 00100)\n= 10000\n```\n\n因此选 B。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official",
+        "nativeTranscription": "Manually transcribed from the supplied English and Chinese question pages, with formulas and option layouts checked against rendered source pages. English solution steps follow the official solution; Chinese explanations are translated and clarified."
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do? (Loops)",
+        "zh": "这个程序是做什么的？（循环）"
+      },
+      "statement": {
+        "en": "What is the final value of `count` when the following program is run?\n\n```text\ncount = 0\nfor x = 1 to 9\n    num = x * 100 + x * 10 + x\n    sum = 3 * x\n    if num / sum == 37 then\n        count = count + 1\n    end if\nnext x\n```",
+        "zh": "运行下列程序后，变量 `count` 的最终值是多少？\n\n```text\ncount = 0\nfor x = 1 to 9\n    num = x * 100 + x * 10 + x\n    sum = 3 * x\n    if num / sum == 37 then\n        count = count + 1\n    end if\nnext x\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "0",
+            "zh": "0"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "1",
+            "zh": "1"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "3",
+            "zh": "3"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "5",
+            "zh": "5"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "9",
+            "zh": "9"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "The program computes $111/3$, $222/6$, $333/9$, $444/12$, $555/15$, $666/18$, $777/21$, $888/24$, and $999/27$. Every quotient is 37. In general,\n\n$$\n\\frac{\\mathrm{num}}{\\mathrm{sum}}=\\frac{100x+10x+x}{3x}=\\frac{111x}{3x}=37\n$$\n\nfor every $x$ from 1 through 9. The condition is true on all nine iterations, so `count` finishes at 9. The answer is E.",
+        "zh": "程序依次计算 $111/3$、$222/6$、$333/9$、$444/12$、$555/15$、$666/18$、$777/21$、$888/24$ 和 $999/27$，这些商都等于 37。一般地，\n\n$$\n\\frac{\\mathrm{num}}{\\mathrm{sum}}=\\frac{100x+10x+x}{3x}=\\frac{111x}{3x}=37.\n$$\n\n当 $x$ 从 1 取到 9 时，九次循环都满足条件，`count` 每次加 1，最终为 9，选 E。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official",
+        "nativeTranscription": "Manually transcribed from the supplied English and Chinese question pages, with formulas and option layouts checked against rendered source pages. English solution steps follow the official solution; Chinese explanations are translated and clarified."
+      }
+    },
+    {
+      "id": "q6",
+      "number": 6,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do? (Loops)",
+        "zh": "这个程序是做什么的？（循环）"
+      },
+      "statement": {
+        "en": "What is output by the following program?\n\n```text\nnum = 1089\nfor x = 3 to 11\n    count = 0\n    while num % x == 0\n        count = count + 1\n        num = num / x\n    end while\n    if count != 0 then\n        output x, count\n    end if\nnext x\n```",
+        "zh": "下列程序的输出结果是什么？\n\n```text\nnum = 1089\nfor x = 3 to 11\n    count = 0\n    while num % x == 0\n        count = count + 1\n        num = num / x\n    end while\n    if count != 0 then\n        output x, count\n    end if\nnext x\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "```text\n3 3\n11 2\n```",
+            "zh": "```text\n3 3\n11 2\n```"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "```text\n3 2\n11 2\n```",
+            "zh": "```text\n3 2\n11 2\n```"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "```text\n3 2\n9 1\n11 2\n```",
+            "zh": "```text\n3 2\n9 1\n11 2\n```"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "```text\n3 1\n3 1\n11 1\n11 1\n```",
+            "zh": "```text\n3 1\n3 1\n11 1\n11 1\n```"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "```text\n11 2\n3 2\n```",
+            "zh": "```text\n11 2\n3 2\n```"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "The program finds the prime factorization of 1089.\n\n- At `x = 3`, $1089/3=363$ and $363/3=121$, so `count` is 2 and the program outputs `3 2`.\n- The remaining value 121 is not divisible by 4, 5, 6, 7, 8, 9, or 10. No output is produced for those values.\n- At `x = 11`, $121/11=11$ and $11/11=1$, so `count` is 2 and the program outputs `11 2`.\n\nThus $1089=3^2\\cdot11^2$, and the complete output is\n\n```text\n3 2\n11 2\n```\n\nThe answer is B.",
+        "zh": "程序对 1089 进行质因数分解。\n\n- 当 `x = 3` 时，$1089/3=363$，$363/3=121$，成功除两次，故 `count` 为 2，输出 `3 2`。\n- 余下的 121 不能被 4、5、6、7、8、9、10 整除，因此这些循环不产生输出。\n- 当 `x = 11` 时，$121/11=11$，$11/11=1$，成功除两次，故输出 `11 2`。\n\n所以 $1089=3^2\\cdot11^2$，完整输出为\n\n```text\n3 2\n11 2\n```\n\n对应选项 B。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official",
+        "nativeTranscription": "Manually transcribed from the supplied English and Chinese question pages, with formulas and option layouts checked against rendered source pages. English solution steps follow the official solution; Chinese explanations are translated and clarified."
+      }
+    }
+  ],
+  "contentNotes": [
+    "Native Markdown transcription of all six questions, real options, solution steps and programming statement replaces source crops. Written question IDs, option IDs, correctOptionIds, programming IDs, official samples/tests and judging settings remain unchanged.",
+    "The License Plates source uses consecutive, adjacent letters/digits. The official D.RRC888 example returns lucky rather than fortunate, so consecutive is clarified as consecutive alphabet/digit values (for example AB, BA, 123 or 321), not merely two arbitrary neighboring letters.",
+    "No diagram is required for this edition. Mathematical fractions and exponents are represented with KaTeX; pseudocode and multi-line output options use native Markdown code blocks."
+  ],
+  "programming": {
+    "id": "license-plates",
+    "definition": {
+      "title": "License Plates",
+      "statement": "Cars in the People’s Republic of China have two kinds of license plates, each with its own rules and restrictions in this problem. All alphabetic characters are uppercase.\n\n| Plate color | Vehicle type | Required format |\n| --- | --- | --- |\n| `green` | Energy-efficient cars | One letter, a dot, then exactly 6 alphanumeric characters. |\n| `blue` | Gas-powered cars | One letter, a dot, then exactly 5 alphanumeric characters. The last character must be a digit. |\n\nA plate that does not satisfy either format is `invalid`.\n\nFor a valid plate, determine whether it has any of these special classifications:\n\n- **Restricted:** If a blue plate’s final digit is odd, the car is restricted on Sunday, Tuesday, Thursday, and Saturday.\n- **Lucky:** The plate contains adjacent repeated 6s, adjacent repeated 8s, or adjacent repeated 9s, such as `66`, `88`, or `99`.\n- **Fortunate:** Among the characters after the dot, there are at least 2 consecutive, adjacent letters or at least 3 consecutive, adjacent digits in strictly ascending or strictly descending order. Consecutive values must follow one another in the alphabet or digit sequence, such as `AB`, `BA`, `123`, or `321`.\n\nGiven a plate and a day of the week, output one string using this priority order:\n\n1. `fortunate`\n2. `lucky`\n3. `restricted`\n4. The plate color, `blue` or `green`\n\nIf the plate is invalid, output `invalid` instead.\n\n### Input\n\nEach run handles **one** case. Read two lines from standard input:\n\n1. A license plate number.\n2. A day of the week, such as `Thursday`.\n\nDo not read a case count.\n\n### Output\n\nPrint exactly one of `blue`, `green`, `lucky`, `restricted`, `fortunate`, or `invalid`. Do not print case numbers, prompts, or labels.\n\n### Worked example\n\nInput:\n\n```text\nF.11235\nThursday\n```\n\nOutput:\n\n```text\nfortunate\n```\n\nThis is a valid blue plate: it begins with a letter and a dot, followed by five alphanumeric characters, and the last character is a digit. It is restricted because that digit is odd and the day is Thursday. It has no repeated sequence of 6s, 8s, or 9s, so it is not lucky. The digits `123` are consecutive and adjacent, so it is fortunate. The priority order therefore selects `fortunate`.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "F.112358\nThursday\n",
+          "expected": "fortunate\n"
+        },
+        {
+          "input": "C.ARLEN\nFriday\n",
+          "expected": "invalid\n"
+        },
+        {
+          "input": "A.M1437\nSaturday\n",
+          "expected": "restricted\n"
+        },
+        {
+          "input": "D.RRC888\nSunday\n",
+          "expected": "lucky\n"
+        },
+        {
+          "input": "P.062825\nMonday\n",
+          "expected": "green\n"
+        },
+        {
+          "input": "Z.47786\nTuesday\n",
+          "expected": "blue\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "X.44997\nSaturday\n",
+          "expected": "lucky\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "P.31415\nThursday\n",
+          "expected": "restricted\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "E.F2171\nFriday\n",
+          "expected": "blue\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "KELVIN0\nSaturday\n",
+          "expected": "invalid\n",
+          "weight": 16.6667
+        },
+        {
+          "input": "P.543210\nSunday\n",
+          "expected": "fortunate\n",
+          "weight": 16.6666
+        },
+        {
+          "input": "J.CABNYC\nMonday\n",
+          "expected": "fortunate\n",
+          "weight": 16.6666
+        }
+      ]
+    },
+    "statementZh": "本题中的汽车车牌分为绿色和蓝色两种，各有相应的规则与限制。车牌中的所有字母均为大写。\n\n| 车牌颜色 | 车辆类型 | 有效格式 |\n| --- | --- | --- |\n| `green`（绿色） | 新能源汽车 | 一个字母和一个点号开头，后面恰好有 6 个字母或数字字符。 |\n| `blue`（蓝色） | 燃油汽车 | 一个字母和一个点号开头，后面恰好有 5 个字母或数字字符，且最后一个字符必须为数字。 |\n\n不满足上述任一种格式的车牌为 `invalid`（无效）。\n\n对于有效车牌，判断它是否符合以下特殊类别：\n\n- **`restricted`（限行）：** 如果蓝色车牌的最后一位数字为奇数，则在 Sunday（周日）、Tuesday（周二）、Thursday（周四）、Saturday（周六）限行。\n- **`lucky`（幸运）：** 车牌中含有相邻且重复的数字 6、8 或 9，例如 `66`、`88`、`99`。\n- **`fortunate`（吉利）：** 点号之后的字符中，存在至少 2 个连续相邻的字母，或至少 3 个连续相邻的数字，且这一段字符按严格升序或严格降序排列。这里的“连续”指字母表或数字序列中的值连续，例如 `AB`、`BA`、`123`、`321`。\n\n给定车牌号和星期几，有效车牌按以下优先顺序选择一个字符串输出：\n\n1. `fortunate`\n2. `lucky`\n3. `restricted`\n4. 车牌颜色 `blue` 或 `green`\n\n如果车牌无效，则输出 `invalid`。\n\n### 输入\n\n每次运行只处理**一组**数据，从标准输入读取两行：\n\n1. 一个车牌号码。\n2. 一个表示星期几的英文单词，例如 `Thursday`。\n\n不读取测试组数。\n\n### 输出\n\n输出 `blue`、`green`、`lucky`、`restricted`、`fortunate`、`invalid` 中的一个字符串。不输出题号、提示语或标签。\n\n### 示例与说明\n\n输入：\n\n```text\nF.11235\nThursday\n```\n\n输出：\n\n```text\nfortunate\n```\n\n这是一个有效的蓝色车牌：它以字母和点号开头，其后有五个字母数字字符，且最后一个字符为数字。由于最后一位数字是奇数，输入日期又是 Thursday，因此符合限行条件。它不含重复的 6、8、9，所以不是 `lucky`。但其中的 `123` 是三个连续且相邻的数字，满足 `fortunate` 条件。因此按优先级输出 `fortunate`。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    }
+  }
+}

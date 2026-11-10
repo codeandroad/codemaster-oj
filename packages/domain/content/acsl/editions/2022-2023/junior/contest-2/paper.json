@@ -1,0 +1,457 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2022-2023-junior-2",
+  "division": "Junior",
+  "season": "2022-2023",
+  "round": 2,
+  "roundLabel": {
+    "en": "Contest 2",
+    "zh": "第二轮"
+  },
+  "title": {
+    "en": "ACSL 2022-2023 Junior · Contest 2",
+    "zh": "ACSL 2022-2023 Junior · 第二轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Junior/2022-2023/第二轮/c_2_jr.pdf",
+      "sha256": "47003e7a96e7c29e5e1d49da091d8adbffd66071989892c01797ebf57a9b172b",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Junior/2022-2023/第二轮/c_2_jr_soln.pdf",
+      "sha256": "c82789c992391a0dd4c9dc2e74670c20c81c4f206fe156839d1a9dcb992eb128",
+      "pages": 1
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Junior/2022-2023/第二轮/c_2_Binary Counting_jr.pdf",
+      "sha256": "ce5f295990eb81a3a0e01ba907433d28d9478f52ce4605a819832258ac271b5d",
+      "pages": 6
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Evaluate the following prefix expression if all numbers are single digits:\n\n`+ - * 2 3 / 4 2 ^ 2 3`",
+        "zh": "如果下方所有数字都是一个单独的数值,请计算下方前缀表达式:\n\n`+ - * 2 3 / 4 2 ^ 2 3`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "14",
+            "zh": "14"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "12",
+            "zh": "12"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "10",
+            "zh": "10"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Evaluate the innermost operations first:\n\n```text\n+ - * 2 3 / 4 2 ^ 2 3\n= + - (* 2 3) (/ 4 2) (^ 2 3)\n= + (- 6 2) 8\n= + 4 8\n= 12\n```\n\nThe infix structure is $((2\\times3)-(4/2))+2^3$. The left operand of the final plus is the entire subtraction $6-2=4$, and its right operand is $2^3=8$. Keep the subtraction and division operand order fixed.\n\n**Answer: C.**",
+        "zh": "先计算最内层运算：\n\n```text\n+ - * 2 3 / 4 2 ^ 2 3\n= + - (* 2 3) (/ 4 2) (^ 2 3)\n= + (- 6 2) 8\n= + 4 8\n= 12\n```\n\n对应的中缀结构是 $((2\\times3)-(4/2))+2^3$。最后一个加法的左操作数是完整减法 $6-2=4$，右操作数是 $2^3=8$。减法和除法都要保持操作数的先后次序。\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Convert the following infix expression to postfix:\n\n$$\n\\frac{A+B}{C}-\\frac{B*C}{A-C}\n$$",
+        "zh": "请将下方中缀表达式转换为后缀表达式:\n\n$$\n\\frac{A+B}{C}-\\frac{B*C}{A-C}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`A B + C / B C * A C - / -`",
+            "zh": "`A B + C / B C * A C - / -`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`A + B C / B C * A C - / -`",
+            "zh": "`A + B C / B C * A C - / -`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`A B C + / B C * A C - / -`",
+            "zh": "`A B C + / B C * A C - / -`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`A B + C / B * C A C - / -`",
+            "zh": "`A B + C / B * C A C - / -`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`A B + C / B C * A - C / -`",
+            "zh": "`A B + C / B C * A - C / -`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "The two terms become `A B + C /` and `B C * A C - /`. Append subtraction after both terms:\n\n```text\nA B + C / B C * A C - / -\n```\n\nFor the second fraction, form the numerator `B C *` and the denominator `A C -` before placing `/`. This represents division by the entire difference $A-C$. The final `-` then subtracts this fraction from the first fraction; it is separate from the minus inside the denominator.\n\n**Answer: A.**",
+        "zh": "两个分式的后缀形式分别为 `A B + C /` 和 `B C * A C - /`。拼接两个部分后，最后加上减法运算符：\n\n```text\nA B + C / B C * A C - / -\n```\n\n第二个分式要先写出分子 `B C *` 和分母 `A C -`，再放 `/`，表示除以完整的 $A-C$。最后一个 `-` 才表示两个分式相减，不能与分母内部的减号混为同一次运算。\n\n**答案：A。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "比特位操作"
+      },
+      "statement": {
+        "en": "Evaluate:\n\n`10100 OR 01100 AND 01011`",
+        "zh": "计算下列表达式:\n\n`10100 OR 01100 AND 01011`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`01000`",
+            "zh": "`01000`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`11100`",
+            "zh": "`11100`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`00111`",
+            "zh": "`00111`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`11111`",
+            "zh": "`11111`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`00000`",
+            "zh": "`00000`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "`10100 OR 01100 AND 01011 = 10100 OR (01100 AND 01011)`\n\n`= 10100 OR 01000`\n\n`= 11100`\n\nAND has higher precedence. `01100 AND 01011` has only its second bit set, giving `01000`. OR combines that bit with the first and third set bits of `10100`, producing `11100`. The width remains five throughout.\n\n**Answer: B.**",
+        "zh": "原卷解析：\n\n`10100 OR 01100 AND 01011 = 10100 OR (01100 AND 01011)`\n\n`= 10100 OR 01000`\n\n`= 11100`\n\n先算优先级更高的 AND。`01100 AND 01011` 只有从左数第 2 位同时为 1，故得 `01000`。再 OR，把这一位与 `10100` 的第 1、3 位合并，得到 `11100`；全过程保持五位。\n\n**答案：B。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "比特位操作"
+      },
+      "statement": {
+        "en": "Evaluate:\n\n`(LCIRC-2 (RSHIFT-1 (NOT 01110)))`",
+        "zh": "计算下列表达式:\n\n`(LCIRC-2 (RSHIFT-1 (NOT 01110)))`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`00010`",
+            "zh": "`00010`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`10001`",
+            "zh": "`10001`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`00001`",
+            "zh": "`00001`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`00100`",
+            "zh": "`00100`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`01100`",
+            "zh": "`01100`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "`(LCIRC-2 (RSHIFT-1 (NOT 01110))) = (LCIRC-2 (RSHIFT-1 10001))`\n\n`= (LCIRC-2 01000)`\n\n`= 00001`\n\nWork inside out. NOT gives `10001`; right shift drops its final 1 and inserts a leading 0, producing `01000`. Rotating that result left twice moves the leading `01` to the end, so `01000` becomes `00001`. The bit discarded by RSHIFT does not reappear in the later rotation.\n\n**Answer: C.**",
+        "zh": "原卷解析：\n\n`(LCIRC-2 (RSHIFT-1 (NOT 01110))) = (LCIRC-2 (RSHIFT-1 10001))`\n\n`= (LCIRC-2 01000)`\n\n`= 00001`\n\n从最内层往外算：NOT 得到 `10001`；右移一位会丢弃末尾的 1、在左侧补 0，变成 `01000`；再左循环两位，把开头的 `01` 移到末尾，得到 `00001`。前一步右移丢掉的位不会在后面的循环移位中重新出现。\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "What is the following program’s output for the given input values?\n\n`p = 1000, r = 10, t = 3`\n\n```text\ninput p, r, t\no = p\nfor c = 1 to t\n    i = p * r / 100\n    p = p + i\nnext c\nf = p - o\noutput f\n```",
+        "zh": "执行下方给定的输入值,以下程序的输出值是多少?\n\n`p = 1000, r = 10, t = 3`\n\n```text\ninput p, r, t\no = p\nfor c = 1 to t\n    i = p * r / 100\n    p = p + i\nnext c\nf = p - o\noutput f\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "100",
+            "zh": "100"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "110",
+            "zh": "110"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "121",
+            "zh": "121"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "331",
+            "zh": "331"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "1331",
+            "zh": "1331"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Each iteration adds $10\\%$ interest to the current balance, so the balances are $1000\\to1100\\to1210\\to1331$.\n\nThe program prints interest earned, not the final balance: $1331-1000=\\boxed{331}$.\n\nThe successive interest amounts are $1000\\times0.1=100$, $1100\\times0.1=110$, and $1210\\times0.1=121$. Their sum is 331. The variable o preserves the original 1000 while p is updated, so the final subtraction removes principal exactly once.\n\n**Answer: D.**",
+        "zh": "每次循环将当前余额增加 $10\\%$，因此余额依次为 $1000\\to1100\\to1210\\to1331$。\n\n程序输出的是获得的利息，而非最终余额：$1331-1000=\\boxed{331}$。\n\n三次产生的利息分别是 $1000\\times0.1=100$、$1100\\times0.1=110$、$1210\\times0.1=121$，合计 331。变量 o 始终保存原本金 1000，只有 p 不断更新，所以最后的减法只扣除一次本金。\n\n**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [],
+  "programming": {
+    "id": "binary-counting",
+    "definition": {
+      "title": "Binary Counting",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Read one line. Keep spaces and punctuation in the input string.\n\n### Problem\n\nGiven a string of characters found on the keyboard, convert each character in the string to the binary equivalent of its ASCII code. In the resulting concatenated string, search for the increasing sequence of binary numbers starting with 0, 1, 10, 11, ... until a number cannot be found anywhere in the string.\n\n### Example\n\nFor the string “Roses are red.”, convert it to a concatenated string of binary numbers using each character’s ASCII code as follows:\n\n| Character | ASCII | Binary |\n| --- | --- | --- |\n| R | 82 | `01010010` |\n| o | 111 | `01101111` |\n| s | 115 | `01110011` |\n| e | 101 | `01100101` |\n| s | 115 | `01110011` |\n| space | 32 | `00100000` |\n| a | 97 | `01100001` |\n| r | 114 | `01110010` |\n| e | 101 | `01100101` |\n| space | 32 | `00100000` |\n| r | 114 | `01110010` |\n| e | 101 | `01100101` |\n| d | 100 | `01100100` |\n| . | 46 | `00101110` |\n\nNow search for binary numbers beginning with 0 in the following string:\n\n```text\n01010010 01101111 01110011 01100101 01110011 00100000 01100001\n01110010 01100101 00100000 01110010 01100101 01100100 00101110\n```\n\nIn this concatenated string (with spaces for readability only), the binary numbers 0, 1, 10, 11, 100, 101, 110, 111, 1000, 1001, 1010, 1011, 1100, 1101, 1110, 1111, and 10000 are found, but not 10001. 10000 is the last one found in the string so the output is its decimal equivalent which is 16.\n\n### Input\n\nInput a string that will be converted to binary using each character’s ASCII code. The string will be fewer than 200 characters.\n\n### Output\n\nOutput an integer representing the decimal number equivalent to the last binary number that can be found in the resulting string starting with 0, 1, 10, 11, ...\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "Roses are red.\n",
+          "expected": "16\n"
+        },
+        {
+          "input": "A is Alpha; B is Bravo; C is Charlie.\n",
+          "expected": "20\n"
+        },
+        {
+          "input": "A stitch in time saves nine.\n",
+          "expected": "14\n"
+        },
+        {
+          "input": "1, 2: Buckle my shoe! 3, 4: Shut the door!\n",
+          "expected": "30\n"
+        },
+        {
+          "input": "Is HackerRank the platform used by ACSL?\n",
+          "expected": "61\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "What was the first computer programming language you learned?\n",
+          "expected": "61\n",
+          "weight": 20
+        },
+        {
+          "input": "Lions and Tigers and Bears, Oh My! This is from The Wizard of Oz.\n",
+          "expected": "30\n",
+          "weight": 20
+        },
+        {
+          "input": "Knock, knock. Who is there? Hawaii. Hawaii who? I am good, Hawaii you?\n",
+          "expected": "64\n",
+          "weight": 20
+        },
+        {
+          "input": "How do you use HackerRank to do each ACSL competition?\n",
+          "expected": "33\n",
+          "weight": 20
+        },
+        {
+          "input": "~{w|x|y|z}\n",
+          "expected": "20\n",
+          "weight": 20
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。读取一行，保留输入字符串内的空格和标点。\n\n### 问题\n\n给定键盘上的字符串，将字符串中每个字符转换为与其 ASCII 码等值的二进制数。生成的连接字符串中，搜索以 0、1、10、11...开始的递增二进制数数列，直到出现一个在字符串中任意位置都无法被找到的二进制数。\n\n### 示例\n\n对于字符串“Roses are red.”,运用如下所示每个字符的 ASCII 码，将其转换成二进制数的连接字符串。\n\n| 字符 | ASCII | 二进制 |\n| --- | --- | --- |\n| R | 82 | `01010010` |\n| o | 111 | `01101111` |\n| s | 115 | `01110011` |\n| e | 101 | `01100101` |\n| s | 115 | `01110011` |\n| 空格 | 32 | `00100000` |\n| a | 97 | `01100001` |\n| r | 114 | `01110010` |\n| e | 101 | `01100101` |\n| 空格 | 32 | `00100000` |\n| r | 114 | `01110010` |\n| e | 101 | `01100101` |\n| d | 100 | `01100100` |\n| . | 46 | `00101110` |\n\n现在搜索下列字符串中从 0 开始的二进制数:\n\n```text\n01010010 01101111 01110011 01100101 01110011 00100000 01100001\n01110010 01100101 00100000 01110010 01100101 01100100 00101110\n```\n\n在这个连接字符串中(空格仅用于阅读),可以找到二进制数 0、1、10、11、100、101、110、111、1000、1001、1010、1011、1100、1101、1110、1111 和 10000,但不能找到10001。10000 是字符串中找到的最后一个二进制数，因此输出与它等值的十进制数，即16。\n\n### 输入\n\n输入即将使用其中每个字符的 ASCII 码转换为二进制数的字符串。字符串将少于 200 个字符。\n\n### 输出\n\n按 0、1、10、11……递增查找，遇到第一个无法找到的二进制数时停止。输出此前最后一个成功找到的二进制数所对应的十进制整数。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [],
+      "zh": []
+    }
+  }
+}

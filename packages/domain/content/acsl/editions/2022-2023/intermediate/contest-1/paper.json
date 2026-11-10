@@ -1,0 +1,459 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2022-2023-intermediate-1",
+  "division": "Intermediate",
+  "season": "2022-2023",
+  "round": 1,
+  "roundLabel": {
+    "en": "Contest 1",
+    "zh": "第一轮"
+  },
+  "title": {
+    "en": "ACSL 2022-2023 Intermediate · Contest 1",
+    "zh": "ACSL 2022-2023 Intermediate · 第一轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Intermediate/2022-2023/第一轮/c_1_int（中英文版本）.pdf",
+      "sha256": "3a2770db679884e622c2de4f7a0d8e5f521fde17f19a79d0365d5bac67f390eb",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Intermediate/2022-2023/第一轮/c_1_int_soln.pdf",
+      "sha256": "2ec59425c25762d71828cfe3fe3f7c88ff44a740a95fafcc2f7e4a7b4a08e73e",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Intermediate/2022-2023/第一轮/c_1_Next Base_int（含答案）.pdf",
+      "sha256": "36ba6fdab6884803eca566887ad54c5d7404c05e5a61c6dddec26a129967a7fd",
+      "pages": 4
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "How many 1s are there in the binary representation of the decimal numbers from 8 to 16, inclusive?",
+        "zh": "从8到16(含8和16)的十进制数字转换成二进制数后,包含多少个1?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "23",
+            "zh": "23"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "21",
+            "zh": "21"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "19",
+            "zh": "19"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "17",
+            "zh": "17"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "15",
+            "zh": "15"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "The binary forms of 8 through 16 are:\n\n| Decimal | Binary |\n| --- | --- |\n| 8 | 1000 |\n| 9 | 1001 |\n| 10 | 1010 |\n| 11 | 1011 |\n| 12 | 1100 |\n| 13 | 1101 |\n| 14 | 1110 |\n| 15 | 1111 |\n| 16 | 10000 |\n\nCounting the 1 bits gives 21.\n\nThe row-by-row counts are $1,2,2,3,2,3,3,4,1$, whose sum is 21. As a check, 8–15 contribute eight leading 1s plus $3\\cdot4=12$ ones among their final three bits; 16 contributes one more, giving $8+12+1=21$.\n\n**Answer: B.**",
+        "zh": "8 到 16 的二进制表示为：\n\n| 十进制 | 二进制 |\n| --- | --- |\n| 8 | 1000 |\n| 9 | 1001 |\n| 10 | 1010 |\n| 11 | 1011 |\n| 12 | 1100 |\n| 13 | 1101 |\n| 14 | 1110 |\n| 15 | 1111 |\n| 16 | 10000 |\n\n统计其中的 1，共有 21 个。\n\n逐行数出的 1 的个数为 $1,2,2,3,2,3,3,4,1$，总和是 21。也可验证：8 至 15 各有一个最高位 1，共 8 个；后三位各有四次为 1，共 $3\\cdot4=12$ 个；16 再贡献一个，因此总数为 $8+12+1=21$。\n\n**答案：B。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Given the following 5 numbers:\n\n$$\n78B_{16},\\quad ACE_{16},\\quad F4A_{16},\\quad 2EF_{16},\\quad BAD_{16}\n$$\n\nWhich one has the most odd numbers in its octal equivalent?",
+        "zh": "给定下面五个数字:\n\n$$\n78B_{16},\\quad ACE_{16},\\quad F4A_{16},\\quad 2EF_{16},\\quad BAD_{16}\n$$\n\n哪一个表示为八进制数字后含有的奇数最多?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "$78B_{16}$",
+            "zh": "$78B_{16}$"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "$ACE_{16}$",
+            "zh": "$ACE_{16}$"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "$F4A_{16}$",
+            "zh": "$F4A_{16}$"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "$2EF_{16}$",
+            "zh": "$2EF_{16}$"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "$BAD_{16}$",
+            "zh": "$BAD_{16}$"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "$$\n78B_{16}=11110001011_{2}=3613_{8},\n$$\n\n$$\nACE_{16}=101011001110_{2}=5316_{8},\n$$\n\n$$\nF4A_{16}=111101001010_{2}=7512_{8},\n$$\n\n$$\n2EF_{16}=1011101111_{2}=1357_{8},\n$$\n\n$$\nBAD_{16}=101110101101_{2}=5655_{8}\n$$\n\nThe most odd digits is 4 in $1357_{8}$ which is $2EF_{16}.$\n\nConvert each hex digit to four bits, then group from the right in threes for octal. In option order, the odd-digit counts are 3, 3, 3, 4, and 3. The question counts odd individual digits (1, 3, 5, 7), not whether the entire number is odd.\n\n**Answer: D.**",
+        "zh": "$$\n78B_{16}=11110001011_{2}=3613_{8},\n$$\n\n$$\nACE_{16}=101011001110_{2}=5316_{8},\n$$\n\n$$\nF4A_{16}=111101001010_{2}=7512_{8},\n$$\n\n$$\n2EF_{16}=1011101111_{2}=1357_{8},\n$$\n\n$$\nBAD_{16}=101110101101_{2}=5655_{8}\n$$\n\n其中 $1357_8$ 的四个数位均为奇数，数量最多；它对应 $2EF_{16}$。\n\n先把每个十六进制数字写成四位二进制，再从右向左每三位一组转成八进制。按选项顺序，奇数数位的个数为 3、3、3、4、3。这里统计的是 1、3、5、7 这些数位出现几次，而不是判断整个数是否为奇数。\n\n**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find $f(25)$ given:\n\n$$\nf(x)=\\begin{cases} 2 & \\text{if }x=1\\\\ 4 & \\text{if }x=2\\\\ 2\\cdot f(x-1)/f(x-2) & \\text{if }x\\ge3 \\end{cases}\n$$",
+        "zh": "给定下列式子,请计算$f(25)$\n\n$$\nf(x)=\\begin{cases} 2 & x=1\\\\ 4 & x=2\\\\ 2\\cdot f(x-1)/f(x-2) & x\\ge3 \\end{cases}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "2",
+            "zh": "2"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "1",
+            "zh": "1"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "3",
+            "zh": "3"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "$$\nf(1)=2\n$$\n\n$$\nf(2)=4\n$$\n\n$$\nf(3)=2*f(2)/f(1)=2*4/2=4\n$$\n\n$$\nf(4)=2*f(3)/f(2)=2*4/4=2\n$$\n\n$$\nf(5)=2*f(4)/f(3)=2*2/4=1\n$$\n\n$$\nf(6)=2*f(5)/f(4)=2*1/2=1\n$$\n\n$$\nf(7)=2*f(6)/f(5)=2*1/1=2\n$$\n\n$$\nf(8)=2*f(7)/f(6)=2*2/1=4\n$$\n\nSo the sequence of numbers produced is: 2 4 4 2 1 1 2 4 4 2 1 1 ... This repeats in a cycle of 6 so f(25) = 2.\n\nThe recurrence is determined by its two previous values. The pair $(f(7),f(8))=(2,4)$ repeats $(f(1),f(2))$, so the whole six-term pattern repeats, not merely a single value. Since $25-1=24$ is divisible by 6, $f(25)=f(1)=2$.\n\n**Answer: A.**",
+        "zh": "$$\nf(1)=2\n$$\n\n$$\nf(2)=4\n$$\n\n$$\nf(3)=2*f(2)/f(1)=2*4/2=4\n$$\n\n$$\nf(4)=2*f(3)/f(2)=2*4/4=2\n$$\n\n$$\nf(5)=2*f(4)/f(3)=2*2/4=1\n$$\n\n$$\nf(6)=2*f(5)/f(4)=2*1/2=1\n$$\n\n$$\nf(7)=2*f(6)/f(5)=2*1/1=2\n$$\n\n$$\nf(8)=2*f(7)/f(6)=2*2/1=4\n$$\n\n数列为 $2,4,4,2,1,1,2,4,4,2,1,1,\\ldots$，周期为 6。因为 $25=4\\cdot6+1$，所以 $f(25)=f(1)=2$。\n\n递推由前两项共同确定。$(f(7),f(8))=(2,4)$ 与初始二元组 $(f(1),f(2))$ 相同，因此重复的是整个六项周期，不只是偶然出现相同的一项。由于 $25-1=24$ 是 6 的倍数，故 $f(25)=f(1)=2$。\n\n**答案：A。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find $f(f(f(9)))$ given:\n\n$$\nf(x)=\\begin{cases} f(x-2)+2 & \\begin{gathered}\\text{if }x\\text{ is a multiple of }4\\\\ \\text{and not a multiple of }3\\end{gathered}\\\\ f(x+1)-1 & \\begin{gathered}\\text{if }x\\text{ is a multiple of }3\\\\ \\text{and not a multiple of }4\\end{gathered}\\\\ x-3 & \\text{otherwise} \\end{cases}\n$$",
+        "zh": "根据以下定义，求 $f(f(f(9)))$：\n\n$$f(x)=\\begin{cases}f(x-2)+2&x\\text{ 是 4 的倍数且不是 3 的倍数}\\\\f(x+1)-1&x\\text{ 是 3 的倍数且不是 4 的倍数}\\\\x-3&\\text{其他情况}\\end{cases}$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "7",
+            "zh": "7"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "4",
+            "zh": "4"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "3",
+            "zh": "3"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "0",
+            "zh": "0"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "$$\nf(9)=f(9+1)-1=f(10)-1=7-1=6\n$$\n\n$$\nf(10)=10-3=7\n$$\n\n$$\nf(6)=f(6+1)-1=f(7)-1=4-1=3\n$$\n\n$$\nf(7)=7-3=4\n$$\n\n$$\nf(3)=f(4)-1=0\n$$\n\n$$\nf(4)=f(2)+2=-1+2=1\n$$\n\n$$\nf(2)=2-3=-1\n$$\n\n$$\nf(f(f(9)))=f(f(6))\n$$\n\n$$\n=f(3)\n$$\n\n$$\n=0\n$$\n\n**Answer: E.**",
+        "zh": "逐层计算所需的函数值：\n\n$$\nf(9)=f(9+1)-1=f(10)-1=7-1=6\n$$\n\n$$\nf(10)=10-3=7\n$$\n\n$$\nf(6)=f(6+1)-1=f(7)-1=4-1=3\n$$\n\n$$\nf(7)=7-3=4\n$$\n\n$$\nf(3)=f(4)-1=0\n$$\n\n$$\nf(4)=f(2)+2=-1+2=1\n$$\n\n$$\nf(2)=2-3=-1\n$$\n\n$$\nf(f(f(9)))=f(f(6))\n$$\n\n$$\n=f(3)\n$$\n\n$$\n=0\n$$\n\n**答案：E。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "Which of the following values for a, b, and c will output OBTUSE and SCALENE?\n\n```text\ninput a, b, c\nif c >= a + b then\n    output \"NOT A TRIANGLE\"\nelse\n    if a ^ 2 + b ^ 2 == c ^ 2 then\n        output \"RIGHT\"\n    else if a ^ 2 + b ^ 2 > c ^ 2 then\n        output \"ACUTE\"\n    else\n        output \"OBTUSE\"\n    end if\n    if a == b and a == c then\n        output \"EQUILATERAL\"\n    end if\n    if a == b or a == c or b == c then\n        output \"ISOSCELES\"\n    else\n        output \"SCALENE\"\n    end if\nend if\n```",
+        "zh": "请问a、 b和c取什么值时,会输出OBTUSE和SCALENE?\n\n```text\ninput a, b, c\nif c >= a + b then\n    output \"NOT A TRIANGLE\"\nelse\n    if a ^ 2 + b ^ 2 == c ^ 2 then\n        output \"RIGHT\"\n    else if a ^ 2 + b ^ 2 > c ^ 2 then\n        output \"ACUTE\"\n    else\n        output \"OBTUSE\"\n    end if\n    if a == b and a == c then\n        output \"EQUILATERAL\"\n    end if\n    if a == b or a == c or b == c then\n        output \"ISOSCELES\"\n    else\n        output \"SCALENE\"\n    end if\nend if\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "a=3, b=6, c=9",
+            "zh": "a=3, b=6, c=9"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "a=4, b=5, c=6",
+            "zh": "a=4, b=5, c=6"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "a=5, b=6, c=10",
+            "zh": "a=5, b=6, c=10"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "a=6, b=6, c=6",
+            "zh": "a=6, b=6, c=6"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "a=6, b=6, c=10",
+            "zh": "a=6, b=6, c=10"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "For `OBTUSE`, the sides must form a triangle and satisfy $a^2+b^2<c^2$. For `SCALENE`, all three sides must differ.\n\nFor $a=5,b=6,c=10$, $10<5+6$, so a triangle exists; $5^2+6^2=61<100=10^2$, so it is obtuse; and all sides differ. Thus **option C** produces both required labels.\n\nThe other choices either fail the triangle test, are acute, or have equal sides.\n\n**Answer: C.**",
+        "zh": "要输出 `OBTUSE`，三边必须能构成三角形，且满足 $a^2+b^2<c^2$；要输出 `SCALENE`，三边必须互不相等。\n\n取 $a=5,b=6,c=10$ 时，$10<5+6$，可以构成三角形；$5^2+6^2=61<100=10^2$，为钝角三角形；三边也互不相等。因此 **选项 C** 同时满足两个输出要求。\n\n其他选项不能成三角形、是锐角三角形，或存在相等的边。\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [
+    "Question 5: official answer column visually verified as C; automated text includes other letters from the explanation or a nonstandard label."
+  ],
+  "programming": {
+    "id": "next-base",
+    "definition": {
+      "title": "Next Base",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Use the line structure shown in the test-case input below.\n\n### Problem\n\nGiven 3 positive integers, n, b, and s, generate the next n numbers in base b starting with s in the given base. We guarantee that the base will be between 2 and 9 inclusive. We guarantee that s is a valid number in base b. Find the base 10 value for the number of times the largest possible digit in the given base is found among all of the digits in the numbers generated.\n\n### Example\n\nIf n=15, b=8, and s=2, the numbers generated are 2, 3, 4, 5, 6, 7, 10, 11, 12, 13, 14, 15, 16, 17, 20. The largest possible digit in base 8 is 7 which occurs 2 times.\n\n### Input\n\nThere will be three integers representing the number of values to be found, the base to be used between 2 and 9 inclusive, and the starting value in the base given that will be no more than 16 digits.\n\n### Output\n\nFor each set of 3 input values, output a base 10 number representing the number of times the largest digit in the inputted base occurs in the sequence of numbers generated.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "15 8 2\n",
+          "expected": "2\n"
+        },
+        {
+          "input": "20 3 12\n",
+          "expected": "21\n"
+        },
+        {
+          "input": "25 5 324\n",
+          "expected": "24\n"
+        },
+        {
+          "input": "13 9 1652\n",
+          "expected": "1\n"
+        },
+        {
+          "input": "45 2 1111011\n",
+          "expected": "170\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "1000 8 10\n",
+          "expected": "357\n",
+          "weight": 20
+        },
+        {
+          "input": "50 4 13\n",
+          "expected": "34\n",
+          "weight": 20
+        },
+        {
+          "input": "75 9 384\n",
+          "expected": "13\n",
+          "weight": 20
+        },
+        {
+          "input": "100 6 555\n",
+          "expected": "31\n",
+          "weight": 20
+        },
+        {
+          "input": "25 2 1100001110\n",
+          "expected": "121\n",
+          "weight": 20
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。输入按下方测试用例展示的行结构读取。\n\n### 问题\n\n给定 3 个正整数 n、b 和 s,生成以给定进制的数字 s 开始的接下来 n个 b 进制数字。 我们确保进制介于 2 和 9 之间 (含 2 和 9)并且 s 是一个 b 进制的有效数字。请计算生成数字的各个数位上的所有数字中，在该进制下可能出现的最大数字一共出现的次数，以十进制表示。\n\n### 示例\n\n如果 n = 15, b = 8 且 s = 2,生成的数字是 2、 3、 4、 5、 6、 7、10、11、12、13、 14、15、 16、 17、20。八进制数各个数位上最大可能数是 7,并且出现了 2 次。\n\n### 输入\n\n将会有三个整数，分别表示生成值的数量，要使用的进制(介于 2 和 9 之间，包含 2 和 9),给定进制的起始值 (不超过 16 位)。\n\n### 输出\n\n对于每组 3 个输入值，输出一个十进制数字，表示生成的数列中输入进制的数字各个数位上的最大数字出现的次数。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [],
+      "zh": []
+    }
+  }
+}

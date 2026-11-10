@@ -1,0 +1,1450 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2020-2021-senior-1",
+  "division": "Senior",
+  "season": "2020-2021",
+  "round": 1,
+  "roundLabel": {
+    "en": "Contest 1",
+    "zh": "第一轮"
+  },
+  "title": {
+    "en": "ACSL 2020-2021 Senior · Contest 1",
+    "zh": "ACSL 2020-2021 Senior · 第一轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Senior/2020-2021/第一轮/Final_c_1_sr.pdf",
+      "sha256": "e5fc348aff4fe3ac4394eb3f67a9c3ffe1c59020887cd73ef12861ba484015d5",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Senior/2020-2021/第一轮/c_1_sr_sol.pdf",
+      "sha256": "b5e4dfa8f6cc39ef57d5f7fb7e2de9143af782d8a0aa6eef0a87f217cf48b79e",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Senior/2020-2021/第一轮/Final_c_1_triangle_sr.pdf",
+      "sha256": "6311547466452262ee4edb1021035b72dc9089001c7aeb40b00e401b1ce26803",
+      "pages": 2
+    },
+    {
+      "id": "programming-2",
+      "path": "resource/acsl-problems/Senior/2020-2021/第一轮/Final_c_1_triangle_sr_sol.pdf",
+      "sha256": "9a67179719977f09896e7a96935245ceb0b9f2fcdd75a167d5dc9f751620eaf4",
+      "pages": 2
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "How many 6’s are there in the octal representation of the decimal numbers from 675 to 700, inclusive?",
+        "zh": "把十进制数675到700(包含675和700)用八进制表示,共会出现多少个数字6?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "9",
+            "zh": "9"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "10",
+            "zh": "10"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "11",
+            "zh": "11"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "12",
+            "zh": "12"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "13",
+            "zh": "13"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "The endpoints are $675_{10}=1243_8$ and $700_{10}=1274_8$. The numbers containing a 6 are 1246, 1256 and 1260 through 1267. There are ten such numbers; 1266 contains two 6s, so the total is **11**. The source solution misprints the first conversion as 1234.\n\nCount occurrences of the digit, not just numbers containing it; in particular, count both positions in $1266_8$. **Answer: C.**",
+        "zh": "两个端点为 $675_{10}=1243_8$、$700_{10}=1274_8$。包含数字 6 的数是 1246、1256 和 1260 至 1267，共十个数；其中 1266 含两个 6，因此总共出现 **11** 个 6。原卷解析把第一个换算误印为 1234。\n\n统计的是数字 6 的出现次数，不是含 6 的数有几个；尤其要把 $1266_8$ 中的两个 6 分别计数。**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Evaluate and express in base 16 if both numbers are hexadecimal.\n\n13 * 74F",
+        "zh": "已知下方两个数字均为十六进制,计算并用十六进制表示结果。\n\n13 * 74F"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "$8BDD_{16}$",
+            "zh": "$8BDD_{16}$"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "$8ADD_{16}$",
+            "zh": "$8ADD_{16}$"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "$7BDE_{16}$",
+            "zh": "$7BDE_{16}$"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "$8AEC_{16}$",
+            "zh": "$8AEC_{16}$"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "$8ACD_{16}$",
+            "zh": "$8ACD_{16}$"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "$13_{16}=10_{16}+3_{16}$. Multiplying $74F_{16}$ by $10_{16}$ shifts it one place to give $74F0_{16}$. Add that shifted value and three copies of $74F_{16}$. The units total $15+15+15=45$ in decimal, so write D and carry 2.\n\n$$\n\\begin{array}{rcccc}\n & {\\scriptstyle 1} & {\\scriptstyle 1} & {\\scriptstyle 2} &  \\\\\n & 7 & 4 & F & 0 \\\\\n &   & 7 & 4 & F \\\\\n &   & 7 & 4 & F \\\\\n+ &   & 7 & 4 & F \\\\\n\\hline\n & 8 & A & D & D\n\\end{array}\n$$\n\nFor another hexadecimal calculation, use $74F_{16}=750_{16}-1$. Then $3\\cdot750_{16}=15F0_{16}$. Add the following two terms, then subtract 3.\n\n$$\n\\begin{array}{rcccc}\n &  & {\\scriptstyle 1} &  &  \\\\\n & 7 & 4 & F & 0 \\\\\n+ & 1 & 5 & F & 0 \\\\\n\\hline\n & 8 & A & E & 0\n\\end{array}\n$$\n\n$8AE0_{16}-3_{16}=8ADD_{16}$. In decimal, $19\\cdot1871=35549=8\\cdot16^3+10\\cdot16^2+13\\cdot16+13$. The product is $8ADD_{16}$ (option B).",
+        "zh": "把 $13_{16}$ 拆为 $10_{16}+3_{16}$。$74F_{16}$ 乘以 $10_{16}$ 相当于左移一位，得 $74F0_{16}$，再加上三个 $74F_{16}$。个位和为十进制 $15+15+15=45$，写 D，向左进 2。\n\n$$\n\\begin{array}{rcccc}\n & {\\scriptstyle 1} & {\\scriptstyle 1} & {\\scriptstyle 2} &  \\\\\n & 7 & 4 & F & 0 \\\\\n &   & 7 & 4 & F \\\\\n &   & 7 & 4 & F \\\\\n+ &   & 7 & 4 & F \\\\\n\\hline\n & 8 & A & D & D\n\\end{array}\n$$\n\n先将两个十六进制数转为十进制：$13_{16}=19$、$74F_{16}=1871$。因此\n\n$$\n19\\times1871=35549=8\\cdot16^3+10\\cdot16^2+13\\cdot16+13=8ADD_{16}\n$$\n\n还原十六进制时，数位值 10 写作 A，13 写作 D，所以结果为 $8ADD_{16}$，选 **B**。注意题目中的 13 也是十六进制，即十进制 19，不能直接按十进制 13 相乘。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find f(24) , given:\n\n$$\nf(x)=\\begin{cases} x+f(x-5) & \\text{if }x\\ge10\\\\ f(x+3)-4 & \\text{if }5<x<10\\\\ 2x-1 & \\text{if }x\\le5 \\end{cases}\n$$",
+        "zh": "根据以下条件,求f (24):\n\n$$\nf(x)=\\begin{cases} x+f(x-5) & \\text{当 }x\\ge10\\\\ f(x+3)-4 & \\text{当 }5<x<10\\\\ 2x-1 & \\text{当 }x\\le5 \\end{cases}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "9",
+            "zh": "9"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "49",
+            "zh": "49"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "56",
+            "zh": "56"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "76",
+            "zh": "76"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "80",
+            "zh": "80"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "The function can be evaluated as follows:\n\n$$\n\\begin{aligned} f(24)&=24+f(24-5)=24+f(19)=24+56=80\\\\ f(19)&=19+f(19-5)=19+f(14)=19+37=56\\\\ f(14)&=14+f(14-5)=14+f(9)=14+23=37\\\\ f(9)&=f(9+3)-4=f(12)-4=27-4=23\\\\ f(12)&=12+f(12-5)=12+f(7)=12+15=27\\\\ f(7)&=f(7+3)-4=f(10)-4=19-4=15\\\\ f(10)&=10+f(10-5)=10+f(5)=10+9=19\\\\ f(5)&=2\\cdot5-1=10-1=9\\end{aligned}\n$$\n\nThe chain stops at $x=5$, where the $x\\le5$ rule applies. In contrast, $x=10$ belongs to the $x\\ge10$ branch. Evaluate the base case first and then substitute upward; $f(24)=80$, **option E**.",
+        "zh": "按递归调用顺序计算：\n\n$$\n\\begin{aligned} f(24)&=24+f(24-5)=24+f(19)=24+56=80\\\\ f(19)&=19+f(19-5)=19+f(14)=19+37=56\\\\ f(14)&=14+f(14-5)=14+f(9)=14+23=37\\\\ f(9)&=f(9+3)-4=f(12)-4=27-4=23\\\\ f(12)&=12+f(12-5)=12+f(7)=12+15=27\\\\ f(7)&=f(7+3)-4=f(10)-4=19-4=15\\\\ f(10)&=10+f(10-5)=10+f(5)=10+9=19\\\\ f(5)&=2\\cdot5-1=10-1=9\\end{aligned}\n$$\n\n递归在 $x=5$ 时使用 $x\\le5$ 的终止规则；$x=10$ 则属于 $x\\ge10$ 分支。先算终止值，再向上代回，得到 $f(24)=80$，选 **E**。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find f(3, 18) , given:\n\n$$\nf(x,y)=\\begin{cases} f(x-2,y+3)+3 & \\text{if }x>y\\\\ f(y-1,x+1)-5 & \\text{if }x<y\\\\ xy & \\text{if }x=y \\end{cases}\n$$",
+        "zh": "根据以下条件,求f (3, 18):\n\n$$\nf(x,y)=\\begin{cases} f(x-2,y+3)+3 & \\text{当 }x>y\\\\ f(y-1,x+1)-5 & \\text{当 }x<y\\\\ xy & \\text{当 }x=y \\end{cases}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "139",
+            "zh": "139"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "142",
+            "zh": "142"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "143",
+            "zh": "143"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "144",
+            "zh": "144"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "148",
+            "zh": "148"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "The function evaluates as follows:\n\n$$\n\\begin{aligned} f(3,18)&=f(18-1,3+1)-5=f(17,4)-5=148-5=143\\\\ f(17,4)&=f(17-2,4+3)+3=f(15,7)+3=145+3=148\\\\ f(15,7)&=f(15-2,7+3)+3=f(13,10)+3=142+3=145\\\\ f(13,10)&=f(13-2,10+3)+3=f(11,13)+3=139+3=142\\\\ f(11,13)&=f(13-1,11+1)-5=f(12,12)-5=144-5=139\\\\ f(12,12)&=12\\cdot12=144\\end{aligned}\n$$\n\nThe $x<y$ rule changes the order of the arguments: $(3,18)$ becomes $(17,4)$, not $(2,19)$. At equality, use $xy$ immediately. Starting from $f(12,12)=144$ and restoring every pending +3 or −5 gives 143, **option C**.",
+        "zh": "按递归调用顺序计算：\n\n$$\n\\begin{aligned} f(3,18)&=f(18-1,3+1)-5=f(17,4)-5=148-5=143\\\\ f(17,4)&=f(17-2,4+3)+3=f(15,7)+3=145+3=148\\\\ f(15,7)&=f(15-2,7+3)+3=f(13,10)+3=142+3=145\\\\ f(13,10)&=f(13-2,10+3)+3=f(11,13)+3=139+3=142\\\\ f(11,13)&=f(13-1,11+1)-5=f(12,12)-5=144-5=139\\\\ f(12,12)&=12\\cdot12=144\\end{aligned}\n$$\n\n当 $x<y$ 时，规则会交换参数的角色：$(3,18)$ 变成 $(17,4)$，不是 $(2,19)$。两参数相等时立即用 $xy$ 终止。由 $f(12,12)=144$ 向上恢复每一层待执行的 +3 或 −5，最终得 143，选 **C**。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "When this program is executed, what is the largest value of any variable?\n\n```text\na = 16: b = 4 : d =12\nc = a / b\nif a / c > d / b then\n    if a < 15 then\n        d = b + c\n    else\n        c = a + b\n    end if\nelse\n    if b > 3 then\n        a = a + d / b\n    end if\nend if\nif c > a then\n    t = a\n    a = c\n    c = t\nend if\nif a > b + c || a > d && a > b then\n    d = d + (a - c) ^ 2\nelse\n    a = a + b * d\nend if\n```",
+        "zh": "执行以下程序后,在变量a, b, c, d中,最大的变量值是多少?\n\n```text\na = 16: b = 4 : d =12\nc = a / b\nif a / c > d / b then\n    if a < 15 then\n        d = b + c\n    else\n        c = a + b\n    end if\nelse\n    if b > 3 then\n        a = a + d / b\n    end if\nend if\nif c > a then\n    t = a\n    a = c\n    c = t\nend if\nif a > b + c || a > d && a > b then\n    d = d + (a - c) ^ 2\nelse\n    a = a + b * d\nend if\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "28",
+            "zh": "28"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "20",
+            "zh": "20"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "16",
+            "zh": "16"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "12",
+            "zh": "12"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "Trace the variables in execution order:\n\n| a | b | c | d |\n| --- | --- | --- | --- |\n| 16 | 4 | — | 12 |\n| 16 | 4 | 4 | 12 |\n| 16 | 4 | 20 | 12 |\n| 20 | 4 | 16 | 12 |\n| 20 | 4 | 16 | 28 |\n\nAfter c becomes 20, a and c swap (temporary variable t=16). The last update gives $d=12+(20-16)^2=28$, the largest value of any variable.\n\nThe first condition is $16/4>12/4$, so it is true; the nested test $16<15$ is false, making $c=20$. In the final condition, $20>4+16$ is false, but both $20>12$ and $20>4$ are true, so the OR condition is true. Thus the update is to $d$, not to $a$. **Answer: A, 28.**",
+        "zh": "按程序执行顺序记录变量的值：\n\n| a | b | c | d |\n| --- | --- | --- | --- |\n| 16 | 4 | — | 12 |\n| 16 | 4 | 4 | 12 |\n| 16 | 4 | 20 | 12 |\n| 20 | 4 | 16 | 12 |\n| 20 | 4 | 16 | 28 |\n\nc 变为 20 后，a 与 c 交换（临时变量 t=16）。最后 $d=12+(20-16)^2=28$，这是所有变量出现过的最大值。\n\n首个条件为 $16/4>12/4$，成立；内层 $16<15$ 不成立，所以 $c=20$。最后一个条件中，$20>4+16$ 为假，但 $20>12$ 与 $20>4$ 都为真，因此整个或条件为真，执行更新 $d$ 的分支而非更新 $a$。**答案：A，28。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          3,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [],
+  "programming": {
+    "id": "numeral-triangles",
+    "definition": {
+      "title": "Numeral Triangles",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Use the line structure shown in the test-case input below.\n\n### Problem\n\nConstruct a Numeral Hex Triangle according to the following rules. You will be given three positive integers: s, a starting number; d, a delta (the amount by which to increase each number in the triangle); and r the number of rows. The numbers s and d will be in hexadecimal.\n\n1. The first row contains the number s.\n\n2. Each of the next rows has one more number than the previous row.\n\n3. Each number in the triangle is d more than the previous number in the triangle.\n\nHere are two examples of Numeral Hex Triangles:\n\nstart=A, delta=9, rows=5\n\n{{diagram:p-cccd71c112db69e7}}\n\nstart=ABC, delta=F, rows=4\n\n{{diagram:p-905fc5b1d353a25b}}\n\n### Input\n\nThe input has 3 positive integers, s, d, and r. The numbers are separated by spaces and each is less than $1{,}000{,}000_{16}$. Recall that $s$ and $d$ are in hexadecimal.\n\n### Output\n\nAdd all the hexadecimal digits in the numbers on row $r$. Reduce this sum to a single hexadecimal digit by repeatedly adding its hexadecimal digits until only one digit remains. Output that digit.\n\nFor example, if the last row contains $1A_{16}$, $1F_{16}$, and $24_{16}$, their digits sum to $1+A+1+F+2+4=21_{16}$. Since this has two hexadecimal digits, add them again: $2_{16}+1_{16}=3_{16}$. Output `3`.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "A 9 5\n",
+          "expected": "5\n"
+        },
+        {
+          "input": "ABC F 4\n",
+          "expected": "C\n"
+        },
+        {
+          "input": "BAD 50 10\n",
+          "expected": "A\n"
+        },
+        {
+          "input": "FED ABC 25\n",
+          "expected": "F\n"
+        },
+        {
+          "input": "184 231 35\n",
+          "expected": "5\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "ABE CAB 40\n",
+          "expected": "5\n",
+          "weight": 20
+        },
+        {
+          "input": "31415 92653 60\n",
+          "expected": "F\n",
+          "weight": 20
+        },
+        {
+          "input": "DEAF BED 72\n",
+          "expected": "3\n",
+          "weight": 20
+        },
+        {
+          "input": "BAD DAD 100\n",
+          "expected": "A\n",
+          "weight": 20
+        },
+        {
+          "input": "704 1776 244\n",
+          "expected": "E\n",
+          "weight": 20
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。输入按下方测试用例展示的行结构读取。\n\n### 问题\n\n根据以下规则构造一个十六进制数字三角形。 已知三个正整数:起始数 s; 增量 d(三角形中每个数字的增加量); 数字三角形行数 r。 数字 s 和 d 均为十六进制。\n\n1. 第一行由数字 s 组成。\n\n2. 接下来的每一行都比上一行多一个数。\n\n3. 三角形中的每个数字都比前一个数字大 d。下面是两个十六进制数字三角形的示例:\n\n{{diagram:p-786dbe27db312218}}\n\n起始数 =A, 增量 =9, 行数 =5 起始数=ABC, 增量 =F, 行数 =4\n\n### 输入\n\n输入包含 3 个正整数 s,d 和 r。 数与数之间用空格分隔，且均小于 $1{,}000{,}000_{16}$。$s$ 和 $d$ 是十六进制数。\n\n### 输出\n\n将第 $r$ 行所有数中的十六进制数字相加。然后反复将所得十六进制数的各位数字相加，直到得到一位十六进制数，输出该数字。\n\n例如，若最后一行包含 $1A_{16}$、$1F_{16}$ 和 $24_{16}$，各位数字相加得到 $1+A+1+F+2+4=21_{16}$。它仍有两位，因此继续计算 $2_{16}+1_{16}=3_{16}$，输出 `3`。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming",
+        "programming-2"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [
+        {
+          "id": "p-cccd71c112db69e7",
+          "width": 325,
+          "height": 235,
+          "alt": {
+            "en": "Number triangle: A; 13 1C; 25 2E 37; 40 49 52 5B; 64 6D 76 7F 88",
+            "zh": "数字三角形：A；13 1C；25 2E 37；40 49 52 5B；64 6D 76 7F 88"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 33,
+              "text": "A",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 54,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 77,
+              "text": "13",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 54,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 77,
+              "text": "1C",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 121,
+              "text": "25",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 121,
+              "text": "2E",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 134,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 161,
+              "y": 121,
+              "text": "37",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 165,
+              "text": "40",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 165,
+              "text": "49",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 134,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 161,
+              "y": 165,
+              "text": "52",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 196,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 223,
+              "y": 165,
+              "text": "5B",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 186,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 209,
+              "text": "64",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 186,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 209,
+              "text": "6D",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 134,
+              "y": 186,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 161,
+              "y": 209,
+              "text": "76",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 196,
+              "y": 186,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 223,
+              "y": 209,
+              "text": "7F",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 258,
+              "y": 186,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 285,
+              "y": 209,
+              "text": "88",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            }
+          ]
+        },
+        {
+          "id": "p-905fc5b1d353a25b",
+          "width": 263,
+          "height": 191,
+          "alt": {
+            "en": "Number triangle: ABC; ACB ADA; AE9 AF8 B07; B16 B25 B34 B43",
+            "zh": "数字三角形：ABC；ACB ADA；AE9 AF8 B07；B16 B25 B34 B43"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 33,
+              "text": "ABC",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 54,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 77,
+              "text": "ACB",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 54,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 77,
+              "text": "ADA",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 121,
+              "text": "AE9",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 121,
+              "text": "AF8",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 134,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 161,
+              "y": 121,
+              "text": "B07",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 165,
+              "text": "B16",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 165,
+              "text": "B25",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 134,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 161,
+              "y": 165,
+              "text": "B34",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 196,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 223,
+              "y": 165,
+              "text": "B43",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            }
+          ]
+        }
+      ],
+      "zh": [
+        {
+          "id": "p-786dbe27db312218",
+          "width": 650,
+          "height": 270,
+          "alt": {
+            "en": "Hexadecimal numeral triangles starting at A with increment 9, and ABC with increment F.",
+            "zh": "十六进制数字三角形：左侧起始数 A、增量 9；右侧起始数 ABC、增量 F。"
+          },
+          "elements": [
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 10,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 33,
+              "text": "A",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 54,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 77,
+              "text": "13",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 54,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 77,
+              "text": "1C",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 121,
+              "text": "25",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 121,
+              "text": "2E",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 134,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 161,
+              "y": 121,
+              "text": "37",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 165,
+              "text": "40",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 165,
+              "text": "49",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 134,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 161,
+              "y": 165,
+              "text": "52",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 196,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 223,
+              "y": 165,
+              "text": "5B",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 10,
+              "y": 186,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 37,
+              "y": 209,
+              "text": "64",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 72,
+              "y": 186,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 99,
+              "y": 209,
+              "text": "6D",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 134,
+              "y": 186,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 161,
+              "y": 209,
+              "text": "76",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 196,
+              "y": 186,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 223,
+              "y": 209,
+              "text": "7F",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 258,
+              "y": 186,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 285,
+              "y": 209,
+              "text": "88",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 350,
+              "y": 10,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 377,
+              "y": 33,
+              "text": "ABC",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 350,
+              "y": 54,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 377,
+              "y": 77,
+              "text": "ACB",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 412,
+              "y": 54,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 439,
+              "y": 77,
+              "text": "ADA",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 350,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 377,
+              "y": 121,
+              "text": "AE9",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 412,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 439,
+              "y": 121,
+              "text": "AF8",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 474,
+              "y": 98,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 501,
+              "y": 121,
+              "text": "B07",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 350,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 377,
+              "y": 165,
+              "text": "B16",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 412,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 439,
+              "y": 165,
+              "text": "B25",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 474,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 501,
+              "y": 165,
+              "text": "B34",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            },
+            {
+              "type": "rect",
+              "x": 536,
+              "y": 142,
+              "width": 54,
+              "height": 34,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 563,
+              "y": 165,
+              "text": "B43",
+              "fontSize": 16,
+              "fill": "ink",
+              "anchor": "middle"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

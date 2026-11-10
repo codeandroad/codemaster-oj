@@ -1,0 +1,378 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2021-2022-elementary-2",
+  "division": "Elementary",
+  "season": "2021-2022",
+  "round": 2,
+  "roundLabel": {
+    "en": "Contest 2",
+    "zh": "第二轮"
+  },
+  "title": {
+    "en": "ACSL 2021-2022 Elementary · Contest 2",
+    "zh": "ACSL 2021-2022 Elementary · 第二轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Elementary/2021-2022/第二轮/c_2_elem.pdf",
+      "sha256": "52c15b06926b3c944212c9f90aa4afd51aa9c97c82a14353a18fe3d07e3330f0",
+      "pages": 2
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Elementary/2021-2022/第二轮/c_2_elem_soln.pdf",
+      "sha256": "4849716fab56d7d74ed9bc12129191b91da5654d59ee117856f12bdbca067e52",
+      "pages": 2
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Evaluate the following prefix expression if all numbers are single digits:\n\n`+ / * 5 2 - 7 2 6`",
+        "zh": "如果下方所有数字都是一个单独的数值,计算下方前缀表达式的值:\n\n`+ / * 5 2 - 7 2 6`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "11",
+            "zh": "11"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "5",
+            "zh": "5"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "2",
+            "zh": "2"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Answer: **B**.\n\nTo evaluate the prefix expression, group every operator followed by 2 operands or digits at the beginning. Then translate the expression to infix and evaluate from the inside out:\n\n`+ / * 5 2 - 7 2 6`\n\n= (+ (/ (* 5 2) ( - 7 2)) 6) = (+ (/ 10 5) 6) = (+ 2 6) = 8",
+        "zh": "答案：**B**。\n\n最外层是加法，第二个操作数是 6。第一个操作数是除法，它的左右子式分别为 $5\\times2=10$ 和 $7-2=5$。所以结果是 $10/5+6=8$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Evaluate the following postfix expression if all numbers are single digits:\n\n`9 3 - 5 2 + * 2 3 ^ 3 2 ^ + -`",
+        "zh": "如果下方所有数字都是一个单独的数值,计算下方后缀表达式的值\n\n`9 3 - 5 2 + * 2 3 ^ 3 2 ^ + -`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "46",
+            "zh": "46"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "42",
+            "zh": "42"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "41",
+            "zh": "41"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "25",
+            "zh": "25"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "24",
+            "zh": "24"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Answer: **D**.\n\nTo evaluate the postfix expression, group every operator preceded by 2 operands or digits at the beginning. Then translate the expression to infix and evaluate from the inside out:\n\n`9 3 - 5 2 + * 2 3 ^ 3 2 ^ + -`\n\n= (((9 3 - ) (5 2 +) *) ((2 3 ^) (3 2 ^) +) - ) = ((6 7 *) (8 9 +) - ) = (42 17 - ) = 25",
+        "zh": "答案：**D**。\n\n后缀式从左到右归并，遇到减号时先弹出的是右操作数。左半段得到 $(9-3)(5+2)=6\\times7=42$，右半段得到 $2^3+3^2=8+9=17$。最后算 $42-17=25$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Convert the following infix expression to prefix:\n\n$$\n\\frac{4*(7-5)}{(8-2)/(2+1)}\n$$",
+        "zh": "请将下方的中缀表达式转换为前缀表达式:\n\n$$\n\\frac{4*(7-5)}{(8-2)/(2+1)}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`* / 4 - 7 5 / - 8 2 + 1 2`",
+            "zh": "`* / 4 - 7 5 / - 8 2 + 1 2`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`/ * 4 - 5 7 / - 2 8 + 1 2`",
+            "zh": "`/ * 4 - 5 7 / - 2 8 + 1 2`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`4 - 7 5 / - 8 2 + 2 1 * /`",
+            "zh": "`4 - 7 5 / - 8 2 + 2 1 * /`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`/ * - 7 5 4 / - 8 2 + 2 1`",
+            "zh": "`/ * - 7 5 4 / - 8 2 + 2 1`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`/ * 4 - 7 5 / - 8 2 + 2 1`",
+            "zh": "`/ * 4 - 7 5 / - 8 2 + 2 1`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "Answer: **E**.\n\nTo convert the following infix expression to prefix, use the order of operations (PEMDAS)and write each infix expression with the operator before both operands in the same order:\n\n$$\n\\frac{4*(7-5)}{(8-2)/(2+1)}\n$$\n\n= (4 * ( - 7 5)) / (( - 8 2) / (+ 2 1)) = (* 4 - 7 5) / (/ - 8 2 + 2 1) = / * 4 - 7 5 / - 8 2 + 2 1",
+        "zh": "答案：**E**。\n\n先分别写分子和分母。分子 $4(7-5)$ 的前缀是 `* 4 - 7 5`，分母 $(8-2)/(2+1)$ 的前缀是 `/ - 8 2 + 2 1`。外层仍是除法，在两段之前再放一个除号。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Convert the following infix expression to postfix:\n\n5 * 7 - (1 + 4) * 6 + 2",
+        "zh": "请将下方的中缀表达式转换为后缀表达式:\n\n5 * 7 - (1 + 4) * 6 + 2"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`5 7 * 1 4 + 6 * - 2 +`",
+            "zh": "`5 7 * 1 4 + 6 * - 2 +`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`5 7 * 1 4 + - 6 * 2 +`",
+            "zh": "`5 7 * 1 4 + - 6 * 2 +`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`5 7 * 1 4 + 6 2 + * -`",
+            "zh": "`5 7 * 1 4 + 6 2 + * -`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`5 7 * 1 4 + 6 2 * + -`",
+            "zh": "`5 7 * 1 4 + 6 2 * + -`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`7 5 * 4 1 + 6 * + 2 -`",
+            "zh": "`7 5 * 4 1 + 6 * + 2 -`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "Answer: **A**.\n\nTo convert the following infix expression to postfix, use the order of operations (PEMDAS)and write each infix expression with the operator after both operands in the same order:\n\n5 * 7 - (1 + 4) * 6 + 2 = ((5 7 *) - ((1 4 +) * 6)) + 2 = ((5 7 *) - ((1 4 +) 6 *)) + 2 = ((5 7 *) ((1 4 +) 6 *) - ) + 2\n\n`= ((5 7 *) ((1 4 +) 6 *) - ) 2 +`\n\n`= 5 7 * 1 4 + 6 * - 2 +`",
+        "zh": "答案：**A**。\n\n乘积分别转成 `5 7 *` 和 `1 4 + 6 *`。原式同级的减法在加 2 之前，所以先把两个乘积接上减号，再接 `2 +`。完整后缀为 `5 7 * 1 4 + 6 * - 2 +`。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Convert the following expression from prefix to postfix:\n\n`- / * ^ 5 2 4 2 + 1 9`",
+        "zh": "请将下方的前缀表达式转换为后缀表达式:\n\n`- / * ^ 5 2 4 2 + 1 9`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`5 2 ^ 4 2 * / 1 9 + -`",
+            "zh": "`5 2 ^ 4 2 * / 1 9 + -`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`5 2 ^ 4 * 2 / 1 9 + -`",
+            "zh": "`5 2 ^ 4 * 2 / 1 9 + -`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`5 2 ^ 2 4 * / 9 1 + -`",
+            "zh": "`5 2 ^ 2 4 * / 9 1 + -`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`5 2 ^ 4 2 1 9 * / + -`",
+            "zh": "`5 2 ^ 4 2 1 9 * / + -`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`5 2 ^ 4 * 2 / 1 9 - +`",
+            "zh": "`5 2 ^ 4 * 2 / 1 9 - +`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Answer: **B**.\n\nTo convert the following expression from prefix to postfix, change each group of 2 operands preceded by an operator to a group of 2 operands succeeded by an operator::\n\n`- / * ^ 5 2 4 2 + 1 9`\n\n= - / * (5 2 ^) 4 2 (1 9 +) = - / ((5 2 ^) 4 *) 2 (1 9 +) = - (((5 2 ^) 4 *) 2 /) (1 9 +)\n\n`= 5 2 ^ 4 * 2 / 1 9 + -`",
+        "zh": "答案：**B**。\n\n前缀式最外层是减法。左侧先算 $5^2$，再乘 4 除以 2，转换为 `5 2 ^ 4 * 2 /`；右侧 $1+9$ 转成 `1 9 +`。后缀的减号写在两段之后。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": []
+}

@@ -1,0 +1,447 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2025-2026-elementary-3",
+  "division": "Elementary",
+  "season": "2025-2026",
+  "round": 3,
+  "roundLabel": {
+    "en": "Contest 3",
+    "zh": "第三轮"
+  },
+  "title": {
+    "en": "ACSL 2025-2026 Elementary · Contest 3",
+    "zh": "ACSL 2025-2026 Elementary · 第三轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Elementary/2025-2026/第三轮/c_3_elem.pdf",
+      "sha256": "1a806142b13f2ba04b290eccd02db8164e00504d9a143790554d67b860009899",
+      "pages": 8
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Elementary/2025-2026/第三轮/c_3_elem_sol.pdf",
+      "sha256": "6baf5f256f3de7a35292f21ef924ee1dc1c9046219938df3e3a5b48660332634",
+      "pages": 2
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "Which of the following Boolean expressions cannot be used to represent all 2-digit whole numbers?",
+        "zh": "请问以下哪个布尔表达式不能用来表示所有的两位整数?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "$x<100 \\;\\mathrm{AND}\\; x≥10$",
+            "zh": "$x<100 \\;\\mathrm{AND}\\; x≥10$"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "$x≤99 \\;\\mathrm{AND}\\; x≥10$",
+            "zh": "$x≤99 \\;\\mathrm{AND}\\; x≥10$"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "$x<99 \\;\\mathrm{AND}\\; x>10$",
+            "zh": "$x<99 \\;\\mathrm{AND}\\; x>10$"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "$x≤99 \\;\\mathrm{AND}\\; x>9$",
+            "zh": "$x≤99 \\;\\mathrm{AND}\\; x>9$"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "$x<100 \\;\\mathrm{AND}\\; x>9$",
+            "zh": "$x<100 \\;\\mathrm{AND}\\; x>9$"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Options A, B, D and E each represent the integers from 10 through99. Option C requires $10<x<99$, so it represents only11 through98 and excludes10 and99.\n\nSource correction: the original list of four valid expressions mistakenly included C instead of E.",
+        "zh": "答案：**C**。\n\n区间包含 10 和 99。C 使用 $x>10$ 与 $x<99$ 两个严格不等式，只接受 11 到 98，两个端点都被排除。A、B、D、E 均包含两端。原解析把四个正确表述中的 E 误写为 C。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          3,
+          5
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "Which ordered pair makes the following expression TRUE?\n\n$$\n\\sim (A*B)*\\sim (A+B)\n$$",
+        "zh": "请问哪个有序对可以使得下列表达式的结果为真?\n\n$$\n\\sim (A*B)*\\sim (A+B)\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "(0,0)",
+            "zh": "(0,0)"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "(0,1)",
+            "zh": "(0,1)"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "(1,0)",
+            "zh": "(1,0)"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "(1,1)",
+            "zh": "(1,1)"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "None of the above",
+            "zh": "上述答案均不正确"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "Answer: **A**.\n\n$\\sim (AB)*\\sim (A+B)$ is TRUE when $\\sim (AB)$ is TRUE and $\\sim (A+B)$ is TRUE. $\\sim (AB)$ is TRUE for all but (1,1). $\\sim (A+B)$ is TRUE for just (0,0). Therefore, the overlap with the AND operator is (0,0).",
+        "zh": "答案：**A**。\n\nAND 要求两项同时为真。$\\sim(A+B)$ 为真只可能是 $(0,0)$；这时 $AB=0$，$\\sim(AB)$ 也为真，所以只有 $(0,0)$ 符合。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          3,
+          5
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "Fill in the columns in the following Truth Table. Give the answer as the last column from top to bottom.\n\n| $A$ | $B$ | $A+B$ | $\\sim B$ | $\\sim B*(A+B)$ | $\\sim(\\sim B*(A+B))$ |\n| --- | --- | --- | --- | --- | --- |\n| 0 | 0 |  |  |  |  |\n| 0 | 1 |  |  |  |  |\n| 1 | 0 |  |  |  |  |\n| 1 | 1 |  |  |  |  |",
+        "zh": "填写以下真值表，将最后一列的内容按照从上到下的顺序依次写出结果。\n\n| $A$ | $B$ | $A+B$ | $\\sim B$ | $\\sim B*(A+B)$ | $\\sim(\\sim B*(A+B))$ |\n| --- | --- | --- | --- | --- | --- |\n| 0 | 0 |  |  |  |  |\n| 0 | 1 |  |  |  |  |\n| 1 | 0 |  |  |  |  |\n| 1 | 1 |  |  |  |  |"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "1000",
+            "zh": "1000"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "1101",
+            "zh": "1101"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "0001",
+            "zh": "0001"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "1001",
+            "zh": "1001"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "1010",
+            "zh": "1010"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Answer: **B**.\n\nThe completed truth table is:\n\n| $A$ | $B$ | $A+B$ | $\\sim B$ | $\\sim B*(A+B)$ | $\\sim(\\sim B*(A+B))$ |\n| --- | --- | --- | --- | --- | --- |\n| 0 | 0 | 0 | 1 | 0 | 1 |\n| 0 | 1 | 1 | 0 | 0 | 1 |\n| 1 | 0 | 1 | 1 | 1 | 0 |\n| 1 | 1 | 1 | 0 | 0 | 1 |\n\nReading the final column from top to bottom gives `1101`.",
+        "zh": "答案：**B**。\n\n先看外层取反前的 $\\sim B(A+B)$。当 $B=1$ 时它为 0；当 $B=0$ 时它等于 $A$，故仅 $(1,0)$ 为 1。按题表行序取反后得到 `1101`。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          3,
+          5
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "Simplify the following Boolean expression:\n\n$$\n\\sim (\\sim A+B)+\\sim (A+\\sim B)+\\sim (A*B)\n$$",
+        "zh": "请简化下列布尔表达式:\n\n$$\n\\sim (\\sim A+B)+\\sim (A+\\sim B)+\\sim (A*B)\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "$\\sim (A*B)$",
+            "zh": "$\\sim (A*B)$"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "$A*\\sim B+\\sim A*B$",
+            "zh": "$A*\\sim B+\\sim A*B$"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "$\\sim A*\\sim B$",
+            "zh": "$\\sim A*\\sim B$"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "$1$",
+            "zh": "$1$"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "$0$",
+            "zh": "$0$"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "Answer: **A**.\n\n$$\n\\sim (\\sim A+B)+\\sim (A+\\sim B)+\\sim (A*B)\n$$\n\n$$\n=A\\sim B+\\sim AB+\\sim A+\\sim B\n$$\n\n$=\\sim B(A+1)+\\sim A(B+1)$ using terms 1 and 4, then 2 and 3\n\n$$\n=\\sim B(1)+\\sim A(1)\n$$\n\n$$\n=\\sim B+\\sim A\n$$\n\n$$\n=\\sim (B*A)\n$$",
+        "zh": "答案：**A**。\n\n用德摩根律，将三项分别化为 $A\\sim B$、$\\sim AB$ 和 $\\sim A+\\sim B$。第一项已被 $\\sim B$ 包含，第二项已被 $\\sim A$ 包含，故 OR 的结果为 $\\sim A+\\sim B=\\sim(AB)$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          3,
+          5
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "The Boolean algebra operator $A\\to B$ is often read as “if A, then B” or “A implies B”. It is TRUE for the ordered pairs (1,1), (0,1), and (0,0). Which of the following is an equivalent expression to $A\\to B$?",
+        "zh": "布尔代数运算符 $A\\to B$ 通常读作“若A,则B”或“A蕴含B”。对于有序数对(1,1), (0,1),和(0,0),该运算结果为真。下列哪一项表达式与 $A\\to B$ 等价?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "$\\sim (A+B)$",
+            "zh": "$\\sim (A+B)$"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "$\\sim A*\\sim B$",
+            "zh": "$\\sim A*\\sim B$"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "$A+\\sim B$",
+            "zh": "$A+\\sim B$"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "$\\sim A+B$",
+            "zh": "$\\sim A+B$"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "$\\sim A*\\sim B+A*B$",
+            "zh": "$\\sim A*\\sim B+A*B$"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Answer: **D**.\n\n$\\sim (A+B)$ is (0,0). $\\sim A*\\sim B$ is just (0,0). $A+\\sim B$ is (1,1), (1,0), (0,0). $\\sim A+B$ is (1,1), (0,1), and (0,0) which is correct. $\\sim A\\sim B+AB$ is (0,0), (1,1). Only $\\sim A+B$ is the same as $A\\to B.$",
+        "zh": "答案：**D**。\n\n蕴含 $A\\to B$ 只在前件为真、后件为假时不成立，即排除 $(1,0)$。$\\sim A+B$ 正好在这一组为 0，其余三组均为 1。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          4,
+          6
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q6",
+      "number": 6,
+      "type": "single",
+      "topic": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "statement": {
+        "en": "In a local elementary school of 100 students, 50 students play an instrument and 60 students play a sport while 20 students play both. If I = {students who play an instrument} and S = {students who play a sport}, how many students would the expression $\\sim (I+S)$ represent?",
+        "zh": "某当地小学有100名学生,其中50名学生演奏乐器,60名学生参加体育运动,20名学生两项都参与。设I = {演奏乐器的学生集合} ,S = {参加体育运动的学生集合} 。请问表达式 $\\sim (I+S)$ 表示多少名学生?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "90",
+            "zh": "90"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "80",
+            "zh": "80"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "50",
+            "zh": "50"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "20",
+            "zh": "20"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "10",
+            "zh": "10"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "Answer: **E**.\n\nIf 20 students play both, then 30 students only play an instrument and 40 students only play a sport. Therefore, there are 10 other students that do neither.",
+        "zh": "答案：**E**。\n\n会乐器的 50 人和做运动的 60 人中，有 20 人重叠。至少参加一项的有 $50+60-20=90$ 人。题给 100 人，两项都不参加的有 $100-90=10$ 人。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          4,
+          6
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": []
+}

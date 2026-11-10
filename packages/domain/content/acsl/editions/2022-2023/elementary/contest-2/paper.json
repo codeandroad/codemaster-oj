@@ -1,0 +1,378 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2022-2023-elementary-2",
+  "division": "Elementary",
+  "season": "2022-2023",
+  "round": 2,
+  "roundLabel": {
+    "en": "Contest 2",
+    "zh": "第二轮"
+  },
+  "title": {
+    "en": "ACSL 2022-2023 Elementary · Contest 2",
+    "zh": "ACSL 2022-2023 Elementary · 第二轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Elementary/2022-2023/第二轮/c_2_elem.pdf",
+      "sha256": "1d58f0bb432589e76f8a28c99c3d2b49394299c0437b2597d145fb0cb2e7056e",
+      "pages": 2
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Elementary/2022-2023/第二轮/c_2_elem_soln.pdf",
+      "sha256": "4ffc2b869527bc71f1e3645d9454b2827538fdf6ea11bbe94615b7a319e72b2e",
+      "pages": 1
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Evaluate the following postfix expression if all numbers are single digits:\n\n`7 3 - 9 4 + * 5 2 * - 6 /`",
+        "zh": "如果下方所有数字都是一个单独的数值,请计算下方后缀表达式:\n\n`7 3 - 9 4 + * 5 2 * - 6 /`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "7",
+            "zh": "7"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "5",
+            "zh": "5"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "2",
+            "zh": "2"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "1",
+            "zh": "1"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "Answer: **A**.\n\n`7 3 - 9 4 + * 5 2 * - 6 / = (7 - 3) (9 + 4) * (5 * 2) - 6 /`\n\n`= 4 13 * 10 - 6 / = (4 * 13) 10 - 6 /`\n\n`= 52 10 - 6 / = (52 - 10) 6 /`\n\n= 42 6 / = (42 / 6) = 7",
+        "zh": "答案：**A**。\n\n从左到右读后缀式。先算 $7-3=4$ 和 $9+4=13$，相乘得 52。另一段 $5\\times2=10$，从 52 中减去 10 得 42，最后 $42/6=7$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Evaluate the following prefix expression if all numbers are single digits:\n\n`/ - + * 3 7 / 8 2 ^ 5 2 9`",
+        "zh": "如果下方所有数字都是一个单独的数值,请计算下方前缀表达式:\n\n`/ - + * 3 7 / 8 2 ^ 5 2 9`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "9",
+            "zh": "9"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "3",
+            "zh": "3"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "1",
+            "zh": "1"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "0",
+            "zh": "0"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "Answer: **E**.\n\n`/ - + * 3 7 / 8 2 ^ 5 2 9 = / - + (3 * 7) (8 / 2) (5 ^ 2) 9`\n\n= / − + 21 4 25 9 = / − (21 + 4) 25 9 = / − 25 25 9 = / (25 − 25) 9 = / 0 9 = (0 / 9) = 0",
+        "zh": "答案：**E**。\n\n最外层除法的右操作数为 9。分子依次算 $3\\times7=21$、$8/2=4$、$5^2=25$，再得 $(21+4)-25=0$。所以 $0/9=0$。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Convert the following infix expression to prefix:\n\n$$\n\\frac{6+9*(7-5)}{(4-2)^{3}}\n$$",
+        "zh": "请将下方中缀表达式转换为前缀表达式:\n\n$$\n\\frac{6+9*(7-5)}{(4-2)^{3}}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`/ + 6 * 9 - 7 5 ^ - 4 3 2`",
+            "zh": "`/ + 6 * 9 - 7 5 ^ - 4 3 2`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`+ / 6 9 * - 7 5 ^ - 4 2 3`",
+            "zh": "`+ / 6 9 * - 7 5 ^ - 4 2 3`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`/ + 6 * 9 - 7 5 ^ - 4 2 3`",
+            "zh": "`/ + 6 * 9 - 7 5 ^ - 4 2 3`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`/ + * - ^ - 6 9 7 5 4 3 2`",
+            "zh": "`/ + * - ^ - 6 9 7 5 4 3 2`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`/ + 6 9 - + 7 5 ^ - 4 2 3`",
+            "zh": "`/ + 6 9 - + 7 5 ^ - 4 2 3`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Answer: **C**.\n\n$$\n\\frac{6+9*(7-5)}{(4-2)^{3}}=(6+9*(7-5))/((4-2)^3)\n$$\n\n= (6 + 9 * (− 7 5)) / ((− 4 2) ^ 3) = (6 + (* 9 − 7 5)) / (^ − 4 2 3) = (+ 6 * 9 − 7 5) / (^ − 4 2 3) = / + 6 * 9 − 7 5 ^ − 4 2 3",
+        "zh": "答案：**C**。\n\n分子从内层的 $7-5$ 开始，先变成 `- 7 5`，再形成 `+ 6 * 9 - 7 5`。分母先减后立方，写成 `^ - 4 2 3`。除号放在两个完整操作数前面。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Convert the following infix expression to postfix:\n\n(7 * 8 − (9 + 3) / 4) ^ (2 − 1)",
+        "zh": "请将下方中缀表达式转换为后缀表达式:\n\n(7 * 8 − (9 + 3) / 4) ^ (2 − 1)"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`8 7 * 3 9 + 4 / - 2 1 - ^`",
+            "zh": "`8 7 * 3 9 + 4 / - 2 1 - ^`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`7 8 * 9 3 + 4 / - 2 1 - ^`",
+            "zh": "`7 8 * 9 3 + 4 / - 2 1 - ^`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`7 8 9 3 4 2 1 * + / - - ^`",
+            "zh": "`7 8 9 3 4 2 1 * + / - - ^`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`8 7 * 9 3 + - 4 / 2 1 - ^`",
+            "zh": "`8 7 * 9 3 + - 4 / 2 1 - ^`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`2 1 - 7 8 * 9 3 + 4 / - ^`",
+            "zh": "`2 1 - 7 8 * 9 3 + 4 / - ^`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Answer: **B**.\n\n(7 * 8 − (9 + 3) / 4) ^ (2 − 1) = ((7 8 *) − (9 3 +) / 4) ^ (2 1 −) = ((7 8 *) − (9 3 + 4 /)) ^ (2 1 −) = (7 8 * 9 3 + 4 / −) ^ (2 1 −)\n\n`= 7 8 * 9 3 + 4 / - 2 1 - ^`",
+        "zh": "答案：**B**。\n\n最外层是乘方，因此后缀式最后一项是 `^`。底数中的 $7\\times8$ 和 $(9+3)/4$ 分别写成 `7 8 *`、`9 3 + 4 /`，在后面接减号。指数 $2-1$ 写成 `2 1 -`，接在底数后再写乘方符号。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Convert the following expression from postfix to prefix:\n\n`4 7 5 3 + + * 6 2 ^ - 8 /`",
+        "zh": "请将下方后缀表达式转换为前缀表达式:\n\n`4 7 5 3 + + * 6 2 ^ - 8 /`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`+ + * 4 7 5 3 ^ - 6 2 / 8`",
+            "zh": "`+ + * 4 7 5 3 ^ - 6 2 / 8`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`/ * - 4 + 7 + 5 3 ^ 6 2 8`",
+            "zh": "`/ * - 4 + 7 + 5 3 ^ 6 2 8`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`/ - * 4 + 7 + 3 5 ^ 2 6 8`",
+            "zh": "`/ - * 4 + 7 + 3 5 ^ 2 6 8`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`/ - * 4 + 7 + 5 3 ^ 6 2 8`",
+            "zh": "`/ - * 4 + 7 + 5 3 ^ 6 2 8`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`/ 8 - * 4 + 7 + 5 3 ^ 6 2`",
+            "zh": "`/ 8 - * 4 + 7 + 5 3 ^ 6 2`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "Answer: **D**.\n\n`4 7 5 3 + + * 6 2 ^ - 8 / = 4 7 (+ 5 3) + * (^ 6 2) - 8 /`\n\n`= 4 (+ 7 + 5 3) * (^ 6 2) - 8 /`\n\n`= (* 4 + 7 + 5 3) (^ 6 2) - 8 /`\n\n`= (- * 4 + 7 + 5 3 ^ 6 2) 8 /`\n\n= / − * 4 + 7 + 5 3 ^ 6 2 8",
+        "zh": "答案：**D**。\n\n把每次运算看作由两个已读子式合成的新子式。左边先得到 `+ 7 + 5 3`，再乘 4、减 $6^2$，成为 `- * 4 + 7 + 5 3 ^ 6 2`。最后右操作数为 8，把除号放在整段最前面。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": []
+}

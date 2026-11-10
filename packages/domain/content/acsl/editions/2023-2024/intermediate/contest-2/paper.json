@@ -1,0 +1,457 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2023-2024-intermediate-2",
+  "division": "Intermediate",
+  "season": "2023-2024",
+  "round": 2,
+  "roundLabel": {
+    "en": "Contest 2",
+    "zh": "第二轮"
+  },
+  "title": {
+    "en": "ACSL 2023-2024 Intermediate · Contest 2",
+    "zh": "ACSL 2023-2024 Intermediate · 第二轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Intermediate/2023-2024/第二轮/c_2_int.pdf",
+      "sha256": "1c44754668db812f87c919c1c48afbc9e1361fca734807ec65554b21dc1b7972",
+      "pages": 2
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Intermediate/2023-2024/第二轮/c_2_int_soln.pdf",
+      "sha256": "5484e76a67c5cbb35ec29df184096b5c86e160547c1038f1881219a91381b060",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Intermediate/2023-2024/第二轮/c_2_ACSL Book_int.pdf",
+      "sha256": "3c11118f08d4229075deb0f2d0a91438b6252d41a6a971e3313060934705ddf0",
+      "pages": 14
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Evaluate the following postfix expression if all numbers are single digits:\n\n`5 8 - 6 9 6 - * 3 / +`",
+        "zh": "如果下方所有数字都是一位数,请计算下方后缀表达式:\n\n`5 8 - 6 9 6 - * 3 / +`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "6",
+            "zh": "6"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "11",
+            "zh": "11"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "3",
+            "zh": "3"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`-2`",
+            "zh": "`-2`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "18",
+            "zh": "18"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "`5 8 - 6 9 6 - * 3 / + = (5 8 -) 6 (9 6 -) * 3 / +`\n\n`= (-3) (6 3 *) 3 / +`\n\n`= (-3) (18 3 /) +`\n\n`= (-3) 6 +`\n\n= 3\n\n**Answer: C.**",
+        "zh": "逐步求出后缀运算的值：\n\n`5 8 - 6 9 6 - * 3 / + = (5 8 -) 6 (9 6 -) * 3 / +`\n\n`= (-3) (6 3 *) 3 / +`\n\n`= (-3) (18 3 /) +`\n\n`= (-3) 6 +`\n\n= 3\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Translate the following infix expression into prefix:\n\n$$\n\\frac{(a+b)^{2}-c}{d+e(b^{2}-a)}\n$$",
+        "zh": "请将下方中缀表达式转换为前缀表达式:\n\n$$\n\\frac{(a+b)^{2}-c}{d+e(b^{2}-a)}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`/-^++ab2cd*e-^b2a`",
+            "zh": "`/-^++ab2cd*e-^b2a`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`/-^ab2c++d*e-^b2a`",
+            "zh": "`/-^ab2c++d*e-^b2a`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`/^-+ab2c+d*e-^b2a`",
+            "zh": "`/^-+ab2c+d*e-^b2a`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`/-^+ab2c-d*e+^b2a`",
+            "zh": "`/-^+ab2c-d*e+^b2a`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`/-^+ab2c+d*e-^b2a`",
+            "zh": "`/-^+ab2c+d*e-^b2a`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "Convert the numerator and denominator separately, then put division first:\n\n```text\n((a + b)^2 - c) / (d + e * (b^2 - a))\n= ((+ a b)^2 - c) / (d + e * ((^ b 2) - a))\n= ((^ + a b 2) - c) / (d + e * (- ^ b 2 a))\n= (- ^ + a b 2 c) / (d + (* e - ^ b 2 a))\n= (- ^ + a b 2 c) / (+ d * e - ^ b 2 a)\n= / - ^ + a b 2 c + d * e - ^ b 2 a\n```\n\n**Answer: E.**",
+        "zh": "分别转换分子与分母，最后把除号放到整个表达式的最前面：\n\n```text\n((a + b)^2 - c) / (d + e * (b^2 - a))\n= ((+ a b)^2 - c) / (d + e * ((^ b 2) - a))\n= ((^ + a b 2) - c) / (d + e * (- ^ b 2 a))\n= (- ^ + a b 2 c) / (d + (* e - ^ b 2 a))\n= (- ^ + a b 2 c) / (+ d * e - ^ b 2 a)\n= / - ^ + a b 2 c + d * e - ^ b 2 a\n```\n\n**答案：E。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "比特位操作"
+      },
+      "statement": {
+        "en": "Evaluate:\n\n`(LCIRC-2 (RSHIFT-1 (NOT 10100))) OR (RCIRC-1 (LSHIFT-2 10111))`",
+        "zh": "请计算下列表达式:\n\n`(LCIRC-2 (RSHIFT-1 (NOT 10100))) OR (RCIRC-1 (LSHIFT-2 10111))`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`01011`",
+            "zh": "`01011`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`00101`",
+            "zh": "`00101`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`01111`",
+            "zh": "`01111`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`11110`",
+            "zh": "`11110`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`11111`",
+            "zh": "`11111`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "`(LCIRC-2 (RSHIFT-1 (NOT 10100))) OR (RCIRC-1 (LSHIFT-2 10111))`\n\n`= (LCIRC-2 (RSHIFT-1 01011)) OR (RCIRC-1 11100)`\n\n`= (LCIRC-2 00101) OR 01110`\n\n`= 10100 OR 01110`\n\n`= 11110`\n\n**Answer: D.**",
+        "zh": "从内层开始依次完成取反、移位和循环移位，最后按位 OR：\n\n`(LCIRC-2 (RSHIFT-1 (NOT 10100))) OR (RCIRC-1 (LSHIFT-2 10111))`\n\n`= (LCIRC-2 (RSHIFT-1 01011)) OR (RCIRC-1 11100)`\n\n`= (LCIRC-2 00101) OR 01110`\n\n`= 10100 OR 01110`\n\n`= 11110`\n\n**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "比特位操作"
+      },
+      "statement": {
+        "en": "Solve the following expression for X if X is a 5-bit string:\n\n`(LCIRC-2 01101) AND X OR (RSHIFT-1 01111) = 10111`",
+        "zh": "X是一个5位的位串,请根据下方表达式计算X的值:\n\n`(LCIRC-2 01101) AND X OR (RSHIFT-1 01111) = 10111`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`0*1*0`",
+            "zh": "`0*1*0`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`1****`",
+            "zh": "`1****`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`0***1`",
+            "zh": "`0***1`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`01*01`",
+            "zh": "`01*01`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`00101`",
+            "zh": "`00101`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Let `X = abcde`.\n\n```text\n(LCIRC-2 01101) AND abcde OR (RSHIFT-1 01111)\n= (10101 AND abcde) OR 00111\n= a0c0e OR 00111\n= a0111\n```\n\nComparing with `10111` gives `a = 1`; all other bits are unrestricted. Thus `X = 1****`.\n\nSource correction: the original comparison line prints `00111` on the right; it must be `10111`, as in the question.\n\n**Answer: B.**",
+        "zh": "设 `X = abcde`：\n\n```text\n(LCIRC-2 01101) AND abcde OR (RSHIFT-1 01111)\n= (10101 AND abcde) OR 00111\n= a0c0e OR 00111\n= a0111\n```\n\n与右边的 `10111` 比较可得 `a = 1`，其他四位任意。因此 `X = 1****`。\n\n原卷勘误：原解析的比较行将右侧误写成 `00111`，应与题面一致，为 `10111`。\n\n**答案：B。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "LISP",
+        "zh": "LISP"
+      },
+      "statement": {
+        "en": "Evaluate the following LISP expression:\n\n```text\n(CAR (CDR (CAR (CDR '(5 (2 (3 4) 1) (6 7 8) 9)))))\n```",
+        "zh": "请计算下方LISP表达式:\n\n```text\n(CAR (CDR (CAR (CDR '(5 (2 (3 4) 1) (6 7 8) 9)))))\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "(7 8)",
+            "zh": "(7 8)"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "(6 7 8)",
+            "zh": "(6 7 8)"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "(3 4)",
+            "zh": "(3 4)"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "((3 4) 1)",
+            "zh": "((3 4) 1)"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "(2 (3 4))",
+            "zh": "(2 (3 4))"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Evaluate from the inside out. The first CAR selects `(2 (3 4) 1)`; after its leading `2` is removed, the final CAR returns the sublist `(3 4)`.\n\n```lisp\n(CDR '(5 (2 (3 4) 1) (6 7 8) 9))\n=> ((2 (3 4) 1) (6 7 8) 9)\nCAR => (2 (3 4) 1)\nCDR => ((3 4) 1)\nCAR => (3 4)\n```\n\n**Answer: C.**",
+        "zh": "从内向外计算。第一次 CAR 取出 `(2 (3 4) 1)`，去掉开头的 `2` 后，最后一次 CAR 返回子表 `(3 4)`。\n\n```lisp\n(CDR '(5 (2 (3 4) 1) (6 7 8) 9))\n=> ((2 (3 4) 1) (6 7 8) 9)\nCAR => (2 (3 4) 1)\nCDR => ((3 4) 1)\nCAR => (3 4)\n```\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [],
+  "programming": {
+    "id": "acsl-book",
+    "definition": {
+      "title": "ACSL Book",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Read two lines: the complete book text, then the message or coordinate string.\n\n### Problem\n\nA book cipher is a method of encoding and decoding a message where the sender and the receiver both use the same text. The sender’s message is encoded by replacing each alphanumeric character in the message to be sent with the location of that character in the text using an “s.w.c” string representing the number of the sentence in the text (s), the number of the word in that sentence (w), and the number of the character in that word (c), all indexed starting with 1. The receiver decodes the encoded message by locating the characters in the text specified by each “s.w.c” string.\n\nIn this program, you will be given the text and the encoded message to be decoded. The text will use the following restrictions:\n\n- A word contains only alphanumeric characters\n\n- All words are separated by a single space or any non-alphanumeric character(s)\n\n- Sentences are terminated with a period, question mark, or exclamation point and sentences are separated by exactly two spaces\n\n- Any keyboard character can appear in the text\n\nThe encoded message will contain multiple “s.w.c” strings, each separated by a single space. Create a decoded message by finding each character in the text. If an “s.w.c” string doesn’t refer to an alphanumeric character in the text, use a space in the decoded message.\n\n### Example\n\n### Input\n\n```text\nACSL, or the American Computer Science League, is an international computer science competition among more than 300 schools.  Originally founded in 1978 as the Rhode Island Computer Science League, it then became the New England Computer Science League.  With countrywide and worldwide participants, it became the American Computer Science League.  It has been in continuous existence since 1978.  Each yearly competition consists of 4 regular-season contests.  All students at each school may compete but the team score is the sum of the best 3 or 5 top scores.  Each contest consists of two parts: a written section (called shorts) and a programming section.  Written topics tested include what does this program do, digital electronics, Boolean algebra, computer numbering systems, recursive functions, data structures (primarily dealing with heaps, binary search trees, stacks, and queues), Lisp programming, regular expressions and Finite State Automata, bit string flicking, graph theory, assembly language programming, and prefix/infix/postfix notation.\n3.5.1 8.21.9 1.10.8 2.7.2 7.15.6 5.4.3 4.10.3 6.18.1\n```\n\n### Output\n\n```text\npython 3\n```\n\nExplanation: The first encoded string “3.5.1” tells you to find the 3rd sentence, the 5th word in that sentence which is “participants”, and then the first character in that word which is the lowercase letter ‘p’. All others are done in a similar fashion. The string “4.10.3” is a space because there are only 8 words in the 4th sentence.\n\n### Input\n\nInput a string representing the text to be used in the decoding and another string representing the encoded message to be decoded. The first string will be no more than 2000 characters and the second string will be no longer than 200 characters.\n\n### Output\n\nOutput the decoded message as a string of characters.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "ACSL, or the American Computer Science League, is an international computer science competition among more than 300 schools.  Originally founded in 1978 as the Rhode Island Computer Science League, it then became the New England Computer Science League.  With countrywide and worldwide participants, it became the American Computer Science League.  It has been in continuous existence since 1978.  Each yearly competition consists of 4 regular-season contests.  All students at each school may compete but the team score is the sum of the best 3 or 5 top scores.  Each contest consists of two parts: a written section (called shorts) and a programming section.  Written topics tested include what does this program do, digital electronics, Boolean algebra, computer numbering systems, recursive functions, data structures (primarily dealing with heaps, binary search trees, stacks, and queues), Lisp programming, regular expressions and Finite State Automata, bit string flicking, graph theory, assembly programming and prefix/ postfix/infix notation.\n3.5.1 8.21.9 1.10.8 2.7.2 7.15.6 5.4.3 4.10.3 6.18.1\n",
+          "expected": "python 3\n"
+        },
+        {
+          "input": "To be or not to be, that is the question - a quote by William Shakespeare.  2B or not 2B - a hexadecimal equivalent!  How would you write it?\n2.1.2 1.3.1 1.4.2 2.7.7 1.12.5 2.5.1 2.3.1 1.16.2 1.14.5 1.10.4 4.1.1 1.14.6 2.7.7 3.2.1 1.14.6 3.3.1 1.15.6 3.3.4 1.1.1 1.15.10 2.7.3 1.10.3\n",
+          "expected": "Boolean is always True\n"
+        },
+        {
+          "input": "Various programming languages are: Java, Python, Visual BASIC, C++, Lisp, C#, FORTRAN, R, SQL.  Javascript is the language of the Internet!  HTML stands for Hypertext Markup Language and is not really a coding language!  There are over 300 languages.  Which one do you like best?\n2.1.1 1.2.6 2.1.3 1.3.6 1.11.3 2.1.8 2.2.2 4.6.1 3.2.2 4.1.2 2.6.3 5.3.3 3.13.1 3.13.6 3.6.3 3.12.6 3.5.5 1.5.4 3.6.4 3.4.4 6.1.2 5.2.1 3.3.1 1.13.6 1.12.6 1.6.1 3.14.1 1.9.1 1.14.1\n",
+          "expected": "Java is the language of AP CS\n"
+        },
+        {
+          "input": "Four score and seven years ago our fathers brought forth on this continent, a new nation, conceived in Liberty, and dedicated to the proposition that all men are created equal.  Now we are engaged in a great civil war, testing whether that nation, or any nation so conceived and so dedicated, can long endure.  We are met on a great battle-field of that war.  We have come to dedicate a portion of that field, as a final resting place for those who here gave their lives that that nation might live.  It is altogether fitting and proper that we should do this.  This was written by Abraham Lincoln on 11/19/1863!\n2.1.1 1.2.3 8.6.3 6.9.1 1.31.1 1.8.7 5.6.1 1.13.7 1.15.2 2.18.1 2.12.2 8.10.4 6.7.1 4.8.2 7.4.1 1.16.2 3.8.4 4.10.4 3.12.1 1.21.7 2.5.1 6.5.7 1.13.7\n",
+          "expected": "No 1 speech of all time\n"
+        },
+        {
+          "input": "There are 10 kinds of people in the world: those who know binary and those who don't!  Thus learn binary.\n1.12.4 2.1.2 2.2.3 1.18.1 3.1.4 1.2.1 1.9.3 1.10.5 1.20.1 1.13.6 1.16.3 2.1.3\n",
+          "expected": "what are you\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "ACSL, or the American Computer Science League, is an international computer science competition among more than 300 schools.  Originally founded in 1978 as the Rhode Island Computer Science League, it then became the New England Computer Science League.  With countrywide and worldwide participants, it became the American Computer Science League.  It has been in continuous existence since 1978.  Each yearly competition consists of four regular-season contests.  All students at each school may compete but the team score is the sum of the best 3 or 5 top scores.  Each contest consists of 2 parts: a written section (called shorts) and a programming section.  Written topics tested include what does this program do, digital electronics, Boolean algebra, computer numbering systems, recursive functions, data structures (primarily dealing with heaps, binary search trees, stacks, and queues), Lisp programming, regular expressions and Finite State Automata, bit string flicking, graph theory, assembly language programming and prefix/postfix/infix notation.\n1.1.1 1.5.3 1.5.7 1.10.5 1.10.9 1.12.6 1.16.3 1.13.11 9.1.1 2.18.1 1.13.2 1.15.1 1.13.4 2.2.3 1.11.6 1.7.2 2.1.2 1.19.1 2.19.1 1.12.2 1.12.3 1.7.6 1.13.11 2.10.2 1.12.4 2.3.3 1.7.1 1.5.7 1.10.7 2.17.3 2.11.5 1.7.6 4.8.5 1.4.1 2.9.1 2.19.1 1.7.1 4.7.8 5.3.7 1.18.7 5.5.3 2.2.1 1.7.5 1.9.2\n",
+          "expected": "American Computer Science League ACSL is fun\n",
+          "weight": 20
+        },
+        {
+          "input": "We hold these truths to be self-evident, that all men are created equal, that they are endowed by their Creator with certain unalienable Rights, that among these are Life, Liberty and the pursuit of Happiness.  That to secure these rights, Governments are instituted among Men, deriving their just powers from the consent of the governed...\n1.30.1 1.20.4 1.8.2 2.12.3 3.1.1 1.14.5 1.25.2 1.35.2 1.6.2 3.4.5 1.36.3 1.24.1 1.17.2 1.28.4 2.8.7 1.8.5 1.37.1 1.22.4 1.23.5 1.36.3 1.36.4 1.23.6 1.24.2 1.8.1 1.36.8 1.36.9 2.21.1 1.31.3 1.7.2 2.2.3 1.35.2 1.17.2 1.7.2 1.8.1\n",
+          "expected": "Live life pursue happiness be free\n",
+          "weight": 20
+        },
+        {
+          "input": "The upheavals [of Artificial Intelligence] can escalate quickly and become scarier and even cataclysmic.  Imagine how a medical robot, originally programmed to rid cancer, could conclude that the best way to obliterate cancer is to exterminate humans who are genetically prone to the disease.\n1.4.1 2.1.1 3.5.2 2.6.3 1.2.9 1.15.6 2.2.1 2.7.9 1.11.7 2.30.7 2.31.5 1.7.7 1.3.1 3.2.1 1.2.9 1.14.3 2.3.1 2.16.3\n",
+          "expected": "AI is here to stay\n",
+          "weight": 20
+        },
+        {
+          "input": "I'm increasingly inclined to think that there should be some regulatory oversight, maybe at the national and international level, just to make sure that we don't do something very foolish.  I mean with artificial intelligence we're summoning the demon.  This was said by Elon Musk at MIT's AeroAstro Centennial Symposium.\n3.10.1 2.1.1 4.1.2 1.4.1 3.9.1 1.33.3 1.8.5 1.31.1 3.10.2 1.4.6 2.11.1 3.3.1 2.4.7 3.7.1 2.7.1 3.4.2 2.11.7 1.32.1 2.10.4 3.10.8 1.2.2 1.1.1 3.1.1 3.9.2 2.5.8 3.11.5 1.17.1 3.1.3 1.12.4 3.6.3 2.5.12 1.11.1\n",
+          "expected": "AI is even scary for IT geniuses\n",
+          "weight": 20
+        },
+        {
+          "input": "The quadratic equation x^2-6x-7=0 can be solved by factoring it into (x-7)(x+1)=0.  By setting x-7=0 or x+1=0, the result is that x = 7 or x = -1.  However, if 3x^2-5x+8=0, factoring is not possible because 25-4*3*8<0 so the roots of this equation are 2 imaginary numbers.  In the 1st case, the function crosses the x-axis at 7 and -1.  In the 2nd case, the graph is completely above the x-axis!\n1.1.1 2.6.2 5.8.10 5.13.5 3.6.1 1.6.2 2.9.2 1.11.1 1.2.1 4.6.2 5.4.2 1.2.5 5.2.3 4.13.3 1.4.2 1.15.1 4.4.3 6.1.1 4.3.1 1.7.1 3.17.1\n",
+          "expected": "Try 8x squared is 170\n",
+          "weight": 20
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。输入两行：完整书本文本，以及消息或坐标字符串。\n\n### 问题\n\n书加密法是一种发送者和接收者使用相同的文本对信息进行编码和解码的方法。发送者对信息进行编码时,使用 \"s.w.c\" 格式将要发送的信息中的每个字母数字字符替换为该字符在文本中的位置。\"s.w.c\" 格式代表文本中句子的编号(s), 句子中单词的编号(w), 单词中字符的编号(c),所有编号均从 1 开始。接收者通过查找每个 \"s.w.c \" 字符串在文本中指定的字符来对编码信息进行解码。\n\n在此程序中,将给定文本以及需解码的编码信息。该文本有以下限制条件:\n\n- 每个单词只包含字母数字字符\n\n- 每个单词之间均用一个空格或任意非字母数字字符(一个或多个)分隔\n\n- 句子以句号、问号或感叹号结束,且句子之间严格用两个空格分隔\n\n- 文本中可以出现任意键盘字符\n\n编码信息将包含多个 \"s.w.c\" 字符串,每个字符串之间用一个空格分隔。通过在文本中查找每一个字符来创建解码信息。如果 \"s.w.c\" 字符串并不指向文本中的某个字母数字字符,则在解码信息中使用一个空格代替。\n\n### 示例\n\n### 输入\n\n```text\nACSL, or the American Computer Science League, is an international computer science competition among more than 300 schools.  Originally founded in 1978 as the Rhode Island Computer Science League, it then became the New England Computer Science League.  With countrywide and worldwide participants, it became the American Computer Science League.  It has been in continuous existence since 1978.  Each yearly competition consists of 4 regular-season contests.  All students at each school may compete but the team score is the sum of the best 3 or 5 top scores.  Each contest consists of two parts: a written section (called shorts) and a programming section.  Written topics tested include what does this program do, digital electronics, Boolean algebra, computer numbering systems, recursive functions, data structures (primarily dealing with heaps, binary search trees, stacks, and queues), Lisp programming, regular expressions and Finite State Automata, bit string flicking, graph theory, assembly language programming, and prefix/infix/postfix notation.\n3.5.1 8.21.9 1.10.8 2.7.2 7.15.6 5.4.3 4.10.3 6.18.1\n```\n\n### 输出\n\n```text\npython 3\n```\n\n解释说明: 第一个编码字符串 \"3.5.1\" 告诉你要先查找到第 3 句话,接着找到这句话的第 5 个单词 \"participants\",最后找到这个单词里的第 1 个字符,即小写字母 'p'。所有其它字符的查找方式都与此类似。因为第 4 句话中只有 8 个单词,所以字符串 \"4.10.3\" 用一个空格代替。\n\n### 输入\n\n输入一个字符串,代表解码时要使用的文本,再输入另一个字符串,代表需解码的编码信息。第一个字符串不超过 2000 个字符,第二个字符串不超过 200 个字符。\n\n### 输出\n\n以字符串的形式输出解码信息。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [],
+      "zh": []
+    }
+  }
+}

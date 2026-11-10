@@ -1,0 +1,457 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2022-2023-senior-2",
+  "division": "Senior",
+  "season": "2022-2023",
+  "round": 2,
+  "roundLabel": {
+    "en": "Contest 2",
+    "zh": "第二轮"
+  },
+  "title": {
+    "en": "ACSL 2022-2023 Senior · Contest 2",
+    "zh": "ACSL 2022-2023 Senior · 第二轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Senior/2022-2023/第二轮/c_2_sr.pdf",
+      "sha256": "58a3ac17bbfba0d2b7b8d171b6e3beb6fd270d76a1ef6dc2385cae23ad5e29a7",
+      "pages": 2
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Senior/2022-2023/第二轮/c_2_sr_soln.pdf",
+      "sha256": "f824a7e697c3b20c5fc9f2d5be7b62ce4ac2cd11f11ba5d60b7e64f2fc0ff478",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Senior/2022-2023/第二轮/c_2_Binary Counting_sr.pdf",
+      "sha256": "d989a616587ec31a509131f6cef63ce0143c2907d581f04c63d8378d9f1e013c",
+      "pages": 6
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Evaluate the following prefix expression if all numbers are single digits:\n\n`+ * 3 - 4 / 6 2 ^ + - 2 * 2 2 6 2`",
+        "zh": "如果下方所有数均为一位数,请计算下方前缀表达式的值:\n\n`+ * 3 - 4 / 6 2 ^ + - 2 * 2 2 6 2`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "20",
+            "zh": "20"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "19",
+            "zh": "19"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "18",
+            "zh": "18"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "17",
+            "zh": "17"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "16",
+            "zh": "16"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "B"
+      ],
+      "explanation": {
+        "en": "Group each prefix operator with its operands. The corresponding infix expression is:\n\n$$\n3\\left(4-\\frac62\\right)+\\left((2-2\\cdot2)+6\\right)^2=3+4^2=19\n$$\n\nThe outer + has left subtree `* 3 - 4 / 6 2`, worth 3×(4−3)=3, and right subtree `^ + - 2 * 2 2 6 2`, worth ((2−4)+6)²=16. Keeping every number as a separate single-digit token gives 3+16=19, **option B**.",
+        "zh": "按每个前缀运算符的操作数进行分组，对应的中缀表达式为：\n\n$$\n3\\left(4-\\frac62\\right)+\\left((2-2\\cdot2)+6\\right)^2=3+4^2=19\n$$\n\n最外层 + 的左子式是 `* 3 - 4 / 6 2`，值为 3×(4−3)=3；右子式是 `^ + - 2 * 2 2 6 2`，值为 ((2−4)+6)²=16。每个数字都应按独立的单个数位读取，最终 3+16=19，选 **B**。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Prefix/Infix/Postfix Notation",
+        "zh": "前缀／中缀／后缀表达式"
+      },
+      "statement": {
+        "en": "Convert the following infix expression to postfix:\n\n$$\\sqrt{1+\\sqrt{1+\\sqrt{1+x}}}$$",
+        "zh": "将下列中缀表达式转换为后缀表达式：\n\n$$\\sqrt{1+\\sqrt{1+\\sqrt{1+x}}}$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`11x1+12/^+12/^+12/^`",
+            "zh": "`11x1+12/^+12/^+12/^`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`111x12/^++12/^+12/^`",
+            "zh": "`111x12/^++12/^+12/^`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`111x+12/^+12/^+12/^`",
+            "zh": "`111x+12/^+12/^+12/^`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`1x11+12/^+12/^+12/^`",
+            "zh": "`1x11+12/^+12/^+12/^`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`x111+12/^+12/^+12/^`",
+            "zh": "`x111+12/^+12/^+12/^`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Write each square root as a power of $1/2$ and work from the innermost expression outward:\n\n- $\\sqrt{1+x}$: `1x+12/^`\n- $\\sqrt{1+\\sqrt{1+x}}$: `11x+12/^+12/^`\n- $\\sqrt{1+\\sqrt{1+\\sqrt{1+x}}}$: `111x+12/^+12/^+12/^`\n\nThis is option C.\n\nIn postfix, `12/` produces the exponent 1/2; it is not the two-digit number 12. Each outer layer begins with a new 1, then the previous complete expression, then +, then `12/^`. This accounts for all three roots without changing their nesting.",
+        "zh": "将每个平方根写成 $1/2$ 次幂，从最内层向外转换：\n\n- $\\sqrt{1+x}$：`1x+12/^`\n- $\\sqrt{1+\\sqrt{1+x}}$：`11x+12/^+12/^`\n- $\\sqrt{1+\\sqrt{1+\\sqrt{1+x}}}$：`111x+12/^+12/^+12/^`\n\n因此选择 C。\n\n后缀串中的 `12/` 计算指数 1/2，不是两位数 12。每添加一层外部根号，结构都是“新的 1、上一层完整表达式、+、12/^”，这样恰好保留三层根号的嵌套关系。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "比特位操作"
+      },
+      "statement": {
+        "en": "Evaluate the following expression:\n\n`(RCIRC-2 (LSHIFT-1 ((RSHIFT-1 01110) AND (LCIRC-2 10011) OR (NOT 01101))))`",
+        "zh": "计算下列表达式:\n\n`(RCIRC-2 (LSHIFT-1 ((RSHIFT-1 01110) AND (LCIRC-2 10011) OR (NOT 01101))))`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`10010`",
+            "zh": "`10010`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`00111`",
+            "zh": "`00111`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`10110`",
+            "zh": "`10110`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`00011`",
+            "zh": "`00011`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`01100`",
+            "zh": "`01100`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "`(RCIRC-2 (LSHIFT-1 ((RSHIFT-1 01110) AND (LCIRC-2 10011)`\n\n`OR (NOT 01101))))`\n\n`= (RCIRC-2 (LSHIFT-1 (00111 AND 01110 OR 10010)))`\n\n`= (RCIRC-2 (LSHIFT-1 ((00111 AND 01110) OR 10010)))`\n\n`= (RCIRC-2 (LSHIFT-1 (00110 OR 10010)))`\n\n`= (RCIRC-2 (LSHIFT-1 10110))`\n\n`= (RCIRC-2 01100)`\n\n`= 00011`\n\nThe initial operations are `RSHIFT-1 01110=00111`, `LCIRC-2 10011=01110`, and `NOT 01101=10010`. The final `RCIRC-2 01100` moves the trailing `00` to the front, so the answer must retain its leading zeros: `00011`, **option D**.",
+        "zh": "最内层得到 `00111 AND 01110 OR 10010`。先做 AND 得 `00110`，再做 OR 得 `10110`。左移一位得到 `01100`，最后右循环移位两位得到 **00011**。\n\n最内层分别是 `RSHIFT-1 01110=00111`、`LCIRC-2 10011=01110`、`NOT 01101=10010`。最后的 `RCIRC-2 01100` 把末尾 `00` 循环移到前面，因此不能省去结果的前导零：`00011`，选 **D**。"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Bit-String Flicking",
+        "zh": "比特位操作"
+      },
+      "statement": {
+        "en": "`Solve for X, a 5-bit string: (LCIRC-2 X) OR (RSHIFT-2 01101) AND (NOT 11011) = (LSHIFT-2 (RCIRC-2 10110))`",
+        "zh": "X是一个5位的位串,求X。\n\n`(LCIRC-2 X) OR (RSHIFT-2 01101) AND (NOT 11011) = (LSHIFT-2 (RCIRC-2 10110))`"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "`00101`",
+            "zh": "`00101`"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "`00100`",
+            "zh": "`00100`"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "`00011`",
+            "zh": "`00011`"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "`00000`",
+            "zh": "`00000`"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "`10101`",
+            "zh": "`10101`"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "`Let X = abcde`\n\n`LHS = (LCIRC-2 X) OR (RSHIFT-2 01101) AND (NOT 11011)`\n\n`= (LCIRC-2 abcde) OR (RSHIFT-2 01101) AND (NOT 11011)`\n\n`= cdeab OR (00011 AND 00100)`\n\n`= cdeab OR 00000`\n\n`= cdeab`\n\n`RHS = (LSHIFT-2 (RCIRC-2 10110))`\n\n`= (LSHIFT-2 10101)`\n\n`= 10100`\n\n`LHS = RHS ⇒ cdeab = 10100 ⇒ c = 1, d = 0, e = 1, a = 0, b = 0`\n\nTherefore X = 00101\n\nAND has higher precedence than OR, so the constant part is `00011 AND 00100=00000`. OR with zero changes nothing. To undo `LCIRC-2 X=10100`, rotate 10100 right twice, giving 00101. Unlike a logical shift, a circular shift is reversible because no bits are discarded. **Answer: A.**",
+        "zh": "设 `X=abcde`。左侧为 `cdeab OR (00011 AND 00100)=cdeab`。右侧先右循环移位得到 `10101`，再左移两位得到 `10100`。因此 `cdeab=10100`，即 **X=00101**。\n\nAND 优先于 OR，所以常量部分为 `00011 AND 00100=00000`，与零 OR 不改变值。将 `LCIRC-2 X=10100` 反向恢复，即把 10100 右循环移位两次，得到 00101。循环移位没有丢弃比特，因而可以这样求逆；逻辑移位则不能直接照搬。**答案：A。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "LISP",
+        "zh": "LISP"
+      },
+      "statement": {
+        "en": "Evaluate the following sequence of LISP expressions:\n\n```text\n(SETQ M '(1 2 (5 1) (3 (4 5) 6) (2 (4))))\n(CDR (CAR (CDR (REVERSE (CDR (CDR M))))))\n```",
+        "zh": "计算下列LISP表达式:\n\n```text\n(SETQ M '(1 2 (5 1) (3 (4 5) 6) (2 (4))))\n(CDR (CAR (CDR (REVERSE (CDR (CDR M))))))\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "(5 1)",
+            "zh": "(5 1)"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "(4 5)",
+            "zh": "(4 5)"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "((4 5) 6)",
+            "zh": "((4 5) 6)"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "(3 (4 5))",
+            "zh": "(3 (4 5))"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "(2 (4))",
+            "zh": "(2 (4))"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "Work from the inside out. REVERSE reverses the remaining top-level elements, without reversing the elements inside each sublist. The final result is `((4 5) 6)`.\n\n```lisp\nM = (1 2 (5 1) (3 (4 5) 6) (2 (4)))\n(CDR (CDR M)) => ((5 1) (3 (4 5) 6) (2 (4)))\nREVERSE       => ((2 (4)) (3 (4 5) 6) (5 1))\nCDR           => ((3 (4 5) 6) (5 1))\nCAR           => (3 (4 5) 6)\nCDR           => ((4 5) 6)\n```\n\nThe last CDR removes the atom 3 from `(3 (4 5) 6)`, leaving a two-element list: first the sublist `(4 5)`, then the atom 6. Keep both the inner and outer parentheses. **Answer: C.**",
+        "zh": "从内向外计算。REVERSE 只反转余下列表的最外层元素顺序，不会反转各子表内部的顺序。最终结果为 `((4 5) 6)`。\n\n```lisp\nM = (1 2 (5 1) (3 (4 5) 6) (2 (4)))\n(CDR (CDR M)) => ((5 1) (3 (4 5) 6) (2 (4)))\nREVERSE       => ((2 (4)) (3 (4 5) 6) (5 1))\nCDR           => ((3 (4 5) 6) (5 1))\nCAR           => (3 (4 5) 6)\nCDR           => ((4 5) 6)\n```\n\n最后一次 CDR 从 `(3 (4 5) 6)` 中删除首元素 3，留下两个元素组成的列表：第一个是子表 `(4 5)`，第二个是原子 6。因此内外两层括号都需保留。**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          2
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [],
+  "programming": {
+    "id": "binary-counting",
+    "definition": {
+      "title": "Binary Counting",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Read one line. Keep spaces and punctuation in the input string.\n\n### Problem\n\nGiven a string of characters found on the keyboard, convert each character in the string to the 8-bit binary equivalent of its ASCII code, padded with leading zeros as in the example. In the resulting concatenated string, search for the increasing sequence of binary numbers starting with 0, 1, 10, 11, ... until a number cannot be found anywhere in the string. Look from the start of the string. If the binary number is found, remove that occurrence of the binary number from the string. Then look from the end of the string. If the binary number is found, remove that occurrence of the binary number from the string. Once a number in the sequence cannot be found, convert the string to an octal number without leading 0s. Then repeat this same process with a sequence of base 8 numbers 0, ..., 7, 10, 11, .... Output the last octal number, converted to base 10, that can successfully be found. If 0 cannot be found, output -1.\n\n### Example\n\nFor the string “Roses are red.”, convert it to a concatenated string of binary numbers using each character’s ASCII code as follows:\n\n| Character | ASCII | Binary |\n| --- | --- | --- |\n| R | 82 | `01010010` |\n| o | 111 | `01101111` |\n| s | 115 | `01110011` |\n| e | 101 | `01100101` |\n| s | 115 | `01110011` |\n| space | 32 | `00100000` |\n| a | 97 | `01100001` |\n| r | 114 | `01110010` |\n| e | 101 | `01100101` |\n| space | 32 | `00100000` |\n| r | 114 | `01110010` |\n| e | 101 | `01100101` |\n| d | 100 | `01100100` |\n| . | 46 | `00101110` |\n\nNow search for binary numbers beginning with 0 in the following string:\n\n```text\n01010010 01101111 01110011 01100101 01110011 00100000 01100001\n01110010 01100101 00100000 01110010 01100101 01100100 00101110\n```\n\nRemove the 0 from both ends so the string becomes:\n\n```text\n1010010 01101111 01110011 01100101 01110011 00100000 01100001\n01110010 01100101 00100000 01110010 01100101 01100100 0010111\n```\n\nRemove the 1 from both ends so the string becomes:\n\n```text\n010010 01101111 01110011 01100101 01110011 00100000 01100001\n01110010 01100101 00100000 01110010 01100101 01100100 001011\n```\n\nRemove 10 from both ends so the string becomes:\n\n```text\n0010 01101111 01110011 01100101 01110011 00100000 01100001\n01110010 01100101 00100000 01110010 01100101 01100100 0011\n```\n\nRemove 11 from both ends so the string becomes:\n\n```text\n0010 001111 01110011 01100101 01110011 00100000 01100001\n01110010 01100101 00100000 01110010 01100101 01100100 00\n```\n\nAfter removing 100 from both ends as shown above, the process continues until the final string becomes:\n\n```text\n0000110000011000010010010000000001000100\n```\n\nThe string 1101 cannot be found in this final string. The binary numbers 0, 1, 10, 11, 100, 101, 110, 111, 1000, 1001, 1010, 1011, and 1100 were found and deleted from one or both sides of the string, but not 1101.\n\nThe resulting string converted to an octal number is 603022200104. Repeating the same process, the sequence of strings is 603022200104, 6302220014, 630222004, 6302004, 602004, 60200 so the last octal number that can be found is 4 since 5 cannot be found in the string.\n\n### Input\n\nA string containing any character that can be found on the keyboard. The string will be fewer than 200 characters.\n\n### Output\n\nOnce a number in the sequence cannot be found, output the last octal number, converted to base 10, that can be found in the string after handling all deletions as explained above. If 0 cannot be found, output -1.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "Roses are red.\n",
+          "expected": "4\n"
+        },
+        {
+          "input": "A is for Alpha; B is for Bravo; C is for Charlie.\n",
+          "expected": "9\n"
+        },
+        {
+          "input": "A stitch in time saves nine.\n",
+          "expected": "8\n"
+        },
+        {
+          "input": "1, 2: Buckle my shoe! 3, 4: Shut the door!\n",
+          "expected": "6\n"
+        },
+        {
+          "input": "The quick brown fox jumped over the lazy dogs.\n",
+          "expected": "5\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "ACSL is 45 years old and going strong.\n",
+          "expected": "6\n",
+          "weight": 20
+        },
+        {
+          "input": "What was the first computer programming language you learned?\n",
+          "expected": "9\n",
+          "weight": 20
+        },
+        {
+          "input": "Lions and Tigers and Bears, Oh My! This is from The Wizard of Oz.\n",
+          "expected": "9\n",
+          "weight": 20
+        },
+        {
+          "input": "zyxwvutsrqponmlkjihgfedcba\n",
+          "expected": "2\n",
+          "weight": 20
+        },
+        {
+          "input": "~{w|x|y|z}\n",
+          "expected": "-1\n",
+          "weight": 20
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。读取一行，保留输入字符串内的空格和标点。\n\n### 问题\n\n给定键盘上的字符串，将字符串中每个字符转换为与 ASCII 码等值的 8 位二进制数，不足 8 位时在前面补 0，如示例所示。生成的连接字符串中，搜索以 0、1、10、11...开始的递增二进制数数列，直到出现一个在字符串中任意位置都无法找到的二进制数。从字符串的开头进行查找，如果找到这个二进制数，从字符串中移除这个二进制数。然后从字符串的末尾进行查找，如果找到这个二进制数，从字符串中移除这个二进制数。一旦数列中出现一个无法被找到的数字时，将字符串转换为不以 0 开头的八进制数。然后用八进制数字组成的数列 0、...、7、10、11、...重复相同的过程。输出可以找到的最后一个八进制数的十进制等值数。如果无法找到 0,则输出 -1。\n\n### 示例\n\n对于字符串“Roses are red.” 运用如下所示每个字符的 ASCII 码，将其转换成二进制数的连接字符串。\n\n| 字符 | ASCII | 二进制 |\n| --- | --- | --- |\n| R | 82 | `01010010` |\n| o | 111 | `01101111` |\n| s | 115 | `01110011` |\n| e | 101 | `01100101` |\n| s | 115 | `01110011` |\n| 空格 | 32 | `00100000` |\n| a | 97 | `01100001` |\n| r | 114 | `01110010` |\n| e | 101 | `01100101` |\n| 空格 | 32 | `00100000` |\n| r | 114 | `01110010` |\n| e | 101 | `01100101` |\n| d | 100 | `01100100` |\n| . | 46 | `00101110` |\n\n现在搜索以下字符串中从 0 开始的二进制数:\n\n```text\n01010010 01101111 01110011 01100101 01110011 00100000 01100001\n01110010 01100101 00100000 01110010 01100101 01100100 00101110\n```\n\n从字符串的两端删除 0,使字符串变为:\n\n```text\n1010010 01101111 01110011 01100101 01110011 00100000 01100001\n01110010 01100101 00100000 01110010 01100101 01100100 0010111\n```\n\n从字符串的两端删除 1,使字符串变为:\n\n```text\n010010 01101111 01110011 01100101 01110011 00100000 01100001\n01110010 01100101 00100000 01110010 01100101 01100100 001011\n```\n\n从字符串的两端删除 10,使字符串变为:\n\n```text\n0010 01101111 01110011 01100101 01110011 00100000 01100001\n01110010 01100101 00100000 01110010 01100101 01100100 0011\n```\n\n从字符串的两端删除 11,使字符串变为:\n\n```text\n0010 001111 01110011 01100101 01110011 00100000 01100001\n01110010 01100101 00100000 01110010 01100101 01100100 00\n```\n\n将上方显示的 100 从两端移除后，继续这个过程直到最后的字符串变为:\n\n```text\n0000110000011000010010010000000001000100\n```\n\n在最终的字符串中无法找到字符串1101。二进制数 0、1、10、11、100、101、110、111、 1000、1001、1010、1011 和 1100 在字符串中找到并从字符串的一端或两端删除，但没有找到和删除 1101。\n\n将最终生成的字符串转换为一个八进制数，即 603022200104。重复相同的过程，字符串数列为 603022200104、6302220014、630222004、6302004、602004、60200,因为在字符串中不能找到 5,所以最后一个可以找到的八进制数是 4。\n\n### 输入\n\n包含键盘上任意字符的字符串。字符串将少于 200 个字符。\n\n### 输出\n\n一旦数列中出现一个无法找到的数字，输出在完成上述所有删除操作之后的字符串中可以找到的最后一个八进制数的十进制等值数。如果无法找到 0,则输出 -1。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [],
+      "zh": []
+    }
+  }
+}

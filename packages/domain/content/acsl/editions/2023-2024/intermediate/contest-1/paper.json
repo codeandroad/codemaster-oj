@@ -1,0 +1,2421 @@
+{
+  "schemaVersion": 1,
+  "slug": "acsl-2023-2024-intermediate-1",
+  "division": "Intermediate",
+  "season": "2023-2024",
+  "round": 1,
+  "roundLabel": {
+    "en": "Contest 1",
+    "zh": "第一轮"
+  },
+  "title": {
+    "en": "ACSL 2023-2024 Intermediate · Contest 1",
+    "zh": "ACSL 2023-2024 Intermediate · 第一轮"
+  },
+  "sources": [
+    {
+      "id": "statement",
+      "path": "resource/acsl-problems/Intermediate/2023-2024/第一轮/c_1_int.pdf",
+      "sha256": "b7163c72c8fe3fc899fe56faa83d925b99783724d06c0bd48d9b79724b6ee5d1",
+      "pages": 4
+    },
+    {
+      "id": "solution",
+      "path": "resource/acsl-problems/Intermediate/2023-2024/第一轮/c_1_int_soln.pdf",
+      "sha256": "e19ebb25bdeea28f48724c9b51e1f04ed0fffb1ae94ddbbfcbb952799775c379",
+      "pages": 2
+    },
+    {
+      "id": "programming",
+      "path": "resource/acsl-problems/Intermediate/2023-2024/第一轮/c_1_ACSL Tiles_int.pdf",
+      "sha256": "0c2816a758f4bd9fa84dc62cfb3e9c50f5da1d20e01b3d58ccc147053b07787c",
+      "pages": 6
+    }
+  ],
+  "assets": [],
+  "questions": [
+    {
+      "id": "q1",
+      "number": 1,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "A palindrome is a word, phrase, or number that is the same forwards and backwards. For example, madam and 12321 are palindromes.\n\nWhat is the next year in our calendar when its octal representation is a palindrome?",
+        "zh": "任何从前往后或从后往前读都相同的单词、短语、数字都为回文。例如,madam和12321都是回文。\n\n请问日历中接下来哪一年的八进制表达为回文?"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "2032",
+            "zh": "2032"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "3773",
+            "zh": "3773"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "4004",
+            "zh": "4004"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "2043",
+            "zh": "2043"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "2112",
+            "zh": "2112"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "The source question uses 2023 as its reference year, not the year in which the exercise is being practised. First convert: $2023_{10}=3747_8$. A four-digit palindrome has the form $abba$. The smallest such octal number above $3747_8$ is $3773_8$: keeping its first two digits 37 forces the final two digits to be 73, while any smaller first pair would give a smaller number.\n\nConvert that octal year back to decimal: $$3773_8=3\\cdot8^3+7\\cdot8^2+7\\cdot8+3=1536+448+56+3=2043_{10}.$$ The calendar year is 2043; 3773 is its octal representation, not the decimal answer.\n\n**Answer: D.**",
+        "zh": "原卷以 2023 年为参照年份，不是以当前做练习的年份为准。先转换：$2023_{10}=3747_8$。四位回文数的形式为 $abba$；在 $3747_8$ 之后，保留前两位 37，就必须把后两位写成 73，得到 $3773_8$。若前两位比 37 小，整个数也更小，因此这就是下一个八进制回文数。\n\n再将它转换回日历使用的十进制：$$3773_8=3\\cdot8^3+7\\cdot8^2+7\\cdot8+3=1536+448+56+3=2043_{10}.$$ 所求年份为 2043；3773 是该年份的八进制写法，不是十进制答案。\n\n**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q2",
+      "number": 2,
+      "type": "single",
+      "topic": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数字系统"
+      },
+      "statement": {
+        "en": "Convert the following hex number to octal. What octal digit occurs most often?\n\n$$\nF43A6C3091_{16}\n$$",
+        "zh": "将下列的十六进制数转换为八进制。在八进制中哪个数字出现的频率最高?\n\n$$\nF43A6C3091_{16}\n$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "0",
+            "zh": "0"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "1",
+            "zh": "1"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "2",
+            "zh": "2"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "3",
+            "zh": "3"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "7",
+            "zh": "7"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "C"
+      ],
+      "explanation": {
+        "en": "$$\nF43A6C3091_{16}=1111010000111010011011000011000010010001_{2}\n$$\n\n$$\n=1111010000111010011011000011000010010001_{2}\n$$\n\n$$\n=17207233030221_{8}\n$$\n\nThere are 3 0’s, 2 1’s, 4 2’s, 3 3’s, 0 4’s, 0 5’s, 0 6’s, and 2 7’s. A 2 occurs most.\n\n**Answer: C.**",
+        "zh": "先把十六进制数逐位转换为四位二进制，再从右向左按三位一组转换为八进制：\n\n$$F43A6C3091_{16}=1111010000111010011011000011000010010001_2=17207233030221_8.$$\n\n其中 0 出现 3 次，1 出现 2 次，2 出现 4 次，3 出现 3 次，7 出现 2 次。因此出现最多的是 **2**。\n\n**答案：C。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q3",
+      "number": 3,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find $f(17,11)$, given:\n\n$$f(x,y)=\\begin{cases}f(x-1,y-2)+3 & x<y\\\\f(y-1,x-2)+1 & x>y\\\\x-y & x=y\\end{cases}$$",
+        "zh": "根据以下定义，求 $f(17,11)$：\n\n$$f(x,y)=\\begin{cases}f(x-1,y-2)+3 & x<y\\\\f(y-1,x-2)+1 & x>y\\\\x-y & x=y\\end{cases}$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "8",
+            "zh": "8"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "9",
+            "zh": "9"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "12",
+            "zh": "12"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "15",
+            "zh": "15"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "16",
+            "zh": "16"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "E"
+      ],
+      "explanation": {
+        "en": "$$\nf(17,11)=f(11-1,17-2)+1=f(10,15)+1=15+1=16\n$$\n\n$$\nf(10,15)=f(10-1,15-2)+3=f(9,13)+3=12+3=15\n$$\n\n$$\nf(9,13)=f(9-1,13-2)+3=f(8,11)+3=9+3=12\n$$\n\n$$\nf(8,11)=f(8-1,11-2)+3=f(7,9)+3=6+3=9\n$$\n\n$$\nf(7,9)=f(7-1,9-2)+3=f(6,7)+3=3+3=6\n$$\n\n$$\nf(6,7)=f(6-1,7-2)+3=f(5,5)+3=0+3=3\n$$\n\n$$\nf(5,5)=5-5=0\n$$\n\nIn the $x>y$ branch the arguments swap roles: $(17,11)$ becomes $(10,15)$, not $(16,9)$. Thereafter the gap $y-x$ falls from 5 to 0 through five $x<y$ calls. The accumulated additions are $1+5\\cdot3=16$, agreeing with the full trace.\n\n**Answer: E.**",
+        "zh": "按原定义递归计算，直到两个参数相等：\n\n$$\nf(17,11)=f(11-1,17-2)+1=f(10,15)+1=15+1=16\n$$\n\n$$\nf(10,15)=f(10-1,15-2)+3=f(9,13)+3=12+3=15\n$$\n\n$$\nf(9,13)=f(9-1,13-2)+3=f(8,11)+3=9+3=12\n$$\n\n$$\nf(8,11)=f(8-1,11-2)+3=f(7,9)+3=6+3=9\n$$\n\n$$\nf(7,9)=f(7-1,9-2)+3=f(6,7)+3=3+3=6\n$$\n\n$$\nf(6,7)=f(6-1,7-2)+3=f(5,5)+3=0+3=3\n$$\n\n$$\nf(5,5)=5-5=0\n$$\n\n在 $x>y$ 分支中，两个参数交换位置：$(17,11)$ 应变成 $(10,15)$，而不是 $(16,9)$。此后连续五次进入 $x<y$ 分支，使差值 $y-x$ 从 5 降到 0。累计相加为 $1+5\\cdot3=16$，与逐层推导一致。\n\n**答案：E。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q4",
+      "number": 4,
+      "type": "single",
+      "topic": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "statement": {
+        "en": "Find $f(24)$ given:\n\n$$\nf(x)=\\begin{cases} 2\\cdot f(x-4) & \\text{if }x\\ge18\\\\ f(x+1)-1 & \\text{if }15<x<18\\\\ x+2 & \\text{if }x\\le15 \\end{cases}\n$$",
+        "zh": "根据以下定义，求 $f(24)$：\n\n$$f(x)=\\begin{cases}2f(x-4)&x\\ge18\\\\f(x+1)-1&15<x<18\\\\x+2&x\\le15\\end{cases}$$"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "16",
+            "zh": "16"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "32",
+            "zh": "32"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "60",
+            "zh": "60"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "120",
+            "zh": "120"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "240",
+            "zh": "240"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "D"
+      ],
+      "explanation": {
+        "en": "$$\nf(24)=2*f(24-4)=2*f(20)=2*60=120\n$$\n\n$$\nf(20)=2*f(20-4)=2*f(16)=2*30=60\n$$\n\n$$\nf(16)=f(16+1)-1=f(17)-1=31-1=30\n$$\n\n$$\nf(17)=f(17+1)-1=f(18)-1=32-1=31\n$$\n\n$$\nf(18)=2*f(18-4)=2*f(14)=2*16=32\n$$\n\n$$\nf(14)=14+2=16\n$$\n\n**Answer: D.**",
+        "zh": "从 $f(14)=16$ 开始逐层代回，各步为：\n\n$$\nf(24)=2*f(24-4)=2*f(20)=2*60=120\n$$\n\n$$\nf(20)=2*f(20-4)=2*f(16)=2*30=60\n$$\n\n$$\nf(16)=f(16+1)-1=f(17)-1=31-1=30\n$$\n\n$$\nf(17)=f(17+1)-1=f(18)-1=32-1=31\n$$\n\n$$\nf(18)=2*f(18-4)=2*f(14)=2*16=32\n$$\n\n$$\nf(14)=14+2=16\n$$\n\n**答案：D。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          1,
+          3
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          1
+        ],
+        "answerProvenance": "official"
+      }
+    },
+    {
+      "id": "q5",
+      "number": 5,
+      "type": "single",
+      "topic": {
+        "en": "What Does This Program Do?",
+        "zh": "程序分析"
+      },
+      "statement": {
+        "en": "Sales employees are paid commission using these conditions:\n\n- `sales < 5000`: 1% of sales.\n- `5000 ≤ sales < 10000`: 1% of the first \\$5,000 and 3% of the rest.\n- `sales ≥ 10000`: 1% of the first \\$5,000, 3% of the next \\$5,000, and 5% of the amount over \\$10,000.\n\nList all code blocks (a, b, c, d) that correctly calculate the commission in `cpay` for any positive value of `sales`.\n\n**a**\n\n```text\nif sales >= 10000 then\n        cpay = sales*.05 + 5000*.03 + 5000*.01\nelse if sales >= 5000 then\n        cpay = sales*.03 + 5000*.01\nelse\n        cpay = sales*.01\nend if\n```\n\n**b**\n\n```text\nif sales < 5000 then\n        cpay = sales*.01\nelse if sales < 10000 then\n        cpay = (sales-5000)*.03 + 5000*.01\nelse\n        cpay = (sales-10000)*.05 + 5000*.03 + 50\nend if\n```\n\n**c**\n\n```text\nif sales < 5000 then\n        cpay = sales*.01\nend if\nif sales >= 5000 && sales < 10000 then\n        cpay = (sales-5000)*.03 + 5000*.01\nelse if sales >= 10000 then\n        cpay = (sales-10000)*.05 + 5000*.03 + 50\nend if\n```\n\n**d**\n\n```text\nif sales >= 10000 then\n        cpay = (sales-10000)*.05 + 5000*.03 + 50\nelse if sales >= 5000 then\n        cpay = (sales-5000)*.03 + 5000*.01\nelse\n        cpay = sales*.01\nend if\n```",
+        "zh": "销售人员的佣金按以下规则计算：\n\n- `sales < 5000`：销售额的 1%。\n- `5000 ≤ sales < 10000`：前 5,000 美元的 1%，加上剩余部分的 3%。\n- `sales ≥ 10000`：前 5,000 美元的 1%，再加上接下来 5,000 美元的 3%，以及超过 10,000 美元部分的 5%。\n\n找出以下所有能够对任意正数销售额 `sales` 正确计算佣金 `cpay` 的代码块（a、b、c、d）。\n\n**a**\n\n```text\nif sales >= 10000 then\n        cpay = sales*.05 + 5000*.03 + 5000*.01\nelse if sales >= 5000 then\n        cpay = sales*.03 + 5000*.01\nelse\n        cpay = sales*.01\nend if\n```\n\n**b**\n\n```text\nif sales < 5000 then\n        cpay = sales*.01\nelse if sales < 10000 then\n        cpay = (sales-5000)*.03 + 5000*.01\nelse\n        cpay = (sales-10000)*.05 + 5000*.03 + 50\nend if\n```\n\n**c**\n\n```text\nif sales < 5000 then\n        cpay = sales*.01\nend if\nif sales >= 5000 && sales < 10000 then\n        cpay = (sales-5000)*.03 + 5000*.01\nelse if sales >= 10000 then\n        cpay = (sales-10000)*.05 + 5000*.03 + 50\nend if\n```\n\n**d**\n\n```text\nif sales >= 10000 then\n        cpay = (sales-10000)*.05 + 5000*.03 + 50\nelse if sales >= 5000 then\n        cpay = (sales-5000)*.03 + 5000*.01\nelse\n        cpay = sales*.01\nend if\n```"
+      },
+      "options": [
+        {
+          "id": "A",
+          "text": {
+            "en": "b, c, d",
+            "zh": "b, c, d"
+          }
+        },
+        {
+          "id": "B",
+          "text": {
+            "en": "a, c, d",
+            "zh": "a, c, d"
+          }
+        },
+        {
+          "id": "C",
+          "text": {
+            "en": "a, b, c",
+            "zh": "a, b, c"
+          }
+        },
+        {
+          "id": "D",
+          "text": {
+            "en": "a, b, d",
+            "zh": "a, b, d"
+          }
+        },
+        {
+          "id": "E",
+          "text": {
+            "en": "a, b, c, d",
+            "zh": "a, b, c, d"
+          }
+        }
+      ],
+      "correctOptionIds": [
+        "A"
+      ],
+      "explanation": {
+        "en": "Commission is computed in brackets: $1\\%$ of the first $5000$, $3\\%$ of the next $5000$, and $5\\%$ only on the amount above $10000$.\n\n- **a** applies the higher rate to all sales, then also adds lower-bracket commission, so it overcounts.\n- **b** and **c** correctly subtract the lower threshold before applying each higher rate.\n- **d** computes the same brackets while testing the highest threshold first.\n\nTherefore **b, c, and d** are correct.\n\nBoundary checks make the difference visible. At sales $=5000$, the correct commission is $50$, but block a gives $5000(0.03)+50=200$. At sales $=10000$, the correct value is $50+150=200$, whereas a gives $500+150+50=700$. In block c the second `if` does not overwrite the result for sales below 5000, since both of its tests are false.\n\n**Answer: A.**",
+        "zh": "佣金应分段计算：前 $5000$ 按 $1\\%$，接下来的 $5000$ 按 $3\\%$，只有超过 $10000$ 的部分按 $5\\%$。\n\n- **a** 把较高比例用于全部销售额，又加上较低档的佣金，造成重复计入。\n- **b** 和 **c** 都先减去对应的下限，再对超过部分使用较高比例。\n- **d** 从最高下限开始判断，计算的是相同的分段佣金。\n\n因此正确的是 **b、c、d**。\n\n代入分界点即可看出错误：销售额为 $5000$ 时，正确佣金为 $50$，a 却得到 $5000(0.03)+50=200$；销售额为 $10000$ 时，应为 $50+150=200$，a 却得到 $500+150+50=700$。c 虽然用了两个独立的 if，但当销售额小于 5000 时，第二组的两个条件都不成立，不会覆盖第一组算出的结果。\n\n**答案：A。**"
+      },
+      "source": {
+        "statementSource": "statement",
+        "statementPages": [
+          2,
+          4
+        ],
+        "solutionSource": "solution",
+        "solutionPages": [
+          2
+        ],
+        "answerProvenance": "official"
+      }
+    }
+  ],
+  "contentNotes": [],
+  "programming": {
+    "id": "acsl-tiles",
+    "definition": {
+      "title": "ACSL Tiles",
+      "statement": "## Standard input and output\n\nEach run handles **one** case. Read from standard input and print the result to standard output. Do not read a case count or print case numbers, prompts, or labels. Use the line structure shown in the test-case input below.\n\n### Problem\n\nACSL Tiles is a one-person game played with rectangular tiles. Each tile has a single-digit number between 1 and 9 inclusive at each end. At the start of the game, there are 4 rows, each with a number. The goal of the game is to build rows by placing a tile at the right end of a row whose last number matches a number on the tile. Tiles can be re-oriented; thus, the tiles 34 and 43 are the same tile. If a tile cannot be placed on any row, it is placed in the discard pile. When all tiles have been played or discarded, find the sum of the single-digit numbers on all of the tiles in the discard pile.\n\nAt each turn, try the next tile in your hand to see if it can be added to one of the rows, starting with the row after the one where the last tile was placed, rotating back to Row 1 if necessary. Start looking at Row 1 when the game starts. However, if the last tile placed was a double (i.e., both numbers are the same), another tile must be placed on that row before any other match can be considered. If the tile cannot be placed, add it to the discard pile.\n\n### Example\n\n### Input\n\n```text\n5923\n56 27 73 34 99 45 32 19 64 57 18\n```\n\n### Output\n\n```text\n21\n```\n\nExplanation: The game starts with 4 rows having numbers 5, 9, 2, 3.\n\n{{diagram:p-52a4708d8185ddc1}}\n\nThe tile 56 is placed on Row 1; the tile 27 is placed on Row 3; the tile 73 is placed on Row 4 as 37 because Row 4 is checked first after a tile is placed on Row 3; the tile 34 is placed on the discard pile; the tile 99 is placed on Row 2.\n\n{{diagram:p-4075e734fcd0e76b}}\n\nThe 45 and the 32 tiles are placed in the discard pile because they don’t match the 99 tile; the tile 19 is placed on Row 2 as 91; the tile 64 is placed on Row 1; the 57 is placed on Row 3 as 75; and the 18 is placed on Row 2. The final outcome is shown below:\n\n{{diagram:p-612798198d4ab635}}\n\nThe sum of the single-digit numbers on the tiles in the discard pile is 3+4+4+5+3+2 = 21.\n\n### Input\n\nInput a 4-digit number that gives the initial numbers, from Row 1 to Row 4. It is followed by a string of no more than 50 2-digit integers, each separated by a single space. Each 2-digit number represents the two numbers on each tile.\n\n### Output\n\nAfter placing the tiles using the rules above, output the sum of the single-digit numbers on the tiles in the discard pile.\n",
+      "mode": "stdio",
+      "comparator": "tokens",
+      "timeLimitMs": 2000,
+      "memoryLimitMb": 256,
+      "starterCode": "# Read one case from standard input.\n# Print the result to standard output.\n",
+      "samples": [
+        {
+          "input": "5923\n56 27 73 34 99 45 32 19 64 57 18\n",
+          "expected": "21\n"
+        },
+        {
+          "input": "4687\n81 72 15 89 36 21 13 67 42 93 48 83 45 47 52 94 62\n",
+          "expected": "86\n"
+        },
+        {
+          "input": "1932\n94 81 13 43 21 31 89 69 18 28 86 88 29 89 92\n",
+          "expected": "11\n"
+        },
+        {
+          "input": "1957\n32 69 87 73 31 88 62\n",
+          "expected": "23\n"
+        },
+        {
+          "input": "1542\n24 44 39 32 92 63 47 76 37 78 38\n",
+          "expected": "46\n"
+        }
+      ],
+      "tests": [
+        {
+          "input": "5179\n14 92 71 51 42 19 18 28 89 29 96 46 13 57 78 27\n",
+          "expected": "16\n",
+          "weight": 20
+        },
+        {
+          "input": "4287\n69 36 21 93 94 35 83 62 88 97 18 72 42 73 75 31 28 52 66 87\n",
+          "expected": "114\n",
+          "weight": 20
+        },
+        {
+          "input": "1745\n21 37 92 42 93 96 19 72 78 18 71 36 56 85 99 97 31 98 23\n",
+          "expected": "61\n",
+          "weight": 20
+        },
+        {
+          "input": "6655\n23 55 55 45 94 99 12 99 89 32 77 65 58 57 66 27 16 76\n",
+          "expected": "36\n",
+          "weight": 20
+        },
+        {
+          "input": "3333\n43 35 55 34 37 53 23 49 13 22 98 12 33 11 53 79 57 39 77 43 72 22 12 48 17 15 75\n",
+          "expected": "67\n",
+          "weight": 20
+        }
+      ]
+    },
+    "statementZh": "## 标准输入与输出\n\n每次运行只处理**一组**数据，从标准输入读取，向标准输出打印结果。不读取测试组数，不输出题号、提示语或标签。输入按下方测试用例展示的行结构读取。\n\n### 问题\n\nACSL Tiles 是一个与长方形图块有关的单人游戏。每个图块的两端都有一个位于 1~9 之间(包括 1 和 9 )的个位数。游戏开始时,共 4 行,每一行都包含一个数字。游戏目标是构建行,将一个图块放在一行的右端,使得这行的最后一个数字与图块上的一个数字匹配。图块可以改变方向;例如 ,图块 34 和图块 43 相同。如果一个图块不能放置在任何一行中,则放弃该图块并将其归入 discard pile。当所有图块都已放置或放弃时, 求 discard pile 中所有图块上个位数的总和。\n\n每一轮游戏开始时,从上一块已放置图块所在行之后的行开始,思考某一图块是否可以被放在其中一行中。如需要,可循环返回第 1 行开始。 游戏开始时,从第 1行开始观察。如果最近一次放置的图块是 double (即图块上两位数字相同),那么必须在考虑其他行的匹配之前先在该行末尾放置图块。如果某一图块无法放置,则放弃该图块并将其归入 discard pile。\n\n### 示例\n\n### 输入\n\n```text\n5923\n56 27 73 34 99 45 32 19 64 57 18\n```\n\n### 输出\n\n```text\n21\n```\n\n详解: 游戏开始时,4 行初始数字为 5, 9, 2, 3。\n\n{{diagram:p-52a4708d8185ddc1}}\n\n图块 56 放置第 1 行;图块 27 放在第 3 行;第 3 行放置之后优先考虑第 4 行,图块 73 旋转为 37 后放在第 4 行;图块 34 归入 discard pile;图块 99 放在第 2 行。\n\n{{diagram:p-4075e734fcd0e76b}}\n\n由于图块 45 和图块 32 都与图块 99 不匹配,两个图块都被归入 discard pile ; 图块 19 旋转变成 91 之后放在第 2 行;图块 64 放在第 1 行;图块 57 旋转变成 75 之后放在第 3 行;图块18 放在第 2 行。最终输出结果如下:\n\n{{diagram:p-612798198d4ab635}}\n\ndiscard pile 中所有图块上个位数之和为 3 + 4 + 4 + 5 + 3 + 2 = 21。\n\n### 输入\n\n输入一个 4 位数,这 4 位数字为第 1 行到第 4 行的初始数字,后面跟着一串包含不超过 50 个的两位整数,数字之间用一个空格隔开。每个两位整数代表每个图块上的两个数字。\n\n### 输出\n\n按照上述规则放置图块之后,输出 discard pile 中所有图块上个位数的总和。\n",
+    "testProvenance": "official",
+    "source": {
+      "sourceIds": [
+        "programming"
+      ],
+      "normalization": "One official case per execution; PDF wrapping and printed case numbers removed."
+    },
+    "statementDiagrams": {
+      "en": [
+        {
+          "id": "p-52a4708d8185ddc1",
+          "width": 300,
+          "height": 235,
+          "alt": {
+            "en": "Worked-example diagram.",
+            "zh": "题目例示图。"
+          },
+          "elements": [
+            {
+              "type": "text",
+              "x": 10,
+              "y": 34,
+              "text": "Row 1:",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 10,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 34,
+              "text": "5",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 10,
+              "y": 89,
+              "text": "Row 2:",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 65,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 89,
+              "text": "9",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 10,
+              "y": 144,
+              "text": "Row 3:",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 120,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 144,
+              "text": "2",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 10,
+              "y": 199,
+              "text": "Row 4:",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 175,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 199,
+              "text": "3",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            }
+          ]
+        },
+        {
+          "id": "p-4075e734fcd0e76b",
+          "width": 330,
+          "height": 300,
+          "alt": {
+            "en": "Worked-example diagram.",
+            "zh": "题目例示图。"
+          },
+          "elements": [
+            {
+              "type": "text",
+              "x": 10,
+              "y": 34,
+              "text": "Row 1:",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 10,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 34,
+              "text": "5",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 180,
+              "y": 10,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 202.5,
+              "y": 34,
+              "text": "5",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 225,
+              "y": 10,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 247.5,
+              "y": 34,
+              "text": "6",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 10,
+              "y": 89,
+              "text": "Row 2:",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 65,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 89,
+              "text": "9",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 180,
+              "y": 65,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 202.5,
+              "y": 89,
+              "text": "9",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 225,
+              "y": 65,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 247.5,
+              "y": 89,
+              "text": "9",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 10,
+              "y": 144,
+              "text": "Row 3:",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 120,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 144,
+              "text": "2",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 180,
+              "y": 120,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 202.5,
+              "y": 144,
+              "text": "2",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 225,
+              "y": 120,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 247.5,
+              "y": 144,
+              "text": "7",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 10,
+              "y": 199,
+              "text": "Row 4:",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 175,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 199,
+              "text": "3",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 180,
+              "y": 175,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 202.5,
+              "y": 199,
+              "text": "3",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 225,
+              "y": 175,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 247.5,
+              "y": 199,
+              "text": "7",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 10,
+              "y": 270,
+              "text": "Discard pile:",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 180,
+              "y": 246,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 202.5,
+              "y": 270,
+              "text": "3",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 225,
+              "y": 246,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 247.5,
+              "y": 270,
+              "text": "4",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            }
+          ]
+        },
+        {
+          "id": "p-612798198d4ab635",
+          "width": 550,
+          "height": 300,
+          "alt": {
+            "en": "Worked-example diagram.",
+            "zh": "题目例示图。"
+          },
+          "elements": [
+            {
+              "type": "text",
+              "x": 10,
+              "y": 34,
+              "text": "Row 1:",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 10,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 34,
+              "text": "5",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 180,
+              "y": 10,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 202.5,
+              "y": 34,
+              "text": "5",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 225,
+              "y": 10,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 247.5,
+              "y": 34,
+              "text": "6",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 290,
+              "y": 10,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 312.5,
+              "y": 34,
+              "text": "6",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 335,
+              "y": 10,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 357.5,
+              "y": 34,
+              "text": "4",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 10,
+              "y": 89,
+              "text": "Row 2:",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 65,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 89,
+              "text": "9",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 180,
+              "y": 65,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 202.5,
+              "y": 89,
+              "text": "9",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 225,
+              "y": 65,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 247.5,
+              "y": 89,
+              "text": "9",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 290,
+              "y": 65,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 312.5,
+              "y": 89,
+              "text": "9",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 335,
+              "y": 65,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 357.5,
+              "y": 89,
+              "text": "1",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 400,
+              "y": 65,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 422.5,
+              "y": 89,
+              "text": "1",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 445,
+              "y": 65,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 467.5,
+              "y": 89,
+              "text": "8",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 10,
+              "y": 144,
+              "text": "Row 3:",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 120,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 144,
+              "text": "2",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 180,
+              "y": 120,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 202.5,
+              "y": 144,
+              "text": "2",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 225,
+              "y": 120,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 247.5,
+              "y": 144,
+              "text": "7",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 290,
+              "y": 120,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 312.5,
+              "y": 144,
+              "text": "7",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 335,
+              "y": 120,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 357.5,
+              "y": 144,
+              "text": "5",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 10,
+              "y": 199,
+              "text": "Row 4:",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 175,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 199,
+              "text": "3",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 180,
+              "y": 175,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 202.5,
+              "y": 199,
+              "text": "3",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 225,
+              "y": 175,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 247.5,
+              "y": 199,
+              "text": "7",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 10,
+              "y": 270,
+              "text": "Discard pile:",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 180,
+              "y": 246,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 202.5,
+              "y": 270,
+              "text": "3",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 225,
+              "y": 246,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 247.5,
+              "y": 270,
+              "text": "4",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 290,
+              "y": 246,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 312.5,
+              "y": 270,
+              "text": "4",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 335,
+              "y": 246,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 357.5,
+              "y": 270,
+              "text": "5",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 400,
+              "y": 246,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 422.5,
+              "y": 270,
+              "text": "3",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 445,
+              "y": 246,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 467.5,
+              "y": 270,
+              "text": "2",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            }
+          ]
+        }
+      ],
+      "zh": [
+        {
+          "id": "p-52a4708d8185ddc1",
+          "width": 300,
+          "height": 235,
+          "alt": {
+            "en": "Worked-example diagram.",
+            "zh": "题目例示图。"
+          },
+          "elements": [
+            {
+              "type": "text",
+              "x": 10,
+              "y": 34,
+              "text": "第 1 行",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 10,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 34,
+              "text": "5",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 10,
+              "y": 89,
+              "text": "第 2 行",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 65,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 89,
+              "text": "9",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 10,
+              "y": 144,
+              "text": "第 3 行",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 120,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 144,
+              "text": "2",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 10,
+              "y": 199,
+              "text": "第 4 行",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 175,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 199,
+              "text": "3",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            }
+          ]
+        },
+        {
+          "id": "p-4075e734fcd0e76b",
+          "width": 330,
+          "height": 300,
+          "alt": {
+            "en": "Worked-example diagram.",
+            "zh": "题目例示图。"
+          },
+          "elements": [
+            {
+              "type": "text",
+              "x": 10,
+              "y": 34,
+              "text": "第 1 行",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 10,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 34,
+              "text": "5",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 180,
+              "y": 10,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 202.5,
+              "y": 34,
+              "text": "5",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 225,
+              "y": 10,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 247.5,
+              "y": 34,
+              "text": "6",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 10,
+              "y": 89,
+              "text": "第 2 行",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 65,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 89,
+              "text": "9",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 180,
+              "y": 65,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 202.5,
+              "y": 89,
+              "text": "9",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 225,
+              "y": 65,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 247.5,
+              "y": 89,
+              "text": "9",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 10,
+              "y": 144,
+              "text": "第 3 行",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 120,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 144,
+              "text": "2",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 180,
+              "y": 120,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 202.5,
+              "y": 144,
+              "text": "2",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 225,
+              "y": 120,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 247.5,
+              "y": 144,
+              "text": "7",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 10,
+              "y": 199,
+              "text": "第 4 行",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 175,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 199,
+              "text": "3",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 180,
+              "y": 175,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 202.5,
+              "y": 199,
+              "text": "3",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 225,
+              "y": 175,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 247.5,
+              "y": 199,
+              "text": "7",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 10,
+              "y": 270,
+              "text": "弃牌堆：",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 180,
+              "y": 246,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 202.5,
+              "y": 270,
+              "text": "3",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 225,
+              "y": 246,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 247.5,
+              "y": 270,
+              "text": "4",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            }
+          ]
+        },
+        {
+          "id": "p-612798198d4ab635",
+          "width": 550,
+          "height": 300,
+          "alt": {
+            "en": "Worked-example diagram.",
+            "zh": "题目例示图。"
+          },
+          "elements": [
+            {
+              "type": "text",
+              "x": 10,
+              "y": 34,
+              "text": "第 1 行",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 10,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 34,
+              "text": "5",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 180,
+              "y": 10,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 202.5,
+              "y": 34,
+              "text": "5",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 225,
+              "y": 10,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 247.5,
+              "y": 34,
+              "text": "6",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 290,
+              "y": 10,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 312.5,
+              "y": 34,
+              "text": "6",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 335,
+              "y": 10,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 357.5,
+              "y": 34,
+              "text": "4",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 10,
+              "y": 89,
+              "text": "第 2 行",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 65,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 89,
+              "text": "9",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 180,
+              "y": 65,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 202.5,
+              "y": 89,
+              "text": "9",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 225,
+              "y": 65,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 247.5,
+              "y": 89,
+              "text": "9",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 290,
+              "y": 65,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 312.5,
+              "y": 89,
+              "text": "9",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 335,
+              "y": 65,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 357.5,
+              "y": 89,
+              "text": "1",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 400,
+              "y": 65,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 422.5,
+              "y": 89,
+              "text": "1",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 445,
+              "y": 65,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 467.5,
+              "y": 89,
+              "text": "8",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 10,
+              "y": 144,
+              "text": "第 3 行",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 120,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 144,
+              "text": "2",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 180,
+              "y": 120,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 202.5,
+              "y": 144,
+              "text": "2",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 225,
+              "y": 120,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 247.5,
+              "y": 144,
+              "text": "7",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 290,
+              "y": 120,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 312.5,
+              "y": 144,
+              "text": "7",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 335,
+              "y": 120,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 357.5,
+              "y": 144,
+              "text": "5",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 10,
+              "y": 199,
+              "text": "第 4 行",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 110,
+              "y": 175,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 132.5,
+              "y": 199,
+              "text": "3",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 180,
+              "y": 175,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 202.5,
+              "y": 199,
+              "text": "3",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 225,
+              "y": 175,
+              "width": 45,
+              "height": 36,
+              "fill": "yellow",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 247.5,
+              "y": 199,
+              "text": "7",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "text",
+              "x": 10,
+              "y": 270,
+              "text": "弃牌堆：",
+              "fontSize": 16,
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 180,
+              "y": 246,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 202.5,
+              "y": 270,
+              "text": "3",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 225,
+              "y": 246,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 247.5,
+              "y": 270,
+              "text": "4",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 290,
+              "y": 246,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 312.5,
+              "y": 270,
+              "text": "4",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 335,
+              "y": 246,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 357.5,
+              "y": 270,
+              "text": "5",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 400,
+              "y": 246,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 422.5,
+              "y": 270,
+              "text": "3",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            },
+            {
+              "type": "rect",
+              "x": 445,
+              "y": 246,
+              "width": 45,
+              "height": 36,
+              "fill": "surface",
+              "stroke": "ink",
+              "strokeWidth": 1
+            },
+            {
+              "type": "text",
+              "x": 467.5,
+              "y": 270,
+              "text": "2",
+              "fontSize": 16,
+              "anchor": "middle",
+              "fill": "ink"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

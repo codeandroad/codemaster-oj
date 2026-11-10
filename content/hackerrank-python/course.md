@@ -162,78 +162,241 @@ assert " | ".join(f"{value:.1f}" for value in [2, 4.5]) == "2.0 | 4.5"
 
 ### 学习目标
 
-能根据数据的顺序和可变性选择容器，使用索引、解包、推导式、排序与聚合组织嵌套数据。
+能创建、读取、修改和复制列表，处理嵌套数据；能选择 `sort()` 或 `sorted()`，写出稳定的多键排序；能用列表推导式和生成器表达式筛选、转换、展平和聚合数据。
 
 ### 正文
 
-#### 顺序、索引与解包
+#### 创建列表与组合序列
 
-列表和元组都是有序序列，可以有重复项。列表写成 `[value, ...]`，可以增删和替换元素；元组常写成 `(value, ...)`，创建后不能替换它的元素。单元素元组需要逗号，如 `("oak",)`。二者都支持从 0 开始的索引、从末尾起算的负索引和切片 `seq[start:stop:step]`。普通索引越界会报错，切片会在实际范围内取值。空序列的长度与默认求和均为 0。
+列表是有序、可变的容器，允许重复项。用 `[]` 或 `list()` 创建空列表，用 `[a, b]` 直接列出元素，用 `list(iterable)` 把可迭代对象逐项收集起来。字符串会按字符拆开，字典默认迭代它的键，`list(range(start, stop, step))` 会把范围里的整数实际存入列表。列表允许混合类型，运算和排序时仍需考虑这些值是否相容。
 
-用 `name, year = record` 拆开固定字段，用 `label, *values = record` 接收其余项。`enumerate(items, start=1)` 可以同时得到编号和值，编号适合显示或加权计算，列表索引依然从 0 开始。元组适合表示固定字段，只有所有成员都可哈希时才可用作字典键。自定义校验和应按定义计算，`hash()` 用于哈希查找，不能用作通用校验和。
+`a + b` 拼接两个列表并返回新列表，`[*a, *b]` 能展开任意可迭代对象。用 `a * n` 重复元素引用，`n <= 0` 时得到空列表。对列表使用 `+=` 会原地扩展，右侧可以是可迭代对象；`*=` 会原地重复。另一个变量若指向同一个列表，也会看到原地修改。
+
+`len(a)` 给出元素个数，`bool(a)` 只判断是否非空，所以 `[0]` 和 `[None]` 都是真值。两个列表按对应元素比较相等，顺序与重复次数都算在内。比较大小时先比较首个不同的元素；若共同部分相同，较短的列表较小。列表可以包含其他列表，但列表自身不可哈希，不能直接作字典的键或集合元素。
 
 ```python
-reading = ("greenhouse", 18, 21, 19)
-site, *temperatures = reading
-checksum = sum(index * value for index, value in enumerate(temperatures, start=1))
-assert (site, temperatures[-1], checksum) == ("greenhouse", 19, 117)
+assert list("oak") == ["o", "a", "k"]
+assert [0, *range(2, 5), 9] == [0, 2, 3, 4, 9]
+assert [1, 2] + [2] == [1, 2, 2]
+assert [1, 3] > [1, 2, 9]
+assert bool([0]) and not []
 ```
 
-#### 列表方法、原地修改与复制
+#### 索引、切片与局部修改
 
-| 操作 | 写法 | 行为 |
+`a[i]` 从 0 开始取元素，`a[-1]` 取末项，`a[-len(a)]` 取首项。索引越界会抛出 `IndexError`。切片 `a[start:stop:step]` 包含起点、排除终点，会把边界限制在有效范围内，返回新的外层列表。省略步长时为 1，省略起止位置时按遍历方向选取边界。负步长向左遍历，`a[::-1]` 得到反向列表；步长 0 会抛出 `ValueError`。也可以保存 `slice(start, stop, step)` 对象，供不同列表复用。
+
+| 操作 | 写法 | 结果 |
 | --- | --- | --- |
-| 增加 | `append(x)`、`extend(values)`、`insert(i, x)` | 分别加入一个值、加入多个值、在指定索引前插入 |
-| 删除 | `remove(x)`、`pop(i)`、`del items[i]` | 分别按值删首次出现项、按索引取出并返回、按索引删除 |
-| 查找 | `x in items`、`index(x)`、`count(x)` | 判断存在、找首次索引、数出现次数 |
-| 改顺序 | `reverse()`、`sort()` | 原地反转与排序，返回 `None` |
-| 创建新容器 | `items.copy()`、`items[:]`、`sorted(items)` | 创建新的外层列表 |
+| 取或换一个元素 | `a[i]`、`a[i] = value` | 一次定位一个元素 |
+| 取一段 | `a[1:4]`、`a[::2]` | 得到切出的新列表 |
+| 改一段 | `a[i:j] = values` | 右侧可以比原区间短、长或为空 |
+| 插入一段 | `a[i:i] = values` | 原区间为空，元素从该处插入 |
+| 跨步替换 | `a[::2] = values` | 步长不是 1 时，右侧长度必须与选中位置数相同 |
+| 删除一段 | `del a[i:j:k]` | 删除选中的位置，跨步删除也可以 |
+| 替换全部 | `a[:] = values` | 原地替换内容，共享该列表的变量也能看到 |
 
-`remove()` 和 `index()` 找不到值时抛出 `ValueError`，可先用成员测试。空列表的 `pop()` 抛出 `IndexError`。`b = a` 让两个名字指向同一个列表。浅复制只复制外层；内层列表仍共享。构造独立网格用 `[[0] * cols for _ in range(rows)]`，避免把同一个内层列表重复引用。需要根据操作名改变列表时，可把操作名和参数分开解包，按到达顺序执行。
-
-```python
-grid = [[0] * 3 for _ in range(2)]
-grid[0][1] = 8
-assert grid == [[0, 8, 0], [0, 0, 0]]
-original = ["tea", "coffee", "tea"]
-working = original.copy()
-working.remove("tea")
-working.insert(1, "water")
-assert working == ["coffee", "water", "tea"]
-assert original == ["tea", "coffee", "tea"]
-```
-
-#### 推导式与二维数据
-
-`[expression for item in values if condition]` 先遍历、再筛选、最后计算结果。多个 `for` 按书写顺序嵌套。二维列表一般用 `matrix[row][column]`，按行访问时先固定 row 再遍历 column。需要输出行列表时，在外层推导式中创建内层列表；需要输出扁平的坐标记录时，让每一项直接产生一个坐标。任一遍历范围为空时，不会产生组合。
+反向切片中省略终点与写 `-1` 含义不同。比如 `a[::-1]` 会读到首项，`a[:-1:-1]` 的终点却是最后一个元素，因此在常见非空列表上返回空列表。
 
 ```python
-aisles = ["east", "west"]
-positions = [(aisle, shelf) for aisle in aisles for shelf in range(4) if shelf % 2]
-assert positions == [("east", 1), ("east", 3), ("west", 1), ("west", 3)]
+items = [10, 20, 30, 40, 50]
+assert items[-3:-1] == [30, 40]
+assert items[4:0:-2] == [50, 30]
+assert items[::-1] == [50, 40, 30, 20, 10]
+items[1:3] = [21]
+items[1:1] = [11, 12]
+items[::2] = [100, 120, 140]
+del items[1::2]
+assert items == [100, 120, 140]
 ```
 
-#### 去重、排序、并列与统计
+#### 列表的全部公开方法
 
-`set(values)` 把可哈希值去重，`sorted(values)` 返回排序后的列表。按不同数值排名时先去重，再对不同值排序并取相应位置；需要所有并列记录时，拿排名值回到原始数据筛选。检查不同值数量后再索引，按接口用 `None` 或空列表表达缺失。要根据记录的一部分排序，可传 `key`，如 `key=lambda item: item[1]`。字典适合按名称保存记录，`mapping.get(key, default)` 可处理缺失键。
+| 方法 | 行为 |
+| --- | --- |
+| `append(x)` | 在末尾加入一个元素。传入列表会把整个列表作为一项 |
+| `extend(iterable)` | 把可迭代对象中的元素逐个追加到末尾 |
+| `insert(i, x)` | 在索引 `i` 之前插入，超出两端时插到首尾 |
+| `remove(x)` | 按值删除第一次匹配项，找不到时抛出 `ValueError` |
+| `pop(i=-1)` | 按位置删除并返回元素，默认取末项；空列表或越界时抛出 `IndexError`。索引以位置参数传入 |
+| `clear()` | 原地清空，效果等同于 `del a[:]` |
+| `index(x, start, stop)` | 返回区间内第一次匹配项在原列表中的索引，起点和终点可省略，终点不包含；找不到时抛出 `ValueError` |
+| `count(x)` | 返回值 `x` 出现的次数，没找到时返回 0 |
+| `reverse()` | 原地反转当前顺序 |
+| `sort(key=..., reverse=...)` | 按规则原地排序 |
+| `copy()` | 返回一个浅复制的列表 |
 
-算术平均是总和除以项数。加权平均中每项乘自己的权重，再除以总权重。先确认分母不为零，计算完成后按需要格式化。计数、求和、最值与平均是不同的聚合，决定是否去重前先明确聚合对象。
+`x in a` 和 `x not in a` 适合只检查是否存在。若要找指定区间中的索引，直接用 `index(x, start, stop)`，因为在切片上查找会得到相对于切片的新索引。原地改动的常用方法返回 `None`，其中 `pop()` 返回刚移除的元素。用 `del a[i]` 删除指定位置，用 `del a` 则移除变量名的绑定。
 
 ```python
-supplies = [("paper", 5), ("ink", 2), ("pens", 5), ("clips", 1)]
-levels = sorted({quantity for _, quantity in supplies}, reverse=True)
-names = sorted(name for name, quantity in supplies if quantity == levels[0])
-assert names == ["paper", "pens"]
-
-measurements = [(10, 1), (16, 2)]
-weighted = sum(value * weight for value, weight in measurements)
-weight_total = sum(weight for _, weight in measurements)
-assert f"{weighted / weight_total:.2f}" == "14.00"
+queue = ["fern", "oak", "fern", "pine"]
+queue.extend(("ash", "ivy"))
+queue.insert(0, "elm")
+assert queue.count("fern") == 2
+assert queue.index("fern", 2, 5) == 3
+assert queue.pop(2) == "oak"
+queue.remove("fern")
+assert queue == ["elm", "fern", "pine", "ash", "ivy"]
+assert queue.clear() is None and queue == []
 ```
+
+列表适合用 `append()` 和 `pop()` 实现后进先出的栈。若需要频繁从队首取值，`pop(0)` 会移动后面的元素，可在学习集合工具时改用 `collections.deque` 的 `popleft()`。
+
+#### 遍历、解包与安全筛选
+
+只需要元素时用 `for value in values`；还需要索引或显示编号时用 `enumerate(values, start=0)`，显示编号可从 1 开始。并行遍历多个序列可以用 `zip()`，默认在最短输入耗尽时停止，要求等长时可用 `strict=True`。用 `first, *middle, last = values` 可以拆出首尾与中间项，带星号的目标收集到一个列表。将列表按位置作为函数参数传递则写 `f(*values)`。固定长度记录可用元组表示，单元素元组需要逗号 `(value,)`；元组仅在各元素都可哈希时才能作字典键。
+
+不要在遍历同一个列表时随意插入、删除或改变其长度，元素移位可能导致漏处理。要保留筛选结果，可以创建新列表；若调用方也需要看到修改，可先生成结果，再用 `a[:] = result` 更新同一个列表。
+
+```python
+readings = [7, -2, 0, -4, 3]
+readings[:] = [value for value in readings if value >= 0]
+assert readings == [7, 0, 3]
+first, *middle, last = [2, 4, 6, 8]
+assert (first, middle, last) == (2, [4, 6], 8)
+pairs = list(zip(["north", "south"], [12, 18], strict=True))
+assert pairs == [("north", 12), ("south", 18)]
+```
+
+#### 列表推导式：筛选、转换与多层遍历
+
+基本形式是 `[表达式 for 变量 in 可迭代对象 if 条件]`。逐项取值，通过末尾的条件后才计算表达式，计算结果会立即收集到新列表。末尾的 `if` 可以省略，也可连续写多个筛选条件。若要每项都保留，只改变输出值，将 `a if 条件 else b` 放在 `for` 前。空输入或全部被过滤会得到 `[]`。
+
+```python
+values = [-3, 0, 2, 5, 8]
+nonnegative_squares = [x * x for x in values if x >= 0]
+labels = ["even" if x % 2 == 0 else "odd" for x in values]
+even_nonnegative = [x for x in values if x >= 0 if x % 2 == 0]
+assert nonnegative_squares == [0, 4, 25, 64]
+assert labels == ["odd", "even", "even", "odd", "even"]
+assert even_nonnegative == [0, 2, 8]
+```
+
+多个 `for` 从左到右对应外层到内层循环。外层变量可用于决定内层范围或条件。单层方括号加多个 `for` 通常产生扁平列表；表达式自身又是一个推导式时，会保留每个外层元素对应的一组结果。若可读性下降，先写普通循环并确认执行顺序，再缩写成推导式。推导式适合构造值，输出日志、修改原数据或提前 `break` 时，普通循环更清楚。
+
+```python
+batches = [[3, -1], [], [0, 4, -2]]
+flat = [n * 2 for row in batches for n in row if n >= 0]
+by_row = [[n * 2 for n in row if n >= 0] for row in batches]
+assert flat == [6, 0, 8]
+assert by_row == [[6], [], [0, 8]]
+
+pairs = [(x, y) for x in range(4) for y in range(x) if (x + y) % 2 == 0]
+assert pairs == [(2, 0), (3, 1)]
+```
+
+对应的普通循环能帮助核对顺序和条件：
+
+```python
+batches = [[3, -1], [], [0, 4, -2]]
+flat = []
+for row in batches:
+    for n in row:
+        if n >= 0:
+            flat.append(n * 2)
+assert flat == [6, 0, 8]
+```
+
+#### 生成器表达式：惰性计算与一次性消费
+
+生成器表达式通常写成 `(表达式 for 变量 in 可迭代对象 if 条件)`。筛选与转换在需要下一项时才执行，生成器本身不会先建一个包含所有结果的列表。它可用 `next(g)` 取下一项，也可交给循环或聚合函数。耗尽后再调用 `next(g)` 会抛出 `StopIteration`，用 `next(g, default)` 可以返回指定的兜底值。生成器对象是一次性迭代器；若需重新遍历，要重新创建生成器，或一开始就把结果收集为可重复遍历的列表。
+
+```python
+g = (x * x for x in range(5) if x % 2 == 0)
+assert next(g) == 0
+assert list(g) == [4, 16]  # 从当前进度继续取值
+assert next(g, None) is None
+assert list(g) == []       # 已经耗尽
+```
+
+若生成器表达式是调用中唯一的参数，可以省略它自己的括号，例如 `sum(x * x for x in values)`。若同一个调用还传其他参数，要保留这层括号，例如 `next((x for x in values if x < 0), None)` 和 `max((x for x in values if x > 0), default=0)`。
+
+| 需要的结果 | 推荐写法 | 消费行为 |
+| --- | --- | --- |
+| 生成列表，稍后索引或反复遍历 | `[f(x) for x in xs if ok(x)]` | 立即把全部结果收集到列表 |
+| 求和、求最值 | `sum(f(x) for x in xs)`、`max((f(x) for x in xs), default=0)` | 读完全部结果；空输入的 `sum()` 为 0，`max()` 可设默认值 |
+| 取首个匹配 | `next((x for x in xs if ok(x)), None)` | 找到第一项就停止 |
+| 判断是否至少有一项满足 | `any(ok(x) for x in xs)` | 遇到第一个真值就停止，空输入为 `False` |
+| 判断是否每项都满足 | `all(ok(x) for x in xs)` | 遇到第一个假值就停止，空输入为 `True` |
+| 需要排序后的列表 | `sorted(f(x) for x in xs)` | 读完生成器并创建一个新的排序结果列表 |
+
+生成器不支持按下标取值或直接求长度。要多次计算统计量，可从可重复迭代的数据源分别创建生成器，也可以在同一个循环中同步更新各项统计。若重复使用同一个生成器，后一次计算只会看到剩余元素。生成器省下的是中间列表的空间。源数据如果已经存成列表，仍然占用内存；把生成器交给 `list()` 或 `sorted()`，也会创建结果列表。
+
+```python
+batches = [[2, 0], [], [9, -3]]
+first_large = next((n for row in batches for n in row if n > 6), None)
+sum_positive = sum(n for row in batches for n in row if n > 0)
+assert first_large == 9 and sum_positive == 11
+assert any(n < 0 for row in batches for n in row)
+assert all(n < 10 for row in batches for n in row)
+assert not any(n > 0 for n in []) and all(n > 0 for n in [])
+```
+
+#### `sort()` 与 `sorted()`：原地操作、排序键和并列
+
+| 选择 | 接受的输入 | 返回值与影响 |
+| --- | --- | --- |
+| `a.sort(key=..., reverse=...)` | 已有列表 `a` | 原地改变 `a`，返回 `None`，共享该列表的变量也会看到新顺序 |
+| `sorted(iterable, key=..., reverse=...)` | 列表、元组、字符串、生成器等任意可迭代对象 | 返回新列表，保留输入容器原有顺序；若输入是一次性迭代器，它会被消费 |
+
+已有的列表需要在后面保留原顺序时，用 `sorted(a)`。只保留排序后的一份列表时，可在工作列表上用 `a.sort()`。想先复制再继续原地处理，可以先写 `work = a.copy()` 再写 `work.sort()`。注意 `a = a.sort()` 会把变量重新绑定到 `None`。
+
+```python
+source = [4, 1, 3, 1]
+ordered = sorted(source)
+work = source.copy()
+result = work.sort(reverse=True)
+assert ordered == [1, 1, 3, 4] and source == [4, 1, 3, 1]
+assert result is None and work == [4, 3, 1, 1]
+assert sorted(("cedar", "elm", "ash"), key=len) == ["elm", "ash", "cedar"]
+```
+
+两种排序都默认升序，`reverse=True` 改为降序。`key` 和 `reverse` 都是关键字参数。传入 `key` 函数后，Python 会为每项计算一次键，再用键比较顺序。可用 `lambda row: row[1]`、具名函数、`str.casefold` 或 `operator.itemgetter(1)`。键函数应根据当前元素计算键，避免读取或修改正在排序的列表。键值必须能互相比较，例如数字和字符串混在一起时，直接排序通常会报 `TypeError`；按业务规则先转换成统一键。对数字文本按数值排序可用 `key=int`，需要忽略大小写时可用 `key=str.casefold`。
+
+两种排序都是稳定的，键相等时保留这些项的输入顺序，`reverse=True` 也一样。先升序排序再用 `[::-1]` 会把并列项的顺序也反过来。如果并列时确实要按第二字段排序，把两个键放入元组，Python 按字段从左向右比较。数值字段需要一升一降时，可对降序字段取负；若字段不能取负，可从次键到主键分两次稳定排序，并为每次指定自己的方向。直接对整个元组键使用 `reverse=True` 会让各字段都按降序比较。
+
+```python
+# 每条记录为 (名称, 级别, 等待分钟数)。先按级别降序，再按等待时长升序。
+jobs = [("A", 8, 2), ("B", 8, 1), ("C", 8, 1), ("D", 9, 5)]
+ranked = sorted(jobs, key=lambda row: (-row[1], row[2]))
+assert [name for name, _, _ in ranked] == ["D", "B", "C", "A"]
+
+work = jobs.copy()
+work.sort(key=lambda row: row[2])
+work.sort(key=lambda row: row[1], reverse=True)
+assert work == ranked and jobs[0][0] == "A"
+
+tie = [("first", 4), ("second", 4)]
+assert sorted(tie, key=lambda row: row[1], reverse=True) == tie
+assert sorted(tie, key=lambda row: row[1])[::-1] == tie[::-1]
+```
+
+`reverse()`、`reversed(a)` 和 `a[::-1]` 都按现有顺序反转，不做大小比较。前者原地修改，`reversed(a)` 返回反向迭代器，反向切片返回新的外层列表。如果只要最小或最大元素，优先考虑 `min()` 或 `max()`，可按 `key` 选择，不必排序整个列表。
+
+#### 嵌套列表、浅复制与统计
+
+`b = a` 不创建新列表，两个变量指向同一个对象。用 `a.copy()`、`a[:]`、`list(a)` 或 `sorted(a)` 得到不同的外层列表，原有元素仍共享。这是浅复制。若要独立修改二维列表的各行，可逐行复制；若还有更深的可变层，可按需要复制每层，或用 `copy.deepcopy()`。新建网格时用推导式创建各行，避免 `[[0] * cols] * rows` 把同一行引用重复多次。
+
+```python
+grid = [[0, 1], [2, 3]]
+outer_only = grid.copy()
+outer_only[0][0] = 9
+assert grid[0][0] == 9
+
+independent = [row.copy() for row in grid]
+independent[0][0] = 8
+assert grid[0][0] == 9 and independent[0][0] == 8
+
+zero_grid = [[0] * 3 for _ in range(2)]
+zero_grid[0][1] = 5
+assert zero_grid == [[0, 5, 0], [0, 0, 0]]
+```
+
+`len()`、`sum()`、`min()`、`max()` 分别回答数量、合计和极值。算术平均用总和除以项数；加权平均是各项乘权重后的和除以权重总和，先检查分母。计算不同值的排名时，可先用集合去重再排序；若要保留首次出现的顺序，可对可哈希元素用 `list(dict.fromkeys(values))`。处理并列记录时，可以先找到目标数值，再在原序列中筛选。别把不同值的个数与原始记录数混用。需要确定的校验和时按题目或协议定义计算，`hash()` 用于哈希查找。
 
 ### 检查点
 
-解释为何对嵌套列表做浅复制后，修改一行可能影响原列表。再用含重复值和负数的一组记录，比较原序列、不同值排名和按键稳定排序的结果。
+用一组带重复值的记录写出 `sort()` 和 `sorted()` 的结果，解释返回值、共享引用、两级排序和并列顺序。用负索引和负步长验证一次切片，并预测普通切片赋值和跨步赋值对长度的要求。对带空行的二维列表分别写保留行结构和展平的推导式；将其中一个表达式改成生成器，依次调用 `next()` 和 `list()`，解释第二次消费会得到什么。
 
 ### 参考答案
 

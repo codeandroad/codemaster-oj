@@ -233,7 +233,7 @@ const rankingPolicy = Object.freeze({
  retroactive:false,
  order:['points_desc','ac_rate_desc','luq_balance_desc'],
  ties:'equal_points_ac_rate_and_luq_balance',
- description:'排名积分计审核公开的普通题首次有效 AC，以及 Paper 4 正式交卷后每道大题全部自动测试首次 AC 的固定 10 分。作业与计时训练额外奖励只计入个人总积分。积分相同时比较未四舍五入的首解 AC 率，暂无有效统计样本者排在已有首解 AC 率者之后。普通练习与作业按同一学生和题目版本统计至首个有效 AC，限时训练与 Paper 4 按正式提交统计。积分和首解 AC 率均相同时比较当前奖学金余额，三项均相同则并列。',
+ description:'排名积分包含审核公开的普通题首次有效 AC、Paper 4 正式交卷后每道大题首次通过全部自动测试的 10 分，以及已启用奖励的 ACSL 试卷所得积分。积分相同时比较未四舍五入的首解 AC 率，暂无有效统计样本者排在已有首解 AC 率者之后。普通练习与作业按同一学生和题目版本统计至首个有效 AC，限时训练与 Paper 4 按正式提交统计。积分和首解 AC 率均相同时比较当前奖学金余额，三项均相同则并列。',
 });
 
 async function leaderboardContexts(pool, user) {
@@ -282,12 +282,14 @@ async function pointsLeaderboard(ctx) {
     WHEN 'month' THEN date_trunc('month', now() AT TIME ZONE 'Asia/Shanghai') AT TIME ZONE 'Asia/Shanghai'
     ELSE NULL::timestamptz END since_at
   ), rank_awards AS (
-   SELECT identity_id,points,created_at FROM school_rank_ledger
+   SELECT identity_id,points,created_at,true AS counts_as_solved FROM school_rank_ledger
    UNION ALL
-   SELECT identity_id,points,created_at FROM paper4_rank_ledger
+   SELECT identity_id,points,created_at,true FROM paper4_rank_ledger
+   UNION ALL
+   SELECT identity_id,points,created_at,false FROM acsl_point_awards
   ), earned AS (
    SELECT l.identity_id, sum(l.points)::int points,
-    count(*)::int solved_problems
+    count(*) FILTER (WHERE l.counts_as_solved)::int solved_problems
    FROM rank_awards l CROSS JOIN bounds b
    WHERE b.since_at IS NULL OR l.created_at>=b.since_at
    GROUP BY l.identity_id
@@ -356,7 +358,8 @@ export async function handleEducation(ctx) {
   if(!user.roles.includes('student'))fail(403,'FORBIDDEN','积分仅适用于学生');
   const totals=(await pool.query(`SELECT
    ((SELECT COALESCE(sum(points),0) FROM school_rank_ledger WHERE identity_id=$1)
-    +(SELECT COALESCE(sum(points),0) FROM paper4_rank_ledger WHERE identity_id=$1))::int points`,[user.identityId])).rows[0];
+    +(SELECT COALESCE(sum(points),0) FROM paper4_rank_ledger WHERE identity_id=$1)
+    +(SELECT COALESCE(sum(points),0) FROM acsl_point_awards WHERE identity_id=$1))::int points`,[user.identityId])).rows[0];
   return result({points:totals.points,rankPoints:totals.points,rankingPolicy});
  }
  if(route==='/points/leaderboard/contexts'&&method==='GET')return result(await leaderboardContexts(pool,user));

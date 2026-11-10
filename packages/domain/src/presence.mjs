@@ -48,7 +48,8 @@ async function studentPreview(db, viewer, identityId) {
  const fullStats = isSelf || viewer.roles.some(role => ['teacher', 'admin'].includes(role));
  const totals = (await db.query(`SELECT
   ((SELECT COALESCE(sum(points),0) FROM school_rank_ledger WHERE identity_id=$1)
-   +(SELECT COALESCE(sum(points),0) FROM paper4_rank_ledger WHERE identity_id=$1))::int points,
+   +(SELECT COALESCE(sum(points),0) FROM paper4_rank_ledger WHERE identity_id=$1)
+   +(SELECT COALESCE(sum(points),0) FROM acsl_point_awards WHERE identity_id=$1))::int points,
   ((SELECT count(DISTINCT problem_id) FROM point_ledger WHERE identity_id=$1 AND reason='first_ac')
    +(SELECT count(*) FROM paper4_rank_ledger WHERE identity_id=$1))::int solved_problems,
   COALESCE((SELECT balance FROM luq_accounts WHERE identity_id=$1),0)::int scholarship,

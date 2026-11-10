@@ -62,7 +62,8 @@ async function profile(ctx, identityId) {
  const p = await visibleProfile(ctx.pool, ctx.user, identityId);
  const totals = (await ctx.pool.query(`SELECT
   ((SELECT COALESCE(sum(points),0) FROM school_rank_ledger WHERE identity_id=$1)
-   +(SELECT COALESCE(sum(points),0) FROM paper4_rank_ledger WHERE identity_id=$1))::int points,
+   +(SELECT COALESCE(sum(points),0) FROM paper4_rank_ledger WHERE identity_id=$1)
+   +(SELECT COALESCE(sum(points),0) FROM acsl_point_awards WHERE identity_id=$1))::int points,
   ((SELECT count(DISTINCT problem_id) FROM point_ledger WHERE identity_id=$1 AND reason='first_ac')
    +(SELECT count(*) FROM paper4_rank_ledger WHERE identity_id=$1))::int solved_problems,
   CASE WHEN $2::boolean OR COALESCE((SELECT show_luq_balance FROM leaderboard_settings WHERE id=true),true)

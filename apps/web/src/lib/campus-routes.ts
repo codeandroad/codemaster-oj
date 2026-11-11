@@ -34,6 +34,18 @@ export function isCampusRoute(pathname: string) {
   return availablePages.has(pathname) || detailPages.some((pattern) => pattern.test(pathname));
 }
 
+export function isCampusAuthRoute(pathname: string) {
+  return pathname === "/login" || pathname === "/register" || pathname === "/activate";
+}
+
+export function loginReturnTo(value: string | null) {
+  if (!value?.startsWith("/") || value.startsWith("//") || value.includes("\\")) return null;
+  const origin = "https://campus.invalid";
+  const url = new URL(value, origin);
+  if (url.origin !== origin || !isCampusRoute(url.pathname) || isCampusAuthRoute(url.pathname)) return null;
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
 
 const legacyLearnerSections: Record<string, string> = {
   "/student/problems": "problems",

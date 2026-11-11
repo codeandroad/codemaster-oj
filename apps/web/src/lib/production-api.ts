@@ -180,6 +180,8 @@ export class ApiError extends Error {
   }
 }
 
+export const productionSessionExpiredEvent = "codemaster:session-expired";
+
 let csrfToken = "";
 export function clearProductionSession() {
   csrfToken = "";
@@ -190,11 +192,13 @@ export async function productionApi<T>(
   path: string,
   options: { method?: string; body?: unknown; signal?: AbortSignal } = {},
 ): Promise<T> {
+  const route = path.replace(/^\//, "");
   const method = options.method ?? "GET";
+  const requestToken = csrfToken;
   const headers: Record<string, string> = { Accept: "application/json" };
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
-  if (method !== "GET" && csrfToken) headers["X-CSRF-Token"] = csrfToken;
-  const response = await fetch(`/api/v1/${path.replace(/^\//, "")}`, {
+  if (method !== "GET" && requestToken) headers["X-CSRF-Token"] = requestToken;
+  const response = await fetch(`/api/v1/${route}`, {
     method,
     headers,
     credentials: "same-origin",
@@ -202,8 +206,13 @@ export async function productionApi<T>(
     ...(options.signal ? { signal: options.signal } : {}),
   });
   const payload = await response.json().catch(() => null);
+  const currentSession = requestToken === csrfToken && !options.signal?.aborted;
   if (!response.ok) {
     const code = payload?.error?.code;
+    if (typeof window !== "undefined" && currentSession && response.status === 401
+      && code === "UNAUTHENTICATED" && route !== "auth/logout") {
+      window.dispatchEvent(new Event(productionSessionExpiredEvent));
+    }
     // A missing school resource may mean that the membership was revoked.
     // Confirm with the school list before switching workspaces.
     if (typeof window !== "undefined" && (code === "LEGACY_WORKSPACE_REQUIRED"
@@ -217,7 +226,7 @@ export async function productionApi<T>(
         (response.status === 401 ? "登录已失效，请重新登录。" : "请求失败，请稍后重试。"),
     );
   }
-  if (payload?.csrfToken) csrfToken = payload.csrfToken;
+  if (currentSession && payload?.csrfToken) csrfToken = payload.csrfToken;
   return payload as T;
 }
 

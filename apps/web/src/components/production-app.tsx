@@ -11,7 +11,7 @@ import { AdminScholarshipPage, StudentScholarshipPage, ScholarshipBalance } from
 import { TeacherScholarshipPage } from "./scholarship/teaching-page";
 
 import { AppLink } from "@/components/navigation";
-import { isCampusRoute, resolvePublicLearningBookmark } from "@/lib/campus-routes";
+import { isCampusAuthRoute, isCampusRoute, loginReturnTo, resolvePublicLearningBookmark } from "@/lib/campus-routes";
 
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -45,7 +45,7 @@ import {WorkspaceThemeProvider} from "@/components/ui/theme-context";
 import {PersonalAppearanceProvider, PersonalAppearanceSettings} from "@/components/personal-appearance-settings";
 import {AppLocaleProvider,useLocale} from "@/components/locale-context";
 import { TeacherPages } from "@/components/teacher/teacher-pages";
-import { ApiError, apiMessage, clearProductionSession, productionApi, roleHome, type AuthResponse, type CampusRole, type CampusUser } from "@/lib/production-api";
+import { ApiError, apiMessage, clearProductionSession, productionApi, productionSessionExpiredEvent, roleHome, type AuthResponse, type CampusRole, type CampusUser } from "@/lib/production-api";
 
 export function ProductionApp() {
   const pathname = usePathname();
@@ -78,6 +78,13 @@ export function ProductionApp() {
   useEffect(() => {
     if (!signedInAccount) return;
     let controller: AbortController | undefined;
+    function expireSession() {
+      const { pathname, search, hash } = window.location;
+      const returnTo = loginReturnTo(`${pathname}${search}${hash}`);
+      clearProductionSession();
+      setUser(null);
+      if (returnTo) router.replace(`/login?${new URLSearchParams({ returnTo })}`);
+    }
     function refreshAccount() {
       if (controller) return;
       const request = new AbortController();
@@ -92,16 +99,23 @@ export function ProductionApp() {
     window.addEventListener("focus", refreshAccount);
     window.addEventListener("codemaster:schools-changed", refreshAccount);
     window.addEventListener("codemaster:school-access-check", refreshAccount);
+    window.addEventListener(productionSessionExpiredEvent, expireSession);
     return () => {
       controller?.abort();
       window.removeEventListener("focus", refreshAccount);
       window.removeEventListener("codemaster:schools-changed", refreshAccount);
       window.removeEventListener("codemaster:school-access-check", refreshAccount);
+      window.removeEventListener(productionSessionExpiredEvent, expireSession);
     };
-  }, [signedInAccount]);
+  }, [router, signedInAccount]);
 
   const loggedIn = (next: CampusUser) => {
     setUser(next);
+    const returnTo = pathname === "/login" ? loginReturnTo(search.get("returnTo")) : null;
+    if (returnTo) {
+      router.replace(returnTo);
+      return;
+    }
     const openWorkspace = (schools: School[]) => {
       const target = resolveLoginDestination({user: next, schools, preferredSchoolId: readSchoolPreference(next.id), joinIntent});
       if (target.schoolId) writeSchoolPreference(next.id, target.schoolId);
@@ -112,7 +126,7 @@ export function ProductionApp() {
       .catch(() => router.replace(roleHome(next)));
   };
   if (!isCampusRoute(pathname)) return null;
-  const authPage = pathname === "/login" || pathname === "/register" || pathname === "/activate";
+  const authPage = isCampusAuthRoute(pathname);
   if (loading && authPage) return <AuthNotice title={pathname === "/register" ? "Create account" : "Sign in"} message="Connecting to CodeMaster…" />;
   if (loading)
     return (

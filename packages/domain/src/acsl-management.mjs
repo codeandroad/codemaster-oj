@@ -67,7 +67,8 @@ function detail(paper) {
 export function mergeAcslManagementEdit(before, body) {
   only(body, ['expectedContentHash', 'requestId', 'reason', 'title', 'questions', 'programming'], 'ACSL edit');
   if (typeof body.expectedContentHash !== 'string' || !/^[a-f0-9]{64}$/.test(body.expectedContentHash)) fail(400, 'INVALID_ACSL_EDIT', 'Include the current content hash.');
-  uuid(body.requestId, 'Edit request ID'); field(body.reason, 'Edit reason', { max: 2000 });
+  uuid(body.requestId, 'Edit request ID');
+  if (body.reason !== undefined) field(body.reason, 'Edit reason', { min: 0, max: 2000 });
   const after = structuredClone(before);
   if (Object.hasOwn(body, 'title')) after.title = body.title;
   if (body.questions !== undefined) {

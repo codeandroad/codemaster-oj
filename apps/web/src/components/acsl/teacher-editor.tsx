@@ -75,7 +75,6 @@ export function AcslTeacherEditor({
     null,
   );
   const errorRef = useRef<HTMLDivElement>(null);
-  const reasonRef = useRef<HTMLTextAreaElement>(null);
   const request = useRef<{ signature: string; id: string } | null>(null);
   const dirty = JSON.stringify([form, diagrams]) !== baseline;
   useNavigationBlocker(dirty || busy);
@@ -199,13 +198,6 @@ export function AcslTeacherEditor({
   function requestPublish() {
     if (pending.current || !dirty || conflict) return;
     setError("");
-    if (!reason.trim()) {
-      setError(
-        tx("Describe why this revision is needed.", "请填写本次修订的原因。"),
-      );
-      reasonRef.current?.focus();
-      return;
-    }
     try {
       inputForSave();
       setDialog("publish");
@@ -223,7 +215,7 @@ export function AcslTeacherEditor({
       const payload = {
         ...content,
         expectedContentHash: paper.contentHash,
-        reason: reason.trim(),
+        reason: reason.trim() || undefined,
       };
       const signature = JSON.stringify(payload);
       if (request.current?.signature !== signature)
@@ -693,9 +685,8 @@ export function AcslTeacherEditor({
         </div>
       </div>
       <label className="block rounded-lg border border-border bg-surface p-4 text-sm font-medium">
-        {tx("Reason for revision", "修订原因")}
+        {tx("Reason for revision (optional)", "修订原因（选填）")}
         <textarea
-          ref={reasonRef}
           className={`${area} mt-2 min-h-20 resize-none`}
           rows={2}
           maxLength={2000}

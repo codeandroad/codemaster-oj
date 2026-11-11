@@ -172,20 +172,23 @@ test('ACSL teacher management authorizes local staff and preserves grades, expor
         { programming: { tests: [] } }, { programming: { samples: [] } }, { enabled: false }, { questions: [{ id: 'q1', statementDiagrams: { en: [{ svg: '<svg/>' }], zh: [] } }] } ]) {
         await request(manage, { auth: auth.teacher, method: 'PATCH', body: { ...edit, ...patch }, status: 400 });
       }
+      for (const reason of [null, 1, 'x'.repeat(2001)]) {
+        await request(manage, { auth: auth.teacher, method: 'PATCH', body: { ...edit, reason }, status: 400 });
+      }
       await request(manage, { auth: auth.teacher, method: 'PATCH', csrf: false, body: edit, status: 403 });
       await request(manage, { auth: auth.pending, method: 'PATCH', body: edit, status: 403 });
       assert.equal((await pool.query('SELECT count(*)::int n FROM acsl_management_updates')).rows[0].n, 0);
     });
 
-    await t.test('correct-key edit freezes old grades, requires review of old drafts, and is idempotent', async () => {
-      const edit = { expectedContentHash: current.contentHash, requestId: randomUUID(), reason: 'Correct the reviewed answer key',
+    await t.test('correct-key edit without a reason freezes old grades, requires review of old drafts, and is idempotent', async () => {
+      const edit = { expectedContentHash: current.contentHash, requestId: randomUUID(),
         title: { en: 'Reviewed ACSL practice', zh: '已审核的 ACSL 练习' },
         questions: [{ id: 'q1', topic: { en: 'Reviewed Boolean algebra', zh: '布尔代数复核' }, correctOptionIds: ['A'], explanation: { en: 'New reviewed explanation.', zh: '修订后的完整解析。' } }],
         programming: { title: 'Reviewed programming title', statement: 'Reviewed English statement.', statementZh: '已审核的中文题面。' } };
       const results = await Promise.all([request(manage, { auth: auth.teacher, method: 'PATCH', body: edit }), request(manage, { auth: auth.teacher, method: 'PATCH', body: edit })]);
       assert.deepEqual(results[0].data, results[1].data); current = results[0].data;
       assert.equal(current.versionId, paper.versionId); assert.notEqual(current.writtenRevision, paper.versionId); assert.deepEqual(current.changedQuestionIds, ['q1']);
-      assert.equal((await pool.query('SELECT count(*)::int n FROM acsl_management_updates')).rows[0].n, 1);
+      assert.deepEqual((await pool.query('SELECT request_id,reason FROM acsl_management_updates')).rows, [{ request_id: edit.requestId, reason: '' }]);
       await request(manage, { auth: auth.teacher, method: 'PATCH', body: { ...edit, reason: 'Reused with different input' }, status: 409 });
       const historical = (await request(path, { auth: auth.historical })).data;
       assert.deepEqual(historical.questions, oldGrade.questions); assert.equal(historical.gradeId, oldGrade.gradeId); assert.equal(historical.score, 6); assert.equal(historical.writtenPointsAwarded, 6);
@@ -203,18 +206,23 @@ test('ACSL teacher management authorizes local staff and preserves grades, expor
       assert.equal(program.title, 'Reviewed programming title'); assert.equal(program.versionId, programming.versionId); assert.deepEqual(program.samples, programming.samples);
     });
 
-    await t.test('concurrent teachers cannot overwrite one another and explanation-only changes preserve completed snapshots', async () => {
-      const draft = { expectedContentHash: current.contentHash, reason: 'Improve the worked explanation', questions: [{ id: 'q2', explanation: { en: 'Teacher explanation A.', zh: '教师解析甲。' } }] };
+    await t.test('explanation-only edits accept a blank reason and preserve completed snapshots under concurrent saves', async () => {
+      const draft = { expectedContentHash: current.contentHash, reason: ' \t\n ', questions: [{ id: 'q2', explanation: { en: 'Teacher explanation A.', zh: '教师解析甲。' } }] };
+      const editIds = [randomUUID(), randomUUID()];
       const results = await Promise.all([
-        request(manage, { auth: auth.teacher, method: 'PATCH', body: { ...draft, requestId: randomUUID() }, status: [200,409] }),
-        request(manage, { auth: auth.admin, method: 'PATCH', body: { ...draft, requestId: randomUUID(), questions: [{ id: 'q2', explanation: { en: 'Teacher explanation B.', zh: '教师解析乙。' } }] }, status: [200,409] }),
+        request(manage, { auth: auth.teacher, method: 'PATCH', body: { ...draft, requestId: editIds[0] }, status: [200,409] }),
+        request(manage, { auth: auth.admin, method: 'PATCH', body: { ...draft, requestId: editIds[1], questions: [{ id: 'q2', explanation: { en: 'Teacher explanation B.', zh: '教师解析乙。' } }] }, status: [200,409] }),
       ]);
       assert.deepEqual(results.map(result => result.status).sort(), [200,409]); current = results.find(result => result.status === 200).data;
       assert.deepEqual(current.changedQuestionIds, []);
+      const savedId = editIds[results.findIndex(result => result.status === 200)];
+      assert.equal((await pool.query('SELECT reason FROM acsl_management_updates WHERE request_id=$1', [savedId])).rows[0].reason, '');
       assert.deepEqual((await request(`${path}/questions/q2/explanation?versionId=${paper.versionId}`, { auth: auth.pending })).data.explanation, original.questions[1].explanation);
       const before = (await request(otherManage, { auth: auth.schoolteacher })).data;
-      const changed = (await request(otherManage, { auth: auth.schoolteacher, method: 'PATCH', body: { expectedContentHash: before.contentHash, requestId: randomUUID(), reason: 'Local school teacher edit', questions: [{ id: 'q1', correctOptionIds: ['A'] }] } })).data;
+      const localEdit = { expectedContentHash: before.contentHash, requestId: randomUUID(), reason: '  Local school teacher edit  ', questions: [{ id: 'q1', correctOptionIds: ['A'] }] };
+      const changed = (await request(otherManage, { auth: auth.schoolteacher, method: 'PATCH', body: localEdit })).data;
       assert.equal(changed.questions[0].correctOptionIds[0], 'A');
+      assert.equal((await pool.query('SELECT reason FROM acsl_management_updates WHERE request_id=$1', [localEdit.requestId])).rows[0].reason, 'Local school teacher edit');
       await pool.query('UPDATE school_memberships SET revoked_at=clock_timestamp() WHERE school_id=$1 AND account_id=$2', [school.id, users.schoolteacher.id]);
       await request(otherManage, { auth: auth.schoolteacher, status: 404 });
       await request(`${otherManage}/export?include=package`, { auth: auth.schoolteacher, status: 404 });
@@ -227,6 +235,9 @@ test('ACSL teacher management authorizes local staff and preserves grades, expor
         JSON.stringify({ expectedContentHash: current.contentHash, requestId: randomUUID(), reason: 'Direct entry validation', ...overrides }), JSON.stringify(content)]);
       const full = (await pool.query('SELECT definition FROM acsl_papers WHERE id=$1', [paper.id])).rows[0].definition;
       await assert.rejects(invoke(users.pending.id, full), { code: '42501' });
+      for (const reason of [null, 1, 'x'.repeat(2001)]) {
+        await assert.rejects(invoke(users.teacher.id, full, { reason }), /ACSL_INVALID_EDIT/);
+      }
       for (const mutate of [ value => { value.questions.reverse(); }, value => { value.questions[0].type = 'multiple'; },
         value => { value.questions[0].options[0].id = 'Z'; }, value => { value.questions[0].correctOptionIds = ['A','D']; },
         value => { value.programming.definition.tests[0].expected += 'bad'; }, value => { value.programming.definition.timeLimitMs += 100; },

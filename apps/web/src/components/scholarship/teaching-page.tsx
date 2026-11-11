@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { AppLink } from "@/components/navigation";
+import { contentAuthoringHref } from "./authoring-links";
 import { useLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
 import { SearchableSelect } from "@/components/ui/searchable-select";
@@ -11,37 +13,20 @@ import {
   Field,
   State,
   Table,
-  area,
   input,
   localInput,
   panel,
   useAction,
   useData,
 } from "@/components/teacher/shared";
-import { date, LessonContent } from "@/components/student/shared";
-import { ApiError, productionApi, type Assignment } from "@/lib/production-api";
+import { date } from "@/components/student/shared";
+import { productionApi, type Assignment } from "@/lib/production-api";
 import type {
-  Paper4Paper,
   Paper4PaperSummary,
 } from "@/components/paper4/model";
 import type { AssistanceKind } from "./assistance";
 import { ScholarshipBatchPrices } from "./batch-prices";
-import { ScholarshipBatchReview } from "./batch-review";
 import { assistancePricePayload, parseAssistancePrice, type AssistancePriceIntent } from "./assistance-price";
-import { SolutionContextPicker } from "./solution-context-picker";
-import type { SolutionVersion } from "./solution-context";
-import {
-  sameSolutionDraft,
-  referenceSolutionDraft,
-  SolutionAlternativesEditor,
-  SolutionDiscardDialog,
-  solutionDraftError,
-  SolutionDraftPreview,
-  useSolutionDraftNavigation,
-  type SolutionDraft,
-  type OriginalSolution,
-  type InheritedSolution,
-} from "./solution-alternatives-editor";
 
 type TargetType =
   | "problem"
@@ -53,24 +38,6 @@ type ActivityType = "assignment" | "timed" | "paper4_activity";
 interface Activity {
   id: string;
   title: string;
-}
-interface Content extends SolutionDraft {
-  id: string;
-  versionId: string;
-  kind: AssistanceKind;
-  language: string;
-  status: string;
-  contentHash?: string;
-  hasPendingSolutions?: boolean;
-  publishedAt?: string;
-}
-interface ContentResponse {
-  items: Content[];
-  originalSolution?: OriginalSolution;
-  inheritedSolution?: InheritedSolution;
-  versions?: SolutionVersion[];
-  recommendedVersionId?: string | null;
-  selectionRequired?: boolean;
 }
 interface Policy {
   id: string | null;
@@ -130,476 +97,65 @@ function kindName(
 }
 
 export function TeacherScholarshipPage({ admin = false }: { admin?: boolean }) {
-  const tx = useText(),
-    search = useSearchParams();
+  const search = useSearchParams(), router = useRouter(), tx = useText();
+  const targetType = search.get("targetType"), targetId = search.get("targetId");
+  const authoring = (targetType === "problem" || targetType === "paper4") && targetId && search.has("kind")
+    ? contentAuthoringHref({ targetType, targetId, versionId: search.get("versionId") ?? undefined,
+        questionKey: search.get("questionKey") ?? undefined,
+        kind: search.get("kind") === "FULL_TRANSLATION" ? "FULL_TRANSLATION" : "FULL_SOLUTION" }, admin)
+    : search.get("mode") === "review" ? `/${admin ? "admin" : "teacher"}/problems/solutions-review?targetType=${targetType === "paper4" ? "paper4" : "problem"}` : null;
+  useEffect(() => { if (authoring) router.replace(authoring); }, [authoring, router]);
+  if (authoring) return <p role="status" className="text-sm text-muted-foreground">{tx("正在打开题目内容编辑页…", "Opening the content editor…")}</p>;
+  return <ScholarshipPolicyPage admin={admin} />;
+}
+
+function ScholarshipPolicyPage({ admin }: { admin: boolean }) {
+  const tx = useText(), search = useSearchParams();
   const [targetType, setTargetType] = useState<TargetType>(
-    ((["batch", "review"].includes(search.get("mode") ?? "")
-      ? ["problem", "paper4"]
-      : ["problem", "paper4", "assignment", "timed", "paper4_activity"]).includes(
-      search.get("targetType") ?? "",
-    )
-      ? search.get("targetType")
-      : "problem") as TargetType,
+    ((search.get("mode") === "batch" ? ["problem", "paper4"] : ["problem", "paper4", "assignment", "timed", "paper4_activity"])
+      .includes(search.get("targetType") ?? "") ? search.get("targetType") : "problem") as TargetType,
   );
-  const [targetId, setTargetId] = useState(search.get("targetId") ?? ""),
-    [questionKey, setQuestionKey] = useState(search.get("questionKey") ?? "");
-  const [mode, setMode] = useState<"single" | "batch" | "review">(
-    search.get("mode") === "review" ? "review" : search.get("mode") === "batch" ? "batch" : "single",
-  ), [policyRevision, setPolicyRevision] = useState(0);
-  const [contentPending, setContentPending] = useState(false);
-  const [versionChoice, setVersionChoice] = useState<{ problemId: string; versionId: string }>();
-  const [contentKind, setContentKind] = useState<AssistanceKind>(search.get("kind") === "FULL_TRANSLATION" ? "FULL_TRANSLATION" : "FULL_SOLUTION");
+  const [targetId, setTargetId] = useState(search.get("targetId") ?? "");
+  const [mode, setMode] = useState<"single" | "batch">(search.get("mode") === "batch" ? "batch" : "single");
+  const [policyRevision, setPolicyRevision] = useState(0);
   const single = mode === "single";
-  function changeMode(next: "single" | "batch" | "review") {
-    setMode(next);
-    if (next !== "single" && targetType !== "paper4" && targetType !== "problem") {
-      setTargetType("problem");
-      setTargetId("");
-      setQuestionKey("");
-    }
-  }
-  const problems = useData<{ items: { targetId: string; title: string; versionId: string }[] }>(
+  const problems = useData<{ items: { targetId: string; title: string }[] }>(
     targetType === "problem" ? "scholarship/contents/review?targetType=problem" : null,
   );
-  const papers = useData<{ items: Paper4PaperSummary[] }>(
-    targetType === "paper4" || targetType === "paper4_activity"
-      ? `paper4/papers?scope=${targetType === "paper4" ? "catalog" : "activities"}`
-      : null,
-  );
-  const activities = useData<{ items: Activity[] }>(
-    targetType === "assignment"
-      ? "assignments"
-      : targetType === "timed"
-        ? "timed-practices"
-        : null,
-  );
-  const paper = useData<Paper4Paper>(
-    targetType === "paper4" && targetId
-      ? `paper4/papers/${encodeURIComponent(targetId)}`
-      : null,
-  );
-  const problem = problems.data?.items.find((item) => item.targetId === targetId);
-  const selectedQuestion = questionKey || paper.data?.questions[0]?.key || "";
-  const requestedVersion = targetId === search.get("targetId") && targetType === search.get("targetType")
-    ? search.get("versionId")
-    : null;
-  const versionId = (targetType === "problem" && versionChoice?.problemId === targetId ? versionChoice.versionId : null) || requestedVersion ||
-    (targetType === "problem" ? problem?.versionId : paper.data?.versionId);
-  const choices =
-    targetType === "problem"
-      ? problems.data?.items.map(item => ({ id: item.targetId, title: item.title }))
-      : targetType === "paper4" || targetType === "paper4_activity"
-        ? papers.data?.items.filter((item) => item.canManage !== false)
-        : activities.data?.items;
-  const picker =
-    targetType === "problem"
-      ? problems
-      : targetType === "paper4" || targetType === "paper4_activity"
-        ? papers
-        : activities;
-  const contentTarget =
-    targetType === "problem" && targetId && versionId
-      ? { problemId: targetId, versionId }
-      : targetType === "paper4" && targetId && versionId && selectedQuestion
-        ? { paperId: targetId, versionId, questionKey: selectedQuestion }
-        : null;
-  return (
-    <div className="space-y-4">
-      {!admin && <h1 className="text-lg font-bold">
-        {tx("奖学金管理", "Scholarship management")}
-      </h1>}
-      <p className="text-sm text-muted-foreground">
-        {tx(
-          "先选择负责的题目或活动。内容审核发布与活动开放规则分别管理；奖学金不改变原有成绩或榜分。",
-          "Select a problem or activity you manage. Reviewed content and activity access rules are managed separately; scholarship does not change existing grades or ranking points.",
-        )}
-      </p>
-      <div className="flex flex-wrap gap-2" role="group" aria-label={tx("管理方式", "Management mode")}>
-        <Button size="sm" variant={single ? "primary" : "secondary"} disabled={contentPending} aria-pressed={single} onClick={() => changeMode("single")}>{tx("单项内容与规则", "Content and rules")}</Button>
-        <Button size="sm" variant={mode === "batch" ? "primary" : "secondary"} disabled={contentPending} aria-pressed={mode === "batch"} onClick={() => changeMode("batch")}>{tx("批量解锁价格", "Batch unlock prices")}</Button>
-        <Button size="sm" variant={mode === "review" ? "primary" : "secondary"} disabled={contentPending} aria-pressed={mode === "review"} onClick={() => changeMode("review")}>{tx("批量审核题解", "Batch solution review")}</Button>
-      </div>
-      <section
-        className={`${panel} grid gap-3 p-4 sm:grid-cols-[200px_minmax(0,1fr)]`}
-      >
-        <Field label={tx("管理对象", "Manage")}>
-          <select
-            className={input}
-            disabled={contentPending}
-            value={targetType}
-            onChange={(event) => {
-              setTargetType(event.target.value as TargetType);
-              setTargetId("");
-              setQuestionKey("");
-            }}
-          >
-            <option value="problem">{tx("普通题目", "Problem")}</option>
-            <option value="paper4">Paper 4 {tx("试卷", "paper")}</option>
-            {single && <option value="assignment">{tx("作业", "Assignment")}</option>}
-            {single && <option value="timed">{tx("限时练习", "Timed practice")}</option>}
-            {single && <option value="paper4_activity">
-              Paper 4 {tx("活动", "activity")}
-            </option>}
-          </select>
-        </Field>
-        {single && <SearchableSelect label={tx("选择题目或活动", "Select problem or activity")}
-          choices={choices ?? []} disabled={contentPending || picker.loading} value={targetId}
-          onChange={value => {
-            setTargetId(value);
-            setQuestionKey("");
-            setVersionChoice(undefined);
-          }} />}
-        {mode !== "review" && <State resource={picker} />}
-        {single && targetType === "paper4" && targetId && (
-          <>
-            <State resource={paper} />
-            <Field label={tx("大题", "Question")}>
-              <select
-                className={input}
-                disabled={contentPending}
-                value={selectedQuestion}
-                onChange={(event) => setQuestionKey(event.target.value)}
-              >
-                {paper.data?.questions.map((item) => (
-                  <option key={item.key} value={item.key}>
-                    {item.key} · {item.title}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </>
-        )}
-      </section>
-      {single && !targetId && <section className={`${panel} space-y-1 p-4`}>
-        <h2 className="font-semibold">{tx("内容录入与发布", "Author and publish content")}</h2>
-        <p className="text-sm text-muted-foreground">{tx("请先在上方选择题目或试卷，然后在这里编辑学生看到的译文、原有题解和新增解法。", "Choose a problem or paper above, then edit student translations, existing solutions and additional approaches here.")}</p>
-      </section>}
-      {mode === "batch" && (targetType === "problem" || targetType === "paper4") && !picker.loading && !picker.error && <ScholarshipBatchPrices key={targetType} targetType={targetType} choices={choices ?? []} initialIds={(search.get("ids") ?? "").split(",").filter(Boolean)} onSaved={() => setPolicyRevision(value => value + 1)}/>}
-      {mode === "review" && (targetType === "problem" || targetType === "paper4") && <ScholarshipBatchReview key={targetType} targetType={targetType} admin={admin}/>}
-      {single && contentTarget && (
-        <ContentEditor
-          key={JSON.stringify(contentTarget)}
-          target={contentTarget}
-          kind={contentKind}
-          onKindChange={setContentKind}
-          contentPending={contentPending}
-          onPendingChange={setContentPending}
-          onVersionChange={versionId => setVersionChoice({ problemId: targetId, versionId })}
-          autoSelect={targetType === "problem" && !requestedVersion && versionChoice?.problemId !== targetId}
-        />
-      )}
-      {single && targetId && (
-        <>
-          <PolicyEditor
-            key={`${targetType}:${targetId}:${policyRevision}`}
-            targetType={targetType}
-            targetId={targetId}
-          />
-          {["assignment", "timed", "paper4_activity"].includes(targetType) && (
-            <ActivityRewardEditor
-              key={`reward:${targetType}:${targetId}`}
-              activityType={targetType as ActivityType}
-              activityId={targetId}
-            />
-          )}
-          <UsageList
-            key={`usage:${targetType}:${targetId}`}
-            targetType={targetType}
-            targetId={targetId}
-          />
-        </>
-      )}
+  const papers = useData<{ items: Paper4PaperSummary[] }>(targetType === "paper4" || targetType === "paper4_activity"
+    ? `paper4/papers?scope=${targetType === "paper4" ? "catalog" : "activities"}` : null);
+  const activities = useData<{ items: Activity[] }>(targetType === "assignment" ? "assignments" : targetType === "timed" ? "timed-practices" : null);
+  const choices = targetType === "problem" ? problems.data?.items.map(item => ({ id: item.targetId, title: item.title }))
+    : targetType === "paper4" || targetType === "paper4_activity" ? papers.data?.items.filter(item => item.canManage !== false) : activities.data?.items;
+  const picker = targetType === "problem" ? problems : targetType === "paper4" || targetType === "paper4_activity" ? papers : activities;
+  return <div className="space-y-4">
+    {!admin && <h1 className="text-lg font-bold">{tx("奖学金管理", "Scholarship management")}</h1>}
+    <p className="text-sm text-muted-foreground">{tx("设置题目或活动的价格与开放规则。题解和译文在对应的题目或试卷编辑页维护。", "Set prices and access rules for problems or activities. Edit solutions and translations in the problem or paper editor.")}</p>
+    <div className="flex flex-wrap gap-2" role="group" aria-label={tx("管理方式", "Management mode")}>
+      <Button size="sm" variant={single ? "primary" : "secondary"} aria-pressed={single} onClick={() => setMode("single")}>{tx("单项价格与规则", "Prices and access rules")}</Button>
+      <Button size="sm" variant={!single ? "primary" : "secondary"} aria-pressed={!single} onClick={() => {
+        setMode("batch");
+        if (targetType !== "problem" && targetType !== "paper4") { setTargetType("problem"); setTargetId(""); }
+      }}>{tx("批量解锁价格", "Batch unlock prices")}</Button>
     </div>
-  );
-}
-
-function ContentEditor({
-  target,
-  kind,
-  onKindChange,
-  contentPending,
-  onPendingChange,
-  onVersionChange,
-  autoSelect = false,
-}: {
-  target:
-    | { problemId: string; versionId: string }
-    | { paperId: string; versionId: string; questionKey: string };
-  kind: AssistanceKind;
-  onKindChange: (kind: AssistanceKind) => void;
-  contentPending: boolean;
-  onPendingChange: (pending: boolean) => void;
-  onVersionChange: (versionId: string) => void;
-  autoSelect?: boolean;
-}) {
-  const tx = useText(),
-    contents = useData<ContentResponse>(
-      `scholarship/contents?${new URLSearchParams(target)}`,
-    );
-  const content = contents.data?.items.find(
-    (item) =>
-      item.kind === kind &&
-      item.language === (kind === "FULL_TRANSLATION" ? "zh-CN" : ""),
-  );
-  useEffect(() => {
-    if (!autoSelect || contents.loading || contents.error || !contents.data) return;
-    const recommended = contents.data.recommendedVersionId;
-    if (recommended) onVersionChange(recommended);
-  }, [autoSelect, contents.loading, contents.error, contents.data, onVersionChange]);
-  const readyToEdit = !autoSelect && contents.data && !contents.loading && !contents.error;
-  return (
-    <section className={`${panel} space-y-3 p-4`}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-semibold">
-          {kind === "FULL_SOLUTION" && "problemId" in target ? tx("学生题解", "Student solutions") : tx("内容录入与发布", "Author and publish content")}
-        </h2>
-        <select
-          aria-label={tx("辅助类型", "Assistance type")}
-          className={`${input} max-w-64`}
-          disabled={contentPending}
-          value={kind}
-          onChange={(event) => onKindChange(event.target.value as AssistanceKind)}
-        >
-          {kinds.map((value) => (
-            <option key={value} value={value}>
-              {kindName(value, tx)}
-            </option>
-          ))}
-        </select>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        {tx(
-          "只发布面向学生的译文或题解；不要粘贴隐藏测试、判题驱动或教师私有批注。每个版本单独审核，未发布内容不会收费。",
-          "Publish student-facing translations or explanations only. Do not include hidden tests, judge drivers, or private teacher notes. Each version is reviewed separately; unpublished content is never charged.",
-        )}
-      </p>
-      <State resource={contents} />
-      {"problemId" in target && contents.data?.versions && <SolutionContextPicker versions={contents.data.versions}
-        value={autoSelect ? undefined : target.versionId} onChange={onVersionChange}
-        disabled={contentPending || contents.loading || Boolean(contents.error)} selectionRequired={contents.data.selectionRequired} />}
-      {readyToEdit && contents.data && (
-        <ContentForm
-          key={kind}
-          kind={kind}
-          target={target}
-          content={content}
-          originalSolution={contents.data.originalSolution}
-          inheritedSolution={contents.data.inheritedSolution}
-          onVersionChange={onVersionChange}
-          disabled={contents.loading || Boolean(contents.error)}
-          reload={contents.reload}
-          onPendingChange={onPendingChange}
-          onSaved={next => contents.setData(previous => ({
-            ...previous,
-            items: [...(previous?.items.filter(item => item.id !== next.id) ?? []), next],
-            versions: previous?.versions?.map(version => version.versionId === target.versionId ? {
-              ...version, solutionStatus: next.kind === "FULL_SOLUTION" ? next.status : version.solutionStatus,
-              hasPendingSolutions: next.kind === "FULL_SOLUTION" ? Boolean(next.hasPendingSolutions) : version.hasPendingSolutions,
-            } : version),
-          }))}
-        />
-      )}
+    <section className={`${panel} grid gap-3 p-4 sm:grid-cols-[200px_minmax(0,1fr)]`}>
+      <Field label={tx("管理对象", "Manage")}><select className={input} value={targetType} onChange={event => { setTargetType(event.target.value as TargetType); setTargetId(""); }}>
+        <option value="problem">{tx("普通题目", "Problem")}</option>
+        <option value="paper4">Paper 4 {tx("试卷", "paper")}</option>
+        {single && <><option value="assignment">{tx("作业", "Assignment")}</option><option value="timed">{tx("限时练习", "Timed practice")}</option><option value="paper4_activity">Paper 4 {tx("活动", "activity")}</option></>}
+      </select></Field>
+      {single && <SearchableSelect label={tx("选择题目或活动", "Select problem or activity")} choices={choices ?? []} disabled={picker.loading} value={targetId} onChange={setTargetId} />}
+      <State resource={picker} />
     </section>
-  );
-}
-
-function ContentForm({
-  target,
-  kind,
-  content,
-  originalSolution,
-  inheritedSolution,
-  onVersionChange,
-  disabled,
-  reload,
-  onPendingChange,
-  onSaved,
-}: {
-  target: { problemId?: string; versionId: string };
-  kind: AssistanceKind;
-  content?: Content;
-  originalSolution?: OriginalSolution;
-  inheritedSolution?: InheritedSolution;
-  onVersionChange: (versionId: string) => void;
-  disabled: boolean;
-  reload: () => void;
-  onPendingChange: (pending: boolean) => void;
-  onSaved: (content: Content) => void;
-}) {
-  const tx = useText(),
-    [draft, setDraft] = useState<SolutionDraft | null>(null),
-    [reviewed, setReviewed] = useState(false),
-    [preview, setPreview] = useState(false),
-    [conflict, setConflict] = useState(false),
-    [discard, setDiscard] = useState(false),
-    action = useAction();
-  const inFlight = useRef(false);
-  const saved = content ?? { body: "" };
-  const multiple = kind === "FULL_SOLUTION" && Boolean(target.problemId);
-  const inherited = multiple && !content ? inheritedSolution : undefined;
-  const initial = inherited
-    ? { body: inherited.body, solutions: inherited.solutions ?? [{ title: tx("原有题解", "Existing solution"), body: inherited.body }] }
-    : multiple && !content && originalSolution
-    ? referenceSolutionDraft(originalSolution, tx("原参考题解", "Reference solution"))
-    : saved;
-  const value = draft ?? initial;
-  const dirty = !sameSolutionDraft(value, saved);
-  const unsavedEdits = draft !== null && dirty;
-  const published = content?.status === "published";
-  const unavailable = disabled || action.busy;
-  const canEdit = !unavailable && (!published || multiple);
-  const canSave = canEdit && dirty && !conflict && !solutionDraftError(value);
-  useSolutionDraftNavigation(unsavedEdits || action.busy);
-  useEffect(() => {
-    onPendingChange(unsavedEdits || action.busy);
-    return () => onPendingChange(false);
-  }, [unsavedEdits, action.busy, onPendingChange]);
-
-  function edit(next: SolutionDraft) {
-    setDraft(next);
-    setReviewed(false);
-    if (!conflict) action.clear();
-  }
-
-  function commit(operation: () => Promise<Content>, message: string) {
-    if (inFlight.current) return;
-    inFlight.current = true;
-    void action.run(async () => {
-      try {
-        const next = await operation();
-        onSaved(next);
-        setDraft(null);
-        setReviewed(false);
-        return message;
-      } catch (cause) {
-        if (cause instanceof ApiError && cause.status === 409) setConflict(true);
-        throw cause;
-      }
-    }).finally(() => { inFlight.current = false; });
-  }
-
-  function reset() {
-    setDiscard(false);
-    setDraft(null);
-    setReviewed(false);
-    action.clear();
-    if (conflict) reload();
-    setConflict(false);
-  }
-
-  return (
-    <div className="space-y-3">
-      {!multiple && <p className="text-xs text-muted-foreground">
-        {tx("\u7248\u672c", "Version")}{" "}
-        <code>{target.versionId.slice(0, 8)}</code>
-        {published && !multiple &&
-          tx(
-            " \u00b7 \u5df2\u53d1\u5e03\u5185\u5bb9\u5df2\u51bb\u7ed3\uff0c\u4fee\u6539\u9700\u8981\u65b0\u9898\u76ee\u7248\u672c\u5e76\u91cd\u65b0\u5ba1\u6838\u3002",
-            " \u00b7 Published content is frozen. Use a new problem version and review changes again.",
-          )}
-      </p>}
-      <p className="text-xs text-muted-foreground">
-        {tx("当前状态：", "Status: ")}
-        {content?.hasPendingSolutions
-          ? tx("已发布 · 更新待审核", "Published · updates awaiting review")
-          : published
-          ? tx("已发布", "Published")
-          : content?.status === "draft"
-            ? tx("草稿", "Draft")
-            : (content?.status ?? (inherited
-              ? tx("已沿用原题解 · 待核对保存", "Carried forward · review and save")
-              : multiple && originalSolution ? tx("已准备参考素材 · 待核对保存", "Reference draft · review and save")
-              : tx("尚未录入", "Not authored")))}
-      </p>
-      {inherited && <div className="space-y-2 rounded-md border border-border p-3">
-        <p className="text-sm">{tx("已沿用之前发布的完整题解。请结合本次题目修改核对说明和代码，再保存并审核发布。", "The previously published solutions are carried forward. Check the explanation and code against this problem edit, then save and review for publication.")}</p>
-        <Button type="button" size="sm" variant="secondary" disabled={unsavedEdits || unavailable} onClick={() => onVersionChange(inherited.versionId)}>{tx("查看原题解", "View the original solutions")}</Button>
-      </div>}
-      {multiple && !content && !inherited && originalSolution && <p className="text-sm text-muted-foreground">{tx("已用此版本的原参考题解准备首篇草稿。请核对后保存、审核发布，再向学生开放；其他解法可继续追加。", "The first draft is prepared from this version’s reference solution. Review, save and publish it for students; add other approaches alongside it.")}</p>}
-      {multiple ? <SolutionAlternativesEditor value={value} onChange={edit} disabled={!canEdit} originalSolution={originalSolution} /> : <Field
-        label={tx(
-          "内容（Markdown，可包含代码块）",
-          "Content (Markdown with code blocks)",
-        )}
-      >
-        <textarea
-          className={`${area} min-h-56 resize-none font-mono`}
-          value={value.body}
-          maxLength={200000}
-          onChange={(event) => edit({ body: event.target.value })}
-          disabled={!canEdit}
-        />
-      </Field>}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={!canSave}
-          aria-busy={action.busy}
-          onClick={() => commit(() => productionApi<Content>("scholarship/contents", {
-            method: "POST",
-            body: {
-              ...target,
-              ...value,
-              kind,
-              language: kind === "FULL_TRANSLATION" ? "zh-CN" : "",
-              expectedHash: content?.contentHash,
-            },
-          }), published
-            ? tx("更新已保存为草稿，等待审核。", "Updates saved for review.")
-            : tx("草稿已保存，审核发布后学生才能获取。", "Draft saved. Students can access it after review and publication."))}
-        >
-          {tx("保存草稿", "Save draft")}
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={!value.body.trim()}
-          onClick={() => setPreview(!preview)}
-        >
-          {preview ? tx("收起预览", "Hide preview") : tx("预览", "Preview")}
-        </Button>
-        {(unsavedEdits || conflict) && <Button size="sm" variant="ghost" disabled={action.busy} onClick={() => unsavedEdits ? setDiscard(true) : reset()}>
-          {conflict ? tx("重新载入", "Reload") : tx("放弃修改", "Discard changes")}
-        </Button>}
-      </div>
-      {preview && (
-        <div className="rounded-md border border-border p-4">
-          {kind === "FULL_SOLUTION" ? <SolutionDraftPreview draft={value} /> : <LessonContent content={value.body} />}
-        </div>
-      )}
-      {content && (!published || content.hasPendingSolutions) && !dirty && !conflict && (
-        <>
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              className="mt-1 accent-primary"
-              type="checkbox"
-              checked={reviewed}
-              disabled={unavailable}
-              onChange={(event) => setReviewed(event.target.checked)}
-            />
-            {tx(
-              "已核对题目版本、内容准确性，并确认不包含私有批注或隐藏测试。",
-              "I reviewed the problem version and accuracy and confirmed there are no private notes or hidden tests.",
-            )}
-          </label>
-          <Button
-            size="sm"
-            disabled={unavailable || !reviewed}
-            aria-busy={action.busy}
-            onClick={() => commit(() => productionApi<Content>(`scholarship/contents/${encodeURIComponent(content.id)}/publish`, {
-              method: "POST", body: { reviewed: true, expectedHash: content.contentHash },
-            }), tx("内容已审核发布。", "Content reviewed and published."))}
-          >
-            {tx("审核并发布", "Review and publish")}
-          </Button>
-        </>
-      )}
-      <Feedback action={action} />
-      {dirty && <p className="text-xs text-muted-foreground">{tx("保存或放弃修改后可切换题目和辅助类型。", "Save or discard edits to switch problems or assistance type.")}</p>}
-      {discard && <SolutionDiscardDialog reload={conflict} onCancel={() => setDiscard(false)} onDiscard={reset} />}
-    </div>
-  );
+    {single && !targetId && <p className="text-sm text-muted-foreground">{tx("请选择题目或活动，查看并调整价格与开放规则。", "Choose a problem or activity to view and adjust its prices and access rules.")}</p>}
+    {!single && (targetType === "problem" || targetType === "paper4") && !picker.loading && !picker.error && <ScholarshipBatchPrices key={targetType} targetType={targetType} choices={choices ?? []} initialIds={(search.get("ids") ?? "").split(",").filter(Boolean)} onSaved={() => setPolicyRevision(value => value + 1)} />}
+    {single && targetId && <>
+      {(targetType === "problem" || targetType === "paper4") && <AppLink className="inline-block text-sm font-medium text-primary hover:underline" href={contentAuthoringHref({ targetType, targetId }, admin)}>{tx("编辑题目与题解", "Edit problem and solutions")}</AppLink>}
+      <PolicyEditor key={`${targetType}:${targetId}:${policyRevision}`} targetType={targetType} targetId={targetId} />
+      {["assignment", "timed", "paper4_activity"].includes(targetType) && <ActivityRewardEditor key={`reward:${targetType}:${targetId}`} activityType={targetType as ActivityType} activityId={targetId} />}
+      <UsageList key={`usage:${targetType}:${targetId}`} targetType={targetType} targetId={targetId} />
+    </>}
+  </div>;
 }
 
 function PolicyEditor({

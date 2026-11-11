@@ -35,6 +35,9 @@ import { AdminAccountsPage, AdminPeoplePage } from "@/components/admin/accounts-
 import { AdminDashboard } from "@/components/admin/dashboard";
 import { legacyCourseAdmissionsHref, legacyCourseAdmissionsSchoolId, SchoolCourseAdmissions } from "@/components/schools/school-course-admissions";
 import { AdminImportPage } from "@/components/admin/import-page";
+import { AdminProblemSolutionsPage } from "@/components/admin/problem-solutions-page";
+import { SolutionReviewPage } from "@/components/teacher/solution-review-page";
+import { Paper4AssistancePage } from "@/components/paper4/paper4-assistance-editor";
 import { AdminProblemBanks } from "@/components/admin/problem-banks";
 import { AdminJudgePage, AdminSettingsPage } from "@/components/admin/system-pages";
 import { Feedback, panelClass as panel, useMutation as useAction } from "@/components/admin/common";
@@ -291,6 +294,11 @@ function ProductionView({pathname,role,user,profileVersion,onProfileSaved}:{path
   if (pathname==="/admin/people") return <AdminPeoplePage/>;
   if (pathname==="/admin/imports") return <AdminImportPage/>;
   if (pathname==="/admin/problem-banks") return <AdminProblemBanks/>;
+  if (pathname === "/admin/problems/solutions-review") return <SolutionReviewPage admin />;
+  const problemSolutions = pathname.match(/^\/admin\/problems\/([^/]+)\/edit$/);
+  if (problemSolutions) return <AdminProblemSolutionsPage id={problemSolutions[1]!} />;
+  const paperSolutions = pathname.match(/^\/admin\/paper4\/([^/]+)$/);
+  if (paperSolutions) return <Paper4AssistancePage id={paperSolutions[1]!} admin />;
   if (pathname==="/admin/judge-service") return <AdminJudgePage/>;
   if (pathname==="/admin/settings") return <AdminSettingsPage/>;
   if (pathname===legacyCourseAdmissionsHref) return <SchoolCourseAdmissions schoolId={legacyCourseAdmissionsSchoolId} href={legacyCourseAdmissionsHref} coursesHref="/teacher/courses"/>;

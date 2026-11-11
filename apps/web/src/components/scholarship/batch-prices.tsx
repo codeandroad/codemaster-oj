@@ -1,6 +1,9 @@
 "use client";
 
 import { useRef, useState, type ChangeEvent } from "react";
+import { usePathname } from "next/navigation";
+import { AppLink } from "@/components/navigation";
+import { contentAuthoringHref } from "./authoring-links";
 import { useLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
 import { useRangeSelection } from "@/components/ui/use-range-selection";
@@ -25,6 +28,7 @@ export function ScholarshipBatchPrices({ targetType, choices, initialIds = [], o
   onSaved?: () => void;
 }) {
   const { locale } = useLocale();
+  const admin = usePathname().startsWith("/admin/");
   const tx = (zh: string, en: string) => locale === "en" ? en : zh;
   const [selected, setSelected] = useState(initialIds), [query, setQuery] = useState("");
   const [translation, setTranslation] = useState(true), [solution, setSolution] = useState(true);
@@ -105,7 +109,7 @@ export function ScholarshipBatchPrices({ targetType, choices, initialIds = [], o
         <p className="text-muted-foreground">{tx("本次保存时的当前版本内容；课程或活动中固定的旧版本需单独审核。", "Current-version content at the time of this save; older versions pinned in courses or activities need their own review.")}</p>
         {publication.map(item => <div key={item.kind} className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span>{item.kind === "FULL_TRANSLATION" ? tx("中文题面", "Chinese translation") : tx("完整题解", "Full solution")} · {tx(`已发布 ${item.published}/${item.total} · 待审核草稿 ${item.draft} · 未录入 ${item.missing}${item.withdrawn ? ` · 已撤回 ${item.withdrawn}` : ""}`, `Published ${item.published}/${item.total} · Draft ${item.draft} · Missing ${item.missing}${item.withdrawn ? ` · Withdrawn ${item.withdrawn}` : ""}`)}</span>
-          {item.firstUnpublished && <a className="font-medium text-primary hover:underline" href={`/teacher/scholarship?${new URLSearchParams({ targetType, targetId: item.firstUnpublished.targetId, kind: item.kind, ...(item.firstUnpublished.questionKey ? { questionKey: item.firstUnpublished.questionKey } : {}) })}`}>{tx("录入并审核内容", "Author and review content")}</a>}
+          {item.firstUnpublished && <AppLink className="font-medium text-primary hover:underline" href={contentAuthoringHref({ targetType, ...item.firstUnpublished, kind: item.kind }, admin)}>{tx("前往题目编辑内容", "Edit content in the problem")}</AppLink>}
         </div>)}
       </div>}
     </form>

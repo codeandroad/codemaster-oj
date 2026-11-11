@@ -406,6 +406,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                     ? tr(`选择前 ${MAX_BATCH_PUBLISH} 道可发布题（共 ${publishableScope.length} 道）`, `Select first ${MAX_BATCH_PUBLISH} publishable (${publishableScope.length} total)`)
                     : `${tr("选择可发布题目", "Select publishable")} (${publishableScope.length})`}
               </Button>
+              <Link href="/teacher/problems/solutions-review" className={buttonVariants({ variant: "secondary", size: "sm" })}>{tr("题解审核", "Solution review")}</Link>
               {!bankId && (
                 <Link
                   className={buttonVariants()}

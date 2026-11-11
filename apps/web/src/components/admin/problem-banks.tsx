@@ -1,5 +1,6 @@
 "use client";
 
+import { contentAuthoringHref } from "@/components/scholarship/authoring-links";
 import { ProblemTutorialEditor } from "@/components/teacher/problem-tutorial-editor";
 import { ProblemPublicationStatus } from "@/components/problem-publication-status";
 import { BankRenameDialog } from "@/components/bank-rename-dialog";
@@ -107,7 +108,7 @@ export function AdminProblemBanks() {
   return <>
     <PageHeader eyebrow={tr("题库管理", "PROBLEM BANKS")} title={tr("题库管理", "Problem banks")}
       description={tr("查看全校和教师私有题库。题目以归档代替删除：停止新的自由练习，但保留题目版本、提交与成绩。", "Manage school and teacher-private banks. Archive instead of deleting problems: stop new free practice while retaining versions, submissions, and grades.")}
-      action={<div className="flex gap-2"><Button variant="secondary" onClick={() => banks.reload()}>{tr("刷新", "Refresh")}</Button><Button onClick={() => setCreating(true)}><Plus size={15} aria-hidden="true" />{tr("新建题库", "New bank")}</Button></div>} />
+      action={<div className="flex flex-wrap gap-2"><AppLink href="/admin/problems/solutions-review" className={buttonVariants({ variant: "secondary" })}>{tr("题解审核", "Solution review")}</AppLink><Button variant="secondary" onClick={() => banks.reload()}>{tr("刷新", "Refresh")}</Button><Button onClick={() => setCreating(true)}><Plus size={15} aria-hidden="true" />{tr("新建题库", "New bank")}</Button></div>} />
     <Feedback action={action} />
     <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(250px,290px)_minmax(0,1fr)]">
       <section className={`${panelClass} min-w-0 self-start`}>
@@ -236,7 +237,7 @@ function ManagedProblemDetail({ id, bankArchived, onClose }: { id: string; bankA
         <p className="mt-2 whitespace-pre-wrap leading-6">{version.statement || tr("暂无题面", "No statement")}</p>
         <p className="mt-2 text-xs text-muted-foreground">{tr("验证", "Validation")}: {version.validationStatus} · {tr("校内公开", "School-wide")}: {version.schoolVisibleAt ? tr("是", "Yes") : tr("否", "No")}</p>
         {!bankArchived && !detail.data?.archivedAt && <AppLink className={buttonVariants({ size: "sm", variant: "secondary", className: "mt-3" })}
-          href={`/admin/scholarship?${new URLSearchParams({ tab: "solutions", targetType: "problem", targetId: id, versionId: version.id, kind: "FULL_SOLUTION" })}`}>
+          href={contentAuthoringHref({ targetType: "problem", targetId: id, versionId: version.id }, true)}>
           {tr("管理学员题解", "Manage student solutions")}
         </AppLink>}
         {version.id === detail.data?.currentVersionId && detail.data.bankVisibility === "school" &&

@@ -9,6 +9,7 @@ import type { CampusUser } from "@/lib/production-api";
 import { TeacherDashboard, TeacherClasses } from "./dashboard-classes";
 import { TeacherBankDetail } from "./bank-detail";
 import { TeacherBanks } from "./problem-banks";
+import { SolutionReviewPage } from "./solution-review-page";
 import { TeacherProblemEditor } from "./problem-editor";
 import { TeacherAssignmentPreview } from "./assignment-preview";
 import {
@@ -36,6 +37,7 @@ export function TeacherPages({
   pathname: string;
   user: CampusUser;
 }) {
+  const search = useSearchParams();
   const path = pathname.replace(/\/$/, "");
   if (path === "/teacher") return <TeacherDashboard />;
   if (path === "/teacher/acsl") return <LegacyAcslTeacherPage user={user} />;
@@ -43,8 +45,9 @@ export function TeacherPages({
   let paper4Match = path.match(/^\/teacher\/paper4\/([^/]+)\/review\/([^/]+)$/);
   if (paper4Match) return <TeacherPaper4Review attemptId={paper4Match[2]!} />;
   paper4Match = path.match(/^\/teacher\/paper4\/([^/]+)$/);
-  if (paper4Match) return <TeacherPaper4Editor id={paper4Match[1]!} user={user} />;
+  if (paper4Match) return <TeacherPaper4Editor key={`${paper4Match[1]}:${search.get("view") ?? "current"}:${search.get("versionId") ?? "latest"}:${search.get("tab") ?? "paper"}:${search.get("questionKey") ?? "first"}:${search.get("kind") ?? "FULL_SOLUTION"}`} id={paper4Match[1]!} user={user} />;
   if (path === "/teacher/classes") return <TeacherClasses user={user} />;
+  if (path === "/teacher/problems/solutions-review") return <SolutionReviewPage />;
   if (path === "/teacher/problems") return <TeacherBanks user={user} />;
   let match = path.match(/^\/teacher\/problems\/banks\/([^/]+)$/);
   if (match) return <TeacherBankDetail id={match[1]!} />;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, type ChangeEvent } from "react";
+import { contentAuthoringHref } from "./authoring-links";
 import { useLocale } from "@/components/locale-context";
 import { SolutionBundle, type SolutionArticle } from "@/components/scholarship/solution-content";
 import { Button } from "@/components/ui/button";
@@ -68,15 +69,9 @@ function itemLabel(item: ReviewItem) {
     : item.title;
 }
 function editorHref(item: ReviewItem, admin: boolean) {
-  return `/${admin ? "admin" : "teacher"}/scholarship?${new URLSearchParams({
-    ...(admin ? { tab: "solutions" } : {}),
-    targetType: item.targetType,
-    targetId: item.targetId,
-    versionId: item.versionId,
-    kind: "FULL_SOLUTION",
-    ...(item.questionKey ? { questionKey: item.questionKey } : {}),
-  })}`;
+  return contentAuthoringHref({ ...item, kind: "FULL_SOLUTION" }, admin);
 }
+
 function selectable(item: ReviewItem) {
   return item.status === "draft" && Boolean(item.contentId && item.contentHash);
 }

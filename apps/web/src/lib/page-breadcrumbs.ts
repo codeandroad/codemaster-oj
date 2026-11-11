@@ -77,6 +77,10 @@ export function pageBreadcrumbs(pathname: string, role: BreadcrumbRole, locale: 
     if (classId) trail[1].href += `?${new URLSearchParams({ classId })}`;
     return trail;
   }
+  if (pathname === "/teacher/problems/solutions-review") return detail("/teacher/problems", ["题解审核", "Solution review"]);
+  if (pathname === "/admin/problems/solutions-review") return detail("/admin/problem-banks", ["题解审核", "Solution review"]);
+  if (/^\/admin\/problems\/[^/]+\/edit$/.test(pathname)) return detail("/admin/problem-banks", ["编辑学生题解", "Edit student solutions"]);
+  if (/^\/admin\/paper4\/[^/]+$/.test(pathname)) return detail("/admin/problem-banks", ["Paper 4 题解与翻译", "Paper 4 solutions and translations"]);
   if (sections[pathname]) return [root, { href: pathname, label: label(sections[pathname]) }];
   if (/^\/teacher\/problems\/banks\/[^/]+$/.test(pathname)) return detail("/teacher/problems", ["题库详情", "Bank details"]);
   if (/^\/teacher\/problems\/[^/]+\/edit$/.test(pathname)) {

@@ -309,8 +309,8 @@ export function StudentScholarshipPage({ endpoint = "scholarship/me" }: { endpoi
 
 export function AdminScholarshipPage() {
   const tx = useText(), search = useSearchParams(),
-    [tab, setTab] = useState(() => search.get("tab") === "solutions" ? "solutions" : "grant"),
-    [solutionsVisited, setSolutionsVisited] = useState(() => search.get("tab") === "solutions"),
+    [tab, setTab] = useState(() => ["solutions", "rules"].includes(search.get("tab") ?? "") || search.has("targetId") || search.get("mode") === "review" ? "rules" : "grant"),
+    [rulesVisited, setRulesVisited] = useState(() => ["solutions", "rules"].includes(search.get("tab") ?? "") || search.has("targetId") || search.get("mode") === "review"),
     [ids, setIds] = useState<string[]>([]),
     [amount, setAmount] = useState(4),
     [reason, setReason] = useState("");
@@ -360,7 +360,7 @@ export function AdminScholarshipPage() {
           ["grant", tx("发放与调整", "Grants & adjustments")],
           ["audit", tx("流水与退款", "Audit & refunds")],
           ["settings", tx("价格与额度", "Prices & limits")],
-          ["solutions", tx("题解与辅助内容", "Solutions and assistance")],
+          ["rules", tx("价格与开放规则", "Prices and access rules")],
         ].map(([value, label]) => (
           <Button
             key={value}
@@ -368,7 +368,7 @@ export function AdminScholarshipPage() {
             size="sm"
             onClick={() => {
               setTab(value);
-              if (value === "solutions") setSolutionsVisited(true);
+              if (value === "rules") setRulesVisited(true);
               action.clear();
             }}
           >
@@ -376,7 +376,7 @@ export function AdminScholarshipPage() {
           </Button>
         ))}
       </div>
-      {solutionsVisited && <div hidden={tab !== "solutions"}><TeacherScholarshipPage admin /></div>}
+      {rulesVisited && <div hidden={tab !== "rules"}><TeacherScholarshipPage admin /></div>}
       {tab === "grant" && (
         <section className={`${panel} space-y-4 p-4`}>
           <p className="text-sm text-muted-foreground">

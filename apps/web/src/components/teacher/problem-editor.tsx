@@ -1,7 +1,7 @@
 "use client";
 
 import { ProblemTutorialEditor } from "./problem-tutorial-editor";
-import { ProblemSolutionsEntry } from "./problem-solutions-entry";
+import { ProblemAssistanceEditor } from "./problem-assistance-editor";
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -79,7 +79,7 @@ const tabs = [
   "教程",
   "版本与发布",
 ];
-const englishTabs: Record<string,string> = { "题面":"Statement", "接口与模板":"Interface and templates", "测试数据":"Test data", "判题设置":"Judge settings", "解答与提示":"Solution and hints", "教程":"Tutorial", "版本与发布":"Versions and publication" };
+const englishTabs: Record<string,string> = { "题面":"Statement", "接口与模板":"Interface and templates", "测试数据":"Test data", "判题设置":"Judge settings", "解答与提示":"Solutions and hints", "教程":"Tutorial", "版本与发布":"Versions and publication" };
 const blank: EditorProblem = {
   id: "new",
   title: "",
@@ -153,7 +153,7 @@ export function TeacherProblemEditor({ id,user }: { id: string;user:CampusUser }
     <>
       <State resource={resource} />
       {(id === "new" || resource.data) && (
-        <ProblemEditorForm key={`${id}:${search.get("versionId")??"latest"}`} initial={resource.data} user={user} />
+        <ProblemEditorForm key={`${id}:${search.get("versionId")??"latest"}:${search.get("solutionVersionId")??"student"}:${search.get("tab")??"statement"}:${search.get("kind")??"FULL_SOLUTION"}`} initial={resource.data} user={user} />
       )}
     </>
   );
@@ -175,6 +175,8 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
       if (search.get("tab") === "solutions") return "解答与提示";
       return "题面";
     }),
+    [solutionsVisited, setSolutionsVisited] = useState(() => search.get("tab") === "solutions"),
+    [solutionPending, setSolutionPending] = useState(false),
     [tutorialVisited, setTutorialVisited] = useState(() => search.get("tab") === "tutorial"),
     [templateLanguage,setTemplateLanguage]=useState<SubmissionLanguage>("python"),
     [preview, setPreview] = useState(false),
@@ -235,6 +237,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
   ) => setProblem((p) => ({ ...p, [key]: value }));
   const save = async (navigate=true) => {
     if (!editable) throw new Error("此题库仅授予阅读权限。");
+    if (solutionPending) throw new Error(tr("请先保存或放弃题解修改，再保存题目。", "Save or discard solution changes before saving the problem."));
     if(!Number.isInteger(problem.timeLimitMs)||problem.timeLimitMs<100||problem.timeLimitMs>5000)throw new Error("时间限制须为 100–5000 ms 的整数。");
     if(!Number.isInteger(problem.memoryLimitMb)||problem.memoryLimitMb<32||problem.memoryLimitMb>256)throw new Error("内存限制须为 32–256 MB 的整数。");
     if(problem.mode==="function"&&problem.functionName&&!/^[A-Za-z_][A-Za-z0-9_]*$/.test(problem.functionName))throw new Error("函数名只能包含字母、数字与下划线，且不能以数字开头。");
@@ -261,7 +264,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
     setProblem(result);
     if (!initial && navigate)
       router.replace(
-        `/teacher/problems/${result.id}/edit?returnTo=${encodeURIComponent(back)}${tab === "教程" ? "&tab=tutorial" : ""}`,
+        `/teacher/problems/${result.id}/edit?returnTo=${encodeURIComponent(back)}${tab === "教程" ? "&tab=tutorial" : tab === "解答与提示" ? "&tab=solutions" : ""}`,
       );
     return result;
   };
@@ -279,7 +282,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
               {tr("学生预览", "Student preview")}
             </Button>
             <Button
-              disabled={action.busy || !editable}
+              disabled={action.busy || solutionPending || !editable}
               onClick={() =>
                 void action.run(async () => {
                   await save();
@@ -288,11 +291,11 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
               }
             >
               <Save size={15} />
-              {tr("保存草稿", "Save draft")}
+              {tr("保存题目草稿", "Save problem draft")}
             </Button>
             <Button
               variant="secondary"
-              disabled={action.busy || !saved || dirty || !saved.canPublish}
+              disabled={action.busy || solutionPending || !saved || dirty || !saved.canPublish}
               onClick={() => setPublish(true)}
             >
               <Send size={15} />
@@ -302,6 +305,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
         }
       />
       <Feedback action={action} />
+      {solutionPending && <p role="status" className="mt-2 text-sm text-muted-foreground">{tr("题解有未保存修改或正在提交。请在“解答与提示”中完成保存，再保存题目草稿。", "Solution changes are unsaved or being submitted. Finish saving them under Solutions and hints before saving the problem draft.")}</p>}
       {draft.recovery&&<section className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface-subtle px-3 py-2 text-sm" data-od-id="teacher-draft-recovery"><p>{tr("发现本机未保存草稿", "Unsaved local draft found")} · {new Date(draft.recovery.updatedAt).toLocaleString(locale === "zh" ? "zh-CN" : "en-US")} {draft.recovery.baseVersion!==(initial?.versionId??"new")&&tr("（服务器版本已变化，请核对后保存）", "(The server version changed; review before saving)")}</p><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={!editable} onClick={draft.restore}>{tr("恢复草稿", "Restore draft")}</Button><Button size="sm" variant="ghost" onClick={draft.discard}>{tr("忽略草稿", "Discard draft")}</Button></div></section>}
       {draft.status&&<p className="mt-2 text-xs text-muted-foreground" role="status" data-od-id="teacher-autosave-status">{draft.status}</p>}
 
@@ -318,7 +322,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
         <Button
           size="sm"
           variant="secondary"
-          disabled={!editable || action.busy}
+          disabled={!editable || action.busy || solutionPending}
           onClick={() => {if(saved?.id && saved.bankId===problem.bankId)setManage(true);else void action.run(async()=>{await save(false);setManage(true);return "草稿已保存，可选择分组。";});}}
         >
           {tr("整理分组", "Organize groups")}
@@ -332,9 +336,10 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
       <Tabs value={tr(tab, englishTabs[tab] ?? tab)} onChange={value => {
         const next = visibleTabs.find(item => tr(item, englishTabs[item] ?? item) === value) ?? "题面";
         if (next === "教程") setTutorialVisited(true);
+        if (next === "解答与提示") setSolutionsVisited(true);
         setTab(next);
       }} items={visibleTabs.map(item => tr(item, englishTabs[item] ?? item))} />
-      <section className={`${panel} ${styles.body}`} hidden={tab === "教程"} data-od-id="teacher-editor-tab-content"><fieldset disabled={!editable || action.busy}>
+      <section className={`${panel} ${styles.body}`} hidden={tab === "教程" || tab === "解答与提示"} data-od-id="teacher-editor-tab-content"><fieldset disabled={!editable || action.busy || solutionPending}>
         {tab === "题面" && (
           <div className="grid grid-cols-[minmax(0,1fr)_260px] gap-5 max-lg:grid-cols-1">
             <div className="space-y-4">
@@ -645,64 +650,8 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
               <Field label={tr("内存限制（MB）","Memory limit (MB)")}><input type="number" step={1} min={32} max={256} value={problem.memoryLimitMb} onChange={e=>update("memoryLimitMb",Number(e.target.value))} className={input}/><p className="mt-1 text-xs text-muted-foreground">{tr("32–256 MB；JavaScript 最低按 128 MB 执行。","32–256 MB; JavaScript uses at least 128 MB.")}</p></Field>
               <Field label={tr("输出比较方式","Output comparison")}><select aria-label={tr("输出比较方式","Output comparison")} disabled={problem.mode==="function"} className={input} value={problem.mode==="function"?"json":problem.comparator==="exact"?"exact":"tokens"} onChange={e=>update("comparator",e.target.value as EditorProblem["comparator"])}>{problem.mode==="function"?<option value="json">{tr("JSON 返回值比较","JSON return-value comparison")}</option>:<><option value="tokens">{tr("按 token 比较（忽略空白差异）","Token comparison (ignore whitespace)")}</option><option value="exact">{tr("精确文本比较","Exact text comparison")}</option></>}</select><p className="mt-1 text-xs text-muted-foreground">{tr("函数题由系统固定使用 JSON 比较。","Function problems always use JSON comparison.")}</p></Field>
               <Field label={tr("测试计分","Test scoring")}><div className="rounded-md border border-border px-3 py-2 text-sm">{tr("启用的正式测试点等权计分","Enabled formal test cases have equal weight")}</div><p className="mt-1 text-xs text-muted-foreground">{tr("公开样例不计分，活动得分按作业或训练规则计算。","Public samples do not score. Activity points follow assignment or practice rules.")}</p></Field>
-              <div className="flex flex-wrap items-start gap-2"><Button variant="secondary" onClick={()=>setTab("测试数据")}>{tr("管理测试数据","Manage test data")}</Button><Button variant="secondary" disabled={!editable||action.busy} onClick={()=>void action.run(async()=>{await save();setTab("版本与发布");return tr("草稿已保存，请查看参考解验证结果。","Draft saved. Check reference validation results.");})}>{tr("验证参考解","Validate reference solution")}</Button></div>
+              <div className="flex flex-wrap items-start gap-2"><Button variant="secondary" onClick={()=>setTab("测试数据")}>{tr("管理测试数据","Manage test data")}</Button><Button variant="secondary" disabled={!editable||action.busy||solutionPending} onClick={()=>void action.run(async()=>{await save();setTab("版本与发布");return tr("草稿已保存，请查看参考解验证结果。","Draft saved. Check reference validation results.");})}>{tr("验证参考解","Validate reference solution")}</Button></div>
             </div>
-          </div>
-        )}
-        {tab === "解答与提示" && (
-          <div className="space-y-5">
-          {saved?.versionId && editable ? <ProblemSolutionsEntry key={`${saved.id}:${saved.versionId}`}
-            problemId={saved.id} versionId={saved.versionId} hasUnsavedProblemChanges={dirty} />
-            : !saved && <p className="text-sm text-muted-foreground">{tr("保存题目草稿后，可在此管理面向学生的题解。", "Save the problem draft to manage student solutions here.")}</p>}
-          <div className="grid grid-cols-[minmax(0,1fr)_260px] gap-5 max-lg:grid-cols-1">
-            <div className="space-y-4">
-              <CodeField
-                language={problem.referenceLanguage ?? "python"}
-                label={tr("参考代码", "Reference code")}
-                value={problem.referenceCode ?? ""}
-                onChange={(v) => update("referenceCode", v)}
-              />
-              <p className="text-xs text-muted-foreground">{tr("此参考代码用于题目验证，可在学生题解中导入并审核发布。修改此处不会替换已经发布的学生答案。", "This reference code is used to validate the problem. It can be imported into student solutions for review. Changes here do not replace published student answers.")}</p>
-              <MathEditor fieldName="editorial" label={tr("教师题解草稿", "Teacher solution notes")} value={problem.editorial ?? ""} disabled={!editable} onChange={value=>update("editorial",value)} rows={5}/>
-              <p className="text-xs text-muted-foreground">{tr("在此整理题解素材。学生当前看到的完整题解请通过上方入口编辑；此字段为空不代表没有已发布题解。", "Use this field to prepare solution notes. Edit the full solution students are reading through the entry above; an empty field here does not mean no solution has been published.")}</p>
-            </div>
-            <aside className="space-y-4">
-              <Field label={tr("分级提示", "Progressive hints")}>
-                <textarea
-                  value={metadataText(problem.hints)}
-                  onChange={(e) =>
-                    update("hints", e.target.value.split("\n").filter(Boolean))
-                  }
-                  rows={8}
-                  className={area}
-                />
-              </Field>
-              <Field label={tr("开放策略", "Release policy")}>
-                <select
-                  value={problem.hintPolicy ?? "afterAC"}
-                  onChange={(e) => update("hintPolicy", e.target.value)}
-                  className={input}
-                >
-                  <option value="afterAC">{tr("通过正式提交后开放", "After a formal AC")}</option>
-                  <option value="always">{tr("始终可见", "Always visible")}</option>
-                  <option value="never">{tr("不开放", "Never visible")}</option>
-                </select>
-              </Field>
-              <Button
-                disabled={action.busy || !editable}
-                onClick={() =>
-                  void action.run(async () => {
-                    await save();
-                    setTab("版本与发布");
-                    return tr("参考解验证任务已提交。", "Reference validation job submitted.");
-                  })
-                }
-              >
-                <Send size={15} />
-                {tr("检查参考解答", "Check reference solution")}
-              </Button>
-            </aside>
-          </div>
           </div>
         )}
         {tab === "版本与发布" && (
@@ -774,7 +723,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
               </Button>
               <Button
                 variant="secondary"
-                disabled={!editable || !saved?.canPublish || dirty || action.busy}
+                disabled={!editable || !saved?.canPublish || dirty || action.busy || solutionPending}
                 onClick={() => setPublish(true)}
               >
                 {bankVisibility === "school" ? tr("提交公开审核", "Request public review") : tr("启用教学版本", "Release for teaching")}
@@ -783,6 +732,72 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
           </div>
         )}
       </fieldset></section>
+      {solutionsVisited && <section className="space-y-4" role="tabpanel" aria-label={tr("解答与提示", "Solutions and hints")} hidden={tab !== "解答与提示"}>
+        {saved?.versionId && editable ? <ProblemAssistanceEditor key={saved.id}
+          problemId={saved.id} versionId={saved.versionId}
+          initialVersionId={search.get("solutionVersionId") ?? undefined}
+          initialKind={search.get("kind") === "FULL_TRANSLATION" ? "FULL_TRANSLATION" : "FULL_SOLUTION"}
+          externalBusy={action.busy} hasUnsavedProblemChanges={dirty} onPendingChange={setSolutionPending} />
+          : <p className={`${panel} p-4 text-sm text-muted-foreground`}>{saved
+            ? tr("你对此题只有查看权限，无法编辑或发布学生题解。", "You have read-only access to this problem and cannot edit or publish student solutions.")
+            : tr("先保存题目草稿，即可在这里修改学生题解、添加多种解法并审核发布。", "Save the problem draft first, then edit student solutions, add approaches and review them for publication here.")}</p>}
+        <details className={`${panel} p-4`} open={!saved || undefined}>
+          <summary className="cursor-pointer font-semibold">{tr("判题参考代码与提示", "Reference validation code and hints")}</summary>
+          <p className="my-3 text-sm text-muted-foreground">{tr("这里的代码用于验证题目，素材与提示随题目草稿保存。学生阅读的题解在上方单独保存并审核发布。", "This code validates the problem. Notes and hints are saved with the problem draft. Save and review student-facing solutions separately above.")}</p>
+          <fieldset disabled={!editable || action.busy}>
+          <div className="grid grid-cols-[minmax(0,1fr)_260px] gap-5 max-lg:grid-cols-1">
+            <div className="space-y-4">
+              <CodeField
+                language={problem.referenceLanguage ?? "python"}
+                label={tr("参考代码", "Reference code")}
+                value={problem.referenceCode ?? ""}
+                onChange={(v) => update("referenceCode", v)}
+              />
+              <p className="text-xs text-muted-foreground">{tr("此参考代码用于题目验证，可在学生题解中导入并审核发布。修改此处不会替换已经发布的学生答案。", "This reference code is used to validate the problem. It can be imported into student solutions for review. Changes here do not replace published student answers.")}</p>
+              <MathEditor fieldName="editorial" label={tr("教师题解草稿", "Teacher solution notes")} value={problem.editorial ?? ""} disabled={!editable} onChange={value=>update("editorial",value)} rows={5}/>
+              <p className="text-xs text-muted-foreground">{tr("在此整理题解素材。学生当前看到的完整题解请直接在上方编辑；此字段为空不代表没有已发布题解。", "Use this field to prepare solution notes. Edit the full solution students are reading directly above; an empty field here does not mean no solution has been published.")}</p>
+            </div>
+            <aside className="space-y-4">
+              <Field label={tr("分级提示", "Progressive hints")}>
+                <textarea
+                  value={metadataText(problem.hints)}
+                  onChange={(e) =>
+                    update("hints", e.target.value.split("\n").filter(Boolean))
+                  }
+                  rows={8}
+                  className={area}
+                />
+              </Field>
+              <Field label={tr("开放策略", "Release policy")}>
+                <select
+                  value={problem.hintPolicy ?? "afterAC"}
+                  onChange={(e) => update("hintPolicy", e.target.value)}
+                  className={input}
+                >
+                  <option value="afterAC">{tr("通过正式提交后开放", "After a formal AC")}</option>
+                  <option value="always">{tr("始终可见", "Always visible")}</option>
+                  <option value="never">{tr("不开放", "Never visible")}</option>
+                </select>
+              </Field>
+              <Button
+                disabled={action.busy || solutionPending || !editable}
+                onClick={() =>
+                  void action.run(async () => {
+                    await save();
+                    setTab("版本与发布");
+                    return tr("参考解验证任务已提交。", "Reference validation job submitted.");
+                  })
+                }
+              >
+                <Send size={15} />
+                {tr("检查参考解答", "Check reference solution")}
+              </Button>
+            </aside>
+          </div>
+
+          </fieldset>
+        </details>
+      </section>}
       {showTutorial && tutorialVisited && <section className={`${panel} ${styles.body}`}
         role="tabpanel" aria-label={tr("教程", "Tutorial")} hidden={tab !== "教程"}>
         {saved ? <ProblemTutorialEditor key={saved.id} endpoint={`problems/${encodeURIComponent(saved.id)}/tutorial`} inline disabled={action.busy} /> :

@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Archive, ClipboardCheck, Download, FilePlus2, Maximize2, Minimize2, Play, Plus, RotateCcw, Save, Send, Settings, Trash2, Upload } from "lucide-react";
-import { AppLink } from "@/components/navigation";
+import { Paper4AssistanceEditor } from "./paper4-assistance-editor";
+import { AppLink, useNavigationBlocker } from "@/components/navigation";
 import { useLocale } from "@/components/locale-context";
 import { PageHeader } from "@/components/page-chrome";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -133,7 +134,7 @@ export function TeacherPaper4List() {
     finally { setBusy(false); }
   }
   return <div className={listStyles.page}>
-    <PageHeader title={tx("Paper 4 试卷", "Paper 4 papers")} action={<div className={listStyles.headerActions}><Button size="sm" variant="secondary" onClick={() => setImportOpen(true)}><Upload size={14}/>{tx("导入 JSON / ZIP", "Import JSON / ZIP")}</Button><AppLink href="/teacher/paper4/new" className={buttonVariants({size:"sm"})}><FilePlus2 size={14}/>{tx("新建试卷", "Create paper")}</AppLink></div>}/>
+    <PageHeader title={tx("Paper 4 试卷", "Paper 4 papers")} action={<div className={listStyles.headerActions}><AppLink href="/teacher/problems/solutions-review?targetType=paper4" className={buttonVariants({size:"sm",variant:"secondary"})}>{tx("题解审核", "Solution review")}</AppLink><Button size="sm" variant="secondary" onClick={() => setImportOpen(true)}><Upload size={14}/>{tx("导入 JSON / ZIP", "Import JSON / ZIP")}</Button><AppLink href="/teacher/paper4/new" className={buttonVariants({size:"sm"})}><FilePlus2 size={14}/>{tx("新建试卷", "Create paper")}</AppLink></div>}/>
     <section className={listStyles.controls}>
       <div className={listStyles.controlTop}>
     <nav aria-label={tx("试卷类型", "Paper type")} className={listStyles.tabs}>
@@ -221,6 +222,8 @@ export function TeacherPaper4Editor({ id, user }: { id: string; user: CampusUser
   const paper = useData<Paper4Paper>(fresh ? "" : `paper4/papers/${encodeURIComponent(id)}${pinnedVersion !== null ? `?versionId=${encodeURIComponent(pinnedVersion)}` : viewingDraft ? "?view=draft" : ""}`);
   const attempts = useData<{ items: Paper4AttemptSummary[] }>(fresh || pinnedVersion !== null || !paper.data?.canManage ? "" : `paper4/attempts?paperId=${encodeURIComponent(id)}`);
   const [draft, setDraft] = useState<PaperDraft>(newDraft);
+  const [contentOpen, setContentOpen] = useState(search.get("tab") === "solutions");
+  const [contentPending, setContentPending] = useState(false);
   const [savedSnapshot, setSavedSnapshot] = useState("");
   const [selected, setSelected] = useState("Q1");
   const [selectedCaseStage, setSelectedCaseStage] = useState("");
@@ -257,6 +260,13 @@ export function TeacherPaper4Editor({ id, user }: { id: string; user: CampusUser
   const caseStage = autoStages.find(stage => stage.id === selectedCaseStage) ?? autoStages[0];
   const cases = caseStage ? draft.runnerCases[caseStage.id] ?? [] : [];
   const draftDirty = !fresh && savedSnapshot !== JSON.stringify(draft);
+  useNavigationBlocker(draftDirty);
+  useEffect(() => {
+    if (!draftDirty) return;
+    const handler = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [draftDirty]);
   const updateQuestion = (key: string, update: (question: Paper4Question) => Paper4Question) => setDraft(current => ({ ...current, questions: current.questions.map(item => item.key === key ? update(item) : item) }));
   const updateCases = (key: string, update: (cases: Paper4RunnerCase[]) => Paper4RunnerCase[]) => setDraft(current => ({ ...current, runnerCases: { ...current.runnerCases, [key]: update(current.runnerCases[key] ?? []) } }));
   async function perform(operation: () => Promise<void>) {
@@ -342,12 +352,29 @@ export function TeacherPaper4Editor({ id, user }: { id: string; user: CampusUser
       setMessage(tx("参考答案验证已完成。逐阶段查看结果。", "Reference validation finished. Review each stage result."));
     });
   }
-  if (!fresh && !paper.data) return <State data={paper}>{null}</State>;
-  if (!fresh && pinnedVersion !== null) return <State data={paper}>{paper.data?.versionId?.toLowerCase() === pinnedVersion.toLowerCase() && <Paper4CatalogPreview key={paper.data.versionId} paper={{...paper.data, canAssign: false}} pinnedVersion/>}</State>;
+  if (!fresh && (!paper.data || paper.loading || paper.error)) return <State data={paper}>{null}</State>;
+  if (!fresh && contentOpen && paper.data?.canManage && !archived && (pinnedVersion === null || paper.data.versionId?.toLowerCase() === pinnedVersion.toLowerCase())) return <div className="space-y-4">
+    <PageHeader eyebrow="Paper 4" title={paper.data.title} description={tx("在此编辑每道大题的学生题解与翻译，保存后审核发布。", "Edit student solutions and translations for each question, then save and review for publication.")} />
+    <div className="flex flex-wrap gap-2" role="group" aria-label={tx("试卷编辑区域", "Paper editor section")}>
+      <Button variant="secondary" size="sm" disabled={contentPending} onClick={() => setContentOpen(false)}>{tx("试卷内容", "Paper content")}</Button>
+      <Button variant="primary" size="sm" aria-pressed>{tx("题解与翻译", "Solutions and translations")}</Button>
+    </div>
+    {contentPending && <p className="text-xs text-muted-foreground">{tx("请先保存或放弃题解修改，再切换编辑区域。", "Save or discard content changes before switching sections.")}</p>}
+    <Paper4AssistanceEditor key={`${paper.data.id}:${paper.data.versionId}:${search.get("questionKey") ?? "first"}:${search.get("kind") ?? "FULL_SOLUTION"}`} paper={paper.data} onPendingChange={setContentPending} />
+  </div>;
+  if (!fresh && pinnedVersion !== null) return <div className="space-y-4">
+    {paper.data?.canManage && !archived && <Button size="sm" variant="secondary" onClick={() => setContentOpen(true)}>{tx("编辑此版本题解与翻译", "Edit solutions and translations for this version")}</Button>}
+    <State data={paper}>{paper.data?.versionId?.toLowerCase() === pinnedVersion.toLowerCase() && <Paper4CatalogPreview key={paper.data.versionId} paper={{...paper.data, canAssign: false}} pinnedVersion/>}</State>
+  </div>;
   if (!fresh && paper.data && !paper.data.canManage) return <Paper4CatalogPreview paper={paper.data}/>;
   return <>
     <PageHeader eyebrow={fresh ? tx("新建试卷", "Create paper") : tx("实践试卷", "Practical paper")} title={fresh ? tx("建立 Paper 4 草稿", "Create a Paper 4 draft") : paper.data?.title ?? tx("正在加载…", "Loading…")} description={isActivity ? tx("此活动按布置时选定的学生名单开放，独立保存时间、答卷和成绩。", "This activity is open to its selected students and keeps its own schedule, attempts and marks.") : tx("准备并验证题目后，发布为全校自由练习；练习任务或模拟考试可另行选择学生布置。", "Prepare and validate the paper, then publish it for school-wide practice. Assign practice tasks or mock exams to selected students separately.")}/>
     {!fresh && <State data={paper}>{null}</State>}
+    {!fresh && paper.data?.canManage && !archived && <div className="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label={tx("试卷编辑区域", "Paper editor section")}>
+      <Button variant="primary" size="sm" aria-pressed>{tx("试卷内容", "Paper content")}</Button>
+      <Button variant="secondary" size="sm" disabled={busy || draftDirty} onClick={() => setContentOpen(true)}>{tx("题解与翻译", "Solutions and translations")}</Button>
+      {draftDirty && <span className="text-xs text-muted-foreground">{tx("先保存试卷修改，再编辑学生内容。", "Save paper changes before editing student content.")}</span>}
+    </div>}
     {!fresh && paper.data && <div className={`${panel} mt-4 flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm`}><div><strong className={archived ? "text-muted-foreground" : "text-foreground"}>{archived ? tx("已归档", "Archived") : !isActivity && isPublished ? tx("已公开 · 全校自由练习", "Public · School-wide practice") : displayStatus} {paper.data.versionNumber ? `· v${paper.data.versionNumber}` : ""}</strong>{archived && <p className="mt-1 text-xs text-muted-foreground">{tx("归档期间学生不能进入试卷或继续作答；已有代码和成绩保留。恢复后仍在期限内的答卷可继续。", "Students cannot enter or continue this paper while archived. Existing code and marks remain; attempts may continue after restoration if still within the deadline.")}</p>}</div><div className="flex flex-wrap gap-2">{!isActivity && isPublished && !archived && <Button size="sm" onClick={() => setAssignOpen(true)}><Send size={14}/>{tx("布置活动", "Assign activity")}</Button>}{paper.data.canExport && <Button size="sm" variant="secondary" disabled={busy || draftDirty} title={draftDirty ? tx("请先保存草稿；导出的是服务器已保存版本", "Save the draft first; export uses the saved server version") : tx("导出可再次导入的 JSON，含参考答案和隐藏测试", "Export reimportable JSON with reference solutions and hidden tests")} onClick={() => void exportPaper()}><Download size={14}/>{tx("导出 JSON", "Export JSON")}</Button>}<Button size="sm" variant="secondary" disabled={busy || draftDirty} title={draftDirty ? tx("请先保存或撤销未保存的修改", "Save or discard unsaved changes first") : undefined} onClick={() => setConfirmArchive(true)}>{archived ? <RotateCcw size={14}/> : <Archive size={14}/>} {archived ? tx("恢复试卷", "Restore paper") : tx("归档试卷", "Archive paper")}</Button></div></div>}
     {!fresh && paper.data?.canManage && <Paper4ShortTitleEditor paper={paper.data} disabled={busy || archived || draftDirty} onSaved={paper.reload}/>}
     {!fresh && isPublished && !paper.data?.sourcePaperId && <div className={`${panel} mt-4 flex flex-wrap items-center justify-between gap-3 p-4 text-sm`}><div><strong>{tx("当前已发布版本", "Current published version")} {paper.data?.versionNumber ? `v${paper.data.versionNumber}` : ""}</strong><p className="mt-1 text-muted-foreground">{archived ? tx("恢复试卷后才能编辑修订草稿。", "Restore this paper before editing a draft revision.") : tx("已发布版本保持不变。创建修订草稿后可修改题目和参考答案，再重新验证并发布新版。", "The published version remains unchanged. Create a draft revision to edit questions and reference code, validate it, then publish the new version.")}</p></div>{paper.data?.hasDraft ? archived ? null : <AppLink href={`/teacher/paper4/${encodeURIComponent(id)}?view=draft`} className={buttonVariants()}>{tx("继续编辑修订草稿", "Edit draft revision")}</AppLink> : <Button disabled={busy || archived} onClick={() => void createRevision()}>{tx("创建修订草稿", "Create draft revision")}</Button>}</div>}

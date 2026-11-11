@@ -349,14 +349,16 @@ export const inputClass = "h-10 w-full min-w-0 rounded-md border border-input bg
 export const panelClass = "rounded-lg border border-border bg-surface";
 export function useData<T>(path: string) {
   const [revision, setRevision] = useState(0);
-  const [state, setState] = useState<{data: T | null; error: string; loading: boolean}>({data:null,error:"",loading:true});
+  const request = `${revision}:${path}`;
+  const [state, setState] = useState<{data: T | null; error: string; loading: boolean; completed?: string}>({data:null,error:"",loading:true});
   useEffect(() => {
     const controller = new AbortController();
-    productionApi<T>(path,{signal:controller.signal}).then(data=>{if(!controller.signal.aborted)setState({data,error:"",loading:false});}).catch(error=>{if(!controller.signal.aborted)setState(previous=>({...previous,error:apiMessage(error),loading:false}));});
+    productionApi<T>(path,{signal:controller.signal}).then(data=>{if(!controller.signal.aborted)setState({data,error:"",loading:false,completed:request});}).catch(error=>{if(!controller.signal.aborted)setState(previous=>({...previous,error:apiMessage(error),loading:false,completed:request}));});
     return ()=>controller.abort();
-  },[path,revision]);
+  },[path,request]);
   const reload=useCallback(()=>setRevision(v=>v+1),[]);
-  return {...state,reload};
+  const { completed, ...resource } = state;
+  return {...resource,pending:completed!==request,reload};
 }
 export function useMutation() {
   const [busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState("");

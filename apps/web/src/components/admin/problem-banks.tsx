@@ -3,6 +3,7 @@
 import { ProblemTutorialEditor } from "@/components/teacher/problem-tutorial-editor";
 import { ProblemPublicationStatus } from "@/components/problem-publication-status";
 import { BankRenameDialog } from "@/components/bank-rename-dialog";
+import { ProblemGroupFilter } from "@/components/problem-group-filter";
 import { useState } from "react";
 import { Archive, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { AppLink } from "@/components/navigation";
@@ -169,12 +170,16 @@ function ManagedProblemList({ bank, onChanged }: { bank: ManagedBank; onChanged:
   const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
+  const [group, setGroup] = useState("");
   const [page, setPage] = useState(1);
   const [candidate, setCandidate] = useState<ProblemAction | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
-  const list = useData<{ bank: { id: string; name: string }; items: ManagedProblem[]; total: number; page: number; pageSize: number }>(`admin/problem-banks/${encodeURIComponent(bank.id)}/problems?page=${page}&search=${encodeURIComponent(search)}`);
+  const params = new URLSearchParams({ page: String(page), search });
+  if (group) params.set("groupId", group);
+  const list = useData<{ groups: { id: string; name: string }[]; items: ManagedProblem[]; total: number; pageSize: number }>(`admin/problem-banks/${encodeURIComponent(bank.id)}/problems?${params}`);
   const action = useMutation();
-  const pages = Math.max(1, Math.ceil((list.data?.total ?? 0) / 100));
+  const result = list.pending || list.error ? null : list.data;
+  const pages = result ? Math.max(1, Math.ceil(result.total / result.pageSize)) : 1;
   const updateProblem = async () => {
     if (!candidate) return;
     await action.run(async () => {
@@ -186,25 +191,28 @@ function ManagedProblemList({ bank, onChanged }: { bank: ManagedBank; onChanged:
     });
   };
   return <section className={`${panelClass} min-w-0`}>
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4"><div><h2 className="font-semibold">{tr("题目列表", "Problems")}</h2><p className="mt-1 text-xs text-muted-foreground">{list.data?.total ?? 0} {tr("题，包含已归档题目", "problems including archived")}</p></div>
-      <form className="flex w-full min-w-0 gap-2 sm:w-auto" onSubmit={event => { event.preventDefault(); setPage(1); setSearch(query.trim()); }}>
-        <label className="sr-only" htmlFor="admin-bank-search">{tr("搜索题目标题", "Search titles")}</label>
-        <input id="admin-bank-search" value={query} maxLength={100} onChange={event => setQuery(event.target.value)} className={`${inputClass} sm:w-56`} placeholder={tr("搜索题目标题", "Search problem titles")} />
-        <Button type="submit" variant="secondary" aria-label={tr("搜索", "Search")}><Search size={16} aria-hidden="true" /></Button>
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4"><div><h2 className="font-semibold">{tr("题目列表", "Problems")}</h2><p aria-live="polite" className="mt-1 min-h-4 text-xs text-muted-foreground">{result && `${result.total} ${tr("题，包含已归档题目", "problems including archived")}`}</p></div>
+      <form noValidate className="flex w-full min-w-0 flex-wrap gap-2 sm:w-auto" onSubmit={event => { event.preventDefault(); setPage(1); setSearch(query.trim()); }}>
+        <div className="flex min-w-0 flex-1 gap-2 sm:flex-none">
+          <label className="sr-only" htmlFor="admin-bank-search">{tr("搜索题目标题", "Search titles")}</label>
+          <input id="admin-bank-search" value={query} maxLength={100} onChange={event => setQuery(event.target.value)} className={`${inputClass} sm:w-56`} placeholder={tr("搜索题目标题", "Search problem titles")} />
+          <Button type="submit" variant="secondary" aria-label={tr("搜索", "Search")}><Search size={16} aria-hidden="true" /></Button>
+        </div>
+        <ProblemGroupFilter groups={list.data?.groups ?? []} value={group} disabled={!list.data} onChange={value => { setPage(1); setGroup(value); }} />
       </form>
     </div>
     <Feedback action={action} />
-    <Loading resource={list}><div className="overflow-x-auto"><table className="w-full min-w-[780px] text-left text-sm">
+    <Loading resource={{ ...list, loading: list.pending }}><div className="overflow-x-auto"><table className="w-full min-w-[780px] text-left text-sm">
       <thead className="bg-surface-subtle text-xs text-muted-foreground"><tr>{[tr("题目", "Problem"), tr("上传教师", "Teacher"), tr("版本状态", "Version"), tr("引用 / 提交", "Links / submissions"), tr("操作", "Actions")].map(label => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead>
-      <tbody>{list.data?.items.map(problem => <tr key={problem.id} className="border-t border-border">
+      <tbody>{result?.items.map(problem => <tr key={problem.id} className="border-t border-border">
         <td className="px-4 py-3"><div><button type="button" className="font-semibold text-primary hover:underline focus-visible:underline" onClick={() => setDetailId(problem.id)}>{problem.title}</button></div><span className="text-xs text-muted-foreground">{problem.id.slice(0, 8)}{problem.archivedAt ? ` · ${tr("已归档", "Archived")}` : ""}</span></td>
         <td className="px-4 py-3">{problem.ownerName}</td>
         <td className="px-4 py-3"><ProblemPublicationStatus problem={problem} bankVisibility={bank.visibility}/><span className="block text-xs text-muted-foreground">{problem.publicVersionCount ? tr(`${problem.publicVersionCount} 个公开版本`, `${problem.publicVersionCount} public versions`) : problem.rankReviewStatus === "pending" && problem.publishedAt ? tr("待审核", "Pending review") : problem.validationStatus ?? "—"}</span></td>
         <td className="px-4 py-3 text-xs text-muted-foreground">{tr(`课程 ${problem.courseCount} · 作业 ${problem.assignmentCount} · 训练 ${problem.timedCount} · 提交 ${problem.submissionCount}`, `Courses ${problem.courseCount} · Assignments ${problem.assignmentCount} · Practices ${problem.timedCount} · Submissions ${problem.submissionCount}`)}</td>
         <td className="px-4 py-3"><Button size="sm" variant="ghost" disabled={Boolean(bank.archivedAt && problem.archivedAt)} onClick={() => setCandidate({ problem, kind: problem.archivedAt ? "restore" : "archive" })}>{problem.archivedAt ? tr("恢复题目", "Restore") : tr("归档题目", "Archive")}</Button></td>
-      </tr>)}{!list.data?.items.length && <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">{tr("此题库暂无符合条件的题目。", "No matching problems in this bank.")}</td></tr>}</tbody>
+      </tr>)}{result?.items.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">{tr("此题库暂无符合条件的题目。", "No matching problems in this bank.")}</td></tr>}</tbody>
     </table></div></Loading>
-    <div className="flex items-center justify-between border-t border-border px-4 py-3 text-sm"><span className="text-muted-foreground">{tr(`第 ${page} / ${pages} 页`, `Page ${page} of ${pages}`)}</span><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={page <= 1} onClick={() => setPage(value => value - 1)}>{tr("上一页", "Previous")}</Button><Button size="sm" variant="secondary" disabled={page >= pages} onClick={() => setPage(value => value + 1)}>{tr("下一页", "Next")}</Button></div></div>
+    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3 text-sm"><span className="text-muted-foreground">{result && tr(`第 ${page} / ${pages} 页`, `Page ${page} of ${pages}`)}</span><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={list.pending || page <= 1} onClick={() => setPage(value => value - 1)}>{tr("上一页", "Previous")}</Button><Button size="sm" variant="secondary" disabled={!result || page >= pages} onClick={() => setPage(value => value + 1)}>{tr("下一页", "Next")}</Button></div></div>
     {candidate && <Modal title={candidate.kind === "archive" ? tr("归档题目", "Archive problem") : tr("恢复题目", "Restore problem")}
       description={candidate.kind === "archive" ? tr("归档将同步撤下该题所有已公开版本，停止新的自由练习与榜单积分；历史提交和成绩保留，已分配作业仍可按原版本访问。被已发布课程或未归档训练引用时会阻止归档。", "Archiving withdraws all public versions, stops new free practice and leaderboard points, and retains submissions and grades. Assigned work keeps its exact version. Published courses or active practices block archiving.") : tr("恢复只重新显示题目，不补发积分；已撤下版本不能再次通过审核，如需校内公开须发布新版本。", "Restoring only reopens the record and does not grant past points. Withdrawn versions cannot be reapproved; publish a new version for school-wide review.")}
       onClose={() => setCandidate(null)}>

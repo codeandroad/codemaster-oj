@@ -210,9 +210,19 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
   if(!Number.isSafeInteger(page)||page<1||page>100000)fail(400,'VALIDATION','页码无效');
   const search=field(url.searchParams.get('search')??'','搜索内容',{min:0,max:100}).trim();
   const pattern=`%${search.replace(/[\\%_]/g,'\\$&')}%`;
-  const total=Number((await pool.query(`SELECT count(*)::int count FROM problems p WHERE p.bank_id=$1 AND
-   ($2='' OR EXISTS(SELECT 1 FROM problem_versions v WHERE v.problem_id=p.id AND v.title ILIKE $3 ESCAPE '\\'))`,
-   [bankId,search,pattern])).rows[0].count);
+  const group=url.searchParams.get('groupId');
+  const ungrouped=group==='ungrouped';
+  const groupId=group&&!ungrouped?uuid(group,'分组 ID'):null;
+  const params=[bankId,search,pattern];
+  if(groupId)params.push(groupId);
+  const where=`p.bank_id=$1
+   AND ($2='' OR EXISTS(SELECT 1 FROM problem_versions x WHERE x.problem_id=p.id AND x.title ILIKE $3 ESCAPE '\\'))
+   ${group? `AND ${ungrouped?'NOT ':''}EXISTS (
+     SELECT 1 FROM problem_groups g JOIN problem_group_members gm ON gm.group_id=g.id
+     WHERE g.bank_id=p.bank_id AND g.archived_at IS NULL AND gm.problem_id=p.id ${groupId?'AND g.id=$4':''}
+   )`:''}`;
+  const total=(await pool.query(`SELECT count(*)::int count FROM problems p WHERE ${where}`,params)).rows[0].count;
+  const groups=(await pool.query('SELECT id,name FROM problem_groups WHERE bank_id=$1 AND archived_at IS NULL ORDER BY created_at,id',[bankId])).rows;
   const rows=(await pool.query(`SELECT p.id,p.archived_at,p.created_at,COALESCE(i.name,'管理员') owner_name,
     v.id version_id,v.title,v.published_at,v.validation_status,v.rank_review_status,v.school_visible_at,
     (SELECT count(*)::int FROM problem_versions pv WHERE pv.problem_id=p.id AND pv.school_visible_at IS NOT NULL) public_version_count,
@@ -224,10 +234,10 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
    LEFT JOIN LATERAL (SELECT v.id,v.title,v.published_at,v.validation_status,v.rank_review_status,v.school_visible_at
     FROM problem_versions v WHERE v.problem_id=p.id
     ORDER BY (v.id=p.current_version_id) DESC,v.created_at DESC,v.id DESC LIMIT 1) v ON true
-   WHERE p.bank_id=$1 AND ($2='' OR EXISTS(SELECT 1 FROM problem_versions x WHERE x.problem_id=p.id AND x.title ILIKE $3 ESCAPE '\\'))
-   ORDER BY p.archived_at NULLS FIRST,p.created_at DESC,p.id DESC LIMIT 100 OFFSET $4`,
-   [bankId,search,pattern,(page-1)*100])).rows;
-  return result({bank:{id:bank.id,name:bank.name,archivedAt:bank.archived_at},page,pageSize:100,total,
+   WHERE ${where}
+   ORDER BY p.archived_at NULLS FIRST,p.created_at DESC,p.id DESC LIMIT 100 OFFSET $${params.length+1}`,
+   [...params,(page-1)*100])).rows;
+  return result({bank:{id:bank.id,name:bank.name,archivedAt:bank.archived_at},groups,page,pageSize:100,total,
    items:rows.map(p=>({id:p.id,title:p.title??'未命名题目',versionId:p.version_id,ownerName:p.owner_name,
     archivedAt:p.archived_at,createdAt:p.created_at,publishedAt:p.published_at,validationStatus:p.validation_status,
     rankReviewStatus:p.rank_review_status,schoolVisibleAt:p.school_visible_at,publicVersionCount:p.public_version_count,
@@ -426,7 +436,11 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
  }
  if(route==='/problem-groups/move'&&method==='POST')return result(await moveGroupMembers({pool,user,body,bankAccess,versionAccess,audit}));
  if(route==='/problem-groups'&&method==='GET') {
-  const bankId=url.searchParams.get('bankId');if(bankId)await bankAccess(pool,user,bankId);const groups=(await pool.query('SELECT * FROM problem_groups WHERE archived_at IS NULL AND ($1::uuid IS NULL OR bank_id=$1) ORDER BY created_at',[bankId])).rows;const items=[];for(const g of groups){try{items.push(await groupShape(pool,g));}catch(error){if(error.code!=='FORBIDDEN')throw error;}}return result({items});
+  const bankId=url.searchParams.get('bankId');if(bankId)await bankAccess(pool,user,bankId);
+  const groups=(await pool.query(`SELECT g.* FROM problem_groups g JOIN problem_banks b ON b.id=g.bank_id
+   WHERE g.archived_at IS NULL AND b.archived_at IS NULL AND ($1::uuid IS NULL OR g.bank_id=$1)
+   ORDER BY g.created_at,g.id`,[bankId])).rows;
+  const items=[];for(const g of groups){try{items.push(await groupShape(pool,g));}catch(error){if(!['FORBIDDEN','NOT_FOUND'].includes(error.code))throw error;}}return result({items});
  }
  if(route==='/problem-groups'&&method==='POST') {
   if(!isStaff(user))fail(403,'FORBIDDEN','需要教师权限');const name=field(body.name,'分组名称'),bankId=uuid(body.bankId||SCHOOL_BANK);const group=await transaction(pool,async db=>{const access=await bankAccess(db,user,bankId);if(!access.canContribute)fail(403,'FORBIDDEN','无权管理该题库的分组');const group=required(await db.query('INSERT INTO problem_groups(bank_id,name,owner_account_id) VALUES($1,$2,$3) RETURNING *',[bankId,name,user.id]));await setMembers(db,group.id,bankId,body.problemIds??[]);await audit(db,user.id,'group.create','problem_group',group.id);return group;});return {status:201,body:await groupShape(pool,group)};

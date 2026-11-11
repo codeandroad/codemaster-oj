@@ -1,6 +1,7 @@
 "use client";
 import { ProblemPublicationStatus, PublicationGuide } from "@/components/problem-publication-status";
 import { BankRenameDialog } from "@/components/bank-rename-dialog";
+import { ProblemGroupFilter } from "@/components/problem-group-filter";
 import {ProblemFilter} from "./problem-filter";
 import { useProblemSelection } from "./use-problem-selection";
 import { courseProblemOrder } from "./assignment-problem-order";
@@ -8,7 +9,7 @@ import styles from "./problem-banks.module.css";
 
 import { AppLink as Link } from "@/components/navigation";
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   Archive,
   ArrowRight,
@@ -95,13 +96,10 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
   const { locale } = useLocale();
   const tr = (zh: string, en: string) => localText(locale, zh, en);
   const router = useRouter(),
-    search = useSearchParams(),
     banks = useData<{ items: Bank[] }>("problem-banks?includeArchived=owned"),
     problems = useData<{ items: ProductionProblem[] }>("problems"),
     groups = useData<{ items: Group[] }>("problem-groups");
-  const [tab, setTab] = useState(
-      search.get("tab") === "all" ? "全部题目" : "题库",
-    ),
+  const [tab, setTab] = useState("全部题目"),
     [showArchived, setShowArchived] = useState(false),
     [query, setQuery] = useState(""),
     [filterBank, setFilterBank] = useState(""),
@@ -120,25 +118,34 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
   const bank = banks.data?.items.find((x) => x.id === bankId),
     activeBanks = banks.data?.items.filter((item) => !item.archivedAt) ?? [],
     archivedBanks = banks.data?.items.filter((item) => !!item.archivedAt) ?? [],
-    listedBanks = showArchived ? archivedBanks : activeBanks,
-    rows =
+    listedBanks = showArchived ? archivedBanks : activeBanks;
+  const scopedBank = bankId || filterBank;
+  const scopedGroups = (groups.data?.items ?? []).filter(group => !scopedBank || group.bankId === scopedBank);
+  const selectedGroup = scopedGroups.find(group => group.id === filterGroup);
+  const groupMembers = new Set(filterGroup === "ungrouped"
+    ? scopedGroups.flatMap(group => group.problemIds)
+    : selectedGroup?.problemIds);
+  const bankNames = new Map(activeBanks.map(bank => [bank.id, bank.name]));
+  const groupOptions = scopedGroups.map(group => ({
+    id: group.id,
+    name: !scopedBank && bankNames.has(group.bankId)
+      ? `${group.name} · ${bankNames.get(group.bankId)}`
+      : group.name,
+  }));
+  const waitingForGroups = Boolean(filterGroup && (groups.loading || groups.error));
+  const searchText = query.trim().toLowerCase();
+  const rows = waitingForGroups ? [] :
       problems.data?.items.filter(
         (x) =>
           (!bankId || x.bankId === bankId) &&
           (!filterBank || x.bankId === filterBank) &&
           (!filterGroup ||
-            (filterGroup === "ungrouped"
-              ? !groups.data?.items.some(
-                  (g) => g.bankId === x.bankId && g.problemIds.includes(x.id),
-                )
-              : groups.data?.items
-                  .find((g) => g.id === filterGroup)
-                  ?.problemIds.includes(x.id))) &&
+            (filterGroup === "ungrouped" ? !groupMembers.has(x.id) : groupMembers.has(x.id))) &&
           (!filterStatus ||
             (filterStatus === "published" ? x.published : !x.published)) &&
           `${x.title} ${x.tags?.join(" ")} ${x.id}`
             .toLowerCase()
-            .includes(query.toLowerCase()),
+            .includes(searchText),
       ) ?? [];
   const { checked, setChecked, changeRow } = useProblemSelection(rows, JSON.stringify([bankId, tab, query, filterBank, filterGroup, filterStatus]));
   const checkedProblems = (problems.data?.items ?? []).filter((problem) => checked.includes(problem.id));
@@ -228,7 +235,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
       <Feedback action={action} />
       <div className={styles.sectionBar}>
         {!bankId && (
-          <Tabs value={tab === "题库" ? tr("题库", "Banks") : tr("全部题目", "All problems")} onChange={value => setTab(value === tr("题库", "Banks") ? "题库" : "全部题目")} items={[tr("题库", "Banks"), tr("全部题目", "All problems")]} />
+          <Tabs value={tab === "题库" ? tr("题库", "Banks") : tr("全部题目", "All problems")} onChange={value => setTab(value === tr("题库", "Banks") ? "题库" : "全部题目")} items={[tr("全部题目", "All problems"), tr("题库", "Banks")]} />
         )}
         <div className={styles.accessGuide}>
           <PublicationGuide />
@@ -363,7 +370,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
               ))}
             </aside>
           )}
-          <section className={panel}>
+          <section className={`${panel} min-w-0`}>
             <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
               <label className="relative min-w-0 flex-1" style={{maxWidth:480,flexBasis:240}}>
                 <Search
@@ -378,7 +385,19 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                   className={`${input} pl-9`}
                 />
               </label>
-              <ProblemFilter banks={banks.data?.items??[]} groups={groups.data?.items??[]} bankId={bankId} bank={filterBank} status={filterStatus} group={filterGroup} onBank={setFilterBank} onStatus={setFilterStatus} onGroup={setFilterGroup}/>
+              <ProblemGroupFilter groups={groupOptions} value={filterGroup} onChange={setFilterGroup} disabled={groups.loading || !groups.data} />
+              <ProblemFilter
+                banks={activeBanks}
+                bankId={bankId}
+                bank={filterBank}
+                status={filterStatus}
+                onBank={value => {
+                  setFilterBank(value);
+                  if (value && selectedGroup && selectedGroup.bankId !== value) setFilterGroup("");
+                }}
+                onStatus={setFilterStatus}
+                onClearGroup={filterGroup ? () => setFilterGroup("") : undefined}
+              />
               <Button variant="secondary" size="sm" onClick={togglePublishableScope} disabled={!publishableScope.length || action.busy}>
                 <CheckSquare2 size={15} />
                 {allPublishableScopeSelected
@@ -504,9 +523,11 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                   </td>
                 </tr>
               ))}
-              {!problems.loading && !rows.length && (
+              {!problems.loading && !problems.error && !waitingForGroups && !rows.length && (
                 <Empty columns={7}>
-                  {tr("当前范围暂无题目。新建题目或导入后，它们会显示在这里。", "No problems in this scope yet. Create or import problems to show them here.")}
+                  {searchText || filterBank || filterGroup || filterStatus
+                    ? tr("没有匹配的题目，请调整搜索或筛选。", "No matching problems. Try another search or filter.")
+                    : tr("当前范围暂无题目。新建题目或导入后，它们会显示在这里。", "No problems in this scope yet. Create or import problems to show them here.")}
                 </Empty>
               )}
             </Table>

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { createApiApplication } from '../dist/application.js';
 import { createPool, transaction } from '../../../packages/domain/src/db.mjs';
 import { migrate } from '../../../packages/domain/src/migrate.mjs';
@@ -24,19 +24,20 @@ test('legacy business endpoints require original-school ownership on the real Ne
       await migrate(pool);
       const legacyAccountId = await bootstrap(pool, { name: 'Original administrator', number: 'ADM', username: 'original-admin', password });
       const hash = await hashPassword(password);
-      async function credential(login, { legacy = false } = {}) {
+      async function credential(login, { legacyRole } = {}) {
         return transaction(pool, async db => {
           const identity = (await db.query('INSERT INTO identities(kind,number,name) VALUES($1,$2,$3) RETURNING id',
-            [legacy ? 'student' : 'teacher', login, 'QA ' + login])).rows[0];
+            [legacyRole ?? 'teacher', login, 'QA ' + login])).rows[0];
           const account = (await db.query('INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,$2,$3) RETURNING id',
             [identity.id, login, hash])).rows[0];
-          if (legacy) await db.query("INSERT INTO account_roles(account_id,role) VALUES($1,'student')", [account.id]);
+          if (legacyRole) await db.query('INSERT INTO account_roles(account_id,role) VALUES($1,$2)', [account.id, legacyRole]);
           return { ...account, identityId: identity.id };
         });
       }
       const schoolAccount = await credential('new-school-admin');
       const platformAccount = await credential('platform-only');
-      const originalStudent = await credential('original-student', { legacy: true });
+      const originalStudent = await credential('original-student', { legacyRole: 'student' });
+      const originalTeacher = await credential('original-teacher', { legacyRole: 'teacher' });
       const school = await provisionSchool(pool, { slug: 'boundary-school', name: 'Boundary School', adminUsername: 'new-school-admin' });
       await provisionPlatformAdministrator(pool, { username: 'platform-only' });
       assert.equal((await pool.query('SELECT count(*)::int n FROM legacy_school_account_ownership WHERE account_id=ANY($1::uuid[])',
@@ -116,6 +117,90 @@ test('legacy business endpoints require original-school ownership on the real Ne
           assert.equal((await request(path, { auth: admin })).status, 200, path);
         }
         assert.equal((await request('/system-settings', { auth: student })).status, 403, 'ownership does not widen the original role');
+      });
+
+      await t.test('admin bank group filters apply before paging and include archived problems', async () => {
+        const bankId = randomUUID();
+        const otherBankId = randomUUID();
+        const groupId = randomUUID();
+        const overlappingGroupId = randomUUID();
+        const archivedGroupId = randomUUID();
+        const otherGroupId = randomUUID();
+        await pool.query(`INSERT INTO problem_banks(id,name,owner_account_id,archived_at) VALUES
+          ($1,'Archived filter bank',$3,now()),($2,'Other filter bank',$3,NULL)`, [bankId, otherBankId, originalTeacher.id]);
+        await pool.query(`INSERT INTO problem_groups(id,bank_id,name,owner_account_id,archived_at) VALUES
+          ($1,$5,'Chapter one',$7,NULL),($2,$5,'Chapter two',$7,NULL),($3,$5,'Retired chapter',$7,now()),
+          ($4,$6,'Chapter one',$7,NULL)`, [groupId, overlappingGroupId, archivedGroupId, otherGroupId, bankId, otherBankId, originalTeacher.id]);
+        const { rows } = await pool.query(`INSERT INTO problems(bank_id,owner_account_id,created_at,archived_at)
+          SELECT $1,$2,to_timestamp(position),CASE WHEN position=1 THEN now() END FROM generate_series(1,104) position
+          RETURNING id,extract(epoch FROM created_at)::int position`, [bankId, originalTeacher.id]);
+        const problemIds = rows.sort((a, b) => a.position - b.position).map(row => row.id);
+        const archivedProblemId = problemIds[0];
+        const overlappingProblemId = problemIds[100];
+        const retiredGroupProblemId = problemIds[101];
+        const ungroupedProblemId = problemIds[102];
+        const otherChapterProblemId = problemIds[103];
+        await pool.query(`WITH versions AS (
+          INSERT INTO problem_versions(problem_id,title,mode,statement,reference_code,time_limit_ms,memory_limit_mb)
+          SELECT id,'Group filter problem ' || position,'stdio','Fixture statement','',1000,64
+          FROM unnest($1::uuid[]) WITH ORDINALITY AS fixture(id,position) RETURNING id,problem_id
+        ) UPDATE problems p SET current_version_id=v.id FROM versions v WHERE p.id=v.problem_id`, [problemIds]);
+        await pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,reference_code,time_limit_ms,memory_limit_mb)
+          SELECT id,'Previous matching title','stdio','Fixture statement','',1000,64 FROM unnest($1::uuid[]) AS fixture(id)`,
+          [[archivedProblemId, otherChapterProblemId]]);
+        await pool.query(`INSERT INTO problem_group_members(group_id,problem_id,position)
+          SELECT $1,id,position FROM unnest($2::uuid[]) WITH ORDINALITY AS fixture(id,position)`, [groupId, problemIds.slice(0, 101)]);
+        await pool.query(`INSERT INTO problem_group_members(group_id,problem_id,position) VALUES
+          ($1,$3,1),($1,$4,2),($2,$5,1)`, [overlappingGroupId, archivedGroupId, overlappingProblemId, otherChapterProblemId, retiredGroupProblemId]);
+
+        const list = (filters = {}, auth = admin) => request(`/admin/problem-banks/${bankId}/problems?${new URLSearchParams(filters)}`, { auth });
+        const all = await list();
+        assert.equal(all.status, 200);
+        assert.ok(all.data.bank.archivedAt);
+        assert.equal(all.data.total, 104);
+        assert.deepEqual([...all.data.groups].sort((a, b) => a.name.localeCompare(b.name)), [
+          { id: groupId, name: 'Chapter one' }, { id: overlappingGroupId, name: 'Chapter two' },
+        ]);
+
+        const firstPage = await list({ groupId });
+        assert.equal(firstPage.status, 200);
+        assert.equal(firstPage.data.total, 101);
+        assert.equal(firstPage.data.pageSize, 100);
+        assert.deepEqual(firstPage.data.items.map(item => item.id), problemIds.slice(1, 101).reverse());
+        const secondPage = await list({ groupId, page: 2, search: 'Group filter problem' });
+        assert.equal(secondPage.status, 200);
+        assert.equal(secondPage.data.total, 101);
+        assert.deepEqual(secondPage.data.items.map(item => item.id), [archivedProblemId]);
+        assert.ok(secondPage.data.items[0].archivedAt);
+
+        const combined = await list({ groupId, search: 'Previous matching title' });
+        assert.equal(combined.status, 200);
+        assert.equal(combined.data.total, 1);
+        assert.deepEqual(combined.data.items.map(item => item.id), [archivedProblemId]);
+        const ungrouped = await list({ groupId: 'ungrouped' });
+        assert.equal(ungrouped.status, 200);
+        assert.equal(ungrouped.data.total, 2);
+        assert.deepEqual(ungrouped.data.items.map(item => item.id), [ungroupedProblemId, retiredGroupProblemId]);
+        const overlapping = await list({ groupId: overlappingGroupId });
+        assert.equal(overlapping.status, 200);
+        assert.equal(overlapping.data.total, 2);
+        assert.deepEqual(overlapping.data.items.map(item => item.id), [otherChapterProblemId, overlappingProblemId]);
+
+        for (const inactiveGroupId of [otherGroupId, archivedGroupId]) {
+          const empty = await list({ groupId: inactiveGroupId });
+          assert.equal(empty.status, 200);
+          assert.equal(empty.data.total, 0);
+          assert.deepEqual(empty.data.items, []);
+        }
+        assert.equal((await list({ groupId: 'invalid-group' })).status, 400);
+        const teacher = await login('original-teacher');
+        for (const auth of [student, teacher, newSchool, platform]) {
+          assert.equal((await list({ groupId }, auth)).status, 403);
+        }
+        const teacherGroups = await request('/problem-groups', { auth: teacher });
+        assert.equal(teacherGroups.status, 200);
+        assert.ok(teacherGroups.data.items.some(group => group.id === otherGroupId));
+        assert.ok(teacherGroups.data.items.every(group => group.bankId !== bankId));
       });
 
       await t.test('shared login, self profile, anonymous site info and school governance remain available', async () => {

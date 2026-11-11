@@ -33,6 +33,7 @@ import {
   type AcslReviewMode,
 } from "./stage-model";
 import { useWrittenReadyNotice } from "./use-written-ready";
+import { AcslWrittenTimer } from "./written-timer";
 import {
   acslCatalogHref,
   acslHref,
@@ -440,6 +441,15 @@ function PaperView({
           ))}
         </div>
       </div>
+      <AcslWrittenTimer
+        key={`${user.id}:${schoolId}:${paper.id}:${paper.versionId}`}
+        accountId={user.id}
+        schoolId={schoolId}
+        paperId={paper.id}
+        versionId={paper.versionId}
+        graded={paper.graded}
+        gradedAt={paper.gradedAt}
+      />
       <section
         className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface p-4"
         aria-label={tx("Written section", "笔试部分")}

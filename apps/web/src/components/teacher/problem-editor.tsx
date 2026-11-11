@@ -1,10 +1,11 @@
 "use client";
 
 import { ProblemTutorialEditor } from "./problem-tutorial-editor";
+import { ProblemSolutionsEntry } from "./problem-solutions-entry";
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AppLink, useNavigationBlocker } from "@/components/navigation";
+import { useNavigationBlocker } from "@/components/navigation";
 import {
   Copy,
   Eye,
@@ -15,7 +16,7 @@ import {
   Send,
   Trash2,
 } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { ProblemPublicationStatus } from "@/components/problem-publication-status";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
 import {
@@ -171,6 +172,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
     [requestedTab, setTab] = useState(() => {
       if (search.get("tab") === "tests") return "测试数据";
       if (search.get("tab") === "tutorial") return "教程";
+      if (search.get("tab") === "solutions") return "解答与提示";
       return "题面";
     }),
     [tutorialVisited, setTutorialVisited] = useState(() => search.get("tab") === "tutorial"),
@@ -648,6 +650,10 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
           </div>
         )}
         {tab === "解答与提示" && (
+          <div className="space-y-5">
+          {saved?.versionId && editable ? <ProblemSolutionsEntry key={`${saved.id}:${saved.versionId}`}
+            problemId={saved.id} versionId={saved.versionId} hasUnsavedProblemChanges={dirty} />
+            : !saved && <p className="text-sm text-muted-foreground">{tr("保存题目草稿后，可在此管理面向学生的题解。", "Save the problem draft to manage student solutions here.")}</p>}
           <div className="grid grid-cols-[minmax(0,1fr)_260px] gap-5 max-lg:grid-cols-1">
             <div className="space-y-4">
               <CodeField
@@ -656,11 +662,9 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                 value={problem.referenceCode ?? ""}
                 onChange={(v) => update("referenceCode", v)}
               />
-              <MathEditor fieldName="editorial" label={tr("题解", "Solution")} value={problem.editorial ?? ""} disabled={!editable} onChange={value=>update("editorial",value)} rows={5}/>
-              {saved?.versionId && editable && <AppLink className={buttonVariants({ size: "sm", variant: "secondary" })}
-                href={`/teacher/scholarship?${new URLSearchParams({ targetType: "problem", targetId: saved.id, versionId: saved.versionId, kind: "FULL_SOLUTION" })}`}>
-                {tr("管理学员题解", "Manage student solutions")}
-              </AppLink>}
+              <p className="text-xs text-muted-foreground">{tr("此参考代码用于题目验证，可在学生题解中导入并审核发布。修改此处不会替换已经发布的学生答案。", "This reference code is used to validate the problem. It can be imported into student solutions for review. Changes here do not replace published student answers.")}</p>
+              <MathEditor fieldName="editorial" label={tr("教师题解草稿", "Teacher solution notes")} value={problem.editorial ?? ""} disabled={!editable} onChange={value=>update("editorial",value)} rows={5}/>
+              <p className="text-xs text-muted-foreground">{tr("在此整理题解素材。学生当前看到的完整题解请通过上方入口编辑；此字段为空不代表没有已发布题解。", "Use this field to prepare solution notes. Edit the full solution students are reading through the entry above; an empty field here does not mean no solution has been published.")}</p>
             </div>
             <aside className="space-y-4">
               <Field label={tr("分级提示", "Progressive hints")}>
@@ -698,6 +702,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                 {tr("检查参考解答", "Check reference solution")}
               </Button>
             </aside>
+          </div>
           </div>
         )}
         {tab === "版本与发布" && (

@@ -4,6 +4,20 @@ import { bytes, fail, field, uuid } from './security.mjs';
 const maxBodyLength = 200000;
 const maxBundleBytes = 512 * 1024;
 
+// Authoring source only. Callers must authorize management of this exact version;
+// students receive only explicitly reviewed assistance content below.
+export function originalProblemSolution({editorial, referenceCode, referenceLanguage = 'python'} = {}) {
+ const parts = [];
+ if (typeof editorial === 'string' && editorial.trim()) parts.push(editorial.trim());
+ if (typeof referenceCode === 'string' && referenceCode.trim()) {
+  const longestRun = [...referenceCode.matchAll(/`+/g)].reduce((length, match) => Math.max(length, match[0].length), 0);
+  const fence = '`'.repeat(Math.max(3, longestRun + 1));
+  const language = ['python', 'cpp', 'javascript'].includes(referenceLanguage) ? referenceLanguage : 'python';
+  parts.push(`${fence}${language}\n${referenceCode}${referenceCode.endsWith('\n') ? '' : '\n'}${fence}`);
+ }
+ return parts.length ? {body: parts.join('\n\n')} : undefined;
+}
+
 function bundleEntries(content, primaryId) {
  const {primaryTitle, alternatives = []} = content.details;
  if (!primaryTitle) return undefined;

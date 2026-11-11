@@ -23,9 +23,9 @@ async function fixture(run){
    await pool.query('INSERT INTO account_roles(account_id,role) VALUES($1,$2)',[account.id,role]);return {id:account.id,identityId:identity.id,roles:[role]};
   };
   const teacher=await actor('teacher'),otherTeacher=await actor('teacher'),student=await actor('student'),otherStudent=await actor('student'),admin=await actor('admin');
-  async function version(problemId){
-   const v=(await pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code,validation_status,published_at,school_visible_at,rank_review_status,rank_approved_at)
-    VALUES($1,'Test','stdio','Public statement',1000,128,'PRIVATE_REFERENCE','AC',clock_timestamp(),clock_timestamp(),'approved',clock_timestamp()) RETURNING id`,[problemId])).rows[0];
+  async function version(problemId,referenceCode='PRIVATE_REFERENCE',editorial=''){
+   const v=(await pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code,metadata,validation_status,published_at,school_visible_at,rank_review_status,rank_approved_at)
+    VALUES($1,'Test','stdio','Public statement',1000,128,$2,$3,'AC',clock_timestamp(),clock_timestamp(),'approved',clock_timestamp()) RETURNING id`,[problemId,referenceCode,{editorial}])).rows[0];
    return {problemId,versionId:v.id};
   }
   async function problem(){const p=(await pool.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id',[teacher.id])).rows[0];const target=await version(p.id);await pool.query('UPDATE problems SET current_version_id=$2 WHERE id=$1',[p.id,target.versionId]);return target;}
@@ -49,6 +49,119 @@ async function fixture(run){
  }finally{await pool.end();await manager.query(`DROP SCHEMA ${schema} CASCADE`);await manager.end();}
 }
 const rejects=(promise,code)=>assert.rejects(promise,error=>error.code===code);
+
+test('original solution source is read-only, exact-version and available only to authorized authors',options,async()=>fixture(async f=>{
+ const original=await f.problem();
+ const latest=await f.version(original.problemId,'NEW_PRIVATE_REFERENCE','New private explanation.');
+ await f.pool.query('UPDATE problems SET current_version_id=$2 WHERE id=$1',[original.problemId,latest.versionId]);
+ const course=(await f.pool.query("INSERT INTO learning_paths(owner_account_id,title) VALUES($1,'Pinned course') RETURNING id",[f.teacher.id])).rows[0];
+ const chapters=(await f.pool.query("INSERT INTO learning_chapters(path_id,title,position) SELECT $1,'Pinned chapter',position FROM generate_series(0,1) position RETURNING id",[course.id])).rows;
+ for(const chapter of chapters)await f.pool.query('INSERT INTO chapter_problems(chapter_id,problem_id,version_id,position) VALUES($1,$2,$3,0)',[chapter.id,original.problemId,original.versionId]);
+ const snapshot=async()=>({
+  versions:(await f.pool.query('SELECT * FROM problem_versions WHERE problem_id=$1 ORDER BY id',[original.problemId])).rows,
+  contents:(await f.pool.query('SELECT * FROM luq_assistance_contents WHERE subject_key=$1 ORDER BY id',[`problem:${original.problemId}`])).rows,
+ });
+ const before=await snapshot();
+ const detail=target=>'/scholarship/contents?'+new URLSearchParams(target);
+ const earlier=await f.call(f.teacher,detail(original),undefined,'GET');
+ assert.deepEqual(earlier.items,[]);
+ assert.equal(earlier.originalSolution.body,'```python\nPRIVATE_REFERENCE\n```');
+ const current=await f.call(f.teacher,detail(latest),undefined,'GET');
+ assert.equal(current.originalSolution.body,'New private explanation.\n\n```python\nNEW_PRIVATE_REFERENCE\n```');
+ assert.deepEqual(current.versions.map(({versionId,current,solutionStatus,courseCount})=>({versionId,current,solutionStatus,courseCount})),[
+  {versionId:latest.versionId,current:true,solutionStatus:'missing',courseCount:0},
+  {versionId:original.versionId,current:false,solutionStatus:'missing',courseCount:1},
+ ]);
+ assert.ok(current.versions.every(version=>version.title==='Test'&&version.createdAt));
+ assert.doesNotMatch(JSON.stringify(current.versions),/PRIVATE_REFERENCE|private explanation/);
+ assert.deepEqual(await snapshot(),before,'reading the source must not create a draft or modify a problem version');
+ await rejects(f.call(f.student,detail(latest),undefined,'GET'),'FORBIDDEN');
+ await rejects(f.call(f.otherTeacher,detail(latest),undefined,'GET'),'FORBIDDEN');
+ const another=await f.problem();
+ await rejects(f.call(f.teacher,detail({...original,versionId:another.versionId}),undefined,'GET'),'NOT_FOUND');
+ const empty=await f.version(original.problemId,'');
+ assert.equal((await f.call(f.teacher,detail(empty),undefined,'GET')).originalSolution,undefined);
+ await f.publish(latest,'FULL_SOLUTION','Reviewed article only.');
+ await f.call(f.teacher,'/scholarship/policies',{targetType:'problem',targetId:original.problemId,kind:'FULL_SOLUTION',mode:'free'});
+ const quote=await f.quote(f.student,latest),provided=await f.provide(f.student,latest);
+ assert.equal(quote.originalSolution,undefined);
+ assert.equal(provided.originalSolution,undefined);
+ assert.equal(provided.body,'Reviewed article only.');
+ assert.doesNotMatch(JSON.stringify([quote,provided]),/PRIVATE_REFERENCE|private explanation/);
+}));
+
+test('missing version solutions inherit only a prior reviewed bundle as a read-only authoring draft',options,async()=>fixture(async f=>{
+ const prior=await f.problem(),kind='FULL_SOLUTION';
+ const draft=await f.call(f.teacher,'/scholarship/contents',{...prior,kind,solutions:[
+  {title:'Original explanation',body:'Reviewed previous primary.'},
+  {title:'Second approach',body:'Reviewed previous alternative.'},
+ ]});
+ const published=await f.call(f.teacher,`/scholarship/contents/${draft.id}/publish`,{reviewed:true,expectedHash:draft.contentHash});
+ await f.call(f.teacher,'/scholarship/contents',{...prior,kind,expectedHash:published.contentHash,
+  solutions:published.solutions.map(solution=>({...solution,body:'PRIVATE PENDING '+solution.body}))});
+ const current=await f.version(prior.problemId),future=await f.version(prior.problemId);
+ await f.publish(future,kind,'FUTURE_VERSION_CONTENT');
+ const unrelated=await f.problem();await f.publish(unrelated,kind,'UNRELATED_PROBLEM_CONTENT');
+ const detail=target=>'/scholarship/contents?'+new URLSearchParams(target);
+ const before=(await f.pool.query('SELECT * FROM luq_assistance_contents ORDER BY id')).rows;
+ const inherited=await f.call(f.teacher,detail(current),undefined,'GET');
+ assert.deepEqual(inherited.items,[]);
+ assert.deepEqual(inherited.inheritedSolution,{versionId:prior.versionId,body:published.body,solutions:published.solutions});
+ assert.doesNotMatch(JSON.stringify(inherited.inheritedSolution),/PRIVATE PENDING|FUTURE_VERSION_CONTENT|UNRELATED_PROBLEM_CONTENT/);
+ assert.deepEqual((await f.pool.query('SELECT * FROM luq_assistance_contents ORDER BY id')).rows,before);
+ const quote=await f.quote(f.student,current);
+ assert.equal(quote.available,false);assert.equal(quote.inheritedSolution,undefined);
+ await rejects(f.provide(f.student,current),'ASSISTANCE_UNAVAILABLE');
+ const blank=await f.problem(),futureOnly=await f.version(blank.problemId);
+ await f.publish(futureOnly,kind,'FUTURE_ONLY');
+ assert.equal((await f.call(f.teacher,detail(blank),undefined,'GET')).inheritedSolution,undefined);
+ const blankOther=await f.problem();
+ assert.equal((await f.call(f.teacher,detail(blankOther),undefined,'GET')).inheritedSolution,undefined);
+ const unstamped=await f.call(f.teacher,'/scholarship/contents',{...blankOther,kind,body:'Missing publication stamp.'});
+ await f.pool.query("UPDATE luq_assistance_contents SET status='published' WHERE id=$1",[unstamped.id]);
+ const unstampedNext=await f.version(blankOther.problemId);
+ assert.equal((await f.call(f.teacher,detail(unstampedNext),undefined,'GET')).inheritedSolution,undefined);
+ const own=await f.call(f.teacher,'/scholarship/contents',{...current,kind,body:'Current version draft.'});
+ for(const status of ['draft','published','withdrawn']){
+  await f.pool.query('UPDATE luq_assistance_contents SET status=$2 WHERE id=$1',[own.id,status]);
+  const existing=await f.call(f.teacher,detail(current),undefined,'GET');
+  assert.equal(existing.inheritedSolution,undefined);
+  assert.equal(existing.items[0].body,'Current version draft.');
+ }
+}));
+
+test('published primary solution revisions remain pending until reviewed and reject competing hashes',options,async()=>fixture(async f=>{
+ const target=await f.problem(),body='Original reviewed explanation.';
+ const published=await f.publish(target,'FULL_SOLUTION',body);
+ await f.call(f.teacher,'/scholarship/policies',{targetType:'problem',targetId:target.problemId,kind:'FULL_SOLUTION',mode:'free'});
+ const detail='/scholarship/contents?'+new URLSearchParams(target);
+ const original=(await f.call(f.teacher,detail,undefined,'GET')).items[0];
+ const edit=label=>f.call(f.teacher,'/scholarship/contents',{...target,kind:'FULL_SOLUTION',expectedHash:original.contentHash,
+  solutions:[{id:published.id,title:'Original solution',body:`Revised explanation ${label}.`},{title:'Another approach',body:`Alternative ${label}.`}]});
+ const results=await Promise.allSettled([edit('A'),edit('B')]);
+ assert.equal(results.filter(result=>result.status==='fulfilled').length,1);
+ assert.equal(results.find(result=>result.status==='rejected').reason.code,'CONTENT_CHANGED');
+ const staged=results.find(result=>result.status==='fulfilled').value;
+ assert.equal(staged.status,'published');assert.equal(staged.hasPendingSolutions,true);
+ const pendingDetail=await f.call(f.teacher,detail,undefined,'GET'),pending=pendingDetail.items[0];
+ assert.equal(pendingDetail.versions[0].solutionStatus,'draft');
+ assert.equal(pendingDetail.versions[0].hasPendingSolutions,true);
+ assert.equal(pending.body,staged.body);
+ assert.notEqual(pending.body,body);
+ const prior=await f.provide(f.student,target);
+ assert.equal(prior.body,body);assert.equal(prior.solutions,undefined);
+ assert.equal(prior.originalSolution,undefined);
+ await rejects(f.call(f.teacher,`/scholarship/contents/${published.id}/publish`,{reviewed:true,expectedHash:original.contentHash}),'CONTENT_CHANGED');
+ await rejects(f.call(f.teacher,'/scholarship/contents',{...target,kind:'FULL_SOLUTION',body:'Unreviewed replacement'}),'PUBLISHED_CONTENT_IMMUTABLE');
+ await f.call(f.teacher,`/scholarship/contents/${published.id}/publish`,{reviewed:true,expectedHash:pending.contentHash});
+ const reviewed=await f.provide(f.student,target);
+ assert.equal(reviewed.body,pending.body);
+ assert.deepEqual(reviewed.solutions,pending.solutions);
+ const final=await f.call(f.teacher,detail,undefined,'GET');
+ assert.equal(final.items[0].hasPendingSolutions,undefined);
+ assert.equal(final.versions[0].solutionStatus,'published');
+ assert.equal(final.versions[0].hasPendingSolutions,undefined);
+}));
 
 test('Luq solution credit follows the actual paid translation across versions and charges only once',options,async()=>fixture(async f=>{
  const target=await f.problem(),other=await f.problem();

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   Empty,
   Feedback,
@@ -18,7 +19,7 @@ import {
   useData,
 } from "@/components/teacher/shared";
 import { date, LessonContent } from "@/components/student/shared";
-import { ApiError, productionApi, type Assignment, type ProductionProblem } from "@/lib/production-api";
+import { ApiError, productionApi, type Assignment } from "@/lib/production-api";
 import type {
   Paper4Paper,
   Paper4PaperSummary,
@@ -28,12 +29,15 @@ import { ScholarshipBatchPrices } from "./batch-prices";
 import { ScholarshipBatchReview } from "./batch-review";
 import {
   sameSolutionDraft,
+  referenceSolutionDraft,
   SolutionAlternativesEditor,
   SolutionDiscardDialog,
   solutionDraftError,
   SolutionDraftPreview,
   useSolutionDraftNavigation,
   type SolutionDraft,
+  type OriginalSolution,
+  type InheritedSolution,
 } from "./solution-alternatives-editor";
 
 type TargetType =
@@ -56,6 +60,12 @@ interface Content extends SolutionDraft {
   contentHash?: string;
   hasPendingSolutions?: boolean;
   publishedAt?: string;
+}
+interface ContentResponse {
+  items: Content[];
+  originalSolution?: OriginalSolution;
+  inheritedSolution?: InheritedSolution;
+  versions?: { versionId: string; title: string; createdAt: string; current: boolean; solutionStatus: string | null; hasPendingSolutions: boolean; courseCount?: number }[];
 }
 interface Policy {
   id: string | null;
@@ -130,6 +140,8 @@ export function TeacherScholarshipPage({ admin = false }: { admin?: boolean }) {
     search.get("mode") === "review" ? "review" : search.get("mode") === "batch" ? "batch" : "single",
   ), [policyRevision, setPolicyRevision] = useState(0);
   const [contentPending, setContentPending] = useState(false);
+  const [versionChoice, setVersionChoice] = useState<{ problemId: string; versionId: string }>();
+  const [contentKind, setContentKind] = useState<AssistanceKind>(admin || search.get("kind") === "FULL_SOLUTION" ? "FULL_SOLUTION" : "FULL_TRANSLATION");
   const single = mode === "single";
   function changeMode(next: "single" | "batch" | "review") {
     setMode(next);
@@ -139,8 +151,8 @@ export function TeacherScholarshipPage({ admin = false }: { admin?: boolean }) {
       setQuestionKey("");
     }
   }
-  const problems = useData<{ items: ProductionProblem[] }>(
-    targetType === "problem" ? "problems" : null,
+  const problems = useData<{ items: { targetId: string; title: string; versionId: string }[] }>(
+    targetType === "problem" ? "scholarship/contents/review?targetType=problem" : null,
   );
   const papers = useData<{ items: Paper4PaperSummary[] }>(
     targetType === "paper4" || targetType === "paper4_activity"
@@ -159,16 +171,16 @@ export function TeacherScholarshipPage({ admin = false }: { admin?: boolean }) {
       ? `paper4/papers/${encodeURIComponent(targetId)}`
       : null,
   );
-  const problem = problems.data?.items.find((item) => item.id === targetId);
+  const problem = problems.data?.items.find((item) => item.targetId === targetId);
   const selectedQuestion = questionKey || paper.data?.questions[0]?.key || "";
   const requestedVersion = targetId === search.get("targetId") && targetType === search.get("targetType")
     ? search.get("versionId")
     : null;
-  const versionId = requestedVersion ||
+  const versionId = (targetType === "problem" && versionChoice?.problemId === targetId ? versionChoice.versionId : null) || requestedVersion ||
     (targetType === "problem" ? problem?.versionId : paper.data?.versionId);
   const choices =
     targetType === "problem"
-      ? problems.data?.items.filter((item) => item.canEdit !== false)
+      ? problems.data?.items.map(item => ({ id: item.targetId, title: item.title }))
       : targetType === "paper4" || targetType === "paper4_activity"
         ? papers.data?.items.filter((item) => item.canManage !== false)
         : activities.data?.items;
@@ -223,24 +235,13 @@ export function TeacherScholarshipPage({ admin = false }: { admin?: boolean }) {
             </option>}
           </select>
         </Field>
-        {single && <Field label={tx("选择题目或活动", "Select problem or activity")}>
-          <select
-            className={input}
-            disabled={contentPending}
-            value={targetId}
-            onChange={(event) => {
-              setTargetId(event.target.value);
-              setQuestionKey("");
-            }}
-          >
-            <option value="">{tx("请选择", "Choose an item")}</option>
-            {choices?.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.title}
-              </option>
-            ))}
-          </select>
-        </Field>}
+        {single && <SearchableSelect label={tx("选择题目或活动", "Select problem or activity")}
+          choices={choices ?? []} disabled={contentPending || picker.loading} value={targetId}
+          onChange={value => {
+            setTargetId(value);
+            setQuestionKey("");
+            setVersionChoice(undefined);
+          }} />}
         {mode !== "review" && <State resource={picker} />}
         {single && targetType === "paper4" && targetId && (
           <>
@@ -262,15 +263,21 @@ export function TeacherScholarshipPage({ admin = false }: { admin?: boolean }) {
           </>
         )}
       </section>
+      {single && !targetId && <section className={`${panel} space-y-1 p-4`}>
+        <h2 className="font-semibold">{tx("内容录入与发布", "Author and publish content")}</h2>
+        <p className="text-sm text-muted-foreground">{tx("请先在上方选择题目或试卷，然后在这里编辑学生看到的译文、原有题解和新增解法。", "Choose a problem or paper above, then edit student translations, existing solutions and additional approaches here.")}</p>
+      </section>}
       {mode === "batch" && (targetType === "problem" || targetType === "paper4") && !picker.loading && !picker.error && <ScholarshipBatchPrices key={targetType} targetType={targetType} choices={choices ?? []} initialIds={(search.get("ids") ?? "").split(",").filter(Boolean)} onSaved={() => setPolicyRevision(value => value + 1)}/>}
       {mode === "review" && (targetType === "problem" || targetType === "paper4") && <ScholarshipBatchReview key={targetType} targetType={targetType} admin={admin}/>}
       {single && contentTarget && (
         <ContentEditor
           key={JSON.stringify(contentTarget)}
           target={contentTarget}
-          initialKind={admin || search.get("kind") === "FULL_SOLUTION" ? "FULL_SOLUTION" : "FULL_TRANSLATION"}
+          kind={contentKind}
+          onKindChange={setContentKind}
           contentPending={contentPending}
           onPendingChange={setContentPending}
+          onVersionChange={versionId => setVersionChoice({ problemId: targetId, versionId })}
         />
       )}
       {single && targetId && (
@@ -300,22 +307,25 @@ export function TeacherScholarshipPage({ admin = false }: { admin?: boolean }) {
 
 function ContentEditor({
   target,
-  initialKind = "FULL_TRANSLATION",
+  kind,
+  onKindChange,
   contentPending,
   onPendingChange,
+  onVersionChange,
 }: {
   target:
     | { problemId: string; versionId: string }
     | { paperId: string; versionId: string; questionKey: string };
-  initialKind?: AssistanceKind;
+  kind: AssistanceKind;
+  onKindChange: (kind: AssistanceKind) => void;
   contentPending: boolean;
   onPendingChange: (pending: boolean) => void;
+  onVersionChange: (versionId: string) => void;
 }) {
   const tx = useText(),
-    contents = useData<{ items: Content[] }>(
+    contents = useData<ContentResponse>(
       `scholarship/contents?${new URLSearchParams(target)}`,
-    ),
-    [kind, setKind] = useState<AssistanceKind>(initialKind);
+    );
   const content = contents.data?.items.find(
     (item) =>
       item.kind === kind &&
@@ -332,7 +342,7 @@ function ContentEditor({
           className={`${input} max-w-64`}
           disabled={contentPending}
           value={kind}
-          onChange={(event) => setKind(event.target.value as AssistanceKind)}
+          onChange={(event) => onKindChange(event.target.value as AssistanceKind)}
         >
           {kinds.map((value) => (
             <option key={value} value={value}>
@@ -348,17 +358,33 @@ function ContentEditor({
         )}
       </p>
       <State resource={contents} />
+      {"problemId" in target && contents.data?.versions && <Field label={tx("题目版本", "Problem version")}>
+        <select aria-label={tx("题目版本", "Problem version")} className={input} value={target.versionId} disabled={contentPending || contents.loading} onChange={event => onVersionChange(event.target.value)}>
+          {contents.data.versions.map(version => <option key={version.versionId} value={version.versionId}>
+            {version.versionId.slice(0, 8)} · {date(version.createdAt)}{version.current ? tx(" · 当前教学版本", " · Current teaching version") : ""}{version.courseCount ? tx(" · 课程使用中", " · Used by courses") : ""} · {version.hasPendingSolutions ? tx("题解更新待审核", "Solution updates awaiting review") : version.solutionStatus === "published" ? tx("题解已发布", "Solution published") : version.solutionStatus === "draft" ? tx("题解草稿", "Solution draft") : tx("未发布题解", "No published solution")}
+          </option>)}
+        </select>
+        <p className="mt-1 text-xs text-muted-foreground">{tx("课程和活动可能使用历史版本。要修改学生看到的题解，请选择对应版本。", "Courses and activities may use an earlier version. Select that version to edit the solution students see.")}</p>
+      </Field>}
       {contents.data && (
         <ContentForm
           key={kind}
           kind={kind}
           target={target}
           content={content}
+          originalSolution={contents.data.originalSolution}
+          inheritedSolution={contents.data.inheritedSolution}
+          onVersionChange={onVersionChange}
           disabled={contents.loading || Boolean(contents.error)}
           reload={contents.reload}
           onPendingChange={onPendingChange}
           onSaved={next => contents.setData(previous => ({
+            ...previous,
             items: [...(previous?.items.filter(item => item.id !== next.id) ?? []), next],
+            versions: previous?.versions?.map(version => version.versionId === target.versionId ? {
+              ...version, solutionStatus: next.kind === "FULL_SOLUTION" ? next.status : version.solutionStatus,
+              hasPendingSolutions: next.kind === "FULL_SOLUTION" ? Boolean(next.hasPendingSolutions) : version.hasPendingSolutions,
+            } : version),
           }))}
         />
       )}
@@ -370,6 +396,9 @@ function ContentForm({
   target,
   kind,
   content,
+  originalSolution,
+  inheritedSolution,
+  onVersionChange,
   disabled,
   reload,
   onPendingChange,
@@ -378,6 +407,9 @@ function ContentForm({
   target: { problemId?: string; versionId: string };
   kind: AssistanceKind;
   content?: Content;
+  originalSolution?: OriginalSolution;
+  inheritedSolution?: InheritedSolution;
+  onVersionChange: (versionId: string) => void;
   disabled: boolean;
   reload: () => void;
   onPendingChange: (pending: boolean) => void;
@@ -392,18 +424,25 @@ function ContentForm({
     action = useAction();
   const inFlight = useRef(false);
   const saved = content ?? { body: "" };
-  const value = draft ?? saved;
-  const dirty = !sameSolutionDraft(value, saved);
   const multiple = kind === "FULL_SOLUTION" && Boolean(target.problemId);
+  const inherited = multiple && !content ? inheritedSolution : undefined;
+  const initial = inherited
+    ? { body: inherited.body, solutions: inherited.solutions ?? [{ title: tx("原有题解", "Existing solution"), body: inherited.body }] }
+    : multiple && !content && originalSolution
+    ? referenceSolutionDraft(originalSolution, tx("原参考题解", "Reference solution"))
+    : saved;
+  const value = draft ?? initial;
+  const dirty = !sameSolutionDraft(value, saved);
+  const unsavedEdits = draft !== null && dirty;
   const published = content?.status === "published";
   const unavailable = disabled || action.busy;
   const canEdit = !unavailable && (!published || multiple);
   const canSave = canEdit && dirty && !conflict && !solutionDraftError(value);
-  useSolutionDraftNavigation(dirty || action.busy);
+  useSolutionDraftNavigation(unsavedEdits || action.busy);
   useEffect(() => {
-    onPendingChange(dirty || action.busy);
+    onPendingChange(unsavedEdits || action.busy);
     return () => onPendingChange(false);
-  }, [dirty, action.busy, onPendingChange]);
+  }, [unsavedEdits, action.busy, onPendingChange]);
 
   function edit(next: SolutionDraft) {
     setDraft(next);
@@ -458,7 +497,12 @@ function ContentForm({
             ? tx("草稿", "Draft")
             : (content?.status ?? tx("尚未录入", "Not authored"))}
       </p>
-      {multiple ? <SolutionAlternativesEditor value={value} onChange={edit} disabled={!canEdit} lockPrimaryBody={published} /> : <Field
+      {inherited && <div className="space-y-2 rounded-md border border-border p-3">
+        <p className="text-sm">{tx(`已从版本 ${inherited.versionId.slice(0, 8)} 带入全部已发布题解，尚未保存到此版本。请核对新题面、接口和参考代码后保存并审核发布。`, `All published solutions from version ${inherited.versionId.slice(0, 8)} are carried forward into this unsaved draft. Check them against the new statement, interface and reference code, then save and review for publication.`)}</p>
+        <Button type="button" size="sm" variant="secondary" disabled={unsavedEdits || unavailable} onClick={() => onVersionChange(inherited.versionId)}>{tx("打开原版本已发布题解", "Open the original published solutions")}</Button>
+      </div>}
+      {multiple && !content && !inherited && originalSolution && <p className="text-sm text-muted-foreground">{tx("已用此版本的原参考题解准备首篇草稿。请核对后保存、审核发布，再向学生开放；其他解法可继续追加。", "The first draft is prepared from this version’s reference solution. Review, save and publish it for students; add other approaches alongside it.")}</p>}
+      {multiple ? <SolutionAlternativesEditor value={value} onChange={edit} disabled={!canEdit} originalSolution={originalSolution} /> : <Field
         label={tx(
           "内容（Markdown，可包含代码块）",
           "Content (Markdown with code blocks)",
@@ -501,7 +545,7 @@ function ContentForm({
         >
           {preview ? tx("收起预览", "Hide preview") : tx("预览", "Preview")}
         </Button>
-        {(dirty || conflict) && <Button size="sm" variant="ghost" disabled={action.busy} onClick={() => dirty ? setDiscard(true) : reset()}>
+        {(unsavedEdits || conflict) && <Button size="sm" variant="ghost" disabled={action.busy} onClick={() => unsavedEdits ? setDiscard(true) : reset()}>
           {conflict ? tx("重新载入", "Reload") : tx("放弃修改", "Discard changes")}
         </Button>}
       </div>

@@ -3,7 +3,7 @@ import {fail,uuid,enumValue,canonicalHash,integer} from './security.mjs';
 import {postScholarshipEntry,getScholarshipSettings} from './scholarship-ledger.mjs';
 import {scholarshipActivityAccess} from './scholarship-rules.mjs';
 import {assistanceKind,assistanceLanguage,resolveAssistanceTarget,resolveAssistancePolicy,assistancePolicyTarget,hasLegacyPracticeAc,lockScholarshipAssistance,isScholarshipStaff} from './scholarship-access.mjs';
-import {approvedAssistanceContent,editableAssistanceContent,pendingSolution,readAssistanceDraft} from './problem-solution-bundles.mjs';
+import {approvedAssistanceContent,editableAssistanceContent,originalProblemSolution,pendingSolution,readAssistanceDraft} from './problem-solution-bundles.mjs';
 
 const response=(body,status=200)=>({status,body});
 const one=result=>{if(!result.rowCount)fail(404,'NOT_FOUND','辅助内容不存在');return result.rows[0];};
@@ -210,7 +210,29 @@ export async function handleScholarshipAssistance(ctx){
  if(route==='/scholarship/contents'&&method==='GET'){
   const target=await resolveAssistanceTarget(pool,user,inputFromUrl(url),{manage:true,helpers});
   const items=(await pool.query('SELECT * FROM luq_assistance_contents WHERE subject_key=$1 AND version_id=$2 ORDER BY kind,language',[target.subjectKey,target.versionId])).rows;
-  return response({items:items.map(contentShape)});
+  let originalSolution,inheritedSolution,versions;
+  if(target.problemId){
+   const version=(await pool.query('SELECT metadata,reference_code,reference_language FROM problem_versions WHERE id=$1 AND problem_id=$2',[target.versionId,target.problemId])).rows[0];
+   originalSolution=originalProblemSolution({editorial:version?.metadata?.editorial,referenceCode:version?.reference_code,referenceLanguage:version?.reference_language});
+   if(!items.some(item=>item.kind==='FULL_SOLUTION'&&item.language==='')){
+    const previous=(await pool.query(`SELECT c.id,c.body,c.solution_details,c.version_id FROM problem_versions v
+     JOIN luq_assistance_contents c ON c.version_id=v.id AND c.subject_key=$2 AND c.kind='FULL_SOLUTION' AND c.language='' AND c.status='published' AND c.published_at IS NOT NULL
+     WHERE v.problem_id=$1 AND v.id<>$3 AND v.created_at<=(SELECT created_at FROM problem_versions WHERE id=$3 AND problem_id=$1)
+     ORDER BY v.created_at DESC,v.id DESC LIMIT 1`,[target.problemId,target.subjectKey,target.versionId])).rows[0];
+    if(previous)inheritedSolution={versionId:previous.version_id,...approvedAssistanceContent(previous)};
+   }
+   const rows=(await pool.query(`SELECT v.id,v.title,v.created_at,v.id=p.current_version_id AS current,
+    c.status,c.pending_solution IS NOT NULL AS has_pending,
+    (SELECT count(DISTINCT ch.path_id)::integer FROM chapter_problems cp JOIN learning_chapters ch ON ch.id=cp.chapter_id
+     JOIN learning_paths course ON course.id=ch.path_id
+     WHERE cp.problem_id=p.id AND cp.version_id=v.id AND ch.archived_at IS NULL AND course.archived_at IS NULL) AS course_count
+    FROM problem_versions v JOIN problems p ON p.id=v.problem_id
+    LEFT JOIN luq_assistance_contents c ON c.subject_key=$2 AND c.version_id=v.id AND c.kind='FULL_SOLUTION' AND c.language=''
+    WHERE v.problem_id=$1 ORDER BY v.created_at DESC,v.id DESC`,[target.problemId,target.subjectKey])).rows;
+   versions=rows.map(row=>({versionId:row.id,title:row.title,createdAt:row.created_at,current:row.current===true,
+    solutionStatus:row.has_pending?'draft':row.status??'missing',courseCount:row.course_count,...(row.has_pending?{hasPendingSolutions:true}:{})}));
+  }
+  return response({items:items.map(contentShape),...(originalSolution?{originalSolution}:{}),...(inheritedSolution?{inheritedSolution}:{}),...(versions?{versions}:{})});
  }
  if(route==='/scholarship/contents'&&method==='POST'){
   const kind=assistanceKind(body.kind),language=assistanceLanguage(kind,body.language);
@@ -225,7 +247,6 @@ export async function handleScholarshipAssistance(ctx){
    }
    let saved;
    if(old?.status==='published'){
-    if(draft.body!==old.body)fail(409,'PUBLISHED_CONTENT_IMMUTABLE','已发布的首篇题解正文不可覆盖，请在新的题目版本中修订');
     const pending=pendingSolution(old,draft);
     saved=one(await db.query('UPDATE luq_assistance_contents SET pending_solution=$2,updated_at=clock_timestamp() WHERE id=$1 RETURNING *',[old.id,pending]));
    }else if(old){

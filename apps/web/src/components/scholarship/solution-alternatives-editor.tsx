@@ -7,9 +7,16 @@ import { useNavigationBlocker } from "@/components/navigation";
 import { area, input, Modal } from "@/components/teacher/shared";
 import { Button } from "@/components/ui/button";
 import { SolutionBundle, type SolutionArticle } from "./solution-content";
+import { includesOriginalSolution } from "./solution-source";
 
 type DraftArticle = Omit<SolutionArticle, "id"> & { id?: string };
 export type SolutionDraft = { body: string; solutions?: DraftArticle[] };
+export type OriginalSolution = { body: string };
+export type InheritedSolution = SolutionDraft & { versionId: string };
+
+export function referenceSolutionDraft(source: OriginalSolution, title: string): SolutionDraft {
+  return { body: source.body, solutions: [{ title, body: source.body }] };
+}
 
 const maxSolutions = 10;
 const maxTitleLength = 120;
@@ -71,11 +78,11 @@ export function SolutionDiscardDialog({ onCancel, onDiscard, reload = false }: {
   </Modal>;
 }
 
-export function SolutionAlternativesEditor({ value, onChange, disabled, lockPrimaryBody }: {
+export function SolutionAlternativesEditor({ value, onChange, disabled, originalSolution }: {
   value: SolutionDraft;
   onChange: (value: SolutionDraft) => void;
   disabled: boolean;
-  lockPrimaryBody?: boolean;
+  originalSolution?: OriginalSolution;
 }) {
   const { locale } = useLocale();
   const tx = (zh: string, en: string) => locale === "en" ? en : zh;
@@ -85,11 +92,12 @@ export function SolutionAlternativesEditor({ value, onChange, disabled, lockPrim
   const titleField = useRef<HTMLInputElement>(null);
   const firstSolution = useRef<HTMLButtonElement>(null);
   const focusTitle = useRef(false);
-  const items = value.solutions?.length ? value.solutions : [{ title: tx("主要解法", "Main approach"), body: value.body }];
+  const items = value.solutions?.length ? value.solutions : [{ title: value.body.trim() ? tx("原有题解", "Existing solution") : tx("主要解法", "Main approach"), body: value.body }];
   const active = Math.min(requested, items.length - 1);
   const current = items[active];
   const error = solutionDraftError(value);
   const validate = Boolean(value.solutions || value.body);
+  const originalIncluded = originalSolution && includesOriginalSolution(items, originalSolution);
 
   useEffect(() => {
     if (!focusTitle.current) return;
@@ -108,6 +116,20 @@ export function SolutionAlternativesEditor({ value, onChange, disabled, lockPrim
   }
 
   return <div className="space-y-3">
+    {originalSolution && <div className="space-y-2 rounded-md border border-border bg-surface-subtle p-3">
+      <p className="text-sm">{originalIncluded
+        ? tx("此版本的原参考题解已包含在下方解法中。", "This version’s reference solution is included below.")
+        : tx("此版本还有题目编辑页中的原参考题解，可补入并与现有解法一起提供给学生。", "This version also has a reference solution from the problem editor. Add it alongside the existing approaches for students.")}</p>
+      <p className="text-xs text-muted-foreground">{tx("新增或修改题解后，请保存并审核发布。审核期间学生仍看到原先发布的内容。", "Save and review new or revised solutions before publishing. Students continue to see the previously published content during review.")}</p>
+      {!originalIncluded && <Button type="button" size="sm" variant="secondary" disabled={disabled || items.length >= maxSolutions} onClick={() => {
+        const reference = { title: tx("原参考题解", "Reference solution"), body: originalSolution.body };
+        const empty = items.length === 1 && !items[0].body.trim();
+        setRequested(empty ? 0 : items.length);
+        focusTitle.current = true;
+        update(empty ? [reference] : [...items, reference]);
+      }}>{tx("补入原参考题解", "Add reference solution")}</Button>}
+      {!originalIncluded && items.length >= maxSolutions && <p className="text-xs text-muted-foreground">{tx("已达到 10 篇上限，请先合并或移除一篇解法。", "The 10-solution limit is reached. Combine or remove an approach first.")}</p>}
+    </div>}
     <div className="flex flex-wrap items-center justify-between gap-2">
       <h3 className="text-sm font-semibold">{tx("解法与阅读顺序", "Solutions and reading order")}</h3>
       <Button type="button" size="sm" variant="secondary" disabled={disabled || items.length >= maxSolutions} onClick={() => {
@@ -137,11 +159,10 @@ export function SolutionAlternativesEditor({ value, onChange, disabled, lockPrim
         <label className="block space-y-1.5 text-sm font-semibold">
           <span>{tx("解法正文（Markdown，可包含代码块）", "Solution body (Markdown with code blocks)")}</span>
           <textarea className={`${area} block min-h-56 max-h-[55dvh] resize-none field-sizing-content font-mono font-normal`}
-            rows={10} value={current.body} maxLength={maxBodyLength} disabled={disabled} readOnly={active === 0 && lockPrimaryBody}
+            rows={10} value={current.body} maxLength={maxBodyLength} disabled={disabled}
             required aria-invalid={validate && !current.body.trim()} aria-describedby={validate && error ? id : undefined}
             onChange={event => edit({ body: event.target.value })} />
         </label>
-        {active === 0 && lockPrimaryBody && <p className="text-xs text-muted-foreground">{tx("主要解法的正文已发布。可更新标题或补充其他解法。", "The main solution body is published. You can edit its title or add other approaches.")}</p>}
         {active > 0 && <div className="flex flex-wrap items-center gap-2">
           <Button type="button" size="sm" variant="ghost" disabled={disabled || active === 1} onClick={() => move(-1)}><ArrowUp size={14} aria-hidden="true" />{tx("上移", "Move up")}</Button>
           <Button type="button" size="sm" variant="ghost" disabled={disabled || active === items.length - 1} onClick={() => move(1)}><ArrowDown size={14} aria-hidden="true" />{tx("下移", "Move down")}</Button>

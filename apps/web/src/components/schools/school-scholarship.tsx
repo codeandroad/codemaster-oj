@@ -14,12 +14,15 @@ import { ScholarshipPopover } from "@/components/scholarship/scholarship-popover
 import { useData as useStudentData } from "@/components/student/shared";
 import {
   sameSolutionDraft,
+  referenceSolutionDraft,
   SolutionAlternativesEditor,
   SolutionDiscardDialog,
   solutionDraftError,
   SolutionDraftPreview,
   useSolutionDraftNavigation,
   type SolutionDraft,
+  type OriginalSolution,
+  type InheritedSolution,
 } from "@/components/scholarship/solution-alternatives-editor";
 
 export type SchoolAssistanceTarget = {
@@ -42,7 +45,7 @@ type Settings = {
   revision: number;
   displayFields: Record<string, boolean>;
 };
-type Content = SolutionDraft & { id?: string; revision: number; status: string; hasPendingSolutions?: boolean };
+type Content = SolutionDraft & { id?: string; revision: number; status: string; hasPendingSolutions?: boolean; originalSolution?: OriginalSolution; inheritedSolution?: InheritedSolution };
 type Target = SchoolAssistanceTarget & {
   subjectKey: string;
   title: string;
@@ -1559,12 +1562,20 @@ function ContentEditor({
     [usage, setUsage] = useState(false);
   const inFlight = useRef(false);
   const saved = data.data ?? { body: "" };
-  const value = draft ?? saved;
-  const dirty = !sameSolutionDraft(value, saved);
   const multiple = kind === "FULL_SOLUTION" && target.type === "problem";
+  const originalSolution = data.data?.originalSolution;
+  const inherited = multiple && !data.data?.id ? data.data?.inheritedSolution : undefined;
+  const initial = inherited
+    ? { body: inherited.body, solutions: inherited.solutions ?? [{ title: tx("原有题解", "Existing solution"), body: inherited.body }] }
+    : multiple && !data.data?.id && originalSolution
+    ? referenceSolutionDraft(originalSolution, tx("原参考题解", "Reference solution"))
+    : saved;
+  const value = draft ?? initial;
+  const dirty = !sameSolutionDraft(value, saved);
+  const unsavedEdits = draft !== null && dirty;
   const disabled = busy || data.loading || Boolean(data.error) || !data.data;
   const canSave = !disabled && dirty && !conflict && !solutionDraftError(value);
-  useSolutionDraftNavigation(dirty || busy);
+  useSolutionDraftNavigation(unsavedEdits || busy);
   const records = useData<{
     items: { id: string; name: string; kind: string; providedAt: string }[];
   }>(usage ? `${prefix(schoolId)}/usage?${query}` : null);
@@ -1589,7 +1600,7 @@ function ContentEditor({
           expectedRevision: data.data.revision,
         },
       });
-      data.setData({ ...value, ...next });
+      data.setData({ ...value, ...next, originalSolution });
       setDraft(null);
       setMessage(tx("草稿已保存，等待审核。", "Draft saved for review."));
       data.reload();
@@ -1604,7 +1615,7 @@ function ContentEditor({
   }
   function close() {
     if (inFlight.current) return;
-    if (dirty) setDiscard("close");
+    if (unsavedEdits) setDiscard("close");
     else onClose();
   }
   function confirmDiscard() {
@@ -1684,11 +1695,13 @@ function ContentEditor({
           <>
             <p className="text-xs text-muted-foreground">
               {tx(
-                "只录入面向学生的题解或译文。保存为待审核草稿，不自动复制参考代码、隐藏测试或私有批注。",
-                "Enter student-facing solution or translation content only. Saving creates a review draft; reference code, hidden tests and private notes are never copied automatically.",
+                "只录入面向学生的题解或译文。核对参考代码与说明，保存后由学校管理员审核发布。不要包含隐藏测试或私有批注。",
+                "Prepare student-facing solutions or translations. Check the reference code and explanation, then save for school administrator review. Do not include hidden tests or private notes.",
               )}
             </p>
-            {multiple ? <SolutionAlternativesEditor value={value} onChange={edit} disabled={disabled} /> : <textarea
+            {inherited && <p className="text-sm text-muted-foreground">{tx(`已从版本 ${inherited.versionId.slice(0, 8)} 带入全部已发布题解，尚未保存到此版本。请核对新题面、接口和参考代码后保存，交由管理员审核发布。`, `All published solutions from version ${inherited.versionId.slice(0, 8)} are carried forward into this unsaved draft. Check the new statement, interface and reference code, then save for administrator review.`)}</p>}
+            {multiple && !data.data.id && !inherited && originalSolution && <p className="text-sm text-muted-foreground">{tx("已用此版本的原参考题解准备首篇草稿。其他解法可继续追加，审核发布后学生才能查看。", "The first draft is prepared from this version’s reference solution. Add other approaches alongside it; students can view them after review and publication.")}</p>}
+            {multiple ? <SolutionAlternativesEditor value={value} onChange={edit} disabled={disabled} originalSolution={originalSolution} /> : <textarea
               aria-label={tx("辅助内容", "Assistance content")}
               className="min-h-80 w-full resize-none rounded-md border border-input bg-background p-3 font-mono text-sm"
               value={value.body}

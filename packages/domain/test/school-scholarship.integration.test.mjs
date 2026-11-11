@@ -92,6 +92,85 @@ test('school scholarships: real roles, atomic rewards, consumption, timing and i
   });
   await t.test('exact balance is sufficient, price confirmation is enforced and a published new version reuses entitlement',async()=>{const x=await problem('Exact balance');await content(x,'FULL_SOLUTION');const available=(await call('two','wallet')).balance;await call('teacher','policies','POST',{targets:[x],kind:'FULL_SOLUTION',price:available,mode:'paid'});const price=await quote('two',x,'FULL_SOLUTION');await assert.rejects(call('two','assistance/unlock','POST',{...x,kind:'FULL_SOLUTION',requestId:randomUUID(),confirmedContentId:price.contentId,confirmedRevision:price.contentRevision,confirmedPrice:price.price-1}),e=>e.code==='QUOTE_CHANGED');await unlock('two',x,'FULL_SOLUTION');assert.equal((await call('two','wallet')).balance,0);await provide('two',x,'FULL_SOLUTION');const next=randomUUID();await owner.query('INSERT INTO school_problem_versions(school_id,id,problem_id,draft_revision,definition) SELECT school_id,$3,id,2,draft FROM school_problems WHERE school_id=$1 AND id=$2',[alpha.id,x.problemId,next]);await owner.query('UPDATE school_problems SET published_version_id=$3 WHERE school_id=$1 AND id=$2',[alpha.id,x.problemId,next]);const target={...x,versionId:next};assert.equal((await quote('two',target,'FULL_SOLUTION')).available,false);await content(target,'FULL_SOLUTION','New reviewed version');assert.equal((await quote('two',target,'FULL_SOLUTION')).price,0);assert.equal((await provide('two',target,'FULL_SOLUTION')).body,'New reviewed version');assert.equal((await call('two','wallet')).balance,0);});
   await t.test('leaderboard uses names and distinct rank accounting, hidden fields stay out of JSON',async()=>{const route=`/schools/${alpha.id}/leaderboard`;let result=(await handleSchoolLeaderboard({pool:app,user:users.one,route,method:'GET',url:new URL('http://qa.local'+route)})).body;assert.ok(result.items.find(i=>i.identityId===ids.one).points>=20);assert.equal(result.items.find(i=>i.identityId===ids.one).name,'one');const prior=result.items.find(i=>i.identityId===ids.one),balance=(await call('one','wallet')).balance;await submit('one',q);await finish('WA');result=(await handleSchoolLeaderboard({pool:app,user:users.one,route,method:'GET',url:new URL('http://qa.local'+route)})).body;const repeated=result.items.find(i=>i.identityId===ids.one);assert.equal(repeated.attempts,prior.attempts+1);assert.ok(repeated.acRate<prior.acRate,'post-AC assessed submissions follow the legacy AC-rate policy');assert.equal(repeated.points,prior.points);assert.equal((await call('one','wallet')).balance,balance);const config=await call('admin','settings');await call('admin','settings','PATCH',{...config,expectedRevision:config.revision,displayFields:{solved:false,attempts:false,acRate:false,scholarship:false}});result=(await handleSchoolLeaderboard({pool:app,user:users.one,route,method:'GET',url:new URL('http://qa.local'+route)})).body;assert.equal(result.items[0].scholarship,undefined);assert.equal(result.items[0].acRate,undefined);assert.equal(result.items[0].attempts,undefined);});
+  await t.test('school original source stays scoped to authorized authors and the exact version',async()=>{
+   const original=await problem('Original school solution'),next=randomUUID();
+   await owner.query(`INSERT INTO school_problem_versions(school_id,id,problem_id,draft_revision,definition)
+    SELECT school_id,$3,id,2,draft||$4::jsonb FROM school_problems WHERE school_id=$1 AND id=$2`,
+   [alpha.id,original.problemId,next,{reference_code:'NEXT PRIVATE REFERENCE',editorial:'Next private explanation.'}]);
+   await owner.query('UPDATE school_problems SET published_version_id=$3 WHERE school_id=$1 AND id=$2',[alpha.id,original.problemId,next]);
+   const latest={...original,versionId:next},kind='FULL_SOLUTION';
+   const detail=target=>'content?'+new URLSearchParams({...target,kind});
+   const snapshot=async()=>({
+    versions:(await owner.query('SELECT * FROM school_problem_versions WHERE school_id=$1 AND problem_id=$2 ORDER BY id',[alpha.id,original.problemId])).rows,
+    contents:(await owner.query('SELECT * FROM school_scholarship_contents WHERE school_id=$1 AND subject_key=$2 ORDER BY id',[alpha.id,`problem:${original.problemId}`])).rows,
+   });
+   const before=await snapshot(),earlier=await call('teacher',detail(original));
+   assert.equal(earlier.status,'missing');assert.equal(earlier.revision,0);
+   assert.equal(earlier.originalSolution.body,'```python\nPRIVATE REFERENCE\n```');
+   assert.equal((await call('admin',detail(latest))).originalSolution.body,'Next private explanation.\n\n```python\nNEXT PRIVATE REFERENCE\n```');
+   assert.deepEqual(await snapshot(),before);
+   await assert.rejects(call('one',detail(latest)),e=>e.status===404);
+   await assert.rejects(call('outsider',detail(latest)),e=>e.status===404);
+   await assert.rejects(call('outsider',detail(latest),'GET',{},beta),e=>e.status===404);
+   const other=await problem('Unrelated school version');
+   await assert.rejects(call('teacher',detail({...latest,versionId:other.versionId})),e=>e.status===404);
+   assert.equal((await call('teacher','content?'+new URLSearchParams({...latest,kind:'FULL_TRANSLATION'}))).originalSolution,undefined);
+   await content(latest,kind,'Reviewed school article only.');
+   await call('teacher','policies','POST',{targets:[latest],kind,price:0,mode:'paid'});
+   const price=await quote('one',latest,kind),provided=await provide('one',latest,kind);
+   assert.equal(price.originalSolution,undefined);assert.equal(provided.originalSolution,undefined);
+   assert.equal(provided.body,'Reviewed school article only.');
+   assert.doesNotMatch(JSON.stringify([price,provided]),/PRIVATE REFERENCE|private explanation/);
+  });
+  await t.test('school versions inherit reviewed bundles without publishing, pending leakage or cross-school fallback',async()=>{
+   const prior=await problem('Inherited school solutions'),kind='FULL_SOLUTION';
+   const saved=await call('teacher','content','POST',{...prior,kind,expectedRevision:0,solutions:[
+    {title:'Original explanation',body:'Reviewed school primary.'},
+    {title:'Another method',body:'Reviewed school alternative.'},
+   ]});
+   await call('admin','contents/review','POST',{confirmReviewed:true,items:[saved]});
+   const detail=target=>'content?'+new URLSearchParams({...target,kind});
+   const published=await call('teacher',detail(prior));
+   await call('teacher','content','POST',{...prior,kind,expectedRevision:published.revision,
+    solutions:published.solutions.map(solution=>({...solution,body:'PRIVATE PENDING '+solution.body}))});
+   const next=async(target,revision)=>{
+    const versionId=randomUUID();
+    await owner.query('INSERT INTO school_problem_versions(school_id,id,problem_id,draft_revision,definition) SELECT school_id,$3,id,$4,draft FROM school_problems WHERE school_id=$1 AND id=$2',[alpha.id,target.problemId,versionId,revision]);
+    return {...target,versionId};
+   };
+   const current=await next(prior,2),future=await next(prior,3);
+   await owner.query('UPDATE school_problems SET published_version_id=$3 WHERE school_id=$1 AND id=$2',[alpha.id,prior.problemId,current.versionId]);
+   await content(future,kind,'FUTURE SCHOOL CONTENT');
+   const unrelated=await problem('Other source');await content(unrelated,kind,'UNRELATED SCHOOL CONTENT');
+   const before=(await owner.query('SELECT * FROM school_scholarship_contents ORDER BY school_id,id')).rows;
+   const inherited=await call('teacher',detail(current));
+   assert.equal(inherited.status,'missing');assert.equal(inherited.revision,0);
+   assert.deepEqual(inherited.inheritedSolution,{versionId:prior.versionId,body:published.body,solutions:published.solutions});
+   assert.doesNotMatch(JSON.stringify(inherited.inheritedSolution),/PRIVATE PENDING|FUTURE SCHOOL CONTENT|UNRELATED SCHOOL CONTENT/);
+   assert.deepEqual((await owner.query('SELECT * FROM school_scholarship_contents ORDER BY school_id,id')).rows,before);
+   const price=await quote('one',current,kind);
+   assert.equal(price.available,false);assert.equal(price.inheritedSolution,undefined);
+   await assert.rejects(provide('one',current,kind),e=>e.status===403);
+   const blank=await problem('No prior published solution'),futureOnly=await next(blank,2);
+   await content(futureOnly,kind,'FUTURE ONLY');
+   assert.equal((await call('teacher',detail(blank))).inheritedSolution,undefined);
+   const empty=await problem('No own-school solution'),foreignBank=randomUUID(),foreignVersion=randomUUID();
+   await owner.query("INSERT INTO school_problem_banks(school_id,id,owner_account_id,name,request_id) VALUES($1,$2,$3,'Foreign source',$4)",[beta.id,foreignBank,users.outsider.id,randomUUID()]);
+   await owner.query("INSERT INTO school_problems(school_id,id,bank_id,owner_account_id,draft,request_id) VALUES($1,$2,$3,$4,'{}',$5)",[beta.id,empty.problemId,foreignBank,users.outsider.id,randomUUID()]);
+   await owner.query("INSERT INTO school_problem_versions(school_id,id,problem_id,draft_revision,definition,created_at) VALUES($1,$2,$3,1,'{}','2000-01-01')",[beta.id,foreignVersion,empty.problemId]);
+   await owner.query("INSERT INTO school_scholarship_contents(school_id,subject_key,version_id,kind,language,body,status,author_account_id,published_at) VALUES($1,$2,$3,'FULL_SOLUTION','','FOREIGN SCHOOL CONTENT','published',$4,clock_timestamp())",[beta.id,`problem:${empty.problemId}`,foreignVersion,users.outsider.id]);
+   assert.equal((await call('teacher',detail(empty))).inheritedSolution,undefined);
+   const unstamped=await call('teacher','content','POST',{...empty,kind,body:'Missing school publication stamp.',expectedRevision:0});
+   await owner.query("UPDATE school_scholarship_contents SET status='published' WHERE school_id=$1 AND id=$2",[alpha.id,unstamped.id]);
+   assert.equal((await call('teacher',detail(await next(empty,2)))).inheritedSolution,undefined);
+   assert.equal((await call('teacher','content?'+new URLSearchParams({...current,kind:'FULL_TRANSLATION'}))).inheritedSolution,undefined);
+   const own=await call('teacher','content','POST',{...current,kind,body:'Current school draft.',expectedRevision:0});
+   for(const status of ['draft','published','withdrawn']){
+    await owner.query('UPDATE school_scholarship_contents SET status=$3 WHERE school_id=$1 AND id=$2',[alpha.id,own.id,status]);
+    const existing=await call('teacher',detail(current));
+    assert.equal(existing.inheritedSolution,undefined);assert.equal(existing.body,'Current school draft.');
+   }
+  });
   await t.test('school administrator reviews a whole solution bundle while the old solution remains available',async()=>{
    const target=await problem('Multiple school solutions');
    const kind='FULL_SOLUTION';

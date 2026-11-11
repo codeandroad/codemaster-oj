@@ -3,7 +3,7 @@ import { auditSchool, LEGACY_SCHOOL_ID, lockSchoolTeaching, schoolRole } from '.
 import { lockScholarshipAssistance } from './scholarship-access.mjs';
 import { schoolActivityJobVisibleSql } from './school-activities.mjs';
 import { canonicalHash, enumValue, fail, field, integer, uuid } from './security.mjs';
-import { approvedAssistanceContent, editableAssistanceContent, pendingSolution, readAssistanceDraft } from './problem-solution-bundles.mjs';
+import { approvedAssistanceContent, editableAssistanceContent, originalProblemSolution, pendingSolution, readAssistanceDraft } from './problem-solution-bundles.mjs';
 
 const reply=(body,status=200)=>({status,body});
 const kindOf=b=>enumValue(b.kind,['FULL_TRANSLATION','FULL_SOLUTION'],'Content type');
@@ -188,7 +188,20 @@ export async function handleSchoolScholarship({pool,user,route,method,body={},ur
   if(path==='content'&&['GET','POST'].includes(method)){
    const b=method==='GET'?Object.fromEntries(url.searchParams):body,t=await target(db,s,user,role,b,{management:true}),k=kindOf(b),language=languageOf(k);
    const old=(await db.query('SELECT * FROM school_scholarship_contents WHERE school_id=$1 AND subject_key=$2 AND version_id=$3 AND kind=$4 AND language=$5 FOR UPDATE',[s,t.subject,t.v.id,k,language])).rows[0];
-   if(method==='GET')return reply(old?{id:old.id,...editableAssistanceContent(old),status:old.status,revision:old.revision}:{body:'',status:'missing',revision:0});
+   if(method==='GET'){
+    const definition=t.v.definition;
+    const originalSolution=t.type==='problem'&&k==='FULL_SOLUTION'?originalProblemSolution({editorial:definition.editorial??definition.metadata?.editorial,referenceCode:definition.reference_code,referenceLanguage:definition.reference_language}):undefined;
+    let inheritedSolution;
+    if(!old&&t.type==='problem'&&k==='FULL_SOLUTION'){
+     const previous=(await db.query(`SELECT c.id,c.body,c.solution_details,c.version_id FROM school_problem_versions v
+      JOIN school_scholarship_contents c ON c.school_id=v.school_id AND c.version_id=v.id AND c.subject_key=$3 AND c.kind='FULL_SOLUTION' AND c.language='' AND c.status='published' AND c.published_at IS NOT NULL
+      WHERE v.school_id=$1 AND v.problem_id=$2 AND v.id<>$4
+       AND v.created_at<=(SELECT created_at FROM school_problem_versions WHERE school_id=$1 AND problem_id=$2 AND id=$4)
+      ORDER BY v.created_at DESC,v.id DESC LIMIT 1`,[s,t.p.id,t.subject,t.v.id])).rows[0];
+     if(previous)inheritedSolution={versionId:previous.version_id,...approvedAssistanceContent(previous)};
+    }
+    return reply({...(old?{id:old.id,...editableAssistanceContent(old),status:old.status,revision:old.revision}:{body:'',status:'missing',revision:0}),...(originalSolution?{originalSolution}:{}),...(inheritedSolution?{inheritedSolution}:{})});
+   }
    if(integer(body.expectedRevision??0,0,2147483646,'Revision')!==(old?.revision??0))fail(409,'REVISION_CONFLICT','Content changed. Refresh first.');
    const draft=readAssistanceDraft(body,{subjectKey:t.subject,kind:k,previous:old});
    const staged=old?.status==='published'&&body.solutions!==undefined;

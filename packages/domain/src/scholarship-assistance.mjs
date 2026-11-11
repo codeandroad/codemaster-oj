@@ -4,6 +4,7 @@ import {postScholarshipEntry,getScholarshipSettings} from './scholarship-ledger.
 import {scholarshipActivityAccess} from './scholarship-rules.mjs';
 import {assistanceKind,assistanceLanguage,resolveAssistanceTarget,resolveAssistancePolicy,assistancePolicyTarget,hasLegacyPracticeAc,lockScholarshipAssistance,isScholarshipStaff} from './scholarship-access.mjs';
 import {approvedAssistanceContent,editableAssistanceContent,originalProblemSolution,pendingSolution,readAssistanceDraft} from './problem-solution-bundles.mjs';
+import {withProblemSolutionUsage} from './problem-solution-usage.mjs';
 
 const response=(body,status=200)=>({status,body});
 const one=result=>{if(!result.rowCount)fail(404,'NOT_FOUND','辅助内容不存在');return result.rows[0];};
@@ -210,7 +211,7 @@ export async function handleScholarshipAssistance(ctx){
  if(route==='/scholarship/contents'&&method==='GET'){
   const target=await resolveAssistanceTarget(pool,user,inputFromUrl(url),{manage:true,helpers});
   const items=(await pool.query('SELECT * FROM luq_assistance_contents WHERE subject_key=$1 AND version_id=$2 ORDER BY kind,language',[target.subjectKey,target.versionId])).rows;
-  let originalSolution,inheritedSolution,versions;
+  let originalSolution,inheritedSolution,versions,selection;
   if(target.problemId){
    const version=(await pool.query('SELECT metadata,reference_code,reference_language FROM problem_versions WHERE id=$1 AND problem_id=$2',[target.versionId,target.problemId])).rows[0];
    originalSolution=originalProblemSolution({editorial:version?.metadata?.editorial,referenceCode:version?.reference_code,referenceLanguage:version?.reference_language});
@@ -221,7 +222,7 @@ export async function handleScholarshipAssistance(ctx){
      ORDER BY v.created_at DESC,v.id DESC LIMIT 1`,[target.problemId,target.subjectKey,target.versionId])).rows[0];
     if(previous)inheritedSolution={versionId:previous.version_id,...approvedAssistanceContent(previous)};
    }
-   const rows=(await pool.query(`SELECT v.id,v.title,v.created_at,v.id=p.current_version_id AS current,
+   const rows=(await pool.query(`SELECT v.id,v.title,v.created_at,v.published_at,v.id=p.current_version_id AS current,
     c.status,c.pending_solution IS NOT NULL AS has_pending,
     (SELECT count(DISTINCT ch.path_id)::integer FROM chapter_problems cp JOIN learning_chapters ch ON ch.id=cp.chapter_id
      JOIN learning_paths course ON course.id=ch.path_id
@@ -229,10 +230,11 @@ export async function handleScholarshipAssistance(ctx){
     FROM problem_versions v JOIN problems p ON p.id=v.problem_id
     LEFT JOIN luq_assistance_contents c ON c.subject_key=$2 AND c.version_id=v.id AND c.kind='FULL_SOLUTION' AND c.language=''
     WHERE v.problem_id=$1 ORDER BY v.created_at DESC,v.id DESC`,[target.problemId,target.subjectKey])).rows;
-   versions=rows.map(row=>({versionId:row.id,title:row.title,createdAt:row.created_at,current:row.current===true,
+   versions=rows.map((row,index)=>({versionId:row.id,title:row.title,createdAt:row.created_at,current:row.current===true,latest:index===0,published:!!row.published_at,
     solutionStatus:row.has_pending?'draft':row.status??'missing',courseCount:row.course_count,...(row.has_pending?{hasPendingSolutions:true}:{})}));
+   ({versions,...selection}=await withProblemSolutionUsage(pool,user,target.problemId,versions));
   }
-  return response({items:items.map(contentShape),...(originalSolution?{originalSolution}:{}),...(inheritedSolution?{inheritedSolution}:{}),...(versions?{versions}:{})});
+  return response({items:items.map(contentShape),...(originalSolution?{originalSolution}:{}),...(inheritedSolution?{inheritedSolution}:{}),...(versions?{versions,...selection}:{})});
  }
  if(route==='/scholarship/contents'&&method==='POST'){
   const kind=assistanceKind(body.kind),language=assistanceLanguage(kind,body.language);
@@ -280,10 +282,14 @@ export async function handleScholarshipAssistance(ctx){
    target=access.activity;canManage=access.canManage;frozen=access.frozen;
   }else target=await assistancePolicyTarget(pool,user,targetType,targetId);
   const rows=(await pool.query(`SELECT DISTINCT ON(kind) * FROM luq_assistance_policies WHERE target_type=$1 AND target_id=$2 ORDER BY kind,rule_version DESC`,[targetType,targetId])).rows;
+  const settings=await getScholarshipSettings(pool);
   const mode=targetType==='timed'||targetType==='paper4_activity'&&target.activity_kind==='exam'?'disabled':'paid';
   return response({items:['FULL_TRANSLATION','FULL_SOLUTION'].map(kind=>{
    const found=rows.find(row=>row.kind===kind);
-   return found?policyShape(found):{id:null,targetType,targetId,kind,mode,opensAt:null,price:null,ruleVersion:0};
+   const policy=found?policyShape(found):{id:null,targetType,targetId,kind,mode,opensAt:null,price:null,ruleVersion:0};
+   const defaultPrice=kind==='FULL_TRANSLATION'?settings.translationPrice:settings.solutionPrice;
+   // Configuration only; free access and student-specific discounts belong to quotes.
+   return {...policy,defaultPrice,effectivePrice:policy.price??defaultPrice};
   }),canManage,frozen});
  }
 

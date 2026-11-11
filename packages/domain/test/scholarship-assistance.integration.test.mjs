@@ -4,7 +4,8 @@ import {randomBytes,randomUUID} from 'node:crypto';
 import {createPool,transaction} from '../src/db.mjs';
 import {migrate} from '../src/migrate.mjs';
 import {handleScholarshipAssistance} from '../src/scholarship-assistance.mjs';
-import {postScholarshipEntry} from '../src/scholarship-ledger.mjs';
+import {postScholarshipEntry,handleScholarshipLedger} from '../src/scholarship-ledger.mjs';
+import {handleEducation} from '../src/education.mjs';
 
 const options={skip:!process.env.TEST_DATABASE_URL,timeout:60000};
 async function fixture(run){
@@ -23,9 +24,9 @@ async function fixture(run){
    await pool.query('INSERT INTO account_roles(account_id,role) VALUES($1,$2)',[account.id,role]);return {id:account.id,identityId:identity.id,roles:[role]};
   };
   const teacher=await actor('teacher'),otherTeacher=await actor('teacher'),student=await actor('student'),otherStudent=await actor('student'),admin=await actor('admin');
-  async function version(problemId,referenceCode='PRIVATE_REFERENCE',editorial=''){
+  async function version(problemId,referenceCode='PRIVATE_REFERENCE',editorial='',{published=true,approved=true}={}){
    const v=(await pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code,metadata,validation_status,published_at,school_visible_at,rank_review_status,rank_approved_at)
-    VALUES($1,'Test','stdio','Public statement',1000,128,$2,$3,'AC',clock_timestamp(),clock_timestamp(),'approved',clock_timestamp()) RETURNING id`,[problemId,referenceCode,{editorial}])).rows[0];
+    VALUES($1,'Test','stdio','Public statement',1000,128,$2,$3,'AC',CASE WHEN $4 THEN clock_timestamp() END,CASE WHEN $4 AND $5 THEN clock_timestamp() END,CASE WHEN $5 THEN 'approved' ELSE 'pending' END,CASE WHEN $4 AND $5 THEN clock_timestamp() END) RETURNING id`,[problemId,referenceCode,{editorial},published,approved])).rows[0];
    return {problemId,versionId:v.id};
   }
   async function problem(){const p=(await pool.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id',[teacher.id])).rows[0];const target=await version(p.id);await pool.query('UPDATE problems SET current_version_id=$2 WHERE id=$1',[p.id,target.versionId]);return target;}
@@ -49,6 +50,43 @@ async function fixture(run){
  }finally{await pool.end();await manager.query(`DROP SCHEMA ${schema} CASCADE`);await manager.end();}
 }
 const rejects=(promise,code)=>assert.rejects(promise,error=>error.code===code);
+
+test('policy price displays track school defaults without converting inherited prices into overrides',options,async()=>fixture(async f=>{
+ const target=await f.problem();
+ const path=`/scholarship/policies?targetType=problem&targetId=${target.problemId}`;
+ const read=async()=>Object.fromEntries((await f.call(f.teacher,path,undefined,'GET')).items.map(item=>[item.kind,item]));
+ const settings=async(translationPrice,solutionPrice)=>handleScholarshipLedger({pool:f.pool,user:f.admin,route:'/scholarship/settings',method:'PATCH',body:{translationPrice,solutionPrice}});
+ await settings(7,13);
+ let policies=await read();
+ assert.equal(policies.FULL_TRANSLATION.defaultPrice,7);
+ assert.equal(policies.FULL_TRANSLATION.effectivePrice,7);
+ assert.equal(policies.FULL_SOLUTION.defaultPrice,13);
+ assert.equal(policies.FULL_SOLUTION.effectivePrice,13);
+ assert.equal(policies.FULL_SOLUTION.price,null);
+ assert.equal((await f.pool.query('SELECT count(*)::int count FROM luq_assistance_policies')).rows[0].count,0,'reading numeric defaults does not create overrides');
+ await settings(9,17);
+ policies=await read();
+ assert.equal(policies.FULL_TRANSLATION.effectivePrice,9);
+ assert.equal(policies.FULL_SOLUTION.effectivePrice,17,'an inherited price follows the current setting');
+ const save=body=>f.call(f.teacher,'/scholarship/policies',{targetType:'problem',targetId:target.problemId,kind:'FULL_SOLUTION',mode:'paid',...body});
+ await save({price:0});
+ policies=await read();
+ assert.equal(policies.FULL_SOLUTION.price,0);
+ assert.equal(policies.FULL_SOLUTION.effectivePrice,0,'zero is a custom price, not a missing price');
+ await settings(11,19);
+ assert.equal((await read()).FULL_SOLUTION.effectivePrice,0);
+ await save({price:null});
+ policies=await read();
+ assert.equal(policies.FULL_SOLUTION.price,null);
+ assert.equal(policies.FULL_SOLUTION.effectivePrice,19);
+ await save({mode:'free'});
+ await f.publish(target);
+ assert.equal((await read()).FULL_SOLUTION.effectivePrice,19,'the display metadata is the paid base price even in free mode');
+ assert.equal((await f.quote(f.student,target)).price,0,'free access still quotes zero');
+ assert.equal((await f.pool.query("SELECT count(*)::int count FROM luq_ledger WHERE kind='purchase'")).rows[0].count,0);
+ await rejects(f.call(f.student,path,undefined,'GET'),'FORBIDDEN');
+ await rejects(f.call(f.otherTeacher,path,undefined,'GET'),'FORBIDDEN');
+}));
 
 test('original solution source is read-only, exact-version and available only to authorized authors',options,async()=>fixture(async f=>{
  const original=await f.problem();
@@ -88,6 +126,101 @@ test('original solution source is read-only, exact-version and available only to
  assert.equal(provided.originalSolution,undefined);
  assert.equal(provided.body,'Reviewed article only.');
  assert.doesNotMatch(JSON.stringify([quote,provided]),/PRIVATE_REFERENCE|private explanation/);
+}));
+
+test('solution use follows the same resolved revision students open in published courses',options,async()=>fixture(async f=>{
+ const original=await f.problem(),middle=await f.version(original.problemId,undefined,undefined,{published:false,approved:false}),latest=await f.version(original.problemId,undefined,undefined,{approved:false});
+ await f.pool.query('UPDATE problems SET current_version_id=$2 WHERE id=$1',[original.problemId,latest.versionId]);
+ const course=(await f.pool.query("INSERT INTO learning_paths(owner_account_id,title,published_at) VALUES($1,'Current student course',clock_timestamp()) RETURNING id",[f.teacher.id])).rows[0];
+ const chapter=(await f.pool.query("INSERT INTO learning_chapters(path_id,title,position) VALUES($1,'Lesson',0) RETURNING id",[course.id])).rows[0];
+ await f.pool.query('INSERT INTO chapter_problems(chapter_id,problem_id,version_id,position) VALUES($1,$2,$3,0)',[chapter.id,original.problemId,original.versionId]);
+ const details=()=>f.call(f.teacher,'/scholarship/contents?'+new URLSearchParams(latest),undefined,'GET');
+ const studentCourse=async()=>{
+  const route=`/learning-paths/${course.id}`;
+  const result=await handleEducation({pool:f.pool,user:f.student,route,method:'GET',url:new URL(`http://test${route}`),helpers:{versionAccess:async()=>({})}});
+  return result.body.chapters[0].problems[0].versionId;
+ };
+ const before=(await f.pool.query('SELECT * FROM problem_versions WHERE problem_id=$1 ORDER BY id',[original.problemId])).rows;
+ let detail=await details();
+ assert.equal(detail.recommendedVersionId,original.versionId);
+ assert.equal(detail.selectionRequired,false);
+ assert.equal(await studentCourse(),detail.recommendedVersionId);
+ assert.deepEqual(detail.versions.find(v=>v.versionId===original.versionId).usage,{courseCount:1,courses:[{id:course.id,title:'Current student course'}],assignmentCount:0,assignments:[],timedCount:0,timedPractices:[],schoolPractice:true});
+ assert.equal(detail.versions.find(v=>v.versionId===latest.versionId).latest,true);
+ assert.equal(detail.versions.find(v=>v.versionId===latest.versionId).current,true);
+ assert.equal(detail.versions.find(v=>v.versionId===latest.versionId).published,true);
+ assert.equal(detail.versions.find(v=>v.versionId===middle.versionId).published,false);
+ assert.deepEqual((await f.pool.query('SELECT * FROM problem_versions WHERE problem_id=$1 ORDER BY id',[original.problemId])).rows,before,'usage reads never save a revision');
+ // Approval changes what published lessons open without rewriting their source link.
+ await f.pool.query("UPDATE problem_versions SET school_visible_at=clock_timestamp(),rank_review_status='approved',rank_approved_at=clock_timestamp() WHERE id=$1",[latest.versionId]);
+ detail=await details();
+ assert.equal(detail.recommendedVersionId,latest.versionId);
+ assert.equal(await studentCourse(),latest.versionId);
+ assert.equal(detail.versions.find(v=>v.versionId===original.versionId).courseCount,1,'legacy linked-course metadata remains compatible');
+ assert.equal(detail.versions.find(v=>v.versionId===original.versionId).usage.courseCount,0);
+ assert.equal(detail.versions.find(v=>v.versionId===latest.versionId).usage.courseCount,1);
+ assert.equal((await f.pool.query('SELECT version_id FROM chapter_problems WHERE chapter_id=$1',[chapter.id])).rows[0].version_id,original.versionId);
+ // Teacher edit access to draft/future/expired/withdrawn courses is not student use.
+ for(const patch of ["available_from=now()+interval '1 day'","available_from=NULL,available_until=now()-interval '1 day'","available_until=NULL,published_at=NULL,withdrawn_at=now()","published_at=clock_timestamp(),withdrawn_at=NULL,archived_at=now()"]){
+  await f.pool.query(`UPDATE learning_paths SET ${patch} WHERE id=$1`,[course.id]);
+  assert.ok((await details()).versions.every(version=>version.usage.courseCount===0));
+ }
+ const quote=await f.quote(f.student,original);
+ assert.equal(quote.versions,undefined);assert.equal(quote.recommendedVersionId,undefined);assert.equal(quote.selectionRequired,undefined);
+}));
+
+test('solution use reveals only readable course names and managed activity names',options,async()=>fixture(async f=>{
+ const original=await f.problem(),latest=await f.version(original.problemId);
+ await f.pool.query('UPDATE problems SET current_version_id=$2 WHERE id=$1',[original.problemId,latest.versionId]);
+ const cls=(await f.pool.query("INSERT INTO classes(name,owner_account_id) VALUES('Private audience',$1) RETURNING id",[f.otherTeacher.id])).rows[0];
+ const course=(await f.pool.query("INSERT INTO learning_paths(owner_account_id,title,published_at,access_scope) VALUES($1,'PRIVATE_OTHER_COURSE',clock_timestamp(),'classes') RETURNING id",[f.otherTeacher.id])).rows[0];
+ await f.pool.query('INSERT INTO learning_path_classes(path_id,class_id) VALUES($1,$2)',[course.id,cls.id]);
+ const chapter=(await f.pool.query("INSERT INTO learning_chapters(path_id,title,position) VALUES($1,'Private lesson',0) RETURNING id",[course.id])).rows[0];
+ await f.pool.query('INSERT INTO chapter_problems(chapter_id,problem_id,version_id,position) VALUES($1,$2,$3,0)',[chapter.id,original.problemId,original.versionId]);
+ const assignment=async(owner,target,title)=>{
+  const row=(await f.pool.query("INSERT INTO assignments(owner_account_id,class_id,title,due_at,state,published_at) VALUES($1,$2,$3,now()+interval '1 day','Published',now()) RETURNING id",[owner.id,cls.id,title])).rows[0];
+  await f.pool.query('INSERT INTO assignment_problems(assignment_id,problem_id,version_id,points,position) VALUES($1,$2,$3,100,0)',[row.id,target.problemId,target.versionId]);return row;
+ };
+ const first=await assignment(f.teacher,original,'Older worksheet'),second=await assignment(f.teacher,latest,'Newer worksheet');
+ const otherAssignment=await assignment(f.otherTeacher,latest,'PRIVATE_OTHER_ASSIGNMENT');
+ const timed=(await f.pool.query("INSERT INTO timed_practices(owner_account_id,class_id,title,starts_at,ends_at,duration_minutes,state) VALUES($1,$2,'Private timed practice',now(),now()+interval '1 hour',30,'Draft') RETURNING id",[f.otherTeacher.id,cls.id])).rows[0];
+ await f.pool.query('INSERT INTO timed_practice_problems(practice_id,problem_id,version_id,points,position) VALUES($1,$2,$3,100,0)',[timed.id,original.problemId,latest.versionId]);
+ await f.pool.query("UPDATE timed_practices SET state='Published' WHERE id=$1",[timed.id]);
+ const get=user=>f.call(user,'/scholarship/contents?'+new URLSearchParams(latest),undefined,'GET');
+ let detail=await get(f.teacher);
+ assert.equal(detail.recommendedVersionId,latest.versionId,'the published course resolves the latest approved revision');
+ assert.equal(detail.versions.find(v=>v.versionId===latest.versionId).usage.courseCount,1);
+ assert.deepEqual(detail.versions.find(v=>v.versionId===latest.versionId).usage.courses,[]);
+ assert.doesNotMatch(JSON.stringify(detail),/PRIVATE_OTHER_COURSE|PRIVATE_OTHER_ASSIGNMENT|Private timed practice/);
+ assert.ok(!JSON.stringify(detail).includes(otherAssignment.id));assert.ok(!JSON.stringify(detail).includes(timed.id));
+ assert.deepEqual(detail.versions.find(v=>v.versionId===original.versionId).usage.assignments,[{id:first.id,title:'Older worksheet'}]);
+ assert.deepEqual(detail.versions.find(v=>v.versionId===latest.versionId).usage.assignments,[{id:second.id,title:'Newer worksheet'}]);
+ assert.equal(detail.versions.find(v=>v.versionId===latest.versionId).usage.assignmentCount,2);
+ assert.equal(detail.versions.find(v=>v.versionId===latest.versionId).usage.timedCount,1);
+ assert.deepEqual(detail.versions.find(v=>v.versionId===latest.versionId).usage.timedPractices,[]);
+ const admin=await get(f.admin);
+ assert.equal(admin.versions.find(v=>v.versionId===latest.versionId).usage.courses[0].title,'PRIVATE_OTHER_COURSE');
+ assert.equal(admin.versions.find(v=>v.versionId===latest.versionId).usage.assignmentCount,2);
+ assert.equal(admin.versions.find(v=>v.versionId===latest.versionId).usage.timedCount,1);
+ await f.pool.query('UPDATE learning_paths SET published_at=NULL WHERE id=$1',[course.id]);
+ detail=await get(f.teacher);
+ assert.equal(detail.recommendedVersionId,null);assert.equal(detail.selectionRequired,true,'different managed activities require an explicit use choice');
+ await f.pool.query('UPDATE assignments SET archived_at=now() WHERE id=$1',[second.id]);
+ detail=await get(f.teacher);
+ assert.equal(detail.recommendedVersionId,null);assert.equal(detail.selectionRequired,true,'other teachers’ active uses remain visible as anonymous counts');
+ await f.pool.query('UPDATE assignments SET archived_at=now() WHERE id=$1',[first.id]);
+ detail=await get(f.teacher);
+ assert.equal(detail.recommendedVersionId,latest.versionId,'a private activity still prevents wrongly treating its revision as unused');
+ assert.equal(detail.selectionRequired,false);
+ await f.pool.query('UPDATE assignments SET archived_at=now() WHERE id=$1',[otherAssignment.id]);
+ await f.pool.query("UPDATE timed_practices SET state='Archived',archived_at=now() WHERE id=$1",[timed.id]);
+ detail=await get(f.teacher);
+ assert.equal(detail.recommendedVersionId,latest.versionId,'without a current course or managed activity, school practice is preferred');
+ await f.pool.query("UPDATE problem_versions SET school_visible_at=NULL,rank_review_status='pending',rank_approved_at=NULL WHERE problem_id=$1",[original.problemId]);
+ const newest=await f.version(original.problemId,undefined,undefined,{published:false,approved:false});
+ detail=await get(f.teacher);
+ assert.equal(detail.recommendedVersionId,newest.versionId,'when there is no student use, start from the latest saved draft');
+ await rejects(get(f.student),'FORBIDDEN');await rejects(get(f.otherTeacher),'FORBIDDEN');
 }));
 
 test('missing version solutions inherit only a prior reviewed bundle as a read-only authoring draft',options,async()=>fixture(async f=>{

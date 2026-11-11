@@ -27,6 +27,9 @@ import type {
 import type { AssistanceKind } from "./assistance";
 import { ScholarshipBatchPrices } from "./batch-prices";
 import { ScholarshipBatchReview } from "./batch-review";
+import { assistancePricePayload, parseAssistancePrice, type AssistancePriceIntent } from "./assistance-price";
+import { SolutionContextPicker } from "./solution-context-picker";
+import type { SolutionVersion } from "./solution-context";
 import {
   sameSolutionDraft,
   referenceSolutionDraft,
@@ -65,7 +68,9 @@ interface ContentResponse {
   items: Content[];
   originalSolution?: OriginalSolution;
   inheritedSolution?: InheritedSolution;
-  versions?: { versionId: string; title: string; createdAt: string; current: boolean; solutionStatus: string | null; hasPendingSolutions: boolean; courseCount?: number }[];
+  versions?: SolutionVersion[];
+  recommendedVersionId?: string | null;
+  selectionRequired?: boolean;
 }
 interface Policy {
   id: string | null;
@@ -75,6 +80,8 @@ interface Policy {
   mode: "disabled" | "paid" | "free";
   opensAt: string | null;
   price: number | null;
+  defaultPrice: number;
+  effectivePrice: number;
   ruleVersion: number;
 }
 interface PolicyResponse {
@@ -141,7 +148,7 @@ export function TeacherScholarshipPage({ admin = false }: { admin?: boolean }) {
   ), [policyRevision, setPolicyRevision] = useState(0);
   const [contentPending, setContentPending] = useState(false);
   const [versionChoice, setVersionChoice] = useState<{ problemId: string; versionId: string }>();
-  const [contentKind, setContentKind] = useState<AssistanceKind>(admin || search.get("kind") === "FULL_SOLUTION" ? "FULL_SOLUTION" : "FULL_TRANSLATION");
+  const [contentKind, setContentKind] = useState<AssistanceKind>(search.get("kind") === "FULL_TRANSLATION" ? "FULL_TRANSLATION" : "FULL_SOLUTION");
   const single = mode === "single";
   function changeMode(next: "single" | "batch" | "review") {
     setMode(next);
@@ -278,6 +285,7 @@ export function TeacherScholarshipPage({ admin = false }: { admin?: boolean }) {
           contentPending={contentPending}
           onPendingChange={setContentPending}
           onVersionChange={versionId => setVersionChoice({ problemId: targetId, versionId })}
+          autoSelect={targetType === "problem" && !requestedVersion && versionChoice?.problemId !== targetId}
         />
       )}
       {single && targetId && (
@@ -312,6 +320,7 @@ function ContentEditor({
   contentPending,
   onPendingChange,
   onVersionChange,
+  autoSelect = false,
 }: {
   target:
     | { problemId: string; versionId: string }
@@ -321,6 +330,7 @@ function ContentEditor({
   contentPending: boolean;
   onPendingChange: (pending: boolean) => void;
   onVersionChange: (versionId: string) => void;
+  autoSelect?: boolean;
 }) {
   const tx = useText(),
     contents = useData<ContentResponse>(
@@ -331,11 +341,17 @@ function ContentEditor({
       item.kind === kind &&
       item.language === (kind === "FULL_TRANSLATION" ? "zh-CN" : ""),
   );
+  useEffect(() => {
+    if (!autoSelect || contents.loading || contents.error || !contents.data) return;
+    const recommended = contents.data.recommendedVersionId;
+    if (recommended) onVersionChange(recommended);
+  }, [autoSelect, contents.loading, contents.error, contents.data, onVersionChange]);
+  const readyToEdit = !autoSelect && contents.data && !contents.loading && !contents.error;
   return (
     <section className={`${panel} space-y-3 p-4`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-semibold">
-          {tx("内容录入与发布", "Author and publish content")}
+          {kind === "FULL_SOLUTION" && "problemId" in target ? tx("学生题解", "Student solutions") : tx("内容录入与发布", "Author and publish content")}
         </h2>
         <select
           aria-label={tx("辅助类型", "Assistance type")}
@@ -358,15 +374,10 @@ function ContentEditor({
         )}
       </p>
       <State resource={contents} />
-      {"problemId" in target && contents.data?.versions && <Field label={tx("题目版本", "Problem version")}>
-        <select aria-label={tx("题目版本", "Problem version")} className={input} value={target.versionId} disabled={contentPending || contents.loading} onChange={event => onVersionChange(event.target.value)}>
-          {contents.data.versions.map(version => <option key={version.versionId} value={version.versionId}>
-            {version.versionId.slice(0, 8)} · {date(version.createdAt)}{version.current ? tx(" · 当前教学版本", " · Current teaching version") : ""}{version.courseCount ? tx(" · 课程使用中", " · Used by courses") : ""} · {version.hasPendingSolutions ? tx("题解更新待审核", "Solution updates awaiting review") : version.solutionStatus === "published" ? tx("题解已发布", "Solution published") : version.solutionStatus === "draft" ? tx("题解草稿", "Solution draft") : tx("未发布题解", "No published solution")}
-          </option>)}
-        </select>
-        <p className="mt-1 text-xs text-muted-foreground">{tx("课程和活动可能使用历史版本。要修改学生看到的题解，请选择对应版本。", "Courses and activities may use an earlier version. Select that version to edit the solution students see.")}</p>
-      </Field>}
-      {contents.data && (
+      {"problemId" in target && contents.data?.versions && <SolutionContextPicker versions={contents.data.versions}
+        value={autoSelect ? undefined : target.versionId} onChange={onVersionChange}
+        disabled={contentPending || contents.loading || Boolean(contents.error)} selectionRequired={contents.data.selectionRequired} />}
+      {readyToEdit && contents.data && (
         <ContentForm
           key={kind}
           kind={kind}
@@ -478,7 +489,7 @@ function ContentForm({
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">
+      {!multiple && <p className="text-xs text-muted-foreground">
         {tx("\u7248\u672c", "Version")}{" "}
         <code>{target.versionId.slice(0, 8)}</code>
         {published && !multiple &&
@@ -486,7 +497,7 @@ function ContentForm({
             " \u00b7 \u5df2\u53d1\u5e03\u5185\u5bb9\u5df2\u51bb\u7ed3\uff0c\u4fee\u6539\u9700\u8981\u65b0\u9898\u76ee\u7248\u672c\u5e76\u91cd\u65b0\u5ba1\u6838\u3002",
             " \u00b7 Published content is frozen. Use a new problem version and review changes again.",
           )}
-      </p>
+      </p>}
       <p className="text-xs text-muted-foreground">
         {tx("当前状态：", "Status: ")}
         {content?.hasPendingSolutions
@@ -495,11 +506,14 @@ function ContentForm({
           ? tx("已发布", "Published")
           : content?.status === "draft"
             ? tx("草稿", "Draft")
-            : (content?.status ?? tx("尚未录入", "Not authored"))}
+            : (content?.status ?? (inherited
+              ? tx("已沿用原题解 · 待核对保存", "Carried forward · review and save")
+              : multiple && originalSolution ? tx("已准备参考素材 · 待核对保存", "Reference draft · review and save")
+              : tx("尚未录入", "Not authored")))}
       </p>
       {inherited && <div className="space-y-2 rounded-md border border-border p-3">
-        <p className="text-sm">{tx(`已从版本 ${inherited.versionId.slice(0, 8)} 带入全部已发布题解，尚未保存到此版本。请核对新题面、接口和参考代码后保存并审核发布。`, `All published solutions from version ${inherited.versionId.slice(0, 8)} are carried forward into this unsaved draft. Check them against the new statement, interface and reference code, then save and review for publication.`)}</p>
-        <Button type="button" size="sm" variant="secondary" disabled={unsavedEdits || unavailable} onClick={() => onVersionChange(inherited.versionId)}>{tx("打开原版本已发布题解", "Open the original published solutions")}</Button>
+        <p className="text-sm">{tx("已沿用之前发布的完整题解。请结合本次题目修改核对说明和代码，再保存并审核发布。", "The previously published solutions are carried forward. Check the explanation and code against this problem edit, then save and review for publication.")}</p>
+        <Button type="button" size="sm" variant="secondary" disabled={unsavedEdits || unavailable} onClick={() => onVersionChange(inherited.versionId)}>{tx("查看原题解", "View the original solutions")}</Button>
       </div>}
       {multiple && !content && !inherited && originalSolution && <p className="text-sm text-muted-foreground">{tx("已用此版本的原参考题解准备首篇草稿。请核对后保存、审核发布，再向学生开放；其他解法可继续追加。", "The first draft is prepared from this version’s reference solution. Review, save and publish it for students; add other approaches alongside it.")}</p>}
       {multiple ? <SolutionAlternativesEditor value={value} onChange={edit} disabled={!canEdit} originalSolution={originalSolution} /> : <Field
@@ -625,9 +639,10 @@ function PolicyEditor({
           const policy = policies.data?.items.find(
             (item) => item.kind === kind,
           );
+          if (!policy) return null;
           return (
             <PolicyForm
-              key={`${kind}:${policy?.ruleVersion ?? 0}`}
+              key={`${kind}:${policy.ruleVersion}:${policy.defaultPrice}:${policy.effectivePrice}`}
               kind={kind}
               policy={policy}
               targetType={targetType}
@@ -651,25 +666,31 @@ function PolicyForm({
   targetType: TargetType;
   targetId: string;
   kind: AssistanceKind;
-  policy?: Policy;
+  policy: Policy;
   locked: boolean;
   reload: () => void;
 }) {
   const tx = useText(),
     [mode, setMode] = useState(
-      policy?.mode ??
+      policy.mode ??
         (targetType === "timed" || targetType === "paper4_activity"
           ? "disabled"
           : "paid"),
     ),
-    [opensAt, setOpensAt] = useState(localInput(policy?.opensAt ?? undefined)),
-    [price, setPrice] = useState(policy?.price == null ? "" : String(policy.price)),
+    [opensAt, setOpensAt] = useState(localInput(policy.opensAt ?? undefined)),
+    [price, setPrice] = useState(String(policy.effectivePrice)),
+    [priceIntent, setPriceIntent] = useState<AssistancePriceIntent>("unchanged"),
     action = useAction();
+  const configurablePrice = ["problem", "paper4"].includes(targetType);
+  const validPrice = parseAssistancePrice(price) !== undefined;
+  const usingDefault = priceIntent === "default" || priceIntent === "unchanged" && policy.price === null;
+  const priceDescriptionId = `policy-price-${targetType}-${targetId}-${kind}`;
   return (
     <form
       className="border-t border-border pt-3"
       onSubmit={(event) => {
         event.preventDefault();
+        if (locked || action.busy || configurablePrice && !validPrice) return;
         void action.run(async () => {
           await productionApi("scholarship/policies", {
             method: "POST",
@@ -679,18 +700,19 @@ function PolicyForm({
               kind,
               mode,
               opensAt: opensAt ? new Date(opensAt).toISOString() : null,
-              ...(["problem", "paper4"].includes(targetType) ? { price: price === "" ? null : Number(price) } : {}),
+              ...(configurablePrice ? assistancePricePayload(priceIntent, price) : {}),
             },
           });
           reload();
+          return tx("开放规则已保存。", "Access rules saved.");
         });
       }}
     >
       <fieldset
         disabled={locked || action.busy}
-        className="grid items-end gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(160px,1fr)_120px_minmax(150px,1fr)_minmax(180px,1fr)_auto]"
+        className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(160px,1fr)_120px_minmax(150px,1fr)_minmax(180px,1fr)_auto]"
       >
-        <strong className="pb-2 text-sm">{kindName(kind, tx)}</strong>
+        <strong className="pb-2 text-sm sm:pt-7">{kindName(kind, tx)}</strong>
         <Field label={tx("开放方式", "Access")}>
           <select
             className={input}
@@ -702,7 +724,24 @@ function PolicyForm({
             <option value="free">{tx("免费", "Free")}</option>
           </select>
         </Field>
-        {["problem", "paper4"].includes(targetType) && <Field label={tx("解锁价格（奖学金；留空默认）", "Unlock cost (scholarship; blank = default)")}><input className={input} type="number" min={0} max={1000} step={1} value={price} onChange={event => setPrice(event.target.value)} placeholder={tx("全校默认", "School default")}/></Field>}
+        {configurablePrice && <div className="space-y-1.5">
+          <Field label={tx("解锁价格（奖学金）", "Unlock cost (scholarship)")}>
+            <input className={input} type="number" min={0} max={1000} step={1} required value={price}
+              aria-invalid={!validPrice} aria-describedby={priceDescriptionId}
+              onChange={event => { setPrice(event.target.value); setPriceIntent("custom"); }} />
+          </Field>
+          <div id={priceDescriptionId} className="space-y-1 text-xs text-muted-foreground">
+            <p>{usingDefault
+              ? tx(`全校默认：${policy.defaultPrice}，随全校配置更新。`, `School default: ${policy.defaultPrice}. Follows school settings.`)
+              : `${targetType === "paper4" ? tx("本卷自定义", "Custom paper price") : tx("本题自定义", "Custom problem price")} · ${tx(`全校默认 ${policy.defaultPrice}`, `School default ${policy.defaultPrice}`)}`}</p>
+            {!validPrice && <p role="status" className="text-destructive">{tx("请输入 0–1000 的整数，价格不能为空。", "Enter an integer from 0 to 1000. A price is required.")}</p>}
+            {mode === "free" && <p>{tx("当前免费开放；此价格仅在付费开放时使用。", "Access is currently free. This price applies only in paid mode.")}</p>}
+          </div>
+          <Button type="button" size="sm" variant="ghost" disabled={usingDefault && validPrice} className="h-auto min-h-8 whitespace-normal px-0 text-left"
+            onClick={() => { setPrice(String(policy.defaultPrice)); setPriceIntent("default"); }}>
+            {tx("恢复全校默认", "Restore school default")}
+          </Button>
+        </div>}
         <Field label={tx("开放时间（可选）", "Opens at (optional)")}>
           <input
             type="datetime-local"
@@ -711,7 +750,7 @@ function PolicyForm({
             onChange={(event) => setOpensAt(event.target.value)}
           />
         </Field>
-        <Button type="submit" size="sm" disabled={action.busy}>
+        <Button type="submit" size="sm" className="sm:mt-7" disabled={action.busy || configurablePrice && !validPrice}>
           {tx("保存", "Save")}
         </Button>
       </fieldset>

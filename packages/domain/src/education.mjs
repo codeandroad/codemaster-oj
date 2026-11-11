@@ -8,6 +8,7 @@ import { getTimedPracticeResult } from './timed.mjs';
 import { avatarForIdentity } from './avatars.mjs';
 import {readableCourseIds,courseClasses,courseProperties,saveCourseProperties,assertCoursePublicationAccess} from './course-access.mjs';
 import { assignmentProgressById } from './assignment-grades.mjs';
+import { latestCourseProblemVersion } from './course-problem-version.mjs';
 
 const staff = user => user.roles.includes('teacher') || user.roles.includes('admin');
 const administrator = user => user.roles.includes('admin');
@@ -31,12 +32,6 @@ function pathShape(p) {
 
 // Published lessons open the latest approved revision. Keep the linked
 // revision available for progress already earned before it was replaced.
-const latestCourseProblemVersion = `LEFT JOIN LATERAL (
- SELECT candidate.id FROM problem_versions candidate
- WHERE candidate.problem_id=cp.problem_id AND candidate.published_at IS NOT NULL
-  AND candidate.school_visible_at IS NOT NULL AND candidate.rank_review_status='approved'
- ORDER BY candidate.published_at DESC,candidate.created_at DESC,candidate.id DESC LIMIT 1
-) latest ON`;
 const courseAcceptedSubmission = `s.kind IN ('submit','correction') AND s.status='AC'
  AND (s.timed_attempt_id IS NULL OR EXISTS(SELECT 1 FROM timed_attempts ta JOIN timed_practices tp ON tp.id=ta.practice_id
   WHERE ta.id=s.timed_attempt_id AND tp.results_published_at IS NOT NULL))`;

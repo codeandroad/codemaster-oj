@@ -1,38 +1,17 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId } from "react";
 import { useLocale } from "@/components/locale-context";
 import { AppLink } from "@/components/navigation";
 import { buttonVariants } from "@/components/ui/button";
-import { input, State, useData } from "./shared";
+import { hasStudentUse, type SolutionUse, type SolutionVersion } from "@/components/scholarship/solution-context";
+import { State, useData } from "./shared";
 
-export type ProblemSolutionVersion = {
-  versionId: string;
-  title: string;
-  createdAt: string;
-  current: boolean;
-  solutionStatus?: "missing" | "draft" | "published" | "withdrawn";
-  hasPendingSolutions?: boolean;
-  courseCount?: number;
+type SolutionDestinations = {
+  recommendedVersionId: string | null;
+  selectionRequired: boolean;
+  versions: SolutionVersion[];
 };
-
-export function solutionVersionLabel(version: ProblemSolutionVersion, locale: string, viewingVersionId?: string) {
-  const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
-  const date = new Date(version.createdAt);
-  const parts = [Number.isNaN(date.getTime()) ? version.versionId.slice(0, 8) : date.toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
-    month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit",
-  })];
-  if (!Number.isNaN(date.getTime())) parts.push(version.versionId.slice(0, 8));
-  if (viewingVersionId === version.versionId) parts.push(tr("正在编辑的题目版本", "Version in this editor"));
-  if (version.current) parts.push(tr("当前教学版本", "Current teaching version"));
-  if (version.courseCount) parts.push(tr(`${version.courseCount} 个课程引用`, `Used in ${version.courseCount} course${version.courseCount === 1 ? "" : "s"}`));
-  parts.push(version.hasPendingSolutions ? tr("题解更新待审核", "Solution updates awaiting review")
-    : version.solutionStatus === "published" ? tr("题解已发布", "Solutions published")
-    : version.solutionStatus === "draft" ? tr("题解草稿", "Solution draft")
-    : version.solutionStatus === "withdrawn" ? tr("题解已撤回", "Solutions withdrawn")
-    : tr("尚无学生题解", "No student solutions"));
-  return parts.join(" · ");
-}
 
 export function ProblemSolutionsEntry({ problemId, versionId, hasUnsavedProblemChanges }: {
   problemId: string;
@@ -41,43 +20,58 @@ export function ProblemSolutionsEntry({ problemId, versionId, hasUnsavedProblemC
 }) {
   const { locale } = useLocale();
   const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
-  const selectorId = useId();
-  const [selectedVersionId, setSelectedVersionId] = useState(versionId);
-  const resource = useData<{ versions?: ProblemSolutionVersion[] }>(
+  const id = useId();
+  const resource = useData<SolutionDestinations>(
     `scholarship/contents?${new URLSearchParams({ problemId, versionId })}`,
   );
-  const versions = resource.data?.versions;
-  const selected = versions?.find(version => version.versionId === selectedVersionId);
-  const href = `/teacher/scholarship?${new URLSearchParams({
-    targetType: "problem", targetId: problemId, versionId: selectedVersionId, kind: "FULL_SOLUTION",
-  })}`;
+  const destinations = resource.data;
+  const used = destinations?.versions.some(hasStudentUse);
+  const recommended = destinations?.versions.find(version => version.versionId === destinations.recommendedVersionId);
+  const uses: string[] = [];
+  if (recommended?.usage) {
+    const { usage } = recommended;
+    const describe = (count: number, items: SolutionUse[], zh: string, en: string) => {
+      if (!count) return;
+      const titles = items.slice(0, 2).map(item => item.title).join(locale === "zh" ? "、" : ", ");
+      uses.push(`${tr(zh, en)}${titles ? `${locale === "zh" ? "：" : ": "}${titles}` : ""}${count > items.slice(0, 2).length ? tr(`（共 ${count} 项）`, ` (${count} total)`) : ""}`);
+    };
+    describe(usage.courseCount, usage.courses, "课程", "Courses");
+    describe(usage.assignmentCount, usage.assignments ?? [], "作业", "Assignments");
+    describe(usage.timedCount, usage.timedPractices ?? [], "限时训练", "Timed practices");
+    if (usage.schoolPractice) uses.push(tr("校内题库练习", "School problem-bank practice"));
+  }
+  const query = { targetType: "problem", targetId: problemId, kind: "FULL_SOLUTION" };
+  const href = `/teacher/scholarship?${new URLSearchParams(query)}`;
+  const prepareHref = `/teacher/scholarship?${new URLSearchParams({ ...query, versionId })}`;
+  const canPrepareSeparately = destinations && destinations.recommendedVersionId !== versionId;
 
-  return <section className="space-y-3 rounded-md border border-border bg-surface-subtle p-4" aria-labelledby={`${selectorId}-title`}>
+  return <section className="space-y-3 rounded-md border border-border bg-surface-subtle p-4" aria-labelledby={`${id}-title`}>
     <div className="space-y-1">
-      <h2 id={`${selectorId}-title`} className="font-semibold">{tr("学生题解", "Student solutions")}</h2>
+      <h2 id={`${id}-title`} className="font-semibold">{tr("学生题解", "Student solutions")}</h2>
       <p className="text-sm text-muted-foreground">{tr(
-        "学生 Solution 页签中的完整正文、参考代码和多种解法在这里管理。修订先保存为草稿，审核发布后才向学生展示。",
-        "Manage the explanations, reference code and approaches shown in the student Solution tab. Revisions are saved as drafts and reach students after review and publication.",
+        "在这里编辑学生看到的完整题解、参考代码和多种解法。修改先保存为草稿，审核发布后生效。",
+        "Edit the explanations, reference code and approaches students read. Changes take effect after saving a draft and reviewing it for publication.",
       )}</p>
     </div>
     <State resource={resource} />
-    {versions && versions.length > 0 && <div className="max-w-3xl space-y-1.5">
-      <label htmlFor={selectorId} className="text-sm font-semibold">{tr("题解对应的题目版本", "Problem version for solutions")}</label>
-      <select id={selectorId} className={input} value={selectedVersionId} onChange={event => setSelectedVersionId(event.target.value)}>
-        {versions.map(version => <option key={version.versionId} value={version.versionId}>{solutionVersionLabel(version, locale, versionId)}</option>)}
-      </select>
-      {versions.length > 1 && <p className="text-xs text-muted-foreground">{tr(
-        "课程和作业可能仍使用旧版本。查找学生已看到的题解时，请选择对应版本。",
-        "Courses and assignments may still use an earlier version. Select that version to find the solution students are reading.",
-      )}</p>}
+    {destinations && !resource.loading && !resource.error && <div className="space-y-1 text-sm text-muted-foreground">
+      {destinations.selectionRequired ? <p>{tr(
+        "不同课程或活动正在使用不同的题目内容。进入后按课程或活动选择要编辑的学生题解。",
+        "Courses or activities use different problem content. Open student solutions, then choose the course or activity you want to update.",
+      )}</p> : uses.length ? <p className="[overflow-wrap:anywhere]">{tr("将打开学生正在使用的题解：", "Opens the student-facing solutions used by: ")}{uses.join(" · ")}</p>
+        : <p>{tr("此题暂未用于学生学习，可先准备并审核学生题解。", "This problem is not currently used for student learning. You can prepare and review its solutions first.")}</p>}
     </div>}
-    {!versions && !resource.loading && !resource.error && <p className="text-xs text-muted-foreground">{tr("题目版本", "Problem version")} · <code>{versionId.slice(0, 8)}</code></p>}
-    <AppLink href={href} className={buttonVariants({ size: "sm", variant: "secondary" })}>
-      {selected && selected.solutionStatus !== "missing" ? tr("编辑学生题解", "Edit student solutions") : tr("管理学生题解", "Manage student solutions")}
-    </AppLink>
+    <div className="flex flex-wrap gap-2">
+      <AppLink href={href} className={buttonVariants({ size: "sm", variant: "default", className: "h-auto min-h-9 whitespace-normal text-left" })}>
+        {used ? tr("编辑学生正在看的题解", "Edit student-facing solutions") : tr("管理学生题解", "Manage student solutions")}
+      </AppLink>
+      {canPrepareSeparately && <AppLink href={prepareHref} className={buttonVariants({ size: "sm", variant: "secondary", className: "h-auto min-h-9 whitespace-normal text-left" })}>
+        {tr("为本次题目修改准备题解", "Prepare solutions for this problem edit")}
+      </AppLink>}
+    </div>
     {hasUnsavedProblemChanges && <p className="text-xs text-muted-foreground">{tr(
-      "本页有未保存的修改。如需使用修改后的参考代码或题解素材，请先保存题目草稿，再管理新版本的学生题解。",
-      "This page has unsaved changes. To use the updated reference code or solution notes, save the problem draft first, then manage solutions for the new version.",
+      "本页有未保存的修改。如需使用修改后的参考代码或题解素材，请先保存题目草稿，再为本次修改准备学生题解。",
+      "This page has unsaved changes. To use the updated reference code or solution notes, save the problem draft first, then prepare solutions for this edit.",
     )}</p>}
   </section>;
 }

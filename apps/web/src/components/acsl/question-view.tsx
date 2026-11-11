@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { useLocale } from "@/components/locale-context";
 import { useNavigationBlocker } from "@/components/navigation";
 import { Button } from "@/components/ui/button";
 import { ApiError, apiMessage, productionApi } from "@/lib/production-api";
 import { AcslRichContent } from "./rich-content";
+import { acslAnswerOptionClassName } from "./answer-option";
+import { createAcslAnswerSaveQueue, type AcslAnswerSaveState } from "./answer-save-queue";
 import type { AcslDiagrams } from "./diagram-model";
 import {
   sameSelection,
@@ -16,6 +18,8 @@ import {
   type AcslQuestion,
   type LocalizedText,
 } from "./model";
+
+const StableRichContent = memo(AcslRichContent);
 
 export function AcslQuestionView({
   schoolId,
@@ -46,15 +50,23 @@ export function AcslQuestionView({
 }) {
   const { locale } = useLocale();
   const tx = (en: string, zh: string) => (locale === "en" ? en : zh);
-  const [selected, setSelected] = useState(question.draft.selectedOptionIds);
-  const [draft, setDraft] = useState(question.draft);
+  const [saveState, setSaveState] = useState<AcslAnswerSaveState>({
+    selected: question.draft.selectedOptionIds, draft: question.draft,
+    saving: false, pending: false, error: null, conflict: false,
+  });
+  const selected = saveState.selected;
+  const draft = saveState.draft;
   const last = graded ? question.lastSubmission : null;
   const mounted = useRef(true);
   const saveStatusRef = useRef<HTMLSpanElement>(null);
-  const [busy, setBusy] = useState(false);
-  const busyRef = useRef(false);
-  const [error, setError] = useState("");
-  const [conflict, setConflict] = useState(false);
+  const [explanationBusy, setExplanationBusy] = useState(false);
+  const explanationBusyRef = useRef(false);
+  const [explanationError, setExplanationError] = useState("");
+  const [explanationConflict, setExplanationConflict] = useState(false);
+  const busy = saveState.saving || explanationBusy;
+  const error = saveState.error !== null ? apiMessage(saveState.error) : explanationError;
+  const conflict = saveState.conflict || explanationConflict;
+  const reviewConfirmation = useRef(false);
   const [explanation, setExplanation] = useState<{
     correctOptionIds: string[];
     explanation: LocalizedText;
@@ -65,78 +77,72 @@ export function AcslQuestionView({
   const requestedExplanation = useRef(false);
   const dirty = !sameSelection(selected, draft.selectedOptionIds);
   const base = `schools/${schoolId}/acsl/${encodeURIComponent(paperId)}/questions/${encodeURIComponent(question.id)}`;
-  useNavigationBlocker(dirty || busy);
+  const [saveQueue] = useState(() => createAcslAnswerSaveQueue(question.draft, {
+    send: (next, expectedRevision, signal) => productionApi<
+      AcslDraft & Pick<AcslQuestion, "requiresReview">
+    >(`${base}/draft`, {
+      method: "PATCH", signal,
+      body: { versionId, writtenRevision, expectedRevision, selectedOptionIds: next },
+    }),
+    onState: next => {
+      setSaveState(next);
+      onEditingChange(next.pending);
+    },
+    onSaved: saved => {
+      onChanged({ ...question,
+        draft: { selectedOptionIds: saved.selectedOptionIds, revision: saved.revision },
+        requiresReview: saved.requiresReview, lastSubmission: null });
+    },
+  }));
+  useEffect(() => {
+    if (!question.requiresReview && reviewConfirmation.current) {
+      reviewConfirmation.current = false;
+      saveStatusRef.current?.focus();
+    }
+  }, [question.requiresReview]);
+  useNavigationBlocker(saveState.pending || explanationBusy);
   useEffect(() => {
     mounted.current = true;
+    saveQueue.activate();
     return () => {
       mounted.current = false;
+      saveQueue.dispose();
       onEditingChange(false);
     };
-  }, [onEditingChange]);
+  }, [onEditingChange, saveQueue]);
   useEffect(() => {
-    if (!dirty && !busy) return;
+    if (!saveState.pending && !explanationBusy) return;
     const protect = (event: BeforeUnloadEvent) => event.preventDefault();
     window.addEventListener("beforeunload", protect);
     return () => window.removeEventListener("beforeunload", protect);
-  }, [dirty, busy]);
+  }, [saveState.pending, explanationBusy]);
 
   function report(reason: unknown) {
-    setConflict(reason instanceof ApiError && reason.status === 409);
-    setError(apiMessage(reason));
+    setExplanationConflict(reason instanceof ApiError && reason.status === 409);
+    setExplanationError(apiMessage(reason));
   }
-  async function save(next: string[]) {
-    if (busyRef.current || conflict || graded || locked) return;
-    busyRef.current = true;
-    onEditingChange(true);
-    setBusy(true);
-    setError("");
-    setSelected(next);
-    try {
-      const saved = await productionApi<
-        AcslDraft & Pick<AcslQuestion, "requiresReview">
-      >(`${base}/draft`, {
-        method: "PATCH",
-        body: {
-          versionId,
-          writtenRevision,
-          expectedRevision: draft.revision,
-          selectedOptionIds: next,
-        },
-      });
-      if (!mounted.current) return;
-      const savedDraft = {
-        selectedOptionIds: saved.selectedOptionIds,
-        revision: saved.revision,
-      };
-      setDraft(savedDraft);
-      onChanged({
-        ...question,
-        draft: savedDraft,
-        requiresReview: saved.requiresReview,
-        lastSubmission: null,
-      });
-      onEditingChange(false);
-      if (
-        question.requiresReview &&
-        sameSelection(next, draft.selectedOptionIds)
-      )
-        saveStatusRef.current?.focus();
-    } catch (reason) {
-      if (mounted.current) report(reason);
-    } finally {
-      busyRef.current = false;
-      if (mounted.current) setBusy(false);
-    }
+  function selectOption(optionId: string) {
+    if (conflict || graded || locked) return;
+    setExplanationError("");
+    reviewConfirmation.current = false;
+    const current = saveQueue.snapshot().selected;
+    void saveQueue.select(question.type === "single" ? [optionId]
+      : current.includes(optionId) ? current.filter(id => id !== optionId) : [...current, optionId]);
+  }
+  function retrySave(confirmReview = false) {
+    if (conflict || graded || locked) return;
+    reviewConfirmation.current = confirmReview;
+    void saveQueue.retry();
   }
   const toggleExplanation = useCallback(async () => {
     if (explanation) {
       setExplanationOpen((value) => !value);
       return;
     }
-    if (busyRef.current || locked || !last) return;
-    busyRef.current = true;
-    setBusy(true);
-    setError("");
+    if (explanationBusyRef.current || locked || !last) return;
+    explanationBusyRef.current = true;
+    setExplanationBusy(true);
+    setExplanationError("");
     try {
       const result = await productionApi<{
         correctOptionIds: string[];
@@ -150,8 +156,8 @@ export function AcslQuestionView({
     } catch (reason) {
       if (mounted.current) report(reason);
     } finally {
-      busyRef.current = false;
-      if (mounted.current) setBusy(false);
+      explanationBusyRef.current = false;
+      if (mounted.current) setExplanationBusy(false);
     }
   }, [explanation, locked, last, base, versionId]);
   useEffect(() => {
@@ -183,7 +189,7 @@ export function AcslQuestionView({
         </span>
       </div>
       <div className="max-w-3xl text-base leading-7" lang={language}>
-        <AcslRichContent
+        <StableRichContent
           content={question.statement[language]}
           diagrams={question.statementDiagrams?.[language]}
           language={language}
@@ -204,7 +210,7 @@ export function AcslQuestionView({
       )}
       <fieldset
         className="mt-5 space-y-2"
-        disabled={busy || conflict || graded || locked}
+        disabled={conflict || graded || locked}
         aria-describedby={
           !graded && question.requiresReview
             ? "acsl-choice-help acsl-question-review-notice"
@@ -222,27 +228,19 @@ export function AcslQuestionView({
         {question.options.map((option) => (
           <label
             key={option.id}
-            className={`flex min-h-12 cursor-pointer items-baseline gap-3 rounded-md border p-3 text-sm ${selected.includes(option.id) ? "border-primary bg-primary/5" : "border-border hover:bg-muted"} ${graded ? "cursor-default" : busy || conflict || locked ? "cursor-wait opacity-70" : ""}`}
+            className={`flex min-h-12 items-baseline gap-3 rounded-md border p-3 text-sm ${acslAnswerOptionClassName(selected.includes(option.id), last?.correct)} ${graded ? "cursor-default" : conflict || locked ? "cursor-not-allowed" : selected.includes(option.id) ? "cursor-pointer" : "cursor-pointer hover:bg-muted"}`}
           >
             <input
               type={question.type === "single" ? "radio" : "checkbox"}
               name={`acsl-${question.id}`}
               value={option.id}
               checked={selected.includes(option.id)}
-              onChange={() =>
-                void save(
-                  question.type === "single"
-                    ? [option.id]
-                    : selected.includes(option.id)
-                      ? selected.filter((id) => id !== option.id)
-                      : [...selected, option.id],
-                )
-              }
+              onChange={() => selectOption(option.id)}
               className="mt-0.5 size-4 shrink-0 self-start accent-primary"
             />
             <span className="font-semibold">{option.id}.</span>
             <div className="min-w-0" lang={language}>
-              <AcslRichContent
+              <StableRichContent
                 content={option.text[language]}
                 diagrams={option.diagrams?.[language]}
                 language={language}
@@ -253,7 +251,7 @@ export function AcslQuestionView({
           </label>
         ))}
       </fieldset>
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      <div className="mt-4 flex min-h-9 flex-wrap items-center gap-3">
         <span
           ref={saveStatusRef}
           tabIndex={-1}
@@ -264,7 +262,7 @@ export function AcslQuestionView({
             ? tx("Written section submitted", "笔试已交卷")
             : busy
               ? tx("Saving…", "正在保存…")
-              : dirty
+              : dirty || saveState.error !== null
                 ? tx("Answer not saved", "答案尚未保存")
                 : question.requiresReview
                   ? tx("Saved answer needs review", "已保存答案待复核")
@@ -276,19 +274,19 @@ export function AcslQuestionView({
             size="sm"
             data-od-id="acsl-confirm-reviewed-answer"
             disabled={busy || conflict || locked || selected.length === 0}
-            onClick={() => void save(selected)}
+            onClick={() => retrySave(true)}
           >
-            {dirty
+            {dirty || saveState.error !== null
               ? tx("Retry save", "重试保存")
               : tx("Confirm saved answer", "确认已保存答案")}
           </Button>
         )}
-        {dirty && !question.requiresReview && !conflict && !graded && (
+        {saveState.error !== null && !question.requiresReview && !conflict && !graded && (
           <Button
             variant="secondary"
             size="sm"
             disabled={busy || locked}
-            onClick={() => void save(selected)}
+            onClick={() => retrySave()}
           >
             {tx("Retry save", "重试保存")}
           </Button>
@@ -366,7 +364,7 @@ export function AcslQuestionView({
             {tx("Correct answer", "正确答案")}{" "}
             {explanation.correctOptionIds.join(", ")}
           </p>
-          <AcslRichContent
+          <StableRichContent
             content={explanation.explanation[language]}
             diagrams={explanation.explanationDiagrams?.[language]}
             language={language}

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import type { AcslLanguage, AcslPaper } from "./model";
 import { AcslRichContent } from "./rich-content";
 import { AcslResultSummary } from "./stage-components";
+import { acslAnswerOptionClassName } from "./answer-option";
 import {
   acslReviewHref,
   acslStageSummary,
@@ -164,18 +165,18 @@ export function AcslReviewPanel({
               aria-label={tx("Answer options", "答案选项")}
             >
               {question.options.map((option) => {
-                const selected = last?.selectedOptionIds.includes(option.id);
+                const selected = last?.selectedOptionIds.includes(option.id) ?? false;
                 return (
                   <li
                     key={option.id}
-                    className={`flex min-w-0 items-baseline gap-3 rounded-md border p-3 ${selected ? "border-primary/40 bg-primary/5" : "border-border"}`}
+                    className={`flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-2 rounded-md border p-3 ${acslAnswerOptionClassName(selected, last?.correct)}`}
                     data-option-id={option.id}
                     data-selected={Boolean(selected)}
                   >
                     <span className="shrink-0 text-sm font-semibold">
                       {option.id}.
                     </span>
-                    <div className="min-w-0 flex-1" lang={language}>
+                    <div className="min-w-0 flex-[1_1_12rem]" lang={language}>
                       <AcslRichContent
                         content={option.text[language]}
                         diagrams={option.diagrams?.[language]}
@@ -185,8 +186,11 @@ export function AcslReviewPanel({
                       />
                     </div>
                     {selected && (
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        {tx("Your choice", "已选")}
+                      <span className={`inline-flex max-w-full items-center gap-1.5 text-xs font-semibold ${last?.correct ? "text-success" : "text-destructive"}`}>
+                        {last?.correct ? <CheckCircle2 size={14} className="shrink-0" aria-hidden="true" /> : <XCircle size={14} className="shrink-0" aria-hidden="true" />}
+                        {last?.correct
+                          ? tx("Your choice · Correct", "已选 · 正确")
+                          : tx("Your choice · Question incorrect", "已选 · 本题答错")}
                       </span>
                     )}
                   </li>

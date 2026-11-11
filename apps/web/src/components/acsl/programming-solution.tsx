@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CodeTokens } from "@/components/student/code-editor";
 import { Button } from "@/components/ui/button";
 import { AcslRichContent } from "./rich-content";
 import type { AcslLanguage } from "./model";
@@ -53,10 +54,12 @@ export function AcslProgrammingSolutionView({
         </div>
       )}
       <pre
-        className="max-w-full overflow-auto rounded-md border border-border bg-surface-subtle p-3 text-xs leading-6"
+        className="max-w-full overflow-auto rounded-md border border-border bg-surface-subtle p-3 text-xs leading-6 print:[&_span]:text-inherit"
         tabIndex={printable ? undefined : 0}
         aria-label={zh ? "Python 3 参考代码" : "Python 3 reference code"}
-      ><code>{solution.code}</code></pre>
+      >
+        <code><CodeTokens code={solution.code} language={solution.language} /></code>
+      </pre>
     </div>
   );
 }

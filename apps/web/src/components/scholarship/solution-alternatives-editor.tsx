@@ -118,8 +118,8 @@ export function SolutionAlternativesEditor({ value, onChange, disabled, original
   return <div className="space-y-3">
     {originalSolution && <div className="space-y-2 rounded-md border border-border bg-surface-subtle p-3">
       <p className="text-sm">{originalIncluded
-        ? tx("此版本的原参考题解已包含在下方解法中。", "This version’s reference solution is included below.")
-        : tx("此版本还有题目编辑页中的原参考题解，可补入并与现有解法一起提供给学生。", "This version also has a reference solution from the problem editor. Add it alongside the existing approaches for students.")}</p>
+        ? tx("本题的原参考题解已包含在下方解法中。", "This problem’s reference solution is included below.")
+        : tx("本题还有原参考题解，可补入并与现有解法一起提供给学生。", "This problem also has a reference solution. Add it alongside the existing approaches for students.")}</p>
       <p className="text-xs text-muted-foreground">{tx("新增或修改题解后，请保存并审核发布。审核期间学生仍看到原先发布的内容。", "Save and review new or revised solutions before publishing. Students continue to see the previously published content during review.")}</p>
       {!originalIncluded && <Button type="button" size="sm" variant="secondary" disabled={disabled || items.length >= maxSolutions} onClick={() => {
         const reference = { title: tx("原参考题解", "Reference solution"), body: originalSolution.body };

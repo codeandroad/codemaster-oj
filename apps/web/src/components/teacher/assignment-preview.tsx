@@ -5,7 +5,7 @@ import { AppLink } from "@/components/navigation";
 import { useLocale } from "@/components/locale-context";
 import { PageHeader } from "@/components/page-chrome";
 import { buttonVariants } from "@/components/ui/button";
-import { draftKey, readDraft, saveDraft } from "@/components/student/drafts";
+import { draftKey, readCurrentDraft, saveDraft } from "@/components/student/drafts";
 import { date, State, useData } from "@/components/student/shared";
 import { ProblemWorkspace, type ProblemWorkspaceAdapter } from "@/components/student/workspace";
 import { productionApi, type CampusUser, type ProductionProblem, type SubmissionLanguage } from "@/lib/production-api";
@@ -54,7 +54,7 @@ export function TeacherAssignmentPreview({ id, user }: { id: string; user: Campu
     }
     const { problem, revision } = data;
     const context = `legacy-assignment-preview:${id}:${revision}`;
-    const key = (language: SubmissionLanguage) => draftKey(user.id, problem.id, problem.versionId, context, language);
+    const key = (language: SubmissionLanguage) => draftKey(user.id, problem.id, "current", context, language);
     const adapter: ProblemWorkspaceAdapter = {
       context, returnTo, returnLabel: en ? "Back to preview" : "返回试做", homeHref: returnTo,
       presence: null,
@@ -68,13 +68,14 @@ export function TeacherAssignmentPreview({ id, user }: { id: string; user: Campu
         method: "POST", body: { ...input, revision, versionId: problem.versionId },
       }),
       normalizeSubmission: result => result,
-      readDraft: language => readDraft(key(language)),
+      draftVersion: "current",
+      readDraft: language => readCurrentDraft(user.id, problem.id, context, language),
       saveDraft: (language, draft) => saveDraft(key(language), draft),
       account: () => <span className="hidden rounded bg-muted px-2 py-1 text-xs font-semibold text-foreground sm:inline">
         {en ? "Assignment preview" : "作业试做"}
       </span>,
     };
-    return <ProblemWorkspace key={`${user.id}:${context}:${problem.id}:${problem.versionId}`} user={user} problem={problem} adapter={adapter}/>;
+    return <ProblemWorkspace key={`${user.id}:${context}:${problem.id}:${problem.versionId}`} user={user} problem={problem} adapter={adapter} onReloadProblem={()=>{selected.reload();overview.reload();}}/>;
   }
   const preview = overview.data;
   const score = preview?.problems.reduce((sum, problem) => sum + (problem.score ?? 0), 0) ?? 0;

@@ -6,6 +6,7 @@ import { metadataPage } from './problem-submissions.mjs';
 import { bytes, canonicalHash, enumValue, fail, integer, uuid } from './security.mjs';
 import { submissionCaseFeedback, submissionMeasurements, submissionMeasurementsSql } from './submission-feedback.mjs';
 import { assertJudgeAdmission } from './system.mjs';
+import { resolveLiveProblemVersion, assertLiveProblemVersion } from './live-problem-version.mjs';
 
 const reply = (body, status = 200) => ({ status, body });
 const jobStatus = `CASE t.state WHEN 'queued' THEN 'Waiting' WHEN 'leased' THEN 'Judging'
@@ -48,7 +49,8 @@ async function enqueue(db, { a, user, body, config, submitLimiter, version }) {
     if (old.request_hash !== hash) fail(409, 'IDEMPOTENCY_CONFLICT', '相同请求键对应的内容不同。');
     return reply({ id: old.id }, 202);
   }
-  if (revision !== a.edit_revision || versionId !== version.id) fail(409, 'STALE_ASSIGNMENT', '作业已更新，请重新进入试做。');
+  assertLiveProblemVersion(versionId,version.id);
+  if (revision !== a.edit_revision) fail(409, 'STALE_ASSIGNMENT', '作业已更新，请重新进入试做。');
   if (kind === 'samples' && !version.samples.some(sample => sample.enabled !== false)) {
     fail(409, 'NO_PUBLIC_SAMPLES', '此版本没有启用的公开样例。');
   }
@@ -100,10 +102,8 @@ export async function handleLegacyAssignmentPreview(ctx, { submitLimiter, assign
     }
     if (target !== 'problems') return null;
     const problemId = uuid(targetId, '题目 ID');
-    const { rows: [version] } = await db.query(`SELECT v.* FROM assignment_problems ap JOIN problem_versions v
-      ON v.id=ap.version_id AND v.problem_id=ap.problem_id
-      WHERE ap.assignment_id=$1 AND ap.problem_id=$2 AND v.published_at IS NOT NULL`, [a.id, problemId]);
-    if (!version) fail(404, 'NOT_FOUND', '此题不在作业中或尚未发布。');
+    if (!(await db.query('SELECT 1 FROM assignment_problems WHERE assignment_id=$1 AND problem_id=$2',[a.id,problemId])).rowCount) fail(404, 'NOT_FOUND', '此题不在作业中或尚未发布。');
+    const version = await resolveLiveProblemVersion(db, problemId, {allowArchived:method==='GET'});
     if (method === 'POST' && submissions) return enqueue(db, { ...ctx, a, submitLimiter, version });
     if (method !== 'GET') return null;
     if (submissions) {

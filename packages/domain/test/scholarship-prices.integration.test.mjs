@@ -110,7 +110,7 @@ test('Luq catalog prices follow immutable activity copies but never bypass exam 
  assert.equal((await f.quote(p)).available,false,'batch price retains future opening');
 }));
 
-test('Luq batch pricing reports safe current-version publication metadata without publishing, leaking bodies or changing replay results',options,()=>fixture(async f=>{
+test('Luq batch pricing reports safe shared-solution publication metadata without publishing, leaking bodies or changing replay results',options,()=>fixture(async f=>{
  const paper=await f.paper();
  const draft=await f.call(f.teacher,'/scholarship/contents',{paperId:paper.paperId,versionId:paper.versionId,questionKey:'Q1',kind:'FULL_SOLUTION',body:'DRAFT_BODY_MUST_NOT_APPEAR'});
  await f.publish({...paper,questionKey:'Q2'},'FULL_TRANSLATION');
@@ -142,9 +142,10 @@ test('Luq batch pricing reports safe current-version publication metadata withou
  await f.call(f.teacher,`/scholarship/contents/${newerContent.id}/publish`,{reviewed:true});
  const request={requestId:randomUUID(),targetType:'problem',targetIds:[problem.id],prices:{FULL_SOLUTION:5}};
  const current=await f.call(f.teacher,'/scholarship/policies/batch-prices',request);
- assert.deepEqual(current.publication,[{kind:'FULL_SOLUTION',total:1,published:0,draft:0,withdrawn:0,missing:1,firstUnpublished:{targetId:problem.id}}],'Newer-version publication must not imply the current version is available');
+ assert.deepEqual(current.publication,[{kind:'FULL_SOLUTION',total:1,published:1,draft:0,withdrawn:0,missing:0,firstUnpublished:null}],'The shared reviewed solution is available across problem revisions');
  assert.ok(!JSON.stringify(current).includes('REFERENCE')&&!JSON.stringify(current).includes('VERSION_BODY'));
- assert.equal((await f.pool.query('SELECT count(*)::int n FROM luq_assistance_contents WHERE version_id=$1',[version.id])).rows[0].n,0,'Pricing neither copies private reference code nor copies another version');
+ assert.equal((await f.pool.query('SELECT count(*)::int n FROM luq_assistance_contents WHERE version_id=$1',[version.id])).rows[0].n,0,'Pricing never copies private reference code or creates a second solution row');
+ assert.deepEqual((await f.pool.query('SELECT id,body,status FROM luq_assistance_contents WHERE id=$1',[newerContent.id])).rows[0],{id:newerContent.id,body:'UNRELATED_NEWER_VERSION_BODY',status:'published'},'Pricing leaves reviewed solution content unchanged');
 
  const legacyId=randomUUID(),legacyResult={requestId:legacyId,count:1,items:[]};
  await f.pool.query('INSERT INTO luq_price_batches(request_id,actor_account_id,request_hash,result) VALUES($1,$2,$3,$4)',[

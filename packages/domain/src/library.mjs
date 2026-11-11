@@ -4,6 +4,7 @@ import { transaction } from './db.mjs';
 import { fail, field, uuid, enumValue, canonicalHash } from './security.mjs';
 import { handleProblemTutorial } from './problem-tutorials.mjs';
 import { legacyProblemStatement } from './problem-statement-display.mjs';
+import { liveProblemVersionIdSql } from './live-problem-version.mjs';
 
 export async function canReviewActivitySubmission(db,user,submission,{readOnly=false}={}){
  if(submission.original_submission_id&&!submission.assignment_id&&!submission.timed_attempt_id){
@@ -50,22 +51,26 @@ export async function problemPermissions(db,user,problem,version) {
  const canEdit=!problem.archived_at&&(own||(isStaff(user)&&(bankOwner||grant==='edit')));
  const schoolRead=!!version.published_at&&!!version.school_visible_at&&bank.visibility==='school'&&!bank.archived_at&&!problem.archived_at;
  if(own||(!bank.archived_at&&staffRead)||schoolRead)return {canRead:true,canEdit:canEdit&&!bank.archived_at,canRunFree:true};
- // An activity owner can still inspect the exact
- // selected version after private-bank access changes, including in a draft.
- // This does not grant access to other versions or authoring-only material.
+ const {rows:[current]}=await db.query(`SELECT ${liveProblemVersionIdSql('p')} id FROM problems p WHERE p.id=$1`,[problem.id]);
+ const isLive=current?.id===version.id;
+ const ownSnapshot=user.roles.includes('student')&&!!version.published_at&&!!(await db.query('SELECT 1 FROM submissions WHERE identity_id=$1 AND problem_id=$2 AND version_id=$3 LIMIT 1',[user.identityId,problem.id,version.id])).rowCount;
+ // Activities grant the current exercise, while original pins and the
+ // learner's own submissions remain readable for historical feedback.
  const assignmentTeacherRead=user.roles.includes('teacher')&&!!version.published_at&&!!(await db.query(`
   SELECT 1 FROM assignment_problems ap
   JOIN assignments a ON a.id=ap.assignment_id
-  WHERE a.owner_account_id=$2 AND ap.problem_id=$1 AND $3 IN (ap.version_id,ap.prior_version_id) LIMIT 1`,[problem.id,user.id,version.id])).rowCount;
+  WHERE a.owner_account_id=$2 AND ap.problem_id=$1 AND ($4 OR $3 IN (ap.version_id,ap.prior_version_id)
+   OR EXISTS(SELECT 1 FROM submissions s WHERE s.assignment_id=a.id AND s.problem_id=$1 AND s.version_id=$3)) LIMIT 1`,[problem.id,user.id,version.id,isLive])).rowCount;
  const timedTeacherRead=user.roles.includes('teacher')&&!!version.published_at&&!!(await db.query(`
   SELECT 1 FROM timed_practice_problems tpp JOIN timed_practices tp ON tp.id=tpp.practice_id
-  WHERE tp.owner_account_id=$2 AND tpp.problem_id=$1 AND tpp.version_id=$3 LIMIT 1`,[problem.id,user.id,version.id])).rowCount;
- const assignmentRead=user.roles.includes('student')&&!!version.published_at&&!!(await db.query('SELECT 1 FROM assignment_problems ap JOIN assignments assignment ON assignment.id=ap.assignment_id AND assignment.state=\'Published\' JOIN assignment_participants part ON part.assignment_id=ap.assignment_id WHERE $1 IN (ap.version_id,ap.prior_version_id) AND part.identity_id=$2 AND NOT part.exempt LIMIT 1',[version.id,user.identityId])).rowCount;
+  WHERE tp.owner_account_id=$2 AND tpp.problem_id=$1 AND ($4 OR tpp.version_id=$3
+   OR EXISTS(SELECT 1 FROM submissions s JOIN timed_attempts ta ON ta.id=s.timed_attempt_id WHERE ta.practice_id=tp.id AND s.problem_id=$1 AND s.version_id=$3)) LIMIT 1`,[problem.id,user.id,version.id,isLive])).rowCount;
+ const assignmentRead=user.roles.includes('student')&&!!version.published_at&&!!(await db.query(`SELECT 1 FROM assignment_problems ap JOIN assignments assignment ON assignment.id=ap.assignment_id AND assignment.state='Published' JOIN assignment_participants part ON part.assignment_id=ap.assignment_id WHERE ap.problem_id=$3 AND ($4 OR $5 OR $1 IN (ap.version_id,ap.prior_version_id)) AND part.identity_id=$2 AND NOT part.exempt LIMIT 1`,[version.id,user.identityId,problem.id,isLive,ownSnapshot])).rowCount;
  let timedRead=false,timedReleased=false;
  if(user.roles.includes('student')&&version.published_at&&(await db.query("SELECT to_regclass('timed_practice_problems') existing")).rows[0].existing) {
-  const permitted=(await db.query("SELECT practice.results_published_at FROM timed_practice_problems tp JOIN timed_practices practice ON practice.id=tp.practice_id JOIN timed_practice_participants part ON part.practice_id=tp.practice_id LEFT JOIN timed_attempts attempt ON attempt.practice_id=tp.practice_id AND attempt.identity_id=part.identity_id WHERE tp.version_id=$1 AND part.identity_id=$2 AND NOT part.exempt AND (practice.state IN ('Published','ResultsPublished') OR practice.state='Archived' AND practice.results_published_at IS NOT NULL) AND (practice.results_published_at IS NOT NULL OR attempt.id IS NOT NULL) ORDER BY practice.results_published_at DESC NULLS LAST LIMIT 1",[version.id,user.identityId])).rows[0];timedRead=!!permitted;timedReleased=!!permitted?.results_published_at;
+  const permitted=(await db.query("SELECT practice.results_published_at FROM timed_practice_problems tp JOIN timed_practices practice ON practice.id=tp.practice_id JOIN timed_practice_participants part ON part.practice_id=tp.practice_id LEFT JOIN timed_attempts attempt ON attempt.practice_id=tp.practice_id AND attempt.identity_id=part.identity_id WHERE tp.problem_id=$3 AND ($4 OR $5 OR tp.version_id=$1) AND part.identity_id=$2 AND NOT part.exempt AND (practice.state IN ('Published','ResultsPublished') OR practice.state='Archived' AND practice.results_published_at IS NOT NULL) AND (practice.results_published_at IS NOT NULL OR attempt.id IS NOT NULL) ORDER BY practice.results_published_at DESC NULLS LAST LIMIT 1",[version.id,user.identityId,problem.id,isLive,ownSnapshot])).rows[0];timedRead=!!permitted;timedReleased=!!permitted?.results_published_at;
  }
- return {canRead:own||(!bank.archived_at&&staffRead)||schoolRead||assignmentTeacherRead||timedTeacherRead||assignmentRead||timedRead,canEdit:canEdit&&!bank.archived_at,canRunFree:assignmentRead||timedReleased};
+ return {canRead:own||(!bank.archived_at&&staffRead)||schoolRead||assignmentTeacherRead||timedTeacherRead||assignmentRead||timedRead||ownSnapshot,canEdit:canEdit&&!bank.archived_at,canRunFree:assignmentRead||timedReleased};
 }
 
 export async function restoreIdentityBindings(db,identityId,newAccountId,{restoreRoles=true,restoreEmail=true}={}) {

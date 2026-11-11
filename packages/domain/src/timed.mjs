@@ -1,6 +1,7 @@
 import {courseMetadataForUser} from './course-access.mjs';
 import {audienceClasses,audienceStudents,defaultClassStudents,replaceAudienceClasses,activityClasses,linkedCourse} from './activity-audience.mjs';
 import { transaction } from './db.mjs';
+import { assertLiveProblemVersion, liveProblemVersionIdSql, resolveLiveProblemVersion } from './live-problem-version.mjs';
 import { fail, field, uuid, integer } from './security.mjs';
 
 const isAdmin = (user) => user.roles.includes('admin');
@@ -120,10 +121,11 @@ async function results(db, practice) {
 async function practiceResult(db, user, id) {
   const practice = await practiceAccess(db, user, id);
   const serverNow = await now(db);
-  const problems = (await db.query(`SELECT ap.problem_id,ap.version_id,ap.points,v.title,
+  const problems = (await db.query(`SELECT ap.problem_id,v.id AS version_id,ap.points,v.title,
     ap.reward_points,ap.speed_bonus_points,ap.attempt_bonus_points,
     COALESCE(global_reward.points,10) first_ac_points
-    FROM timed_practice_problems ap JOIN problem_versions v ON v.id=ap.version_id
+    FROM timed_practice_problems ap JOIN problems p ON p.id=ap.problem_id
+    JOIN problem_versions v ON v.id=COALESCE(${liveProblemVersionIdSql('p')},ap.version_id)
     LEFT JOIN point_rewards global_reward ON global_reward.problem_id=ap.problem_id AND global_reward.assignment_id IS NULL
     WHERE ap.practice_id=$1 ORDER BY ap.position`, [id])).rows;
   const attempt = (await db.query('SELECT * FROM timed_attempts WHERE practice_id=$1 AND identity_id=$2', [id, user.identityId])).rows[0];
@@ -152,13 +154,13 @@ export async function prepareTimedSubmission(db, user, body, version) {
   if (!practice.isParticipant) fail(403, 'FORBIDDEN', '教师预览不能建立学生计时提交');
   if (practice.state !== 'Published' || practice.forced_ended_at) fail(409, 'TRAINING_CLOSED', '计时训练已结束或结果已发布');
   const assigned = row(await db.query('SELECT * FROM timed_practice_problems WHERE practice_id=$1 AND problem_id=$2', [practice.id, uuid(body.problemId)]), '题目不属于该计时训练');
-  if (body.versionId && body.versionId !== assigned.version_id) fail(409, 'VERSION_MISMATCH', '计时训练题目版本已固定，请使用活动页面的版本');
+  const live = await resolveLiveProblemVersion(db, assigned.problem_id);
+  assertLiveProblemVersion(body.versionId, live.id);
   const attempt = (await db.query('SELECT * FROM timed_attempts WHERE practice_id=$1 AND identity_id=$2 FOR UPDATE', [practice.id, user.identityId])).rows[0];
   if (!attempt) fail(409, 'NOT_STARTED', '请先在活动页面开始计时训练');
   const acceptedAt = await now(db);
   if (attempt.state !== 'Active' || attempt.finished_at || acceptedAt > attempt.deadline_at) fail(409, 'DEADLINE_PASSED', '个人计时已结束；截止后的代码不会成为正式提交');
-  const pinned = assigned.version_id === version.id ? version : row(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND published_at IS NOT NULL', [assigned.version_id]));
-  return { version: pinned, timedAttemptId: attempt.id, acceptedAt };
+  return { version: live, timedAttemptId: attempt.id, acceptedAt };
 }
 
 export async function maskTimedSubmission(db, user, submission) {
@@ -209,9 +211,8 @@ export function createTimedService(pool) {
             if (!Number.isFinite(points) || points <= 0 || points > 1000) fail(400, 'VALIDATION', '题目分值须在 0–1000 之间');
             const reward = rewardCaps(entry);
             configuredRewards.push(reward);
-            const current = row(await db.query('SELECT current_version_id FROM problems WHERE id=$1 AND archived_at IS NULL', [problemId]), '题目不存在');
-            const versionId = entry.versionId ? uuid(entry.versionId) : current.current_version_id;
-            const version = row(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND problem_id=$2 AND published_at IS NOT NULL', [versionId, problemId]), '只能选择已发布题目');
+            if (entry.versionId) uuid(entry.versionId);
+            const version = await resolveLiveProblemVersion(db, problemId);
             if (helpers.versionAccess) await helpers.versionAccess(db, user, problemId, version.id);
             await db.query(`INSERT INTO timed_practice_problems(
               practice_id,problem_id,version_id,points,position,reward_points,speed_bonus_points,attempt_bonus_points)
@@ -251,8 +252,8 @@ export function createTimedService(pool) {
            if(seen.has(problemId))fail(400,'VALIDATION','同题不能重复选择');
            seen.add(problemId);
            if(!Number.isFinite(points)||points<=0||points>1000)fail(400,'VALIDATION','题目分值无效');
-           const current=row(await db.query('SELECT current_version_id FROM problems WHERE id=$1 AND archived_at IS NULL',[problemId]));
-           const version=row(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND problem_id=$2 AND published_at IS NOT NULL',[e.versionId?uuid(e.versionId):current.current_version_id,problemId]));
+           if(e.versionId)uuid(e.versionId);
+           const version=await resolveLiveProblemVersion(db,problemId);
            if(helpers.versionAccess)await helpers.versionAccess(db,user,problemId,version.id);
            selected.push({problemId,versionId:version.id,points,...rewardCaps(e,previousRewards.get(problemId))});
          }
@@ -317,7 +318,10 @@ export function createTimedService(pool) {
             WHERE tpp.practice_id=$1 FOR SHARE OF p,b,v`,[id])).rows;
           if(linked.some(x=>x.problem_archived_at||x.bank_archived_at||x.version_problem_id!==x.problem_id||!x.published_at))
             fail(409,'UNAVAILABLE_PROBLEM','训练包含已归档或未发布的题目版本，请先在草稿中替换');
-          for(const selected of linked)if(helpers.versionAccess)await helpers.versionAccess(db,user,selected.problem_id,selected.version_id);
+          for(const selected of linked){
+            const live=await resolveLiveProblemVersion(db,selected.problem_id);
+            if(helpers.versionAccess)await helpers.versionAccess(db,user,selected.problem_id,live.id);
+          }
           rewardBudget((await db.query('SELECT reward_points,speed_bonus_points,attempt_bonus_points FROM timed_practice_problems WHERE practice_id=$1',[id])).rows.map((entry)=>rewardCaps(entry)));
           if (serverNow >= practice.ends_at) fail(409, 'INVALID_STATE', '结束窗口已过期，发布前请将结束时间设置为晚于当前时间');
           await db.query("UPDATE timed_practices SET state='Published' WHERE id=$1", [id]);
@@ -389,7 +393,7 @@ export function createTimedService(pool) {
                 AND participant.identity_id=attempt.identity_id AND NOT participant.exempt
               JOIN submissions sub ON sub.timed_attempt_id=attempt.id AND sub.identity_id=attempt.identity_id
               JOIN timed_practice_problems problem ON problem.practice_id=attempt.practice_id
-                AND problem.problem_id=sub.problem_id AND problem.version_id=sub.version_id
+                AND problem.problem_id=sub.problem_id
               WHERE attempt.practice_id=$1 AND sub.kind='submit' AND sub.status='AC'
                 AND sub.created_at>=attempt.started_at
                 AND sub.created_at<=LEAST(attempt.deadline_at,COALESCE(attempt.finished_at,attempt.deadline_at))`, [id]);

@@ -3,6 +3,7 @@ import { fail,field,uuid,enumValue,integer } from './security.mjs';
 import {audienceClasses,audienceStudents,defaultClassStudents,replaceAudienceClasses} from './activity-audience.mjs';
 import {getScholarshipSettings} from './scholarship-ledger.mjs';
 import {checkScholarshipRuleVersion,readScholarshipRule,saveScholarshipRule} from './scholarship-rules.mjs';
+import {resolveLiveProblemVersion} from './live-problem-version.mjs';
 const staff=u=>{if(!u.roles.some(r=>['teacher','admin'].includes(r)))fail(403,'FORBIDDEN','需要教师权限');};
 const row=r=>{if(!r.rowCount)fail(404,'NOT_FOUND','资源不存在');return r.rows[0];};
 const rewardPoints=(value,fallback=0)=>value===undefined?fallback:integer(value,0,20,'作业每题额外奖学金');
@@ -19,10 +20,8 @@ async function syncRewards(db,id,problems,accountId){
  for(const problem of problems)if(problem.rewardPoints>0)await db.query('INSERT INTO point_rewards(problem_id,assignment_id,points,updated_by) VALUES($1,$2,$3,$4)',[problem.problemId,id,problem.rewardPoints,accountId]);
 }
 async function currentAssignmentVersion(ctx,db,problemId){
- // Publication and school review lock the same problem row before changing its version.
- const locked=row(await db.query('SELECT current_version_id,archived_at FROM problems WHERE id=$1 FOR SHARE',[problemId]));
- const {v}=await ctx.helpers.versionAccess(db,ctx.user,problemId,locked.current_version_id);
- if(locked.archived_at||!locked.current_version_id||!v.published_at)fail(409,'UNPUBLISHED','只能选择未归档题目的最新已发布版本');
+ const current=await resolveLiveProblemVersion(db,problemId);
+ const {v}=await ctx.helpers.versionAccess(db,ctx.user,problemId,current.id);
  return v.id;
 }
 async function input(ctx,db,body,old) {
@@ -95,11 +94,11 @@ async function editPublished(ctx,db,id,old,body){
    problems.push({problemId,requestedVersion,versionId:pinned.get(problemId)?.version_id,points,rewardPoints:rewardPoints(item.rewardPoints,Number(pinned.get(problemId)?.reward_points??0))});
   }
   for(const problem of [...problems].sort((a,b)=>a.problemId.localeCompare(b.problemId))){
-   const {problemId,versionId,requestedVersion}=problem;
-   if(versionId&&(!requestedVersion||requestedVersion===versionId))continue;
-   const latest=await currentAssignmentVersion(ctx,db,problemId);
-   if(versionId&&requestedVersion!==latest)fail(409,'VERSION_MISMATCH','只能明确选择该题当前已发布的最新版本');
-   problem.versionId=latest;
+   // Existing pins document what was assigned originally. Updating exercise
+   // content centrally must not rewrite these audit records or freeze edits
+   // to the assignment's title, audience and deadline.
+   if(problem.versionId)continue;
+   problem.versionId=await currentAssignmentVersion(ctx,db,problem.problemId);
   }
  }
  checkRewardBudget(problems);

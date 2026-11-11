@@ -10,7 +10,7 @@ import { provisionPlatformAdministrator } from '../../../packages/domain/src/pla
 import { GoJudge } from '../../../packages/domain/judge.mjs';
 import { processOne } from '../../../packages/domain/worker.mjs';
 
-test('legacy teachers preview pinned homework with private, separately judged results', {
+test('legacy teachers preview the current exercise with private, immutable judged results', {
   skip: !process.env.TEST_DATABASE_URL, timeout: 90000,
 }, async () => {
   const manager = createPool(process.env.TEST_DATABASE_URL);
@@ -106,16 +106,18 @@ test('legacy teachers preview pinned homework with private, separately judged re
     assert.equal(before.chapterComplete, false);
     assert.equal(before.grades[0].score, 0);
     const view = await teacher(preview);
-    assert.equal(view.problems[0].versionId, versionId);
+    assert.equal(view.problems[0].versionId, latest);
+    assert.equal((await student(`/problems/${problemId}?current=1&versionId=${versionId}`)).versionId,latest,'normal workspace reads current content even when a bookmarked URL carries an old version');
+    assert.equal((await student(`/problems/${problemId}?versionId=${versionId}`)).versionId,versionId,'explicit historical reads keep their original snapshot');
     assert.equal(view.problems[0].score, null);
     const statement = await teacher(problem);
-    assert.equal(statement.problem.title, 'Pinned preview task');
+    assert.equal(statement.problem.title, 'Later library version');
     assert.deepEqual(statement.problem.samples, [{ input: '5', expected: '5' }]);
     assert.equal(statement.problem.referenceCode, undefined);
     assert.equal(statement.problem.tests, undefined);
-    const body = { kind: 'submit', code: 'print(input())', language: 'python', requestId: randomUUID(), versionId, revision: view.revision };
+    const body = { kind: 'submit', code: 'print(input())', language: 'python', requestId: randomUUID(), versionId: latest, revision: view.revision };
     await teacher(enqueue, { body, includeCsrf: false, status: 403 });
-    await teacher(enqueue, { body: { ...body, versionId: latest }, status: 409 });
+    await teacher(enqueue, { body: { ...body, versionId }, status: 409 });
     await student(preview, { status: 404 });
     await student(enqueue, { body, status: 404 });
     await colleague(preview, { status: 403 });
@@ -129,7 +131,7 @@ test('legacy teachers preview pinned homework with private, separately judged re
     const { rows: [task] } = await pool.query('SELECT id,purpose,submission_id,version_id FROM judge_tasks WHERE preview_submission_id=$1', [queued.id]);
     assert.equal(task.purpose, 'assignment_preview');
     assert.equal(task.submission_id, null);
-    assert.equal(task.version_id, versionId);
+    assert.equal(task.version_id, latest);
     await admin(`/judge-tasks/${task.id}`, { status: 404 });
     await admin(`/judge-tasks/${task.id}/retry`, { body: { reason: 'QA privacy' }, status: 404 });
 
@@ -169,7 +171,7 @@ test('legacy teachers preview pinned homework with private, separately judged re
     assert.deepEqual(await state(), before);
 
     // Positive control proves all four student projections respond to formal work.
-    await student('/submissions', { body: { assignmentId, problemId, versionId, kind: 'submit',
+    await student('/submissions', { body: { assignmentId, problemId, versionId: latest, kind: 'submit',
       code: 'print(input())', idempotencyKey: randomUUID() }, status: 201 });
     assert.equal(await processOne({ pool, judge, logger: {} }), true);
     const formal = await state();
@@ -179,6 +181,19 @@ test('legacy teachers preview pinned homework with private, separately judged re
     assert.ok(formal.balance > before.balance);
     assert.ok(Number(formal.stored.rank) > Number(before.stored.rank));
     assert.notDeepEqual(formal.ranking, before.ranking);
+    const queuedBeforeUpdate = await teacher(enqueue, {
+      body: { ...body, kind: 'samples', requestId: randomUUID() }, status: 202,
+    });
+    const newest = await publish('Updated everywhere');
+    assert.equal((await teacher(preview)).problems[0].versionId, newest);
+    assert.equal((await student(assignment)).problems[0].versionId, newest);
+    assert.equal((await student(`/learning-paths/${courseId}`)).chapters[0].problems[0].versionId, newest);
+    assert.equal((await pool.query('SELECT version_id FROM assignment_problems WHERE assignment_id=$1',[assignmentId])).rows[0].version_id,versionId,'original assignment pin remains an audit record');
+    assert.equal(await processOne({ pool, judge, logger: {} }), true);
+    assert.equal((await teacher(`${preview}/jobs/${queuedBeforeUpdate.id}`)).status,'AC');
+    assert.equal((await pool.query('SELECT version_id FROM judge_tasks WHERE preview_submission_id=$1',[queuedBeforeUpdate.id])).rows[0].version_id,latest,'queued work retains its original judge definition');
+    await teacher(enqueue,{body:{...body,requestId:randomUUID()},status:409});
+    assert.equal((await state()).grades[0].score,20,'new content does not erase historical grades');
     await pool.query("UPDATE assignments SET due_at=clock_timestamp()-interval '1 second', edit_revision=edit_revision+1 WHERE id=$1", [assignmentId]);
     await teacher(enqueue, { body: { ...body, requestId: randomUUID() }, status: 409 });
     assert.equal((await teacher(preview)).problems[0].score, null);

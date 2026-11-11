@@ -11,7 +11,7 @@ import { claimSchoolTask,finishSchoolTask,processSchoolOne } from '../school-wor
 import { GoJudge } from '../judge.mjs';
 
 test('isolated school and public practice lifecycle, authorization, queue and feedback',{skip:!process.env.TEST_DATABASE_URL,timeout:120000},async t=>{
- const base=new URL(process.env.TEST_DATABASE_URL);assert.equal(base.pathname,'/campus_qa');const manager=createPool(base.href),schema=`school_practice_${randomBytes(5).toString('hex')}`;const scoped=new URL(base);scoped.searchParams.set('options',`-csearch_path=${schema}`);const pool=createPool(scoped.href);let app,worker;
+ const base=new URL(process.env.TEST_DATABASE_URL);assert.match(base.pathname,/^\/campus_qa(?:_[a-z0-9_]+)?$/);const manager=createPool(base.href),schema=`school_practice_${randomBytes(5).toString('hex')}`;const scoped=new URL(base);scoped.searchParams.set('options',`-csearch_path=${schema}`);const pool=createPool(scoped.href);let app,worker;
  try{
   await manager.query(`CREATE SCHEMA ${schema}`);await migrate(pool);
   const grants=(await readFile(new URL('../grants.mjs',import.meta.url),'utf8')).match(/await pool\.query\(`([\s\S]*?)`\);/)?.[1];assert.ok(grants);await pool.query(grants.replaceAll('SCHEMA public',`SCHEMA ${schema}`));

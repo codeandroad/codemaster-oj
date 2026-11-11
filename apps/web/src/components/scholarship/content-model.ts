@@ -24,4 +24,16 @@ export interface ContentResponse {
   versions?: SolutionVersion[];
   recommendedVersionId?: string | null;
   selectionRequired?: boolean;
+  sharedSolution?: {
+    shared: true;
+    contentId: string | null;
+    legacySources: LegacySolutionSource[];
+  };
 }
+
+export type LegacySolutionSource = SolutionDraft & {
+  contentId: string;
+  createdAt: string;
+  status: string;
+  pending?: SolutionDraft | null;
+};

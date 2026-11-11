@@ -3,6 +3,7 @@ import { transaction } from './db.mjs';
 import { publicProblemMetadata, studentPublicStatementRows } from './problem-public-statements.mjs';
 import { activeAccount, auditSchool, LEGACY_SCHOOL_ID, lockSchoolTeaching } from './schools.mjs';
 import { fail, uuid } from './security.mjs';
+import { liveProblemVersionIdSql } from './live-problem-version.mjs';
 
 const snapshotBankId = '00000000-0000-4000-8000-000000000074';
 const scope = db => db.query("SELECT set_config('campus.school_id',$1,true)", [LEGACY_SCHOOL_ID]);
@@ -11,7 +12,7 @@ const sourceColumns = `p.id AS problem_id,p.bank_id,p.owner_account_id,b.name AS
  v.starter_codes,v.time_limit_ms,v.memory_limit_mb,v.samples`;
 const sourceTables = `problems p
  JOIN problem_banks b ON b.id=p.bank_id
- JOIN problem_versions v ON v.id=p.current_version_id AND v.problem_id=p.id`;
+ JOIN problem_versions v ON v.id=${liveProblemVersionIdSql('p')} AND v.problem_id=p.id`;
 // A problem reused by a timed practice remains outside public practice, even
 // if the author creates another edition with the same exercise.
 const sourceAccess = `p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school'

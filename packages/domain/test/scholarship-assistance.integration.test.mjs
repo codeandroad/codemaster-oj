@@ -34,8 +34,10 @@ async function fixture(run){
    const url=new URL(`http://luq.test${route}`);const result=await handleScholarshipAssistance({pool,user,route:url.pathname,url,method,body});assert.ok(result);return result.body;
   }
   async function publish(target,kind='FULL_SOLUTION',text='Published explanation\n```python\nprint(1)\n```'){
-   const draft=await call(teacher,'/scholarship/contents',{...target,kind,body:text});
-   await call(teacher,`/scholarship/contents/${draft.id}/publish`,{reviewed:true});return draft;
+   const existing=kind==='FULL_SOLUTION'?(await call(teacher,'/scholarship/contents?'+new URLSearchParams(target),undefined,'GET')).items.find(item=>item.kind===kind):null;
+   const input=existing?{solutions:[{title:'Main approach',body:text}],expectedHash:existing.contentHash}:{body:text};
+   const draft=await call(teacher,'/scholarship/contents',{...target,kind,...input});
+   await call(teacher,`/scholarship/contents/${draft.id}/publish`,{reviewed:true,expectedHash:draft.contentHash});return draft;
   }
   async function grant(user,amount){return transaction(pool,db=>postScholarshipEntry(db,{identityId:user.identityId,delta:amount,kind:'admin_grant',sourceKey:randomUUID(),reason:'Test grant',actorAccountId:admin.id}));}
   async function refund(user,entry){return transaction(pool,db=>postScholarshipEntry(db,{identityId:user.identityId,delta:-entry.delta,kind:'refund',sourceKey:`refund:${entry.id}`,refundOf:entry.id,reason:'Test refund',actorAccountId:admin.id}));}
@@ -117,7 +119,7 @@ test('original solution source is read-only, exact-version and available only to
  await rejects(f.call(f.otherTeacher,detail(latest),undefined,'GET'),'FORBIDDEN');
  const another=await f.problem();
  await rejects(f.call(f.teacher,detail({...original,versionId:another.versionId}),undefined,'GET'),'NOT_FOUND');
- const empty=await f.version(original.problemId,'');
+ const empty=await f.version(original.problemId,'','',{published:false,approved:false});
  assert.equal((await f.call(f.teacher,detail(empty),undefined,'GET')).originalSolution,undefined);
  await f.publish(latest,'FULL_SOLUTION','Reviewed article only.');
  await f.call(f.teacher,'/scholarship/policies',{targetType:'problem',targetId:original.problemId,kind:'FULL_SOLUTION',mode:'free'});
@@ -165,7 +167,8 @@ test('solution use follows the same resolved revision students open in published
   await f.pool.query(`UPDATE learning_paths SET ${patch} WHERE id=$1`,[course.id]);
   assert.ok((await details()).versions.every(version=>version.usage.courseCount===0));
  }
- const quote=await f.quote(f.student,original);
+ await rejects(f.quote(f.student,original),'PROBLEM_UPDATED');
+ const quote=await f.quote(f.student,latest);
  assert.equal(quote.versions,undefined);assert.equal(quote.recommendedVersionId,undefined);assert.equal(quote.selectionRequired,undefined);
 }));
 
@@ -193,21 +196,21 @@ test('solution use reveals only readable course names and managed activity names
  assert.deepEqual(detail.versions.find(v=>v.versionId===latest.versionId).usage.courses,[]);
  assert.doesNotMatch(JSON.stringify(detail),/PRIVATE_OTHER_COURSE|PRIVATE_OTHER_ASSIGNMENT|Private timed practice/);
  assert.ok(!JSON.stringify(detail).includes(otherAssignment.id));assert.ok(!JSON.stringify(detail).includes(timed.id));
- assert.deepEqual(detail.versions.find(v=>v.versionId===original.versionId).usage.assignments,[{id:first.id,title:'Older worksheet'}]);
- assert.deepEqual(detail.versions.find(v=>v.versionId===latest.versionId).usage.assignments,[{id:second.id,title:'Newer worksheet'}]);
- assert.equal(detail.versions.find(v=>v.versionId===latest.versionId).usage.assignmentCount,2);
+ assert.deepEqual(detail.versions.find(v=>v.versionId===original.versionId).usage.assignments,[]);
+ assert.deepEqual(detail.versions.find(v=>v.versionId===latest.versionId).usage.assignments.map(item=>item.id).sort(),[first.id,second.id].sort());
+ assert.equal(detail.versions.find(v=>v.versionId===latest.versionId).usage.assignmentCount,3);
  assert.equal(detail.versions.find(v=>v.versionId===latest.versionId).usage.timedCount,1);
  assert.deepEqual(detail.versions.find(v=>v.versionId===latest.versionId).usage.timedPractices,[]);
  const admin=await get(f.admin);
  assert.equal(admin.versions.find(v=>v.versionId===latest.versionId).usage.courses[0].title,'PRIVATE_OTHER_COURSE');
- assert.equal(admin.versions.find(v=>v.versionId===latest.versionId).usage.assignmentCount,2);
+ assert.equal(admin.versions.find(v=>v.versionId===latest.versionId).usage.assignmentCount,3);
  assert.equal(admin.versions.find(v=>v.versionId===latest.versionId).usage.timedCount,1);
  await f.pool.query('UPDATE learning_paths SET published_at=NULL WHERE id=$1',[course.id]);
  detail=await get(f.teacher);
- assert.equal(detail.recommendedVersionId,null);assert.equal(detail.selectionRequired,true,'different managed activities require an explicit use choice');
+ assert.equal(detail.recommendedVersionId,latest.versionId);assert.equal(detail.selectionRequired,false,'all managed activities share the live problem');
  await f.pool.query('UPDATE assignments SET archived_at=now() WHERE id=$1',[second.id]);
  detail=await get(f.teacher);
- assert.equal(detail.recommendedVersionId,null);assert.equal(detail.selectionRequired,true,'other teachers’ active uses remain visible as anonymous counts');
+ assert.equal(detail.recommendedVersionId,latest.versionId);assert.equal(detail.selectionRequired,false,'private activities share the same problem without exposing their names');
  await f.pool.query('UPDATE assignments SET archived_at=now() WHERE id=$1',[first.id]);
  detail=await get(f.teacher);
  assert.equal(detail.recommendedVersionId,latest.versionId,'a private activity still prevents wrongly treating its revision as unused');
@@ -223,44 +226,50 @@ test('solution use reveals only readable course names and managed activity names
  await rejects(get(f.student),'FORBIDDEN');await rejects(get(f.otherTeacher),'FORBIDDEN');
 }));
 
-test('missing version solutions inherit only a prior reviewed bundle as a read-only authoring draft',options,async()=>fixture(async f=>{
+test('one shared solution retains published content, pending changes and historical source material across problem updates',options,async()=>fixture(async f=>{
  const prior=await f.problem(),kind='FULL_SOLUTION';
  const draft=await f.call(f.teacher,'/scholarship/contents',{...prior,kind,solutions:[
   {title:'Original explanation',body:'Reviewed previous primary.'},
   {title:'Second approach',body:'Reviewed previous alternative.'},
  ]});
  const published=await f.call(f.teacher,`/scholarship/contents/${draft.id}/publish`,{reviewed:true,expectedHash:draft.contentHash});
- await f.call(f.teacher,'/scholarship/contents',{...prior,kind,expectedHash:published.contentHash,
+ const pending=await f.call(f.teacher,'/scholarship/contents',{...prior,kind,expectedHash:published.contentHash,
   solutions:published.solutions.map(solution=>({...solution,body:'PRIVATE PENDING '+solution.body}))});
- const current=await f.version(prior.problemId),future=await f.version(prior.problemId);
- await f.publish(future,kind,'FUTURE_VERSION_CONTENT');
+ const current=await f.version(prior.problemId);
+ // Simulate material saved before shared ownership was introduced; keep it intact.
+ const historical=(await f.pool.query(`INSERT INTO luq_assistance_contents(subject_key,version_id,kind,body,status,published_at,pending_solution,author_account_id)
+  VALUES($1,$2,'FULL_SOLUTION','Historical reviewed explanation.','published',now(),$3,$4) RETURNING *`,
+  [`problem:${prior.problemId}`,current.versionId,{body:'Historical private pending.',details:{}},f.teacher.id])).rows[0];
  const unrelated=await f.problem();await f.publish(unrelated,kind,'UNRELATED_PROBLEM_CONTENT');
  const detail=target=>'/scholarship/contents?'+new URLSearchParams(target);
  const before=(await f.pool.query('SELECT * FROM luq_assistance_contents ORDER BY id')).rows;
- const inherited=await f.call(f.teacher,detail(current),undefined,'GET');
- assert.deepEqual(inherited.items,[]);
- assert.deepEqual(inherited.inheritedSolution,{versionId:prior.versionId,body:published.body,solutions:published.solutions});
- assert.doesNotMatch(JSON.stringify(inherited.inheritedSolution),/PRIVATE PENDING|FUTURE_VERSION_CONTENT|UNRELATED_PROBLEM_CONTENT/);
- assert.deepEqual((await f.pool.query('SELECT * FROM luq_assistance_contents ORDER BY id')).rows,before);
- const quote=await f.quote(f.student,current);
- assert.equal(quote.available,false);assert.equal(quote.inheritedSolution,undefined);
- await rejects(f.provide(f.student,current),'ASSISTANCE_UNAVAILABLE');
- const blank=await f.problem(),futureOnly=await f.version(blank.problemId);
- await f.publish(futureOnly,kind,'FUTURE_ONLY');
- assert.equal((await f.call(f.teacher,detail(blank),undefined,'GET')).inheritedSolution,undefined);
- const blankOther=await f.problem();
- assert.equal((await f.call(f.teacher,detail(blankOther),undefined,'GET')).inheritedSolution,undefined);
- const unstamped=await f.call(f.teacher,'/scholarship/contents',{...blankOther,kind,body:'Missing publication stamp.'});
- await f.pool.query("UPDATE luq_assistance_contents SET status='published' WHERE id=$1",[unstamped.id]);
- const unstampedNext=await f.version(blankOther.problemId);
- assert.equal((await f.call(f.teacher,detail(unstampedNext),undefined,'GET')).inheritedSolution,undefined);
- const own=await f.call(f.teacher,'/scholarship/contents',{...current,kind,body:'Current version draft.'});
- for(const status of ['draft','published','withdrawn']){
-  await f.pool.query('UPDATE luq_assistance_contents SET status=$2 WHERE id=$1',[own.id,status]);
-  const existing=await f.call(f.teacher,detail(current),undefined,'GET');
-  assert.equal(existing.inheritedSolution,undefined);
-  assert.equal(existing.items[0].body,'Current version draft.');
+ for(const target of [prior,current]){
+  const data=await f.call(f.teacher,detail(target),undefined,'GET');
+  assert.equal(data.items[0].id,published.id);
+  assert.equal(data.items[0].contentHash,pending.contentHash);
+  assert.match(data.items[0].body,/PRIVATE PENDING/);
+  assert.equal(data.sharedSolution.contentId,published.id);
+  assert.equal(data.sharedSolution.legacySources[0].contentId,historical.id);
+  assert.equal(data.sharedSolution.legacySources[0].body,historical.body);
+  assert.equal(data.sharedSolution.legacySources[0].pending.body,'Historical private pending.');
+  assert.doesNotMatch(JSON.stringify(data),/UNRELATED_PROBLEM_CONTENT/);
  }
+ assert.deepEqual((await f.pool.query('SELECT * FROM luq_assistance_contents ORDER BY id')).rows,before,'read-only historical materials do not create or replace content');
+ await f.call(f.teacher,'/scholarship/policies',{targetType:'problem',targetId:prior.problemId,kind,mode:'free'});
+ await rejects(f.quote(f.student,prior),'PROBLEM_UPDATED');
+ assert.equal((await f.quote(f.student,current)).contentId,published.id);
+ assert.deepEqual((await f.provide(f.student,current)).solutions,published.solutions,'pending edits are not exposed when the question is published');
+ await rejects(f.call(f.teacher,`/scholarship/contents/${historical.id}/publish`,{reviewed:true}),'SHARED_SOLUTION_REQUIRED');
+ await f.call(f.teacher,`/scholarship/contents/${published.id}/publish`,{reviewed:true,expectedHash:pending.contentHash});
+ assert.deepEqual((await f.provide(f.student,current)).solutions,pending.solutions);
+ assert.deepEqual((await f.pool.query('SELECT * FROM luq_assistance_contents WHERE id=$1',[historical.id])).rows[0],historical);
+ const canonical=(await f.call(f.teacher,detail(current),undefined,'GET')).items[0];
+ const saves=await Promise.allSettled([prior,current].map((target,index)=>f.call(f.teacher,'/scholarship/contents',{
+  ...target,kind,expectedHash:canonical.contentHash,solutions:[{title:'Shared change',body:`Concurrent edit ${index}`}],
+ })));
+ assert.equal(saves.filter(result=>result.status==='fulfilled').length,1);
+ assert.equal(saves.find(result=>result.status==='rejected').reason.code,'CONTENT_CHANGED');
+ assert.equal((await f.pool.query('SELECT count(*)::int n FROM luq_problem_solutions WHERE problem_id=$1',[prior.problemId])).rows[0].n,1);
 }));
 
 test('published primary solution revisions remain pending until reviewed and reject competing hashes',options,async()=>fixture(async f=>{
@@ -299,11 +308,11 @@ test('published primary solution revisions remain pending until reviewed and rej
 test('Luq solution credit follows the actual paid translation across versions and charges only once',options,async()=>fixture(async f=>{
  const target=await f.problem(),other=await f.problem();
  await f.publish(target,'FULL_TRANSLATION','中文题面');
- const next=await f.version(target.problemId);
- await f.publish(next);await f.publish(other);
+ await f.publish(target);await f.publish(other);
  await f.grant(f.student,8);
- const original=await f.quote(f.student,next);
+ const original=await f.quote(f.student,target);
  assert.equal((await f.unlock(f.student,target,'FULL_TRANSLATION')).charged,3);
+ const next=await f.version(target.problemId);
  await f.call(f.teacher,'/scholarship/policies',{targetType:'problem',targetId:target.problemId,kind:'FULL_TRANSLATION',mode:'paid',price:7});
  const discounted=await f.quote(f.student,next);
  assert.deepEqual([discounted.basePrice,discounted.translationCredit,discounted.price,discounted.balanceAfter],[8,3,5,0]);
@@ -388,23 +397,25 @@ test('Luq reviewed assistance has no body in quotes/unlocks, exact funds and con
  await rejects(f.call(f.teacher,'/scholarship/contents',{...target,kind:'FULL_SOLUTION',body:'overwrite'}),'PUBLISHED_CONTENT_IMMUTABLE');
 }));
 
-test('Luq balance competition, request replay, version pinning, refund and cross-version entitlement',options,async()=>fixture(async f=>{
+test('Luq balance competition, request replay, shared content, refund and cross-version entitlement',options,async()=>fixture(async f=>{
  const a=await f.problem(),b=await f.problem();await f.publish(a);await f.publish(b);await f.grant(f.student,8);
  const outcomes=await Promise.allSettled([f.unlock(f.student,a),f.unlock(f.student,b)]);
  assert.equal(outcomes.filter(r=>r.status==='fulfilled').length,1);
  const won=outcomes[0].status==='fulfilled'?a:b,lost=won===a?b:a;
  assert.equal((await f.pool.query('SELECT balance FROM luq_accounts WHERE identity_id=$1',[f.student.identityId])).rows[0].balance,0);
- const next=await f.version(won.problemId);assert.equal((await f.quote(f.student,next)).available,false);
- await rejects(f.provide(f.student,next),'ASSISTANCE_UNAVAILABLE');await f.publish(next,'FULL_SOLUTION','NEW_VERSION_ONLY');
- assert.equal((await f.quote(f.student,next)).price,0);assert.equal((await f.provide(f.student,next)).body,'NEW_VERSION_ONLY');
- assert.notEqual((await f.provide(f.student,won)).body,'NEW_VERSION_ONLY');
+ const oldQuote=await f.quote(f.student,won);
+ const next=await f.version(won.problemId);assert.equal((await f.quote(f.student,next)).available,true);
+ assert.equal((await f.quote(f.student,next)).contentId,oldQuote.contentId);
+ assert.ok((await f.provide(f.student,next)).body);await f.publish(next,'FULL_SOLUTION','SHARED_UPDATED_EXPLANATION');
+ assert.equal((await f.quote(f.student,next)).price,0);assert.equal((await f.provide(f.student,next)).body,'SHARED_UPDATED_EXPLANATION');
+ await rejects(f.provide(f.student,won),'PROBLEM_UPDATED');
  const purchase=(await f.pool.query("SELECT id FROM luq_ledger WHERE identity_id=$1 AND kind='purchase'",[f.student.identityId])).rows[0];
  await transaction(f.pool,db=>postScholarshipEntry(db,{identityId:f.student.identityId,delta:8,kind:'refund',sourceKey:`refund:${purchase.id}`,refundOf:purchase.id,actorAccountId:f.admin.id,reason:'Refund fixture'}));
- assert.equal((await f.quote(f.student,won)).unlocked,true,'refund keeps entitlement');
+ assert.equal((await f.quote(f.student,next)).unlocked,true,'refund keeps entitlement');
  const requestKey=randomUUID(),q=await f.quote(f.student,lost);
  const body={...lost,kind:'FULL_SOLUTION',requestKey,confirmedPrice:q.price,confirmedContentId:q.contentId};
  await f.call(f.student,'/scholarship/assistance/unlock',body);await f.call(f.student,'/scholarship/assistance/unlock',body);
- await rejects(f.call(f.student,'/scholarship/assistance/unlock',{...body,...won}),'IDEMPOTENCY_CONFLICT');
+ await rejects(f.call(f.student,'/scholarship/assistance/unlock',{...body,...next}),'IDEMPOTENCY_CONFLICT');
 }));
 
 test('Luq free task content gives no permanent entitlement, translation does not assist AC and activity policies freeze',options,async()=>fixture(async f=>{
@@ -435,29 +446,34 @@ test('Luq active exam restrictions beat balance, prior purchase, old versions an
  await f.pool.query('INSERT INTO timed_practice_problems(practice_id,problem_id,version_id,points,position) VALUES($1,$2,$3,100,0)',[exam.id,target.problemId,newer.versionId]);
  await f.pool.query('INSERT INTO timed_practice_participants(practice_id,identity_id) VALUES($1,$2)',[exam.id,f.student.identityId]);
  await f.pool.query("UPDATE timed_practices SET state='Published' WHERE id=$1",[exam.id]);
- assert.equal((await f.quote(f.student,target)).mode,'disabled');assert.equal((await f.quote(f.student,newer)).available,false);
- await rejects(f.provide(f.student,target),'ASSISTANCE_LOCKED');await rejects(f.unlock(f.student,newer),'ASSISTANCE_LOCKED');
+ await rejects(f.quote(f.student,target),'PROBLEM_UPDATED');assert.equal((await f.quote(f.student,newer)).available,false);
+ assert.equal((await f.quote(f.student,newer)).mode,'disabled');await rejects(f.provide(f.student,newer),'ASSISTANCE_LOCKED');await rejects(f.unlock(f.student,newer),'ASSISTANCE_LOCKED');
  await f.pool.query('UPDATE timed_practices SET results_published_at=clock_timestamp() WHERE id=$1',[exam.id]);
- assert.equal((await f.quote(f.student,target)).available,true);assert.ok((await f.provide(f.student,target)).body);
+ assert.equal((await f.quote(f.student,newer)).available,true);assert.ok((await f.provide(f.student,newer)).body);
 }));
 
 test('free after AC respects the student, exact version and paid activity policy',options,async()=>fixture(async f=>{
- const target=await f.problem(),newer=await f.version(target.problemId);
- await f.publish(target);await f.publish(newer);await f.publish(target,'FULL_TRANSLATION','中文题面');
+ const target=await f.problem();
+ await f.publish(target);await f.publish(target,'FULL_TRANSLATION','中文题面');
  const ac=await f.submit(f.student,target);
  await f.pool.query("UPDATE submissions SET status='AC',score=100 WHERE id=$1",[ac.id]);
  assert.equal((await f.quote(f.student,target)).mode,'free');
- assert.equal((await f.quote(f.student,newer)).mode,'paid');
  assert.equal((await f.quote(f.otherStudent,target)).mode,'paid');
  assert.equal((await f.quote(f.student,target,'FULL_TRANSLATION')).price,3);
+ const newer=await f.version(target.problemId);
+ assert.equal((await f.quote(f.student,newer)).mode,'paid','old AC is a historical result, not an AC against the changed problem');
+ await rejects(f.quote(f.student,target),'PROBLEM_UPDATED');
+ const newAc=await f.submit(f.student,newer);
+ await f.pool.query("UPDATE submissions SET status='AC',score=100 WHERE id=$1",[newAc.id]);
+ assert.equal((await f.quote(f.student,newer)).mode,'free');
  const {rows:[assignment]}=await f.pool.query(`INSERT INTO assignments(title,owner_account_id,due_at,state)
   VALUES('Paid policy',$1,now()+interval '1 hour','Draft') RETURNING id`,[f.teacher.id]);
  await f.pool.query('INSERT INTO assignment_problems(assignment_id,problem_id,version_id,points,position) VALUES($1,$2,$3,100,0)',[assignment.id,target.problemId,target.versionId]);
  await f.pool.query('INSERT INTO assignment_participants(assignment_id,identity_id) VALUES($1,$2)',[assignment.id,f.student.identityId]);
  await f.call(f.teacher,'/scholarship/policies',{targetType:'assignment',targetId:assignment.id,kind:'FULL_SOLUTION',mode:'paid'});
  await f.pool.query("UPDATE assignments SET state='Published',published_at=now() WHERE id=$1",[assignment.id]);
- assert.equal((await f.quote(f.student,{...target,assignmentId:assignment.id})).mode,'paid');
- await rejects(f.provide(f.student,target),'UNLOCK_REQUIRED');
+ assert.equal((await f.quote(f.student,{...newer,assignmentId:assignment.id})).mode,'paid');
+ await rejects(f.provide(f.student,newer),'UNLOCK_REQUIRED');
 }));
 
 test('Luq answer provision and submission share an acceptance lock; later viewing cannot revise an earlier snapshot',options,async()=>fixture(async f=>{

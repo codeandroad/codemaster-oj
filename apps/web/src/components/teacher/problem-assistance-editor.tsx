@@ -9,7 +9,6 @@ import { ContentEditor } from "@/components/scholarship/content-editor";
 export function ProblemAssistanceEditor({
   problemId,
   versionId,
-  initialVersionId,
   initialKind = "FULL_SOLUTION",
   externalBusy = false,
   hasUnsavedProblemChanges = false,
@@ -24,14 +23,16 @@ export function ProblemAssistanceEditor({
   onPendingChange?: (pending: boolean) => void;
 }) {
   const { locale } = useLocale();
-  const [chosenVersion, setChosenVersion] = useState(initialVersionId);
+  // Old solutionVersionId links still open this one problem-level editor.
+  const [selection, setSelection] = useState<{ sourceVersion: string; selectedVersion: string }>();
   const [kind, setKind] = useState<AssistanceKind>(initialKind);
   const [pending, setPending] = useState(false);
   const reportPending = useCallback((next: boolean) => {
     setPending(next);
     onPendingChange?.(next);
   }, [onPendingChange]);
-  const chooseVersion = useCallback((next: string) => setChosenVersion(next), []);
+  const chooseVersion = useCallback((next: string) => setSelection({ sourceVersion: versionId, selectedVersion: next }), [versionId]);
+  const chosenVersion = selection?.sourceVersion === versionId ? selection.selectedVersion : undefined;
   const selectedVersion = chosenVersion ?? versionId;
 
   return <div className="min-w-0 space-y-3">
@@ -39,7 +40,7 @@ export function ProblemAssistanceEditor({
       ? "The problem has unsaved changes. You can edit the published student solutions below. To use updated reference code or solution notes, save the problem draft first."
       : "题目还有未保存的修改。你可以直接编辑下方已有的学生题解；如需使用修改后的参考代码或题解素材，请先保存题目草稿。"}</p>}
     <ContentEditor
-      key={`${problemId}:${versionId}:${selectedVersion}`}
+      key={problemId}
       target={{ problemId, versionId: selectedVersion }}
       kind={kind}
       onKindChange={setKind}

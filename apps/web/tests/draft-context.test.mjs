@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { draftKey, initialWorkspaceLanguage, workspaceDraftContext, workspaceEditorCode } from '../src/components/student/drafts.ts';
+import { draftKey, initialWorkspaceLanguage, workspaceDraftContext, workspaceEditorCode, readCurrentDraft, readCurrentDraftLanguage, saveDraft, saveDraftLanguage, readDraft, hasTimedDraft } from '../src/components/student/drafts.ts';
 
 test('same problem and version use separate drafts for each route context', () => {
   const routes = [
@@ -43,4 +43,38 @@ test('reopening preserves unsent edits and falls back to the selected language o
   assert.equal(initialWorkspaceLanguage('javascript', null, 'python', () => null), 'javascript');
   assert.equal(initialWorkspaceLanguage(null, null, 'cpp', () => null), 'cpp');
   assert.deepEqual(workspaceEditorCode('python', null, null, 'starter'), { code: 'starter', receivedCode: 'starter' });
+});
+
+test('current problem drafts survive publication while accounts, contexts, languages and correction snapshots stay separate', () => {
+  const storage=new Map(), previousWindow=globalThis.window, previousStorage=globalThis.sessionStorage;
+  globalThis.window={};
+  globalThis.sessionStorage={
+    get length(){return storage.size;}, key:index=>[...storage.keys()][index]??null,
+    getItem:key=>storage.get(key)??null, setItem:(key,value)=>storage.set(key,value),
+  };
+  try {
+    const old='00000000-0000-4000-8000-000000000001', newer='00000000-0000-4000-8000-000000000002';
+    const draft=(code,updatedAt)=>({code,receivedCode:'received',updatedAt});
+    const first=draft('unsent Python','2026-11-11T01:00:00Z'),second=draft('unsent C++','2026-11-11T02:00:00Z');
+    saveDraft(draftKey('user','problem',old,'assignment:one'),first);
+    saveDraft(draftKey('user','problem',newer,'assignment:one','cpp'),second);
+    saveDraftLanguage('user','problem',newer,'assignment:one','cpp');
+    saveDraft(draftKey('other-user','problem',newer,'assignment:one'),draft('another account','2026-11-11T03:00:00Z'));
+    saveDraft(draftKey('user','other-problem',newer,'assignment:one'),draft('another exercise','2026-11-11T03:00:00Z'));
+    saveDraft(draftKey('user','problem',newer,'review:SUB1'),draft('correction only','2026-11-11T03:00:00Z'));
+    assert.deepEqual(readCurrentDraft('user','problem','assignment:one','python'),first);
+    assert.deepEqual(readCurrentDraft('user','problem','assignment:one','cpp'),second);
+    assert.equal(readCurrentDraft('user','problem','assignment:two','python'),null);
+    assert.equal(readCurrentDraft('user','problem','assignment:one','javascript'),null);
+    assert.equal(readCurrentDraftLanguage('user','problem','assignment:one'),'cpp');
+    const current=draft('kept after refresh','2026-11-11T04:00:00Z');
+    saveDraft(draftKey('user','problem','current','assignment:one'),current);
+    assert.deepEqual(readCurrentDraft('user','problem','assignment:one','python'),current);
+    assert.deepEqual(readDraft(draftKey('user','problem',old,'assignment:one')),first,'original stored snapshot is not overwritten');
+    saveDraft(draftKey('user','problem',old,'timed:one'),first);
+    assert.equal(hasTimedDraft('user','one','problem',newer),true,'a problem update does not hide unsent work at timed-practice exit');
+  } finally {
+    if(previousWindow===undefined)delete globalThis.window;else globalThis.window=previousWindow;
+    if(previousStorage===undefined)delete globalThis.sessionStorage;else globalThis.sessionStorage=previousStorage;
+  }
 });

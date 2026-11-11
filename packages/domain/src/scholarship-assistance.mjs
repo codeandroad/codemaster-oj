@@ -4,6 +4,7 @@ import {postScholarshipEntry,getScholarshipSettings} from './scholarship-ledger.
 import {scholarshipActivityAccess} from './scholarship-rules.mjs';
 import {assistanceKind,assistanceLanguage,resolveAssistanceTarget,resolveAssistancePolicy,assistancePolicyTarget,hasLegacyPracticeAc,lockScholarshipAssistance,isScholarshipStaff} from './scholarship-access.mjs';
 import {approvedAssistanceContent,editableAssistanceContent,originalProblemSolution,pendingSolution,readAssistanceDraft} from './problem-solution-bundles.mjs';
+import {sharedSolutionIdSql,sharedProblemSolution,retainSharedSolution,assertSharedSolution} from './shared-problem-solutions.mjs';
 import {withProblemSolutionUsage} from './problem-solution-usage.mjs';
 
 const response=(body,status=200)=>({status,body});
@@ -34,8 +35,10 @@ async function aidState(db,user,input,helpers){
  const policy=await resolveAssistancePolicy(db,user,target,kind);
  const restriction=helpers.assistanceRestriction?await helpers.assistanceRestriction(db,user,target,kind):null;
  if(restriction?.mode==='disabled')Object.assign(policy,restriction);
- const content=(await db.query(`SELECT id FROM luq_assistance_contents WHERE subject_key=$1 AND version_id=$2
-  AND kind=$3 AND language=$4 AND status='published' AND published_at IS NOT NULL`,[target.subjectKey,target.versionId,kind,language])).rows[0];
+ const shared=kind==='FULL_SOLUTION'&&target.subjectKey===`problem:${target.problemId}`;
+ const foundContent=shared ? await sharedProblemSolution(db,target.problemId,target.versionId) : (await db.query(`SELECT id,status,published_at FROM luq_assistance_contents WHERE subject_key=$1 AND version_id=$2
+  AND kind=$3 AND language=$4`,[target.subjectKey,target.versionId,kind,language])).rows[0];
+ const content=foundContent?.status==='published'&&foundContent.published_at?foundContent:null;
  const entitlement=(await db.query(`SELECT id,ledger_id FROM luq_assistance_entitlements
   WHERE identity_id=$1 AND subject_key=$2 AND kind=$3 AND language=$4`,[user.identityId,target.subjectKey,kind,language])).rows[0];
  const settings=await getScholarshipSettings(db);
@@ -147,8 +150,8 @@ export async function handleScholarshipAssistance(ctx){
     CROSS JOIN LATERAL jsonb_array_elements(COALESCE(v.definition->'questions','[]'::jsonb)) WITH ORDINALITY q(question,position)
     WHERE p.delivery_kind='catalog' AND p.archived_at IS NULL AND ($2::boolean OR p.owner_account_id=$1)`;
   const rows=(await pool.query(`WITH subjects AS (${subjects})
-   SELECT s.*,c.id,c.kind,c.language,c.body,c.status,c.published_at,c.solution_details,c.pending_solution
-   FROM subjects s LEFT JOIN luq_assistance_contents c ON c.subject_key=s.subject_key AND c.version_id=s.version_id
+   SELECT s.*,c.id,c.kind,c.language,c.body,c.status,c.published_at,c.solution_details,c.pending_solution,c.version_id content_version_id
+   FROM subjects s LEFT JOIN luq_assistance_contents c ON c.subject_key=s.subject_key AND ${targetType==='problem'?`c.id=${sharedSolutionIdSql('s.target_id','s.version_id')}`:'c.version_id=s.version_id'}
     AND c.kind='FULL_SOLUTION' AND c.language=''
    ORDER BY s.title,s.target_id,s.position`,[user.id,user.roles.includes('admin')])).rows;
   const counts={published:0,draft:0,missing:0,withdrawn:0};
@@ -157,7 +160,7 @@ export async function handleScholarshipAssistance(ctx){
    return {targetType,targetId:row.target_id,title:row.title,
     ...(row.question_key?{questionKey:row.question_key,questionTitle:row.question_title}:{}),
     versionId:row.version_id,contentId:row.id??null,status,
-    contentHash:row.id?contentHash(row):null,publishedAt:row.published_at??null,
+    contentHash:row.id?contentHash({...row,version_id:row.content_version_id}):null,publishedAt:row.published_at??null,
     ...(row.pending_solution?{hasPendingSolutions:true}:{})};
   });
   return response({items,counts,total:items.length});
@@ -187,6 +190,7 @@ export async function handleScholarshipAssistance(ctx){
    for(const item of items){
     const row=one(await db.query('SELECT * FROM luq_assistance_contents WHERE id=$1 FOR UPDATE',[item.contentId]));
     await contentTarget(db,user,row,helpers);
+    await assertSharedSolution(db,row);
     if(row.kind!=='FULL_SOLUTION'||row.language!=='')fail(400,'CONTENT_KIND','批量审核入口仅支持完整题解与参考代码');
     if(contentHash(row)!==item.expectedHash)fail(409,'CONTENT_CHANGED','所选参考答案已修改，请刷新并重新审核；本批次未发布');
     if(row.status==='withdrawn')fail(409,'CONTENT_WITHDRAWN','所选参考答案已撤回，请先修订为草稿后重新审核；本批次未发布');
@@ -210,7 +214,19 @@ export async function handleScholarshipAssistance(ctx){
  }
  if(route==='/scholarship/contents'&&method==='GET'){
   const target=await resolveAssistanceTarget(pool,user,inputFromUrl(url),{manage:true,helpers});
-  const items=(await pool.query('SELECT * FROM luq_assistance_contents WHERE subject_key=$1 AND version_id=$2 ORDER BY kind,language',[target.subjectKey,target.versionId])).rows;
+  let items=(await pool.query('SELECT * FROM luq_assistance_contents WHERE subject_key=$1 AND version_id=$2 ORDER BY kind,language',[target.subjectKey,target.versionId])).rows;
+  let sharedSolution;
+  if(target.problemId){
+   const canonical=await sharedProblemSolution(pool,target.problemId,target.versionId);
+   items=items.filter(item=>item.kind!=='FULL_SOLUTION');
+   if(canonical)items.push(canonical);
+   const history=(await pool.query(`SELECT c.*,v.created_at version_created_at FROM luq_assistance_contents c
+    JOIN problem_versions v ON v.id=c.version_id AND v.problem_id=$1
+    WHERE c.subject_key=$2 AND c.kind='FULL_SOLUTION' AND c.language='' AND ($3::uuid IS NULL OR c.id<>$3)
+    ORDER BY c.updated_at DESC,c.id`,[target.problemId,target.subjectKey,canonical?.id??null])).rows;
+   sharedSolution={shared:true,contentId:canonical?.id??null,legacySources:history.map(row=>({contentId:row.id,createdAt:row.version_created_at,status:row.status,
+    ...approvedAssistanceContent(row),...(row.pending_solution?{pending:editableAssistanceContent(row)}:{})}))};
+  }
   let originalSolution,inheritedSolution,versions,selection;
   if(target.problemId){
    const version=(await pool.query('SELECT metadata,reference_code,reference_language FROM problem_versions WHERE id=$1 AND problem_id=$2',[target.versionId,target.problemId])).rows[0];
@@ -234,15 +250,16 @@ export async function handleScholarshipAssistance(ctx){
     solutionStatus:row.has_pending?'draft':row.status??'missing',courseCount:row.course_count,...(row.has_pending?{hasPendingSolutions:true}:{})}));
    ({versions,...selection}=await withProblemSolutionUsage(pool,user,target.problemId,versions));
   }
-  return response({items:items.map(contentShape),...(originalSolution?{originalSolution}:{}),...(inheritedSolution?{inheritedSolution}:{}),...(versions?{versions,...selection}:{})});
+  return response({items:items.map(contentShape),...(sharedSolution?{sharedSolution}:{}),...(originalSolution?{originalSolution}:{}),...(inheritedSolution?{inheritedSolution}:{}),...(versions?{versions,...selection}:{})});
  }
  if(route==='/scholarship/contents'&&method==='POST'){
   const kind=assistanceKind(body.kind),language=assistanceLanguage(kind,body.language);
   return response(await transaction(pool,async db=>{
    const target=await resolveAssistanceTarget(db,user,body,{manage:true,helpers});
-   await db.query("SELECT pg_advisory_xact_lock(hashtextextended('luq-content:'||$1,0))",[`${target.subjectKey}:${target.versionId}:${kind}:${language}`]);
-   const old=(await db.query('SELECT * FROM luq_assistance_contents WHERE subject_key=$1 AND version_id=$2 AND kind=$3 AND language=$4 FOR UPDATE',[target.subjectKey,target.versionId,kind,language])).rows[0];
-   if(old?.status==='published'&&body.solutions===undefined)fail(409,'PUBLISHED_CONTENT_IMMUTABLE','已发布辅助内容不可覆盖，请在新的题目版本中修订');
+   const shared=kind==='FULL_SOLUTION'&&!!target.problemId;
+   await db.query("SELECT pg_advisory_xact_lock(hashtextextended('luq-content:'||$1,0))",[`${target.subjectKey}:${shared?'shared':target.versionId}:${kind}:${language}`]);
+   const old=shared?await sharedProblemSolution(db,target.problemId,target.versionId,{lock:true}):(await db.query('SELECT * FROM luq_assistance_contents WHERE subject_key=$1 AND version_id=$2 AND kind=$3 AND language=$4 FOR UPDATE',[target.subjectKey,target.versionId,kind,language])).rows[0];
+   if(old?.status==='published'&&body.solutions===undefined)fail(409,'PUBLISHED_CONTENT_IMMUTABLE',kind==='FULL_SOLUTION'?'已发布题解不可直接覆盖，请在题解编辑器中保存待审核修改':'已发布译文不可直接覆盖，请通过内容编辑器提交修改');
    const draft=readAssistanceDraft(body,{subjectKey:target.subjectKey,kind,previous:old,requireNonBlank:true});
    if(old&&(body.solutions!==undefined||editableAssistanceContent(old).solutions||body.expectedHash!==undefined)&&body.expectedHash!==contentHash(old)){
     fail(409,'CONTENT_CHANGED','辅助内容已修改，请重新载入后再保存');
@@ -257,6 +274,7 @@ export async function handleScholarshipAssistance(ctx){
     saved=one(await db.query(`INSERT INTO luq_assistance_contents(subject_key,version_id,kind,language,body,status,author_account_id,solution_details)
      VALUES($1,$2,$3,$4,$5,'draft',$6,$7) RETURNING *`,[target.subjectKey,target.versionId,kind,language,draft.body,user.id,draft.details]));
    }
+   if(shared)await retainSharedSolution(db,target.problemId,saved.id);
    await audit(db,user,'luq.content_draft','luq_content',saved.id,{subjectKey:target.subjectKey,versionId:target.versionId,kind,language});
    return contentShape(saved);
   }),201);
@@ -267,6 +285,7 @@ export async function handleScholarshipAssistance(ctx){
   return response(await transaction(pool,async db=>{
    const row=one(await db.query('SELECT * FROM luq_assistance_contents WHERE id=$1 FOR UPDATE',[uuid(publish[1])]));
    await contentTarget(db,user,row,helpers);
+   await assertSharedSolution(db,row);
    const needsReview=row.status!=='published'||row.pending_solution!==null;
    if((body.expectedHash!==undefined||needsReview&&editableAssistanceContent(row).solutions)&&body.expectedHash!==contentHash(row)){
     fail(409,'CONTENT_CHANGED','辅助内容已修改，请重新载入后再审核');
@@ -351,7 +370,7 @@ export async function handleScholarshipAssistance(ctx){
    const statuses=(await db.query(`WITH subjects AS (${subjects})
     SELECT s.target_id,s.question_key,k.kind,c.status,c.published_at IS NOT NULL has_publication
     FROM subjects s CROSS JOIN unnest($2::text[]) k(kind)
-    LEFT JOIN luq_assistance_contents c ON c.subject_key=s.subject_key AND c.version_id=s.version_id
+    LEFT JOIN luq_assistance_contents c ON c.subject_key=s.subject_key AND ${targetType==='problem'?`(k.kind='FULL_SOLUTION' AND c.id=${sharedSolutionIdSql('s.target_id','s.version_id')} OR k.kind<>'FULL_SOLUTION' AND c.version_id=s.version_id)`:'c.version_id=s.version_id'}
      AND c.kind=k.kind AND c.language=CASE WHEN k.kind='FULL_TRANSLATION' THEN 'zh-CN' ELSE '' END
     ORDER BY s.target_id,s.question_position,k.kind`,[targetIds,kinds])).rows;
    const publication=kinds.map(kind=>{

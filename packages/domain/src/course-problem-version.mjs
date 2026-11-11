@@ -1,8 +1,7 @@
-// Shared by published course reading and staff solution-use summaries. The join
-// condition decides whether a valid linked revision may advance to this one.
+import { liveProblemVersionIdSql } from './live-problem-version.mjs';
+
+// Courses use the same current teaching definition as every other activity.
+// The caller still enforces the course's school-public approval requirements.
 export const latestCourseProblemVersion = `LEFT JOIN LATERAL (
- SELECT candidate.id FROM problem_versions candidate
- WHERE candidate.problem_id=cp.problem_id AND candidate.published_at IS NOT NULL
-  AND candidate.school_visible_at IS NOT NULL AND candidate.rank_review_status='approved'
- ORDER BY candidate.published_at DESC,candidate.created_at DESC,candidate.id DESC LIMIT 1
+ SELECT ${liveProblemVersionIdSql('p')} id
 ) latest ON`;

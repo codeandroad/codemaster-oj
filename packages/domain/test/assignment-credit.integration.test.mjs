@@ -85,9 +85,12 @@ test('ordinary assignments recognize prior formal AC without copying submissions
     VALUES($1,'Latest credit task','stdio','Revised exercise.',500,64,'print(1)','AC') RETURNING id`,[first.id]);
    assert.deepEqual(await versions(teacher), [[first.versionId,first.versionId]],'an unpublished edit is not selectable');
    await teacher.api(`/problems/${first.id}/publish`,{versionId:replacement.id});
-   assert.deepEqual(await versions(colleague), [],'the picker never falls back to an older version');
+   assert.deepEqual(await versions(colleague), [[first.versionId,first.versionId]],'the approved problem stays current while its replacement awaits review');
    await student.api(picker,undefined,'GET',403);
-   await colleague.api('/assignments',body,'POST',404);
+   const colleagueDraft=await colleague.api('/assignments',body,'POST',201);
+   assert.equal(colleagueDraft.problems[0].versionId,first.versionId);
+   assert.deepEqual(await versions(teacher), [[first.versionId,first.versionId]]);
+   await admin(`/problems/${first.id}/rank-review`,{versionId:replacement.id,decision:'approved'},'PATCH');
    assert.deepEqual(await versions(teacher), [[replacement.id,replacement.id]]);
    const published=await teacher.api(`/assignments/${draft.id}/publish`,{expectedRevision:draft.editRevision,problems:body.problems});
    assert.equal(published.problems[0].versionId,replacement.id,'publishing ignores a stale client version');
@@ -124,8 +127,10 @@ test('ordinary assignments recognize prior formal AC without copying submissions
    await other.api(`/problems/${id}/submissions?assignmentId=${assignmentId}&versionId=${latest.versionId}`,undefined,'GET',403);
    const work={assignmentId,problemId:id,kind:'submit',code:'print(input())'};
    await student.api('/submissions',{...work,versionId:original.versionId,idempotencyKey:randomUUID()},'POST',409);
-   const retry=await student.api('/submissions',{...work,code:'PRIVATE_STUDENT_CODE_SENTINEL',versionId:latest.versionId,idempotencyKey:randomUUID()},'POST',409);
-   assert.equal(retry.error.code,'SUBMISSION_ALREADY_ACCEPTED');
+   const retry=await student.api('/submissions',{...work,code:'PRIVATE_STUDENT_CODE_SENTINEL',versionId:latest.versionId,idempotencyKey:randomUUID()},'POST',201);
+   assert.equal(retry.versionId,latest.versionId,'same code is independently judged against a newly published snapshot');
+   const repeated=await student.api('/submissions',{...work,code:'PRIVATE_STUDENT_CODE_SENTINEL',versionId:latest.versionId,idempotencyKey:randomUUID()},'POST',409);
+   assert.equal(repeated.error.code,'SUBMISSION_ALREADY_PENDING');
    const next=await student.api('/submissions',{...work,versionId:latest.versionId,idempotencyKey:randomUUID()},'POST',201);
    assert.equal(next.versionId,latest.versionId);
    assert.equal((await pool.query('SELECT version_id FROM judge_tasks WHERE submission_id=$1',[next.id.replace(/^SUB/,'')])).rows[0].version_id,latest.versionId);
@@ -222,9 +227,9 @@ test('ordinary assignments recognize prior formal AC without copying submissions
    assert.deepEqual(await student.api(url), {items:[]});
   });
 
-  await t.test('stable identity and the exact assigned version are required', async () => {
+  await t.test('old cross-activity credit keeps its original version boundary and identity', async () => {
    const old = await problem(), latest = await problem(old.id);
-   await submit(old);
+   await submit(old, { createdAt: '2020-01-01T00:00:00.000Z' });
    const id = await assignment([latest]);
    assert.equal((await cell(id)).status, 'NotSubmitted');
    await submit(latest, { user: other });
@@ -235,6 +240,28 @@ test('ordinary assignments recognize prior formal AC without copying submissions
    assert.equal((await cell(id)).status, 'AC');
    await pool.query("UPDATE identities SET name='Renamed student',number='CREDIT-renamed' WHERE id=$1", [student.identityId]);
    assert.equal((await cell(id)).completionSource, 'other_entry');
+  });
+
+  await t.test('live publication preserves old grades, future mastery and reward receipts across repeated revisions', async () => {
+   const old = await problem(), id = await assignment([old]);
+   const historical = await submit(old, { assignmentId:id, status:'WA', createdAt:'2020-01-01T00:00:00.000Z' });
+   const before = await counts();
+   const next = await problem(old.id);
+   await submit(next, { createdAt:'2020-01-02T00:00:00.000Z' });
+   assert.equal((await cell(id)).score,60,'an old mismatched free AC must not retroactively change this grade');
+   assert.equal((await cell(id)).submissionId,`SUB${historical}`);
+   const fresh = await submit(next);
+   const received = await counts();
+   assert.equal((await cell(id)).completionSource,'other_entry','new work earns durable problem-level mastery');
+   const later = await problem(old.id);
+   assert.equal((await result(id)).problems[0].versionId,later.versionId);
+   assert.equal((await cell(id)).score,100,'another publication cannot erase newly earned mastery');
+   assert.equal(received.submissions,String(Number(before.submissions)+2));
+   assert.equal(received.rewards,before.rewards,'outside activity work never earns the activity reward');
+   assert.deepEqual(await counts(),received,'reading credit never copies submissions or pays another reward');
+   assert.ok((await student.api(`/submissions/SUB${fresh}/assignment-completions`)).items.some(item=>item.id===id));
+   const history = await student.api(`/submissions/SUB${historical}`);
+   assert.equal(history.versionId,old.versionId);assert.equal(history.score,60);
   });
 
   await t.test('deadline is inclusive; samples, custom runs, corrections and non-AC results do not count', async () => {
@@ -271,7 +298,7 @@ test('ordinary assignments recognize prior formal AC without copying submissions
    assert.equal(a.grades[0].problems[0].completionSource, null);
   });
 
-  await t.test('attempt count is exact for this identity, assignment and pinned version, including pending and late formal submissions', async () => {
+  await t.test('attempt count spans admitted versions for this identity and assignment, including pending and late formal submissions', async () => {
    const p = await problem(), id = await assignment([p]);
    await submit(p);
    assert.equal((await cell(id)).assignmentAttempts, 0);
@@ -285,15 +312,15 @@ test('ordinary assignments recognize prior formal AC without copying submissions
    await submit(p, { assignmentId: elsewhere });
    await submit(p, { user: other, assignmentId: id });
    const anotherVersion = await problem(p.id);
-   await submit(anotherVersion, { assignmentId: id });
-   assert.equal((await cell(id)).assignmentAttempts, 3);
+   await submit(anotherVersion, { assignmentId: id, status: 'Waiting' });
+   assert.equal((await cell(id)).assignmentAttempts, 4);
    // More than a paginated submission history page must still be counted.
    await pool.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,assignment_id,kind,code,idempotency_key,request_hash,status)
     SELECT $1,$2,$3,$4,$5,'submit','count fixture',gen_random_uuid(),'count-fixture','Waiting' FROM generate_series(1,205)`, [student.id, student.identityId, p.id, p.versionId, id]);
    const g = await cell(id);
-   assert.equal(g.assignmentAttempts, 208); assert.equal(g.hasAssignmentSubmission, true);
+   assert.equal(g.assignmentAttempts, 209); assert.equal(g.hasAssignmentSubmission, true);
    assert.equal(g.status, 'AC'); assert.equal(g.completionSource, 'other_entry');
-   assert.equal((await teacher.api(`/assignments/${id}`)).grades[0].problems[0].assignmentAttempts, 208);
+   assert.equal((await teacher.api(`/assignments/${id}`)).grades[0].problems[0].assignmentAttempts, 209);
   });
 
   await t.test('course display ordering is consistent, preserves the scored snapshot and allows switching to saved custom order after submissions', async () => {
@@ -313,7 +340,7 @@ test('ordinary assignments recognize prior formal AC without copying submissions
    let displayed=await result(id);
    assert.equal(displayed.problemOrder,'course');
    assert.deepEqual(displayed.problems.map(p=>p.problemId),[c1p1,c1p2,c2p1,outside,archived].map(p=>p.id));
-   assert.equal(displayed.problems[0].versionId,c1p1.versionId,'course order must not upgrade the assigned version');
+   assert.equal(displayed.problems[0].versionId,courseVersion.versionId,'the assignment and course resolve the same current problem');
    assert.deepEqual(displayed.problems.map(p=>p.position),[3,2,1,0,4]);
    assert.deepEqual((await teacher.api(`/assignments/${id}`)).problems,displayed.problems);
    const revision=displayed.editRevision;

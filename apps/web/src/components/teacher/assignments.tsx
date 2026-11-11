@@ -24,7 +24,6 @@ import { ActivityRewardFields, type RewardRule, type RuleResponse } from "@/comp
 import { useLocale, type AppLocale } from "@/components/locale-context";
 import {
   productionApi,
-  apiMessage,
   ApiError,
   type Assignment,
   type ProductionProblem,
@@ -192,11 +191,6 @@ interface SelectedProblem {
   mode?: string;
   versionId?: string;
 }
-interface LatestProblemVersion {
-  versionId: string;
-  title: string;
-  difficulty: string | null;
-}
 const getProblemVersion = (problemId: string, versionId: string) =>
   productionApi<ProductionProblem>(`problems/${encodeURIComponent(problemId)}?versionId=${encodeURIComponent(versionId)}`);
 
@@ -269,9 +263,6 @@ function AssignmentEditorForm({
     [picker, setPicker] = useState(false),
     [publish, setPublish] = useState(false),
     [confirmUpdate, setConfirmUpdate] = useState(false),
-    [latestVersions, setLatestVersions] = useState<Record<string, LatestProblemVersion | null>>({}),
-    [checkingVersion, setCheckingVersion] = useState<string | null>(null),
-    [versionError, setVersionError] = useState(""),
     [stale, setStale] = useState(false),
     action = useAction();
   const rewardResource = useData<RuleResponse>(`scholarship/reward-rules?activityType=assignment${saved ? `&activityId=${encodeURIComponent(saved.id)}` : ""}`);
@@ -348,44 +339,20 @@ function AssignmentEditorForm({
       focusReward.current = false;
     }
   }, [tab, rewardReady]);
-  const checkLatestVersion = async (problemId: string) => {
-    setCheckingVersion(problemId);
-    setVersionError("");
-    try {
-      const { items: [published] } = await productionApi<{ items: ProductionProblem[] }>(
-        `problems?purpose=assignment&problemId=${encodeURIComponent(problemId)}`,
-      );
-      setLatestVersions((current) => ({
-        ...current,
-        [problemId]: published?.versionId
-          ? {
-              versionId: published.versionId,
-              title: published.title,
-              difficulty: published.difficulty ?? null,
-            }
-          : null,
-      }));
-    } catch (error) {
-      setVersionError(apiMessage(error));
-    } finally {
-      setCheckingVersion(null);
-    }
-  };
   const problemEditorHref = (problem: SelectedProblem) => {
     const query = new URLSearchParams({
       returnTo: saved
         ? `/teacher/assignments/${saved.id}/edit`
         : "/teacher/assignments/new/edit",
     });
-    if (problem.versionId) query.set("versionId", problem.versionId);
     return `/teacher/problems/${problem.problemId}/edit?${query.toString()}`;
   };
   const snapshot = { title, description, course, coursePathId, problemOrder, due, problems: selected, participants, rewardEdit };
   const savedProblems = savedProblemOrder(saved?.problems ?? []);
   const savedParticipants = activeParticipants(saved?.participantDetails, saved?.participants ?? []);
   const problemEdits = (problems: typeof savedProblems) => JSON.stringify(
-    problems.map(({ problemId, points, versionId, rewardPoints }) => ({
-      problemId, points, versionId, rewardPoints: rewardPoints ?? 0,
+    problems.map(({ problemId, points, rewardPoints }) => ({
+      problemId, points, rewardPoints: rewardPoints ?? 0,
     })),
   );
   const changesFor = (value: typeof snapshot) => ({
@@ -450,10 +417,6 @@ function AssignmentEditorForm({
     },
   });
   const changedClass = JSON.stringify([...classIds].sort()) !== JSON.stringify([...(saved?.classIds ?? (saved?.classId ? [saved.classId] : []))].sort());
-  const changedPinnedVersions = selected.some((problem) => {
-    const original = saved?.problems.find((item) => item.problemId === problem.problemId);
-    return original && original.versionId !== problem.versionId;
-  });
   const hasChanges = changedClass || Object.values(changes).some(Boolean);
   useDirty(hasChanges);
   const save = async (assign = false) => {
@@ -479,8 +442,6 @@ function AssignmentEditorForm({
       throw new Error("恢复已豁免学生请在作业进度页操作。");
     if (published && hasSubmissions && changedProblems)
       throw new Error("已有正式提交，题目、分值、顺序和单题奖学金不能修改。可修改说明、截止时间或适用学生。");
-    if (published && hasActivity && changedPinnedVersions)
-      throw new Error("已有运行或提交记录，不能切换作业题目的固定版本。");
     const dueAt=activityDate(due,'截止时间');
     if (assign && Date.parse(dueAt) <= Date.now())
       throw new Error(ui(locale, "发布前请设置晚于当前时间的截止时间。", "Choose a future deadline before assigning."));
@@ -664,9 +625,8 @@ function AssignmentEditorForm({
           {hasSubmissions
             ? ui(locale, "已有正式提交，题目、分值、顺序和单题奖学金已固定。", "Formal submissions lock the problems, marks, order, and per-problem scholarships.")
             : ui(locale, "尚无正式提交，可以调整题目、分值、顺序和单题奖学金。", "Before the first formal submission, you can edit the problems, marks, order, and per-problem scholarships.")}
-          {hasActivity
-            ? "已有运行或提交记录，题目固定版本不可替换；有记录的学生不能从名单中移除。"
-            : "尚无运行记录，可在检查后明确选择题库的新发布版本。"}
+          {ui(locale, "题目内容与题解跟随题库更新，审核发布后自动同步；历史提交和成绩保留。", "Problem content and solutions follow the problem bank after publication and review. Historical submissions and grades are retained.")}
+          {hasActivity && ui(locale, "有记录的学生不能从名单中移除。", "Students with activity records cannot be removed.")}
           <Link
             className={`${link} ml-2`}
             href={`/teacher/assignments/${saved?.id}/progress`}
@@ -810,7 +770,7 @@ function AssignmentEditorForm({
                   )}
                   {published && hasActivity && !hasSubmissions && (
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {ui(locale, "已有运行记录，可调整题目、分值和单题奖学金；已固定的题目版本保持锁定。", "Run history locks the pinned versions. Problems, marks, and per-problem scholarships remain editable.")}
+                      {ui(locale, "已有运行记录，可调整选题、分值和单题奖学金；题目内容在题库统一维护。", "You can still adjust the selected problems, marks, and per-problem scholarships. Maintain problem content in the problem bank.")}
                     </p>
                   )}
                 </div>
@@ -851,11 +811,6 @@ function AssignmentEditorForm({
                   : ui(locale, "按保存的题目顺序显示。", "Uses the saved problem order.")}</span>
               </div>
               {!courseOrderReady && <State resource={courseOrderState} />}
-              {versionError && (
-                <p role="alert" className="mb-3 text-sm text-destructive">
-                  {versionError}
-                </p>
-              )}
               {courseOrderReady && <Table headers={[
                 ui(locale, "顺序", "Order"), ui(locale, "题目", "Problem"), ui(locale, "接口", "Interface"),
                 ui(locale, "作业分值", "Assignment marks"), ui(locale, "首次 AC 积分", "First-AC points"),
@@ -871,55 +826,7 @@ function AssignmentEditorForm({
                       >
                         {p.title}
                       </Link>
-                      {published && (
-                        <div className="mt-1 space-y-1 text-xs text-muted-foreground">
-                          <p>本作业固定版本：{p.versionId?.slice(0, 8) ?? "未知"}</p>
-                          <button
-                            type="button"
-                            className={link}
-                            disabled={checkingVersion !== null}
-                            onClick={() => void checkLatestVersion(p.problemId)}
-                          >
-                            {checkingVersion === p.problemId ? "正在检查…" : "检查题库最新版"}
-                          </button>
-                          {latestVersions[p.problemId] === null && (
-                            <p>题库中没有可用的已发布版本。</p>
-                          )}
-                          {latestVersions[p.problemId] && (
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span>
-                                题库最新发布：{latestVersions[p.problemId]!.title} ·
-                                {" "}{latestVersions[p.problemId]!.versionId.slice(0, 8)}
-                              </span>
-                              {latestVersions[p.problemId]!.versionId !== p.versionId ? (
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  disabled={hasActivity || action.busy}
-                                  onClick={() => setSelected((current) => current.map((item) =>
-                                    item.problemId === p.problemId
-                                      ? {
-                                          ...item,
-                                          versionId: latestVersions[p.problemId]!.versionId,
-                                          title: latestVersions[p.problemId]!.title,
-                                          difficulty: latestVersions[p.problemId]!.difficulty,
-                                        }
-                                      : item,
-                                  ))}
-                                >
-                                  使用最新发布版本
-                                </Button>
-                              ) : (
-                                <span>
-                                  {saved?.problems.find((item) => item.problemId === p.problemId)?.versionId === p.versionId
-                                    ? "已是最新版本"
-                                    : "已选最新版，保存修改后生效"}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      <p className="mt-1 text-xs text-muted-foreground">{ui(locale, "题目与题解自动同步题库", "Problem and solutions follow the problem bank")}</p>
                     </td>
                     <td>
                       {p.mode === "function"
@@ -1294,7 +1201,7 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
             <div className="border-b border-border px-4 py-3">
               <h2 className="font-bold">{ui(locale, "学生进度矩阵", "Student progress matrix")}</h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                {ui(locale, "成绩取截止前最高有效分；同版本在其他入口正式 AC 可直接计满分，标注来源且不新增提交或奖励。", "Grades use the best valid score before the deadline. A formal AC on the same version elsewhere earns full credit, with its source marked and no new submission or reward.")}
+                {ui(locale, "成绩取截止前最高有效分；同题在其他入口符合计分规则的正式 AC 可直接计满分，标注来源且不新增提交或奖励。", "Grades use the best valid score before the deadline. An eligible formal AC on the same problem elsewhere earns full credit, with its source marked and no new submission or reward.")}
               </p>
             </div>
             <div className="overflow-x-auto">

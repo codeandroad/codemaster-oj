@@ -9,6 +9,7 @@ import { avatarForIdentity } from './avatars.mjs';
 import {readableCourseIds,courseClasses,courseProperties,saveCourseProperties,assertCoursePublicationAccess} from './course-access.mjs';
 import { assignmentProgressById } from './assignment-grades.mjs';
 import { latestCourseProblemVersion } from './course-problem-version.mjs';
+import { liveProblemVersionIdSql, resolveLiveProblemVersion } from './live-problem-version.mjs';
 
 const staff = user => user.roles.includes('teacher') || user.roles.includes('admin');
 const administrator = user => user.roles.includes('admin');
@@ -47,13 +48,14 @@ async function taskStats(db,user,ids,draftIds=[]) {
   AND ${courseCompletedRevision('v')} AND ${courseAcceptedSubmission}))::int completed_tasks
  FROM learning_chapters c JOIN chapter_problems cp ON cp.chapter_id=c.id JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id JOIN problem_versions v ON v.id=cp.version_id
  ${latestCourseProblemVersion} true
- WHERE c.path_id=ANY($1::uuid[]) AND c.archived_at IS NULL AND p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school' AND v.published_at IS NOT NULL AND v.school_visible_at IS NOT NULL GROUP BY c.path_id`,[ids,user.identityId])).rows;
+ JOIN problem_versions active ON active.id=COALESCE(latest.id,cp.version_id)
+ WHERE c.path_id=ANY($1::uuid[]) AND c.archived_at IS NULL AND p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school' AND active.published_at IS NOT NULL AND active.school_visible_at IS NOT NULL AND active.rank_review_status='approved' GROUP BY c.path_id`,[ids,user.identityId])).rows;
  const stats=new Map(rows.map(r=>[r.path_id,r]));
  if(draftIds.length){
   const drafts=(await db.query(`SELECT c.path_id,count(DISTINCT cp.version_id)::int task_count
    FROM learning_chapters c JOIN chapter_problems cp ON cp.chapter_id=c.id
    JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id
-   JOIN problem_versions v ON v.id=cp.version_id AND v.problem_id=cp.problem_id
+   JOIN problem_versions v ON v.id=COALESCE(${liveProblemVersionIdSql('p')},cp.version_id) AND v.problem_id=cp.problem_id
    WHERE c.path_id=ANY($1::uuid[]) AND c.archived_at IS NULL AND p.archived_at IS NULL
     AND b.archived_at IS NULL AND b.visibility='school' GROUP BY c.path_id`,[draftIds])).rows;
   for(const draft of drafts)stats.set(draft.path_id,{...draft,completed_tasks:0});
@@ -69,15 +71,15 @@ async function pathResult(ctx, id, db = ctx.pool, allowArchived = false) {
   LEFT JOIN learning_progress pr ON pr.chapter_id=c.id AND pr.identity_id=$2 WHERE c.path_id=$1 AND c.archived_at IS NULL ORDER BY c.position,c.created_at,c.id`, [id, ctx.user.identityId])).rows;
  const links = chapters.length ? (await db.query(`SELECT cp.*,v.id active_version_id,v.title,v.published_at,v.school_visible_at,v.rank_review_status,b.name bank_name,b.visibility bank_visibility,b.archived_at bank_archived_at,p.archived_at problem_archived_at,
   EXISTS(SELECT 1 FROM submissions s WHERE s.identity_id=$3 AND ${courseAcceptedSubmission}
-   AND (s.version_id=cp.version_id OR $2 AND linked.school_visible_at IS NOT NULL AND ${courseCompletedRevision('linked')})) completed
+   AND (s.version_id=cp.version_id OR $2 AND ${courseCompletedRevision('linked')})) completed
   FROM chapter_problems cp JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id
   JOIN problem_versions linked ON linked.id=cp.version_id AND linked.problem_id=cp.problem_id
-  ${latestCourseProblemVersion} $2 AND linked.published_at IS NOT NULL AND linked.school_visible_at IS NOT NULL
+  ${latestCourseProblemVersion} true
   JOIN problem_versions v ON v.id=COALESCE(latest.id,linked.id)
   WHERE cp.chapter_id=ANY($1::uuid[]) ORDER BY cp.position`, [chapters.map(c => c.id),Boolean(p.published_at),ctx.user.identityId])).rows : [];
  const visible = new Map();
  for (const link of links) {
-  const publicForStudents=link.bank_visibility==='school'&&!link.bank_archived_at&&!link.problem_archived_at&&!!link.published_at&&!!link.school_visible_at;
+  const publicForStudents=link.bank_visibility==='school'&&!link.bank_archived_at&&!link.problem_archived_at&&!!link.published_at&&!!link.school_visible_at&&link.rank_review_status==='approved';
   const readyForCourse=publicForStudents&&link.rank_review_status==='approved';
   if (!p.canEdit && !publicForStudents) continue;
   // A published lesson never grants student access to a private or nonpublic
@@ -116,16 +118,16 @@ async function setLinks(ctx, db, path, chapterId, problemIds) {
   const bank=(await db.query(`SELECT visibility,archived_at FROM problem_banks WHERE id=$1 ${path.published_at?'FOR SHARE':''}`,[lockedProblem.bank_id])).rows[0];
   if(!bank || bank.visibility!=='school' || bank.archived_at)fail(409,'PRIVATE_LESSON_PROBLEM','校内学习章节须关联校内题库中的题目');
   let resolved=selected;
-  if(path.published_at&&!existing.has(id)){
-   if(!lockedProblem.current_version_id)fail(409,'UNAPPROVED_LESSON_PROBLEM','已发布课程只能关联通过管理员校内公开审核的题目');
-   resolved=await ctx.helpers.versionAccess(db,ctx.user,id,lockedProblem.current_version_id);
+  if(path.published_at){
+   const current=await resolveLiveProblemVersion(db,id);
+   resolved=await ctx.helpers.versionAccess(db,ctx.user,id,current.id);
   }
   const {v,owner}=resolved;
   const checked=path.published_at?exists(await db.query('SELECT problem_id,published_at,school_visible_at,rank_review_status FROM problem_versions WHERE id=$1 FOR SHARE',[v.id])):v;
   const approved=checked.problem_id===id&&!!checked.published_at&&!!checked.school_visible_at&&checked.rank_review_status==='approved';
   if(path.published_at&&!approved)fail(409,'UNAPPROVED_LESSON_PROBLEM','已发布课程只能关联通过管理员校内公开审核的题目');
   if(!path.published_at&&!approved&&!owner)fail(403,'FORBIDDEN','未公开题目只能由有编辑权限的教师关联至课程草稿');
-  links.push({ problemId: id, versionId: v.id });
+  links.push({ problemId: id, versionId: existing.get(id)??v.id });
  }
  await db.query('DELETE FROM chapter_problems WHERE chapter_id=$1', [chapterId]);
  for (const [position, link] of links.entries()) await db.query('INSERT INTO chapter_problems(chapter_id,problem_id,version_id,position) VALUES($1,$2,$3,$4)', [chapterId,link.problemId,link.versionId,position]);
@@ -474,8 +476,9 @@ export async function handleEducation(ctx) {
    (SELECT count(DISTINCT COALESCE(latest.id,cp.version_id))::int FROM chapter_problems cp JOIN learning_chapters c ON c.id=cp.chapter_id
     JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id JOIN problem_versions v ON v.id=cp.version_id
     ${latestCourseProblemVersion} true
+    JOIN problem_versions active ON active.id=COALESCE(latest.id,cp.version_id)
     WHERE c.path_id=$1 AND c.archived_at IS NULL AND p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school'
-    AND v.published_at IS NOT NULL AND v.school_visible_at IS NOT NULL AND EXISTS(SELECT 1 FROM submissions s WHERE s.identity_id=i.id
+    AND active.published_at IS NOT NULL AND active.school_visible_at IS NOT NULL AND active.rank_review_status='approved' AND EXISTS(SELECT 1 FROM submissions s WHERE s.identity_id=i.id
      AND ${courseCompletedRevision('v')} AND ${courseAcceptedSubmission})) completed_tasks
    FROM identities i WHERE i.kind='student' AND i.archived_at IS NULL AND ($2::boolean
     OR EXISTS(SELECT 1 FROM class_members cm JOIN teacher_classes tc ON tc.class_id=cm.class_id JOIN classes cl ON cl.id=cm.class_id WHERE cm.identity_id=i.id AND tc.account_id=$3 AND cl.archived_at IS NULL)
@@ -501,7 +504,7 @@ export async function handleEducation(ctx) {
       v.published_at,v.school_visible_at,v.rank_review_status
       FROM chapter_problems cp JOIN learning_chapters c ON c.id=cp.chapter_id
       JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id
-      JOIN problem_versions v ON v.id=cp.version_id
+      JOIN problem_versions v ON v.id=COALESCE(${liveProblemVersionIdSql('p')},cp.version_id)
       WHERE c.path_id=$1 AND c.archived_at IS NULL FOR SHARE OF p,b,v`,[id])).rows;
     if(links.some(link=>link.problem_id!==link.version_problem_id||link.problem_archived_at||link.bank_archived_at||link.bank_visibility!=='school'||!link.published_at||!link.school_visible_at||link.rank_review_status!=='approved'))
      fail(409,'UNAPPROVED_LESSON_PROBLEM','课程存在未通过审核的关联题目，无法恢复公开课程');
@@ -562,7 +565,7 @@ export async function handleEducation(ctx) {
     v.problem_id version_problem_id,v.published_at,v.school_visible_at,v.rank_review_status
     FROM chapter_problems cp JOIN learning_chapters c ON c.id=cp.chapter_id
     JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id
-    JOIN problem_versions v ON v.id=cp.version_id
+    JOIN problem_versions v ON v.id=COALESCE(${liveProblemVersionIdSql('p')},cp.version_id)
     WHERE c.path_id=$1 AND c.archived_at IS NULL FOR SHARE OF p,b,v`,[path.id])).rows;
    if(linked.some(link=>link.problem_archived_at||link.bank_archived_at||link.bank_visibility!=='school'||link.version_problem_id!==link.problem_id||!link.published_at||!link.school_visible_at||link.rank_review_status!=='approved'))
     fail(409,'UNAPPROVED_LESSON_PROBLEM','章节练习须先发布并通过管理员校内公开审核，课程才能发布');

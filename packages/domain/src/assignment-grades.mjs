@@ -1,7 +1,11 @@
 // Prior mastery contributes to the assignment grade without creating a
-// submission, changing its original context, or settling any reward.
+// submission, changing its original context, or settling any reward. Existing
+// cross-activity credit retains its original version scope; only work received
+// after live references were introduced gains problem-level cross-activity credit.
 export const assignmentPassingSubmission = `
- previous.identity_id=part.identity_id AND previous.problem_id=ap.problem_id AND previous.version_id IN (ap.version_id,ap.prior_version_id)
+ previous.identity_id=part.identity_id AND previous.problem_id=ap.problem_id
+ AND (previous.assignment_id=assignment.id OR previous.version_id IN (ap.version_id,ap.prior_version_id)
+  OR previous.created_at>=(SELECT applied_at FROM schema_migrations WHERE name='098_live_problem_activity_results.sql'))
  AND previous.kind='submit' AND previous.status='AC' AND previous.score=100 AND previous.created_at<=assignment.due_at
  AND (previous.timed_attempt_id IS NULL OR EXISTS (
   SELECT 1 FROM timed_first_ac_candidates candidate
@@ -44,18 +48,18 @@ async function loadAssignmentGradeRows(db, assignmentIds, identityId) {
   LEFT JOIN LATERAL (
    SELECT count(*)::integer total FROM submissions
    WHERE assignment_id=part.assignment_id AND identity_id=part.identity_id
-    AND problem_id=ap.problem_id AND version_id IN (ap.version_id,ap.prior_version_id) AND kind='submit'
+    AND problem_id=ap.problem_id AND kind='submit'
   ) attempts ON true
   LEFT JOIN LATERAL (
    SELECT id,score,status FROM submissions
    WHERE assignment_id=part.assignment_id AND identity_id=part.identity_id
-    AND problem_id=ap.problem_id AND version_id IN (ap.version_id,ap.prior_version_id) AND kind='submit'
+    AND problem_id=ap.problem_id AND kind='submit'
     AND created_at<=assignment.due_at AND score IS NOT NULL AND status NOT IN ('Waiting','Judging','System Error')
    ORDER BY score DESC,created_at,id LIMIT 1
   ) s ON true
   LEFT JOIN LATERAL (
    SELECT status FROM submissions WHERE assignment_id=part.assignment_id AND identity_id=part.identity_id
-    AND problem_id=ap.problem_id AND version_id IN (ap.version_id,ap.prior_version_id) AND kind='submit' AND created_at<=assignment.due_at
+    AND problem_id=ap.problem_id AND kind='submit' AND created_at<=assignment.due_at
     AND status IN ('Waiting','Judging','System Error') ORDER BY created_at DESC LIMIT 1
   ) pending ON true
   LEFT JOIN LATERAL (

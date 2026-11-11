@@ -55,12 +55,12 @@ async function fixture(run){
  }finally{await pool.end();await manager.query(`DROP SCHEMA ${schema} CASCADE`);await manager.end();}
 }
 
-test('Luq review inventory separates published, draft, missing and withdrawn exact-version solutions without leaking private content',options,()=>fixture(async f=>{
+test('Luq review inventory reports shared problem solutions without leaking private content',options,()=>fixture(async f=>{
  const published=await f.problem(),draft=await f.problem(),missing=await f.problem(),withdrawn=await f.problem();
  const publishedContent=await f.draft(published),draftContent=await f.draft(draft),withdrawnContent=await f.draft(withdrawn);
  await f.call(f.teacher,`/scholarship/contents/${publishedContent.id}/publish`,{reviewed:true});
  await f.pool.query("UPDATE luq_assistance_contents SET status='withdrawn' WHERE id=$1",[withdrawnContent.id]);
- // Neither a translation nor another version's solution satisfies the current solution.
+ // Translation remains versioned; an ordinary problem has one shared solution across its revisions.
  await f.draft(missing,'TRANSLATION_BODY_DO_NOT_LEAK',f.teacher,'FULL_TRANSLATION');
  const newer=(await f.pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code)
   VALUES($1,'Other version','stdio','Other statement',1000,64,'OTHER_PRIVATE_CODE') RETURNING id`,[missing.problemId])).rows[0];
@@ -69,10 +69,10 @@ test('Luq review inventory separates published, draft, missing and withdrawn exa
  const foreign=await f.problem(f.other,'Foreign teacher title');await f.draft(foreign,'FOREIGN_BODY',f.other);
  const archived=await f.problem();await f.pool.query('UPDATE problems SET archived_at=now() WHERE id=$1',[archived.problemId]);
  const overview=await f.list();
- assert.deepEqual(overview.counts,{published:1,draft:1,missing:1,withdrawn:1});
+ assert.deepEqual(overview.counts,{published:2,draft:1,missing:0,withdrawn:1});
  assert.equal(overview.total,4);assert.equal(overview.items.length,4);
  assert.equal(overview.items.find(row=>row.targetId===missing.problemId).versionId,missing.versionId);
- assert.equal(overview.items.find(row=>row.targetId===missing.problemId).contentId,null);
+ assert.equal(overview.items.find(row=>row.targetId===missing.problemId).contentId,newerContent.id);
  assert.equal(overview.items.find(row=>row.targetId===draft.problemId).contentId,draftContent.id);
  assert.equal(overview.items.find(row=>row.targetId===published.problemId).status,'published');
  assert.equal(overview.items.find(row=>row.targetId===withdrawn.problemId).status,'withdrawn');
@@ -207,30 +207,39 @@ test('Luq batch publication rejects stale reviews, missing or withdrawn candidat
  assert.equal(row.status,'draft');assert.equal(row.body,'Concurrent edit after review');
 }));
 
-test('bulk-published solutions still require student purchase and return only the requested problem version',options,()=>fixture(async f=>{
+test('bulk-published shared solutions preserve purchases and require the current teaching version',options,()=>fixture(async f=>{
  const p=await f.problem();
  const first=await f.draft(p,'VERSION_ONE_REVIEWED_SOLUTION');
- const version2=(await f.pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code,published_at,school_visible_at,rank_review_status,rank_approved_at)
-  VALUES($1,'Version two','stdio','Second statement',1000,64,'PRIVATE_V2_CODE',now(),now(),'approved',now()) RETURNING id`,[p.problemId])).rows[0].id;
- const second=await f.draft({...p,versionId:version2},'VERSION_TWO_REVIEWED_SOLUTION');
  const target={...p,kind:'FULL_SOLUTION'},quote=()=>f.call(f.student,'/scholarship/assistance/quote',target);
  assert.equal((await quote()).available,false);
  await f.publish([await f.getCandidate(first.id)]);
  assert.equal((await quote()).available,true);
- const secondTarget={...target,versionId:version2};
- assert.equal((await f.call(f.student,'/scholarship/assistance/quote',secondTarget)).available,false);
  await rejects(f.call(f.student,'/scholarship/assistance/provide',target),403);
  const offered=await quote();
  assert.equal(Object.hasOwn(offered,'body'),false);assert.equal(offered.price,8);
  const unlocked=await f.call(f.student,'/scholarship/assistance/unlock',{...target,requestKey:randomUUID(),confirmedPrice:offered.price,confirmedContentId:offered.contentId});
  assert.equal(unlocked.charged,8);assert.equal(Object.hasOwn(unlocked,'body'),false);
  assert.equal((await f.call(f.student,'/scholarship/assistance/provide',target)).body,'VERSION_ONE_REVIEWED_SOLUTION');
- await rejects(f.call(f.student,'/scholarship/assistance/provide',secondTarget),404);
+ const version2=(await f.pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code,published_at,school_visible_at,rank_review_status,rank_approved_at)
+  VALUES($1,'Version two','stdio','Second statement',1000,64,'PRIVATE_V2_CODE',clock_timestamp(),clock_timestamp(),'approved',clock_timestamp()) RETURNING id`,[p.problemId])).rows[0].id;
  await f.pool.query('UPDATE problems SET current_version_id=$2 WHERE id=$1',[p.problemId,version2]);
+ const secondTarget={...target,versionId:version2};
+ await rejects(quote(),409);
+ await rejects(f.call(f.student,'/scholarship/assistance/provide',target),409);
+ const inherited=await f.call(f.student,'/scholarship/assistance/quote',secondTarget);
+ assert.equal(inherited.available,true,'a new published exercise uses the existing reviewed problem solution');
+ assert.equal(inherited.contentId,first.id);assert.equal(inherited.price,0,'the same purchase remains valid after a problem update');
+ assert.equal(Object.hasOwn(inherited,'body'),false);
+ const second=await f.call(f.teacher,'/scholarship/contents',{...p,versionId:version2,kind:'FULL_SOLUTION',
+  expectedHash:(await f.getCandidate(first.id)).expectedHash,
+  solutions:[{id:first.id,title:'Shared approach',body:'VERSION_TWO_REVIEWED_SOLUTION'}]});
+ assert.equal(second.id,first.id,'editing through another revision updates the one canonical editor');
+ assert.equal((await f.call(f.student,'/scholarship/assistance/provide',secondTarget)).body,'VERSION_ONE_REVIEWED_SOLUTION','pending changes remain private until reviewed');
  await f.publish([await f.getCandidate(second.id)]);
- assert.equal((await f.call(f.student,'/scholarship/assistance/quote',secondTarget)).price,0,'Stable purchase crosses versions; reviewed content remains exact-version');
+ assert.equal((await f.call(f.student,'/scholarship/assistance/quote',secondTarget)).price,0);
  assert.equal((await f.call(f.student,'/scholarship/assistance/provide',secondTarget)).body,'VERSION_TWO_REVIEWED_SOLUTION');
- assert.equal((await f.call(f.student,'/scholarship/assistance/provide',target)).body,'VERSION_ONE_REVIEWED_SOLUTION');
+ await rejects(f.call(f.student,'/scholarship/assistance/provide',target),409);
+ assert.equal((await f.pool.query('SELECT count(*)::int n FROM luq_assistance_entitlements')).rows[0].n,1);
 }));
 
 test('Luq content batch runtime grants allow application append/read only and deny all judge-worker access',options,async()=>{

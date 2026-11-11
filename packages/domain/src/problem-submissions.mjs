@@ -1,4 +1,5 @@
 import { schoolActivityJobVisibleSql } from './school-activities.mjs';
+import { assertLiveProblemVersion, resolveLiveProblemVersion } from './live-problem-version.mjs';
 import { enumValue, integer, uuid, fail } from './security.mjs';
 import { submissionMeasurements, submissionMeasurementsSql } from './submission-feedback.mjs';
 
@@ -40,24 +41,24 @@ const legacySubmissionScope=`FROM submissions s
  LEFT JOIN timed_practices tp ON tp.id=ta.practice_id
  WHERE s.problem_id=$1 AND s.kind='submit'
  AND (s.timed_attempt_id IS NULL OR tp.results_published_at IS NOT NULL)`;
-export const legacyVisibleSubmissions=`${legacySubmissionScope} AND s.version_id=$2`;
+export const legacyVisibleSubmissions=legacySubmissionScope;
 
 export async function legacyProblemSolved(db,user,problemId,versionId) {
- return (await db.query(`SELECT EXISTS(SELECT 1 ${legacyVisibleSubmissions} AND s.identity_id=$3 AND s.status='AC') solved`,[problemId,versionId,user.identityId])).rows[0].solved;
+ return (await db.query(`SELECT EXISTS(SELECT 1 ${legacyVisibleSubmissions} AND s.identity_id=$2 AND s.status='AC') solved`,[problemId,user.identityId])).rows[0].solved;
 }
 
 export async function legacyProblemSubmissions(db,user,problemId,url,helpers) {
  const assignmentId=url.searchParams.get('assignmentId'),practiceId=url.searchParams.get('timedPracticeId');
  if(assignmentId&&practiceId)fail(400,'VALIDATION','Choose one activity context.');
- let versionId=url.searchParams.get('versionId'),priorVersionId=null;
+ let versionId=url.searchParams.get('versionId');
  if(assignmentId){
   await db.query('SELECT id FROM assignments WHERE id=$1 FOR SHARE',[uuid(assignmentId)]);
   await helpers.assignmentAccess(db,user,assignmentId);
   const pin=(await db.query('SELECT version_id,prior_version_id FROM assignment_problems WHERE assignment_id=$1 AND problem_id=$2',[assignmentId,uuid(problemId)])).rows[0];
   if(!pin)fail(404,'NOT_FOUND','Problem is not in this assignment.');
-  if(versionId&&uuid(versionId)!==pin.version_id)fail(409,'VERSION_MISMATCH','Use the assigned version.');
-  versionId=pin.version_id;
-  priorVersionId=pin.prior_version_id;
+  const live=await resolveLiveProblemVersion(db,problemId,{allowArchived:true});
+  assertLiveProblemVersion(versionId&&uuid(versionId),live.id);
+  versionId=live.id;
  }
  if(practiceId){
   const practice=(await db.query(`SELECT p.* FROM timed_practices p WHERE p.id=$1 AND
@@ -67,8 +68,9 @@ export async function legacyProblemSubmissions(db,user,problemId,url,helpers) {
   if(!practice)fail(404,'NOT_FOUND','Practice is unavailable.');
   const pin=(await db.query('SELECT version_id FROM timed_practice_problems WHERE practice_id=$1 AND problem_id=$2',[practiceId,uuid(problemId)])).rows[0];
   if(!pin)fail(404,'NOT_FOUND','Problem is not in this practice.');
-  if(versionId&&uuid(versionId)!==pin.version_id)fail(409,'VERSION_MISMATCH','Use the assigned version.');
-  versionId=pin.version_id;
+  const live=await resolveLiveProblemVersion(db,problemId,{allowArchived:true});
+  assertLiveProblemVersion(versionId&&uuid(versionId),live.id);
+  versionId=live.id;
  }
  // Keep publication/archive visibility coherent while collecting metadata.
  await db.query('SELECT id FROM problems WHERE id=$1 FOR SHARE',[uuid(problemId)]);
@@ -81,27 +83,28 @@ export async function legacyProblemSubmissions(db,user,problemId,url,helpers) {
    FROM submissions s JOIN legacy_school_identity_ownership own_scope ON own_scope.identity_id=s.identity_id
    LEFT JOIN timed_attempts ta ON ta.id=s.timed_attempt_id
    LEFT JOIN timed_practices tp ON tp.id=ta.practice_id
-   WHERE s.problem_id=$1 AND s.version_id=$2 AND s.identity_id=$3 AND s.kind='submit'
-    AND CASE WHEN $4::uuid IS NOT NULL THEN tp.id=$4
+   WHERE s.problem_id=$1 AND s.identity_id=$2 AND s.kind='submit'
+    AND CASE WHEN $3::uuid IS NOT NULL THEN tp.id=$3
      ELSE s.timed_attempt_id IS NULL OR tp.results_published_at IS NOT NULL END
-   ORDER BY s.created_at DESC,s.id DESC LIMIT 1`,[p.id,v.id,user.identityId,practiceId]);
+   ORDER BY s.created_at DESC,s.id DESC LIMIT 1`,[p.id,user.identityId,practiceId]);
   return {submission:rows[0]??null};
  }
  const bank=(await db.query('SELECT visibility,archived_at FROM problem_banks WHERE id=$1',[p.bank_id])).rows[0];
  const schoolVisible=!!v.published_at&&!!v.school_visible_at&&bank?.visibility==='school'&&!bank.archived_at&&!p.archived_at;
- return metadataPage(db,`SELECT 'SUB'||s.id::text id,s.id received_id,s.identity_id actor_key,s.created_at,COALESCE(s.language,'python') language,s.status,s.identity_id=$3 is_own,r.private_results,
+ return metadataPage(db,`SELECT 'SUB'||s.id::text id,s.id received_id,s.identity_id actor_key,s.created_at,COALESCE(s.language,'python') language,s.status,s.identity_id=$2 is_own,r.private_results,
   COALESCE(CASE WHEN profile.leaderboard_use_nickname THEN NULLIF(btrim(profile.nickname),'') END,NULLIF(btrim(person.name),''),'Student') display_name
-  FROM (SELECT s.* ${legacySubmissionScope} AND (s.version_id=$2 OR s.assignment_id=$6 AND s.version_id=$7)
-   AND ($4::boolean OR s.identity_id=$3 OR
+  FROM (SELECT s.* ${legacySubmissionScope}
+   AND ($3::boolean OR ($5::boolean AND EXISTS(SELECT 1 FROM problem_versions public_version
+    WHERE public_version.id=s.version_id AND public_version.published_at IS NOT NULL AND public_version.school_visible_at IS NOT NULL)) OR s.identity_id=$2 OR
    s.assignment_id IS NOT NULL AND EXISTS(SELECT 1 FROM assignments a WHERE a.id=s.assignment_id AND
-    (a.owner_account_id=$5 OR a.state='Published' AND EXISTS(SELECT 1 FROM assignment_participants ap WHERE ap.assignment_id=a.id AND ap.identity_id=$3 AND NOT ap.exempt))) OR
-   tp.results_published_at IS NOT NULL AND EXISTS(SELECT 1 FROM timed_practice_participants part WHERE part.practice_id=tp.id AND part.identity_id=$3 AND NOT part.exempt))) s
+    (a.owner_account_id=$4 OR a.state='Published' AND EXISTS(SELECT 1 FROM assignment_participants ap WHERE ap.assignment_id=a.id AND ap.identity_id=$2 AND NOT ap.exempt))) OR
+   tp.results_published_at IS NOT NULL AND EXISTS(SELECT 1 FROM timed_practice_participants part WHERE part.practice_id=tp.id AND part.identity_id=$2 AND NOT part.exempt))) s
   JOIN identities person ON person.id=s.identity_id
   LEFT JOIN accounts profile ON profile.identity_id=person.id AND profile.binding_released_at IS NULL
   LEFT JOIN LATERAL (SELECT r.private_results FROM judge_runs r JOIN judge_tasks t ON t.id=r.task_id
    WHERE r.submission_id=s.id AND r.id IS DISTINCT FROM s.pending_judge_run_id AND r.status=s.status AND r.score IS NOT DISTINCT FROM s.score
     AND (NOT t.rejudge OR EXISTS(SELECT 1 FROM audit_events e WHERE e.action='submission.rejudge_confirm' AND e.resource_id=s.id::text AND e.metadata->>'runId'=r.id::text))
-   ORDER BY r.created_at DESC,r.id DESC LIMIT 1) r ON true`,[problemId,v.id,user.identityId,schoolVisible||permissions.canEdit,user.id,assignmentId,priorVersionId],url);
+   ORDER BY r.created_at DESC,r.id DESC LIMIT 1) r ON true`,[problemId,user.identityId,permissions.canEdit,user.id,schoolVisible],url);
 }
 
 export async function schoolProblemSubmissions(db,p,user,url,accessContext) {

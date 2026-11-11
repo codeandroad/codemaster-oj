@@ -59,4 +59,33 @@ export function readDraft(key: string): StudentDraft | null {
   try { const value = JSON.parse(sessionStorage.getItem(key) ?? "null"); return value && typeof value.code === "string" && typeof value.receivedCode === "string" ? value : null; } catch { return null; }
 }
 export function saveDraft(key: string, draft: StudentDraft): boolean { try { sessionStorage.setItem(key, JSON.stringify(draft)); return true; } catch { return false; } }
-export function hasTimedDraft(userId: string, practiceId: string, problemId: string, versionId: string) { return (["python", "cpp", "javascript"] as const).some(language => { const draft = readDraft(draftKey(userId, problemId, versionId, `timed:${practiceId}`, language)); return Boolean(draft && draft.code.trim() && draft.code !== draft.receivedCode); }); }
+
+// Current teaching follows one exercise, so unsent work follows it too. Retain
+// old storage entries and recover the newest draft only within the same user,
+// problem, activity context and language. Correction snapshots use readDraft.
+function currentDraftEntries(userId: string, problemId: string, context: string) {
+  const entries: { version: string; language: SubmissionLanguage; draft: StudentDraft }[] = [];
+  if (typeof window === "undefined") return entries;
+  const scope = `${prefix}${userId}:${context}:${problemId}:`;
+  try {
+    for (let index = 0; index < sessionStorage.length; index++) {
+      const key = sessionStorage.key(index);
+      if (!key?.startsWith(scope)) continue;
+      const match = /^(current|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?::(cpp|javascript))?$/i.exec(key.slice(scope.length));
+      if (!match) continue;
+      const draft = readDraft(key);
+      if (draft) entries.push({ version: match[1], language: (match[2] ?? "python") as SubmissionLanguage, draft });
+    }
+  } catch { /* A storage restriction must not prevent opening the workspace. */ }
+  return entries.sort((a, b) => (Date.parse(b.draft.updatedAt) || 0) - (Date.parse(a.draft.updatedAt) || 0));
+}
+export function readCurrentDraft(userId: string, problemId: string, context: string, language: SubmissionLanguage): StudentDraft | null {
+  return readDraft(draftKey(userId, problemId, "current", context, language))
+    ?? currentDraftEntries(userId, problemId, context).find(entry => entry.language === language)?.draft ?? null;
+}
+export function readCurrentDraftLanguage(userId: string, problemId: string, context: string): SubmissionLanguage | null {
+  return readDraftLanguage(userId, problemId, "current", context)
+    ?? currentDraftEntries(userId, problemId, context).map(entry => readDraftLanguage(userId, problemId, entry.version, context) ?? entry.language)[0]
+    ?? null;
+}
+export function hasTimedDraft(userId: string, practiceId: string, problemId: string, versionId: string) { return (["python", "cpp", "javascript"] as const).some(language => { const draft = readCurrentDraft(userId, problemId, `timed:${practiceId}`, language) ?? readDraft(draftKey(userId, problemId, versionId, `timed:${practiceId}`, language)); return Boolean(draft && draft.code.trim() && draft.code !== draft.receivedCode); }); }

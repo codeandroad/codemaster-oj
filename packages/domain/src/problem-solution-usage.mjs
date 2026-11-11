@@ -1,3 +1,4 @@
+import {liveProblemVersionIdSql} from './live-problem-version.mjs';
 import { readableCourseIds } from './course-access.mjs';
 import { latestCourseProblemVersion } from './course-problem-version.mjs';
 
@@ -31,17 +32,17 @@ export async function withProblemSolutionUsage(db,user,problemId,versions) {
   ORDER BY course.title,course.id`,[problemId])).rows;
  const readableCourses = await readableCourseIds(db,user,courseRows.map(course => course.id));
  const admin = user.roles.includes('admin');
- const assignments = (await db.query(`SELECT a.id,a.title,a.owner_account_id,ap.version_id FROM assignment_problems ap
-  JOIN assignments a ON a.id=ap.assignment_id WHERE ap.problem_id=$1 AND a.state='Published'
+ const assignments = (await db.query(`SELECT a.id,a.title,a.owner_account_id,${liveProblemVersionIdSql('p')} version_id FROM assignment_problems ap
+  JOIN problems p ON p.id=ap.problem_id JOIN assignments a ON a.id=ap.assignment_id WHERE ap.problem_id=$1 AND a.state='Published'
    AND a.archived_at IS NULL ORDER BY a.title,a.id`,[problemId])).rows;
- const timedPractices = (await db.query(`SELECT t.id,t.title,t.owner_account_id,tp.version_id FROM timed_practice_problems tp
-  JOIN timed_practices t ON t.id=tp.practice_id WHERE tp.problem_id=$1 AND t.state IN ('Published','ResultsPublished')
+ const timedPractices = (await db.query(`SELECT t.id,t.title,t.owner_account_id,${liveProblemVersionIdSql('p')} version_id FROM timed_practice_problems tp
+  JOIN problems p ON p.id=tp.problem_id JOIN timed_practices t ON t.id=tp.practice_id WHERE tp.problem_id=$1 AND t.state IN ('Published','ResultsPublished')
    AND t.archived_at IS NULL ORDER BY t.title,t.id`,[problemId])).rows;
  // This is the default school-wide practice revision, not current_version_id:
  // a pending teaching replacement must not displace a student's public one.
  const practice = (await db.query(`SELECT v.id FROM problem_versions v JOIN problems p ON p.id=v.problem_id
   JOIN problem_banks bank ON bank.id=p.bank_id WHERE p.id=$1 AND p.archived_at IS NULL
-   AND bank.archived_at IS NULL AND bank.visibility='school' AND v.published_at IS NOT NULL AND v.school_visible_at IS NOT NULL
+   AND bank.archived_at IS NULL AND bank.visibility='school' AND v.id=${liveProblemVersionIdSql('p')} AND v.published_at IS NOT NULL AND v.school_visible_at IS NOT NULL
   ORDER BY v.published_at DESC,v.created_at DESC,v.id DESC LIMIT 1`,[problemId])).rows[0];
  const shape = row => ({id:row.id,title:row.title});
  const readableActivity = row => admin || row.owner_account_id === user.id;

@@ -88,7 +88,7 @@ test('reviewed public English statements bind exact versions without leaking pai
   assert.equal((await teacher.call(endpoint,{body:{...request,...draft,sourceHash:draftSource.sourceHash},expected:409})).error.code,'VERSION_NOT_PUBLISHED');
   assert.equal((await pool.query('SELECT count(*)::int n FROM problem_public_statements')).rows[0].n,0);
 
-  const course=await teacher.call('/learning-paths',{body:{title:'Version-pinned English course'},expected:201});
+  const course=await teacher.call('/learning-paths',{body:{title:'Current English course'},expected:201});
   const chapter=await teacher.call(`/learning-paths/${course.id}/chapters`,{body:{title:'Price practice',content:'Public lesson',problemIds:[first.problemId]},expected:201});
   await teacher.call(`/learning-paths/${course.id}/publish`,{body:{}});
   const submission=(await pool.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,code,idempotency_key,request_hash)
@@ -149,7 +149,8 @@ test('reviewed public English statements bind exact versions without leaking pai
   assert.equal(teacherView.objective,originalMetadata.objective);assert.equal(teacherView.privateNotes,'PRIVATE_NOTES_SENTINEL');
   assert.equal(teacherView.referenceCode,'# PRIVATE_REFERENCE_SENTINEL\nprint(1)');assert.equal(teacherView.tests[0].input,'PRIVATE_TEST_INPUT');
 
-  // The course and historical submission keep V1 while the library advances to V2.
+  // Course and library follow the same current exercise; the submission and
+  // each reviewed language presentation keep their exact source snapshot.
   const second=await problem(teacher,'Price conversion',original+'\n第二版说明。',{problemId:first.problemId});
   assertPending(await student.call(`/problems/${second.problemId}`));
   assertPending((await student.call('/problems')).items.find(item=>item.id===second.problemId));
@@ -159,8 +160,8 @@ test('reviewed public English statements bind exact versions without leaking pai
   await teacher.call(endpoint,{body:{...request,...second,sourceHash:secondSource.sourceHash,statement:secondEnglish},expected:201});
   const courseView=await student.call(`/learning-paths/${course.id}`);
   const link=courseView.chapters.find(item=>item.id===chapter.id).problems[0];
-  assert.equal(link.versionId,first.versionId);assertSafe(courseView);
-  assert.equal((await student.call(`/problems/${link.problemId}?versionId=${link.versionId}`)).statement,english);
+  assert.equal(link.versionId,second.versionId);assertSafe(courseView);
+  assert.equal((await student.call(`/problems/${link.problemId}?versionId=${link.versionId}`)).statement,secondEnglish);
   assert.equal((await student.call(`/problems/${first.problemId}`)).statement,secondEnglish);
   const history=await student.call(`/submissions/${submission.id}`);assertSafe(history);
   assert.equal(history.versionId,first.versionId);
@@ -168,8 +169,9 @@ test('reviewed public English statements bind exact versions without leaking pai
   assertSafe(await student.call('/review-notebook'));
 
   // Chinese remains a distinct reviewed, priced Luq item; presentation publication grants no assistance entitlement.
-  const target={...first,kind:'FULL_TRANSLATION',language:'zh-CN'};
-  const translated=await teacher.call('/scholarship/contents',{body:{...target,body:original},expected:201});
+  const target={...second,kind:'FULL_TRANSLATION',language:'zh-CN'},translatedBody=original+'\n第二版说明。';
+  await student.call('/scholarship/assistance/quote',{body:{...target,versionId:first.versionId},expected:409});
+  const translated=await teacher.call('/scholarship/contents',{body:{...target,body:translatedBody},expected:201});
   await teacher.call(`/scholarship/contents/${translated.id}/publish`,{body:{reviewed:true}});
   const quote=await student.call('/scholarship/assistance/quote',{body:target});assert.equal(quote.price,3);assertSafe(quote);
   await student.call('/scholarship/assistance/provide',{body:target,expected:403});
@@ -177,7 +179,7 @@ test('reviewed public English statements bind exact versions without leaking pai
   const oldBalance=Number((await pool.query('SELECT balance FROM luq_accounts WHERE identity_id=$1',[student.identityId])).rows[0].balance);
   const unlocked=await student.call('/scholarship/assistance/unlock',{body:{...target,requestKey:randomUUID(),confirmedPrice:3,confirmedContentId:quote.contentId}});
   assert.equal(unlocked.charged,3);assertSafe(unlocked);
-  assert.equal((await student.call('/scholarship/assistance/provide',{body:target})).body,original);
+  assert.equal((await student.call('/scholarship/assistance/provide',{body:target})).body,translatedBody);
   assert.equal(Number((await pool.query('SELECT balance FROM luq_accounts WHERE identity_id=$1',[student.identityId])).rows[0].balance),oldBalance-3);
   assert.equal((await pool.query("SELECT count(*)::int n FROM luq_assistance_deliveries WHERE kind='FULL_SOLUTION'")).rows[0].n,0);
   assert.equal((await student.call(`/problems/${first.problemId}?versionId=${first.versionId}`,{language:'zh-CN'})).statement,english,'Paid Chinese does not silently replace the public English statement');
@@ -188,6 +190,7 @@ test('reviewed public English statements bind exact versions without leaking pai
   await pool.query("UPDATE timed_practices SET state='Published' WHERE id=$1",[exam.id]);
   assert.equal((await student.call('/scholarship/assistance/quote',{body:target})).mode,'disabled');
   assert.equal((await student.call('/scholarship/assistance/provide',{body:target,expected:403})).error.code,'ASSISTANCE_LOCKED');
-  assert.equal((await student.call(`/problems/${first.problemId}?versionId=${first.versionId}`)).statement,english,'Course/history still show only public English during a restricted assessment');
+  assert.equal((await student.call(`/problems/${first.problemId}?versionId=${first.versionId}`)).statement,english,'Historical snapshots still show only reviewed public English during a restricted assessment');
+  assert.equal((await student.call(`/problems/${second.problemId}?current=1`)).statement,secondEnglish,'Current course entry shows its own reviewed public English during a restricted assessment');
  }finally{if(app)await app.close();await pool.end();await manager.query(`DROP SCHEMA ${schema} CASCADE`);await manager.end();}
 });

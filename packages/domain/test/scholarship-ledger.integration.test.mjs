@@ -127,6 +127,25 @@ test('assignment completion pays 15 once after every required formal in-assignme
  const notifications=(await pool.query("SELECT data FROM student_system_notifications WHERE legacy_identity_id=$1 AND kind='activity_reward'",[s.identityId])).rows;
  assert.deepEqual(notifications,[{data:{amount:15,activityTitle:'Luq'}}]);
 });
+test('require-all completion accepts later problem revisions without copying historical awards',{skip:!url},async()=>{
+ const s=await account(),p=await problem(),q=await problem(),id=await assignment(s,[p,q],15,false,{requireAll:true});
+ const old=await submit(s,p,{assignmentId:id});
+ const newer=(await pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code,
+  validation_status,published_at,rank_review_status,rank_approved_at,school_visible_at)
+  VALUES($1,'Live revision','stdio','Updated test',500,64,'print(2)','AC',clock_timestamp(),'approved',clock_timestamp(),clock_timestamp()) RETURNING id`,[q.id])).rows[0].id;
+ const current={...q,versionId:newer};
+ await submit(s,current);
+ assert.equal(await balance(s),8,'cross-context mastery does not earn an activity reward');
+ await migrate(pool);
+ assert.equal(await balance(s),8,'running migrations never backfills activity awards');
+ await submit(s,current,{assignmentId:id});
+ assert.equal(await balance(s),23,'the newer snapshot counts towards the existing activity');
+ await submit(s,p,{assignmentId:id});await submit(s,current,{assignmentId:id});
+ assert.equal(await balance(s),23);
+ assert.equal((await pool.query('SELECT count(*)::int n FROM luq_activity_awards WHERE identity_id=$1 AND activity_id=$2',[s.identityId,id])).rows[0].n,1);
+ const kept=(await pool.query('SELECT version_id,score FROM submissions WHERE id=$1',[old.id])).rows[0];
+ assert.equal(kept.version_id,p.versionId);assert.equal(Number(kept.score),100);
+});
 test('challenge excludes assisted attempts; learning may explicitly allow them',{skip:!url},async()=>{
  const s=await account(),p=await problem();await delivery(s,p);const challenge=await assignment(s,[p],6);await submit(s,p,{assignmentId:challenge});assert.equal(await balance(s),0);
  const learning=await assignment(s,[p],6,true);await submit(s,p,{assignmentId:learning});assert.equal(await balance(s),6);

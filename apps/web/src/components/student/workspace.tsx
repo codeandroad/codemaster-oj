@@ -18,7 +18,7 @@ import { CopyCodeButton } from "./copy-code-button";
 import { isPending, productionApi, productionId, type Assignment, type CampusUser, type ProductionProblem, type Submission, type SubmissionLanguage } from "@/lib/production-api";
 import { MAX_CUSTOM_INPUT_LENGTH } from "./result-feedback";
 import { Feedback, LessonContent, ResultPanel, State, textarea, useData, useMutation, useSubmission, type DetailedSubmission } from "./shared";
-import { draftKey, initialWorkspaceLanguage, readDraft, readDraftLanguage, saveDraft, saveDraftLanguage, workspaceDraftContext, workspaceEditorCode, type WorkspaceSubmission } from "./drafts";
+import { draftKey, initialWorkspaceLanguage, readDraft, readDraftLanguage, readCurrentDraft, readCurrentDraftLanguage, saveDraft, saveDraftLanguage, workspaceDraftContext, workspaceEditorCode, type WorkspaceSubmission } from "./drafts";
 import {formatCode,downloadCode} from "./code-format";
 import {WorkspaceThemeProvider} from "@/components/ui/theme-context";
 import {displayBinding} from "./editor-keymap";
@@ -45,8 +45,8 @@ import { validateFunctionInput } from "@/lib/function-input";
 export function StudentWorkspace({ id, user }: { id: string; user: CampusUser }) {
   const { locale } = useLocale();
   const search = useSearchParams(), originalId = search.get("originalSubmissionId"), version = search.get("versionId");
-  const original = useData<Submission>(originalId ? `submissions/${encodeURIComponent(originalId)}` : ""), pinned = originalId ? original.data?.versionId : version;
-  const problem = useData<ProductionProblem>(!originalId || original.data ? `problems/${id}${pinned ? `?versionId=${encodeURIComponent(pinned)}` : ""}` : "");
+  const original = useData<Submission>(originalId ? `submissions/${encodeURIComponent(originalId)}` : ""), pinned = originalId ? original.data?.versionId : user.roles.some(role => role === "admin" || role === "teacher") ? version : null;
+  const problem = useData<ProductionProblem>(!originalId || original.data ? `problems/${id}${pinned ? `?versionId=${encodeURIComponent(pinned)}` : "?current=1"}` : "");
   const context = workspaceDraftContext({
     originalSubmissionId: originalId ? original.data?.originalSubmissionId ?? original.data?.id ?? originalId : null,
     timedPracticeId: search.get("timedPracticeId"),
@@ -57,7 +57,7 @@ export function StudentWorkspace({ id, user }: { id: string; user: CampusUser })
   if (originalId && original.loading) return <div className="p-5"><State data={original}>{locale === "en" ? "Loading original submission…" : "正在加载原提交…"}</State></div>;
   if (originalId && original.data?.problemId !== id) return <div role="alert" className="p-5 text-sm text-destructive">{original.error || (locale === "en" ? "The correction problem does not match the original submission." : "订正题目与原提交不匹配。")}</div>;
   const loaded = problem.data?.id === id.toLowerCase() && (!pinned || problem.data.versionId === pinned.toLowerCase()) ? problem.data : null;
-  return <State data={{ ...problem, data: loaded, loading: problem.loading || (!loaded && !problem.error) }}>{loaded && <ProblemWorkspace key={`${user.id}:${loaded.id}:${loaded.versionId}:${context}`} problem={loaded} user={user} original={originalId ? original.data : null}/>}</State>;
+  return <State data={{ ...problem, data: loaded, loading: problem.loading || (!loaded && !problem.error) }}>{loaded && <ProblemWorkspace key={`${user.id}:${loaded.id}:${loaded.versionId}:${context}`} problem={loaded} user={user} original={originalId ? original.data : null} onReloadProblem={problem.reload}/>}</State>;
 }
 function safeReturn(value: string | null) { return value?.startsWith("/student/") && !value.startsWith("//") ? value : null; }
 /** Transport and navigation adapters share the full workspace UI, never its access rights. */
@@ -79,13 +79,14 @@ export type ProblemWorkspaceAdapter = {
   onSubmissionCompleted?: (result: DetailedSubmission) => void;
   readDraft: (language: SubmissionLanguage) => ReturnType<typeof readDraft>;
   saveDraft: (language: SubmissionLanguage, draft: NonNullable<ReturnType<typeof readDraft>>) => boolean;
+  draftVersion?: string;
   account: (hasUnsavedChanges: boolean) => ReactNode;
   /** Every adapter explicitly chooses its authorized audience, or null. */
   presence: ReactNode;
   statusBanner?: ReactNode;
   assistance?: (kind: "FULL_TRANSLATION" | "FULL_SOLUTION") => ReactNode;
 };
-type ProblemWorkspaceProps = { problem: ProductionProblem; user: CampusUser; original?: Submission | null; adapter?: ProblemWorkspaceAdapter };
+type ProblemWorkspaceProps = { problem: ProductionProblem; user: CampusUser; original?: Submission | null; adapter?: ProblemWorkspaceAdapter; onReloadProblem?: () => void };
 
 export function ProblemWorkspace(props: ProblemWorkspaceProps) {
   const { problem, user, original, adapter } = props;
@@ -110,7 +111,7 @@ function WorkspaceEntry({ resumePath, ...props }: ProblemWorkspaceProps & { subm
   return <State data={latest}><WorkspaceEditor {...props} latest={latest.data?.submission ?? null}/></State>;
 }
 
-function WorkspaceEditor({ problem, user, original = null, adapter, submissionsPath, latest }: ProblemWorkspaceProps & { submissionsPath: string; latest: WorkspaceSubmission | null }) {
+function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProblem, submissionsPath, latest }: ProblemWorkspaceProps & { submissionsPath: string; latest: WorkspaceSubmission | null }) {
   const { locale, t } = useLocale();
   const tx = useCallback((zh: string, en: string) => locale === "en" ? en : zh, [locale]);
   const panelName = (panel: WorkspacePanel) => locale === "en" ? ({ statement: "Problem", editor: "Code editor", testing: "Tests" } as const)[panel] : panelNames[panel];
@@ -130,12 +131,13 @@ function WorkspaceEditor({ problem, user, original = null, adapter, submissionsP
   const sourceDisplay = sourceLabel === "Assignment" ? tx("作业", "Assignment") : t(sourceLabel);
   const context = adapter?.context ?? workspaceDraftContext({ originalSubmissionId: originalId, timedPracticeId, assignmentId, learningPathId, chapterId });
   const originalLanguage = submissionLanguage(original?.language);
-  const readWorkspaceDraft = useCallback((selected: SubmissionLanguage) => adapter ? adapter.readDraft(selected) : readDraft(draftKey(user.id, problem.id, problem.versionId ?? "current", context, selected)), [adapter, user.id, problem.id, problem.versionId, context]);
-  const saveWorkspaceDraft = useCallback((selected: SubmissionLanguage, draft: NonNullable<ReturnType<typeof readDraft>>) => adapter ? adapter.saveDraft(selected, draft) : saveDraft(draftKey(user.id, problem.id, problem.versionId ?? "current", context, selected), draft), [adapter, user.id, problem.id, problem.versionId, context]);
+  const draftVersion = original ? problem.versionId ?? "current" : adapter ? adapter.draftVersion ?? problem.versionId ?? "current" : "current";
+  const readWorkspaceDraft = useCallback((selected: SubmissionLanguage) => adapter ? adapter.readDraft(selected) : original ? readDraft(draftKey(user.id, problem.id, draftVersion, context, selected)) : readCurrentDraft(user.id, problem.id, context, selected), [adapter, original, user.id, problem.id, draftVersion, context]);
+  const saveWorkspaceDraft = useCallback((selected: SubmissionLanguage, draft: NonNullable<ReturnType<typeof readDraft>>) => adapter ? adapter.saveDraft(selected, draft) : saveDraft(draftKey(user.id, problem.id, draftVersion, context, selected), draft), [adapter, user.id, problem.id, draftVersion, context]);
   const [language, setLanguage] = useState(() => initialWorkspaceLanguage(
-    readDraftLanguage(user.id, problem.id, problem.versionId ?? "current", context), latest, originalLanguage, readWorkspaceDraft,
+    draftVersion === "current" ? readCurrentDraftLanguage(user.id, problem.id, context) : readDraftLanguage(user.id, problem.id, draftVersion, context), latest, originalLanguage, readWorkspaceDraft,
   ));
-  const storageKey = draftKey(user.id, problem.id, problem.versionId ?? "current", context, language);
+  const storageKey = draftKey(user.id, problem.id, draftVersion, context, language);
   const [initialCode] = useState(() => workspaceEditorCode(language, readWorkspaceDraft(language), latest,
     original && language === originalLanguage ? original.code : starterFor(problem, language)));
   const restoredSubmission = useRef(latest && submissionLanguage(latest.language) === language);
@@ -148,6 +150,7 @@ function WorkspaceEditor({ problem, user, original = null, adapter, submissionsP
   const rightRef = useRef<HTMLDivElement>(null), verticalDrag = useRef<{top:number;height:number;next:number}|null>(null), executionLock = useRef(false);
   const rootRef = useRef<HTMLDivElement>(null), mainRef = useRef<HTMLElement>(null), dragRef = useRef<{ width: number; left: number; next: number } | null>(null);
   const [draftSaved,setDraftSaved]=useState(false);
+  const [problemUpdated,setProblemUpdated]=useState(false);
   const action = useMutation(), polling = useSubmission(submissionId, adapter && submissionId ? adapter.submissionPath(submissionId) : undefined, adapter?.normalizeSubmission), keys = useRef(new Map<string, string>()), timedSession = useStudentTimedSession(timedPracticeId);
   const [problemListOpen,setProblemListOpen]=useState(false);
   const formalResult = polling.result;
@@ -183,14 +186,18 @@ function WorkspaceEditor({ problem, user, original = null, adapter, submissionsP
   const anyDirty = dirty || supportedLanguages.some(other => { if (other === language) return false; const draft = readWorkspaceDraft(other); return draft?.code !== draft?.receivedCode && Boolean(draft?.code.trim()); });
   useNavigationBlocker(anyDirty);
   const pending = action.busy || Boolean(submissionId && !polling.result && !polling.error) || Boolean(polling.result && isPending(polling.result.status));
-  const unavailable = Boolean(timedPracticeId && !timedSession.active);
+  const changedDefinition = !original && (problemUpdated
+    || Boolean(assignment.data?.problems.some(item => item.problemId === problem.id && item.versionId !== problem.versionId))
+    || Boolean(courseChapter?.problems.some(item => item.problemId === problem.id && item.versionId !== problem.versionId))
+    || Boolean(timedSession.data?.problems.some(item => item.problemId === problem.id && item.versionId !== problem.versionId)));
+  const unavailable = Boolean(timedPracticeId && !timedSession.active) || changedDefinition;
   useEffect(() => { setDraftSaved(saveWorkspaceDraft(language, { code, receivedCode, updatedAt: new Date().toISOString() })); }, [language, code, receivedCode, saveWorkspaceDraft]);
   useEffect(() => { if (!layoutMessage) return; const timeout = window.setTimeout(() => setLayoutMessage(""), 4000); return () => window.clearTimeout(timeout); }, [layoutMessage]);
   useEffect(() => { if (!anyDirty) return; const beforeUnload = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; }; window.addEventListener("beforeunload", beforeUnload); return () => window.removeEventListener("beforeunload", beforeUnload); }, [anyDirty]);
   function changeLanguage(next: SubmissionLanguage) {
     if (next === language || pending || formatting) return;
     saveWorkspaceDraft(language, { code, receivedCode, updatedAt: new Date().toISOString() });
-    saveDraftLanguage(user.id, problem.id, problem.versionId ?? "current", context, next);
+    saveDraftLanguage(user.id, problem.id, draftVersion, context, next);
     const nextDraft = readWorkspaceDraft(next);
     const starter = original && next === originalLanguage ? original.code : starterFor(problem, next);
     const nextCode = workspaceEditorCode(next, nextDraft, restoredSubmission.current && nextDraft ? null : latest, starter);
@@ -221,6 +228,10 @@ function WorkspaceEditor({ problem, user, original = null, adapter, submissionsP
         accepted = adapter ? await adapter.submit({kind, code, language, customInput, requestId: key}) : await productionApi<Submission>("submissions", { method: "POST", body: { ...body, idempotencyKey: key } });
       } catch (error) {
         if (!(error instanceof ApiError)) throw error;
+        if (error.code === "PROBLEM_UPDATED") {
+          keys.current.delete(signature);
+          setProblemUpdated(true);
+        }
         if (error.code === "SUBMISSION_ALREADY_ACCEPTED") {
           keys.current.delete(signature);
           setReceivedCode(code);
@@ -381,6 +392,17 @@ function WorkspaceEditor({ problem, user, original = null, adapter, submissionsP
       <span className="shrink-0 text-xs text-muted-foreground">{navigationItems.findIndex(p=>p.problemId===problem.id)+1} / {navigationItems.length}</span>
       {assignmentGrade?.status==="AC"&&<span role="status" className="shrink-0 text-xs text-success">{assignmentGrade.completionSource==="other_entry"?tx("已在其他入口通过","Passed elsewhere"):tx("本题已完成","Completed")}</span>}
       {navigation.next?<Button size="sm" variant="secondary" className="shrink-0 max-[760px]:min-h-11" disabled={pending||navigationLoading||Boolean(navigationError)} onClick={()=>switchProblem(navigation.next)} data-od-id="assignment-next-problem">{tx("下一题","Next problem")}<ChevronRight size={15}/></Button>:<span className="shrink-0 text-xs text-muted-foreground">{tx("最后一题","Last problem")}</span>}
+    </div>}
+    {changedDefinition && <div role="alert" className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-info-soft px-4 py-3 text-sm">
+      <p>{tx("教师已更新题目，请加载最新题面后继续。当前代码会保留，请核对新的要求和接口。", "Your teacher updated this problem. Load the current statement to continue. Your code will be kept; check the new requirements and interface.")}</p>
+      {onReloadProblem && <Button size="sm" disabled={pending} onClick={() => {
+        if (!saveWorkspaceDraft(language,{code,receivedCode,updatedAt:new Date().toISOString()})) {
+          setLayoutMessage(tx("本机草稿保存失败，请先复制或下载代码后刷新。", "The local draft could not be saved. Copy or download your code before refreshing."));
+          return;
+        }
+        saveDraftLanguage(user.id,problem.id,draftVersion,context,language);
+        onReloadProblem();
+      }}>{tx("保留代码并刷新题目", "Keep code and refresh problem")}</Button>}
     </div>}
     <nav className={styles.mobileTabs} aria-label={tx("答题分区","Workspace panels")}>{panelIds.map(panel => <button key={panel} type="button" aria-pressed={layout.mobilePanel === panel} onClick={() => dispatch({ type: "mobile", panel })} data-od-id={`mobile-${panel}`}>{panel === "statement" ? tx("题目","Problem") : panel === "editor" ? tx("代码","Code") : tx("测试","Tests")}</button>)}</nav>
     <main ref={mainRef} className={mainClass} data-mobile={layout.mobilePanel} style={{ "--workspace-left": `${settings.panelPercent}%` } as CSSProperties}>

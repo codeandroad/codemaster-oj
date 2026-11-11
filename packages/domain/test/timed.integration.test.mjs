@@ -63,14 +63,14 @@ test('timed attempts: publication, scope, concurrent start, minimum deadline and
   await assert.rejects(pool.query('DELETE FROM timed_practice_participants WHERE practice_id=$1', [practice.id]), /immutable/);
 });
 
-test('timed submission: server deadline, pinned version, manual finish and bounded audited extension', { skip: !url }, async () => {
+test('timed submission: server deadline, current version, manual finish and bounded audited extension', { skip: !url }, async () => {
   const practice = await create(); await call(`/timed-practices/${practice.id}/publish`, 'POST', teacher);
   const body = { problemId, versionId: version.id, timedPracticeId: practice.id, kind: 'submit' };
   await assert.rejects(transaction(pool, (db) => timed.prepareSubmission(db, student, body, version)), failure('NOT_STARTED'));
   const attempt = (await call(`/timed-practices/${practice.id}/start`, 'POST', student)).body;
   const accepted = await transaction(pool, (db) => timed.prepareSubmission(db, student, body, { ...version, id: randomUUID() }));
   assert.equal(accepted.version.id, version.id); assert.equal(accepted.timedAttemptId, attempt.id); assert.ok(accepted.acceptedAt <= attempt.deadlineAt);
-  await assert.rejects(transaction(pool, (db) => timed.prepareSubmission(db, student, { ...body, versionId: randomUUID() }, version)), failure('VERSION_MISMATCH'));
+  await assert.rejects(transaction(pool, (db) => timed.prepareSubmission(db, student, { ...body, versionId: randomUUID() }, version)), failure('PROBLEM_UPDATED'));
   await assert.rejects(transaction(pool, (db) => timed.prepareSubmission(db, student, { ...body, assignmentId: randomUUID() }, version)), failure('VALIDATION'));
   await call(`/timed-practices/${practice.id}/finish`, 'POST', student);
   await assert.rejects(transaction(pool, (db) => timed.prepareSubmission(db, student, body, version)), failure('DEADLINE_PASSED'));
@@ -172,4 +172,32 @@ test('teacher force end serializes against accepted submissions and closes unsta
   const result = (await call(`/timed-practices/${practice.id}/results`, 'POST', teacher)).body;
   assert.equal(result.status, 'ResultsPublished'); assert.equal(result.grades.find((entry) => entry.identityId === outsider.identityId).score, 0);
   assert.equal((await pool.query("SELECT count(*) FROM audit_events WHERE resource_id=$1 AND action='timed.end'", [practice.id])).rows[0].count, '1');
+});
+
+
+test('published problem updates reach an existing timed practice while judged snapshots and released rewards remain intact', { skip: !url }, async () => {
+  const practice = await create(); await call(`/timed-practices/${practice.id}/publish`, 'POST', teacher);
+  const attempt = (await call(`/timed-practices/${practice.id}/start`, 'POST', student)).body;
+  const original = await submission(practice, attempt, 'AC', 100);
+  const updated = (await pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,samples,time_limit_ms,memory_limit_mb,comparator,reference_code,validation_status,published_at)
+    VALUES($1,'Updated timed problem','stdio','Updated statement','[{"input":"","expected":"43"}]',500,64,'tokens','print(43)','AC',clock_timestamp()) RETURNING *`, [problemId])).rows[0];
+  await pool.query('UPDATE problems SET current_version_id=$2 WHERE id=$1',[problemId,updated.id]);
+  const current = (await call(`/timed-practices/${practice.id}`, 'GET', student)).body;
+  assert.equal(current.problems[0].versionId,updated.id);assert.equal(current.problems[0].title,'Updated timed problem');
+  assert.equal((await pool.query('SELECT version_id FROM timed_practice_problems WHERE practice_id=$1',[practice.id])).rows[0].version_id,version.id,'the activity provenance is not rewritten');
+  const body = { problemId,versionId:version.id,timedPracticeId:practice.id,kind:'submit' };
+  await assert.rejects(transaction(pool,db=>timed.prepareSubmission(db,student,body,version)),failure('PROBLEM_UPDATED'));
+  await assert.rejects(transaction(pool,db=>timed.prepareSubmission(db,outsider,{...body,versionId:updated.id},updated)),failure('FORBIDDEN'));
+  const accepted = await transaction(pool,db=>timed.prepareSubmission(db,student,{...body,versionId:updated.id},version));
+  assert.equal(accepted.version.id,updated.id);
+  const latest = await submission(current,attempt,'AC',100);
+  await call(`/timed-practices/${practice.id}/finish`,'POST',student);
+  const published = (await call(`/timed-practices/${practice.id}/results`,'POST',teacher)).body;
+  assert.equal(published.grades[0].problems[0].submissionId,`SUB${latest.id}`);
+  assert.equal(published.grades[0].score,100);
+  const credited = (await pool.query('SELECT submission_id FROM timed_first_ac_candidates WHERE practice_id=$1 ORDER BY submission_id',[practice.id])).rows.map(r=>r.submission_id);
+  assert.deepEqual(credited,[original.id,latest.id],'both accepted snapshots remain eligible after explicit result publication');
+  const kept = (await pool.query('SELECT version_id,score FROM submissions WHERE id=$1',[original.id])).rows[0];
+  assert.equal(kept.version_id,version.id);assert.equal(Number(kept.score),100);
+  assert.equal(published.grades[0].problems[0].formalAttempts,2);
 });

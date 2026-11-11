@@ -6,6 +6,7 @@ import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
 import {createPool} from '../src/db.mjs';
 import {migrate} from '../src/migrate.mjs';
+import {sharedSolutionIdSql} from '../src/shared-problem-solutions.mjs';
 
 test('Luq production grants: application cannot overwrite balances and worker settles rewards without Luq privileges',
  {skip:!process.env.TEST_DATABASE_URL,timeout:60000},async()=>{
@@ -36,7 +37,25 @@ test('Luq production grants: application cannot overwrite balances and worker se
   await assert.rejects(asRole('campus_app','UPDATE luq_accounts SET balance=999 WHERE identity_id=$1',[student]),e=>e.code==='42501');
   await assert.rejects(asRole('campus_app',"INSERT INTO luq_ledger(identity_id,delta,balance_after,kind,source_key,reason) VALUES($1,99,109,'admin_grant','direct','Denied')",[student]),e=>e.code==='42501');
   await assert.rejects(asRole('campus_app','DELETE FROM luq_ledger WHERE identity_id=$1',[student]),e=>e.code==='42501');
-  for(const table of ['luq_accounts','luq_ledger','luq_initial_grants','luq_assistance_contents','luq_assistance_entitlements','luq_assistance_deliveries','problem_public_statements'])await assert.rejects(asRole('campus_worker',`SELECT * FROM ${table}`),e=>e.code==='42501');
+  for(const table of ['luq_accounts','luq_ledger','luq_initial_grants','luq_assistance_contents','luq_assistance_entitlements','luq_assistance_deliveries','luq_problem_solutions','problem_public_statements'])await assert.rejects(asRole('campus_worker',`SELECT * FROM ${table}`),e=>e.code==='42501');
+  const otherProblem=(await pool.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id',[account])).rows[0].id;
+  const content=(await asRole('campus_app',`INSERT INTO luq_assistance_contents(subject_key,version_id,kind,language,body,author_account_id)
+   VALUES($1,$2,'FULL_SOLUTION','','Reviewed solution material',$3) RETURNING id`,['problem:'+problem,version,account])).rows[0].id;
+  await assert.rejects(asRole('campus_app','INSERT INTO luq_problem_solutions(problem_id,content_id) VALUES($1,$2)',[otherProblem,content]),e=>e.code==='23514',
+   'the pointer cannot reference another problem’s content');
+  const invalidSource=(await asRole('campus_app',`INSERT INTO luq_assistance_contents(subject_key,version_id,kind,language,body,author_account_id)
+   VALUES($1,$2,'FULL_SOLUTION','','Mismatched historical source',$3) RETURNING id`,['problem:'+otherProblem,version,account])).rows[0].id;
+  await assert.rejects(asRole('campus_app','INSERT INTO luq_problem_solutions(problem_id,content_id) VALUES($1,$2)',[otherProblem,invalidSource]),e=>e.code==='23514',
+   'matching subject text cannot bypass the source version ownership check');
+  assert.equal((await asRole('campus_app',`SELECT ${sharedSolutionIdSql('$1::uuid','$2::uuid')} AS id`,[otherProblem,version])).rows[0].id,null,
+   'fallback selection also excludes a historical row whose version belongs to a different problem');
+  const translation=(await asRole('campus_app',`INSERT INTO luq_assistance_contents(subject_key,version_id,kind,language,body,author_account_id)
+   VALUES($1,$2,'FULL_TRANSLATION','zh-CN','译文',$3) RETURNING id`,['problem:'+problem,version,account])).rows[0].id;
+  await assert.rejects(asRole('campus_app','INSERT INTO luq_problem_solutions(problem_id,content_id) VALUES($1,$2)',[problem,translation]),e=>e.code==='23514');
+  await asRole('campus_app','INSERT INTO luq_problem_solutions(problem_id,content_id) VALUES($1,$2)',[problem,content]);
+  assert.equal((await asRole('campus_app','SELECT content_id FROM luq_problem_solutions WHERE problem_id=$1',[problem])).rows[0].content_id,content);
+  await assert.rejects(asRole('campus_app','UPDATE luq_problem_solutions SET created_at=clock_timestamp() WHERE problem_id=$1',[problem]),e=>e.code==='42501');
+  await assert.rejects(asRole('campus_app','DELETE FROM luq_problem_solutions WHERE problem_id=$1',[problem]),e=>e.code==='42501');
   await asRole('campus_app',`INSERT INTO problem_public_statements(version_id,language,statement,metadata,source_hash,content_hash,author_account_id,reviewer_account_id)
    VALUES($1,'en','Reviewed English','{}',$2,$2,$3,$3)`,[version,'a'.repeat(64),account]);
   assert.equal((await asRole('campus_app','SELECT statement FROM problem_public_statements WHERE version_id=$1',[version])).rows[0].statement,'Reviewed English');

@@ -43,6 +43,7 @@ import { learnerAssignmentCompletion, learnerSubmissionAssignmentCompletions } f
 import {activityClasses,handleTeachingAudience,handleClassHub} from './activity-audience.mjs';
 import { submissionHistory,problemOwnProgress,emptyOwnProgress } from './submission-history.mjs';
 import { legacyProblemSubmissions, legacyProblemSolved } from './problem-submissions.mjs';
+import { liveProblemVersionIdSql, resolveLiveProblemVersion, assertLiveProblemVersion } from './live-problem-version.mjs';
 import { LANGUAGES, languageLimitsFor, starterCodesFor } from './languages.mjs';
 import { avatarForIdentity, isPresetAvatar } from './avatars.mjs';
 import { normalizeNickname, nicknameTooLong } from './nickname-policy.mjs';
@@ -127,42 +128,15 @@ export async function createDomainServices(pool,config) {
  async function versionAccess(db,user,problemId,versionId) {
   uuid(problemId,'题目 ID');if(versionId) uuid(versionId,'版本 ID');
   const p=row(await db.query('SELECT * FROM problems WHERE id=$1',[problemId]));
-  if(p.archived_at){
-   // Archive hides the library entry, while students keep access to the
-   // immutable version they were assigned in work or timed practice.
-   if(!versionId)fail(404,'NOT_FOUND','题目不存在');
-   const selected=await db.query(`SELECT 1 FROM assignment_problems ap
-    JOIN assignments a ON a.id=ap.assignment_id
-    LEFT JOIN classes c ON c.id=a.class_id
-    WHERE ap.problem_id=$1 AND $2 IN (ap.version_id,ap.prior_version_id) AND (
-     $3::boolean
-     OR $4::boolean AND a.owner_account_id=$6
-     OR $5::boolean AND a.state='Published' AND EXISTS(SELECT 1 FROM assignment_participants part WHERE part.assignment_id=a.id AND part.identity_id=$7 AND NOT part.exempt)
-    ) LIMIT 1`,[problemId,versionId,rolesInclude(user,'admin'),rolesInclude(user,'teacher'),rolesInclude(user,'student'),user.id,user.identityId]);
-   if(!selected.rowCount){
-    const timed=await db.query(`SELECT 1 FROM timed_practice_problems tpp
-     JOIN timed_practices tp ON tp.id=tpp.practice_id
-     WHERE tpp.problem_id=$1 AND tpp.version_id=$2 AND (
-      $3::boolean
-      OR $4::boolean AND tp.owner_account_id=$6
-      OR $5::boolean AND (tp.state IN ('Published','ResultsPublished')
-       OR tp.state='Archived' AND tp.results_published_at IS NOT NULL) AND EXISTS(
-       SELECT 1 FROM timed_practice_participants part
-       LEFT JOIN timed_attempts attempt ON attempt.practice_id=part.practice_id AND attempt.identity_id=part.identity_id
-       WHERE part.practice_id=tp.id AND part.identity_id=$7 AND NOT part.exempt
-       AND (tp.results_published_at IS NOT NULL OR attempt.id IS NOT NULL))
-     ) LIMIT 1`,[problemId,versionId,rolesInclude(user,'admin'),rolesInclude(user,'teacher'),rolesInclude(user,'student'),user.id,user.identityId]);
-    if(!timed.rowCount)fail(404,'NOT_FOUND','题目不存在');
-   }
-  }
+  // Archived entries are hidden from navigation; explicit audit snapshots
+  // still go through the activity, ownership and submission permissions below.
+  if(p.archived_at&&!versionId)fail(404,'NOT_FOUND','题目不存在');
   const own=isStaff(user)&&(p.owner_account_id===user.id||rolesInclude(user,'admin'));let bankRead=false;
   if(isStaff(user)){try{bankRead=(await bankAccess(db,user,p.bank_id)).canRead;}catch(error){if(!['FORBIDDEN','NOT_FOUND'].includes(error.code))throw error;}}
   if(!versionId&&!own&&!bankRead){
-   // A pending replacement must not displace the latest approved public
-   // version. Assigned students can still reach an exact pending version.
-   const candidates=(await db.query(`SELECT * FROM problem_versions WHERE problem_id=$1 AND published_at IS NOT NULL
-    ORDER BY (school_visible_at IS NOT NULL) DESC,published_at DESC,created_at DESC,id DESC`,[problemId])).rows;
-   for(const candidate of candidates){const permissions=await problemPermissions(db,user,p,candidate);if(permissions.canRead)return {p,v:candidate,owner:permissions.canEdit,permissions};}
+   const v=await resolveLiveProblemVersion(db,problemId,{lock:false});
+   const permissions=await problemPermissions(db,user,p,v);
+   if(permissions.canRead)return {p,v,owner:permissions.canEdit,permissions};
    fail(404,'NOT_FOUND','题目不存在');
   }
   const r=versionId?await db.query('SELECT * FROM problem_versions WHERE id=$1 AND problem_id=$2',[versionId,problemId]):await db.query('SELECT * FROM problem_versions WHERE problem_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1',[problemId]);
@@ -205,9 +179,10 @@ export async function createDomainServices(pool,config) {
   if(a.state==='Draft'&&!canManage)fail(404,'NOT_FOUND','作业尚未发布');if(!isParticipant&&!canManage)fail(403,'FORBIDDEN','未分配该作业或无权管理');if(a.state==='Draft'&&!canManage)fail(404,'NOT_FOUND','作业尚未发布');return {...a,isParticipant:isParticipant&&a.state==='Published',canManage};
  }
  async function assignmentProblemRows(db,a) {
-  return (await db.query(`SELECT ap.problem_id,ap.version_id,ap.points,ap.position,v.title,v.metadata->'difficulty' difficulty,
+  return (await db.query(`SELECT ap.problem_id,v.id version_id,ap.points,ap.position,v.title,v.metadata->'difficulty' difficulty,
    COALESCE(global_reward.points,10) first_ac_points,COALESCE(assignment_reward.points,0) reward_points
-   FROM assignment_problems ap JOIN problem_versions v ON v.id=ap.version_id
+   FROM assignment_problems ap JOIN problems p ON p.id=ap.problem_id
+   JOIN problem_versions v ON v.id=COALESCE(${liveProblemVersionIdSql('p')},ap.version_id)
    LEFT JOIN point_rewards global_reward ON global_reward.problem_id=ap.problem_id AND global_reward.assignment_id IS NULL
    LEFT JOIN point_rewards assignment_reward ON assignment_reward.problem_id=ap.problem_id AND assignment_reward.assignment_id=ap.assignment_id
    LEFT JOIN LATERAL (SELECT chapter.position chapter_position,chapter.created_at chapter_created_at,chapter.id chapter_id,cp.position problem_position
@@ -474,11 +449,11 @@ export async function createDomainServices(pool,config) {
     const rows=(await pool.query(`SELECT v.*,
      (SELECT count(*) FROM test_cases tc WHERE tc.version_id=v.id AND tc.enabled) formal_test_count,
      p.bank_id,bank.visibility bank_visibility,
-     CASE WHEN $2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit'))
+     CASE WHEN NOT $7 AND ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit')))
       THEN p.current_version_id ELSE v.id END published_version_id,
-     CASE WHEN $2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit'))
+     CASE WHEN NOT $7 AND ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit')))
       THEN pv.title ELSE v.title END published_title,
-     CASE WHEN $2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit'))
+     CASE WHEN NOT $7 AND ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit')))
       THEN pv.metadata->'difficulty' ELSE v.metadata->'difficulty' END published_difficulty,
      ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission='edit')) can_edit,
      ($3 AND (${schoolPublishedTutorialProblemSql})) shared_tutorial
@@ -486,19 +461,22 @@ export async function createDomainServices(pool,config) {
     LEFT JOIN bank_permissions bp ON bp.bank_id=bank.id AND bp.account_id=$1
     JOIN LATERAL (
      SELECT * FROM problem_versions v WHERE v.problem_id=p.id
-     AND (NOT $7::boolean OR v.id=p.current_version_id AND v.published_at IS NOT NULL) AND (
+     AND (NOT $7::boolean OR v.id=${liveProblemVersionIdSql('p')})
+     AND ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit'))
+       OR v.id=${liveProblemVersionIdSql('p')}) AND (
       $2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit'))
       OR v.published_at IS NOT NULL AND bank.visibility='school' AND v.school_visible_at IS NOT NULL
       OR $5 AND v.published_at IS NOT NULL AND EXISTS (
        SELECT 1 FROM assignment_problems ap JOIN assignments assignment
         ON assignment.id=ap.assignment_id AND assignment.state='Published'
        JOIN assignment_participants part ON part.assignment_id=ap.assignment_id
-       WHERE v.id IN (ap.version_id,ap.prior_version_id) AND part.identity_id=$4 AND NOT part.exempt)
+       WHERE ap.problem_id=p.id AND part.identity_id=$4 AND NOT part.exempt)
       OR $5 AND v.published_at IS NOT NULL AND EXISTS (
        SELECT 1 FROM timed_practice_problems tp JOIN timed_practices practice ON practice.id=tp.practice_id
        JOIN timed_practice_participants part ON part.practice_id=tp.practice_id
        LEFT JOIN timed_attempts attempt ON attempt.practice_id=tp.practice_id AND attempt.identity_id=part.identity_id
-       WHERE tp.version_id=v.id AND part.identity_id=$4 AND NOT part.exempt
+       WHERE tp.problem_id=p.id AND part.identity_id=$4 AND NOT part.exempt
+        AND (practice.state IN ('Published','ResultsPublished') OR practice.state='Archived' AND practice.results_published_at IS NOT NULL)
         AND (practice.results_published_at IS NOT NULL OR attempt.id IS NOT NULL))
      ) ORDER BY
       CASE WHEN $2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit'))
@@ -557,7 +535,10 @@ export async function createDomainServices(pool,config) {
     return respond(200,{publishedCount:published.length,items:published.map(({problemId,versionId,title})=>({problemId,versionId,title,alreadyPublished:false}))});
    }
    m=route.match(/^\/problems\/([^/]+)$/);
-   if(m&&method==='GET')return respond(200,await problemResult(pool,user,m[1],url.searchParams.get('versionId')));
+   if(m&&method==='GET'){
+    const selected=url.searchParams.get('current')==='1'?(await resolveLiveProblemVersion(pool,m[1],{lock:false,allowArchived:true})).id:url.searchParams.get('versionId');
+    return respond(200,await problemResult(pool,user,m[1],selected));
+   }
    m=route.match(/^\/problems\/([^/]+)\/versions$/);
    if(m&&method==='POST'){
     staff(user);const input=problemInput(body);const v=await transaction(pool,async db=>{const {owner,p}=await versionAccess(db,user,m[1]);if(!owner)fail(403,'FORBIDDEN','无权修改该题');if(body.bankId&&input.bankId!==p.bank_id)fail(409,'BANK_IMMUTABLE','题目版本仍属于原题库；跨题库请新建副本并保留来源');return insertVersion(db,user,m[1],input);});return respond(201,await problemResult(pool,user,v.problem_id,v.id));
@@ -671,32 +652,26 @@ export async function createDomainServices(pool,config) {
      submitLimiter.check(user.id);
      await assertJudgeAdmission(db);
      if((await db.query("SELECT count(*)::int count FROM submissions WHERE identity_id=$1 AND status IN ('Waiting','Judging')",[user.identityId])).rows[0].count>=5)fail(429,'TOO_MANY_PENDING','最多同时等待 5 个运行，请等待已有结果');
-     let resolvedVersion=requestedVersion,assignment=null,priorAssignmentVersion=null;
+     let assignment=null;
      if(assignmentId){
-      // Serialize against teacher edits before reading the pinned version or
-      // checking its visibility. A concurrent version switch must yield one
-      // coherent assignment snapshot, never permission for an obsolete pin.
+      // Activity membership remains authoritative; its historical pin no
+      // longer selects the current teaching definition.
       await db.query('SELECT id FROM assignments WHERE id=$1 FOR SHARE',[assignmentId]);
       assignment=await assignmentAccess(db,user,assignmentId);
       if(!assignment.isParticipant)fail(403,'FORBIDDEN','只能作为被分配的学生提交作业，教师请使用练习预览');
       if(assignment.archived_at)fail(409,'ASSIGNMENT_ARCHIVED','作业已归档，不能在此作业中继续运行或提交；可从题库独立练习');
-      const pinned=row(await db.query('SELECT version_id,prior_version_id FROM assignment_problems WHERE assignment_id=$1 AND problem_id=$2',[assignmentId,problemId]));
-      priorAssignmentVersion=pinned.prior_version_id;
-      const correctingPrior=kind==='correction'&&requestedVersion&&requestedVersion===priorAssignmentVersion;
-      if(requestedVersion&&requestedVersion!==pinned.version_id&&!correctingPrior)fail(409,'VERSION_MISMATCH','提交版本与作业固定版本不同，请刷新作业');
-      resolvedVersion=correctingPrior?priorAssignmentVersion:pinned.version_id;
+      row(await db.query('SELECT problem_id FROM assignment_problems WHERE assignment_id=$1 AND problem_id=$2',[assignmentId,problemId]));
      }
-     if(!resolvedVersion&&timedPracticeId)resolvedVersion=row(await db.query('SELECT version_id FROM timed_practice_problems WHERE practice_id=$1 AND problem_id=$2',[timedPracticeId,problemId])).version_id;
-     if(!resolvedVersion&&originalId)resolvedVersion=(await submissionAccess(db,user,originalId)).version_id;
-     const {p,v:accessibleVersion,permissions}=await versionAccess(db,user,problemId,resolvedVersion);
-     // A student may still see an older approved version while a replacement
-     // awaits review. Submit exactly the version that access checked.
-     const submissionVersion=resolvedVersion||(permissions.canEdit||!accessibleVersion.published_at?p.current_version_id:accessibleVersion.id);
-     let v=row(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND published_at IS NOT NULL',[submissionVersion]),'学生运行需要已发布题目');
+     // Corrections retain the original judge snapshot. Every new run captures
+     // the one current definition under the same parent lock as publication.
+     const original=originalId?await submissionAccess(db,user,originalId):null;
+     let v=original?row(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND published_at IS NOT NULL',[original.version_id])):await resolveLiveProblemVersion(db,problemId);
+     const {permissions}=await versionAccess(db,user,problemId,v.id);
+     if(!original)assertLiveProblemVersion(requestedVersion,v.id);
      // The homework deadline limits official grades and activity rewards,
      // not admission to the judge. Persist the server's receipt time as usual.
      let acceptedAt=row(await db.query('SELECT clock_timestamp()::text AS accepted_at')).accepted_at;
-     if(originalId){const original=await submissionAccess(db,user,originalId);if(original.timed_attempt_id&&!(await db.query('SELECT 1 FROM timed_attempts attempt JOIN timed_practices practice ON practice.id=attempt.practice_id WHERE attempt.id=$1 AND practice.results_published_at IS NOT NULL',[original.timed_attempt_id])).rowCount)fail(409,'RESULTS_NOT_RELEASED','计时训练成绩发布后才能提交订正');if(original.identity_id!==user.identityId||original.problem_id!==problemId||!['submit','correction'].includes(original.kind))fail(400,'VALIDATION','只能订正自己的同题正式提交');if(assignmentId&&original.assignment_id!==assignmentId)fail(409,'ASSIGNMENT_CONTEXT_MISMATCH','作业订正须引用本作业的原提交');if(assignmentId&&original.version_id!==resolvedVersion&&original.version_id!==priorAssignmentVersion)fail(409,'VERSION_MISMATCH','作业订正须使用原提交的作业题目版本');if(requestedVersion&&requestedVersion!==original.version_id)fail(409,'VERSION_MISMATCH','订正版本与原提交不同');v=row(await db.query('SELECT * FROM problem_versions WHERE id=$1',[original.version_id]));}
+     if(original){if(original.timed_attempt_id&&!(await db.query('SELECT 1 FROM timed_attempts attempt JOIN timed_practices practice ON practice.id=attempt.practice_id WHERE attempt.id=$1 AND practice.results_published_at IS NOT NULL',[original.timed_attempt_id])).rowCount)fail(409,'RESULTS_NOT_RELEASED','计时训练成绩发布后才能提交订正');if(original.identity_id!==user.identityId||original.problem_id!==problemId||!['submit','correction'].includes(original.kind))fail(400,'VALIDATION','只能订正自己的同题正式提交');if(assignmentId&&original.assignment_id!==assignmentId)fail(409,'ASSIGNMENT_CONTEXT_MISMATCH','作业订正须引用本作业的原提交');if(requestedVersion&&requestedVersion!==original.version_id)fail(409,'VERSION_MISMATCH','订正版本与原提交不同');}
      if(!timedPracticeId&&!permissions.canRunFree)fail(403,'TIMED_CONTEXT_REQUIRED','该题目仅授权用于当前计时训练，请从训练工作区提交');const timedContext=await timed.prepareSubmission(db,user,body,v);if(timedContext){v=timedContext.version;acceptedAt=timedContext.acceptedAt;}if(kind==='samples'&&!(v.samples||[]).some(sample=>sample.enabled!==false))fail(409,'NO_PUBLIC_SAMPLES','此版本没有启用的公开样例，请联系教师补齐后运行');if(kind==='custom'&&v.mode==='function'){try{parseFunctionInput(customInput);}catch{fail(400,'VALIDATION','函数自测输入须为 JSON 参数数组或合法的 args/kwargs 对象');}}
      if(kind==='submit'){
       // A new request key cannot create a second attempt for identical code
@@ -704,10 +679,10 @@ export async function createDomainServices(pool,config) {
       const scope=[user.identityId,v.problem_id,v.id,assignment?.id??null,timedContext?.timedAttemptId??null,language];
       await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`submission-code:${canonicalHash([...scope,code])}`]);
       const duplicate=(await db.query(`SELECT status FROM submissions
-        WHERE identity_id=$1 AND problem_id=$2 AND version_id IN ($3,$8)
+        WHERE identity_id=$1 AND problem_id=$2 AND version_id=$3
           AND assignment_id IS NOT DISTINCT FROM $4::uuid AND timed_attempt_id IS NOT DISTINCT FROM $5::uuid
           AND language=$6 AND kind='submit' AND code=$7 AND status IN ('Waiting','Judging','AC')
-        ORDER BY (status='AC') DESC LIMIT 1`,[...scope,code,priorAssignmentVersion])).rows[0];
+        ORDER BY (status='AC') DESC LIMIT 1`,[...scope,code])).rows[0];
       if(duplicate?.status==='AC')fail(409,'SUBMISSION_ALREADY_ACCEPTED','相同代码已通过，不会重复计入提交次数。修改代码后可再次提交。');
       if(duplicate)fail(409,'SUBMISSION_ALREADY_PENDING','相同代码已提交，请等待当前判题结果。');
      }

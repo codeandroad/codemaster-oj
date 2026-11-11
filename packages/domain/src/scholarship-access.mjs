@@ -1,6 +1,7 @@
 import {fail,uuid,field,enumValue} from './security.mjs';
 import {problemPermissions} from './library.mjs';
 import {scholarshipActivityAccess} from './scholarship-rules.mjs';
+import {resolveLiveProblemVersion,assertLiveProblemVersion} from './live-problem-version.mjs';
 import {LEGACY_SCHOOL_ID} from './schools.mjs';
 
 const one=result=>{if(!result.rowCount)fail(404,'NOT_FOUND','题目或活动不存在');return result.rows[0];};
@@ -41,7 +42,9 @@ export async function resolveAssistanceTarget(db,user,input,{manage=false,helper
  if(manage&&!isScholarshipStaff(user))fail(403,'FORBIDDEN','需要教师权限');
  if(input.problemId){
   if(input.paper4AttemptId||input.paperId)fail(400,'VALIDATION','只能指定一种题目');
-  const problemId=uuid(input.problemId),versionId=uuid(input.versionId);
+  const problemId=uuid(input.problemId);
+  let versionId=uuid(input.versionId);
+  if(!manage){const live=await resolveLiveProblemVersion(db,problemId);assertLiveProblemVersion(versionId,live.id);versionId=live.id;}
   let p,v,permissions;
   if(helpers.versionAccess){({p,v,permissions}=await helpers.versionAccess(db,user,problemId,versionId));}
   else{
@@ -56,14 +59,14 @@ export async function resolveAssistanceTarget(db,user,input,{manage=false,helper
    if(input.timedAttemptId)fail(400,'VALIDATION','不能混用活动上下文');
    const a=one(await db.query(`SELECT a.* FROM assignments a JOIN assignment_problems ap ON ap.assignment_id=a.id
     JOIN assignment_participants part ON part.assignment_id=a.id AND part.identity_id=$2 AND NOT part.exempt
-    WHERE a.id=$1 AND a.state='Published' AND ap.problem_id=$3 AND ap.version_id=$4`,[uuid(input.assignmentId),user.identityId,p.id,v.id]));
+    WHERE a.id=$1 AND a.state='Published' AND ap.problem_id=$3 `,[uuid(input.assignmentId),user.identityId,p.id]));
    target.contextType='assignment';target.contextId=a.id;
   }
   if(!manage&&input.timedAttemptId){
    const a=one(await db.query(`SELECT t.id,tp.id practice_id FROM timed_attempts t JOIN timed_practices tp ON tp.id=t.practice_id
     JOIN timed_practice_problems p ON p.practice_id=tp.id JOIN timed_practice_participants part
     ON part.practice_id=tp.id AND part.identity_id=t.identity_id AND NOT part.exempt
-    WHERE t.id=$1 AND t.identity_id=$2 AND p.problem_id=$3 AND p.version_id=$4 AND tp.state<>'Draft'`,[uuid(input.timedAttemptId),user.identityId,p.id,v.id]));
+    WHERE t.id=$1 AND t.identity_id=$2 AND p.problem_id=$3 AND tp.state<>'Draft'`,[uuid(input.timedAttemptId),user.identityId,p.id]));
    target.contextType='timed';target.contextId=a.practice_id;
   }
   return target;

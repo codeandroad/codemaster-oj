@@ -2,11 +2,12 @@
 
 import { useEffect } from "react";
 import { useLocale } from "@/components/locale-context";
-import { input, panel, State, useData } from "@/components/teacher/shared";
+import { input, panel, State } from "@/components/teacher/shared";
 import type { AssistanceKind } from "./assistance";
 import { ContentForm } from "./content-form";
-import type { ContentResponse, ContentTarget } from "./content-model";
-import { SolutionContextPicker } from "./solution-context-picker";
+import type { ContentTarget } from "./content-model";
+import { useContentResource } from "./content-resource";
+import { SolutionUsageSummary } from "./solution-usage-summary";
 
 export type { ContentResponse, ContentTarget, AssistanceContent } from "./content-model";
 
@@ -41,7 +42,7 @@ export function ContentEditor({
   externalBusy?: boolean;
 }) {
   const tx = useText(),
-    contents = useData<ContentResponse>(
+    contents = useContentResource(
       `scholarship/contents?${new URLSearchParams(target)}`,
     );
   const content = contents.data?.items.find(
@@ -51,10 +52,12 @@ export function ContentEditor({
   );
   useEffect(() => {
     if (!autoSelect || contents.loading || contents.error || !contents.data) return;
-    const recommended = contents.data.recommendedVersionId;
-    if (recommended) onVersionChange(recommended);
-  }, [autoSelect, contents.loading, contents.error, contents.data, onVersionChange]);
-  const readyToEdit = !autoSelect && contents.data && !contents.loading && !contents.error;
+    onVersionChange(contents.data.recommendedVersionId || target.versionId);
+  }, [autoSelect, contents.loading, contents.error, contents.data, onVersionChange, target.versionId]);
+  const shared = kind === "FULL_SOLUTION" && "problemId" in target;
+  // Retain the mounted form while reference metadata refreshes after saving a
+  // problem snapshot. Its unsaved solution draft belongs to the problem.
+  const readyToEdit = contents.data && (shared || !autoSelect);
   return (
     <section className={`${panel} space-y-3 p-4`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -88,19 +91,16 @@ export function ContentEditor({
         )}
       </p>
       <State resource={contents} />
-      {"problemId" in target && contents.data?.versions && <SolutionContextPicker versions={contents.data.versions}
-        value={autoSelect ? undefined : target.versionId} onChange={onVersionChange}
-        disabled={contentPending || externalBusy || contents.loading || Boolean(contents.error)} selectionRequired={contents.data.selectionRequired} />}
+      {shared && contents.data && <SolutionUsageSummary versions={contents.data.versions ?? []} />}
       {readyToEdit && contents.data && (
         <ContentForm
-          key={`${kind}:${target.versionId}`}
+          key={`${kind}:${shared && "problemId" in target ? target.problemId : target.versionId}`}
           kind={kind}
           target={target}
           content={content}
           originalSolution={contents.data.originalSolution}
-          inheritedSolution={contents.data.inheritedSolution}
-          onVersionChange={onVersionChange}
-          disabled={externalBusy || contents.loading || Boolean(contents.error)}
+          legacySources={shared ? contents.data.sharedSolution?.legacySources : undefined}
+          disabled={externalBusy || autoSelect || contents.loading || Boolean(contents.error)}
           reload={contents.reload}
           onPendingChange={onPendingChange}
           onSaved={next => contents.setData(previous => ({

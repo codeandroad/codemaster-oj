@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import { ScholarshipIcon } from "./scholarship-icon";
 import { ScholarshipPopover } from "./scholarship-popover";
@@ -19,6 +20,7 @@ import {
   useData,
 } from "@/components/teacher/shared";
 import { StudentAudienceSelector } from "@/components/teacher/student-audience-selector";
+import { TeacherScholarshipPage } from "./teaching-page";
 import {
   apiMessage,
   productionApi,
@@ -306,8 +308,9 @@ export function StudentScholarshipPage({ endpoint = "scholarship/me" }: { endpoi
 }
 
 export function AdminScholarshipPage() {
-  const tx = useText(),
-    [tab, setTab] = useState("grant"),
+  const tx = useText(), search = useSearchParams(),
+    [tab, setTab] = useState(() => search.get("tab") === "solutions" ? "solutions" : "grant"),
+    [solutionsVisited, setSolutionsVisited] = useState(() => search.get("tab") === "solutions"),
     [ids, setIds] = useState<string[]>([]),
     [amount, setAmount] = useState(4),
     [reason, setReason] = useState("");
@@ -357,6 +360,7 @@ export function AdminScholarshipPage() {
           ["grant", tx("发放与调整", "Grants & adjustments")],
           ["audit", tx("流水与退款", "Audit & refunds")],
           ["settings", tx("价格与额度", "Prices & limits")],
+          ["solutions", tx("题解与辅助内容", "Solutions and assistance")],
         ].map(([value, label]) => (
           <Button
             key={value}
@@ -364,6 +368,7 @@ export function AdminScholarshipPage() {
             size="sm"
             onClick={() => {
               setTab(value);
+              if (value === "solutions") setSolutionsVisited(true);
               action.clear();
             }}
           >
@@ -371,6 +376,7 @@ export function AdminScholarshipPage() {
           </Button>
         ))}
       </div>
+      {solutionsVisited && <div hidden={tab !== "solutions"}><TeacherScholarshipPage admin /></div>}
       {tab === "grant" && (
         <section className={`${panel} space-y-4 p-4`}>
           <p className="text-sm text-muted-foreground">

@@ -86,6 +86,47 @@ test('Luq real Nest transport: role/CSRF boundary, idempotent grants, content pr
   assert.equal((await pool.query('SELECT count(*)::int n FROM luq_assistance_deliveries')).rows[0].n,0,'purchase is not answer delivery');
   assert.equal((await student.call('/scholarship/assistance/provide',{method:'POST',body:input})).body,'REVIEWED_SOLUTION_SENTINEL');
   await other.call('/scholarship/assistance/provide',{method:'POST',body:input,expected:403});
+
+  await t.test('review publishes ordered solutions without disrupting an existing unlock',async()=>{
+   const list='/scholarship/contents?'+new URLSearchParams({problemId,versionId});
+   const publish=`/scholarship/contents/${content.id}/publish`;
+   const [current]=(await teacher.call(list)).items;
+   const solutions=[
+    {title:'Direct method',body:current.body},
+    {title:'Alternative method',body:'REVIEWED_ALTERNATIVE_SENTINEL'},
+   ];
+   const edit={...input,body:current.body,solutions,expectedHash:current.contentHash};
+   await student.call('/scholarship/contents',{method:'POST',body:edit,expected:403});
+   await stranger.call('/scholarship/contents',{method:'POST',body:edit,expected:403});
+   await teacher.call('/scholarship/contents',{method:'POST',body:edit,badCsrf:true,expected:403});
+   const staged=await teacher.call('/scholarship/contents',{method:'POST',body:edit,expected:201});
+   assert.equal(staged.id,content.id);
+   assert.equal(staged.status,'published');
+   assert.notEqual(staged.contentHash,current.contentHash);
+   const [review]=(await admin.call(list)).items;
+   assert.equal(review.hasPendingSolutions,true);
+   assert.deepEqual(review.solutions.map(({title,body})=>({title,body})),solutions);
+   assert.equal(new Set(review.solutions.map(({id})=>id)).size,2);
+   await teacher.call('/scholarship/contents',{method:'POST',body:edit,expected:409});
+   await admin.call(publish,{method:'POST',body:{reviewed:true,expectedHash:current.contentHash},expected:409});
+
+   const pendingDelivery=await student.call('/scholarship/assistance/provide',{method:'POST',body:input});
+   assert.equal(pendingDelivery.body,current.body);
+   assert.equal(pendingDelivery.solutions,undefined);
+   await admin.call(publish,{method:'POST',body:{reviewed:true,expectedHash:review.contentHash}});
+   const [published]=(await teacher.call(list)).items;
+   assert.equal(Boolean(published.hasPendingSolutions),false);
+   const refreshedQuote=await student.call('/scholarship/assistance/quote',{method:'POST',body:input});
+   assert.equal(refreshedQuote.price,0);
+   assert.equal(refreshedQuote.solutions,undefined);
+   assert.ok(!JSON.stringify(refreshedQuote).includes('Alternative method'));
+   const publishedDelivery=await student.call('/scholarship/assistance/provide',{method:'POST',body:input});
+   assert.equal(publishedDelivery.body,current.body);
+   assert.deepEqual(publishedDelivery.solutions,review.solutions);
+   await other.call('/scholarship/assistance/provide',{method:'POST',body:input,expected:403});
+   assert.equal((await student.call('/scholarship/me')).balance,0);
+  });
+
   const rule={activityType:'assignment',activityId:assignmentId,amount:5,minimumAc:1,minimumScore:100,taskKind:'challenge',allowSolutionAssisted:false,expectedVersion:0};
   await stranger.call('/scholarship/reward-rules',{method:'POST',body:rule,expected:404});
   const saved=await teacher.call('/scholarship/reward-rules',{method:'POST',body:rule});assert.equal(saved.rule.version,1);

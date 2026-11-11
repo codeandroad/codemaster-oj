@@ -92,6 +92,38 @@ test('school scholarships: real roles, atomic rewards, consumption, timing and i
   });
   await t.test('exact balance is sufficient, price confirmation is enforced and a published new version reuses entitlement',async()=>{const x=await problem('Exact balance');await content(x,'FULL_SOLUTION');const available=(await call('two','wallet')).balance;await call('teacher','policies','POST',{targets:[x],kind:'FULL_SOLUTION',price:available,mode:'paid'});const price=await quote('two',x,'FULL_SOLUTION');await assert.rejects(call('two','assistance/unlock','POST',{...x,kind:'FULL_SOLUTION',requestId:randomUUID(),confirmedContentId:price.contentId,confirmedRevision:price.contentRevision,confirmedPrice:price.price-1}),e=>e.code==='QUOTE_CHANGED');await unlock('two',x,'FULL_SOLUTION');assert.equal((await call('two','wallet')).balance,0);await provide('two',x,'FULL_SOLUTION');const next=randomUUID();await owner.query('INSERT INTO school_problem_versions(school_id,id,problem_id,draft_revision,definition) SELECT school_id,$3,id,2,draft FROM school_problems WHERE school_id=$1 AND id=$2',[alpha.id,x.problemId,next]);await owner.query('UPDATE school_problems SET published_version_id=$3 WHERE school_id=$1 AND id=$2',[alpha.id,x.problemId,next]);const target={...x,versionId:next};assert.equal((await quote('two',target,'FULL_SOLUTION')).available,false);await content(target,'FULL_SOLUTION','New reviewed version');assert.equal((await quote('two',target,'FULL_SOLUTION')).price,0);assert.equal((await provide('two',target,'FULL_SOLUTION')).body,'New reviewed version');assert.equal((await call('two','wallet')).balance,0);});
   await t.test('leaderboard uses names and distinct rank accounting, hidden fields stay out of JSON',async()=>{const route=`/schools/${alpha.id}/leaderboard`;let result=(await handleSchoolLeaderboard({pool:app,user:users.one,route,method:'GET',url:new URL('http://qa.local'+route)})).body;assert.ok(result.items.find(i=>i.identityId===ids.one).points>=20);assert.equal(result.items.find(i=>i.identityId===ids.one).name,'one');const prior=result.items.find(i=>i.identityId===ids.one),balance=(await call('one','wallet')).balance;await submit('one',q);await finish('WA');result=(await handleSchoolLeaderboard({pool:app,user:users.one,route,method:'GET',url:new URL('http://qa.local'+route)})).body;const repeated=result.items.find(i=>i.identityId===ids.one);assert.equal(repeated.attempts,prior.attempts+1);assert.ok(repeated.acRate<prior.acRate,'post-AC assessed submissions follow the legacy AC-rate policy');assert.equal(repeated.points,prior.points);assert.equal((await call('one','wallet')).balance,balance);const config=await call('admin','settings');await call('admin','settings','PATCH',{...config,expectedRevision:config.revision,displayFields:{solved:false,attempts:false,acRate:false,scholarship:false}});result=(await handleSchoolLeaderboard({pool:app,user:users.one,route,method:'GET',url:new URL('http://qa.local'+route)})).body;assert.equal(result.items[0].scholarship,undefined);assert.equal(result.items[0].acRate,undefined);assert.equal(result.items[0].attempts,undefined);});
+  await t.test('school administrator reviews a whole solution bundle while the old solution remains available',async()=>{
+   const target=await problem('Multiple school solutions');
+   const kind='FULL_SOLUTION';
+   const primary='Print the constant.';
+   await content(target,kind,primary);
+   const solutions=[
+    {title:'Direct output',body:primary},
+    {title:'Arithmetic',body:'Compute the sum before printing.'},
+   ];
+   const detail='content?'+new URLSearchParams({...target,kind});
+   const current=await call('teacher',detail);
+   const edit={...target,kind,body:primary,solutions,expectedRevision:current.revision};
+   await assert.rejects(call('one','content','POST',edit),e=>e.status===404);
+   await assert.rejects(call('outsider','content','POST',edit),e=>e.status===404);
+   const staged=await call('teacher','content','POST',edit);
+   assert.equal(staged.status,'published');
+   const pending=await call('admin',detail);
+   assert.equal(pending.hasPendingSolutions,true);
+   await assert.rejects(call('teacher','content','POST',edit),e=>e.code==='REVISION_CONFLICT');
+   await assert.rejects(call('admin','contents/review','POST',{confirmReviewed:true,items:[current]}),e=>e.code==='REVISION_CONFLICT');
+   await assert.rejects(call('teacher','contents/review','POST',{confirmReviewed:true,items:[staged]}),e=>e.status===403);
+   await call('teacher','policies','POST',{targets:[target],kind,price:0,mode:'paid'});
+   const prior=await provide('one',target,kind);
+   assert.equal(prior.body,primary);
+   assert.equal(prior.solutions,undefined);
+   await call('admin','contents/review','POST',{confirmReviewed:true,items:[staged]});
+   const publishedQuote=await quote('one',target,kind);
+   assert.equal(publishedQuote.solutions,undefined);
+   assert.ok(!JSON.stringify(publishedQuote).includes('Arithmetic'));
+   const published=await provide('one',target,kind);
+   assert.deepEqual(published.solutions.map(({title,body})=>({title,body})),solutions);
+  });
  }finally{await Promise.all([app?.end(),worker?.end()]);await owner.end();await manager.query(`DROP SCHEMA ${schema} CASCADE`);await manager.end();}
 });
 
@@ -101,7 +133,7 @@ test('scholarship migration preserves historical AC and grants only the configur
  try{
   await manager.query(`CREATE SCHEMA ${schema}`);
   // This disposable schema defers scholarship tables and dependent migrations.
-  const deferred=['070_school_scholarship.sql','076_student_system_notifications.sql','077_assignment_completion_scholarship.sql','080_public_scholarship.sql','082_activity_bonus_scholarship.sql','085_public_practice_preferences.sql'];
+  const deferred=['070_school_scholarship.sql','076_student_system_notifications.sql','077_assignment_completion_scholarship.sql','080_public_scholarship.sql','082_activity_bonus_scholarship.sql','085_public_practice_preferences.sql','096_problem_solution_bundles.sql'];
   await db.query('CREATE TABLE schema_migrations(name text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');await db.query('INSERT INTO schema_migrations(name) SELECT unnest($1::text[])',[deferred]);await migrate(db);
   const person=(await db.query("INSERT INTO identities(kind,number,name) VALUES('personal','history','History') RETURNING id")).rows[0],user=(await db.query("INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,'history','unusable-qa') RETURNING id",[person.id])).rows[0];
   const school=await provisionSchool(db,{slug:'history-alpha',name:'History',adminUsername:'history'});await db.query("UPDATE school_memberships SET role='student' WHERE school_id=$1 AND account_id=$2",[school.id,user.id]);

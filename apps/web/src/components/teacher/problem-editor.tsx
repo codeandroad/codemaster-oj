@@ -4,7 +4,7 @@ import { ProblemTutorialEditor } from "./problem-tutorial-editor";
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useNavigationBlocker } from "@/components/navigation";
+import { AppLink, useNavigationBlocker } from "@/components/navigation";
 import {
   Copy,
   Eye,
@@ -15,7 +15,7 @@ import {
   Send,
   Trash2,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { ProblemPublicationStatus } from "@/components/problem-publication-status";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
 import {
@@ -657,6 +657,10 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                 onChange={(v) => update("referenceCode", v)}
               />
               <MathEditor fieldName="editorial" label={tr("题解", "Solution")} value={problem.editorial ?? ""} disabled={!editable} onChange={value=>update("editorial",value)} rows={5}/>
+              {saved?.versionId && editable && <AppLink className={buttonVariants({ size: "sm", variant: "secondary" })}
+                href={`/teacher/scholarship?${new URLSearchParams({ targetType: "problem", targetId: saved.id, versionId: saved.versionId, kind: "FULL_SOLUTION" })}`}>
+                {tr("管理学员题解", "Manage student solutions")}
+              </AppLink>}
             </div>
             <aside className="space-y-4">
               <Field label={tr("分级提示", "Progressive hints")}>

@@ -6,6 +6,7 @@ import {createApiApplication} from '../dist/application.js';
 import {createPool} from '../../../packages/domain/src/db.mjs';
 import {migrate} from '../../../packages/domain/src/migrate.mjs';
 import {loadConfig} from '../../../packages/domain/src/application.mjs';
+import {hashPassword} from '../../../packages/domain/src/security.mjs';
 import {seedPublicScholarshipProblem} from '../../../packages/domain/test/helpers/public-scholarship.mjs';
 
 test('public scholarship HTTP uses shared purchase rules without exposing private school content',
@@ -25,6 +26,8 @@ test('public scholarship HTTP uses shared purchase rules without exposing privat
   await owner.query(grants.replaceAll('SCHEMA public',`SCHEMA ${schema}`));
   const appUrl=new URL(baseUrl);appUrl.searchParams.set('options',`-crole=campus_app -csearch_path=${schema}`);
   const origin='http://public-aid.test',password=randomBytes(24).toString('base64url');
+  await owner.query("UPDATE accounts SET username='public-aid-author',password_hash=$2 WHERE id=$1",[problem.authorId,await hashPassword(password)]);
+  await owner.query("INSERT INTO account_roles(account_id,role) VALUES($1,'teacher')",[problem.authorId]);
   app=await createApiApplication({databaseUrl:appUrl.href,logger:false,config:loadConfig({SESSION_SECRET:randomBytes(32).toString('base64url'),APP_ORIGIN:origin,COOKIE_SECURE:'false'})});
   await app.listen(0,'127.0.0.1');const base=await app.getUrl();
   async function request(path,{auth,body,method='GET',status=200,csrf=true}={}) {
@@ -97,6 +100,28 @@ test('public scholarship HTTP uses shared purchase rules without exposing privat
    assert.equal((await wallet(other)).balance,0);
    await aid('provide',solution,{auth:other,status:403});
    assert.equal((await owner.query("SELECT count(*)::int n FROM luq_ledger WHERE identity_id=$1 AND kind='purchase'",[learner.identityId])).rows[0].n,2);
+  });
+  await t.test('public delivery adds reviewed alternatives to the existing entitlement',async()=>{
+   const login=await request('/auth/login',{method:'POST',body:{username:'public-aid-author',password}});
+   const auth={cookie:login.cookie,csrf:login.data.csrfToken};
+   const solution={...input,kind:'FULL_SOLUTION',language:''};
+   const contents='/scholarship/contents';
+   const {data:{items}}=await request(contents+'?'+new URLSearchParams({problemId:problem.problemId,versionId:problem.versionId}),{auth});
+   const primary=items.find(item=>item.kind==='FULL_SOLUTION');
+   const solutions=[
+    {title:'Literal output',body:primary.body},
+    {title:'Arithmetic expression',body:'Evaluate the sum.\n```python\nprint(2 + 3)\n```'},
+   ];
+   const edit=await request(contents,{auth,method:'POST',status:201,body:{...solution,body:primary.body,solutions,expectedHash:primary.contentHash}});
+   assert.equal((await aid('provide',solution)).data.solutions,undefined);
+   await request(`${contents}/${primary.id}/publish`,{auth,method:'POST',body:{reviewed:true,expectedHash:edit.data.contentHash}});
+   const {data:quoted}=await aid('quote',solution);
+   assert.equal(quoted.solutions,undefined);
+   assert.ok(!JSON.stringify(quoted).includes('Arithmetic expression'));
+   const {data:delivered}=await aid('provide',solution);
+   assert.deepEqual(delivered.solutions.map(({title,body})=>({title,body})),solutions);
+   await aid('provide',solution,{auth:other,status:403});
+   assert.equal((await wallet()).balance,92);
   });
   await t.test('drafts, withdrawn aid and revoked publication block even previously paid rights',async()=>{
    const pending={...input,problemId:draft.problemId,versionId:draft.versionId};

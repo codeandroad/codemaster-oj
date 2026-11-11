@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import {
   useData,
 } from "@/components/teacher/shared";
 import { date, LessonContent } from "@/components/student/shared";
-import { productionApi, type Assignment, type ProductionProblem } from "@/lib/production-api";
+import { ApiError, productionApi, type Assignment, type ProductionProblem } from "@/lib/production-api";
 import type {
   Paper4Paper,
   Paper4PaperSummary,
@@ -26,6 +26,15 @@ import type {
 import type { AssistanceKind } from "./assistance";
 import { ScholarshipBatchPrices } from "./batch-prices";
 import { ScholarshipBatchReview } from "./batch-review";
+import {
+  sameSolutionDraft,
+  SolutionAlternativesEditor,
+  SolutionDiscardDialog,
+  solutionDraftError,
+  SolutionDraftPreview,
+  useSolutionDraftNavigation,
+  type SolutionDraft,
+} from "./solution-alternatives-editor";
 
 type TargetType =
   | "problem"
@@ -38,13 +47,14 @@ interface Activity {
   id: string;
   title: string;
 }
-interface Content {
+interface Content extends SolutionDraft {
   id: string;
   versionId: string;
   kind: AssistanceKind;
   language: string;
-  body: string;
   status: string;
+  contentHash?: string;
+  hasPendingSolutions?: boolean;
   publishedAt?: string;
 }
 interface Policy {
@@ -102,7 +112,7 @@ function kindName(
     : tx("完整题解与参考代码", "Full solution and reference code");
 }
 
-export function TeacherScholarshipPage() {
+export function TeacherScholarshipPage({ admin = false }: { admin?: boolean }) {
   const tx = useText(),
     search = useSearchParams();
   const [targetType, setTargetType] = useState<TargetType>(
@@ -119,6 +129,7 @@ export function TeacherScholarshipPage() {
   const [mode, setMode] = useState<"single" | "batch" | "review">(
     search.get("mode") === "review" ? "review" : search.get("mode") === "batch" ? "batch" : "single",
   ), [policyRevision, setPolicyRevision] = useState(0);
+  const [contentPending, setContentPending] = useState(false);
   const single = mode === "single";
   function changeMode(next: "single" | "batch" | "review") {
     setMode(next);
@@ -175,9 +186,9 @@ export function TeacherScholarshipPage() {
         : null;
   return (
     <div className="space-y-4">
-      <h1 className="text-lg font-bold">
+      {!admin && <h1 className="text-lg font-bold">
         {tx("奖学金管理", "Scholarship management")}
-      </h1>
+      </h1>}
       <p className="text-sm text-muted-foreground">
         {tx(
           "先选择负责的题目或活动。内容审核发布与活动开放规则分别管理；奖学金不改变原有成绩或榜分。",
@@ -185,9 +196,9 @@ export function TeacherScholarshipPage() {
         )}
       </p>
       <div className="flex flex-wrap gap-2" role="group" aria-label={tx("管理方式", "Management mode")}>
-        <Button size="sm" variant={single ? "primary" : "secondary"} aria-pressed={single} onClick={() => changeMode("single")}>{tx("单项内容与规则", "Content and rules")}</Button>
-        <Button size="sm" variant={mode === "batch" ? "primary" : "secondary"} aria-pressed={mode === "batch"} onClick={() => changeMode("batch")}>{tx("批量解锁价格", "Batch unlock prices")}</Button>
-        <Button size="sm" variant={mode === "review" ? "primary" : "secondary"} aria-pressed={mode === "review"} onClick={() => changeMode("review")}>{tx("批量审核题解", "Batch solution review")}</Button>
+        <Button size="sm" variant={single ? "primary" : "secondary"} disabled={contentPending} aria-pressed={single} onClick={() => changeMode("single")}>{tx("单项内容与规则", "Content and rules")}</Button>
+        <Button size="sm" variant={mode === "batch" ? "primary" : "secondary"} disabled={contentPending} aria-pressed={mode === "batch"} onClick={() => changeMode("batch")}>{tx("批量解锁价格", "Batch unlock prices")}</Button>
+        <Button size="sm" variant={mode === "review" ? "primary" : "secondary"} disabled={contentPending} aria-pressed={mode === "review"} onClick={() => changeMode("review")}>{tx("批量审核题解", "Batch solution review")}</Button>
       </div>
       <section
         className={`${panel} grid gap-3 p-4 sm:grid-cols-[200px_minmax(0,1fr)]`}
@@ -195,6 +206,7 @@ export function TeacherScholarshipPage() {
         <Field label={tx("管理对象", "Manage")}>
           <select
             className={input}
+            disabled={contentPending}
             value={targetType}
             onChange={(event) => {
               setTargetType(event.target.value as TargetType);
@@ -214,6 +226,7 @@ export function TeacherScholarshipPage() {
         {single && <Field label={tx("选择题目或活动", "Select problem or activity")}>
           <select
             className={input}
+            disabled={contentPending}
             value={targetId}
             onChange={(event) => {
               setTargetId(event.target.value);
@@ -235,6 +248,7 @@ export function TeacherScholarshipPage() {
             <Field label={tx("大题", "Question")}>
               <select
                 className={input}
+                disabled={contentPending}
                 value={selectedQuestion}
                 onChange={(event) => setQuestionKey(event.target.value)}
               >
@@ -249,12 +263,14 @@ export function TeacherScholarshipPage() {
         )}
       </section>
       {mode === "batch" && (targetType === "problem" || targetType === "paper4") && !picker.loading && !picker.error && <ScholarshipBatchPrices key={targetType} targetType={targetType} choices={choices ?? []} initialIds={(search.get("ids") ?? "").split(",").filter(Boolean)} onSaved={() => setPolicyRevision(value => value + 1)}/>}
-      {mode === "review" && (targetType === "problem" || targetType === "paper4") && <ScholarshipBatchReview key={targetType} targetType={targetType}/>}
+      {mode === "review" && (targetType === "problem" || targetType === "paper4") && <ScholarshipBatchReview key={targetType} targetType={targetType} admin={admin}/>}
       {single && contentTarget && (
         <ContentEditor
           key={JSON.stringify(contentTarget)}
           target={contentTarget}
-          initialKind={search.get("kind") === "FULL_SOLUTION" ? "FULL_SOLUTION" : "FULL_TRANSLATION"}
+          initialKind={admin || search.get("kind") === "FULL_SOLUTION" ? "FULL_SOLUTION" : "FULL_TRANSLATION"}
+          contentPending={contentPending}
+          onPendingChange={setContentPending}
         />
       )}
       {single && targetId && (
@@ -285,11 +301,15 @@ export function TeacherScholarshipPage() {
 function ContentEditor({
   target,
   initialKind = "FULL_TRANSLATION",
+  contentPending,
+  onPendingChange,
 }: {
   target:
     | { problemId: string; versionId: string }
     | { paperId: string; versionId: string; questionKey: string };
   initialKind?: AssistanceKind;
+  contentPending: boolean;
+  onPendingChange: (pending: boolean) => void;
 }) {
   const tx = useText(),
     contents = useData<{ items: Content[] }>(
@@ -310,6 +330,7 @@ function ContentEditor({
         <select
           aria-label={tx("辅助类型", "Assistance type")}
           className={`${input} max-w-64`}
+          disabled={contentPending}
           value={kind}
           onChange={(event) => setKind(event.target.value as AssistanceKind)}
         >
@@ -327,13 +348,18 @@ function ContentEditor({
         )}
       </p>
       <State resource={contents} />
-      {!contents.loading && !contents.error && (
+      {contents.data && (
         <ContentForm
-          key={`${kind}:${content?.id ?? "new"}:${content?.status ?? "new"}`}
+          key={kind}
           kind={kind}
           target={target}
           content={content}
+          disabled={contents.loading || Boolean(contents.error)}
           reload={contents.reload}
+          onPendingChange={onPendingChange}
+          onSaved={next => contents.setData(previous => ({
+            items: [...(previous?.items.filter(item => item.id !== next.id) ?? []), next],
+          }))}
         />
       )}
     </section>
@@ -344,25 +370,79 @@ function ContentForm({
   target,
   kind,
   content,
+  disabled,
   reload,
+  onPendingChange,
+  onSaved,
 }: {
-  target: { versionId: string };
+  target: { problemId?: string; versionId: string };
   kind: AssistanceKind;
   content?: Content;
+  disabled: boolean;
   reload: () => void;
+  onPendingChange: (pending: boolean) => void;
+  onSaved: (content: Content) => void;
 }) {
   const tx = useText(),
-    [body, setBody] = useState(content?.body ?? ""),
+    [draft, setDraft] = useState<SolutionDraft | null>(null),
     [reviewed, setReviewed] = useState(false),
     [preview, setPreview] = useState(false),
+    [conflict, setConflict] = useState(false),
+    [discard, setDiscard] = useState(false),
     action = useAction();
-  const unchanged = body === (content?.body ?? "");
+  const inFlight = useRef(false);
+  const saved = content ?? { body: "" };
+  const value = draft ?? saved;
+  const dirty = !sameSolutionDraft(value, saved);
+  const multiple = kind === "FULL_SOLUTION" && Boolean(target.problemId);
+  const published = content?.status === "published";
+  const unavailable = disabled || action.busy;
+  const canEdit = !unavailable && (!published || multiple);
+  const canSave = canEdit && dirty && !conflict && !solutionDraftError(value);
+  useSolutionDraftNavigation(dirty || action.busy);
+  useEffect(() => {
+    onPendingChange(dirty || action.busy);
+    return () => onPendingChange(false);
+  }, [dirty, action.busy, onPendingChange]);
+
+  function edit(next: SolutionDraft) {
+    setDraft(next);
+    setReviewed(false);
+    if (!conflict) action.clear();
+  }
+
+  function commit(operation: () => Promise<Content>, message: string) {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    void action.run(async () => {
+      try {
+        const next = await operation();
+        onSaved(next);
+        setDraft(null);
+        setReviewed(false);
+        return message;
+      } catch (cause) {
+        if (cause instanceof ApiError && cause.status === 409) setConflict(true);
+        throw cause;
+      }
+    }).finally(() => { inFlight.current = false; });
+  }
+
+  function reset() {
+    setDiscard(false);
+    setDraft(null);
+    setReviewed(false);
+    action.clear();
+    if (conflict) reload();
+    setConflict(false);
+  }
+
   return (
     <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
         {tx("\u7248\u672c", "Version")}{" "}
         <code>{target.versionId.slice(0, 8)}</code>
-        {content?.status === "published" &&
+        {published && !multiple &&
           tx(
             " \u00b7 \u5df2\u53d1\u5e03\u5185\u5bb9\u5df2\u51bb\u7ed3\uff0c\u4fee\u6539\u9700\u8981\u65b0\u9898\u76ee\u7248\u672c\u5e76\u91cd\u65b0\u5ba1\u6838\u3002",
             " \u00b7 Published content is frozen. Use a new problem version and review changes again.",
@@ -370,78 +450,74 @@ function ContentForm({
       </p>
       <p className="text-xs text-muted-foreground">
         {tx("当前状态：", "Status: ")}
-        {content?.status === "published"
+        {content?.hasPendingSolutions
+          ? tx("已发布 · 更新待审核", "Published · updates awaiting review")
+          : published
           ? tx("已发布", "Published")
           : content?.status === "draft"
             ? tx("草稿", "Draft")
             : (content?.status ?? tx("尚未录入", "Not authored"))}
       </p>
-      <Field
+      {multiple ? <SolutionAlternativesEditor value={value} onChange={edit} disabled={!canEdit} lockPrimaryBody={published} /> : <Field
         label={tx(
           "内容（Markdown，可包含代码块）",
           "Content (Markdown with code blocks)",
         )}
       >
         <textarea
-          className={`${area} min-h-56 font-mono`}
-          value={body}
+          className={`${area} min-h-56 resize-none font-mono`}
+          value={value.body}
           maxLength={200000}
-          onChange={(event) => {
-            setBody(event.target.value);
-            setReviewed(false);
-          }}
-          disabled={action.busy || content?.status === "published"}
+          onChange={(event) => edit({ body: event.target.value })}
+          disabled={!canEdit}
         />
-      </Field>
+      </Field>}
       <div className="flex flex-wrap gap-2">
         <Button
           size="sm"
           variant="secondary"
-          disabled={
-            action.busy || !body.trim() || content?.status === "published"
-          }
-          onClick={() =>
-            void action.run(async () => {
-              await productionApi("scholarship/contents", {
-                method: "POST",
-                body: {
-                  ...target,
-                  kind,
-                  language: kind === "FULL_TRANSLATION" ? "zh-CN" : "",
-                  body,
-                },
-              });
-              reload();
-              return tx(
-                "草稿已保存，审核发布后学生才能获取。",
-                "Draft saved. Students can access it after review and publication.",
-              );
-            })
-          }
+          disabled={!canSave}
+          aria-busy={action.busy}
+          onClick={() => commit(() => productionApi<Content>("scholarship/contents", {
+            method: "POST",
+            body: {
+              ...target,
+              ...value,
+              kind,
+              language: kind === "FULL_TRANSLATION" ? "zh-CN" : "",
+              expectedHash: content?.contentHash,
+            },
+          }), published
+            ? tx("更新已保存为草稿，等待审核。", "Updates saved for review.")
+            : tx("草稿已保存，审核发布后学生才能获取。", "Draft saved. Students can access it after review and publication."))}
         >
           {tx("保存草稿", "Save draft")}
         </Button>
         <Button
           size="sm"
           variant="ghost"
-          disabled={!body.trim()}
+          disabled={!value.body.trim()}
           onClick={() => setPreview(!preview)}
         >
           {preview ? tx("收起预览", "Hide preview") : tx("预览", "Preview")}
         </Button>
+        {(dirty || conflict) && <Button size="sm" variant="ghost" disabled={action.busy} onClick={() => dirty ? setDiscard(true) : reset()}>
+          {conflict ? tx("重新载入", "Reload") : tx("放弃修改", "Discard changes")}
+        </Button>}
       </div>
       {preview && (
         <div className="rounded-md border border-border p-4">
-          <LessonContent content={body} />
+          {kind === "FULL_SOLUTION" ? <SolutionDraftPreview draft={value} /> : <LessonContent content={value.body} />}
         </div>
       )}
-      {content && content.status !== "published" && unchanged && (
+      {content && (!published || content.hasPendingSolutions) && !dirty && !conflict && (
         <>
           <label className="flex items-start gap-2 text-sm">
             <input
               className="mt-1 accent-primary"
               type="checkbox"
               checked={reviewed}
+              disabled={unavailable}
               onChange={(event) => setReviewed(event.target.checked)}
             />
             {tx(
@@ -451,26 +527,19 @@ function ContentForm({
           </label>
           <Button
             size="sm"
-            disabled={action.busy || !reviewed}
-            onClick={() =>
-              void action.run(async () => {
-                await productionApi(
-                  `scholarship/contents/${encodeURIComponent(content.id)}/publish`,
-                  { method: "POST", body: { reviewed: true } },
-                );
-                reload();
-                return tx(
-                  "内容已审核发布。",
-                  "Content reviewed and published.",
-                );
-              })
-            }
+            disabled={unavailable || !reviewed}
+            aria-busy={action.busy}
+            onClick={() => commit(() => productionApi<Content>(`scholarship/contents/${encodeURIComponent(content.id)}/publish`, {
+              method: "POST", body: { reviewed: true, expectedHash: content.contentHash },
+            }), tx("内容已审核发布。", "Content reviewed and published."))}
           >
             {tx("审核并发布", "Review and publish")}
           </Button>
         </>
       )}
       <Feedback action={action} />
+      {dirty && <p className="text-xs text-muted-foreground">{tx("保存或放弃修改后可切换题目和辅助类型。", "Save or discard edits to switch problems or assistance type.")}</p>}
+      {discard && <SolutionDiscardDialog reload={conflict} onCancel={() => setDiscard(false)} onDiscard={reset} />}
     </div>
   );
 }

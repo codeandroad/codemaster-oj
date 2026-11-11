@@ -2,7 +2,7 @@
 
 import { useRef, useState, type ChangeEvent } from "react";
 import { useLocale } from "@/components/locale-context";
-import { SolutionContent } from "@/components/scholarship/solution-content";
+import { SolutionBundle, type SolutionArticle } from "@/components/scholarship/solution-content";
 import { Button } from "@/components/ui/button";
 import { useRangeSelection } from "@/components/ui/use-range-selection";
 import { type EditorTheme } from "@/components/student/editor-themes";
@@ -20,6 +20,7 @@ interface ReviewItem {
   contentId: string | null;
   contentHash: string | null;
   status: Status;
+  hasPendingSolutions?: boolean;
   publishedAt: string | null;
 }
 interface ReviewList {
@@ -35,6 +36,7 @@ interface ReviewContent {
   body: string;
   status: string;
   contentHash: string;
+  solutions?: SolutionArticle[];
 }
 interface PublishResult {
   requestId: string;
@@ -57,13 +59,17 @@ function statusLabel(status: Status, tx: Text) {
     withdrawn: tx("已撤回", "Withdrawn"),
   }[status];
 }
+function reviewStatus(item: ReviewItem, tx: Text) {
+  return item.hasPendingSolutions ? tx("更新待审核", "Updates awaiting review") : statusLabel(item.status, tx);
+}
 function itemLabel(item: ReviewItem) {
   return item.questionKey
     ? `${item.title} · ${item.questionKey}${item.questionTitle ? ` ${item.questionTitle}` : ""}`
     : item.title;
 }
-function editorHref(item: ReviewItem) {
-  return `/teacher/scholarship?${new URLSearchParams({
+function editorHref(item: ReviewItem, admin: boolean) {
+  return `/${admin ? "admin" : "teacher"}/scholarship?${new URLSearchParams({
+    ...(admin ? { tab: "solutions" } : {}),
     targetType: item.targetType,
     targetId: item.targetId,
     versionId: item.versionId,
@@ -76,7 +82,7 @@ function selectable(item: ReviewItem) {
 }
 
 /** The list contains metadata only. Content is fetched on explicit staff preview. */
-export function ScholarshipBatchReview({ targetType }: { targetType: "problem" | "paper4" }) {
+export function ScholarshipBatchReview({ targetType, admin = false }: { targetType: "problem" | "paper4"; admin?: boolean }) {
   const { locale } = useLocale();
   const tx: Text = (zh, en) => locale === "en" ? en : zh;
   const list = useData<ReviewList>(`scholarship/contents/review?${new URLSearchParams({ targetType })}`);
@@ -205,10 +211,10 @@ export function ScholarshipBatchReview({ targetType }: { targetType: "problem" |
           <td className="p-2 text-center"><input type="checkbox" aria-label={tx(`选择 ${itemLabel(item)}`, `Select ${itemLabel(item)}`)} checked={Boolean(item.contentId && selected.includes(item.contentId))} disabled={busy || !selectable(item)} onChange={event => changeDraftSelection(item, event)}/></td>
           <td className="break-words px-2 py-2"><span className="font-medium">{item.title}</span>{item.questionKey && <span className="mt-0.5 block text-xs text-muted-foreground">{item.questionKey}{item.questionTitle ? ` · ${item.questionTitle}` : ""}</span>}</td>
           <td className="px-2 py-2"><code className="text-xs" title={item.versionId}>{item.versionId.slice(0, 8)}</code></td>
-          <td className="px-2 py-2"><span className={`inline-block rounded border px-1.5 py-0.5 text-xs ${statusStyle[item.status]}`}>{statusLabel(item.status, tx)}</span></td>
+          <td className="px-2 py-2"><span className={`inline-block rounded border px-1.5 py-0.5 text-xs ${statusStyle[item.status]}`}>{reviewStatus(item, tx)}</span></td>
           <td className="px-2 py-1"><div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             {item.contentId && <Button size="sm" variant="ghost" className="h-8 px-1" disabled={busy} onClick={() => setPreview(item)}>{tx("预览", "Preview")}</Button>}
-            {item.status !== "published" && <a href={editorHref(item)} className="inline-flex min-h-8 items-center font-medium text-primary hover:underline">{item.status === "missing" ? tx("录入", "Author") : tx("编辑", "Edit")}</a>}
+            {(item.status !== "published" || item.targetType === "problem") && <a href={editorHref(item, admin)} className="inline-flex min-h-8 items-center font-medium text-primary hover:underline">{item.status === "missing" ? tx("录入", "Author") : tx("编辑", "Edit")}</a>}
           </div></td>
         </tr>)}</tbody>
       </table>
@@ -247,9 +253,9 @@ function SolutionPreview({ item, onClose, onRefresh }: { item: ReviewItem; onClo
   return <Modal title={tx("参考答案预览", "Solution preview")} onClose={onClose} wide>
     <div className="space-y-3">
       <p className="text-sm font-medium">{itemLabel(item)}</p>
-      <p className="text-xs text-muted-foreground">{tx("版本", "Version")} <code>{item.versionId.slice(0, 8)}</code> · {statusLabel(item.status, tx)}</p>
+      <p className="text-xs text-muted-foreground">{tx("版本", "Version")} <code>{item.versionId.slice(0, 8)}</code> · {reviewStatus(item, tx)}</p>
       <State resource={contents}/>
-      {!contents.loading && !contents.error && (content ? <SolutionContent body={content.body} theme={theme} onThemeChange={setTheme}/> : <div className="space-y-2"><p role="alert" className="text-sm text-destructive">{tx("此题解已变更，请刷新状态后重新核对。", "This solution has changed. Refresh status and review again.")}</p><Button size="sm" variant="secondary" onClick={onRefresh}>{tx("刷新并重新核对", "Refresh and review again")}</Button></div>)}
+      {!contents.loading && !contents.error && (content ? <SolutionBundle body={content.body} solutions={content.solutions} theme={theme} onThemeChange={setTheme}/> : <div className="space-y-2"><p role="alert" className="text-sm text-destructive">{tx("此题解已变更，请刷新状态后重新核对。", "This solution has changed. Refresh status and review again.")}</p><Button size="sm" variant="secondary" onClick={onRefresh}>{tx("刷新并重新核对", "Refresh and review again")}</Button></div>)}
     </div>
   </Modal>;
 }

@@ -6,12 +6,21 @@ import { useLocale } from "@/components/locale-context";
 import { inputClass } from "@/components/admin/common";
 import { Button } from "@/components/ui/button";
 import { Modal, useData } from "@/components/teacher/shared";
-import { SolutionContent } from "@/components/scholarship/solution-content";
+import { SolutionBundle, type SolutionArticle } from "@/components/scholarship/solution-content";
 import { MathContent } from "@/components/math-content";
-import { apiMessage, productionApi, productionId } from "@/lib/production-api";
+import { ApiError, apiMessage, productionApi, productionId } from "@/lib/production-api";
 import { ScholarshipIcon } from "@/components/scholarship/scholarship-icon";
 import { ScholarshipPopover } from "@/components/scholarship/scholarship-popover";
 import { useData as useStudentData } from "@/components/student/shared";
+import {
+  sameSolutionDraft,
+  SolutionAlternativesEditor,
+  SolutionDiscardDialog,
+  solutionDraftError,
+  SolutionDraftPreview,
+  useSolutionDraftNavigation,
+  type SolutionDraft,
+} from "@/components/scholarship/solution-alternatives-editor";
 
 export type SchoolAssistanceTarget = {
   type: "problem" | "paper4";
@@ -33,11 +42,11 @@ type Settings = {
   revision: number;
   displayFields: Record<string, boolean>;
 };
-type Content = { id?: string; body: string; revision: number; status: string };
+type Content = SolutionDraft & { id?: string; revision: number; status: string; hasPendingSolutions?: boolean };
 type Target = SchoolAssistanceTarget & {
   subjectKey: string;
   title: string;
-  contents: { id: string; kind: Kind; revision: number; status: string }[];
+  contents: { id: string; kind: Kind; revision: number; status: string; hasPendingSolutions?: boolean }[];
   policies: {
     kind: Kind;
     mode: string;
@@ -102,14 +111,17 @@ function SchoolAssistanceContents({
       contentId: string;
       contentRevision: number;
     } | null>(null),
-    [provided, setProvided] = useState<string | null>(null),
+    [provided, setProvided] = useState<{ body: string; solutions?: SolutionArticle[] } | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const lock = useRef(false),
     request = useRef<string | null>(null);
+  const problemSolutions = kind === "FULL_SOLUTION" && target.type === "problem";
   const title =
     kind === "FULL_SOLUTION"
-      ? tx("完整题解与参考代码", "Full solution and reference code")
+      ? problemSolutions
+        ? tx("题解与参考代码", "Solutions and reference code")
+        : tx("完整题解与参考代码", "Full solution and reference code")
       : tx("中文题面", "Chinese translation");
   async function prepare() {
     if (lock.current) return;
@@ -151,11 +163,11 @@ function SchoolAssistanceContents({
         });
         notify();
       }
-      const content = await productionApi<{ body: string }>(
+      const content = await productionApi<{ body: string; solutions?: SolutionArticle[] }>(
         `${prefix(schoolId)}/assistance/provide`,
         { method: "POST", body: { ...target, kind } },
       );
-      setProvided(content.body);
+      setProvided(content);
       setQuote(null);
     } catch (e) {
       setError(apiMessage(e));
@@ -169,23 +181,30 @@ function SchoolAssistanceContents({
       <Feedback error={error} />
       {provided !== null ? (
         kind === "FULL_SOLUTION" ? (
-          <SolutionContent body={provided} />
+          <SolutionBundle body={provided.body} solutions={provided.solutions} />
         ) : (
-          <MathContent content={provided} />
+          <MathContent content={provided.body} />
         )
       ) : (
-        <Button
-          variant="secondary"
-          disabled={busy}
-          onClick={() => void prepare()}
-        >
-          {kind === "FULL_SOLUTION" ? (
-            <BookOpen className="size-4" />
-          ) : (
-            <Languages className="size-4" />
+        <>
+          {problemSolutions && (
+            <p className="text-sm text-muted-foreground">
+              {tx("一次解锁即可查看此版本已发布的所有题解。", "Unlock all published solutions for this version together.")}
+            </p>
           )}
-          {tx("查看开放方式与价格", "View access and price")}
-        </Button>
+          <Button
+            variant="secondary"
+            disabled={busy}
+            onClick={() => void prepare()}
+          >
+            {kind === "FULL_SOLUTION" ? (
+              <BookOpen className="size-4" />
+            ) : (
+              <Languages className="size-4" />
+            )}
+            {tx("查看开放方式与价格", "View access and price")}
+          </Button>
+        </>
       )}
       {quote && (
         <Modal
@@ -1149,9 +1168,10 @@ function ScholarshipContents({
     [error, setError] = useState(""),
     anchor = useRef<string | null>(null);
   const state = (i: Target) => i.contents.find((c) => c.kind === kind),
+    reviewStatus = (i: Target) => state(i)?.hasPendingSolutions ? "draft" : state(i)?.status ?? "missing",
     items = (data.data?.items ?? []).filter(
       (i) =>
-        (status === "all" || (state(i)?.status ?? "missing") === status) &&
+        (status === "all" || reviewStatus(i) === status) &&
         i.title.toLowerCase().includes(q.toLowerCase()),
     ),
     chosen = (data.data?.items ?? []).filter((i) =>
@@ -1188,7 +1208,7 @@ function ScholarshipContents({
       const contents = chosen
         .map(state)
         .filter(
-          (c): c is NonNullable<typeof c> => !!c && c.status !== "published",
+          (c): c is NonNullable<typeof c> => !!c && (c.status !== "published" || Boolean(c.hasPendingSolutions)),
         );
       if (contents.length !== chosen.length)
         throw new Error(
@@ -1290,7 +1310,7 @@ function ScholarshipContents({
           <Button
             disabled={
               !selected.length ||
-              chosen.some((i) => !state(i) || state(i)?.status === "published")
+              chosen.some((i) => ["missing", "published"].includes(reviewStatus(i)))
             }
             onClick={() => {
               setConfirmed(false);
@@ -1341,6 +1361,7 @@ function ScholarshipContents({
             <tbody>
               {items.map((i) => {
                 const c = state(i),
+                  displayStatus = reviewStatus(i),
                   p = i.policies.find((p) => p.kind === kind);
                 return (
                   <tr className="border-t border-border" key={i.subjectKey}>
@@ -1364,12 +1385,12 @@ function ScholarshipContents({
                     </td>
                     <td className="px-3 py-2">
                       <span
-                        className={`inline-flex items-center gap-1 ${c?.status === "published" ? "text-emerald-700" : "text-muted-foreground"}`}
+                        className={`inline-flex items-center gap-1 ${displayStatus === "published" ? "text-emerald-700" : "text-muted-foreground"}`}
                       >
-                        {c?.status === "published" && (
+                        {displayStatus === "published" && (
                           <Check className="size-3.5" />
                         )}
-                        {label(c?.status ?? "missing")}
+                        {c?.hasPendingSolutions ? tx("更新待审核", "Updates awaiting review") : label(displayStatus)}
                       </span>
                     </td>
                     <td className="px-3 py-2">
@@ -1528,51 +1549,83 @@ function ContentEditor({
       ) as [string, string][],
     ),
     data = useData<Content>(`${prefix(schoolId)}/content?${query}`),
-    [text, setText] = useState<string | null>(null),
+    [draft, setDraft] = useState<SolutionDraft | null>(null),
     [preview, setPreview] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
+    [message, setMessage] = useState(""),
+    [conflict, setConflict] = useState(false),
+    [discard, setDiscard] = useState<"close" | "reload" | null>(null),
     [usage, setUsage] = useState(false);
-  const current = text ?? data.data?.body ?? "";
+  const inFlight = useRef(false);
+  const saved = data.data ?? { body: "" };
+  const value = draft ?? saved;
+  const dirty = !sameSolutionDraft(value, saved);
+  const multiple = kind === "FULL_SOLUTION" && target.type === "problem";
+  const disabled = busy || data.loading || Boolean(data.error) || !data.data;
+  const canSave = !disabled && dirty && !conflict && !solutionDraftError(value);
+  useSolutionDraftNavigation(dirty || busy);
   const records = useData<{
     items: { id: string; name: string; kind: string; providedAt: string }[];
   }>(usage ? `${prefix(schoolId)}/usage?${query}` : null);
+  function edit(next: SolutionDraft) {
+    setDraft(next);
+    setMessage("");
+    if (!conflict) setError("");
+  }
   async function save() {
-    if (busy || !data.data) return;
+    if (!canSave || !data.data || inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     setError("");
+    setMessage("");
     try {
-      await productionApi(`${prefix(schoolId)}/content`, {
+      const next = await productionApi<Omit<Content, keyof SolutionDraft>>(`${prefix(schoolId)}/content`, {
         method: "POST",
         body: {
           ...target,
+          ...value,
           kind,
-          body: current,
           expectedRevision: data.data.revision,
         },
       });
-      setText(null);
+      data.setData({ ...value, ...next });
+      setDraft(null);
+      setMessage(tx("草稿已保存，等待审核。", "Draft saved for review."));
       data.reload();
       onSaved();
     } catch (e) {
+      if (e instanceof ApiError && e.status === 409) setConflict(true);
       setError(apiMessage(e));
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   }
   function close() {
-    if (
-      !busy &&
-      (text === null ||
-        text === data.data?.body ||
-        window.confirm(tx("放弃未保存的内容？", "Discard unsaved content?")))
-    )
+    if (inFlight.current) return;
+    if (dirty) setDiscard("close");
+    else onClose();
+  }
+  function confirmDiscard() {
+    if (discard === "close") {
       onClose();
+      return;
+    }
+    setDiscard(null);
+    setDraft(null);
+    setConflict(false);
+    setError("");
+    data.reload();
   }
   return (
     <Modal wide title={target.title} onClose={close}>
       <div className="space-y-3">
         <Feedback error={error || data.error} />
+        {message && <p role="status" className="text-sm text-success">{message}</p>}
+        {data.data?.hasPendingSolutions && <p className="text-xs text-muted-foreground">{tx("已保存的更新等待审核。学员目前可查看已发布的题解。", "Saved updates are awaiting review. Students can still view the published solutions.")}</p>}
+        {conflict && <Button size="sm" variant="secondary" onClick={() => setDiscard("reload")}>{tx("重新载入", "Reload")}</Button>}
+        {data.error && !conflict && <Button size="sm" variant="secondary" onClick={data.reload}>{tx("重试", "Retry")}</Button>}
         <div className="flex flex-wrap gap-2">
           <Button
             variant={preview ? "secondary" : "default"}
@@ -1596,7 +1649,7 @@ function ContentEditor({
             {tx("学生使用记录", "Student usage")}
           </Button>
         </div>
-        {usage ? (
+        {data.loading && !data.data ? <Loading /> : usage ? (
           <>
             <Feedback error={records.error} />
             <div className="max-h-80 overflow-auto text-sm">
@@ -1622,12 +1675,12 @@ function ContentEditor({
         ) : preview ? (
           <div className="max-h-[60vh] overflow-y-auto">
             {kind === "FULL_SOLUTION" ? (
-              <SolutionContent body={current} />
+              <SolutionDraftPreview draft={value} />
             ) : (
-              <MathContent content={current} />
+              <MathContent content={value.body} />
             )}
           </div>
-        ) : (
+        ) : data.data && (
           <>
             <p className="text-xs text-muted-foreground">
               {tx(
@@ -1635,14 +1688,17 @@ function ContentEditor({
                 "Enter student-facing solution or translation content only. Saving creates a review draft; reference code, hidden tests and private notes are never copied automatically.",
               )}
             </p>
-            <textarea
+            {multiple ? <SolutionAlternativesEditor value={value} onChange={edit} disabled={disabled} /> : <textarea
               aria-label={tx("辅助内容", "Assistance content")}
-              className="min-h-80 w-full rounded-md border border-input bg-background p-3 font-mono text-sm"
-              value={current}
-              onChange={(e) => setText(e.target.value)}
-            />
+              className="min-h-80 w-full resize-none rounded-md border border-input bg-background p-3 font-mono text-sm"
+              value={value.body}
+              maxLength={200000}
+              disabled={disabled}
+              onChange={(e) => edit({ body: e.target.value })}
+            />}
             <Button
-              disabled={busy || !current.trim() || !data.data}
+              disabled={!canSave}
+              aria-busy={busy}
               onClick={() => void save()}
             >
               {tx("保存待审核草稿", "Save review draft")}
@@ -1650,6 +1706,7 @@ function ContentEditor({
           </>
         )}
       </div>
+      {discard && <SolutionDiscardDialog reload={discard === "reload"} onCancel={() => setDiscard(null)} onDiscard={confirmDiscard} />}
     </Modal>
   );
 }

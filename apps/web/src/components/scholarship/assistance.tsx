@@ -6,7 +6,7 @@ import { useLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/teacher/shared";
 import { LessonContent } from "@/components/student/shared";
-import { SolutionContent } from "@/components/scholarship/solution-content";
+import { SolutionBundle, type SolutionArticle } from "@/components/scholarship/solution-content";
 import { apiMessage, productionApi, productionId } from "@/lib/production-api";
 
 export type AssistanceKind = "FULL_TRANSLATION" | "FULL_SOLUTION";
@@ -35,6 +35,7 @@ interface Quote {
 }
 interface Provided {
   body: string;
+  solutions?: SolutionArticle[];
   kind: AssistanceKind;
   language: string;
   providedAt?: string;
@@ -68,10 +69,13 @@ export function ScholarshipAssistance<Content extends Provided = Provided>({
     kind,
     language: kind === "FULL_TRANSLATION" ? "zh-CN" : "",
   };
+  const problemSolutions = kind === "FULL_SOLUTION" && "problemId" in target;
   const title =
     kind === "FULL_TRANSLATION"
       ? tx("中文题面", "Chinese translation")
-      : tx("完整题解与参考代码", "Full solution and reference code");
+      : problemSolutions
+        ? tx("题解与参考代码", "Solutions and reference code")
+        : tx("完整题解与参考代码", "Full solution and reference code");
   async function prepare() {
     if (lock.current) return;
     lock.current = true;
@@ -140,7 +144,7 @@ export function ScholarshipAssistance<Content extends Provided = Provided>({
           {renderBody ? (
             renderBody(provided.body, provided)
           ) : kind === "FULL_SOLUTION" ? (
-            <SolutionContent body={provided.body} />
+            <SolutionBundle body={provided.body} solutions={provided.solutions} />
           ) : (
             <LessonContent content={provided.body} />
           )}
@@ -159,10 +163,15 @@ export function ScholarshipAssistance<Content extends Provided = Provided>({
                   "查看已审核的中文题面。翻译不影响首次 AC 的奖学金奖励。",
                   "Read the reviewed Chinese statement. Translation does not affect first-AC scholarship rewards.",
                 )
-              : tx(
-                  "查看已发布的题解。提交前查看完整答案会影响本题首次 AC 的奖学金奖励；成绩和排行榜积分不变。",
-                  "Read the published solution. Viewing a full solution before submitting affects first-AC scholarship rewards for this problem; grades and leaderboard points are unchanged.",
-                ))}
+              : problemSolutions
+                ? tx(
+                    "一次解锁即可查看此版本已发布的所有题解。提交前查看会影响本题首次 AC 的奖学金奖励。",
+                    "Unlock all published solutions for this version together. Viewing them before submitting affects this problem’s first-AC scholarship reward.",
+                  )
+                : tx(
+                    "查看已发布的题解。提交前查看完整答案会影响本题首次 AC 的奖学金奖励；成绩和排行榜积分不变。",
+                    "Read the published solution. Viewing a full solution before submitting affects first-AC scholarship rewards for this problem; grades and leaderboard points are unchanged.",
+                  ))}
           </p>
           <Button
             size="sm"

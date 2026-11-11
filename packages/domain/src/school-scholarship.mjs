@@ -3,6 +3,7 @@ import { auditSchool, LEGACY_SCHOOL_ID, lockSchoolTeaching, schoolRole } from '.
 import { lockScholarshipAssistance } from './scholarship-access.mjs';
 import { schoolActivityJobVisibleSql } from './school-activities.mjs';
 import { canonicalHash, enumValue, fail, field, integer, uuid } from './security.mjs';
+import { approvedAssistanceContent, editableAssistanceContent, pendingSolution, readAssistanceDraft } from './problem-solution-bundles.mjs';
 
 const reply=(body,status=200)=>({status,body});
 const kindOf=b=>enumValue(b.kind,['FULL_TRANSLATION','FULL_SOLUTION'],'Content type');
@@ -171,8 +172,8 @@ export async function handleSchoolScholarship({pool,user,route,method,body={},ur
    }));
    if(path==='assistance/provide'){
     if(st.quote.mode!=='free'&&!st.entitlement)fail(403,'PAYMENT_REQUIRED','Unlock this content first.');
-    const content=(await db.query("SELECT body FROM school_scholarship_contents WHERE school_id=$1 AND id=$2 AND status='published' FOR SHARE",[s,st.content.id])).rows[0];if(!content)fail(409,'CONTENT_CHANGED','Content has changed.');
-    const delivery=(await db.query('INSERT INTO school_scholarship_deliveries(school_id,identity_id,subject_key,version_id,kind,content_id,context_type,context_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id,provided_at',[s,i.id,st.t.subject,st.t.v.id,st.k,st.content.id,st.t.activityId?st.t.activityType:'practice',st.t.activityId])).rows[0];return reply({body:content.body,kind:st.k,language:st.language,contentId:st.content.id,providedAt:delivery.provided_at});
+    const content=(await db.query("SELECT id,body,solution_details FROM school_scholarship_contents WHERE school_id=$1 AND id=$2 AND status='published' FOR SHARE",[s,st.content.id])).rows[0];if(!content)fail(409,'CONTENT_CHANGED','Content has changed.');
+    const delivery=(await db.query('INSERT INTO school_scholarship_deliveries(school_id,identity_id,subject_key,version_id,kind,content_id,context_type,context_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id,provided_at',[s,i.id,st.t.subject,st.t.v.id,st.k,st.content.id,st.t.activityId?st.t.activityType:'practice',st.t.activityId])).rows[0];return reply({...approvedAssistanceContent(content),kind:st.k,language:st.language,contentId:st.content.id,providedAt:delivery.provided_at});
    }
   }
   if(path==='targets'&&method==='GET'){
@@ -181,19 +182,38 @@ export async function handleSchoolScholarship({pool,user,route,method,body={},ur
    for(const p of problems)items.push({type:'problem',problemId:p.id,versionId:p.version_id,title:p.title,subjectKey:`problem:${p.id}`});
    const papers=(await db.query(`SELECT p.id,p.published_version_id AS version_id,v.content FROM school_paper4_papers p JOIN school_paper4_versions v ON v.school_id=p.school_id AND v.id=p.published_version_id WHERE p.school_id=$1 AND ($2='school_admin' OR p.owner_account_id=$3) ORDER BY p.created_at DESC,p.id`,[s,role,user.id])).rows;
    for(const p of papers)for(const q of p.content.definition?.questions??[])items.push({type:'paper4',paperId:p.id,questionKey:q.key,versionId:p.version_id,title:`${p.content.shortTitle||p.content.title} · ${q.title}`,subjectKey:`paper4:${p.id}:${q.key}`});
-   const contents=(await db.query('SELECT id,subject_key,version_id,kind,status,revision FROM school_scholarship_contents WHERE school_id=$1',[s])).rows;const policies=(await db.query("SELECT * FROM school_scholarship_policies WHERE school_id=$1 AND target_type='subject'",[s])).rows;
-   return reply({items:items.map(i=>({...i,contents:contents.filter(c=>c.subject_key===i.subjectKey&&c.version_id===i.versionId).map(c=>({id:c.id,kind:c.kind,status:c.status,revision:c.revision})),policies:policies.filter(p=>p.target_key===i.subjectKey).map(p=>({kind:p.kind,mode:p.mode,price:p.price,opensAt:p.opens_at}))}))});
+   const contents=(await db.query('SELECT id,subject_key,version_id,kind,status,revision,pending_solution IS NOT NULL has_pending FROM school_scholarship_contents WHERE school_id=$1',[s])).rows;const policies=(await db.query("SELECT * FROM school_scholarship_policies WHERE school_id=$1 AND target_type='subject'",[s])).rows;
+   return reply({items:items.map(i=>({...i,contents:contents.filter(c=>c.subject_key===i.subjectKey&&c.version_id===i.versionId).map(c=>({id:c.id,kind:c.kind,status:c.status,revision:c.revision,...(c.has_pending?{hasPendingSolutions:true}:{})})),policies:policies.filter(p=>p.target_key===i.subjectKey).map(p=>({kind:p.kind,mode:p.mode,price:p.price,opensAt:p.opens_at}))}))});
   }
   if(path==='content'&&['GET','POST'].includes(method)){
    const b=method==='GET'?Object.fromEntries(url.searchParams):body,t=await target(db,s,user,role,b,{management:true}),k=kindOf(b),language=languageOf(k);
    const old=(await db.query('SELECT * FROM school_scholarship_contents WHERE school_id=$1 AND subject_key=$2 AND version_id=$3 AND kind=$4 AND language=$5 FOR UPDATE',[s,t.subject,t.v.id,k,language])).rows[0];
-   if(method==='GET')return reply(old?{id:old.id,body:old.body,status:old.status,revision:old.revision}:{body:'',status:'missing',revision:0});
-   if(integer(body.expectedRevision??0,0,2147483646,'Revision')!==(old?.revision??0))fail(409,'REVISION_CONFLICT','Content changed. Refresh first.');const text=field(body.body,'Content',{max:200000,trim:false});
-   const r=(await db.query(`INSERT INTO school_scholarship_contents(school_id,subject_key,version_id,kind,language,body,author_account_id) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(school_id,subject_key,version_id,kind,language) DO UPDATE SET body=EXCLUDED.body,status='draft',revision=school_scholarship_contents.revision+1,reviewer_account_id=NULL,published_at=NULL,updated_at=clock_timestamp() RETURNING id,revision,status`,[s,t.subject,t.v.id,k,language,text,user.id])).rows[0];await auditSchool(db,s,user.id,'scholarship.content.draft',r.id);return reply(r);
+   if(method==='GET')return reply(old?{id:old.id,...editableAssistanceContent(old),status:old.status,revision:old.revision}:{body:'',status:'missing',revision:0});
+   if(integer(body.expectedRevision??0,0,2147483646,'Revision')!==(old?.revision??0))fail(409,'REVISION_CONFLICT','Content changed. Refresh first.');
+   const draft=readAssistanceDraft(body,{subjectKey:t.subject,kind:k,previous:old});
+   const staged=old?.status==='published'&&body.solutions!==undefined;
+   const {rows:[saved]}=staged?await db.query(`UPDATE school_scholarship_contents SET pending_solution=$3,
+    revision=revision+1,updated_at=clock_timestamp() WHERE school_id=$1 AND id=$2 RETURNING *`,[s,old.id,pendingSolution(old,draft)]):
+    await db.query(`INSERT INTO school_scholarship_contents(school_id,subject_key,version_id,kind,language,body,author_account_id,solution_details)
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(school_id,subject_key,version_id,kind,language) DO UPDATE SET
+      body=EXCLUDED.body,solution_details=EXCLUDED.solution_details,status='draft',revision=school_scholarship_contents.revision+1,
+      reviewer_account_id=NULL,published_at=NULL,updated_at=clock_timestamp() RETURNING *`,[s,t.subject,t.v.id,k,language,draft.body,user.id,draft.details]);
+   await auditSchool(db,s,user.id,'scholarship.content.draft',saved.id);
+   return reply({id:saved.id,revision:saved.revision,status:saved.status,...(saved.pending_solution?{hasPendingSolutions:true}:{})});
   }
   if(path==='contents/review'&&method==='POST'){
    requireAdmin(role);if(body.confirmReviewed!==true||!Array.isArray(body.items)||!body.items.length||body.items.length>500)fail(400,'REVIEW_REQUIRED','Confirm review of up to 500 selected contents.');const publish=body.publish!==false;
-   for(const item of body.items){const id=uuid(item.id),rev=integer(item.revision,1,2147483646,'Revision');const r=(await db.query('SELECT * FROM school_scholarship_contents WHERE school_id=$1 AND id=$2 FOR UPDATE',[s,id])).rows[0];if(!r||r.revision!==rev)fail(409,'REVISION_CONFLICT','A selected content changed. Refresh first.');if(!r.body.trim())fail(400,'CONTENT_REQUIRED','Content is missing.');await db.query(`UPDATE school_scholarship_contents SET status=$3,reviewer_account_id=$4,published_at=CASE WHEN $3='published' THEN clock_timestamp() ELSE NULL END,revision=revision+1 WHERE school_id=$1 AND id=$2`,[s,id,publish?'published':'withdrawn',user.id]);await auditSchool(db,s,user.id,publish?'scholarship.content.publish':'scholarship.content.withdraw',id);}
+   for(const item of body.items){
+    const id=uuid(item.id),rev=integer(item.revision,1,2147483646,'Revision');
+    const r=(await db.query('SELECT * FROM school_scholarship_contents WHERE school_id=$1 AND id=$2 FOR UPDATE',[s,id])).rows[0];
+    if(!r||r.revision!==rev)fail(409,'REVISION_CONFLICT','A selected content changed. Refresh first.');
+    if(!editableAssistanceContent(r).body.trim())fail(400,'CONTENT_REQUIRED','Content is missing.');
+    await db.query(`UPDATE school_scholarship_contents SET status=$3,reviewer_account_id=$4,
+     published_at=CASE WHEN $3='published' THEN clock_timestamp() ELSE NULL END,revision=revision+1,
+     body=COALESCE(pending_solution->>'body',body),solution_details=COALESCE(pending_solution->'details',solution_details),pending_solution=NULL
+     WHERE school_id=$1 AND id=$2`,[s,id,publish?'published':'withdrawn',user.id]);
+    await auditSchool(db,s,user.id,publish?'scholarship.content.publish':'scholarship.content.withdraw',id);
+   }
    return reply({count:body.items.length});
   }
   if(path==='policies'&&method==='POST'){

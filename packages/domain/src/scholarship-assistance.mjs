@@ -1,17 +1,30 @@
 import {transaction} from './db.mjs';
-import {fail,field,uuid,enumValue,canonicalHash,integer} from './security.mjs';
+import {fail,uuid,enumValue,canonicalHash,integer} from './security.mjs';
 import {postScholarshipEntry,getScholarshipSettings} from './scholarship-ledger.mjs';
 import {scholarshipActivityAccess} from './scholarship-rules.mjs';
 import {assistanceKind,assistanceLanguage,resolveAssistanceTarget,resolveAssistancePolicy,assistancePolicyTarget,hasLegacyPracticeAc,lockScholarshipAssistance,isScholarshipStaff} from './scholarship-access.mjs';
+import {approvedAssistanceContent,editableAssistanceContent,pendingSolution,readAssistanceDraft} from './problem-solution-bundles.mjs';
 
 const response=(body,status=200)=>({status,body});
 const one=result=>{if(!result.rowCount)fail(404,'NOT_FOUND','辅助内容不存在');return result.rows[0];};
-const contentHash=r=>canonicalHash({id:r.id,subjectKey:r.subject_key,versionId:r.version_id,kind:r.kind,language:r.language,body:r.body});
-const contentShape=r=>({id:r.id,subjectKey:r.subject_key,versionId:r.version_id,kind:r.kind,language:r.language,body:r.body,status:r.status,authorAccountId:r.author_account_id,reviewerAccountId:r.reviewer_account_id,publishedAt:r.published_at,contentHash:contentHash(r)});
+const contentHash=r=>{
+ const {body,solutions}=editableAssistanceContent(r);
+ return canonicalHash({id:r.id,subjectKey:r.subject_key,versionId:r.version_id,kind:r.kind,language:r.language,body,solutions});
+};
+const contentShape=r=>({id:r.id,subjectKey:r.subject_key,versionId:r.version_id,kind:r.kind,language:r.language,...editableAssistanceContent(r),status:r.status,authorAccountId:r.author_account_id,reviewerAccountId:r.reviewer_account_id,publishedAt:r.published_at,contentHash:contentHash(r)});
 const policyShape=r=>({id:r.id,targetType:r.target_type,targetId:r.target_id,kind:r.kind,mode:r.mode,opensAt:r.opens_at,price:r.price??null,ruleVersion:r.rule_version});
 const inputFromUrl=url=>Object.fromEntries(url.searchParams.entries());
 async function audit(db,user,action,type,id,metadata={}){
  await db.query('INSERT INTO audit_events(actor_account_id,action,resource_type,resource_id,metadata) VALUES($1,$2,$3,$4,$5)',[user.id,action,type,String(id),metadata]);
+}
+async function publishAssistanceContent(db,user,row,requestId){
+ const saved=one(await db.query(`UPDATE luq_assistance_contents SET
+  status='published',reviewer_account_id=$2,published_at=clock_timestamp(),updated_at=clock_timestamp(),
+  body=COALESCE(pending_solution->>'body',body),solution_details=COALESCE(pending_solution->'details',solution_details),pending_solution=NULL
+  WHERE id=$1 RETURNING *`,[row.id,user.id]));
+ await audit(db,user,'luq.content_publish','luq_content',row.id,{requestId,kind:row.kind,language:row.language,
+  subjectKey:row.subject_key,versionId:row.version_id,contentHash:contentHash(row)});
+ return saved;
 }
 async function balance(db,identityId){return Number((await db.query('SELECT balance FROM luq_accounts WHERE identity_id=$1',[identityId])).rows[0]?.balance??0);}
 async function aidState(db,user,input,helpers){
@@ -97,11 +110,11 @@ export async function studentAssistanceOperation(db,user,action,body={},helpers=
    const state=await aidState(db,user,body,helpers);assertAvailable(state);
    if(state.policy.mode!=='free'&&!state.entitlement)fail(403,'UNLOCK_REQUIRED','请先确认并解锁辅助内容');
    // Body is fetched only after both current permission and entitlement have passed.
-   const content=one(await db.query(`SELECT body FROM luq_assistance_contents WHERE id=$1 AND status='published' FOR SHARE`,[state.content.id]));
+   const content=one(await db.query(`SELECT id,body,solution_details FROM luq_assistance_contents WHERE id=$1 AND status='published' FOR SHARE`,[state.content.id]));
    const delivery=one(await db.query(`INSERT INTO luq_assistance_deliveries
     (identity_id,subject_key,version_id,kind,language,content_id,entitlement_id,context_type,context_id)
     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id,provided_at`,[user.identityId,state.target.subjectKey,state.target.versionId,state.kind,state.language,state.content.id,state.entitlement?.id??null,state.target.contextType,state.target.contextId]));
-   return {body:content.body,kind:state.kind,language:state.language,providedAt:delivery.provided_at,contentId:state.content.id,deliveryId:delivery.id};
+   return {...approvedAssistanceContent(content),kind:state.kind,language:state.language,providedAt:delivery.provided_at,contentId:state.content.id,deliveryId:delivery.id};
  }
  return null;
 }
@@ -133,17 +146,18 @@ export async function handleScholarshipAssistance(ctx){
     CROSS JOIN LATERAL jsonb_array_elements(COALESCE(v.definition->'questions','[]'::jsonb)) WITH ORDINALITY q(question,position)
     WHERE p.delivery_kind='catalog' AND p.archived_at IS NULL AND ($2::boolean OR p.owner_account_id=$1)`;
   const rows=(await pool.query(`WITH subjects AS (${subjects})
-   SELECT s.*,c.id,c.kind,c.language,c.body,c.status,c.published_at
+   SELECT s.*,c.id,c.kind,c.language,c.body,c.status,c.published_at,c.solution_details,c.pending_solution
    FROM subjects s LEFT JOIN luq_assistance_contents c ON c.subject_key=s.subject_key AND c.version_id=s.version_id
     AND c.kind='FULL_SOLUTION' AND c.language=''
    ORDER BY s.title,s.target_id,s.position`,[user.id,user.roles.includes('admin')])).rows;
   const counts={published:0,draft:0,missing:0,withdrawn:0};
   const items=rows.map(row=>{
-   const status=row.id?row.status:'missing';counts[status]++;
+   const status=row.pending_solution?'draft':row.status??'missing';counts[status]++;
    return {targetType,targetId:row.target_id,title:row.title,
     ...(row.question_key?{questionKey:row.question_key,questionTitle:row.question_title}:{}),
     versionId:row.version_id,contentId:row.id??null,status,
-    contentHash:row.id?contentHash(row):null,publishedAt:row.published_at??null};
+    contentHash:row.id?contentHash(row):null,publishedAt:row.published_at??null,
+    ...(row.pending_solution?{hasPendingSolutions:true}:{})};
   });
   return response({items,counts,total:items.length});
  }
@@ -175,20 +189,17 @@ export async function handleScholarshipAssistance(ctx){
     if(row.kind!=='FULL_SOLUTION'||row.language!=='')fail(400,'CONTENT_KIND','批量审核入口仅支持完整题解与参考代码');
     if(contentHash(row)!==item.expectedHash)fail(409,'CONTENT_CHANGED','所选参考答案已修改，请刷新并重新审核；本批次未发布');
     if(row.status==='withdrawn')fail(409,'CONTENT_WITHDRAWN','所选参考答案已撤回，请先修订为草稿后重新审核；本批次未发布');
-    if(!row.body.trim())fail(409,'CONTENT_EMPTY','所选参考答案缺少正文；本批次未发布');
+    if(!editableAssistanceContent(row).body.trim())fail(409,'CONTENT_EMPTY','所选参考答案缺少正文；本批次未发布');
     checked.push(row);
    }
    const published=[];
    let publishedCount=0,alreadyPublishedCount=0;
    for(const row of checked){
-    if(row.status==='published'){
+    if(row.status==='published'&&!row.pending_solution){
      alreadyPublishedCount++;published.push({contentId:row.id,status:row.status,publishedAt:row.published_at?.toISOString()??null});continue;
     }
-    const saved=one(await db.query(`UPDATE luq_assistance_contents SET status='published',reviewer_account_id=$2,
-     published_at=clock_timestamp(),updated_at=clock_timestamp() WHERE id=$1 RETURNING id,status,published_at`,[row.id,user.id]));
+    const saved=await publishAssistanceContent(db,user,row,requestId);
     publishedCount++;published.push({contentId:saved.id,status:saved.status,publishedAt:saved.published_at.toISOString()});
-    await audit(db,user,'luq.content_publish','luq_content',row.id,{requestId,kind:row.kind,language:row.language,
-     subjectKey:row.subject_key,versionId:row.version_id,contentHash:contentHash(row)});
    }
    const result={requestId,publishedCount,alreadyPublishedCount,items:published};
    await db.query('INSERT INTO luq_content_batches(request_id,actor_account_id,request_hash,result) VALUES($1,$2,$3,$4)',[requestId,user.id,requestHash,result]);
@@ -202,16 +213,27 @@ export async function handleScholarshipAssistance(ctx){
   return response({items:items.map(contentShape)});
  }
  if(route==='/scholarship/contents'&&method==='POST'){
-  const kind=assistanceKind(body.kind),language=assistanceLanguage(kind,body.language),content=field(body.body,'辅助正文',{max:200000,trim:false});
-  if(!content.trim())fail(400,'VALIDATION','辅助正文不能为空');
+  const kind=assistanceKind(body.kind),language=assistanceLanguage(kind,body.language);
   return response(await transaction(pool,async db=>{
    const target=await resolveAssistanceTarget(db,user,body,{manage:true,helpers});
    await db.query("SELECT pg_advisory_xact_lock(hashtextextended('luq-content:'||$1,0))",[`${target.subjectKey}:${target.versionId}:${kind}:${language}`]);
-   const old=(await db.query('SELECT id,status FROM luq_assistance_contents WHERE subject_key=$1 AND version_id=$2 AND kind=$3 AND language=$4 FOR UPDATE',[target.subjectKey,target.versionId,kind,language])).rows[0];
-   if(old?.status==='published')fail(409,'PUBLISHED_CONTENT_IMMUTABLE','已发布辅助内容不可覆盖，请在新的题目版本中修订');
-   const saved=old?one(await db.query("UPDATE luq_assistance_contents SET body=$2,status='draft',updated_at=clock_timestamp() WHERE id=$1 RETURNING *",[old.id,content])):
-    one(await db.query(`INSERT INTO luq_assistance_contents(subject_key,version_id,kind,language,body,status,author_account_id)
-     VALUES($1,$2,$3,$4,$5,'draft',$6) RETURNING *`,[target.subjectKey,target.versionId,kind,language,content,user.id]));
+   const old=(await db.query('SELECT * FROM luq_assistance_contents WHERE subject_key=$1 AND version_id=$2 AND kind=$3 AND language=$4 FOR UPDATE',[target.subjectKey,target.versionId,kind,language])).rows[0];
+   if(old?.status==='published'&&body.solutions===undefined)fail(409,'PUBLISHED_CONTENT_IMMUTABLE','已发布辅助内容不可覆盖，请在新的题目版本中修订');
+   const draft=readAssistanceDraft(body,{subjectKey:target.subjectKey,kind,previous:old,requireNonBlank:true});
+   if(old&&(body.solutions!==undefined||editableAssistanceContent(old).solutions||body.expectedHash!==undefined)&&body.expectedHash!==contentHash(old)){
+    fail(409,'CONTENT_CHANGED','辅助内容已修改，请重新载入后再保存');
+   }
+   let saved;
+   if(old?.status==='published'){
+    if(draft.body!==old.body)fail(409,'PUBLISHED_CONTENT_IMMUTABLE','已发布的首篇题解正文不可覆盖，请在新的题目版本中修订');
+    const pending=pendingSolution(old,draft);
+    saved=one(await db.query('UPDATE luq_assistance_contents SET pending_solution=$2,updated_at=clock_timestamp() WHERE id=$1 RETURNING *',[old.id,pending]));
+   }else if(old){
+    saved=one(await db.query("UPDATE luq_assistance_contents SET body=$2,solution_details=$3,status='draft',updated_at=clock_timestamp() WHERE id=$1 RETURNING *",[old.id,draft.body,draft.details]));
+   }else{
+    saved=one(await db.query(`INSERT INTO luq_assistance_contents(subject_key,version_id,kind,language,body,status,author_account_id,solution_details)
+     VALUES($1,$2,$3,$4,$5,'draft',$6,$7) RETURNING *`,[target.subjectKey,target.versionId,kind,language,draft.body,user.id,draft.details]));
+   }
    await audit(db,user,'luq.content_draft','luq_content',saved.id,{subjectKey:target.subjectKey,versionId:target.versionId,kind,language});
    return contentShape(saved);
   }),201);
@@ -222,10 +244,11 @@ export async function handleScholarshipAssistance(ctx){
   return response(await transaction(pool,async db=>{
    const row=one(await db.query('SELECT * FROM luq_assistance_contents WHERE id=$1 FOR UPDATE',[uuid(publish[1])]));
    await contentTarget(db,user,row,helpers);
-   if(row.status==='published')return contentShape(row);
-   const saved=one(await db.query("UPDATE luq_assistance_contents SET status='published',reviewer_account_id=$2,published_at=clock_timestamp(),updated_at=clock_timestamp() WHERE id=$1 RETURNING *",[row.id,user.id]));
-   await audit(db,user,'luq.content_publish','luq_content',row.id,{kind:row.kind,language:row.language});
-   return contentShape(saved);
+   const needsReview=row.status!=='published'||row.pending_solution!==null;
+   if((body.expectedHash!==undefined||needsReview&&editableAssistanceContent(row).solutions)&&body.expectedHash!==contentHash(row)){
+    fail(409,'CONTENT_CHANGED','辅助内容已修改，请重新载入后再审核');
+   }
+   return contentShape(needsReview?await publishAssistanceContent(db,user,row):row);
   }));
  }
  if(route==='/scholarship/policies'&&method==='GET'){

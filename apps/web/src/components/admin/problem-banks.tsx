@@ -8,7 +8,7 @@ import { useState } from "react";
 import { Archive, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { AppLink } from "@/components/navigation";
 import { PageHeader } from "@/components/page-chrome";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { useLocale } from "@/components/locale-context";
 import { productionApi } from "@/lib/production-api";
 import { Drawer, Feedback, Loading, Modal, inputClass, panelClass, useData, useMutation } from "./common";
@@ -235,6 +235,10 @@ function ManagedProblemDetail({ id, bankArchived, onClose }: { id: string; bankA
         <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{version.title}{version.id === detail.data?.currentVersionId ? ` · ${tr("当前版本", "Current version")}` : ""}</h3><ProblemPublicationStatus problem={version} bankVisibility={detail.data?.bankVisibility}/></div>
         <p className="mt-2 whitespace-pre-wrap leading-6">{version.statement || tr("暂无题面", "No statement")}</p>
         <p className="mt-2 text-xs text-muted-foreground">{tr("验证", "Validation")}: {version.validationStatus} · {tr("校内公开", "School-wide")}: {version.schoolVisibleAt ? tr("是", "Yes") : tr("否", "No")}</p>
+        {!bankArchived && !detail.data?.archivedAt && <AppLink className={buttonVariants({ size: "sm", variant: "secondary", className: "mt-3" })}
+          href={`/admin/scholarship?${new URLSearchParams({ tab: "solutions", targetType: "problem", targetId: id, versionId: version.id, kind: "FULL_SOLUTION" })}`}>
+          {tr("管理学员题解", "Manage student solutions")}
+        </AppLink>}
         {version.id === detail.data?.currentVersionId && detail.data.bankVisibility === "school" &&
           !detail.data.archivedAt && version.rankReviewStatus === "approved" && version.schoolVisibleAt &&
           <PlatformProblemRequest key={version.id} problemId={id} versionId={version.id}/>}

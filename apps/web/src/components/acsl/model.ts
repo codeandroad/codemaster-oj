@@ -1,5 +1,6 @@
 import type { AcslLearningLink } from "./learning-links";
 import type { AcslDiagrams } from "./diagram-model";
+import type { CourseLocalizations } from "@/components/course-localization";
 
 export type AcslLanguage = "en" | "zh";
 export type LocalizedText = Record<AcslLanguage, string>;
@@ -56,7 +57,20 @@ export type AcslPaper = AcslPaperSummary & {
   questions: AcslQuestion[];
   programming: { id: string; title: string; solved: boolean } | null;
 };
-export type AcslCatalog = { enabled: boolean; items: AcslPaperSummary[] };
+export type AcslLearningCourse = {
+  courseId: string;
+  href: string;
+  title: string;
+  description: string;
+  localizations?: CourseLocalizations;
+  ownerScope: "platform";
+  sourceSchool?: string;
+  chapterCount: number;
+  completedChapters: number;
+  totalExercises: number;
+  completedExercises: number;
+};
+export type AcslCatalog = { enabled: boolean; items: AcslPaperSummary[]; learningCourses?: AcslLearningCourse[] };
 
 export const acslDivisions = [
   "Elementary",

@@ -48,6 +48,8 @@ export function AcslLearningLinks({
       (link) =>
         sourceUrl.pathname ===
           `/student/learning-paths/${link.courseId}/chapters/${link.chapterId}` ||
+        (sourceUrl.pathname === `/practice/courses/${link.courseId}` &&
+          sourceUrl.searchParams.get("chapterId") === link.chapterId) ||
         (sourceUrl.pathname === "/schools" &&
           sourceUrl.searchParams.get("courseId") === link.courseId &&
           sourceUrl.searchParams.get("chapterId") === link.chapterId),

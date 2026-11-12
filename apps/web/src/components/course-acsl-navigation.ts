@@ -36,7 +36,14 @@ function safeHref(value: string | null | undefined, schoolId: string, kind: "acs
   const params = source.searchParams;
   const output = new URL(source.pathname, localOrigin);
   const result = output.searchParams;
-  if (source.pathname === "/schools") {
+  if (source.pathname.startsWith("/practice/courses/")) {
+    const match = source.pathname.match(/^\/practice\/courses\/([^/]+)$/);
+    if (kind !== "course" || !match || !uuid.test(match[1]) ||
+        params.get("schoolId")?.toLowerCase() !== schoolId.toLowerCase() ||
+        params.has("chapterId") && !uuid.test(params.get("chapterId") ?? "")) return null;
+    result.set("schoolId", schoolId.toLowerCase());
+    if (params.has("chapterId")) result.set("chapterId", params.get("chapterId")!);
+  } else if (source.pathname === "/schools") {
     if (schoolId === legacySchoolId || params.get("schoolId")?.toLowerCase() !== schoolId.toLowerCase() ||
         params.get("section") !== (kind === "acsl" ? "acsl" : "courses") ||
         params.has("schoolRole") && params.get("schoolRole") !== "student") return null;

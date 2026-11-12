@@ -86,6 +86,31 @@ test("school-scoped routes keep their school and chapter when both directions ar
   assert.equal(acslLearningHref(course, schoolPaper, otherSchool), null);
 });
 
+test("catalog → platform course → practice and return keep school, filters and language", () => {
+  const platformCourse = `/practice/courses/${courseId}?chapterId=${chapterId}&schoolId=${otherSchool}`;
+  const catalog = `/schools?schoolId=${otherSchool}&section=acsl&${filters}`;
+  const lesson = acslLearningHref(platformCourse, catalog, otherSchool, "zh");
+  assert.equal(url(lesson).pathname, `/practice/courses/${courseId}`);
+  assert.equal(url(lesson).searchParams.get("schoolId"), otherSchool);
+  assert.equal(url(lesson).searchParams.get("chapterId"), chapterId);
+  const paper = `/schools?schoolId=${otherSchool}&section=acsl&paperId=${paperId}&questionId=q1`;
+  const practice = acslPracticeHref(paper, lesson, otherSchool, "en");
+  const returned = courseReturnHref(url(practice).searchParams, otherSchool);
+  assert.equal(url(returned).pathname, `/practice/courses/${courseId}`);
+  assert.equal(url(returned).searchParams.get("schoolId"), otherSchool);
+  assert.equal(url(returned).searchParams.get("contentLanguage"), "en");
+  const catalogReturn = url(acslReturnHref(url(returned).searchParams, otherSchool));
+  for (const [key, value] of new URLSearchParams(filters)) assert.equal(catalogReturn.searchParams.get(key), value);
+  assert.equal(catalogReturn.searchParams.get("paperId"), null);
+  assert.equal(catalogReturn.searchParams.get("contentLanguage"), "en");
+  assert.equal(safeCourseHref(platformCourse, school), null);
+  for (const target of [
+    `/practice/courses/${courseId}`, `/practice/courses/${courseId}?schoolId=${otherSchool}&chapterId=bad`,
+    `/practice/courses/${courseId}/edit?schoolId=${otherSchool}`, `/practice/courses/bad?schoolId=${otherSchool}`,
+    `${platformCourse}&schoolId=${school}`, `/practice?section=courses&courseId=${courseId}&schoolId=${otherSchool}`,
+  ]) assert.equal(safeCourseHref(target, otherSchool), null, target);
+});
+
 test("context survives normal view transitions without carrying arbitrary query data or growing recursively", () => {
   let practice = `${written}&${filters}&review=1&reviewMode=wrong&answer=D&identityId=private`;
   for (let i = 0; i < 20; i++) {

@@ -8,6 +8,11 @@ import { Feedback, Loading, useData, useMutation } from "@/components/admin/comm
 import { CourseAccessSummary, courseSourceName } from "@/components/course-access";
 import type { CourseLocalizations, ChapterLocalizations } from "@/components/course-localization";
 import { LearningCourseReader } from "@/components/student/learning-course-reader";
+import { CoursePracticeReturn } from "@/components/student/course-practice-return";
+import { CourseAcslPractice } from "@/components/student/course-acsl-practice";
+import type { CourseAcslLink } from "@/components/course-acsl";
+import { useCourseLanguage } from "@/components/course-language";
+import { courseLanguageHref } from "@/components/course-localization";
 import { AppLink } from "@/components/navigation";
 import { useCourseProgressRefresh } from "@/components/student/course-progress-refresh";
 import { LearningCourseList, LearningCourseRow, learningCourseTitleClass } from "@/components/student/learning-course-list";
@@ -56,6 +61,10 @@ type CourseDetail = {
     id: string;
     title: string;
     body: string;
+    objective?: string;
+    checkpoint?: string;
+    checkpointAnswer?: string;
+    acslLinks?: CourseAcslLink[];
     localizations?: ChapterLocalizations;
     sectionKey?: string | null;
     read: boolean;
@@ -179,6 +188,7 @@ function CourseAdmissionDialog({ entry, onUpdated, onClose, returnFocus }: {
 
 export function PublicCoursePage({ id, homeHref }: { id: string; homeHref: string }) {
   const router = useRouter();
+  const schoolId = useSearchParams().get("schoolId");
   const entry = useData<PublicCourseEntry>(`practice/courses/${encodeURIComponent(id)}/entry`);
   const [updated, setUpdated] = useState<PublicCourseEntry | null>(null);
   const course = updated ?? entry.data;
@@ -186,7 +196,7 @@ export function PublicCoursePage({ id, homeHref }: { id: string; homeHref: strin
   const catalogHref = courseSearchHref(homeHref, query);
   return <>
     <Loading resource={entry}>
-      {course?.admission === "direct" ? <CourseReader id={id} courseQuery={query}/>
+      {course?.admission === "direct" ? <CourseReader key={`${id}:${schoolId ?? "legacy"}`} id={id} courseQuery={query}/>
         : course && <CourseAdmissionDialog entry={course} onUpdated={setUpdated} onClose={() => router.replace(catalogHref)}/>}
     </Loading>
   </>;
@@ -195,9 +205,12 @@ export function PublicCoursePage({ id, homeHref }: { id: string; homeHref: strin
 function CourseReader({ id, courseQuery }: { id: string; courseQuery: string }) {
   const text = useSchoolText();
   const localError = useSchoolError();
-  const course = useData<CourseDetail>(`practice/courses/${encodeURIComponent(id)}`);
-  useCourseProgressRefresh(course);
   const location = useSearchParams(), pathname = usePathname();
+  const { language } = useCourseLanguage();
+  const schoolId = location.get("schoolId") ?? "00000000-0000-4000-8000-000000000052";
+  const schoolQuery = location.has("schoolId") ? `?${new URLSearchParams({ schoolId })}` : "";
+  const course = useData<CourseDetail>(`practice/courses/${encodeURIComponent(id)}${schoolQuery}`);
+  useCourseProgressRefresh(course);
   const chapterHref = (chapterId: string) => {
     const query = new URLSearchParams(location.toString());
     query.set("chapterId", chapterId);
@@ -207,7 +220,9 @@ function CourseReader({ id, courseQuery }: { id: string; courseQuery: string }) 
     course={{ ...course.data, chapterCount: course.data.chapters.length, taskCount: course.data.totalExercises,
       completedTasks: course.data.completedExercises }}
     chapters={course.data.chapters.map(chapter => ({
-      id: chapter.id, title: chapter.title, sectionKey: chapter.sectionKey, content: chapter.body, localizations: chapter.localizations, completed: chapter.read,
+      id: chapter.id, title: chapter.title, sectionKey: chapter.sectionKey, content: chapter.body,
+      objective: chapter.objective, checkpoint: chapter.checkpoint, checkpointAnswer: chapter.checkpointAnswer,
+      localizations: chapter.localizations, completed: chapter.read,
       problems: chapter.problems.map(problem => ({ id: problem.problemId, title: problem.title, completed: problem.solved,
         href: `/practice/problems?${new URLSearchParams({ problemId: problem.problemId, versionId: problem.versionId,
           publicCourseId: id, publicChapterId: chapter.id, ...(courseQuery && { courseQ: courseQuery }) })}`,
@@ -216,10 +231,17 @@ function CourseReader({ id, courseQuery }: { id: string; courseQuery: string }) 
     selectedChapterId={location.get("chapterId")} chapterHref={chapterHref} scrollKey={`public:${id}`}
     metadata={<CourseAccessSummary course={course.data} showAuthor
       accessLabel={[text("Public course", "公开课程"), courseSourceName(course.data)].filter(Boolean).join(" · ")}/>}
+    relatedActivities={course.data.ownerScope === "platform" ? <CoursePracticeReturn schoolId={schoolId}/> : undefined}
+    extraPractice={chapterId => {
+      if (course.data?.ownerScope !== "platform") return null;
+      const links = course.data.chapters.find(chapter => chapter.id === chapterId)?.acslLinks ?? [];
+      return links.length ? <CourseAcslPractice links={links} schoolId={schoolId} legacy={schoolId === "00000000-0000-4000-8000-000000000052"}
+        courseHref={courseLanguageHref(`/practice/courses/${encodeURIComponent(id)}?${new URLSearchParams({ schoolId, chapterId })}`, language)}/> : null;
+    }}
     canTrackProgress={course.data.canTrackProgress}
     onRead={async chapterId => {
       try {
-        await productionApi(`practice/courses/${encodeURIComponent(id)}/chapters/${encodeURIComponent(chapterId)}/read`, {
+        await productionApi(`practice/courses/${encodeURIComponent(id)}/chapters/${encodeURIComponent(chapterId)}/read${schoolQuery}`, {
           method: "POST", body: { read: true, expectedRevision: course.data!.revision },
         });
         course.reload();

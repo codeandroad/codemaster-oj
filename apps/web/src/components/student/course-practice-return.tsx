@@ -17,9 +17,9 @@ export function CoursePracticeReturn({ schoolId }: { schoolId: string }) {
         className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-primary hover:underline"
       >
         <ArrowLeft size={15} />
-        {locale === "en"
-          ? "Return to ACSL practice / review"
-          : "返回 ACSL 练习与复盘"}
+        {!new URL(href, "https://campus.invalid").searchParams.has("paperId")
+          ? locale === "en" ? "Return to ACSL papers" : "返回 ACSL 试卷目录"
+          : locale === "en" ? "Return to ACSL practice / review" : "返回 ACSL 练习与复盘"}
       </AppLink>
     </div>
   ) : null;

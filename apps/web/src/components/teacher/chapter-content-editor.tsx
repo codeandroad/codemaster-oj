@@ -3,6 +3,7 @@
 import { useId } from "react";
 import { useLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
+import { MathContent } from "@/components/math-content";
 import type { ChapterLocalizedDetails, CourseLanguage } from "@/components/course-localization";
 import {
   addChapterTranslation,
@@ -82,6 +83,7 @@ export function ChapterContentEditor({
         onChange={value => update(field, value)}
         rows={field === "content" ? 14 : 5}
         disabled={disabled}
+        renderPreview={value => <MathContent content={value} language={language === "original" ? originalLanguage ?? undefined : language}/>}
       />)}
     </fieldset>}
   </section>;

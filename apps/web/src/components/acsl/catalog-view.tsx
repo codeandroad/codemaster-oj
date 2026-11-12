@@ -4,6 +4,7 @@ import { useLocale } from "@/components/locale-context";
 import { AppLink } from "@/components/navigation";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { AcslCatalogFilters, useAcslCatalogState } from "./catalog-filters";
+import { AcslCatalogLearningCourses } from "./catalog-learning-courses";
 import { acslHref, acslRoundLabel, type AcslCatalog } from "./model";
 import { acslReviewHref, acslStageSummary } from "./stage-model";
 
@@ -28,6 +29,7 @@ export function AcslCatalogView({
     visibleSeasons,
     visibleCount,
     changeFilters,
+    catalogHref,
   } = useAcslCatalogState({
     items: catalog.items,
     baseHref,
@@ -39,6 +41,7 @@ export function AcslCatalogView({
 
   return (
     <div className="space-y-4" data-od-id="acsl-catalog">
+      <AcslCatalogLearningCourses courses={catalog.learningCourses ?? []} catalogHref={catalogHref} schoolId={schoolId}/>
       <AcslCatalogFilters
         filters={filters}
         seasons={seasons}

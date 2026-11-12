@@ -9,6 +9,9 @@ export type CourseChapter = {
   id: string;
   title: string;
   body: string;
+  objective?: string;
+  checkpoint?: string;
+  checkpointAnswer?: string;
   localizations?: ChapterLocalizations;
   acslLinks?: CourseAcslLink[];
   read?: boolean;

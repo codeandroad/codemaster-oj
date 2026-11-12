@@ -9,7 +9,7 @@ export function SiteFooter({ locale, current, className = "" }: {
 }) {
   return (
     <footer className={`flex flex-col gap-y-1 border-t border-border py-3 text-sm text-muted-foreground xl:flex-row xl:items-center xl:justify-between xl:gap-x-6 ${className}`}>
-      <p className="shrink-0">© CodeMaster</p>
+      <p className="shrink-0">© 2006 CodeMaster</p>
       <nav aria-label={locale === "zh" ? "网站政策与联系" : "Site policies and contact"}>
         <ul className="flex flex-wrap gap-x-3 xl:justify-end xl:gap-x-5">
           {sitePolicySlugs.map(document => (

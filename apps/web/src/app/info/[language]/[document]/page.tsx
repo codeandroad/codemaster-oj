@@ -103,7 +103,6 @@ export default async function SitePolicyPage({ params }: PageProps) {
               </section>
             ))}
             {related && <Link href={sitePolicyHref(language, related)} className={`${textLink} inline-flex min-h-10 items-center`}>{sitePolicyTitles[language][related]}</Link>}
-            {slug === "contact" && <Link href="/login?reset=1" className={`${textLink} inline-flex min-h-10 items-center`}>{chinese ? "打开密码重置页" : "Open password reset"}</Link>}
           </div>
         </article>
       </main>

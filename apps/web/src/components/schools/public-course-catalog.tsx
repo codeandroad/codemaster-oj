@@ -3,7 +3,7 @@
 import { useRef, useState, type MouseEvent } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Feedback, Loading, useData, useMutation } from "@/components/admin/common";
-import { CourseAccessSummary } from "@/components/course-access";
+import { CourseAccessSummary, courseSourceName } from "@/components/course-access";
 import type { CourseLocalizations, ChapterLocalizations } from "@/components/course-localization";
 import { LearningCourseReader } from "@/components/student/learning-course-reader";
 import { AppLink } from "@/components/navigation";
@@ -28,6 +28,7 @@ type PublicCourseEntry = {
   category?: string;
   difficulty?: "beginner" | "intermediate" | "advanced";
   coverKey?: string;
+  ownerScope?: "school" | "platform";
   sourceSchool?: string;
   revision: number;
   accessScope?: "school" | "classes";
@@ -41,6 +42,7 @@ type CourseDetail = {
   requiredLanguage?: SubmissionLanguage | null;
   localizations?: CourseLocalizations;
   revision: number;
+  ownerScope?: "school" | "platform";
   sourceSchool?: string;
   authorName?: string;
   authoredAt?: string;
@@ -104,7 +106,7 @@ export function PublicCourseCatalog({ courseHref, showSearch = true }: { courseH
             ? { value: course.completedChapters, total: course.chapterCount }
             : undefined;
           const chapterLabel = text(`${course.chapterCount} chapters`, `${course.chapterCount} 章`);
-          return <LearningCourseRow key={course.id} course={course} title={title} source={course.sourceSchool}
+          return <LearningCourseRow key={course.id} course={course} title={title} source={courseSourceName(course)}
             status={reading ? admission : `${admission} · ${chapterLabel}`} reading={reading}
             practice={course.admission === "direct" && course.totalExercises !== undefined ? { value: course.completedExercises ?? 0, total: course.totalExercises } : undefined} />;
         })}
@@ -129,6 +131,7 @@ function CourseAdmissionDialog({ entry, onUpdated, onClose, returnFocus }: {
   const text = useSchoolText();
   const action = useMutation();
   const submitting = useRef(false);
+  const source = courseSourceName(entry);
   const description = entry.admission === "pending"
     ? text("The school is reviewing your application.", "学校正在审核你的申请。")
     : entry.admission === "rejected"
@@ -159,7 +162,7 @@ function CourseAdmissionDialog({ entry, onUpdated, onClose, returnFocus }: {
       <DialogTitle className="pr-7">{entry.title}</DialogTitle>
       <DialogDescription>{description}</DialogDescription>
       {entry.description && <p className="whitespace-pre-wrap break-words text-sm">{entry.description}</p>}
-      {entry.sourceSchool && <p className="text-xs text-muted-foreground">{entry.sourceSchool}</p>}
+      {source && <p className="text-xs text-muted-foreground">{source}</p>}
       <Feedback action={action}/>
       <div className="flex flex-wrap justify-end gap-2">
         <Button variant="secondary" onClick={onClose} disabled={action.busy}>{text("Close", "关闭")}</Button>
@@ -207,7 +210,7 @@ function CourseReader({ id, courseQuery }: { id: string; courseQuery: string }) 
     }))}
     selectedChapterId={location.get("chapterId")} chapterHref={chapterHref} scrollKey={`public:${id}`}
     metadata={<CourseAccessSummary course={course.data} showAuthor
-      accessLabel={[text("Public course", "公开课程"), course.data.sourceSchool].filter(Boolean).join(" · ")}/>}
+      accessLabel={[text("Public course", "公开课程"), courseSourceName(course.data)].filter(Boolean).join(" · ")}/>}
     canTrackProgress={course.data.canTrackProgress}
     onRead={async chapterId => {
       try {

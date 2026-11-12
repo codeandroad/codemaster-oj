@@ -10,7 +10,7 @@ import { CoursePaper4Practice } from "./course-paper4-practice";
 import { useCourseProgressRefresh } from "./course-progress-refresh";
 import type { CoursePaper4Link } from "@/components/course-paper4";
 import { coursePaper4Progress } from "@/components/paper4/paper4-learning-navigation";
-import { CourseAccessSummary, type CourseAccessMetadata } from "@/components/course-access";
+import { CourseAccessSummary, courseSourceName, type CourseAccessMetadata } from "@/components/course-access";
 import {courseDifficulties} from "@/components/learning-course";
 import {LearningCourseList,LearningCourseRow,learningCourseTitleClass} from "./learning-course-list";
 import { CourseCatalogSearch, useCourseCatalogQuery } from "./learning-course-search";
@@ -61,7 +61,7 @@ export function StudentLearningList(){
      ? ui(locale,"没有符合搜索条件的课程。","No courses match this search.")
      : ui(locale,"暂无已发布课程","No published courses yet")) : undefined}>
     {visible.map(path=><LearningCourseRow key={path.id} course={{...path,difficulty:path.difficulty??"beginner"}}
-      source={path.ownerScope === "platform" ? ui(locale,"平台管理员","Platform administrator") : undefined}
+      source={courseSourceName(path)}
       title={<AppLink href={courseLanguageHref(`/student/learning-paths/${path.id}`, language)} className={learningCourseTitleClass}>{path.title}</AppLink>}
       reading={{value:path.completedChapters,total:path.chapterCount}}
       practice={{value:path.completedTasks??0,total:path.taskCount??0}} />)}

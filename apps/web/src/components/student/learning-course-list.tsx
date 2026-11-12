@@ -50,7 +50,7 @@ export function LearningCourseRow({ course, title, source, status, reading, prac
       {(reading || practice) && <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,10rem),1fr))] gap-3"
         role="group" aria-label={text("课程进度", "Course progress")}>
         {reading && <CourseProgress label={text("章节阅读", "Chapters read")} empty={text("暂无章节", "No chapters")} count={reading} />}
-        {practice && <CourseProgress label={text("练习完成", "Practice completed")} empty={text("暂无练习", "No practice")} count={practice} />}
+        {practice && <CourseProgress label={text("练习完成", "Practice completed")} empty="N/A" count={practice} />}
       </div>}
     </div>
   </li>;
@@ -58,9 +58,9 @@ export function LearningCourseRow({ course, title, source, status, reading, prac
 
 function CourseProgress({ label, empty, count }: { label: string; empty: string; count: ProgressCount }) {
   return <div className="min-w-0 text-xs">
-    <div className="flex items-center justify-between gap-2 whitespace-nowrap">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="shrink-0 font-medium">{count.total ? `${count.value}/${count.total}` : empty}</span>
+    <div className="flex items-baseline justify-between gap-2">
+      <span className="min-w-0 break-words text-muted-foreground">{label}</span>
+      <span className="shrink-0 whitespace-nowrap font-medium">{count.total ? `${count.value}/${count.total}` : empty}</span>
     </div>
     {count.total > 0 && <progress aria-label={label} max={count.total} value={Math.min(count.value, count.total)} className="mt-2 h-1.5 w-full accent-primary" />}
   </div>;

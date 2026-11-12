@@ -83,7 +83,7 @@
       "sourceTopics": [
         "Recursive Functions"
       ],
-      "status": "planned",
+      "status": "draft",
       "practiceReferences": [
         {
           "paperSlug": "acsl-2020-2021-intermediate-1",
@@ -133,7 +133,11 @@
           "paperSlug": "acsl-2025-2026-intermediate-1",
           "questionId": "q4"
         }
-      ]
+      ],
+      "documents": {
+        "en": "intermediate/recursion/course.en.md",
+        "zh": "intermediate/recursion/course.zh.md"
+      }
     },
     {
       "id": "program-tracing",
@@ -146,7 +150,7 @@
       "sourceTopics": [
         "What Does This Program Do?"
       ],
-      "status": "planned",
+      "status": "draft",
       "practiceReferences": [
         {
           "paperSlug": "acsl-2020-2021-intermediate-1",
@@ -180,7 +184,11 @@
           "paperSlug": "acsl-2025-2026-intermediate-1",
           "questionId": "q6"
         }
-      ]
+      ],
+      "documents": {
+        "en": "intermediate/program-tracing/course.en.md",
+        "zh": "intermediate/program-tracing/course.zh.md"
+      }
     },
     {
       "id": "expressions",

@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "unitId": "program-tracing",
+  "chapters": [
+    {
+      "position": 0,
+      "key": "state-and-arithmetic",
+      "note": "Sequential assignments, integer conversion, remainders, and stored-value history.",
+      "references": [
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-1",
+          "questionId": "q5"
+        }
+      ]
+    },
+    {
+      "position": 1,
+      "key": "branches-and-boundaries",
+      "note": "Apply state tracing to independent and nested conditions, candidate inputs, and interval counterexamples.",
+      "references": [
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-1",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-1",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-1",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-1",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-1",
+          "questionId": "q5"
+        }
+      ]
+    },
+    {
+      "position": 2,
+      "key": "loops-and-stopping",
+      "note": "For-loop steps, while tests, sequential pair updates, and termination.",
+      "references": [
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-1",
+          "questionId": "q6"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-1",
+          "questionId": "q6"
+        }
+      ]
+    }
+  ]
+}

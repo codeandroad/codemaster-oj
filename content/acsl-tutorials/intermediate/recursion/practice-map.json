@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "unitId": "recursion",
+  "chapters": [
+    {
+      "position": 0,
+      "key": "base-cases-and-return-order",
+      "note": "Single dependency, base-case indexing, and stage-zero interpretations. Use the original checkpoints before formal practice.",
+      "references": [
+        { "paperSlug": "acsl-2024-2025-intermediate-1", "questionId": "q3" },
+        { "paperSlug": "acsl-2025-2026-intermediate-1", "questionId": "q3" }
+      ]
+    },
+    {
+      "position": 1,
+      "key": "call-trees-and-composition",
+      "note": "Multiple dependencies, complete recurrence state, and nested function evaluation. Formal problems keep their own recurrence and domain.",
+      "references": [
+        { "paperSlug": "acsl-2020-2021-intermediate-1", "questionId": "q3" },
+        { "paperSlug": "acsl-2020-2021-intermediate-1", "questionId": "q4" },
+        { "paperSlug": "acsl-2021-2022-intermediate-1", "questionId": "q4" },
+        { "paperSlug": "acsl-2022-2023-intermediate-1", "questionId": "q3" },
+        { "paperSlug": "acsl-2022-2023-intermediate-1", "questionId": "q4" }
+      ]
+    },
+    {
+      "position": 2,
+      "key": "parameters-branches-and-floor",
+      "note": "Preserve caller parameters, choose branches for each complete state, apply floor exactly where defined, and inspect actual progress toward a base case.",
+      "references": [
+        { "paperSlug": "acsl-2021-2022-intermediate-1", "questionId": "q3" },
+        { "paperSlug": "acsl-2023-2024-intermediate-1", "questionId": "q3" },
+        { "paperSlug": "acsl-2023-2024-intermediate-1", "questionId": "q4" },
+        { "paperSlug": "acsl-2024-2025-intermediate-1", "questionId": "q4" },
+        { "paperSlug": "acsl-2025-2026-intermediate-1", "questionId": "q4" }
+      ]
+    }
+  ]
+}

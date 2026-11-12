@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   chapterTranslation,
   type CourseLanguage,
@@ -133,10 +134,10 @@ export function ChapterTranslationEditor({
         {tx("English and Chinese chapter content", "中英文章节内容")}
       </summary>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <label className="flex items-center gap-2 text-sm">
-          {tx("Editing language", "编辑语言")}
+        <label className="flex max-w-full items-center gap-2 text-sm">
+          <span className="shrink-0 whitespace-nowrap">{tx("Editing language", "编辑语言")}</span>
           <select
-            className={`${input} w-auto`}
+            className={cn(input, "w-auto max-w-full")}
             value={language}
             onChange={(event) =>
               setLanguage(event.target.value as CourseLanguage)

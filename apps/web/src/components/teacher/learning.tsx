@@ -12,9 +12,10 @@ import { CourseDirectory } from "@/components/course-directory";
 import { CourseSectionsEditor, ChapterSectionSelect } from "@/components/course-sections-editor";
 import { canonicalCourseHref, courseChapterNeighbor, orderCourseChapters, parseCourseSections, validateChapterSections, type CourseSection } from "@/components/course-sections";
 import { LearningChapterContent } from "../student/learning-course-reader";
-import { CourseLanguageControl, useCourseLanguage } from "@/components/course-language";
-import { localizedChapter, parseChapterLocalizations, type CourseLocalizations, type ChapterLocalizations } from "@/components/course-localization";
-import { ChapterTranslationEditor } from "./course-translation-editor";
+import { useCourseLanguage } from "@/components/course-language";
+import { localizedChapter, parseChapterLocalizations, type CourseLocalizations, type ChapterLocalizations, type CourseLanguage } from "@/components/course-localization";
+import { ChapterContentEditor, ChapterEditingLanguageControl } from "./chapter-content-editor";
+import { findOriginalLanguage, type ChapterEditingLanguage, type ChapterEditorValue } from "./chapter-editor-model";
 import { CourseAcslEditor } from "./course-acsl-editor";
 import { courseAcslReferences, courseAcslLabel, type CourseAcslLink } from "@/components/course-acsl";
 import {LearningCover,courseCovers,courseDifficulties} from "@/components/learning-course";
@@ -537,6 +538,8 @@ function LearningEditorForm({
       search.get("chapter") ?? initial.redirectedChapterId ?? initial.chapters?.[0]?.id ?? "",
     ),
     [preview, setPreview] = useState(search.get("preview") === "1"),
+    [editingSelection, setEditingSelection] = useState<{ chapterId: string; language: ChapterEditingLanguage } | null>(null),
+    [originalLanguages, setOriginalLanguages] = useState(() => new Map<string, CourseLanguage | null>((initial.chapters ?? []).map(item => [item.id, findOriginalLanguage({ title: item.title, content: item.content, objective: item.objective ?? "", checkpoint: item.checkpoint ?? "", checkpointAnswer: item.checkpointAnswer ?? "" }, item.localizations)]))),
     [picker, setPicker] = useState(false),
     [paper4Picker, setPaper4Picker] = useState(false),
     [metadata, setMetadata] = useState(false),
@@ -578,6 +581,24 @@ function LearningEditorForm({
   const chapter = chapters.find((x) => x.id === current) ?? chapters[0],
     selectedIndex = chapters.findIndex((x) => x.id === chapter?.id),
     dirty = JSON.stringify(chapters) !== JSON.stringify(path.chapters ?? []) || JSON.stringify(sections) !== JSON.stringify(path.sections ?? []);
+  const original = { title: chapter?.title ?? "", content: chapter?.content ?? "", objective: chapter?.objective ?? "", checkpoint: chapter?.checkpoint ?? "", checkpointAnswer: chapter?.checkpointAnswer ?? "" };
+  const originalLanguage = originalLanguages.get(chapter?.id ?? "") ?? null;
+  const editingLanguage: ChapterEditingLanguage = editingSelection && editingSelection.chapterId === chapter?.id
+    ? editingSelection.language
+    : chapter?.localizations?.en && chapter.localizations.zh ? language : originalLanguage ?? "original";
+  const changeEditingLanguage = (next: ChapterEditingLanguage) => {
+    if (!chapter) return;
+    setEditingSelection({ chapterId: chapter.id, language: next });
+    if (next !== "original") setLanguage(next);
+  };
+  const presentedChapter = (item: Chapter) => editingLanguage === "original" ? item : localizedChapter(item, editingLanguage);
+  const updateChapterContent = (value: ChapterEditorValue) => {
+    if (chapter && originalLanguage && !value.localizations?.[originalLanguage]) {
+      setOriginalLanguages(previous => new Map(previous).set(chapter.id, null));
+    }
+    setChapters(items => items.map(item => item.id === chapter?.id
+      ? { ...item, ...value.original, localizations: value.localizations } : item));
+  };
   const linkedByProblem = new Map<string, ChapterProblem[]>();
   for (const problem of chapters.flatMap((item) => item.problems)) {
     linkedByProblem.set(problem.problemId, [...(linkedByProblem.get(problem.problemId) ?? []), problem]);
@@ -863,7 +884,7 @@ function LearningEditorForm({
               {t("新增")}
             </Button>
           </div>
-          <div className="max-h-[60dvh] overflow-y-auto"><CourseDirectory sections={sections} chapters={chapters.map(item => localizedChapter(item, language))} language={language} locale={locale} selectedId={chapter?.id} onSelect={setCurrent} showProgress={false}/></div>
+          <div className="max-h-[60dvh] overflow-y-auto"><CourseDirectory sections={sections} chapters={chapters.map(presentedChapter)} language={language} locale={locale} selectedId={chapter?.id} onSelect={setCurrent} showProgress={false}/></div>
           {!chapters.length && (
             <p className="p-4 text-sm text-muted-foreground">
               {t("暂无章节，点击“新增”开始编写。")}
@@ -873,13 +894,7 @@ function LearningEditorForm({
         {chapter && (
           <section className={`${panel} p-5`}>
             <div className="flex flex-wrap items-center gap-2">
-              <input
-                aria-label={t("章节名称")}
-                value={chapter.title}
-                onChange={(e) => update("title", e.target.value)}
-                className={`${input} min-w-48 flex-1 font-bold`}
-                disabled={!canEditCourse}
-              />
+              <h2 className="min-w-0 flex-1 font-semibold">{tr("章节内容", "Chapter content")}</h2>
               <Button
                 size="icon"
                 variant="secondary"
@@ -925,24 +940,7 @@ function LearningEditorForm({
             </div>
             <div className="mt-5 grid gap-4">
               <ChapterSectionSelect sections={sections} value={chapter.sectionKey} onChange={key => update("sectionKey", key)} disabled={!canEditCourse || action.busy}/>
-              <Field label={t("学习目标")}>
-                <textarea
-                  value={chapter.objective ?? ""}
-                  onChange={(e) => update("objective", e.target.value)}
-                  rows={2}
-                  readOnly={!canEditCourse}
-                  className={area}
-                />
-              </Field>
-              <Field label={t("正文 · Markdown 讲解与示例")}>
-                <textarea
-                  value={chapter.content}
-                  onChange={(e) => update("content", e.target.value)}
-                  rows={12}
-                  readOnly={!canEditCourse}
-                  className={area}
-                />
-              </Field>
+              <ChapterContentEditor original={original} localizations={chapter.localizations} originalLanguage={originalLanguage} language={editingLanguage} onLanguageChange={changeEditingLanguage} onChange={updateChapterContent} disabled={!canEditCourse || action.busy}/>
               <section className="border border-border">
                 <div className="flex justify-between gap-3 bg-surface-subtle p-3">
                   <div>
@@ -1048,25 +1046,6 @@ function LearningEditorForm({
                 </div>)}
               </section>
               <CourseAcslEditor schoolId={LEGACY_SCHOOL_ID} links={chapter.acslLinks ?? []} onChange={links => update("acslLinks", links)} disabled={!canEditCourse || action.busy}/>
-              <Field label={t("检查点 · 独立练习")}>
-                <textarea
-                  value={chapter.checkpoint ?? ""}
-                  onChange={(e) => update("checkpoint", e.target.value)}
-                  rows={3}
-                  readOnly={!canEditCourse}
-                  className={area}
-                />
-              </Field>
-              <Field label={t("检查点参考答案")}>
-                <textarea
-                  value={chapter.checkpointAnswer ?? ""}
-                  onChange={(e) => update("checkpointAnswer", e.target.value)}
-                  rows={3}
-                  readOnly={!canEditCourse}
-                  className={area}
-                />
-              </Field>
-              <ChapterTranslationEditor value={chapter.localizations} original={{ title: chapter.title, content: chapter.content, objective: chapter.objective ?? "", checkpoint: chapter.checkpoint ?? "", checkpointAnswer: chapter.checkpointAnswer ?? "" }} onChange={value => update("localizations", value)} disabled={!canEditCourse || action.busy}/>
             </div>
           </section>
         )}
@@ -1098,18 +1077,18 @@ function LearningEditorForm({
         <div className="fixed inset-0 z-50 isolate overflow-y-auto bg-background" data-od-id="teacher-course-preview">
           <div className="sticky top-0 z-20 isolate flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface p-4">
             <div>
-              <b>{t("学生预览")} · {chapter && localizedChapter(chapter, language).title}</b>
+              <b>{t("学生预览")} · {chapter && presentedChapter(chapter).title}</b>
               <p className="text-xs text-muted-foreground">{tr("当前编辑内容 · 未发布题目仅供教师预览", "Current edits · unpublished problems are visible to teachers only")}</p>
             </div>
-            <CourseLanguageControl language={language} onChange={setLanguage} missing={!chapter?.localizations?.[language]}/>
+            {chapter && <ChapterEditingLanguageControl original={original} localizations={chapter.localizations} originalLanguage={originalLanguage} language={editingLanguage} onLanguageChange={changeEditingLanguage} preview/>}
             <Button variant="secondary" onClick={() => setPreview(false)}>
               ← {t("返回原编辑位置")}
             </Button>
           </div>
           <div className="relative z-0 isolate mx-auto grid max-w-7xl gap-5 p-4 sm:p-8 lg:grid-cols-[280px_minmax(0,1fr)]">
-          <aside className="self-start rounded-md border border-border bg-surface"><CourseDirectory sections={sections} chapters={chapters.map(item => localizedChapter(item, language))} language={language} locale={locale} selectedId={chapter?.id} onSelect={setCurrent} showProgress={false}/></aside>
+          <aside className="self-start rounded-md border border-border bg-surface"><CourseDirectory sections={sections} chapters={chapters.map(presentedChapter)} language={language} locale={locale} selectedId={chapter?.id} onSelect={setCurrent} showProgress={false}/></aside>
           <article className="min-w-0">
-            {chapter && <LearningChapterContent chapter={localizedChapter(chapter, language)}/>}
+            {chapter && <LearningChapterContent chapter={presentedChapter(chapter)}/>}
             <h2 className="mt-6 font-bold">{t("相关练习")}</h2>
             {chapter?.problems.map((x) => (
               <p className="mt-3 flex flex-wrap items-center gap-2 text-primary" key={x.problemId}>

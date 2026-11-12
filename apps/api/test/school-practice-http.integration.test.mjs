@@ -98,6 +98,10 @@ test('school and public practice Nest transport requires scoped membership, CSRF
   const publicDetail = `/practice/submissions/${school.id}/${publicRun.id}`;
   await request('/practice/submissions',{status:401});
   assert.deepEqual((await request('/practice/submissions',{auth:auth.personal})).data.items.map(job=>job.id),[publicRun.id]);
+  await request('/practice/submissions?status=unknown',{auth:auth.personal,status:400});
+  assert.deepEqual((await request('/practice/submissions?status=WA',{auth:auth.personal})).data.items.map(job=>job.id),[publicRun.id]);
+  assert.deepEqual((await request('/practice/submissions?status=AC',{auth:auth.personal})).data.items,[]);
+  assert.deepEqual((await request('/practice/submissions?status=WA',{auth:auth.student})).data.items,[]);
   assert.equal((await request('/practice/submissions',{auth:auth.student})).data.items.length,0);
   for(const path of [publicDetail,`/practice/problems/${problem.id}/submissions/${publicRun.id}`]){
    const {data}=await request(path,{auth:auth.personal});

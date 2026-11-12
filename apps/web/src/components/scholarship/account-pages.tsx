@@ -6,7 +6,8 @@ import { RefreshCw } from "lucide-react";
 import { ScholarshipIcon } from "./scholarship-icon";
 import { ScholarshipPopover } from "./scholarship-popover";
 import { useLocale } from "@/components/locale-context";
-import { Button } from "@/components/ui/button";
+import { AppLink } from "@/components/navigation";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Empty,
   Feedback,
@@ -259,6 +260,7 @@ export function StudentScholarshipPage({ endpoint = "scholarship/me" }: { endpoi
   const tx = useText(),
     [page, setPage] = useState(1),
     resource = useData<ScholarshipAccount>(`${endpoint}?page=${page}`);
+  const publicPractice = endpoint === "practice/scholarship/me";
   return (
     <div className="space-y-4">
       <section
@@ -273,7 +275,7 @@ export function StudentScholarshipPage({ endpoint = "scholarship/me" }: { endpoi
             )}
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <strong className="inline-flex items-center gap-1.5 text-2xl tabular-nums" aria-label={tx("奖学金余额", "Scholarship balance")}>
             <ScholarshipIcon size={26} />{resource.data?.balance ?? "—"}
           </strong>
@@ -281,6 +283,9 @@ export function StudentScholarshipPage({ endpoint = "scholarship/me" }: { endpoi
             <RefreshCw size={14} />
             {tx("刷新", "Refresh")}
           </Button>
+          {publicPractice && <AppLink href="/practice/settings#public-practice" className={buttonVariants({ size: "sm", variant: "ghost" })}>
+            {tx("奖学金设置", "Scholarship settings")}
+          </AppLink>}
         </div>
       </section>
       <State resource={resource} />
@@ -298,9 +303,12 @@ export function StudentScholarshipPage({ endpoint = "scholarship/me" }: { endpoi
         />
       </section>
       <p className="text-xs leading-6 text-muted-foreground">
+        {publicPractice
+          ? tx("开启公开练习奖学金后可一次性领取初始额度。关闭后仍保留余额和已解锁内容。", "Enable public practice scholarship to receive the one-time starting allowance. Turning it off keeps your balance and unlocked content.")
+          : tx("学生按初始发放规则一次性领取奖学金，同一身份不重复发放。", "Students receive the configured starting scholarship allowance once per identity.")}{" "}
         {tx(
-          "学生按初始发放规则一次性领取奖学金，同一身份不重复发放。历史积分不兑换，历史 AC 不补发。首次正式 AC 可计奖题目按规则奖励；同题不重复。中文翻译不影响首次 AC 奖学金，提交前查看完整答案会影响该奖励。",
-          "Students receive the configured starting scholarship allowance once per identity. Historical points and accepted work are not converted. Eligible first formal ACs earn a once-per-problem reward. Translation does not affect first-AC scholarship rewards; viewing a full solution before submission does.",
+          "历史积分不兑换，历史 AC 不补发。首次正式 AC 可计奖题目按规则奖励；同题不重复。中文翻译不影响首次 AC 奖学金，提交前查看完整答案会影响该奖励。",
+          "Historical points and accepted work are not converted. Eligible first formal ACs earn a once-per-problem reward. Translation does not affect first-AC scholarship rewards; viewing a full solution before submission does.",
         )}
       </p>
     </div>

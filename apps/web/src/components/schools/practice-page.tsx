@@ -78,12 +78,7 @@ export function PracticePage({ user, pathname, onLogout, onUserSaved }: {
       content = <PublicPracticeLeaderboard/>;
       break;
     case "scholarship":
-      content = <div className="space-y-3">
-        <AppLink href="/practice/settings#public-practice" className="text-sm font-medium text-primary hover:underline">
-          {text("Manage public practice scholarship", "管理公开练习奖学金")}
-        </AppLink>
-        <StudentScholarshipPage endpoint="practice/scholarship/me"/>
-      </div>;
+      content = <StudentScholarshipPage endpoint="practice/scholarship/me"/>;
       break;
     default:
       content = <PublicStudyHome user={user}/>;

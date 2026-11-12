@@ -2,14 +2,14 @@
 
 import { useLocale } from "@/components/locale-context";
 
-const verdicts = ["Waiting", "Judging", "AC", "WA", "CE", "RE", "TLE", "MLE", "OLE", "System Error"];
+export const submissionVerdicts = ["Waiting", "Judging", "AC", "WA", "CE", "RE", "TLE", "MLE", "OLE", "System Error"];
 const contexts = ["assignment", "timed", "correction", "practice"];
 
-export function StudentSubmissionFilter({ verdict, context, onVerdict, onContext }: {
+export function StudentSubmissionFilter({ verdict, context = "", onVerdict, onContext }: {
   verdict: string;
-  context: string;
+  context?: string;
   onVerdict: (value: string) => void;
-  onContext: (value: string) => void;
+  onContext?: (value: string) => void;
 }) {
   const { locale } = useLocale();
   const label = (zh: string, en: string) => locale === "en" ? en : zh;
@@ -31,15 +31,15 @@ export function StudentSubmissionFilter({ verdict, context, onVerdict, onContext
       {label("判题结果", "Verdict")}
       <select value={verdict} onChange={event => onVerdict(event.target.value)} className={selectClass}>
         <option value="">{label("全部结果", "All verdicts")}</option>
-        {verdicts.map(value => <option key={value} value={value}>{verdictLabel(value)}</option>)}
+        {submissionVerdicts.map(value => <option key={value} value={value}>{verdictLabel(value)}</option>)}
       </select>
     </label>
-    <label className="min-w-0 flex-1 text-sm font-medium sm:max-w-56 sm:flex-none sm:w-56">
+    {onContext && <label className="min-w-0 flex-1 text-sm font-medium sm:max-w-56 sm:flex-none sm:w-56">
       {label("来源", "Context")}
       <select value={context} onChange={event => onContext(event.target.value)} className={selectClass}>
         <option value="">{label("全部来源", "All contexts")}</option>
         {contexts.map(value => <option key={value} value={value}>{contextLabel(value)}</option>)}
       </select>
-    </label>
+    </label>}
   </div>;
 }

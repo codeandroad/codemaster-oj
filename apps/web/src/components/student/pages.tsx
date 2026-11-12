@@ -4,6 +4,7 @@ import { LegacyAcslPage } from "@/components/acsl/acsl-page";
 
 import {StudentProblemFilter} from "./problem-filter";
 import {StudentSubmissionFilter} from "./submission-filter";
+import { ReviewNotebookView, SubmissionHistory, studyRecordScore as score, studyRecordVerdict as statusLabel } from "./study-record-views";
 import dynamic from "next/dynamic";
 
 import { StudentScholarshipRule } from "@/components/scholarship/teaching-page";
@@ -40,11 +41,6 @@ function displayDate(value: string | null | undefined, locale: AppLocale) { retu
 const notebookFilters = ["All", "Needs review", "Retried", "Resolved", "Feedback received"];
 function notebookStateLabel(locale: AppLocale, value: string) { return ({ "Feedback received": ui(locale, "收到反馈", "Feedback received"), All: ui(locale, "全部", "All"), "Needs review": ui(locale, "需要订正", "Needs review"), Retried: ui(locale, "已重试", "Retried"), Resolved: ui(locale, "已解决", "Resolved") } as Record<string, string>)[value] ?? value; }
 function submissionKindLabel(locale: AppLocale, kind: string) { return locale === "zh" ? kindLabel(kind, locale) : kind === "submit" ? "Formal submission" : kind === "correction" ? "Correction" : kind === "samples" ? "Public sample run" : "Custom input run"; }
-function statusLabel(locale: AppLocale, status: string) {
-  const labels: Record<string, string> = { Waiting: "等待中", Judging: "评测中", Executed: "已运行", "System Error": "系统错误", "Not started": "未开始", NotStarted: "未开始", Unavailable: "不可用", NotSubmitted: "未提交", Open: "进行中", Ended: "已结束" };
-  return locale === "zh" ? labels[status] ?? status : status;
-}
-
 export function StudentPages({ pathname, user }: { pathname: string; user: CampusUser }) {
   const { locale } = useLocale();
   const parts = pathname.split("/").filter(Boolean);
@@ -73,7 +69,6 @@ function assignmentProgress(assignment: Assignment, identityId?: string) {
   return { grade, max, attempted, solved, complete, percent: required.length ? solved / required.length * 100 : 0 };
 }
 function sourceLabel(submission: Submission, assignments: Assignment[] = [], locale: AppLocale = "en") { return submission.originalSubmissionId ? ui(locale, "订正", "Correction") : submission.assignmentId ? assignments.find(a => a.id === submission.assignmentId)?.title ?? ui(locale, "作业", "Assignment") : submission.timedPracticeId ? ui(locale, "限时训练", "Timed Practice") : ui(locale, "题库练习", "Practice library"); }
-function score(submission: Submission) { return submission.score == null || isPending(submission.status) || /system.?error/i.test(submission.status) ? "—" : `${Number(submission.score).toFixed(2)}/100`; }
 
 export function StudentDashboard({ user }: { user: CampusUser }) {
   const { locale } = useLocale();
@@ -372,7 +367,12 @@ export function StudentSubmissions({ user }: { user: CampusUser }) {
   const submissions = useData<{ items: Submission[]; nextCursor: string | null }>(`submissions?${query}`), assignments = useData<{ items: Assignment[] }>("assignments");
   const visible = formal(submissions.data?.items ?? []);
   function filter(setValue: (value: string) => void, value: string) { setValue(value); setCursors([null]); }
-  return <><PageHeader eyebrow={ui(locale, "学习记录", "Your activity")} title={ui(locale, "提交记录", "Submissions")} description={ui(locale, "这里只列出正式提交，不包含样例或自定义运行。", "Formal submissions only. Sample and custom runs are not listed here.")}/><div className="mt-5 flex flex-wrap items-center gap-2 border border-border bg-surface p-3 panel-shadow"><StudentSubmissionFilter verdict={verdict} context={context} onVerdict={value => filter(setVerdict, value)} onContext={value => filter(setContext, value)}/></div><State data={submissions}>{visible.length ? <div className="mt-4 overflow-x-auto border border-border bg-surface panel-shadow"><table className="w-full min-w-[900px] text-left text-sm"><thead className="bg-surface-subtle text-xs text-muted-foreground"><tr>{[ui(locale, "提交编号", "Submission"), ui(locale, "题目", "Problem"), ui(locale, "来源", "Context"), ui(locale, "语言", "Language"), ui(locale, "判题结果", "Verdict"), ui(locale, "成绩", "Score"), ui(locale, "提交时间", "Submitted"), ui(locale, "操作", "Action")].map(t => <th key={t} className="px-4 py-3">{t}</th>)}</tr></thead><tbody>{visible.map(s => <tr key={s.id} className="border-t border-border hover:bg-surface-subtle"><td className="px-4 py-3 font-mono text-xs"><AppLink href={`/student/submissions/${s.id}`} className="font-semibold text-primary hover:underline focus-visible:underline">{s.id}</AppLink></td><td className="px-4 py-3"><AppLink href={`/student/submissions/${s.id}`} className="font-semibold text-primary hover:underline focus-visible:underline">{s.problemTitle}</AppLink></td><td className="max-w-[220px] px-4 py-3 text-muted-foreground">{sourceLabel(s, assignments.data?.items, locale)}</td><td className="px-4 py-3 text-muted-foreground">{languageInfo[submissionLanguage(s.language)].name}</td><td className="px-4 py-3"><StatusPill status={statusLabel(locale, s.status)}/></td><td className="px-4 py-3 font-semibold">{score(s)}</td><td className="px-4 py-3 text-xs text-muted-foreground">{displayDate(s.createdAt, locale)}</td><td className="px-4 py-3"><AppLink href={`/student/submissions/${s.id}`} className="font-semibold text-primary">{ui(locale, "打开", "Open")}</AppLink></td></tr>)}</tbody></table></div> : <Empty title={ui(locale, "没有匹配的提交", "No matching submissions")} description={ui(locale, "调整筛选条件，或从题目工作区正式提交代码。", "Change the filters, or make a formal submission from a problem workspace.")}/>}</State>{submissions.data && <nav aria-label={ui(locale, "提交记录分页", "Submission history pages")} className="mt-3 flex flex-wrap items-center justify-between gap-3"><p className="text-xs text-muted-foreground">{ui(locale, `第 ${cursors.length} 页 · 本页 ${visible.length} 条`, `Page ${cursors.length} · ${visible.length} records on this page`)}</p><div className="flex gap-2"><Button variant="secondary" size="sm" aria-label={ui(locale, "上一页提交记录", "Previous submissions page")} disabled={submissions.loading || cursors.length === 1} onClick={() => setCursors(values => values.slice(0, -1))}>{ui(locale, "上一页", "Previous")}</Button><Button variant="secondary" size="sm" aria-label={ui(locale, "下一页提交记录", "Next submissions page")} disabled={submissions.loading || !submissions.data.nextCursor} onClick={() => { const next = submissions.data?.nextCursor; if (next) setCursors(values => [...values, next]); }}>{ui(locale, "下一页", "Next")}</Button></div></nav>}</>;
+  return <SubmissionHistory resource={submissions}
+    rows={visible.map(s => ({ ...s, key: s.id, href: `/student/submissions/${s.id}`, title: s.problemTitle, context: sourceLabel(s, assignments.data?.items, locale) }))}
+    filters={<StudentSubmissionFilter verdict={verdict} context={context} onVerdict={value => filter(setVerdict, value)} onContext={value => filter(setContext, value)}/>}
+    pagination={{ page: cursors.length, hasMore: Boolean(submissions.data?.nextCursor),
+      previous: () => setCursors(values => values.slice(0, -1)),
+      next: () => { const next = submissions.data?.nextCursor; if (next) setCursors(values => [...values, next]); } }}/>;
 }
 export function StudentSubmission({ id, user }: { id: string; user: CampusUser }) {
   const { locale } = useLocale();
@@ -405,7 +405,22 @@ export function StudentNotebook({ user }: { user: CampusUser }) {
   const notebook = useData<{ items: NotebookEntry[] }>("review-notebook"), submissions = useData<{ items: Submission[] }>(`submissions?identityId=${user.identityId}&kind=submit,correction`), assignments = useData<{ items: Assignment[] }>("assignments");
   const [filter, setFilter] = useState("All");
   const groups = notebookGroups(notebook.data?.items ?? [], submissions.data?.items ?? [], user), visible = groups.filter(g => filter === "All" || g.state === filter);
-  return <><PageHeader eyebrow={ui(locale, "订正", "Correction")} title={ui(locale, "订正本", "Review Notebook")} description={ui(locale, "原活动成绩与后续订正分开记录。", "Original activity results and later corrections remain separate.")}/><Tabs items={notebookFilters.map(value => notebookStateLabel(locale, value))} value={notebookStateLabel(locale, filter)} onChange={value => setFilter(notebookFilters.find(state => notebookStateLabel(locale, state) === value) ?? "All")} label={ui(locale, "订正状态", "Correction status")}/><State data={notebook}>{visible.length ? <div className="mt-4 overflow-x-auto border border-border bg-surface panel-shadow"><table className="w-full min-w-[1080px] text-left text-sm"><thead className="bg-surface-subtle text-xs text-muted-foreground"><tr>{[ui(locale, "题目", "Problem"), ui(locale, "来源活动", "Source activity"), ui(locale, "原始结果", "Original result"), ui(locale, "最近订正", "Latest correction"), ui(locale, "状态", "Status"), ui(locale, "教师反馈", "Teacher feedback"), ui(locale, "最近练习", "Latest practice"), ui(locale, "操作", "Action")].map(t => <th key={t} className="px-4 py-3">{t}</th>)}</tr></thead><tbody>{visible.map(group => <tr key={group.originalId} className="border-t border-border"><td className="px-4 py-3"><AppLink href={`/student/review-notebook/${group.latest.id}`} className="font-semibold text-primary hover:underline focus-visible:underline">{group.latest.problemTitle}</AppLink></td><td className="max-w-[200px] px-4 py-3">{group.original ? sourceLabel(group.original, assignments.data?.items, locale) : ui(locale, "提交", "Submission")}</td><td className="px-4 py-3"><StatusPill status={group.original ? `${statusLabel(locale, group.original.status)} · ${score(group.original)}` : group.originalStatus ? statusLabel(locale, group.originalStatus) : ui(locale, "不可用", "Not available")}/></td><td className="px-4 py-3"><StatusPill status={group.correction ? `${statusLabel(locale, group.correction.status)} · ${score(group.correction)}` : ui(locale, "未重试", "Not retried")}/></td><td className="px-4 py-3">{notebookStateLabel(locale, group.state)}</td><td className="max-w-[200px] px-4 py-3 text-muted-foreground">{group.feedback?.note || "—"}</td><td className="px-4 py-3 text-xs">{displayDate(group.correction?.createdAt ?? group.latest.createdAt, locale)}</td><td className="px-4 py-3"><AppLink href={`/student/review-notebook/${group.latest.id}`} className="font-semibold text-primary">{ui(locale, "打开", "Open")}</AppLink></td></tr>)}</tbody></table></div> : <Empty title={ui(locale, "暂无订正记录", "No correction records")} description={ui(locale, "从提交详情选择“加入订正本”，记录错误原因和下一次测试。", "Choose Add to Review Notebook from a submission to record the cause and next test.")}/>}</State></>;
+  return <ReviewNotebookView resource={notebook} school
+    filters={<Tabs items={notebookFilters.map(value => notebookStateLabel(locale, value))} value={notebookStateLabel(locale, filter)}
+      onChange={value => setFilter(notebookFilters.find(state => notebookStateLabel(locale, state) === value) ?? "All")}
+      label={ui(locale, "订正状态", "Correction status")}/>}
+    rows={visible.map(group => ({
+      key: group.originalId,
+      href: `/student/review-notebook/${group.latest.id}`,
+      title: group.latest.problemTitle ?? group.original?.problemTitle ?? ui(locale, "订正记录", "Review entry"),
+      context: group.original ? sourceLabel(group.original, assignments.data?.items, locale) : ui(locale, "提交", "Submission"),
+      originalResult: group.original ? `${statusLabel(locale, group.original.status)} · ${score(group.original)}`
+        : group.originalStatus ? statusLabel(locale, group.originalStatus) : ui(locale, "不可用", "Not available"),
+      correction: group.correction && `${statusLabel(locale, group.correction.status)} · ${score(group.correction)}`,
+      state: notebookStateLabel(locale, group.state),
+      feedback: group.feedback?.note,
+      lastPracticedAt: group.correction?.createdAt ?? group.latest.createdAt,
+    }))}/>;
 }
 function splitNotes(note: string) {
   const headings = ["What went wrong", "What I changed", "What I will test next"];

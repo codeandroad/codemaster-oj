@@ -25,9 +25,10 @@ export function SchoolSubmissionDetail({ schoolId, submissionId, backHref }: {
     problemHref={job => `/schools?schoolId=${encodeURIComponent(schoolId)}&section=problems&problemId=${encodeURIComponent(job.problemId)}`} />;
 }
 
-export function StudySubmissionDetail<T extends JobDetail>({ path, backHref, problemHref, renderExtra }: {
+export function StudySubmissionDetail<T extends JobDetail>({ path, backHref, backLabel, problemHref, renderExtra }: {
   path: string;
   backHref: string;
+  backLabel?: string;
   problemHref: (job: T) => string;
   renderExtra?: (job: T, reload: () => void) => ReactNode;
 }) {
@@ -42,7 +43,7 @@ export function StudySubmissionDetail<T extends JobDetail>({ path, backHref, pro
   }, [job, resource.error, resource.reload]);
   return <div className="space-y-4">
     <AppLink href={backHref} className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline">
-      <ArrowLeft size={15} aria-hidden="true" />{text("Back to submissions", "返回提交记录")}
+      <ArrowLeft size={15} aria-hidden="true" />{backLabel ?? text("Back to submissions", "返回提交记录")}
     </AppLink>
     <State data={resource}>
       {job && <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">

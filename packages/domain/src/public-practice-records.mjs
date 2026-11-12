@@ -1,5 +1,5 @@
 import { transaction } from './db.mjs';
-import { fail, field, integer, uuid } from './security.mjs';
+import { enumValue, fail, field, integer, uuid } from './security.mjs';
 import { activeAccount } from './schools.mjs';
 
 export const publicPracticeFirstAc = `SELECT DISTINCT ON (j.problem_id)
@@ -43,19 +43,25 @@ export async function handlePublicPracticeRecords({ pool, user, route, url, meth
    return { status: 200, body: { ...await projectJob(db, job), note: job.note, noteUpdatedAt: job.note_updated_at } };
   }
   const page = integer(Number(url.searchParams.get('page') ?? 1), 1, 100000, 'Page');
+  const rawStatus = url.searchParams.get('status');
+  const status = !notebook && rawStatus ? enumValue(rawStatus,
+   ['Waiting','Judging','AC','WA','CE','RE','TLE','MLE','OLE','System Error'], 'Verdict') : null;
   const { rows } = await db.query(`
    SELECT j.id,j.school_id,j.problem_id,j.payload->'version'->>'title' AS title,j.payload->>'language' AS language,
-          j.state,j.created_at,j.result->>'status' AS status,j.result->>'score' AS score,n.updated_at AS note_updated_at
+          j.created_at,outcome.status,j.result->>'score' AS score,n.updated_at AS note_updated_at
    FROM school_judge_jobs j
+   CROSS JOIN LATERAL (SELECT COALESCE(j.result->>'status',
+    CASE j.state WHEN 'failed' THEN 'System Error' WHEN 'leased' THEN 'Judging' ELSE 'Waiting' END) AS status) outcome
    LEFT JOIN public_practice_notes n ON n.account_id=j.account_id AND n.school_id=j.school_id AND n.submission_id=j.id
    WHERE j.account_id=$1 AND j.access_context='public' AND j.kind='submit'
      AND (NOT $2::boolean OR n.submission_id IS NOT NULL)
+     AND ($4::text IS NULL OR outcome.status=$4)
    ORDER BY COALESCE(CASE WHEN $2 THEN n.updated_at END,j.created_at) DESC,j.id DESC,j.school_id
    LIMIT 26 OFFSET $3
-  `, [user.id, notebook, (page - 1) * 25]);
+  `, [user.id, notebook, (page - 1) * 25, status]);
   return { status: 200, body: { page, hasMore: rows.length > 25, items: rows.slice(0, 25).map(j => ({
    id: j.id, schoolId: j.school_id, problemId: j.problem_id, problemTitle: j.title, language: j.language,
-   createdAt: j.created_at, status: j.status ?? (j.state === 'failed' ? 'System Error' : j.state === 'leased' ? 'Judging' : 'Waiting'),
+   createdAt: j.created_at, status: j.status,
    score: j.score === null ? null : Number(j.score), noteUpdatedAt: j.note_updated_at,
   })) } };
  });

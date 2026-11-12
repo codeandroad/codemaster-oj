@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
-import { AppLink, useNavigationBlocker } from "@/components/navigation";
-import { StatusPill } from "@/components/page-chrome";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Feedback, State, date, textarea, useData, useMutation } from "@/components/student/shared";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "@/components/locale-context";
+import { useNavigationBlocker } from "@/components/navigation";
+import { Button } from "@/components/ui/button";
+import { Feedback, textarea, useData, useMutation } from "@/components/student/shared";
+import { StudentSubmissionFilter, submissionVerdicts } from "@/components/student/submission-filter";
+import { ReviewNotebookView, SubmissionHistory, studyRecordScore, studyRecordVerdict } from "@/components/student/study-record-views";
 import { productionApi } from "@/lib/production-api";
 import { StudySubmissionDetail, type JobDetail } from "./school-submission-detail";
 import { useSchoolText } from "./school-ui";
@@ -33,10 +34,13 @@ export function PublicReviewNotebook() {
 }
 
 function PublicStudyRecords({ notebook }: { notebook: boolean }) {
+  const text = useSchoolText();
   const pathname = usePathname();
   const search = useSearchParams();
   const id = search.get("submissionId");
   const schoolId = search.get("submissionSchoolId");
+  const selectedVerdict = search.get("publicVerdict") ?? "";
+  const verdict = !notebook && submissionVerdicts.includes(selectedVerdict) ? selectedVerdict : "";
   const candidate = Number(search.get("publicPage") ?? 1);
   const page = Number.isInteger(candidate) && candidate > 0 && candidate <= 100000 ? candidate : 1;
   function href(changes: Record<string, string | null>) {
@@ -51,50 +55,48 @@ function PublicStudyRecords({ notebook }: { notebook: boolean }) {
     const path = `practice/submissions/${encodeURIComponent(schoolId)}/${encodeURIComponent(id)}`;
     return <StudySubmissionDetail<PublicJob> key={path} path={path}
       backHref={href({ submissionId: null, submissionSchoolId: null })}
+      backLabel={notebook ? text("Back to review notebook", "返回订正本") : undefined}
       problemHref={job => `/practice/problems?problemId=${encodeURIComponent(job.problemId)}`}
       renderExtra={(job, reload) => job.state === "completed" &&
         <PublicCorrectionNote key={job.noteUpdatedAt ?? "new"} path={path} job={job} onSaved={reload} />}
     />;
   }
-  return <PublicRecordsList key={`${notebook}:${page}`} notebook={notebook} page={page} href={href} />;
+  return <PublicRecordsList key={`${notebook}:${page}:${verdict}`} notebook={notebook} page={page} verdict={verdict} href={href} />;
 }
 
-function PublicRecordsList({ notebook, page, href }: {
+function PublicRecordsList({ notebook, page, verdict, href }: {
   notebook: boolean;
   page: number;
+  verdict: string;
   href: (changes: Record<string, string | null>) => string;
 }) {
   const text = useSchoolText();
   const { locale } = useLocale();
-  const data = useData<RecordPage>(`practice/${notebook ? "review-notebook" : "submissions"}?page=${page}`);
-  return <section className="space-y-3">
-    <h2 className="text-lg font-semibold">{notebook ? text("Public practice review notebook", "公开练习订正本") : text("Public practice submissions", "公开练习提交记录")}</h2>
-    <State data={data}>
-      {data.data?.items.length ? <div className="overflow-auto rounded-lg border border-border bg-surface">
-        <table className="w-full min-w-[480px] text-left text-sm">
-          <thead className="bg-surface-subtle text-xs text-muted-foreground"><tr>
-            <th scope="col" className="p-3">{text("Problem", "题目")}</th>
-            <th scope="col" className="p-3">{text("Result", "结果")}</th>
-            <th scope="col" className="p-3">{text("Language", "语言")}</th>
-            <th scope="col" className="p-3">{notebook ? text("Note updated", "笔记更新时间") : text("Submitted", "提交时间")}</th>
-          </tr></thead>
-          <tbody>{data.data.items.map(row => <tr key={`${row.schoolId}:${row.id}`} className="border-t border-border">
-            <td className="p-3"><AppLink className="font-semibold text-primary hover:underline" href={href({ submissionId: row.id, submissionSchoolId: row.schoolId })}>{row.problemTitle}</AppLink></td>
-            <td className="p-3"><StatusPill status={row.status} /></td>
-            <td className="p-3">{row.language === "cpp" ? "C++" : row.language === "javascript" ? "JavaScript" : "Python 3"}</td>
-            <td className="p-3">{date((notebook && row.noteUpdatedAt) || row.createdAt, locale)}</td>
-          </tr>)}</tbody>
-        </table>
-      </div> : <p className="rounded-lg border border-border bg-surface p-4 text-sm text-muted-foreground">
-        {notebook ? text("Open a completed submission and save a review note to add it here.", "打开已完成的提交并保存订正笔记，即可在这里查看。")
-          : text("There are no public practice submissions on this page.", "本页暂无公开练习提交。")}
-      </p>}
-      {(page > 1 || data.data?.hasMore) && <nav className="flex gap-2" aria-label={text("Record pages", "记录分页")}>
-        {page > 1 && <AppLink className={buttonVariants({ size: "sm", variant: "secondary" })} href={href({ publicPage: String(page - 1) })}>{text("Previous", "上一页")}</AppLink>}
-        {data.data?.hasMore && <AppLink className={buttonVariants({ size: "sm", variant: "secondary" })} href={href({ publicPage: String(page + 1) })}>{text("Next", "下一页")}</AppLink>}
-      </nav>}
-    </State>
-  </section>;
+  const router = useRouter();
+  const query = new URLSearchParams({ page: String(page), ...(verdict ? { status: verdict } : {}) });
+  const resource = useData<RecordPage>(`practice/${notebook ? "review-notebook" : "submissions"}?${query}`);
+  const rows = (resource.data?.items ?? []).map(row => ({
+    ...row,
+    key: `${row.schoolId}:${row.id}`,
+    displayId: row.id.slice(0, 8),
+    href: href({ submissionId: row.id, submissionSchoolId: row.schoolId }),
+    title: row.problemTitle,
+    context: text("Public practice", "公开练习"),
+  }));
+  const pagination = {
+    page,
+    hasMore: Boolean(resource.data?.hasMore),
+    previous: () => router.push(href({ publicPage: page > 2 ? String(page - 1) : null })),
+    next: () => router.push(href({ publicPage: String(page + 1) })),
+  };
+  if (notebook) return <ReviewNotebookView resource={resource} pagination={pagination}
+    rows={rows.map(row => {
+      const score = studyRecordScore(row);
+      const status = studyRecordVerdict(locale, row.status);
+      return { ...row, originalResult: score === "—" ? status : `${status} · ${score}`, lastPracticedAt: row.noteUpdatedAt ?? row.createdAt };
+    })}/>;
+  return <SubmissionHistory resource={resource} rows={rows} pagination={pagination}
+    filters={<StudentSubmissionFilter verdict={verdict} onVerdict={value => router.push(href({ publicVerdict: value || null, publicPage: null }))}/>}/>;
 }
 
 function PublicCorrectionNote({ path, job, onSaved }: { path: string; job: PublicJob; onSaved: () => void }) {

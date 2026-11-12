@@ -13,8 +13,9 @@ export async function readUnifiedAcslCourse({unitIds}={}) {
  const sections=units.map(unit=>({key:unit.id,title:unit.title.en,groupKey:`contest-${unit.round}`,groupTitle:`Contest ${unit.round}`,
   localizations:{en:{title:unit.title.en,groupTitle:`Contest ${unit.round}`},zh:{title:unit.title.zh,groupTitle:`第 ${unit.round} 轮`}}}));
  const lessons=documents.reduce((n,doc)=>n+doc.chapters.length,0);
- const en={title:'ACSL Intermediate Course',description:`Learn ACSL Intermediate through structured topics, worked examples and original self-checks, then practice with linked past-paper questions. ${units.length} topics and ${lessons} lessons are currently available; further topics will be added after review.`};
- const zh={title:'ACSL Intermediate 系统课程',description:`按专题学习概念、完整例题与原创自测，再进入关联真题练习。目前已编写 ${units.length} 个专题、${lessons} 节课，后续专题验收完成后逐步加入。`};
+ const complete=units.length===manifest.units.length;
+ const en={title:'ACSL Intermediate Course',description:`Learn ACSL Intermediate through structured topics, worked examples and original self-checks, then practice with linked past-paper questions. ${units.length} topics and ${lessons} lessons ${complete?'cover Contests 1–4.':'are currently available; further topics will be added after review.'}`};
+ const zh={title:'ACSL Intermediate 系统课程',description:`按专题学习概念、完整例题与原创自测，再进入关联真题练习。${complete?'覆盖第 1–4 轮，共':'目前已编写'} ${units.length} 个专题、${lessons} 节课${complete?'。':'，后续专题验收完成后逐步加入。'}`};
  const document={format:'codemaster-learning-path',version:1,...en,category:'ACSL · Intermediate',difficulty:'intermediate',coverKey:'general',
   estimatedMinutes:documents.reduce((n,doc)=>n+doc.estimatedMinutes,0),localizations:{en,zh},sections,
   chapters:documents.flatMap((doc,index)=>doc.chapters.map(chapter=>({...chapter,sectionKey:units[index].id})))};

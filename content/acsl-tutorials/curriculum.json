@@ -707,7 +707,7 @@
       "sourceTopics": [
         "Assembly Language"
       ],
-      "status": "planned",
+      "status": "draft",
       "practiceReferences": [
         {
           "paperSlug": "acsl-2020-2021-intermediate-4",
@@ -741,7 +741,11 @@
           "paperSlug": "acsl-2025-2026-intermediate-4",
           "questionId": "q6"
         }
-      ]
+      ],
+      "documents": {
+        "en": "intermediate/assembly/course.en.md",
+        "zh": "intermediate/assembly/course.zh.md"
+      }
     }
   ]
 }

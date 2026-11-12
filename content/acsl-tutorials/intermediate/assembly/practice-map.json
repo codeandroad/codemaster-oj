@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "unitId": "assembly",
+  "chapters": [
+    {
+      "position": 0,
+      "key": "accumulator-and-memory",
+      "references": [
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-4",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-4",
+          "questionId": "q5"
+        }
+      ]
+    },
+    {
+      "position": 1,
+      "key": "branches-and-control",
+      "references": [
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-4",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-4",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-4",
+          "questionId": "q6"
+        }
+      ]
+    },
+    {
+      "position": 2,
+      "key": "loops-input-and-invariants",
+      "references": [
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-4",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-4",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-4",
+          "questionId": "q6"
+        }
+      ]
+    }
+  ]
+}

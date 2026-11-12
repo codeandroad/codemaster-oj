@@ -11,7 +11,7 @@ const root = new URL('../content/acsl-tutorials/', import.meta.url);
 const katex = createRequire(new URL('../apps/web/package.json', import.meta.url))('katex');
 const json = async url => JSON.parse(await readFile(url, 'utf8'));
 
-export const tutorialUnitIds = ['number-systems', 'recursion', 'program-tracing', 'expressions', 'bit-strings', 'lisp', 'boolean-algebra', 'data-structures', 'automata-regex', 'graphs', 'digital-electronics'];
+export const tutorialUnitIds = ['number-systems', 'recursion', 'program-tracing', 'expressions', 'bit-strings', 'lisp', 'boolean-algebra', 'data-structures', 'automata-regex', 'graphs', 'digital-electronics', 'assembly'];
 export function assertTutorialUnit(unitId) {
   assert.ok(tutorialUnitIds.includes(unitId), `Unknown tutorial unit: ${unitId}`);
   return unitId;
@@ -168,6 +168,7 @@ export async function checkAcslTutorials(unitId) {
       // Only these reviewed, first-party validators may execute. Never import a
       // path supplied by a manifest, lesson, API response, or student program.
       const validators = {
+        'assembly': () => import('../content/acsl-tutorials/intermediate/assembly/checks.mjs'),
         'digital-electronics': () => import('../content/acsl-tutorials/intermediate/digital-electronics/checks.mjs'),
         'graphs': () => import('../content/acsl-tutorials/intermediate/graphs/checks.mjs'),
         'boolean-algebra': () => import('../content/acsl-tutorials/intermediate/boolean-algebra/checks.mjs'),

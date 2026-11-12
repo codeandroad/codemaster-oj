@@ -38,7 +38,6 @@ export function PublicPracticeLeaderboard() {
   const [page, setPage] = useState(1);
   const ranking = useData<PublicRanking>(`practice/leaderboard?page=${page}`);
   const data = ranking.data?.page === page ? ranking.data : null;
-  const own = ranking.data?.own;
   const number = new Intl.NumberFormat(locale === "en" ? "en" : "zh-CN");
   const percent = new Intl.NumberFormat(locale === "en" ? "en" : "zh-CN", {
     style: "percent",
@@ -71,21 +70,6 @@ export function PublicPracticeLeaderboard() {
           </AppLink>
         </div>
       </div>
-
-      {own && (
-        <dl aria-label={text("My public ranking stats", "我的公开排名数据")} className="grid grid-cols-3 divide-x divide-border rounded-lg border border-border bg-surface">
-          {[
-            { label: text("My rank", "我的排名"), value: own.rank === null ? text("Unranked", "暂未上榜") : `#${number.format(own.rank)}` },
-            { label: text("My points", "我的积分"), value: number.format(own.points) },
-            { label: text("Ranked solves", "计入排名的解题数"), value: number.format(own.solved) },
-          ].map(metric => (
-            <div key={metric.label} className="space-y-1 px-3 py-3 sm:px-4">
-              <dt className="text-xs text-muted-foreground">{metric.label}</dt>
-              <dd className="break-words text-base font-semibold tabular-nums sm:text-lg">{metric.value}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
 
       <Loading resource={{ ...ranking, loading: pageLoading }}>
         {data && (

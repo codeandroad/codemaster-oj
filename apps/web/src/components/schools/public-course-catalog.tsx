@@ -77,16 +77,22 @@ type CourseDetail = {
   canTrackProgress: boolean;
 };
 
-export function PublicCourseCatalog({ courseHref, showSearch = true }: { courseHref: (id: string) => string; showSearch?: boolean }) {
-  const text = useSchoolText();
-  const { language } = useCourseLanguage();
+export function courseAdmissionLabel(admission: PublicCourseEntry["admission"], text: ReturnType<typeof useSchoolText>, chapterCount?: number) {
+  const labels: Record<PublicCourseEntry["admission"], [string, string]> = {
+    pending: ["Awaiting review", "待审核"],
+    rejected: ["Application declined", "申请未通过"],
+    apply: ["Application required", "需申请"],
+    invite: ["Invitation required", "需邀请码"],
+    requirements: ["Learning requirements not met", "尚未达到学习门槛"],
+    denied: ["Not eligible", "不符合开放范围"],
+    direct: ["Open for study", "可直接学习"],
+  };
+  const label = text(...labels[admission]);
+  return chapterCount === undefined ? label : `${label} · ${text(`${chapterCount} chapters`, `${chapterCount} 章`)}`;
+}
+
+export function useCourseAdmissionDialog(detailHref: (id: string) => string, reload: () => void) {
   const router = useRouter();
-  const catalog = useData<{ courses: PublicCourseEntry[] }>("practice/catalog");
-  useCourseProgressRefresh(catalog);
-  const [catalogQuery, setQuery] = useCourseCatalogQuery();
-  const query = showSearch ? catalogQuery : "";
-  const courses = filterCourseCatalog((catalog.data?.courses ?? []).map(course => localizedCourse(course, language)), query);
-  const detailHref = (id: string) => courseSearchHref(courseHref(id), query);
   const action = useMutation();
   const [selected, setSelected] = useState<PublicCourseEntry | null>(null);
   const trigger = useRef<HTMLButtonElement | null>(null);
@@ -104,42 +110,49 @@ export function PublicCourseCatalog({ courseHref, showSearch = true }: { courseH
     opening.current = false;
   }
 
+  return { busy: action.busy, openCourse, feedback: <Feedback action={action}/>,
+    dialog: selected && <CourseAdmissionDialog entry={selected} onUpdated={entry => {
+      if (entry.admission === "direct") {
+        setSelected(null);
+        router.push(detailHref(entry.id));
+      } else setSelected(entry);
+      reload();
+    }} onClose={() => setSelected(null)} returnFocus={() => trigger.current?.focus()}/> };
+}
+
+export function PublicCourseCatalog({ courseHref, showSearch = true }: { courseHref: (id: string) => string; showSearch?: boolean }) {
+  const text = useSchoolText();
+  const { language } = useCourseLanguage();
+  const catalog = useData<{ courses: PublicCourseEntry[] }>("practice/catalog");
+  useCourseProgressRefresh(catalog);
+  const [catalogQuery, setQuery] = useCourseCatalogQuery();
+  const query = showSearch ? catalogQuery : "";
+  const courses = filterCourseCatalog((catalog.data?.courses ?? []).map(course => localizedCourse(course, language)), query);
+  const detailHref = (id: string) => courseSearchHref(courseHref(id), query);
+  const { busy, openCourse, feedback, dialog } = useCourseAdmissionDialog(detailHref, catalog.reload);
+
   return <div className="space-y-3">
     {showSearch && <CourseCatalogSearch query={query} onSearch={setQuery}/>}
-    <Feedback action={action}/>
+    {feedback}
     <Loading resource={catalog}>
       <LearningCourseList empty={!courses.length ? (query
         ? text("No courses match this search.", "没有符合搜索条件的课程。")
         : text("No public courses yet.", "暂无公开课程。")) : undefined}>
         {courses.map(course => {
-          const admission = course.admission === "pending" ? text("Awaiting review", "待审核")
-            : course.admission === "rejected" ? text("Application declined", "申请未通过")
-              : course.admission === "apply" ? text("Application required", "需申请")
-                : course.admission === "invite" ? text("Invitation required", "需邀请码")
-                  : course.admission === "requirements" ? text("Learning requirements not met", "尚未达到学习门槛")
-                    : course.admission === "denied" ? text("Not eligible", "不符合开放范围")
-                      : text("Open for study", "可直接学习");
           const title = course.admission === "direct"
             ? <AppLink href={detailHref(course.id)} className={learningCourseTitleClass}>{course.title}</AppLink>
-            : <button type="button" className={learningCourseTitleClass} disabled={action.busy}
+            : <button type="button" className={learningCourseTitleClass} disabled={busy}
                 onClick={event => void openCourse(event, course.id)}>{course.title}</button>;
           const reading = course.admission === "direct" && course.completedChapters !== undefined
             ? { value: course.completedChapters, total: course.chapterCount }
             : undefined;
-          const chapterLabel = text(`${course.chapterCount} chapters`, `${course.chapterCount} 章`);
           return <LearningCourseRow key={course.id} course={course} title={title} source={courseSourceName(course)}
-            status={reading ? admission : `${admission} · ${chapterLabel}`} reading={reading}
+            status={courseAdmissionLabel(course.admission, text, reading ? undefined : course.chapterCount)} reading={reading}
             practice={course.admission === "direct" && course.totalExercises !== undefined ? { value: course.completedExercises ?? 0, total: course.totalExercises } : undefined} />;
         })}
       </LearningCourseList>
     </Loading>
-    {selected && <CourseAdmissionDialog entry={selected} onUpdated={entry => {
-      if (entry.admission === "direct") {
-        setSelected(null);
-        router.push(detailHref(entry.id));
-      } else setSelected(entry);
-      catalog.reload();
-    }} onClose={() => setSelected(null)} returnFocus={() => trigger.current?.focus()}/>}
+    {dialog}
   </div>;
 }
 

@@ -214,6 +214,37 @@ test('platform course admission combines audience, requirements and grants acros
       await owner.query('UPDATE school_memberships SET revoked_at=NULL WHERE account_id=$1', [actors['multi-student'].id]);
     });
 
+    await run('a platform course targeting the legacy school appears in both course tabs before admission', async () => {
+      const schoolRule = { schoolId: LEGACY_SCHOOL_ID, ...rule('direct', { minimumPoints: 300 }) };
+      const independent = rule('invite'), name = 'legacy-student';
+      let course = await create(policy({ independent, schools: [schoolRule] }), 'ACSL discovery fixture');
+      const issued = await invite(course, course.audiencePolicy.independentRule);
+      const schoolList = () => get('/learning-paths?includeAdmission=true', name);
+      const publicList = async actor => (await get('/practice/catalog', actor)).courses.find(item => item.id === course.id);
+      const summary = (await schoolList()).items.find(item => item.id === course.id);
+      assert.ok(summary);
+      assert.equal(summary.title, course.title);
+      assert.equal(summary.admission, 'requirements');
+      assert.equal(summary.chapterCount, 1);
+      for (const key of ['chapters', 'completedChapters', 'taskCount', 'admissionRules']) assert.ok(!(key in summary));
+      noLesson(summary); noCode(summary, issued.code);
+      assert.equal((await publicList(name)).admission, 'requirements');
+      const schoolEntry = await entry(course, name);
+      assert.equal(schoolEntry.admissionRules.length, 1);
+      assert.equal(schoolEntry.admissionRules[0].points.required, 300);
+      assert.equal((await publicList('free')).admission, 'invite');
+      assert.equal(await publicList('beta-student'), undefined);
+      await get('/learning-paths?includeAdmission=true', 'beta-student', 403);
+      assert.ok(!(await get('/learning-paths', name)).items.some(item => item.id === course.id));
+      await get(`/learning-paths/${course.id}`, name, 404); await read(course, name, 403);
+
+      course = await change(course, { audiencePolicy: policy({ independent, schools: [{ ...schoolRule, minimumPoints: 0 }] }) });
+      const admitted = (await schoolList()).items.find(item => item.id === course.id);
+      assert.equal(admitted.completedChapters, 0);
+      assert.ok(!('admission' in admitted));
+      assert.equal((await get(`/learning-paths/${course.id}`, name)).id, course.id);
+    });
+
     await run('applications expose metadata only and require platform approval; content edits retain grants', async () => {
       let course = await create(policy({ independent: rule('application') }));
       const r = course.audiencePolicy.independentRule;
@@ -561,7 +592,7 @@ test('platform course admission combines audience, requirements and grants acros
       assert.equal(paths.filter(course => course.audiencePolicy.allRule.prerequisiteCourseIds.length === 1).length, 1);
     });
 
-    if (process.env.TEST_KEEP_PLATFORM_ADMISSION_FIXTURE && passedCases === 16) {
+    if (process.env.TEST_KEEP_PLATFORM_ADMISSION_FIXTURE && passedCases === 17) {
       const browserCourse = await create(policy({ independent: rule('application'), schools: [{ schoolId: alpha.id, ...rule() }, { schoolId: beta.id, ...rule('invite') }] }), 'QA platform admission: three routes', [
         { title: 'An original bilingual lesson', content: 'Read the explanation before completing the checkpoint.', objective: 'Understand the admission flow', checkpoint: 'Explain one rule in your own words.', checkpointAnswer: 'Rules combine an audience with requirements and an admission method.', localizations: { en: { title: 'An original bilingual lesson', content: 'Read the explanation before completing the checkpoint.', objective: 'Understand the admission flow', checkpoint: 'Explain one rule in your own words.', checkpointAnswer: 'Rules combine an audience with requirements and an admission method.' }, zh: { title: '原创双语课时', content: '阅读讲解，再完成检查点。', objective: '理解课程准入流程', checkpoint: '用自己的话解释一条规则。', checkpointAnswer: '规则由目标人群、前置条件和准入方式组成。' } } },
       ]);

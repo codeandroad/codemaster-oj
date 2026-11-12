@@ -11,7 +11,7 @@ import { transaction } from './db.mjs';
 import { fail, field, uuid, bytes, integer,enumValue } from './security.mjs';
 import { getTimedPracticeResult } from './timed.mjs';
 import { avatarForIdentity } from './avatars.mjs';
-import {managesCourse,readableCourseIds,courseClasses,courseProperties,saveCourseProperties,assertCoursePublicationAccess} from './course-access.mjs';
+import {managesCourse,readableCourseIds,courseAccess,courseClasses,courseProperties,saveCourseProperties,assertCoursePublicationAccess} from './course-access.mjs';
 import { assignmentProgressById } from './assignment-grades.mjs';
 import { latestCourseProblemVersion } from './course-problem-version.mjs';
 import { liveProblemVersionIdSql, resolveLiveProblemVersion } from './live-problem-version.mjs';
@@ -438,14 +438,24 @@ export async function handleEducation(ctx) {
  if (route === '/learning-paths' && method === 'GET') {
   const archived=ctx.url.searchParams.get('archived')==='true';
   if(archived)requireStaff(user);
-  let paths = (await pool.query(`SELECT p.*,(SELECT count(*) FROM learning_chapters c WHERE c.path_id=p.id AND c.archived_at IS NULL) chapter_count,
+  const paths = (await pool.query(`SELECT p.*,(SELECT count(*) FROM learning_chapters c WHERE c.path_id=p.id AND c.archived_at IS NULL) chapter_count,
    (SELECT count(*) FROM learning_progress pr JOIN learning_chapters c ON c.id=pr.chapter_id WHERE c.path_id=p.id AND c.archived_at IS NULL AND pr.identity_id=$2 AND pr.completed) completed_chapters
    FROM learning_paths p WHERE (p.archived_at IS NOT NULL)=$5 AND (NOT $5 AND p.published_at IS NOT NULL OR ($3::boolean AND (p.owner_account_id=$1 OR $4::boolean))) ORDER BY p.updated_at DESC,p.id`, [user.id,user.identityId,staff(user),administrator(user),archived])).rows;
-  const readable=await readableCourseIds(pool,user,paths.map(p=>p.id),{listed:true});
-  paths=paths.filter(p=>readable.has(p.id));
-  for(const path of paths)path.classes=await courseClasses(pool,path.id);
-  const stats=await taskStats(pool,user,paths.map(p=>p.id),paths.filter(p=>!p.published_at).map(p=>p.id));
-  return result({ items:paths.filter(p=>!staff(user)||p.owner_scope!=='platform').map(p=>({...pathShape({...p,...stats.get(p.id),canEdit:managesCourse(user,p)}),archived:!!p.archived_at})) });
+  const {readable,platformAdmissions}=await courseAccess(pool,user,paths.map(p=>p.id),{listed:true});
+  const includeAdmission=ctx.url.searchParams.get('includeAdmission')==='true'&&user.roles.includes('student')&&!staff(user);
+  const accessible=paths.filter(p=>readable.has(p.id));
+  for(const path of accessible)path.classes=await courseClasses(pool,path.id);
+  const stats=await taskStats(pool,user,accessible.map(p=>p.id),accessible.filter(p=>!p.published_at).map(p=>p.id));
+  return result({items:paths.flatMap(p=>{
+   if(readable.has(p.id)&&(!staff(user)||p.owner_scope!=='platform'))
+    return pathShape({...p,...stats.get(p.id),canEdit:managesCourse(user,p)});
+   const entry=includeAdmission?platformAdmissions.get(p.id):null;
+   // School discovery may show a matching course before admission, without its learner data.
+   if(!entry||entry.admission==='denied'||!entry.admissionRules.some(rule=>rule.targetKind==='school'&&rule.schoolId===LEGACY_SCHOOL_ID))return [];
+   return {id:p.id,title:p.title,description:p.description,category:p.category,difficulty:p.difficulty,coverKey:p.cover_key,
+    coverImage:p.cover_image,authorName:p.author_name,...localizedFields(p.localizations),ownerScope:p.owner_scope,
+    chapterCount:Number(p.chapter_count),admission:entry.admission};
+  })});
  }
  if (route === '/learning-paths/import' && method === 'POST') {
   requireStaff(user);const doc=validateLearningDocument(body);

@@ -17,6 +17,7 @@ import { CourseCatalogSearch, useCourseCatalogQuery } from "./learning-course-se
 import { filterCourseCatalog } from "./learning-course-search-model";
 import { AppLink } from "@/components/navigation";
 import { LearningCourseReader } from "./learning-course-reader";
+import { courseAdmissionLabel, useCourseAdmissionDialog, type PublicCourseEntry } from "@/components/schools/public-course-catalog";
 
 import { Check, ChevronDown, ClipboardList } from "lucide-react";
 import { useEffect } from "react";
@@ -49,27 +50,40 @@ type CourseAssignment = {
 };
 
 export interface LearningPath extends CourseAccessMetadata { sections?: CourseSection[]; redirectedFromCourseId?: string; redirectedChapterId?: string; localizations?: CourseLocalizations; id: string; title: string; description: string; category: string; published: boolean; chapterCount: number; completedChapters: number; canEdit: boolean;difficulty?:keyof typeof courseDifficulties;coverKey?:string;taskCount?:number;completedTasks?:number; chapters?: LearningChapter[]; assignments?: CourseAssignment[]; }
+type LockedLearningPath = CourseAccessMetadata & Pick<LearningPath, "id" | "title" | "description" | "category" | "difficulty" | "coverKey" | "chapterCount" | "localizations"> & {
+  admission: PublicCourseEntry["admission"];
+};
 export function StudentLearningList(){
  const {locale}=useLocale();
  const {language}=useCourseLanguage();
- const paths=useData<{items:LearningPath[]}>("learning-paths");
+ const paths=useData<{items:(LearningPath | LockedLearningPath)[]}>("learning-paths?includeAdmission=true");
  const [query, setQuery] = useCourseCatalogQuery();
  const visible = filterCourseCatalog((paths.data?.items ?? []).map(path => localizedCourse(path, language)), query);
+ const detailHref = (id: string) => courseLanguageHref(`/student/learning-paths/${id}`, language);
+ const { busy, openCourse, feedback, dialog } = useCourseAdmissionDialog(detailHref, paths.reload);
  useCourseProgressRefresh(paths);
  return <>
   <PageHeader title={ui(locale,"课程","Courses")} description={ui(locale,"按章节阅读、练习与复盘；已读和判题通过分别记录。","Read, practice, and review each chapter. Reading and accepted submissions are tracked separately.")}/>
   <CourseCatalogSearch query={query} onSearch={setQuery}/>
+  {feedback}
   <State data={paths}>
    <div className="mt-3"><LearningCourseList empty={!visible.length ? (query
      ? ui(locale,"没有符合搜索条件的课程。","No courses match this search.")
      : ui(locale,"暂无已发布课程","No published courses yet")) : undefined}>
-    {visible.map(path=><LearningCourseRow key={path.id} course={{...path,difficulty:path.difficulty??"beginner"}}
-      source={courseSourceName(path)}
-      title={<AppLink href={courseLanguageHref(`/student/learning-paths/${path.id}`, language)} className={learningCourseTitleClass}>{path.title}</AppLink>}
-      reading={{value:path.completedChapters,total:path.chapterCount}}
-      practice={{value:path.completedTasks??0,total:path.taskCount??0}} />)}
+    {visible.map(path => {
+      const course = {...path, difficulty:path.difficulty??"beginner"} as const;
+      const source = courseSourceName(path);
+      if ("admission" in path) return <LearningCourseRow key={path.id} course={course} source={source}
+        title={<button type="button" className={learningCourseTitleClass} disabled={busy} onClick={event => void openCourse(event,path.id)}>{path.title}</button>}
+        status={courseAdmissionLabel(path.admission, (en, zh) => ui(locale, zh, en), path.chapterCount)}/>;
+      return <LearningCourseRow key={path.id} course={course} source={source}
+        title={<AppLink href={detailHref(path.id)} className={learningCourseTitleClass}>{path.title}</AppLink>}
+        reading={{value:path.completedChapters,total:path.chapterCount}}
+        practice={{value:path.completedTasks??0,total:path.taskCount??0}}/>;
+    })}
    </LearningCourseList></div>
   </State>
+  {dialog}
  </>;
 }
 export function StudentLearningDetail({ id, chapterId }: { id: string; chapterId?: string }) {

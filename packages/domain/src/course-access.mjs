@@ -2,14 +2,18 @@ import {canonicalMergedCourseId} from './course-merge.mjs';
 import {fail,field,uuid,enumValue} from './security.mjs';
 import {normalizeRequiredLanguage} from './course-language-policy.mjs';
 import {resolveLiveProblemVersion} from './live-problem-version.mjs';
-import {platformCourseAudienceSql,platformCourseEligible} from './platform-course-access.mjs';
+import {platformCourseAudienceSql,platformCourseAdmission} from './platform-course-access.mjs';
 const isStaff=user=>user.roles.some(role=>role==='teacher'||role==='admin');
 export const managesCourse=(user,course)=>course.owner_scope!=='platform'&&isStaff(user)&&(user.roles.includes('admin')||course.owner_account_id===user.id);
 
 // A course link or a class task never widens the audience of the course itself.
 // Listing is a discovery preference; direct eligible links may still be opened.
 export async function readableCourseIds(db,user,ids,{listed=false}={}){
- if(!ids.length)return new Set();
+ return (await courseAccess(db,user,ids,{listed})).readable;
+}
+export async function courseAccess(db,user,ids,{listed=false}={}){
+ const readable=new Set(),platformAdmissions=new Map();
+ if(!ids.length)return {readable,platformAdmissions};
  const rows=(await db.query(`SELECT p.id,p.owner_scope FROM learning_paths p WHERE p.id=ANY($1::uuid[]) AND (
   p.owner_scope='school' AND $4::boolean AND (p.owner_account_id=$2 OR $5::boolean)
   OR p.published_at IS NOT NULL AND p.archived_at IS NULL AND (NOT $6::boolean OR p.listed)
@@ -17,9 +21,14 @@ export async function readableCourseIds(db,user,ids,{listed=false}={}){
    AND (p.owner_scope='platform' AND ${platformCourseAudienceSql('p','$2')}
     OR p.owner_scope='school' AND (p.access_scope='school' OR EXISTS(SELECT 1 FROM learning_path_classes pc JOIN classes c ON c.id=pc.class_id AND c.archived_at IS NULL
     JOIN class_members cm ON cm.class_id=c.id WHERE pc.path_id=p.id AND cm.identity_id=$3))))`,[ids,user.id,user.identityId,isStaff(user),user.roles.includes('admin'),listed])).rows;
- const allowed=new Set(),state={};
- for(const row of rows)if(row.owner_scope!=='platform'||await platformCourseEligible(db,row.id,user.id,{state}))allowed.add(row.id);
- return allowed;
+ const state={};
+ for(const row of rows){
+  if(row.owner_scope!=='platform'){readable.add(row.id);continue;}
+  const entry=await platformCourseAdmission(db,row.id,user.id,{state});
+  platformAdmissions.set(row.id,entry);
+  if(entry.admission==='direct')readable.add(row.id);
+ }
+ return {readable,platformAdmissions};
 }
 export async function courseMetadataForUser(db,user,id){
  if(!id)return null;

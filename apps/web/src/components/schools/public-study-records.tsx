@@ -6,7 +6,7 @@ import { useLocale } from "@/components/locale-context";
 import { useNavigationBlocker } from "@/components/navigation";
 import { Button } from "@/components/ui/button";
 import { Feedback, textarea, useData, useMutation } from "@/components/student/shared";
-import { submissionVerdicts } from "@/components/student/submission-filter";
+import { publicSubmissionContext, submissionVerdicts } from "@/components/student/submission-filter";
 import { ReviewNotebookView, SubmissionHistory, studyRecordScore, studyRecordVerdict } from "@/components/student/study-record-views";
 import { productionApi } from "@/lib/production-api";
 import { StudySubmissionDetail, type JobDetail } from "./school-submission-detail";
@@ -41,6 +41,7 @@ function PublicStudyRecords({ notebook }: { notebook: boolean }) {
   const schoolId = search.get("submissionSchoolId");
   const selectedVerdict = search.get("publicVerdict") ?? "";
   const verdict = !notebook && submissionVerdicts.includes(selectedVerdict) ? selectedVerdict : "";
+  const context = search.get("publicContext") === publicSubmissionContext ? publicSubmissionContext : "";
   const candidate = Number(search.get("publicPage") ?? 1);
   const page = Number.isInteger(candidate) && candidate > 0 && candidate <= 100000 ? candidate : 1;
   function href(changes: Record<string, string | null>) {
@@ -61,18 +62,20 @@ function PublicStudyRecords({ notebook }: { notebook: boolean }) {
         <PublicCorrectionNote key={job.noteUpdatedAt ?? "new"} path={path} job={job} onSaved={reload} />}
     />;
   }
-  return <PublicRecordsList key={`${notebook}:${page}:${verdict}`} notebook={notebook} page={page} verdict={verdict} href={href} />;
+  return <PublicRecordsList key={`${notebook}:${page}:${verdict}`} notebook={notebook} page={page} verdict={verdict} context={context} href={href} />;
 }
 
-function PublicRecordsList({ notebook, page, verdict, href }: {
+function PublicRecordsList({ notebook, page, verdict, context, href }: {
   notebook: boolean;
   page: number;
   verdict: string;
+  context: string;
   href: (changes: Record<string, string | null>) => string;
 }) {
   const text = useSchoolText();
   const { locale } = useLocale();
   const router = useRouter();
+  // This endpoint already restricts submissions to public practice.
   const query = new URLSearchParams({ page: String(page), ...(verdict ? { status: verdict } : {}) });
   const resource = useData<RecordPage>(`practice/${notebook ? "review-notebook" : "submissions"}?${query}`);
   const rows = (resource.data?.items ?? []).map(row => ({
@@ -96,7 +99,11 @@ function PublicRecordsList({ notebook, page, verdict, href }: {
       return { ...row, originalResult: score === "—" ? status : `${status} · ${score}`, lastPracticedAt: row.noteUpdatedAt ?? row.createdAt };
     })}/>;
   return <SubmissionHistory resource={resource} rows={rows} pagination={pagination}
-    filters={{ verdict, onVerdict: value => router.push(href({ publicVerdict: value || null, publicPage: null })) }}/>;
+    filters={{
+      verdict, context, scope: "public",
+      onVerdict: value => router.push(href({ publicVerdict: value || null, publicPage: null })),
+      onContext: value => router.push(href({ publicContext: value || null, publicPage: null })),
+    }}/>;
 }
 
 function PublicCorrectionNote({ path, job, onSaved }: { path: string; job: PublicJob; onSaved: () => void }) {

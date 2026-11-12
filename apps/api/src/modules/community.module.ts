@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Module, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, Module, Patch, Post, Req, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { DomainService } from '../domain.service.js';
 import { DomainGuard, type DomainRequest } from '../domain.guard.js';
@@ -50,35 +50,39 @@ export class CommunityController {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
 
- @Get('profile-message-reports')
+ @Get(['profile-message-reports','platform/profile-message-reports'])
  async allReports(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
- @Post('profile-message-reports/:reportId/dismiss')
+ @Post(['profile-message-reports/:reportId/dismiss','platform/profile-message-reports/:reportId/dismiss'])
  async dismissReport(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
- @Get('profiles/:identityId')
+ @Get(['profiles/:identityId','practice/profiles/:accountId'])
  async profile(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
- @Get('profiles/:identityId/activity')
+ @Patch('practice/profiles/:accountId')
+ async updateProfile(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
+  return applyResponse(response,await this.domain.execute('community',request.domainContext));
+ }
+ @Get(['profiles/:identityId/activity','practice/profiles/:accountId/activity'])
  async activity(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
- @Get('profiles/:identityId/messages')
+ @Get(['profiles/:identityId/messages','practice/profiles/:accountId/messages'])
  async messages(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
- @Post('profiles/:identityId/messages')
+ @Post(['profiles/:identityId/messages','practice/profiles/:accountId/messages'])
  async createMessage(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
- @Delete('profiles/:identityId/messages/:messageId')
+ @Delete(['profiles/:identityId/messages/:messageId','practice/profiles/:accountId/messages/:messageId'])
  async deleteMessage(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
- @Post('profiles/:identityId/messages/:messageId/report')
+ @Post(['profiles/:identityId/messages/:messageId/report','practice/profiles/:accountId/messages/:messageId/report'])
  async reportMessage(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }

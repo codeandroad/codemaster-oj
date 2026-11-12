@@ -827,6 +827,7 @@ export function resourceArea(route) {
  if(/^\/schools\/[^/]+\/activities(?:\/|$)/.test(route))return 'schoolActivities';
  if(/^\/schools\/[^/]+\/course-admissions(?:\/|$)/.test(route))return 'publicLearning';
  if(/^\/practice\/presence(?:\/|$)/.test(route))return 'publicPresence';
+ if(/^\/(practice\/profiles|platform\/profile-message-reports)(?:\/|$)/.test(route))return 'community';
  if(/^\/practice(?:\/|$)/.test(route))return /^\/practice\/(catalog|courses)(?:\/|$)/.test(route)?'publicLearning':'schoolPractice';
  if(/^\/schools\/[^/]+\/(problem-banks|problems|judge-jobs|judge-status|submissions)(?:\/|$)/.test(route))return 'schoolPractice';
  if(/^\/platform(?:\/|$)/.test(route))return 'platform';

@@ -8,10 +8,12 @@ import {
   Building2,
   BookOpen,
   BookOpenCheck,
+  Flag,
   RefreshCw,
 } from "lucide-react";
 import { WorkspaceFrame } from "@/components/workspace-frame";
 import { AccountMenu } from "@/components/account-menu";
+import { MessageReports } from "@/components/admin/message-reports";
 import { NotificationDropdown } from "@/components/student/notification-dropdown";
 import { useSearchParams, useRouter } from "next/navigation";
 import { PersonalWorkspaceSettings } from "./personal-workspace-settings";
@@ -39,6 +41,15 @@ import {
   type PlatformSchoolAction,
 } from "./platform-ui";
 
+const platformSections = {
+  schools: { icon: Building2, en: "Schools", zh: "学校" },
+  courses: { icon: BookOpen, en: "Platform courses", zh: "平台课程" },
+  "course-review": { icon: BookOpenCheck, en: "Course review", zh: "课程公开审核" },
+  problems: { icon: BookOpenCheck, en: "Public problems", zh: "公开题库" },
+  "message-reports": { icon: Flag, en: "Message reports", zh: "留言举报" },
+} as const;
+type PlatformSection = keyof typeof platformSections;
+
 export function PlatformPage({
   user,
   onLogout,
@@ -59,15 +70,9 @@ export function PlatformPage({
   const personalProfile = search.get("section") === "profile";
   const personalPage = personalSettings || personalProfile;
   const [action, setAction] = useState<PlatformSchoolAction | null>(null);
-  const section =
-    search.get("section") === "course-review"
-      ? "course-review"
-      : search.get("section") === "courses"
-      ? "courses"
-      : search.get("section") === "problems"
-        ? "problems"
-        : "schools";
-  const setSection = (next: "schools" | "courses" | "course-review" | "problems") =>
+  const requestedSection = search.get("section") ?? "";
+  const section = Object.hasOwn(platformSections, requestedSection) ? requestedSection as PlatformSection : "schools";
+  const setSection = (next: PlatformSection) =>
     router.push(`/platform?section=${next}`);
   const [revision, setRevision] = useState(0);
   const [page, setPage] = useState(1);
@@ -106,13 +111,8 @@ export function PlatformPage({
                 className="space-y-1 p-3"
                 aria-label={text("Platform navigation", "平台导航")}
               >
-                {(["schools", "courses", "course-review", "problems"] as const).map((item) => {
-                  const Icon =
-                    item === "schools"
-                      ? Building2
-                      : item === "courses"
-                        ? BookOpen
-                        : BookOpenCheck;
+                {(Object.keys(platformSections) as PlatformSection[]).map((item) => {
+                  const { icon: Icon, en, zh } = platformSections[item];
                   return (
                     <Button
                       key={item}
@@ -130,12 +130,7 @@ export function PlatformPage({
                       }}
                     >
                       <Icon size={17} />
-                      {item === "schools"
-                        ? text("Schools", "学校")
-                        : item === "courses"
-                          ? text("Platform courses", "平台课程")
-                          : item === "course-review" ? text("Course review", "课程公开审核")
-                          : text("Public problems", "公开题库")}
+                      {text(en, zh)}
                     </Button>
                   );
                 })}
@@ -152,12 +147,7 @@ export function PlatformPage({
                     ? text("Settings", "设置")
                     : personalProfile
                       ? text("Profile", "个人资料")
-                    : section === "schools"
-                      ? text("Schools", "学校")
-                      : section === "courses"
-                        ? text("Platform courses", "平台课程")
-                        : section === "course-review" ? text("Course review", "课程公开审核")
-                        : text("Public problems", "公开题库")}
+                      : text(platformSections[section].en, platformSections[section].zh)}
                 </h1>
               </div>
             }
@@ -239,6 +229,8 @@ export function PlatformPage({
                       <PlatformCourses />
                     ) : section === "course-review" ? (
                       <PublicCourseReview />
+                    ) : section === "message-reports" ? (
+                      <MessageReports practice />
                     ) : (
                       <PublicProblemReview />
                     )}

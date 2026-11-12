@@ -28,6 +28,10 @@ async function publicPracticePreferences(db,user,changes){
     scholarship_enabled=COALESCE($2,public_practice_preferences.scholarship_enabled),
     ranking_enabled=COALESCE($3,public_practice_preferences.ranking_enabled)`,
   [user.id,scholarshipEnabled,rankingEnabled]);
+  if(rankingEnabled===true){
+   await db.query('SELECT include_public_practice_rank_history($1)',[user.id]);
+   await db.query('UPDATE public_practice_preferences SET rank_history_included=true WHERE account_id=$1',[user.id]);
+  }
   if(scholarshipEnabled===true)await db.query('SELECT luq_grant_initial($1)',[user.identityId]);
  }
  const {rows:[preferences]}=await db.query(`SELECT

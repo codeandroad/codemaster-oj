@@ -285,8 +285,8 @@ function ProductionView({pathname,role,user,profileVersion,onProfileSaved}:{path
   if (pathname === "/teacher/scholarship") return <TeacherScholarshipPage/>;
   if (pathname === "/admin/scholarship") return <AdminScholarshipPage/>;
   if(pathname.endsWith("/points"))return <PointsPage user={user} student={role==="student"} workspace={role}/>;
-  if(/^\/(student|teacher|admin)\/people\/[^/]+$/.test(pathname))return <StudentPublicProfile identityId={pathname.split("/")[3]} viewer={user} workspace={role}/>;
-  if(pathname==="/student/profile")return <><ProfileEditor user={user} onSaved={onProfileSaved}/><StudentPublicProfile key={profileVersion} identityId={user.identityId} viewer={user} embedded/></>;
+  if(/^\/(student|teacher|admin)\/people\/[^/]+$/.test(pathname))return <StudentPublicProfile profileId={pathname.split("/")[3]} viewer={user} workspace={role}/>;
+  if(pathname==="/student/profile")return <><ProfileEditor user={user} onSaved={onProfileSaved}/><StudentPublicProfile key={profileVersion} profileId={user.identityId} viewer={user} embedded/></>;
   if(pathname.endsWith("/profile"))return <ProfileEditor user={user} onSaved={onProfileSaved}/>;
   if(pathname==="/student/settings"||pathname==="/teacher/settings"||pathname==="/admin/personal-settings")return <><AlignedProfile user={user} teacher={role==="teacher"} admin={role==="admin"}/><PersonalAppearanceSettings/><JoinedSchoolSettings user={user}/></>;
   if (role==="student") return <StudentPages pathname={pathname} user={user}/>;

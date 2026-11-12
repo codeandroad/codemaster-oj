@@ -121,12 +121,57 @@ test('school and public practice Nest transport requires scoped membership, CSRF
    assert.match(before.data.own.name,/^Learner-[0-9A-F]{8}$/);
 
    const accepted={status:'AC',score:100,passed:1,total:1,publicMessage:'',privateResults:[]};
-   // Complete the queued school sample, then a real public submission using
-   // the application's normal transport and restricted worker role.
+   // Complete the queued school sample, then a public submission before
+   // opting in. The private history should already contain the accepted solve.
    await processSchoolOne({pool:worker,judge:{judge:async()=>accepted}});
+   const historical=(await request(`/practice/problems/${problem.id}/submissions`,{auth:auth.personal,method:'POST',
+    body:{kind:'submit',code:'def solve(data):\n return data*2',requestId:randomUUID()},status:202})).data;
+   await processSchoolOne({pool:worker,judge:{judge:async()=>accepted}});
+   const unshared=(await request('/practice/leaderboard',{auth:auth.personal})).data;
+   assert.deepEqual(unshared.progress,{solved:1,rankingEnabled:false,historyIncluded:false});
+   assert.equal(unshared.own.rank,null);
+   assert.deepEqual(unshared.items,[]);
+
+   const profile=`/practice/profiles/${users.personal.id}`;
+   await request(profile,{status:401});
+   await request(profile,{auth:auth.student,status:404});
+   assert.deepEqual((await request(profile,{auth:auth.personal})).data.profile,
+    {points:0,scholarship:0,solvedProblems:1,nickname:before.data.own.name,avatar:before.data.own.avatar,isSelf:true,profileEnabled:false});
+   const activity=(await request(`${profile}/activity?pageSize=5`,{auth:auth.personal})).data;
+   assert.equal(activity.total,1);
+   assert.deepEqual(activity.items.map(({id,problemTitle})=>[id,problemTitle]),[[historical.id,problem.title]]);
+   assert.doesNotMatch(JSON.stringify(activity),/solve\(data\)|1874/);
+   assert.deepEqual((await request(`${profile}/messages`,{auth:auth.personal})).data.items,[]);
+   const share={method:'PATCH',body:{profileEnabled:true}};
+   await request(profile,{auth:auth.personal,...share,csrf:false,status:403});
+   await request(profile,{auth:auth.student,...share,status:403});
+   await request(profile,{auth:auth.personal,...share});
+   const visitor=(await request(profile,{auth:auth.student})).data.profile;
+   assert.deepEqual(visitor,{nickname:before.data.own.name,avatar:before.data.own.avatar,isSelf:false});
+   await request(`${profile}/activity`,{auth:auth.student,status:404});
+   const messageBody={body:'Nice work on your public practice.'};
+   await request(`${profile}/messages`,{auth:auth.personal,method:'POST',body:messageBody,status:400});
+   const message=(await request(`${profile}/messages`,{auth:auth.student,method:'POST',body:messageBody,status:201})).data;
+   assert.match(message.author.nickname,/^Learner-[0-9A-F]{8}$/);
+   assert.equal(message.author.id,undefined);
+   assert.equal((await request(`${profile}/messages`,{auth:auth.personal})).data.items[0].canDelete,true);
+   await request(`${profile}/messages/${message.id}`,{auth:auth.teacher,method:'DELETE',status:403});
+   await request(`${profile}/messages/${message.id}/report`,{auth:auth.personal,method:'POST',body:{reason:'other'}});
+   await request('/platform/profile-message-reports',{auth:auth.admin,status:403});
+   const reports=(await request('/platform/profile-message-reports',{auth:auth.platform})).data;
+   assert.deepEqual(reports.items.map(report=>[report.profileAccountId,report.messageId]),[[users.personal.id,message.id]]);
+   await request(profile,{auth:auth.personal,method:'PATCH',body:{profileEnabled:false}});
+   await request(`${profile}/messages`,{auth:auth.student,status:404});
+   assert.equal((await request(`${profile}/messages`,{auth:auth.personal})).data.total,1);
+   await request(`${profile}/messages/${message.id}`,{auth:auth.platform,method:'DELETE'});
+   assert.equal((await request(`${profile}/messages`,{auth:auth.personal})).data.total,0);
+
    for(const account of ['personal','teacher','platform']) {
     await request('/practice/preferences',{auth:auth[account],method:'PATCH',body:{rankingEnabled:true}});
    }
+   const enabled=(await request('/practice/leaderboard',{auth:auth.personal})).data;
+   assert.deepEqual(enabled.progress,{solved:1,rankingEnabled:true,historyIncluded:true});
+   assert.deepEqual([enabled.own.rank,enabled.own.points,enabled.own.attempts],[1,10,2]);
    await request(`/practice/problems/${problem.id}/submissions`,{auth:auth.personal,method:'POST',
     body:{kind:'submit',code:'def solve(data):\n return 0',requestId:randomUUID()},status:202});
    await processSchoolOne({pool:worker,judge:{judge:async()=>({...accepted,status:'WA',score:0,passed:0})}});
@@ -152,6 +197,7 @@ test('school and public practice Nest transport requires scoped membership, CSRF
    await seedJob('student','public','submit','System Error');
    await seedJob('teacher','public','submit','AC');
    await seedJob('platform','public','submit','AC');
+   await request('/practice/preferences',{auth:auth.teacher,method:'PATCH',body:{rankingEnabled:true}});
    await pool.query("UPDATE accounts SET nickname='Shared Nickname',leaderboard_use_nickname=true WHERE id=$1",[users.teacher.id]);
    await pool.query("UPDATE accounts SET nickname='Private Nickname',leaderboard_use_nickname=false WHERE id=$1",[users.personal.id]);
 
@@ -177,9 +223,11 @@ test('school and public practice Nest transport requires scoped membership, CSRF
    const hidden=(await request('/practice/leaderboard',{auth:auth.personal})).data;
    assert.deepEqual(hidden.items,[]);
    assert.equal(hidden.own.rank,null);
+   assert.deepEqual(hidden.progress,{solved:1,rankingEnabled:false,historyIncluded:true});
    await request('/practice/preferences',{auth:auth.personal,method:'PATCH',body:{rankingEnabled:true}});
    assert.equal((await request('/practice/leaderboard',{auth:auth.personal})).data.own.points,10);
    await assert.rejects(worker.query('SELECT * FROM public_practice_leaderboard($1,1,50)',[users.personal.id]),{code:'42501'});
+   await assert.rejects(worker.query('SELECT include_public_practice_rank_history($1)',[users.personal.id]),{code:'42501'});
    const app=createPool(runtime.href);
    try {
     assert.equal((await app.query('SELECT count(*)::int AS total FROM school_judge_jobs')).rows[0].total,0);

@@ -137,7 +137,13 @@ test('school-wide profiles, first-AC activity and guestbook keep administrator m
    const read=(viewer,target)=>call(viewer,`/profiles/${target.identityId}`);
    const publicProfile=(await read(beta,alpha)).body.profile;
    assert.deepEqual(Object.keys(publicProfile).sort(),
-    ['avatar','bio','id','isSelf','nickname','points','rankPoints','solvedProblems'].sort());
+    ['avatar','bio','id','isSelf','nickname','points','rankPoints','scholarship','solvedProblems'].sort());
+   const scholarship=(await pool.query('SELECT balance FROM luq_accounts WHERE identity_id=$1',[alpha.identityId])).rows[0]?.balance ?? 0;
+   assert.equal(publicProfile.scholarship,scholarship);
+   await pool.query('UPDATE leaderboard_settings SET show_luq_balance=false WHERE id=true');
+   assert.equal((await read(beta,alpha)).body.profile.scholarship,undefined);
+   assert.equal((await read(alpha,alpha)).body.profile.scholarship,scholarship);
+   await pool.query('UPDATE leaderboard_settings SET show_luq_balance=true WHERE id=true');
    assert.equal(publicProfile.nickname,'Alpha');
    assert.equal(publicProfile.isSelf,false);
    assert.equal((await read(alpha,alpha)).body.profile.isSelf,true);

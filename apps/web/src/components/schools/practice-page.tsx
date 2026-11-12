@@ -7,6 +7,7 @@ import { Feedback, panelClass, useData, useMutation } from "@/components/admin/c
 import { AppLink } from "@/components/navigation";
 import { PersonalAppearanceProvider } from "@/components/personal-appearance-settings";
 import { NotificationDropdown } from "@/components/student/notification-dropdown";
+import { StudentPublicProfile } from "@/components/student/public-profile";
 import { StudentPresenceHeartbeat } from "@/components/student/student-presence";
 import { ScholarshipBalance, StudentScholarshipPage } from "@/components/scholarship/account-pages";
 import { useWorkspaceSettings } from "@/components/student/workspace-settings";
@@ -39,6 +40,7 @@ export function PracticePage({ user, pathname, onLogout, onUserSaved }: {
   const item = publicStudyNavigation.find(item => item.section === section);
   const label = section === "settings" ? text("Personal settings", "个人设置")
     : section === "profile" ? text("Profile", "个人资料")
+      : section === "people" ? text("Public profile", "公开主页")
       : item ? navLabel(item) : text("Public learning", "公开学习");
 
   useEffect(() => { document.title = `${label} · CodeMaster`; }, [label]);
@@ -52,7 +54,13 @@ export function PracticePage({ user, pathname, onLogout, onUserSaved }: {
       </div>;
       break;
     case "profile":
-      content = <PersonalWorkspaceProfile user={user} onUserSaved={onUserSaved} publicLeaderboard/>;
+      content = <>
+        <PersonalWorkspaceProfile user={user} onUserSaved={onUserSaved} publicLeaderboard/>
+        <StudentPublicProfile profileId={user.id} viewer={user} workspace="practice" embedded/>
+      </>;
+      break;
+    case "people":
+      content = <StudentPublicProfile key={courseId} profileId={courseId} viewer={user} workspace="practice"/>;
       break;
     case "problems":
       content = <PublicPractice/>;

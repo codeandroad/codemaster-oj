@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { Trophy } from "lucide-react";
-import { Loading } from "@/components/admin/common";
+import { Feedback, Loading, useMutation } from "@/components/admin/common";
 import { useLocale } from "@/components/locale-context";
 import { AppLink } from "@/components/navigation";
 import { ProfileAvatar } from "@/components/profile-hero";
 import { useData } from "@/components/teacher/shared";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { productionApi } from "@/lib/production-api";
 import { LeaderboardPodium } from "./leaderboard-podium";
 import { useSchoolText } from "./school-ui";
 
@@ -25,6 +26,7 @@ type PublicRankRow = {
 type PublicRanking = {
   items: PublicRankRow[];
   own: PublicRankRow;
+  progress: { solved: number; rankingEnabled: boolean; historyIncluded: boolean };
   page: number;
   pageSize: number;
   total: number;
@@ -38,6 +40,9 @@ export function PublicPracticeLeaderboard() {
   const [page, setPage] = useState(1);
   const ranking = useData<PublicRanking>(`practice/leaderboard?page=${page}`);
   const data = ranking.data?.page === page ? ranking.data : null;
+  const own = ranking.data?.own;
+  const progress = ranking.data?.progress;
+  const enrollment = useMutation();
   const number = new Intl.NumberFormat(locale === "en" ? "en" : "zh-CN");
   const percent = new Intl.NumberFormat(locale === "en" ? "en" : "zh-CN", {
     style: "percent",
@@ -45,6 +50,7 @@ export function PublicPracticeLeaderboard() {
   });
   const pageLoading = ranking.loading || (!data && !ranking.error);
   const title = text("Public practice leaderboard", "公开练习积分榜");
+  const rankingOff = progress?.rankingEnabled === false;
 
   return (
     <section aria-label={title} className="space-y-4">
@@ -70,6 +76,19 @@ export function PublicPracticeLeaderboard() {
           </AppLink>
         </div>
       </div>
+
+      {progress && own && (rankingOff || !progress.historyIncluded && progress.solved > own.solved) && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface px-4 py-3">
+          <p className="text-sm text-muted-foreground">{rankingOff
+            ? text("Turn on public ranking to include eligible past submissions and show your entry on the leaderboard.", "开启公开排名后，符合条件的历史提交会计入排名，你的排名将显示在榜单上。")
+            : text("You can include eligible public practice submissions from before you turned ranking on.", "可以将开启排名前符合条件的公开练习提交纳入榜单。")}</p>
+          <Button size="sm" variant="secondary" disabled={enrollment.busy || ranking.loading} onClick={() => void enrollment.run(async () => {
+            await productionApi("practice/preferences", { method: "PATCH", body: { rankingEnabled: true } });
+            ranking.reload();
+          })}>{rankingOff ? text("Enable ranking", "开启排名") : text("Include past submissions", "纳入历史提交")}</Button>
+        </div>
+      )}
+      <Feedback action={enrollment}/>
 
       <Loading resource={{ ...ranking, loading: pageLoading }}>
         {data && (
@@ -121,7 +140,7 @@ export function PublicPracticeLeaderboard() {
               ) : (
                 <p role="status" className="px-4 py-6 text-center text-sm text-muted-foreground">
                   {data.total === 0
-                    ? text("Solve a public problem to take the first spot.", "完成一道公开练习题，争取成为第一位上榜的学习者。")
+                    ? text("No learners are ranked yet.", "目前还没有学习者上榜。")
                     : text("No rankings on this page.", "本页暂无排名。")}
                 </p>
               )}

@@ -27,8 +27,8 @@ export function PublicPracticePreferences() {
       key: "rankingEnabled",
       title: text("Public practice ranking", "公开练习排名"),
       detail: text(
-        "Eligible submissions made while ranking is on can count. Turning it off hides your entry without changing your practice history.",
-        "开启期间符合条件的提交可计入排名。关闭后隐藏榜单条目，保留个人练习记录。",
+        "Turning on ranking includes eligible past submissions and displays your entry on the public leaderboard. Turning it off hides your entry.",
+        "开启后，符合条件的历史提交也会计入公开排名。关闭后隐藏榜单条目。",
       ),
     },
   ] as const;

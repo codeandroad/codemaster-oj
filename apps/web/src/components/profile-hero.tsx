@@ -16,7 +16,7 @@ export function ProfileAvatar({ avatar, nickname, large = false }: { avatar?: st
   </span>;
 }
 
-export function ProfileHero({ avatar, nickname, bio, actions, children, self = false, selfLabel, presenceIdentityId }: {
+export function ProfileHero({ avatar, nickname, bio, actions, children, self = false, selfLabel, presenceIdentityId, showBio = true }: {
   avatar?: string | null;
   nickname: string;
   bio?: string | null;
@@ -25,6 +25,7 @@ export function ProfileHero({ avatar, nickname, bio, actions, children, self = f
   self?: boolean;
   selfLabel?: string;
   presenceIdentityId?: string;
+  showBio?: boolean;
   scope?: "school" | "personal";
 }) {
   const { locale } = useLocale();
@@ -46,7 +47,7 @@ export function ProfileHero({ avatar, nickname, bio, actions, children, self = f
         {presenceIdentityId && <StudentOnlineStatus key={presenceIdentityId} identityId={presenceIdentityId}/>}
         {self && <span className="rounded-full bg-accent px-2.5 py-1 text-xs font-semibold text-primary">{selfLabel ?? (locale === "en" ? "My profile" : "我的主页")}</span>}
       </div>
-      <p className="mt-2 max-w-[72ch] whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">{bio?.trim() || (self ? (locale === "en" ? "Add a short bio so others can get to know you." : "写一句介绍，让大家更了解你。") : (locale === "en" ? "This student has not added a bio yet." : "这位同学还没有填写个人介绍。"))}</p>
+      {showBio && <p className="mt-2 max-w-[72ch] whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">{bio?.trim() || (self ? (locale === "en" ? "Add a short bio so others can get to know you." : "写一句介绍，让大家更了解你。") : (locale === "en" ? "This student has not added a bio yet." : "这位同学还没有填写个人介绍。"))}</p>}
       {children}
     </div>
   </section>;

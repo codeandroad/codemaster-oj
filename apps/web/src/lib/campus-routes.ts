@@ -18,6 +18,7 @@ const detailPages = [
   /^\/admin\/problems\/[^/]+\/edit$/,
   /^\/admin\/paper4\/[^/]+$/,
   /^\/practice\/courses\/[^/]+$/,
+  /^\/practice\/people\/[^/]+$/,
   /^\/student\/classes\/[^/]+$/,
   /^\/teacher\/problems\/banks\/[^/]+$/,
   /^\/teacher\/paper4\/[^/]+$/,

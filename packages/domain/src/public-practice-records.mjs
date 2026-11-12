@@ -2,6 +2,17 @@ import { transaction } from './db.mjs';
 import { fail, field, integer, uuid } from './security.mjs';
 import { activeAccount } from './schools.mjs';
 
+export const publicPracticeFirstAc = `SELECT DISTINCT ON (j.problem_id)
+  j.id,j.problem_id,j.payload->'version'->>'title' AS title,j.created_at
+ FROM school_judge_jobs j
+ WHERE j.account_id=$1 AND j.access_context='public' AND j.kind='submit'
+  AND j.activity_id IS NULL AND j.state='completed' AND j.result->>'status'='AC'
+ ORDER BY j.problem_id,j.created_at,j.id`;
+
+export function setPublicPracticeHistoryAccount(db, accountId) {
+ return db.query("SELECT set_config('campus.public_history_account_id',$1,true)", [accountId]);
+}
+
 export async function handlePublicPracticeRecords({ pool, user, route, url, method, body }, projectJob) {
  const detail = route.match(/^\/practice\/submissions\/([^/]+)\/([^/]+)(\/note)?$/);
  const notebook = route === '/practice/review-notebook';
@@ -9,7 +20,7 @@ export async function handlePublicPracticeRecords({ pool, user, route, url, meth
  if (method !== 'GET' && !(detail?.[3] && method === 'PATCH')) return null;
  return transaction(pool, async db => {
   await activeAccount(db, user.id);
-  await db.query("SELECT set_config('campus.public_history_account_id',$1,true)", [user.id]);
+  await setPublicPracticeHistoryAccount(db, user.id);
   if (detail) {
    const schoolId = uuid(detail[1]), id = uuid(detail[2]);
    const { rows: [job] } = await db.query(`

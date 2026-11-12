@@ -42,7 +42,7 @@ export const sitePolicyContent: Record<AppLocale, Record<SitePolicySlug, SitePol
           items: [
             "Account details include your username, display name and a password hash. An email address is optional at personal registration. Profile settings can include a nickname, avatar and bio. School records may include your name, student or staff number, gender, class membership and role. Schools may supply identity and class lists.",
             "Learning and judging records include course progress, submitted code, run inputs, judging results, assignments, assessment answers and grades, as well as related points and rewards. These records support judging, progress tracking and teaching review.",
-            "The service uses session and recent activity information to maintain sign-in and show online status. It uses IP addresses to limit repeated requests and keeps audit records for certain administrative actions. When you use the school guestbook, the service processes messages and related reports for display and moderation.",
+            "The service uses session and recent activity information to maintain sign-in and show online status. It uses IP addresses to limit repeated requests and keeps audit records for certain administrative actions. It processes profile messages and related reports for display and moderation.",
           ],
         },
         {
@@ -50,6 +50,7 @@ export const sitePolicyContent: Record<AppLocale, Record<SitePolicySlug, SitePol
           paragraphs: [
             "School access is based on role, membership and class assignment. Authorized teachers and school administrators can access the teaching and administrative records they are permitted to manage. Classmates may see names on a shared class roster. Where enabled, school profiles can display nicknames, avatars, bios, eligible activity and guestbook messages to authorized school users.",
             "Signed-in learners may see online status, avatars and other profile information available in public practice. You can choose whether to appear on the public practice leaderboard. It uses a generated alias unless you choose to show your nickname.",
+            "If you enable practice profile sharing, signed-in users with the profile link can see your leaderboard display name and read or post messages. Your practice solving history is visible only to you on your profile.",
           ],
         },
         {
@@ -175,7 +176,7 @@ export const sitePolicyContent: Record<AppLocale, Record<SitePolicySlug, SitePol
           items: [
             "账号信息包括用户名、显示名称和密码哈希。个人注册时可选填邮箱，也可在个人资料中设置昵称、头像和简介。学校档案可能包含姓名、学号或工号、性别、班级及角色。身份和班级名单可由学校提供。",
             "学习和判题记录包括课程进度、提交代码、运行输入、判题结果、作业、考核作答、成绩及相关积分或奖励，用于评测、记录进度和教学复核。",
-            "网站使用会话和最近活动信息维持登录、显示在线状态。IP 地址用于限制短时间内的重复请求，部分管理操作会记入审计记录。使用校内留言功能时，网站也会处理留言和相关举报，用于展示和管理。",
+            "网站使用会话和最近活动信息维持登录、显示在线状态。IP 地址用于限制短时间内的重复请求，部分管理操作会记入审计记录。网站会处理主页留言和相关举报，用于展示和管理。",
           ],
         },
         {
@@ -183,6 +184,7 @@ export const sitePolicyContent: Record<AppLocale, Record<SitePolicySlug, SitePol
           paragraphs: [
             "校内访问按角色、学校成员关系和班级范围控制。获授权的教师和学校管理员可查看其职责范围内的教学和管理记录。同班学生可看到班级名单中的姓名。开启相关功能时，有权限的校内用户可看到学生主页展示的昵称、头像、简介、部分学习动态和留言。",
             "已登录的学习者可能看到公开练习区的在线状态、头像及其他可见的个人资料。你可以自行选择是否参与公开练习排行榜。榜单使用系统生成的别名，也可按你的选择显示昵称。",
+            "开启公开练习主页后，持有主页链接的登录用户可以看到你的榜单显示名，并查看或发布留言。资料页里的公开练习解题记录仅本人可见。",
           ],
         },
         {

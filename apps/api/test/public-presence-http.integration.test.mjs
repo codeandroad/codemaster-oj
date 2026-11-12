@@ -171,9 +171,11 @@ test('public presence isolates explicitly present learners and public achievemen
    const unranked=(await card(nicknamed)).data;
    assert.deepEqual(unranked.stats,{points:10,solvedProblems:1,acRate:100,scholarship:0});
    assert.equal(unranked.activity[0].problemTitle,'Public exercise 0');
-   assert.equal((await request('/practice/leaderboard',{auth:other})).data.own.points,0);
+   const privateProgress=(await request('/practice/leaderboard',{auth:other})).data;
+   assert.equal(privateProgress.own.points,0);
+   assert.equal(privateProgress.progress.solved,1);
    await request('/practice/preferences',{auth:other,method:'PATCH',body:{rankingEnabled:true}});
-   assert.equal((await request('/practice/leaderboard',{auth:other})).data.own.points,0,'enabling ranking does not backfill earlier submissions');
+   assert.equal((await request('/practice/leaderboard',{auth:other})).data.own.points,10,'enabling ranking includes eligible earlier submissions');
    assert.deepEqual((await card(nicknamed)).data,unranked);
   });
   await t.test('recent activity hides withdrawn, archived and superseded editions',async()=>{

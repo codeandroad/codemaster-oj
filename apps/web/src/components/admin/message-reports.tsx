@@ -12,6 +12,7 @@ interface MessageReport {
   id: string;
   messageId: string;
   profileIdentityId: string;
+  profileAccountId?: string;
   profileNickname: string;
   profileAvailable: boolean;
   authorIdentityId: string;
@@ -55,13 +56,18 @@ const time = (value: string, locale: AppLocale) => new Intl.DateTimeFormat(local
   dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Shanghai",
 }).format(new Date(value));
 
-export function MessageReports() {
+export function MessageReports({ practice = false }: { practice?: boolean } = {}) {
   const { locale } = useLocale();
   const t = (value: string) => locale === "en" ? reportEnglish[value] ?? value : value;
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<ReportStatus>("pending");
   const [selected, setSelected] = useState<MessageReport | null>(null);
-  const reports = useData<ReportPage>(`profile-message-reports?status=${status}&page=${page}&pageSize=${pageSize}`);
+  const base = `${practice ? "platform/" : ""}profile-message-reports`;
+  const profileHref = (report: MessageReport) => practice
+    ? `/practice/people/${encodeURIComponent(report.profileAccountId ?? "")}`
+    : `/admin/people/${encodeURIComponent(report.profileIdentityId)}?from=reports`;
+  const profileLabel = practice ? (locale === "en" ? "Profile owner" : "主页所有者") : t("被留言学生");
+  const reports = useData<ReportPage>(`${base}?status=${status}&page=${page}&pageSize=${pageSize}`);
   const action = useMutation();
   const totalPages = Math.max(1, Math.ceil((reports.data?.total ?? 0) / pageSize));
   const counts = reports.data?.counts;
@@ -74,7 +80,9 @@ export function MessageReports() {
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h2 className="flex items-center gap-2 font-bold"><Flag size={17} className="text-primary"/>{t("留言举报")}</h2>
-        <p className="mt-1 text-sm leading-6 text-muted-foreground">{t("查看学生对主页留言的举报。删除会立即从主页隐藏留言，并保留举报与操作记录。")}</p>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">{practice
+          ? (locale === "en" ? "Review reports about public practice profile messages." : "处理公开练习主页的留言举报。")
+          : t("查看学生对主页留言的举报。删除会立即从主页隐藏留言，并保留举报与操作记录。")}</p>
       </div>
       <Button size="sm" variant="secondary" disabled={reports.loading} onClick={reports.reload}><RefreshCw size={14}/>{t("刷新列表")}</Button>
     </div>
@@ -90,7 +98,7 @@ export function MessageReports() {
           <table className="w-full min-w-[850px] text-left text-sm">
             <thead className="bg-surface-subtle text-xs text-muted-foreground"><tr>
               <th scope="col" className="px-4 py-3">{t("举报时间")}</th>
-              <th scope="col" className="px-4 py-3">{t("被留言学生")}</th>
+              <th scope="col" className="px-4 py-3">{profileLabel}</th>
               <th scope="col" className="px-4 py-3">{t("留言者")}</th>
               <th scope="col" className="px-4 py-3">{t("举报原因")}</th>
               <th scope="col" className="px-4 py-3">{t("留言内容")}</th>
@@ -100,7 +108,7 @@ export function MessageReports() {
             <tbody>
               {reports.data.items.map(report => <tr key={report.id} className="border-t border-border align-top">
                 <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground"><time dateTime={report.createdAt}>{time(report.createdAt, locale)}</time></td>
-                <td className="px-4 py-3 font-semibold">{report.profileAvailable ? <AppLink href={`/admin/people/${encodeURIComponent(report.profileIdentityId)}?from=reports`} className="text-primary hover:underline focus-visible:underline">{report.profileNickname}</AppLink> : <><span>{report.profileNickname}</span><span className="mt-1 block text-xs font-normal text-muted-foreground">{t("主页不可用")}</span></>}</td>
+                <td className="px-4 py-3 font-semibold">{report.profileAvailable ? <AppLink href={profileHref(report)} className="text-primary hover:underline focus-visible:underline">{report.profileNickname}</AppLink> : <><span>{report.profileNickname}</span><span className="mt-1 block text-xs font-normal text-muted-foreground">{t("主页不可用")}</span></>}</td>
                 <td className="px-4 py-3">{report.authorNickname}</td>
                 <td className="px-4 py-3">{t(reasonLabels[report.reason])}</td>
                 <td className="max-w-sm px-4 py-3"><p className="line-clamp-3 whitespace-pre-wrap break-words">{report.body}</p></td>
@@ -119,7 +127,7 @@ export function MessageReports() {
     </Loading>
     {selected && <Modal title={t("处理留言举报")} description={t("核对留言内容与举报原因。删除后，学生主页不再显示该留言，举报记录仍保留。")} onClose={() => { if (!action.busy) setSelected(null); }}>
       <dl className="grid gap-3 text-sm sm:grid-cols-[100px_1fr]">
-        <dt className="text-muted-foreground">{t("被留言学生")}</dt><dd className="font-semibold">{selected.profileAvailable ? <AppLink href={`/admin/people/${encodeURIComponent(selected.profileIdentityId)}?from=reports`} className="text-primary hover:underline focus-visible:underline">{selected.profileNickname} {t("· 查看主页")}</AppLink> : <>{selected.profileNickname}<span className="ml-2 text-xs font-normal text-muted-foreground">{t("主页不可用")}</span></>}</dd>
+        <dt className="text-muted-foreground">{profileLabel}</dt><dd className="font-semibold">{selected.profileAvailable ? <AppLink href={profileHref(selected)} className="text-primary hover:underline focus-visible:underline">{selected.profileNickname} {t("· 查看主页")}</AppLink> : <>{selected.profileNickname}<span className="ml-2 text-xs font-normal text-muted-foreground">{t("主页不可用")}</span></>}</dd>
         <dt className="text-muted-foreground">{t("留言者")}</dt><dd>{selected.authorNickname}</dd>
         <dt className="text-muted-foreground">{t("举报原因")}</dt><dd>{t(reasonLabels[selected.reason])}</dd>
         <dt className="text-muted-foreground">{t("举报时间")}</dt><dd>{time(selected.createdAt, locale)}</dd>
@@ -128,10 +136,11 @@ export function MessageReports() {
       <div className="rounded-md border border-border bg-surface-subtle p-4"><p className="text-xs font-semibold text-muted-foreground">{t("留言原文")}</p><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6">{selected.body}</p></div>
       <Feedback action={action}/>
       <div className="flex flex-wrap justify-end gap-2"><Button variant="secondary" disabled={action.busy} onClick={() => setSelected(null)}>{t("返回列表")}</Button>{selected.status === "pending" && <Button variant="outline" disabled={action.busy} onClick={() => { void action.run(async () => {
-        await productionApi(`profile-message-reports/${encodeURIComponent(selected.id)}/dismiss`, { method: "POST" });
+        await productionApi(`${base}/${encodeURIComponent(selected.id)}/dismiss`, { method: "POST" });
         setSelected(null); refreshAfterResolution(); action.success(t("举报已驳回，留言保持展示。"));
       }); }}>{t("驳回举报")}</Button>}{selected.status === "pending" && <Button variant="destructive" disabled={action.busy} onClick={() => { void action.run(async () => {
-        await productionApi(`profiles/${encodeURIComponent(selected.profileIdentityId)}/messages/${encodeURIComponent(selected.messageId)}`, { method: "DELETE" });
+        const profileId = practice ? selected.profileAccountId ?? "" : selected.profileIdentityId;
+        await productionApi(`${practice ? "practice/" : ""}profiles/${encodeURIComponent(profileId)}/messages/${encodeURIComponent(selected.messageId)}`, { method: "DELETE" });
         setSelected(null); refreshAfterResolution(); action.success(t("留言已删除，举报记录已保留。"));
       }); }}><Trash2 size={14}/>{t(action.busy ? "处理中…" : "删除违规留言")}</Button>}</div>
     </Modal>}

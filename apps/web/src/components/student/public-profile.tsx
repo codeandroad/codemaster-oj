@@ -12,28 +12,28 @@ import { productionApi, type CampusRole, type CampusUser } from "@/lib/productio
 import { Feedback, State, date, panel, textarea, useData, useMutation, useRefreshOnReturn } from "./shared";
 
 interface PublicProfile {
-  id: string;
   nickname: string;
   avatar: string | null;
-  bio: string | null;
-  points: number;
+  bio?: string | null;
+  points?: number;
   scholarship?: number;
-  solvedProblems: number;
+  solvedProblems?: number;
   isSelf: boolean;
+  profileEnabled?: boolean;
 }
 interface ProfileActivity {
   id: string;
   type: "first_ac";
   problemId: string;
   problemTitle: string;
-  points: number;
+  points?: number;
   createdAt: string;
 }
 interface GuestbookMessage {
   id: string;
   body: string;
   createdAt: string;
-  author: { id: string; nickname: string; avatar: string | null };
+  author: { nickname: string; avatar: string | null };
   canDelete: boolean;
   canReport: boolean;
   reportedByMe: boolean;
@@ -77,15 +77,17 @@ function Pagination({ page, total, onChange, label, locale }: { page: number; to
 }
 
 /** Public information is always loaded from the public profile API, never from private CampusUser fields. */
-export function StudentPublicProfile({ identityId, viewer, embedded = false, workspace = "student" }: { identityId: string; viewer: CampusUser; embedded?: boolean; workspace?: CampusRole }) {
+export function StudentPublicProfile({ profileId, viewer, embedded = false, workspace = "student" }: { profileId: string; viewer: CampusUser; embedded?: boolean; workspace?: CampusRole | "practice" }) {
   const { locale } = useLocale();
-  const base = `profiles/${encodeURIComponent(identityId)}`;
+  const practice = workspace === "practice";
+  const showActivity = !practice || embedded;
+  const base = `${practice ? "practice/" : ""}profiles/${encodeURIComponent(profileId)}`;
   const { version, refresh } = useRefreshOnReturn();
   const profile = useData<{ profile: PublicProfile }>(base, version);
   const [activityPage, setActivityPage] = useState(1);
   const [messagePage, setMessagePage] = useState(1);
-  const activity = useData<Page<ProfileActivity>>(`${base}/activity?page=${activityPage}&pageSize=${pageSize}`, version);
-  const messages = useData<Page<GuestbookMessage>>(`${base}/messages?page=${messagePage}&pageSize=${pageSize}`);
+  const activity = useData<Page<ProfileActivity>>(showActivity ? `${base}/activity?page=${activityPage}&pageSize=${pageSize}` : "", version);
+  const messages = useData<Page<GuestbookMessage>>(`${base}/messages?page=${messagePage}&pageSize=${pageSize}`, version);
   const [draft, setDraft] = useState("");
   const [selected, setSelected] = useState<GuestbookMessage | null>(null);
   const [dialog, setDialog] = useState<"delete" | "report" | null>(null);
@@ -93,11 +95,13 @@ export function StudentPublicProfile({ identityId, viewer, embedded = false, wor
   const [notice, setNotice] = useState("");
   const post = useMutation();
   const moderation = useMutation();
+  const visibility = useMutation();
   const person = profile.data?.profile;
-  const own = person?.isSelf ?? identityId === viewer.identityId;
-  const publicHref = `/${workspace}/people/${encodeURIComponent(identityId)}`;
-  const stats = person && <dl className={`mt-5 grid max-w-xl ${person.scholarship === undefined ? "grid-cols-2" : "grid-cols-3"} gap-3 border-t border-border pt-4 text-sm`}>
-    <div><dt className="text-xs text-muted-foreground">{ui(locale, "积分", "Points")}</dt><dd className="mt-1 text-lg font-bold tabular-nums">{person.points}</dd></div>
+  const own = person?.isSelf ?? profileId === (practice ? viewer.id : viewer.identityId);
+  const canWrite = practice || workspace === "student" && viewer.roles.includes("student");
+  const publicHref = `/${workspace}/people/${encodeURIComponent(profileId)}`;
+  const stats = person?.points !== undefined && <dl className={`mt-5 grid max-w-xl ${person.scholarship === undefined ? "grid-cols-2" : "grid-cols-3"} gap-3 border-t border-border pt-4 text-sm`}>
+    <div><dt className="text-xs text-muted-foreground">{practice ? ui(locale, "排名积分", "Ranking points") : ui(locale, "积分", "Points")}</dt><dd className="mt-1 text-lg font-bold tabular-nums">{person.points}</dd></div>
     {person.scholarship !== undefined && <div><dt className="text-xs text-muted-foreground">{ui(locale, "奖学金", "Scholarship")}</dt><dd className="mt-1 text-lg font-bold tabular-nums">{person.scholarship}</dd></div>}
     <div><dt className="text-xs text-muted-foreground">{ui(locale, "已解题目", "Solved problems")}</dt><dd className="mt-1 text-lg font-bold tabular-nums">{person.solvedProblems}</dd></div>
   </dl>;
@@ -107,7 +111,7 @@ export function StudentPublicProfile({ identityId, viewer, embedded = false, wor
     {embedded ? (
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-bold">{ui(locale, "解题动态与留言", "Activity and messages")}</h2>
-        <AppLink href={`${publicHref}?from=profile`} className={buttonVariants({ variant: "secondary" })}>{ui(locale, "查看公开主页", "View public profile")}</AppLink>
+        {(!practice || person?.profileEnabled) && <AppLink href={`${publicHref}?from=profile`} className={buttonVariants({ variant: "secondary" })}>{ui(locale, "查看公开主页", "View public profile")}</AppLink>}
       </div>
     ) : (
       <h1 className="sr-only">{ui(locale, "学生主页", "Student profile")}</h1>
@@ -115,28 +119,38 @@ export function StudentPublicProfile({ identityId, viewer, embedded = false, wor
 
     <State data={profile}>
       {embedded && stats}
-      {person && !embedded && <ProfileHero avatar={person.avatar} nickname={person.nickname} bio={person.bio} presenceIdentityId={workspace === "student" || workspace === "teacher" || workspace === "admin" ? identityId : undefined} self={person.isSelf} selfLabel={ui(locale, "我的资料", "My profile")} actions={person.isSelf ? <AppLink href={`/${workspace}/profile`} className={buttonVariants({ variant: "outline" })}>{ui(locale, "编辑个人资料", "Edit profile")}</AppLink> : undefined}>
-        {stats}
+      {person && !embedded && <ProfileHero avatar={person.avatar} nickname={person.nickname} bio={person.bio} presenceIdentityId={workspace === "student" || workspace === "teacher" || workspace === "admin" ? profileId : undefined} showBio={!practice} self={person.isSelf} selfLabel={ui(locale, "我的资料", "My profile")} actions={person.isSelf ? <AppLink href={`/${workspace}/profile`} className={buttonVariants({ variant: "outline" })}>{ui(locale, "编辑个人资料", "Edit profile")}</AppLink> : undefined}>
+        {!practice && stats}
       </ProfileHero>}
     </State>
 
-    {person && <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-      <section className={`${panel} min-w-0`} aria-labelledby="profile-activity-heading">
+    {person && <div className={`grid items-start gap-5 ${showActivity ? "xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]" : ""}`}>
+      {showActivity && <section className={`${panel} min-w-0`} aria-labelledby="profile-activity-heading">
         <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><Award size={18} className="text-primary"/><h3 id="profile-activity-heading" className="font-bold">{ui(locale, "解题动态", "Solving activity")}</h3></div><Button size="sm" variant="ghost" disabled={profile.loading || activity.loading} onClick={refresh}>{ui(locale, "刷新", "Refresh")}</Button></div>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">{ui(locale, "每道题首次 AC 后显示一条动态；未公布的限时训练成绩不会提前展示，非公开题目动态仅本人可见。", "A first AC creates one activity entry per problem. Unreleased timed-practice results stay hidden; private-problem activity is visible only to you.")}</p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{practice ? ui(locale, "公开练习的首次正式通过记录仅本人可见。", "Only you can see your first accepted submission for each public practice problem.") : ui(locale, "每道题首次 AC 后显示一条动态；未公布的限时训练成绩不会提前展示，非公开题目动态仅本人可见。", "A first AC creates one activity entry per problem. Unreleased timed-practice results stay hidden; private-problem activity is visible only to you.")}</p>
         <State data={activity}>
           {activity.data?.items.length ? <ol className="mt-4 space-y-3">{activity.data.items.map(item => <li key={item.id} className="relative border-l-2 border-primary/25 py-1 pl-4">
             <span aria-hidden="true" className="absolute -left-[5px] top-2 size-2 rounded-full bg-primary"/>
-            <p className="break-words text-sm">{ui(locale, "首次通过", "First AC on")} <span className="font-semibold">{item.problemTitle}</span>{item.points > 0 && <span className="ml-2 font-semibold text-success">+{item.points} {ui(locale, "分", "points")}</span>}</p>
+            <p className="break-words text-sm">{ui(locale, "首次通过", "First AC on")} <span className="font-semibold">{item.problemTitle}</span>{item.points != null && item.points > 0 && <span className="ml-2 font-semibold text-success">+{item.points} {ui(locale, "分", "points")}</span>}</p>
             <time className="mt-1 block text-xs text-muted-foreground" dateTime={item.createdAt}>{date(item.createdAt, locale)}</time>
           </li>)}</ol> : <p className="mt-5 rounded-md bg-surface-subtle p-4 text-sm text-muted-foreground">{ui(locale, "暂无公开解题动态，完成首道题目后会出现在这里。", "No public solving activity yet. Your first solved problem will appear here.")}</p>}
           <Pagination label={ui(locale, "解题动态", "Solving activity")} locale={locale} page={activityPage} total={activity.data?.total ?? 0} onChange={setActivityPage}/>
         </State>
-      </section>
+      </section>}
 
       <section className={`${panel} min-w-0`} aria-labelledby="profile-messages-heading">
         <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><MessageCircle size={18} className="text-primary"/><h3 id="profile-messages-heading" className="font-bold">{ui(locale, "主页留言", "Profile messages")}</h3></div><Button size="sm" variant="ghost" disabled={messages.loading} onClick={messages.reload}>{ui(locale, "刷新", "Refresh")}</Button></div>
-        {!own && workspace === "student" && viewer.roles.includes("student") && <form className="mt-3" onSubmit={event => { event.preventDefault(); if (!draft.trim()) return; setNotice(""); void post.run(async () => {
+        {practice && embedded && <div className="mt-2 space-y-2">
+          <p id="practice-profile-sharing" className="text-xs leading-5 text-muted-foreground">{person.profileEnabled
+            ? ui(locale, "登录用户可通过公开主页链接查看和发布留言。", "Signed-in users with your public profile link can read and leave messages.")
+            : ui(locale, "开启后，持有主页链接的登录用户可以看到你的榜单显示名并留言。", "Enable sharing to let signed-in users with your profile link see your leaderboard name and leave messages.")}</p>
+          <Button size="sm" variant="secondary" aria-describedby="practice-profile-sharing" disabled={visibility.busy || profile.loading} onClick={() => void visibility.run(async () => {
+            await productionApi(base, { method: "PATCH", body: { profileEnabled: !person.profileEnabled } });
+            profile.reload();
+          })}>{person.profileEnabled ? ui(locale, "关闭公开主页", "Turn off profile sharing") : ui(locale, "开启公开主页和留言", "Enable profile sharing and messages")}</Button>
+          <Feedback action={visibility}/>
+        </div>}
+        {!own && canWrite && <form className="mt-3" onSubmit={event => { event.preventDefault(); if (!draft.trim()) return; setNotice(""); void post.run(async () => {
           await productionApi(`${base}/messages`, { method: "POST", body: { body: draft.trim() } });
           setDraft(""); setMessagePage(1); messages.reload(); post.success(ui(locale, "留言已发布。", "Message posted."));
         }); }}>
@@ -152,7 +166,7 @@ export function StudentPublicProfile({ identityId, viewer, embedded = false, wor
               <div className="min-w-0 flex-1"><div className="flex flex-wrap items-baseline justify-between gap-2"><span className="text-sm font-semibold">{item.author.nickname}</span><time dateTime={item.createdAt} className="text-xs text-muted-foreground">{date(item.createdAt, locale)}</time></div>
                 <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6">{item.body}</p>
                 {item.reportedByMe && <span className="mt-2 inline-flex rounded-full bg-warning-soft px-2 py-0.5 text-xs font-semibold text-warning">{ui(locale, "已举报", "Reported")}</span>}
-                {(item.canDelete || item.canReport) && <div className="mt-2 flex gap-3">{item.canDelete && <button type="button" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive hover:underline" onClick={() => { moderation.reset(); setSelected(item); setDialog("delete"); }}><Trash2 size={13}/>{ui(locale, "删除", "Delete")}</button>}{workspace === "student" && item.canReport && <button type="button" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline" onClick={() => { moderation.reset(); setSelected(item); setReportReason("abuse"); setDialog("report"); }}><Flag size={13}/>{ui(locale, "举报", "Report")}</button>}</div>}
+                {(item.canDelete || item.canReport) && <div className="mt-2 flex gap-3">{item.canDelete && <button type="button" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive hover:underline" onClick={() => { moderation.reset(); setSelected(item); setDialog("delete"); }}><Trash2 size={13}/>{ui(locale, "删除", "Delete")}</button>}{canWrite && item.canReport && <button type="button" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline" onClick={() => { moderation.reset(); setSelected(item); setReportReason("abuse"); setDialog("report"); }}><Flag size={13}/>{ui(locale, "举报", "Report")}</button>}</div>}
               </div>
             </div>
           </li>)}</ol> : <p className="mt-3 rounded-md bg-surface-subtle p-3 text-sm text-muted-foreground">{ui(locale, "还没有留言。", "No messages yet.")}</p>}
@@ -164,7 +178,7 @@ export function StudentPublicProfile({ identityId, viewer, embedded = false, wor
     <Dialog open={dialog !== null} onOpenChange={open => { if (!open && !moderation.busy) { setDialog(null); setSelected(null); } }}>
       <DialogContent>
         <DialogTitle>{dialog === "report" ? ui(locale, "举报留言", "Report message") : ui(locale, "删除留言", "Delete message")}</DialogTitle>
-        <DialogDescription>{dialog === "report" ? ui(locale, "请选择举报原因，学校管理员可以查看并处理。", "Choose a reason. School administrators will review the report.") : ui(locale, "删除后，所有人都将无法再看到这条留言。", "This message will no longer be visible to anyone after deletion.")}</DialogDescription>
+        <DialogDescription>{dialog === "report" ? practice ? ui(locale, "请选择举报原因，平台管理员会处理。", "Choose a reason. Platform administrators will review the report.") : ui(locale, "请选择举报原因，学校管理员可以查看并处理。", "Choose a reason. School administrators will review the report.") : ui(locale, "删除后，所有人都将无法再看到这条留言。", "This message will no longer be visible to anyone after deletion.")}</DialogDescription>
         {dialog === "report" && <label className="text-sm font-semibold">{ui(locale, "举报原因", "Reason")}<select className="mt-2 h-10 w-full rounded-md border border-border bg-surface px-3 text-sm" value={reportReason} onChange={event => setReportReason(event.target.value as ReportReason)}>{reportReasons.map(reason => <option key={reason.value} value={reason.value}>{ui(locale, reason.label, englishReportReasons[reason.value])}</option>)}</select></label>}
         <DialogFooter><Button variant="secondary" disabled={moderation.busy} onClick={() => { setDialog(null); setSelected(null); }}>{ui(locale, "取消", "Cancel")}</Button><Button variant={dialog === "delete" ? "destructive" : "default"} disabled={moderation.busy || !selected} onClick={() => { if (!selected) return; void moderation.run(async () => {
           if (dialog === "report") { await productionApi(`${base}/messages/${encodeURIComponent(selected.id)}/report`, { method: "POST", body: { reason: reportReason } }); messages.reload(); setNotice("reported"); }

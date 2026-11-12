@@ -2,15 +2,21 @@ import { defaultAvatarPath } from './avatars.mjs';
 import { transaction } from './db.mjs';
 import { integer } from './security.mjs';
 import { activeAccount } from './schools.mjs';
+import { publicPracticeFirstAc, setPublicPracticeHistoryAccount } from './public-practice-records.mjs';
 
 const PAGE_SIZE = 50;
-const POINTS_PER_SOLVED = 10;
+export const POINTS_PER_SOLVED = 10;
 
 export async function publicPracticeLeaderboard({ pool, user, url }) {
  const page = integer(Number(url.searchParams.get('page') ?? 1), 1, 100000, 'Page');
  return transaction(pool, async db => {
   await activeAccount(db, user.id);
   const { rows } = await db.query('SELECT * FROM public_practice_leaderboard($1,$2,$3)', [user.id, page, PAGE_SIZE]);
+  await setPublicPracticeHistoryAccount(db, user.id);
+  const { rows: [progress] } = await db.query(`SELECT count(*)::int solved,
+   COALESCE((SELECT ranking_enabled FROM public_practice_preferences WHERE account_id=$1),false) AS "rankingEnabled",
+   COALESCE((SELECT rank_history_included FROM public_practice_preferences WHERE account_id=$1),false) AS "historyIncluded"
+   FROM (${publicPracticeFirstAc}) first_ac`, [user.id]);
   const total = rows[0]?.total ?? 0;
   function shape(row) {
    return {
@@ -24,6 +30,7 @@ export async function publicPracticeLeaderboard({ pool, user, url }) {
    body: {
     items: rows.filter(row => row.in_page).map(shape),
     own: shape(rows.find(row => row.is_own)),
+    progress,
     page, pageSize: PAGE_SIZE, total, hasMore: page * PAGE_SIZE < total,
     pointsPerSolved: POINTS_PER_SOLVED,
    },

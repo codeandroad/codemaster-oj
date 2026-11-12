@@ -35,14 +35,16 @@ async function presenceViewer(db, user, sess) {
 async function studentPreview(db, viewer, identityId) {
  const person = (await db.query(`SELECT i.id,
   CASE WHEN a.leaderboard_use_nickname THEN COALESCE(NULLIF(btrim(a.nickname),''),i.name)
-   ELSE i.name END display_name, a.avatar
+   ELSE i.name END display_name, a.avatar,
+  EXISTS(SELECT 1 FROM sessions s WHERE s.account_id=a.id AND s.expires_at>statement_timestamp()
+   AND s.presence_seen_at>statement_timestamp()-($3::int * interval '1 second')) is_online
   FROM identities i JOIN accounts a ON a.identity_id=i.id
   JOIN legacy_school_identity_ownership io ON io.identity_id=i.id AND io.school_id=$2
   JOIN legacy_school_account_ownership ao ON ao.account_id=a.id AND ao.school_id=io.school_id
   WHERE i.id=$1 AND i.kind='student' AND i.archived_at IS NULL
    AND a.disabled_at IS NULL AND a.binding_released_at IS NULL
    AND EXISTS(SELECT 1 FROM account_roles r WHERE r.account_id=a.id AND r.role='student')`,
- [identityId, LEGACY_SCHOOL_ID])).rows[0];
+ [identityId, LEGACY_SCHOOL_ID, PRESENCE_TTL_SECONDS])).rows[0];
  if (!person) fail(404, 'NOT_FOUND', '学生近况不可访问');
  const isSelf = viewer.identity_id === person.id;
  const fullStats = isSelf || viewer.roles.some(role => ['teacher', 'admin'].includes(role));
@@ -81,7 +83,7 @@ async function studentPreview(db, viewer, identityId) {
     WHERE ta.id=s.timed_attempt_id AND tp.school_id=$2 AND tp.results_published_at IS NOT NULL))
   ORDER BY l.created_at DESC,l.id DESC LIMIT 3`, [identityId, LEGACY_SCHOOL_ID])).rows;
  return {student: {identityId: person.id, displayName: person.display_name,
-  avatar: avatarForIdentity(person.avatar, person.id), isSelf},
+  avatar: avatarForIdentity(person.avatar, person.id), isSelf, isOnline: person.is_online},
  stats: {points: totals.points,
   ...(fullStats || totals.show_solved_problems ? {solvedProblems: totals.solved_problems} : {}),
   ...(ac ? {acRate: ac.assessed ? Math.round(ac.accepted * 1000 / ac.assessed) / 10 : null} : {}),

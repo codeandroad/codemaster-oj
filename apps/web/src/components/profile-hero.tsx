@@ -3,6 +3,7 @@
 import Image from "next/image";
 import type { ReactNode } from "react";
 import { useLocale } from "./locale-context";
+import { StudentOnlineStatus } from "./student/student-online-status";
 
 export function ProfileAvatar({ avatar, nickname, large = false }: { avatar?: string | null; nickname: string; large?: boolean }) {
   const size = large ? 112 : 36;
@@ -15,7 +16,7 @@ export function ProfileAvatar({ avatar, nickname, large = false }: { avatar?: st
   </span>;
 }
 
-export function ProfileHero({ avatar, nickname, bio, actions, children, self = false, selfLabel }: {
+export function ProfileHero({ avatar, nickname, bio, actions, children, self = false, selfLabel, presenceIdentityId }: {
   avatar?: string | null;
   nickname: string;
   bio?: string | null;
@@ -23,6 +24,7 @@ export function ProfileHero({ avatar, nickname, bio, actions, children, self = f
   children?: ReactNode;
   self?: boolean;
   selfLabel?: string;
+  presenceIdentityId?: string;
   scope?: "school" | "personal";
 }) {
   const { locale } = useLocale();
@@ -41,6 +43,7 @@ export function ProfileHero({ avatar, nickname, bio, actions, children, self = f
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <h2 className="break-words text-2xl font-bold leading-tight sm:text-[28px]">{nickname}</h2>
+        {presenceIdentityId && <StudentOnlineStatus key={presenceIdentityId} identityId={presenceIdentityId}/>}
         {self && <span className="rounded-full bg-accent px-2.5 py-1 text-xs font-semibold text-primary">{selfLabel ?? (locale === "en" ? "My profile" : "我的主页")}</span>}
       </div>
       <p className="mt-2 max-w-[72ch] whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">{bio?.trim() || (self ? (locale === "en" ? "Add a short bio so others can get to know you." : "写一句介绍，让大家更了解你。") : (locale === "en" ? "This student has not added a bio yet." : "这位同学还没有填写个人介绍。"))}</p>

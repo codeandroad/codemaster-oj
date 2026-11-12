@@ -97,10 +97,11 @@ test('Nest presence routes require auth and CSRF, expose only public fields, and
   assert.equal(preview.status, 200, JSON.stringify(preview.data));
   assert.equal(preview.cache, 'no-store');
   assert.deepEqual(Object.keys(preview.data).sort(), ['activity', 'stats', 'student']);
-  assert.deepEqual(Object.keys(preview.data.student).sort(), ['avatar', 'displayName', 'identityId', 'isSelf']);
+  assert.deepEqual(Object.keys(preview.data.student).sort(), ['avatar', 'displayName', 'identityId', 'isOnline', 'isSelf']);
   assert.equal(preview.data.student.identityId, student.identityId);
   assert.equal(preview.data.student.displayName, 'Student');
   assert.equal(preview.data.student.isSelf, false);
+  assert.equal(preview.data.student.isOnline, true);
   assert.equal((await request(previewPath, {auth: first})).data.student.isSelf, true);
   assert.deepEqual(preview.data.activity, []);
   assert.equal((await request(`/presence/students/${teacher.identityId}`, {auth: first})).status, 404);
@@ -119,6 +120,7 @@ test('Nest presence routes require auth and CSRF, expose only public fields, and
   assert.equal((await request(membersPath,{auth:staff})).data.items[0].isOnline,true);
   assert.equal((await request('/auth/logout', {method: 'POST', body: {}, auth: second})).status, 200);
   assert.equal((await request('/presence', {auth: staff})).data.onlineCount, 0);
+  assert.equal((await request(previewPath,{auth:staff})).data.student.isOnline,false);
   assert.equal((await request(membersPath,{auth:staff})).data.items[0].isOnline,false);
   assert.equal((await request('/presence/heartbeat', {method: 'POST', body: {}, auth: second})).status, 401);
   const renewed = await login(student);

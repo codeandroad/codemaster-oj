@@ -115,7 +115,7 @@ export function StudentPublicProfile({ identityId, viewer, embedded = false, wor
 
     <State data={profile}>
       {embedded && stats}
-      {person && !embedded && <ProfileHero avatar={person.avatar} nickname={person.nickname} bio={person.bio} self={person.isSelf} selfLabel={ui(locale, "我的资料", "My profile")} actions={person.isSelf ? <AppLink href={`/${workspace}/profile`} className={buttonVariants({ variant: "outline" })}>{ui(locale, "编辑个人资料", "Edit profile")}</AppLink> : undefined}>
+      {person && !embedded && <ProfileHero avatar={person.avatar} nickname={person.nickname} bio={person.bio} presenceIdentityId={workspace === "student" || workspace === "teacher" || workspace === "admin" ? identityId : undefined} self={person.isSelf} selfLabel={ui(locale, "我的资料", "My profile")} actions={person.isSelf ? <AppLink href={`/${workspace}/profile`} className={buttonVariants({ variant: "outline" })}>{ui(locale, "编辑个人资料", "Edit profile")}</AppLink> : undefined}>
         {stats}
       </ProfileHero>}
     </State>

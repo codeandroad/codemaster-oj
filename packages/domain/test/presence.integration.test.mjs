@@ -85,7 +85,7 @@ test('student preview uses application grants, school ownership and safe first-A
   const blank = await call(viewer);
   assert.deepEqual(Object.keys(blank).sort(), ['activity', 'stats', 'student']);
   assert.deepEqual(blank.student, {identityId: target.user.identityId, displayName: 'Public nickname',
-   avatar: defaultAvatarPath(target.user.identityId), isSelf: false});
+   avatar: defaultAvatarPath(target.user.identityId), isSelf: false, isOnline: true});
   assert.deepEqual(blank.stats, {points: 0, solvedProblems: 0, acRate: null, scholarship: 100});
   assert.deepEqual(blank.activity, []);
   await pool.query('UPDATE leaderboard_settings SET show_solved_problems=false,show_ac_rate=false,show_luq_balance=false WHERE id=true');

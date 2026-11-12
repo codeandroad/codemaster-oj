@@ -37,7 +37,7 @@ export function RunResultPanel(props: Props) {
   </section>;
 }
 
-function ResultContent({ result, reload, currentCode, currentLanguage, onLocate, onUseCase }: Props & { result: DetailedSubmission }) {
+function ResultContent({ result, error, reload, currentCode, currentLanguage, onLocate, onUseCase }: Props & { result: DetailedSubmission }) {
   const { locale } = useLocale(), id = useId();
   const tx = (zh: string, en: string) => locale === "en" ? en : zh;
   const label = (status: string) => titles[status]?.[locale === "en" ? 1 : 0] ?? status;
@@ -50,6 +50,8 @@ function ResultContent({ result, reload, currentCode, currentLanguage, onLocate,
     if (tab.offsetLeft < list.scrollLeft || tab.offsetLeft + tab.offsetWidth > list.scrollLeft + list.clientWidth) list.scrollLeft = Math.max(0, tab.offsetLeft - (list.clientWidth - tab.offsetWidth) / 2);
   }, [index, cases.length]);
   const pending = isPending(result.status), formal = !["samples", "custom"].includes(result.kind), publicCase = active?.visibility === "public";
+  const verdict = formal && result.status === "Waiting" ? tx("等待评测", "Queued for judging")
+    : formal && result.status === "Judging" ? tx("评测中", "Judging") : label(result.status);
   const reusableInput = formal && publicCase && active.status === "WA" && typeof active.input === "string" && active.input.length <= MAX_CUSTOM_INPUT_LENGTH ? active.input : null;
   const status = active?.status ?? result.status;
   const caseDiagnostic = publicCase ? active.stderr : active?.status === "RE" ? active.runtimeError : undefined;
@@ -64,7 +66,7 @@ function ResultContent({ result, reload, currentCode, currentLanguage, onLocate,
   return <>
     <div className={styles.heading}>
       <div className={styles.verdict} data-tone={pending ? "pending" : failed ? "error" : "success"} role="status">
-        {pending && <LoaderCircle size={20} className="animate-spin"/>}<h3>{label(result.status)}</h3>
+        {pending && <LoaderCircle size={20} className="animate-spin"/>}<h3>{verdict}</h3>
       </div>
       {!pending && result.resultsVisible !== false && <div className={styles.metrics}>
         <span><Clock3 size={13} aria-hidden="true"/>{tx("总用时", "Total runtime")}: {submissionMeasurement(result.runtimeMs, "ms", locale)}</span>
@@ -84,7 +86,7 @@ function ResultContent({ result, reload, currentCode, currentLanguage, onLocate,
       </p>
     )}
     {stale && <p className={styles.notice}>{tx("当前代码已修改，以下结果对应上次运行的代码。", "Your code has changed. These results belong to the previous run.")}</p>}
-    {pending && <p className={styles.notice}>{tx("任务已接收，结果会自动更新。", "Your run was received. Results update automatically.")} <button type="button" onClick={reload} className="text-primary hover:underline">{tx("刷新", "Refresh")}</button></p>}
+    {pending && !error && <p className={styles.notice}>{tx("结果会自动更新。", "Results update automatically.")} <button type="button" onClick={reload} className="text-primary hover:underline">{tx("刷新", "Refresh")}</button></p>}
     {!!cases.length && <div ref={caseList} className={styles.cases} role="tablist" aria-label={tx("测试结果用例", "Result test cases")} onKeyDown={event => {
       let next = index; if (event.key === "ArrowRight") next = (index + 1) % cases.length; else if (event.key === "ArrowLeft") next = (index - 1 + cases.length) % cases.length; else if (event.key === "Home") next = 0; else if (event.key === "End") next = cases.length - 1; else return;
       event.preventDefault(); setSelected(next); document.getElementById(`${id}-case-${next}`)?.focus();

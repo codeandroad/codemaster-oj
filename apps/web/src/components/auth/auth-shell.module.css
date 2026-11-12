@@ -4,9 +4,14 @@
   color: var(--foreground);
   background: var(--background);
   min-height: 100svh;
-  padding: max(40px, calc((100svh - 560px) / 2)) 24px 40px;
+  display: flex;
+  flex-direction: column;
   scrollbar-color: var(--border-strong) var(--background);
   scrollbar-width: thin;
+}
+.main {
+  flex: 1;
+  padding: max(40px, calc((100svh - 560px) / 2)) 24px 40px;
 }
 /* A common viewport anchor, independent of each step's height, prevents jumps. */
 .frame {
@@ -65,7 +70,7 @@
 .help { margin-top: 14px; font-size: 12px; line-height: 21px; color: var(--muted-foreground); }
 .help summary { cursor: pointer; width: fit-content; min-height: 28px; color: var(--primary); }
 .help p { margin: 8px 0; }
-.footer { display: flex; align-items: center; justify-content: flex-end; gap: 16px; margin: 8px auto 0; width: 100%; max-width: 1120px; padding-inline: 3px; color: var(--muted-foreground); font-size: 12px; }
+.footer { margin-inline: auto; width: calc(100% - 48px); max-width: 1120px; }
 .language { min-height: 36px; height: auto; padding-inline: 8px; font-size: 12px; font-weight: 500; }
 .steps { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin: 18px 0 0; padding: 0 0 12px; border-bottom: 1px solid var(--border); list-style: none; color: var(--muted-foreground); font-size: 12px; }
 .step { display: flex; align-items: center; gap: 6px; }
@@ -87,14 +92,15 @@
 .done svg { color: var(--success); }
 .done p { margin: 12px 0 22px; color: var(--muted-foreground); font-size: 14px; line-height: 24px; overflow-wrap: anywhere; }
 @media (max-width: 1023px) {
-  .page { padding: 40px 24px; }
+  .main { padding: 40px 24px; }
   .frame { max-width: 520px; grid-template-columns: minmax(0, 1fr); gap: 0; }
   .introduction { display: none; }
   .mobileLogo { display: block; width: 230px; max-width: 100%; height: auto; margin-bottom: 16px; }
   .footer { max-width: 520px; }
 }
 @media (max-width: 639px) {
-  .page { padding: 20px 16px; }
+  .main { padding: 20px 16px; }
+  .footer { width: calc(100% - 32px); }
   .formPanel { padding: 16px; }
 }
 @media (max-width: 359px) {

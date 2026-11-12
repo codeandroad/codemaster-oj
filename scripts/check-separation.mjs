@@ -124,7 +124,7 @@ try {
   const manifest = await parseJson(resolve(root, 'package.json'));
   if (manifest && Object.keys(manifest.dependencies || {}).length)
     issue('ROOT_RUNTIME_DEPENDENCIES', resolve(root, 'package.json'), 'The project root orchestrates separately installed applications and must not supply their runtime dependencies.');
-  await application('apps/web', 'Next.js', ['src/app/layout.tsx', 'src/app/[[...path]]/page.tsx', 'next.config.mjs'], ['next', 'react', 'react-dom']);
+  await application('apps/web', 'Next.js', ['src/app/layout.tsx', 'src/app/(campus)/layout.tsx', 'src/app/(campus)/[[...path]]/page.tsx', 'next.config.mjs'], ['next', 'react', 'react-dom']);
   await application('apps/api', 'NestJS', ['src/main.ts', 'src/app.module.ts'], ['@nestjs/core', '@nestjs/common', '@nestjs/platform-express']);
   await application('packages/domain', 'shared domain', ['src/app.mjs', 'src/migrate.mjs', 'worker.mjs', 'judge.mjs'], ['pg']);
 

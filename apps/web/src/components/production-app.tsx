@@ -20,6 +20,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import {NotificationDropdown} from "@/components/student/notification-dropdown";
 import { AccountMenu } from "@/components/account-menu";
 import { WorkspaceFrame } from "@/components/workspace-frame";
+import { SiteFooter } from "@/components/site-footer";
 import { workspaceNavigation, WorkspaceNavigation } from "@/components/workspace-navigation";
 import { schoolDisplayName, type School } from "./schools/school-ui";
 import { resolveLoginDestination } from "./auth/login-destination";
@@ -130,7 +131,7 @@ export function ProductionApp() {
       .catch(() => router.replace(roleHome(next)));
   };
   if (!isCampusRoute(pathname)) return null;
-  const authPage = isCampusAuthRoute(pathname);
+  const authPage = pathname === "/" || isCampusAuthRoute(pathname);
   if (loading && authPage) return <AuthNotice title={pathname === "/register" ? "Create account" : "Sign in"} message="Connecting to CodeMaster…" />;
   if (loading)
     return (
@@ -267,6 +268,7 @@ function ProductionShell({
   const links = <WorkspaceNavigation items={workspaceNavigation[role].filter(item => item.section !== "acsl" || acslEnabled).map((item) => ({ ...item, href: item.path, active: activePath(item.path) }))}/>;
   return <PageHeadingProvider pathname={pathname}><WorkspaceThemeProvider theme={shellTheme}><PersonalAppearanceProvider pageTheme={settings.pageTheme} updatePageTheme={pageTheme=>update({pageTheme})}><div style={{colorScheme:shellTheme}} className={shellTheme === "dark" ? "dark" : ""}>
     <WorkspaceFrame student={role === "student"} schoolName={school ? schoolDisplayName(school, locale) : t("校内学习平台")} navigation={links}
+      footer={pathname === "/" && <div className="mx-auto max-w-[1500px] px-4 sm:px-6"><SiteFooter locale={locale} /></div>}
       breadcrumb={<div className="flex min-w-0 items-center"><PageBreadcrumbs pathname={pathname} role={role}/><ShellPageHeading pathname={pathname} role={role}/></div>}
       account={<>{role === "student" && <ScholarshipBalance identityId={user.identityId}/>}<NotificationDropdown key={`${user.id}:${role}`} workspace={role === "student" ? "student" : "staff"}/><AccountMenu user={user} role={role} busy={action.busy} onLogout={() => action.run(async () => {
         try { await productionApi("auth/logout", {method:"POST"}); } catch(reason) { if (!(reason instanceof ApiError && reason.status === 401)) throw reason; } onLogout();

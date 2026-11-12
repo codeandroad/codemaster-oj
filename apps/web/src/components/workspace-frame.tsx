@@ -19,6 +19,7 @@ export function WorkspaceFrame({
   breadcrumb,
   account,
   children,
+  footer,
   student = false,
 }: {
   schoolName: string;
@@ -26,6 +27,7 @@ export function WorkspaceFrame({
   breadcrumb: ReactNode;
   account: ReactNode;
   children: ReactNode;
+  footer?: ReactNode;
   student?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -76,6 +78,7 @@ export function WorkspaceFrame({
           <main className="production-page-content mx-auto max-w-[1500px] space-y-3 px-4 py-4 sm:px-6">
             {children}
           </main>
+          {footer}
         </div>
       </div>
       <Dialog open={open} onOpenChange={setOpen}>

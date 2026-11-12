@@ -97,5 +97,30 @@ test('Nest bulk solution review routes enforce authentication, CSRF, managed inv
   assert.equal((await student.call('/scholarship/assistance/provide',{body:{...first,kind:'FULL_SOLUTION'}})).body,'REVIEWED_HTTP_SOLUTION_ONE');
   assert.equal((await pool.query('SELECT count(*)::int n FROM luq_assistance_deliveries')).rows[0].n,1);
   assert.notEqual(firstContent.id,secondContent.id);
+  const current=(await teacher.call(`/scholarship/contents?problemId=${first.problemId}&versionId=${first.versionId}`)).items[0];
+  const solutions=['python','cpp','javascript',null].map((programmingLanguage,index)=>({
+   title:`Language approach ${index}`,body:`Reviewed language body ${index}`,programmingLanguage,
+  }));
+  const revision={...first,kind:'FULL_SOLUTION',expectedHash:current.contentHash,solutions};
+  await student.call('/scholarship/contents',{body:revision,expected:403});
+  await other.call('/scholarship/contents',{body:revision,expected:403});
+  await teacher.call('/scholarship/contents',{body:revision,badCsrf:true,expected:403});
+  await teacher.call('/scholarship/contents',{body:{...revision,solutions:[{...solutions[0],programmingLanguage:'ruby'}]},expected:400});
+  const moneyBefore=(await pool.query('SELECT row_to_json(l) r FROM luq_ledger l ORDER BY id')).rows;
+  const pending=await teacher.call('/scholarship/contents',{body:revision,expected:201});
+  assert.equal(pending.hasPendingSolutions,true);
+  assert.deepEqual(pending.solutions.map(s=>s.programmingLanguage??null),['python','cpp','javascript',null]);
+  const beforeReview=await student.call('/scholarship/assistance/provide',{body:{...first,kind:'FULL_SOLUTION'}});
+  assert.equal(beforeReview.body,'REVIEWED_HTTP_SOLUTION_ONE');assert.equal(beforeReview.solutions,undefined);
+  await teacher.call(`/scholarship/contents/${pending.id}/publish`,{body:{reviewed:true,expectedHash:current.contentHash},expected:409});
+  await teacher.call(`/scholarship/contents/${pending.id}/publish`,{body:{reviewed:true,expectedHash:pending.contentHash}});
+  const delivered=await student.call('/scholarship/assistance/provide',{body:{...first,kind:'FULL_SOLUTION'}});
+  assert.deepEqual(delivered.solutions.map(({id,...entry})=>entry),solutions.map(({programmingLanguage,...entry})=>({
+   ...entry,...(programmingLanguage?{programmingLanguage}:{}),
+  })));
+  const afterQuote=await student.call('/scholarship/assistance/quote',{body:{...first,kind:'FULL_SOLUTION'}});
+  assert.equal(afterQuote.unlocked,true);assert.equal(afterQuote.price,0);
+  assert.equal(afterQuote.solutions,undefined);
+  assert.deepEqual((await pool.query('SELECT row_to_json(l) r FROM luq_ledger l ORDER BY id')).rows,moneyBefore);
  }finally{if(app)await app.close();await pool.end();await manager.query(`DROP SCHEMA ${schema} CASCADE`);await manager.end();}
 });

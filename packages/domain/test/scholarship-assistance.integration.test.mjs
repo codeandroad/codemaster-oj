@@ -229,8 +229,8 @@ test('solution use reveals only readable course names and managed activity names
 test('one shared solution retains published content, pending changes and historical source material across problem updates',options,async()=>fixture(async f=>{
  const prior=await f.problem(),kind='FULL_SOLUTION';
  const draft=await f.call(f.teacher,'/scholarship/contents',{...prior,kind,solutions:[
-  {title:'Original explanation',body:'Reviewed previous primary.'},
-  {title:'Second approach',body:'Reviewed previous alternative.'},
+  {title:'Original explanation',body:'Reviewed previous primary.',programmingLanguage:'python'},
+  {title:'Second approach',body:'Reviewed previous alternative.',programmingLanguage:'cpp'},
  ]});
  const published=await f.call(f.teacher,`/scholarship/contents/${draft.id}/publish`,{reviewed:true,expectedHash:draft.contentHash});
  const pending=await f.call(f.teacher,'/scholarship/contents',{...prior,kind,expectedHash:published.contentHash,

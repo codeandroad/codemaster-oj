@@ -318,7 +318,7 @@ function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation
       </div>
       {(activeTab === "translation" || activeTab === "solution") && (
         <div id={`school-practice-${activeTab}`} role="tabpanel" aria-labelledby={`school-practice-tab-${activeTab}`}>
-          <SchoolAssistance key={`${problem.versionId}:${activeTab}`} schoolId={problem.schoolId}
+          <SchoolAssistance key={`${problem.versionId}:${activeTab}`} schoolId={problem.schoolId} preferredLanguage={language}
             target={{ type: "problem", problemId: problem.id, versionId: problem.versionId!, activityId: problem.activity?.id }}
             kind={activeTab === "translation" ? "FULL_TRANSLATION" : "FULL_SOLUTION"} />
         </div>

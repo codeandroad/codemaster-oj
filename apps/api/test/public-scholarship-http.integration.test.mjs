@@ -109,8 +109,8 @@ test('public scholarship HTTP uses shared purchase rules without exposing privat
    const {data:{items}}=await request(contents+'?'+new URLSearchParams({problemId:problem.problemId,versionId:problem.versionId}),{auth});
    const primary=items.find(item=>item.kind==='FULL_SOLUTION');
    const solutions=[
-    {title:'Literal output',body:primary.body},
-    {title:'Arithmetic expression',body:'Evaluate the sum.\n```python\nprint(2 + 3)\n```'},
+    {title:'Literal output',body:primary.body,programmingLanguage:'python'},
+    {title:'Arithmetic expression',body:'Evaluate the sum.\n```cpp\nstd::cout << 2 + 3;\n```',programmingLanguage:'cpp'},
    ];
    const edit=await request(contents,{auth,method:'POST',status:201,body:{...solution,body:primary.body,solutions,expectedHash:primary.contentHash}});
    assert.equal((await aid('provide',solution)).data.solutions,undefined);
@@ -119,7 +119,7 @@ test('public scholarship HTTP uses shared purchase rules without exposing privat
    assert.equal(quoted.solutions,undefined);
    assert.ok(!JSON.stringify(quoted).includes('Arithmetic expression'));
    const {data:delivered}=await aid('provide',solution);
-   assert.deepEqual(delivered.solutions.map(({title,body})=>({title,body})),solutions);
+   assert.deepEqual(delivered.solutions.map(({id,...entry})=>entry),solutions);
    await aid('provide',solution,{auth:other,status:403});
    assert.equal((await wallet()).balance,92);
   });

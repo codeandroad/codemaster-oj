@@ -6,45 +6,16 @@ import { useLocale } from "@/components/locale-context";
 import { useNavigationBlocker } from "@/components/navigation";
 import { area, input, Modal } from "@/components/teacher/shared";
 import { Button } from "@/components/ui/button";
-import { SolutionBundle, type SolutionArticle } from "./solution-content";
+import { SolutionBundle } from "./solution-content";
 import { includesOriginalSolution } from "./solution-source";
-
-type DraftArticle = Omit<SolutionArticle, "id"> & { id?: string };
-export type SolutionDraft = { body: string; solutions?: DraftArticle[] };
-export type OriginalSolution = { body: string };
-export type InheritedSolution = SolutionDraft & { versionId: string };
-
-export function referenceSolutionDraft(source: OriginalSolution, title: string): SolutionDraft {
-  return { body: source.body, solutions: [{ title, body: source.body }] };
-}
+import { languageInfo, supportedLanguages } from "@/components/student/languages";
+import { solutionDraftError, type DraftArticle, type SolutionDraft, type OriginalSolution } from "./solution-model";
+export { referenceSolutionDraft, sameSolutionDraft, solutionDraftError } from "./solution-model";
+export type { SolutionDraft, OriginalSolution, InheritedSolution } from "./solution-model";
 
 const maxSolutions = 10;
 const maxTitleLength = 120;
 const maxBodyLength = 200_000;
-
-export function sameSolutionDraft(a: SolutionDraft, b: SolutionDraft) {
-  if (a.body !== b.body || a.solutions?.length !== b.solutions?.length) return false;
-  return a.solutions?.every((item, index) => {
-    const other = b.solutions?.[index];
-    return item.id === other?.id && item.title === other?.title && item.body === other?.body;
-  }) ?? true;
-}
-
-export function solutionDraftError(draft: SolutionDraft) {
-  if (!draft.body.trim() || draft.solutions?.some(item => !item.title.trim() || !item.body.trim())) return "required";
-  if (draft.solutions) {
-    const [primary, ...other] = draft.solutions;
-    if (!primary) return "required";
-    const alternatives = other.map(({ id, title, body }) => ({
-      id: id ?? "00000000-0000-0000-0000-000000000000",
-      title: title.trim(),
-      body,
-    }));
-    const canonical = { body: draft.body, details: { primaryTitle: primary.title.trim(), alternatives } };
-    if (new TextEncoder().encode(JSON.stringify(canonical)).length > 512 * 1024) return "size";
-  }
-  return null;
-}
 
 export function SolutionDraftPreview({ draft }: { draft: SolutionDraft }) {
   return <SolutionBundle body={draft.body} solutions={draft.solutions?.map((item, index) => ({
@@ -90,9 +61,10 @@ export function SolutionAlternativesEditor({ value, onChange, disabled, original
   const [requested, setRequested] = useState(0);
   const [removing, setRemoving] = useState(false);
   const titleField = useRef<HTMLInputElement>(null);
+  const bodyField = useRef<HTMLTextAreaElement>(null);
   const firstSolution = useRef<HTMLButtonElement>(null);
   const focusTitle = useRef(false);
-  const items = value.solutions?.length ? value.solutions : [{ title: value.body.trim() ? tx("原有题解", "Existing solution") : tx("主要解法", "Main approach"), body: value.body }];
+  const items: DraftArticle[] = value.solutions?.length ? value.solutions : [{ title: value.body.trim() ? tx("原有题解", "Existing solution") : tx("主要解法", "Main approach"), body: value.body }];
   const active = Math.min(requested, items.length - 1);
   const current = items[active];
   const error = solutionDraftError(value);
@@ -118,7 +90,7 @@ export function SolutionAlternativesEditor({ value, onChange, disabled, original
   return <div className="space-y-3">
     {originalSolution && !originalIncluded && <div className="flex flex-wrap items-center gap-2">
       <Button type="button" size="sm" variant="secondary" disabled={disabled || items.length >= maxSolutions} onClick={() => {
-        const reference = { title: tx("原参考题解", "Reference solution"), body: originalSolution.body };
+        const reference = { title: tx("原参考题解", "Reference solution"), ...originalSolution };
         const empty = items.length === 1 && !items[0].body.trim();
         setRequested(empty ? 0 : items.length);
         focusTitle.current = true;
@@ -141,11 +113,22 @@ export function SolutionAlternativesEditor({ value, onChange, disabled, original
             disabled={disabled} className="h-auto min-h-8 w-full min-w-0 justify-start gap-2 whitespace-normal px-2 py-1.5 text-left text-xs"
             onClick={() => setRequested(index)}>
             <span aria-hidden="true" className="shrink-0 tabular-nums text-muted-foreground">{index + 1}</span>
-            <span className="min-w-0 [overflow-wrap:anywhere]">{item.title.trim() || tx("未命名解法", "Untitled solution")}</span>
+            <span className="min-w-0 [overflow-wrap:anywhere]">{item.title.trim() || tx("未命名解法", "Untitled solution")}
+              <span className="block text-xs font-normal text-muted-foreground">{item.programmingLanguage ? languageInfo[item.programmingLanguage].name : tx("通用 / 未标注", "General / unspecified")}</span>
+            </span>
           </Button>
         </li>)}
       </ol>
       <div className="min-w-0 space-y-3">
+        <label className="block space-y-1.5 text-sm font-semibold">
+          <span>{tx("题解编程语言", "Solution programming language")}</span>
+          <select className={`${input} font-normal`} value={current.programmingLanguage ?? ""} disabled={disabled}
+            aria-label={tx("题解编程语言", "Solution programming language")}
+            onChange={event => edit({ programmingLanguage: event.target.value ? event.target.value as DraftArticle["programmingLanguage"] : null })}>
+            <option value="">{tx("通用思路 / 未标注", "General approach / unspecified")}</option>
+            {supportedLanguages.map(language => <option key={language} value={language}>{languageInfo[language].name}</option>)}
+          </select>
+        </label>
         <label className="block space-y-1.5 text-sm font-semibold">
           <span>{tx("解法标题", "Solution title")}</span>
           <input ref={titleField} className={`${input} font-normal`} value={current.title} maxLength={maxTitleLength}
@@ -154,11 +137,18 @@ export function SolutionAlternativesEditor({ value, onChange, disabled, original
         </label>
         <label className="block space-y-1.5 text-sm font-semibold">
           <span>{tx("解法正文（Markdown，可包含代码块）", "Solution body (Markdown with code blocks)")}</span>
-          <textarea className={`${area} block min-h-56 max-h-[55dvh] resize-none field-sizing-content font-mono font-normal`}
+          <textarea ref={bodyField} className={`${area} block min-h-56 max-h-[55dvh] resize-none field-sizing-content font-mono font-normal`}
             rows={10} value={current.body} maxLength={maxBodyLength} disabled={disabled}
             required aria-invalid={validate && !current.body.trim()} aria-describedby={validate && error ? id : undefined}
             onChange={event => edit({ body: event.target.value })} />
         </label>
+        <p className="text-xs text-muted-foreground">{tx("每篇解法可选择一种编程语言。同一语言可添加多种解法，通用思路会在各语言下显示。", "Choose a programming language for each solution. A language can have multiple approaches. General approaches appear with every language.")}</p>
+        {current.programmingLanguage && <Button type="button" size="sm" variant="secondary" disabled={disabled || current.body.length > maxBodyLength - 24} onClick={() => {
+          const prefix = current.body.trimEnd();
+          const start = `${prefix}${prefix ? "\n\n" : ""}\`\`\`${current.programmingLanguage}\n`;
+          edit({ body: `${start}\n\`\`\`` });
+          requestAnimationFrame(() => { bodyField.current?.focus(); bodyField.current?.setSelectionRange(start.length, start.length); });
+        }}>{tx("添加代码块", "Add code block")}</Button>}
         {active > 0 && <div className="flex flex-wrap items-center gap-2">
           <Button type="button" size="sm" variant="ghost" disabled={disabled || active === 1} onClick={() => move(-1)}><ArrowUp size={14} aria-hidden="true" />{tx("上移", "Move up")}</Button>
           <Button type="button" size="sm" variant="ghost" disabled={disabled || active === items.length - 1} onClick={() => move(1)}><ArrowDown size={14} aria-hidden="true" />{tx("下移", "Move down")}</Button>

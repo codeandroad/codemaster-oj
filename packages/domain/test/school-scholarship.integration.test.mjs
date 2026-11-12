@@ -122,11 +122,36 @@ test('school scholarships: real roles, atomic rewards, consumption, timing and i
    assert.equal(provided.body,'Reviewed school article only.');
    assert.doesNotMatch(JSON.stringify([price,provided]),/PRIVATE REFERENCE|private explanation/);
   });
+  await t.test('school multilingual solutions preserve language through review, delivery and language-only revisions',async()=>{
+   const target=await problem('Multilingual school solutions'),kind='FULL_SOLUTION';
+   const solutions=['python','cpp','javascript',null].map((programmingLanguage,index)=>({title:`Approach ${index}`,body:`Language explanation ${index}`,programmingLanguage}));
+   await assert.rejects(call('teacher','content','POST',{...target,kind,expectedRevision:0,solutions:[{...solutions[0],programmingLanguage:'ruby'}]}),e=>e.status===400);
+   await assert.rejects(call('one','content','POST',{...target,kind,expectedRevision:0,solutions}),e=>e.status===404);
+   const saved=await call('teacher','content','POST',{...target,kind,expectedRevision:0,solutions});
+   await call('teacher','policies','POST',{targets:[target],kind,mode:'free'});
+   await assert.rejects(provide('one',target,kind),e=>e.status===403);
+   await call('admin','contents/review','POST',{confirmReviewed:true,items:[saved]});
+   const delivered=await provide('one',target,kind);
+   assert.deepEqual(delivered.solutions.map(s=>s.programmingLanguage??null),['python','cpp','javascript',null]);
+   const detail='content?'+new URLSearchParams({...target,kind});
+   const published=await call('teacher',detail);
+   const pending=await call('teacher','content','POST',{...target,kind,expectedRevision:published.revision,
+    solutions:published.solutions.map((s,index)=>({...s,programmingLanguage:index===0?null:s.programmingLanguage}))});
+   assert.equal(pending.hasPendingSolutions,true);
+   assert.deepEqual((await provide('one',target,kind)).solutions,delivered.solutions);
+   assert.equal((await call('teacher',detail)).solutions[0].programmingLanguage,undefined);
+   await assert.rejects(call('admin','contents/review','POST',{confirmReviewed:true,items:[{id:saved.id,revision:published.revision}]}),e=>e.status===409);
+   await call('admin','contents/review','POST',{confirmReviewed:true,items:[pending]});
+   const reviewed=await provide('one',target,kind);
+   assert.equal(reviewed.solutions[0].programmingLanguage,undefined);
+   assert.equal(reviewed.solutions[0].body,delivered.solutions[0].body);
+   await assert.rejects(call('outsider',detail),e=>e.status===404);
+  });
   await t.test('school versions inherit reviewed bundles without publishing, pending leakage or cross-school fallback',async()=>{
    const prior=await problem('Inherited school solutions'),kind='FULL_SOLUTION';
    const saved=await call('teacher','content','POST',{...prior,kind,expectedRevision:0,solutions:[
-    {title:'Original explanation',body:'Reviewed school primary.'},
-    {title:'Another method',body:'Reviewed school alternative.'},
+    {title:'Original explanation',body:'Reviewed school primary.',programmingLanguage:'python'},
+    {title:'Another method',body:'Reviewed school alternative.',programmingLanguage:'cpp'},
    ]});
    await call('admin','contents/review','POST',{confirmReviewed:true,items:[saved]});
    const detail=target=>'content?'+new URLSearchParams({...target,kind});

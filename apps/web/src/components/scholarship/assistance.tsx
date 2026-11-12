@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/teacher/shared";
 import { LessonContent } from "@/components/student/shared";
 import { SolutionBundle, type SolutionArticle } from "@/components/scholarship/solution-content";
-import { apiMessage, productionApi, productionId } from "@/lib/production-api";
+import { apiMessage, productionApi, productionId, type SubmissionLanguage } from "@/lib/production-api";
 
 export type AssistanceKind = "FULL_TRANSLATION" | "FULL_SOLUTION";
 export type AssistanceTarget =
@@ -48,12 +48,14 @@ export function ScholarshipAssistance<Content extends Provided = Provided>({
   kind,
   renderBody,
   description,
+  preferredLanguage,
   endpoint = "scholarship/assistance",
 }: {
   target: AssistanceTarget;
   kind: AssistanceKind;
   renderBody?: (body: string, content: Content) => ReactNode;
   description?: string;
+  preferredLanguage?: SubmissionLanguage;
   endpoint?: "scholarship/assistance" | "practice/scholarship/assistance" | `schools/${string}/acsl/${string}/programming/${"translation" | "solution"}`;
 }) {
   const { locale } = useLocale(),
@@ -144,7 +146,7 @@ export function ScholarshipAssistance<Content extends Provided = Provided>({
           {renderBody ? (
             renderBody(provided.body, provided)
           ) : kind === "FULL_SOLUTION" ? (
-            <SolutionBundle body={provided.body} solutions={provided.solutions} />
+            <SolutionBundle body={provided.body} solutions={provided.solutions} preferredLanguage={preferredLanguage} />
           ) : (
             <LessonContent content={provided.body} />
           )}

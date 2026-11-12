@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Modal, useData } from "@/components/teacher/shared";
 import { SolutionBundle, type SolutionArticle } from "@/components/scholarship/solution-content";
 import { MathContent } from "@/components/math-content";
-import { ApiError, apiMessage, productionApi, productionId } from "@/lib/production-api";
+import { ApiError, apiMessage, productionApi, productionId, type SubmissionLanguage } from "@/lib/production-api";
 import { ScholarshipIcon } from "@/components/scholarship/scholarship-icon";
 import { ScholarshipPopover } from "@/components/scholarship/scholarship-popover";
 import { useData as useStudentData } from "@/components/student/shared";
@@ -83,6 +83,7 @@ export function SchoolAssistance(props: {
   schoolId: string;
   target: SchoolAssistanceTarget;
   kind: Kind;
+  preferredLanguage?: SubmissionLanguage;
 }) {
   return (
     <SchoolAssistanceContents
@@ -95,10 +96,12 @@ function SchoolAssistanceContents({
   schoolId,
   target,
   kind,
+  preferredLanguage,
 }: {
   schoolId: string;
   target: SchoolAssistanceTarget;
   kind: Kind;
+  preferredLanguage?: SubmissionLanguage;
 }) {
   const tx = useText(),
     [quote, setQuote] = useState<{
@@ -184,7 +187,7 @@ function SchoolAssistanceContents({
       <Feedback error={error} />
       {provided !== null ? (
         kind === "FULL_SOLUTION" ? (
-          <SolutionBundle body={provided.body} solutions={provided.solutions} />
+          <SolutionBundle body={provided.body} solutions={provided.solutions} preferredLanguage={preferredLanguage} />
         ) : (
           <MathContent content={provided.body} />
         )

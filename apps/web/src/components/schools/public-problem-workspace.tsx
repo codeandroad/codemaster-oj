@@ -62,7 +62,7 @@ function PublicWorkspace({user, problem, catalog}:{user:CampusUser;problem:Probl
       submit: ({kind,code,language,customInput,requestId})=>productionApi(`${path}/submissions`, {method:"POST",body:{kind,code,language,input:customInput,requestId,versionId:problem.versionId,...(inCourse ? {courseId,chapterId} : {})}}),
       submissionPath: id=>`${path}/submissions/${encodeURIComponent(id)}`, normalizeSubmission:normalizeJob,
       ...publicDraftStorage(user.id,problem,storage),
-      assistance: kind=><ScholarshipAssistance key={`${problem.id}:${problem.versionId}:${kind}`} target={{problemId:problem.id,versionId:problem.versionId!}} kind={kind} endpoint="practice/scholarship/assistance"/>,
+      assistance: (kind, language)=><ScholarshipAssistance preferredLanguage={language} key={`${problem.id}:${problem.versionId}:${kind}`} target={{problemId:problem.id,versionId:problem.versionId!}} kind={kind} endpoint="practice/scholarship/assistance"/>,
       presence:<><StudentPresenceHeartbeat identityId={user.id} endpoint="practice/presence"/><OnlineStudents identityId={user.id} endpoint="practice/presence"/></>,
       account:hasUnsavedChanges=><><ScholarshipBalance identityId={user.id} endpoint="practice/scholarship/me" href="/practice/scholarship"/><NotificationDropdown key={user.id} workspace="public"/><AccountMenu user={user} busy={logout.busy} leaderboardHref="/practice/leaderboard" onLogout={()=>{
         if(hasUnsavedChanges&&!window.confirm(locale==="en"?"Your code has not been submitted. The draft remains in this browser. Sign out?":"代码尚未提交，草稿保留在本机。确认退出登录？"))return;

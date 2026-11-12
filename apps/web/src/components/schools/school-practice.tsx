@@ -498,7 +498,7 @@ export function PublicProblemReview() {
         <table className="w-full text-left text-sm">
           <thead className="bg-surface-subtle"><tr>
             <th scope="col" className="px-4 py-2">{tx("题目", "Problem")}</th>
-            <th scope="col" className="px-4 py-2">{tx("来源学校", "Source school")}</th>
+            <th scope="col" className="px-4 py-2">{tx("来源", "Source")}</th>
             <th scope="col" className="px-4 py-2">{tx("状态", "Status")}</th>
             <th scope="col" className="px-4 py-2">{tx("操作", "Actions")}</th>
           </tr></thead>

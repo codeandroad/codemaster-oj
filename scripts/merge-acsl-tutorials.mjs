@@ -8,11 +8,13 @@ import {readUnifiedAcslCourse} from './lib/acsl-unified-course.mjs';
 import {localCourseOptions,localCourseApi,unifiedState,saveUnifiedState} from './lib/local-acsl-course-api.mjs';
 import {matchesTutorialDraft} from './import-acsl-tutorials.mjs';
 export async function mergeAcslTutorials(argv=process.argv.slice(2)){
- const options=localCourseOptions(argv,{merging:true}),{document,units}=await readUnifiedAcslCourse(),api=await localCourseApi(options);
+ // Only the six historical standalone topics need merging. Later topics are
+ // appended to that course; they must never become additional source courses.
+ const options=localCourseOptions(argv,{merging:true}),{document,units}=await readUnifiedAcslCourse({unitIds:['number-systems','recursion','program-tracing','expressions','bit-strings','lisp']}),api=await localCourseApi(options);
  const lock=await open(`${api.journal}.lock`,'wx',0o600);
  try{
   let existing;try{existing=JSON.parse(await readFile(api.journal,'utf8'));}catch(error){if(error.code!=='ENOENT')throw error;}
-  if(existing?.courseId){const course=await api.request(`learning-paths/${existing.courseId}`);assert.ok(matchesTutorialDraft(course,document,existing),'Unified course changed; review it without remerging.');console.log(JSON.stringify({merged:false,alreadyUnified:true,courseId:course.id}));return;}
+  if(existing?.courseId){const course=await api.request(`learning-paths/${existing.courseId}`),current=await readUnifiedAcslCourse({unitIds:course.sections.map(s=>s.key)});assert.ok(matchesTutorialDraft(course,current.document,existing),'Unified course changed; review it without remerging.');console.log(JSON.stringify({merged:false,alreadyUnified:true,courseId:course.id}));return;}
   const list=(await api.request('learning-paths')).items,courses=[];
   const recoveryFile=`${api.journal}.merge-plan.json`;
   let recovery;try{recovery=JSON.parse(await readFile(recoveryFile,'utf8'));}catch(error){if(error.code!=='ENOENT')throw error;}

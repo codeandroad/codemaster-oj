@@ -4,9 +4,11 @@ import {readAcslBilingualTutorial} from './acsl-tutorial-document.mjs';
 import {validateLearningDocument} from '../../packages/domain/src/learning-document.mjs';
 
 // Authoring stays modular; importing creates a single course and stable topic keys.
-export async function readUnifiedAcslCourse() {
+export async function readUnifiedAcslCourse({unitIds}={}) {
  const manifest=JSON.parse(await readFile(new URL('../../content/acsl-tutorials/curriculum.json',import.meta.url),'utf8'));
- const units=manifest.units.filter(unit=>unit.documents);
+ const authored=manifest.units.filter(unit=>unit.documents);
+ if(unitIds)assert.deepEqual(unitIds,authored.slice(0,unitIds.length).map(unit=>unit.id),'Only an authored curriculum prefix can describe an earlier course.');
+ const units=unitIds?authored.slice(0,unitIds.length):authored;
  const documents=await Promise.all(units.map(unit=>readAcslBilingualTutorial(unit.id)));
  const sections=units.map(unit=>({key:unit.id,title:unit.title.en,groupKey:`contest-${unit.round}`,groupTitle:`Contest ${unit.round}`,
   localizations:{en:{title:unit.title.en,groupTitle:`Contest ${unit.round}`},zh:{title:unit.title.zh,groupTitle:`第 ${unit.round} 轮`}}}));

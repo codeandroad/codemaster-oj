@@ -23,7 +23,7 @@ const requireStaff = user => { if (!staff(user)) fail(403, 'FORBIDDEN', '需要�
 const exists = query => { if (!query.rowCount) fail(404, 'NOT_FOUND', '内容不存在'); return query.rows[0]; };
 
 async function pathAccess(db, user, id, edit = false, lock = false, allowArchived = false) {
- const path = exists(await db.query(`SELECT * FROM learning_paths WHERE id=$1 AND (archived_at IS NULL OR $2) ${lock ? 'FOR UPDATE' : ''}`, [uuid(id),allowArchived]));
+ const path = exists(await db.query(`SELECT *,xmin::text AS edit_revision FROM learning_paths WHERE id=$1 AND (archived_at IS NULL OR $2) ${lock ? 'FOR UPDATE' : ''}`, [uuid(id),allowArchived]));
  const canEdit = managesCourse(user,path);
  if(path.merged_into_id){if(!canEdit)fail(404,'NOT_FOUND','内容不存在');fail(409,'COURSE_MERGED','课程已整合，请打开统一课程。');}
  if(path.archived_at&&(!allowArchived||!canEdit))fail(404,'NOT_FOUND','内容不存在');
@@ -33,8 +33,19 @@ async function pathAccess(db, user, id, edit = false, lock = false, allowArchive
 }
 
 function pathShape(p) {
- return {...(p.merged_into_id?{mergedIntoCourseId:p.merged_into_id}:{}),sections:p.sections??[],ownerScope:p.owner_scope??'school',platformAudience:p.owner_scope==='platform'?p.platform_access_scope:undefined,...localizedFields(p.localizations),authorName:p.author_name??'',authoredAt:p.authored_at??p.created_at,coverImage:p.cover_image??null,requiredLanguage:p.required_language??null,accessScope:p.access_scope??'school',availableFrom:p.available_from??null,availableUntil:p.available_until??null,listed:p.listed??true,withdrawnAt:p.withdrawn_at??null,classIds:(p.classes??[]).map(c=>c.id),classes:p.classes??[], id: p.id, title: p.title,estimatedMinutes:p.estimated_minutes,updatedAt:p.updated_at,createdAt:p.created_at, description: p.description, category: p.category, published: !!p.published_at,archived:!!p.archived_at,
+ return {...(p.canEdit&&p.edit_revision?{editRevision:p.edit_revision}:{}),...(p.merged_into_id?{mergedIntoCourseId:p.merged_into_id}:{}),sections:p.sections??[],ownerScope:p.owner_scope??'school',platformAudience:p.owner_scope==='platform'?p.platform_access_scope:undefined,...localizedFields(p.localizations),authorName:p.author_name??'',authoredAt:p.authored_at??p.created_at,coverImage:p.cover_image??null,requiredLanguage:p.required_language??null,accessScope:p.access_scope??'school',availableFrom:p.available_from??null,availableUntil:p.available_until??null,listed:p.listed??true,withdrawnAt:p.withdrawn_at??null,classIds:(p.classes??[]).map(c=>c.id),classes:p.classes??[], id: p.id, title: p.title,estimatedMinutes:p.estimated_minutes,updatedAt:p.updated_at,createdAt:p.created_at, description: p.description, category: p.category, published: !!p.published_at,archived:!!p.archived_at,
   difficulty:p.difficulty??'beginner',coverKey:p.cover_key??'general',taskCount:Number(p.task_count??0),completedTasks:Number(p.completed_tasks??0),chapterCount: Number(p.chapter_count ?? 0), completedChapters: Number(p.completed_chapters ?? 0), canEdit: p.canEdit ?? false };
+}
+
+// Call only after pathAccess(..., edit=true, lock=true), before any mutation.
+// Optional for compatibility with ordinary editing; imports use it to refuse
+// concurrent edits or publication rather than overwriting a newer draft.
+function assertExpectedDraftRevision(body,path) {
+ if(!Object.hasOwn(body,'expectedDraftRevision'))return;
+ if(typeof body.expectedDraftRevision!=='string'||!/^\d{1,10}$/.test(body.expectedDraftRevision))
+  fail(400,'VALIDATION','课程修订标记无效');
+ if(path.published_at||path.edit_revision!==body.expectedDraftRevision)
+  fail(409,'COURSE_DRAFT_CONFLICT','课程已修改或发布，请重新读取草稿；未修改任何内容。');
 }
 
 // Published lessons open the latest approved revision. Keep the linked
@@ -75,6 +86,14 @@ async function taskStats(db,user,ids,draftIds=[]) {
  return stats;
 }
 async function pathResult(ctx, id, db = ctx.pool, allowArchived = false) {
+ // Metadata, revision and chapter bodies must come from the same snapshot.
+ // A concurrent edit after this read invalidates the returned xmin token.
+ if(db===ctx.pool)return transaction(db,async client=>{
+  // Existing ACSL access checks take FOR SHARE locks on school/account rows,
+  // so PostgreSQL READ ONLY is unsuitable even though this view writes no data.
+  await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+  return pathResult(ctx,id,client,allowArchived);
+ });
  const redirectedFromCourseId=id;
  id=await canonicalMergedCourseId(db,id);
  const p = await pathAccess(db, ctx.user, id, false, false, allowArchived);
@@ -472,6 +491,7 @@ export async function handleEducation(ctx) {
     for(const v of versions){await db.query('UPDATE problem_versions SET published_at=COALESCE(published_at,now()) WHERE id=$1',[v.id]);await db.query('UPDATE problems SET current_version_id=$1 WHERE id=$2',[v.id,v.problem_id]);}
     const live=(await db.query('SELECT id FROM learning_chapters WHERE path_id=$1 AND archived_at IS NULL',[id])).rows;
     for(const item of bundle){if(!live.some(c=>c.id===item.chapterId))fail(409,'CONFLICT','配套章节已移除，请恢复章节或手动整理题库引用');if(!path.published_at){const old=(await db.query('SELECT problem_id FROM chapter_problems WHERE chapter_id=$1 ORDER BY position',[item.chapterId])).rows;await setLinks(ctx,db,path,item.chapterId,[...old.map(x=>x.problem_id),item.problemId]);}}
+    await db.query('UPDATE learning_paths SET updated_at=now() WHERE id=$1',[id]);
     await helpers.audit(db,user.id,'learning.practice_publish','learning_path',id,{count:bundle.length});
    }else if(bundle.length && body.document!==undefined){
     fail(409,'CONFLICT','此课程已有配套题目，请在题库编辑现有练习，避免重复导入');
@@ -556,6 +576,7 @@ export async function handleEducation(ctx) {
   requireStaff(user);
   const p=await transaction(pool,async db=>{
    const path=await pathAccess(db,user,match[1],true,true);
+   assertExpectedDraftRevision(body,path);
    if(body.sections!==undefined){const sections=courseSections(body.sections);assertChapterSections(sections,(await db.query('SELECT section_key FROM learning_chapters WHERE path_id=$1 AND archived_at IS NULL',[path.id])).rows);await db.query('UPDATE learning_paths SET sections=$2 WHERE id=$1',[path.id,JSON.stringify(sections)]);}
    const properties=await courseProperties(db,user,body,path);
    await saveCourseProperties(db,path.id,properties);
@@ -619,6 +640,7 @@ export async function handleEducation(ctx) {
   const title=field(body.title,'章节标题'),content=bytes(body.content??'','章节正文');
   const chapter=await transaction(pool,async db=>{
    const path=await pathAccess(db,user,match[1],true,true);
+   assertExpectedDraftRevision(body,path);
    if(path.published_at&&!content.trim())fail(409,'INCOMPLETE','已发布路径新增章节必须有正文');
    const c=exists(await db.query('INSERT INTO learning_chapters(path_id,title,content,position,objective,checkpoint,checkpoint_answer) VALUES($1,$2,$3,(SELECT COALESCE(max(position),-1)+1 FROM learning_chapters WHERE path_id=$1),$4,$5,$6) RETURNING *',[path.id,title,content,field(body.objective??'','学习目标',{min:0,max:4000}),field(body.checkpoint??'','检查点',{min:0,max:10000}),field(body.checkpointAnswer??'','检查点答案',{min:0,max:10000})]));
    const acslLinks=await resolveCourseAcslLinks(db,LEGACY_SCHOOL_ID,user,body.acslLinks??[]);

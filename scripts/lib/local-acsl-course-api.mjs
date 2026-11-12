@@ -20,9 +20,10 @@ export async function localCourseApi(options){
  const auth=JSON.parse(await readFile(resolve(options.authFile),'utf8'));
  assert.ok(typeof auth.username==='string'&&auth.username&&typeof auth.password==='string'&&auth.password,'Private auth file requires username and password.');
  let cookie='',csrf='';
- async function request(path,body){
+ async function request(path,body,method=body===undefined?'GET':'POST'){
   assert.ok(/^[a-z0-9/-]+$/i.test(path));
-  const response=await fetch(`${origin.origin}/api/v1/${path}`,{method:body===undefined?'GET':'POST',redirect:'error',headers:{Origin:origin.origin,...(cookie?{Cookie:cookie}:{}),...(csrf?{'X-CSRF-Token':csrf}:{}),...(body===undefined?{}:{'Content-Type':'application/json'})},body:body===undefined?undefined:JSON.stringify(body)});
+  assert.ok(['GET','POST','PATCH'].includes(method));
+  const response=await fetch(`${origin.origin}/api/v1/${path}`,{method,redirect:'error',headers:{Origin:origin.origin,...(cookie?{Cookie:cookie}:{}),...(csrf?{'X-CSRF-Token':csrf}:{}),...(body===undefined?{}:{'Content-Type':'application/json'})},body:body===undefined?undefined:JSON.stringify(body)});
   const value=await response.json();if(!response.ok)throw Error(`${path}: HTTP ${response.status} (${value.error?.code??'REQUEST_FAILED'})`);
   if(path==='auth/login'){cookie=response.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');csrf=value.csrfToken;assert.ok(value.user.roles.some(r=>['teacher','admin'].includes(r)),'A teacher account is required.');}
   return value;

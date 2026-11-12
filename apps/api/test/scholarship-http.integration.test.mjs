@@ -138,11 +138,14 @@ test('Luq real Nest transport: role/CSRF boundary, idempotent grants, content pr
   await teacher.call('/scholarship/reward-rules',{method:'POST',body:{...rule,expectedVersion:1},expected:409});
   const oldPoints=await pool.query('SELECT count(*)::int n FROM point_ledger');assert.equal(oldPoints.rows[0].n,0,'Luq purchases never write the old points ledger');
 
-  await t.test('a formal AC allows the owner to read reviewed content without purchasing it',async()=>{
+  await t.test('a formal AC on an earlier version opens the current reviewed solution for free',async()=>{
    const before=await other.call('/scholarship/assistance/quote',{method:'POST',body:input});
    assert.equal(before.price,8);
+   const {rows:[earlier]}=await pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code,validation_status,published_at)
+    SELECT problem_id,'Earlier Luq boundary',mode,statement,time_limit_ms,memory_limit_mb,reference_code,'AC',now()-interval '1 day'
+    FROM problem_versions WHERE id=$1 RETURNING id`,[versionId]);
    const {rows:[submission]}=await pool.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,code,idempotency_key,request_hash)
-    VALUES($1,$2,$3,$4,'submit','print(1)',$5,'fixture') RETURNING id`,[other.id,other.identityId,problemId,versionId,randomUUID()]);
+    VALUES($1,$2,$3,$4,'submit','print(1)',$5,'fixture') RETURNING id`,[other.id,other.identityId,problemId,earlier.id,randomUUID()]);
    assert.equal((await other.call('/scholarship/assistance/quote',{method:'POST',body:input})).mode,'paid');
    await pool.query("UPDATE submissions SET status='AC',score=100 WHERE id=$1",[submission.id]);
    const free=await other.call('/scholarship/assistance/quote',{method:'POST',body:input});

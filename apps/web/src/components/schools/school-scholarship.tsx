@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Check, Languages } from "lucide-react";
+import { Check } from "lucide-react";
 import { useLocale } from "@/components/locale-context";
 import { inputClass } from "@/components/admin/common";
 import { Button } from "@/components/ui/button";
 import { Modal, useData } from "@/components/teacher/shared";
-import { SolutionBundle, type SolutionArticle } from "@/components/scholarship/solution-content";
+import { ScholarshipAssistance, type SchoolAssistanceTarget } from "@/components/scholarship/assistance";
 import { MathContent } from "@/components/math-content";
 import { ApiError, apiMessage, productionApi, productionId, type SubmissionLanguage } from "@/lib/production-api";
 import { ScholarshipIcon } from "@/components/scholarship/scholarship-icon";
@@ -25,15 +25,7 @@ import {
   type InheritedSolution,
 } from "@/components/scholarship/solution-alternatives-editor";
 
-export type SchoolAssistanceTarget = {
-  type: "problem" | "paper4";
-  versionId: string;
-  problemId?: string;
-  paperId?: string;
-  questionKey?: string;
-  attemptId?: string;
-  activityId?: string;
-};
+export type { SchoolAssistanceTarget } from "@/components/scholarship/assistance";
 type Kind = "FULL_TRANSLATION" | "FULL_SOLUTION";
 type Settings = {
   initialGrant: number;
@@ -79,216 +71,19 @@ function useText() {
 }
 const notify = () =>
   window.dispatchEvent(new Event("codemaster:school-scholarship-changed"));
-export function SchoolAssistance(props: {
+export function SchoolAssistance({ schoolId, target, kind, preferredLanguage }: {
   schoolId: string;
   target: SchoolAssistanceTarget;
   kind: Kind;
   preferredLanguage?: SubmissionLanguage;
 }) {
-  return (
-    <SchoolAssistanceContents
-      key={JSON.stringify([props.schoolId, props.target, props.kind])}
-      {...props}
-    />
-  );
-}
-function SchoolAssistanceContents({
-  schoolId,
-  target,
-  kind,
-  preferredLanguage,
-}: {
-  schoolId: string;
-  target: SchoolAssistanceTarget;
-  kind: Kind;
-  preferredLanguage?: SubmissionLanguage;
-}) {
-  const tx = useText(),
-    [quote, setQuote] = useState<{
-      available: boolean;
-      reason: string;
-      price: number;
-      basePrice: number;
-      translationCredit: number;
-      balance: number;
-      balanceAfter: number;
-      unlocked: boolean;
-      mode: string;
-      contentId: string;
-      contentRevision: number;
-    } | null>(null),
-    [provided, setProvided] = useState<{ body: string; solutions?: SolutionArticle[] } | null>(null),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
-  const lock = useRef(false),
-    request = useRef<string | null>(null);
-  const problemSolutions = kind === "FULL_SOLUTION" && target.type === "problem";
-  const title =
-    kind === "FULL_SOLUTION"
-      ? problemSolutions
-        ? tx("题解与参考代码", "Solutions and reference code")
-        : tx("完整题解与参考代码", "Full solution and reference code")
-      : tx("中文题面", "Chinese translation");
-  async function prepare() {
-    if (lock.current) return;
-    lock.current = true;
-    setBusy(true);
-    setError("");
-    try {
-      setQuote(
-        await productionApi(`${prefix(schoolId)}/assistance/quote`, {
-          method: "POST",
-          body: { ...target, kind },
-        }),
-      );
-    } catch (e) {
-      setError(apiMessage(e));
-    } finally {
-      lock.current = false;
-      setBusy(false);
-    }
-  }
-  async function provide() {
-    if (lock.current || !quote?.available) return;
-    lock.current = true;
-    setBusy(true);
-    setError("");
-    try {
-      if (quote.mode === "paid" && !quote.unlocked) {
-        request.current ??= productionId();
-        await productionApi(`${prefix(schoolId)}/assistance/unlock`, {
-          method: "POST",
-          body: {
-            ...target,
-            kind,
-            requestId: request.current,
-            confirmedContentId: quote.contentId,
-            confirmedRevision: quote.contentRevision,
-            confirmedPrice: quote.price,
-          },
-        });
-        notify();
-      }
-      const content = await productionApi<{ body: string; solutions?: SolutionArticle[] }>(
-        `${prefix(schoolId)}/assistance/provide`,
-        { method: "POST", body: { ...target, kind } },
-      );
-      setProvided(content);
-      setQuote(null);
-    } catch (e) {
-      setError(apiMessage(e));
-    } finally {
-      lock.current = false;
-      setBusy(false);
-    }
-  }
-  return (
-    <div className="space-y-3">
-      <Feedback error={error} />
-      {provided !== null ? (
-        kind === "FULL_SOLUTION" ? (
-          <SolutionBundle body={provided.body} solutions={provided.solutions} preferredLanguage={preferredLanguage} />
-        ) : (
-          <MathContent content={provided.body} />
-        )
-      ) : (
-        <>
-          {problemSolutions && (
-            <p className="text-sm text-muted-foreground">
-              {tx("一次解锁即可查看此版本已发布的所有题解。", "Unlock all published solutions for this version together.")}
-            </p>
-          )}
-          <Button
-            variant="secondary"
-            disabled={busy}
-            onClick={() => void prepare()}
-          >
-            {kind === "FULL_SOLUTION" ? (
-              <BookOpen className="size-4" />
-            ) : (
-              <Languages className="size-4" />
-            )}
-            {tx("查看开放方式与价格", "View access and price")}
-          </Button>
-        </>
-      )}
-      {quote && (
-        <Modal
-          title={title}
-          onClose={() => {
-            if (!busy) setQuote(null);
-          }}
-        >
-          <div className="space-y-4 text-sm">
-            <Feedback error={error} />
-            {!quote.available ? (
-              <p>{quote.reason}</p>
-            ) : (
-              <>
-                <p>
-                  {quote.unlocked ? (
-                    tx(
-                      "已解锁，免费重看。",
-                      "Already unlocked. View again at no charge.",
-                    )
-                  ) : quote.mode === "free" ? (
-                    tx(
-                      "本次免费开放，不产生永久购买权益。",
-                      "Free access for this context; no permanent purchase entitlement.",
-                    )
-                  ) : (
-                    <>
-                      {tx("解锁需要", "Unlock for")}{" "}
-                      <strong>
-                        {quote.price} {tx("奖学金", "scholarship")}
-                      </strong>
-                      {quote.translationCredit > 0 && (
-                        <span>
-                          {" "}
-                          ({quote.basePrice} − {quote.translationCredit}{" "}
-                          {tx("翻译抵扣", "translation credit")})
-                        </span>
-                      )}{" "}
-                      · {tx("扣后余额", "Balance after")}: {quote.balanceAfter}
-                    </>
-                  )}
-                </p>
-                {kind === "FULL_SOLUTION" && (
-                  <p className="text-muted-foreground">
-                    {tx(
-                      "在提交前查看完整答案，该提交不获得本题首次 AC 奖学金；成绩和排行榜积分不变。",
-                      "Receiving the full solution before submitting excludes that submission from the first-AC scholarship reward. Grades and ranking points stay unchanged.",
-                    )}
-                  </p>
-                )}
-              </>
-            )}
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="secondary"
-                disabled={busy}
-                onClick={() => setQuote(null)}
-              >
-                {tx("取消", "Cancel")}
-              </Button>
-              {quote.available && (
-                <Button
-                  disabled={busy || quote.balanceAfter < 0}
-                  onClick={() => void provide()}
-                >
-                  {quote.balanceAfter < 0
-                    ? tx("余额不足", "Insufficient balance")
-                    : quote.price > 0
-                      ? tx("确认解锁并查看", "Confirm unlock and view")
-                      : tx("查看内容", "View content")}
-                </Button>
-              )}
-            </div>
-          </div>
-        </Modal>
-      )}
-    </div>
-  );
+  return <ScholarshipAssistance
+    endpoint={`schools/${schoolId}/scholarship/assistance`}
+    target={target}
+    kind={kind}
+    preferredLanguage={preferredLanguage}
+    renderBody={kind === "FULL_TRANSLATION" ? body => <MathContent content={body} /> : undefined}
+  />;
 }
 
 type ActivityAssistancePolicy = {

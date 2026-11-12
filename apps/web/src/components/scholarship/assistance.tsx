@@ -1,15 +1,24 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
-import { BookOpen, Languages } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Languages } from "lucide-react";
 import { useLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/teacher/shared";
 import { LessonContent } from "@/components/student/shared";
 import { SolutionBundle, type SolutionArticle } from "@/components/scholarship/solution-content";
-import { apiMessage, productionApi, productionId, type SubmissionLanguage } from "@/lib/production-api";
+import { ApiError, apiMessage, productionApi, productionId, type SubmissionLanguage } from "@/lib/production-api";
 
 export type AssistanceKind = "FULL_TRANSLATION" | "FULL_SOLUTION";
+export type SchoolAssistanceTarget = {
+  type: "problem" | "paper4";
+  versionId: string;
+  problemId?: string;
+  paperId?: string;
+  questionKey?: string;
+  attemptId?: string;
+  activityId?: string;
+};
 export type AssistanceTarget =
   | {
       problemId: string;
@@ -18,7 +27,8 @@ export type AssistanceTarget =
       timedAttemptId?: string;
     }
   | { paper4AttemptId: string; questionKey: string }
-  | { paperVersionId: string; contentLanguage?: "en" | "zh" };
+  | { paperVersionId: string; contentLanguage?: "en" | "zh" }
+  | SchoolAssistanceTarget;
 interface Quote {
   available: boolean;
   mode: "disabled" | "paid" | "free";
@@ -29,6 +39,7 @@ interface Quote {
   balance: number;
   balanceAfter: number;
   contentId?: string;
+  contentRevision?: number;
   requiresConfirmation: boolean;
   reason?: string;
   affectsFirstAcScholarship?: boolean;
@@ -42,27 +53,35 @@ interface Provided {
   contentId: string;
 }
 
-/** Metadata only until the student explicitly confirms. Bodies are never prefetched or persisted. */
-export function ScholarshipAssistance<Content extends Provided = Provided>({
+type AssistanceProps<Content extends Provided> = {
+  target: AssistanceTarget;
+  kind: AssistanceKind;
+  renderBody?: (body: string, content: Content) => ReactNode;
+  description?: string;
+  preferredLanguage?: SubmissionLanguage;
+  endpoint?: "scholarship/assistance" | "practice/scholarship/assistance" | `schools/${string}/scholarship/assistance` | `schools/${string}/acsl/${string}/programming/${"translation" | "solution"}`;
+};
+
+export function ScholarshipAssistance<Content extends Provided = Provided>(props: AssistanceProps<Content>) {
+  return <AssistanceContents key={JSON.stringify([props.endpoint, props.target, props.kind])} {...props} />;
+}
+
+function AssistanceContents<Content extends Provided>({
   target,
   kind,
   renderBody,
   description,
   preferredLanguage,
   endpoint = "scholarship/assistance",
-}: {
-  target: AssistanceTarget;
-  kind: AssistanceKind;
-  renderBody?: (body: string, content: Content) => ReactNode;
-  description?: string;
-  preferredLanguage?: SubmissionLanguage;
-  endpoint?: "scholarship/assistance" | "practice/scholarship/assistance" | `schools/${string}/acsl/${string}/programming/${"translation" | "solution"}`;
-}) {
+}: AssistanceProps<Content>) {
   const { locale } = useLocale(),
     tx = (zh: string, en: string) => (locale === "en" ? en : zh);
+  const isSolution = kind === "FULL_SOLUTION";
   const [quote, setQuote] = useState<Quote | null>(null),
     [provided, setProvided] = useState<Content | null>(null);
-  const [busy, setBusy] = useState(false),
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [reload, setReload] = useState(0);
+  const [busy, setBusy] = useState(isSolution),
     [error, setError] = useState("");
   const lock = useRef(false),
     requestKey = useRef<string | null>(null);
@@ -71,13 +90,47 @@ export function ScholarshipAssistance<Content extends Provided = Provided>({
     kind,
     language: kind === "FULL_TRANSLATION" ? "zh-CN" : "",
   };
-  const problemSolutions = kind === "FULL_SOLUTION" && "problemId" in target;
+  const serializedBody = JSON.stringify(body);
+  const schoolAssistance = "type" in target;
+  const problemSolutions = isSolution && (schoolAssistance ? target.type === "problem" : "problemId" in target);
   const title =
     kind === "FULL_TRANSLATION"
       ? tx("中文题面", "Chinese translation")
       : problemSolutions
         ? tx("题解与参考代码", "Solutions and reference code")
         : tx("完整题解与参考代码", "Full solution and reference code");
+
+  useEffect(() => {
+    if (!isSolution) return;
+    const controller = new AbortController();
+    const signal = controller.signal;
+    const options = { method: "POST", body: JSON.parse(serializedBody), signal };
+    async function load() {
+      try {
+        const next = await productionApi<Quote>(`${endpoint}/quote`, options);
+        if (signal.aborted) return;
+        setQuote(next);
+        if (next.available && (next.mode === "free" || next.unlocked)) {
+          const content = await productionApi<Content>(`${endpoint}/provide`, options);
+          if (!signal.aborted) setProvided(content);
+        }
+      } catch (cause) {
+        if (!signal.aborted) setError(apiMessage(cause));
+      } finally {
+        if (!signal.aborted) setBusy(false);
+      }
+    }
+    void load();
+    return () => controller.abort();
+  }, [endpoint, isSolution, reload, serializedBody]);
+
+  function reloadAccess() {
+    setDialogOpen(false);
+    setQuote(null);
+    setError("");
+    setBusy(true);
+    setReload(previous => previous + 1);
+  }
   async function prepare() {
     if (lock.current) return;
     lock.current = true;
@@ -90,6 +143,7 @@ export function ScholarshipAssistance<Content extends Provided = Provided>({
           body,
         }),
       );
+      setDialogOpen(true);
     } catch (cause) {
       setError(apiMessage(cause));
     } finally {
@@ -105,25 +159,27 @@ export function ScholarshipAssistance<Content extends Provided = Provided>({
     try {
       if (quote.mode === "paid" && !quote.unlocked) {
         requestKey.current ??= productionId();
-        const unlock = await productionApi<{ balance: number }>(`${endpoint}/unlock`, {
+        const unlock = await productionApi<{ balance: number; unlocked: boolean }>(`${endpoint}/unlock`, {
           method: "POST",
           body: {
             ...body,
             requestKey: requestKey.current,
             confirmedPrice: quote.price,
             confirmedContentId: quote.contentId,
+            confirmedRevision: quote.contentRevision,
           },
         });
         // An unlock can succeed even if delivery fails. Retry only delivery; entitlement remains permanent.
         setQuote({
           ...quote,
-          unlocked: true,
+          unlocked: unlock.unlocked,
+          mode: unlock.unlocked ? quote.mode : "free",
           price: 0,
           balance: unlock.balance,
           balanceAfter: unlock.balance,
           requiresConfirmation: false,
         });
-        window.dispatchEvent(new Event("campus-judge:scholarship-changed"));
+        window.dispatchEvent(new Event(schoolAssistance ? "codemaster:school-scholarship-changed" : "campus-judge:scholarship-changed"));
       }
       setProvided(
         await productionApi<Content>(`${endpoint}/provide`, {
@@ -131,13 +187,19 @@ export function ScholarshipAssistance<Content extends Provided = Provided>({
           body,
         }),
       );
+      setDialogOpen(false);
       setQuote(null);
     } catch (cause) {
+      if (isSolution && cause instanceof ApiError && cause.code === "QUOTE_CHANGED") {
+        requestKey.current = null;
+        reloadAccess();
+        return;
+      }
       setError(apiMessage(cause));
     } finally {
       lock.current = false;
-      setBusy(false);
     }
+    setBusy(false);
   }
   return (
     <section className="space-y-3" aria-label={title}>
@@ -150,30 +212,36 @@ export function ScholarshipAssistance<Content extends Provided = Provided>({
           ) : (
             <LessonContent content={provided.body} />
           )}
-          <p className="text-xs text-muted-foreground">
+          {!isSolution && <p className="text-xs text-muted-foreground">
             {provided.providedAt ? tx(
               "本次提供已记录；已解锁内容可免费重看，仍受活动开放规则约束。",
               "Delivery recorded. Unlocked content can be viewed again free, subject to activity access rules.",
             ) : tx("已解锁的内容可免费重看。", "Unlocked content can be viewed again free.")}
-          </p>
+          </p>}
+        </>
+      ) : isSolution ? (
+        <>
+          {busy && !dialogOpen && <p role="status" className="text-sm text-muted-foreground">{tx("正在加载题解…", "Loading solutions…")}</p>}
+          {!busy && quote && !quote.available && <p role="status" className="text-sm text-muted-foreground">
+            {quote.reason || tx("当前暂无可查看的题解。", "No solution is available here yet.")}
+          </p>}
+          {!busy && !dialogOpen && quote?.available && quote.requiresConfirmation && <>
+            {description && <p className="text-sm text-muted-foreground">{description}</p>}
+            <Button size="sm" variant="secondary" onClick={() => { setError(""); setDialogOpen(true); }}>
+              {tx(`解锁题解（${quote.price} 奖学金）`, `Unlock solution (${quote.price} scholarship)`)}
+            </Button>
+          </>}
+          {!busy && !dialogOpen && error && !quote?.requiresConfirmation && <Button size="sm" variant="secondary" onClick={reloadAccess}>
+            {tx("重新加载题解", "Retry loading solutions")}
+          </Button>}
         </>
       ) : (
         <>
           <p className="text-sm text-muted-foreground">
-            {description ?? (kind === "FULL_TRANSLATION"
-              ? tx(
-                  "查看已审核的中文题面。翻译不影响首次 AC 的奖学金奖励。",
-                  "Read the reviewed Chinese statement. Translation does not affect first-AC scholarship rewards.",
-                )
-              : problemSolutions
-                ? tx(
-                    "一次解锁即可查看此版本已发布的所有题解。提交前查看会影响本题首次 AC 的奖学金奖励。",
-                    "Unlock all published solutions for this version together. Viewing them before submitting affects this problem’s first-AC scholarship reward.",
-                  )
-                : tx(
-                    "查看已发布的题解。提交前查看完整答案会影响本题首次 AC 的奖学金奖励；成绩和排行榜积分不变。",
-                    "Read the published solution. Viewing a full solution before submitting affects first-AC scholarship rewards for this problem; grades and leaderboard points are unchanged.",
-                  ))}
+            {description ?? tx(
+              "查看已审核的中文题面。翻译不影响首次 AC 的奖学金奖励。",
+              "Read the reviewed Chinese statement. Translation does not affect first-AC scholarship rewards.",
+            )}
           </p>
           <Button
             size="sm"
@@ -181,29 +249,24 @@ export function ScholarshipAssistance<Content extends Provided = Provided>({
             disabled={busy}
             onClick={() => void prepare()}
           >
-            {kind === "FULL_TRANSLATION" ? (
-              <Languages size={15} />
-            ) : (
-              <BookOpen size={15} />
-            )}{" "}
+            <Languages size={15} />{" "}
             {busy
               ? tx("正在查询…", "Checking…")
               : tx("查看开放方式与价格", "Check access and price")}
           </Button>
         </>
       )}
-      {error && (
+      {error && !dialogOpen && (
         <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
       )}
-      {quote && (
+      {quote && dialogOpen && (
         <Modal
           title={title}
           onClose={() => {
             if (!busy) {
-              setQuote(null);
-              setError("");
+              setDialogOpen(false);
             }
           }}
         >
@@ -291,7 +354,7 @@ export function ScholarshipAssistance<Content extends Provided = Provided>({
                 size="sm"
                 variant="secondary"
                 disabled={busy}
-                onClick={() => setQuote(null)}
+                onClick={() => setDialogOpen(false)}
               >
                 {tx("取消", "Cancel")}
               </Button>

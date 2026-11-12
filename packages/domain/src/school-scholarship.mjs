@@ -61,12 +61,11 @@ export async function publicSchoolAssistanceRestriction(db,s,u,problemId,kind){
    AND (a.ends_at IS NULL OR a.ends_at>=clock_timestamp() OR a.kind='timed' AND a.results_published_at IS NULL)`,[s,problemId,u.id])).rows;
  if(assigned.some(a=>a.kind==='timed'&&!a.results_published_at))return {mode:'disabled',reason:'Assistance is unavailable until this assessment releases its results.'};
  const {rows:[rules]}=await db.query(`SELECT
-   coalesce(bool_or(mode='disabled' OR opens_at>clock_timestamp()),false) blocked,
-   coalesce(bool_or(target_type='activity' AND mode='paid'),false) activity_paid
+   coalesce(bool_or(mode='disabled' OR opens_at>clock_timestamp()),false) blocked
   FROM school_scholarship_policies WHERE school_id=$1 AND kind=$2
    AND (target_type='subject' AND target_key=$3 OR target_type='activity' AND target_key=ANY($4::text[]))`,[s,kind,'problem:'+problemId,assigned.map(a=>a.id)]);
  if(rules.blocked)return {mode:'disabled',reason:'This assistance is not open under the current school activity rules.'};
- return rules.activity_paid?{activityPaid:true}:null;
+ return null;
 }
 async function currentAssistance(db,s,u,role,b){
  const k=kindOf(b),language=languageOf(k),t=await target(db,s,u,role,b),i=await studentIdentity(db,s,u),cfg=await schoolScholarshipSettings(db,s);
@@ -81,12 +80,11 @@ async function currentAssistance(db,s,u,role,b){
  if(exam){mode='disabled';reason='Assistance is unavailable until this assessment releases its results.';}
  if(mode==='paid'&&price===0)mode='free';
  const content=(await db.query(`SELECT id,revision FROM school_scholarship_contents WHERE school_id=$1 AND subject_key=$2 AND version_id=$3 AND kind=$4 AND language=$5 AND status='published' FOR SHARE`,[s,t.subject,t.v.id,k,language])).rows[0];
- const freeAfterAc=!!content&&k==='FULL_SOLUTION'&&mode==='paid'&&t.type==='problem'&&!t.activityId
-  &&!policies.some(p=>p.target_type==='activity'&&p.mode==='paid')
+ const freeAfterAc=!!content&&k==='FULL_SOLUTION'&&mode==='paid'&&t.type==='problem'
   &&(await db.query(`SELECT EXISTS(SELECT 1 FROM school_judge_jobs j
-   WHERE j.school_id=$1 AND j.identity_id=$2 AND j.problem_id=$3 AND j.version_id=$4
+   WHERE j.school_id=$1 AND j.identity_id=$2 AND j.problem_id=$3
     AND j.access_context='school' AND j.kind='submit' AND j.state='completed' AND j.result->>'status'='AC'
-    AND ${schoolActivityJobVisibleSql('j')}) accepted`,[s,i.id,t.p.id,t.v.id])).rows[0].accepted;
+    AND ${schoolActivityJobVisibleSql('j')}) accepted`,[s,i.id,t.p.id])).rows[0].accepted;
  if(freeAfterAc)mode='free';
  const entitlement=(await db.query('SELECT * FROM school_scholarship_entitlements WHERE school_id=$1 AND identity_id=$2 AND subject_key=$3 AND kind=$4 AND language=$5',[s,i.id,t.subject,k,language])).rows[0];
  let translationCredit=0,creditLedger=null;

@@ -81,6 +81,15 @@ test('school scholarships: real roles, atomic rewards, consumption, timing and i
    await assert.rejects(provide('one',x,'FULL_SOLUTION'),e=>e.code==='ASSISTANCE_UNAVAILABLE');
    await act('teacher',a.id+'/end','POST');await act('teacher',a.id+'/publish-results','POST');
    assert.equal((await quote('one',x,'FULL_SOLUTION')).mode,'free');
+   const versionId=randomUUID();
+   await owner.query('INSERT INTO school_problem_versions(school_id,id,problem_id,draft_revision,definition) SELECT school_id,$3,id,2,draft FROM school_problems WHERE school_id=$1 AND id=$2',[alpha.id,x.problemId,versionId]);
+   await owner.query('UPDATE school_problems SET published_version_id=$3 WHERE school_id=$1 AND id=$2',[alpha.id,x.problemId,versionId]);
+   const current={...x,versionId};
+   await content(current,'FULL_SOLUTION','Current reviewed solution');
+   assert.equal((await quote('one',current,'FULL_SOLUTION')).price,0);
+   assert.equal((await quote('two',current,'FULL_SOLUTION')).mode,'paid');
+   assert.equal((await provide('one',current,'FULL_SOLUTION')).body,'Current reviewed solution');
+   assert.equal((await call('one','wallet')).balance,before+4);
   });
   await t.test('Paper 4 uses actual stage marks, keeps stable first-AC and supports delayed examination awards',async()=>{
    const paperId=randomUUID(),versionId=randomUUID(),questions=[{key:'Q1',title:'First',stages:[{id:'s1',judgeMode:'auto',maxMarks:20}]},{key:'Q2',title:'Second',stages:[{id:'s2',judgeMode:'auto',maxMarks:40},{id:'s3',judgeMode:'auto',maxMarks:40}]}],content={title:'Mark proportions',definition:{questions}};

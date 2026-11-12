@@ -440,6 +440,8 @@ test('Luq free task content gives no permanent entitlement, translation does not
 
 test('Luq active exam restrictions beat balance, prior purchase, old versions and free-library entry',options,async()=>fixture(async f=>{
  const target=await f.problem();await f.publish(target);await f.grant(f.student,8);await f.unlock(f.student,target);
+ const accepted=await f.submit(f.student,target);
+ await f.pool.query("UPDATE submissions SET status='AC',score=100 WHERE id=$1",[accepted.id]);
  const newer=await f.version(target.problemId);await f.publish(newer);
  const exam=(await f.pool.query(`INSERT INTO timed_practices(title,owner_account_id,starts_at,ends_at,duration_minutes,state)
   VALUES('Exam',$1,now()-interval '1 minute',now()+interval '1 hour',60,'Draft') RETURNING id`,[f.teacher.id])).rows[0];
@@ -452,7 +454,7 @@ test('Luq active exam restrictions beat balance, prior purchase, old versions an
  assert.equal((await f.quote(f.student,newer)).available,true);assert.ok((await f.provide(f.student,newer)).body);
 }));
 
-test('free after AC respects the student, exact version and paid activity policy',options,async()=>fixture(async f=>{
+test('a student’s formal AC keeps the shared solution free across revisions and assignment entry',options,async()=>fixture(async f=>{
  const target=await f.problem();
  await f.publish(target);await f.publish(target,'FULL_TRANSLATION','中文题面');
  const ac=await f.submit(f.student,target);
@@ -461,19 +463,22 @@ test('free after AC respects the student, exact version and paid activity policy
  assert.equal((await f.quote(f.otherStudent,target)).mode,'paid');
  assert.equal((await f.quote(f.student,target,'FULL_TRANSLATION')).price,3);
  const newer=await f.version(target.problemId);
- assert.equal((await f.quote(f.student,newer)).mode,'paid','old AC is a historical result, not an AC against the changed problem');
+ const free=await f.quote(f.student,newer);
+ assert.deepEqual([free.mode,free.price,free.requiresConfirmation,free.body],['free',0,false,undefined]);
+ assert.equal((await f.quote(f.otherStudent,newer)).mode,'paid');
  await rejects(f.quote(f.student,target),'PROBLEM_UPDATED');
- const newAc=await f.submit(f.student,newer);
- await f.pool.query("UPDATE submissions SET status='AC',score=100 WHERE id=$1",[newAc.id]);
- assert.equal((await f.quote(f.student,newer)).mode,'free');
  const {rows:[assignment]}=await f.pool.query(`INSERT INTO assignments(title,owner_account_id,due_at,state)
   VALUES('Paid policy',$1,now()+interval '1 hour','Draft') RETURNING id`,[f.teacher.id]);
  await f.pool.query('INSERT INTO assignment_problems(assignment_id,problem_id,version_id,points,position) VALUES($1,$2,$3,100,0)',[assignment.id,target.problemId,target.versionId]);
  await f.pool.query('INSERT INTO assignment_participants(assignment_id,identity_id) VALUES($1,$2)',[assignment.id,f.student.identityId]);
  await f.call(f.teacher,'/scholarship/policies',{targetType:'assignment',targetId:assignment.id,kind:'FULL_SOLUTION',mode:'paid'});
  await f.pool.query("UPDATE assignments SET state='Published',published_at=now() WHERE id=$1",[assignment.id]);
- assert.equal((await f.quote(f.student,{...newer,assignmentId:assignment.id})).mode,'paid');
- await rejects(f.provide(f.student,newer),'UNLOCK_REQUIRED');
+ const contextual={...newer,assignmentId:assignment.id};
+ assert.equal((await f.quote(f.student,contextual)).mode,'free');
+ assert.ok((await f.provide(f.student,contextual)).body);
+ assert.ok((await f.provide(f.student,newer)).body);
+ assert.equal((await f.unlock(f.student,contextual)).charged,0);
+ assert.equal((await f.pool.query("SELECT count(*)::int n FROM luq_ledger WHERE kind='purchase'")).rows[0].n,0);
 }));
 
 test('Luq answer provision and submission share an acceptance lock; later viewing cannot revise an earlier snapshot',options,async()=>fixture(async f=>{

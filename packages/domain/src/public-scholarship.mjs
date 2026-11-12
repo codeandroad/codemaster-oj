@@ -69,7 +69,7 @@ export async function publicScholarshipOperation(ctx,loadPublicProblem){
   // drafts/reference code are deliberately not copied into this public path.
   const result=await studentAssistanceOperation(db,user,action[1],body,{assistanceTarget:async()=>target,
    assistanceRestriction:async(db,u,t,kind)=>publicSchoolAssistanceRestriction(db,p.school_id,u,p.id,kind),
-   hasPracticeAc:legacy?hasLegacyPracticeAc:(db,u,t)=>hasPublicPracticeAc(db,u.id,p.school_id,t.problemId,t.versionId)});
+   hasPracticeAc:legacy?hasLegacyPracticeAc:(db,u,t)=>hasPublicPracticeAc(db,u.id,p.school_id,t.problemId)});
   return {status:200,body:result};
  });
 }

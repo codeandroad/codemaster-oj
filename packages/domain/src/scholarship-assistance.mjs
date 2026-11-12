@@ -44,7 +44,6 @@ async function aidState(db,user,input,helpers){
  const settings=await getScholarshipSettings(db);
  const basePrice=policy.price??(kind==='FULL_TRANSLATION'?settings.translationPrice:settings.solutionPrice);
  const freeAfterAc=!!content&&kind==='FULL_SOLUTION'&&policy.mode==='paid'&&basePrice>0&&!!target.problemId
-  &&!target.contextId&&!policy.activityPaid&&!restriction?.activityPaid
   &&await (helpers.hasPracticeAc??hasLegacyPracticeAc)(db,user,target);
  if(freeAfterAc)policy.mode='free';
  if(policy.mode==='paid'&&basePrice===0)policy.mode='free';

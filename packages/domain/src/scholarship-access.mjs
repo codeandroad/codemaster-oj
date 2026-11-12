@@ -19,21 +19,22 @@ export async function hasProvidedSolution(db,identityId,subjectKey){
   WHERE identity_id=$1 AND subject_key=$2 AND kind='FULL_SOLUTION') used`,[identityId,subjectKey])).rows[0].used;
 }
 
-export async function hasPublicPracticeAc(db,accountId,schoolId,problemId,versionId){
+export async function hasPublicPracticeAc(db,accountId,schoolId,problemId){
  await db.query("SELECT set_config('campus.public_history_account_id',$1,true)",[accountId]);
  return (await db.query(`SELECT EXISTS(SELECT 1 FROM school_judge_jobs
-  WHERE school_id=$1 AND account_id=$2 AND problem_id=$3 AND version_id=$4
+  WHERE school_id=$1 AND account_id=$2 AND problem_id=$3
    AND access_context='public' AND activity_id IS NULL AND kind='submit'
-   AND state='completed' AND result->>'status'='AC') accepted`,[schoolId,accountId,problemId,versionId])).rows[0].accepted;
+   AND state='completed' AND result->>'status'='AC') accepted`,[schoolId,accountId,problemId])).rows[0].accepted;
 }
 
-export async function hasLegacyPracticeAc(db,user,{problemId,versionId}){
+export async function hasLegacyPracticeAc(db,user,{problemId}){
+ // Solutions belong to the problem, including after a new version is published.
  const {rows:[{accepted}]}=await db.query(`SELECT EXISTS(SELECT 1 FROM submissions s
-  WHERE s.identity_id=$1 AND s.problem_id=$2 AND s.version_id=$3 AND s.kind='submit' AND s.status='AC'
+  WHERE s.identity_id=$1 AND s.problem_id=$2 AND s.kind='submit' AND s.status='AC'
    AND (s.timed_attempt_id IS NULL OR EXISTS (
     SELECT 1 FROM timed_attempts ta JOIN timed_practices tp ON tp.id=ta.practice_id
-    WHERE ta.id=s.timed_attempt_id AND tp.results_published_at IS NOT NULL))) accepted`,[user.identityId,problemId,versionId]);
- return accepted||hasPublicPracticeAc(db,user.id,LEGACY_SCHOOL_ID,problemId,versionId);
+    WHERE ta.id=s.timed_attempt_id AND tp.results_published_at IS NOT NULL))) accepted`,[user.identityId,problemId]);
+ return accepted||hasPublicPracticeAc(db,user.id,LEGACY_SCHOOL_ID,problemId);
 }
 
 // Read only public statement/version identifiers here; never reference code or judge data.
@@ -168,7 +169,7 @@ export async function resolveAssistancePolicy(db,user,target,kind){
   const available=policyAvailability(policy??{mode:item.defaultMode});
   if(available.mode==='disabled')return {...available,reason:'当前已分配的活动限制了此辅助内容'};
   // A free policy grants a contextual view only. A different active paid rule remains restrictive.
-  if(available.mode==='paid'&&(item.type!==target.contextType||item.id!==target.contextId))result={mode:'paid',price:base.price,activityPaid:true};
+  if(available.mode==='paid'&&(item.type!==target.contextType||item.id!==target.contextId))result={mode:'paid',price:base.price};
  }
  return result;
 }

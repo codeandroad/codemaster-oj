@@ -1,5 +1,7 @@
 "use client";
 
+import type { CourseSection } from "@/components/course-sections";
+
 import { useRef, useState, type MouseEvent } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Feedback, Loading, useData, useMutation } from "@/components/admin/common";
@@ -21,6 +23,7 @@ type PublicCourseEntry = {
   title: string;
   description: string;
   localizations?: CourseLocalizations;
+  sections?: CourseSection[];
   chapterCount: number;
   completedChapters?: number;
   totalExercises?: number;
@@ -41,6 +44,7 @@ type CourseDetail = {
   description: string;
   requiredLanguage?: SubmissionLanguage | null;
   localizations?: CourseLocalizations;
+  sections?: CourseSection[];
   revision: number;
   ownerScope?: "school" | "platform";
   sourceSchool?: string;
@@ -53,6 +57,7 @@ type CourseDetail = {
     title: string;
     body: string;
     localizations?: ChapterLocalizations;
+    sectionKey?: string | null;
     read: boolean;
     problems: { problemId: string; versionId: string; title: string; solved: boolean }[];
   }[];
@@ -202,7 +207,7 @@ function CourseReader({ id, courseQuery }: { id: string; courseQuery: string }) 
     course={{ ...course.data, chapterCount: course.data.chapters.length, taskCount: course.data.totalExercises,
       completedTasks: course.data.completedExercises }}
     chapters={course.data.chapters.map(chapter => ({
-      id: chapter.id, title: chapter.title, content: chapter.body, localizations: chapter.localizations, completed: chapter.read,
+      id: chapter.id, title: chapter.title, sectionKey: chapter.sectionKey, content: chapter.body, localizations: chapter.localizations, completed: chapter.read,
       problems: chapter.problems.map(problem => ({ id: problem.problemId, title: problem.title, completed: problem.solved,
         href: `/practice/problems?${new URLSearchParams({ problemId: problem.problemId, versionId: problem.versionId,
           publicCourseId: id, publicChapterId: chapter.id, ...(courseQuery && { courseQ: courseQuery }) })}`,

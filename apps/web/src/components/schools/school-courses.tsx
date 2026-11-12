@@ -706,7 +706,7 @@ function CourseReader({ school, base, id, preview = false, onBack }: {
     {preview && <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground"><Button size="sm" variant="ghost" onClick={onBack}><ArrowLeft size={14}/>{text("Courses", "课程")}</Button>{text("Student preview", "学生预览")}</div>}
     <LearningCourseReader
       course={{ ...course, taskCount: course.totalExercises, completedTasks: course.completedExercises }}
-      chapters={course.chapters.map(item => ({ id: item.id, title: item.title, content: item.body, localizations: item.localizations, completed: Boolean(item.read),
+      chapters={course.chapters.map(item => ({ id: item.id, title: item.title, sectionKey: item.sectionKey, content: item.body, localizations: item.localizations, completed: Boolean(item.read),
         problems: (item.problems ?? []).map(problem => ({ id: problem.problemId, title: problem.title ?? problem.problemId,
           completed: problem.solved, available: Boolean(problem.available), href: readerHref(item.id, problem.problemId) })),
       }))}

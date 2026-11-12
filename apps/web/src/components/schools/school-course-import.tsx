@@ -83,6 +83,7 @@ export function SchoolCourseImport({
                   title: doc.title,
                   description: doc.description,
                   localizations: doc.localizations,
+                  sections: doc.sections,
                   category: doc.category,
                   requiredLanguage: doc.requiredLanguage,
                   difficulty: doc.difficulty ?? "beginner",
@@ -97,6 +98,7 @@ export function SchoolCourseImport({
                     id: crypto.randomUUID(),
                     title: c.title,
                     localizations: c.localizations,
+                    sectionKey: c.sectionKey,
                     acslLinks: c.acslLinks,
                     body: [
                       c.objective &&

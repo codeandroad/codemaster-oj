@@ -8,7 +8,8 @@ import { LearningProgressSummary } from "@/components/learning-course";
 import { AppLink } from "@/components/navigation";
 import { PageHeader } from "@/components/page-chrome";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { chapterDirectoryTitle } from "@/lib/learning-chapter-title";
+import { CourseDirectory } from "@/components/course-directory";
+import { orderCourseChapters, type CourseSection } from "@/components/course-sections";
 import { Empty, Feedback, LessonContent, panel, useMutation } from "./shared";
 import { CourseLanguageControl, useCourseLanguage } from "@/components/course-language";
 import { localizedCourse, localizedChapter, type CourseLocalizations, type ChapterLocalizations } from "@/components/course-localization";
@@ -26,6 +27,7 @@ export interface ReaderChapter {
   title: string;
   content: string;
   completed: boolean;
+  sectionKey?: string | null;
   objective?: string;
   checkpoint?: string;
   checkpointAnswer?: string;
@@ -38,7 +40,7 @@ export function LearningCourseReader({
   course: sourceCourse, chapters: sourceChapters, selectedChapterId, chapterHref, onRead, canTrackProgress = true,
   metadata, relatedActivities, extraPractice, chapterResources, scrollKey,
 }: {
-  course: { title: string; description: string; chapterCount: number; completedChapters: number; taskCount: number; completedTasks: number; localizations?: CourseLocalizations };
+  course: { title: string; description: string; chapterCount: number; completedChapters: number; taskCount: number; completedTasks: number; localizations?: CourseLocalizations; sections?: CourseSection[] };
   chapters: ReaderChapter[];
   selectedChapterId?: string | null;
   chapterHref: (chapterId: string) => string;
@@ -54,7 +56,7 @@ export function LearningCourseReader({
   const text = (zh: string, en: string) => locale === "en" ? en : zh;
   const { language, setLanguage } = useCourseLanguage();
   const course = localizedCourse(sourceCourse, language);
-  const chapters = sourceChapters.map(item => localizedChapter(item, language));
+  const chapters = orderCourseChapters(sourceCourse.sections, sourceChapters).map(item => localizedChapter(item, language));
   const directoryRef = useRef<HTMLDivElement>(null);
   const chapter = selectedChapterId
     ? chapters.find(item => item.id === selectedChapterId)
@@ -86,14 +88,8 @@ export function LearningCourseReader({
       container.scrollTop += top - (container.clientHeight - activeRect.height) / 2;
   }, [chapter?.id]);
 
-  const directory = <nav className="p-2" aria-label={text("章节目录", "Chapter directory")}>
-    {chapters.map((item, itemIndex) => <AppLink key={item.id} href={chapterHref(item.id)}
-      aria-current={item.id === chapter?.id ? "page" : undefined}
-      className={`flex items-center justify-between gap-2 rounded-md px-3 py-2 text-sm ${item.id === chapter?.id ? "bg-accent font-semibold text-primary" : "text-muted-foreground hover:bg-surface-subtle"}`}>
-      <span className="min-w-0 flex-1 break-words">{chapterDirectoryTitle(item.title, itemIndex)}</span>
-      {item.completed && <CheckCircle2 size={15} className="shrink-0 text-success" aria-label={text("本章已读", "Chapter read")}/>}
-    </AppLink>)}
-  </nav>;
+  const directory = <CourseDirectory sections={course.sections} chapters={chapters} language={language} locale={locale}
+    selectedId={chapter?.id} chapterHref={chapterHref}/>;
 
   return <>
     <PageHeader className="course-detail-header" title={chapter?.title ?? course.title} description={course.description}/>

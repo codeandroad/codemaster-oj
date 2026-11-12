@@ -14,8 +14,8 @@ export function PageBreadcrumbs({ pathname, role }: { pathname: string; role: Br
   const items = pageBreadcrumbs(pathname, role, locale, title, search);
   return <nav aria-label={locale === "en" ? "Breadcrumb" : "当前位置"} data-od-id="page-breadcrumbs" className="min-w-0 flex-1 text-sm">
     <ol className="flex min-w-0 items-center gap-1.5">
-      {items.map((item, index) => <li key={item.href} className={`flex min-w-0 items-center gap-1.5 ${index === items.length - 1 ? "flex-1" : "shrink-0 max-sm:max-w-[95px]"}`}>
-        {index > 0 && <ChevronRight size={14} aria-hidden="true" className="shrink-0 text-muted-foreground/60"/>}
+      {items.map((item, index) => <li key={item.href} className={`min-w-0 items-center gap-1.5 ${index === items.length - 1 ? "flex flex-1" : "hidden shrink-0 sm:flex"}`}>
+        {index > 0 && <ChevronRight size={14} aria-hidden="true" className="hidden shrink-0 text-muted-foreground/60 sm:block"/>}
         {index === items.length - 1
           ? <span aria-current="page" title={item.label} className="block min-w-0 truncate font-semibold text-foreground">{item.label}</span>
           : <AppLink href={item.href} title={item.label} className="block min-w-0 truncate text-muted-foreground hover:text-primary focus-visible:underline">{item.label}</AppLink>}

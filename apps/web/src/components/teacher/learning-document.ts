@@ -1,12 +1,13 @@
+import { parseCourseSections, parseSectionKey, validateChapterSections, type CourseSection } from "../course-sections.ts";
 import {parse,stringify} from "yaml";
 import type {CoursePaper4Reference} from "../course-paper4";
 import { parseCourseLocalizations, parseChapterLocalizations, type CourseLocalizations, type ChapterLocalizations } from "../course-localization.ts";
 import { parseCourseAcslReferences, type CourseAcslReference } from "../course-acsl.ts";
 import { supportedLanguages } from "../student/languages.ts";
 import type { SubmissionLanguage } from "@/lib/production-api";
-export interface LearningDocumentChapter {title:string;objective:string;content:string;checkpoint:string;checkpointAnswer:string;problemIds:string[];paper4Links?:CoursePaper4Reference[];localizations?:ChapterLocalizations;acslLinks?:CourseAcslReference[];}
-export interface LearningDocument {format:"codemaster-learning-path";version:1;localizations?:CourseLocalizations;title:string;description:string;category:string;requiredLanguage?:SubmissionLanguage|null;estimatedMinutes:number;difficulty?:"beginner"|"intermediate"|"advanced";coverKey?:"python"|"algorithms"|"general";authorName?:string;authoredAt?:string|null;coverImage?:string|null;chapters:LearningDocumentChapter[];}
-const sectionNames:Record<string,keyof LearningDocumentChapter>={"学习目标":"objective","正文":"content","检查点":"checkpoint","参考答案":"checkpointAnswer","关联题目":"problemIds","Paper 4 练习":"paper4Links","双语内容":"localizations","ACSL 练习":"acslLinks"};
+export interface LearningDocumentChapter {sectionKey?:string|null;title:string;objective:string;content:string;checkpoint:string;checkpointAnswer:string;problemIds:string[];paper4Links?:CoursePaper4Reference[];localizations?:ChapterLocalizations;acslLinks?:CourseAcslReference[];}
+export interface LearningDocument {format:"codemaster-learning-path";version:1;sections?:CourseSection[];localizations?:CourseLocalizations;title:string;description:string;category:string;requiredLanguage?:SubmissionLanguage|null;estimatedMinutes:number;difficulty?:"beginner"|"intermediate"|"advanced";coverKey?:"python"|"algorithms"|"general";authorName?:string;authoredAt?:string|null;coverImage?:string|null;chapters:LearningDocumentChapter[];}
+const sectionNames:Record<string,keyof LearningDocumentChapter>={"所属专题":"sectionKey","学习目标":"objective","正文":"content","检查点":"checkpoint","参考答案":"checkpointAnswer","关联题目":"problemIds","Paper 4 练习":"paper4Links","双语内容":"localizations","ACSL 练习":"acslLinks"};
 export function parseCoursePaper4References(value:unknown):CoursePaper4Reference[] {
  if(!Array.isArray(value)||value.length>100)throw Error("Paper 4 练习须为最多 100 项的 JSON 数组。");
  const id=(item:unknown)=>typeof item==="string"&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item);
@@ -24,6 +25,7 @@ export function parseLearningMarkdown(input:string):LearningDocument {
  const meta=parse(match[1]);if(!meta||meta.format!=="codemaster-learning-path"||meta.version!==1)throw Error("仅支持 codemaster-learning-path 版本 1。");
  const str=(v:unknown,name:string,max:number,required=false)=>{if(typeof v!=="string"||v.length>max||required&&!v.trim())throw Error(`${name}缺失或过长。`);return v.trim();};
  const doc:LearningDocument={format:"codemaster-learning-path",version:1,title:str(meta.title,"路径标题",200,true),description:str(meta.description??"","描述",4000),category:str(meta.category??"Python","分类",100,true),estimatedMinutes:meta.estimatedMinutes,chapters:[]};
+ if(meta.sections!==undefined)doc.sections=parseCourseSections(meta.sections);
  if(meta.localizations!==undefined)doc.localizations=parseCourseLocalizations(meta.localizations);
  if(meta.requiredLanguage!==undefined){
   if(meta.requiredLanguage!==null&&!supportedLanguages.includes(meta.requiredLanguage))throw Error("必用编程语言无效。");
@@ -44,11 +46,11 @@ export function parseLearningMarkdown(input:string):LearningDocument {
  }
  if(!Number.isInteger(doc.estimatedMinutes)||doc.estimatedMinutes<1||doc.estimatedMinutes>10080)throw Error("预计时长须为 1–10080 分钟。");
  let chapter:LearningDocumentChapter|null=null,key:keyof LearningDocumentChapter="content",buffer:string[]=[],fence:{char:string;length:number}|null=null,seen=new Set<string>();
- const flush=()=>{if(!chapter)return;const value=buffer.join("\n").trim();if(key==="problemIds"){const ids=value?JSON.parse(value):[];if(!Array.isArray(ids)||ids.length>100||ids.some(id=>typeof id!=="string"||!/^[-0-9a-f]{36}$/i.test(id)))throw Error("关联题目须为最多 100 个 UUID 的 JSON 数组。");chapter.problemIds=ids;}else if(key==="paper4Links")chapter.paper4Links=parseCoursePaper4References(value?JSON.parse(value):[]);else if(key==="localizations")chapter.localizations=parseChapterLocalizations(value?JSON.parse(value):{});else if(key==="acslLinks")chapter.acslLinks=parseCourseAcslReferences(value?JSON.parse(value):[]);else chapter[key]=value;buffer=[];};
+ const flush=()=>{if(!chapter)return;const value=buffer.join("\n").trim();if(key==="problemIds"){const ids=value?JSON.parse(value):[];if(!Array.isArray(ids)||ids.length>100||ids.some(id=>typeof id!=="string"||!/^[-0-9a-f]{36}$/i.test(id)))throw Error("关联题目须为最多 100 个 UUID 的 JSON 数组。");chapter.problemIds=ids;}else if(key==="paper4Links")chapter.paper4Links=parseCoursePaper4References(value?JSON.parse(value):[]);else if(key==="localizations")chapter.localizations=parseChapterLocalizations(value?JSON.parse(value):{});else if(key==="acslLinks")chapter.acslLinks=parseCourseAcslReferences(value?JSON.parse(value):[]);else if(key==="sectionKey")chapter.sectionKey=parseSectionKey(value.startsWith('"')||value==="null"?JSON.parse(value):value);else chapter[key]=value;buffer=[];};
  for(const line of text.slice(match[0].length).split("\n")){
   const fm=line.match(/^\s*(`{3,}|~{3,})(.*)$/);if(fm){if(!fence)fence={char:fm[1][0],length:fm[1].length};else if(fm[1][0]===fence.char&&fm[1].length>=fence.length&&!fm[2].trim())fence=null;buffer.push(line);continue;}
   if(!fence){const heading=line.match(/^## 章节：[ \t]*(.+)$/);if(heading){flush();chapter={title:str(heading[1],"章节标题",200,true),objective:"",content:"",checkpoint:"",checkpointAnswer:"",problemIds:[]};doc.chapters.push(chapter);seen=new Set();key="content";buffer=[];continue;}
-   const section=line.match(/^### (学习目标|正文|检查点|参考答案|关联题目|Paper 4 练习|双语内容|ACSL 练习)\s*$/);if(section){if(!chapter)throw Error("章节字段必须在章节标题之后。");flush();if(seen.has(section[1]))throw Error(`章节「${chapter.title}」有重复字段：${section[1]}`);seen.add(section[1]);key=sectionNames[section[1]];continue;}
+   const section=line.match(/^### (所属专题|学习目标|正文|检查点|参考答案|关联题目|Paper 4 练习|双语内容|ACSL 练习)\s*$/);if(section){if(!chapter)throw Error("章节字段必须在章节标题之后。");flush();if(seen.has(section[1]))throw Error(`章节「${chapter.title}」有重复字段：${section[1]}`);seen.add(section[1]);key=sectionNames[section[1]];continue;}
   }
   if(chapter)buffer.push(line);else if(line.trim()&&!line.startsWith("# "))throw Error("章节前只能有文档主标题；请使用「## 章节：标题」。");
  }
@@ -56,10 +58,11 @@ export function parseLearningMarkdown(input:string):LearningDocument {
  if(!doc.chapters.length||doc.chapters.length>100)throw Error("文档需包含 1–100 个章节。");
  for(const c of doc.chapters){if(!c.content.trim())throw Error(`章节「${c.title}」缺少正文。`);if(c.objective.length>4000||c.checkpoint.length>10000||c.checkpointAnswer.length>10000||new TextEncoder().encode(c.content).length>262144)throw Error(`章节「${c.title}」内容过长。`);}
  if(new TextEncoder().encode(JSON.stringify(doc)).length>1572864)throw Error("文档不得超过 1.5 MiB。");
+ validateChapterSections(doc.sections,doc.chapters);
  return doc;
 }
 export function serializeLearningMarkdown(doc:LearningDocument):string {
  const {chapters,...meta}=doc;
- return `---\n${stringify(meta).trim()}\n---\n\n# ${doc.title}\n\n`+chapters.map(c=>`## 章节：${c.title}\n\n### 学习目标\n\n${c.objective.trim()}\n\n### 正文\n\n${c.content.trim()}\n\n### 检查点\n\n${c.checkpoint.trim()}\n\n### 参考答案\n\n${c.checkpointAnswer.trim()}\n\n### 关联题目\n\n${JSON.stringify(c.problemIds)}\n${c.localizations?`\n### 双语内容\n\n${JSON.stringify(c.localizations)}\n`:""}${c.acslLinks?.length?`\n### ACSL 练习\n\n${JSON.stringify(c.acslLinks)}\n`:""}${c.paper4Links?.length?`\n### Paper 4 练习\n\n${JSON.stringify(c.paper4Links)}\n`:""}`).join("\n");
+ return `---\n${stringify(meta).trim()}\n---\n\n# ${doc.title}\n\n`+chapters.map(c=>`## 章节：${c.title}\n\n### 学习目标\n\n${c.objective.trim()}\n\n### 正文\n\n${c.content.trim()}\n\n### 检查点\n\n${c.checkpoint.trim()}\n\n### 参考答案\n\n${c.checkpointAnswer.trim()}\n\n### 关联题目\n\n${JSON.stringify(c.problemIds)}\n${c.sectionKey!==undefined?`\n### 所属专题\n\n${JSON.stringify(c.sectionKey)}\n`:""}${c.localizations?`\n### 双语内容\n\n${JSON.stringify(c.localizations)}\n`:""}${c.acslLinks?.length?`\n### ACSL 练习\n\n${JSON.stringify(c.acslLinks)}\n`:""}${c.paper4Links?.length?`\n### Paper 4 练习\n\n${JSON.stringify(c.paper4Links)}\n`:""}`).join("\n");
 }
 export function downloadLearningMarkdown(doc:LearningDocument){const markdown=serializeLearningMarkdown(doc);parseLearningMarkdown(markdown);const blob=new Blob([markdown],{type:"text/markdown;charset=utf-8"});const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=doc.title.replace(/[\\/:*?"<>|]/g,"-")+".md";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}

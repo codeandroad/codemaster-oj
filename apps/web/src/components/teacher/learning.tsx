@@ -8,7 +8,9 @@ import { CourseProgrammingLanguageField } from "./course-programming-language-fi
 import { CourseAdmissionsDialog } from "@/components/schools/course-admissions-dialog";
 import { CoursePaper4Picker } from "./course-paper4-picker";
 import { coursePaper4LinkKey, coursePaper4References, coursePaper4UnitCount, mergeCoursePaper4Links, type CoursePaper4Link } from "@/components/course-paper4";
-import { chapterDirectoryTitle } from "@/lib/learning-chapter-title";
+import { CourseDirectory } from "@/components/course-directory";
+import { CourseSectionsEditor, ChapterSectionSelect } from "@/components/course-sections-editor";
+import { canonicalCourseHref, courseChapterNeighbor, orderCourseChapters, parseCourseSections, validateChapterSections, type CourseSection } from "@/components/course-sections";
 import { LearningChapterContent } from "../student/learning-course-reader";
 import { CourseLanguageControl, useCourseLanguage } from "@/components/course-language";
 import { localizedChapter, parseChapterLocalizations, type CourseLocalizations, type ChapterLocalizations } from "@/components/course-localization";
@@ -84,6 +86,7 @@ function mergeReviewStatus(local: Chapter[], previous: Chapter[], fresh: Chapter
   }) }));
 }
 interface Chapter {
+  sectionKey?: string | null;
   id: string;
   title: string;
   content: string;
@@ -97,6 +100,10 @@ interface Chapter {
   acslLinks?: CourseAcslLink[];
 }
 interface Path extends CourseAccessMetadata {
+  sections?: CourseSection[];
+  redirectedFromCourseId?: string;
+  redirectedChapterId?: string;
+  mergedIntoCourseId?: string;
   localizations?: CourseLocalizations;
   id: string;
   archived?:boolean;
@@ -168,11 +175,11 @@ export function TeacherLearning({ canManageAdmissions = false }: { canManageAdmi
                   access={<CourseAccessSummary course={path}/>}
                   status={<StatusPill status={courseStatus(path, locale)}/>}
                   actions={<>
-                    <Link className={link} href={`/teacher/courses/${path.id}`}>{path.archived ? tx("查看", "View") : path.canEdit ? t("编辑") : t("查看")}</Link>
+                    <Link className={link} href={`/teacher/courses/${path.mergedIntoCourseId ?? path.id}`}>{path.mergedIntoCourseId ? tx("打开合并课程", "Open combined course") : path.archived ? tx("查看", "View") : path.canEdit ? t("编辑") : t("查看")}</Link>
                     {!path.archived && <Link className={`${link} ml-4`} href={`/teacher/courses/${path.id}?preview=1`}>{t("学生预览")}</Link>}
                     {canManageAdmissions && path.published && !path.archived &&
                       <Button size="sm" variant="ghost" onClick={() => setAdmissionTarget(path)}>{tx("课程准入", "Course admissions")}</Button>}
-                    {path.canEdit && <Button size="sm" variant="ghost" disabled={action.busy} onClick={() => setArchiveTarget(path)}>{path.archived ? tx("恢复", "Restore") : tx("归档", "Archive")}</Button>}
+                    {path.canEdit && !path.mergedIntoCourseId && <Button size="sm" variant="ghost" disabled={action.busy} onClick={() => setArchiveTarget(path)}>{path.archived ? tx("恢复", "Restore") : tx("归档", "Archive")}</Button>}
                   </>}
                 />
               ))}
@@ -485,6 +492,15 @@ function ResourceEditor({
 export function TeacherLearningEditor({ id }: { id: string }) {
   const resource = useData<Path>(`learning-paths/${id}`);
   const reload = resource.reload;
+  const router = useRouter();
+  useEffect(() => {
+    if (!resource.data?.redirectedFromCourseId) return;
+    const href = canonicalCourseHref(`${window.location.pathname}${window.location.search}${window.location.hash}`, id, resource.data.id);
+    if (!href) return;
+    const target = new URL(href, window.location.origin);
+    if (!target.searchParams.has("chapter") && resource.data.redirectedChapterId) target.searchParams.set("chapter", resource.data.redirectedChapterId);
+    router.replace(`${target.pathname}${target.search}${target.hash}`);
+  }, [id, resource.data, router]);
   useEffect(() => {
     const onFocus = () => reload();
     window.addEventListener("focus", onFocus);
@@ -516,8 +532,9 @@ function LearningEditorForm({
   const search = useSearchParams(),
     [path, setPath] = useState(initial),
     [chapters, setChapters] = useState(initial.chapters ?? []),
+    [sections, setSections] = useState<CourseSection[]>(initial.sections ?? []),
     [current, setCurrent] = useState(
-      search.get("chapter") ?? initial.chapters?.[0]?.id ?? "",
+      search.get("chapter") ?? initial.redirectedChapterId ?? initial.chapters?.[0]?.id ?? "",
     ),
     [preview, setPreview] = useState(search.get("preview") === "1"),
     [picker, setPicker] = useState(false),
@@ -540,11 +557,12 @@ function LearningEditorForm({
     })),
     JSON.stringify([path.id, batchPublishOpen, batchPublishLoading]),
   );
-  const localCourse = useRef({ path, chapters });
-  useEffect(() => { localCourse.current = { path, chapters }; }, [path, chapters]);
+  const localCourse = useRef({ path, chapters, sections });
+  useEffect(() => { localCourse.current = { path, chapters, sections }; }, [path, chapters, sections]);
   useEffect(() => {
     const previous = localCourse.current;
     setPath(initial);
+    setSections(JSON.stringify(previous.sections) === JSON.stringify(previous.path.sections ?? []) ? initial.sections ?? [] : previous.sections);
     setChapters(mergeReviewStatus(previous.chapters, previous.path.chapters ?? [], initial.chapters ?? []));
   }, [initial]);
   const canEditCourse = path.canEdit && !path.archived;
@@ -559,7 +577,7 @@ function LearningEditorForm({
   }, [path.archived]);
   const chapter = chapters.find((x) => x.id === current) ?? chapters[0],
     selectedIndex = chapters.findIndex((x) => x.id === chapter?.id),
-    dirty = JSON.stringify(chapters) !== JSON.stringify(path.chapters ?? []);
+    dirty = JSON.stringify(chapters) !== JSON.stringify(path.chapters ?? []) || JSON.stringify(sections) !== JSON.stringify(path.sections ?? []);
   const linkedByProblem = new Map<string, ChapterProblem[]>();
   for (const problem of chapters.flatMap((item) => item.problems)) {
     linkedByProblem.set(problem.problemId, [...(linkedByProblem.get(problem.problemId) ?? []), problem]);
@@ -587,10 +605,31 @@ function LearningEditorForm({
     setChapters((xs) =>
       xs.map((x) => (x.id === chapter?.id ? { ...x, [key]: value } : x)),
     );
+  const moveChapter = (direction: -1 | 1) => {
+    const target = courseChapterNeighbor(chapters, selectedIndex, direction);
+    if (target < 0) return;
+    const next = [...chapters]; [next[selectedIndex], next[target]] = [next[target], next[selectedIndex]];
+    setChapters(next);
+  };
   const save = async () => {
     if (!canEditCourse) throw new Error(tr("已归档课程只能查看；请先在课程列表中恢复。", "Archived courses are read-only. Restore the course from the list first."));
-    for (let position = 0; position < chapters.length; position++) {
-      const item = chapters[position]!;
+    const nextSections = parseCourseSections(sections);
+    validateChapterSections(nextSections, chapters);
+    // Register new topics first, then move lessons before removing their old topics.
+    const stagedSections = [...nextSections, ...(path.sections ?? []).filter(section => !nextSections.some(next => next.key === section.key)).map(section => {
+      const group = nextSections.find(next => section.groupKey && next.groupKey === section.groupKey);
+      if (!group) return section;
+      const localizations = { ...section.localizations };
+      for (const language of ["en", "zh"] as const) {
+        const groupTitle = nextSections.find(next => next.groupKey === group.groupKey && next.localizations?.[language]?.groupTitle)?.localizations?.[language]?.groupTitle;
+        if (groupTitle) localizations[language] = { title: localizations[language]?.title ?? section.title, groupTitle };
+      }
+      return { ...section, groupTitle: group.groupTitle, localizations };
+    })];
+    if (JSON.stringify(stagedSections) !== JSON.stringify(path.sections ?? [])) await productionApi(`learning-paths/${path.id}`, { method: "PATCH", body: { sections: stagedSections } });
+    const ordered = orderCourseChapters(nextSections, chapters);
+    for (let position = 0; position < ordered.length; position++) {
+      const item = ordered[position]!;
       const result = await productionApi<Chapter>(
         item.id.startsWith("new-")
           ? `learning-paths/${path.id}/chapters`
@@ -599,6 +638,7 @@ function LearningEditorForm({
           method: item.id.startsWith("new-") ? "POST" : "PATCH",
           body: {
             title: item.title,
+            sectionKey: item.sectionKey ?? null,
             content: item.content,
             objective: item.objective ?? "",
             checkpoint: item.checkpoint ?? "",
@@ -620,8 +660,10 @@ function LearningEditorForm({
         ),
       );
     }
+    if (stagedSections.length !== nextSections.length) await productionApi(`learning-paths/${path.id}`, { method: "PATCH", body: { sections: nextSections } });
     const fresh = await productionApi<Path>(`learning-paths/${path.id}`);
     setPath(fresh);
+    setSections(fresh.sections ?? []);
     setChapters(fresh.chapters ?? []);
     onSaved();
     return fresh;
@@ -780,7 +822,7 @@ function LearningEditorForm({
         <div className="min-w-0 flex-1 space-y-1"><CourseAccessSummary course={path} showAuthor/><p className="text-xs text-muted-foreground">{t(courseDifficulties[path.difficulty??"beginner"])} · {chapters.length} {t("章")} · {path.estimatedMinutes??30} {tr("分钟", "minutes")}</p></div>
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <Button variant="secondary" size="sm" disabled={!path.canEdit} onClick={()=>setProgressOpen(true)}>{t("查看学生进度总览")}</Button>
-        <Button size="sm" variant="secondary" onClick={()=>{const doc:LearningDocument={format:"codemaster-learning-path",version:1,localizations:path.localizations,title:path.title,description:path.description,category:path.category,requiredLanguage:path.requiredLanguage,estimatedMinutes:path.estimatedMinutes??30,difficulty:path.difficulty??"beginner",coverKey:path.coverKey??"general",authorName:path.authorName,authoredAt:path.authoredAt,coverImage:path.coverImage,chapters:chapters.map(c=>({localizations:c.localizations,acslLinks:courseAcslReferences(c.acslLinks),title:c.title,content:c.content,objective:c.objective??"",checkpoint:c.checkpoint??"",checkpointAnswer:c.checkpointAnswer??"",problemIds:c.problems.map(p=>p.problemId),paper4Links:coursePaper4References(c.paper4Links)}))};void action.run(async()=>{downloadLearningMarkdown(doc);return t("已导出当前编辑内容（包括未保存修改）。");});}}>{t("导出 Markdown")}</Button>
+        <Button size="sm" variant="secondary" onClick={()=>{const doc:LearningDocument={format:"codemaster-learning-path",version:1,sections,localizations:path.localizations,title:path.title,description:path.description,category:path.category,requiredLanguage:path.requiredLanguage,estimatedMinutes:path.estimatedMinutes??30,difficulty:path.difficulty??"beginner",coverKey:path.coverKey??"general",authorName:path.authorName,authoredAt:path.authoredAt,coverImage:path.coverImage,chapters:orderCourseChapters(sections,chapters).map(c=>({sectionKey:c.sectionKey,localizations:c.localizations,acslLinks:courseAcslReferences(c.acslLinks),title:c.title,content:c.content,objective:c.objective??"",checkpoint:c.checkpoint??"",checkpointAnswer:c.checkpointAnswer??"",problemIds:c.problems.map(p=>p.problemId),paper4Links:coursePaper4References(c.paper4Links)}))};void action.run(async()=>{downloadLearningMarkdown(doc);return t("已导出当前编辑内容（包括未保存修改）。");});}}>{t("导出 Markdown")}</Button>
         <Button size="sm" variant="secondary" disabled={!canEditCourse} onClick={() => setMetadata(true)}>
           {tr("课程属性与开放", "Properties and access")}
         </Button>
@@ -789,6 +831,7 @@ function LearningEditorForm({
       </div>
       {progressOpen&&<LearningProgressDialog id={path.id} onClose={()=>setProgressOpen(false)}/>}
       {canEditCourse&&canUseLegacyPythonPractice(path)&&<PythonPracticePanel id={path.id} bundle={path.practiceBundle??[]} disabled={dirty||action.busy} onRefreshStatus={async()=>{const fresh=await productionApi<Path>(`learning-paths/${path.id}`);setPath(current=>({...current,practiceBundle:fresh.practiceBundle}));}} onUpdated={async()=>{const fresh=await productionApi<Path>(`learning-paths/${path.id}`);setPath(fresh);setChapters(fresh.chapters??[]);}}/>}
+      <div className="mt-5"><CourseSectionsEditor sections={sections} chapters={chapters} onChange={setSections} disabled={!canEditCourse || action.busy}/></div>
       <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
         <aside className={`${panel} self-start lg:sticky lg:top-5`}>
           <div className="flex justify-between border-b border-border p-3">
@@ -803,6 +846,7 @@ function LearningEditorForm({
                   {
                     id,
                     title: t("新章节"),
+                    sectionKey: chapter?.sectionKey ?? sections[0]?.key ?? null,
                     content: "",
                     position: x.length,
                     objective: "",
@@ -819,19 +863,7 @@ function LearningEditorForm({
               {t("新增")}
             </Button>
           </div>
-          <div className="max-h-[60dvh] overflow-y-auto">{chapters.map((x, i) => (
-            <button
-              key={x.id}
-              onClick={() => setCurrent(x.id)}
-              className={`flex w-full items-start gap-3 border-b border-border px-3 py-3 text-left text-sm leading-5 ${x.id === chapter?.id ? "bg-accent font-semibold text-primary" : ""}`}
-            >
-              <span className="min-w-0 flex-1 break-words">
-                {chapterDirectoryTitle(x.title, i)}
-              </span>
-              <span className="shrink-0 whitespace-nowrap text-xs leading-5 tabular-nums text-muted-foreground">{x.problems.length + coursePaper4UnitCount(x.paper4Links)} {t("题")}</span>
-            </button>
-          ))}
-          </div>
+          <div className="max-h-[60dvh] overflow-y-auto"><CourseDirectory sections={sections} chapters={chapters.map(item => localizedChapter(item, language))} language={language} locale={locale} selectedId={chapter?.id} onSelect={setCurrent} showProgress={false}/></div>
           {!chapters.length && (
             <p className="p-4 text-sm text-muted-foreground">
               {t("暂无章节，点击“新增”开始编写。")}
@@ -852,8 +884,8 @@ function LearningEditorForm({
                 size="icon"
                 variant="secondary"
                 title={t("章节上移")}
-                disabled={selectedIndex === 0 || !canEditCourse}
-                onClick={() => setChapters(move(chapters, selectedIndex, -1))}
+                disabled={courseChapterNeighbor(chapters, selectedIndex, -1) < 0 || !canEditCourse}
+                onClick={() => moveChapter(-1)}
               >
                 <ArrowUp size={15} />
               </Button>
@@ -862,9 +894,9 @@ function LearningEditorForm({
                 variant="secondary"
                 title={t("章节下移")}
                 disabled={
-                  selectedIndex === chapters.length - 1 || !canEditCourse
+                  courseChapterNeighbor(chapters, selectedIndex, 1) < 0 || !canEditCourse
                 }
-                onClick={() => setChapters(move(chapters, selectedIndex, 1))}
+                onClick={() => moveChapter(1)}
               >
                 <ArrowDown size={15} />
               </Button>
@@ -892,6 +924,7 @@ function LearningEditorForm({
               </Button>
             </div>
             <div className="mt-5 grid gap-4">
+              <ChapterSectionSelect sections={sections} value={chapter.sectionKey} onChange={key => update("sectionKey", key)} disabled={!canEditCourse || action.busy}/>
               <Field label={t("学习目标")}>
                 <textarea
                   value={chapter.objective ?? ""}
@@ -1073,7 +1106,9 @@ function LearningEditorForm({
               ← {t("返回原编辑位置")}
             </Button>
           </div>
-          <article className="relative z-0 isolate mx-auto max-w-3xl p-4 sm:p-8">
+          <div className="relative z-0 isolate mx-auto grid max-w-7xl gap-5 p-4 sm:p-8 lg:grid-cols-[280px_minmax(0,1fr)]">
+          <aside className="self-start rounded-md border border-border bg-surface"><CourseDirectory sections={sections} chapters={chapters.map(item => localizedChapter(item, language))} language={language} locale={locale} selectedId={chapter?.id} onSelect={setCurrent} showProgress={false}/></aside>
+          <article className="min-w-0">
             {chapter && <LearningChapterContent chapter={localizedChapter(chapter, language)}/>}
             <h2 className="mt-6 font-bold">{t("相关练习")}</h2>
             {chapter?.problems.map((x) => (
@@ -1085,6 +1120,7 @@ function LearningEditorForm({
             {(chapter?.paper4Links ?? []).map(item => <div key={coursePaper4LinkKey(item)} className="mt-3 rounded-md border border-border p-3 text-sm"><p className="font-semibold text-primary">{item.title}{item.questionKey && ` · ${item.questionKey} · ${item.questionTitle ?? item.questions[0]?.title ?? ""}`}</p><p className="mt-1 text-muted-foreground">{item.questionKey ? tr("指定大题", "Selected question") : tr("整套试卷", "Whole paper")} · v{item.versionNumber ?? "—"} · {item.questions.length} {tr("道大题", "questions")}</p></div>)}
             {(chapter?.acslLinks ?? []).map(item => <p key={`${item.paperSlug}:${item.kind}:${item.questionId ?? ""}`} className="mt-3 rounded-md border border-border p-3 text-sm">{courseAcslLabel(item, language)}</p>)}
           </article>
+          </div>
         </div>
       )}
       {metadata && canEditCourse && <CourseSettingsDialog course={path} onClose={() => setMetadata(false)} onSaved={saved => { setPath(current => ({ ...current, ...saved })); onSaved(); }}/>}

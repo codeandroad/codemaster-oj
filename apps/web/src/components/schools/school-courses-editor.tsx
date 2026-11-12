@@ -1,5 +1,7 @@
 "use client";
 
+import { CourseSectionsEditor, ChapterSectionSelect } from "@/components/course-sections-editor";
+import { parseCourseSections, validateChapterSections, orderCourseChapters, courseChapterNeighbor } from "@/components/course-sections";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ArrowDown, ArrowUp, Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import {
@@ -55,12 +57,13 @@ function inputFor(course?: CourseDetail): CourseInput {
         title: course.title,
         description: course.description,
         localizations: course.localizations,
+        sections: course.sections,
         accessScope: course.accessScope,
         classIds: [...course.classIds],
-        chapters: course.chapters.map(({ id, title, body, problems, localizations, acslLinks }) => ({
+        chapters: course.chapters.map(({ id, title, body, problems, localizations, acslLinks, sectionKey }) => ({
           id,
           title,
-          body, localizations, acslLinks,
+          body, localizations, acslLinks, sectionKey,
           problems: (problems ?? []).map(({ problemId, versionId }) => ({
             problemId,
             versionId,
@@ -158,7 +161,7 @@ export function SchoolCourseEditor({
     }));
   }
   function moveChapter(direction: -1 | 1) {
-    const target = chapterIndex + direction;
+    const target = courseChapterNeighbor(form.chapters, chapterIndex, direction);
     if (target < 0 || target >= form.chapters.length) return;
     setForm((previous) => {
       const chapters = [...previous.chapters];
@@ -198,13 +201,15 @@ export function SchoolCourseEditor({
       return;
     }
     try {
+      parseCourseSections(form.sections ?? []);
+      validateChapterSections(form.sections, form.chapters);
       if (form.localizations) parseCourseLocalizations(form.localizations);
       for (const item of form.chapters) if (item.localizations) parseChapterLocalizations(item.localizations);
     } catch (error) { setValidation(error instanceof Error ? error.message : text("Check translated content.", "请核对双语内容。")); return; }
     const payload = {
       ...form,
       title: form.title.trim(),
-      chapters: form.chapters.map((item) => ({
+      chapters: orderCourseChapters(form.sections, form.chapters).map((item) => ({
         ...item,
         title: item.title.trim(),
         acslLinks: courseAcslReferences(item.acslLinks),
@@ -497,6 +502,7 @@ export function SchoolCourseEditor({
                   </Button>
                 )}
               </div>
+              <CourseSectionsEditor sections={form.sections ?? []} chapters={form.chapters} onChange={sections => setForm(previous => ({ ...previous, sections }))} disabled={mutation.busy}/>
               <CourseTranslationFields value={form.localizations} onChange={localizations => setForm(previous => ({ ...previous, localizations }))} disabled={mutation.busy}/>
               {form.accessScope === "classes" && (
                 <div
@@ -533,6 +539,7 @@ export function SchoolCourseEditor({
                       id: crypto.randomUUID(),
                       title: text("New chapter", "新章节"),
                       body: "",
+                      sectionKey: chapter?.sectionKey ?? form.sections?.[0]?.key ?? null,
                     };
                     setForm((previous) => ({
                       ...previous,
@@ -562,7 +569,7 @@ export function SchoolCourseEditor({
                           setPreview(false);
                         }}
                       >
-                        {form.chapters.map((item, index) => (
+                        {orderCourseChapters(form.sections, form.chapters).map((item, index) => (
                           <option key={item.id} value={item.id}>
                             {index + 1}.{" "}
                             {item.title || text("Untitled", "未命名")}
@@ -574,7 +581,7 @@ export function SchoolCourseEditor({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      disabled={chapterIndex <= 0}
+                      disabled={courseChapterNeighbor(form.chapters, chapterIndex, -1) < 0}
                       title={text("Move chapter up", "章节上移")}
                       aria-label={text("Move chapter up", "章节上移")}
                       onClick={() => moveChapter(-1)}
@@ -585,7 +592,7 @@ export function SchoolCourseEditor({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      disabled={chapterIndex >= form.chapters.length - 1}
+                      disabled={courseChapterNeighbor(form.chapters, chapterIndex, 1) < 0}
                       title={text("Move chapter down", "章节下移")}
                       aria-label={text("Move chapter down", "章节下移")}
                       onClick={() => moveChapter(1)}
@@ -621,6 +628,7 @@ export function SchoolCourseEditor({
                       }
                     />
                   </label>
+                  <ChapterSectionSelect sections={form.sections ?? []} value={chapter.sectionKey} onChange={sectionKey => editChapter({ sectionKey })} disabled={mutation.busy}/>
                   <CourseAcslEditor schoolId={school.id} links={chapter.acslLinks ?? []} onChange={acslLinks => editChapter({ acslLinks })} disabled={mutation.busy}/>
                   <SchoolCourseProblemPicker
                     schoolId={school.id}

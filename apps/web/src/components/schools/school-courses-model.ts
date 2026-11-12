@@ -1,9 +1,11 @@
+import type { CourseSection } from "@/components/course-sections";
 import type { CourseLocalizations, ChapterLocalizations } from "@/components/course-localization";
 import type { CourseAcslLink } from "@/components/course-acsl";
 import { ApiError, type SubmissionLanguage } from "@/lib/production-api";
 import { useSchoolText } from "./school-ui";
 
 export type CourseChapter = {
+  sectionKey?: string | null;
   id: string;
   title: string;
   body: string;
@@ -30,6 +32,7 @@ export type CourseProperties = {
   authoredAt: string | null;
 };
 export type SchoolCourse = CourseProperties & {
+  sections?: CourseSection[];
   id: string;
   title: string;
   description: string;
@@ -56,7 +59,7 @@ export type CourseDetail = SchoolCourse & {
 export type CourseInput = CourseProperties &
   Pick<
     CourseDetail,
-    "title" | "description" | "localizations" | "accessScope" | "classIds" | "chapters"
+    "title" | "description" | "localizations" | "sections" | "accessScope" | "classIds" | "chapters"
   >;
 export type CoursePage<T> = { items: T[]; page: number; hasMore: boolean };
 

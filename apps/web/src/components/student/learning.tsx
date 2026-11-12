@@ -19,7 +19,9 @@ import { AppLink } from "@/components/navigation";
 import { LearningCourseReader } from "./learning-course-reader";
 
 import { Check, ChevronDown, ClipboardList } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { useEffect } from "react";
+import { canonicalCourseHref, type CourseSection } from "@/components/course-sections";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
 import { productionApi } from "@/lib/production-api";
 import { State, useData } from "./shared";
@@ -29,6 +31,7 @@ function ui(locale:AppLocale,zh:string,en:string){return locale==="en"?en:zh;}
 
 
 export interface LearningChapter {
+  sectionKey?: string | null;
   id: string; title: string; content: string; position: number; completed: boolean;
   objective?: string; checkpoint?: string; checkpointAnswer?: string; estimatedMinutes?: number;taskCount?:number;completedTasks?:number;
   paper4Links?: CoursePaper4Link[];
@@ -45,7 +48,7 @@ type CourseAssignment = {
   totalProblems?: number;
 };
 
-export interface LearningPath extends CourseAccessMetadata { localizations?: CourseLocalizations; id: string; title: string; description: string; category: string; published: boolean; chapterCount: number; completedChapters: number; canEdit: boolean;difficulty?:keyof typeof courseDifficulties;coverKey?:string;taskCount?:number;completedTasks?:number; chapters?: LearningChapter[]; assignments?: CourseAssignment[]; }
+export interface LearningPath extends CourseAccessMetadata { sections?: CourseSection[]; redirectedFromCourseId?: string; redirectedChapterId?: string; localizations?: CourseLocalizations; id: string; title: string; description: string; category: string; published: boolean; chapterCount: number; completedChapters: number; canEdit: boolean;difficulty?:keyof typeof courseDifficulties;coverKey?:string;taskCount?:number;completedTasks?:number; chapters?: LearningChapter[]; assignments?: CourseAssignment[]; }
 export function StudentLearningList(){
  const {locale}=useLocale();
  const {language}=useCourseLanguage();
@@ -73,22 +76,31 @@ export function StudentLearningDetail({ id, chapterId }: { id: string; chapterId
   const { locale } = useLocale();
   const { language } = useCourseLanguage();
   const path = useData<LearningPath>(`learning-paths/${id}`), search = useSearchParams();
-  const selected = chapterId ?? search.get("chapter");
+  const router = useRouter(), canonicalId = path.data?.id ?? id;
+  const selected = chapterId ?? search.get("chapter") ?? path.data?.redirectedChapterId;
+  useEffect(() => {
+    if (!path.data?.redirectedFromCourseId) return;
+    const href = canonicalCourseHref(`${window.location.pathname}${window.location.search}${window.location.hash}`, id, path.data.id);
+    if (!href) return;
+    const target = new URL(href, window.location.origin);
+    if (!chapterId && !target.searchParams.has("chapter") && path.data.redirectedChapterId) target.pathname = `/student/learning-paths/${path.data.id}/chapters/${path.data.redirectedChapterId}`;
+    router.replace(`${target.pathname}${target.search}${target.hash}`);
+  }, [id, chapterId, path.data, router]);
   const pending = path.data?.chapters?.some(item => item.paper4Links?.some(link => coursePaper4Progress(link).pending > 0)) ?? false;
   useCourseProgressRefresh({ ...path, pending });
-  const chapterHref = (chapter: string) => preserveAcslLearningContext(courseLanguageHref(`/student/learning-paths/${id}/chapters/${chapter}`, language), search, "00000000-0000-4000-8000-000000000052") ?? courseLanguageHref(`/student/learning-paths/${id}/chapters/${chapter}`, language);
+  const chapterHref = (chapter: string) => preserveAcslLearningContext(courseLanguageHref(`/student/learning-paths/${canonicalId}/chapters/${chapter}`, language), search, "00000000-0000-4000-8000-000000000052") ?? courseLanguageHref(`/student/learning-paths/${canonicalId}/chapters/${chapter}`, language);
   return <State data={path}>{path.data && <LearningCourseReader
     course={{ ...path.data, taskCount: path.data.taskCount ?? 0, completedTasks: path.data.completedTasks ?? 0 }}
     chapters={(path.data.chapters ?? []).map(chapter => ({ ...chapter, problems: chapter.problems.map(problem => ({
       id: problem.problemId, title: problem.title, completed: problem.completed,
-      href: `/student/problems/${problem.problemId}?${new URLSearchParams({ versionId: problem.versionId, learningPathId: id, chapterId: chapter.id, returnTo: chapterHref(chapter.id), sourceLabel: chapter.title })}`,
+      href: `/student/problems/${problem.problemId}?${new URLSearchParams({ versionId: problem.versionId, learningPathId: canonicalId, chapterId: chapter.id, returnTo: chapterHref(chapter.id), sourceLabel: chapter.title })}`,
     })) }))}
-    selectedChapterId={selected} chapterHref={chapterHref} scrollKey={id}
+    selectedChapterId={selected} chapterHref={chapterHref} scrollKey={canonicalId}
     metadata={<CourseAccessSummary course={path.data} showAuthor/>}
-    relatedActivities={<><CoursePracticeReturn schoolId="00000000-0000-4000-8000-000000000052"/><CourseAssignmentLinks key={id} items={path.data.assignments ?? []} locale={locale}/></>}
+    relatedActivities={<><CoursePracticeReturn schoolId="00000000-0000-4000-8000-000000000052"/><CourseAssignmentLinks key={canonicalId} items={path.data.assignments ?? []} locale={locale}/></>}
     extraPractice={chapterId => {
       const chapter = path.data?.chapters?.find(item => item.id === chapterId);
-      return chapter && (chapter.paper4Links?.length || chapter.acslLinks?.length) ? <>{Boolean(chapter.paper4Links?.length) && <CoursePaper4Practice links={chapter.paper4Links ?? []} pathId={id} chapterId={chapterId}/>}<CourseAcslPractice links={chapter.acslLinks ?? []} schoolId="00000000-0000-4000-8000-000000000052" legacy courseHref={chapterHref(chapterId)}/></> : null;
+      return chapter && (chapter.paper4Links?.length || chapter.acslLinks?.length) ? <>{Boolean(chapter.paper4Links?.length) && <CoursePaper4Practice links={chapter.paper4Links ?? []} pathId={canonicalId} chapterId={chapterId}/>}<CourseAcslPractice links={chapter.acslLinks ?? []} schoolId="00000000-0000-4000-8000-000000000052" legacy courseHref={chapterHref(chapterId)}/></> : null;
     }}
     onRead={async chapterId => {
       await productionApi(`chapters/${chapterId}/progress`, { method: "POST", body: { completed: true } });

@@ -1,4 +1,4 @@
-import {Controller,Get,Post,Delete,Module,Req,Res,UseGuards} from '@nestjs/common';
+import {Controller,Get,Post,Patch,Delete,Module,Req,Res,UseGuards} from '@nestjs/common';
 import type {Response} from 'express';
 import {DomainService} from '../domain.service.js';
 import {DomainGuard,type DomainRequest} from '../domain.guard.js';
@@ -7,6 +7,9 @@ import {applyResponse} from '../domain.response.js';
 @UseGuards(DomainGuard)
 class PublicLearningController {
  constructor(private readonly domain:DomainService) {}
+ @Get(['platform/courses','platform/courses/audience','platform/courses/:id']) platformCourses(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
+ @Post(['platform/courses','platform/courses/:id/publish','platform/courses/:id/unpublish','platform/courses/:id/archive','platform/courses/:id/restore']) platformCourseAction(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
+ @Patch('platform/courses/:id') platformCourseUpdate(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
  @Get('practice/catalog') catalog(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
  @Get('practice/courses/:id') course(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
  @Get('practice/courses/:id/entry') entry(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}

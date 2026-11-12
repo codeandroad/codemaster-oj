@@ -6,6 +6,9 @@ import { isPlatformAdministrator } from './platform-governance.mjs';
 import { legacyCourseCandidate, legacyCourseIsLive, legacyCourseReviewCandidates, legacyCourseSourceVersion, legacyDirectAccess, legacyEdition, requireLegacyCourseAdmin, snapshotLegacyCourse } from './legacy-public-course.mjs';
 import { availableLegacyPublicProblemVersions } from './legacy-public-problems.mjs';
 import { canonicalHash, enumValue, fail, integer, uuid } from './security.mjs';
+import { handlePlatformCourses } from './platform-courses.mjs';
+import { platformCourseEligible } from './platform-course-access.mjs';
+import { platformCourseListings, platformCourseEdition, platformReadProgress } from './platform-public-course.mjs';
 
 const respond = (body, status = 200) => ({ status, body });
 const setSchool = (db, id) => db.query("SELECT set_config('campus.school_id',$1,true)", [id]);
@@ -22,6 +25,7 @@ async function context(db, user, { platform = false } = {}) {
 
 async function edition(db, listing, { detail = false, lock = false } = {}) {
   await setSchool(db, listing.school_id);
+  if(listing.platform_owned)return platformCourseEdition(db,listing,{detail,lock});
   if (listing.school_id === LEGACY_SCHOOL_ID) return legacyEdition(db, listing, { detail, lock });
   return (await db.query(`SELECT p.title, p.description, p.revision, p.access_scope, p.properties->'localizations' AS localizations,
       p.required_language,p.language_credit_cutoffs,s.name school_name,
@@ -39,11 +43,14 @@ async function edition(db, listing, { detail = false, lock = false } = {}) {
 }
 
 async function activeListing(db, id, { includeWithdrawn = false } = {}) {
+  const [platform]=await platformCourseListings(db,id);
+  if(platform)return platform;
   return (await db.query(`SELECT * FROM public_course_listings WHERE id=$1
     AND ($2 OR withdrawn_at IS NULL)`, [id, includeWithdrawn])).rows[0];
 }
 
 async function admissionFor(db, listing, course, accountId) {
+  if(listing.platform_owned)return await platformCourseEligible(db,listing.course_id,accountId)?'direct':'denied';
   if (listing.access_mode === 'direct') return 'direct';
   const eligible = listing.school_id === LEGACY_SCHOOL_ID
     ? await legacyDirectAccess(db, listing, course.access_scope, accountId)
@@ -73,6 +80,7 @@ function courseEntry(listing, course, admission) {
     description: course.description,
     chapterCount: course.chapter_count,
     sourceSchool: course.school_name,
+    ownerScope: listing.platform_owned?'platform':'school',
     category: course.category,
     difficulty: course.difficulty,
     coverKey: course.cover_key,
@@ -89,7 +97,9 @@ function courseEntry(listing, course, admission) {
 async function catalogue(pool, user) {
   return transaction(pool, async db => {
     await context(db, user);
-    const { rows } = await db.query('SELECT * FROM public_course_listings WHERE withdrawn_at IS NULL ORDER BY approved_at DESC,id');
+    const { rows } = await db.query(`SELECT l.* FROM public_course_listings l WHERE withdrawn_at IS NULL
+      AND NOT EXISTS(SELECT 1 FROM learning_paths p WHERE p.id=l.course_id AND p.owner_scope='platform') ORDER BY approved_at DESC,id`);
+    rows.unshift(...await platformCourseListings(db));
     const { rows: progress } = await db.query(`SELECT listing_id,chapter_id,content_hash FROM public_course_progress
       WHERE listing_id=ANY($1::uuid[]) AND account_id=$2 AND read`, [rows.map(row => row.id), user.id]);
     const readByListing = new Map();
@@ -102,12 +112,14 @@ async function catalogue(pool, user) {
       const course = await edition(db, listing);
       if (!course) continue;
       const admission = await admissionFor(db, listing, course, user.id);
+      if(admission==='denied')continue;
       const entry = courseEntry(listing, course, admission);
       if (admission === 'direct') {
         const read = readByListing.get(listing.id);
         const detail = await edition(db, listing, { detail: true });
         if (!detail) continue;
-        entry.completedChapters = detail.chapters.filter(chapter => read?.get(chapter.id) === contentHash(chapter)).length;
+        const platformRead=listing.platform_owned?await platformReadProgress(db,listing,user.id):[];
+        entry.completedChapters = detail.chapters.filter(chapter => platformRead.find(p=>p.chapter_id===chapter.id)?.read ?? (read?.get(chapter.id) === contentHash(chapter))).length;
         const available = await publicChapterProblems(db, listing, detail, user.id);
         const exercises = detail.chapters.flatMap(chapter => chapter.problems ?? [])
           .flatMap(link => available.get(`${link.problemId}:${link.versionId}`) ?? []);
@@ -183,6 +195,7 @@ async function publicCourse({ pool, user, method, body }, match) {
     if (!course) fail(404, 'NOT_FOUND', '公开课程不存在或已撤回');
 
     const admission = await admissionFor(db, listing, course, user.id);
+    if(admission==='denied')fail(404,'NOT_FOUND','课程不存在或不在开放范围');
     if (match[2] === 'entry' && method === 'GET') return respond(courseEntry(listing, course, admission));
     if (match[2] === 'applications' && method === 'POST') {
       if (body.expectedRevision !== course.revision) fail(409, 'REVISION_CONFLICT', '课程版本已更新，请刷新');
@@ -205,7 +218,9 @@ async function publicCourse({ pool, user, method, body }, match) {
       const chapterId = uuid(match[3], '章节 ID');
       const chapter = publishedChapters.find(c => c.id === chapterId);
       if (!chapter) fail(404, 'NOT_FOUND', '章节不存在');
-      await db.query(`INSERT INTO public_course_progress(listing_id,account_id,chapter_id,content_hash,read)
+      if(listing.platform_owned)await db.query(`INSERT INTO learning_progress(identity_id,chapter_id,completed)
+        VALUES($1,$2,$3) ON CONFLICT(identity_id,chapter_id) DO UPDATE SET completed=EXCLUDED.completed,updated_at=now()`,[user.identityId,chapter.id,body.read]);
+      else await db.query(`INSERT INTO public_course_progress(listing_id,account_id,chapter_id,content_hash,read)
         VALUES($1,$2,$3,$4,$5) ON CONFLICT(listing_id,account_id,chapter_id) DO UPDATE SET
         content_hash=EXCLUDED.content_hash,read=EXCLUDED.read,updated_at=now()`,
       [listing.id, user.id, chapter.id, contentHash(chapter), body.read]);
@@ -213,13 +228,14 @@ async function publicCourse({ pool, user, method, body }, match) {
     const { rows: progress } = await db.query(
       'SELECT chapter_id,content_hash,read FROM public_course_progress WHERE listing_id=$1 AND account_id=$2',
       [listing.id, user.id]);
+    const platformRead=listing.platform_owned?await platformReadProgress(db,listing,user.id):[];
     const availableProblems = await publicChapterProblems(db, listing, detail, user.id);
     const acslByChapter=new Map();
     for(const chapter of publishedChapters)acslByChapter.set(chapter.id,await projectCourseAcslLinks(db,listing.school_id,user,chapter.acslLinks??[]));
     const chapters = publishedChapters.map((c, position) => ({
       ...localizedFields(publicChapterLocalizations(c.localizations)),id: c.id, title: c.title, body: c.body, position,
       ...(c.acslLinks?.length?{acslLinks:acslByChapter.get(c.id)}:{}),
-      read: progress.some(p => p.chapter_id === c.id && p.content_hash === contentHash(c) && p.read),
+      read: platformRead.find(p=>p.chapter_id===c.id)?.read??progress.some(p => p.chapter_id === c.id && p.content_hash === contentHash(c) && p.read),
       problems: (c.problems ?? []).flatMap(({ problemId, versionId }) => {
         const problem = availableProblems.get(`${problemId}:${versionId}`);
         return problem ? [problem] : [];
@@ -252,7 +268,7 @@ export const currentCourseAdmissionsJoin = `JOIN LATERAL (
     SELECT v.title FROM legacy_course_publication_versions v
     JOIN learning_paths p ON p.school_id=v.school_id AND p.id=v.course_id
     WHERE v.school_id=l.school_id AND v.course_id=l.course_id AND v.revision=l.legacy_revision
-      AND (${legacyCourseIsLive}) AND v.source_version=${legacyCourseSourceVersion}
+      AND p.owner_scope='school' AND (${legacyCourseIsLive}) AND v.source_version=${legacyCourseSourceVersion}
     UNION ALL
     SELECT p.title FROM school_courses c
     JOIN school_course_publications p ON p.school_id=c.school_id AND p.course_id=c.id AND p.revision=c.published_revision
@@ -436,6 +452,7 @@ async function platformPublications({ pool, user, method, body }) {
 
 export async function handlePublicLearning(ctx) {
   const { pool, user, route, method, url } = ctx;
+  if(/^\/platform\/courses(?:\/|$)/.test(route))return handlePlatformCourses(ctx);
   if (route === '/practice/catalog' && method === 'GET') {
     const { listPublicProblems } = await import('./school-practice.mjs');
     const courses = await catalogue(pool, user);
@@ -461,6 +478,7 @@ export async function handlePublicLearning(ctx) {
       if (source) await lockSchoolTeaching(db, source.school_id);
       await context(db, user, { platform: true });
       if (!source) fail(404, 'NOT_FOUND', '公开记录不存在');
+      if(source.platform_owned)fail(409,'PLATFORM_COURSE_MANAGEMENT','请在平台课程管理中下架课程');
       await db.query('UPDATE public_course_listings SET withdrawn_at=COALESCE(withdrawn_at,now()) WHERE id=$1', [id]);
       await db.query("INSERT INTO platform_audit_events(actor_account_id,action,school_id,detail) VALUES($1,'public.course.withdrawn',$2,$3)",
         [user.id, source.school_id, { courseId: source.course_id }]);

@@ -30,6 +30,7 @@ import { useWorkspaceSettings } from "@/components/student/workspace-settings";
 import { productionApi, type CampusUser } from "@/lib/production-api";
 import { useSchoolText } from "./school-ui";
 import { PlatformSchoolDialog } from "./platform-school-dialog";
+import { PlatformCourses } from "./platform-courses";
 import { PublicCourseReview } from "./public-course-review";
 import { PublicProblemReview } from "./school-practice";
 import {
@@ -59,12 +60,14 @@ export function PlatformPage({
   const personalPage = personalSettings || personalProfile;
   const [action, setAction] = useState<PlatformSchoolAction | null>(null);
   const section =
-    search.get("section") === "courses"
+    search.get("section") === "course-review"
+      ? "course-review"
+      : search.get("section") === "courses"
       ? "courses"
       : search.get("section") === "problems"
         ? "problems"
         : "schools";
-  const setSection = (next: "schools" | "courses" | "problems") =>
+  const setSection = (next: "schools" | "courses" | "course-review" | "problems") =>
     router.push(`/platform?section=${next}`);
   const [revision, setRevision] = useState(0);
   const [page, setPage] = useState(1);
@@ -103,7 +106,7 @@ export function PlatformPage({
                 className="space-y-1 p-3"
                 aria-label={text("Platform navigation", "平台导航")}
               >
-                {(["schools", "courses", "problems"] as const).map((item) => {
+                {(["schools", "courses", "course-review", "problems"] as const).map((item) => {
                   const Icon =
                     item === "schools"
                       ? Building2
@@ -130,7 +133,8 @@ export function PlatformPage({
                       {item === "schools"
                         ? text("Schools", "学校")
                         : item === "courses"
-                          ? text("Public courses", "公开课程")
+                          ? text("Platform courses", "平台课程")
+                          : item === "course-review" ? text("Course review", "课程公开审核")
                           : text("Public problems", "公开题库")}
                     </Button>
                   );
@@ -151,7 +155,8 @@ export function PlatformPage({
                     : section === "schools"
                       ? text("Schools", "学校")
                       : section === "courses"
-                        ? text("Public courses", "公开课程")
+                        ? text("Platform courses", "平台课程")
+                        : section === "course-review" ? text("Course review", "课程公开审核")
                         : text("Public problems", "公开题库")}
                 </h1>
               </div>
@@ -231,6 +236,8 @@ export function PlatformPage({
                         />
                       </>
                     ) : section === "courses" ? (
+                      <PlatformCourses />
+                    ) : section === "course-review" ? (
                       <PublicCourseReview />
                     ) : (
                       <PublicProblemReview />

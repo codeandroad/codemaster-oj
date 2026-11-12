@@ -9,7 +9,7 @@ import { transaction } from './db.mjs';
 import { fail, field, uuid, bytes, integer,enumValue } from './security.mjs';
 import { getTimedPracticeResult } from './timed.mjs';
 import { avatarForIdentity } from './avatars.mjs';
-import {readableCourseIds,courseClasses,courseProperties,saveCourseProperties,assertCoursePublicationAccess} from './course-access.mjs';
+import {managesCourse,readableCourseIds,courseClasses,courseProperties,saveCourseProperties,assertCoursePublicationAccess} from './course-access.mjs';
 import { assignmentProgressById } from './assignment-grades.mjs';
 import { latestCourseProblemVersion } from './course-problem-version.mjs';
 import { liveProblemVersionIdSql, resolveLiveProblemVersion } from './live-problem-version.mjs';
@@ -22,7 +22,7 @@ const exists = query => { if (!query.rowCount) fail(404, 'NOT_FOUND', '内容不
 
 async function pathAccess(db, user, id, edit = false, lock = false, allowArchived = false) {
  const path = exists(await db.query(`SELECT * FROM learning_paths WHERE id=$1 AND (archived_at IS NULL OR $2) ${lock ? 'FOR UPDATE' : ''}`, [uuid(id),allowArchived]));
- const canEdit = staff(user) && (administrator(user) || path.owner_account_id === user.id);
+ const canEdit = managesCourse(user,path);
  if(path.archived_at&&(!allowArchived||!canEdit))fail(404,'NOT_FOUND','内容不存在');
  if (edit && !canEdit) fail(403, 'FORBIDDEN', '只能维护本人负责的学习内容');
  if (!canEdit && !(await readableCourseIds(db,user,[path.id])).has(path.id)) fail(404, 'NOT_FOUND', '内容不存在');
@@ -30,7 +30,7 @@ async function pathAccess(db, user, id, edit = false, lock = false, allowArchive
 }
 
 function pathShape(p) {
- return {...localizedFields(p.localizations),authorName:p.author_name??'',authoredAt:p.authored_at??p.created_at,coverImage:p.cover_image??null,requiredLanguage:p.required_language??null,accessScope:p.access_scope??'school',availableFrom:p.available_from??null,availableUntil:p.available_until??null,listed:p.listed??true,withdrawnAt:p.withdrawn_at??null,classIds:(p.classes??[]).map(c=>c.id),classes:p.classes??[], id: p.id, title: p.title,estimatedMinutes:p.estimated_minutes,updatedAt:p.updated_at,createdAt:p.created_at, description: p.description, category: p.category, published: !!p.published_at,archived:!!p.archived_at,
+ return {ownerScope:p.owner_scope??'school',platformAudience:p.owner_scope==='platform'?p.platform_access_scope:undefined,...localizedFields(p.localizations),authorName:p.author_name??'',authoredAt:p.authored_at??p.created_at,coverImage:p.cover_image??null,requiredLanguage:p.required_language??null,accessScope:p.access_scope??'school',availableFrom:p.available_from??null,availableUntil:p.available_until??null,listed:p.listed??true,withdrawnAt:p.withdrawn_at??null,classIds:(p.classes??[]).map(c=>c.id),classes:p.classes??[], id: p.id, title: p.title,estimatedMinutes:p.estimated_minutes,updatedAt:p.updated_at,createdAt:p.created_at, description: p.description, category: p.category, published: !!p.published_at,archived:!!p.archived_at,
   difficulty:p.difficulty??'beginner',coverKey:p.cover_key??'general',taskCount:Number(p.task_count??0),completedTasks:Number(p.completed_tasks??0),chapterCount: Number(p.chapter_count ?? 0), completedChapters: Number(p.completed_chapters ?? 0), canEdit: p.canEdit ?? false };
 }
 
@@ -417,7 +417,7 @@ export async function handleEducation(ctx) {
   paths=paths.filter(p=>readable.has(p.id));
   for(const path of paths)path.classes=await courseClasses(pool,path.id);
   const stats=await taskStats(pool,user,paths.map(p=>p.id),paths.filter(p=>!p.published_at).map(p=>p.id));
-  return result({ items:paths.map(p=>({...pathShape({...p,...stats.get(p.id),canEdit:staff(user)&&(administrator(user)||p.owner_account_id===user.id)}),archived:!!p.archived_at})) });
+  return result({ items:paths.filter(p=>!staff(user)||p.owner_scope!=='platform').map(p=>({...pathShape({...p,...stats.get(p.id),canEdit:managesCourse(user,p)}),archived:!!p.archived_at})) });
  }
  if (route === '/learning-paths/import' && method === 'POST') {
   requireStaff(user);const doc=validateLearningDocument(body);
@@ -516,7 +516,7 @@ export async function handleEducation(ctx) {
   requireStaff(user);const id=uuid(restoreMatch[1]);
   await transaction(pool,async db=>{
    const path=exists(await db.query('SELECT * FROM learning_paths WHERE id=$1 FOR UPDATE',[id]));
-   if(!administrator(user)&&path.owner_account_id!==user.id)fail(403,'FORBIDDEN','只能恢复本人课程');
+   if(!managesCourse(user,path))fail(403,'FORBIDDEN','只能恢复本人课程');
    if(!path.archived_at)return;
    let withdrawForPaper4=false;
    if(path.published_at){

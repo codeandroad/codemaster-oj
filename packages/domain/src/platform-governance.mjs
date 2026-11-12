@@ -96,7 +96,7 @@ async function listSchools(db, url) {
         ((SELECT count(*) FROM school_classes WHERE school_id=$1)
           + (SELECT count(*) FROM classes WHERE school_id=$1))::int classes,
         (SELECT count(*)::int FROM problem_banks WHERE school_id=$1) banks,
-        ((SELECT count(*) FROM learning_paths WHERE school_id=$1)
+        ((SELECT count(*) FROM learning_paths WHERE school_id=$1 AND owner_scope='school')
           + (SELECT count(*) FROM school_courses WHERE school_id=$1))::int courses,
         (SELECT count(*)::int FROM assignments WHERE school_id=$1) assignments,
         (SELECT count(*)::int FROM paper4_papers WHERE school_id=$1) papers`, [school.id]);

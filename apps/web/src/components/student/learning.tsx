@@ -61,6 +61,7 @@ export function StudentLearningList(){
      ? ui(locale,"没有符合搜索条件的课程。","No courses match this search.")
      : ui(locale,"暂无已发布课程","No published courses yet")) : undefined}>
     {visible.map(path=><LearningCourseRow key={path.id} course={{...path,difficulty:path.difficulty??"beginner"}}
+      source={path.ownerScope === "platform" ? ui(locale,"平台管理员","Platform administrator") : undefined}
       title={<AppLink href={courseLanguageHref(`/student/learning-paths/${path.id}`, language)} className={learningCourseTitleClass}>{path.title}</AppLink>}
       reading={{value:path.completedChapters,total:path.chapterCount}}
       practice={{value:path.completedTasks??0,total:path.taskCount??0}} />)}

@@ -43,7 +43,7 @@ async function legacyCandidates(db, courseId, { lock = false, preview = false } 
       WHERE v.school_id=p.school_id AND v.course_id=p.id ORDER BY v.revision DESC LIMIT 1
     ) latest ON true
     ${preview ? 'LEFT JOIN public_course_listings l ON l.school_id=p.school_id AND l.course_id=p.id' : ''}
-    WHERE p.school_id=$1 AND ($2::uuid IS NULL OR p.id=$2)
+    WHERE p.school_id=$1 AND p.owner_scope='school' AND ($2::uuid IS NULL OR p.id=$2)
     ${preview ? `AND (${legacyCourseIsLive}) AND (p.access_scope='school' OR (
       l.access_mode='application' AND l.withdrawn_at IS NULL AND l.revision=latest.revision
       AND latest.source_version=${legacyCourseSourceVersion}
@@ -56,7 +56,7 @@ async function legacyCandidates(db, courseId, { lock = false, preview = false } 
 export const legacyCourseCandidate = async (db, courseId, options) => (await legacyCandidates(db, courseId, options))[0];
 export const legacyCourseReviewCandidates = (db) => legacyCandidates(db, null, { preview: true });
 
-async function legacyCandidateChapters(db, courseId) {
+export async function legacyCandidateChapters(db, courseId) {
   const { rows } = await db.query(`SELECT c.id,c.title,c.content body,c.localizations,c.acsl_links AS "acslLinks",COALESCE((
       SELECT jsonb_agg(jsonb_build_object('problemId',cp.problem_id,'versionId',cp.version_id)
         ORDER BY cp.position,cp.problem_id)

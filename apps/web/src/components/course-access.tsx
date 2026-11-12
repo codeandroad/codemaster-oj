@@ -4,6 +4,8 @@ import { useLocale, type AppLocale } from "@/components/locale-context";
 import { requiredLanguageText } from "@/components/student/languages";
 import type { SubmissionLanguage } from "@/lib/production-api";
 export interface CourseAccessMetadata {
+  ownerScope?: "school" | "platform";
+  platformAudience?: "all" | "schools" | "students";
   requiredLanguage?: SubmissionLanguage | null;
   authorName?: string;
   authoredAt?: string | null;
@@ -26,7 +28,7 @@ export function CourseAccessSummary({ course, showAuthor = false, accessLabel }:
   const date = (value: string) => new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "zh-CN", { timeZone: "Asia/Shanghai", dateStyle: "medium" }).format(new Date(value));
   const dateTime = (value: string) => new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "zh-CN", { timeZone: "Asia/Shanghai", dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
   return <span className="flex flex-wrap gap-x-4 gap-y-1 text-xs leading-5 text-muted-foreground">
-    <span>{accessLabel ?? (course.accessScope === "classes" ? course.classes?.map(item => item.name).join(" / ") || tx("指定班级", "Selected classes") : tx("全校可学", "School-wide"))}</span>
+    <span>{accessLabel ?? (course.ownerScope === "platform" ? tx("平台管理员", "Platform administrator") + " · " + (course.platformAudience === "schools" ? tx("指定学校", "Selected schools") : course.platformAudience === "students" ? tx("指定学生", "Selected students") : tx("全平台公开", "Platform-wide")) : course.accessScope === "classes" ? course.classes?.map(item => item.name).join(" / ") || tx("指定班级", "Selected classes") : tx("全校可学", "School-wide"))}</span>
     {course.requiredLanguage && <span>{requiredLanguageText(locale, course.requiredLanguage, "course")}</span>}
     {(course.availableFrom || course.availableUntil) && <span>{course.availableFrom ? dateTime(course.availableFrom) : tx("即日起", "Available now")} – {course.availableUntil ? dateTime(course.availableUntil) : tx("无截止时间", "No closing date")}</span>}
     {showAuthor && course.authorName && <span>{tx("创建者：", "Author: ")}{course.authorName}</span>}

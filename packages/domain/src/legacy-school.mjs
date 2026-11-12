@@ -26,7 +26,7 @@ export async function getLegacySchoolOwnershipSummary(db) {
       (SELECT count(*)::int FROM classes WHERE school_id=$1) AS classes,
       (SELECT count(*)::int FROM problem_banks WHERE school_id=$1) AS banks,
       (SELECT count(*)::int FROM problems p JOIN problem_banks b ON b.id=p.bank_id WHERE b.school_id=$1) AS problems,
-      (SELECT count(*)::int FROM learning_paths WHERE school_id=$1) AS courses,
+      (SELECT count(*)::int FROM learning_paths WHERE school_id=$1 AND owner_scope='school') AS courses,
       (SELECT count(*)::int FROM assignments WHERE school_id=$1) AS assignments,
       (SELECT count(*)::int FROM timed_practices WHERE school_id=$1) AS "timedPractices",
       (SELECT count(*)::int FROM paper4_papers WHERE school_id=$1) AS papers,

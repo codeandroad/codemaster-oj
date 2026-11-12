@@ -640,7 +640,7 @@
       "sourceTopics": [
         "Digital Electronics"
       ],
-      "status": "planned",
+      "status": "draft",
       "practiceReferences": [
         {
           "paperSlug": "acsl-2020-2021-intermediate-4",
@@ -690,7 +690,11 @@
           "paperSlug": "acsl-2025-2026-intermediate-4",
           "questionId": "q4"
         }
-      ]
+      ],
+      "documents": {
+        "en": "intermediate/digital-electronics/course.en.md",
+        "zh": "intermediate/digital-electronics/course.zh.md"
+      }
     },
     {
       "id": "assembly",

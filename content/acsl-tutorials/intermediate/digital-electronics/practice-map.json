@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "unitId": "digital-electronics",
+  "chapters": [
+    {
+      "key": "symbols-and-gate-by-gate-tracing",
+      "position": 0,
+      "references": [
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-4",
+          "questionId": "q4"
+        }
+      ]
+    },
+    {
+      "key": "truth-tables-and-input-counts",
+      "position": 1,
+      "references": [
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-4",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-4",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-4",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-4",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-4",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-4",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-4",
+          "questionId": "q3"
+        }
+      ]
+    },
+    {
+      "key": "equivalence-and-backward-constraints",
+      "position": 2,
+      "references": [
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-4",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-4",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-4",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-4",
+          "questionId": "q4"
+        }
+      ]
+    }
+  ]
+}

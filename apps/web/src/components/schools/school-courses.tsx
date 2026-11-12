@@ -13,6 +13,10 @@ import {
   useData,
   useMutation,
 } from "@/components/admin/common";
+import { useCourseLanguage } from "@/components/course-language";
+import { courseLanguageHref, localizedCourse } from "@/components/course-localization";
+import { CourseAcslPractice } from "@/components/student/course-acsl-practice";
+import { CoursePracticeReturn } from "@/components/student/course-practice-return";
 import { CourseAccessSummary } from "@/components/course-access";
 import { LearningCourseReader } from "@/components/student/learning-course-reader";
 import { useCourseProgressRefresh } from "@/components/student/course-progress-refresh";
@@ -385,6 +389,7 @@ function CourseList({
   onAdmissions?: (course: SchoolCourse) => void;
 }) {
   const text = useSchoolText();
+  const { language } = useCourseLanguage();
   const resource = useData<CoursePage<SchoolCourse>>(path);
   if (canAuthor) return (
     <Loading resource={resource}>
@@ -422,7 +427,7 @@ function CourseList({
       <LearningCourseList empty={!resource.data?.items.length ? (query
         ? text("No courses match this search.", "没有符合搜索条件的课程。")
         : text("No courses in this view.", "当前列表暂无课程。")) : undefined}>
-        {resource.data?.items.map(course => <LearningCourseRow key={course.id} course={course}
+        {resource.data?.items.map(item => localizedCourse(item, language)).map(course => <LearningCourseRow key={course.id} course={course}
           title={<button type="button" className={learningCourseTitleClass} onClick={() => onOpen(course.id)}>{course.title}</button>}
           status={course.accessScope === "school" ? text("School-wide", "本校学生") : text("Selected classes", "指定班级")}
           reading={{ value: course.completedChapters, total: course.chapterCount }}
@@ -676,6 +681,7 @@ function CourseReader({ school, base, id, preview = false, onBack }: {
   school: School; base: string; id: string; preview?: boolean; onBack: () => void;
 }) {
   const text = useSchoolText();
+  const { language } = useCourseLanguage();
   const resource = useData<CourseDetail>(`${base}/${id}${preview ? "/preview" : ""}`);
   useCourseProgressRefresh(resource);
   const location = useSearchParams(), pathname = usePathname();
@@ -685,7 +691,7 @@ function CourseReader({ school, base, id, preview = false, onBack }: {
   const chapter = selectedChapter ? course?.chapters.find(item => item.id === selectedChapter)
     : course?.chapters.find(item => !item.read) ?? course?.chapters[0];
   const readerHref = (chapterId: string, problemId: string | null = null) => practiceLocation(pathname, location.toString(), {
-    courseId: id, chapterId, problemId,
+    courseId: id, chapterId, problemId, contentLanguage: language,
   });
   const practiceId = location.get("problemId");
   const practiceItems = (chapter?.problems ?? []).filter(item => item.available).map(item => ({ id: item.problemId, title: item.title ?? item.problemId }));
@@ -700,12 +706,14 @@ function CourseReader({ school, base, id, preview = false, onBack }: {
     {preview && <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground"><Button size="sm" variant="ghost" onClick={onBack}><ArrowLeft size={14}/>{text("Courses", "课程")}</Button>{text("Student preview", "学生预览")}</div>}
     <LearningCourseReader
       course={{ ...course, taskCount: course.totalExercises, completedTasks: course.completedExercises }}
-      chapters={course.chapters.map(item => ({ id: item.id, title: item.title, content: item.body, completed: Boolean(item.read),
+      chapters={course.chapters.map(item => ({ id: item.id, title: item.title, content: item.body, localizations: item.localizations, completed: Boolean(item.read),
         problems: (item.problems ?? []).map(problem => ({ id: problem.problemId, title: problem.title ?? problem.problemId,
           completed: problem.solved, available: Boolean(problem.available), href: readerHref(item.id, problem.problemId) })),
       }))}
       selectedChapterId={selectedChapter} chapterHref={chapterId => readerHref(chapterId)} scrollKey={`school:${school.id}:${id}`}
       metadata={<CourseAccessSummary course={course} showAuthor/>}
+      relatedActivities={<CoursePracticeReturn schoolId={school.id}/>}
+      extraPractice={chapterId => { const links = course.chapters.find(item => item.id === chapterId)?.acslLinks ?? []; return links.length ? <CourseAcslPractice links={links} schoolId={school.id} courseHref={courseLanguageHref(readerHref(chapterId), language)}/> : null; }}
       canTrackProgress={!preview && course.canTrackProgress}
       chapterResources={chapterId => !preview ? <SchoolLearningResources schoolId={school.id} canAuthor={false} courseId={id} chapterId={chapterId} hideEmpty/> : null}
       onRead={async chapterId => {

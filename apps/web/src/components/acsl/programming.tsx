@@ -37,6 +37,7 @@ import {
   type ProductionProblem,
 } from "@/lib/production-api";
 import { acslHref, type AcslLanguage, type AcslPaper } from "./model";
+import { AcslLearningLinks } from "./learning-links";
 import { AcslRichContent } from "./rich-content";
 import type { AcslDiagram } from "./diagram-model";
 import { AcslStudentProgrammingSolution } from "./student-programming-solution";
@@ -276,6 +277,7 @@ function ProgrammingWorkspace({
       onSubmissionCompleted,
       statusBanner: (
         <>
+          <AcslLearningLinks links={paper.learningLinks ?? []} schoolId={path.split("/")[1]} language={language}/>
           {(paper.graded || solved || progressError) && (
             <div
               className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-surface px-4 py-2"

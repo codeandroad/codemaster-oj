@@ -10,6 +10,8 @@ import { PageHeader } from "@/components/page-chrome";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { chapterDirectoryTitle } from "@/lib/learning-chapter-title";
 import { Empty, Feedback, LessonContent, panel, useMutation } from "./shared";
+import { CourseLanguageControl, useCourseLanguage } from "@/components/course-language";
+import { localizedCourse, localizedChapter, type CourseLocalizations, type ChapterLocalizations } from "@/components/course-localization";
 
 export interface ReaderPractice {
   id: string;
@@ -28,14 +30,15 @@ export interface ReaderChapter {
   checkpoint?: string;
   checkpointAnswer?: string;
   problems: ReaderPractice[];
+  localizations?: ChapterLocalizations;
 }
 
 /** Shared presentation for school and public learning; callers retain their own access checks and APIs. */
 export function LearningCourseReader({
-  course, chapters, selectedChapterId, chapterHref, onRead, canTrackProgress = true,
+  course: sourceCourse, chapters: sourceChapters, selectedChapterId, chapterHref, onRead, canTrackProgress = true,
   metadata, relatedActivities, extraPractice, chapterResources, scrollKey,
 }: {
-  course: { title: string; description: string; chapterCount: number; completedChapters: number; taskCount: number; completedTasks: number };
+  course: { title: string; description: string; chapterCount: number; completedChapters: number; taskCount: number; completedTasks: number; localizations?: CourseLocalizations };
   chapters: ReaderChapter[];
   selectedChapterId?: string | null;
   chapterHref: (chapterId: string) => string;
@@ -49,6 +52,9 @@ export function LearningCourseReader({
 }) {
   const { locale } = useLocale();
   const text = (zh: string, en: string) => locale === "en" ? en : zh;
+  const { language, setLanguage } = useCourseLanguage();
+  const course = localizedCourse(sourceCourse, language);
+  const chapters = sourceChapters.map(item => localizedChapter(item, language));
   const directoryRef = useRef<HTMLDivElement>(null);
   const chapter = selectedChapterId
     ? chapters.find(item => item.id === selectedChapterId)
@@ -91,6 +97,7 @@ export function LearningCourseReader({
 
   return <>
     <PageHeader className="course-detail-header" title={chapter?.title ?? course.title} description={course.description}/>
+    <div className="mt-3"><CourseLanguageControl language={language} onChange={setLanguage} missing={Boolean(chapter && !chapter.localizations?.[language])}/></div>
     {metadata && <div className="mt-2">{metadata}</div>}
     <div className="mt-4"><LearningProgressSummary read={course.completedChapters} totalChapters={course.chapterCount} done={course.completedTasks} totalTasks={course.taskCount}/></div>
     {relatedActivities}
@@ -122,14 +129,7 @@ function ReaderLesson({ chapter, nextHref, onRead, canTrackProgress, extraPracti
   const router = useRouter(), action = useMutation(), pending = useRef(false);
   const saveScroll = () => { try { sessionStorage.setItem(`learning-scroll:${scrollKey}:${chapter.id}`, String(window.scrollY)); } catch {} };
   return <article className="space-y-5" data-od-id="learning-chapter-content">
-    <section className={`${panel} p-5 sm:p-7`}><h1 className="text-2xl font-bold">{chapter.title}</h1>
-      {chapter.objective && <div className="mt-4 border-b border-border pb-5"><h2 className="text-sm font-semibold">{text("学习目标", "Learning objective")}</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{chapter.objective}</p></div>}
-      <div className="mt-6"><LessonContent content={chapter.content}/></div>
-    </section>
-    {chapter.checkpoint?.trim() && <section className={`${panel} p-5 sm:p-7`} data-od-id="learning-checkpoint">
-      <h2 className="text-lg font-bold">{text("检查点", "Checkpoint")}</h2><div className="mt-3"><LessonContent content={chapter.checkpoint}/></div>
-      {chapter.checkpointAnswer?.trim() && <details className="mt-4 border-t border-border pt-4 text-sm"><summary className="cursor-pointer font-semibold text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">{text("查看参考答案", "View reference answer")}</summary><div className="mt-3"><LessonContent content={chapter.checkpointAnswer}/></div></details>}
-    </section>}
+    <LearningChapterContent chapter={chapter}/>
     {(chapter.problems.length > 0 || Boolean(extraPractice)) && <section className={`${panel} p-5 sm:p-7`}>
       <h2 className="text-lg font-bold">{text("配套练习", "Practice problems")}</h2>
       {chapter.problems.map(problem => <div key={problem.id} className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
@@ -159,4 +159,19 @@ function ReaderLesson({ chapter, nextHref, onRead, canTrackProgress, extraPracti
       <Feedback action={action}/>
     </section>}
   </article>;
+}
+
+/** Shared lesson and checkpoint presentation for the reader and teacher previews. */
+export function LearningChapterContent({ chapter }: { chapter: Pick<ReaderChapter, "title" | "content" | "objective" | "checkpoint" | "checkpointAnswer"> }) {
+  const { locale } = useLocale(), text = (zh: string, en: string) => locale === "en" ? en : zh;
+  return <div className="relative isolate space-y-5" data-od-id="learning-lesson-presentation">
+    <section className={`${panel} p-5 sm:p-7`}><h1 className="text-2xl font-bold">{chapter.title}</h1>
+      {chapter.objective && <div className="mt-4 border-b border-border pb-5"><h2 className="text-sm font-semibold">{text("学习目标", "Learning objective")}</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{chapter.objective}</p></div>}
+      <div className="mt-6"><LessonContent content={chapter.content}/></div>
+    </section>
+    {chapter.checkpoint?.trim() && <section className={`${panel} p-5 sm:p-7`} data-od-id="learning-checkpoint">
+      <h2 className="text-lg font-bold">{text("检查点", "Checkpoint")}</h2><div className="mt-3"><LessonContent content={chapter.checkpoint}/></div>
+      {chapter.checkpointAnswer?.trim() && <details className="mt-4 border-t border-border pt-4 text-sm"><summary className="cursor-pointer font-semibold text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">{text("查看参考答案", "View reference answer")}</summary><div className="mt-3"><LessonContent content={chapter.checkpointAnswer}/></div></details>}
+    </section>}
+  </div>;
 }

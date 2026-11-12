@@ -9,7 +9,12 @@ import { CourseAdmissionsDialog } from "@/components/schools/course-admissions-d
 import { CoursePaper4Picker } from "./course-paper4-picker";
 import { coursePaper4LinkKey, coursePaper4References, coursePaper4UnitCount, mergeCoursePaper4Links, type CoursePaper4Link } from "@/components/course-paper4";
 import { chapterDirectoryTitle } from "@/lib/learning-chapter-title";
-import {LessonContent} from "../student/shared";
+import { LearningChapterContent } from "../student/learning-course-reader";
+import { CourseLanguageControl, useCourseLanguage } from "@/components/course-language";
+import { localizedChapter, parseChapterLocalizations, type CourseLocalizations, type ChapterLocalizations } from "@/components/course-localization";
+import { ChapterTranslationEditor } from "./course-translation-editor";
+import { CourseAcslEditor } from "./course-acsl-editor";
+import { courseAcslReferences, courseAcslLabel, type CourseAcslLink } from "@/components/course-acsl";
 import {LearningCover,courseCovers,courseDifficulties} from "@/components/learning-course";
 import {PythonPracticePanel,type CoursePractice} from "./python-practice-panel";
 import {canUseLegacyPythonPractice} from "./legacy-python-practice";
@@ -88,8 +93,11 @@ interface Chapter {
   checkpointAnswer?: string;
   problems: ChapterProblem[];
   paper4Links?: CoursePaper4Link[];
+  localizations?: ChapterLocalizations;
+  acslLinks?: CourseAcslLink[];
 }
 interface Path extends CourseAccessMetadata {
+  localizations?: CourseLocalizations;
   id: string;
   archived?:boolean;
   title: string;
@@ -503,6 +511,7 @@ function LearningEditorForm({
   onSaved: () => void;
 }) {
   const {t, locale} = useLocale();
+  const { language, setLanguage } = useCourseLanguage();
   const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
   const search = useSearchParams(),
     [path, setPath] = useState(initial),
@@ -557,6 +566,7 @@ function LearningEditorForm({
   }
   const allPaper4Links = chapters.flatMap(item => item.paper4Links ?? []);
   const linkedPaper4Count = coursePaper4UnitCount(allPaper4Links);
+  const linkedAcslCount = chapters.reduce((total, item) => total + (item.acslLinks?.length ?? 0), 0);
   const unavailablePaper4 = allPaper4Links.filter(item => item.available === false || item.readyForCourse === false).length;
   const linkedProblemCount = linkedByProblem.size;
   const linkedStatus = [...linkedByProblem.values()].map((versions) => {
@@ -596,6 +606,8 @@ function LearningEditorForm({
             position,
             problemIds: item.problems.map((x) => x.problemId),
             paper4Links: coursePaper4References(item.paper4Links),
+            localizations: item.localizations ? parseChapterLocalizations(item.localizations) : undefined,
+            acslLinks: courseAcslReferences(item.acslLinks),
           },
         },
       );
@@ -742,7 +754,7 @@ function LearningEditorForm({
               {linkedProblemCount > 0
                 ? tr(`课程关联 ${linkedProblemCount} 题：${approvedProblems} 题已审核公开 · ${reviewingProblems} 题已发布待审核 · ${unpublishedProblems} 题未发布 · ${revisionProblems} 题需新修订版。`,
                   `${linkedProblemCount} linked: ${approvedProblems} approved · ${reviewingProblems} published and awaiting review · ${unpublishedProblems} unpublished · ${revisionProblems} need a new revision.`)
-                : linkedPaper4Count ? tr(`已关联 ${linkedPaper4Count} 道 Paper 4 大题。`, `${linkedPaper4Count} Paper 4 questions linked.`) : tr("课程草稿尚未关联题目。", "This draft has no linked problems yet.")}
+                : linkedAcslCount ? tr(`已关联 ${linkedAcslCount} 项 ACSL 真题练习。`, `${linkedAcslCount} ACSL practices linked.`) : linkedPaper4Count ? tr(`已关联 ${linkedPaper4Count} 道 Paper 4 大题。`, `${linkedPaper4Count} Paper 4 questions linked.`) : tr("课程草稿尚未关联题目。", "This draft has no linked problems yet.")}
             </p>
             <p className="text-xs opacity-85">
               {unpublishedProblems > 0
@@ -768,7 +780,7 @@ function LearningEditorForm({
         <div className="min-w-0 flex-1 space-y-1"><CourseAccessSummary course={path} showAuthor/><p className="text-xs text-muted-foreground">{t(courseDifficulties[path.difficulty??"beginner"])} · {chapters.length} {t("章")} · {path.estimatedMinutes??30} {tr("分钟", "minutes")}</p></div>
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <Button variant="secondary" size="sm" disabled={!path.canEdit} onClick={()=>setProgressOpen(true)}>{t("查看学生进度总览")}</Button>
-        <Button size="sm" variant="secondary" onClick={()=>{const doc:LearningDocument={format:"codemaster-learning-path",version:1,title:path.title,description:path.description,category:path.category,requiredLanguage:path.requiredLanguage,estimatedMinutes:path.estimatedMinutes??30,difficulty:path.difficulty??"beginner",coverKey:path.coverKey??"general",authorName:path.authorName,authoredAt:path.authoredAt,coverImage:path.coverImage,chapters:chapters.map(c=>({title:c.title,content:c.content,objective:c.objective??"",checkpoint:c.checkpoint??"",checkpointAnswer:c.checkpointAnswer??"",problemIds:c.problems.map(p=>p.problemId),paper4Links:coursePaper4References(c.paper4Links)}))};void action.run(async()=>{downloadLearningMarkdown(doc);return t("已导出当前编辑内容（包括未保存修改）。");});}}>{t("导出 Markdown")}</Button>
+        <Button size="sm" variant="secondary" onClick={()=>{const doc:LearningDocument={format:"codemaster-learning-path",version:1,localizations:path.localizations,title:path.title,description:path.description,category:path.category,requiredLanguage:path.requiredLanguage,estimatedMinutes:path.estimatedMinutes??30,difficulty:path.difficulty??"beginner",coverKey:path.coverKey??"general",authorName:path.authorName,authoredAt:path.authoredAt,coverImage:path.coverImage,chapters:chapters.map(c=>({localizations:c.localizations,acslLinks:courseAcslReferences(c.acslLinks),title:c.title,content:c.content,objective:c.objective??"",checkpoint:c.checkpoint??"",checkpointAnswer:c.checkpointAnswer??"",problemIds:c.problems.map(p=>p.problemId),paper4Links:coursePaper4References(c.paper4Links)}))};void action.run(async()=>{downloadLearningMarkdown(doc);return t("已导出当前编辑内容（包括未保存修改）。");});}}>{t("导出 Markdown")}</Button>
         <Button size="sm" variant="secondary" disabled={!canEditCourse} onClick={() => setMetadata(true)}>
           {tr("课程属性与开放", "Properties and access")}
         </Button>
@@ -1002,6 +1014,7 @@ function LearningEditorForm({
                   </span>
                 </div>)}
               </section>
+              <CourseAcslEditor schoolId={LEGACY_SCHOOL_ID} links={chapter.acslLinks ?? []} onChange={links => update("acslLinks", links)} disabled={!canEditCourse || action.busy}/>
               <Field label={t("检查点 · 独立练习")}>
                 <textarea
                   value={chapter.checkpoint ?? ""}
@@ -1020,6 +1033,7 @@ function LearningEditorForm({
                   className={area}
                 />
               </Field>
+              <ChapterTranslationEditor value={chapter.localizations} original={{ title: chapter.title, content: chapter.content, objective: chapter.objective ?? "", checkpoint: chapter.checkpoint ?? "", checkpointAnswer: chapter.checkpointAnswer ?? "" }} onChange={value => update("localizations", value)} disabled={!canEditCourse || action.busy}/>
             </div>
           </section>
         )}
@@ -1048,30 +1062,19 @@ function LearningEditorForm({
         />
       )}
       {preview && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-background">
-          <div className="sticky top-0 flex justify-between border-b border-border bg-surface p-4">
+        <div className="fixed inset-0 z-50 isolate overflow-y-auto bg-background" data-od-id="teacher-course-preview">
+          <div className="sticky top-0 z-20 isolate flex flex-wrap items-center justify-between gap-3 border-b border-border bg-surface p-4">
             <div>
-              <b>{t("学生预览")} · {chapter?.title}</b>
+              <b>{t("学生预览")} · {chapter && localizedChapter(chapter, language).title}</b>
               <p className="text-xs text-muted-foreground">{tr("当前编辑内容 · 未发布题目仅供教师预览", "Current edits · unpublished problems are visible to teachers only")}</p>
             </div>
+            <CourseLanguageControl language={language} onChange={setLanguage} missing={!chapter?.localizations?.[language]}/>
             <Button variant="secondary" onClick={() => setPreview(false)}>
               ← {t("返回原编辑位置")}
             </Button>
           </div>
-          <article className="mx-auto max-w-3xl p-8">
-            <h1 className="text-2xl font-bold">{chapter?.title}</h1>
-            <p className="mt-4 text-sm text-primary">{chapter?.objective}</p>
-            <div className="mt-6"><LessonContent content={chapter?.content??""}/></div>
-            {chapter?.checkpoint?.trim() && (
-              <section className="mt-6 border border-primary/30 bg-info-soft p-5">
-                <h2 className="font-bold">{t("检查点")}</h2>
-                <div className="mt-3"><LessonContent content={chapter.checkpoint}/></div>
-                {chapter.checkpointAnswer?.trim() && <details className="mt-4 text-sm">
-                  <summary className="cursor-pointer font-semibold text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">{t("查看参考答案")}</summary>
-                  <div className="mt-3"><LessonContent content={chapter.checkpointAnswer}/></div>
-                </details>}
-              </section>
-            )}
+          <article className="relative z-0 isolate mx-auto max-w-3xl p-4 sm:p-8">
+            {chapter && <LearningChapterContent chapter={localizedChapter(chapter, language)}/>}
             <h2 className="mt-6 font-bold">{t("相关练习")}</h2>
             {chapter?.problems.map((x) => (
               <p className="mt-3 flex flex-wrap items-center gap-2 text-primary" key={x.problemId}>
@@ -1080,6 +1083,7 @@ function LearningEditorForm({
               </p>
             ))}
             {(chapter?.paper4Links ?? []).map(item => <div key={coursePaper4LinkKey(item)} className="mt-3 rounded-md border border-border p-3 text-sm"><p className="font-semibold text-primary">{item.title}{item.questionKey && ` · ${item.questionKey} · ${item.questionTitle ?? item.questions[0]?.title ?? ""}`}</p><p className="mt-1 text-muted-foreground">{item.questionKey ? tr("指定大题", "Selected question") : tr("整套试卷", "Whole paper")} · v{item.versionNumber ?? "—"} · {item.questions.length} {tr("道大题", "questions")}</p></div>)}
+            {(chapter?.acslLinks ?? []).map(item => <p key={`${item.paperSlug}:${item.kind}:${item.questionId ?? ""}`} className="mt-3 rounded-md border border-border p-3 text-sm">{courseAcslLabel(item, language)}</p>)}
           </article>
         </div>
       )}

@@ -1,3 +1,4 @@
+import type { AcslLearningLink } from "./learning-links";
 import type { AcslDiagrams } from "./diagram-model";
 
 export type AcslLanguage = "en" | "zh";
@@ -47,6 +48,7 @@ export type AcslPaperSummary = {
   programmingSolved: boolean;
 };
 export type AcslPaper = AcslPaperSummary & {
+  learningLinks?: AcslLearningLink[];
   writtenRevision: string;
   changedQuestionIds: string[];
   writtenRevisionAt: string | null;
@@ -77,6 +79,7 @@ export function acslCatalogHref(
   const params = new URLSearchParams(query);
   for (const key of [
     "paperId",
+    "paperVersionId",
     "questionId",
     "coding",
     "review",

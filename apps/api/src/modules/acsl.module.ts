@@ -9,7 +9,7 @@ import { DomainService } from '../domain.service.js';
 export class AcslController {
   constructor(private readonly domain: DomainService) {}
 
-  @Get(['manage', 'manage/:paperId', 'manage/:paperId/export', 'manage/:paperId/solution-price'])
+  @Get(['links', 'manage', 'manage/:paperId', 'manage/:paperId/export', 'manage/:paperId/solution-price'])
   async manageRead(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
     response.setHeader('Cache-Control', 'private, no-store');
     return applyResponse(response, await this.domain.execute('acsl', request.domainContext));

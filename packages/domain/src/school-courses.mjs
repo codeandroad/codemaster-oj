@@ -1,3 +1,5 @@
+import { courseLocalizations, localizedFields } from './course-localizations.mjs';
+import { normalizeCourseAcslLinks, resolveCourseAcslLinks, projectCourseAcslLinks, acslLinkCounts } from './course-acsl.mjs';
 import { schoolActivityJobVisibleSql } from './school-activities.mjs';
 import { validateCoverImage } from './course-access.mjs';
 import { normalizeRequiredLanguage } from './course-language-policy.mjs';
@@ -13,7 +15,7 @@ const manages = (course, user, role) => role === 'school_admin' || role === 'tea
 
 function courseInput(body, previous={}) {
  const old=previous.properties??{};
- const properties={category:field(body.category??old.category??'Programming','课程分类',{min:1,max:100}),
+ const properties={localizations:body.localizations===undefined?old.localizations??null:courseLocalizations(body.localizations),category:field(body.category??old.category??'Programming','课程分类',{min:1,max:100}),
  difficulty:enumValue(body.difficulty??old.difficulty??'beginner',['beginner','intermediate','advanced'],'难度'),
  coverKey:enumValue(body.coverKey??old.coverKey??'general',['python','algorithms','general'],'课程封面'),
  estimatedMinutes:integer(body.estimatedMinutes??old.estimatedMinutes??60,1,10080,'预计学习时间'),
@@ -29,7 +31,13 @@ function courseInput(body, previous={}) {
  const description=field(body.description??'','课程简介',{min:0,max:4000});
  const accessScope=enumValue(body.accessScope??'school',['school','classes'],'开放范围');
  if(!Array.isArray(body.chapters)||body.chapters.length>100)fail(400,'VALIDATION','课程最多包含100章');
- const chapters=body.chapters.map(chapter=>({id:uuid(chapter?.id,'章节 ID').toLowerCase(),title:field(chapter?.title,'章节标题',{max:200}),body:field(chapter?.body??'','章节正文',{min:0,max:100000,trim:false}),problems:chapterProblems(chapter?.problems)}));
+ const chapters=body.chapters.map(chapter=>{
+  const previousChapter=previous.chapters?.find(old=>old.id===chapter?.id);
+  return {id:uuid(chapter?.id,'章节 ID').toLowerCase(),title:field(chapter?.title,'章节标题',{max:200}),body:field(chapter?.body??'','章节正文',{min:0,max:100000,trim:false}),
+   ...localizedFields(chapter?.localizations===undefined?previousChapter?.localizations:courseLocalizations(chapter.localizations,{chapter:true})),
+   ...Object.fromEntries(['objective','checkpoint','checkpointAnswer'].filter(key=>chapter?.[key]!==undefined||previousChapter?.[key]!==undefined).map(key=>[key,field(chapter?.[key]??previousChapter[key],key,{min:0,max:key==='objective'?4000:10000,trim:false})])),
+   ...(chapter?.acslLinks!==undefined||previousChapter?.acslLinks!==undefined?{acslLinks:normalizeCourseAcslLinks(chapter?.acslLinks??previousChapter?.acslLinks??[])}:{}),problems:chapterProblems(chapter?.problems)};
+ });
  if(new Set(chapters.map(c=>c.id)).size!==chapters.length)fail(400,'VALIDATION','章节 ID 不能重复');
  if(Buffer.byteLength(JSON.stringify(chapters))>1000000)fail(400,'VALIDATION','课程正文总量不能超过1 MB');
  if(!Array.isArray(body.classIds??[])||(body.classIds??[]).length>50)fail(400,'VALIDATION','课程最多关联50个班级');
@@ -122,13 +130,14 @@ export async function schoolCourseProblemLanguage(db,user,{courseId,chapterId,sc
  }
  return view.required_language;
 }
-async function shape(db,schoolId,loaded,{detail=false}={}){
+async function shape(db,schoolId,loaded,{detail=false,user}={}){
  const {course,view,canManage,identityId}=loaded;
  const practice=await chapterPractice(db,schoolId,view,identityId);
+ for(const chapter of practice.chapters){const links=await projectCourseAcslLinks(db,schoolId,user,chapter.acslLinks??[]);if(chapter.acslLinks!==undefined)chapter.acslLinks=links;const counts=acslLinkCounts(links);practice.totalExercises+=counts.total;practice.completedExercises+=counts.completed;}
  const progress=identityId?(await db.query('SELECT chapter_id,content_hash,read FROM school_course_progress WHERE school_id=$1 AND course_id=$2 AND identity_id=$3',[schoolId,course.id,identityId])).rows:[];
  const readIds=new Set(progress.filter(row=>row.read&&view.chapters.some(ch=>ch.id===row.chapter_id&&contentHash(ch)===row.content_hash)).map(row=>row.chapter_id));
  const properties=view.properties??{};
- const body={id:course.id,title:view.title,description:view.description,
+ const body={...localizedFields(properties.localizations),id:course.id,title:view.title,description:view.description,
   category:properties.category??'Programming',difficulty:properties.difficulty??'beginner',coverKey:properties.coverKey??'general',
   estimatedMinutes:properties.estimatedMinutes??60,authorName:properties.authorName??'',authoredAt:properties.authoredAt??course.created_at,
   coverImage:properties.coverImage??null,requiredLanguage:view.required_language??null,archived:!!course.archived_at,accessScope:view.access_scope,
@@ -176,32 +185,33 @@ export async function handleSchoolCourses(context){
       OR $2='student' AND c.published AND (p.access_scope='school' OR EXISTS(
        SELECT 1 FROM school_course_publication_classes pc JOIN school_class_roster r ON r.school_id=pc.school_id AND r.class_id=pc.class_id
        WHERE pc.school_id=c.school_id AND pc.course_id=c.id AND pc.revision=c.published_revision AND r.identity_id=$4 AND EXISTS(SELECT 1 FROM school_classes active WHERE active.school_id=pc.school_id AND active.id=pc.class_id AND active.archived_at IS NULL))))
-     AND ($5='' OR strpos(lower(CASE WHEN $2='student' THEN p.title||' '||p.description ELSE c.title||' '||c.description END),lower($5))>0)
+     AND ($5='' OR strpos(lower(CASE WHEN $2='student' THEN p.title||' '||p.description||' '||COALESCE(p.properties->'localizations','{}'::jsonb)::text ELSE c.title||' '||c.description||' '||COALESCE(c.properties->'localizations','{}'::jsonb)::text END),lower($5))>0)
     ORDER BY c.created_at DESC,c.id LIMIT $6 OFFSET $7`,[schoolId,role,user.id,identityId,q,PAGE_SIZE+1,(page-1)*PAGE_SIZE,archived]);
    const items=[];
-   for(const row of rows.slice(0,PAGE_SIZE))items.push(await shape(db,schoolId,await loadSchoolCourse(db,schoolId,row.id,user,role)));
+   for(const row of rows.slice(0,PAGE_SIZE))items.push(await shape(db,schoolId,await loadSchoolCourse(db,schoolId,row.id,user,role),{user}));
    return reply({items,page,hasMore:rows.length>PAGE_SIZE});
   }
   if(!courseId&&method==='POST'){
    if(!['school_admin','teacher'].includes(role))fail(403,'FORBIDDEN','需要本校教职权限');
    const input=courseInput(body),requestId=uuid(body.requestId,'请求 ID'),hash=canonicalHash(input);
    const old=(await db.query('SELECT * FROM school_courses WHERE school_id=$1 AND owner_account_id=$2 AND create_request_id=$3',[schoolId,user.id,requestId])).rows[0];
-   if(old){if(old.create_request_hash!==hash)fail(409,'IDEMPOTENCY_CONFLICT','相同请求 ID 的课程内容不同');return reply(await shape(db,schoolId,{course:old,view:old,canManage:true,identityId:null},{detail:true}));}
+   if(old){if(old.create_request_hash!==hash)fail(409,'IDEMPOTENCY_CONFLICT','相同请求 ID 的课程内容不同');return reply(await shape(db,schoolId,{course:old,view:old,canManage:true,identityId:null},{detail:true,user}));}
    await validateClasses(db,schoolId,user,role,input.classIds);
    await validateProblems(db,schoolId,input.chapters);
+   for(const chapter of input.chapters)if(chapter.acslLinks!==undefined)chapter.acslLinks=await resolveCourseAcslLinks(db,schoolId,user,chapter.acslLinks,[]);
    const course=(await db.query(`INSERT INTO school_courses(school_id,owner_account_id,title,description,access_scope,chapters,create_request_id,create_request_hash,properties,required_language)
     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,[schoolId,user.id,input.title,input.description,input.accessScope,JSON.stringify(input.chapters),requestId,hash,input.properties,input.requiredLanguage??null])).rows[0];
    await saveClasses(db,schoolId,course.id,input.classIds);
    await auditSchool(db,schoolId,user.id,'school.course.create',course.id);
-   return reply(await shape(db,schoolId,{course,view:course,canManage:true,identityId:null},{detail:true}),201);
+   return reply(await shape(db,schoolId,{course,view:course,canManage:true,identityId:null},{detail:true,user}),201);
   }
   if(!courseId)return null;
   const loaded=await loadSchoolCourse(db,schoolId,courseId,user,role);
   if(method==='GET'&&match[3]==='preview'){
    const view=await schoolCoursePreviewView(db,schoolId,loaded);
-   return reply({...await shape(db,schoolId,{...loaded,view,canManage:false},{detail:true}),isPreview:true});
+   return reply({...await shape(db,schoolId,{...loaded,view,canManage:false},{detail:true,user}),isPreview:true});
   }
-  if(method==='GET'&&!match[3]&&!match[4])return reply(await shape(db,schoolId,loaded,{detail:true}));
+  if(method==='GET'&&!match[3]&&!match[4])return reply(await shape(db,schoolId,loaded,{detail:true,user}));
   if(method==='POST'&&match[4]){
    if(loaded.canManage||role!=='student')fail(403,'FORBIDDEN','阅读进度仅用于学生学习');
    if(!loaded.identityId)fail(409,'SCHOOL_IDENTITY_REQUIRED','请联系学校管理员关联学生身份后记录进度');
@@ -224,6 +234,7 @@ export async function handleSchoolCourses(context){
    const input=courseInput(body,loaded.course);
    await validateClasses(db,schoolId,user,role,input.classIds);
    await validateProblems(db,schoolId,input.chapters);
+   for(const chapter of input.chapters)if(chapter.acslLinks!==undefined)chapter.acslLinks=await resolveCourseAcslLinks(db,schoolId,user,chapter.acslLinks,loaded.course.chapters.find(old=>old.id===chapter.id)?.acslLinks??[]);
    await db.query(`UPDATE school_courses SET title=$3,description=$4,access_scope=$5,chapters=$6,properties=$7,required_language=$8,revision=revision+1,updated_at=clock_timestamp()
     WHERE school_id=$1 AND id=$2`,[schoolId,courseId,input.title,input.description,input.accessScope,JSON.stringify(input.chapters),input.properties,input.requiredLanguage??null]);
    await saveClasses(db,schoolId,courseId,input.classIds);
@@ -236,6 +247,7 @@ export async function handleSchoolCourses(context){
    if(c.access_scope==='classes'&&!ids.length)fail(409,'COURSE_CLASSES_REQUIRED','发布前请至少选择一个班级');
    await validateClasses(db,schoolId,user,role,ids);
    await validateProblems(db,schoolId,c.chapters);
+   for(const chapter of c.chapters){const links=await projectCourseAcslLinks(db,schoolId,user,chapter.acslLinks??[]);if(links.some(link=>!link.available))fail(409,'UNAVAILABLE_ACSL_LINK','请修复不可用的 ACSL 引用后发布课程。');}
    const revision=c.revision+1;
    await db.query(`INSERT INTO school_course_publications(school_id,course_id,revision,title,description,access_scope,chapters,published_by,properties,required_language,language_credit_cutoffs)
     SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
@@ -253,6 +265,6 @@ export async function handleSchoolCourses(context){
    await db.query('UPDATE school_courses SET archived_at=CASE WHEN $3 THEN clock_timestamp() ELSE NULL END,published=false,revision=revision+1,updated_at=clock_timestamp() WHERE school_id=$1 AND id=$2',[schoolId,courseId,archive]);
    await auditSchool(db,schoolId,user.id,archive?'school.course.archive':'school.course.restore',courseId);
   }else return null;
-  return reply(await shape(db,schoolId,await loadSchoolCourse(db,schoolId,courseId,user,role),{detail:true}));
+  return reply(await shape(db,schoolId,await loadSchoolCourse(db,schoolId,courseId,user,role),{detail:true,user}));
  });
 }

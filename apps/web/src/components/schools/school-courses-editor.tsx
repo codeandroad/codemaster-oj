@@ -15,8 +15,13 @@ import {
   courseDifficulties,
 } from "@/components/learning-course";
 import { SchoolCourseProblemPicker } from "./school-course-problem-picker";
-import { MathContent } from "@/components/math-content";
+import { LearningChapterContent } from "@/components/student/learning-course-reader";
+import { CourseLanguageControl, useCourseLanguage } from "@/components/course-language";
+import { localizedChapter, parseCourseLocalizations, parseChapterLocalizations } from "@/components/course-localization";
+import { CourseTranslationFields, ChapterTranslationEditor } from "@/components/teacher/course-translation-editor";
+import { CourseAcslEditor } from "@/components/teacher/course-acsl-editor";
 import { CourseProgrammingLanguageField } from "@/components/teacher/course-programming-language-field";
+import { courseAcslReferences } from "@/components/course-acsl";
 import { useNavigationBlocker } from "@/components/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,12 +54,13 @@ function inputFor(course?: CourseDetail): CourseInput {
         authoredAt: course.authoredAt,
         title: course.title,
         description: course.description,
+        localizations: course.localizations,
         accessScope: course.accessScope,
         classIds: [...course.classIds],
-        chapters: course.chapters.map(({ id, title, body, problems }) => ({
+        chapters: course.chapters.map(({ id, title, body, problems, localizations, acslLinks }) => ({
           id,
           title,
-          body,
+          body, localizations, acslLinks,
           problems: (problems ?? []).map(({ problemId, versionId }) => ({
             problemId,
             versionId,
@@ -94,6 +100,7 @@ export function SchoolCourseEditor({
   onSaved: () => void;
 }) {
   const text = useSchoolText();
+  const { language, setLanguage } = useCourseLanguage();
   const errorMessage = useCourseError(true);
   const mutation = useMutation();
   const pending = useRef(false);
@@ -190,12 +197,17 @@ export function SchoolCourseEditor({
       classSection.current?.focus();
       return;
     }
+    try {
+      if (form.localizations) parseCourseLocalizations(form.localizations);
+      for (const item of form.chapters) if (item.localizations) parseChapterLocalizations(item.localizations);
+    } catch (error) { setValidation(error instanceof Error ? error.message : text("Check translated content.", "请核对双语内容。")); return; }
     const payload = {
       ...form,
       title: form.title.trim(),
       chapters: form.chapters.map((item) => ({
         ...item,
         title: item.title.trim(),
+        acslLinks: courseAcslReferences(item.acslLinks),
       })),
       classIds: form.accessScope === "school" ? [] : form.classIds,
     };
@@ -485,6 +497,7 @@ export function SchoolCourseEditor({
                   </Button>
                 )}
               </div>
+              <CourseTranslationFields value={form.localizations} onChange={localizations => setForm(previous => ({ ...previous, localizations }))} disabled={mutation.busy}/>
               {form.accessScope === "classes" && (
                 <div
                   ref={classSection}
@@ -608,6 +621,7 @@ export function SchoolCourseEditor({
                       }
                     />
                   </label>
+                  <CourseAcslEditor schoolId={school.id} links={chapter.acslLinks ?? []} onChange={acslLinks => editChapter({ acslLinks })} disabled={mutation.busy}/>
                   <SchoolCourseProblemPicker
                     schoolId={school.id}
                     selected={chapter.problems ?? []}
@@ -642,16 +656,8 @@ export function SchoolCourseEditor({
                         aria-labelledby="school-course-body-label"
                         className="min-h-64 max-h-[45vh] overflow-auto rounded-md border border-border p-4"
                       >
-                        {chapter.body ? (
-                          <MathContent
-                            content={chapter.body}
-                            preserveHeadingLevels
-                          />
-                        ) : (
-                          <p className="text-sm text-muted-foreground">
-                            {text("This chapter is empty.", "本章正文为空。")}
-                          </p>
-                        )}
+                        <CourseLanguageControl language={language} onChange={setLanguage} missing={!chapter.localizations?.[language]}/>
+                        <div className="mt-3"><LearningChapterContent chapter={localizedChapter(chapter, language)}/></div>
                       </div>
                     ) : (
                       <textarea
@@ -667,6 +673,7 @@ export function SchoolCourseEditor({
                       />
                     )}
                   </div>
+                  <ChapterTranslationEditor value={chapter.localizations} original={{ title: chapter.title, content: chapter.body, objective: "", checkpoint: "", checkpointAnswer: "" }} onChange={localizations => editChapter({ localizations })} disabled={mutation.busy}/>
                 </div>
               ) : (
                 <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">

@@ -4,6 +4,7 @@ import { useRef, useState, type MouseEvent } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Feedback, Loading, useData, useMutation } from "@/components/admin/common";
 import { CourseAccessSummary } from "@/components/course-access";
+import type { CourseLocalizations, ChapterLocalizations } from "@/components/course-localization";
 import { LearningCourseReader } from "@/components/student/learning-course-reader";
 import { AppLink } from "@/components/navigation";
 import { useCourseProgressRefresh } from "@/components/student/course-progress-refresh";
@@ -19,6 +20,7 @@ type PublicCourseEntry = {
   id: string;
   title: string;
   description: string;
+  localizations?: CourseLocalizations;
   chapterCount: number;
   completedChapters?: number;
   totalExercises?: number;
@@ -37,6 +39,7 @@ type CourseDetail = {
   title: string;
   description: string;
   requiredLanguage?: SubmissionLanguage | null;
+  localizations?: CourseLocalizations;
   revision: number;
   sourceSchool?: string;
   authorName?: string;
@@ -47,6 +50,7 @@ type CourseDetail = {
     id: string;
     title: string;
     body: string;
+    localizations?: ChapterLocalizations;
     read: boolean;
     problems: { problemId: string; versionId: string; title: string; solved: boolean }[];
   }[];
@@ -195,7 +199,7 @@ function CourseReader({ id, courseQuery }: { id: string; courseQuery: string }) 
     course={{ ...course.data, chapterCount: course.data.chapters.length, taskCount: course.data.totalExercises,
       completedTasks: course.data.completedExercises }}
     chapters={course.data.chapters.map(chapter => ({
-      id: chapter.id, title: chapter.title, content: chapter.body, completed: chapter.read,
+      id: chapter.id, title: chapter.title, content: chapter.body, localizations: chapter.localizations, completed: chapter.read,
       problems: chapter.problems.map(problem => ({ id: problem.problemId, title: problem.title, completed: problem.solved,
         href: `/practice/problems?${new URLSearchParams({ problemId: problem.problemId, versionId: problem.versionId,
           publicCourseId: id, publicChapterId: chapter.id, ...(courseQuery && { courseQ: courseQuery }) })}`,

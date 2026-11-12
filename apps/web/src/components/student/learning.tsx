@@ -1,5 +1,11 @@
 "use client";
 
+import { preserveAcslLearningContext } from "@/components/course-acsl-navigation";
+import { useCourseLanguage } from "@/components/course-language";
+import { courseLanguageHref, localizedCourse, type CourseLocalizations, type ChapterLocalizations } from "@/components/course-localization";
+import type { CourseAcslLink } from "@/components/course-acsl";
+import { CourseAcslPractice } from "./course-acsl-practice";
+import { CoursePracticeReturn } from "./course-practice-return";
 import { CoursePaper4Practice } from "./course-paper4-practice";
 import { useCourseProgressRefresh } from "./course-progress-refresh";
 import type { CoursePaper4Link } from "@/components/course-paper4";
@@ -26,6 +32,8 @@ export interface LearningChapter {
   id: string; title: string; content: string; position: number; completed: boolean;
   objective?: string; checkpoint?: string; checkpointAnswer?: string; estimatedMinutes?: number;taskCount?:number;completedTasks?:number;
   paper4Links?: CoursePaper4Link[];
+  localizations?: ChapterLocalizations;
+  acslLinks?: CourseAcslLink[];
   problems: { problemId: string; title: string; versionId: string;completed?:boolean }[];
 }
 type CourseAssignment = {
@@ -37,12 +45,13 @@ type CourseAssignment = {
   totalProblems?: number;
 };
 
-export interface LearningPath extends CourseAccessMetadata { id: string; title: string; description: string; category: string; published: boolean; chapterCount: number; completedChapters: number; canEdit: boolean;difficulty?:keyof typeof courseDifficulties;coverKey?:string;taskCount?:number;completedTasks?:number; chapters?: LearningChapter[]; assignments?: CourseAssignment[]; }
+export interface LearningPath extends CourseAccessMetadata { localizations?: CourseLocalizations; id: string; title: string; description: string; category: string; published: boolean; chapterCount: number; completedChapters: number; canEdit: boolean;difficulty?:keyof typeof courseDifficulties;coverKey?:string;taskCount?:number;completedTasks?:number; chapters?: LearningChapter[]; assignments?: CourseAssignment[]; }
 export function StudentLearningList(){
  const {locale}=useLocale();
+ const {language}=useCourseLanguage();
  const paths=useData<{items:LearningPath[]}>("learning-paths");
  const [query, setQuery] = useCourseCatalogQuery();
- const visible = filterCourseCatalog(paths.data?.items ?? [], query);
+ const visible = filterCourseCatalog((paths.data?.items ?? []).map(path => localizedCourse(path, language)), query);
  useCourseProgressRefresh(paths);
  return <>
   <PageHeader title={ui(locale,"课程","Courses")} description={ui(locale,"按章节阅读、练习与复盘；已读和判题通过分别记录。","Read, practice, and review each chapter. Reading and accepted submissions are tracked separately.")}/>
@@ -52,7 +61,7 @@ export function StudentLearningList(){
      ? ui(locale,"没有符合搜索条件的课程。","No courses match this search.")
      : ui(locale,"暂无已发布课程","No published courses yet")) : undefined}>
     {visible.map(path=><LearningCourseRow key={path.id} course={{...path,difficulty:path.difficulty??"beginner"}}
-      title={<AppLink href={`/student/learning-paths/${path.id}`} className={learningCourseTitleClass}>{path.title}</AppLink>}
+      title={<AppLink href={courseLanguageHref(`/student/learning-paths/${path.id}`, language)} className={learningCourseTitleClass}>{path.title}</AppLink>}
       reading={{value:path.completedChapters,total:path.chapterCount}}
       practice={{value:path.completedTasks??0,total:path.taskCount??0}} />)}
    </LearningCourseList></div>
@@ -61,11 +70,12 @@ export function StudentLearningList(){
 }
 export function StudentLearningDetail({ id, chapterId }: { id: string; chapterId?: string }) {
   const { locale } = useLocale();
+  const { language } = useCourseLanguage();
   const path = useData<LearningPath>(`learning-paths/${id}`), search = useSearchParams();
   const selected = chapterId ?? search.get("chapter");
   const pending = path.data?.chapters?.some(item => item.paper4Links?.some(link => coursePaper4Progress(link).pending > 0)) ?? false;
   useCourseProgressRefresh({ ...path, pending });
-  const chapterHref = (chapter: string) => `/student/learning-paths/${id}/chapters/${chapter}`;
+  const chapterHref = (chapter: string) => preserveAcslLearningContext(courseLanguageHref(`/student/learning-paths/${id}/chapters/${chapter}`, language), search, "00000000-0000-4000-8000-000000000052") ?? courseLanguageHref(`/student/learning-paths/${id}/chapters/${chapter}`, language);
   return <State data={path}>{path.data && <LearningCourseReader
     course={{ ...path.data, taskCount: path.data.taskCount ?? 0, completedTasks: path.data.completedTasks ?? 0 }}
     chapters={(path.data.chapters ?? []).map(chapter => ({ ...chapter, problems: chapter.problems.map(problem => ({
@@ -74,10 +84,10 @@ export function StudentLearningDetail({ id, chapterId }: { id: string; chapterId
     })) }))}
     selectedChapterId={selected} chapterHref={chapterHref} scrollKey={id}
     metadata={<CourseAccessSummary course={path.data} showAuthor/>}
-    relatedActivities={<CourseAssignmentLinks key={id} items={path.data.assignments ?? []} locale={locale}/>}
+    relatedActivities={<><CoursePracticeReturn schoolId="00000000-0000-4000-8000-000000000052"/><CourseAssignmentLinks key={id} items={path.data.assignments ?? []} locale={locale}/></>}
     extraPractice={chapterId => {
       const chapter = path.data?.chapters?.find(item => item.id === chapterId);
-      return chapter?.paper4Links?.length ? <CoursePaper4Practice links={chapter.paper4Links} pathId={id} chapterId={chapterId}/> : null;
+      return chapter && (chapter.paper4Links?.length || chapter.acslLinks?.length) ? <>{Boolean(chapter.paper4Links?.length) && <CoursePaper4Practice links={chapter.paper4Links ?? []} pathId={id} chapterId={chapterId}/>}<CourseAcslPractice links={chapter.acslLinks ?? []} schoolId="00000000-0000-4000-8000-000000000052" legacy courseHref={chapterHref(chapterId)}/></> : null;
     }}
     onRead={async chapterId => {
       await productionApi(`chapters/${chapterId}/progress`, { method: "POST", body: { completed: true } });

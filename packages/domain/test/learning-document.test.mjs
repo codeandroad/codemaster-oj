@@ -3,7 +3,13 @@ const doc={format:'codemaster-learning-path',version:1,title:'Python',descriptio
 test('server validates document and drops foreign IDs/progress/published status',()=>{const d=validateLearningDocument({...doc,published:true,completed:true,id:'foreign'});assert.equal(d.chapters.length,1);assert.equal(d.published,undefined);assert.equal(d.id,undefined);});
 test('bad version, empty content and invalid UUID are rejected server-side',()=>{assert.throws(()=>validateLearningDocument({...doc,version:2}));assert.throws(()=>validateLearningDocument({...doc,chapters:[{...doc.chapters[0],content:''}]}));assert.throws(()=>validateLearningDocument({...doc,chapters:[{...doc.chapters[0],problemIds:['fake']}]}));});
 function context(failChapter=false,role='teacher') {const calls=[],id='11111111-1111-4111-8111-111111111111';const db={release(){},async query(sql,params){calls.push({sql,params});if(sql.startsWith('INSERT INTO learning_paths'))return {rowCount:1,rows:[{id,estimated_minutes:90,title:'Python'}]};if(sql.startsWith('INSERT INTO learning_chapters')){if(failChapter)throw Error('database failure');return {rowCount:1,rows:[{id}]};}return {rowCount:0,rows:[]};}};return {calls,ctx:{route:'/learning-paths/import',method:'POST',body:doc,user:{id,identityId:id,roles:[role]},pool:{connect:async()=>db},helpers:{audit:async()=>{calls.push({sql:'AUDIT'});}},url:new URL('https://example.test/api/v1/learning-paths/import')}};}
-test('import commits the path and chapters together as a draft',async()=>{const {ctx,calls}=context();const r=await handleEducation(ctx);assert.equal(r.status,201);assert.equal(r.body.published,false);assert.equal(r.body.chapterCount,1);assert.equal(calls.at(-1).sql,'COMMIT');assert.ok(!calls.some(c=>c.sql.includes('published_at')));});
+test('import commits the path and chapters together as a draft',async()=>{
+ const {ctx,calls}=context();const r=await handleEducation(ctx);
+ assert.equal(r.status,201);assert.equal(r.body.published,false);assert.equal(r.body.chapterCount,1);assert.equal(calls.at(-1).sql,'COMMIT');
+ // Reading publication state in a CASE expression must not count as publishing.
+ assert.ok(!calls.some(({sql})=>/\bINSERT\s+INTO\s+learning_paths\s*\([^)]*\bpublished_at\b/i.test(sql)), 'draft import must not insert a publication timestamp');
+ assert.ok(!calls.some(({sql})=>/\bUPDATE\s+learning_paths\b/i.test(sql)&&/(?:\bSET|,)\s*published_at\s*=/i.test(sql)), 'draft import must not assign a publication timestamp');
+});
 test('database failure rolls back the entire import',async()=>{const {ctx,calls}=context(true);await assert.rejects(handleEducation(ctx));assert.equal(calls.at(-1).sql,'ROLLBACK');assert.ok(!calls.some(c=>c.sql==='COMMIT'));});
 test('student cannot import learning paths',async()=>{const {ctx,calls}=context(false,'student');await assert.rejects(handleEducation(ctx),e=>e.status===403);assert.equal(calls.length,0);});
 

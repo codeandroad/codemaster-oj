@@ -8,6 +8,7 @@ import { submissionCaseFeedback } from './submission-feedback.mjs';
 import { handleAcslManagement } from './acsl-management.mjs';
 import { acslTranslation, acslSolution, requireAcslTranslation } from './acsl-translation.mjs';
 import { acslCatalog } from './acsl-catalog.mjs';
+import { acslLearningLinks, courseAcslPicker } from './course-acsl.mjs';
 
 const reply = (body, status = 200) => ({ status, body });
 
@@ -139,7 +140,7 @@ async function paperDetail(db, paper, user) {
   });
   const pointRules = user.roles.includes('student') && paper.written_points_per_correct !== null
     ? { writtenPerCorrect: paper.written_points_per_correct, programming: paper.programming_points } : undefined;
-  return { ...summary(paper, state), questions, pointRules,
+  return { ...summary(paper, state), questions, pointRules, learningLinks: await acslLearningLinks(db,paper.school_id,paper,user),
     writtenRevision: paper.written_revision ?? paper.version_id,
     writtenRevisionAt: paper.written_revision_at,
     changedQuestionIds: paper.written_changed_question_ids,
@@ -341,6 +342,7 @@ export async function handleAcsl({ pool, user, route, method, body = {}, url }) 
   if (!match) return null;
   const schoolId = uuid(match[1]);
   if (match[2] === 'manage') return handleAcslManagement({ pool, user, schoolId, tail: match[3], method, body, url });
+  if (match[2] === 'links' && !match[3] && method === 'GET') return reply(await courseAcslPicker(pool,schoolId,user));
   return transaction(pool, async db => {
     await access(db, schoolId, user);
     if (!match[2] && method === 'GET') {
@@ -348,7 +350,10 @@ export async function handleAcsl({ pool, user, route, method, body = {}, url }) 
       return reply({ enabled: items.length > 0, items });
     }
     const paper = await loadPaper(db, schoolId, match[2]);
-    if (!match[3] && method === 'GET') return reply(await paperDetail(db, paper, user));
+    if (!match[3] && method === 'GET') {
+      if(url.searchParams.has('paperVersionId'))checkVersion(paper,url.searchParams.get('paperVersionId'));
+      return reply(await paperDetail(db, paper, user));
+    }
     const assetMatch = match[3]?.match(/^assets\/([A-Za-z0-9-]{1,100})$/);
     if (assetMatch && method === 'GET') {
       checkVersion(paper, url.searchParams.get('versionId'));
@@ -380,3 +385,6 @@ export async function handleAcsl({ pool, user, route, method, body = {}, url }) 
     return null;
   });
 }
+
+// Read-only course projections share the existing account and formal-AC rules.
+export { access as requireAcslCourseAccess, loadGrade as acslCourseGrade, codingProgress as acslCourseCodingProgress };

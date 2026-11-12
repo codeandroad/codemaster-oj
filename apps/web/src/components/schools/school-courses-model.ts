@@ -1,3 +1,5 @@
+import type { CourseLocalizations, ChapterLocalizations } from "@/components/course-localization";
+import type { CourseAcslLink } from "@/components/course-acsl";
 import { ApiError, type SubmissionLanguage } from "@/lib/production-api";
 import { useSchoolText } from "./school-ui";
 
@@ -5,6 +7,8 @@ export type CourseChapter = {
   id: string;
   title: string;
   body: string;
+  localizations?: ChapterLocalizations;
+  acslLinks?: CourseAcslLink[];
   read?: boolean;
   problems?: CourseProblem[];
 };
@@ -29,6 +33,7 @@ export type SchoolCourse = CourseProperties & {
   id: string;
   title: string;
   description: string;
+  localizations?: CourseLocalizations;
   status: "draft" | "published" | "unpublished";
   revision: number;
   publishedRevision: number | null;
@@ -51,7 +56,7 @@ export type CourseDetail = SchoolCourse & {
 export type CourseInput = CourseProperties &
   Pick<
     CourseDetail,
-    "title" | "description" | "accessScope" | "classIds" | "chapters"
+    "title" | "description" | "localizations" | "accessScope" | "classIds" | "chapters"
   >;
 export type CoursePage<T> = { items: T[]; page: number; hasMore: boolean };
 

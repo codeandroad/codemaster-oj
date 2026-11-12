@@ -1,3 +1,5 @@
+import { localizedFields, publicChapterLocalizations } from './course-localizations.mjs';
+import { projectCourseAcslLinks, acslLinkCounts } from './course-acsl.mjs';
 import { transaction } from './db.mjs';
 import { activeAccount, auditSchool, LEGACY_SCHOOL_ID, lockSchoolTeaching, requireSchoolAdmin } from './schools.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
@@ -21,7 +23,7 @@ async function context(db, user, { platform = false } = {}) {
 async function edition(db, listing, { detail = false, lock = false } = {}) {
   await setSchool(db, listing.school_id);
   if (listing.school_id === LEGACY_SCHOOL_ID) return legacyEdition(db, listing, { detail, lock });
-  return (await db.query(`SELECT p.title, p.description, p.revision, p.access_scope,
+  return (await db.query(`SELECT p.title, p.description, p.revision, p.access_scope, p.properties->'localizations' AS localizations,
       p.required_language,p.language_credit_cutoffs,s.name school_name,
       p.properties->>'category' category, p.properties->>'difficulty' difficulty, p.properties->>'coverKey' cover_key,
       p.properties->>'coverImage' cover_image, p.properties->>'authorName' author_name,
@@ -66,7 +68,7 @@ async function admissionFor(db, listing, course, accountId) {
 
 function courseEntry(listing, course, admission) {
   return {
-    id: listing.id,
+    ...localizedFields(course.localizations),id: listing.id,
     title: course.title,
     description: course.description,
     chapterCount: course.chapter_count,
@@ -111,6 +113,7 @@ async function catalogue(pool, user) {
           .flatMap(link => available.get(`${link.problemId}:${link.versionId}`) ?? []);
         entry.totalExercises = exercises.length;
         entry.completedExercises = exercises.filter(problem => problem.solved).length;
+        for(const chapter of detail.chapters){const links=await projectCourseAcslLinks(db,listing.school_id,user,chapter.acslLinks??[]),counts=acslLinkCounts(links);entry.totalExercises+=counts.total;entry.completedExercises+=counts.completed;}
       }
       courses.push(entry);
     }
@@ -211,8 +214,11 @@ async function publicCourse({ pool, user, method, body }, match) {
       'SELECT chapter_id,content_hash,read FROM public_course_progress WHERE listing_id=$1 AND account_id=$2',
       [listing.id, user.id]);
     const availableProblems = await publicChapterProblems(db, listing, detail, user.id);
+    const acslByChapter=new Map();
+    for(const chapter of publishedChapters)acslByChapter.set(chapter.id,await projectCourseAcslLinks(db,listing.school_id,user,chapter.acslLinks??[]));
     const chapters = publishedChapters.map((c, position) => ({
-      id: c.id, title: c.title, body: c.body, position,
+      ...localizedFields(publicChapterLocalizations(c.localizations)),id: c.id, title: c.title, body: c.body, position,
+      ...(c.acslLinks?.length?{acslLinks:acslByChapter.get(c.id)}:{}),
       read: progress.some(p => p.chapter_id === c.id && p.content_hash === contentHash(c) && p.read),
       problems: (c.problems ?? []).flatMap(({ problemId, versionId }) => {
         const problem = availableProblems.get(`${problemId}:${versionId}`);
@@ -222,8 +228,8 @@ async function publicCourse({ pool, user, method, body }, match) {
     return respond({
       ...courseEntry(listing, course, admission),
       chapters, completedChapters: chapters.filter(c => c.read).length, canTrackProgress: true,
-      totalExercises: chapters.reduce((total, chapter) => total + chapter.problems.length, 0),
-      completedExercises: chapters.reduce((total, chapter) => total + chapter.problems.filter(problem => problem.solved).length, 0),
+      totalExercises: chapters.reduce((total, chapter) => total + chapter.problems.length + acslLinkCounts(chapter.acslLinks??[]).total, 0),
+      completedExercises: chapters.reduce((total, chapter) => total + chapter.problems.filter(problem => problem.solved).length + acslLinkCounts(chapter.acslLinks??[]).completed, 0),
     });
   });
 }

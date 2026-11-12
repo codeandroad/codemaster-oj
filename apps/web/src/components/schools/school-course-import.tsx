@@ -82,6 +82,7 @@ export function SchoolCourseImport({
                 setDraft({
                   title: doc.title,
                   description: doc.description,
+                  localizations: doc.localizations,
                   category: doc.category,
                   requiredLanguage: doc.requiredLanguage,
                   difficulty: doc.difficulty ?? "beginner",
@@ -95,6 +96,8 @@ export function SchoolCourseImport({
                   chapters: doc.chapters.map((c) => ({
                     id: crypto.randomUUID(),
                     title: c.title,
+                    localizations: c.localizations,
+                    acslLinks: c.acslLinks,
                     body: [
                       c.objective &&
                         `## ${text("Learning objective", "学习目标")}\n\n${c.objective}`,

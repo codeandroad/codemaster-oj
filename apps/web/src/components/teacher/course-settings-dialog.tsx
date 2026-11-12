@@ -9,11 +9,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { useRangeSelection } from "@/components/ui/use-range-selection";
 import { apiMessage, productionApi, type SchoolClass } from "@/lib/production-api";
-import { useData } from "./shared";
 import { CourseProgrammingLanguageField } from "./course-programming-language-field";
+import { useData } from "./shared";
+import { CourseTranslationFields } from "./course-translation-editor";
+import { parseCourseLocalizations, type CourseLocalizations } from "@/components/course-localization";
 import { CourseSettingsInputError, courseSettingsInput, courseCoverByteLength, courseCoverMaxBytes } from "./course-settings-input";
 
 export interface CourseSettings extends CourseAccessMetadata {
+  localizations?: CourseLocalizations;
   id: string; title: string; description: string; category: string; estimatedMinutes?: number;
   difficulty?: keyof typeof courseDifficulties; coverKey?: keyof typeof courseCovers;
 }
@@ -24,6 +27,7 @@ export function CourseSettingsDialog({ course, onClose, onSaved }: { course: Cou
   const { locale } = useLocale(), tx = (zh: string, en: string) => locale === "en" ? en : zh;
   const classes = useData<{ items: SchoolClass[] }>("classes");
   const [tab, setTab] = useState<"details" | "access">("details");
+  const [localizations, setLocalizations] = useState(course.localizations);
   const [requiredLanguage, setRequiredLanguage] = useState(course.requiredLanguage ?? null);
   const [title, setTitle] = useState(course.title), [description, setDescription] = useState(course.description), [category, setCategory] = useState(course.category);
   const [authorName, setAuthorName] = useState(course.authorName ?? ""), [authoredAt, setAuthoredAt] = useState(localTime(course.authoredAt || course.createdAt));
@@ -77,7 +81,7 @@ export function CourseSettingsDialog({ course, onClose, onSaved }: { course: Cou
     try {
       const body = courseSettingsInput({ title, description, category, estimatedMinutes: minutes, difficulty, coverKey, coverImage, authorName, authoredAt, accessScope: scope, classIds, availableFrom: from, availableUntil: until, listed });
       setBusy(true);
-      const saved = await productionApi<CourseSettings>(`learning-paths/${course.id}`, { method: "PATCH", body: { ...body, requiredLanguage } });
+      const saved = await productionApi<CourseSettings>(`learning-paths/${course.id}`, { method: "PATCH", body: { ...body, requiredLanguage, localizations: localizations ? parseCourseLocalizations(localizations) : undefined } });
       onSaved(saved); onClose();
     } catch (reason) {
       if (reason instanceof CourseSettingsInputError) { setTab(reason.section); fail(messages[reason.code] ?? apiMessage(reason)); }
@@ -97,6 +101,7 @@ export function CourseSettingsDialog({ course, onClose, onSaved }: { course: Cou
         <div className="grid gap-4 sm:grid-cols-3"><label className="grid gap-1 text-sm font-semibold">{tx("课程标签", "Category")}<input className={input} maxLength={100} required value={category} onChange={event => setCategory(event.target.value)}/></label><label className="grid gap-1 text-sm font-semibold">{tx("课程难度", "Level")}<select className={input} value={difficulty} onChange={event => setDifficulty(event.target.value as typeof difficulty)}>{Object.entries(courseDifficulties).map(([key, label]) => <option key={key} value={key}>{locale === "en" ? ({ beginner: "Beginner", intermediate: "Intermediate", advanced: "Advanced" })[key as typeof difficulty] : label}</option>)}</select></label><label className="grid gap-1 text-sm font-semibold">{tx("预计分钟数", "Estimated minutes")}<input className={input} type="number" min={1} max={10080} required value={minutes} onChange={event => setMinutes(Number(event.target.value))}/></label></div>
         <CourseProgrammingLanguageField className={input} value={requiredLanguage} onChange={setRequiredLanguage}/>
         <label className="grid gap-1 text-sm font-semibold">{tx("简介", "Description")}<textarea className={`${input} min-h-24 py-2 leading-6`} maxLength={4000} value={description} onChange={event => setDescription(event.target.value)}/></label>
+        <CourseTranslationFields value={localizations} onChange={setLocalizations} disabled={busy || imageBusy}/>
         <div className="grid items-start gap-4 sm:grid-cols-[180px_minmax(0,1fr)]"><div className="overflow-hidden rounded-md border border-border"><LearningCover coverKey={coverKey} coverImage={coverImage}/></div><div className="space-y-3"><label className="grid gap-1 text-sm font-semibold">{tx("预设封面", "Preset cover")}<select className={input} value={coverKey} onChange={event => { setCoverKey(event.target.value as typeof coverKey); setCoverImage(""); }}>{Object.entries(courseCovers).map(([key, label]) => <option key={key} value={key}>{locale === "en" ? ({ python: "Python", algorithms: "Algorithms", general: "General learning" })[key as typeof coverKey] : label}</option>)}</select></label><div className="flex flex-wrap items-center gap-2"><label className="relative inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border border-border px-3 text-sm font-semibold focus-within:outline-2 focus-within:outline-primary"><Camera size={16} aria-hidden="true"/>{tx("上传预览图", "Upload cover")}<input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy || imageBusy} className="sr-only" onChange={event => { void image(event.target.files?.[0]); event.target.value = ""; }}/></label>{coverImage && <Button type="button" variant="ghost" size="sm" onClick={() => setCoverImage("")}>{tx("移除自定义图片", "Remove image")}</Button>}</div><p className="text-xs text-muted-foreground">{tx("PNG、JPEG、WebP，原图最大 5 MB；裁切为 16:9，压缩后不超过 512 KB。", "PNG, JPEG or WebP, up to 5 MB; cropped to 16:9 and compressed to at most 512 KB.")}</p>{imageBusy && <p role="status" className="text-sm text-muted-foreground">{tx("正在处理图片…", "Processing image…")}</p>}</div></div>
       </fieldset> : <fieldset disabled={busy || imageBusy} className="space-y-4">
         <label className="grid gap-1 text-sm font-semibold">{tx("准入范围", "Eligible students")}<select className={input} value={scope} onChange={event => setScope(event.target.value as typeof scope)}><option value="school">{tx("全校学生（含未分班）", "All school students (including no class)")}</option><option value="classes">{tx("指定班级（可多选）", "Selected classes (multiple allowed)")}</option></select></label>

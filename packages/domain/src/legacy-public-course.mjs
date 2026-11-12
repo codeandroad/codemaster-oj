@@ -1,5 +1,6 @@
 import { fail } from './security.mjs';
 import { activeAccount, LEGACY_SCHOOL_ID } from './schools.mjs';
+import { publicChapterLocalizations, localizedFields } from './course-localizations.mjs';
 
 // Original-school lessons are mutable. The parent version changes whenever
 // teaching staff edit the course, its audience or its chapters.
@@ -24,7 +25,7 @@ export async function requireLegacyCourseAdmin(db, accountId) {
 }
 
 async function legacyCandidates(db, courseId, { lock = false, preview = false } = {}) {
-  const { rows } = await db.query(`SELECT p.id,p.title,p.description,p.access_scope,p.required_language,p.language_credit_cutoffs,
+  const { rows } = await db.query(`SELECT p.id,p.title,p.description,p.access_scope,p.localizations,p.required_language,p.language_credit_cutoffs,
     ${legacyCourseSourceVersion} source_version,
     (${legacyCourseIsLive}) published,
     CASE WHEN latest.source_version=${legacyCourseSourceVersion} THEN latest.revision
@@ -56,14 +57,14 @@ export const legacyCourseCandidate = async (db, courseId, options) => (await leg
 export const legacyCourseReviewCandidates = (db) => legacyCandidates(db, null, { preview: true });
 
 async function legacyCandidateChapters(db, courseId) {
-  const { rows } = await db.query(`SELECT c.id,c.title,c.content body,COALESCE((
+  const { rows } = await db.query(`SELECT c.id,c.title,c.content body,c.localizations,c.acsl_links AS "acslLinks",COALESCE((
       SELECT jsonb_agg(jsonb_build_object('problemId',cp.problem_id,'versionId',cp.version_id)
         ORDER BY cp.position,cp.problem_id)
       FROM chapter_problems cp WHERE cp.chapter_id=c.id
     ),'[]'::jsonb) problems
     FROM learning_chapters c WHERE c.path_id=$1 AND c.archived_at IS NULL
     ORDER BY c.position,c.created_at,c.id`, [courseId]);
-  return rows;
+  return rows.map(({localizations,acslLinks,...chapter})=>({...chapter,...localizedFields(publicChapterLocalizations(localizations)),...(acslLinks?.length?{acslLinks}:{})}));
 }
 
 export async function snapshotLegacyCourse(db, course) {
@@ -73,14 +74,14 @@ export async function snapshotLegacyCourse(db, course) {
     fail(409, 'NOT_PUBLISHED', '请先发布包含完整章节的校内课程');
   }
   await db.query(`INSERT INTO legacy_course_publication_versions
-    (school_id,course_id,revision,source_version,title,description,access_scope,chapters,required_language,language_credit_cutoffs)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10)`,
+    (school_id,course_id,revision,source_version,title,description,access_scope,chapters,localizations,required_language,language_credit_cutoffs)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10,$11)`,
   [LEGACY_SCHOOL_ID, course.id, course.published_revision, course.source_version, course.title,
-    course.description, course.access_scope, JSON.stringify(chapters),course.required_language,course.language_credit_cutoffs]);
+    course.description, course.access_scope, JSON.stringify(chapters),course.localizations??null,course.required_language,course.language_credit_cutoffs]);
 }
 
 export async function legacyEdition(db, listing, { detail, lock }) {
-  return (await db.query(`SELECT v.title,v.description,v.revision,v.access_scope,v.required_language,v.language_credit_cutoffs,s.name school_name,
+  return (await db.query(`SELECT v.title,v.description,v.revision,v.access_scope,v.localizations,v.required_language,v.language_credit_cutoffs,s.name school_name,
     p.category,p.difficulty,p.cover_key,p.cover_image,p.author_name,p.authored_at,
     jsonb_array_length(v.chapters) chapter_count ${detail ? ', v.chapters' : ''}
     FROM legacy_course_publication_versions v

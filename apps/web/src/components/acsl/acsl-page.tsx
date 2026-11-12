@@ -22,6 +22,8 @@ import {
   type CampusUser,
 } from "@/lib/production-api";
 import type { School } from "@/components/schools/school-ui";
+import { preserveAcslLearningContext } from "@/components/course-acsl-navigation";
+import { AcslLearningLinks } from "./learning-links";
 import { AcslQuestionView } from "./question-view";
 import { AcslProgramming } from "./programming";
 import { AcslCatalogView } from "./catalog-view";
@@ -83,7 +85,7 @@ export function AcslPage({
   const language: AcslLanguage =
     params.get("contentLanguage") === "zh" ? "zh" : "en";
   const paperId = params.get("paperId");
-  const catalogHref = acslCatalogHref(baseHref, params);
+  const catalogHref = preserveAcslLearningContext(acslCatalogHref(baseHref, params), params, schoolId) ?? acslCatalogHref(baseHref, params);
   const catalog = useWorkspaceData<AcslCatalog>(
     paperId ? "" : `schools/${schoolId}/acsl`,
   );
@@ -136,9 +138,16 @@ function PaperLoader({
   language: AcslLanguage;
   legacySchool: boolean;
 }) {
+  const params = useSearchParams(), { locale } = useLocale();
+  const requestedVersion = params.get("paperVersionId");
   const paper = useData<AcslPaper>(
-    `schools/${schoolId}/acsl/${encodeURIComponent(paperId)}`,
+    `schools/${schoolId}/acsl/${encodeURIComponent(paperId)}${requestedVersion ? `?${new URLSearchParams({ paperVersionId: requestedVersion })}` : ""}`,
   );
+  if (paper.data && requestedVersion && requestedVersion !== paper.data.versionId) return <div className="space-y-3" role="alert"><p className="text-sm text-muted-foreground">{locale === "en" ? "This linked edition is no longer available. Return to the course and ask your teacher to update its practice link." : "关联的试卷版本已不可用，请返回课程并请老师更新练习关联。"}</p><AppLink href={baseHref} className="text-sm text-primary hover:underline">{locale === "en" ? "ACSL papers" : "ACSL 试卷"}</AppLink></div>;
+  const [paperPathname, paperQuery = ""] = baseHref.split("?");
+  const paperParams = new URLSearchParams(paperQuery);
+  if (requestedVersion) paperParams.set("paperVersionId", requestedVersion);
+  const paperBaseHref = `${paperPathname}${paperParams.size ? `?${paperParams}` : ""}`;
   return (
     <Loading resource={paper}>
       {paper.data && (
@@ -146,7 +155,7 @@ function PaperLoader({
           schoolId={schoolId}
           initialPaper={paper.data}
           user={user}
-          baseHref={baseHref}
+          baseHref={paperBaseHref}
           language={language}
           legacySchool={legacySchool}
         />
@@ -403,10 +412,11 @@ function PaperView({
     );
   return (
     <div className="space-y-4" data-od-id="acsl-paper">
+      <AcslLearningLinks links={paper.learningLinks ?? []} schoolId={schoolId} language={language} questionIds={reviewing ? paper.questions.filter(item => params.get("reviewMode") !== "wrong" || item.lastSubmission?.correct === false).map(item => item.id) : question ? [question.id] : []}/>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <AppLink
-            href={baseHref}
+            href={acslCatalogHref(baseHref, params)}
             className="text-xs text-primary hover:underline"
           >
             {tx("Back to ACSL papers", "返回 ACSL 试卷")}

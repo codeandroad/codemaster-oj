@@ -1,5 +1,6 @@
 "use client";
 import { WorkspaceDataProvider, useWorkspaceData } from "./workspace-data";
+import { CourseLanguageProvider } from "./course-language";
 import { useAcslEnabled } from "./acsl/acsl-page";
 import { LegacyAcslTeacherPage } from "./acsl/teacher-entry";
 import { StudentPresenceHeartbeat } from "./student/student-presence";
@@ -165,10 +166,10 @@ export function ProductionApp() {
     clearProductionSession();
     router.replace("/login");
   };
-  return <AppLocaleProvider key={user.id} accountId={user.id}><WorkspaceDataProvider key={`${user.id}:${user.identityId}:${user.roles.join(",")}`}>
+  return <AppLocaleProvider key={user.id} accountId={user.id}><CourseLanguageProvider key={user.id} accountId={user.id}><WorkspaceDataProvider key={`${user.id}:${user.identityId}:${user.roles.join(",")}`}>
     <AuthenticatedWorkspace user={user} pathname={pathname} search={search} profileVersion={profileVersion}
       onUserSaved={setUser} onProfileSaved={(next) => { setUser(next); setProfileVersion(value => value + 1); }} onLogout={logout}/>
-  </WorkspaceDataProvider></AppLocaleProvider>;
+  </WorkspaceDataProvider></CourseLanguageProvider></AppLocaleProvider>;
 }
 
 function AuthenticatedWorkspace({user,pathname,search,profileVersion,onUserSaved,onProfileSaved,onLogout}: {

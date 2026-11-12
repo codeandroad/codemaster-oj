@@ -225,14 +225,21 @@ export function Table({
   headers,
   children,
   min = 850,
+  columnWidths,
 }: {
   headers: string[];
   children: ReactNode;
   min?: number;
+  columnWidths?: readonly number[];
 }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm" style={{ minWidth: min }}>
+      <table className={`w-full text-left text-sm${columnWidths ? " table-fixed" : ""}`} style={{ minWidth: min }}>
+        {columnWidths && (
+          <colgroup>
+            {columnWidths.map((width, index) => <col key={headers[index]} style={{ width: `${width}%` }} />)}
+          </colgroup>
+        )}
         <thead className="bg-surface-subtle text-xs text-muted-foreground">
           <tr>
             {headers.map((header, i) => (

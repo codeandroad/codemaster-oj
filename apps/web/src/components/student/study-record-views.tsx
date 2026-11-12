@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { useLocale, type AppLocale } from "@/components/locale-context";
 import { AppLink } from "@/components/navigation";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { isPending } from "@/lib/production-api";
 import { languageInfo, submissionLanguage } from "./languages";
 import { Empty, State, date } from "./shared";
+import { StudentSubmissionFilter } from "./submission-filter";
 
 type Resource = Parameters<typeof State>[0]["data"];
 type RecordRow = { key: string; href: string; title: string; context: string };
@@ -61,11 +62,14 @@ function RecordPager({ pagination, count, loading, notebook = false }: {
   </nav>;
 }
 
-function RecordTable({ headings, children, label, width }: {
-  headings: string[]; children: ReactNode; label: string; width: string;
+function RecordTable({ headings, children, label, width, columnWidths }: {
+  headings: string[]; children: ReactNode; label: string; width: string; columnWidths?: readonly number[];
 }) {
   return <div className="mt-4 overflow-x-auto border border-border bg-surface panel-shadow" role="region" aria-label={label} tabIndex={0}>
-    <table className={`w-full text-left text-sm ${width}`}>
+    <table className={`w-full text-left text-sm ${width}${columnWidths ? " table-fixed" : ""}`}>
+      {columnWidths && <colgroup>
+        {headings.map((heading, index) => <col key={heading} style={{ width: `${columnWidths[index]}%` }}/>)}
+      </colgroup>}
       <thead className="bg-surface-subtle text-xs text-muted-foreground"><tr>
         {headings.map(heading => <th key={heading} scope="col" className="px-4 py-3">{heading}</th>)}
       </tr></thead>
@@ -74,22 +78,24 @@ function RecordTable({ headings, children, label, width }: {
   </div>;
 }
 
+const submissionColumnWidths = [9, 29, 15, 8, 8, 10, 14, 7] as const;
+
 export function SubmissionHistory({ resource, rows, filters, pagination }: {
-  resource: Resource; rows: SubmissionRow[]; filters: ReactNode; pagination: Pagination;
+  resource: Resource; rows: SubmissionRow[]; filters: ComponentProps<typeof StudentSubmissionFilter>; pagination: Pagination;
 }) {
   const { locale } = useLocale();
   const tx = (zh: string, en: string) => locale === "en" ? en : zh;
   return <>
     <PageHeader eyebrow={tx("学习记录", "Your activity")} title={tx("提交记录", "Submissions")}
       description={tx("这里只列出正式提交，不包含样例或自定义运行。", "Formal submissions only. Sample and custom runs are not listed here.")}/>
-    <div className="mt-5 flex flex-wrap items-center gap-2 border border-border bg-surface p-3 panel-shadow">{filters}</div>
+    <div className="mt-5 border border-border bg-surface p-3 panel-shadow"><StudentSubmissionFilter {...filters}/></div>
     <State data={resource}>
-      {rows.length ? <RecordTable label={tx("提交记录", "Submissions")} width="min-w-[900px]"
+      {rows.length ? <RecordTable label={tx("提交记录", "Submissions")} width="min-w-[1100px]" columnWidths={submissionColumnWidths}
         headings={[tx("提交编号", "Submission"), tx("题目", "Problem"), tx("来源", "Context"), tx("语言", "Language"), tx("判题结果", "Verdict"), tx("成绩", "Score"), tx("提交时间", "Submitted"), tx("操作", "Action")]}>
         {rows.map(row => <tr key={row.key} className="border-t border-border hover:bg-surface-subtle">
           <td className="px-4 py-3 font-mono text-xs"><AppLink href={row.href} className={linkClass} title={row.displayId ? row.id : undefined}>{row.displayId ?? row.id}</AppLink></td>
-          <td className="px-4 py-3"><AppLink href={row.href} className={linkClass}>{row.title}</AppLink></td>
-          <td className="max-w-[220px] px-4 py-3 text-muted-foreground">{row.context}</td>
+          <td className="px-4 py-3 wrap-anywhere"><AppLink href={row.href} className={linkClass}>{row.title}</AppLink></td>
+          <td className="px-4 py-3 wrap-anywhere text-muted-foreground">{row.context}</td>
           <td className="px-4 py-3 text-muted-foreground">{languageInfo[submissionLanguage(row.language)].name}</td>
           <td className="px-4 py-3"><StatusPill status={studyRecordVerdict(locale, row.status)}/></td>
           <td className="px-4 py-3 font-semibold">{studyRecordScore(row)}</td>

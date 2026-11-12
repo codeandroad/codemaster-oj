@@ -6,7 +6,7 @@ import { useLocale } from "@/components/locale-context";
 import { useNavigationBlocker } from "@/components/navigation";
 import { Button } from "@/components/ui/button";
 import { Feedback, textarea, useData, useMutation } from "@/components/student/shared";
-import { StudentSubmissionFilter, submissionVerdicts } from "@/components/student/submission-filter";
+import { submissionVerdicts } from "@/components/student/submission-filter";
 import { ReviewNotebookView, SubmissionHistory, studyRecordScore, studyRecordVerdict } from "@/components/student/study-record-views";
 import { productionApi } from "@/lib/production-api";
 import { StudySubmissionDetail, type JobDetail } from "./school-submission-detail";
@@ -96,7 +96,7 @@ function PublicRecordsList({ notebook, page, verdict, href }: {
       return { ...row, originalResult: score === "—" ? status : `${status} · ${score}`, lastPracticedAt: row.noteUpdatedAt ?? row.createdAt };
     })}/>;
   return <SubmissionHistory resource={resource} rows={rows} pagination={pagination}
-    filters={<StudentSubmissionFilter verdict={verdict} onVerdict={value => router.push(href({ publicVerdict: value || null, publicPage: null }))}/>}/>;
+    filters={{ verdict, onVerdict: value => router.push(href({ publicVerdict: value || null, publicPage: null })) }}/>;
 }
 
 function PublicCorrectionNote({ path, job, onSaved }: { path: string; job: PublicJob; onSaved: () => void }) {

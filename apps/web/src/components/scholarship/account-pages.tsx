@@ -6,8 +6,7 @@ import { RefreshCw } from "lucide-react";
 import { ScholarshipIcon } from "./scholarship-icon";
 import { ScholarshipPopover } from "./scholarship-popover";
 import { useLocale } from "@/components/locale-context";
-import { AppLink } from "@/components/navigation";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Empty,
   Feedback,
@@ -137,6 +136,8 @@ function ScholarshipBalanceContent({ endpoint = "scholarship/me", href = "/stude
   );
 }
 
+const accountLedgerColumnWidths = [30, 44, 13, 13] as const;
+
 function Ledger({
   entries,
   names,
@@ -156,9 +157,10 @@ function Ledger({
     first_ac: tx("首次 AC 奖励", "First-AC reward"),
     activity: tx("活动额外奖励", "Activity reward"),
   };
-  return (
+  return (<>
     <Table
       min={650}
+      columnWidths={names || onRefund ? undefined : accountLedgerColumnWidths}
       headers={[
         tx("时间", "Time"),
         ...(names ? [tx("学生", "Student")] : []),
@@ -178,7 +180,7 @@ function Ledger({
               {names.get(entry.identityId) ?? entry.identityId.slice(0, 8)}
             </td>
           )}
-          <td>
+          <td className="wrap-anywhere">
             <span>{entry.reason || kindLabels[entry.kind] || entry.kind}</span>
             <span className="mt-0.5 block text-xs text-muted-foreground">
               {kindLabels[entry.kind] ?? entry.kind}
@@ -210,13 +212,11 @@ function Ledger({
           )}
         </tr>
       ))}
-      {!entries.length && (
-        <Empty columns={5 + (names ? 1 : 0) + (onRefund ? 1 : 0)}>
-          {tx("暂无奖学金流水。", "No scholarship transactions yet.")}
-        </Empty>
-      )}
     </Table>
-  );
+    {!entries.length && <p className="border-t border-border px-4 py-3 text-center text-sm text-muted-foreground">
+      {tx("暂无奖学金流水。", "No scholarship transactions yet.")}
+    </p>}
+  </>);
 }
 
 function LedgerPager({
@@ -283,9 +283,6 @@ export function StudentScholarshipPage({ endpoint = "scholarship/me" }: { endpoi
             <RefreshCw size={14} />
             {tx("刷新", "Refresh")}
           </Button>
-          {publicPractice && <AppLink href="/practice/settings#public-practice" className={buttonVariants({ size: "sm", variant: "ghost" })}>
-            {tx("奖学金设置", "Scholarship settings")}
-          </AppLink>}
         </div>
       </section>
       <State resource={resource} />

@@ -3,7 +3,6 @@
 import { LegacyAcslPage } from "@/components/acsl/acsl-page";
 
 import {StudentProblemFilter} from "./problem-filter";
-import {StudentSubmissionFilter} from "./submission-filter";
 import { ReviewNotebookView, SubmissionHistory, studyRecordScore as score, studyRecordVerdict as statusLabel } from "./study-record-views";
 import dynamic from "next/dynamic";
 
@@ -369,7 +368,7 @@ export function StudentSubmissions({ user }: { user: CampusUser }) {
   function filter(setValue: (value: string) => void, value: string) { setValue(value); setCursors([null]); }
   return <SubmissionHistory resource={submissions}
     rows={visible.map(s => ({ ...s, key: s.id, href: `/student/submissions/${s.id}`, title: s.problemTitle, context: sourceLabel(s, assignments.data?.items, locale) }))}
-    filters={<StudentSubmissionFilter verdict={verdict} context={context} onVerdict={value => filter(setVerdict, value)} onContext={value => filter(setContext, value)}/>}
+    filters={{ verdict, context, onVerdict: value => filter(setVerdict, value), onContext: value => filter(setContext, value) }}
     pagination={{ page: cursors.length, hasMore: Boolean(submissions.data?.nextCursor),
       previous: () => setCursors(values => values.slice(0, -1)),
       next: () => { const next = submissions.data?.nextCursor; if (next) setCursors(values => [...values, next]); } }}/>;

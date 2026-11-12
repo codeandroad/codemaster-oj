@@ -56,7 +56,7 @@ export function PracticePage({ user, pathname, onLogout, onUserSaved }: {
       break;
     case "profile":
       content = <>
-        <PersonalWorkspaceProfile user={user} onUserSaved={onUserSaved} publicLeaderboard/>
+        <PersonalWorkspaceProfile user={user} onUserSaved={onUserSaved} publicPractice/>
         <StudentPublicProfile profileId={user.id} viewer={user} workspace="practice" embedded/>
       </>;
       break;

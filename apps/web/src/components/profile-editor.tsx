@@ -5,6 +5,7 @@ import { Camera, Pencil, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Button } from "./ui/button";
 import { ProfileAvatar, ProfileHero } from "./profile-hero";
+import type { PresenceEndpoint } from "./student/student-presence";
 import { DEFAULT_AVATARS, defaultAvatarPath, randomDefaultAvatarPath } from "@/lib/default-avatars";
 import { genderLabel, genderOptions } from "@/lib/gender";
 import { NICKNAME_MAX_UNITS, nicknameUnits, nicknameTooLong, normalizeNickname } from "@/lib/nickname-policy";
@@ -27,11 +28,12 @@ function Detail({ label, children }: { label: string; children: ReactNode }) {
   </div>;
 }
 
-export function ProfileEditor({ user, onSaved, personal = false, publicLeaderboard = false, roleLabel }: {
+export function ProfileEditor({ user, onSaved, personal = false, publicLeaderboard = false, presenceEndpoint = "presence", roleLabel }: {
   user: CampusUser;
   onSaved?: (next: CampusUser) => void;
   personal?: boolean;
   publicLeaderboard?: boolean;
+  presenceEndpoint?: PresenceEndpoint;
   roleLabel?: ReactNode;
 }) {
   const { locale } = useLocale();
@@ -53,6 +55,8 @@ export function ProfileEditor({ user, onSaved, personal = false, publicLeaderboa
     : leaderboardDefaultName;
   const displayName = (editing ? nickname : user.nickname)?.trim() || user.name || (user.roles.includes("student") ? ui(locale, "同学", "Student") : ui(locale, "校内用户", "School user"));
   const roleName = roleLabel ?? (personal ? user.platformAdmin ? ui(locale, "平台管理员", "Platform administrator") : ui(locale, "个人账号", "Personal account") : user.roles.includes("admin") ? ui(locale, "管理员", "Administrator") : user.roles.includes("teacher") ? ui(locale, "教师", "Teacher") : ui(locale, "学生", "Student"));
+  const presenceIdentityId = presenceEndpoint === "practice/presence" ? user.id
+    : !personal && user.roles.includes("student") ? user.identityId : undefined;
 
   function resetDraft() {
     setNickname(user.nickname ?? "");
@@ -105,7 +109,7 @@ export function ProfileEditor({ user, onSaved, personal = false, publicLeaderboa
 
   return <div className="mt-5 space-y-4">
     <h1 className="sr-only">{ui(locale, "个人资料", "Profile")}</h1>
-    <ProfileHero avatar={editing ? avatar : user.avatar} nickname={displayName} bio={editing ? bio : user.bio} presenceIdentityId={!personal && user.roles.includes("student") ? user.identityId : undefined} scope={personal ? "personal" : "school"} self selfLabel={ui(locale, "我的资料", "My profile")} actions={editing ? undefined : <Button type="button" variant="outline" onClick={() => { setMessage(""); setEditing(true); }}><Pencil size={15}/>{ui(locale, "编辑个人资料", "Edit profile")}</Button>}>
+    <ProfileHero avatar={editing ? avatar : user.avatar} nickname={displayName} bio={editing ? bio : user.bio} presenceIdentityId={presenceIdentityId} presenceEndpoint={presenceEndpoint} scope={personal ? "personal" : "school"} self selfLabel={ui(locale, "我的资料", "My profile")} actions={editing ? undefined : <Button type="button" variant="outline" onClick={() => { setMessage(""); setEditing(true); }}><Pencil size={15}/>{ui(locale, "编辑个人资料", "Edit profile")}</Button>}>
       <p className="mt-4 text-xs leading-5 text-muted-foreground">{personal ? ui(locale, "更新头像、昵称和个人介绍。", "Update your avatar, nickname and bio.") : ui(locale, "昵称、头像和介绍对校内用户可见。排行榜默认显示姓名，可在下方编辑资料时改为显示昵称。", "Your nickname, avatar, and bio are visible to school users. The leaderboard uses your full name unless you enable nickname display below.")}</p>
     </ProfileHero>
 

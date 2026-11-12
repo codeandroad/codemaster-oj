@@ -1,6 +1,7 @@
 "use client";
 
 import { ProfileEditor } from "@/components/profile-editor";
+import { PublicPracticeProfileSharing } from "@/components/student/public-profile-sharing";
 import type { CampusUser } from "@/lib/production-api";
 import { RoleLabel, type SchoolRole } from "./school-ui";
 
@@ -8,18 +9,19 @@ export function PersonalWorkspaceProfile({
   user,
   onUserSaved,
   schoolRoles,
-  publicLeaderboard,
+  publicPractice = false,
 }: {
   user: CampusUser;
   onUserSaved: (user: CampusUser) => void;
   schoolRoles?: SchoolRole[];
-  publicLeaderboard?: boolean;
+  publicPractice?: boolean;
 }) {
-  return (
+  return (<>
     <ProfileEditor
       user={user}
       personal
-      publicLeaderboard={publicLeaderboard}
+      publicLeaderboard={publicPractice}
+      presenceEndpoint={publicPractice ? "practice/presence" : undefined}
       onSaved={onUserSaved}
       roleLabel={
         schoolRoles?.length
@@ -32,5 +34,6 @@ export function PersonalWorkspaceProfile({
           : undefined
       }
     />
-  );
+    {!publicPractice && schoolRoles?.includes("student") && <PublicPracticeProfileSharing key={user.id} accountId={user.id}/>}
+  </>);
 }

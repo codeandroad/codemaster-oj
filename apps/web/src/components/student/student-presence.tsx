@@ -9,7 +9,7 @@ import styles from "./student-presence.module.css";
 import { StudentPresenceCard } from "./student-presence-card";
 
 export const presenceChanged = "campus-judge:presence-updated";
-type PresenceEndpoint = "presence" | "practice/presence";
+export type PresenceEndpoint = "presence" | "practice/presence";
 type Presence = { onlineCount: number; total: number; page: number; pageSize: number; items: { identityId: string; displayName: string; avatar?: string | null }[] };
 
 /** A visible authenticated student tab renews its own session, never another identity. */

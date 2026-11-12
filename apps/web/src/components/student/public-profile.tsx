@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } f
 import { useLocale, type AppLocale } from "@/components/locale-context";
 import { productionApi, type CampusRole, type CampusUser } from "@/lib/production-api";
 import { Feedback, State, date, panel, textarea, useData, useMutation, useRefreshOnReturn } from "./shared";
+import { ProfileSharingControls } from "./public-profile-sharing";
 
 interface PublicProfile {
   nickname: string;
@@ -95,7 +96,6 @@ export function StudentPublicProfile({ profileId, viewer, embedded = false, work
   const [notice, setNotice] = useState("");
   const post = useMutation();
   const moderation = useMutation();
-  const visibility = useMutation();
   const person = profile.data?.profile;
   const own = person?.isSelf ?? profileId === (practice ? viewer.id : viewer.identityId);
   const canWrite = practice || workspace === "student" && viewer.roles.includes("student");
@@ -140,16 +140,7 @@ export function StudentPublicProfile({ profileId, viewer, embedded = false, work
 
       <section className={`${panel} min-w-0`} aria-labelledby="profile-messages-heading">
         <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><MessageCircle size={18} className="text-primary"/><h3 id="profile-messages-heading" className="font-bold">{ui(locale, "主页留言", "Profile messages")}</h3></div><Button size="sm" variant="ghost" disabled={messages.loading} onClick={messages.reload}>{ui(locale, "刷新", "Refresh")}</Button></div>
-        {practice && embedded && <div className="mt-2 space-y-2">
-          <p id="practice-profile-sharing" className="text-xs leading-5 text-muted-foreground">{person.profileEnabled
-            ? ui(locale, "登录用户可通过公开主页链接查看和发布留言。", "Signed-in users with your public profile link can read and leave messages.")
-            : ui(locale, "开启后，持有主页链接的登录用户可以看到你的榜单显示名并留言。", "Enable sharing to let signed-in users with your profile link see your leaderboard name and leave messages.")}</p>
-          <Button size="sm" variant="secondary" aria-describedby="practice-profile-sharing" disabled={visibility.busy || profile.loading} onClick={() => void visibility.run(async () => {
-            await productionApi(base, { method: "PATCH", body: { profileEnabled: !person.profileEnabled } });
-            profile.reload();
-          })}>{person.profileEnabled ? ui(locale, "关闭公开主页", "Turn off profile sharing") : ui(locale, "开启公开主页和留言", "Enable profile sharing and messages")}</Button>
-          <Feedback action={visibility}/>
-        </div>}
+        {practice && embedded && person.isSelf && <ProfileSharingControls endpoint={base} enabled={Boolean(person.profileEnabled)} loading={profile.loading} reload={profile.reload}/>}
         {!own && canWrite && <form className="mt-3" onSubmit={event => { event.preventDefault(); if (!draft.trim()) return; setNotice(""); void post.run(async () => {
           await productionApi(`${base}/messages`, { method: "POST", body: { body: draft.trim() } });
           setDraft(""); setMessagePage(1); messages.reload(); post.success(ui(locale, "留言已发布。", "Message posted."));

@@ -10,10 +10,13 @@ class PublicLearningController {
  @Get(['platform/courses','platform/courses/audience','platform/courses/acsl-links','platform/courses/:id']) platformCourses(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
  @Post(['platform/courses','platform/courses/:id/publish','platform/courses/:id/unpublish','platform/courses/:id/archive','platform/courses/:id/restore']) platformCourseAction(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
  @Patch('platform/courses/:id') platformCourseUpdate(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
+ @Get('platform/courses/:id/admissions') platformAdmissions(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
+ @Post(['platform/courses/:id/admissions/:applicationId/decision','platform/courses/:id/rules/:ruleId/invitation']) platformAdmissionAction(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
  @Get('practice/catalog') catalog(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
  @Get('practice/courses/:id') course(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
  @Get('practice/courses/:id/entry') entry(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
  @Post('practice/courses/:id/applications') apply(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
+ @Post('practice/courses/:id/invitations/redeem') redeem(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
  @Post('practice/courses/:id/chapters/:chapterId/read') read(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
  @Get(['schools/:schoolId/course-admissions', 'schools/:schoolId/course-admissions/:courseId']) admissions(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
  @Post(['schools/:schoolId/course-admissions/:courseId', 'schools/:schoolId/course-admissions/:courseId/:applicationId/decision'])

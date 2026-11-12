@@ -2,7 +2,7 @@ import { transaction } from './db.mjs';
 import { LEGACY_SCHOOL_ID, schoolRole } from './schools.mjs';
 import { fail, field, uuid } from './security.mjs';
 import { readableCourseIds } from './course-access.mjs';
-import { platformCourseAudienceSql } from './platform-course-access.mjs';
+import { platformCourseAudienceSql, platformCourseEligible } from './platform-course-access.mjs';
 import { legacyCourseIsLive } from './legacy-public-course.mjs';
 
 export function normalizeCourseAcslLinks(value = []) {
@@ -126,10 +126,11 @@ const courseHref=(schoolId,courseId,chapterId)=>schoolId===LEGACY_SCHOOL_ID
  :`/practice/courses/${courseId}?${new URLSearchParams({chapterId,schoolId})}`;
 
 async function platformAcslCourses(db,user) {
- return (await db.query(`SELECT p.id,p.title,p.description,p.localizations FROM learning_paths p
+ const courses=(await db.query(`SELECT p.id,p.title,p.description,p.localizations FROM learning_paths p
   WHERE p.owner_scope='platform' AND (${legacyCourseIsLive}) AND ${platformCourseAudienceSql('p','$1')}
   AND EXISTS(SELECT 1 FROM learning_chapters c WHERE c.path_id=p.id AND c.archived_at IS NULL AND jsonb_array_length(c.acsl_links)>0)
   ORDER BY p.title,p.id`,[user.id])).rows;
+ const allowed=[],state={};for(const course of courses)if(await platformCourseEligible(db,course.id,user.id,{state}))allowed.push(course);return allowed;
 }
 
 // The ACSL directory is already in an authorized school transaction. Reuse its

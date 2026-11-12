@@ -81,6 +81,10 @@ REVOKE ALL ON public_course_applications, legacy_course_publication_versions, sc
  FROM PUBLIC, campus_app, campus_worker;
 GRANT SELECT, INSERT ON public_course_applications, legacy_course_publication_versions, school_exit_requests, school_problem_publication_requests, legacy_public_problem_requests, public_practice_notes TO campus_app;
 GRANT UPDATE(status,decided_by,decided_at) ON public_course_applications TO campus_app;
+REVOKE ALL ON platform_course_rules,platform_course_admissions,platform_course_invitations,platform_course_invitation_attempts FROM PUBLIC,campus_app,campus_worker;
+GRANT SELECT,INSERT,UPDATE ON platform_course_rules,platform_course_invitations,platform_course_invitation_attempts TO campus_app;
+GRANT SELECT,INSERT ON platform_course_admissions TO campus_app;
+GRANT UPDATE(status,decided_by,decided_at) ON platform_course_admissions TO campus_app;
 REVOKE ALL ON staff_course_notification_reads FROM PUBLIC, campus_app, campus_worker;
 GRANT SELECT, INSERT(school_id,account_id,application_id) ON staff_course_notification_reads TO campus_app;
 REVOKE ALL ON course_admission_notifications FROM PUBLIC, campus_app, campus_worker;

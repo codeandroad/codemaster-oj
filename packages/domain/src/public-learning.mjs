@@ -1,13 +1,15 @@
+import { courseEntry } from './public-course-entry.mjs';
 import { localizedFields, publicChapterLocalizations } from './course-localizations.mjs';
 import { projectCourseAcslLinks, acslLinkCounts, requireCourseAcslSchool } from './course-acsl.mjs';
 import { transaction } from './db.mjs';
 import { activeAccount, auditSchool, LEGACY_SCHOOL_ID, lockSchoolTeaching, requireSchoolAdmin } from './schools.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
 import { legacyCourseCandidate, legacyCourseIsLive, legacyCourseReviewCandidates, legacyCourseSourceVersion, legacyDirectAccess, legacyEdition, requireLegacyCourseAdmin, snapshotLegacyCourse } from './legacy-public-course.mjs';
-import { availableLegacyPublicProblemVersions } from './legacy-public-problems.mjs';
+import { publicChapterProblems } from './platform-course-progress.mjs';
 import { canonicalHash, enumValue, fail, integer, uuid } from './security.mjs';
 import { handlePlatformCourses } from './platform-courses.mjs';
-import { platformCourseEligible } from './platform-course-access.mjs';
+import { platformCourseAdmission } from './platform-course-access.mjs';
+import { handlePlatformCourseAdmissions } from './platform-course-admissions.mjs';
 import { platformCourseListings, platformCourseEdition, platformReadProgress } from './platform-public-course.mjs';
 
 const respond = (body, status = 200) => ({ status, body });
@@ -50,7 +52,7 @@ async function activeListing(db, id, { includeWithdrawn = false } = {}) {
 }
 
 async function admissionFor(db, listing, course, accountId) {
-  if(listing.platform_owned)return await platformCourseEligible(db,listing.course_id,accountId)?'direct':'denied';
+  if(listing.platform_owned){const access=await platformCourseAdmission(db,listing.course_id,accountId);course.admissionRules=access.admissionRules;return access.admission;}
   if (listing.access_mode === 'direct') return 'direct';
   const eligible = listing.school_id === LEGACY_SCHOOL_ID
     ? await legacyDirectAccess(db, listing, course.access_scope, accountId)
@@ -73,26 +75,6 @@ async function admissionFor(db, listing, course, accountId) {
   return application ? 'rejected' : 'apply';
 }
 
-function courseEntry(listing, course, admission) {
-  return {
-    sections:course.sections??[],...localizedFields(course.localizations),id: listing.id,
-    title: course.title,
-    description: course.description,
-    chapterCount: course.chapter_count,
-    sourceSchool: course.school_name,
-    ownerScope: listing.platform_owned?'platform':'school',
-    category: course.category,
-    difficulty: course.difficulty,
-    coverKey: course.cover_key,
-    coverImage: course.cover_image ?? null,
-    authorName: course.author_name ?? '',
-    authoredAt: course.authored_at,
-    revision: course.revision,
-    requiredLanguage: course.required_language ?? null,
-    accessScope: course.access_scope,
-    admission,
-  };
-}
 
 async function catalogue(pool, user, url) {
   return transaction(pool, async db => {
@@ -135,40 +117,6 @@ async function catalogue(pool, user, url) {
   });
 }
 
-async function publicChapterProblems(db, listing, course, accountId) {
-  const links = course.chapters.flatMap(chapter => chapter.problems ?? []);
-  const problems = new Map();
-  if (!links.length) return problems;
-
-  const { rows } = await db.query(`WITH links AS (
-    SELECT DISTINCT "problemId","versionId"
-    FROM jsonb_to_recordset($2::jsonb) AS link("problemId" uuid,"versionId" uuid)
-  )
-  SELECT links.*,v.definition->>'title' AS title, EXISTS (
-    SELECT 1 FROM school_judge_jobs j WHERE j.school_id=p.school_id
-      AND j.problem_id=p.id AND j.version_id=v.id AND j.account_id=$3
-      AND j.access_context='public' AND j.kind='submit' AND j.activity_id IS NULL
-      AND j.state='completed' AND j.result->>'status'='AC'
-      AND course_language_allows_credit($4,$5,j.payload->>'language',j.created_at)
-  ) AS solved
-  FROM links
-  JOIN school_problem_publications pub ON pub.school_id=$1 AND pub.problem_id=links."problemId"
-    AND pub.version_id=links."versionId" AND pub.withdrawn_at IS NULL
-  JOIN school_problems p ON p.school_id=pub.school_id AND p.id=pub.problem_id
-    AND p.published AND p.published_version_id=pub.version_id
-  JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id AND NOT b.archived
-  JOIN school_problem_versions v ON v.school_id=p.school_id AND v.problem_id=p.id AND v.id=pub.version_id`,
-  [listing.school_id, JSON.stringify(links), accountId, course.required_language, course.language_credit_cutoffs]);
-  const legacyVersions = listing.school_id === LEGACY_SCHOOL_ID && rows.length
-    ? await availableLegacyPublicProblemVersions(db, rows.map(row => row.versionId))
-    : null;
-  for (const row of rows) {
-    if (!legacyVersions || legacyVersions.has(row.versionId)) {
-      problems.set(`${row.problemId}:${row.versionId}`, row);
-    }
-  }
-  return problems;
-}
 
 export async function publicCourseProblemLanguage(db, user, { courseId, chapterId, schoolId, problemId, versionId }) {
   await context(db, user);
@@ -461,6 +409,7 @@ async function platformPublications({ pool, user, method, body }) {
 }
 
 export async function handlePublicLearning(ctx) {
+  const admissions=await handlePlatformCourseAdmissions(ctx);if(admissions)return admissions;
   const { pool, user, route, method, url } = ctx;
   if(/^\/platform\/courses(?:\/|$)/.test(route))return handlePlatformCourses(ctx);
   if (route === '/practice/catalog' && method === 'GET') {

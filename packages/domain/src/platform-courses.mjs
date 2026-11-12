@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { transaction } from './db.mjs';
 import { activeAccount, LEGACY_SCHOOL_ID, lockSchoolTeaching } from './schools.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
-import { platformCourseAudience } from './platform-course-access.mjs';
+import { platformAudiencePolicy, platformCourseAudience, savePlatformCourseAudience } from './platform-course-access.mjs';
 import { courseDisplayProperties } from './course-access.mjs';
 import { courseLocalizations } from './course-localizations.mjs';
 import { assertCoursePaper4Ready } from './course-paper4.mjs';
@@ -17,6 +17,7 @@ const sourceVersion='extract(epoch FROM p.updated_at)::text';
 async function authorize(db,user) {
  await activeAccount(db,user.id);
  if(!await isPlatformAdministrator(db,user.id))fail(403,'PLATFORM_ADMIN_REQUIRED','需要平台管理员权限');
+ await db.query("SELECT set_config('campus.account_id',$1,true)",[user.id]);
  await db.query("SELECT set_config('campus.school_id',$1,true)",[LEGACY_SCHOOL_ID]);
 }
 async function get(db,id,{lock=false}={}) {
@@ -26,19 +27,24 @@ async function get(db,id,{lock=false}={}) {
  return p;
 }
 async function shape(db,p,{detail=false}={}) {
+ const audiencePolicy=await platformAudiencePolicy(db,p);
+ const schoolIds=audiencePolicy.schoolRules.map(rule=>rule.schoolId),studentIds=audiencePolicy.accountRules.map(rule=>rule.identityId);
  const chapters=(await db.query(`SELECT id,title,content,objective,checkpoint,checkpoint_answer AS "checkpointAnswer",
   localizations,acsl_links AS "acslLinks",section_key AS "sectionKey",(SELECT count(*)::int FROM chapter_problems WHERE chapter_id=c.id) AS "problemCount"
   FROM learning_chapters c WHERE path_id=$1 AND archived_at IS NULL ORDER BY position,created_at,id`,[p.id])).rows;
- const schools=p.platform_school_ids.length?(await db.query('SELECT id,name FROM schools WHERE id=ANY($1::uuid[]) ORDER BY name,id',[p.platform_school_ids])).rows:[];
- const students=p.platform_student_ids.length?(await db.query(`SELECT i.id,i.name,
+ const schools=schoolIds.length?(await db.query('SELECT id,name FROM schools WHERE id=ANY($1::uuid[]) ORDER BY name,id',[schoolIds])).rows:[];
+ const students=studentIds.length?(await db.query(`SELECT i.id,i.name,
   (SELECT a.username FROM accounts a WHERE a.identity_id=i.id AND a.binding_released_at IS NULL LIMIT 1) username
-  FROM identities i WHERE i.id=ANY($1::uuid[]) ORDER BY i.name,i.id`,[p.platform_student_ids])).rows:[];
+  FROM identities i WHERE i.id=ANY($1::uuid[]) ORDER BY i.name,i.id`,[studentIds])).rows:[];
+ const pendingApplications=Number((await db.query(`SELECT count(*) n FROM platform_course_admissions a
+  JOIN platform_course_rules r ON r.id=a.rule_id AND r.active AND r.generation=a.generation
+  WHERE a.course_id=$1 AND a.status='pending'`,[p.id])).rows[0].n);
  return {sections:p.sections??[],id:p.id,title:p.title,description:p.description,category:p.category,difficulty:p.difficulty,coverKey:p.cover_key,
   coverImage:p.cover_image,authorName:p.author_name,authoredAt:p.authored_at,estimatedMinutes:p.estimated_minutes,
   requiredLanguage:p.required_language,localizations:p.localizations,published:!!p.published_at,archived:!!p.archived_at,
   revision:p.platform_revision,sourceVersion:p.source_version,sourceSchool:'平台管理员',ownerScope:'platform',canEdit:true,
-  audienceScope:p.platform_access_scope,schoolIds:p.platform_school_ids,studentIds:p.platform_student_ids,
-  schools,students,chapterCount:chapters.length,...(detail?{chapters}:{})};
+  audiencePolicy,audienceScope:audiencePolicy.independentRule||schoolIds.length&&studentIds.length?'custom':p.platform_access_scope,schoolIds,studentIds,
+  schools,students,pendingApplications,chapterCount:chapters.length,...(detail?{chapters}:{})};
 }
 async function audit(db,user,action,p) {
  await db.query(`INSERT INTO platform_audit_events(actor_account_id,action,detail) VALUES($1,$2,$3)`,
@@ -81,6 +87,7 @@ async function save(db,user,body,old) {
   updated_at=clock_timestamp(),platform_revision=platform_revision+CASE WHEN $16 THEN 1 ELSE 0 END WHERE id=$1`,
  [id,title,description,category,minutes,difficulty,cover,display.authorName,display.authoredAt,display.coverImage,display.requiredLanguage,localizations,audience.scope,audience.schoolIds,audience.studentIds,!!old]);
  await db.query('UPDATE learning_paths SET sections=$2 WHERE id=$1',[id,JSON.stringify(sections)]);
+ await savePlatformCourseAudience(db,id,audience);
  if(body.chapters===undefined)assertChapterSections(sections,(await db.query('SELECT section_key FROM learning_chapters WHERE path_id=$1 AND archived_at IS NULL',[id])).rows);
  if(body.chapters!==undefined){
   if(!Array.isArray(body.chapters)||body.chapters.length>100||Buffer.byteLength(JSON.stringify(body.chapters))>1500000)
@@ -127,7 +134,7 @@ export async function handlePlatformCourses({pool,user,route,method,body,url}) {
    const kind=enumValue(url.searchParams.get('kind')??'schools',['schools','students'],'选择类型');
    const items=kind==='schools'?(await db.query('SELECT id,name FROM schools WHERE strpos(lower(name),$1)>0 ORDER BY name,id LIMIT 100',[q])).rows
     :q.length<2?[]:(await db.query(`SELECT i.id,i.name,a.username FROM identities i JOIN accounts a ON a.identity_id=i.id
-     WHERE i.kind='student' AND i.archived_at IS NULL AND a.disabled_at IS NULL AND a.binding_released_at IS NULL
+     WHERE i.kind IN ('student','personal') AND i.archived_at IS NULL AND a.disabled_at IS NULL AND a.binding_released_at IS NULL
      AND (strpos(lower(i.name),$1)>0 OR strpos(lower(a.username),$1)>0 OR strpos(lower(i.number),$1)>0)
      ORDER BY a.username,i.id LIMIT 30`,[q])).rows;
    return reply({items});

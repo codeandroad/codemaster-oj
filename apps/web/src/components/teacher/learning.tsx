@@ -1088,7 +1088,7 @@ function LearningEditorForm({
           <div className="relative z-0 isolate mx-auto grid max-w-7xl gap-5 p-4 sm:p-8 lg:grid-cols-[280px_minmax(0,1fr)]">
           <aside className="self-start rounded-md border border-border bg-surface"><CourseDirectory sections={sections} chapters={chapters.map(presentedChapter)} language={language} locale={locale} selectedId={chapter?.id} onSelect={setCurrent} showProgress={false}/></aside>
           <article className="min-w-0">
-            {chapter && <LearningChapterContent chapter={presentedChapter(chapter)}/>}
+            {chapter && <LearningChapterContent chapter={presentedChapter(chapter)} language={editingLanguage === "original" ? undefined : editingLanguage}/>}
             <h2 className="mt-6 font-bold">{t("相关练习")}</h2>
             {chapter?.problems.map((x) => (
               <p className="mt-3 flex flex-wrap items-center gap-2 text-primary" key={x.problemId}>

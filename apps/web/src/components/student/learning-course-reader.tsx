@@ -102,7 +102,7 @@ export function LearningCourseReader({
         <details className="lg:hidden"><summary className="cursor-pointer px-4 py-3 font-semibold">{text("章节目录", "Chapter directory")} · {chapter ? `${index + 1}/${course.chapterCount}` : course.chapterCount}<ChevronDown className="float-right" size={16}/></summary><div className="max-h-[60dvh] overflow-y-auto">{directory}</div></details>
         <div ref={directoryRef} className="hidden lg:block lg:max-h-[calc(100dvh-2rem)] lg:overflow-y-auto lg:overscroll-contain">{directory}</div>
       </aside>
-      <main className="min-w-0">{chapter ? <ReaderLesson key={chapter.id} chapter={chapter}
+      <main className="min-w-0">{chapter ? <ReaderLesson key={chapter.id} chapter={chapter} language={language}
         nextHref={nextChapterId ? chapterHref(nextChapterId) : undefined} onRead={onRead} canTrackProgress={canTrackProgress}
         extraPractice={extraPractice?.(chapter.id)} resources={chapterResources?.(chapter.id)} scrollKey={scrollKey}/>
         : <Empty title={selectedChapterId ? text("章节不存在", "Chapter not found") : text("暂无章节", "No chapters available")}
@@ -111,8 +111,9 @@ export function LearningCourseReader({
   </>;
 }
 
-function ReaderLesson({ chapter, nextHref, onRead, canTrackProgress, extraPractice, resources, scrollKey }: {
+function ReaderLesson({ chapter, language, nextHref, onRead, canTrackProgress, extraPractice, resources, scrollKey }: {
   chapter: ReaderChapter;
+  language: "en" | "zh";
   nextHref?: string;
   onRead: (chapterId: string) => Promise<void>;
   canTrackProgress: boolean;
@@ -125,7 +126,7 @@ function ReaderLesson({ chapter, nextHref, onRead, canTrackProgress, extraPracti
   const router = useRouter(), action = useMutation(), pending = useRef(false);
   const saveScroll = () => { try { sessionStorage.setItem(`learning-scroll:${scrollKey}:${chapter.id}`, String(window.scrollY)); } catch {} };
   return <article className="space-y-5" data-od-id="learning-chapter-content">
-    <LearningChapterContent chapter={chapter}/>
+    <LearningChapterContent chapter={chapter} language={language}/>
     {(chapter.problems.length > 0 || Boolean(extraPractice)) && <section className={`${panel} p-5 sm:p-7`}>
       <h2 className="text-lg font-bold">{text("配套练习", "Practice problems")}</h2>
       {chapter.problems.map(problem => <div key={problem.id} className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
@@ -158,16 +159,16 @@ function ReaderLesson({ chapter, nextHref, onRead, canTrackProgress, extraPracti
 }
 
 /** Shared lesson and checkpoint presentation for the reader and teacher previews. */
-export function LearningChapterContent({ chapter }: { chapter: Pick<ReaderChapter, "title" | "content" | "objective" | "checkpoint" | "checkpointAnswer"> }) {
+export function LearningChapterContent({ chapter, language }: { language?: "en" | "zh"; chapter: Pick<ReaderChapter, "title" | "content" | "objective" | "checkpoint" | "checkpointAnswer"> }) {
   const { locale } = useLocale(), text = (zh: string, en: string) => locale === "en" ? en : zh;
   return <div className="relative isolate space-y-5" data-od-id="learning-lesson-presentation">
     <section className={`${panel} p-5 sm:p-7`}><h1 className="text-2xl font-bold">{chapter.title}</h1>
       {chapter.objective && <div className="mt-4 border-b border-border pb-5"><h2 className="text-sm font-semibold">{text("学习目标", "Learning objective")}</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{chapter.objective}</p></div>}
-      <div className="mt-6"><LessonContent content={chapter.content}/></div>
+      <div className="mt-6"><LessonContent language={language} content={chapter.content}/></div>
     </section>
     {chapter.checkpoint?.trim() && <section className={`${panel} p-5 sm:p-7`} data-od-id="learning-checkpoint">
-      <h2 className="text-lg font-bold">{text("检查点", "Checkpoint")}</h2><div className="mt-3"><LessonContent content={chapter.checkpoint}/></div>
-      {chapter.checkpointAnswer?.trim() && <details className="mt-4 border-t border-border pt-4 text-sm"><summary className="cursor-pointer font-semibold text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">{text("查看参考答案", "View reference answer")}</summary><div className="mt-3"><LessonContent content={chapter.checkpointAnswer}/></div></details>}
+      <h2 className="text-lg font-bold">{text("检查点", "Checkpoint")}</h2><div className="mt-3"><LessonContent language={language} content={chapter.checkpoint}/></div>
+      {chapter.checkpointAnswer?.trim() && <details className="mt-4 border-t border-border pt-4 text-sm"><summary className="cursor-pointer font-semibold text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">{text("查看参考答案", "View reference answer")}</summary><div className="mt-3"><LessonContent language={language} content={chapter.checkpointAnswer}/></div></details>}
     </section>}
   </div>;
 }

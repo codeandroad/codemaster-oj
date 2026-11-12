@@ -665,7 +665,7 @@ export function SchoolCourseEditor({
                         className="min-h-64 max-h-[45vh] overflow-auto rounded-md border border-border p-4"
                       >
                         <CourseLanguageControl language={language} onChange={setLanguage} missing={!chapter.localizations?.[language]}/>
-                        <div className="mt-3"><LearningChapterContent chapter={localizedChapter(chapter, language)}/></div>
+                        <div className="mt-3"><LearningChapterContent chapter={localizedChapter(chapter, language)} language={language}/></div>
                       </div>
                     ) : (
                       <textarea

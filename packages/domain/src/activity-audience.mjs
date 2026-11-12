@@ -3,6 +3,7 @@ import {fail,uuid,field} from './security.mjs';
 import {avatarForIdentity} from './avatars.mjs';
 import {PRESENCE_TTL_SECONDS} from './presence.mjs';
 import {LEGACY_SCHOOL_ID} from './legacy-school.mjs';
+import {assignmentProgressById} from './assignment-grades.mjs';
 const admin=user=>user.roles.includes('admin');
 const staff=user=>user.roles.some(role=>['teacher','admin'].includes(role));
 export async function audienceClasses(db,user,body,old=null,kind='assignment'){
@@ -114,15 +115,43 @@ export async function handleClassHub(ctx){
    AND (a.class_id=$1 OR EXISTS(SELECT 1 FROM assignment_classes ac WHERE ac.assignment_id=a.id AND ac.class_id=$1))
    AND ($3::boolean AND (a.owner_account_id=$4 OR $5::boolean) OR EXISTS(SELECT 1 FROM assignment_participants part WHERE part.assignment_id=a.id AND part.identity_id=$2 AND NOT part.exempt))
   ORDER BY a.created_at DESC,a.id`,[id,user.identityId,manager,user.id,admin(user)])).rows;
- const timedPractices=(await pool.query(`SELECT t.id,t.title,t.starts_at "startsAt",t.ends_at "endsAt",t.duration_minutes "durationMinutes",t.course_path_id "coursePathId",p.title "courseTitle"
+ if(member){
+  const progress=await assignmentProgressById(pool,assignments.map(a=>a.id),user.identityId);
+  for(const assignment of assignments){
+   const summary=progress.get(assignment.id);
+   if(summary?.totalProblems)Object.assign(assignment,summary);
+  }
+ }
+ const timedPractices=(await pool.query(`SELECT t.id,t.title,t.starts_at "startsAt",t.ends_at "endsAt",t.duration_minutes "durationMinutes",t.course_path_id "coursePathId",p.title "courseTitle",
+  CASE WHEN NOT $6::boolean OR part.identity_id IS NULL THEN NULL
+   WHEN attempt.id IS NULL THEN 'not_started'
+   WHEN attempt.state='Finished' OR attempt.deadline_at<=statement_timestamp()
+    OR t.forced_ended_at IS NOT NULL OR t.results_published_at IS NOT NULL THEN 'completed'
+   ELSE 'in_progress' END "completionStatus"
   FROM timed_practices t LEFT JOIN learning_paths p ON p.id=t.course_path_id AND p.published_at IS NOT NULL AND p.archived_at IS NULL
+  LEFT JOIN timed_practice_participants part ON part.practice_id=t.id AND part.identity_id=$2 AND NOT part.exempt
+  LEFT JOIN timed_attempts attempt ON attempt.practice_id=t.id AND attempt.identity_id=part.identity_id AND $6::boolean
   WHERE t.state<>'Draft' AND t.archived_at IS NULL
    AND (t.class_id=$1 OR EXISTS(SELECT 1 FROM timed_practice_classes ac WHERE ac.practice_id=t.id AND ac.class_id=$1))
-   AND ($3::boolean AND (t.owner_account_id=$4 OR $5::boolean) OR EXISTS(SELECT 1 FROM timed_practice_participants part WHERE part.practice_id=t.id AND part.identity_id=$2 AND NOT part.exempt))
-  ORDER BY t.created_at DESC,t.id`,[id,user.identityId,manager,user.id,admin(user)])).rows;
- const paper4Activities=(await pool.query(`SELECT p.id,p.title,p.activity_kind "activityKind",p.starts_at "startsAt",p.ends_at "endsAt"
-  FROM paper4_papers p WHERE (p.class_id=$1 OR EXISTS(SELECT 1 FROM paper4_activity_classes ac WHERE ac.paper_id=p.id AND ac.class_id=$1)) AND p.delivery_kind='activity' AND p.status='published' AND p.archived_at IS NULL
-   AND (p.owner_account_id=$3 OR $4::boolean OR $2::boolean AND EXISTS(SELECT 1 FROM paper4_activity_participants part WHERE part.paper_id=p.id AND part.identity_id=$5)) ORDER BY p.created_at DESC,p.id`,[id,member,user.id,admin(user),user.identityId])).rows;
+   AND ($3::boolean AND (t.owner_account_id=$4 OR $5::boolean) OR part.identity_id IS NOT NULL)
+  ORDER BY t.created_at DESC,t.id`,[id,user.identityId,manager,user.id,admin(user),member])).rows;
+ const paper4Activities=(await pool.query(`SELECT p.id,p.title,p.activity_kind "activityKind",p.starts_at "startsAt",p.ends_at "endsAt",
+  CASE WHEN part.identity_id IS NULL THEN NULL
+   WHEN attempt.state IS NULL THEN 'not_started'
+   WHEN attempt.state='submitted' THEN 'submitted'
+   WHEN version.ends_at<=statement_timestamp() THEN 'ended'
+   ELSE 'in_progress' END "completionStatus"
+  FROM paper4_papers p
+  LEFT JOIN paper4_versions version ON version.id=p.current_version_id AND version.paper_id=p.id
+  LEFT JOIN paper4_activity_participants part ON part.paper_id=p.id AND part.identity_id=$5 AND $2::boolean
+  LEFT JOIN LATERAL (
+   SELECT a.state FROM paper4_attempts a
+   WHERE a.paper_id=p.id AND a.version_id=version.id AND a.identity_id=part.identity_id
+   ORDER BY a.attempt_number DESC LIMIT 1
+  ) attempt ON true
+  WHERE (p.class_id=$1 OR EXISTS(SELECT 1 FROM paper4_activity_classes ac WHERE ac.paper_id=p.id AND ac.class_id=$1)) AND p.delivery_kind='activity' AND p.status='published' AND p.archived_at IS NULL
+   AND (p.owner_account_id=$3 OR $4::boolean OR part.identity_id IS NOT NULL)
+  ORDER BY p.created_at DESC,p.id`,[id,member,user.id,admin(user),user.identityId])).rows;
  const linkedIds=[...new Set([...assignments,...timedPractices].map(item=>item.coursePathId).filter(Boolean))];
  const linkedReadable=await readableCourseIds(pool,user,linkedIds);
  for(const item of [...assignments,...timedPractices])if(!linkedReadable.has(item.coursePathId)){item.coursePathId=null;item.courseTitle=null;}

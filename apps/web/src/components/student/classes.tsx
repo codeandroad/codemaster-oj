@@ -2,12 +2,12 @@
 
 import { useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BookOpen, ChevronRight, ClipboardList, FileText, Users } from "lucide-react";
+import { BookOpen, Check, ChevronRight, ClipboardList, FileText, Users } from "lucide-react";
 import { AppLink } from "@/components/navigation";
-import { PageHeader } from "@/components/page-chrome";
+import { PageHeader, StatusPill } from "@/components/page-chrome";
 import { useLocale } from "@/components/locale-context";
 import { buttonVariants } from "@/components/ui/button";
-import { Empty, LessonContent, State, useData } from "./shared";
+import { Empty, LessonContent, State, useData, useRefreshOnReturn } from "./shared";
 import { ClassRoster, type ClassMember } from "./class-roster";
 
 interface StudentClassSummary {
@@ -19,6 +19,8 @@ interface StudentClassSummary {
 }
 interface ClassCourse { id: string; title: string; description?: string; }
 interface LinkedCourse { coursePathId?: string | null; courseTitle?: string | null; }
+interface AssignmentProgress { completed?: boolean; completedProblems?: number; totalProblems?: number; }
+type AttemptStatus = "not_started" | "in_progress" | "completed" | "submitted" | "ended";
 interface ClassResource {
   id: string;
   title: string;
@@ -31,9 +33,9 @@ interface ClassResource {
 interface StudentClassDetail extends StudentClassSummary {
   members: ClassMember[];
   teachers: { name: string }[];
-  assignments: (LinkedCourse & { id: string; title: string; dueAt: string })[];
-  timedPractices: (LinkedCourse & { id: string; title: string; startsAt: string; endsAt: string; durationMinutes: number })[];
-  paper4Activities: { id: string; title: string; activityKind: "practice" | "exam"; startsAt: string | null; endsAt: string | null }[];
+  assignments: (LinkedCourse & AssignmentProgress & { id: string; title: string; dueAt: string })[];
+  timedPractices: (LinkedCourse & { id: string; title: string; startsAt: string; endsAt: string; durationMinutes: number; completionStatus?: AttemptStatus | null })[];
+  paper4Activities: { id: string; title: string; activityKind: "practice" | "exam"; startsAt: string | null; endsAt: string | null; completionStatus?: AttemptStatus | null }[];
   courses: ClassCourse[];
   resources: ClassResource[];
 }
@@ -61,7 +63,8 @@ export function StudentClass({ id }: { id: string }) {
   const router = useRouter();
   const search = useSearchParams();
   const tx = (zh: string, en: string) => locale === "en" ? en : zh;
-  const resource = useData<StudentClassDetail>(`classes/${encodeURIComponent(id)}`);
+  const { version } = useRefreshOnReturn();
+  const resource = useData<StudentClassDetail>(`classes/${encodeURIComponent(id)}`, version);
   const tab = search.get("tab") === "courses" ? "courses" : search.get("tab") === "resources" ? "resources" : "tasks";
   const data = resource.data;
   const taskCount = (data?.assignments.length ?? 0) + (data?.timedPractices.length ?? 0) + (data?.paper4Activities.length ?? 0);
@@ -75,9 +78,9 @@ export function StudentClass({ id }: { id: string }) {
         {([{ key: "tasks", label: tx("任务", "Tasks"), count: taskCount }, { key: "courses", label: tx("课程", "Courses"), count: data.courses.length }, { key: "resources", label: tx("资料", "Resources"), count: data.resources.length }] as const).map(item => <button key={item.key} type="button" aria-pressed={tab === item.key} onClick={() => router.replace(`/student/classes/${encodeURIComponent(id)}${item.key === "tasks" ? "" : `?tab=${item.key}`}`)} className={`min-h-11 border-b-2 px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-primary ${tab === item.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{item.label}<span className="ml-1.5 text-xs tabular-nums">{item.count}</span></button>)}
       </nav>
       {tab === "tasks" && (taskCount ? <div className={`${surface} mt-4`}>
-        {data.assignments.map(task => <ClassTaskRow key={`assignment:${task.id}`} href={`/student/assignments/${task.id}`} title={task.title} kind={tx("作业", "Assignment")} timing={`${tx("截止 ", "Due ")}${date(task.dueAt, locale)}`} course={task}/>)}
-        {data.timedPractices.map(task => <ClassTaskRow key={`timed:${task.id}`} href={`/student/timed-practice/${task.id}`} title={task.title} kind={tx("限时训练", "Timed practice")} timing={`${date(task.startsAt, locale)} – ${date(task.endsAt, locale)} · ${task.durationMinutes} ${tx("分钟", "min")}`} course={task}/>)}
-        {data.paper4Activities.map(task => <ClassTaskRow key={`paper4:${task.id}`} href={`/student/paper4/${task.id}`} title={task.title} kind={task.activityKind === "exam" ? tx("Paper 4 模拟考试", "Paper 4 mock exam") : tx("Paper 4 班级练习", "Paper 4 class practice")} timing={task.startsAt || task.endsAt ? `${task.startsAt ? date(task.startsAt, locale) : tx("即日起", "Available now")} – ${task.endsAt ? date(task.endsAt, locale) : tx("无截止时间", "No deadline")}` : tx("不限时间", "No time limit")}/>)}
+        {data.assignments.map(task => <ClassTaskRow key={`assignment:${task.id}`} href={`/student/assignments/${task.id}`} title={task.title} kind={tx("作业", "Assignment")} timing={`${tx("截止 ", "Due ")}${date(task.dueAt, locale)}`} course={task} progress={task}/>)}
+        {data.timedPractices.map(task => <ClassTaskRow key={`timed:${task.id}`} href={`/student/timed-practice/${task.id}`} title={task.title} kind={tx("限时训练", "Timed practice")} timing={`${date(task.startsAt, locale)} – ${date(task.endsAt, locale)} · ${task.durationMinutes} ${tx("分钟", "min")}`} course={task} attemptStatus={task.completionStatus}/>)}
+        {data.paper4Activities.map(task => <ClassTaskRow key={`paper4:${task.id}`} href={`/student/paper4/${task.id}`} title={task.title} kind={task.activityKind === "exam" ? tx("Paper 4 模拟考试", "Paper 4 mock exam") : tx("Paper 4 班级练习", "Paper 4 class practice")} timing={task.startsAt || task.endsAt ? `${task.startsAt ? date(task.startsAt, locale) : tx("即日起", "Available now")} – ${task.endsAt ? date(task.endsAt, locale) : tx("无截止时间", "No deadline")}` : tx("不限时间", "No time limit")} attemptStatus={task.completionStatus}/>)}
       </div> : <Empty title={tx("暂无布置给你的班级任务", "No class tasks assigned to you")}/>)}
       {tab === "courses" && (data.courses.length ? <div className={`${surface} mt-4`}>{data.courses.map(course => <AppLink key={course.id} href={`/student/learning-paths/${course.id}`} className="flex min-h-16 items-center gap-3 border-b border-border px-4 py-3 last:border-b-0 hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-primary"><BookOpen size={18} aria-hidden="true" className="shrink-0 text-primary"/><span className="min-w-0 flex-1"><strong className="block text-sm text-primary">{course.title}</strong>{course.description && <span className="mt-1 block line-clamp-2 text-xs text-muted-foreground">{course.description}</span>}</span><ChevronRight size={17} aria-hidden="true" className="shrink-0 text-muted-foreground"/></AppLink>)}</div> : <Empty title={tx("暂无关联课程", "No linked courses")}/>)}
       {tab === "resources" && (data.resources.length ? <div className={`${surface} mt-4`}>{data.resources.map(item => <ClassResourceRow key={item.id} resource={item} linkedCourse={data.courses.some(course => course.id === item.pathId)}/>)}</div> : <Empty title={tx("暂无班级资料", "No class resources")}/>)}
@@ -88,9 +91,31 @@ export function StudentClass({ id }: { id: string }) {
   </>;
 }
 
-function ClassTaskRow({ href, title, kind, timing, course }: { href: string; title: string; kind: string; timing: string; course?: LinkedCourse }) {
+function ClassTaskRow({ href, title, kind, timing, course, progress, attemptStatus }: {
+  href: string; title: string; kind: string; timing: string; course?: LinkedCourse;
+  progress?: AssignmentProgress; attemptStatus?: AttemptStatus | null;
+}) {
   const { locale } = useLocale();
-  return <div className="flex items-start gap-3 border-b border-border px-4 py-3 last:border-b-0 sm:px-5"><ClipboardList size={18} aria-hidden="true" className="mt-1 shrink-0 text-muted-foreground"/><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-x-3 gap-y-1"><AppLink href={href} className="text-sm font-semibold text-primary hover:underline focus-visible:underline">{title}</AppLink><span className="rounded bg-surface-subtle px-2 py-0.5 text-xs text-muted-foreground">{kind}</span></div><p className="mt-1 text-xs text-muted-foreground">{timing}</p>{course?.coursePathId && course.courseTitle && <AppLink href={`/student/learning-paths/${course.coursePathId}`} className="mt-1 inline-block text-xs text-primary hover:underline focus-visible:underline">{locale === "en" ? "Course: " : "课程："}{course.courseTitle}</AppLink>}</div><AppLink href={href} aria-label={locale === "en" ? `Open ${title}` : `打开${title}`} className="inline-flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-subtle hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"><ChevronRight size={17} aria-hidden="true"/></AppLink></div>;
+  const tx = (zh: string, en: string) => locale === "en" ? en : zh;
+  const attemptLabels = { not_started: "Not started", in_progress: "In progress", completed: "Completed", submitted: tx("已提交", "Submitted"), ended: "Ended" };
+  const status = progress?.completed === true ? "Completed" : progress?.completed === false ? tx("未完成", "Incomplete") : attemptStatus ? attemptLabels[attemptStatus] : null;
+
+  return <div className="flex items-start gap-3 border-b border-border px-4 py-3 last:border-b-0 sm:px-5">
+    <ClipboardList size={18} aria-hidden="true" className="mt-1 shrink-0 text-muted-foreground"/>
+    <div className="min-w-0 flex-1">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <AppLink href={href} className="min-w-0 wrap-anywhere text-sm font-semibold text-primary hover:underline focus-visible:underline">{title}</AppLink>
+        <span className="rounded bg-surface-subtle px-2 py-0.5 text-xs text-muted-foreground">{kind}</span>
+        {status && <StatusPill status={status} icon={status === "Completed" || attemptStatus === "submitted" ? <Check size={13}/> : undefined}/>}
+        {progress?.completedProblems !== undefined && (progress.totalProblems ?? 0) > 0 && <span className="text-xs tabular-nums text-muted-foreground">
+          {tx(`${progress.completedProblems}/${progress.totalProblems} 题已通过`, `${progress.completedProblems}/${progress.totalProblems} passed`)}
+        </span>}
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">{timing}</p>
+      {course?.coursePathId && course.courseTitle && <AppLink href={`/student/learning-paths/${course.coursePathId}`} className="mt-1 inline-block text-xs text-primary hover:underline focus-visible:underline">{tx("课程：", "Course: ")}{course.courseTitle}</AppLink>}
+    </div>
+    <AppLink href={href} aria-label={tx(`打开${title}`, `Open ${title}`)} className="inline-flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-subtle hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"><ChevronRight size={17} aria-hidden="true"/></AppLink>
+  </div>;
 }
 
 function ClassResourceRow({ resource, linkedCourse }: { resource: ClassResource; linkedCourse: boolean }) {

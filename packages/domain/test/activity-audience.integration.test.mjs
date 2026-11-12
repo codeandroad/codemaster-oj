@@ -66,7 +66,29 @@ test('explicit cross-class recipients and class-private resources have independe
   const classAssignment=await teacher('/assignments',{title:'Visible class course assignment',classIds:[classA.id],participants:[users.own.identityId],coursePathId:course.id,dueAt,problems:[{problemId:problem.id,points:100}]},'POST',201);
   const resource=await teacher('/learning-resources',{title:'Published course note',type:'note',scope:'school',pathId:course.id,content:'School-visible course material.'},'POST',201);
   const privateResource=await teacher('/learning-resources',{title:'Teacher private note',type:'note',scope:'private',pathId:course.id,content:'Private teacher answer.'},'POST',201);
-  const hub=await own(`/classes/${classA.id}`);assert(hub.assignments.some(a=>a.id===classAssignment.id));assert(hub.resources.some(r=>r.id===resource.id));assert(!hub.resources.some(r=>r.id===privateResource.id));
+  const hubPath=`/classes/${classA.id}`;
+  const hub=await own(hubPath);assert(hub.resources.some(r=>r.id===resource.id));assert(!hub.resources.some(r=>r.id===privateResource.id));
+  const assignmentProgress=async api=>{
+   const {completed,completedProblems,totalProblems}=(await api(hubPath)).assignments.find(a=>a.id===classAssignment.id);
+   return {completed,completedProblems,totalProblems};
+  };
+  assert.deepEqual(await assignmentProgress(own),{completed:false,completedProblems:0,totalProblems:1});
+  const ownSubmission=await own('/submissions',{kind:'submit',problemId:problem.id,assignmentId:classAssignment.id,code:'print(input())',idempotencyKey:randomUUID()},'POST',201);
+  assert.equal((await assignmentProgress(own)).completed,false,'a queued submission does not complete the assignment');
+  await pool.query("UPDATE submissions SET status='AC',score=100 WHERE id=$1",[ownSubmission.id.slice(3)]);
+  assert.deepEqual(await assignmentProgress(own),{completed:true,completedProblems:1,totalProblems:1});
+  assert.equal((await assignmentProgress(teacher)).completed,undefined,'staff do not receive a learner completion status');
+
+  const classTimed=await teacher('/timed-practices',{title:'Class timed practice',classIds:[classA.id],participants:[users.own.identityId],startsAt:new Date(Date.now()-60000).toISOString(),endsAt:dueAt,durationMinutes:30,problems:[{problemId:problem.id,points:100}]},'POST',201);
+  await teacher(`/timed-practices/${classTimed.id}/publish`,{});
+  const timedStatus=async api=>(await api(hubPath)).timedPractices.find(p=>p.id===classTimed.id).completionStatus;
+  assert.equal(await timedStatus(own),'not_started');
+  const classAttempt=await own(`/timed-practices/${classTimed.id}/start`,{});
+  assert.equal(await timedStatus(own),'in_progress');
+  await pool.query('UPDATE timed_attempts SET deadline_at=started_at WHERE id=$1',[classAttempt.id]);
+  assert.equal(await timedStatus(own),'completed');
+  assert.equal((await pool.query('SELECT state FROM timed_attempts WHERE id=$1',[classAttempt.id])).rows[0].state,'Active','reading the hub does not mutate an elapsed attempt');
+  assert.equal(await timedStatus(teacher),null);
   assert(!(await unassigned('/learning-resources')).items.some(r=>r.id===privateResource.id));await other(`/classes/${classA.id}`,undefined,'GET',403);
   await pool.query('UPDATE classes SET archived_at=now() WHERE id=$1',[classA.id]);await own(`/classes/${classA.id}`,undefined,'GET',404);
   assert.equal((await unassigned(`/assignments/${noClass.id}`)).id,noClass.id,'optional class metadata must not govern explicit recipient access');

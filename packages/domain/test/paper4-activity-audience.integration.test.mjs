@@ -89,7 +89,11 @@ test('Paper 4 recipients, rather than class membership, authorize every student 
   }
   // Being unassigned or excluded from this activity never closes the public source.
   for(const api of [classmate,unassigned,excluded])assert.equal((await api.send(`/paper4/papers/${paper.id}`)).deliveryKind,'catalog');
+  await pool.query('INSERT INTO class_members(class_id,identity_id) VALUES($1,$2)',[classA.id,cross.user.identityId]);
+  const classActivity=async api=>(await api.send(`/classes/${classA.id}`)).paper4Activities.find(p=>p.id===activity.id);
+  assert.equal((await classActivity(cross)).completionStatus,'not_started');
   const attempt=await cross.send(`/paper4/papers/${activity.id}/attempt`,{},'POST',201);
+  assert.equal((await classActivity(cross)).completionStatus,'in_progress');
   assert.equal((await cross.send(`/paper4/papers/${activity.id}/attempt`)).id,attempt.id);
   await cross.send(`/paper4/attempts/${attempt.id}/files/Q1`,{content:'print(1)',revision:0},'PATCH');
   await cross.send(`/paper4/attempts/${attempt.id}/checkpoints`,{stageId:'Q1a'},'POST',201);
@@ -104,6 +108,8 @@ test('Paper 4 recipients, rather than class membership, authorize every student 
   await cross.send(`/paper4/attempts/${attempt.id}/marks`,{stageId:'Q1a',marks:75},'PATCH',403);
   await cross.send(`/paper4/attempts/${attempt.id}/release`,{},'POST',403);
   await cross.send(`/paper4/attempts/${attempt.id}/submit`,{});
+  assert.equal((await classActivity(cross)).completionStatus,'submitted');
+  assert.equal((await classActivity(teacher)).completionStatus,null);
   await teacher.send(`/paper4/attempts/${attempt.id}/marks`,{stageId:'Q1a',marks:70,note:'Teacher feedback'},'PATCH');
   assert.equal((await cross.send(`/paper4/attempts/${attempt.id}`)).score,null);
   await teacher.send(`/paper4/attempts/${attempt.id}/release`,{});assert.equal((await cross.send(`/paper4/attempts/${attempt.id}`)).score,70);

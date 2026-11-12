@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "unitId": "data-structures",
+  "chapters": [
+    {
+      "key": "stack-and-queue-states",
+      "position": 0,
+      "references": [
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-3",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-3",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-3",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-3",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-3",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-3",
+          "questionId": "q4"
+        }
+      ]
+    },
+    {
+      "key": "bst-insertion-and-duplicates",
+      "position": 1,
+      "references": [
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-3",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-3",
+          "questionId": "q3"
+        }
+      ]
+    },
+    {
+      "key": "depths-and-path-lengths",
+      "position": 2,
+      "references": [
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-3",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-3",
+          "questionId": "q2"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-3",
+          "questionId": "q3"
+        }
+      ]
+    },
+    {
+      "key": "traversals-and-integrated-traces",
+      "position": 3,
+      "references": [
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-3",
+          "questionId": "q3"
+        }
+      ]
+    }
+  ]
+}

@@ -386,7 +386,7 @@
       "sourceTopics": [
         "Boolean Algebra"
       ],
-      "status": "planned",
+      "status": "draft",
       "practiceReferences": [
         {
           "paperSlug": "acsl-2020-2021-intermediate-3",
@@ -432,7 +432,11 @@
           "paperSlug": "acsl-2025-2026-intermediate-3",
           "questionId": "q2"
         }
-      ]
+      ],
+      "documents": {
+        "en": "intermediate/boolean-algebra/course.en.md",
+        "zh": "intermediate/boolean-algebra/course.zh.md"
+      }
     },
     {
       "id": "data-structures",
@@ -445,7 +449,7 @@
       "sourceTopics": [
         "Data Structures"
       ],
-      "status": "planned",
+      "status": "draft",
       "practiceReferences": [
         {
           "paperSlug": "acsl-2020-2021-intermediate-3",
@@ -495,7 +499,11 @@
           "paperSlug": "acsl-2025-2026-intermediate-3",
           "questionId": "q4"
         }
-      ]
+      ],
+      "documents": {
+        "en": "intermediate/data-structures/course.en.md",
+        "zh": "intermediate/data-structures/course.zh.md"
+      }
     },
     {
       "id": "automata-regex",
@@ -510,7 +518,7 @@
         "FSAs",
         "Regular Expressions"
       ],
-      "status": "planned",
+      "status": "draft",
       "practiceReferences": [
         {
           "paperSlug": "acsl-2020-2021-intermediate-3",
@@ -548,7 +556,11 @@
           "paperSlug": "acsl-2025-2026-intermediate-3",
           "questionId": "q6"
         }
-      ]
+      ],
+      "documents": {
+        "en": "intermediate/automata-regex/course.en.md",
+        "zh": "intermediate/automata-regex/course.zh.md"
+      }
     },
     {
       "id": "graphs",

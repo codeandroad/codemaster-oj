@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "unitId": "boolean-algebra",
+  "chapters": [
+    {
+      "position": 0,
+      "key": "logic-and-truth-tables",
+      "note": "Read complement scope and precedence, preserve the ordered inputs, and verify every truth-table row before counting.",
+      "references": [
+        { "paperSlug": "acsl-2020-2021-intermediate-3", "questionId": "q1" },
+        { "paperSlug": "acsl-2021-2022-intermediate-3", "questionId": "q2" },
+        { "paperSlug": "acsl-2024-2025-intermediate-3", "questionId": "q1" }
+      ]
+    },
+    {
+      "position": 1,
+      "key": "laws-and-complement-scope",
+      "note": "Apply De Morgan one bar at a time; justify each factoring, absorption, and complement step without arithmetic cancellation.",
+      "references": [
+        { "paperSlug": "acsl-2021-2022-intermediate-3", "questionId": "q1" },
+        { "paperSlug": "acsl-2022-2023-intermediate-3", "questionId": "q1" },
+        { "paperSlug": "acsl-2024-2025-intermediate-3", "questionId": "q2" },
+        { "paperSlug": "acsl-2025-2026-intermediate-3", "questionId": "q1" }
+      ]
+    },
+    {
+      "position": 2,
+      "key": "equivalence-and-counting",
+      "note": "Prove equivalence over all inputs, separate disjoint cases, include free variables, and avoid counting overlapping product terms twice.",
+      "references": [
+        { "paperSlug": "acsl-2020-2021-intermediate-3", "questionId": "q2" },
+        { "paperSlug": "acsl-2022-2023-intermediate-3", "questionId": "q2" },
+        { "paperSlug": "acsl-2023-2024-intermediate-3", "questionId": "q1" },
+        { "paperSlug": "acsl-2025-2026-intermediate-3", "questionId": "q2" }
+      ]
+    }
+  ]
+}

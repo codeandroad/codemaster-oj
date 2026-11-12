@@ -11,7 +11,7 @@ const root = new URL('../content/acsl-tutorials/', import.meta.url);
 const katex = createRequire(new URL('../apps/web/package.json', import.meta.url))('katex');
 const json = async url => JSON.parse(await readFile(url, 'utf8'));
 
-export const tutorialUnitIds = ['number-systems', 'recursion', 'program-tracing', 'expressions', 'bit-strings', 'lisp'];
+export const tutorialUnitIds = ['number-systems', 'recursion', 'program-tracing', 'expressions', 'bit-strings', 'lisp', 'boolean-algebra', 'data-structures', 'automata-regex'];
 export function assertTutorialUnit(unitId) {
   assert.ok(tutorialUnitIds.includes(unitId), `Unknown tutorial unit: ${unitId}`);
   return unitId;
@@ -168,6 +168,9 @@ export async function checkAcslTutorials(unitId) {
       // Only these reviewed, first-party validators may execute. Never import a
       // path supplied by a manifest, lesson, API response, or student program.
       const validators = {
+        'boolean-algebra': () => import('../content/acsl-tutorials/intermediate/boolean-algebra/checks.mjs'),
+        'data-structures': () => import('../content/acsl-tutorials/intermediate/data-structures/checks.mjs'),
+        'automata-regex': () => import('../content/acsl-tutorials/intermediate/automata-regex/checks.mjs'),
         expressions: () => import('../content/acsl-tutorials/intermediate/expressions/checks.mjs'),
         'bit-strings': () => import('../content/acsl-tutorials/intermediate/bit-strings/checks.mjs'),
         lisp: () => import('../content/acsl-tutorials/intermediate/lisp/checks.mjs'),

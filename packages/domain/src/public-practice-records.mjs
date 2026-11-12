@@ -46,6 +46,8 @@ export async function handlePublicPracticeRecords({ pool, user, route, url, meth
   const rawStatus = url.searchParams.get('status');
   const status = !notebook && rawStatus ? enumValue(rawStatus,
    ['Waiting','Judging','AC','WA','CE','RE','TLE','MLE','OLE','System Error'], 'Verdict') : null;
+  const rawReviewState = url.searchParams.get('reviewState');
+  const reviewState = notebook && rawReviewState ? enumValue(rawReviewState, ['resolved', 'needs-review'], 'Review state') : null;
   const { rows } = await db.query(`
    SELECT j.id,j.school_id,j.problem_id,j.payload->'version'->>'title' AS title,j.payload->>'language' AS language,
           j.created_at,outcome.status,j.result->>'score' AS score,n.updated_at AS note_updated_at
@@ -56,9 +58,10 @@ export async function handlePublicPracticeRecords({ pool, user, route, url, meth
    WHERE j.account_id=$1 AND j.access_context='public' AND j.kind='submit'
      AND (NOT $2::boolean OR n.submission_id IS NOT NULL)
      AND ($4::text IS NULL OR outcome.status=$4)
+     AND ($5::text IS NULL OR (outcome.status='AC')=($5='resolved'))
    ORDER BY COALESCE(CASE WHEN $2 THEN n.updated_at END,j.created_at) DESC,j.id DESC,j.school_id
    LIMIT 26 OFFSET $3
-  `, [user.id, notebook, (page - 1) * 25, status]);
+  `, [user.id, notebook, (page - 1) * 25, status, reviewState]);
   return { status: 200, body: { page, hasMore: rows.length > 25, items: rows.slice(0, 25).map(j => ({
    id: j.id, schoolId: j.school_id, problemId: j.problem_id, problemTitle: j.title, language: j.language,
    createdAt: j.created_at, status: j.status,

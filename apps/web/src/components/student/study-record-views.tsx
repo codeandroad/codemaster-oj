@@ -7,8 +7,9 @@ import { PageHeader, StatusPill } from "@/components/page-chrome";
 import { Button } from "@/components/ui/button";
 import { isPending } from "@/lib/production-api";
 import { languageInfo, submissionLanguage } from "./languages";
-import { Empty, State, date } from "./shared";
+import { Empty, State, Tabs, date } from "./shared";
 import { StudentSubmissionFilter } from "./submission-filter";
+import type { ReviewNotebookFilter, ReviewNotebookState } from "./review-notebook-state";
 
 type Resource = Parameters<typeof State>[0]["data"];
 type RecordRow = { key: string; href: string; title: string; context: string };
@@ -26,7 +27,7 @@ type NotebookRow = RecordRow & {
   lastPracticedAt?: string;
   language?: string;
   correction?: string;
-  state?: string;
+  state: ReviewNotebookState;
   feedback?: string;
 };
 
@@ -109,37 +110,49 @@ export function SubmissionHistory({ resource, rows, filters, pagination }: {
   </>;
 }
 
-export function ReviewNotebookView({ resource, rows, filters, pagination, school = false }: {
-  resource: Resource; rows: NotebookRow[]; filters?: ReactNode; pagination?: Pagination; school?: boolean;
+const notebookColumnWidths = [23, 13, 13, 10, 12, 11, 12, 6] as const;
+const notebookFilters = ["All", "Needs review", "Retried", "Resolved", "Feedback received"] as const;
+const publicNotebookFilters = ["All", "Needs review", "Resolved"] as const;
+
+export function ReviewNotebookView({ resource, rows, filter, onFilter, pagination, school = false }: {
+  resource: Resource; rows: NotebookRow[]; filter: ReviewNotebookFilter;
+  onFilter: (value: ReviewNotebookFilter) => void; pagination?: Pagination; school?: boolean;
 }) {
   const { locale } = useLocale();
   const tx = (zh: string, en: string) => locale === "en" ? en : zh;
+  const labels: Record<ReviewNotebookFilter, string> = {
+    All: tx("全部", "All"), "Needs review": tx("需要订正", "Needs review"),
+    Retried: tx("已重试", "Retried"), Resolved: tx("已解决", "Resolved"),
+    "Feedback received": tx("收到反馈", "Feedback received"),
+  };
+  const filters = school ? notebookFilters : publicNotebookFilters;
   return <>
     <PageHeader eyebrow={tx("订正", "Correction")} title={tx("订正本", "Review Notebook")}
       description={school ? tx("原活动成绩与后续订正分开记录。", "Original activity results and later corrections remain separate.")
         : tx("查看从正式提交保存的订正笔记。", "Review the notes saved from your formal submissions.")}/>
-    {filters}
+    <Tabs items={filters.map(value => labels[value])} value={labels[filter]}
+      onChange={value => onFilter(filters.find(option => labels[option] === value) ?? "All")}
+      label={tx("订正状态", "Correction status")}/>
     <State data={resource}>
-      {rows.length ? <RecordTable label={tx("订正记录", "Review entries")} width={school ? "min-w-[1080px]" : "min-w-[680px]"}
+      {rows.length ? <RecordTable label={tx("订正记录", "Review entries")} width="min-w-[1120px]" columnWidths={notebookColumnWidths}
         headings={[tx("题目", "Problem"), tx("来源活动", "Source activity"), tx("原始结果", "Original result"),
-          ...(school ? [tx("最新订正", "Latest correction"), tx("状态", "Status"), tx("教师反馈", "Teacher feedback")] : []),
-          school ? tx("最近练习", "Latest practice") : tx("笔记更新时间", "Note updated"), tx("操作", "Action")]}>
+          tx("最新订正", "Latest correction"), tx("状态", "Status"), tx("教师反馈", "Teacher feedback"),
+          tx("最近活动", "Latest activity"), tx("操作", "Action")]}>
         {rows.map(row => <tr key={row.key} className="border-t border-border">
-          <td className="px-4 py-3"><AppLink href={row.href} className={linkClass}>{row.title}</AppLink>
+          <td className="px-4 py-3 wrap-anywhere"><AppLink href={row.href} className={linkClass}>{row.title}</AppLink>
             {row.language && <span className="mt-1 block text-xs text-muted-foreground">{languageInfo[submissionLanguage(row.language)].name}</span>}
           </td>
-          <td className="max-w-[200px] px-4 py-3">{row.context}</td>
+          <td className="px-4 py-3 wrap-anywhere">{row.context}</td>
           <td className="px-4 py-3"><StatusPill status={row.originalResult}/></td>
-          {school && <>
-            <td className="px-4 py-3"><StatusPill status={row.correction ?? tx("未重试", "Not retried")}/></td>
-            <td className="px-4 py-3">{row.state}</td>
-            <td className="max-w-[220px] px-4 py-3 text-muted-foreground">{row.feedback || "—"}</td>
-          </>}
+          <td className="px-4 py-3">{row.correction || school ? <StatusPill status={row.correction ?? tx("未重试", "Not retried")}/> : "—"}</td>
+          <td className="px-4 py-3">{labels[row.state]}</td>
+          <td className="px-4 py-3 wrap-anywhere text-muted-foreground">{row.feedback || "—"}</td>
           <td className="px-4 py-3 text-xs">{date(row.lastPracticedAt, locale)}</td>
           <td className="px-4 py-3"><AppLink href={row.href} className={linkClass}>{tx("打开", "Open")}</AppLink></td>
         </tr>)}
       </RecordTable> : <Empty title={tx("暂无订正记录", "No correction records")}
-        description={school ? tx("从提交详情选择“加入订正本”，记录错误原因和下一次测试。", "Choose Add to Review Notebook from a submission to record the cause and next test.")
+        description={filter !== "All" ? tx("请选择其他订正状态。", "Select another correction status.")
+          : school ? tx("从提交详情选择“加入订正本”，记录错误原因和下一次测试。", "Choose Add to Review Notebook from a submission to record the cause and next test.")
           : tx("从提交详情保存订正笔记。", "Open a completed submission and save a review note.")}/>}
     </State>
     {pagination && (pagination.page > 1 || pagination.hasMore) && Boolean(resource.data) &&

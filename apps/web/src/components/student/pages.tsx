@@ -17,7 +17,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
 import { isPending, productionApi, type Assignment, type AuthResponse, type CampusUser, type ProductionProblem, type ReviewEntry, type SchoolClass, type Submission } from "@/lib/production-api";
-import { CodeBlock, Empty, Feedback, ResultPanel, ResultScore, State, Tabs, input, kindLabel, panel, shortId, textarea, useData, useMutation, useSubmission } from "./shared";
+import { CodeBlock, Empty, Feedback, ResultPanel, ResultScore, State, input, kindLabel, panel, shortId, textarea, useData, useMutation, useSubmission } from "./shared";
 import { StudentClasses, StudentClass } from "./classes";
 import { StudentLearningDetail, StudentLearningList, type LearningPath } from "./learning";
 import { StudentTimedDetail, StudentTimedList, type TimedPractice } from "./timed";
@@ -33,12 +33,10 @@ const StudentPaper4Detail = dynamic(() => import("@/components/paper4/student-pa
 import { genderLabel } from "@/lib/gender";
 import { languageInfo, requiredLanguageText, submissionLanguage } from "./languages";
 import { useLocale, type AppLocale } from "@/components/locale-context";
-import { reviewNotebookState } from "./review-notebook-state";
+import { reviewNotebookState, type ReviewNotebookFilter } from "./review-notebook-state";
 
 function ui(locale: AppLocale, chinese: string, english: string) { return locale === "en" ? english : chinese; }
 function displayDate(value: string | null | undefined, locale: AppLocale) { return value ? new Intl.DateTimeFormat(locale === "en" ? "en-US" : "zh-CN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Shanghai" }).format(new Date(value)) : "—"; }
-const notebookFilters = ["All", "Needs review", "Retried", "Resolved", "Feedback received"];
-function notebookStateLabel(locale: AppLocale, value: string) { return ({ "Feedback received": ui(locale, "收到反馈", "Feedback received"), All: ui(locale, "全部", "All"), "Needs review": ui(locale, "需要订正", "Needs review"), Retried: ui(locale, "已重试", "Retried"), Resolved: ui(locale, "已解决", "Resolved") } as Record<string, string>)[value] ?? value; }
 function submissionKindLabel(locale: AppLocale, kind: string) { return locale === "zh" ? kindLabel(kind, locale) : kind === "submit" ? "Formal submission" : kind === "correction" ? "Correction" : kind === "samples" ? "Public sample run" : "Custom input run"; }
 export function StudentPages({ pathname, user }: { pathname: string; user: CampusUser }) {
   const { locale } = useLocale();
@@ -402,21 +400,19 @@ function notebookGroups(entries: NotebookEntry[], submissions: Submission[], use
 export function StudentNotebook({ user }: { user: CampusUser }) {
   const { locale } = useLocale();
   const notebook = useData<{ items: NotebookEntry[] }>("review-notebook"), submissions = useData<{ items: Submission[] }>(`submissions?identityId=${user.identityId}&kind=submit,correction`), assignments = useData<{ items: Assignment[] }>("assignments");
-  const [filter, setFilter] = useState("All");
+  const [filter, setFilter] = useState<ReviewNotebookFilter>("All");
   const groups = notebookGroups(notebook.data?.items ?? [], submissions.data?.items ?? [], user), visible = groups.filter(g => filter === "All" || g.state === filter);
-  return <ReviewNotebookView resource={notebook} school
-    filters={<Tabs items={notebookFilters.map(value => notebookStateLabel(locale, value))} value={notebookStateLabel(locale, filter)}
-      onChange={value => setFilter(notebookFilters.find(state => notebookStateLabel(locale, state) === value) ?? "All")}
-      label={ui(locale, "订正状态", "Correction status")}/>}
+  return <ReviewNotebookView resource={notebook} school filter={filter} onFilter={setFilter}
     rows={visible.map(group => ({
       key: group.originalId,
       href: `/student/review-notebook/${group.latest.id}`,
       title: group.latest.problemTitle ?? group.original?.problemTitle ?? ui(locale, "订正记录", "Review entry"),
       context: group.original ? sourceLabel(group.original, assignments.data?.items, locale) : ui(locale, "提交", "Submission"),
+      language: group.original?.language,
       originalResult: group.original ? `${statusLabel(locale, group.original.status)} · ${score(group.original)}`
         : group.originalStatus ? statusLabel(locale, group.originalStatus) : ui(locale, "不可用", "Not available"),
       correction: group.correction && `${statusLabel(locale, group.correction.status)} · ${score(group.correction)}`,
-      state: notebookStateLabel(locale, group.state),
+      state: group.state,
       feedback: group.feedback?.note,
       lastPracticedAt: group.correction?.createdAt ?? group.latest.createdAt,
     }))}/>;

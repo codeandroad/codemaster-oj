@@ -113,6 +113,10 @@ test('school and public practice Nest transport requires scoped membership, CSRF
   await request(`${publicDetail}/note`,{auth:auth.personal,method:'PATCH',body:{note:'Check the return type'},csrf:false,status:403});
   await request(`${publicDetail}/note`,{auth:auth.personal,method:'PATCH',body:{note:'Check the return type'}});
   assert.equal((await request('/practice/review-notebook',{auth:auth.personal})).data.items[0].id,publicRun.id);
+  assert.deepEqual((await request('/practice/review-notebook?reviewState=needs-review',{auth:auth.personal})).data.items.map(job=>job.id),[publicRun.id]);
+  assert.deepEqual((await request('/practice/review-notebook?reviewState=resolved',{auth:auth.personal})).data.items,[]);
+  assert.deepEqual((await request('/practice/review-notebook?reviewState=needs-review',{auth:auth.student})).data.items,[]);
+  await request('/practice/review-notebook?reviewState=unknown',{auth:auth.personal,status:400});
   await t.test('public leaderboard uses first effective AC and never includes school or private submission data',async()=>{
    await request('/practice/leaderboard',{status:401});
    await request('/practice/leaderboard?page=0',{auth:auth.personal,status:400});
@@ -131,6 +135,9 @@ test('school and public practice Nest transport requires scoped membership, CSRF
    const historical=(await request(`/practice/problems/${problem.id}/submissions`,{auth:auth.personal,method:'POST',
     body:{kind:'submit',code:'def solve(data):\n return data*2',requestId:randomUUID()},status:202})).data;
    await processSchoolOne({pool:worker,judge:{judge:async()=>accepted}});
+   await request(`/practice/submissions/${school.id}/${historical.id}/note`,{auth:auth.personal,method:'PATCH',body:{note:'Accepted solution'}});
+   assert.deepEqual((await request('/practice/review-notebook?reviewState=resolved',{auth:auth.personal})).data.items.map(job=>job.id),[historical.id]);
+   assert.deepEqual((await request('/practice/review-notebook?reviewState=needs-review',{auth:auth.personal})).data.items.map(job=>job.id),[publicRun.id]);
    const unshared=(await request('/practice/leaderboard',{auth:auth.personal})).data;
    assert.deepEqual(unshared.progress,{solved:1,rankingEnabled:false,historyIncluded:false});
    assert.equal(unshared.own.rank,null);

@@ -41,7 +41,8 @@ export function PracticePage({ user, pathname, onLogout, onUserSaved }: {
   const label = section === "settings" ? text("Personal settings", "个人设置")
     : section === "profile" ? text("Profile", "个人资料")
       : section === "people" ? text("Public profile", "公开主页")
-      : item ? navLabel(item) : text("Public learning", "公开学习");
+      : section === "leaderboard" ? text("Leaderboard", "公开练习榜")
+        : item ? navLabel(item) : text("Public learning", "公开学习");
 
   useEffect(() => { document.title = `${label} · CodeMaster`; }, [label]);
 
@@ -105,7 +106,7 @@ export function PracticePage({ user, pathname, onLogout, onUserSaved }: {
             account={<>
               <ScholarshipBalance identityId={user.id} endpoint="practice/scholarship/me" href="/practice/scholarship"/>
               <NotificationDropdown key={user.id} workspace="public"/>
-              <AccountMenu user={user} busy={logout.busy} onLogout={() => void logout.run(async () => {
+              <AccountMenu user={user} busy={logout.busy} leaderboardHref="/practice/leaderboard" onLogout={() => void logout.run(async () => {
                 try {
                   await productionApi("auth/logout", { method: "POST" });
                 } catch (error) {
@@ -160,10 +161,7 @@ function PublicStudyHome({ user }: { user: CampusUser }) {
         <h2 className="font-semibold">{text("Public problems", "公开题目")}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{text("Write code and check your results in the practice workspace.", "在练习工作区编写代码并查看判题结果。")}</p>
       </div>
-      <div className="flex flex-wrap items-center gap-4 text-sm font-semibold">
-        <AppLink href="/practice/leaderboard" className="text-primary hover:underline">{text("View leaderboard", "查看公开练习榜")}</AppLink>
-        <AppLink href="/practice/problems" className="text-primary hover:underline">{text("Browse problems", "浏览题目")} →</AppLink>
-      </div>
+      <AppLink href="/practice/problems" className="text-sm font-semibold text-primary hover:underline">{text("Browse problems", "浏览题目")} →</AppLink>
     </section>
   </div>;
 }

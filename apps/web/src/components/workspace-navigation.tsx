@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, BookOpen, BookOpenCheck, ClipboardList, Clock3, Code2, Database, FileClock, FileCode2, Gauge, Home, LayoutDashboard, Library, NotebookPen, Settings, Trophy, UserRound, Users } from "lucide-react";
+import { BarChart3, BookOpen, BookOpenCheck, ClipboardList, Clock3, Code2, Database, FileClock, FileCode2, Gauge, Home, LayoutDashboard, Library, NotebookPen, Settings, UserRound, Users } from "lucide-react";
 import { AppLink } from "./navigation";
 import { useLocale } from "./locale-context";
 import { ScholarshipIcon } from "./scholarship/scholarship-icon";
@@ -63,12 +63,9 @@ const publicStudyPaths: Record<string, string> = {
   scholarship: "/practice/scholarship",
 };
 
-export const publicStudyNavigation = [
-  ...workspaceNavigation.student
-    .filter(item => Object.hasOwn(publicStudyPaths, item.section))
-    .map(item => ({ ...item, path: publicStudyPaths[item.section] })),
-  { section: "leaderboard", path: "/practice/leaderboard", label: "公开练习榜", shortEnglish: "Leaderboard", icon: Trophy },
-] satisfies readonly WorkspaceNavigationItem[];
+export const publicStudyNavigation = workspaceNavigation.student
+  .filter(item => Object.hasOwn(publicStudyPaths, item.section))
+  .map(item => ({ ...item, path: publicStudyPaths[item.section] }));
 
 export function useWorkspaceNavigationLabel() {
   const { locale, t } = useLocale();

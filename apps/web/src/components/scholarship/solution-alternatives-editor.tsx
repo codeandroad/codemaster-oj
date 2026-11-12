@@ -116,19 +116,15 @@ export function SolutionAlternativesEditor({ value, onChange, disabled, original
   }
 
   return <div className="space-y-3">
-    {originalSolution && <div className="space-y-2 rounded-md border border-border bg-surface-subtle p-3">
-      <p className="text-sm">{originalIncluded
-        ? tx("本题的原参考题解已包含在下方解法中。", "This problem’s reference solution is included below.")
-        : tx("本题还有原参考题解，可补入并与现有解法一起提供给学生。", "This problem also has a reference solution. Add it alongside the existing approaches for students.")}</p>
-      <p className="text-xs text-muted-foreground">{tx("新增或修改题解后，请保存并审核发布。审核期间学生仍看到原先发布的内容。", "Save and review new or revised solutions before publishing. Students continue to see the previously published content during review.")}</p>
-      {!originalIncluded && <Button type="button" size="sm" variant="secondary" disabled={disabled || items.length >= maxSolutions} onClick={() => {
+    {originalSolution && !originalIncluded && <div className="flex flex-wrap items-center gap-2">
+      <Button type="button" size="sm" variant="secondary" disabled={disabled || items.length >= maxSolutions} onClick={() => {
         const reference = { title: tx("原参考题解", "Reference solution"), body: originalSolution.body };
         const empty = items.length === 1 && !items[0].body.trim();
         setRequested(empty ? 0 : items.length);
         focusTitle.current = true;
         update(empty ? [reference] : [...items, reference]);
-      }}>{tx("补入原参考题解", "Add reference solution")}</Button>}
-      {!originalIncluded && items.length >= maxSolutions && <p className="text-xs text-muted-foreground">{tx("已达到 10 篇上限，请先合并或移除一篇解法。", "The 10-solution limit is reached. Combine or remove an approach first.")}</p>}
+      }}>{tx("补入原参考题解", "Add reference solution")}</Button>
+      {items.length >= maxSolutions && <p className="text-xs text-muted-foreground">{tx("已达到 10 篇上限，请先合并或移除一篇解法。", "The 10-solution limit is reached. Combine or remove an approach first.")}</p>}
     </div>}
     <div className="flex flex-wrap items-center justify-between gap-2">
       <h3 className="text-sm font-semibold">{tx("解法与阅读顺序", "Solutions and reading order")}</h3>

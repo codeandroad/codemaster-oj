@@ -7,7 +7,6 @@ import type { AssistanceKind } from "./assistance";
 import { ContentForm } from "./content-form";
 import type { ContentTarget } from "./content-model";
 import { useContentResource } from "./content-resource";
-import { SolutionUsageSummary } from "./solution-usage-summary";
 
 export type { ContentResponse, ContentTarget, AssistanceContent } from "./content-model";
 
@@ -83,15 +82,14 @@ export function ContentEditor({
           "在此维护学生阅读的中文题面。先保存草稿，核对内容后审核发布。",
           "Maintain the Chinese problem text students read. Save a draft, check its content, then review and publish.",
         ) : "problemId" in target ? tx(
-          "在此修改学生看到的完整题解、参考代码和多种解法。先保存草稿，核对后审核发布；审核期间学生继续看到已发布内容。",
-          "Edit the explanations, reference code and approaches students read. Save a draft, review it, then publish. Students continue to see the published content during review.",
+          "编辑题解和参考代码，支持多种解法。修改后请保存草稿并审核发布。",
+          "Edit explanations, reference code and multiple approaches. Save a draft, then review and publish your changes.",
         ) : tx(
           "在此维护这道大题的解题说明和参考代码。先保存草稿，核对内容后审核发布。",
           "Maintain this question’s explanation and reference code. Save a draft, check its content, then review and publish.",
         )}
       </p>
       <State resource={contents} />
-      {shared && contents.data && <SolutionUsageSummary versions={contents.data.versions ?? []} />}
       {readyToEdit && contents.data && (
         <ContentForm
           key={`${kind}:${shared && "problemId" in target ? target.problemId : target.versionId}`}

@@ -12,7 +12,7 @@ import { CourseCatalogSearch, useCourseCatalogQuery } from "@/components/student
 import { courseSearchHref, filterCourseCatalog } from "@/components/student/learning-course-search-model";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { productionApi } from "@/lib/production-api";
+import { productionApi, type SubmissionLanguage } from "@/lib/production-api";
 import { useSchoolError, useSchoolText } from "./school-ui";
 
 type PublicCourseEntry = {
@@ -36,6 +36,7 @@ type CourseDetail = {
   id: string;
   title: string;
   description: string;
+  requiredLanguage?: SubmissionLanguage | null;
   revision: number;
   sourceSchool?: string;
   authorName?: string;

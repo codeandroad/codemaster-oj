@@ -4,6 +4,7 @@ import { AppLink as Link } from "@/components/navigation";
 import { CourseAccessSummary, courseStatus, type CourseAccessMetadata } from "@/components/course-access";
 import { CourseCatalogTable, CourseCatalogRow } from "./course-catalog-table";
 import { CourseSettingsDialog } from "./course-settings-dialog";
+import { CourseProgrammingLanguageField } from "./course-programming-language-field";
 import { CourseAdmissionsDialog } from "@/components/schools/course-admissions-dialog";
 import { CoursePaper4Picker } from "./course-paper4-picker";
 import { coursePaper4LinkKey, coursePaper4References, coursePaper4UnitCount, mergeCoursePaper4Links, type CoursePaper4Link } from "@/components/course-paper4";
@@ -294,6 +295,7 @@ function CreatePath({
                 estimatedMinutes: Number(d.get("minutes")),
                 difficulty: d.get("difficulty"),
                 coverKey: d.get("coverKey"),
+                requiredLanguage: d.get("requiredLanguage") || null,
               },
             });
             onCreated(result.id);
@@ -343,6 +345,7 @@ function CreatePath({
             </select>
           </Field>
         </div>
+        <CourseProgrammingLanguageField className={input}/>
         <p className="text-xs text-muted-foreground">
           {t("先创建草稿并添加章节，检查内容后发布给本校学生。")}
         </p>
@@ -765,7 +768,7 @@ function LearningEditorForm({
         <div className="min-w-0 flex-1 space-y-1"><CourseAccessSummary course={path} showAuthor/><p className="text-xs text-muted-foreground">{t(courseDifficulties[path.difficulty??"beginner"])} · {chapters.length} {t("章")} · {path.estimatedMinutes??30} {tr("分钟", "minutes")}</p></div>
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <Button variant="secondary" size="sm" disabled={!path.canEdit} onClick={()=>setProgressOpen(true)}>{t("查看学生进度总览")}</Button>
-        <Button size="sm" variant="secondary" onClick={()=>{const doc:LearningDocument={format:"codemaster-learning-path",version:1,title:path.title,description:path.description,category:path.category,estimatedMinutes:path.estimatedMinutes??30,difficulty:path.difficulty??"beginner",coverKey:path.coverKey??"general",authorName:path.authorName,authoredAt:path.authoredAt,coverImage:path.coverImage,chapters:chapters.map(c=>({title:c.title,content:c.content,objective:c.objective??"",checkpoint:c.checkpoint??"",checkpointAnswer:c.checkpointAnswer??"",problemIds:c.problems.map(p=>p.problemId),paper4Links:coursePaper4References(c.paper4Links)}))};void action.run(async()=>{downloadLearningMarkdown(doc);return t("已导出当前编辑内容（包括未保存修改）。");});}}>{t("导出 Markdown")}</Button>
+        <Button size="sm" variant="secondary" onClick={()=>{const doc:LearningDocument={format:"codemaster-learning-path",version:1,title:path.title,description:path.description,category:path.category,requiredLanguage:path.requiredLanguage,estimatedMinutes:path.estimatedMinutes??30,difficulty:path.difficulty??"beginner",coverKey:path.coverKey??"general",authorName:path.authorName,authoredAt:path.authoredAt,coverImage:path.coverImage,chapters:chapters.map(c=>({title:c.title,content:c.content,objective:c.objective??"",checkpoint:c.checkpoint??"",checkpointAnswer:c.checkpointAnswer??"",problemIds:c.problems.map(p=>p.problemId),paper4Links:coursePaper4References(c.paper4Links)}))};void action.run(async()=>{downloadLearningMarkdown(doc);return t("已导出当前编辑内容（包括未保存修改）。");});}}>{t("导出 Markdown")}</Button>
         <Button size="sm" variant="secondary" disabled={!canEditCourse} onClick={() => setMetadata(true)}>
           {tr("课程属性与开放", "Properties and access")}
         </Button>

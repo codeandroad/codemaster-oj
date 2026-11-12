@@ -1,7 +1,9 @@
 import {parse,stringify} from "yaml";
 import type {CoursePaper4Reference} from "../course-paper4";
+import { supportedLanguages } from "../student/languages.ts";
+import type { SubmissionLanguage } from "@/lib/production-api";
 export interface LearningDocumentChapter {title:string;objective:string;content:string;checkpoint:string;checkpointAnswer:string;problemIds:string[];paper4Links?:CoursePaper4Reference[];}
-export interface LearningDocument {format:"codemaster-learning-path";version:1;title:string;description:string;category:string;estimatedMinutes:number;difficulty?:"beginner"|"intermediate"|"advanced";coverKey?:"python"|"algorithms"|"general";authorName?:string;authoredAt?:string|null;coverImage?:string|null;chapters:LearningDocumentChapter[];}
+export interface LearningDocument {format:"codemaster-learning-path";version:1;title:string;description:string;category:string;requiredLanguage?:SubmissionLanguage|null;estimatedMinutes:number;difficulty?:"beginner"|"intermediate"|"advanced";coverKey?:"python"|"algorithms"|"general";authorName?:string;authoredAt?:string|null;coverImage?:string|null;chapters:LearningDocumentChapter[];}
 const sectionNames:Record<string,keyof LearningDocumentChapter>={"学习目标":"objective","正文":"content","检查点":"checkpoint","参考答案":"checkpointAnswer","关联题目":"problemIds","Paper 4 练习":"paper4Links"};
 export function parseCoursePaper4References(value:unknown):CoursePaper4Reference[] {
  if(!Array.isArray(value)||value.length>100)throw Error("Paper 4 练习须为最多 100 项的 JSON 数组。");
@@ -20,6 +22,10 @@ export function parseLearningMarkdown(input:string):LearningDocument {
  const meta=parse(match[1]);if(!meta||meta.format!=="codemaster-learning-path"||meta.version!==1)throw Error("仅支持 codemaster-learning-path 版本 1。");
  const str=(v:unknown,name:string,max:number,required=false)=>{if(typeof v!=="string"||v.length>max||required&&!v.trim())throw Error(`${name}缺失或过长。`);return v.trim();};
  const doc:LearningDocument={format:"codemaster-learning-path",version:1,title:str(meta.title,"路径标题",200,true),description:str(meta.description??"","描述",4000),category:str(meta.category??"Python","分类",100,true),estimatedMinutes:meta.estimatedMinutes,chapters:[]};
+ if(meta.requiredLanguage!==undefined){
+  if(meta.requiredLanguage!==null&&!supportedLanguages.includes(meta.requiredLanguage))throw Error("必用编程语言无效。");
+  doc.requiredLanguage=meta.requiredLanguage;
+ }
  if(meta.difficulty!==undefined){if(!["beginner","intermediate","advanced"].includes(meta.difficulty))throw Error("课程难度无效。");doc.difficulty=meta.difficulty;}
  if(meta.coverKey!==undefined){if(!["python","algorithms","general"].includes(meta.coverKey))throw Error("课程封面无效。");doc.coverKey=meta.coverKey;}
  if(meta.authorName!==undefined)doc.authorName=str(meta.authorName,"创建者",120);

@@ -115,13 +115,56 @@ test('course restrictions also protect resource discovery, task course links and
  });
 });
 
+test('course language qualifies new progress and retains earlier progress through policy changes',options,async()=>{
+ await fixture(async({pool,teacher,admin,classmate,cross,unassigned})=>{
+  const path=await course(teacher);
+  const pathUrl=`/learning-paths/${path.id}`;
+  const problem=await teacher.send('/problems',{title:'Course language exercise',mode:'stdio',statement:'Print 1',samples:[{input:'',expected:'1'}],tests:[{input:'',expected:'1',weight:100}],referenceCode:'print(1)'},'POST',201);
+  await pool.query("UPDATE problem_versions SET validation_status='AC' WHERE id=$1",[problem.versionId]);
+  await teacher.send(`/problems/${problem.id}/publish`,{versionId:problem.versionId});
+  await admin.send(`/problems/${problem.id}/rank-review`,{versionId:problem.versionId,decision:'approved'},'PATCH');
+  await teacher.send(`/chapters/${path.chapter.id}`,{problemIds:[problem.id]},'PATCH');
+  await teacher.send(pathUrl+'/publish',{});
+  const submit=async(api,language,context={},status=201)=>api.send('/submissions',{
+   kind:'submit',language,problemId:problem.id,versionId:problem.versionId,code:{python:'print(1)',cpp:'int main() {}',javascript:'console.log(1)'}[language],idempotencyKey:randomUUID(),...context,
+  },'POST',status);
+  const accept=async(api,language,context)=>{
+   const submission=await submit(api,language,context);
+   await pool.query("UPDATE submissions SET status='AC',score=100 WHERE id=$1",[submission.id.slice(3)]);
+  };
+  const completed=async api=>(await api.send(pathUrl)).completedTasks;
+  const context={courseId:path.id,chapterId:path.chapter.id};
+  await accept(classmate,'cpp');
+  assert.equal(await completed(classmate),1);
+  assert.equal((await teacher.send(pathUrl,{requiredLanguage:'Python'},'PATCH',400)).error.code,'VALIDATION');
+  assert.equal((await teacher.send(pathUrl,{requiredLanguage:'python'},'PATCH')).requiredLanguage,'python');
+  assert.equal(await completed(classmate),1,'prior unrestricted AC remains eligible');
+  assert.equal((await submit(cross,'cpp',context,400)).error.code,'COURSE_LANGUAGE_REQUIRED');
+  await submit(cross,'python',{...context,chapterId:randomUUID()},404);
+  await accept(cross,'python',context);
+  await accept(unassigned,'cpp');
+  assert.equal(await completed(cross),1);
+  assert.equal(await completed(unassigned),0,'new independent AC in another language does not count');
+  await teacher.send(pathUrl,{requiredLanguage:'javascript'},'PATCH');
+  assert.equal(await completed(classmate),1);
+  assert.equal(await completed(cross),1,'AC matching a previous published rule remains eligible');
+  assert.equal(await completed(unassigned),0,'changing language does not revive unrelated AC');
+  const report=await admin.send(pathUrl+'/progress');
+  assert.equal(report.items.find(item=>item.id===unassigned.user.identityId).completedTasks,0);
+  assert.equal((await cross.send('/learning-paths')).items.find(item=>item.id===path.id).completedTasks,1);
+  await accept(unassigned,'javascript',context);
+  assert.equal(await completed(unassigned),1);
+ });
+});
+
 test('display cover import is bounded and access settings never survive a document import',options,async()=>{
  await fixture(async({teacher,otherTeacher,admin,classA,classB})=>{
   const image='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aPp8AAAAASUVORK5CYII=';
   for(const coverImage of ['https://example.test/tracker.png','data:image/svg+xml;base64,PHN2Zy8+','data:image/png;base64,aGVsbG8='])await teacher.send('/learning-paths',{title:'Bad cover',coverImage},'POST',400);
-  const doc={format:'codemaster-learning-path',version:1,title:'Imported display',category:'Paper 4',estimatedMinutes:30,authorName:'Original author',authoredAt:'2022-06-01T00:00:00Z',coverImage:image,accessScope:'classes',classIds:[classB.id],availableFrom:iso(7200000),listed:false,published:true,chapters:[{title:'Lesson',content:'Imported body',problemIds:[]}]};
+  const doc={format:'codemaster-learning-path',version:1,title:'Imported display',category:'Paper 4',requiredLanguage:'python',estimatedMinutes:30,authorName:'Original author',authoredAt:'2022-06-01T00:00:00Z',coverImage:image,accessScope:'classes',classIds:[classB.id],availableFrom:iso(7200000),listed:false,published:true,chapters:[{title:'Lesson',content:'Imported body',problemIds:[]}]};
   const imported=await teacher.send('/learning-paths/import',doc,'POST',201);
   assert.equal(imported.authorName,'Original author');assert.equal(imported.coverImage,image);assert.equal(imported.authoredAt,'2022-06-01T00:00:00.000Z');assert.equal(imported.accessScope,'school');assert.deepEqual(imported.classIds,[]);assert.equal(imported.availableFrom,null);assert.equal(imported.listed,true);assert.equal(imported.published,false);
+  assert.equal(imported.requiredLanguage,'python');
   await otherTeacher.send(`/learning-paths/${imported.id}`,{coverImage:null},'PATCH',403);
   const changed=await admin.send(`/learning-paths/${imported.id}`,{coverImage:null},'PATCH');assert.equal(changed.coverImage,null);assert.equal(changed.chapters.length,1);
  });

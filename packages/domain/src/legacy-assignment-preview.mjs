@@ -1,4 +1,6 @@
 import { transaction } from './db.mjs';
+import { assignmentRequiredLanguage } from './assignment-authoring.mjs';
+import { assertRequiredLanguage } from './course-language-policy.mjs';
 import { parseFunctionInput } from './function-input.mjs';
 import { LANGUAGES } from './languages.mjs';
 import { LEGACY_SCHOOL_ID } from './legacy-school.mjs';
@@ -33,7 +35,7 @@ async function result(db, scope, id) {
   });
 }
 
-async function enqueue(db, { a, user, body, config, submitLimiter, version }) {
+async function enqueue(db, { a, user, body, config, submitLimiter, version, requiredLanguage }) {
   const kind = enumValue(body.kind, ['submit','samples','custom'], '试做类型');
   const language = enumValue(body.language ?? 'python', LANGUAGES, '代码语言');
   const code = bytes(body.code, '代码', config.codeLimit);
@@ -51,6 +53,7 @@ async function enqueue(db, { a, user, body, config, submitLimiter, version }) {
   }
   assertLiveProblemVersion(versionId,version.id);
   if (revision !== a.edit_revision) fail(409, 'STALE_ASSIGNMENT', '作业已更新，请重新进入试做。');
+  assertRequiredLanguage(language, requiredLanguage);
   if (kind === 'samples' && !version.samples.some(sample => sample.enabled !== false)) {
     fail(409, 'NO_PUBLIC_SAMPLES', '此版本没有启用的公开样例。');
   }
@@ -85,15 +88,17 @@ export async function handleLegacyAssignmentPreview(ctx, { submitLimiter, assign
     const scope = [a.id, user.id];
     if (method === 'GET' && target === 'jobs' && !submissions) return result(db, scope, uuid(targetId, '试做提交 ID'));
     if (!target && method === 'GET') {
+      const requiredLanguage = await assignmentRequiredLanguage(db, a);
       const problems = (await assignmentProblemRows(db, a)).map(p => ({
         problemId: p.problem_id, versionId: p.version_id, title: p.title, points: Number(p.points),
       }));
       const { rows } = await db.query(`SELECT p.version_id, max(r.score) score
         ${previewJobs} WHERE ${previewOwner} AND p.assignment_revision=$3 AND p.kind='submit' AND t.state='completed'
-        GROUP BY p.version_id`, [...scope, a.edit_revision]);
+        AND ($4::text IS NULL OR p.language=$4)
+        GROUP BY p.version_id`, [...scope, a.edit_revision, requiredLanguage]);
       const scores = new Map(rows.map(row => [row.version_id, row.score]));
       return reply({
-        id: a.id, title: a.title, description: a.description, dueAt: a.due_at, revision: a.edit_revision,
+        id: a.id, title: a.title, description: a.description, dueAt: a.due_at, revision: a.edit_revision, requiredLanguage,
         problems: problems.map(problem => {
           const score = scores.get(problem.versionId);
           return { ...problem, score: score == null ? null : Math.round(Number(score) * problem.points) / 100 };
@@ -103,8 +108,10 @@ export async function handleLegacyAssignmentPreview(ctx, { submitLimiter, assign
     if (target !== 'problems') return null;
     const problemId = uuid(targetId, '题目 ID');
     if (!(await db.query('SELECT 1 FROM assignment_problems WHERE assignment_id=$1 AND problem_id=$2',[a.id,problemId])).rowCount) fail(404, 'NOT_FOUND', '此题不在作业中或尚未发布。');
+    const enqueueing = method === 'POST' && Boolean(submissions);
+    const requiredLanguage = await assignmentRequiredLanguage(db, a, { lock: enqueueing });
     const version = await resolveLiveProblemVersion(db, problemId, {allowArchived:method==='GET'});
-    if (method === 'POST' && submissions) return enqueue(db, { ...ctx, a, submitLimiter, version });
+    if (enqueueing) return enqueue(db, { ...ctx, a, submitLimiter, version, requiredLanguage });
     if (method !== 'GET') return null;
     if (submissions) {
       return reply(await metadataPage(db, `SELECT p.id::text,p.id received_id,p.account_id actor_key,p.created_at,
@@ -112,6 +119,6 @@ export async function handleLegacyAssignmentPreview(ctx, { submitLimiter, assign
         ${previewJobs} WHERE ${previewOwner} AND p.assignment_revision=$3 AND p.problem_id=$4 AND p.kind='submit' AND p.version_id=$6`,
       [...scope, a.edit_revision, problemId, user.name, version.id], url));
     }
-    return reply({ problem: await projectProblem(db, version), revision: a.edit_revision });
+    return reply({ problem: await projectProblem(db, version), revision: a.edit_revision, requiredLanguage });
   });
 }

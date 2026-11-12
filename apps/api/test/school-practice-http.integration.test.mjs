@@ -288,5 +288,82 @@ test('school and public practice Nest transport requires scoped membership, CSRF
     assert.equal((await request(`/practice/problems/${p.id}`,{auth:auth.student})).data.solved,false);
    }
   });
+  await t.test('school and public course runs enforce the published language while preserving earned progress',async()=>{
+   await request('/platform/problem-publications',{auth:auth.platform,method:'POST',body:{schoolId:school.id,problemId:problem.id,...exactVersion}});
+   const chapter={id:randomUUID(),title:'Double',body:'Practice doubling.',problems:[{problemId:problem.id,...exactVersion}]};
+   const input={title:'Programming practice',description:'Course practice',accessScope:'school',classIds:[],chapters:[chapter]};
+   const created=(await request(`${prefix}/courses`,{auth:auth.teacher,method:'POST',status:201,body:{...input,requestId:randomUUID()}})).data;
+   const coursePath=`${prefix}/courses/${created.id}`;
+   const publish=async revision=>(await request(coursePath+'/publish',{auth:auth.teacher,method:'POST',body:{expectedRevision:revision}})).data;
+   const list=async revision=>(await request('/platform/course-publications',{auth:auth.platform,method:'POST',status:201,
+    body:{schoolId:school.id,courseId:created.id,revision}})).data;
+   const firstEdition=await publish(created.revision);
+   const listing=await list(firstEdition.revision);
+   const publicCourse=`/practice/courses/${listing.id}`;
+   const getCourse=async account=>(await request(publicCourse,{auth:auth[account]})).data;
+   assert.equal((await getCourse('personal')).completedExercises,1);
+
+   const edited=(await request(coursePath,{auth:auth.teacher,method:'PATCH',body:{...input,expectedRevision:firstEdition.revision,requiredLanguage:'javascript'}})).data;
+   assert.equal(edited.requiredLanguage,'javascript');
+   assert.equal((await request(coursePath,{auth:auth.student})).data.requiredLanguage,null);
+   assert.equal((await getCourse('personal')).requiredLanguage,null);
+   const secondEdition=await publish(edited.revision);
+   assert.equal((await list(secondEdition.revision)).id,listing.id);
+   assert.equal((await getCourse('personal')).requiredLanguage,'javascript');
+   assert.equal((await getCourse('personal')).completedExercises,1,'the previously recognized Python AC remains earned');
+   assert.equal((await getCourse('admin')).completedExercises,0);
+   const publicProblem=(await request(`/practice/problems/${problem.id}`,{auth:auth.admin})).data;
+   assert.match(publicProblem.definition.starterCodes.javascript,/function solve\(/);
+
+   const schoolRuns=`${prefix}/problems/${problem.id}/submissions`;
+   const publicRuns=`/practice/problems/${problem.id}/submissions`;
+   const schoolContext={courseId:created.id,chapterId:chapter.id,...exactVersion};
+   const publicContext={...schoolContext,courseId:listing.id};
+   const run=(path,account,body,status)=>request(path,{auth:auth[account],method:'POST',status,
+    body:{requestId:randomUUID(),kind:'submit',language:'python',code:'def solve(data): return data*2',...body}});
+   for(const [path,account,context] of [[schoolRuns,'student',schoolContext],[publicRuns,'admin',publicContext]]){
+    for(const kind of ['samples','custom','submit']){
+     const result=await run(path,account,{...context,kind,...(kind==='custom'&&{input:'[5]'})},400);
+     assert.equal(result.data.error.code,'COURSE_LANGUAGE_REQUIRED');
+    }
+    await run(path,account,{...context,chapterId:undefined},400);
+    await run(path,account,{...context,chapterId:randomUUID()},404);
+   }
+   await run(schoolRuns,'personal',schoolContext,404);
+   await run(schoolRuns,'student',{...schoolContext,coursePreview:true},403);
+   await run(publicRuns,'admin',{...publicContext,coursePreview:true},403);
+   const draft=(await request(`${prefix}/courses`,{auth:auth.teacher,method:'POST',status:201,
+    body:{...input,requestId:randomUUID(),requiredLanguage:'javascript'}})).data;
+   const draftContext={...schoolContext,courseId:draft.id,coursePreview:true};
+   const previewMismatch=await run(schoolRuns,'teacher',draftContext,400);
+   assert.equal(previewMismatch.data.error.code,'COURSE_LANGUAGE_REQUIRED');
+
+   const accepted={status:'AC',score:100,passed:1,total:1,publicMessage:'',privateResults:[]};
+   const judge=process.env.GO_JUDGE_TEST_URL
+    ? new GoJudge({url:process.env.GO_JUDGE_TEST_URL,token:process.env.GO_JUDGE_TEST_TOKEN,environmentVersion:'course-language-qa'})
+    : {judge:async()=>accepted};
+   const free=(await run(publicRuns,'admin',exactVersion,202)).data;
+   await processSchoolOne({pool:worker,judge});
+   assert.equal((await request(`${publicRuns}/${free.id}`,{auth:auth.admin})).data.status,'AC');
+   assert.equal((await getCourse('admin')).completedExercises,0,'a new Python AC in free practice cannot satisfy the JavaScript requirement');
+   const code='function solve(data) { return data * 2; }';
+   const freeJavascript=(await run(publicRuns,'admin',{...exactVersion,language:'javascript',code},202)).data;
+   await processSchoolOne({pool:worker,judge});
+   assert.equal((await request(`${publicRuns}/${freeJavascript.id}`,{auth:auth.admin})).data.status,'AC');
+   assert.equal((await getCourse('admin')).completedExercises,1,'a matching-language AC in free practice earns course progress');
+
+   const scoped={...publicContext,kind:'samples',language:'javascript',code,requestId:randomUUID()};
+   const result=(await run(publicRuns,'admin',scoped,202)).data;
+   assert.equal((await run(publicRuns,'admin',scoped,202)).data.id,result.id);
+   await run(publicRuns,'admin',{...scoped,courseId:undefined,chapterId:undefined},409);
+   await processSchoolOne({pool:worker,judge});
+   assert.equal((await request(`${publicRuns}/${result.id}`,{auth:auth.admin})).data.status,'AC');
+   const schoolJob=(await run(schoolRuns,'student',{...schoolContext,language:'javascript',code},202)).data;
+   await processSchoolOne({pool:worker,judge});
+   assert.equal((await request(`${prefix}/judge-jobs/${schoolJob.id}`,{auth:auth.student})).data.status,'AC');
+   const previewJob=(await run(schoolRuns,'teacher',{...draftContext,kind:'samples',language:'javascript',code},202)).data;
+   await processSchoolOne({pool:worker,judge});
+   assert.equal((await request(`${prefix}/judge-jobs/${previewJob.id}`,{auth:auth.teacher})).data.status,'AC');
+  });
  }finally{await server?.close();await worker?.end();await pool.end();await owner.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);await owner.end();}
 });

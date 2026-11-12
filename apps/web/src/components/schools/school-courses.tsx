@@ -689,10 +689,12 @@ function CourseReader({ school, base, id, preview = false, onBack }: {
   });
   const practiceId = location.get("problemId");
   const practiceItems = (chapter?.problems ?? []).filter(item => item.available).map(item => ({ id: item.problemId, title: item.title ?? item.problemId }));
-  if (practiceId && chapter && practiceItems.some(item => item.id === practiceId)) return <PracticeProblem
-    key={practiceId} path={`schools/${school.id}/problems/${practiceId}`} jobPath={jobId => `schools/${school.id}/judge-jobs/${jobId}`}
+  const practice = chapter?.problems?.find(item => item.available && item.problemId === practiceId);
+  if (course && chapter && practice && !resource.error) return <PracticeProblem
+    key={`${id}:${chapter.id}:${practice.problemId}:${practice.versionId}`} path={`schools/${school.id}/problems/${practice.problemId}`} jobPath={jobId => `schools/${school.id}/judge-jobs/${jobId}`}
+    expectedVersionId={practice.versionId} course={{ courseId: id, chapterId: chapter.id, requiredLanguage: course.requiredLanguage, solved: Boolean(practice.solved), preview, reload: resource.reload }}
     backLabel={text("Back to chapter", "返回章节")}
-    navigation={{ items: practiceItems, currentId: practiceId, onSelect: problemId => window.history.pushState(null, "", readerHref(chapter.id, problemId)) }}
+    navigation={{ items: practiceItems, currentId: practice.problemId, onSelect: problemId => window.history.pushState(null, "", readerHref(chapter.id, problemId)) }}
     onBack={() => { window.history.pushState(null, "", readerHref(chapter.id)); resource.reload(); }}/>
   return <Loading resource={resource}>{course && <>
     {preview && <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground"><Button size="sm" variant="ghost" onClick={onBack}><ArrowLeft size={14}/>{text("Courses", "课程")}</Button>{text("Student preview", "学生预览")}</div>}

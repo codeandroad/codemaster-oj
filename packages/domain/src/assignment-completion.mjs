@@ -27,6 +27,7 @@ async function completedAssignments(db, identityId, assignmentIds, matchedSubmis
     SELECT min(s.created_at) AS first_at FROM submissions s
     WHERE s.assignment_id=assignment.id AND s.identity_id=part.identity_id AND s.problem_id=ap.problem_id
      AND s.kind='submit' AND s.created_at<=assignment.due_at
+     AND (assignment.required_language IS NULL OR s.language=assignment.required_language)
    ) attempt ON true
    WHERE assignment.id=ANY($1::uuid[]) AND assignment.state='Published'
     AND ($3::bigint IS NULL OR assignment.archived_at IS NULL)

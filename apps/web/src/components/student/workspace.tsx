@@ -25,7 +25,7 @@ import {displayBinding} from "./editor-keymap";
 import {FormatCodeIcon} from "./format-code-icon";
 import {EditorShortcutsHint} from "./editor-shortcuts";
 import { CodeEditor,type CodeEditorHandle } from "./code-editor";
-import { languageInfo, starterFor, submissionLanguage, supportedLanguages } from "./languages";
+import { languageInfo, requiredLanguageText, starterFor, submissionLanguage, supportedLanguages } from "./languages";
 import { TimedClock, useStudentTimedSession } from "./timed";
 import { useWorkspaceSettings, WorkspaceSettingsDialog } from "./workspace-settings";
 import { WorkspaceTimer } from "./workspace-timer";
@@ -63,6 +63,9 @@ function safeReturn(value: string | null) { return value?.startsWith("/student/"
 /** Transport and navigation adapters share the full workspace UI, never its access rights. */
 export type ProblemWorkspaceAdapter = {
   context: string;
+  requiredLanguage?: SubmissionLanguage | null;
+  languageScope?: "course" | "assignment";
+  reloadLanguagePolicy?: () => void;
   returnTo: string;
   returnLabel: string;
   homeHref: string;
@@ -107,24 +110,58 @@ export function ProblemWorkspace(props: ProblemWorkspaceProps) {
 }
 
 function WorkspaceEntry({ resumePath, ...props }: ProblemWorkspaceProps & { submissionsPath: string; resumePath: string }) {
+  const { locale } = useLocale();
+  const params = useSearchParams();
+  const assignmentId = props.original || props.adapter ? null : params.get("assignmentId");
+  const timedPracticeId = props.original || props.adapter ? null : params.get("timedPracticeId");
+  const hasCourseContext = !props.original && !props.adapter && !assignmentId && !timedPracticeId;
+  const learningPathId = hasCourseContext ? params.get("learningPathId") : null;
+  const chapterId = hasCourseContext ? params.get("chapterId") : null;
+  const assignment = useData<Assignment>(assignmentId ? `assignments/${encodeURIComponent(assignmentId)}` : "");
+  const course = useData<LearningPath>(learningPathId && chapterId ? `learning-paths/${encodeURIComponent(learningPathId)}` : "");
   const latest = useData<{ submission: WorkspaceSubmission | null }>(resumePath);
-  return <State data={latest}><WorkspaceEditor {...props} latest={latest.data?.submission ?? null}/></State>;
+  const courseChapter = course.data?.chapters?.find(chapter => chapter.id === chapterId);
+  const courseScoped = Boolean(learningPathId || chapterId);
+  const scopedResource = assignmentId ? assignment : courseScoped ? course : null;
+  const scopedProblem = assignmentId ? assignment.data?.problems : courseChapter?.problems;
+  const contextValid = scopedProblem?.some(item => item.problemId === props.problem.id);
+  const contextError = scopedResource && !scopedResource.loading && !contextValid
+    ? (locale === "en" ? "This problem is unavailable in this course or assignment." : "此题不在当前课程或作业中。")
+    : "";
+  if (scopedResource && !contextValid) {
+    const back = assignmentId ? `/student/assignments/${encodeURIComponent(assignmentId)}`
+      : learningPathId ? `/student/learning-paths/${encodeURIComponent(learningPathId)}` : "/student/problems";
+    return <div className="p-5">
+      <AppLink href={back} className="text-sm text-primary underline underline-offset-2">{locale === "en" ? "Go back" : "返回"}</AppLink>
+      <State data={{ ...scopedResource, data: undefined, error: scopedResource.error || contextError }}>{null}</State>
+    </div>;
+  }
+  const requiredLanguage = props.adapter?.requiredLanguage ?? props.original?.requiredLanguage
+    ?? assignment.data?.requiredLanguage ?? course.data?.requiredLanguage ?? null;
+  return <State data={latest}><WorkspaceEditor {...props} key={requiredLanguage ?? "unrestricted"}
+    latest={latest.data?.submission ?? null} requiredLanguage={requiredLanguage}
+    scope={{ assignmentId, timedPracticeId, learningPathId, chapterId, assignment, course, courseChapter }}/></State>;
 }
 
-function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProblem, submissionsPath, latest }: ProblemWorkspaceProps & { submissionsPath: string; latest: WorkspaceSubmission | null }) {
+function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProblem, submissionsPath, latest, requiredLanguage, scope }: ProblemWorkspaceProps & {
+  submissionsPath: string; latest: WorkspaceSubmission | null; requiredLanguage: SubmissionLanguage | null;
+  scope: {
+    assignmentId: string | null; timedPracticeId: string | null; learningPathId: string | null; chapterId: string | null;
+    assignment: ReturnType<typeof useData<Assignment>>; course: ReturnType<typeof useData<LearningPath>>;
+    courseChapter: NonNullable<LearningPath["chapters"]>[number] | undefined;
+  };
+}) {
   const { locale, t } = useLocale();
   const tx = useCallback((zh: string, en: string) => locale === "en" ? en : zh, [locale]);
   const panelName = (panel: WorkspacePanel) => locale === "en" ? ({ statement: "Problem", editor: "Code editor", testing: "Tests" } as const)[panel] : panelNames[panel];
   const router = useRouter();
-  const params = useSearchParams(), assignmentId = original || adapter ? null : params.get("assignmentId"), timedPracticeId = original || adapter ? null : params.get("timedPracticeId"), originalId = original ? original.originalSubmissionId ?? original.id : null;
-  const learningPathId=!adapter&&!assignmentId&&!timedPracticeId&&!originalId?params.get("learningPathId"):null,chapterId=params.get("chapterId");
+  const params = useSearchParams(), originalId = original ? original.originalSubmissionId ?? original.id : null;
+  const { assignmentId, timedPracticeId, learningPathId, chapterId, assignment, course, courseChapter } = scope;
   const tutorialEndpoint = !adapter && problem.versionId ? `problems/${encodeURIComponent(problem.id)}/tutorial?${new URLSearchParams({
     versionId: problem.versionId, ...(learningPathId && chapterId ? { courseId: learningPathId, chapterId } : {}),
   })}` : "";
   const tutorial = useProblemTutorial(tutorialEndpoint, adapter?.tutorial);
   const statementId = useId();
-  const course=useData<LearningPath>(learningPathId?`learning-paths/${encodeURIComponent(learningPathId)}`:"");
-  const courseChapter=course.data?.chapters?.find(c=>c.id===chapterId);
   const courseValid=!!courseChapter?.problems.some(p=>p.problemId===problem.id&&p.versionId===problem.versionId);
   const returnTo = adapter?.returnTo ?? (learningPathId&&chapterId?`/student/learning-paths/${encodeURIComponent(learningPathId)}/chapters/${encodeURIComponent(chapterId)}`:safeReturn(params.get("returnTo"))) ?? (timedPracticeId ? `/student/timed-practice/${timedPracticeId}` : assignmentId ? `/student/assignments/${assignmentId}` : originalId ? `/student/submissions/${originalId}` : "/student/problems");
   const sourceLabel = params.get("sourceLabel") ?? (timedPracticeId ? tx("限时训练", "Timed Practice") : assignmentId ? tx("作业", "Assignment") : originalId ? tx("订正本", "Review Notebook") : tx("题目", "Problems"));
@@ -135,7 +172,7 @@ function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProb
   const readWorkspaceDraft = useCallback((selected: SubmissionLanguage) => adapter ? adapter.readDraft(selected) : original ? readDraft(draftKey(user.id, problem.id, draftVersion, context, selected)) : readCurrentDraft(user.id, problem.id, context, selected), [adapter, original, user.id, problem.id, draftVersion, context]);
   const saveWorkspaceDraft = useCallback((selected: SubmissionLanguage, draft: NonNullable<ReturnType<typeof readDraft>>) => adapter ? adapter.saveDraft(selected, draft) : saveDraft(draftKey(user.id, problem.id, draftVersion, context, selected), draft), [adapter, user.id, problem.id, draftVersion, context]);
   const [language, setLanguage] = useState(() => initialWorkspaceLanguage(
-    draftVersion === "current" ? readCurrentDraftLanguage(user.id, problem.id, context) : readDraftLanguage(user.id, problem.id, draftVersion, context), latest, originalLanguage, readWorkspaceDraft,
+    draftVersion === "current" ? readCurrentDraftLanguage(user.id, problem.id, context) : readDraftLanguage(user.id, problem.id, draftVersion, context), latest, originalLanguage, readWorkspaceDraft, requiredLanguage,
   ));
   const storageKey = draftKey(user.id, problem.id, draftVersion, context, language);
   const [initialCode] = useState(() => workspaceEditorCode(language, readWorkspaceDraft(language), latest,
@@ -167,35 +204,37 @@ function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProb
     && formalResult.kind === "submit" && formalResult.status === "AC" ? formalResult.id : null;
   const celebrations = useAssignmentCelebrations(user.id, finishingSubmissionId);
   const celebration = !settingsOpen && !confirm && !layoutOpen && !problemListOpen ? celebrations.current : undefined;
-  const library=useData<{items:ProductionProblem[]}>(!adapter&&!learningPathId&&!assignmentId&&!timedPracticeId?"problems":""),assignment=useData<Assignment>(assignmentId?`assignments/${encodeURIComponent(assignmentId)}`:"");
+  const library=useData<{items:ProductionProblem[]}>(!adapter&&!learningPathId&&!assignmentId&&!timedPracticeId?"problems":"");
   const assignmentProblem = assignment.data?.problems.find(p => p.problemId === problem.id && p.versionId === problem.versionId);
   const assignmentValid = Boolean(assignmentProblem);
   const problemReward = assignmentProblem?.rewardPoints ?? 0;
   const assignmentGrade=assignment.data?.grades?.find(grade=>grade.identityId===user.identityId)?.problems.find(p=>p.problemId===problem.id);
   const refreshedSubmission=useRef<string|null>(null);
   const submissions = useProblemSubmissions(submissionsPath, `${submissionId ?? ""}:${polling.result?.status ?? ""}`), dirty = code !== receivedCode;
-  const reloadAssignment=assignment.reload,reloadSubmissions=submissions.reload;
+  const reloadAssignment=assignment.reload,reloadCourse=course.reload,reloadSubmissions=submissions.reload;
   useEffect(()=>{
     const result=polling.result;
-    if(!assignmentId||!result||result.id!==submissionId||result.kind!=="submit"||isPending(result.status))return;
+    if((!assignmentId&&!learningPathId)||!result||result.id!==submissionId||result.kind!=="submit"||isPending(result.status))return;
     const key=`${result.id}:${result.status}`;
     if(refreshedSubmission.current===key)return;
     refreshedSubmission.current=key;
-    reloadAssignment();reloadSubmissions();
-  },[assignmentId,submissionId,polling.result,reloadAssignment,reloadSubmissions]);
-  const anyDirty = dirty || supportedLanguages.some(other => { if (other === language) return false; const draft = readWorkspaceDraft(other); return draft?.code !== draft?.receivedCode && Boolean(draft?.code.trim()); });
+    if (assignmentId) reloadAssignment();
+    if (learningPathId) reloadCourse();
+    reloadSubmissions();
+  },[assignmentId,learningPathId,submissionId,polling.result,reloadAssignment,reloadCourse,reloadSubmissions]);
+  const anyDirty = dirty || !requiredLanguage && supportedLanguages.some(other => { if (other === language) return false; const draft = readWorkspaceDraft(other); return draft?.code !== draft?.receivedCode && Boolean(draft?.code.trim()); });
   useNavigationBlocker(anyDirty);
   const pending = action.busy || Boolean(submissionId && !polling.result && !polling.error) || Boolean(polling.result && isPending(polling.result.status));
   const changedDefinition = !original && (problemUpdated
     || Boolean(assignment.data?.problems.some(item => item.problemId === problem.id && item.versionId !== problem.versionId))
     || Boolean(courseChapter?.problems.some(item => item.problemId === problem.id && item.versionId !== problem.versionId))
     || Boolean(timedSession.data?.problems.some(item => item.problemId === problem.id && item.versionId !== problem.versionId)));
-  const unavailable = Boolean(timedPracticeId && !timedSession.active) || changedDefinition;
+  const unavailable = Boolean(timedPracticeId && !timedSession.active) || changedDefinition || Boolean(course.error || assignment.error);
   useEffect(() => { setDraftSaved(saveWorkspaceDraft(language, { code, receivedCode, updatedAt: new Date().toISOString() })); }, [language, code, receivedCode, saveWorkspaceDraft]);
   useEffect(() => { if (!layoutMessage) return; const timeout = window.setTimeout(() => setLayoutMessage(""), 4000); return () => window.clearTimeout(timeout); }, [layoutMessage]);
   useEffect(() => { if (!anyDirty) return; const beforeUnload = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; }; window.addEventListener("beforeunload", beforeUnload); return () => window.removeEventListener("beforeunload", beforeUnload); }, [anyDirty]);
   function changeLanguage(next: SubmissionLanguage) {
-    if (next === language || pending || formatting) return;
+    if (requiredLanguage || next === language || pending || formatting) return;
     saveWorkspaceDraft(language, { code, receivedCode, updatedAt: new Date().toISOString() });
     saveDraftLanguage(user.id, problem.id, draftVersion, context, next);
     const nextDraft = readWorkspaceDraft(next);
@@ -221,7 +260,7 @@ function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProb
         validateFunctionInput(customInput);
       }
       setSubmissionId(null);
-      const body = { problemId: problem.id, versionId: problem.versionId, code, language, kind, ...(assignmentId ? { assignmentId } : {}), ...(timedPracticeId ? { timedPracticeId } : {}), ...(kind === "correction" && originalId ? { originalSubmissionId: originalId } : {}), ...(kind === "custom" ? { customInput } : {}) };
+      const body = { problemId: problem.id, versionId: problem.versionId, code, language, kind, ...(assignmentId ? { assignmentId } : {}), ...(timedPracticeId ? { timedPracticeId } : {}), ...(learningPathId && chapterId ? { courseId: learningPathId, chapterId } : {}), ...(originalId ? { originalSubmissionId: originalId } : {}), ...(kind === "custom" ? { customInput } : {}) };
       const signature = JSON.stringify(body), key = keys.current.get(signature) ?? productionId(); keys.current.set(signature, key);
       let accepted: {id: string};
       try {
@@ -231,6 +270,12 @@ function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProb
         if (error.code === "PROBLEM_UPDATED") {
           keys.current.delete(signature);
           setProblemUpdated(true);
+        }
+        if (error.code === "COURSE_LANGUAGE_REQUIRED") {
+          keys.current.delete(signature);
+          adapter?.reloadLanguagePolicy?.();
+          if (learningPathId) course.reload();
+          if (assignmentId) assignment.reload();
         }
         if (error.code === "SUBMISSION_ALREADY_ACCEPTED") {
           keys.current.delete(signature);
@@ -343,6 +388,8 @@ function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProb
   function switchProblem(target:NavigationProblem|null){if(!target||navigationLoading||navigationError||pending)return;navigateWorkspace(adapter ? adapter.navigation.href(target) : navigationHref(target,{assignmentId,timedPracticeId,returnTo,sourceLabel,learningPathId,chapterId}));}
   function randomProblem(){if(!navigation.random.length)return;switchProblem(navigation.random[Math.floor(Math.random()*navigation.random.length)]);}
   const chapterContext = adapter?.chapter ?? (courseValid ? {courseTitle: course.data!.title, title: courseChapter!.title, position: courseChapter!.position, completed: Boolean(courseChapter?.problems.find(p=>p.problemId===problem.id)?.completed)} : undefined);
+  const solved = assignmentId && requiredLanguage ? assignmentGrade?.status === "AC"
+    : learningPathId || chapterContext ? Boolean(chapterContext?.completed) : submissions.data?.solved ?? problem.solved ?? false;
   const sample = problem.samples[selectedSample] ?? problem.samples[0];
   const assistanceAvailable = !adapter || Boolean(adapter.assistance);
   const statementTabs = [
@@ -383,7 +430,7 @@ function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProb
       </div>
     </header>
     {adapter?.statusBanner}
-    {chapterContext&&<div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-surface px-4 py-2" data-od-id="course-practice-context"><span className="text-xs">{chapterContext.courseTitle} › {locale==="en"?`Chapter ${chapterContext.position+1}`:`第 ${chapterContext.position+1} 章`} · {chapterContext.title}</span>{((polling.result?.status==="AC"&&polling.result.kind==="submit"&&polling.result.versionId===problem.versionId)||chapterContext.completed)&&<><span className="text-sm text-success">{tx("本题已完成","Problem completed")}</span>{navigation.next&&<Button size="sm" onClick={()=>switchProblem(navigation.next)}>{tx("下一题","Next problem")}</Button>}</>}<Button size="sm" variant="secondary" onClick={()=>navigateWorkspace(returnTo)}>{tx("返回章节","Back to chapter")}</Button></div>}
+    {chapterContext&&<div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-surface px-4 py-2" data-od-id="course-practice-context"><span className="text-xs">{chapterContext.courseTitle} › {locale==="en"?`Chapter ${chapterContext.position+1}`:`第 ${chapterContext.position+1} 章`} · {chapterContext.title}</span>{chapterContext.completed&&<><span className="text-sm text-success">{tx("本题已完成","Problem completed")}</span>{navigation.next&&<Button size="sm" onClick={()=>switchProblem(navigation.next)}>{tx("下一题","Next problem")}</Button>}</>}<Button size="sm" variant="secondary" onClick={()=>navigateWorkspace(returnTo)}>{tx("返回章节","Back to chapter")}</Button></div>}
     {assignmentId&&assignment.data&&assignmentValid&&<div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border bg-surface px-4 py-1" data-od-id="assignment-practice-context">
       <div className="min-w-0 flex-1 basis-52 text-xs leading-5 [overflow-wrap:anywhere]">
         <StudentScholarshipRule activityType="assignment" activityId={assignmentId} assignmentContext={assignment.data}/>
@@ -434,7 +481,7 @@ function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProb
         <div key={statementTab === "Tutorial" ? "tutorial" : "statement"} id={`${statementId}-panel`}
           className={styles.panelBody} role="tabpanel" aria-labelledby={`${statementId}-${statementTab}`}
           tabIndex={statementTab === "Tutorial" ? 0 : undefined}>
-{statementTab === "Problem" ? <><div className="flex items-start justify-between gap-4"><div className="min-w-0"><ProblemHeading title={problem.title} difficulty={problem.difficulty} tags={problem.tags}/></div><SolvedStatus solved={submissions.data?.solved ?? problem.solved ?? false}/></div><article className="max-w-2xl text-base leading-7">
+{statementTab === "Problem" ? <><div className="flex items-start justify-between gap-4"><div className="min-w-0"><ProblemHeading title={problem.title} difficulty={problem.difficulty} tags={problem.tags}/></div><SolvedStatus solved={solved}/></div><article className="max-w-2xl text-base leading-7">
           {problemReward > 0 && (
             <p className="my-1 py-1 text-xs font-semibold leading-5">
               {tx(`本题按时通过奖励 +${problemReward}`, `Extra reward for passing by the deadline +${problemReward}`)}
@@ -449,7 +496,7 @@ function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProb
       <div ref={rightRef} className={rightClass} style={{ "--workspace-editor-height": `${layout.editorPercent}%` } as CSSProperties}>
         <section className={panelClass("editor")} data-od-id="editor-panel" onMouseEnter={()=>setActivePanel("editor")} onFocusCapture={()=>setActivePanel("editor")}>
           <header className={styles.panelHeader}><span className={styles.panelTitle}><Code2 size={16} className="text-muted-foreground"/>{tx("代码","Code")}</span>{panelActions("editor")}</header>
-          <div className={styles.editorToolbar}><div className="flex min-w-0 items-center gap-3"><select id="workspace-language" aria-label={tx("编程语言","Programming language")} value={language} disabled={pending||formatting} onChange={event => changeLanguage(event.target.value as SubmissionLanguage)} data-od-id="programming-language">{supportedLanguages.map(value => <option key={value} value={value}>{languageInfo[value].name}</option>)}</select><span title={languageInfo[language].runtime} className="hidden font-mono text-muted-foreground sm:inline">{languageInfo[language].file}</span></div><div className={styles.tools}>
+          <div className={styles.editorToolbar}><div className="flex min-w-0 items-center gap-3">{requiredLanguage ? <span className="min-w-0 break-words font-semibold" data-od-id="required-programming-language">{requiredLanguageText(locale, requiredLanguage, adapter?.languageScope ?? (original ? "correction" : assignmentId ? "assignment" : "course"))}</span> : <select id="workspace-language" aria-label={tx("编程语言","Programming language")} value={language} disabled={pending||formatting} onChange={event => changeLanguage(event.target.value as SubmissionLanguage)} data-od-id="programming-language">{supportedLanguages.map(value => <option key={value} value={value}>{languageInfo[value].name}</option>)}</select>}<span title={languageInfo[language].runtime} className="hidden font-mono text-muted-foreground sm:inline">{languageInfo[language].file}</span></div><div className={styles.tools}>
             <CopyCodeButton code={code} className={styles.tool}/>
             <button type="button" className={styles.tool} title={tx("下载编辑器中的代码","Download code from editor")} aria-label={tx("下载编辑器中的代码","Download code from editor")} onClick={()=>downloadCode(code,languageInfo[language].file)} data-od-id="download-code"><Download size={14}/></button>
             <button type="button" className={styles.tool} title={`${tx("代码格式化","Format code")} · ${displayBinding(settings.editorKeymap.format)}`} aria-label={tx("代码格式化","Format code")} disabled={formatting||!code.trim()} onClick={()=>void formatEditor()} data-od-id="format-code"><FormatCodeIcon/></button>

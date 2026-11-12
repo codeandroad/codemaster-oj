@@ -1,4 +1,4 @@
-import { ApiError } from "@/lib/production-api";
+import { ApiError, type SubmissionLanguage } from "@/lib/production-api";
 import { useSchoolText } from "./school-ui";
 
 export type CourseChapter = {
@@ -16,6 +16,7 @@ export type CourseProblem = {
   solved?: boolean;
 };
 export type CourseProperties = {
+  requiredLanguage?: SubmissionLanguage | null;
   category: string;
   difficulty: "beginner" | "intermediate" | "advanced";
   coverKey: "python" | "algorithms" | "general";

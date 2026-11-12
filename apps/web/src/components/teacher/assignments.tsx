@@ -22,6 +22,7 @@ import { PageHeader, StatusPill } from "@/components/page-chrome";
 import { ScholarshipIcon } from "@/components/scholarship/scholarship-icon";
 import { ActivityRewardFields, type RewardRule, type RuleResponse } from "@/components/scholarship/teaching-page";
 import { useLocale, type AppLocale } from "@/components/locale-context";
+import { languageInfo, requiredLanguageText } from "@/components/student/languages";
 import {
   productionApi,
   ApiError,
@@ -29,6 +30,7 @@ import {
   type ProductionProblem,
   type SchoolClass,
   type Submission,
+  type SubmissionLanguage,
 } from "@/lib/production-api";
 import { TeacherAssignment } from "./dashboard-classes";
 import { ProblemPicker } from "./problem-banks";
@@ -234,7 +236,7 @@ function AssignmentEditorForm({
   const router = useRouter(),
     searchParams = useSearchParams(),
     classes = useData<{ items: SchoolClass[] }>("classes"),
-    courses = useData<{ items: { id: string; title: string; published: boolean; canEdit: boolean }[] }>("learning-paths"),
+    courses = useData<{ items: { id: string; title: string; published: boolean; canEdit: boolean; requiredLanguage?: SubmissionLanguage | null }[] }>("learning-paths"),
     audience = useData<AudienceDirectory>("teaching/audience"),
     [tab, setTab] = useState(searchParams.get("tab") === "problems" ? "Problems" : assignmentTabs[0]!),
     [saved, setSaved] = useState(initial),
@@ -266,7 +268,7 @@ function AssignmentEditorForm({
     [stale, setStale] = useState(false),
     action = useAction();
   const rewardResource = useData<RuleResponse>(`scholarship/reward-rules?activityType=assignment${saved ? `&activityId=${encodeURIComponent(saved.id)}` : ""}`);
-  const courseOutline = useData<{ id: string; chapters: { problems: { problemId: string }[] }[] }>(coursePathId ? `learning-paths/${coursePathId}` : null);
+  const courseOutline = useData<{ id: string; requiredLanguage?: SubmissionLanguage | null; chapters: { problems: { problemId: string }[] }[] }>(coursePathId ? `learning-paths/${coursePathId}` : null);
   const needsCourseOrder = problemOrder === "course" && Boolean(coursePathId);
   const matchingCourseOutline = courseOutline.data?.id === coursePathId;
   const courseOrderReady = !needsCourseOrder ||
@@ -297,6 +299,11 @@ function AssignmentEditorForm({
         .map((person) => person.identityId) ?? [],
     ),
     canEditProblems = !published || !hasSubmissions;
+  const requiredLanguage = published ? saved?.requiredLanguage
+    : matchingCourseOutline ? courseOutline.data?.requiredLanguage
+    : courses.data?.items.find(item => item.id === coursePathId)?.requiredLanguage;
+  const languageRequirement = requiredLanguage ? published ? requiredLanguageText(locale, requiredLanguage, "assignment")
+    : ui(locale, `发布后，本作业只接受 ${languageInfo[requiredLanguage].name}。`, `This assignment will require ${languageInfo[requiredLanguage].name} once published.`) : null;
   const directory = audience.data?.items ?? [];
   const students: AudienceStudent[] = [...directory, ...(saved?.participantDetails ?? []).filter(person => !directory.some(student => student.id === person.identityId)).map(person => ({ id: person.identityId, name: person.name, number: "", historical: true }))];
   const audienceClasses = audience.data?.classes ?? classes.data?.items ?? [];
@@ -674,6 +681,7 @@ function AssignmentEditorForm({
                   {courses.data?.items.filter((item) => item.published).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
                 </select>
                 <p className="mt-1 text-xs text-muted-foreground">{ui(locale, "仅显示已发布课程；学生可从作业进入所关联的课程。", "Only published courses are shown. Students can open the linked course from their assignment.")}</p>
+                {languageRequirement && <p className="mt-1 text-xs font-semibold">{languageRequirement}</p>}
               </Field>
               <Field label={ui(locale, "布置学生", "Recipients")}>
                 <div className="flex min-h-10 items-center justify-between gap-3 rounded-md border border-input bg-surface-subtle px-3 text-sm"><span>{ui(locale, `已选择 ${participants.length} 名学生`, `${participants.length} students selected`)}</span><Button type="button" size="sm" variant="ghost" onClick={() => setTab("Applicable list")}>{ui(locale, "选择学生", "Choose students")}</Button></div>
@@ -994,6 +1002,7 @@ function AssignmentEditorForm({
                 {ui(locale, "截止", "Due")} {due || ui(locale, "尚未设置", "Not set")}
               </p>
               {coursePathId && <p className="mt-2 text-sm text-primary">{ui(locale, "关联课程：", "Linked course: ")}{courses.data?.items.find(item => item.id === coursePathId)?.title ?? initial?.courseTitle ?? ui(locale, "课程不可用", "Course unavailable")}</p>}
+              {languageRequirement && <p className="mt-2 text-sm">{languageRequirement}</p>}
               <p className="mt-4 whitespace-pre-wrap text-sm">{description}</p>
               {!courseOrderReady && <State resource={courseOrderState} />}
               {courseOrderReady && <Table headers={[
@@ -1055,6 +1064,7 @@ function AssignmentEditorForm({
           <p className="text-sm leading-6">
             {ui(locale, `向已选择的 ${participants.length} 名学生布置 ${selected.length} 道题，总分 ${total} 分。`, `Assign ${selected.length} problems worth ${total} marks to ${participants.length} selected students.`)}
           </p>
+          {languageRequirement && <p className="mt-2 text-sm">{languageRequirement}</p>}
           {rewardSummary}
           {rewardReady && Boolean(completionReward?.amount) && <p className="mt-2 text-xs text-muted-foreground">{rewardCondition}</p>}
           <State resource={rewardResource} />

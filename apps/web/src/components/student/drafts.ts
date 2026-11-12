@@ -9,7 +9,9 @@ export function initialWorkspaceLanguage(
   latest: WorkspaceSubmission | null,
   fallback: SubmissionLanguage,
   read: (language: SubmissionLanguage) => StudentDraft | null,
+  requiredLanguage: SubmissionLanguage | null = null,
 ): SubmissionLanguage {
+  if (requiredLanguage) return requiredLanguage;
   if (latest) {
     const languages = selected ? [selected, ...supportedLanguages.filter(language => language !== selected)] : supportedLanguages;
     const unsaved = languages.find(language => {

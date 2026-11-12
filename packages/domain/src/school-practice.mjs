@@ -11,7 +11,10 @@ import { publicProblemMetadata } from './problem-public-statements.mjs';
 import { handlePublicPracticeRecords } from './public-practice-records.mjs';
 import { publicPracticeLeaderboard } from './public-practice-leaderboard.mjs';
 import { customTutorial, saveTutorial, tutorialContext, tutorialSettings } from './problem-tutorials.mjs';
-import { loadSchoolCourse } from './school-courses.mjs';
+import { loadSchoolCourse, schoolCourseProblemLanguage } from './school-courses.mjs';
+import { publicCourseProblemLanguage } from './public-learning.mjs';
+import { assertRequiredLanguage } from './course-language-policy.mjs';
+import { LANGUAGES, starterCodesFor } from './languages.mjs';
 import {
  decideLegacyPublicProblem, handleLegacyPublicProblemRequest, legacyPublicProblemPresentation,
  listLegacyPublicProblemReviews, previewLegacyPublicProblem,
@@ -61,7 +64,7 @@ export function normalizeSchoolProblem(body){
 const publicDefinition=v=>({title:v.title,statement:v.statement,mode:v.mode,functionName:v.function_name,comparator:v.comparator,
  ...publicProblemMetadata(v.metadata),tags:Array.isArray(v.tags)?v.tags.filter(tag=>typeof tag==='string'):[],
  timeLimitMs:v.time_limit_ms,memoryLimitMb:v.memory_limit_mb,starterCode:v.starter_code,
- starterCodes:Object.fromEntries(['python','cpp','javascript'].flatMap(language=>typeof v.starter_codes?.[language]==='string'?[[language,v.starter_codes[language]]]:[])),
+ starterCodes:starterCodesFor(v),
  samples:v.samples.map(t=>({input:t.input,expected:t.expected}))});
 const draftDefinition=v=>({...publicDefinition(v),referenceCode:v.reference_code,tests:v.tests.map(t=>({input:t.input,expected:t.expected,weight:t.weight}))});
 async function loadProblem(db,schoolId,id,user,role,{publicOnly=false}={}){
@@ -96,21 +99,36 @@ async function publicProblemStatus(db, problem, versionId) {
  `, [problem.school_id, problem.id, versionId]);
  return state;
 }
-async function enqueue(db,{schoolId,p,version,user,kind,body,accessContext}){
- const requestId=uuid(body.requestId,'Request ID'),language=enumValue(body.language??'python',['python','cpp','javascript'],'Language');
+async function enqueue(db,{schoolId,p,version,user,role,kind,body,accessContext}){
+ const requestId=uuid(body.requestId,'Request ID'),language=enumValue(body.language??'python',LANGUAGES,'Language');
+ const course = body.courseId == null && body.chapterId == null ? null : {
+  courseId:uuid(body.courseId,'Course ID').toLowerCase(),
+  chapterId:uuid(body.chapterId,'Chapter ID').toLowerCase(),
+ };
+ if(body.coursePreview!=null&&typeof body.coursePreview!=='boolean')fail(400,'VALIDATION','Invalid course preview mode.');
+ const preview=body.coursePreview===true;
+ if(preview&&(!course||accessContext!=='staff_practice'))fail(403,'FORBIDDEN','Course preview requires course management access.');
  const code=kind==='validation'?version.definition.reference_code:bytes(body.code,'Code');
  const customInput=kind==='custom'?bytes(body.input??'','Input',262144):null;
- const requestHash=canonicalHash({problemId:p.id,versionId:version.id,kind,language,code,customInput,accessContext});
+ const requestHash=canonicalHash({problemId:p.id,versionId:version.id,kind,language,code,customInput,accessContext,...course,...(preview&&{coursePreview:true})});
  await db.query("SELECT pg_advisory_xact_lock(hashtextextended('school-submit:'||$1,0))",[user.id]);
  const old=(await db.query('SELECT * FROM school_judge_jobs WHERE account_id=$1 AND request_id=$2',[user.id,requestId])).rows[0];
  if(old){if(old.request_hash!==requestHash)fail(409,'REQUEST_CONFLICT','Request ID was used for another operation.');return {id:old.id,state:old.state};}
+ if(course){
+  if(kind==='validation')fail(400,'VALIDATION','Reference validation cannot use a course context.');
+  if(body.versionId!=null&&uuid(body.versionId).toLowerCase()!==version.id)
+   fail(409,'REVISION_CONFLICT','This problem version has changed. Refresh the course before submitting.');
+  const resolveLanguage=accessContext==='public'?publicCourseProblemLanguage:schoolCourseProblemLanguage;
+  const requiredLanguage=await resolveLanguage(db,user,{...course,schoolId,problemId:p.id,versionId:version.id,role,preview});
+  assertRequiredLanguage(language,requiredLanguage);
+ }
  const counts=(await db.query(`SELECT count(*) FILTER(WHERE state IN ('queued','leased'))::integer AS pending,count(*) FILTER(WHERE created_at>now()-interval '5 minutes')::integer AS recent FROM school_judge_jobs WHERE account_id=$1`,[user.id])).rows[0];
  if(counts.pending>=5||counts.recent>=60)fail(429,'RATE_LIMIT','Too many judge requests. Please wait.');
  const definition=version.definition,tests=kind==='custom'?[{position:1,input:customInput}]:kind==='samples'?definition.samples:definition.tests;
  const payload={kind,version:{...definition,reference_code:undefined,tests:undefined},code,language,tests};
  try{validateTask(payload);}catch{fail(400,'INVALID_CASES','Invalid code, language or input.');}
  const identityId=accessContext==='school'?(await db.query('SELECT id FROM school_identities WHERE school_id=$1 AND account_id=$2',[schoolId,user.id])).rows[0]?.id:null;
- const job=(await db.query(`INSERT INTO school_judge_jobs(school_id,problem_id,version_id,account_id,identity_id,request_id,request_hash,kind,access_context,payload) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id,state`,[schoolId,p.id,version.id,user.id,identityId??null,requestId,requestHash,kind,accessContext,JSON.stringify(payload)])).rows[0];
+ const job=(await db.query(`INSERT INTO school_judge_jobs(school_id,problem_id,version_id,account_id,identity_id,request_id,request_hash,kind,access_context,payload,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,clock_timestamp()) RETURNING id,state`,[schoolId,p.id,version.id,user.id,identityId??null,requestId,requestHash,kind,accessContext,JSON.stringify(payload)])).rows[0];
  return job;
 }
 async function projectJob(db,job){
@@ -308,7 +326,7 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
   if(method==='GET'){const practice=url.searchParams.get('view')==='practice';if(practice&&(!p.published||p.archived))fail(404,'NOT_FOUND','Problem unavailable.');return reply(await shapeProblem(db,p,user,role,{detail:true,publicOnly:practice}));}
   if(m[4]==='submissions'&&method==='POST'){
    if(!p.published||p.archived)fail(409,'NOT_PUBLISHED','Publish the problem before student practice.');
-   const version=(await db.query('SELECT * FROM school_problem_versions WHERE school_id=$1 AND id=$2',[schoolId,p.published_version_id])).rows[0];return reply(await enqueue(db,{schoolId,p,version,user,kind:enumValue(body.kind,['samples','custom','submit'],'Run type'),body,accessContext:practiceContext(role)}),202);
+   const version=(await db.query('SELECT * FROM school_problem_versions WHERE school_id=$1 AND id=$2',[schoolId,p.published_version_id])).rows[0];return reply(await enqueue(db,{schoolId,p,version,user,role,kind:enumValue(body.kind,['samples','custom','submit'],'Run type'),body,accessContext:practiceContext(role)}),202);
   }
   if(!canManage(p,user,role))fail(403,'FORBIDDEN','You cannot manage this problem.');revision(body,p);
   if(method==='PATCH'&&!m[4]){const definition=normalizeSchoolProblem(body);await db.query('UPDATE school_problems SET draft=$3,revision=revision+1,updated_at=clock_timestamp() WHERE school_id=$1 AND id=$2',[schoolId,id,JSON.stringify(definition)]);await auditSchool(db,schoolId,user.id,'school.problem.update',id);return reply(await shapeProblem(db,await loadProblem(db,schoolId,id,user,role),user,role,{detail:true}));}

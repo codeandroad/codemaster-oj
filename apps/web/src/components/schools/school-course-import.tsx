@@ -83,6 +83,7 @@ export function SchoolCourseImport({
                   title: doc.title,
                   description: doc.description,
                   category: doc.category,
+                  requiredLanguage: doc.requiredLanguage,
                   difficulty: doc.difficulty ?? "beginner",
                   coverKey: doc.coverKey ?? "general",
                   coverImage: doc.coverImage ?? null,

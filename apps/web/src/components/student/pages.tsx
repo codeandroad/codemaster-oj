@@ -31,7 +31,7 @@ import problemStyles from "./problems-page.module.css";
 const StudentPaper4List = dynamic(() => import("@/components/paper4/student-paper4").then(module => module.StudentPaper4List));
 const StudentPaper4Detail = dynamic(() => import("@/components/paper4/student-paper4").then(module => module.StudentPaper4Detail));
 import { genderLabel } from "@/lib/gender";
-import { languageInfo, submissionLanguage } from "./languages";
+import { languageInfo, requiredLanguageText, submissionLanguage } from "./languages";
 import { useLocale, type AppLocale } from "@/components/locale-context";
 import { reviewNotebookState } from "./review-notebook-state";
 
@@ -265,6 +265,7 @@ export function StudentAssignment({ id, user }: { id: string; user: CampusUser }
             </Button>}
           </div>
           {a.coursePathId && a.courseTitle && <p className="mt-2 text-sm"><AppLink href={`/student/learning-paths/${a.coursePathId}`} className="font-semibold text-primary hover:underline focus-visible:underline">{ui(locale, "关联课程：", "Course: ")}{a.courseTitle} →</AppLink></p>}
+          {a.requiredLanguage && <p className="mt-2 text-sm font-semibold">{requiredLanguageText(locale, a.requiredLanguage, "assignment")}</p>}
           <p className="mt-2 text-sm leading-6 text-muted-foreground">{a.classNames?.join(" / ") || a.classes?.map(item => item.name).join(" / ") || a.className || classes.data?.items.find(c => c.id === a.classId)?.name || ui(locale, "按学生名单布置", "Direct assignment")} · {ui(locale, "截止", "Due")} {displayDate(a.dueAt, locale)} Asia/Shanghai</p>
           {!a.archived && <p className="mt-1 text-sm leading-6 text-muted-foreground">{t("截止后仍可提交并查看判题结果。补交不计入作业成绩，也不发放作业完成奖学金等作业奖励。")}</p>}
         </div>
@@ -280,7 +281,9 @@ export function StudentAssignment({ id, user }: { id: string; user: CampusUser }
         <section className="min-w-0 border border-border bg-surface panel-shadow">
           <div className="border-b border-border px-4 py-3">
             <h2 id="assignment-required-problems" className="font-bold">{ui(locale, "必做题目", "Required problems")}</h2>
-            <p className="mt-1 text-xs text-muted-foreground">{ui(locale, "提交次数仅统计本作业内的正式提交；其他入口通过可直接计入完成。", "Counts show formal submissions in this assignment; AC elsewhere can count toward completion.")}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{a.requiredLanguage
+              ? ui(locale, `提交次数仅统计本作业的正式提交。在其他入口使用 ${languageInfo[a.requiredLanguage].name} 通过也可计入完成。`, `Counts show formal submissions in this assignment. AC in ${languageInfo[a.requiredLanguage].name} elsewhere can count toward completion.`)
+              : ui(locale, "提交次数仅统计本作业内的正式提交；其他入口通过可直接计入完成。", "Counts show formal submissions in this assignment; AC elsewhere can count toward completion.")}</p>
           </div>
           <div
             className="overflow-x-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"

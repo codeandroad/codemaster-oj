@@ -24,7 +24,7 @@ export async function requireLegacyCourseAdmin(db, accountId) {
 }
 
 async function legacyCandidates(db, courseId, { lock = false, preview = false } = {}) {
-  const { rows } = await db.query(`SELECT p.id,p.title,p.description,p.access_scope,
+  const { rows } = await db.query(`SELECT p.id,p.title,p.description,p.access_scope,p.required_language,p.language_credit_cutoffs,
     ${legacyCourseSourceVersion} source_version,
     (${legacyCourseIsLive}) published,
     CASE WHEN latest.source_version=${legacyCourseSourceVersion} THEN latest.revision
@@ -73,14 +73,14 @@ export async function snapshotLegacyCourse(db, course) {
     fail(409, 'NOT_PUBLISHED', '请先发布包含完整章节的校内课程');
   }
   await db.query(`INSERT INTO legacy_course_publication_versions
-    (school_id,course_id,revision,source_version,title,description,access_scope,chapters)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb)`,
+    (school_id,course_id,revision,source_version,title,description,access_scope,chapters,required_language,language_credit_cutoffs)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10)`,
   [LEGACY_SCHOOL_ID, course.id, course.published_revision, course.source_version, course.title,
-    course.description, course.access_scope, JSON.stringify(chapters)]);
+    course.description, course.access_scope, JSON.stringify(chapters),course.required_language,course.language_credit_cutoffs]);
 }
 
 export async function legacyEdition(db, listing, { detail, lock }) {
-  return (await db.query(`SELECT v.title,v.description,v.revision,v.access_scope,s.name school_name,
+  return (await db.query(`SELECT v.title,v.description,v.revision,v.access_scope,v.required_language,v.language_credit_cutoffs,s.name school_name,
     p.category,p.difficulty,p.cover_key,p.cover_image,p.author_name,p.authored_at,
     jsonb_array_length(v.chapters) chapter_count ${detail ? ', v.chapters' : ''}
     FROM legacy_course_publication_versions v

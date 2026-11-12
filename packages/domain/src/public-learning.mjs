@@ -4,7 +4,6 @@ import { isPlatformAdministrator } from './platform-governance.mjs';
 import { legacyCourseCandidate, legacyCourseIsLive, legacyCourseReviewCandidates, legacyCourseSourceVersion, legacyDirectAccess, legacyEdition, requireLegacyCourseAdmin, snapshotLegacyCourse } from './legacy-public-course.mjs';
 import { availableLegacyPublicProblemVersions } from './legacy-public-problems.mjs';
 import { canonicalHash, enumValue, fail, integer, uuid } from './security.mjs';
-import { listPublicProblems } from './school-practice.mjs';
 
 const respond = (body, status = 200) => ({ status, body });
 const setSchool = (db, id) => db.query("SELECT set_config('campus.school_id',$1,true)", [id]);
@@ -22,7 +21,8 @@ async function context(db, user, { platform = false } = {}) {
 async function edition(db, listing, { detail = false, lock = false } = {}) {
   await setSchool(db, listing.school_id);
   if (listing.school_id === LEGACY_SCHOOL_ID) return legacyEdition(db, listing, { detail, lock });
-  return (await db.query(`SELECT p.title, p.description, p.revision, p.access_scope, s.name school_name,
+  return (await db.query(`SELECT p.title, p.description, p.revision, p.access_scope,
+      p.required_language,p.language_credit_cutoffs,s.name school_name,
       p.properties->>'category' category, p.properties->>'difficulty' difficulty, p.properties->>'coverKey' cover_key,
       p.properties->>'coverImage' cover_image, p.properties->>'authorName' author_name,
       COALESCE(p.properties->>'authoredAt',c.created_at::text) authored_at,
@@ -78,6 +78,7 @@ function courseEntry(listing, course, admission) {
     authorName: course.author_name ?? '',
     authoredAt: course.authored_at,
     revision: course.revision,
+    requiredLanguage: course.required_language ?? null,
     accessScope: course.access_scope,
     admission,
   };
@@ -105,7 +106,7 @@ async function catalogue(pool, user) {
         const detail = await edition(db, listing, { detail: true });
         if (!detail) continue;
         entry.completedChapters = detail.chapters.filter(chapter => read?.get(chapter.id) === contentHash(chapter)).length;
-        const available = await publicChapterProblems(db, listing, detail.chapters, user.id);
+        const available = await publicChapterProblems(db, listing, detail, user.id);
         const exercises = detail.chapters.flatMap(chapter => chapter.problems ?? [])
           .flatMap(link => available.get(`${link.problemId}:${link.versionId}`) ?? []);
         entry.totalExercises = exercises.length;
@@ -117,8 +118,8 @@ async function catalogue(pool, user) {
   });
 }
 
-async function publicChapterProblems(db, listing, chapters, accountId) {
-  const links = chapters.flatMap(chapter => chapter.problems ?? []);
+async function publicChapterProblems(db, listing, course, accountId) {
+  const links = course.chapters.flatMap(chapter => chapter.problems ?? []);
   const problems = new Map();
   if (!links.length) return problems;
 
@@ -131,6 +132,7 @@ async function publicChapterProblems(db, listing, chapters, accountId) {
       AND j.problem_id=p.id AND j.version_id=v.id AND j.account_id=$3
       AND j.access_context='public' AND j.kind='submit' AND j.activity_id IS NULL
       AND j.state='completed' AND j.result->>'status'='AC'
+      AND course_language_allows_credit($4,$5,j.payload->>'language',j.created_at)
   ) AS solved
   FROM links
   JOIN school_problem_publications pub ON pub.school_id=$1 AND pub.problem_id=links."problemId"
@@ -139,7 +141,7 @@ async function publicChapterProblems(db, listing, chapters, accountId) {
     AND p.published AND p.published_version_id=pub.version_id
   JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id AND NOT b.archived
   JOIN school_problem_versions v ON v.school_id=p.school_id AND v.problem_id=p.id AND v.id=pub.version_id`,
-  [listing.school_id, JSON.stringify(links), accountId]);
+  [listing.school_id, JSON.stringify(links), accountId, course.required_language, course.language_credit_cutoffs]);
   const legacyVersions = listing.school_id === LEGACY_SCHOOL_ID && rows.length
     ? await availableLegacyPublicProblemVersions(db, rows.map(row => row.versionId))
     : null;
@@ -149,6 +151,21 @@ async function publicChapterProblems(db, listing, chapters, accountId) {
     }
   }
   return problems;
+}
+
+export async function publicCourseProblemLanguage(db, user, { courseId, chapterId, schoolId, problemId, versionId }) {
+  await context(db, user);
+  const listing = await activeListing(db, courseId);
+  const course = listing?.school_id === schoolId && await edition(db, listing, { detail: true, lock: true });
+  if (!course) fail(404, 'COURSE_PROBLEM_UNAVAILABLE', '公开课程不存在或已撤回');
+  if (await admissionFor(db, listing, course, user.id) !== 'direct') {
+    fail(403, 'COURSE_APPLICATION_REQUIRED', '请先申请加入课程');
+  }
+  const chapter = course.chapters.find(item => item.id === chapterId);
+  if (!chapter?.problems?.some(link => link.problemId === problemId && link.versionId === versionId)) {
+    fail(404, 'COURSE_PROBLEM_UNAVAILABLE', '此题不在可访问的公开课程章节中');
+  }
+  return course.required_language;
 }
 
 async function publicCourse({ pool, user, method, body }, match) {
@@ -176,7 +193,8 @@ async function publicCourse({ pool, user, method, body }, match) {
     }
     if (match[2] && !match[3]) return null;
     if (admission !== 'direct') fail(403, 'COURSE_APPLICATION_REQUIRED', '请先申请加入课程');
-    const { chapters: publishedChapters } = await edition(db, listing, { detail: true });
+    const detail = await edition(db, listing, { detail: true });
+    const publishedChapters = detail.chapters;
     if (method === 'POST') {
       if (!match[3]) return null;
       if (body.expectedRevision !== course.revision) fail(409, 'REVISION_CONFLICT', '课程版本已更新，请刷新');
@@ -192,7 +210,7 @@ async function publicCourse({ pool, user, method, body }, match) {
     const { rows: progress } = await db.query(
       'SELECT chapter_id,content_hash,read FROM public_course_progress WHERE listing_id=$1 AND account_id=$2',
       [listing.id, user.id]);
-    const availableProblems = await publicChapterProblems(db, listing, publishedChapters, user.id);
+    const availableProblems = await publicChapterProblems(db, listing, detail, user.id);
     const chapters = publishedChapters.map((c, position) => ({
       id: c.id, title: c.title, body: c.body, position,
       read: progress.some(p => p.chapter_id === c.id && p.content_hash === contentHash(c) && p.read),
@@ -355,7 +373,7 @@ async function platformPublications({ pool, user, method, body }) {
         await setSchool(db, school.id);
         const rows = school.id === LEGACY_SCHOOL_ID
           ? await legacyCourseReviewCandidates(db)
-          : (await db.query(`SELECT c.id,c.published_revision,p.title,p.description,
+          : (await db.query(`SELECT c.id,c.published_revision,p.title,p.description,p.required_language,
             CASE WHEN p.access_scope='school' THEN p.chapters ELSE '[]'::jsonb END chapters,
             p.access_scope, jsonb_array_length(p.chapters) chapter_count,
             l.id listing_id,l.revision approved_revision,l.withdrawn_at,l.access_mode
@@ -373,7 +391,7 @@ async function platformPublications({ pool, user, method, body }) {
           items.push({
             schoolId: school.id, schoolName: school.name, courseId: c.id, revision: c.published_revision,
             ...(c.source_version && { sourceVersion: c.source_version }),
-            title: c.title, description: c.description,
+            title: c.title, description: c.description, requiredLanguage: c.required_language ?? null,
             chapters: c.chapters.map(ch => ({ id: ch.id, title: ch.title, body: ch.body })),
             chapterCount: c.chapter_count, canPublishDirect: c.access_scope === 'school',
             listingId: c.listing_id ?? null, listingActive, approvedRevision: c.approved_revision ?? null,
@@ -413,6 +431,7 @@ async function platformPublications({ pool, user, method, body }) {
 export async function handlePublicLearning(ctx) {
   const { pool, user, route, method, url } = ctx;
   if (route === '/practice/catalog' && method === 'GET') {
+    const { listPublicProblems } = await import('./school-practice.mjs');
     const courses = await catalogue(pool, user);
     const { items: problems } = await listPublicProblems(pool, user, url);
     return respond({ courses, problems });

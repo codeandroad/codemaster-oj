@@ -10,7 +10,8 @@ import { handleSchoolSettings } from './school-settings.mjs';
 import { schoolPracticeOperation } from './school-practice.mjs';
 import { handlePublicLearning } from './public-learning.mjs';
 import { randomUUID } from 'node:crypto';
-import {courseMetadataForUser} from './course-access.mjs';
+import {courseMetadataForUser, resolveLegacyCourseProblem} from './course-access.mjs';
+import {assertRequiredLanguage} from './course-language-policy.mjs';
 import { transaction } from './db.mjs';
 import { parseFunctionInput, parseJsonValue } from './function-input.mjs';
 import { handleLibrary, bankAccess, problemPermissions, restoreIdentityBindings, canReviewActivitySubmission, SCHOOL_BANK } from './library.mjs';
@@ -35,7 +36,7 @@ import {publicProblemMetadata,studentPublicStatementRows} from './problem-public
 import {legacyProblemStatement} from './problem-statement-display.mjs';
 import { handleSystem, assertJudgeAdmission, getSettings } from './system.mjs';
 import { handlePeopleAlignment, handleFavorites, bindPendingTeacherClasses } from './alignment.mjs';
-import { handleAssignmentAuthoring } from './assignment-authoring.mjs';
+import { assignmentRequiredLanguage, handleAssignmentAuthoring } from './assignment-authoring.mjs';
 import { handleLegacyAssignmentPreview } from './legacy-assignment-preview.mjs';
 import { loadSubmissionResult } from './submission-feedback.mjs';
 import { assignmentGradeRows } from './assignment-grades.mjs';
@@ -59,7 +60,7 @@ const identityIds=(value,name,max=500)=>{if(value===undefined)return [];if(!Arra
 const userShape=r=>({id:r.id,identityId:r.identity_id,name:r.name,number:r.number,gender:r.gender??null,username:r.username,email:r.email||null,nickname:r.nickname,showNicknameOnLeaderboard:!!r.leaderboard_use_nickname,bio:r.bio,avatar:avatarForIdentity(r.avatar,r.identity_id),roles:r.roles,platformAdmin:!!r.platform_admin,defaultSchoolId:r.default_school_id??null,activatedAt:r.created_at});
 const personShape=r=>({id:r.id,kind:r.kind,number:r.number,name:r.name,gender:r.gender??null,classes:r.classes||[],activated:!!r.activated});
 const problemShape=(r,{includeDisabledSamples=false}={})=>({...publicProblemMetadata(r.metadata),id:r.problem_id,title:r.title,mode:r.mode,statement:legacyProblemStatement(r),statementLanguage:r.statement_language,publicStatementPending:r.public_statement_pending,functionName:r.function_name,starterCode:r.starter_code,starterCodes:starterCodesFor(r),supportedLanguages:LANGUAGES,languageLimits:languageLimitsFor(r),referenceLanguage:r.reference_language||'python',samples:(r.samples||[]).filter(sample=>includeDisabledSamples||sample.enabled!==false),timeLimitMs:r.time_limit_ms,memoryLimitMb:r.memory_limit_mb,comparator:r.comparator,tags:r.tags||[],source:r.source||'',versionId:r.id,publishedVersionId:r.published_version_id||(r.published_at?r.id:null),publishedTitle:r.published_title||(r.published_at?r.title:null),published:!!r.published_at,schoolVisibleAt:r.school_visible_at??null,rankReviewStatus:r.rank_review_status??'pending',rankApprovedAt:r.rank_approved_at??null,bankVisibility:r.bank_visibility,validationStatus:r.validation_status,validationMessage:r.validation_message||null,formalTestCount:r.formal_test_count===undefined?undefined:Number(r.formal_test_count),canPublish:r.validation_status==='AC'&&!r.published_at});
-const submissionShape=r=>({id:`SUB${r.id}`,identityId:r.identity_id,problemId:r.problem_id,problemTitle:r.problem_title,versionId:r.version_id,kind:r.kind,language:r.language||'python',status:r.status,score:r.score===null?null:Number(r.score),passed:r.passed,total:r.total,createdAt:r.created_at,code:r.code,publicOutput:r.public_output||null,message:r.public_message||null,assignmentId:r.assignment_id||null,timedPracticeId:r.timed_practice_id||null,timedAttemptId:r.timed_attempt_id||null,resultsVisible:r.results_visible!==false,originalSubmissionId:r.original_submission_id?`SUB${r.original_submission_id}`:null,studentName:r.student_name});
+const submissionShape=r=>({id:`SUB${r.id}`,identityId:r.identity_id,problemId:r.problem_id,problemTitle:r.problem_title,versionId:r.version_id,kind:r.kind,language:r.language||'python',requiredLanguage:r.required_language??null,status:r.status,score:r.score===null?null:Number(r.score),passed:r.passed,total:r.total,createdAt:r.created_at,code:r.code,publicOutput:r.public_output||null,message:r.public_message||null,assignmentId:r.assignment_id||null,timedPracticeId:r.timed_practice_id||null,timedAttemptId:r.timed_attempt_id||null,resultsVisible:r.results_visible!==false,originalSubmissionId:r.original_submission_id?`SUB${r.original_submission_id}`:null,studentName:r.student_name});
 const reviewNoteShape = r => ({
  id:r.id,note:r.note,createdAt:r.created_at,authorName:r.author_name,
  authorIdentityId:r.author_identity_id,teacherFeedback:r.teacher_feedback,
@@ -196,13 +197,14 @@ export async function createDomainServices(pool,config) {
   const ps=await assignmentProblemRows(db,a);
   const linkedCourse=await courseMetadataForUser(db,user,a.course_path_id);
   const visibleCourse=Boolean(linkedCourse?.published_at&&!linkedCourse.archived_at);
+  const requiredLanguage=await assignmentRequiredLanguage(db,a);
   const linkedClasses=await activityClasses(db,id);
   const problems=ps.map(p=>({
    problemId:p.problem_id,versionId:p.version_id,position:p.position,title:p.title,
    points:Number(p.points),firstAcPoints:Number(p.first_ac_points),rewardPoints:Number(p.reward_points),
    ...(a.canManage&&typeof p.difficulty==='string'?{difficulty:p.difficulty}:{}),
   }));
-  const result={id:a.id,title:a.title,canManage:a.canManage,classIds:linkedClasses.map(c=>c.id),classes:linkedClasses,classId:a.class_id,className:(await db.query('SELECT name FROM classes WHERE id=$1',[a.class_id])).rows[0]?.name,state:a.state,archived:!!a.archived_at,description:a.description,course:a.course,coursePathId:linkedCourse?.id??null,courseTitle:linkedCourse?.title??null,courseAvailable:visibleCourse,problemOrder:a.problem_order,published:a.state==='Published',publishedAt:a.published_at,createdAt:a.created_at,dueAt:a.due_at,editRevision:a.edit_revision,problems};
+  const result={id:a.id,title:a.title,canManage:a.canManage,classIds:linkedClasses.map(c=>c.id),classes:linkedClasses,classId:a.class_id,className:(await db.query('SELECT name FROM classes WHERE id=$1',[a.class_id])).rows[0]?.name,state:a.state,archived:!!a.archived_at,description:a.description,course:a.course,coursePathId:linkedCourse?.id??null,courseTitle:linkedCourse?.title??null,courseAvailable:visibleCourse,requiredLanguage,problemOrder:a.problem_order,published:a.state==='Published',publishedAt:a.published_at,createdAt:a.created_at,dueAt:a.due_at,editRevision:a.edit_revision,problems};
   {
    const protectedParticipantIds=a.canManage?(await db.query('SELECT DISTINCT identity_id FROM submissions WHERE assignment_id=$1',[id])).rows.map(person=>person.identity_id):[];
    if(a.canManage)result.protectedParticipantIds=protectedParticipantIds;
@@ -639,19 +641,29 @@ export async function createDomainServices(pool,config) {
     if(rolesInclude(user,'admin'))await audit(pool,user.id,'submissions.admin_list','submission','list');return respond(200,{items:await Promise.all(history.rows.map(async r=>submissionShape(await timed.maskSubmission(pool,user,r)))),nextCursor:history.nextCursor});
    }
    if(route==='/submissions'&&method==='POST'){
-    const kind=enumValue(body.kind,['submit','samples','custom','correction'],'提交类型'),language=enumValue(body.language??'python',LANGUAGES,'代码语言'),problemId=uuid(body.problemId),code=bytes(body.code,'代码',config.codeLimit),key=field(body.idempotencyKey,'请求去重键',{min:8,max:100}),assignmentId=body.assignmentId?uuid(body.assignmentId):null,timedPracticeId=body.timedPracticeId?uuid(body.timedPracticeId):null,requestedVersion=body.versionId?uuid(body.versionId,'版本 ID'):null,originalId=body.originalSubmissionId?submissionId(body.originalSubmissionId):null,customInput=kind==='custom'?bytes(body.customInput??'','自定义输入'):null;
-    if(timedPracticeId&&(assignmentId||kind==='correction'))fail(400,'VALIDATION','计时训练不能混合作业或订正上下文');if(!code.trim())fail(400,'VALIDATION','请先输入代码');if(kind==='correction'&&!originalId)fail(400,'VALIDATION','订正需要原提交编号');if(kind!=='correction'&&originalId)fail(400,'VALIDATION','该提交类型不能设置原提交');
-    const requestHash=canonicalHash({kind,language,problemId,code,assignmentId,timedPracticeId,requestedVersion,originalId,customInput});
+    const kind=enumValue(body.kind,['submit','samples','custom','correction'],'提交类型');
+    const language=enumValue(body.language??'python',LANGUAGES,'代码语言');
+    const problemId=uuid(body.problemId),code=bytes(body.code,'代码',config.codeLimit),key=field(body.idempotencyKey,'请求去重键',{min:8,max:100});
+    const assignmentId=body.assignmentId?uuid(body.assignmentId):null,timedPracticeId=body.timedPracticeId?uuid(body.timedPracticeId):null;
+    const requestedVersion=body.versionId?uuid(body.versionId,'版本 ID'):null,originalId=body.originalSubmissionId?submissionId(body.originalSubmissionId):null;
+    const customInput=kind==='custom'?bytes(body.customInput??'','自定义输入'):null;
+    const courseContext=body.courseId!=null||body.chapterId!=null
+     ?{courseId:uuid(body.courseId,'课程 ID').toLowerCase(),chapterId:uuid(body.chapterId,'章节 ID').toLowerCase()}:null;
+    if(courseContext&&(assignmentId||timedPracticeId||originalId))fail(400,'VALIDATION','课程练习不能混合作业、计时训练或订正');
+    if(timedPracticeId&&(assignmentId||originalId||kind==='correction'))fail(400,'VALIDATION','计时训练不能混合作业或订正上下文');
+    if(!code.trim())fail(400,'VALIDATION','请先输入代码');
+    if(kind==='correction'&&!originalId)fail(400,'VALIDATION','订正需要原提交编号');
+    if(kind==='submit'&&originalId)fail(400,'VALIDATION','正式提交不能设置原提交');
+    const target={problemId,code,assignmentId,timedPracticeId,requestedVersion,originalId,customInput};
+    const requestHash=canonicalHash({kind,language,...target,...(courseContext??{})});
     // Requests accepted before migration 013 omitted language from the hash.
     // Their stored rows default to Python; preserve retry semantics without
     // allowing a reused key to silently switch to another language.
-    const legacyPythonHash=language==='python'?canonicalHash({kind,problemId,code,assignmentId,timedPracticeId,requestedVersion,originalId,customInput}):null;
+    const legacyPythonHash=language==='python'&&!courseContext?canonicalHash({kind,...target}):null;
     const result=await transaction(pool,async db=>{
      await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`${user.id}:${key}`]);
      const old=(await db.query('SELECT s.*,v.title problem_title FROM submissions s JOIN problem_versions v ON v.id=s.version_id WHERE account_id=$1 AND idempotency_key=$2',[user.id,key])).rows[0];if(old){if(old.request_hash!==requestHash&&!(old.language==='python'&&old.request_hash===legacyPythonHash))fail(409,'IDEMPOTENCY_CONFLICT','相同请求键对应的内容不同');return old;}
      submitLimiter.check(user.id);
-     await assertJudgeAdmission(db);
-     if((await db.query("SELECT count(*)::int count FROM submissions WHERE identity_id=$1 AND status IN ('Waiting','Judging')",[user.identityId])).rows[0].count>=5)fail(429,'TOO_MANY_PENDING','最多同时等待 5 个运行，请等待已有结果');
      let assignment=null;
      if(assignmentId){
       // Activity membership remains authoritative; its historical pin no
@@ -665,14 +677,26 @@ export async function createDomainServices(pool,config) {
      // Corrections retain the original judge snapshot. Every new run captures
      // the one current definition under the same parent lock as publication.
      const original=originalId?await submissionAccess(db,user,originalId):null;
-     let v=original?row(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND published_at IS NOT NULL',[original.version_id])):await resolveLiveProblemVersion(db,problemId);
+     if(original){
+      if(original.identity_id!==user.identityId||original.problem_id!==problemId||!['submit','correction'].includes(original.kind))fail(400,'VALIDATION','只能订正自己的同题正式提交');
+      if(original.access_timed_attempt_id&&!(await db.query('SELECT 1 FROM timed_attempts attempt JOIN timed_practices practice ON practice.id=attempt.practice_id WHERE attempt.id=$1 AND practice.results_published_at IS NOT NULL',[original.access_timed_attempt_id])).rowCount)fail(409,'RESULTS_NOT_RELEASED','计时训练成绩发布后才能订正或运行样例');
+      if(assignmentId&&original.access_assignment_id!==assignmentId)fail(409,'ASSIGNMENT_CONTEXT_MISMATCH','作业订正须引用本作业的原提交');
+      if(requestedVersion&&requestedVersion!==original.version_id)fail(409,'VERSION_MISMATCH','订正版本与原提交不同');
+     }
+     const course=courseContext?await resolveLegacyCourseProblem(db,user,{...courseContext,problemId}):null;
+     let v=original?row(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND published_at IS NOT NULL',[original.version_id]))
+      :course?.version??await resolveLiveProblemVersion(db,problemId);
      const {permissions}=await versionAccess(db,user,problemId,v.id);
+     if(!timedPracticeId&&!permissions.canRunFree)fail(403,'TIMED_CONTEXT_REQUIRED','该题目仅授权用于当前计时训练，请从训练工作区提交');
+     const requiredLanguage=course?.requiredLanguage??assignment?.required_language??original?.required_language??null;
+     assertRequiredLanguage(language,requiredLanguage);
      if(!original)assertLiveProblemVersion(requestedVersion,v.id);
+     await assertJudgeAdmission(db);
+     if((await db.query("SELECT count(*)::int count FROM submissions WHERE identity_id=$1 AND status IN ('Waiting','Judging')",[user.identityId])).rows[0].count>=5)fail(429,'TOO_MANY_PENDING','最多同时等待 5 个运行，请等待已有结果');
      // The homework deadline limits official grades and activity rewards,
      // not admission to the judge. Persist the server's receipt time as usual.
      let acceptedAt=row(await db.query('SELECT clock_timestamp()::text AS accepted_at')).accepted_at;
-     if(original){if(original.timed_attempt_id&&!(await db.query('SELECT 1 FROM timed_attempts attempt JOIN timed_practices practice ON practice.id=attempt.practice_id WHERE attempt.id=$1 AND practice.results_published_at IS NOT NULL',[original.timed_attempt_id])).rowCount)fail(409,'RESULTS_NOT_RELEASED','计时训练成绩发布后才能提交订正');if(original.identity_id!==user.identityId||original.problem_id!==problemId||!['submit','correction'].includes(original.kind))fail(400,'VALIDATION','只能订正自己的同题正式提交');if(assignmentId&&original.assignment_id!==assignmentId)fail(409,'ASSIGNMENT_CONTEXT_MISMATCH','作业订正须引用本作业的原提交');if(requestedVersion&&requestedVersion!==original.version_id)fail(409,'VERSION_MISMATCH','订正版本与原提交不同');}
-     if(!timedPracticeId&&!permissions.canRunFree)fail(403,'TIMED_CONTEXT_REQUIRED','该题目仅授权用于当前计时训练，请从训练工作区提交');const timedContext=await timed.prepareSubmission(db,user,body,v);if(timedContext){v=timedContext.version;acceptedAt=timedContext.acceptedAt;}if(kind==='samples'&&!(v.samples||[]).some(sample=>sample.enabled!==false))fail(409,'NO_PUBLIC_SAMPLES','此版本没有启用的公开样例，请联系教师补齐后运行');if(kind==='custom'&&v.mode==='function'){try{parseFunctionInput(customInput);}catch{fail(400,'VALIDATION','函数自测输入须为 JSON 参数数组或合法的 args/kwargs 对象');}}
+     const timedContext=await timed.prepareSubmission(db,user,body,v);if(timedContext){v=timedContext.version;acceptedAt=timedContext.acceptedAt;}if(kind==='samples'&&!(v.samples||[]).some(sample=>sample.enabled!==false))fail(409,'NO_PUBLIC_SAMPLES','此版本没有启用的公开样例，请联系教师补齐后运行');if(kind==='custom'&&v.mode==='function'){try{parseFunctionInput(customInput);}catch{fail(400,'VALIDATION','函数自测输入须为 JSON 参数数组或合法的 args/kwargs 对象');}}
      if(kind==='submit'){
       // A new request key cannot create a second attempt for identical code
       // while it is in flight or already accepted in this grading context.
@@ -686,7 +710,7 @@ export async function createDomainServices(pool,config) {
       if(duplicate?.status==='AC')fail(409,'SUBMISSION_ALREADY_ACCEPTED','相同代码已通过，不会重复计入提交次数。修改代码后可再次提交。');
       if(duplicate)fail(409,'SUBMISSION_ALREADY_PENDING','相同代码已提交，请等待当前判题结果。');
      }
-     const s=row(await db.query('INSERT INTO submissions(account_id,identity_id,problem_id,version_id,assignment_id,kind,original_submission_id,code,language,custom_input,idempotency_key,request_hash,created_at,timed_attempt_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *',[user.id,user.identityId,problemId,v.id,assignmentId,kind,originalId,code,language,customInput,key,requestHash,acceptedAt,timedContext?.timedAttemptId||null]));await db.query("INSERT INTO judge_tasks(submission_id,version_id,purpose) VALUES($1,$2,'submission')",[s.id,v.id]);if(kind==='correction')await db.query('INSERT INTO review_entries(submission_id,author_account_id,note) VALUES($1,$2,$3)',[s.id,user.id,'已提交订正']);return {...s,problem_title:v.title};
+     const s=row(await db.query('INSERT INTO submissions(account_id,identity_id,problem_id,version_id,assignment_id,kind,original_submission_id,code,language,custom_input,idempotency_key,request_hash,created_at,timed_attempt_id,required_language) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *',[user.id,user.identityId,problemId,v.id,assignmentId,kind,originalId,code,language,customInput,key,requestHash,acceptedAt,timedContext?.timedAttemptId||null,requiredLanguage]));await db.query("INSERT INTO judge_tasks(submission_id,version_id,purpose) VALUES($1,$2,'submission')",[s.id,v.id]);if(kind==='correction')await db.query('INSERT INTO review_entries(submission_id,author_account_id,note) VALUES($1,$2,$3)',[s.id,user.id,'已提交订正']);return {...s,problem_title:v.title};
     });return respond(201,submissionShape(await timed.maskSubmission(pool,user,result)));
    }
    m=route.match(/^\/submissions\/([^/]+)\/assignment-completions$/);

@@ -16,6 +16,7 @@ import {
 } from "@/components/learning-course";
 import { SchoolCourseProblemPicker } from "./school-course-problem-picker";
 import { MathContent } from "@/components/math-content";
+import { CourseProgrammingLanguageField } from "@/components/teacher/course-programming-language-field";
 import { useNavigationBlocker } from "@/components/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +39,7 @@ import {
 function inputFor(course?: CourseDetail): CourseInput {
   return course
     ? {
+        requiredLanguage: course.requiredLanguage ?? null,
         category: course.category,
         difficulty: course.difficulty,
         coverKey: course.coverKey,
@@ -60,6 +62,7 @@ function inputFor(course?: CourseDetail): CourseInput {
         })),
       }
     : {
+        requiredLanguage: null,
         category: "Programming",
         difficulty: "beginner",
         coverKey: "general",
@@ -462,6 +465,8 @@ export function SchoolCourseEditor({
                   />
                 </label>
               </div>
+              <CourseProgrammingLanguageField className={`${inputClass} h-9`} value={form.requiredLanguage ?? null}
+                onChange={requiredLanguage => setForm(previous => ({ ...previous, requiredLanguage }))}/>
               <div className="flex items-center gap-3">
                 <div className="w-32 overflow-hidden rounded-md">
                   <LearningCover

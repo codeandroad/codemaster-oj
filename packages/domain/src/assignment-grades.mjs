@@ -6,6 +6,7 @@ export const assignmentPassingSubmission = `
  previous.identity_id=part.identity_id AND previous.problem_id=ap.problem_id
  AND (previous.assignment_id=assignment.id OR previous.version_id IN (ap.version_id,ap.prior_version_id)
   OR previous.created_at>=(SELECT applied_at FROM schema_migrations WHERE name='098_live_problem_activity_results.sql'))
+ AND (assignment.required_language IS NULL OR previous.language=assignment.required_language)
  AND previous.kind='submit' AND previous.status='AC' AND previous.score=100 AND previous.created_at<=assignment.due_at
  AND (previous.timed_attempt_id IS NULL OR EXISTS (
   SELECT 1 FROM timed_first_ac_candidates candidate
@@ -49,17 +50,20 @@ async function loadAssignmentGradeRows(db, assignmentIds, identityId) {
    SELECT count(*)::integer total FROM submissions
    WHERE assignment_id=part.assignment_id AND identity_id=part.identity_id
     AND problem_id=ap.problem_id AND kind='submit'
+    AND (assignment.required_language IS NULL OR language=assignment.required_language)
   ) attempts ON true
   LEFT JOIN LATERAL (
    SELECT id,score,status FROM submissions
    WHERE assignment_id=part.assignment_id AND identity_id=part.identity_id
     AND problem_id=ap.problem_id AND kind='submit'
+    AND (assignment.required_language IS NULL OR language=assignment.required_language)
     AND created_at<=assignment.due_at AND score IS NOT NULL AND status NOT IN ('Waiting','Judging','System Error')
    ORDER BY score DESC,created_at,id LIMIT 1
   ) s ON true
   LEFT JOIN LATERAL (
    SELECT status FROM submissions WHERE assignment_id=part.assignment_id AND identity_id=part.identity_id
     AND problem_id=ap.problem_id AND kind='submit' AND created_at<=assignment.due_at
+    AND (assignment.required_language IS NULL OR language=assignment.required_language)
     AND status IN ('Waiting','Judging','System Error') ORDER BY created_at DESC LIMIT 1
   ) pending ON true
   LEFT JOIN LATERAL (

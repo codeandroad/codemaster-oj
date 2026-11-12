@@ -1,4 +1,6 @@
 import {fail,field,uuid,enumValue} from './security.mjs';
+import {normalizeRequiredLanguage} from './course-language-policy.mjs';
+import {resolveLiveProblemVersion} from './live-problem-version.mjs';
 const isStaff=user=>user.roles.some(role=>role==='teacher'||role==='admin');
 export const managesCourse=(user,course)=>isStaff(user)&&(user.roles.includes('admin')||course.owner_account_id===user.id);
 
@@ -17,7 +19,25 @@ export async function readableCourseIds(db,user,ids,{listed=false}={}){
 export async function courseMetadataForUser(db,user,id){
  if(!id)return null;
  if(!(await readableCourseIds(db,user,[id])).has(id))return null;
- return (await db.query('SELECT id,title,published_at,archived_at FROM learning_paths WHERE id=$1',[id])).rows[0]??null;
+ return (await db.query('SELECT id,title,published_at,archived_at,required_language FROM learning_paths WHERE id=$1',[id])).rows[0]??null;
+}
+export async function resolveLegacyCourseProblem(db,user,{courseId,chapterId,problemId}){
+ // Chapter and policy edits lock the course before reading its exercises.
+ const {rows:[course]}=await db.query(`SELECT required_language FROM learning_paths
+  WHERE id=$1 AND published_at IS NOT NULL AND archived_at IS NULL FOR SHARE`,[courseId]);
+ if(!course||!(await readableCourseIds(db,user,[courseId])).has(courseId)){
+  fail(404,'COURSE_PROBLEM_UNAVAILABLE','此题不在可访问的已发布课程章节中');
+ }
+ const version=await resolveLiveProblemVersion(db,problemId);
+ const link=await db.query(`SELECT 1 FROM learning_chapters c
+  JOIN chapter_problems cp ON cp.chapter_id=c.id
+  JOIN problems p ON p.id=cp.problem_id
+  JOIN problem_banks b ON b.id=p.bank_id AND b.visibility='school'
+  WHERE c.path_id=$1 AND c.id=$2 AND c.archived_at IS NULL AND p.id=$3`,[courseId,chapterId,problemId]);
+ if(!link.rowCount||!version.school_visible_at||version.rank_review_status!=='approved'){
+  fail(404,'COURSE_PROBLEM_UNAVAILABLE','此题不在可访问的已发布课程章节中');
+ }
+ return {version,requiredLanguage:course.required_language};
 }
 export async function courseClasses(db,id){
  return (await db.query(`SELECT c.id,c.name,(c.archived_at IS NOT NULL) archived FROM learning_path_classes pc JOIN classes c ON c.id=pc.class_id WHERE pc.path_id=$1 ORDER BY c.name,c.id`,[id])).rows;
@@ -42,6 +62,7 @@ function timestamp(value,label,{nullable=true}={}){
 }
 export function courseDisplayProperties(body,old={},defaultName=''){
  return {authorName:field(body.authorName??old.author_name??defaultName,'课程作者',{min:0,max:200}),
+  requiredLanguage:normalizeRequiredLanguage(body.requiredLanguage,old.required_language),
   authoredAt:body.authoredAt===undefined?old.authored_at??null:timestamp(body.authoredAt,'编写时间',{nullable:false}),
   coverImage:body.coverImage===undefined?old.cover_image??null:validateCoverImage(body.coverImage)};
 }
@@ -68,7 +89,12 @@ export async function courseProperties(db,user,body,old={}){
 }
 export async function saveCourseProperties(db,id,properties){
  const p=properties;
- await db.query(`UPDATE learning_paths SET author_name=$2,authored_at=COALESCE($3,authored_at),cover_image=$4,access_scope=$5,available_from=$6,available_until=$7,listed=$8 WHERE id=$1`,[id,p.authorName,p.authoredAt,p.coverImage,p.accessScope,p.availableFrom,p.availableUntil,p.listed]);
+ await db.query(`UPDATE learning_paths SET author_name=$2,authored_at=COALESCE($3,authored_at),cover_image=$4,access_scope=$5,available_from=$6,available_until=$7,listed=$8,
+  required_language=$9,
+  language_credit_cutoffs=CASE WHEN published_at IS NOT NULL
+   THEN course_language_credit_cutoffs(language_credit_cutoffs,published_required_language,$9,clock_timestamp()) ELSE language_credit_cutoffs END,
+  published_required_language=CASE WHEN published_at IS NOT NULL THEN $9 ELSE published_required_language END
+  WHERE id=$1`,[id,p.authorName,p.authoredAt,p.coverImage,p.accessScope,p.availableFrom,p.availableUntil,p.listed,p.requiredLanguage]);
  await db.query('DELETE FROM learning_path_classes WHERE path_id=$1',[id]);
  for(const classId of p.classIds)await db.query('INSERT INTO learning_path_classes(path_id,class_id) VALUES($1,$2)',[id,classId]);
 }

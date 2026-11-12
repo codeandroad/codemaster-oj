@@ -1,5 +1,6 @@
 import { schoolActivityJobVisibleSql } from './school-activities.mjs';
 import { validateCoverImage } from './course-access.mjs';
+import { normalizeRequiredLanguage } from './course-language-policy.mjs';
 import { handleSchoolLearningResources } from './school-learning-resources.mjs';
 import { transaction } from './db.mjs';
 import { auditSchool, LEGACY_SCHOOL_ID, lockSchoolTeaching, schoolRole } from './schools.mjs';
@@ -34,7 +35,8 @@ function courseInput(body, previous={}) {
  if(!Array.isArray(body.classIds??[])||(body.classIds??[]).length>50)fail(400,'VALIDATION','课程最多关联50个班级');
  const classIds=[...new Set((body.classIds??[]).map(id=>uuid(id,'班级 ID').toLowerCase()))].sort();
  if(accessScope==='school'&&classIds.length)fail(400,'VALIDATION','全校课程无需选择班级');
- return {title,description,accessScope,chapters,classIds,properties};
+ const requiredLanguage=normalizeRequiredLanguage(body.requiredLanguage,previous.required_language);
+ return {title,description,accessScope,chapters,classIds,properties,...(requiredLanguage?{requiredLanguage}:{})};
 }
 
 function chapterProblems(value=[]){
@@ -51,18 +53,20 @@ async function validateProblems(db,schoolId,chapters){
   WHERE p.id IS NULL OR NOT p.published OR b.archived`,[schoolId,JSON.stringify(links)]);
  if(result.invalid)fail(409,'COURSE_PROBLEM_UNAVAILABLE','配套练习必须为本校当前已审核发布版本');
 }
-async function chapterPractice(db,schoolId,chapters,identityId){
+async function chapterPractice(db,schoolId,view,identityId){
+ const {chapters,required_language,language_credit_cutoffs}=view;
  const links=chapters.flatMap(ch=>ch.problems??[]);const indexed=new Map();
  if(links.length){
   const rows=(await db.query(`WITH links AS (SELECT DISTINCT "problemId","versionId" FROM jsonb_to_recordset($2::jsonb) AS l("problemId" uuid,"versionId" uuid)),
    solved AS (SELECT DISTINCT j.problem_id,j.version_id FROM school_judge_jobs j JOIN links l ON l."problemId"=j.problem_id AND l."versionId"=j.version_id
-    WHERE j.school_id=$1 AND j.identity_id=$3 AND j.access_context='school' AND j.kind='submit' AND j.state='completed' AND j.result->>'status'='AC' AND ${schoolActivityJobVisibleSql('j')})
+    WHERE j.school_id=$1 AND j.identity_id=$3 AND j.access_context='school' AND j.kind='submit' AND j.state='completed' AND j.result->>'status'='AC' AND ${schoolActivityJobVisibleSql('j')}
+    AND course_language_allows_credit($4,$5,j.payload->>'language',j.created_at))
    SELECT l."problemId",l."versionId",v.definition->>'title' AS title,
     p.published AND NOT b.archived AND p.published_version_id=l."versionId" AS available,solved.problem_id IS NOT NULL AS solved
    FROM links l JOIN school_problems p ON p.school_id=$1 AND p.id=l."problemId"
    JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id
    JOIN school_problem_versions v ON v.school_id=p.school_id AND v.problem_id=p.id AND v.id=l."versionId"
-   LEFT JOIN solved ON solved.problem_id=p.id AND solved.version_id=l."versionId"`,[schoolId,JSON.stringify(links),identityId])).rows;
+   LEFT JOIN solved ON solved.problem_id=p.id AND solved.version_id=l."versionId"`,[schoolId,JSON.stringify(links),identityId,required_language,language_credit_cutoffs??{}])).rows;
   for(const row of rows)indexed.set(row.problemId+':'+row.versionId,row);
  }
  let completed=0,total=0;
@@ -102,16 +106,32 @@ export async function loadSchoolCourse(db,schoolId,id,user,role,{publishedOnly=f
  }
  return {course,view,canManage:false,identityId};
 }
+async function schoolCoursePreviewView(db,schoolId,loaded){
+ if(!loaded.canManage)fail(403,'FORBIDDEN','需要课程管理权限');
+ const course=loaded.course;
+ if(!course.published_revision)return course;
+ return (await db.query('SELECT * FROM school_course_publications WHERE school_id=$1 AND course_id=$2 AND revision=$3',
+  [schoolId,course.id,course.published_revision])).rows[0];
+}
+export async function schoolCourseProblemLanguage(db,user,{courseId,chapterId,schoolId,problemId,versionId,role,preview=false}){
+ const loaded=await loadSchoolCourse(db,schoolId,courseId,user,role,{publishedOnly:!preview});
+ const view=preview?await schoolCoursePreviewView(db,schoolId,loaded):loaded.view;
+ const chapter=view.chapters.find(item=>item.id===chapterId);
+ if(!chapter?.problems?.some(link=>link.problemId===problemId&&link.versionId===versionId)){
+  fail(404,'COURSE_PROBLEM_UNAVAILABLE','此题不在可访问的已发布课程章节中');
+ }
+ return view.required_language;
+}
 async function shape(db,schoolId,loaded,{detail=false}={}){
  const {course,view,canManage,identityId}=loaded;
- const practice=await chapterPractice(db,schoolId,view.chapters,identityId);
+ const practice=await chapterPractice(db,schoolId,view,identityId);
  const progress=identityId?(await db.query('SELECT chapter_id,content_hash,read FROM school_course_progress WHERE school_id=$1 AND course_id=$2 AND identity_id=$3',[schoolId,course.id,identityId])).rows:[];
  const readIds=new Set(progress.filter(row=>row.read&&view.chapters.some(ch=>ch.id===row.chapter_id&&contentHash(ch)===row.content_hash)).map(row=>row.chapter_id));
  const properties=view.properties??{};
  const body={id:course.id,title:view.title,description:view.description,
   category:properties.category??'Programming',difficulty:properties.difficulty??'beginner',coverKey:properties.coverKey??'general',
   estimatedMinutes:properties.estimatedMinutes??60,authorName:properties.authorName??'',authoredAt:properties.authoredAt??course.created_at,
-  coverImage:properties.coverImage??null,archived:!!course.archived_at,accessScope:view.access_scope,
+  coverImage:properties.coverImage??null,requiredLanguage:view.required_language??null,archived:!!course.archived_at,accessScope:view.access_scope,
 
   status:course.published?'published':course.published_revision?'unpublished':'draft',
   revision:canManage?course.revision:course.published_revision,publishedRevision:course.published_revision,
@@ -169,8 +189,8 @@ export async function handleSchoolCourses(context){
    if(old){if(old.create_request_hash!==hash)fail(409,'IDEMPOTENCY_CONFLICT','相同请求 ID 的课程内容不同');return reply(await shape(db,schoolId,{course:old,view:old,canManage:true,identityId:null},{detail:true}));}
    await validateClasses(db,schoolId,user,role,input.classIds);
    await validateProblems(db,schoolId,input.chapters);
-   const course=(await db.query(`INSERT INTO school_courses(school_id,owner_account_id,title,description,access_scope,chapters,create_request_id,create_request_hash,properties)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,[schoolId,user.id,input.title,input.description,input.accessScope,JSON.stringify(input.chapters),requestId,hash,input.properties])).rows[0];
+   const course=(await db.query(`INSERT INTO school_courses(school_id,owner_account_id,title,description,access_scope,chapters,create_request_id,create_request_hash,properties,required_language)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,[schoolId,user.id,input.title,input.description,input.accessScope,JSON.stringify(input.chapters),requestId,hash,input.properties,input.requiredLanguage??null])).rows[0];
    await saveClasses(db,schoolId,course.id,input.classIds);
    await auditSchool(db,schoolId,user.id,'school.course.create',course.id);
    return reply(await shape(db,schoolId,{course,view:course,canManage:true,identityId:null},{detail:true}),201);
@@ -178,8 +198,7 @@ export async function handleSchoolCourses(context){
   if(!courseId)return null;
   const loaded=await loadSchoolCourse(db,schoolId,courseId,user,role);
   if(method==='GET'&&match[3]==='preview'){
-   if(!loaded.canManage)fail(403,'FORBIDDEN','需要课程管理权限');
-   const view=loaded.course.published_revision?(await db.query('SELECT * FROM school_course_publications WHERE school_id=$1 AND course_id=$2 AND revision=$3',[schoolId,courseId,loaded.course.published_revision])).rows[0]:loaded.course;
+   const view=await schoolCoursePreviewView(db,schoolId,loaded);
    return reply({...await shape(db,schoolId,{...loaded,view,canManage:false},{detail:true}),isPreview:true});
   }
   if(method==='GET'&&!match[3]&&!match[4])return reply(await shape(db,schoolId,loaded,{detail:true}));
@@ -205,8 +224,8 @@ export async function handleSchoolCourses(context){
    const input=courseInput(body,loaded.course);
    await validateClasses(db,schoolId,user,role,input.classIds);
    await validateProblems(db,schoolId,input.chapters);
-   await db.query(`UPDATE school_courses SET title=$3,description=$4,access_scope=$5,chapters=$6,properties=$7,revision=revision+1,updated_at=clock_timestamp()
-    WHERE school_id=$1 AND id=$2`,[schoolId,courseId,input.title,input.description,input.accessScope,JSON.stringify(input.chapters),input.properties]);
+   await db.query(`UPDATE school_courses SET title=$3,description=$4,access_scope=$5,chapters=$6,properties=$7,required_language=$8,revision=revision+1,updated_at=clock_timestamp()
+    WHERE school_id=$1 AND id=$2`,[schoolId,courseId,input.title,input.description,input.accessScope,JSON.stringify(input.chapters),input.properties,input.requiredLanguage??null]);
    await saveClasses(db,schoolId,courseId,input.classIds);
    await auditSchool(db,schoolId,user.id,'school.course.update',courseId);
   }else if(method==='POST'&&match[3]==='publish'){
@@ -218,8 +237,11 @@ export async function handleSchoolCourses(context){
    await validateClasses(db,schoolId,user,role,ids);
    await validateProblems(db,schoolId,c.chapters);
    const revision=c.revision+1;
-   await db.query(`INSERT INTO school_course_publications(school_id,course_id,revision,title,description,access_scope,chapters,published_by,properties)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,[schoolId,courseId,revision,c.title,c.description,c.access_scope,JSON.stringify(c.chapters),user.id,c.properties]);
+   await db.query(`INSERT INTO school_course_publications(school_id,course_id,revision,title,description,access_scope,chapters,published_by,properties,required_language,language_credit_cutoffs)
+    SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+     COALESCE((SELECT course_language_credit_cutoffs(previous.language_credit_cutoffs,previous.required_language,$10,clock_timestamp())
+      FROM school_course_publications previous WHERE previous.school_id=$1 AND previous.course_id=$2 AND previous.revision=$11),'{}'::jsonb)`,
+    [schoolId,courseId,revision,c.title,c.description,c.access_scope,JSON.stringify(c.chapters),user.id,c.properties,c.required_language,c.published_revision]);
    for(const id of ids)await db.query('INSERT INTO school_course_publication_classes(school_id,course_id,revision,class_id) VALUES($1,$2,$3,$4)',[schoolId,courseId,revision,id]);
    await db.query('UPDATE school_courses SET revision=$3,published_revision=$3,published=true,updated_at=clock_timestamp() WHERE school_id=$1 AND id=$2',[schoolId,courseId,revision]);
    await auditSchool(db,schoolId,user.id,'school.course.publish',courseId);

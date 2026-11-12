@@ -105,6 +105,7 @@ export interface Assignment {
   coursePathId?: string | null;
   courseTitle?: string | null;
   courseAvailable?: boolean;
+  requiredLanguage?: SubmissionLanguage | null;
   problemOrder?: "course" | "custom";
   dueAt: string;
   completion?: AssignmentCompletion | null;
@@ -143,6 +144,7 @@ export interface Submission {
   createdAt: string;
   code: string;
   language?: SubmissionLanguage;
+  requiredLanguage?: SubmissionLanguage | null;
   publicOutput?: string | null;
   message?: string | null;
   assignmentId?: string | null;

@@ -27,7 +27,7 @@ async function pathAccess(db, user, id, edit = false, lock = false, allowArchive
 }
 
 function pathShape(p) {
- return {authorName:p.author_name??'',authoredAt:p.authored_at??p.created_at,coverImage:p.cover_image??null,accessScope:p.access_scope??'school',availableFrom:p.available_from??null,availableUntil:p.available_until??null,listed:p.listed??true,withdrawnAt:p.withdrawn_at??null,classIds:(p.classes??[]).map(c=>c.id),classes:p.classes??[], id: p.id, title: p.title,estimatedMinutes:p.estimated_minutes,updatedAt:p.updated_at,createdAt:p.created_at, description: p.description, category: p.category, published: !!p.published_at,archived:!!p.archived_at,
+ return {authorName:p.author_name??'',authoredAt:p.authored_at??p.created_at,coverImage:p.cover_image??null,requiredLanguage:p.required_language??null,accessScope:p.access_scope??'school',availableFrom:p.available_from??null,availableUntil:p.available_until??null,listed:p.listed??true,withdrawnAt:p.withdrawn_at??null,classIds:(p.classes??[]).map(c=>c.id),classes:p.classes??[], id: p.id, title: p.title,estimatedMinutes:p.estimated_minutes,updatedAt:p.updated_at,createdAt:p.created_at, description: p.description, category: p.category, published: !!p.published_at,archived:!!p.archived_at,
   difficulty:p.difficulty??'beginner',coverKey:p.cover_key??'general',taskCount:Number(p.task_count??0),completedTasks:Number(p.completed_tasks??0),chapterCount: Number(p.chapter_count ?? 0), completedChapters: Number(p.completed_chapters ?? 0), canEdit: p.canEdit ?? false };
 }
 
@@ -45,8 +45,10 @@ async function taskStats(db,user,ids,draftIds=[]) {
  if(!ids.length)return new Map();
  const rows=(await db.query(`SELECT c.path_id,count(DISTINCT COALESCE(latest.id,cp.version_id))::int task_count,
  count(DISTINCT COALESCE(latest.id,cp.version_id)) FILTER(WHERE EXISTS(SELECT 1 FROM submissions s WHERE s.identity_id=$2
-  AND ${courseCompletedRevision('v')} AND ${courseAcceptedSubmission}))::int completed_tasks
- FROM learning_chapters c JOIN chapter_problems cp ON cp.chapter_id=c.id JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id JOIN problem_versions v ON v.id=cp.version_id
+  AND ${courseCompletedRevision('v')} AND ${courseAcceptedSubmission}
+  AND course_language_allows_credit(path.required_language,path.language_credit_cutoffs,s.language,s.created_at)))::int completed_tasks
+ FROM learning_chapters c JOIN learning_paths path ON path.id=c.path_id
+ JOIN chapter_problems cp ON cp.chapter_id=c.id JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id JOIN problem_versions v ON v.id=cp.version_id
  ${latestCourseProblemVersion} true
  JOIN problem_versions active ON active.id=COALESCE(latest.id,cp.version_id)
  WHERE c.path_id=ANY($1::uuid[]) AND c.archived_at IS NULL AND p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school' AND active.published_at IS NOT NULL AND active.school_visible_at IS NOT NULL AND active.rank_review_status='approved' GROUP BY c.path_id`,[ids,user.identityId])).rows;
@@ -71,12 +73,13 @@ async function pathResult(ctx, id, db = ctx.pool, allowArchived = false) {
   LEFT JOIN learning_progress pr ON pr.chapter_id=c.id AND pr.identity_id=$2 WHERE c.path_id=$1 AND c.archived_at IS NULL ORDER BY c.position,c.created_at,c.id`, [id, ctx.user.identityId])).rows;
  const links = chapters.length ? (await db.query(`SELECT cp.*,v.id active_version_id,v.title,v.published_at,v.school_visible_at,v.rank_review_status,b.name bank_name,b.visibility bank_visibility,b.archived_at bank_archived_at,p.archived_at problem_archived_at,
   EXISTS(SELECT 1 FROM submissions s WHERE s.identity_id=$3 AND ${courseAcceptedSubmission}
+   AND course_language_allows_credit($4,$5,s.language,s.created_at)
    AND (s.version_id=cp.version_id OR $2 AND ${courseCompletedRevision('linked')})) completed
   FROM chapter_problems cp JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id
   JOIN problem_versions linked ON linked.id=cp.version_id AND linked.problem_id=cp.problem_id
   ${latestCourseProblemVersion} true
   JOIN problem_versions v ON v.id=COALESCE(latest.id,linked.id)
-  WHERE cp.chapter_id=ANY($1::uuid[]) ORDER BY cp.position`, [chapters.map(c => c.id),Boolean(p.published_at),ctx.user.identityId])).rows : [];
+  WHERE cp.chapter_id=ANY($1::uuid[]) ORDER BY cp.position`, [chapters.map(c => c.id),Boolean(p.published_at),ctx.user.identityId,p.required_language,p.language_credit_cutoffs])).rows : [];
  const visible = new Map();
  for (const link of links) {
   const publicForStudents=link.bank_visibility==='school'&&!link.bank_archived_at&&!link.problem_archived_at&&!!link.published_at&&!!link.school_visible_at&&link.rank_review_status==='approved';
@@ -416,7 +419,7 @@ export async function handleEducation(ctx) {
    const p=exists(await db.query('INSERT INTO learning_paths(owner_account_id,title,description,category,estimated_minutes,difficulty,cover_key) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *',[user.id,doc.title,doc.description,doc.category,doc.estimatedMinutes,doc.difficulty,doc.coverKey]));
    const properties=await courseProperties(db,user,doc);
    await saveCourseProperties(db,p.id,properties);
-   Object.assign(p,{author_name:properties.authorName,authored_at:properties.authoredAt??p.authored_at,cover_image:properties.coverImage});
+   Object.assign(p,{author_name:properties.authorName,authored_at:properties.authoredAt??p.authored_at,cover_image:properties.coverImage,required_language:properties.requiredLanguage});
    for(let position=0;position<doc.chapters.length;position++){
     const c=doc.chapters[position];const chapter=exists(await db.query('INSERT INTO learning_chapters(path_id,title,content,position,objective,checkpoint,checkpoint_answer) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *',[p.id,c.title,c.content,position,c.objective,c.checkpoint,c.checkpointAnswer]));
     await setLinks(ctx,db,p,chapter.id,c.problemIds);
@@ -432,7 +435,7 @@ export async function handleEducation(ctx) {
    const p=exists(await db.query('INSERT INTO learning_paths(owner_account_id,title,description,category,estimated_minutes,difficulty,cover_key) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *',[user.id,title,description,category,integer(body.estimatedMinutes??30,1,10080,'预计学习时长'),enumValue(body.difficulty??'beginner',['beginner','intermediate','advanced'],'难度'),enumValue(body.coverKey??'general',['python','algorithms','general'],'封面')]));
    const properties=await courseProperties(db,user,body);
    await saveCourseProperties(db,p.id,properties);
-   Object.assign(p,{author_name:properties.authorName,authored_at:properties.authoredAt??p.authored_at,cover_image:properties.coverImage,access_scope:properties.accessScope,available_from:properties.availableFrom,available_until:properties.availableUntil,listed:properties.listed,classes:await courseClasses(db,p.id)});
+   Object.assign(p,{author_name:properties.authorName,authored_at:properties.authoredAt??p.authored_at,cover_image:properties.coverImage,required_language:properties.requiredLanguage,access_scope:properties.accessScope,available_from:properties.availableFrom,available_until:properties.availableUntil,listed:properties.listed,classes:await courseClasses(db,p.id)});
    await helpers.audit(db,user.id,'learning.create','learning_path',p.id); return p;
   });
   return result(pathShape({...path,canEdit:true}),201);
@@ -479,11 +482,12 @@ export async function handleEducation(ctx) {
     JOIN problem_versions active ON active.id=COALESCE(latest.id,cp.version_id)
     WHERE c.path_id=$1 AND c.archived_at IS NULL AND p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school'
     AND active.published_at IS NOT NULL AND active.school_visible_at IS NOT NULL AND active.rank_review_status='approved' AND EXISTS(SELECT 1 FROM submissions s WHERE s.identity_id=i.id
-     AND ${courseCompletedRevision('v')} AND ${courseAcceptedSubmission})) completed_tasks
+     AND ${courseCompletedRevision('v')} AND ${courseAcceptedSubmission}
+     AND course_language_allows_credit($4,$5,s.language,s.created_at))) completed_tasks
    FROM identities i WHERE i.kind='student' AND i.archived_at IS NULL AND ($2::boolean
     OR EXISTS(SELECT 1 FROM class_members cm JOIN teacher_classes tc ON tc.class_id=cm.class_id JOIN classes cl ON cl.id=cm.class_id WHERE cm.identity_id=i.id AND tc.account_id=$3 AND cl.archived_at IS NULL)
     OR EXISTS(SELECT 1 FROM assignment_participants part JOIN assignments a ON a.id=part.assignment_id WHERE part.identity_id=i.id AND NOT part.exempt AND a.owner_account_id=$3 AND a.course_path_id=$1 AND a.state='Published')
-    OR EXISTS(SELECT 1 FROM timed_practice_participants part JOIN timed_practices t ON t.id=part.practice_id WHERE part.identity_id=i.id AND NOT part.exempt AND t.owner_account_id=$3 AND t.course_path_id=$1 AND t.state<>'Draft')) ORDER BY i.number,i.id`,[path.id,administrator(user),user.id])).rows;
+    OR EXISTS(SELECT 1 FROM timed_practice_participants part JOIN timed_practices t ON t.id=part.practice_id WHERE part.identity_id=i.id AND NOT part.exempt AND t.owner_account_id=$3 AND t.course_path_id=$1 AND t.state<>'Draft')) ORDER BY i.number,i.id`,[path.id,administrator(user),user.id,path.required_language,path.language_credit_cutoffs])).rows;
   const paper4=await loadCoursePaper4(pool,[path.id],students.map(s=>s.id));
   return result({chapterCount,taskCount:counts.get(path.id)?.task_count??0,items:students.map(s=>({id:s.id,name:s.name,number:s.number,completedChapters:Number(s.completed_chapters),completedTasks:Number(s.completed_tasks)+paper4Progress(paper4,'path',path.id,s.id).completedTasks}))});
  }
@@ -569,7 +573,10 @@ export async function handleEducation(ctx) {
     WHERE c.path_id=$1 AND c.archived_at IS NULL FOR SHARE OF p,b,v`,[path.id])).rows;
    if(linked.some(link=>link.problem_archived_at||link.bank_archived_at||link.bank_visibility!=='school'||link.version_problem_id!==link.problem_id||!link.published_at||!link.school_visible_at||link.rank_review_status!=='approved'))
     fail(409,'UNAPPROVED_LESSON_PROBLEM','章节练习须先发布并通过管理员校内公开审核，课程才能发布');
-   await db.query('UPDATE learning_paths SET published_at=COALESCE(published_at,now()),withdrawn_at=NULL,updated_at=now() WHERE id=$1',[path.id]);
+   await db.query(`UPDATE learning_paths SET published_at=COALESCE(published_at,now()),withdrawn_at=NULL,updated_at=now(),
+    language_credit_cutoffs=CASE WHEN published_at IS NOT NULL OR withdrawn_at IS NOT NULL
+     THEN course_language_credit_cutoffs(language_credit_cutoffs,published_required_language,required_language,clock_timestamp()) ELSE language_credit_cutoffs END,
+    published_required_language=required_language WHERE id=$1`,[path.id]);
    await helpers.audit(db,user.id,'learning.publish','learning_path',path.id);
   });
   return result(await pathResult(ctx,match[1]));

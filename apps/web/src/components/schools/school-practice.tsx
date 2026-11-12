@@ -7,7 +7,7 @@ import { useLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { MathContent } from "@/components/math-content";
-import { apiMessage, productionApi, type CampusUser } from "@/lib/production-api";
+import { ApiError, apiMessage, productionApi, type CampusUser, type SubmissionLanguage } from "@/lib/production-api";
 import problemStyles from "@/components/student/problems-page.module.css";
 import { ProblemCatalogSearch } from "@/components/student/problem-catalog-search";
 import { CodeEditor } from "@/components/student/code-editor";
@@ -16,6 +16,7 @@ import { ProblemSubmissionsTable, SolvedStatus, useProblemSubmissions } from "@/
 import { ProblemTutorial, useProblemTutorial } from "@/components/student/problem-tutorial";
 import { ProblemTutorialEditor } from "@/components/teacher/problem-tutorial-editor";
 import { RunResultPanel } from "@/components/student/run-result-panel";
+import { languageInfo, requiredLanguageText, starterFor, submissionLanguage, supportedLanguages } from "@/components/student/languages";
 import { useWorkspaceSettings, WorkspaceSettingsDialog } from "@/components/student/workspace-settings";
 import { Feedback, State, input, textarea, useData, useMutation, type DetailedSubmission } from "@/components/student/shared";
 import type { ResultCase } from "@/components/student/result-feedback";
@@ -166,23 +167,38 @@ function SchoolPracticeContents({ schoolId, role, initialProblemId }: { schoolId
   </div>;
 }
 
-type PracticeProblemProps = { path: string; jobPath: (id: string) => string; onBack: () => void; backLabel?: string; navigation?: PracticeNavigation; expectedVersionId?: string };
-export function PracticeProblem({path,jobPath,onBack,backLabel,navigation,expectedVersionId}:PracticeProblemProps){
+type CoursePracticeContext = { courseId: string; chapterId: string; requiredLanguage?: SubmissionLanguage | null; solved: boolean; preview: boolean; reload: () => void };
+type PracticeProblemProps = { path: string; jobPath: (id: string) => string; onBack: () => void; backLabel?: string; navigation?: PracticeNavigation; expectedVersionId?: string; course?: CoursePracticeContext };
+export function PracticeProblem({path,jobPath,onBack,backLabel,navigation,expectedVersionId,course}:PracticeProblemProps){
  const query = new URLSearchParams({ view: "practice", ...(expectedVersionId && { versionId: expectedVersionId }) });
- const data=useData<Problem>(`${path}?${query}`),auth=useData<{user:CampusUser}>("auth/me");return <>{(!data.data?.definition||!auth.data?.user)&&<PracticeToolbar title={data.data?.title??""} onBack={onBack} backLabel={backLabel} navigation={navigation}/>}<State data={data}><State data={auth}>{data.data?.definition&&auth.data?.user&&<PracticeEditor key={`${path}:${data.data.versionId}:${data.data.activity?.revision ?? ""}`} problem={data.data} userId={auth.data.user.id} path={path} jobPath={jobPath} onBack={onBack} backLabel={backLabel} navigation={navigation} expectedVersionId={expectedVersionId}/>}</State></State></>;
+ const data=useData<Problem>(`${path}?${query}`),auth=useData<{user:CampusUser}>("auth/me");return <>{(!data.data?.definition||!auth.data?.user||data.error||auth.error)&&<PracticeToolbar title={data.data?.title??""} onBack={onBack} backLabel={backLabel} navigation={navigation}/>}<State data={data}><State data={auth}>{data.data?.definition&&auth.data?.user&&<PracticeEditor key={`${path}:${data.data.versionId}:${data.data.activity?.revision ?? ""}:${course?.courseId ?? ""}:${course?.chapterId ?? ""}:${course?.requiredLanguage ?? ""}`} problem={data.data} userId={auth.data.user.id} path={path} jobPath={jobPath} onBack={onBack} backLabel={backLabel} navigation={navigation} expectedVersionId={expectedVersionId} course={course}/>}</State></State></>;
 }
-function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation,expectedVersionId}:PracticeProblemProps&{problem:Problem;userId:string}){
+function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation,expectedVersionId,course}:PracticeProblemProps&{problem:Problem;userId:string}){
  const {locale,t}=useLocale(),tx=(zh:string,en:string)=>locale==="zh"?zh:en,workspace=useWorkspaceSettings(userId),action=useMutation(),def=problem.definition!;
  const activity=problem.activity;
  const preview=problem.activity?.preview===true;
- const key=preview
+ const draftBase=preview
    ? `codemaster:assignment-preview:${userId}:${problem.schoolId}:${problem.activity?.id}:${problem.activity?.revision}:${problem.id}:${problem.versionId}`
    : `codemaster:school-practice:${userId}:${problem.schoolId}:${problem.id}:${problem.versionId}`;
- const [code,setCode]=useState(def.starterCode),[loaded,setLoaded]=useState(false),[settingsOpen,setSettingsOpen]=useState(false),[job,setJob]=useState<Job|null>(null),[jobId,setJobId]=useState<string|null>(null),[custom,setCustom]=useState(""),[pollError,setPollError]=useState("");
- const search=useSearchParams(),courseId=search.get("courseId"),chapterId=search.get("chapterId");
+ const requiredLanguage=course?.requiredLanguage ?? null;
+ const languageKey = `${draftBase}:language`;
+ const draftKey = (language: SubmissionLanguage) => language === "python" ? draftBase : `${draftBase}:${language}`;
+ function readCode(language: SubmissionLanguage) {
+   try { return localStorage.getItem(draftKey(language)) ?? starterFor(def, language); }
+   catch { return starterFor(def, language); }
+ }
+ const [language,setLanguage]=useState<SubmissionLanguage>(()=>{
+   if (requiredLanguage || activity) return requiredLanguage ?? "python";
+   try { return submissionLanguage(localStorage.getItem(languageKey)); }
+   catch { return "python"; }
+ });
+ const [code,setCode]=useState(()=>readCode(language)),[settingsOpen,setSettingsOpen]=useState(false),[job,setJob]=useState<Job|null>(null),[jobId,setJobId]=useState<string|null>(null),[custom,setCustom]=useState(""),[pollError,setPollError]=useState("");
+ const key=draftKey(language);
+ const [draftSaved,setDraftSaved]=useState(false);
+ const courseContext=course ? {courseId:course.courseId,chapterId:course.chapterId} : undefined;
  const canReadTutorial=!preview&&(problem.activity?.kind!=="timed"||Boolean(problem.activity.resultsPublishedAt));
  const tutorialEndpoint=canReadTutorial&&problem.versionId?`schools/${encodeURIComponent(problem.schoolId)}/problems/${encodeURIComponent(problem.id)}/tutorial?${new URLSearchParams({
-   versionId:problem.versionId,...(courseId&&chapterId?{courseId,chapterId}:{}),
+   versionId:problem.versionId,...courseContext,
  })}`:"";
  const tutorial = useProblemTutorial(tutorialEndpoint);
  const statementScrollRef = useRef<HTMLDivElement>(null);
@@ -195,6 +211,8 @@ function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation
  }
  const jobEndpoint=jobId?jobPath(jobId):"";
  useEffect(()=>{if(!preview&&!problem.staffPractice&&job?.kind==="submit"&&!["queued","leased"].includes(job.state))window.dispatchEvent(new Event("codemaster:school-scholarship-changed"));},[job?.id,job?.kind,job?.state,preview,problem.staffPractice]);
+ const reloadCourse=course?.reload;
+ useEffect(()=>{if(reloadCourse&&job?.kind==="submit"&&!["queued","leased"].includes(job.state))reloadCourse();},[job?.id,job?.kind,job?.state,reloadCourse]);
  const [leftTab, setLeftTab] = useState<"problem" | "translation" | "tutorial" | "solution" | "submissions">("problem");
  const activeTab = leftTab === "tutorial" && !tutorial ? "problem" : leftTab;
  function selectTab(tab: typeof leftTab) {
@@ -202,8 +220,10 @@ function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation
    setLeftTab(tab);
  }
  const submissions=useProblemSubmissions(`${path}/submissions`,`${jobId??""}:${job?.state??""}:${job?.status??""}`);
- useEffect(()=>{try{setCode(localStorage.getItem(key)??def.starterCode);}catch{}setLoaded(true);},[key,def.starterCode]);
- useEffect(()=>{if(loaded)try{localStorage.setItem(key,code);}catch{}},[key,code,loaded]);
+ useEffect(()=>{
+   try { localStorage.setItem(key, code); setDraftSaved(true); }
+   catch { setDraftSaved(false); }
+ },[key,code]);
  useEffect(()=>{if(!jobEndpoint)return;let stopped=false,timer:ReturnType<typeof setTimeout>;const poll=()=>productionApi<Job>(jobEndpoint).then(value=>{if(stopped)return;setJob(value);setPollError("");if(["queued","leased"].includes(value.state))timer=setTimeout(()=>void poll(),1000);}).catch(error=>{if(!stopped){setPollError(apiMessage(error));timer=setTimeout(()=>void poll(),3000);}});void poll();return()=>{stopped=true;clearTimeout(timer);};},[jobEndpoint]);
  const [clock,setClock]=useState(()=>Date.now());
  const deadline=activity?.kind==="timed"?activity.attempt?.deadlineAt:null;
@@ -219,7 +239,23 @@ function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation
    { id: "submissions", label: tx("提交记录", "Submissions"), icon: History },
  ] as const;
  const pending=action.busy||!!jobId&&(!job||["queued","leased"].includes(job.state));
- const run=(kind:"samples"|"custom"|"submit")=>void action.run(async()=>{const next=await productionApi<{id:string}>(`${path}/submissions`,{method:"POST",body:{kind,code,language:"python",input:custom,requestId:crypto.randomUUID(),...(preview ? {versionId:problem.versionId,expectedRevision:problem.activity?.revision} : expectedVersionId&&{versionId:expectedVersionId})}});setJob(null);setJobId(next.id);});
+ function changeLanguage(next: SubmissionLanguage) {
+   if (requiredLanguage || activity || pending || next === language) return;
+   try { localStorage.setItem(key, code); localStorage.setItem(languageKey, next); } catch { /* Draft storage is optional. */ }
+   setLanguage(next); setCode(readCode(next)); setJob(null); setJobId(null); setPollError(""); action.reset();
+ }
+ function run(kind:"samples"|"custom"|"submit") {
+   if (pending || closed || !code.trim()) return;
+   void action.run(async()=>{
+     try {
+       const next=await productionApi<{id:string}>(`${path}/submissions`,{method:"POST",body:{kind,code,language,input:custom,requestId:crypto.randomUUID(),...courseContext,...(course?.preview ? {coursePreview:true} : {}),...(preview ? {versionId:problem.versionId,expectedRevision:problem.activity?.revision} : expectedVersionId&&{versionId:expectedVersionId})}});
+       setJob(null);setJobId(next.id);
+     } catch (error) {
+       if (error instanceof ApiError && error.code === "COURSE_LANGUAGE_REQUIRED") course?.reload();
+       throw error;
+     }
+   });
+ }
  return <div className="space-y-3">
   <PracticeToolbar title={problem.title} onBack={onBack} backLabel={backLabel} navigation={navigation}/>
   {problem.staffPractice&&<p className="text-sm text-muted-foreground">{tx("教师练习 · 结果仅供个人查看，不计入学生成绩、奖学金或排名。","Teacher practice · Results are personal and do not count toward student grades, scholarship or rankings.")}</p>}
@@ -259,7 +295,7 @@ function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation
       <div hidden={activeTab !== "problem"} id="school-practice-problem" role="tabpanel" aria-labelledby="school-practice-tab-problem">
         <div className="mb-4 flex items-start justify-between gap-3">
           <h1 className="text-xl font-bold">{problem.title}</h1>
-          <SolvedStatus solved={submissions.data?.solved ?? problem.solved ?? false} />
+          <SolvedStatus solved={course?.solved ?? submissions.data?.solved ?? problem.solved ?? false} />
         </div>
         <MathContent content={def.statement} />
         <div className="mt-5 space-y-4">
@@ -298,7 +334,54 @@ function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation
       </div>
     </div>
   </section>
-  <div className="min-w-0 space-y-3"><section className="overflow-hidden rounded-lg border border-border bg-surface"><div className="flex items-center justify-between border-b border-border px-4 py-2 text-sm"><strong>Python 3</strong><div className="flex items-center gap-1"><CopyCodeButton code={code}/><Button size="sm" variant="ghost" aria-label={tx("编辑器设置","Editor settings")} onClick={()=>setSettingsOpen(true)}><Settings size={16}/></Button></div></div><div className="h-[370px]"><CodeEditor idPrefix="school-practice" code={code} onChange={setCode} language="python" settings={workspace.settings} status={loaded?tx("草稿已保存（本地）","Draft saved locally"):""} onEnableVim={()=>workspace.update({keyBinding:"vim"})}/></div><div className="flex justify-end gap-2 border-t border-border p-2"><Button size="sm" variant="secondary" disabled={!loaded||pending||closed} onClick={()=>run("samples")}>{tx("运行样例","Run")}</Button><Button size="sm" disabled={!loaded||pending||closed} onClick={()=>run("submit")}>{tx("提交","Submit")}</Button></div></section><details ref={customDetailsRef} className="rounded-lg border border-border bg-surface p-3 text-sm"><summary className="cursor-pointer">{tx("自定义输入","Custom input")}</summary><textarea ref={customInputRef} aria-label={tx("自定义输入","Custom input")} className={`${textarea} mt-2 font-mono`} rows={3} value={custom} onChange={e=>setCustom(e.target.value)}/><Button size="sm" variant="secondary" disabled={pending||!loaded||closed} onClick={()=>run("custom")}>{tx("运行输入","Run input")}</Button></details><div className="overflow-hidden rounded-lg border border-border bg-surface"><RunResultPanel result={job&&job.kind!==("validation" as string)?{...job,testResults:job.caseFeedback}:null} error={action.error||pollError} reload={()=>{if(jobEndpoint)void action.run(async()=>setJob(await productionApi<Job>(jobEndpoint)));}} loading={pending} currentCode={code} currentLanguage="python" onUseCase={pending || closed ? undefined : useCaseAsInput}/></div></div></div><WorkspaceSettingsDialog editorOnly initialSection="editor" open={settingsOpen} onOpenChange={setSettingsOpen} settings={workspace.settings} update={workspace.update} reset={workspace.reset}/></div>;
+  <div className="min-w-0 space-y-3">
+    <section className="overflow-hidden rounded-lg border border-border bg-surface">
+      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2 text-sm">
+        {requiredLanguage ? <strong data-od-id="required-programming-language">{requiredLanguageText(locale, requiredLanguage, "course")}</strong>
+          : activity ? <strong>{languageInfo[language].name}</strong>
+          : <select className={`${input} max-w-36`} aria-label={tx("编程语言", "Programming language")}
+              disabled={pending} value={language} onChange={event=>changeLanguage(submissionLanguage(event.target.value))}
+              data-od-id="programming-language">
+              {supportedLanguages.map(value=><option key={value} value={value}>{languageInfo[value].name}</option>)}
+            </select>}
+        <div className="flex shrink-0 items-center gap-1">
+          <CopyCodeButton code={code}/>
+          <Button size="sm" variant="ghost" aria-label={tx("编辑器设置","Editor settings")} onClick={()=>setSettingsOpen(true)}>
+            <Settings size={16}/>
+          </Button>
+        </div>
+      </div>
+      <div className="h-[370px]">
+        <CodeEditor idPrefix="school-practice" code={code} onChange={setCode} language={language} settings={workspace.settings}
+          status={draftSaved ? tx("草稿已保存（本地）","Draft saved locally") : undefined}
+          onEnableVim={()=>workspace.update({keyBinding:"vim"})}/>
+      </div>
+      <div className="flex justify-end gap-2 border-t border-border p-2">
+        <Button size="sm" variant="secondary" disabled={pending||closed||!code.trim()||!def.samples.length}
+          onClick={()=>run("samples")}>{tx("运行样例","Run")}</Button>
+        <Button size="sm" disabled={pending||closed||!code.trim()} onClick={()=>run("submit")}>{tx("提交","Submit")}</Button>
+      </div>
+    </section>
+    <details ref={customDetailsRef} className="rounded-lg border border-border bg-surface p-3 text-sm">
+      <summary className="cursor-pointer">{tx("自定义输入","Custom input")}</summary>
+      <textarea ref={customInputRef} aria-label={tx("自定义输入","Custom input")} className={`${textarea} mt-2 font-mono`}
+        rows={3} value={custom} onChange={e=>setCustom(e.target.value)}/>
+      <Button size="sm" variant="secondary" disabled={pending||closed||!code.trim()} onClick={()=>run("custom")}>
+        {tx("运行输入","Run input")}
+      </Button>
+    </details>
+    <div className="overflow-hidden rounded-lg border border-border bg-surface">
+      <RunResultPanel result={job&&job.kind!==("validation" as string)?{...job,testResults:job.caseFeedback}:null}
+        error={action.error||pollError}
+        reload={()=>{if(jobEndpoint)void action.run(async()=>setJob(await productionApi<Job>(jobEndpoint)));}}
+        loading={pending} currentCode={code} currentLanguage={language} onUseCase={pending || closed ? undefined : useCaseAsInput}/>
+    </div>
+  </div>
+  </div>
+  <WorkspaceSettingsDialog editorOnly initialSection="editor" open={settingsOpen} onOpenChange={setSettingsOpen}
+    settings={workspace.settings} update={workspace.update} reset={workspace.reset}/>
+ </div>;
+
 }
 
 export function PublicPractice(props:{problemId?:string}={}){return <PublicPracticeContents key={props.problemId??"list"} {...props}/>;}

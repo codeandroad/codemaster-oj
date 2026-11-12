@@ -6,6 +6,7 @@ import { useLocale } from "@/components/locale-context";
 import { PageHeader } from "@/components/page-chrome";
 import { buttonVariants } from "@/components/ui/button";
 import { draftKey, readCurrentDraft, saveDraft } from "@/components/student/drafts";
+import { requiredLanguageText } from "@/components/student/languages";
 import { date, State, useData } from "@/components/student/shared";
 import { ProblemWorkspace, type ProblemWorkspaceAdapter } from "@/components/student/workspace";
 import { productionApi, type CampusUser, type ProductionProblem, type SubmissionLanguage } from "@/lib/production-api";
@@ -15,9 +16,10 @@ type Preview = {
   title: string;
   description: string;
   dueAt: string;
+  requiredLanguage?: SubmissionLanguage | null;
   problems: { problemId: string; versionId: string; title: string; points: number; score: number | null }[];
 };
-type PreviewProblem = { problem: ProductionProblem & { versionId: string }; revision: number };
+type PreviewProblem = { problem: ProductionProblem & { versionId: string }; revision: number; requiredLanguage?: SubmissionLanguage | null };
 
 function previewHref(id: string, from: "edit" | "progress", problemId?: string) {
   const query = new URLSearchParams({ from });
@@ -57,6 +59,7 @@ export function TeacherAssignmentPreview({ id, user }: { id: string; user: Campu
     const key = (language: SubmissionLanguage) => draftKey(user.id, problem.id, "current", context, language);
     const adapter: ProblemWorkspaceAdapter = {
       context, returnTo, returnLabel: en ? "Back to preview" : "返回试做", homeHref: returnTo,
+      requiredLanguage: data.requiredLanguage, languageScope: "assignment", reloadLanguagePolicy: selected.reload,
       presence: null,
       navigation: {
         items: overview.data.problems, loading: overview.loading, error: overview.error, reload: overview.reload,
@@ -96,6 +99,7 @@ export function TeacherAssignmentPreview({ id, user }: { id: string; user: Campu
     <State data={overview} empty={preview && !preview.problems.length ? (en ? "This assignment has no problems yet." : "这份作业还没有题目。") : undefined}>
       {preview && <section className="mt-5 rounded-lg border border-border bg-surface p-4">
         <p className="mb-3 text-sm text-muted-foreground">{en ? "Student deadline" : "学生截止时间"} <time dateTime={preview.dueAt}>{date(preview.dueAt, locale)}</time></p>
+        {preview.requiredLanguage && <p className="mb-3 text-sm">{requiredLanguageText(locale, preview.requiredLanguage, "assignment")}</p>}
         {preview.description && <p className="mb-4 whitespace-pre-wrap break-words text-sm">{preview.description}</p>}
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="font-semibold">{en ? "Assignment problems" : "作业题目"}</h2>

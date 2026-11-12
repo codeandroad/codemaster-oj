@@ -12,7 +12,9 @@ import { CoursePracticeReturn } from "@/components/student/course-practice-retur
 import { CourseAcslPractice } from "@/components/student/course-acsl-practice";
 import type { CourseAcslLink } from "@/components/course-acsl";
 import { useCourseLanguage } from "@/components/course-language";
-import { courseLanguageHref } from "@/components/course-localization";
+import { courseLanguageHref, localizedCourse } from "@/components/course-localization";
+import { PlatformCourseAdmissionGate } from "./platform-course-admission-gate";
+import type { LearnerAdmissionRule } from "./platform-course-admission-model";
 import { AppLink } from "@/components/navigation";
 import { useCourseProgressRefresh } from "@/components/student/course-progress-refresh";
 import { LearningCourseList, LearningCourseRow, learningCourseTitleClass } from "@/components/student/learning-course-list";
@@ -23,7 +25,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { productionApi, type SubmissionLanguage } from "@/lib/production-api";
 import { useSchoolError, useSchoolText } from "./school-ui";
 
-type PublicCourseEntry = {
+export type PublicCourseEntry = {
   id: string;
   title: string;
   description: string;
@@ -40,7 +42,8 @@ type PublicCourseEntry = {
   sourceSchool?: string;
   revision: number;
   accessScope?: "school" | "classes";
-  admission: "direct" | "apply" | "pending" | "rejected";
+  admission: "direct" | "apply" | "pending" | "rejected" | "invite" | "requirements" | "denied";
+  admissionRules?: LearnerAdmissionRule[];
 };
 
 type CourseDetail = {
@@ -76,12 +79,13 @@ type CourseDetail = {
 
 export function PublicCourseCatalog({ courseHref, showSearch = true }: { courseHref: (id: string) => string; showSearch?: boolean }) {
   const text = useSchoolText();
+  const { language } = useCourseLanguage();
   const router = useRouter();
   const catalog = useData<{ courses: PublicCourseEntry[] }>("practice/catalog");
   useCourseProgressRefresh(catalog);
   const [catalogQuery, setQuery] = useCourseCatalogQuery();
   const query = showSearch ? catalogQuery : "";
-  const courses = filterCourseCatalog(catalog.data?.courses ?? [], query);
+  const courses = filterCourseCatalog((catalog.data?.courses ?? []).map(course => localizedCourse(course, language)), query);
   const detailHref = (id: string) => courseSearchHref(courseHref(id), query);
   const action = useMutation();
   const [selected, setSelected] = useState<PublicCourseEntry | null>(null);
@@ -111,7 +115,10 @@ export function PublicCourseCatalog({ courseHref, showSearch = true }: { courseH
           const admission = course.admission === "pending" ? text("Awaiting review", "待审核")
             : course.admission === "rejected" ? text("Application declined", "申请未通过")
               : course.admission === "apply" ? text("Application required", "需申请")
-                : text("Open for study", "可直接学习");
+                : course.admission === "invite" ? text("Invitation required", "需邀请码")
+                  : course.admission === "requirements" ? text("Learning requirements not met", "尚未达到学习门槛")
+                    : course.admission === "denied" ? text("Not eligible", "不符合开放范围")
+                      : text("Open for study", "可直接学习");
           const title = course.admission === "direct"
             ? <AppLink href={detailHref(course.id)} className={learningCourseTitleClass}>{course.title}</AppLink>
             : <button type="button" className={learningCourseTitleClass} disabled={action.busy}
@@ -136,12 +143,17 @@ export function PublicCourseCatalog({ courseHref, showSearch = true }: { courseH
   </div>;
 }
 
-function CourseAdmissionDialog({ entry, onUpdated, onClose, returnFocus }: {
+type AdmissionDialogProps = {
   entry: PublicCourseEntry;
   onUpdated: (entry: PublicCourseEntry) => void;
   onClose: () => void;
   returnFocus?: () => void;
-}) {
+};
+function CourseAdmissionDialog(props: AdmissionDialogProps) {
+  return props.entry.ownerScope === "platform" ? <PlatformCourseAdmissionGate {...props}/> : <SchoolCourseAdmissionDialog {...props}/>;
+}
+
+function SchoolCourseAdmissionDialog({ entry, onUpdated, onClose, returnFocus }: AdmissionDialogProps) {
   const text = useSchoolText();
   const action = useMutation();
   const submitting = useRef(false);

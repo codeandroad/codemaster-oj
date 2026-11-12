@@ -7,6 +7,8 @@ import { Feedback, Loading, useData, useMutation } from "@/components/admin/comm
 import { Button } from "@/components/ui/button";
 import { productionApi } from "@/lib/production-api";
 import { PlatformCourseEditor } from "./platform-course-editor";
+import { PlatformCourseAdmissions } from "./platform-course-admissions";
+import { courseAudiencePolicy } from "./platform-course-admission-model";
 import type { PlatformCourse } from "./platform-course-model";
 import { useSchoolText } from "./school-ui";
 
@@ -24,9 +26,10 @@ export function PlatformCourses() {
     await action.run(work);
     pending.current = false;
   };
-  function navigateToCourse(id?: string) {
+  function navigateToCourse(id?: string, view?: "admissions") {
     const url = new URL(window.location.href);
     if (id) url.searchParams.set("courseId", id); else url.searchParams.delete("courseId");
+    if (view) url.searchParams.set("view", view); else url.searchParams.delete("view");
     window.history.pushState(null, "", `${url.pathname}${url.search}`);
   }
   function close() { setEditor(null); if (courseId) navigateToCourse(); requestAnimationFrame(() => trigger.current?.focus()); }
@@ -37,10 +40,11 @@ export function PlatformCourses() {
       action.success(text("Course updated.", "课程已更新。")); courses.reload();
     });
   }
+  if (courseId && params.get("view") === "admissions") return <PlatformCourseAdmissions key={courseId} courseId={courseId} onBack={() => { close(); courses.reload(); }}/>
   if (courseId) return <PlatformCourseDetail key={courseId} id={courseId} onClose={close} onSaved={saved}/>;
   if (editor) return <PlatformCourseEditor key={`${editor.id}:${editor.revision}`} course={editor} onClose={close} onSaved={saved}/>;
   return <div className="space-y-4">
-    <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted-foreground">{text("Create platform courses and choose who can study them.", "发布与管理平台课程，选择全平台、指定学校或指定学生开放。")}</p>
+    <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted-foreground">{text("Manage platform courses, audiences and admission requirements.", "管理平台课程、开放范围与准入条件。")}</p>
       <Button size="sm" disabled={action.busy} onClick={event => {
         trigger.current = event.currentTarget;
         setEditor({ id: "", title: "", description: "", category: "Programming", authorName: text("Platform administrator", "平台管理员"), estimatedMinutes: 60, requiredLanguage: null, revision: 0, sourceVersion: "", published: false, archived: false, audienceScope: "all", schoolIds: [], studentIds: [], schools: [], students: [], chapters: [], chapterCount: 0 });
@@ -48,9 +52,10 @@ export function PlatformCourses() {
     <Feedback action={action}/>
     <Loading resource={courses}><ul className="divide-y divide-border rounded-lg border border-border bg-surface">{courses.data?.items.map(course => <li key={course.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
       <div className="min-w-0 flex-1"><h2 className="break-words text-sm font-semibold">{course.title}</h2><p className="mt-1 text-xs text-muted-foreground">
-        {course.archived ? text("Archived", "已归档") : course.published ? text("Published", "已发布") : text("Draft", "未发布")} · {course.audienceScope === "all" ? text("Everyone", "全平台") : course.audienceScope === "schools" ? text(`${course.schoolIds.length} schools`, `${course.schoolIds.length} 所学校`) : text(`${course.studentIds.length} students`, `${course.studentIds.length} 名学生`)} · {text(`${course.chapterCount} chapters`, `${course.chapterCount} 章`)}
+        {course.archived ? text("Archived", "已归档") : course.published ? text("Published", "已发布") : text("Draft", "未发布")} · {courseAudiencePolicy(course).scope === "all" ? text("All registered users", "所有注册用户") : text("Custom audience", "自定义范围")} · {text(`${course.chapterCount} chapters`, `${course.chapterCount} 章`)}
       </p></div><div className="flex flex-wrap gap-2">
         {!course.archived && <Button size="sm" variant="secondary" disabled={action.busy} onClick={event => { trigger.current = event.currentTarget; navigateToCourse(course.id); }}>{text("Edit", "编辑")}</Button>}
+        <Button size="sm" variant="secondary" disabled={action.busy} onClick={event => { trigger.current = event.currentTarget; navigateToCourse(course.id, "admissions"); }}>{text("Learning applications", "学习申请")}{course.pendingApplications ? ` (${course.pendingApplications})` : ""}</Button>
         {!course.archived && <Button size="sm" variant="secondary" disabled={action.busy} onClick={() => void change(course, course.published ? "unpublish" : "publish")}>{course.published ? text("Withdraw", "下架") : text("Publish", "发布")}</Button>}
         <Button size="sm" variant="ghost" disabled={action.busy} onClick={() => void change(course, course.archived ? "restore" : "archive")}>{course.archived ? text("Restore", "恢复") : text("Archive", "归档")}</Button>
       </div>

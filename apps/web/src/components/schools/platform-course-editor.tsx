@@ -17,6 +17,7 @@ import { courseAcslReferences, parseCourseAcslReferences } from "@/components/co
 import { CourseAcslEditor } from "@/components/teacher/course-acsl-editor";
 import { productionApi } from "@/lib/production-api";
 import { PlatformCourseAudience } from "./platform-course-audience";
+import { activeAdmissionRules, courseAudiencePolicy, courseAudiencePolicyForSave } from "./platform-course-admission-model";
 import { PlatformCourseDetailsEditor } from "./platform-course-details-editor";
 import type { PlatformChapter, PlatformCourse } from "./platform-course-model";
 import { useSchoolText } from "./school-ui";
@@ -30,7 +31,7 @@ export function PlatformCourseEditor({ course, onSaved, onClose }: {
 }) {
   const text = useSchoolText();
   const { language, setLanguage } = useCourseLanguage();
-  const [draft, setDraft] = useState(course);
+  const [draft, setDraft] = useState(() => ({ ...course, audiencePolicy: courseAudiencePolicy(course) }));
   const [chapterKeys, setChapterKeys] = useState(() => course.chapters.map((chapter, index) => chapter.id ?? `initial-${index}`));
   const [originalLanguages, setOriginalLanguages] = useState(() => new Map<string, CourseLanguage | null>(course.chapters.map((chapter, index) => [chapter.id ?? `initial-${index}`, findOriginalLanguage(originalFields(chapter), chapter.localizations)])));
   const [editingSelection, setEditingSelection] = useState<{ key: string; language: ChapterEditingLanguage } | null>(null);
@@ -38,9 +39,9 @@ export function PlatformCourseEditor({ course, onSaved, onClose }: {
   const [requestId] = useState(() => crypto.randomUUID());
   const action = useMutation();
   const saving = useRef(false);
-  const dirty = JSON.stringify(draft) !== JSON.stringify(course);
+  const dirty = JSON.stringify(draft) !== JSON.stringify({ ...course, audiencePolicy: courseAudiencePolicy(course) });
   useDirty(dirty);
-  const update = (patch: Partial<PlatformCourse>) => setDraft(value => ({ ...value, ...patch }));
+  const update = (patch: Partial<PlatformCourse>) => setDraft(value => ({ ...value, ...patch, audiencePolicy: patch.audiencePolicy ?? value.audiencePolicy }));
   const chapter = draft.chapters[selected];
   const chapterKey = chapterKeys[selected];
   const original = originalFields(chapter);
@@ -73,14 +74,16 @@ export function PlatformCourseEditor({ course, onSaved, onClose }: {
     await action.run(async () => {
       parseCourseSections(draft.sections ?? []);
       validateChapterSections(draft.sections, draft.chapters);
+      const policy = courseAudiencePolicyForSave(draft.audiencePolicy);
+      if (!activeAdmissionRules(policy).length) throw new Error(text("Choose at least one course audience.", "请至少选择一项课程开放范围。"));
+      if (activeAdmissionRules(policy).some(rule => !Number.isSafeInteger(rule.minimumPoints) || rule.minimumPoints < 0)) throw new Error(text("Minimum points must be a non-negative integer.", "最低积分须为不小于 0 的整数。"));
       const saved = await productionApi<PlatformCourse>(course.id ? `platform/courses/${course.id}` : "platform/courses", {
         method: course.id ? "PATCH" : "POST", body: {
           ...draft, localizations: parseCourseLocalizations(draft.localizations ?? {}),
           chapters: orderCourseChapters(draft.sections, draft.chapters).map(chapter => ({ ...chapter,
             localizations: parseChapterLocalizations(chapter.localizations ?? {}), acslLinks: parseCourseAcslReferences(courseAcslReferences(chapter.acslLinks)),
           })), requestId, expectedRevision: course.revision, sourceVersion: course.sourceVersion,
-          schoolIds: draft.audienceScope === "schools" ? draft.schools.map(item => item.id) : [],
-          studentIds: draft.audienceScope === "students" ? draft.students.map(item => item.id) : [],
+          audiencePolicy: policy, audienceScope: undefined, schoolIds: undefined, studentIds: undefined,
         },
       });
       onSaved(saved);
@@ -103,9 +106,9 @@ export function PlatformCourseEditor({ course, onSaved, onClose }: {
           <label className="grid gap-2 text-sm font-semibold">{text("Displayed author", "显示作者")}<input className={inputClass} maxLength={200} value={draft.authorName} onChange={event => update({ authorName: event.target.value })}/></label></div>
         <CourseProgrammingLanguageField className={inputClass} value={draft.requiredLanguage} onChange={requiredLanguage => update({ requiredLanguage })}/>
       </div>
-      <div className="min-w-0 rounded-lg border border-border bg-surface p-4"><PlatformCourseAudience scope={draft.audienceScope} onScope={audienceScope => update({ audienceScope })}
-        selected={draft.audienceScope === "schools" ? draft.schools : draft.students}
-        onSelected={items => update(draft.audienceScope === "schools" ? { schools: items } : { students: items })}/></div>
+      <div className="min-w-0 rounded-lg border border-border bg-surface p-4"><PlatformCourseAudience courseId={course.id} policy={draft.audiencePolicy}
+        onChange={audiencePolicy => update({ audiencePolicy })} schools={draft.schools} accounts={draft.students}
+        onSchools={schools => update({ schools })} onAccounts={students => update({ students })} disabled={action.busy} dirty={dirty}/></div>
     </fieldset>
     <CourseSectionsEditor sections={draft.sections ?? []} chapters={draft.chapters} onChange={sections => update({ sections })} disabled={action.busy}/>
     <fieldset disabled={action.busy} className="min-w-0 space-y-4 rounded-lg border border-border bg-surface p-4">

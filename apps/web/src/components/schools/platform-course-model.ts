@@ -1,3 +1,4 @@
+import type { AudiencePolicy } from "./platform-course-admission-model";
 import type { CourseSection } from "@/components/course-sections";
 import type { SubmissionLanguage } from "@/lib/production-api";
 import type { CourseLocalizations, ChapterLocalizations } from "@/components/course-localization";
@@ -11,6 +12,8 @@ export type PlatformChapter = {
   localizations?: ChapterLocalizations; acslLinks?: CourseAcslLink[];
 };
 export type PlatformCourse = {
+  audiencePolicy?: AudiencePolicy;
+  pendingApplications?: number;
   sections?: CourseSection[];
   localizations?: CourseLocalizations;
   id: string; title: string; description: string; category: string; authorName: string;

@@ -1,3 +1,4 @@
+import { courseSections, chapterSectionKey } from './course-sections.mjs';
 import { courseLocalizations, localizedFields } from './course-localizations.mjs';
 import { normalizeCourseAcslLinks, resolveCourseAcslLinks, projectCourseAcslLinks, acslLinkCounts } from './course-acsl.mjs';
 import { schoolActivityJobVisibleSql } from './school-activities.mjs';
@@ -15,7 +16,8 @@ const manages = (course, user, role) => role === 'school_admin' || role === 'tea
 
 function courseInput(body, previous={}) {
  const old=previous.properties??{};
- const properties={localizations:body.localizations===undefined?old.localizations??null:courseLocalizations(body.localizations),category:field(body.category??old.category??'Programming','课程分类',{min:1,max:100}),
+ const sections=courseSections(body.sections===undefined?old.sections??[]:body.sections);
+ const properties={sections,localizations:body.localizations===undefined?old.localizations??null:courseLocalizations(body.localizations),category:field(body.category??old.category??'Programming','课程分类',{min:1,max:100}),
  difficulty:enumValue(body.difficulty??old.difficulty??'beginner',['beginner','intermediate','advanced'],'难度'),
  coverKey:enumValue(body.coverKey??old.coverKey??'general',['python','algorithms','general'],'课程封面'),
  estimatedMinutes:integer(body.estimatedMinutes??old.estimatedMinutes??60,1,10080,'预计学习时间'),
@@ -33,7 +35,7 @@ function courseInput(body, previous={}) {
  if(!Array.isArray(body.chapters)||body.chapters.length>100)fail(400,'VALIDATION','课程最多包含100章');
  const chapters=body.chapters.map(chapter=>{
   const previousChapter=previous.chapters?.find(old=>old.id===chapter?.id);
-  return {id:uuid(chapter?.id,'章节 ID').toLowerCase(),title:field(chapter?.title,'章节标题',{max:200}),body:field(chapter?.body??'','章节正文',{min:0,max:100000,trim:false}),
+  return {sectionKey:chapterSectionKey(chapter?.sectionKey===undefined?previousChapter?.sectionKey:chapter.sectionKey,sections),id:uuid(chapter?.id,'章节 ID').toLowerCase(),title:field(chapter?.title,'章节标题',{max:200}),body:field(chapter?.body??'','章节正文',{min:0,max:100000,trim:false}),
    ...localizedFields(chapter?.localizations===undefined?previousChapter?.localizations:courseLocalizations(chapter.localizations,{chapter:true})),
    ...Object.fromEntries(['objective','checkpoint','checkpointAnswer'].filter(key=>chapter?.[key]!==undefined||previousChapter?.[key]!==undefined).map(key=>[key,field(chapter?.[key]??previousChapter[key],key,{min:0,max:key==='objective'?4000:10000,trim:false})])),
    ...(chapter?.acslLinks!==undefined||previousChapter?.acslLinks!==undefined?{acslLinks:normalizeCourseAcslLinks(chapter?.acslLinks??previousChapter?.acslLinks??[])}:{}),problems:chapterProblems(chapter?.problems)};
@@ -137,7 +139,7 @@ async function shape(db,schoolId,loaded,{detail=false,user}={}){
  const progress=identityId?(await db.query('SELECT chapter_id,content_hash,read FROM school_course_progress WHERE school_id=$1 AND course_id=$2 AND identity_id=$3',[schoolId,course.id,identityId])).rows:[];
  const readIds=new Set(progress.filter(row=>row.read&&view.chapters.some(ch=>ch.id===row.chapter_id&&contentHash(ch)===row.content_hash)).map(row=>row.chapter_id));
  const properties=view.properties??{};
- const body={...localizedFields(properties.localizations),id:course.id,title:view.title,description:view.description,
+ const body={sections:properties.sections??[],...localizedFields(properties.localizations),id:course.id,title:view.title,description:view.description,
   category:properties.category??'Programming',difficulty:properties.difficulty??'beginner',coverKey:properties.coverKey??'general',
   estimatedMinutes:properties.estimatedMinutes??60,authorName:properties.authorName??'',authoredAt:properties.authoredAt??course.created_at,
   coverImage:properties.coverImage??null,requiredLanguage:view.required_language??null,archived:!!course.archived_at,accessScope:view.access_scope,

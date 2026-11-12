@@ -1,3 +1,4 @@
+import { courseSections, chapterSectionKey, assertChapterSections } from './course-sections.mjs';
 import { randomUUID } from 'node:crypto';
 import { transaction } from './db.mjs';
 import { activeAccount, LEGACY_SCHOOL_ID, lockSchoolTeaching } from './schools.mjs';
@@ -26,13 +27,13 @@ async function get(db,id,{lock=false}={}) {
 }
 async function shape(db,p,{detail=false}={}) {
  const chapters=(await db.query(`SELECT id,title,content,objective,checkpoint,checkpoint_answer AS "checkpointAnswer",
-  localizations,(SELECT count(*)::int FROM chapter_problems WHERE chapter_id=c.id) AS "problemCount"
+  localizations,section_key AS "sectionKey",(SELECT count(*)::int FROM chapter_problems WHERE chapter_id=c.id) AS "problemCount"
   FROM learning_chapters c WHERE path_id=$1 AND archived_at IS NULL ORDER BY position,created_at,id`,[p.id])).rows;
  const schools=p.platform_school_ids.length?(await db.query('SELECT id,name FROM schools WHERE id=ANY($1::uuid[]) ORDER BY name,id',[p.platform_school_ids])).rows:[];
  const students=p.platform_student_ids.length?(await db.query(`SELECT i.id,i.name,
   (SELECT a.username FROM accounts a WHERE a.identity_id=i.id AND a.binding_released_at IS NULL LIMIT 1) username
   FROM identities i WHERE i.id=ANY($1::uuid[]) ORDER BY i.name,i.id`,[p.platform_student_ids])).rows:[];
- return {id:p.id,title:p.title,description:p.description,category:p.category,difficulty:p.difficulty,coverKey:p.cover_key,
+ return {sections:p.sections??[],id:p.id,title:p.title,description:p.description,category:p.category,difficulty:p.difficulty,coverKey:p.cover_key,
   coverImage:p.cover_image,authorName:p.author_name,authoredAt:p.authored_at,estimatedMinutes:p.estimated_minutes,
   requiredLanguage:p.required_language,localizations:p.localizations,published:!!p.published_at,archived:!!p.archived_at,
   revision:p.platform_revision,sourceVersion:p.source_version,sourceSchool:'平台管理员',ownerScope:'platform',
@@ -72,6 +73,7 @@ async function save(db,user,body,old) {
  const difficulty=enumValue(body.difficulty??old?.difficulty??'beginner',['beginner','intermediate','advanced'],'难度');
  const cover=enumValue(body.coverKey??old?.cover_key??'general',['python','algorithms','general'],'封面');
  const localizations=body.localizations===undefined?old?.localizations??null:courseLocalizations(body.localizations);
+ const sections=courseSections(body.sections===undefined?old?.sections??[]:body.sections);
  const id=old?.id??uuid(body.requestId,'请求 ID');
  if(!old)await db.query(`INSERT INTO learning_paths(id,owner_account_id,title,owner_scope,platform_create_request_hash) VALUES($1,$2,$3,'platform',$4)`,[id,user.id,title,canonicalHash(body)]);
  await db.query(`UPDATE learning_paths SET title=$2,description=$3,category=$4,estimated_minutes=$5,difficulty=$6,cover_key=$7,
@@ -81,19 +83,24 @@ async function save(db,user,body,old) {
   published_required_language=CASE WHEN published_at IS NOT NULL THEN $11 ELSE published_required_language END,
   updated_at=clock_timestamp(),platform_revision=platform_revision+CASE WHEN $16 THEN 1 ELSE 0 END WHERE id=$1`,
  [id,title,description,category,minutes,difficulty,cover,display.authorName,display.authoredAt,display.coverImage,display.requiredLanguage,localizations,audience.scope,audience.schoolIds,audience.studentIds,!!old]);
+ await db.query('UPDATE learning_paths SET sections=$2 WHERE id=$1',[id,JSON.stringify(sections)]);
+ if(body.chapters===undefined)assertChapterSections(sections,(await db.query('SELECT section_key FROM learning_chapters WHERE path_id=$1 AND archived_at IS NULL',[id])).rows);
  if(body.chapters!==undefined){
   if(!Array.isArray(body.chapters)||body.chapters.length>100||Buffer.byteLength(JSON.stringify(body.chapters))>1500000)
    fail(400,'VALIDATION','课程最多 100 章，正文总量不能超过 1.5 MB');
-  const existing=new Set((await db.query('SELECT id FROM learning_chapters WHERE path_id=$1',[id])).rows.map(c=>c.id));
+  const existingChapters=new Map((await db.query('SELECT id,section_key FROM learning_chapters WHERE path_id=$1',[id])).rows.map(c=>[c.id,c]));
+  const existing=new Set(existingChapters.keys());
   const retained=[];
   for(const [position,c] of body.chapters.entries()){
    const chapterId=c.id?uuid(c.id).toLowerCase():randomUUID();
    if(retained.includes(chapterId))fail(400,'VALIDATION','章节 ID 不能重复');
    if(c.id&&!existing.has(chapterId))fail(400,'VALIDATION','章节不属于此课程');
    retained.push(chapterId);
+   const sectionKey=chapterSectionKey(c.sectionKey===undefined?existingChapters.get(chapterId)?.section_key:c.sectionKey,sections);
    const chapterTitle=field(c.title,'章节标题',{max:200}),content=field(c.content??'','章节正文',{min:0,max:100000,trim:false});
    if(existing.has(chapterId))await db.query(`UPDATE learning_chapters SET title=$2,content=$3,position=$4,archived_at=NULL,updated_at=clock_timestamp() WHERE id=$1`,[chapterId,chapterTitle,content,position]);
    else await db.query('INSERT INTO learning_chapters(id,path_id,title,content,position) VALUES($1,$2,$3,$4,$5)',[chapterId,id,chapterTitle,content,position]);
+   await db.query('UPDATE learning_chapters SET section_key=$2 WHERE id=$1',[chapterId,sectionKey]);
   }
   await db.query('UPDATE learning_chapters SET archived_at=clock_timestamp() WHERE path_id=$1 AND archived_at IS NULL AND NOT(id=ANY($2::uuid[]))',[id,retained]);
  }

@@ -382,7 +382,8 @@ test('school course HTTP lifecycle preserves published boundaries and stable lea
     assert.equal(JSON.stringify(safe).includes('SECRET'),false);
     assert.equal(JSON.stringify(safe).includes('PRIVATE'),false);
     const stored=(await pool.query('SELECT chapters FROM school_courses WHERE id=$1',[safe.id])).rows[0];
-    assert.deepEqual(Object.keys(stored.chapters[0]).sort(),['body','id','problems','title']);
+    assert.deepEqual(Object.keys(stored.chapters[0]).sort(),['body','id','problems','sectionKey','title']);
+    assert.equal(stored.chapters[0].sectionKey,null);
     assert.equal(safe.chapters[0].body,indentedMarkdown,'draft creation must preserve meaningful Markdown whitespace');
     assert.equal(stored.chapters[0].body,indentedMarkdown);
     const whitespacePath=courses+'/'+safe.id;

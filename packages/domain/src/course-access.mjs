@@ -1,3 +1,4 @@
+import {canonicalMergedCourseId} from './course-merge.mjs';
 import {fail,field,uuid,enumValue} from './security.mjs';
 import {normalizeRequiredLanguage} from './course-language-policy.mjs';
 import {resolveLiveProblemVersion} from './live-problem-version.mjs';
@@ -24,6 +25,7 @@ export async function courseMetadataForUser(db,user,id){
  return (await db.query('SELECT id,title,published_at,archived_at,required_language FROM learning_paths WHERE id=$1',[id])).rows[0]??null;
 }
 export async function resolveLegacyCourseProblem(db,user,{courseId,chapterId,problemId}){
+ courseId=await canonicalMergedCourseId(db,courseId);
  // Chapter and policy edits lock the course before reading its exercises.
  const {rows:[course]}=await db.query(`SELECT required_language FROM learning_paths
   WHERE id=$1 AND published_at IS NOT NULL AND archived_at IS NULL FOR SHARE`,[courseId]);

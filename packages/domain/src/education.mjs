@@ -1,3 +1,5 @@
+import { handleCourseMerge, canonicalMergedCourseId } from './course-merge.mjs';
+import { courseSections, chapterSectionKey, assertChapterSections } from './course-sections.mjs';
 import { courseLocalizations, localizedFields } from './course-localizations.mjs';
 import { legacyCourseAcsl, acslLinkCounts, resolveCourseAcslLinks, projectCourseAcslLinks } from './course-acsl.mjs';
 import { LEGACY_SCHOOL_ID } from './schools.mjs';
@@ -23,6 +25,7 @@ const exists = query => { if (!query.rowCount) fail(404, 'NOT_FOUND', '内容不
 async function pathAccess(db, user, id, edit = false, lock = false, allowArchived = false) {
  const path = exists(await db.query(`SELECT * FROM learning_paths WHERE id=$1 AND (archived_at IS NULL OR $2) ${lock ? 'FOR UPDATE' : ''}`, [uuid(id),allowArchived]));
  const canEdit = managesCourse(user,path);
+ if(path.merged_into_id){if(!canEdit)fail(404,'NOT_FOUND','内容不存在');fail(409,'COURSE_MERGED','课程已整合，请打开统一课程。');}
  if(path.archived_at&&(!allowArchived||!canEdit))fail(404,'NOT_FOUND','内容不存在');
  if (edit && !canEdit) fail(403, 'FORBIDDEN', '只能维护本人负责的学习内容');
  if (!canEdit && !(await readableCourseIds(db,user,[path.id])).has(path.id)) fail(404, 'NOT_FOUND', '内容不存在');
@@ -30,7 +33,7 @@ async function pathAccess(db, user, id, edit = false, lock = false, allowArchive
 }
 
 function pathShape(p) {
- return {ownerScope:p.owner_scope??'school',platformAudience:p.owner_scope==='platform'?p.platform_access_scope:undefined,...localizedFields(p.localizations),authorName:p.author_name??'',authoredAt:p.authored_at??p.created_at,coverImage:p.cover_image??null,requiredLanguage:p.required_language??null,accessScope:p.access_scope??'school',availableFrom:p.available_from??null,availableUntil:p.available_until??null,listed:p.listed??true,withdrawnAt:p.withdrawn_at??null,classIds:(p.classes??[]).map(c=>c.id),classes:p.classes??[], id: p.id, title: p.title,estimatedMinutes:p.estimated_minutes,updatedAt:p.updated_at,createdAt:p.created_at, description: p.description, category: p.category, published: !!p.published_at,archived:!!p.archived_at,
+ return {...(p.merged_into_id?{mergedIntoCourseId:p.merged_into_id}:{}),sections:p.sections??[],ownerScope:p.owner_scope??'school',platformAudience:p.owner_scope==='platform'?p.platform_access_scope:undefined,...localizedFields(p.localizations),authorName:p.author_name??'',authoredAt:p.authored_at??p.created_at,coverImage:p.cover_image??null,requiredLanguage:p.required_language??null,accessScope:p.access_scope??'school',availableFrom:p.available_from??null,availableUntil:p.available_until??null,listed:p.listed??true,withdrawnAt:p.withdrawn_at??null,classIds:(p.classes??[]).map(c=>c.id),classes:p.classes??[], id: p.id, title: p.title,estimatedMinutes:p.estimated_minutes,updatedAt:p.updated_at,createdAt:p.created_at, description: p.description, category: p.category, published: !!p.published_at,archived:!!p.archived_at,
   difficulty:p.difficulty??'beginner',coverKey:p.cover_key??'general',taskCount:Number(p.task_count??0),completedTasks:Number(p.completed_tasks??0),chapterCount: Number(p.chapter_count ?? 0), completedChapters: Number(p.completed_chapters ?? 0), canEdit: p.canEdit ?? false };
 }
 
@@ -72,7 +75,10 @@ async function taskStats(db,user,ids,draftIds=[]) {
  return stats;
 }
 async function pathResult(ctx, id, db = ctx.pool, allowArchived = false) {
+ const redirectedFromCourseId=id;
+ id=await canonicalMergedCourseId(db,id);
  const p = await pathAccess(db, ctx.user, id, false, false, allowArchived);
+ const redirectedChapterId=id!==redirectedFromCourseId?(await db.query('SELECT merged_first_chapter_id FROM learning_paths WHERE id=$1',[redirectedFromCourseId])).rows[0]?.merged_first_chapter_id??null:null;
  p.classes=await courseClasses(db,id);
  const chapters = (await db.query(`SELECT c.*, COALESCE(pr.completed,false) completed FROM learning_chapters c
   LEFT JOIN learning_progress pr ON pr.chapter_id=c.id AND pr.identity_id=$2 WHERE c.path_id=$1 AND c.archived_at IS NULL ORDER BY c.position,c.created_at,c.id`, [id, ctx.user.identityId])).rows;
@@ -108,10 +114,10 @@ async function pathResult(ctx, id, db = ctx.pool, allowArchived = false) {
  const status=new Map(state.map(v=>[v.id,v]));
  const linkedAssignments=p.published_at&&ctx.user.roles.includes('student')?(await db.query(`SELECT a.id,a.title,a.due_at FROM assignments a WHERE a.course_path_id=$1 AND a.state='Published' AND a.archived_at IS NULL AND EXISTS(SELECT 1 FROM assignment_participants ap WHERE ap.assignment_id=a.id AND ap.identity_id=$2 AND NOT ap.exempt) ORDER BY a.due_at DESC,a.created_at DESC`,[id,ctx.user.identityId])).rows:[];
  const assignmentProgress=await assignmentProgressById(db,linkedAssignments.map(a=>a.id),ctx.user.identityId);
- return { ...pathShape({ ...p, task_count:versions.size+paper4Total.taskCount+acslTotal.total,completed_tasks:solved.size+paper4Total.completedTasks+acslTotal.completed,chapter_count: chapters.length, completed_chapters: chapters.filter(c => c.completed).length }),
+ return { ...(id!==redirectedFromCourseId?{redirectedFromCourseId,redirectedChapterId}:{}),...pathShape({ ...p, task_count:versions.size+paper4Total.taskCount+acslTotal.total,completed_tasks:solved.size+paper4Total.completedTasks+acslTotal.completed,chapter_count: chapters.length, completed_chapters: chapters.filter(c => c.completed).length }),
   assignments:linkedAssignments.map(a=>({id:a.id,title:a.title,dueAt:a.due_at,...assignmentProgress.get(a.id)})),
   practiceBundle:p.canEdit?bundle.map(x=>({...x,validationStatus:status.get(x.versionId)?.validation_status??'Unknown',published:!!status.get(x.versionId)?.published_at})):undefined,
-  chapters: chapters.map(c => ({ ...localizedFields(c.localizations),acslLinks:acsl.chapters.get(c.id)??[],id: c.id, title: c.title, content: c.content, position: c.position, completed: c.completed,objective:c.objective,checkpoint:c.checkpoint,checkpointAnswer:c.checkpoint_answer, paper4Links:chapterPaper4Links(paper4,c.id,ctx.user.identityId,{includeUnavailable:p.canEdit}),taskCount:(visible.get(c.id)??[]).length+paper4Progress(paper4,'chapter',c.id,ctx.user.identityId).taskCount+acslLinkCounts(acsl.chapters.get(c.id)??[]).total,completedTasks:(visible.get(c.id)??[]).filter(link=>link.completed).length+paper4Progress(paper4,'chapter',c.id,ctx.user.identityId).completedTasks+acslLinkCounts(acsl.chapters.get(c.id)??[]).completed,problems: visible.get(c.id) ?? [] })) };
+  chapters: chapters.map(c => ({ sectionKey:c.section_key??null,...localizedFields(c.localizations),acslLinks:acsl.chapters.get(c.id)??[],id: c.id, title: c.title, content: c.content, position: c.position, completed: c.completed,objective:c.objective,checkpoint:c.checkpoint,checkpointAnswer:c.checkpoint_answer, paper4Links:chapterPaper4Links(paper4,c.id,ctx.user.identityId,{includeUnavailable:p.canEdit}),taskCount:(visible.get(c.id)??[]).length+paper4Progress(paper4,'chapter',c.id,ctx.user.identityId).taskCount+acslLinkCounts(acsl.chapters.get(c.id)??[]).total,completedTasks:(visible.get(c.id)??[]).filter(link=>link.completed).length+paper4Progress(paper4,'chapter',c.id,ctx.user.identityId).completedTasks+acslLinkCounts(acsl.chapters.get(c.id)??[]).completed,problems: visible.get(c.id) ?? [] })) };
 }
 
 async function setLinks(ctx, db, path, chapterId, problemIds) {
@@ -359,6 +365,7 @@ ${leaderboardPaperAttempts}
 }
 
 export async function handleEducation(ctx) {
+ const merged=await handleCourseMerge(ctx);if(merged)return merged;
  const { pool, user, route, method, body, helpers } = ctx;
  if(route==='/points/me'&&method==='GET'){
   if(!user.roles.includes('student'))fail(403,'FORBIDDEN','积分仅适用于学生');
@@ -423,6 +430,7 @@ export async function handleEducation(ctx) {
   requireStaff(user);const doc=validateLearningDocument(body);
   const path=await transaction(pool,async db=>{
    const p=exists(await db.query('INSERT INTO learning_paths(owner_account_id,title,description,category,estimated_minutes,difficulty,cover_key) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *',[user.id,doc.title,doc.description,doc.category,doc.estimatedMinutes,doc.difficulty,doc.coverKey]));
+   if(doc.sections){await db.query('UPDATE learning_paths SET sections=$2 WHERE id=$1',[p.id,JSON.stringify(doc.sections)]);p.sections=doc.sections;}
    if(doc.localizations){await db.query('UPDATE learning_paths SET localizations=$2 WHERE id=$1',[p.id,doc.localizations]);p.localizations=doc.localizations;}
    const properties=await courseProperties(db,user,doc);
    await saveCourseProperties(db,p.id,properties);
@@ -430,7 +438,7 @@ export async function handleEducation(ctx) {
    for(let position=0;position<doc.chapters.length;position++){
     const c=doc.chapters[position];const chapter=exists(await db.query('INSERT INTO learning_chapters(path_id,title,content,position,objective,checkpoint,checkpoint_answer) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *',[p.id,c.title,c.content,position,c.objective,c.checkpoint,c.checkpointAnswer]));
     const acslLinks=await resolveCourseAcslLinks(db,LEGACY_SCHOOL_ID,user,c.acslLinks??[]);
-    await db.query('UPDATE learning_chapters SET localizations=$2,acsl_links=$3 WHERE id=$1',[chapter.id,c.localizations??null,JSON.stringify(acslLinks)]);
+    await db.query('UPDATE learning_chapters SET localizations=$2,acsl_links=$3,section_key=$4 WHERE id=$1',[chapter.id,c.localizations??null,JSON.stringify(acslLinks),chapterSectionKey(c.sectionKey,doc.sections??[])]);
     await setLinks(ctx,db,p,chapter.id,c.problemIds);
     await setChapterPaper4Links(db,chapter.id,c.paper4Links??[]);
    }
@@ -442,6 +450,7 @@ export async function handleEducation(ctx) {
   const title=field(body.title,'学习路径标题'),description=field(body.description??'','描述',{min:0,max:4000}),category=field(body.category??'Python','分类',{max:100});
   const path = await transaction(pool,async db=>{
    const p=exists(await db.query('INSERT INTO learning_paths(owner_account_id,title,description,category,estimated_minutes,difficulty,cover_key) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *',[user.id,title,description,category,integer(body.estimatedMinutes??30,1,10080,'预计学习时长'),enumValue(body.difficulty??'beginner',['beginner','intermediate','advanced'],'难度'),enumValue(body.coverKey??'general',['python','algorithms','general'],'封面')]));
+   if(body.sections!==undefined){const sections=courseSections(body.sections);await db.query('UPDATE learning_paths SET sections=$2 WHERE id=$1',[p.id,JSON.stringify(sections)]);p.sections=sections;}
    if(body.localizations!==undefined){const localized=courseLocalizations(body.localizations);await db.query('UPDATE learning_paths SET localizations=$2 WHERE id=$1',[p.id,localized]);p.localizations=localized;}
    const properties=await courseProperties(db,user,body);
    await saveCourseProperties(db,p.id,properties);
@@ -517,6 +526,7 @@ export async function handleEducation(ctx) {
   await transaction(pool,async db=>{
    const path=exists(await db.query('SELECT * FROM learning_paths WHERE id=$1 FOR UPDATE',[id]));
    if(!managesCourse(user,path))fail(403,'FORBIDDEN','只能恢复本人课程');
+   if(path.merged_into_id)fail(409,'COURSE_MERGED','课程已整合，请打开统一课程。');
    if(!path.archived_at)return;
    let withdrawForPaper4=false;
    if(path.published_at){
@@ -546,6 +556,7 @@ export async function handleEducation(ctx) {
   requireStaff(user);
   const p=await transaction(pool,async db=>{
    const path=await pathAccess(db,user,match[1],true,true);
+   if(body.sections!==undefined){const sections=courseSections(body.sections);assertChapterSections(sections,(await db.query('SELECT section_key FROM learning_chapters WHERE path_id=$1 AND archived_at IS NULL',[path.id])).rows);await db.query('UPDATE learning_paths SET sections=$2 WHERE id=$1',[path.id,JSON.stringify(sections)]);}
    const properties=await courseProperties(db,user,body,path);
    await saveCourseProperties(db,path.id,properties);
    if(path.published_at&&properties.audienceChanged&&body.archived!==true)await assertCoursePublicationAccess(db,{...path,access_scope:properties.accessScope});
@@ -611,13 +622,14 @@ export async function handleEducation(ctx) {
    if(path.published_at&&!content.trim())fail(409,'INCOMPLETE','已发布路径新增章节必须有正文');
    const c=exists(await db.query('INSERT INTO learning_chapters(path_id,title,content,position,objective,checkpoint,checkpoint_answer) VALUES($1,$2,$3,(SELECT COALESCE(max(position),-1)+1 FROM learning_chapters WHERE path_id=$1),$4,$5,$6) RETURNING *',[path.id,title,content,field(body.objective??'','学习目标',{min:0,max:4000}),field(body.checkpoint??'','检查点',{min:0,max:10000}),field(body.checkpointAnswer??'','检查点答案',{min:0,max:10000})]));
    const acslLinks=await resolveCourseAcslLinks(db,LEGACY_SCHOOL_ID,user,body.acslLinks??[]);
-   await db.query('UPDATE learning_chapters SET localizations=$2,acsl_links=$3 WHERE id=$1',[c.id,courseLocalizations(body.localizations,{chapter:true}),JSON.stringify(acslLinks)]);
+   c.section_key=chapterSectionKey(body.sectionKey,path.sections??[]);
+   await db.query('UPDATE learning_chapters SET localizations=$2,acsl_links=$3,section_key=$4 WHERE id=$1',[c.id,courseLocalizations(body.localizations,{chapter:true}),JSON.stringify(acslLinks),c.section_key]);
    await setLinks(ctx,db,path,c.id,body.problemIds??[]);
    await setChapterPaper4Links(db,c.id,body.paper4Links??[]);
    await db.query('UPDATE learning_paths SET updated_at=now() WHERE id=$1',[path.id]);
    await helpers.audit(db,user.id,'learning.chapter_create','learning_chapter',c.id);return c;
   });
-  return result({id:chapter.id,pathId:chapter.path_id,title:chapter.title,content:chapter.content,position:chapter.position,objective:chapter.objective,checkpoint:chapter.checkpoint,checkpointAnswer:chapter.checkpoint_answer,completed:false,paper4Links:chapterPaper4Links(await loadCoursePaper4(pool,[chapter.path_id],[user.identityId]),chapter.id,user.identityId,{includeUnavailable:true})},201);
+  return result({id:chapter.id,pathId:chapter.path_id,sectionKey:chapter.section_key??null,title:chapter.title,content:chapter.content,position:chapter.position,objective:chapter.objective,checkpoint:chapter.checkpoint,checkpointAnswer:chapter.checkpoint_answer,completed:false,paper4Links:chapterPaper4Links(await loadCoursePaper4(pool,[chapter.path_id],[user.identityId]),chapter.id,user.identityId,{includeUnavailable:true})},201);
  }
  match=route.match(/^\/chapters\/([^/]+)$/);
  if (match && ['PATCH','DELETE'].includes(method)) {
@@ -636,6 +648,7 @@ export async function handleEducation(ctx) {
     if(position<chapter.position)await db.query('UPDATE learning_chapters SET position=position+1 WHERE path_id=$1 AND archived_at IS NULL AND id<>$2 AND position >= $3 AND position < $4',[path.id,chapter.id,position,chapter.position]);
     if(position>chapter.position)await db.query('UPDATE learning_chapters SET position=position-1 WHERE path_id=$1 AND archived_at IS NULL AND id<>$2 AND position > $3 AND position <= $4',[path.id,chapter.id,chapter.position,position]);
     await db.query('UPDATE learning_chapters SET title=$1,content=$2,position=$3,updated_at=now(),objective=$5,checkpoint=$6,checkpoint_answer=$7 WHERE id=$4',[title,content,position,chapter.id,body.objective===undefined?chapter.objective:field(body.objective,'学习目标',{min:0,max:4000}),body.checkpoint===undefined?chapter.checkpoint:field(body.checkpoint,'检查点',{min:0,max:10000}),body.checkpointAnswer===undefined?chapter.checkpoint_answer:field(body.checkpointAnswer,'检查点答案',{min:0,max:10000})]);
+    if(body.sectionKey!==undefined)await db.query('UPDATE learning_chapters SET section_key=$2 WHERE id=$1',[chapter.id,chapterSectionKey(body.sectionKey,path.sections??[])]);
     if(body.localizations!==undefined)await db.query('UPDATE learning_chapters SET localizations=$2 WHERE id=$1',[chapter.id,courseLocalizations(body.localizations,{chapter:true})]);
     if(body.acslLinks!==undefined){const links=await resolveCourseAcslLinks(db,LEGACY_SCHOOL_ID,user,body.acslLinks,chapter.acsl_links);await db.query('UPDATE learning_chapters SET acsl_links=$2 WHERE id=$1',[chapter.id,JSON.stringify(links)]);}
     if (body.problemIds!==undefined) await setLinks(ctx,db,path,chapter.id,body.problemIds);

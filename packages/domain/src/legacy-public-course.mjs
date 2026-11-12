@@ -25,7 +25,7 @@ export async function requireLegacyCourseAdmin(db, accountId) {
 }
 
 async function legacyCandidates(db, courseId, { lock = false, preview = false } = {}) {
-  const { rows } = await db.query(`SELECT p.id,p.title,p.description,p.access_scope,p.localizations,p.required_language,p.language_credit_cutoffs,
+  const { rows } = await db.query(`SELECT p.id,p.title,p.description,p.access_scope,p.localizations,p.sections,p.required_language,p.language_credit_cutoffs,
     ${legacyCourseSourceVersion} source_version,
     (${legacyCourseIsLive}) published,
     CASE WHEN latest.source_version=${legacyCourseSourceVersion} THEN latest.revision
@@ -34,7 +34,7 @@ async function legacyCandidates(db, courseId, { lock = false, preview = false } 
     ${preview ? `, l.id listing_id,l.revision approved_revision,l.withdrawn_at,l.access_mode,
       (SELECT count(*)::int FROM learning_chapters c WHERE c.path_id=p.id AND c.archived_at IS NULL) chapter_count,
       CASE WHEN p.access_scope='school' THEN COALESCE((
-        SELECT jsonb_agg(jsonb_build_object('id',c.id,'title',c.title,'body',c.content) ORDER BY c.position,c.created_at,c.id)
+        SELECT jsonb_agg(jsonb_build_object('id',c.id,'title',c.title,'body',c.content,'sectionKey',c.section_key) ORDER BY c.position,c.created_at,c.id)
         FROM learning_chapters c WHERE c.path_id=p.id AND c.archived_at IS NULL
       ),'[]'::jsonb) ELSE '[]'::jsonb END chapters` : ''}
     FROM learning_paths p
@@ -57,7 +57,7 @@ export const legacyCourseCandidate = async (db, courseId, options) => (await leg
 export const legacyCourseReviewCandidates = (db) => legacyCandidates(db, null, { preview: true });
 
 export async function legacyCandidateChapters(db, courseId) {
-  const { rows } = await db.query(`SELECT c.id,c.title,c.content body,c.localizations,c.acsl_links AS "acslLinks",COALESCE((
+  const { rows } = await db.query(`SELECT c.id,c.title,c.content body,c.section_key AS "sectionKey",c.localizations,c.acsl_links AS "acslLinks",COALESCE((
       SELECT jsonb_agg(jsonb_build_object('problemId',cp.problem_id,'versionId',cp.version_id)
         ORDER BY cp.position,cp.problem_id)
       FROM chapter_problems cp WHERE cp.chapter_id=c.id
@@ -74,14 +74,14 @@ export async function snapshotLegacyCourse(db, course) {
     fail(409, 'NOT_PUBLISHED', '请先发布包含完整章节的校内课程');
   }
   await db.query(`INSERT INTO legacy_course_publication_versions
-    (school_id,course_id,revision,source_version,title,description,access_scope,chapters,localizations,required_language,language_credit_cutoffs)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10,$11)`,
+    (school_id,course_id,revision,source_version,title,description,access_scope,chapters,localizations,required_language,language_credit_cutoffs,sections)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10,$11,$12::jsonb)`,
   [LEGACY_SCHOOL_ID, course.id, course.published_revision, course.source_version, course.title,
-    course.description, course.access_scope, JSON.stringify(chapters),course.localizations??null,course.required_language,course.language_credit_cutoffs]);
+    course.description, course.access_scope, JSON.stringify(chapters),course.localizations??null,course.required_language,course.language_credit_cutoffs,JSON.stringify(course.sections??[])]);
 }
 
 export async function legacyEdition(db, listing, { detail, lock }) {
-  return (await db.query(`SELECT v.title,v.description,v.revision,v.access_scope,v.localizations,v.required_language,v.language_credit_cutoffs,s.name school_name,
+  return (await db.query(`SELECT v.title,v.description,v.revision,v.access_scope,v.localizations,v.sections,v.required_language,v.language_credit_cutoffs,s.name school_name,
     p.category,p.difficulty,p.cover_key,p.cover_image,p.author_name,p.authored_at,
     jsonb_array_length(v.chapters) chapter_count ${detail ? ', v.chapters' : ''}
     FROM legacy_course_publication_versions v

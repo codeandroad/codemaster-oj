@@ -27,7 +27,7 @@ async function edition(db, listing, { detail = false, lock = false } = {}) {
   await setSchool(db, listing.school_id);
   if(listing.platform_owned)return platformCourseEdition(db,listing,{detail,lock});
   if (listing.school_id === LEGACY_SCHOOL_ID) return legacyEdition(db, listing, { detail, lock });
-  return (await db.query(`SELECT p.title, p.description, p.revision, p.access_scope, p.properties->'localizations' AS localizations,
+  return (await db.query(`SELECT p.title, p.description, p.revision, p.access_scope, p.properties->'localizations' AS localizations,p.properties->'sections' AS sections,
       p.required_language,p.language_credit_cutoffs,s.name school_name,
       p.properties->>'category' category, p.properties->>'difficulty' difficulty, p.properties->>'coverKey' cover_key,
       p.properties->>'coverImage' cover_image, p.properties->>'authorName' author_name,
@@ -75,7 +75,7 @@ async function admissionFor(db, listing, course, accountId) {
 
 function courseEntry(listing, course, admission) {
   return {
-    ...localizedFields(course.localizations),id: listing.id,
+    sections:course.sections??[],...localizedFields(course.localizations),id: listing.id,
     title: course.title,
     description: course.description,
     chapterCount: course.chapter_count,
@@ -233,7 +233,7 @@ async function publicCourse({ pool, user, method, body }, match) {
     const acslByChapter=new Map();
     for(const chapter of publishedChapters)acslByChapter.set(chapter.id,await projectCourseAcslLinks(db,listing.school_id,user,chapter.acslLinks??[]));
     const chapters = publishedChapters.map((c, position) => ({
-      ...localizedFields(publicChapterLocalizations(c.localizations)),id: c.id, title: c.title, body: c.body, position,
+      sectionKey:c.sectionKey??null,...localizedFields(publicChapterLocalizations(c.localizations)),id: c.id, title: c.title, body: c.body, position,
       ...(c.acslLinks?.length?{acslLinks:acslByChapter.get(c.id)}:{}),
       read: platformRead.find(p=>p.chapter_id===c.id)?.read??progress.some(p => p.chapter_id === c.id && p.content_hash === contentHash(c) && p.read),
       problems: (c.problems ?? []).flatMap(({ problemId, versionId }) => {
@@ -395,7 +395,7 @@ async function platformPublications({ pool, user, method, body }) {
         await setSchool(db, school.id);
         const rows = school.id === LEGACY_SCHOOL_ID
           ? await legacyCourseReviewCandidates(db)
-          : (await db.query(`SELECT c.id,c.published_revision,p.title,p.description,p.required_language,
+          : (await db.query(`SELECT c.id,c.published_revision,p.title,p.description,p.required_language,p.properties->'sections' AS sections,
             CASE WHEN p.access_scope='school' THEN p.chapters ELSE '[]'::jsonb END chapters,
             p.access_scope, jsonb_array_length(p.chapters) chapter_count,
             l.id listing_id,l.revision approved_revision,l.withdrawn_at,l.access_mode
@@ -414,7 +414,7 @@ async function platformPublications({ pool, user, method, body }) {
             schoolId: school.id, schoolName: school.name, courseId: c.id, revision: c.published_revision,
             ...(c.source_version && { sourceVersion: c.source_version }),
             title: c.title, description: c.description, requiredLanguage: c.required_language ?? null,
-            chapters: c.chapters.map(ch => ({ id: ch.id, title: ch.title, body: ch.body })),
+            sections:c.sections??[],chapters: c.chapters.map(ch => ({ id: ch.id, title: ch.title, body: ch.body,sectionKey:ch.sectionKey??null })),
             chapterCount: c.chapter_count, canPublishDirect: c.access_scope === 'school',
             listingId: c.listing_id ?? null, listingActive, approvedRevision: c.approved_revision ?? null,
             admissionMode: listingActive ? c.access_mode : null,

@@ -98,6 +98,11 @@ export class EducationController {
     return applyResponse(response, await this.domain.execute('education', request.domainContext));
   }
 
+  @Post('learning-paths/:id/merge')
+  async mergePath(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('education', request.domainContext));
+  }
+
   @Post('learning-paths/:id/restore')
   async restorePath(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('education', request.domainContext));

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Award, Flag, MessageCircle, Trash2 } from "lucide-react";
 import { AppLink } from "@/components/navigation";
 import { ProfileHero } from "@/components/profile-hero";
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } f
 import { useLocale, type AppLocale } from "@/components/locale-context";
 import { productionApi, type CampusRole, type CampusUser } from "@/lib/production-api";
 import { Feedback, State, date, panel, textarea, useData, useMutation, useRefreshOnReturn } from "./shared";
-import { ProfileSharingControls } from "./public-profile-sharing";
+import { ProfileSharingControls, type PracticeProfileSharing } from "./public-profile-sharing";
 
 interface PublicProfile {
   nickname: string;
@@ -77,6 +77,24 @@ function Pagination({ page, total, onChange, label, locale }: { page: number; to
   </nav>;
 }
 
+export function ProfileMessagesPanel({ sharing, children, refreshing, onRefresh }: {
+  sharing?: ReactNode;
+  children?: ReactNode;
+  refreshing?: boolean;
+  onRefresh?: () => void;
+}) {
+  const { locale } = useLocale();
+  const headingId = useId();
+  return <section className={`${panel} min-w-0`} aria-labelledby={headingId}>
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2"><MessageCircle size={18} className="text-primary"/><h3 id={headingId} className="font-bold">{ui(locale, "主页留言", "Profile messages")}</h3></div>
+      {onRefresh && <Button size="sm" variant="ghost" disabled={refreshing} onClick={onRefresh}>{ui(locale, "刷新", "Refresh")}</Button>}
+    </div>
+    {sharing}
+    {children}
+  </section>;
+}
+
 /** Public information is always loaded from the public profile API, never from private CampusUser fields. */
 export function StudentPublicProfile({ profileId, viewer, embedded = false, workspace = "student" }: { profileId: string; viewer: CampusUser; embedded?: boolean; workspace?: CampusRole | "practice" }) {
   const { locale } = useLocale();
@@ -98,6 +116,8 @@ export function StudentPublicProfile({ profileId, viewer, embedded = false, work
   const moderation = useMutation();
   const person = profile.data?.profile;
   const own = person?.isSelf ?? profileId === (practice ? viewer.id : viewer.identityId);
+  const showSharing = embedded && own;
+  const schoolSharing = useData<PracticeProfileSharing>(showSharing && !practice ? `practice/profiles/${encodeURIComponent(viewer.id)}` : "", version);
   const canWrite = practice || workspace === "student" && viewer.roles.includes("student");
   const publicHref = `/${workspace}/people/${encodeURIComponent(profileId)}`;
   const stats = person?.points !== undefined && <dl className={`mt-5 grid max-w-xl ${person.scholarship === undefined ? "grid-cols-2" : "grid-cols-3"} gap-3 border-t border-border pt-4 text-sm`}>
@@ -138,9 +158,8 @@ export function StudentPublicProfile({ profileId, viewer, embedded = false, work
         </State>
       </section>}
 
-      <section className={`${panel} min-w-0`} aria-labelledby="profile-messages-heading">
-        <div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2"><MessageCircle size={18} className="text-primary"/><h3 id="profile-messages-heading" className="font-bold">{ui(locale, "主页留言", "Profile messages")}</h3></div><Button size="sm" variant="ghost" disabled={messages.loading} onClick={messages.reload}>{ui(locale, "刷新", "Refresh")}</Button></div>
-        {practice && embedded && person.isSelf && <ProfileSharingControls endpoint={base} enabled={Boolean(person.profileEnabled)} loading={profile.loading} reload={profile.reload}/>}
+      <ProfileMessagesPanel refreshing={messages.loading} onRefresh={messages.reload} sharing={showSharing &&
+        <ProfileSharingControls accountId={viewer.id} resource={practice ? profile : schoolSharing} showLink={!practice}/>}>
         {!own && canWrite && <form className="mt-3" onSubmit={event => { event.preventDefault(); if (!draft.trim()) return; setNotice(""); void post.run(async () => {
           await productionApi(`${base}/messages`, { method: "POST", body: { body: draft.trim() } });
           setDraft(""); setMessagePage(1); messages.reload(); post.success(ui(locale, "留言已发布。", "Message posted."));
@@ -163,7 +182,7 @@ export function StudentPublicProfile({ profileId, viewer, embedded = false, work
           </li>)}</ol> : <p className="mt-3 rounded-md bg-surface-subtle p-3 text-sm text-muted-foreground">{ui(locale, "还没有留言。", "No messages yet.")}</p>}
           <Pagination label={ui(locale, "主页留言", "Profile messages")} locale={locale} page={messagePage} total={messages.data?.total ?? 0} onChange={setMessagePage}/>
         </State>
-      </section>
+      </ProfileMessagesPanel>
     </div>}
 
     <Dialog open={dialog !== null} onOpenChange={open => { if (!open && !moderation.busy) { setDialog(null); setSelected(null); } }}>

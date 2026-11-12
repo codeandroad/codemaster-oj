@@ -2,6 +2,7 @@
 
 import { ProfileEditor } from "@/components/profile-editor";
 import { PublicPracticeProfileSharing } from "@/components/student/public-profile-sharing";
+import { ProfileMessagesPanel } from "@/components/student/public-profile";
 import type { CampusUser } from "@/lib/production-api";
 import { RoleLabel, type SchoolRole } from "./school-ui";
 
@@ -34,6 +35,8 @@ export function PersonalWorkspaceProfile({
           : undefined
       }
     />
-    {!publicPractice && schoolRoles?.includes("student") && <PublicPracticeProfileSharing key={user.id} accountId={user.id}/>}
+    {!publicPractice && schoolRoles?.includes("student") && <div className="mt-5">
+      <ProfileMessagesPanel sharing={<PublicPracticeProfileSharing key={user.id} accountId={user.id}/>}/>
+    </div>}
   </>);
 }

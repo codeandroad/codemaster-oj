@@ -45,7 +45,6 @@ import { AdminJudgePage, AdminSettingsPage } from "@/components/admin/system-pag
 import { Feedback, panelClass as panel, useMutation as useAction } from "@/components/admin/common";
 import { StudentPages, AlignedProfile } from "@/components/student/pages";
 import { StudentPublicProfile } from "@/components/student/public-profile";
-import { PublicPracticeProfileSharing } from "@/components/student/public-profile-sharing";
 import {useWorkspaceSettings} from "@/components/student/workspace-settings";
 import {WorkspaceThemeProvider} from "@/components/ui/theme-context";
 import {PersonalAppearanceProvider, PersonalAppearanceSettings} from "@/components/personal-appearance-settings";
@@ -287,7 +286,7 @@ function ProductionView({pathname,role,user,profileVersion,onProfileSaved}:{path
   if (pathname === "/admin/scholarship") return <AdminScholarshipPage/>;
   if(pathname.endsWith("/points"))return <PointsPage user={user} student={role==="student"} workspace={role}/>;
   if(/^\/(student|teacher|admin)\/people\/[^/]+$/.test(pathname))return <StudentPublicProfile profileId={pathname.split("/")[3]} viewer={user} workspace={role}/>;
-  if(pathname==="/student/profile")return <><ProfileEditor user={user} onSaved={onProfileSaved}/><PublicPracticeProfileSharing key={user.id} accountId={user.id}/><StudentPublicProfile key={profileVersion} profileId={user.identityId} viewer={user} embedded/></>;
+  if(pathname==="/student/profile")return <><ProfileEditor user={user} onSaved={onProfileSaved}/><StudentPublicProfile key={profileVersion} profileId={user.identityId} viewer={user} embedded/></>;
   if(pathname.endsWith("/profile"))return <ProfileEditor user={user} onSaved={onProfileSaved}/>;
   if(pathname==="/student/settings"||pathname==="/teacher/settings"||pathname==="/admin/personal-settings")return <><AlignedProfile user={user} teacher={role==="teacher"} admin={role==="admin"}/><PersonalAppearanceSettings/><JoinedSchoolSettings user={user}/></>;
   if (role==="student") return <StudentPages pathname={pathname} user={user}/>;

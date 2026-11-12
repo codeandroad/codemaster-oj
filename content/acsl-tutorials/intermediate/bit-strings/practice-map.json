@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "unitId": "bit-strings",
+  "chapters": [
+    {
+      "key": "logic-and-precedence",
+      "position": 0,
+      "references": [
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-2",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-2",
+          "questionId": "q3"
+        }
+      ]
+    },
+    {
+      "key": "shifts-and-rotations",
+      "position": 1,
+      "references": [
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-2",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-2",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-2",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-2",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-2",
+          "questionId": "q3"
+        }
+      ]
+    },
+    {
+      "key": "unknown-bits-and-information",
+      "position": 2,
+      "references": [
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-2",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-2",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-2",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-2",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-2",
+          "questionId": "q4"
+        }
+      ]
+    }
+  ]
+}

@@ -201,7 +201,7 @@
       "sourceTopics": [
         "Prefix/Infix/Postfix Notation"
       ],
-      "status": "planned",
+      "status": "draft",
       "practiceReferences": [
         {
           "paperSlug": "acsl-2020-2021-intermediate-2",
@@ -251,7 +251,11 @@
           "paperSlug": "acsl-2025-2026-intermediate-2",
           "questionId": "q2"
         }
-      ]
+      ],
+      "documents": {
+        "en": "intermediate/expressions/course.en.md",
+        "zh": "intermediate/expressions/course.zh.md"
+      }
     },
     {
       "id": "bit-strings",
@@ -264,7 +268,7 @@
       "sourceTopics": [
         "Bit-String Flicking"
       ],
-      "status": "planned",
+      "status": "draft",
       "practiceReferences": [
         {
           "paperSlug": "acsl-2020-2021-intermediate-2",
@@ -314,7 +318,11 @@
           "paperSlug": "acsl-2025-2026-intermediate-2",
           "questionId": "q4"
         }
-      ]
+      ],
+      "documents": {
+        "en": "intermediate/bit-strings/course.en.md",
+        "zh": "intermediate/bit-strings/course.zh.md"
+      }
     },
     {
       "id": "lisp",
@@ -327,7 +335,7 @@
       "sourceTopics": [
         "LISP"
       ],
-      "status": "planned",
+      "status": "draft",
       "practiceReferences": [
         {
           "paperSlug": "acsl-2020-2021-intermediate-2",
@@ -361,7 +369,11 @@
           "paperSlug": "acsl-2025-2026-intermediate-2",
           "questionId": "q6"
         }
-      ]
+      ],
+      "documents": {
+        "en": "intermediate/lisp/course.en.md",
+        "zh": "intermediate/lisp/course.zh.md"
+      }
     },
     {
       "id": "boolean-algebra",

@@ -9,7 +9,9 @@ import { matchesTutorialDraft, tutorialJournalKey } from '../import-acsl-tutoria
 test('CLI defaults preserve number systems and reject ambiguous or incomplete arguments', () => {
   assert.equal(parseTutorialOptions([]).unitId, 'number-systems');
   assert.equal(parseTutorialOptions(['--all']).all, true);
-  assert.equal(parseTutorialOptions(['--unit', 'recursion']).unitId, 'recursion');
+  for (const unit of ['recursion', 'expressions', 'bit-strings', 'lisp']) {
+    assert.equal(parseTutorialOptions(['--unit', unit]).unitId, unit);
+  }
   assert.equal(parseTutorialOptions(['--unit', 'program-tracing', '--language', 'zh'], { importing: true }).language, 'zh');
   for (const args of [['--unit'], ['--unit', '--all'], ['--unit', 'unknown'], ['--unit', '../../private'],
     ['--all', '--unit', 'number-systems'], ['--unit', 'recursion', '--unit', 'recursion'], ['--wat'], ['recursion']]) {
@@ -25,8 +27,8 @@ test('number-system journal keys remain byte-compatible while each unit has its 
   const legacy = createHash('sha256').update(`${identity.origin}\0${identity.username}\0${identity.language}`).digest('hex');
   assert.equal(tutorialJournalKey(identity), legacy);
   assert.equal(tutorialJournalKey({ ...identity, unitId: 'number-systems' }), legacy);
-  const keys = ['number-systems', 'recursion', 'program-tracing'].map(unitId => tutorialJournalKey({ ...identity, unitId }));
-  assert.equal(new Set(keys).size, 3);
+  const keys = ['number-systems', 'recursion', 'program-tracing', 'expressions', 'bit-strings', 'lisp'].map(unitId => tutorialJournalKey({ ...identity, unitId }));
+  assert.equal(new Set(keys).size, 6);
   assert.notEqual(tutorialJournalKey({ ...identity, unitId: 'recursion', language: 'en' }), keys[1]);
   assert.throws(() => tutorialJournalKey({ ...identity, unitId: 'other' }));
 });

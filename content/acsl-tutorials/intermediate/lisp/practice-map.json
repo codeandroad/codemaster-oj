@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "unitId": "lisp",
+  "chapters": [
+    {
+      "position": 0,
+      "key": "list-shape-and-selection",
+      "note": "Quoted lists, complete top-level elements, CAR versus CDR, and preserved sublist shape.",
+      "references": [
+        { "paperSlug": "acsl-2020-2021-intermediate-2", "questionId": "q5" },
+        { "paperSlug": "acsl-2021-2022-intermediate-2", "questionId": "q5" }
+      ]
+    },
+    {
+      "position": 1,
+      "key": "nested-list-evaluation",
+      "note": "Trace each nested selector and top-level REVERSE; CONS and composite selectors are supporting extensions.",
+      "references": [
+        { "paperSlug": "acsl-2022-2023-intermediate-2", "questionId": "q5" },
+        { "paperSlug": "acsl-2023-2024-intermediate-2", "questionId": "q5" },
+        { "paperSlug": "acsl-2024-2025-intermediate-2", "questionId": "q6" },
+        { "paperSlug": "acsl-2025-2026-intermediate-2", "questionId": "q6" }
+      ]
+    },
+    {
+      "position": 2,
+      "key": "arithmetic-and-quoted-expressions",
+      "note": "Evaluate nested prefix arithmetic, preserve SUB/DIV order and fractions; distinguish quoted data from evaluation.",
+      "references": [
+        { "paperSlug": "acsl-2024-2025-intermediate-2", "questionId": "q5" },
+        { "paperSlug": "acsl-2025-2026-intermediate-2", "questionId": "q5" }
+      ]
+    }
+  ]
+}

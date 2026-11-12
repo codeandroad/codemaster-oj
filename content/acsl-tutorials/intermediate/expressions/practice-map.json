@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "unitId": "expressions",
+  "chapters": [
+    {
+      "position": 0,
+      "key": "structure-and-notation",
+      "note": "Identify the root and complete subexpressions; preserve implicit multiplication and a grouped denominator.",
+      "references": [
+        { "paperSlug": "acsl-2024-2025-intermediate-2", "questionId": "q2" }
+      ]
+    },
+    {
+      "position": 1,
+      "key": "stack-evaluation",
+      "note": "Evaluate prefix and postfix while preserving operand order, including variables with negative values.",
+      "references": [
+        { "paperSlug": "acsl-2020-2021-intermediate-2", "questionId": "q1" },
+        { "paperSlug": "acsl-2021-2022-intermediate-2", "questionId": "q1" },
+        { "paperSlug": "acsl-2022-2023-intermediate-2", "questionId": "q1" },
+        { "paperSlug": "acsl-2023-2024-intermediate-2", "questionId": "q1" },
+        { "paperSlug": "acsl-2024-2025-intermediate-2", "questionId": "q1" },
+        { "paperSlug": "acsl-2025-2026-intermediate-2", "questionId": "q1" }
+      ]
+    },
+    {
+      "position": 2,
+      "key": "conversion-and-verification",
+      "note": "Convert complete ordered subexpressions, fractions, powers, and assignment formulas; verify by reconstruction.",
+      "references": [
+        { "paperSlug": "acsl-2020-2021-intermediate-2", "questionId": "q2" },
+        { "paperSlug": "acsl-2021-2022-intermediate-2", "questionId": "q2" },
+        { "paperSlug": "acsl-2022-2023-intermediate-2", "questionId": "q2" },
+        { "paperSlug": "acsl-2023-2024-intermediate-2", "questionId": "q2" },
+        { "paperSlug": "acsl-2025-2026-intermediate-2", "questionId": "q2" }
+      ]
+    }
+  ]
+}

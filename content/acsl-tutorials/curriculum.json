@@ -1,0 +1,707 @@
+{
+  "format": "codemaster-acsl-curriculum",
+  "version": 1,
+  "division": "Intermediate",
+  "officialTopicReference": "https://www.acsl.org/get-started/study-materials",
+  "referenceCheckedOn": "2026-11-11",
+  "units": [
+    {
+      "id": "number-systems",
+      "round": 1,
+      "title": {
+        "en": "Computer Number Systems",
+        "zh": "计算机数制"
+      },
+      "plannedLessons": 4,
+      "sourceTopics": [
+        "Computer Number Systems"
+      ],
+      "status": "sample",
+      "practiceReferences": [
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-1",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-1",
+          "questionId": "q2"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-1",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-1",
+          "questionId": "q2"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-1",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-1",
+          "questionId": "q2"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-1",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-1",
+          "questionId": "q2"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-1",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-1",
+          "questionId": "q2"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-1",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-1",
+          "questionId": "q2"
+        }
+      ],
+      "documents": {
+        "en": "intermediate/number-systems/course.en.md",
+        "zh": "intermediate/number-systems/course.zh.md"
+      }
+    },
+    {
+      "id": "recursion",
+      "round": 1,
+      "title": {
+        "en": "Recursive Functions",
+        "zh": "递归函数"
+      },
+      "plannedLessons": 3,
+      "sourceTopics": [
+        "Recursive Functions"
+      ],
+      "status": "planned",
+      "practiceReferences": [
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-1",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-1",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-1",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-1",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-1",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-1",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-1",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-1",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-1",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-1",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-1",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-1",
+          "questionId": "q4"
+        }
+      ]
+    },
+    {
+      "id": "program-tracing",
+      "round": 1,
+      "title": {
+        "en": "Program Tracing",
+        "zh": "程序追踪"
+      },
+      "plannedLessons": 3,
+      "sourceTopics": [
+        "What Does This Program Do?"
+      ],
+      "status": "planned",
+      "practiceReferences": [
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-1",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-1",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-1",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-1",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-1",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-1",
+          "questionId": "q6"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-1",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-1",
+          "questionId": "q6"
+        }
+      ]
+    },
+    {
+      "id": "expressions",
+      "round": 2,
+      "title": {
+        "en": "Prefix, Infix and Postfix",
+        "zh": "前缀、中缀与后缀"
+      },
+      "plannedLessons": 3,
+      "sourceTopics": [
+        "Prefix/Infix/Postfix Notation"
+      ],
+      "status": "planned",
+      "practiceReferences": [
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-2",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-2",
+          "questionId": "q2"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-2",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-2",
+          "questionId": "q2"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-2",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-2",
+          "questionId": "q2"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-2",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-2",
+          "questionId": "q2"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-2",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-2",
+          "questionId": "q2"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-2",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-2",
+          "questionId": "q2"
+        }
+      ]
+    },
+    {
+      "id": "bit-strings",
+      "round": 2,
+      "title": {
+        "en": "Bit-String Operations",
+        "zh": "位串运算"
+      },
+      "plannedLessons": 3,
+      "sourceTopics": [
+        "Bit-String Flicking"
+      ],
+      "status": "planned",
+      "practiceReferences": [
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-2",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-2",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-2",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-2",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-2",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-2",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-2",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-2",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-2",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-2",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-2",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-2",
+          "questionId": "q4"
+        }
+      ]
+    },
+    {
+      "id": "lisp",
+      "round": 2,
+      "title": {
+        "en": "LISP",
+        "zh": "LISP"
+      },
+      "plannedLessons": 3,
+      "sourceTopics": [
+        "LISP"
+      ],
+      "status": "planned",
+      "practiceReferences": [
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-2",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-2",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-2",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-2",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-2",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-2",
+          "questionId": "q6"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-2",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-2",
+          "questionId": "q6"
+        }
+      ]
+    },
+    {
+      "id": "boolean-algebra",
+      "round": 3,
+      "title": {
+        "en": "Boolean Algebra",
+        "zh": "布尔代数"
+      },
+      "plannedLessons": 3,
+      "sourceTopics": [
+        "Boolean Algebra"
+      ],
+      "status": "planned",
+      "practiceReferences": [
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-3",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-3",
+          "questionId": "q2"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-3",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-3",
+          "questionId": "q2"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-3",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-3",
+          "questionId": "q2"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-3",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-3",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-3",
+          "questionId": "q2"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-3",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-3",
+          "questionId": "q2"
+        }
+      ]
+    },
+    {
+      "id": "data-structures",
+      "round": 3,
+      "title": {
+        "en": "Data Structures",
+        "zh": "数据结构"
+      },
+      "plannedLessons": 4,
+      "sourceTopics": [
+        "Data Structures"
+      ],
+      "status": "planned",
+      "practiceReferences": [
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-3",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-3",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-3",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-3",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-3",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-3",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-3",
+          "questionId": "q2"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-3",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-3",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-3",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-3",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-3",
+          "questionId": "q4"
+        }
+      ]
+    },
+    {
+      "id": "automata-regex",
+      "round": 3,
+      "title": {
+        "en": "Finite-State Automata and Regular Expressions",
+        "zh": "有限状态机与正则表达式"
+      },
+      "plannedLessons": 4,
+      "sourceTopics": [
+        "FSAs and Regular Expressions",
+        "FSAs",
+        "Regular Expressions"
+      ],
+      "status": "planned",
+      "practiceReferences": [
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-3",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-3",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-3",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-3",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-3",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-3",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-3",
+          "questionId": "q6"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-3",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-3",
+          "questionId": "q6"
+        }
+      ]
+    },
+    {
+      "id": "graphs",
+      "round": 4,
+      "title": {
+        "en": "Graph Theory",
+        "zh": "图论"
+      },
+      "plannedLessons": 3,
+      "sourceTopics": [
+        "Graph Theory"
+      ],
+      "status": "planned",
+      "practiceReferences": [
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-4",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-4",
+          "questionId": "q2"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-4",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-4",
+          "questionId": "q2"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-4",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-4",
+          "questionId": "q2"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-4",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-4",
+          "questionId": "q2"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-4",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-4",
+          "questionId": "q2"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-4",
+          "questionId": "q1"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-4",
+          "questionId": "q2"
+        }
+      ]
+    },
+    {
+      "id": "digital-electronics",
+      "round": 4,
+      "title": {
+        "en": "Digital Electronics",
+        "zh": "数字电路"
+      },
+      "plannedLessons": 3,
+      "sourceTopics": [
+        "Digital Electronics"
+      ],
+      "status": "planned",
+      "practiceReferences": [
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-4",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-4",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-4",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-4",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-4",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-4",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-4",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-4",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-4",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-4",
+          "questionId": "q4"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-4",
+          "questionId": "q3"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-4",
+          "questionId": "q4"
+        }
+      ]
+    },
+    {
+      "id": "assembly",
+      "round": 4,
+      "title": {
+        "en": "Assembly Language",
+        "zh": "汇编语言"
+      },
+      "plannedLessons": 3,
+      "sourceTopics": [
+        "Assembly Language"
+      ],
+      "status": "planned",
+      "practiceReferences": [
+        {
+          "paperSlug": "acsl-2020-2021-intermediate-4",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2021-2022-intermediate-4",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2022-2023-intermediate-4",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2023-2024-intermediate-4",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-4",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2024-2025-intermediate-4",
+          "questionId": "q6"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-4",
+          "questionId": "q5"
+        },
+        {
+          "paperSlug": "acsl-2025-2026-intermediate-4",
+          "questionId": "q6"
+        }
+      ]
+    }
+  ]
+}

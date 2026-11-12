@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "unitId": "number-systems",
+  "chapters": [
+    {
+      "position": 0,
+      "key": "digits-and-place-value",
+      "note": "Foundation lesson: use the original checkpoint before conversion practice.",
+      "references": []
+    },
+    {
+      "position": 1,
+      "key": "base-conversion",
+      "note": "Integer conversion, binary digit counting, and binary grouping between octal and hexadecimal.",
+      "references": [
+        { "paperSlug": "acsl-2020-2021-intermediate-1", "questionId": "q1" },
+        { "paperSlug": "acsl-2021-2022-intermediate-1", "questionId": "q1" },
+        { "paperSlug": "acsl-2022-2023-intermediate-1", "questionId": "q1" },
+        { "paperSlug": "acsl-2022-2023-intermediate-1", "questionId": "q2" },
+        { "paperSlug": "acsl-2023-2024-intermediate-1", "questionId": "q2" },
+        { "paperSlug": "acsl-2024-2025-intermediate-1", "questionId": "q1" }
+      ]
+    },
+    {
+      "position": 2,
+      "key": "column-arithmetic",
+      "note": "Apply aligned column addition with carries in base eight.",
+      "references": [
+        { "paperSlug": "acsl-2024-2025-intermediate-1", "questionId": "q2" }
+      ]
+    },
+    {
+      "position": 3,
+      "key": "mixed-bases",
+      "note": "Combine arithmetic and conversion; transfer the method to sequences, counting, and palindrome constraints.",
+      "references": [
+        { "paperSlug": "acsl-2020-2021-intermediate-1", "questionId": "q2" },
+        { "paperSlug": "acsl-2021-2022-intermediate-1", "questionId": "q2" },
+        { "paperSlug": "acsl-2023-2024-intermediate-1", "questionId": "q1" },
+        { "paperSlug": "acsl-2025-2026-intermediate-1", "questionId": "q1" },
+        { "paperSlug": "acsl-2025-2026-intermediate-1", "questionId": "q2" }
+      ]
+    }
+  ]
+}

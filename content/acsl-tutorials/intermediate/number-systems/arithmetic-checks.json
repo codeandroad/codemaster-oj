@@ -1,0 +1,696 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "l1-cabinet-unit",
+      "kind": "convert",
+      "input": "1000",
+      "fromBase": 5,
+      "toBase": 10,
+      "expected": "125"
+    },
+    {
+      "id": "l1-crate-unit",
+      "kind": "convert",
+      "input": "100",
+      "fromBase": 5,
+      "toBase": 10,
+      "expected": "25"
+    },
+    {
+      "id": "l1-box-unit",
+      "kind": "convert",
+      "input": "10",
+      "fromBase": 5,
+      "toBase": 10,
+      "expected": "5"
+    },
+    {
+      "id": "l1-warehouse",
+      "kind": "convert",
+      "input": "2304",
+      "fromBase": 5,
+      "toBase": 10,
+      "expected": "329"
+    },
+    {
+      "id": "l1-hex-place-value",
+      "kind": "convert",
+      "input": "3C2",
+      "fromBase": 16,
+      "toBase": 10,
+      "expected": "962"
+    },
+    {
+      "id": "l1-leading-zero",
+      "kind": "convert",
+      "input": "0031",
+      "fromBase": 5,
+      "toBase": 5,
+      "expected": "31"
+    },
+    {
+      "id": "l1-checkpoint-1",
+      "kind": "convert",
+      "input": "402",
+      "fromBase": 7,
+      "toBase": 10,
+      "expected": "198"
+    },
+    {
+      "id": "l1-checkpoint-3-with-zero",
+      "kind": "convert",
+      "input": "306",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "198"
+    },
+    {
+      "id": "l1-checkpoint-3-without-zero",
+      "kind": "convert",
+      "input": "36",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "30"
+    },
+    {
+      "id": "l2-division",
+      "kind": "convert",
+      "input": "154",
+      "fromBase": 10,
+      "toBase": 8,
+      "expected": "232"
+    },
+    {
+      "id": "l2-division-check",
+      "kind": "convert",
+      "input": "232",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "154"
+    },
+    {
+      "id": "l2-binary-octal",
+      "kind": "convert",
+      "input": "1011010110",
+      "fromBase": 2,
+      "toBase": 8,
+      "expected": "1326"
+    },
+    {
+      "id": "l2-binary-hex",
+      "kind": "convert",
+      "input": "1011010110",
+      "fromBase": 2,
+      "toBase": 16,
+      "expected": "2D6"
+    },
+    {
+      "id": "l2-octal-check",
+      "kind": "convert",
+      "input": "1326",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "726"
+    },
+    {
+      "id": "l2-hex-check",
+      "kind": "convert",
+      "input": "2D6",
+      "fromBase": 16,
+      "toBase": 10,
+      "expected": "726"
+    },
+    {
+      "id": "l2-zero-boundary",
+      "kind": "convert",
+      "input": "0",
+      "fromBase": 10,
+      "toBase": 8,
+      "expected": "0"
+    },
+    {
+      "id": "l2-checkpoint-1",
+      "kind": "convert",
+      "input": "173",
+      "fromBase": 10,
+      "toBase": 8,
+      "expected": "255"
+    },
+    {
+      "id": "l2-checkpoint-1-back",
+      "kind": "convert",
+      "input": "255",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "173"
+    },
+    {
+      "id": "l2-checkpoint-2",
+      "kind": "convert",
+      "input": "111001011",
+      "fromBase": 2,
+      "toBase": 16,
+      "expected": "1CB"
+    },
+    {
+      "id": "l2-checkpoint-2-binary-check",
+      "kind": "convert",
+      "input": "111001011",
+      "fromBase": 2,
+      "toBase": 10,
+      "expected": "459"
+    },
+    {
+      "id": "l2-checkpoint-2-hex-check",
+      "kind": "convert",
+      "input": "1CB",
+      "fromBase": 16,
+      "toBase": 10,
+      "expected": "459"
+    },
+    {
+      "id": "l2-checkpoint-3",
+      "kind": "convert",
+      "input": "2D6",
+      "fromBase": 16,
+      "toBase": 2,
+      "expected": "1011010110"
+    },
+    {
+      "id": "l3-octal-layout",
+      "kind": "add",
+      "base": 8,
+      "operands": [
+        "267",
+        "145"
+      ],
+      "expected": "434",
+      "carries": [
+        1,
+        1,
+        0
+      ]
+    },
+    {
+      "id": "l3-octal-left",
+      "kind": "convert",
+      "input": "267",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "183"
+    },
+    {
+      "id": "l3-octal-right",
+      "kind": "convert",
+      "input": "145",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "101"
+    },
+    {
+      "id": "l3-octal-result",
+      "kind": "convert",
+      "input": "434",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "284"
+    },
+    {
+      "id": "l3-hex-layout",
+      "kind": "add",
+      "base": 16,
+      "operands": [
+        "2B7",
+        "19D"
+      ],
+      "expected": "454",
+      "carries": [
+        1,
+        1,
+        0
+      ]
+    },
+    {
+      "id": "l3-hex-left",
+      "kind": "convert",
+      "input": "2B7",
+      "fromBase": 16,
+      "toBase": 10,
+      "expected": "695"
+    },
+    {
+      "id": "l3-hex-right",
+      "kind": "convert",
+      "input": "19D",
+      "fromBase": 16,
+      "toBase": 10,
+      "expected": "413"
+    },
+    {
+      "id": "l3-hex-result",
+      "kind": "convert",
+      "input": "454",
+      "fromBase": 16,
+      "toBase": 10,
+      "expected": "1108"
+    },
+    {
+      "id": "l3-three-addends-layout",
+      "kind": "add",
+      "base": 8,
+      "operands": [
+        "75",
+        "67",
+        "56"
+      ],
+      "expected": "242",
+      "carries": [
+        2,
+        2
+      ]
+    },
+    {
+      "id": "l3-three-addends-first",
+      "kind": "convert",
+      "input": "75",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "61"
+    },
+    {
+      "id": "l3-three-addends-second",
+      "kind": "convert",
+      "input": "67",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "55"
+    },
+    {
+      "id": "l3-three-addends-third",
+      "kind": "convert",
+      "input": "56",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "46"
+    },
+    {
+      "id": "l3-three-addends-result",
+      "kind": "convert",
+      "input": "242",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "162"
+    },
+    {
+      "id": "l3-checkpoint-1",
+      "kind": "add",
+      "base": 8,
+      "operands": [
+        "347",
+        "256"
+      ],
+      "expected": "625",
+      "carries": [
+        1,
+        1,
+        0
+      ]
+    },
+    {
+      "id": "l3-checkpoint-1-left",
+      "kind": "convert",
+      "input": "347",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "231"
+    },
+    {
+      "id": "l3-checkpoint-1-right",
+      "kind": "convert",
+      "input": "256",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "174"
+    },
+    {
+      "id": "l3-checkpoint-1-result",
+      "kind": "convert",
+      "input": "625",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "405"
+    },
+    {
+      "id": "l3-checkpoint-2",
+      "kind": "add",
+      "base": 16,
+      "operands": [
+        "58A",
+        "2CF"
+      ],
+      "expected": "859",
+      "carries": [
+        1,
+        1,
+        0
+      ]
+    },
+    {
+      "id": "l3-checkpoint-2-left",
+      "kind": "convert",
+      "input": "58A",
+      "fromBase": 16,
+      "toBase": 10,
+      "expected": "1418"
+    },
+    {
+      "id": "l3-checkpoint-2-right",
+      "kind": "convert",
+      "input": "2CF",
+      "fromBase": 16,
+      "toBase": 10,
+      "expected": "719"
+    },
+    {
+      "id": "l3-checkpoint-2-result",
+      "kind": "convert",
+      "input": "859",
+      "fromBase": 16,
+      "toBase": 10,
+      "expected": "2137"
+    },
+    {
+      "id": "l4-warehouse-left",
+      "kind": "convert",
+      "input": "236",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "158"
+    },
+    {
+      "id": "l4-warehouse-right",
+      "kind": "convert",
+      "input": "3D",
+      "fromBase": 16,
+      "toBase": 10,
+      "expected": "61"
+    },
+    {
+      "id": "l4-warehouse-result",
+      "kind": "convert",
+      "input": "219",
+      "fromBase": 10,
+      "toBase": 16,
+      "expected": "DB"
+    },
+    {
+      "id": "l4-second-route-conversion",
+      "kind": "convert",
+      "input": "3D",
+      "fromBase": 16,
+      "toBase": 8,
+      "expected": "75"
+    },
+    {
+      "id": "l4-second-route-sum",
+      "kind": "add",
+      "base": 8,
+      "operands": [
+        "236",
+        "75"
+      ],
+      "expected": "333",
+      "carries": [
+        1,
+        1,
+        0
+      ]
+    },
+    {
+      "id": "l4-second-route-bits",
+      "kind": "convert",
+      "input": "333",
+      "fromBase": 8,
+      "toBase": 2,
+      "expected": "11011011"
+    },
+    {
+      "id": "l4-second-route-hex",
+      "kind": "convert",
+      "input": "11011011",
+      "fromBase": 2,
+      "toBase": 16,
+      "expected": "DB"
+    },
+    {
+      "id": "l4-unknown-base-substitution",
+      "kind": "convert",
+      "input": "31",
+      "fromBase": 7,
+      "toBase": 10,
+      "expected": "22"
+    },
+    {
+      "id": "l4-checkpoint-1-left",
+      "kind": "convert",
+      "input": "157",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "111"
+    },
+    {
+      "id": "l4-checkpoint-1-right",
+      "kind": "convert",
+      "input": "2A",
+      "fromBase": 16,
+      "toBase": 10,
+      "expected": "42"
+    },
+    {
+      "id": "l4-checkpoint-1-result",
+      "kind": "convert",
+      "input": "153",
+      "fromBase": 10,
+      "toBase": 16,
+      "expected": "99"
+    },
+    {
+      "id": "l4-checkpoint-1-check",
+      "kind": "convert",
+      "input": "99",
+      "fromBase": 16,
+      "toBase": 10,
+      "expected": "153"
+    },
+    {
+      "id": "l4-checkpoint-2-base-substitution",
+      "kind": "convert",
+      "input": "42",
+      "fromBase": 7,
+      "toBase": 10,
+      "expected": "30"
+    },
+    {
+      "id": "l4-checkpoint-3-left",
+      "kind": "convert",
+      "input": "31",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "25"
+    },
+    {
+      "id": "l4-checkpoint-3-right",
+      "kind": "convert",
+      "input": "12",
+      "fromBase": 16,
+      "toBase": 10,
+      "expected": "18"
+    },
+    {
+      "id": "l4-checkpoint-3-correct-result",
+      "kind": "convert",
+      "input": "43",
+      "fromBase": 10,
+      "toBase": 16,
+      "expected": "2B"
+    },
+    {
+      "id": "l4-checkpoint-3-rejected-label",
+      "kind": "convert",
+      "input": "43",
+      "fromBase": 16,
+      "toBase": 10,
+      "expected": "67"
+    },
+    {
+      "id": "l3-octal-decimal-check",
+      "kind": "add",
+      "base": 10,
+      "operands": [
+        "183",
+        "101"
+      ],
+      "expected": "284"
+    },
+    {
+      "id": "l3-hex-decimal-check",
+      "kind": "add",
+      "base": 10,
+      "operands": [
+        "695",
+        "413"
+      ],
+      "expected": "1108"
+    },
+    {
+      "id": "l3-three-addends-decimal-check",
+      "kind": "add",
+      "base": 10,
+      "operands": [
+        "61",
+        "55",
+        "46"
+      ],
+      "expected": "162"
+    },
+    {
+      "id": "l3-checkpoint-1-decimal-check",
+      "kind": "add",
+      "base": 10,
+      "operands": [
+        "231",
+        "174"
+      ],
+      "expected": "405"
+    },
+    {
+      "id": "l3-checkpoint-2-decimal-check",
+      "kind": "add",
+      "base": 10,
+      "operands": [
+        "1418",
+        "719"
+      ],
+      "expected": "2137"
+    },
+    {
+      "id": "l4-warehouse-decimal-sum",
+      "kind": "add",
+      "base": 10,
+      "operands": [
+        "158",
+        "61"
+      ],
+      "expected": "219"
+    },
+    {
+      "id": "l4-checkpoint-1-decimal-sum",
+      "kind": "add",
+      "base": 10,
+      "operands": [
+        "111",
+        "42"
+      ],
+      "expected": "153"
+    },
+    {
+      "id": "l4-checkpoint-3-decimal-sum",
+      "kind": "add",
+      "base": 10,
+      "operands": [
+        "25",
+        "18"
+      ],
+      "expected": "43"
+    },
+    {
+      "id": "l3-borrow-layout",
+      "kind": "subtract",
+      "base": 8,
+      "operands": [
+        "402",
+        "157"
+      ],
+      "expected": "223"
+    },
+    {
+      "id": "l3-borrow-left",
+      "kind": "convert",
+      "input": "402",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "258"
+    },
+    {
+      "id": "l3-borrow-right",
+      "kind": "convert",
+      "input": "157",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "111"
+    },
+    {
+      "id": "l3-borrow-result",
+      "kind": "convert",
+      "input": "223",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "147"
+    },
+    {
+      "id": "l3-borrow-decimal-check",
+      "kind": "subtract",
+      "base": 10,
+      "operands": [
+        "258",
+        "111"
+      ],
+      "expected": "147"
+    },
+    {
+      "id": "l3-checkpoint-4-borrow",
+      "kind": "subtract",
+      "base": 8,
+      "operands": [
+        "503",
+        "246"
+      ],
+      "expected": "235"
+    },
+    {
+      "id": "l3-checkpoint-4-left",
+      "kind": "convert",
+      "input": "503",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "323"
+    },
+    {
+      "id": "l3-checkpoint-4-right",
+      "kind": "convert",
+      "input": "246",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "166"
+    },
+    {
+      "id": "l3-checkpoint-4-result",
+      "kind": "convert",
+      "input": "235",
+      "fromBase": 8,
+      "toBase": 10,
+      "expected": "157"
+    },
+    {
+      "id": "l3-checkpoint-4-decimal-check",
+      "kind": "subtract",
+      "base": 10,
+      "operands": [
+        "323",
+        "166"
+      ],
+      "expected": "157"
+    }
+  ]
+}

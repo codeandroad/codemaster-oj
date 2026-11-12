@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "unitId": "graphs",
+  "chapters": [
+    {
+      "position": 0,
+      "key": "directions-and-representations",
+      "note": "Translate each allowed transition into a directed edge and verify every adjacent pair of an ordered route.",
+      "references": [
+        { "paperSlug": "acsl-2025-2026-intermediate-4", "questionId": "q1" }
+      ]
+    },
+    {
+      "position": 1,
+      "key": "exact-length-paths",
+      "note": "Count fixed-length paths with permitted repetition using middle vertices, matrix powers and old-degree edge increments; distinguish exact-length reachability from any-length reachability.",
+      "references": [
+        { "paperSlug": "acsl-2020-2021-intermediate-4", "questionId": "q1" },
+        { "paperSlug": "acsl-2021-2022-intermediate-4", "questionId": "q1" },
+        { "paperSlug": "acsl-2022-2023-intermediate-4", "questionId": "q1" },
+        { "paperSlug": "acsl-2023-2024-intermediate-4", "questionId": "q1" },
+        { "paperSlug": "acsl-2024-2025-intermediate-4", "questionId": "q1" }
+      ]
+    },
+    {
+      "position": 2,
+      "key": "cycles-and-constraints",
+      "note": "Enumerate simple directed cycles; preserve a fixed start or deduplicate by rotation as requested; handle forbidden vertices and vertices belonging to no cycle.",
+      "references": [
+        { "paperSlug": "acsl-2020-2021-intermediate-4", "questionId": "q2" },
+        { "paperSlug": "acsl-2021-2022-intermediate-4", "questionId": "q2" },
+        { "paperSlug": "acsl-2022-2023-intermediate-4", "questionId": "q2" },
+        { "paperSlug": "acsl-2023-2024-intermediate-4", "questionId": "q2" },
+        { "paperSlug": "acsl-2024-2025-intermediate-4", "questionId": "q2" },
+        { "paperSlug": "acsl-2025-2026-intermediate-4", "questionId": "q2" }
+      ]
+    }
+  ]
+}

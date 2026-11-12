@@ -10,17 +10,17 @@ import {readUnifiedAcslCourse} from '../lib/acsl-unified-course.mjs';
 import {readAcslBilingualTutorial} from '../lib/acsl-tutorial-document.mjs';
 import {matchesTutorialDraft} from '../import-acsl-tutorials.mjs';
 
-const keys=['number-systems','recursion','program-tracing','expressions','bit-strings','lisp','boolean-algebra','data-structures','automata-regex'];
+const keys=['number-systems','recursion','program-tracing','expressions','bit-strings','lisp','boolean-algebra','data-structures','automata-regex','graphs'];
 const referenceKey=ref=>`${ref.paperSlug}/${ref.kind??'question'}/${ref.questionId}`;
 const runCli=(name,args=[],options={})=>execFileSync(process.execPath,[fileURLToPath(new URL(`../${name}.mjs`,import.meta.url)),...args],{encoding:'utf8',stdio:'pipe',...options});
 
-test('unified Intermediate course contains all nine authored topics and preserves every bilingual lesson and practice reference',async()=>{
+test('unified Intermediate course contains all authored topics and preserves every bilingual lesson and practice reference',async()=>{
  const {document,units}=await readUnifiedAcslCourse();
  const manifest=JSON.parse(readFileSync(new URL('../../content/acsl-tutorials/curriculum.json',import.meta.url),'utf8'));
  const authored=manifest.units.filter(unit=>unit.documents);
  assert.deepEqual(units.map(unit=>unit.id),keys);assert.deepEqual(document.sections.map(section=>section.key),keys);
- assert.equal(document.chapters.length,30);assert.deepEqual(units.map(unit=>unit.chapterCount),[4,3,3,3,3,3,3,4,4]);
- assert.deepEqual(document.sections.map(section=>section.groupKey),['contest-1','contest-1','contest-1','contest-2','contest-2','contest-2','contest-3','contest-3','contest-3']);
+ assert.equal(document.chapters.length,33);assert.deepEqual(units.map(unit=>unit.chapterCount),[4,3,3,3,3,3,3,4,4,3]);
+ assert.deepEqual(document.sections.map(section=>section.groupKey),['contest-1','contest-1','contest-1','contest-2','contest-2','contest-2','contest-3','contest-3','contest-3','contest-4']);
  assert.equal(document.localizations.en.title,document.title);assert.match(document.localizations.zh.title,/Intermediate/);
  assert.ok(!manifest.units.filter(unit=>!unit.documents).some(unit=>document.sections.some(section=>section.key===unit.id)),'Planned topics do not become empty published-looking sections.');
  let offset=0,totalMinutes=0;
@@ -35,7 +35,7 @@ test('unified Intermediate course contains all nine authored topics and preserve
   offset+=unit.chapterCount;totalMinutes+=source.estimatedMinutes;
  }
  assert.equal(document.estimatedMinutes,totalMinutes);
- const references=document.chapters.flatMap(chapter=>chapter.acslLinks);assert.equal(references.length,96);assert.equal(new Set(references.map(referenceKey)).size,96);
+ const references=document.chapters.flatMap(chapter=>chapter.acslLinks);assert.equal(references.length,108);assert.equal(new Set(references.map(referenceKey)).size,108);
  assert.deepEqual(references.map(referenceKey).sort(),authored.flatMap(unit=>unit.practiceReferences).map(referenceKey).sort());
 });
 
@@ -61,7 +61,7 @@ test('unified import validates the complete course without credentials, API acce
  const directory=mkdtempSync(join(tmpdir(),'acsl-unified-cli-'));
  try{
   const output=runCli('import-acsl-course',[],{cwd:directory});
-  assert.deepEqual(JSON.parse(output),{validated:true,course:'ACSL Intermediate Course',topics:9,lessons:30,practiceLinks:96});
+  assert.deepEqual(JSON.parse(output),{validated:true,course:'ACSL Intermediate Course',topics:10,lessons:33,practiceLinks:108});
   assert.deepEqual(readdirSync(directory),[],'Validation alone must not create import state.');
   for(const args of [['--auth-file'],['--origin'],['--unit','recursion'],['--import','--import'],['--apply']]){
    assert.throws(()=>runCli('import-acsl-course',args,{cwd:directory}),error=>{

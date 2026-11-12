@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, ChevronDown } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, X } from "lucide-react";
 import { useLocale } from "@/components/locale-context";
 import { ScholarshipIcon } from "@/components/scholarship/scholarship-icon";
 import { AppLink } from "@/components/navigation";
@@ -16,13 +16,14 @@ type PresencePreview = {
 };
 
 /** Fetch only the server-filtered preview; never prefetch full profiles or submissions. */
-export function StudentPresenceCard({ identityId, onBack, onMinimize, endpoint = "presence", backLabel, profileHref }: {
+export function StudentPresenceCard({ identityId, onBack, onMinimize, endpoint = "presence", backLabel, profileHref, variant = "panel" }: {
   identityId: string;
   onBack: () => void;
   onMinimize?: () => void;
   endpoint?: "presence" | "practice/presence";
   backLabel?: string;
   profileHref?: string;
+  variant?: "panel" | "disclosure";
 }) {
   const { locale } = useLocale();
   const tx = (zh: string, en: string) => locale === "zh" ? zh : en;
@@ -30,7 +31,7 @@ export function StudentPresenceCard({ identityId, onBack, onMinimize, endpoint =
   const [result, setResult] = useState<PresencePreview | null>(null);
   const [error, setError] = useState<"unavailable" | "failed" | null>(null);
   const [retry, setRetry] = useState(0);
-  useEffect(() => { back.current?.focus(); }, []);
+  useEffect(() => { if (variant === "panel") back.current?.focus(); }, [variant]);
   useEffect(() => {
     const controller = new AbortController();
     let pending = false;
@@ -60,8 +61,9 @@ export function StudentPresenceCard({ identityId, onBack, onMinimize, endpoint =
   const backText = backLabel ?? tx("返回在线列表", "Back to online students");
   return <>
     <div className={styles.toolbar}>
-      <button ref={back} type="button" className={styles.minimize} onClick={onBack} aria-label={backText} title={backLabel ?? tx("返回", "Back")}><ArrowLeft size={15}/></button>
+      {variant === "panel" && <button ref={back} type="button" className={styles.minimize} onClick={onBack} aria-label={backText} title={backLabel ?? tx("返回", "Back")}><ArrowLeft size={15}/></button>}
       <span className={styles.cardTitle}>{tx("学习近况", "Recent activity")}</span>
+      {variant === "disclosure" && <button type="button" className={styles.minimize} onClick={onBack} aria-label={backLabel ?? tx("收起学习近况", "Close recent activity")} title={backLabel ?? tx("收起学习近况", "Close recent activity")}><X size={15}/></button>}
       {onMinimize && <button type="button" className={styles.minimize} onClick={onMinimize} aria-label={tx("最小化在线列表", "Minimize online list")} title={tx("最小化", "Minimize")}><ChevronDown size={16}/></button>}
     </div>
     <div className={styles.cardBody} aria-busy={!result && !error}>

@@ -57,24 +57,55 @@ test('class roster exposes only public active classmates and checks current memb
   assert.deepEqual(roster.map(item=>item.displayName),['A chosen nickname','Alice Real','Bob Real','Viewer']);
   assert.deepEqual(new Set(roster.map(item=>item.id)),new Set([viewer,real,alias,fallback].map(user=>user.identityId)));
   for(const item of roster){
-   assert.deepEqual(Object.keys(item).sort(),['avatar','displayName','id']);
+   assert.deepEqual(Object.keys(item).sort(),['avatar','displayName','id','isOnline']);
+   assert.equal(item.isOnline,false);
    assert.equal(item.avatar,defaultAvatarPath(item.id));
    assert.equal((await student(`/profiles/${item.id}`)).profile.id,item.id,'every classmate link must have a readable public profile');
   }
   const serialized=JSON.stringify(roster);
   for(const privateValue of ['PRIVATE-NUMBER','private.invalid','PRIVATE-BIO','UNSELECTED-NICKNAME','HIDDEN-LEGAL-NAME',disabled.identityId,archived.identityId,released.identityId,revoked.identityId,pending.identityId,...[viewer,real,alias,fallback].flatMap(user=>[user.id,user.username])])assert(!serialized.includes(privateValue),privateValue);
-  await client()(`/classes/${classId}`,undefined,401);
-  await (await login(outsider))(`/classes/${classId}`,undefined,403);
-  await (await login(unassigned))(`/classes/${classId}`,undefined,403);
-  await (await login(otherTeacher))(`/classes/${classId}`,undefined,403);
+  const membersPath=`/classes/${classId}/members`;
+  assert.deepEqual((await student(membersPath)).items,roster);
+  async function session(user,seenSeconds=0,expired=false){
+   const token=randomBytes(32).toString('hex');
+   await pool.query(`INSERT INTO sessions(token_hash,account_id,csrf_token,expires_at,presence_seen_at)
+    VALUES($1,$2,$3,now()+($4::int * interval '1 second'),now()-($5::int * interval '1 second'))`,
+   [token,user.id,randomBytes(32).toString('hex'),expired?-60:3600,seenSeconds]);
+   return token;
+  }
+  const first=await session(real),second=await session(real);
+  await session(alias,91);await session(fallback,0,true);
+  for(const user of [disabled,archived,released,revoked,outsider])await session(user);
+  const refreshed=(await student(membersPath)).items;
+  assert.equal(refreshed.length,4,'multiple sessions count the student only once');
+  assert.deepEqual(refreshed.filter(item=>item.isOnline).map(item=>item.id),[real.identityId]);
+  assert.deepEqual((await student(`/classes/${classId}`)).members,refreshed);
+  await pool.query('DELETE FROM sessions WHERE token_hash=$1',[first]);
+  assert.equal((await student(membersPath)).items.find(item=>item.id===real.identityId).isOnline,true);
+  await pool.query("UPDATE sessions SET presence_seen_at=now()-interval '91 seconds' WHERE token_hash=$1",[second]);
+  assert.equal((await student(membersPath)).items.some(item=>item.isOnline),false,'heartbeat TTL expires');
+  await pool.query('UPDATE sessions SET presence_seen_at=now() WHERE token_hash=$1',[second]);
+  await pool.query('DELETE FROM legacy_school_account_ownership WHERE account_id=$1',[real.id]);
+  assert.equal((await student(membersPath)).items.some(item=>item.id===real.identityId),false);
+  await pool.query('INSERT INTO legacy_school_account_ownership(account_id) VALUES($1)',[real.id]);
+  await pool.query('DELETE FROM sessions WHERE token_hash=$1',[second]);
+  assert.equal((await student(membersPath)).items.some(item=>item.isOnline),false,'revoked sessions stop counting immediately');
+  for(const path of [`/classes/${classId}`,membersPath]){
+   await client()(path,undefined,401);
+   await (await login(outsider))(path,undefined,403);
+   await (await login(unassigned))(path,undefined,403);
+   await (await login(otherTeacher))(path,undefined,403);
+  }
   assert.equal((await (await login(teacher))(`/classes/${classId}`)).members.length,4);
   // Domain checks do not rely on a stale caller role or a released identity.
-  for(const user of [disabled,archived,released,revoked])await assert.rejects(handleClassHub({pool,user:{...user,roles:['student']},route:`/classes/${classId}`,method:'GET'}),error=>error.status===403);
+  for(const user of [disabled,archived,released,revoked])for(const route of [`/classes/${classId}`,membersPath])await assert.rejects(handleClassHub({pool,user:{...user,roles:['student']},route,method:'GET'}),error=>error.status===403);
   await pool.query('DELETE FROM class_members WHERE class_id=$1 AND identity_id=$2',[classId,viewer.identityId]);
   await student(`/classes/${classId}`,undefined,403);
+  await student(membersPath,undefined,403);
   await pool.query('INSERT INTO class_members(class_id,identity_id) VALUES($1,$2)',[classId,viewer.identityId]);
   await pool.query('UPDATE classes SET archived_at=now() WHERE id=$1',[classId]);
   await student(`/classes/${classId}`,undefined,404);
+  await student(membersPath,undefined,404);
  }finally{
   if(server)await new Promise(resolve=>server.close(resolve));
   await pool.end();await manager.query(`DROP SCHEMA ${schema} CASCADE`);await manager.end();

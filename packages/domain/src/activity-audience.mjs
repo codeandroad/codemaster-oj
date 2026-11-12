@@ -1,6 +1,8 @@
 import {readableCourseIds} from './course-access.mjs';
 import {fail,uuid,field} from './security.mjs';
 import {avatarForIdentity} from './avatars.mjs';
+import {PRESENCE_TTL_SECONDS} from './presence.mjs';
+import {LEGACY_SCHOOL_ID} from './legacy-school.mjs';
 const admin=user=>user.roles.includes('admin');
 const staff=user=>user.roles.some(role=>['teacher','admin'].includes(role));
 export async function audienceClasses(db,user,body,old=null,kind='assignment'){
@@ -77,8 +79,23 @@ export async function handleTeachingAudience(ctx){
  return {status:200,body:{items,classes,total:items.length,counts:{all:rows.length,unassigned:rows.filter(row=>!row.classes.length).length}}};
 }
 
+async function classMembers(pool,id){
+ // Only public, active student identities; never expose session or last-seen data.
+ return (await pool.query(`SELECT i.id,
+  CASE WHEN a.leaderboard_use_nickname THEN COALESCE(NULLIF(btrim(a.nickname),''),i.name) ELSE i.name END "displayName",a.avatar,
+  EXISTS(SELECT 1 FROM sessions s WHERE s.account_id=a.id AND s.expires_at>statement_timestamp()
+   AND s.presence_seen_at>statement_timestamp()-($2::int * interval '1 second')) "isOnline"
+  FROM class_members cm JOIN identities i ON i.id=cm.identity_id AND i.kind='student' AND i.archived_at IS NULL
+  JOIN accounts a ON a.identity_id=i.id AND a.disabled_at IS NULL AND a.binding_released_at IS NULL
+  JOIN legacy_school_identity_ownership io ON io.identity_id=i.id AND io.school_id=$3
+  JOIN legacy_school_account_ownership ao ON ao.account_id=a.id AND ao.school_id=io.school_id
+  WHERE cm.class_id=$1 AND EXISTS(SELECT 1 FROM account_roles r WHERE r.account_id=a.id AND r.role='student')
+  ORDER BY lower(CASE WHEN a.leaderboard_use_nickname THEN COALESCE(NULLIF(btrim(a.nickname),''),i.name) ELSE i.name END),i.id`,[id,PRESENCE_TTL_SECONDS,LEGACY_SCHOOL_ID])).rows
+  .map(row=>({id:row.id,displayName:row.displayName,avatar:avatarForIdentity(row.avatar,row.id),isOnline:row.isOnline}));
+}
+
 export async function handleClassHub(ctx){
- const {route,method,user,pool}=ctx;const match=route.match(/^\/classes\/([^/]+)$/);
+ const {route,method,user,pool}=ctx;const match=route.match(/^\/classes\/([^/]+)(\/members)?$/);
  if(!match||method!=='GET')return null;
  const id=uuid(match[1],'班级 ID');
  const cls=(await pool.query('SELECT id,name,type,description FROM classes WHERE id=$1 AND archived_at IS NULL',[id])).rows[0];
@@ -90,6 +107,7 @@ export async function handleClassHub(ctx){
   WHERE cm.class_id=$1 AND cm.identity_id=$2 AND a.id=$3
    AND EXISTS(SELECT 1 FROM account_roles r WHERE r.account_id=a.id AND r.role='student')`,[id,user.identityId,user.id])).rowCount;
  if(!manager&&!member)fail(403,'FORBIDDEN','仅班级成员可查看班级内容');
+ if(match[2])return {status:200,body:{items:await classMembers(pool,id)}};
  const assignments=(await pool.query(`SELECT a.id,a.title,a.due_at "dueAt",a.course_path_id "coursePathId",p.title "courseTitle"
   FROM assignments a LEFT JOIN learning_paths p ON p.id=a.course_path_id AND p.published_at IS NOT NULL AND p.archived_at IS NULL
   WHERE a.state='Published' AND a.archived_at IS NULL
@@ -120,13 +138,7 @@ export async function handleClassHub(ctx){
  // Classmates get the same small public identity projection as the school
  // leaderboard. Only accounts with a live public student profile are linked;
  // pending activation, released bindings and disabled identities stay private.
- const members=(await pool.query(`SELECT i.id,
-  CASE WHEN a.leaderboard_use_nickname THEN COALESCE(NULLIF(btrim(a.nickname),''),i.name) ELSE i.name END "displayName",a.avatar
-  FROM class_members cm JOIN identities i ON i.id=cm.identity_id AND i.kind='student' AND i.archived_at IS NULL
-  JOIN accounts a ON a.identity_id=i.id AND a.disabled_at IS NULL AND a.binding_released_at IS NULL
-  WHERE cm.class_id=$1 AND EXISTS(SELECT 1 FROM account_roles r WHERE r.account_id=a.id AND r.role='student')
-  ORDER BY lower(CASE WHEN a.leaderboard_use_nickname THEN COALESCE(NULLIF(btrim(a.nickname),''),i.name) ELSE i.name END),i.id`,[id])).rows
-  .map(row=>({id:row.id,displayName:row.displayName,avatar:avatarForIdentity(row.avatar,row.id)}));
+ const members=await classMembers(pool,id);
  const memberCount=(await pool.query(`SELECT count(*)::int n FROM class_members cm
   JOIN identities i ON i.id=cm.identity_id AND i.kind='student' AND i.archived_at IS NULL
   WHERE cm.class_id=$1 AND NOT EXISTS(SELECT 1 FROM accounts a WHERE a.identity_id=i.id AND a.binding_released_at IS NULL AND a.disabled_at IS NOT NULL)`,[id])).rows[0].n;

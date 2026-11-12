@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, ChevronRight, ClipboardList, FileText, Users } from "lucide-react";
 import { AppLink } from "@/components/navigation";
 import { PageHeader } from "@/components/page-chrome";
-import { ProfileAvatar } from "@/components/profile-hero";
 import { useLocale } from "@/components/locale-context";
 import { buttonVariants } from "@/components/ui/button";
 import { Empty, LessonContent, State, useData } from "./shared";
-import { StudentPresenceCard } from "./student-presence-card";
+import { ClassRoster, type ClassMember } from "./class-roster";
 
 interface StudentClassSummary {
   id: string;
@@ -20,7 +19,6 @@ interface StudentClassSummary {
 }
 interface ClassCourse { id: string; title: string; description?: string; }
 interface LinkedCourse { coursePathId?: string | null; courseTitle?: string | null; }
-interface ClassMember { id: string; displayName: string; avatar: string; }
 interface ClassResource {
   id: string;
   title: string;
@@ -84,67 +82,10 @@ export function StudentClass({ id }: { id: string }) {
       {tab === "courses" && (data.courses.length ? <div className={`${surface} mt-4`}>{data.courses.map(course => <AppLink key={course.id} href={`/student/learning-paths/${course.id}`} className="flex min-h-16 items-center gap-3 border-b border-border px-4 py-3 last:border-b-0 hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-primary"><BookOpen size={18} aria-hidden="true" className="shrink-0 text-primary"/><span className="min-w-0 flex-1"><strong className="block text-sm text-primary">{course.title}</strong>{course.description && <span className="mt-1 block line-clamp-2 text-xs text-muted-foreground">{course.description}</span>}</span><ChevronRight size={17} aria-hidden="true" className="shrink-0 text-muted-foreground"/></AppLink>)}</div> : <Empty title={tx("暂无关联课程", "No linked courses")}/>)}
       {tab === "resources" && (data.resources.length ? <div className={`${surface} mt-4`}>{data.resources.map(item => <ClassResourceRow key={item.id} resource={item} linkedCourse={data.courses.some(course => course.id === item.pathId)}/>)}</div> : <Empty title={tx("暂无班级资料", "No class resources")}/>)}
       </div>
-      <ClassRoster key={id} members={data.members ?? []}/>
+      <ClassRoster key={id} classId={id} members={data.members ?? []}/>
       </div>
     </>}</State>
   </>;
-}
-
-function ClassRoster({ members }: { members: ClassMember[] }) {
-  const { locale } = useLocale();
-  const [search, setSearch] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const list = useRef<HTMLUListElement>(null);
-  const returnTo = useRef<{ button: HTMLButtonElement; scrollTop: number } | null>(null);
-  const tx = (zh: string, en: string) => locale === "en" ? en : zh;
-  const query = search.trim().toLocaleLowerCase(locale);
-  const visible = query ? members.filter(member => member.displayName.toLocaleLowerCase(locale).includes(query)) : members;
-  const selectedMember = members.find(member => member.id === selectedId);
-  useEffect(() => {
-    if (selectedMember || !returnTo.current) return;
-    const { button, scrollTop } = returnTo.current;
-    returnTo.current = null;
-    if (list.current) list.current.scrollTop = scrollTop;
-    button.focus({ preventScroll: true });
-  }, [selectedMember]);
-  return <section aria-label={tx("班级同学", "Students")} className={`${surface} order-first xl:order-last`} onKeyDown={event => {
-    if (selectedMember && event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      setSelectedId(null);
-    }
-  }}>
-    <div hidden={!!selectedMember}>
-      <div className="flex items-center justify-between border-b border-border px-3 py-2.5"><h2 className="text-sm font-semibold">{tx("班级同学", "Students")}</h2><span className="text-xs tabular-nums text-muted-foreground">{members.length}</span></div>
-      {members.length > 0 && <div className="p-2"><input type="search" aria-label={tx("搜索班级同学", "Search classmates")} placeholder={tx("搜索同学", "Search students")} value={search} onChange={event => setSearch(event.target.value)} className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary"/></div>}
-      {visible.length ? <ul ref={list} className="max-h-64 overflow-y-auto overscroll-contain xl:max-h-96">
-        {visible.map(member => <li key={member.id}>
-          <button
-            type="button"
-            aria-label={tx(`查看 ${member.displayName} 的学习近况`, `View recent activity for ${member.displayName}`)}
-            className="flex min-h-12 w-full cursor-pointer items-center gap-2.5 border-t border-border px-3 py-2 text-left hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2"
-            onClick={event => {
-              returnTo.current = { button: event.currentTarget, scrollTop: list.current?.scrollTop ?? 0 };
-              setSelectedId(member.id);
-            }}
-          >
-            <ProfileAvatar avatar={member.avatar} nickname={member.displayName}/>
-            <span className="min-w-0 flex-1 break-words text-sm font-medium text-primary">{member.displayName}</span>
-            <ChevronRight size={15} aria-hidden="true" className="shrink-0 text-muted-foreground"/>
-          </button>
-        </li>)}
-      </ul> : <p className="px-3 py-4 text-sm text-muted-foreground">{members.length ? tx("没有匹配的同学", "No matching students") : tx("暂无已激活的学生主页", "No student profiles available yet")}</p>}
-    </div>
-    {selectedMember && <div className="flex max-h-[min(280px,60dvh)] flex-col text-xs">
-      <StudentPresenceCard
-        key={selectedMember.id}
-        identityId={selectedMember.id}
-        onBack={() => setSelectedId(null)}
-        backLabel={tx("返回同学列表", "Back to classmates")}
-        profileHref={`/student/people/${encodeURIComponent(selectedMember.id)}`}
-      />
-    </div>}
-  </section>;
 }
 
 function ClassTaskRow({ href, title, kind, timing, course }: { href: string; title: string; kind: string; timing: string; course?: LinkedCourse }) {

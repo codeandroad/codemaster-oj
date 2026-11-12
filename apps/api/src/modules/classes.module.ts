@@ -42,6 +42,11 @@ export class ClassesController {
     return applyResponse(response, await this.domain.execute('classes', request.domainContext));
   }
 
+  @Get('classes/:id/members')
+  async members(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+    return applyResponse(response, await this.domain.execute('classes', request.domainContext));
+  }
+
   @Post('classes/:id/import-members')
   async importMembers(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('classes', request.domainContext));

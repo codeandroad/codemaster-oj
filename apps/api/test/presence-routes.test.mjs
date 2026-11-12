@@ -35,6 +35,11 @@ test('Nest presence routes require auth and CSRF, expose only public fields, and
    return {id: account.id, identityId: identity.id, username};
   }
   const student = await account('student', 'Student'), teacher = await account('teacher', 'Teacher');
+  const outsider = await account('student', 'Other class');
+  const {rows: [classroom]} = await pool.query("INSERT INTO classes(name,owner_account_id) VALUES('Presence class',$1) RETURNING id",[teacher.id]);
+  await pool.query('INSERT INTO teacher_classes(class_id,account_id) VALUES($1,$2)',[classroom.id,teacher.id]);
+  await pool.query('INSERT INTO class_members(class_id,identity_id) VALUES($1,$2)',[classroom.id,student.identityId]);
+  const membersPath = `/classes/${classroom.id}/members`;
   app = await createApiApplication({databaseUrl: appUrl.href, logger: false,
    config: loadConfig({SESSION_SECRET: randomBytes(32).toString('hex'), APP_ORIGIN: 'http://school.test', COOKIE_SECURE: 'false'})});
   await app.listen(0, '127.0.0.1');
@@ -53,6 +58,16 @@ test('Nest presence routes require auth and CSRF, expose only public fields, and
    return {cookie: response.cookie, csrfToken: response.data.csrfToken};
   };
   const first = await login(student), second = await login(student), staff = await login(teacher);
+  const other = await login(outsider);
+  assert.equal((await request(membersPath)).status,401);
+  assert.equal((await request(membersPath,{auth:other})).status,403);
+  assert.equal((await request('/classes/not-a-uuid/members',{auth:first})).status,400);
+  assert.equal((await request(`/classes/${randomUUID()}/members`,{auth:first})).status,404);
+  const initialRoster = await request(membersPath,{auth:first});
+  assert.equal(initialRoster.status,200,JSON.stringify(initialRoster.data));
+  assert.equal(initialRoster.cache,'no-store');
+  assert.deepEqual(Object.keys(initialRoster.data.items[0]).sort(),['avatar','displayName','id','isOnline']);
+  assert.equal(initialRoster.data.items[0].isOnline,false);
   assert.equal((await request('/presence')).status, 401);
   assert.equal((await request('/presence/heartbeat', {method: 'POST', body: {}})).status, 401);
   assert.equal((await request('/presence', {auth: first})).data.onlineCount, 0);
@@ -71,6 +86,11 @@ test('Nest presence routes require auth and CSRF, expose only public fields, and
   assert.equal(list.data.onlineCount, 1);
   assert.deepEqual(Object.keys(list.data.items[0]).sort(), ['avatar', 'displayName', 'identityId']);
   assert.equal(list.data.items[0].identityId, student.identityId);
+  const onlineRoster = await request(membersPath,{auth:staff});
+  assert.equal(onlineRoster.status,200);
+  assert.equal(onlineRoster.data.items.length,1);
+  assert.equal(onlineRoster.data.items[0].isOnline,true);
+  assert.equal((await request(`/classes/${classroom.id}`,{auth:first})).data.members[0].isOnline,true);
   const previewPath = `/presence/students/${student.identityId}`;
   assert.equal((await request(previewPath)).status, 401);
   const preview = await request(previewPath, {auth: staff});
@@ -96,9 +116,16 @@ test('Nest presence routes require auth and CSRF, expose only public fields, and
   assert.equal((await request('/presence?pageSize=51', {auth: staff})).status, 400);
   assert.equal((await request('/auth/logout', {method: 'POST', body: {}, auth: first})).status, 200);
   assert.equal((await request('/presence', {auth: staff})).data.onlineCount, 1);
+  assert.equal((await request(membersPath,{auth:staff})).data.items[0].isOnline,true);
   assert.equal((await request('/auth/logout', {method: 'POST', body: {}, auth: second})).status, 200);
   assert.equal((await request('/presence', {auth: staff})).data.onlineCount, 0);
+  assert.equal((await request(membersPath,{auth:staff})).data.items[0].isOnline,false);
   assert.equal((await request('/presence/heartbeat', {method: 'POST', body: {}, auth: second})).status, 401);
+  const renewed = await login(student);
+  await pool.query('DELETE FROM class_members WHERE class_id=$1 AND identity_id=$2',[classroom.id,student.identityId]);
+  assert.equal((await request(membersPath,{auth:renewed})).status,403);
+  await pool.query('UPDATE classes SET archived_at=now() WHERE id=$1',[classroom.id]);
+  assert.equal((await request(membersPath,{auth:staff})).status,404);
  } finally {
   if (app) await app.close();
   await pool.end();

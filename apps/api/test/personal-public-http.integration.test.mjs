@@ -432,9 +432,9 @@ test('personal registration and reviewed public learning use real grants without
    assert.equal((await request(admissionQueue,{auth:legacy})).data.items[0].pendingCount,0);
    const response = await request(publicPath,{auth:outsider});
    const content = response.data;
-   assert.deepEqual(content.chapters,[{id:chapter.id,position:0,title:'First lesson',body:'Reviewed original lesson.',read:false,
+   assert.deepEqual(content.chapters,[{id:chapter.id,position:0,sectionKey:null,title:'First lesson',body:'Reviewed original lesson.',read:false,
     problems:[{...first,solved:false},{...last,solved:false}]},
-   {id:secondChapter.id,position:1,title:'Second lesson',body:'Second reviewed lesson.',read:false,problems:[]}]);
+   {id:secondChapter.id,position:1,sectionKey:null,title:'Second lesson',body:'Second reviewed lesson.',read:false,problems:[]}]);
    assert.deepEqual([content.authorName,content.authoredAt,content.coverImage,content.category,content.difficulty,content.coverKey],
     ['Published teacher','2026-01-02T03:04:05.000Z',null,'Python','beginner','general']);
    assert.equal(typeof content.sourceSchool,'string');
@@ -485,8 +485,8 @@ test('personal registration and reviewed public learning use real grants without
      ['Python','beginner','general',1]);
    await request(schoolPath,{auth:outsider,status:403});
    const preview = (await request('/platform/course-publications',{auth:platform})).data.items.find(item=>item.courseId===original.id);
-   assert.deepEqual(preview.chapters,[{id:chapter.id,title:'First lesson',body:'Reviewed original lesson.'},
-    {id:secondChapter.id,title:'Second lesson',body:'Second reviewed lesson.'}]);
+   assert.deepEqual(preview.chapters,[{id:chapter.id,sectionKey:null,title:'First lesson',body:'Reviewed original lesson.'},
+    {id:secondChapter.id,sectionKey:null,title:'Second lesson',body:'Second reviewed lesson.'}]);
    await request(`/chapters/${chapter.id}`,{auth:legacy,method:'PATCH',body:{content:'Updated lesson.'}});
    await request(publicPath,{auth:outsider,status:404});
    const publish = {schoolId:LEGACY_SCHOOL_ID,courseId:original.id,revision:preview.revision,sourceVersion:preview.sourceVersion};

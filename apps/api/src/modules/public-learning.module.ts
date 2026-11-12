@@ -7,7 +7,7 @@ import {applyResponse} from '../domain.response.js';
 @UseGuards(DomainGuard)
 class PublicLearningController {
  constructor(private readonly domain:DomainService) {}
- @Get(['platform/courses','platform/courses/audience','platform/courses/:id']) platformCourses(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
+ @Get(['platform/courses','platform/courses/audience','platform/courses/acsl-links','platform/courses/:id']) platformCourses(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
  @Post(['platform/courses','platform/courses/:id/publish','platform/courses/:id/unpublish','platform/courses/:id/archive','platform/courses/:id/restore']) platformCourseAction(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
  @Patch('platform/courses/:id') platformCourseUpdate(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
  @Get('practice/catalog') catalog(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}

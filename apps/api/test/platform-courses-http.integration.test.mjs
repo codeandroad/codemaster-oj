@@ -14,7 +14,7 @@ import { provisionPlatformAdministrator } from '../../../packages/domain/src/pla
 const migration='102_platform_courses.sql';
 test('platform courses retain original data and enforce audiences through NestJS and real runtime grants',
  {skip:!process.env.TEST_DATABASE_URL,timeout:90000},async t=>{
- const base=new URL(process.env.TEST_DATABASE_URL);assert.equal(base.pathname,'/campus_qa');
+ const base=new URL(process.env.TEST_DATABASE_URL);assert.equal(base.pathname,'/campus_qa');assert.ok(['localhost','127.0.0.1'].includes(base.hostname));
  const manager=createPool(base.href),schema='platform_course_'+randomBytes(6).toString('hex');
  await manager.query(`CREATE SCHEMA ${schema}`);
  const connection=new URL(base);connection.searchParams.set('options',`-csearch_path=${schema}`);
@@ -22,7 +22,7 @@ test('platform courses retain original data and enforce audiences through NestJS
  const password=randomBytes(24).toString('base64url'),origin='http://platform-course.test';
  try{
   await pool.query('CREATE TABLE schema_migrations(name text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');
-  await pool.query('INSERT INTO schema_migrations(name) VALUES($1)',[migration]);await migrate(pool);
+  await pool.query('INSERT INTO schema_migrations(name) VALUES($1),($2)',[migration,'105_acsl_platform_course.sql']);await migrate(pool);
   await bootstrap(pool,{name:'Original school administrator',number:'A',username:'school-admin',password});
   const admin=(await pool.query("SELECT id,identity_id FROM accounts WHERE username='school-admin'")).rows[0];
   const hash=await hashPassword(password),actors={};
@@ -44,7 +44,7 @@ test('platform courses retain original data and enforce audiences through NestJS
    SELECT school_id,id,1,extract(epoch FROM updated_at)::text,title,description,access_scope,$2 FROM learning_paths WHERE id=$1`,[first.p.id,JSON.stringify([{id:first.c.id,title:first.c.title,body:first.c.content,problems:[]}])]);
   const listing=(await pool.query('INSERT INTO public_course_listings(school_id,course_id,revision,approved_by) VALUES($1,$2,1,$3) RETURNING id',[LEGACY_SCHOOL_ID,first.p.id,admin.id])).rows[0];
   await provisionPlatformAdministrator(pool,{username:'platform'});
-  await pool.query('DELETE FROM schema_migrations WHERE name=$1',[migration]);await migrate(pool);
+  await pool.query('DELETE FROM schema_migrations WHERE name=ANY($1::text[])',[[migration,'105_acsl_platform_course.sql']]);await migrate(pool);
   await t.test('migration changes only ownership fields of the two named courses',async()=>{
    for(const [index,{p,c}] of originals.entries()){
     const after=(await pool.query('SELECT * FROM learning_paths WHERE id=$1',[p.id])).rows[0];
@@ -104,6 +104,20 @@ test('platform courses retain original data and enforce audiences through NestJS
    assert.equal(course.chapters[0].id,old.chapters[0].id);
    await change({chapters:[{id:randomUUID(),title:'Foreign',content:'no'}]},400);
    await change({chapters:[]},409);
+  });
+  await t.test('platform lessons round-trip every bilingual teaching field without erasing omitted fields',async()=>{
+   const chapter=course.chapters[0],fields={title:'Complete lesson',content:'Native $2^3=8$ explanation',objective:'Trace the state',checkpoint:'Original self-check',checkpointAnswer:'Original lesson-only answer'};
+   const localizations={en:{...fields},zh:{title:'完整课时',content:'原生 $2^3=8$ 讲解',objective:'追踪状态',checkpoint:'原创自测',checkpointAnswer:'仅课内参考答案'}};
+   await change({chapters:[{id:chapter.id,...fields,localizations,acslLinks:[]}]});
+   const saved=(await platform.send('/platform/courses/'+course.id)).chapters[0];
+   for(const [key,value] of Object.entries(fields))assert.equal(saved[key],value,key);
+   assert.deepEqual(saved.localizations,localizations);assert.deepEqual(saved.acslLinks,[]);
+   await change({chapters:[{id:chapter.id,title:'Retitled without losing teaching material'}]});
+   const preserved=(await platform.send('/platform/courses/'+course.id)).chapters[0];
+   for(const key of ['content','objective','checkpoint','checkpointAnswer','localizations','acslLinks'])assert.deepEqual(preserved[key],saved[key],key);
+   const reader=(await personal.send('/practice/courses/'+course.id)).chapters[0];
+   assert.equal(reader.id,chapter.id);assert.equal(reader.body,fields.content);
+   for(const key of ['objective','checkpoint','checkpointAnswer','localizations'])assert.deepEqual(reader[key],saved[key],key);
   });
   await t.test('school audiences block discovery, entry, chapter reads and applications outside the selected schools',async()=>{
    await change({audienceScope:'schools',schoolIds:[alpha.id]});

@@ -1,5 +1,5 @@
 import { localizedFields, publicChapterLocalizations } from './course-localizations.mjs';
-import { projectCourseAcslLinks, acslLinkCounts } from './course-acsl.mjs';
+import { projectCourseAcslLinks, acslLinkCounts, requireCourseAcslSchool } from './course-acsl.mjs';
 import { transaction } from './db.mjs';
 import { activeAccount, auditSchool, LEGACY_SCHOOL_ID, lockSchoolTeaching, requireSchoolAdmin } from './schools.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
@@ -94,9 +94,11 @@ function courseEntry(listing, course, admission) {
   };
 }
 
-async function catalogue(pool, user) {
+async function catalogue(pool, user, url) {
   return transaction(pool, async db => {
     await context(db, user);
+    const acslSchoolId=url?.searchParams.has('schoolId')
+      ?await requireCourseAcslSchool(db,uuid(url.searchParams.get('schoolId'),'学校 ID'),user):LEGACY_SCHOOL_ID;
     const { rows } = await db.query(`SELECT l.* FROM public_course_listings l WHERE withdrawn_at IS NULL
       AND NOT EXISTS(SELECT 1 FROM learning_paths p WHERE p.id=l.course_id AND p.owner_scope='platform') ORDER BY approved_at DESC,id`);
     rows.unshift(...await platformCourseListings(db));
@@ -125,7 +127,7 @@ async function catalogue(pool, user) {
           .flatMap(link => available.get(`${link.problemId}:${link.versionId}`) ?? []);
         entry.totalExercises = exercises.length;
         entry.completedExercises = exercises.filter(problem => problem.solved).length;
-        for(const chapter of detail.chapters){const links=await projectCourseAcslLinks(db,listing.school_id,user,chapter.acslLinks??[]),counts=acslLinkCounts(links);entry.totalExercises+=counts.total;entry.completedExercises+=counts.completed;}
+        for(const chapter of detail.chapters){const links=await projectCourseAcslLinks(db,listing.platform_owned?acslSchoolId:listing.school_id,user,chapter.acslLinks??[]),counts=acslLinkCounts(links);entry.totalExercises+=counts.total;entry.completedExercises+=counts.completed;}
       }
       courses.push(entry);
     }
@@ -183,7 +185,7 @@ export async function publicCourseProblemLanguage(db, user, { courseId, chapterI
   return course.required_language;
 }
 
-async function publicCourse({ pool, user, method, body }, match) {
+async function publicCourse({ pool, user, method, body, url }, match) {
   const id = uuid(match[1], '课程目录 ID');
   return transaction(pool, async db => {
     const source = await activeListing(db, id);
@@ -193,6 +195,13 @@ async function publicCourse({ pool, user, method, body }, match) {
     const listing = await activeListing(db, id);
     const course = listing && await edition(db, listing, { lock: true });
     if (!course) fail(404, 'NOT_FOUND', '公开课程不存在或已撤回');
+
+    let acslSchoolId=listing.platform_owned?LEGACY_SCHOOL_ID:listing.school_id;
+    if(url?.searchParams.has('schoolId')){
+      acslSchoolId=await requireCourseAcslSchool(db,uuid(url.searchParams.get('schoolId'),'学校 ID'),user);
+      if(!listing.platform_owned&&acslSchoolId!==listing.school_id)
+        fail(400,'INVALID_COURSE_SCHOOL_CONTEXT','校内公开课程不能切换练习来源学校');
+    }
 
     const admission = await admissionFor(db, listing, course, user.id);
     if(admission==='denied')fail(404,'NOT_FOUND','课程不存在或不在开放范围');
@@ -231,9 +240,10 @@ async function publicCourse({ pool, user, method, body }, match) {
     const platformRead=listing.platform_owned?await platformReadProgress(db,listing,user.id):[];
     const availableProblems = await publicChapterProblems(db, listing, detail, user.id);
     const acslByChapter=new Map();
-    for(const chapter of publishedChapters)acslByChapter.set(chapter.id,await projectCourseAcslLinks(db,listing.school_id,user,chapter.acslLinks??[]));
+    for(const chapter of publishedChapters)acslByChapter.set(chapter.id,await projectCourseAcslLinks(db,acslSchoolId,user,chapter.acslLinks??[]));
     const chapters = publishedChapters.map((c, position) => ({
-      sectionKey:c.sectionKey??null,...localizedFields(publicChapterLocalizations(c.localizations)),id: c.id, title: c.title, body: c.body, position,
+      sectionKey:c.sectionKey??null,...localizedFields(listing.platform_owned?c.localizations:publicChapterLocalizations(c.localizations)),id: c.id, title: c.title, body: c.body, position,
+      ...(listing.platform_owned?{objective:c.objective??'',checkpoint:c.checkpoint??'',checkpointAnswer:c.checkpointAnswer??''}:{}),
       ...(c.acslLinks?.length?{acslLinks:acslByChapter.get(c.id)}:{}),
       read: platformRead.find(p=>p.chapter_id===c.id)?.read??progress.some(p => p.chapter_id === c.id && p.content_hash === contentHash(c) && p.read),
       problems: (c.problems ?? []).flatMap(({ problemId, versionId }) => {
@@ -455,7 +465,7 @@ export async function handlePublicLearning(ctx) {
   if(/^\/platform\/courses(?:\/|$)/.test(route))return handlePlatformCourses(ctx);
   if (route === '/practice/catalog' && method === 'GET') {
     const { listPublicProblems } = await import('./school-practice.mjs');
-    const courses = await catalogue(pool, user);
+    const courses = await catalogue(pool, user, url);
     const { items: problems } = await listPublicProblems(pool, user, url);
     return respond({ courses, problems });
   }

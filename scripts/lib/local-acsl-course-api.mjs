@@ -13,6 +13,10 @@ export function localCourseOptions(argv,{merging=false}={}) {
  return {origin:options['--origin'],authFile:options['--auth-file'],apply:Boolean(options[merging?'--apply':'--import'])};
 }
 export const unifiedJournalKey=(origin,username)=>createHash('sha256').update(`${origin}\0${username}\0acsl-intermediate-unified`).digest('hex');
+// The platform source has one journal per local environment, independent of
+// which authorized platform administrator performs maintenance. Historical
+// teacher journals remain untouched for migration reconciliation.
+export const platformJournalKey=origin=>createHash('sha256').update(`${origin}\0platform\0acsl-intermediate-unified`).digest('hex');
 export async function localCourseApi(options){
  assert.ok(options.origin&&options.authFile,'Local origin and private auth file are required.');
  const origin=new URL(options.origin);
@@ -25,16 +29,18 @@ export async function localCourseApi(options){
   assert.ok(['GET','POST','PATCH'].includes(method));
   const response=await fetch(`${origin.origin}/api/v1/${path}`,{method,redirect:'error',headers:{Origin:origin.origin,...(cookie?{Cookie:cookie}:{}),...(csrf?{'X-CSRF-Token':csrf}:{}),...(body===undefined?{}:{'Content-Type':'application/json'})},body:body===undefined?undefined:JSON.stringify(body)});
   const value=await response.json();if(!response.ok)throw Error(`${path}: HTTP ${response.status} (${value.error?.code??'REQUEST_FAILED'})`);
-  if(path==='auth/login'){cookie=response.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');csrf=value.csrfToken;assert.ok(value.user.roles.some(r=>['teacher','admin'].includes(r)),'A teacher account is required.');}
+  if(path==='auth/login'){cookie=response.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');csrf=value.csrfToken;assert.equal(value.user.platformAdmin,true,'An active platform administrator is required; school roles cannot maintain the ACSL source.');}
   return value;
  }
  await request('auth/login',auth);
+ await request('platform/courses'); // Revalidate the live platform capability.
+ await request('platform/courses/acsl-links'); // Refuse older APIs that drop rich lesson fields.
  const directory=resolve('.campus-local/acsl-tutorial-import');await mkdir(directory,{recursive:true,mode:0o700});
- const journal=resolve(directory,`${unifiedJournalKey(origin.origin,auth.username)}.json`);
+ const journal=resolve(directory,`${platformJournalKey(origin.origin)}.json`);
  return {request,origin:origin.origin,journal};
 }
 export function unifiedState(course,document,origin){
- return {hash:createHash('sha256').update(JSON.stringify(document)).digest('hex'),origin,courseId:course.id,
+ return {hash:createHash('sha256').update(JSON.stringify(document)).digest('hex'),origin,courseId:course.id,...(course.ownerScope?{ownerScope:course.ownerScope}:{}),
   chapterIds:course.chapters.map(c=>c.id),acslReferences:course.chapters.map(c=>(c.acslLinks??[]).map(({paperSlug,kind,questionId,versionId})=>({paperSlug,kind,...(questionId?{questionId}:{}),...(versionId?{versionId}:{})}))) };
 }
 export const saveUnifiedState=(journal,state)=>writeFile(journal,JSON.stringify(state,null,2)+'\n',{mode:0o600});

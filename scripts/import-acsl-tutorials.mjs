@@ -36,7 +36,7 @@ export function matchesTutorialDraft(course, document, state = {}) {
         && ['title', 'content', 'objective', 'checkpoint', 'checkpointAnswer'].every(field => chapter[field] === expected[field])
         && isDeepStrictEqual(chapter.localizations ?? {}, expected.localizations ?? {})
         && isDeepStrictEqual(refs, expected.acslLinks ?? [])
-        && !chapter.problems?.length && !chapter.paper4Links?.length;
+        && !chapter.problems?.length && !chapter.problemCount && !chapter.paper4Links?.length;
     });
 }
 

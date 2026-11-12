@@ -1,4 +1,12 @@
-import { legacyCandidateChapters } from './legacy-public-course.mjs';
+// Platform-authored teaching content includes its own self-checks. School
+// publication snapshots deliberately retain their separate prose-only policy.
+async function platformCourseChapters(db,courseId) {
+ return (await db.query(`SELECT c.id,c.title,c.content body,c.objective,c.checkpoint,
+  c.checkpoint_answer AS "checkpointAnswer",c.section_key AS "sectionKey",c.localizations,c.acsl_links AS "acslLinks",
+  COALESCE((SELECT jsonb_agg(jsonb_build_object('problemId',cp.problem_id,'versionId',cp.version_id)
+   ORDER BY cp.position,cp.problem_id) FROM chapter_problems cp WHERE cp.chapter_id=c.id),'[]'::jsonb) problems
+  FROM learning_chapters c WHERE c.path_id=$1 AND c.archived_at IS NULL ORDER BY c.position,c.created_at,c.id`,[courseId])).rows;
+}
 
 // Keep existing catalogue URLs when a school source moves to platform ownership.
 // New platform courses use their own stable ID and do not impersonate a school
@@ -17,7 +25,7 @@ export async function platformCourseEdition(db,listing,{detail=false,lock=false}
   AND p.archived_at IS NULL AND p.withdrawn_at IS NULL AND p.listed
   AND (p.available_from IS NULL OR p.available_from<=now()) AND (p.available_until IS NULL OR p.available_until>now())
   ${lock?'FOR SHARE OF p':''}`,[listing.course_id])).rows[0];
- if(p&&detail)p.chapters=await legacyCandidateChapters(db,p.id);
+ if(p&&detail)p.chapters=await platformCourseChapters(db,p.id);
  return p;
 }
 export async function platformReadProgress(db,listing,accountId) {

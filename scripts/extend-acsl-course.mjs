@@ -1,5 +1,5 @@
 // Append reviewed topics to an existing local unified draft. No existing
-// chapter PATCH, publication, progress, formal-answer or reward write is used.
+// lesson identity/content changes, publication, progress, grades or rewards.
 import assert from 'node:assert/strict';
 import {readFile,open,unlink,rename,writeFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
@@ -23,7 +23,8 @@ export async function extendAcslCourse(argv=process.argv.slice(2)){
  const state=JSON.parse(await readFile(api.journal,'utf8'));
  assert.equal(state.origin,api.origin);assert.ok(state.courseId&&state.chapterIds&&state.acslReferences,'A completed unified import/merge journal is required.');
  const hash=createHash('sha256').update(JSON.stringify(document)).digest('hex');
- let course=await api.request(`learning-paths/${state.courseId}`);
+ let course=await api.request(`platform/courses/${state.courseId}`);
+ assert.equal(course.ownerScope,'platform','The ACSL source must be owned by the platform.');
  if(state.hash===hash){assert.ok(matchesTutorialDraft(course,document,state),'Current draft differs from its import journal.');console.log(JSON.stringify({alreadyCurrent:true,courseId:course.id,lessons:course.chapters.length,published:false}));return;}
  const filename=`${api.journal}.extend-${hash}.json`;
  let receipt;try{receipt=JSON.parse(await readFile(filename,'utf8'));}catch(error){if(error.code!=='ENOENT')throw error;}
@@ -50,7 +51,7 @@ export async function extendAcslCourse(argv=process.argv.slice(2)){
   const finalState=unifiedState(course,document,api.origin);
   assert.ok(matchesTutorialDraft(course,document,finalState));
   await save(filename,{...receipt,knownState:finalState,complete:true});await save(api.journal,finalState);
-  console.log(JSON.stringify({extended:true,...plan,preview:`${api.origin}/teacher/courses/${course.id}?preview=1`}));
+  console.log(JSON.stringify({extended:true,...plan,editor:`${api.origin}/platform?section=courses&courseId=${course.id}`}));
  }finally{await lock.close();await unlink(`${api.journal}.lock`);}
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))await extendAcslCourse();

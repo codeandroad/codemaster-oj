@@ -7,9 +7,9 @@ import { platformCourseAudience } from './platform-course-access.mjs';
 import { courseDisplayProperties } from './course-access.mjs';
 import { courseLocalizations } from './course-localizations.mjs';
 import { assertCoursePaper4Ready } from './course-paper4.mjs';
-import { projectCourseAcslLinks } from './course-acsl.mjs';
+import { assertPlatformCourseAcslLinksReady, platformCourseAcslPicker, resolvePlatformCourseAcslLinks } from './platform-course-acsl.mjs';
 import { liveProblemVersionIdSql } from './live-problem-version.mjs';
-import { canonicalHash, enumValue, fail, field, integer, uuid } from './security.mjs';
+import { bytes, canonicalHash, enumValue, fail, field, integer, uuid } from './security.mjs';
 
 const reply=(body,status=200)=>({body,status});
 const sourceVersion='extract(epoch FROM p.updated_at)::text';
@@ -27,7 +27,7 @@ async function get(db,id,{lock=false}={}) {
 }
 async function shape(db,p,{detail=false}={}) {
  const chapters=(await db.query(`SELECT id,title,content,objective,checkpoint,checkpoint_answer AS "checkpointAnswer",
-  localizations,section_key AS "sectionKey",(SELECT count(*)::int FROM chapter_problems WHERE chapter_id=c.id) AS "problemCount"
+  localizations,acsl_links AS "acslLinks",section_key AS "sectionKey",(SELECT count(*)::int FROM chapter_problems WHERE chapter_id=c.id) AS "problemCount"
   FROM learning_chapters c WHERE path_id=$1 AND archived_at IS NULL ORDER BY position,created_at,id`,[p.id])).rows;
  const schools=p.platform_school_ids.length?(await db.query('SELECT id,name FROM schools WHERE id=ANY($1::uuid[]) ORDER BY name,id',[p.platform_school_ids])).rows:[];
  const students=p.platform_student_ids.length?(await db.query(`SELECT i.id,i.name,
@@ -36,7 +36,7 @@ async function shape(db,p,{detail=false}={}) {
  return {sections:p.sections??[],id:p.id,title:p.title,description:p.description,category:p.category,difficulty:p.difficulty,coverKey:p.cover_key,
   coverImage:p.cover_image,authorName:p.author_name,authoredAt:p.authored_at,estimatedMinutes:p.estimated_minutes,
   requiredLanguage:p.required_language,localizations:p.localizations,published:!!p.published_at,archived:!!p.archived_at,
-  revision:p.platform_revision,sourceVersion:p.source_version,sourceSchool:'平台管理员',ownerScope:'platform',
+  revision:p.platform_revision,sourceVersion:p.source_version,sourceSchool:'平台管理员',ownerScope:'platform',canEdit:true,
   audienceScope:p.platform_access_scope,schoolIds:p.platform_school_ids,studentIds:p.platform_student_ids,
   schools,students,chapterCount:chapters.length,...(detail?{chapters}:{})};
 }
@@ -51,10 +51,7 @@ async function assertReady(db,p,user) {
  const chapters=(await db.query('SELECT content,acsl_links FROM learning_chapters WHERE path_id=$1 AND archived_at IS NULL',[p.id])).rows;
  if(!chapters.length||chapters.some(c=>!c.content.trim()))fail(409,'INCOMPLETE','发布前需要至少一个有正文的章节');
  await assertCoursePaper4Ready(db,p.id);
- for(const chapter of chapters){
-  const links=await projectCourseAcslLinks(db,LEGACY_SCHOOL_ID,user,chapter.acsl_links);
-  if(links.some(link=>!link.available))fail(409,'UNAVAILABLE_ACSL_LINK','请修复不可用的 ACSL 引用');
- }
+ await assertPlatformCourseAcslLinksReady(db,user,chapters.flatMap(chapter=>chapter.acsl_links??[]));
  const links=(await db.query(`SELECT p.archived_at, b.archived_at bank_archived,b.visibility,v.published_at,v.school_visible_at,v.rank_review_status
   FROM learning_chapters c JOIN chapter_problems cp ON cp.chapter_id=c.id
   JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id
@@ -64,7 +61,7 @@ async function assertReady(db,p,user) {
   fail(409,'UNAPPROVED_LESSON_PROBLEM','关联练习尚未发布或未通过审核');
 }
 async function save(db,user,body,old) {
- const audience=await platformCourseAudience(db,body,old);
+ const audience=await platformCourseAudience(db,body,old??{});
  const display=courseDisplayProperties(body,old??{},'平台管理员');
  const title=field(body.title??old?.title,'课程名称',{max:200});
  const description=field(body.description??old?.description??'','课程简介',{min:0,max:4000});
@@ -88,19 +85,29 @@ async function save(db,user,body,old) {
  if(body.chapters!==undefined){
   if(!Array.isArray(body.chapters)||body.chapters.length>100||Buffer.byteLength(JSON.stringify(body.chapters))>1500000)
    fail(400,'VALIDATION','课程最多 100 章，正文总量不能超过 1.5 MB');
-  const existingChapters=new Map((await db.query('SELECT id,section_key FROM learning_chapters WHERE path_id=$1',[id])).rows.map(c=>[c.id,c]));
+  const existingChapters=new Map((await db.query('SELECT * FROM learning_chapters WHERE path_id=$1',[id])).rows.map(c=>[c.id,c]));
   const existing=new Set(existingChapters.keys());
   const retained=[];
   for(const [position,c] of body.chapters.entries()){
+   if(!c||typeof c!=='object'||Array.isArray(c))fail(400,'VALIDATION','章节内容无效');
    const chapterId=c.id?uuid(c.id).toLowerCase():randomUUID();
    if(retained.includes(chapterId))fail(400,'VALIDATION','章节 ID 不能重复');
    if(c.id&&!existing.has(chapterId))fail(400,'VALIDATION','章节不属于此课程');
    retained.push(chapterId);
-   const sectionKey=chapterSectionKey(c.sectionKey===undefined?existingChapters.get(chapterId)?.section_key:c.sectionKey,sections);
-   const chapterTitle=field(c.title,'章节标题',{max:200}),content=field(c.content??'','章节正文',{min:0,max:100000,trim:false});
-   if(existing.has(chapterId))await db.query(`UPDATE learning_chapters SET title=$2,content=$3,position=$4,archived_at=NULL,updated_at=clock_timestamp() WHERE id=$1`,[chapterId,chapterTitle,content,position]);
-   else await db.query('INSERT INTO learning_chapters(id,path_id,title,content,position) VALUES($1,$2,$3,$4,$5)',[chapterId,id,chapterTitle,content,position]);
-   await db.query('UPDATE learning_chapters SET section_key=$2 WHERE id=$1',[chapterId,sectionKey]);
+   const before=existingChapters.get(chapterId);
+   const sectionKey=chapterSectionKey(c.sectionKey===undefined?before?.section_key:c.sectionKey,sections);
+   const chapterTitle=field(c.title===undefined?before?.title:c.title,'章节标题',{max:200});
+   const content=bytes(c.content===undefined?before?.content??'':c.content,'章节正文');
+   const objective=field(c.objective===undefined?before?.objective??'':c.objective,'学习目标',{min:0,max:4000,trim:false});
+   const checkpoint=field(c.checkpoint===undefined?before?.checkpoint??'':c.checkpoint,'检查点',{min:0,max:10000,trim:false});
+   const checkpointAnswer=field(c.checkpointAnswer===undefined?before?.checkpoint_answer??'':c.checkpointAnswer,'检查点答案',{min:0,max:10000,trim:false});
+   const chapterLocales=c.localizations===undefined?before?.localizations??null:courseLocalizations(c.localizations,{chapter:true});
+   const acslLinks=c.acslLinks===undefined?before?.acsl_links??[]:await resolvePlatformCourseAcslLinks(db,user,c.acslLinks,before?.acsl_links??[]);
+   if(existing.has(chapterId))await db.query(`UPDATE learning_chapters SET title=$2,content=$3,position=$4,archived_at=NULL,
+    objective=$5,checkpoint=$6,checkpoint_answer=$7,localizations=$8,acsl_links=$9,section_key=$10,updated_at=clock_timestamp() WHERE id=$1`,
+   [chapterId,chapterTitle,content,position,objective,checkpoint,checkpointAnswer,chapterLocales,JSON.stringify(acslLinks),sectionKey]);
+   else await db.query(`INSERT INTO learning_chapters(id,path_id,title,content,position,objective,checkpoint,checkpoint_answer,localizations,acsl_links,section_key)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,[chapterId,id,chapterTitle,content,position,objective,checkpoint,checkpointAnswer,chapterLocales,JSON.stringify(acslLinks),sectionKey]);
   }
   await db.query('UPDATE learning_chapters SET archived_at=clock_timestamp() WHERE path_id=$1 AND archived_at IS NULL AND NOT(id=ANY($2::uuid[]))',[id,retained]);
  }
@@ -114,6 +121,7 @@ export async function handlePlatformCourses({pool,user,route,method,body,url}) {
  if(!match)return null;
  return transaction(pool,async db=>{
   await authorize(db,user);
+  if(match[1]==='acsl-links'&&method==='GET'&&!match[2])return reply(await platformCourseAcslPicker(db,user));
   if(match[1]==='audience'&&method==='GET'){
    const q=field(url.searchParams.get('q')??'','搜索',{min:0,max:100}).toLowerCase();
    const kind=enumValue(url.searchParams.get('kind')??'schools',['schools','students'],'选择类型');

@@ -8,7 +8,7 @@ import { submissionCaseFeedback } from './submission-feedback.mjs';
 import { handleAcslManagement } from './acsl-management.mjs';
 import { acslTranslation, acslSolution, requireAcslTranslation } from './acsl-translation.mjs';
 import { acslCatalog } from './acsl-catalog.mjs';
-import { acslLearningLinks, courseAcslPicker } from './course-acsl.mjs';
+import { acslLearningCourses, acslLearningLinks, courseAcslPicker } from './course-acsl.mjs';
 
 const reply = (body, status = 200) => ({ status, body });
 
@@ -347,7 +347,7 @@ export async function handleAcsl({ pool, user, route, method, body = {}, url }) 
     await access(db, schoolId, user);
     if (!match[2] && method === 'GET') {
       const items = await acslCatalog(db, schoolId, user.id);
-      return reply({ enabled: items.length > 0, items });
+      return reply({ enabled: items.length > 0, items, learningCourses:await acslLearningCourses(db,schoolId,user,items) });
     }
     const paper = await loadPaper(db, schoolId, match[2]);
     if (!match[3] && method === 'GET') {

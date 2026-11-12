@@ -82,3 +82,14 @@ test('individual topic imports are retired before authentication while local top
   assert.deepEqual(readdirSync(directory),[]);
  }finally{rmSync(directory,{recursive:true,force:true});}
 });
+
+test('historical school merge is retired before authentication or business writes',()=>{
+ const directory=mkdtempSync(join(tmpdir(),'acsl-platform-source-'));
+ try{
+  assert.throws(()=>runCli('merge-acsl-tutorials',['--apply','--origin','http://127.0.0.1:1','--auth-file',join(directory,'missing.json')],{cwd:directory}),error=>{
+   assert.match(error.stderr,/School ACSL merges are retired/);
+   assert.doesNotMatch(error.stderr,/ENOENT|ECONNREFUSED|fetch failed/);return true;
+  });
+  assert.deepEqual(readdirSync(directory),[]);
+ }finally{rmSync(directory,{recursive:true,force:true});}
+});

@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { AppLink } from "@/components/navigation";
 import { useLocale } from "@/components/locale-context";
-import { useData } from "@/components/student/shared";
+import { useData } from "@/components/student/data-state";
 import { Button } from "@/components/ui/button";
 import { ScholarshipIcon } from "./scholarship-icon";
 

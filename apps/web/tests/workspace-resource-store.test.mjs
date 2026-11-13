@@ -81,10 +81,16 @@ test('membership refresh removes revoked school and teaching catalogs', async ()
   await seed(h, catalog, { enabled: true });
   await seed(h, catalog + '/manage', { enabled: true });
   await seed(h, 'schools/school-b/acsl', { enabled: true });
+  await seed(h, catalog + '?view=availability', { enabled: true });
+  await seed(h, catalog + '/manage?view=availability', { enabled: true });
+  await seed(h, 'schools/school-b/acsl?view=availability', { enabled: true });
   await seed(h, 'schools', { items: [{ id: 'school-a', roles: ['student'] }] });
   assert.equal(h.store.snapshot(catalog).data.enabled, true);
   assert.equal(h.store.snapshot(catalog + '/manage').data, null);
   assert.equal(h.store.snapshot('schools/school-b/acsl').data, null);
+  assert.equal(h.store.snapshot(catalog + '?view=availability').data.enabled, true);
+  assert.equal(h.store.snapshot(catalog + '/manage?view=availability').data, null);
+  assert.equal(h.store.snapshot('schools/school-b/acsl?view=availability').data, null);
 });
 
 test('expired session clears all resources and rejects late responses', async () => {

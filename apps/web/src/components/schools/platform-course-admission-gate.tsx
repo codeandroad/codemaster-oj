@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, Circle, RefreshCw } from "lucide-react";
-import { Feedback, inputClass, useMutation } from "@/components/admin/common";
+import { Feedback, inputClass, useMutation } from "@/components/admin/data-state";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { AppLink } from "@/components/navigation";
@@ -11,7 +11,7 @@ import { useCourseLanguage } from "@/components/course-language";
 import { courseLanguageHref, localizedCourse } from "@/components/course-localization";
 import { productionApi } from "@/lib/production-api";
 import { validCourseInvitation, type LearnerAdmissionRule } from "./platform-course-admission-model";
-import type { PublicCourseEntry } from "./public-course-catalog";
+import type { PublicCourseEntry } from "./course-admission";
 import { useSchoolText } from "./school-ui";
 
 export function PlatformCourseAdmissionGate({ entry, onUpdated, onClose, returnFocus }: {

@@ -1,12 +1,20 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import type { ReactNode } from "react";
 import { AppLink } from "@/components/navigation";
 import { useCatalogFilterUrl } from "@/components/use-catalog-filter-preferences";
-import { PublicCourseCatalog, PublicCoursePage } from "./public-course-catalog";
-import { PublicReviewNotebook, PublicSubmissions } from "./public-study-records";
-import { PublicPractice } from "./school-practice";
 import { useSchoolText } from "./school-ui";
+
+const PublicCourseCatalog = dynamic(() => import("./public-course-catalog").then(module => module.PublicCourseCatalog), { loading: ScopeLoading });
+const PublicCoursePage = dynamic(() => import("./public-course-catalog").then(module => module.PublicCoursePage), { loading: ScopeLoading });
+const PublicReviewNotebook = dynamic(() => import("./public-study-records").then(module => module.PublicReviewNotebook), { loading: ScopeLoading });
+const PublicSubmissions = dynamic(() => import("./public-study-records").then(module => module.PublicSubmissions), { loading: ScopeLoading });
+const PublicPractice = dynamic(() => import("./school-practice").then(module => module.PublicPractice), { loading: ScopeLoading });
+function ScopeLoading() {
+  const text = useSchoolText();
+  return <p role="status" className="p-5 text-sm text-muted-foreground">{text("Loading…", "正在加载…")}</p>;
+}
 
 type ResourceSection = "problems" | "courses" | "submissions" | "review-notebook";
 const scopeKeys = ["scope"];

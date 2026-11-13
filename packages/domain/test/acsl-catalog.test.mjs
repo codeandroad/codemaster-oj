@@ -44,7 +44,7 @@ test('a full catalog uses bounded queries and compact rows while preserving acco
       app = createPool(roleUrl.href);
       const root = `/schools/${LEGACY_SCHOOL_ID}/acsl`;
       const request = (user, path = '', method = 'GET', body = {}, pool = app) => handleAcsl({ pool, user: users[user],
-        route: root + path, method, body, url: new URL(`http://catalog.test${root}${path}`) });
+        route: new URL(`http://catalog.test${root}${path}`).pathname, method, body, url: new URL(`http://catalog.test${root}${path}`) });
       const measure = async (user, path = '') => {
         let queries = 0, bytes = 0;
         const measured = { connect: async () => {
@@ -57,8 +57,14 @@ test('a full catalog uses bounded queries and compact rows while preserving acco
         const result = await request(user, path, 'GET', {}, measured);
         assert.ok(queries <= 10, `Catalog must not query every edition separately (${queries} queries)`);
         assert.ok(bytes < 100000, `Catalog must not fetch private definitions or full answer snapshots (${bytes} bytes)`);
+        if (path.includes('view=availability')) assert.ok(bytes < 2000, `Navigation must not load the catalog or progress (${bytes} bytes)`);
         return result.body;
       };
+      await t.test('navigation checks availability without loading 96 papers or learner progress', async () => {
+        assert.deepEqual(await measure('student', '?view=availability'), { enabled: true });
+        assert.deepEqual(await measure('teacher', '/manage?view=availability'), { enabled: true });
+        await assert.rejects(request('student', '/manage?view=availability'), error => error.status === 403);
+      });
       await t.test('96-paper student and teacher lists are compact and omit protected content', async () => {
         for (const [user, path] of [['student', ''], ['teacher', '/manage']]) {
           const catalog = await measure(user, path); assert.equal(catalog.enabled, true); assert.equal(catalog.items.length, 96);
@@ -91,8 +97,14 @@ test('a full catalog uses bounded queries and compact rows while preserving acco
         const foreignRoute = `/schools/${foreignSchool.id}/acsl`;
         await assert.rejects(handleAcsl({ pool: app, user: users.student, route: foreignRoute, method: 'GET',
           url: new URL('http://catalog.test' + foreignRoute) }), error => error.status === 404);
+        await assert.rejects(handleAcsl({ pool: app, user: users.student, route: foreignRoute, method: 'GET',
+          url: new URL('http://catalog.test' + foreignRoute + '?view=availability') }), error => error.status === 404);
+        await owner.query('UPDATE acsl_papers SET enabled=false WHERE school_id=$1', [LEGACY_SCHOOL_ID]);
+        assert.deepEqual(await measure('student', '?view=availability'), { enabled: false });
+        assert.deepEqual(await measure('teacher', '/manage?view=availability'), { enabled: true });
         await owner.query('UPDATE accounts SET disabled_at=clock_timestamp() WHERE id=$1', [users.student.id]);
         await assert.rejects(request('student'), error => error.status === 401);
+        await assert.rejects(request('student', '?view=availability'), error => error.status === 401);
       });
     } finally {
       await app?.end(); await owner.end(); await manager.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`); await manager.end();

@@ -2,7 +2,7 @@
 
 import { preserveAcslLearningContext } from "@/components/course-acsl-navigation";
 import { useCourseLanguage } from "@/components/course-language";
-import { courseLanguageHref, localizedCourse, type CourseLocalizations, type ChapterLocalizations } from "@/components/course-localization";
+import { courseLanguageHref, type CourseLocalizations, type ChapterLocalizations } from "@/components/course-localization";
 import type { CourseAcslLink } from "@/components/course-acsl";
 import { CourseAcslPractice } from "./course-acsl-practice";
 import { CoursePracticeReturn } from "./course-practice-return";
@@ -10,23 +10,18 @@ import { CoursePaper4Practice } from "./course-paper4-practice";
 import { useCourseProgressRefresh } from "./course-progress-refresh";
 import type { CoursePaper4Link } from "@/components/course-paper4";
 import { coursePaper4Progress } from "@/components/paper4/paper4-learning-navigation";
-import { CourseAccessSummary, courseSourceName, type CourseAccessMetadata } from "@/components/course-access";
-import {courseDifficulties} from "@/components/learning-course";
-import {LearningCourseList,LearningCourseRow,learningCourseTitleClass} from "./learning-course-list";
-import { CourseCatalogSearch, useCourseCatalogQuery } from "./learning-course-search";
-import { filterCourseCatalog } from "./learning-course-search-model";
+import { CourseAccessSummary, type CourseAccessMetadata } from "@/components/course-access";
+import type {courseDifficulties} from "@/components/learning-course";
 import { AppLink } from "@/components/navigation";
 import { LearningCourseReader } from "./learning-course-reader";
-import { courseAdmissionLabel, useCourseAdmissionDialog, type PublicCourseEntry } from "@/components/schools/public-course-catalog";
 
 import { Check, ChevronDown, ClipboardList } from "lucide-react";
 import { useEffect } from "react";
 import { canonicalCourseHref, type CourseSection } from "@/components/course-sections";
 import { useRouter, useSearchParams } from "next/navigation";
-import { PageHeader, StatusPill } from "@/components/page-chrome";
+import { StatusPill } from "@/components/page-chrome";
 import { productionApi } from "@/lib/production-api";
 import { State, useData } from "./shared";
-import { useWorkspaceData } from "@/components/workspace-data";
 import {useLocale,type AppLocale} from "@/components/locale-context";
 
 function ui(locale:AppLocale,zh:string,en:string){return locale==="en"?en:zh;}
@@ -51,41 +46,8 @@ type CourseAssignment = {
 };
 
 export interface LearningPath extends CourseAccessMetadata { sections?: CourseSection[]; redirectedFromCourseId?: string; redirectedChapterId?: string; localizations?: CourseLocalizations; id: string; title: string; description: string; category: string; published: boolean; chapterCount: number; completedChapters: number; canEdit: boolean;difficulty?:keyof typeof courseDifficulties;coverKey?:string;taskCount?:number;completedTasks?:number; chapters?: LearningChapter[]; assignments?: CourseAssignment[]; }
-type LockedLearningPath = CourseAccessMetadata & Pick<LearningPath, "id" | "title" | "description" | "category" | "difficulty" | "coverKey" | "chapterCount" | "localizations"> & {
-  admission: PublicCourseEntry["admission"];
-};
-export function StudentLearningList(){
- const {locale}=useLocale();
- const {language}=useCourseLanguage();
- const paths=useWorkspaceData<{items:(LearningPath | LockedLearningPath)[]}>("learning-paths?includeAdmission=true");
- const [query, setQuery] = useCourseCatalogQuery();
- const visible = filterCourseCatalog((paths.data?.items ?? []).map(path => localizedCourse(path, language)), query);
- const detailHref = (id: string) => courseLanguageHref(`/student/learning-paths/${id}`, language);
- const { busy, openCourse, feedback, dialog } = useCourseAdmissionDialog(detailHref, paths.reload);
- return <>
-  <PageHeader title={ui(locale,"课程","Courses")} description={ui(locale,"按章节阅读、练习与复盘；已读和判题通过分别记录。","Read, practice, and review each chapter. Reading and accepted submissions are tracked separately.")}/>
-  <CourseCatalogSearch query={query} onSearch={setQuery}/>
-  {feedback}
-  <State data={paths}>
-   <div className="mt-3"><LearningCourseList empty={!visible.length ? (query
-     ? ui(locale,"没有符合搜索条件的课程。","No courses match this search.")
-     : ui(locale,"暂无已发布课程","No published courses yet")) : undefined}>
-    {visible.map(path => {
-      const course = {...path, difficulty:path.difficulty??"beginner"} as const;
-      const source = courseSourceName(path);
-      if ("admission" in path) return <LearningCourseRow key={path.id} course={course} source={source}
-        title={<button type="button" className={learningCourseTitleClass} disabled={busy} onClick={event => void openCourse(event,path.id)}>{path.title}</button>}
-        status={courseAdmissionLabel(path.admission, (en, zh) => ui(locale, zh, en), path.chapterCount)}/>;
-      return <LearningCourseRow key={path.id} course={course} source={source}
-        title={<AppLink href={detailHref(path.id)} className={learningCourseTitleClass}>{path.title}</AppLink>}
-        reading={{value:path.completedChapters,total:path.chapterCount}}
-        practice={{value:path.completedTasks??0,total:path.taskCount??0}}/>;
-    })}
-   </LearningCourseList></div>
-  </State>
-  {dialog}
- </>;
-}
+export { StudentLearningList } from "./learning-list";
+
 export function StudentLearningDetail({ id, chapterId }: { id: string; chapterId?: string }) {
   const { locale } = useLocale();
   const { language } = useCourseLanguage();

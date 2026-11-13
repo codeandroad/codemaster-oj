@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { RefreshCw } from "lucide-react";
-import { inputClass } from "@/components/admin/common";
+import { inputClass } from "@/components/admin/data-state";
 import { useLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
 import { courseSearchHref, courseSearchMaxLength, courseSearchParameter, courseSearchQuery } from "./learning-course-search-model";

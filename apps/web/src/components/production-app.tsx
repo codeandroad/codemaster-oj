@@ -1,15 +1,14 @@
 "use client";
+import dynamic from "next/dynamic";
+import { StudentProblems } from "./student/problems";
+import { StudentLearningList } from "./student/learning-list";
+import { LearnerResourceScope } from "./schools/learner-resource-scope";
+import { ScholarshipBalance } from "./scholarship/balance";
+import { legacyCourseAdmissionsHref, legacyCourseAdmissionsSchoolId } from "./schools/school-course-admission-routes";
 import { WorkspaceDataProvider, useWorkspaceData } from "./workspace-data";
 import { CourseLanguageProvider } from "./course-language";
-import { useAcslEnabled } from "./acsl/acsl-page";
-import { LegacyAcslTeacherPage } from "./acsl/teacher-entry";
+import { useAcslEnabled } from "./acsl/use-acsl-enabled";
 import { StudentPresenceHeartbeat } from "./student/student-presence";
-import { PlatformPage } from "./schools/platform-page";
-import { SchoolsPage } from "./schools/schools-page";
-import {ProfileEditor} from "./profile-editor";
-import {PointsPage} from "./points-page";
-import { AdminScholarshipPage, StudentScholarshipPage, ScholarshipBalance } from "./scholarship/account-pages";
-import { TeacherScholarshipPage } from "./scholarship/teaching-page";
 
 import { AppLink } from "@/components/navigation";
 import { isCampusAuthRoute, isCampusRoute, loginReturnTo, resolvePublicLearningBookmark } from "@/lib/campus-routes";
@@ -24,33 +23,52 @@ import { SiteFooter } from "@/components/site-footer";
 import { workspaceNavigation, WorkspaceNavigation } from "@/components/workspace-navigation";
 import { schoolDisplayName, type School } from "./schools/school-ui";
 import { resolveLoginDestination } from "./auth/login-destination";
-import { PersonalRegisterPage } from "./auth/personal-register-page";
-import { PracticePage } from "./schools/practice-page";
-import { JoinedSchoolSettings } from "./schools/joined-school-settings";
 import { readSchoolPreference, writeSchoolPreference } from "./schools/school-selection";
 import { PageHeadingProvider } from "@/components/page-heading-context";
 import { PageBreadcrumbs, ShellPageHeading } from "@/components/page-breadcrumbs";
-import { ProductionLoginPage } from "@/components/auth/login-page";
 import { AuthNotice } from "@/components/auth/auth-shell";
-import { ProductionRegisterPage } from "@/components/auth/register-page";
-import { AdminAccountsPage, AdminPeoplePage } from "@/components/admin/accounts-people";
-import { AdminDashboard } from "@/components/admin/dashboard";
-import { legacyCourseAdmissionsHref, legacyCourseAdmissionsSchoolId, SchoolCourseAdmissions } from "@/components/schools/school-course-admissions";
-import { AdminImportPage } from "@/components/admin/import-page";
-import { AdminProblemSolutionsPage } from "@/components/admin/problem-solutions-page";
-import { SolutionReviewPage } from "@/components/teacher/solution-review-page";
-import { Paper4AssistancePage } from "@/components/paper4/paper4-assistance-editor";
-import { AdminProblemBanks } from "@/components/admin/problem-banks";
-import { AdminJudgePage, AdminSettingsPage } from "@/components/admin/system-pages";
-import { Feedback, panelClass as panel, useMutation as useAction } from "@/components/admin/common";
-import { StudentPages, AlignedProfile } from "@/components/student/pages";
-import { StudentPublicProfile } from "@/components/student/public-profile";
+import { Feedback, panelClass as panel, useMutation as useAction } from "@/components/admin/data-state";
 import {useWorkspaceSettings} from "@/components/student/workspace-settings";
 import {WorkspaceThemeProvider} from "@/components/ui/theme-context";
 import {PersonalAppearanceProvider, PersonalAppearanceSettings} from "@/components/personal-appearance-settings";
 import {AppLocaleProvider,useLocale} from "@/components/locale-context";
-import { TeacherPages } from "@/components/teacher/teacher-pages";
 import { ApiError, apiMessage, clearProductionSession, productionApi, productionSessionExpiredEvent, roleHome, type AuthResponse, type CampusRole, type CampusUser } from "@/lib/production-api";
+
+
+// Keep unrelated workspaces and editors out of the authentication/catalog bundle.
+const LegacyAcslTeacherPage = dynamic(() => import("./acsl/teacher-entry").then(module => module.LegacyAcslTeacherPage), { loading: PageLoading });
+const PlatformPage = dynamic(() => import("./schools/platform-page").then(module => module.PlatformPage), { loading: PageLoading });
+const SchoolsPage = dynamic(() => import("./schools/schools-page").then(module => module.SchoolsPage), { loading: PageLoading });
+const ProfileEditor = dynamic(() => import("./profile-editor").then(module => module.ProfileEditor), { loading: PageLoading });
+const PointsPage = dynamic(() => import("./points-page").then(module => module.PointsPage), { loading: PageLoading });
+const AdminScholarshipPage = dynamic(() => import("./scholarship/account-pages").then(module => module.AdminScholarshipPage), { loading: PageLoading });
+const StudentScholarshipPage = dynamic(() => import("./scholarship/account-pages").then(module => module.StudentScholarshipPage), { loading: PageLoading });
+const TeacherScholarshipPage = dynamic(() => import("./scholarship/teaching-page").then(module => module.TeacherScholarshipPage), { loading: PageLoading });
+const PersonalRegisterPage = dynamic(() => import("./auth/personal-register-page").then(module => module.PersonalRegisterPage), { loading: PageLoading });
+const PracticePage = dynamic(() => import("./schools/practice-page").then(module => module.PracticePage), { loading: PageLoading });
+const JoinedSchoolSettings = dynamic(() => import("./schools/joined-school-settings").then(module => module.JoinedSchoolSettings), { loading: PageLoading });
+const ProductionLoginPage = dynamic(() => import("@/components/auth/login-page").then(module => module.ProductionLoginPage), { loading: PageLoading });
+const ProductionRegisterPage = dynamic(() => import("@/components/auth/register-page").then(module => module.ProductionRegisterPage), { loading: PageLoading });
+const AdminAccountsPage = dynamic(() => import("@/components/admin/accounts-people").then(module => module.AdminAccountsPage), { loading: PageLoading });
+const AdminPeoplePage = dynamic(() => import("@/components/admin/accounts-people").then(module => module.AdminPeoplePage), { loading: PageLoading });
+const AdminDashboard = dynamic(() => import("@/components/admin/dashboard").then(module => module.AdminDashboard), { loading: PageLoading });
+const SchoolCourseAdmissions = dynamic(() => import("@/components/schools/school-course-admissions").then(module => module.SchoolCourseAdmissions), { loading: PageLoading });
+const AdminImportPage = dynamic(() => import("@/components/admin/import-page").then(module => module.AdminImportPage), { loading: PageLoading });
+const AdminProblemSolutionsPage = dynamic(() => import("@/components/admin/problem-solutions-page").then(module => module.AdminProblemSolutionsPage), { loading: PageLoading });
+const SolutionReviewPage = dynamic(() => import("@/components/teacher/solution-review-page").then(module => module.SolutionReviewPage), { loading: PageLoading });
+const Paper4AssistancePage = dynamic(() => import("@/components/paper4/paper4-assistance-editor").then(module => module.Paper4AssistancePage), { loading: PageLoading });
+const AdminProblemBanks = dynamic(() => import("@/components/admin/problem-banks").then(module => module.AdminProblemBanks), { loading: PageLoading });
+const AdminJudgePage = dynamic(() => import("@/components/admin/system-pages").then(module => module.AdminJudgePage), { loading: PageLoading });
+const AdminSettingsPage = dynamic(() => import("@/components/admin/system-pages").then(module => module.AdminSettingsPage), { loading: PageLoading });
+const StudentPages = dynamic(() => import("@/components/student/pages").then(module => module.StudentPages), { loading: PageLoading });
+const AlignedProfile = dynamic(() => import("@/components/student/pages").then(module => module.AlignedProfile), { loading: PageLoading });
+const StudentPublicProfile = dynamic(() => import("@/components/student/public-profile").then(module => module.StudentPublicProfile), { loading: PageLoading });
+const TeacherPages = dynamic(() => import("@/components/teacher/teacher-pages").then(module => module.TeacherPages), { loading: PageLoading });
+
+function PageLoading() {
+  const { locale } = useLocale();
+  return <p role="status" className="p-5 text-sm text-muted-foreground">{locale === "en" ? "Loading…" : "正在加载…"}</p>;
+}
 
 export function ProductionApp() {
   const pathname = usePathname();
@@ -289,6 +307,8 @@ function ProductionView({pathname,role,user,profileVersion,onProfileSaved}:{path
   if(pathname==="/student/profile")return <><ProfileEditor user={user} onSaved={onProfileSaved}/><StudentPublicProfile key={profileVersion} profileId={user.identityId} viewer={user} embedded/></>;
   if(pathname.endsWith("/profile"))return <ProfileEditor user={user} onSaved={onProfileSaved}/>;
   if(pathname==="/student/settings"||pathname==="/teacher/settings"||pathname==="/admin/personal-settings")return <><AlignedProfile user={user} teacher={role==="teacher"} admin={role==="admin"}/><PersonalAppearanceSettings/><JoinedSchoolSettings user={user}/></>;
+  if (role === "student" && pathname === "/student/problems") return <LearnerResourceScope section="problems" schoolHref="/student/problems" accountId={user.id}><StudentProblems accountId={user.id}/></LearnerResourceScope>;
+  if (role === "student" && pathname === "/student/learning-paths") return <LearnerResourceScope section="courses" schoolHref="/student/learning-paths"><StudentLearningList/></LearnerResourceScope>;
   if (role==="student") return <StudentPages pathname={pathname} user={user}/>;
   if (pathname==="/teacher/profile") return <AlignedProfile user={user} teacher/>;
   if (role==="teacher") return <TeacherPages pathname={pathname} user={user}/>;

@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import { Search, X } from "lucide-react";
 import { useLocale } from "@/components/locale-context";
-import { input } from "./shared";
+import { input } from "./data-state";
 import problemStyles from "./problems-page.module.css";
 
 export function ProblemCatalogSearch({ value, onChange, label, maxLength, onCompositionStart, onCompositionEnd }: {

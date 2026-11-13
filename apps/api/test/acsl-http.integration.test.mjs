@@ -61,6 +61,13 @@ test('ACSL real Nest lifecycle protects answers, histories, drafts, school scope
     await t.test('authorization, opt-in and safe student projections', async () => {
       await request(root, { status: 401 });
       await request(root, { auth: auth.outsider, status: 404 });
+      await request(`${root}?view=availability`, { status: 401 });
+      await request(`${root}?view=availability`, { auth: auth.outsider, status: 404 });
+      const availability = await request(`${root}?view=availability`, { auth: auth.student });
+      assert.deepEqual(availability.data, { enabled: true });
+      assert.match(availability.headers.get('cache-control'), /no-store/);
+      await request(`${root}/manage?view=availability`, { auth: auth.student, status: 403 });
+      assert.deepEqual((await request(`${root}/manage?view=availability`, { auth: auth.admin })).data, { enabled: true });
       await request(`/schools/${LEGACY_SCHOOL_ID}/acsl/${legacyPaper.id}`, { auth: auth.student, status: 404 });
       assert.equal((await request(`/schools/${LEGACY_SCHOOL_ID}/acsl/${legacyPaper.id}`, { auth: auth.legacy })).data.questions.length, 6);
       const catalog = await request(root, { auth: auth.student }); assert.equal(catalog.data.enabled, true);
@@ -561,8 +568,11 @@ test('ACSL real Nest lifecycle protects answers, histories, drafts, school scope
       await pool.query('UPDATE school_memberships SET revoked_at=now() WHERE school_id=$1 AND account_id=$2', [school.id,users.student.id]);
       await request(path, { auth: auth.student, status: 404 });
       await request(referencePath, { auth: auth.student, status: 404 });
+      await request(`${root}?view=availability`, { auth: auth.student, status: 404 });
       await pool.query('UPDATE acsl_papers SET enabled=false WHERE school_id=$1', [school.id]);
       assert.equal((await request(root, { auth: auth.admin })).data.enabled, false);
+      assert.deepEqual((await request(`${root}?view=availability`, { auth: auth.admin })).data, { enabled: false });
+      assert.deepEqual((await request(`${root}/manage?view=availability`, { auth: auth.admin })).data, { enabled: true });
       await request(path, { auth: auth.admin, status: 404 });
     });
   } finally {

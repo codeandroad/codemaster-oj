@@ -1,4 +1,5 @@
-import { Controller, Module, Req, Res, UseGuards, Delete, Get, Patch, Post } from '@nestjs/common';
+import { Controller, Module, Req, Res, UseGuards, Delete, Get, Patch, Post, StreamableFile } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import type { Response } from 'express';
 import { DomainService } from '../domain.service.js';
 import { DomainGuard, type DomainRequest } from '../domain.guard.js';
@@ -87,6 +88,23 @@ export class EducationController {
 
   @Get('learning-paths/:id/progress')
   async pathProgress(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response):Promise<unknown>{return applyResponse(response,await this.domain.execute('education',request.domainContext));}
+
+  @Get('learning-paths/:id/cover')
+  async pathCover(@Req() request: DomainRequest, @Res({passthrough:true}) response: Response): Promise<unknown> {
+    // Resolve current catalog access before considering a cached image's ETag.
+    const result = await this.domain.execute('education', request.domainContext);
+    const { content, type } = result.body as { content: Buffer; type: string };
+    const etag = `"${createHash('sha256').update(content).digest('hex')}"`;
+    response.setHeader('Cache-Control', 'private, no-cache');
+    response.setHeader('ETag', etag);
+    const conditional = request.headers['if-none-match'];
+    if (typeof conditional === 'string' && conditional.split(',').some(value => value.trim() === '*' || value.trim().replace(/^W\//, '') === etag)) {
+      response.status(304);
+      return;
+    }
+    response.status(result.status);
+    return new StreamableFile(content, { type, disposition: 'inline', length: content.length });
+  }
 
   @Get('learning-paths/:id')
   async path(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {

@@ -135,6 +135,10 @@ export async function handleAcslManagement({ pool, user, schoolId, tail, method,
   return transaction(pool, async db => {
     await staffAccess(db, schoolId, user, method === 'PATCH');
     if (!parts.length) {
+      if (url.searchParams.get('view') === 'availability') {
+        const { rows } = await db.query('SELECT EXISTS(SELECT 1 FROM acsl_papers WHERE school_id=$1) enabled', [schoolId]);
+        return reply(rows[0]);
+      }
       const items = await acslManagementCatalog(db, schoolId);
       return reply({ enabled: items.length > 0, items });
     }

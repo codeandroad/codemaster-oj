@@ -13,7 +13,7 @@ import { transaction } from './db.mjs';
 import { fail, field, uuid, bytes, integer,enumValue } from './security.mjs';
 import { getTimedPracticeResult } from './timed.mjs';
 import { avatarForIdentity } from './avatars.mjs';
-import {managesCourse,readableCourseIds,courseAccess,courseClasses,courseProperties,saveCourseProperties,assertCoursePublicationAccess} from './course-access.mjs';
+import {managesCourse,readableCourseIds,courseAccess,courseClasses,courseProperties,saveCourseProperties,assertCoursePublicationAccess,validateCoverImage} from './course-access.mjs';
 import { assignmentProgressById } from './assignment-grades.mjs';
 import { latestCourseProblemVersion } from './course-problem-version.mjs';
 import { liveProblemVersionIdSql, resolveLiveProblemVersion } from './live-problem-version.mjs';
@@ -23,6 +23,29 @@ const administrator = user => user.roles.includes('admin');
 const result = (body, status = 200) => ({ status, body });
 const requireStaff = user => { if (!staff(user)) fail(403, 'FORBIDDEN', '需要教师权限'); };
 const exists = query => { if (!query.rowCount) fail(404, 'NOT_FOUND', '内容不存在'); return query.rows[0]; };
+const catalogCandidateSql=`(p.archived_at IS NOT NULL)=$5 AND (NOT $3::boolean OR p.owner_scope='school')
+ AND (NOT $5 AND p.published_at IS NOT NULL OR ($3::boolean AND (p.owner_account_id=$1 OR $4::boolean)))`;
+const discoverableAdmission=(user,entry)=>user.roles.includes('student')&&!staff(user)&&entry&&entry.admission!=='denied'
+ &&entry.admissionRules.some(rule=>rule.targetKind==='school'&&rule.schoolId===LEGACY_SCHOOL_ID);
+
+async function catalogCover(pool,user,id,archived) {
+ if(archived)requireStaff(user);
+ return transaction(pool,async db=>{
+  // Keep the cover and its current catalog admission in the same snapshot.
+  // Admission can read prerequisite progress, so this must permit its shared locks.
+  await db.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+  const path=exists(await db.query(`SELECT p.id,p.owner_scope FROM learning_paths p
+   WHERE p.id=$2 AND ${catalogCandidateSql}`,[user.id,uuid(id),staff(user),administrator(user),archived]));
+  const {readable,platformAdmissions}=await courseAccess(db,user,[path.id],{listed:true});
+  if(!(readable.has(path.id)&&(!staff(user)||path.owner_scope!=='platform'))&&!discoverableAdmission(user,platformAdmissions.get(path.id)))
+   fail(404,'NOT_FOUND','内容不存在');
+  const {cover_image:cover}=exists(await db.query('SELECT cover_image FROM learning_paths WHERE id=$1',[path.id]));
+  if(!cover)fail(404,'NOT_FOUND','课程封面不存在');
+  try{validateCoverImage(cover);}catch{fail(404,'NOT_FOUND','课程封面不存在');}
+  const [,type,encoded]=/^data:(image\/(?:png|jpeg|webp));base64,(.+)$/.exec(cover);
+  return {content:Buffer.from(encoded,'base64'),type};
+ });
+}
 
 async function pathAccess(db, user, id, edit = false, lock = false, allowArchived = false) {
  const path = exists(await db.query(`SELECT *,xmin::text AS edit_revision FROM learning_paths WHERE id=$1 AND (archived_at IS NULL OR $2) ${lock ? 'FOR UPDATE' : ''}`, [uuid(id),allowArchived]));
@@ -447,18 +470,22 @@ export async function handleEducation(ctx) {
   const rows = report.students.flatMap(s=>s.assignments.map(a=>[s.identityId,s.name,a.title,a.pending?'待评测':a.score,a.maxScore,a.pending?'pending':'valid'].map(safe)));
   return result({ columns:['Identity ID','Student','Assignment','Score','Maximum','State'], rows });
  }
+ const coverMatch=route.match(/^\/learning-paths\/([^/]+)\/cover$/);
+ if(coverMatch&&method==='GET')return result(await catalogCover(pool,user,coverMatch[1],ctx.url.searchParams.get('archived')==='true'));
  if (route === '/learning-paths' && method === 'GET') {
   const summary=ctx.url.searchParams.get('view')==='summary';
+  const studentSummary=ctx.url.searchParams.get('view')==='student-summary';
   if(summary)requireStaff(user);
   const archived=ctx.url.searchParams.get('archived')==='true';
   if(archived)requireStaff(user);
-  const paths = (await pool.query(`SELECT ${summary?`p.id,p.title,p.description,p.category,p.difficulty,p.cover_key,p.cover_image,p.author_name,p.authored_at,
+  const paths = (await pool.query(`SELECT ${summary||studentSummary?`p.id,p.title,p.description,p.category,p.difficulty,p.cover_key,
+   ${studentSummary?"(p.cover_image IS NOT NULL AND octet_length(p.cover_image)>0) has_cover,p.sections,p.platform_access_scope":'p.cover_image'},p.author_name,p.authored_at,
    p.estimated_minutes,p.required_language,p.published_at,p.archived_at,p.owner_scope,p.owner_account_id,p.merged_into_id,p.localizations,
    p.access_scope,p.available_from,p.available_until,p.listed,p.withdrawn_at,p.updated_at,p.created_at`:'p.*'},
    (SELECT count(*) FROM learning_chapters c WHERE c.path_id=p.id AND c.archived_at IS NULL) chapter_count,
    CASE WHEN $6::boolean THEN 0 ELSE (SELECT count(*) FROM learning_progress pr JOIN learning_chapters c ON c.id=pr.chapter_id WHERE c.path_id=p.id AND c.archived_at IS NULL AND pr.identity_id=$2 AND pr.completed) END completed_chapters
-   FROM learning_paths p WHERE (p.archived_at IS NOT NULL)=$5 AND (NOT $3::boolean OR p.owner_scope='school')
-    AND (NOT $5 AND p.published_at IS NOT NULL OR ($3::boolean AND (p.owner_account_id=$1 OR $4::boolean))) ORDER BY p.updated_at DESC,p.id`, [user.id,user.identityId,staff(user),administrator(user),archived,summary])).rows;
+   FROM learning_paths p WHERE ${catalogCandidateSql} ORDER BY p.updated_at DESC,p.id`, [user.id,user.identityId,staff(user),administrator(user),archived,summary])).rows;
+  if(studentSummary)for(const path of paths)path.cover_image=path.has_cover?`/api/v1/learning-paths/${path.id}/cover${archived?'?archived=true':''}`:null;
   const {readable,platformAdmissions}=await courseAccess(pool,user,paths.map(p=>p.id),{listed:true});
   const includeAdmission=ctx.url.searchParams.get('includeAdmission')==='true'&&user.roles.includes('student')&&!staff(user);
   const accessible=paths.filter(p=>readable.has(p.id));
@@ -476,7 +503,7 @@ export async function handleEducation(ctx) {
    }
    const entry=includeAdmission?platformAdmissions.get(p.id):null;
    // School discovery may show a matching course before admission, without its learner data.
-   if(!entry||entry.admission==='denied'||!entry.admissionRules.some(rule=>rule.targetKind==='school'&&rule.schoolId===LEGACY_SCHOOL_ID))return [];
+   if(!discoverableAdmission(user,entry))return [];
    return {id:p.id,title:p.title,description:p.description,category:p.category,difficulty:p.difficulty,coverKey:p.cover_key,
     coverImage:p.cover_image,authorName:p.author_name,...localizedFields(p.localizations),ownerScope:p.owner_scope,
     chapterCount:Number(p.chapter_count),admission:entry.admission};

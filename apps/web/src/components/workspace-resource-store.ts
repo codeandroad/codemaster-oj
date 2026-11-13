@@ -50,7 +50,7 @@ export function createWorkspaceResourceStore(
     const schools = data as { items?: { id: string; roles: string[]; legacy?: boolean }[] };
     if (!Array.isArray(schools.items)) return;
     for (const [path, value] of entries) {
-      const match = /^schools\/([^/]+)\/acsl(\/manage)?$/.exec(path);
+      const match = /^schools\/([^/]+)\/acsl(\/manage)?(?:\?view=availability)?$/.exec(path);
       if (!match) continue;
       const school = schools.items.find(item => item.id === match[1]);
       const canManage = school?.roles.some(role => ["school_admin", "teacher", "admin"].includes(role));

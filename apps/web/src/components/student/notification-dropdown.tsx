@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useLocale, type AppLocale } from "@/components/locale-context";
 import { productionApi } from "@/lib/production-api";
 import type { Assignment } from "@/lib/production-api";
-import { date, useData } from "./shared";
+import { date, useData } from "./data-state";
 
 interface NotificationBase {
   id: string;

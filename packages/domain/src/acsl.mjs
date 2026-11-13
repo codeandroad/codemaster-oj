@@ -346,6 +346,10 @@ export async function handleAcsl({ pool, user, route, method, body = {}, url }) 
   return transaction(pool, async db => {
     await access(db, schoolId, user);
     if (!match[2] && method === 'GET') {
+      if (url.searchParams.get('view') === 'availability') {
+        const { rows } = await db.query('SELECT EXISTS(SELECT 1 FROM acsl_papers WHERE school_id=$1 AND enabled) enabled', [schoolId]);
+        return reply(rows[0]);
+      }
       const items = await acslCatalog(db, schoolId, user.id);
       return reply({ enabled: items.length > 0, items, learningCourses:await acslLearningCourses(db,schoolId,user,items) });
     }

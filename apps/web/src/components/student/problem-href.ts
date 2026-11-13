@@ -1,0 +1,1 @@
+export function problemHref(problem: { problemId: string; versionId?: string }, context: Record<string, string> = {}) { const params = new URLSearchParams({ ...(problem.versionId ? { versionId: problem.versionId } : {}), ...context }); return `/student/problems/${problem.problemId}${params.size ? `?${params}` : ""}`; }

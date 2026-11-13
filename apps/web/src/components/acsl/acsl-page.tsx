@@ -44,12 +44,7 @@ import {
   type AcslPaper,
 } from "./model";
 
-export function useAcslEnabled(schoolId?: string, management = false) {
-  const catalog = useWorkspaceData<Pick<AcslCatalog, "enabled">>(
-    schoolId ? `schools/${schoolId}/acsl${management ? "/manage" : ""}` : "",
-  );
-  return catalog.data?.enabled === true;
-}
+export { useAcslEnabled } from "./use-acsl-enabled";
 
 export function LegacyAcslPage({ user }: { user: CampusUser }) {
   const schools = useWorkspaceData<{ items: School[] }>("schools");

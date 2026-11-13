@@ -7,6 +7,7 @@ import type { CourseAcslLink } from "@/components/course-acsl";
 export type CourseAudience = "all" | "schools" | "students";
 export type AudienceMember = { id: string; name: string; username?: string | null };
 export type PlatformChapter = {
+  paper4Links?: import("@/components/course-paper4").CoursePaper4Link[];
   problems?: import("./platform-course-problem-links").PlatformProblemLink[];
   sectionKey?: string | null; id?: string; title: string; content: string; problemCount?: number;
   objective?: string; checkpoint?: string; checkpointAnswer?: string;

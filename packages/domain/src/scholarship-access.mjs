@@ -32,7 +32,7 @@ export async function hasLegacyPracticeAc(db,user,{problemId}){
 // Read only public statement/version identifiers here; never reference code or judge data.
 export async function resolveAssistanceTarget(db,user,input,{manage=false,helpers={}}={}){
  if(!manage&&!user.roles.includes('student'))fail(403,'FORBIDDEN','仅学生可使用助学内容');
- if(manage&&!isScholarshipStaff(user))fail(403,'FORBIDDEN','需要教师权限');
+ if(manage&&!input.problemId&&!isScholarshipStaff(user))fail(403,'FORBIDDEN','需要教师权限');
  if(input.problemId){
   if(input.paper4AttemptId||input.paperId)fail(400,'VALIDATION','只能指定一种题目');
   const problemId=uuid(input.problemId);
@@ -46,7 +46,7 @@ export async function resolveAssistanceTarget(db,user,input,{manage=false,helper
    permissions=await problemPermissions(db,user,p,v);
    if(!permissions.canRead)fail(404,'NOT_FOUND','题目不存在');
   }
-  if(manage&&!permissions.canEdit)fail(403,'FORBIDDEN','无权管理此题辅助内容');
+  if(manage&&(!permissions.canEdit||(p.owner_scope!=='platform'&&!isScholarshipStaff(user))))fail(403,'FORBIDDEN','无权管理此题辅助内容');
   const target={subjectKey:`problem:${p.id}`,versionId:v.id,problemId:p.id,title:v.title,baseType:'problem',baseId:p.id,contextType:'free',contextId:null};
   if(!manage&&input.assignmentId){
    if(input.timedAttemptId)fail(400,'VALIDATION','不能混用活动上下文');

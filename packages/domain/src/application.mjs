@@ -149,7 +149,7 @@ export async function createDomainServices(pool,config) {
  async function problemResult(db,user,problemId,versionId) {
   const {p,v,owner,permissions}=await versionAccess(db,user,problemId,versionId);
   const presented=owner||isStaff(user)?v:(await studentPublicStatementRows(db,[v]))[0];
-  const result=problemShape(presented,{includeDisabledSamples:owner});result.publishedVersionId=owner?p.current_version_id:v.id;result.publishedTitle=owner?result.publishedTitle:v.title;result.bankId=p.bank_id;result.bankVisibility=(await db.query('SELECT visibility FROM problem_banks WHERE id=$1',[p.bank_id])).rows[0]?.visibility;result.canEdit=owner;result.canPublish=owner&&result.canPublish;
+  const result=problemShape(presented,{includeDisabledSamples:owner});result.publishedVersionId=owner?p.current_version_id:v.id;result.publishedTitle=owner?result.publishedTitle:v.title;result.ownerScope=p.owner_scope;result.bankId=p.bank_id;result.bankVisibility=(await db.query('SELECT visibility FROM problem_banks WHERE id=$1',[p.bank_id])).rows[0]?.visibility;result.canEdit=owner;result.canPublish=owner&&result.canPublish;
   result.canManageTutorial=await canManageLegacyTutorial(db,user,p,owner);
   result.firstAcPoints=(await db.query('SELECT COALESCE((SELECT points FROM point_rewards WHERE problem_id=$1 AND assignment_id IS NULL),10) first_ac_points',[problemId])).rows[0].first_ac_points;
   if(owner){await recordPublicPracticeStaffExposure(db,user.id,p.id);Object.assign(result,v.metadata||{});result.referenceCode=v.reference_code;result.tests=(await db.query('SELECT input,expected,weight,name,enabled FROM test_cases WHERE version_id=$1 ORDER BY position',[v.id])).rows.map(t=>({...t,weight:Number(t.weight)}));result.formalTestCount=result.tests.filter(t=>t.enabled).length;}else {
@@ -445,7 +445,7 @@ export async function createDomainServices(pool,config) {
    const problemMatch=context.route.match(/^\/(?:admin\/)?problems\/([0-9a-f-]{36})(?:\/|$)/i);
    const ids=problemMatch?[problemMatch[1]]:(context.body.items??[]).map?.(item=>item.problemId)??[];
    if(ids.length&&(await pool.query("SELECT 1 FROM problems WHERE id=ANY($1::uuid[]) AND owner_scope='platform'",[ids])).rowCount)
-    fail(403,'PLATFORM_SOURCE_REQUIRED','平台题目请从平台内容编辑入口维护');
+    fail(403,'PLATFORM_SOURCE_REQUIRED','平台题目请使用课程或题库中的平台编辑器维护');
    const bankMatch=context.route.match(/^\/(?:admin\/)?problem-banks\/([0-9a-f-]{36})(?:\/|$)/i);
    if(bankMatch&&(await pool.query("SELECT 1 FROM problems WHERE bank_id=$1 AND owner_scope='platform'",[bankMatch[1]])).rowCount)
     fail(403,'PLATFORM_SOURCE_REQUIRED','此来源题库包含平台题目，不能通过校内入口修改题库权限或归档');
@@ -465,7 +465,7 @@ export async function createDomainServices(pool,config) {
      ? await transaction(pool, db => legacyProblemCatalogCourses(db, user, courseId)) : null;
     const rows=(await pool.query(`SELECT v.*,
      (SELECT count(*) FROM test_cases tc WHERE tc.version_id=v.id AND tc.enabled) formal_test_count,
-     p.bank_id,bank.visibility bank_visibility,
+     p.bank_id,p.owner_scope,bank.visibility bank_visibility,
      CASE WHEN NOT $7 AND ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit')))
       THEN p.current_version_id ELSE v.id END published_version_id,
      CASE WHEN NOT $7 AND ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit')))
@@ -516,7 +516,7 @@ export async function createDomainServices(pool,config) {
     return respond(200,{...(courseFilter && { courseId, courses: courseFilter.courses }),items:presented.map(r=>({
      ...problemShape(r,{includeDisabledSamples:!!r.can_edit}),
      ...(staffView?{publishedDifficulty:typeof r.published_difficulty==='string'?r.published_difficulty:null}:{}),
-     bankId:r.bank_id,canEdit:!!r.can_edit,canPublish:!!r.can_edit&&r.validation_status==='AC'&&!r.published_at,
+     bankId:r.bank_id,ownerScope:r.owner_scope,canEdit:!!r.can_edit,canPublish:!!r.can_edit&&r.validation_status==='AC'&&!r.published_at,
      canManageTutorial:!!(r.can_edit||r.shared_tutorial),
      firstAcPoints:firstAcPoints.get(r.problem_id)??10,ownProgress:ownProgress.get(r.problem_id)||emptyOwnProgress(),
     }))});
@@ -819,7 +819,7 @@ export async function createDomainServices(pool,config) {
  }
 
  const operations={acsl:handleAcsl,publicPresence:handlePublicPresence,schoolScholarship:handleSchoolScholarship,schoolLeaderboard:handleSchoolLeaderboard,schoolPaper4:handleSchoolPaper4,schoolActivities:schoolActivitiesOperation,schoolPractice:schoolPracticeOperation,publicLearning:handlePublicLearning,auth:authOperation,people:peopleOperation,classes:classesOperation,library:libraryOperation,assignments:assignmentsOperation,submissions:submissionsOperation,education:educationOperation,community:handleCommunity,presence:handlePresence,platform:async ctx=>await handlePublicLearning(ctx)??await schoolPracticeOperation(ctx)??await handlePlatformGovernance(ctx),schools:schoolsOperation,system:systemOperation,paper4:handlePaper4,scholarship:handleScholarship};
- const helpers={audit,classAccess,versionAccess,submissionAccess,assignmentAccess,assignmentResult,problemResult,problemInput,insertVersion,issueActivation,personShape,maskSubmission:timed.maskSubmission};
+ const helpers={problemShape,audit,classAccess,versionAccess,submissionAccess,assignmentAccess,assignmentResult,problemResult,problemInput,insertVersion,issueActivation,personShape,maskSubmission:timed.maskSubmission};
  async function prepareRequest({url:rawUrl,method,headers={},body={},ip='unknown'}) {
   const url=new URL(rawUrl,'http://api.local'),path=url.pathname.replace(/\/$/,'');
   if(!path.startsWith(`${BASE}/`))fail(404,'NOT_FOUND','接口不存在');

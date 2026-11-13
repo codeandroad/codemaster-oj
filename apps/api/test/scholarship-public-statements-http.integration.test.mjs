@@ -139,7 +139,8 @@ test('reviewed public English statements bind exact versions without leaking pai
    assertSafe(list.items.find(item=>item.id===first.problemId));
    assert.equal(list.items.find(item=>item.id===first.problemId).statement,english);
    assert.equal(list.items.find(item=>item.id===native.problemId).statement,'本题本来就是中文，不应自动改写。');
-   assertPending(await student.call(`/problems/${legacy.problemId}?versionId=${legacy.versionId}&locale=${language}`,{language}));
+   const oldLink=await student.call(`/problems/${legacy.problemId}?versionId=${legacy.versionId}&locale=${language}`,{language});
+   assert.equal(oldLink.versionId,first.versionId);assert.equal(oldLink.statement,english);assertSafe(oldLink);
   }
   assert.equal((await teacher.call(`/problems/${legacy.problemId}?versionId=${legacy.versionId}`)).statement,original+'\n历史版说明。','Teachers retain the original pending historical statement');
   await student.call(`/problem-favorites/${first.problemId}`,{body:{favorite:true},method:'PUT'});
@@ -154,7 +155,9 @@ test('reviewed public English statements bind exact versions without leaking pai
   const second=await problem(teacher,'Price conversion',original+'\n第二版说明。',{problemId:first.problemId});
   assertPending(await student.call(`/problems/${second.problemId}`));
   assertPending((await student.call('/problems')).items.find(item=>item.id===second.problemId));
-  assert.equal((await student.call(`/problems/${first.problemId}?versionId=${first.versionId}`)).statement,english,'Publishing another version cannot remove the reviewed historical presentation');
+  assertPending(await student.call(`/problems/${first.problemId}?versionId=${first.versionId}`));
+  const historicalPath=`/problems/${first.problemId}?originalSubmissionId=${submission.id}`;
+  assert.equal((await student.call(historicalPath)).statement,english,'An owned submission retains the reviewed presentation of its original version');
   const secondSource=await teacher.call(query(second));
   const secondEnglish=english+'\nVersion two: preserve the input order.';
   await teacher.call(endpoint,{body:{...request,...second,sourceHash:secondSource.sourceHash,statement:secondEnglish},expected:201});
@@ -182,7 +185,7 @@ test('reviewed public English statements bind exact versions without leaking pai
   assert.equal((await student.call('/scholarship/assistance/provide',{body:target})).body,translatedBody);
   assert.equal(Number((await pool.query('SELECT balance FROM luq_accounts WHERE identity_id=$1',[student.identityId])).rows[0].balance),oldBalance-3);
   assert.equal((await pool.query("SELECT count(*)::int n FROM luq_assistance_deliveries WHERE kind='FULL_SOLUTION'")).rows[0].n,0);
-  assert.equal((await student.call(`/problems/${first.problemId}?versionId=${first.versionId}`,{language:'zh-CN'})).statement,english,'Paid Chinese does not silently replace the public English statement');
+  assert.equal((await student.call(`/problems/${first.problemId}?versionId=${first.versionId}`,{language:'zh-CN'})).statement,secondEnglish,'Ordinary practice uses the current reviewed English; paid Chinese does not silently replace it');
   const exam=(await pool.query(`INSERT INTO timed_practices(title,owner_account_id,starts_at,ends_at,duration_minutes,state)
    VALUES('Translation restriction',$1,now()-interval '1 minute',now()+interval '1 hour',60,'Draft') RETURNING id`,[teacher.id])).rows[0];
   await pool.query('INSERT INTO timed_practice_problems(practice_id,problem_id,version_id,points,position) VALUES($1,$2,$3,100,0)',[exam.id,first.problemId,second.versionId]);
@@ -190,7 +193,7 @@ test('reviewed public English statements bind exact versions without leaking pai
   await pool.query("UPDATE timed_practices SET state='Published' WHERE id=$1",[exam.id]);
   assert.equal((await student.call('/scholarship/assistance/quote',{body:target})).mode,'disabled');
   assert.equal((await student.call('/scholarship/assistance/provide',{body:target,expected:403})).error.code,'ASSISTANCE_LOCKED');
-  assert.equal((await student.call(`/problems/${first.problemId}?versionId=${first.versionId}`)).statement,english,'Historical snapshots still show only reviewed public English during a restricted assessment');
+  assert.equal((await student.call(historicalPath)).statement,english,'Historical snapshots still show only reviewed public English during a restricted assessment');
   assert.equal((await student.call(`/problems/${second.problemId}?current=1`)).statement,secondEnglish,'Current course entry shows its own reviewed public English during a restricted assessment');
  }finally{if(app)await app.close();await pool.end();await manager.query(`DROP SCHEMA ${schema} CASCADE`);await manager.end();}
 });

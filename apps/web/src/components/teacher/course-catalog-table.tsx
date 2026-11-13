@@ -18,7 +18,7 @@ export function CourseCatalogTable({ children, empty }: { children: ReactNode; e
 }
 
 export function CourseCatalogRow({ course, title, access, status, actions }: {
-  course: { category: string; chapterCount: number; description: string; difficulty?: keyof typeof courseDifficulties; coverKey?: string; coverImage?: string | null };
+  course: { ownerScope?: "school" | "platform"; category: string; chapterCount: number; description: string; difficulty?: keyof typeof courseDifficulties; coverKey?: string; coverImage?: string | null };
   title: ReactNode;
   access: ReactNode;
   status: ReactNode;
@@ -28,7 +28,8 @@ export function CourseCatalogRow({ course, title, access, status, actions }: {
   return <tr>
     <td>
       <div className="mb-2 w-36"><LearningCover coverKey={course.coverKey} coverImage={course.coverImage}/></div>
-      {title}
+      {course.ownerScope==="platform" && <span className="mb-2 inline-flex rounded border border-primary/20 bg-primary/5 px-2 py-0.5 text-xs font-semibold text-primary">CodeMaster</span>}
+      <div>{title}</div>
       <p className="mt-1 text-xs text-muted-foreground">{t(courseDifficulties[course.difficulty ?? "beginner"])}</p>
       <p className="mt-1 text-xs text-muted-foreground">{course.description}</p>
     </td>

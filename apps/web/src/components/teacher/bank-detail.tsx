@@ -1,6 +1,7 @@
 "use client";
 
 import { AppLink as Link } from "@/components/navigation";
+import { isPlatformProblem, mergePlatformProblems, problemEditorHref, type PlatformSourceProblem } from "./platform-problem-source";
 import { BankRenameDialog } from "@/components/bank-rename-dialog";
 import { useState } from "react";
 import {
@@ -40,6 +41,7 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
     problems = useData<{
       items: (ProductionProblem & { formalTestCount?: number })[];
     }>("problems"),
+    platformSources = useData<{ items: PlatformSourceProblem[] }>("platform/source-problems?schoolId=00000000-0000-4000-8000-000000000052"),
     groups = useData<{ items: Group[] }>(`problem-groups?bankId=${id}`),
     bank = banks.data?.items.find((x) => x.id === id),
     [confirmPublish, setConfirmPublish] = useState(false),
@@ -56,7 +58,7 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
   const { filters, changeFilters } = useProblemBankFilters(accountId, id);
   const view = filters.group === "none" || groups.data?.items.some(group => group.id === filters.group) ? filters.group : "all";
   const setView = (group: string) => changeFilters({ group: group === "all" ? "" : group });
-  const all = problems.data?.items.filter((p) => p.bankId === id) ?? [],
+  const all = mergePlatformProblems(problems.data?.items ?? [], platformSources.data?.items ?? []).filter((p) => p.bankId === id),
     rows =
       view === "all"
         ? all
@@ -70,7 +72,7 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
                 .find((g) => g.id === view)
                 ?.problemIds.includes(p.id),
             );
-  const { checked, setChecked, changeRow } = useProblemSelection(rows, JSON.stringify([id, view]));
+  const { checked, setChecked, changeRow } = useProblemSelection(rows.filter(problem => !isPlatformProblem(problem)), JSON.stringify([id, view]));
   const selected = checked.filter((id) => rows.some((p) => p.id === id)),
     currentGroup = groups.data?.items.find((g) => g.id === view),
     label =
@@ -153,6 +155,7 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
       </p>
       <State resource={banks} />
       <State resource={problems} />
+      <State resource={platformSources} />
       <State resource={groups} />
       <Feedback action={action} />
       {bank && renamingBank && (
@@ -311,10 +314,10 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
                       <input
                         type="checkbox"
                         aria-label={tr("全选题库题目", "Select all bank problems")}
-                        checked={selected.length === rows.length}
+                        checked={rows.some(p => !isPlatformProblem(p)) && selected.length === rows.filter(p => !isPlatformProblem(p)).length}
                         onChange={(e) =>
                           setChecked(
-                            e.target.checked ? rows.map((p) => p.id) : [],
+                            e.target.checked ? rows.filter(p => !isPlatformProblem(p)).map((p) => p.id) : [],
                           )
                         }
                       />
@@ -340,24 +343,26 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
                         <input
                           aria-label={`${tr("选择", "Select")} ${p.title}`}
                           type="checkbox"
+                          disabled={isPlatformProblem(p)}
                           checked={checked.includes(p.id)}
                           onChange={(event) => changeRow(p.id, event)}
                         />
                       </td>
                       <td className="px-4 py-3">
                         <Link
-                          href={`/teacher/problems/${p.id}/edit?returnTo=${encodeURIComponent(`/teacher/problems/banks/${id}`)}`}
+                          href={problemEditorHref(p, `/teacher/problems/banks/${id}`)}
                           className={styles.problemTitle}
                         >
                           {p.title}
                         </Link>
+                        {isPlatformProblem(p) && <span className="ml-2 text-xs text-muted-foreground">CodeMaster</span>}
                         <p className="mt-1 font-mono text-xs text-muted-foreground">
                           {p.id.slice(0, 8)}
                         </p>
                       </td>
                       <td className="break-words px-4 py-3">
                         <GroupTags
-                          onClick={() => setManage({ ids: [p.id] })}
+                          onClick={isPlatformProblem(p) ? undefined : () => setManage({ ids: [p.id] })}
                           groups={
                             groups.data?.items.filter((g) =>
                               g.problemIds.includes(p.id),
@@ -397,18 +402,19 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                           <Link
                             className={link}
-                            href={`/teacher/problems/${p.id}/edit?returnTo=${encodeURIComponent(`/teacher/problems/banks/${id}`)}`}
+                            href={problemEditorHref(p, `/teacher/problems/banks/${id}`)}
                           >
                             {p.canEdit === false ? tr("查看", "View") : tr("编辑", "Edit")}
                           </Link>
-                          <button
+                          {!isPlatformProblem(p) && <button
+                            type="button"
                             className="text-muted-foreground"
                             aria-label={tr("整理分组", "Organize groups")}
                             title={tr("整理分组", "Organize groups")}
-                            onClick={() => setManage({ ids: [p.id] })}
+                            onClick={isPlatformProblem(p) ? undefined : () => setManage({ ids: [p.id] })}
                           >
                             <MoreHorizontal size={18} />
-                          </button>
+                          </button>}
                         </div>
                       </td>
                     </tr>

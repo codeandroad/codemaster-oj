@@ -38,6 +38,8 @@ import {
 } from "@/components/ui/dialog";
 import { productionApi } from "@/lib/production-api";
 import { useSchoolText, type School } from "./school-ui";
+import { PlatformCourseEditorLoader } from "./platform-course-editor";
+import type { PlatformCourse } from "./platform-course-model";
 import { SchoolCourseEditor } from "./school-courses-editor";
 import {
   useCourseError,
@@ -114,6 +116,7 @@ export function SchoolCourses({
     setRevision((v) => v + 1);
     requestAnimationFrame(() => listHeading.current?.focus());
   }
+  if(edit?.startsWith("platform:"))return <PlatformCourseEditorLoader id={edit.slice(9)} onClose={()=>setEdit(null)} onSaved={()=>{setRevision(value=>value+1);onRefresh?.();}}/>;
   if (selected)
     return (
       <div className="mt-3 space-y-3">
@@ -391,10 +394,15 @@ function CourseList({
   const text = useSchoolText();
   const { language } = useCourseLanguage();
   const resource = useData<CoursePage<SchoolCourse>>(path);
+  const platform = useData<{items:PlatformCourse[]}>(canAuthor?`platform/courses?schoolId=${path.split("/")[1]}`:"");
+  const archived=new URLSearchParams(path.split("?")[1]??"").get("archived")==="true";
+  const platformCourses=page===1?(platform.data?.items??[]).filter(course=>course.archived===archived&&`${course.title} ${course.description}`.toLowerCase().includes(query.toLowerCase())):[];
   if (canAuthor) return (
     <Loading resource={resource}>
+      {platform.error&&<p role="alert" className="text-sm text-destructive">{platform.error}</p>}
       <section className={panel}>
-        <CourseCatalogTable empty={!resource.data?.items.length ? (query ? text("No courses match this search.", "没有符合搜索条件的课程。") : text("No courses in this view.", "当前列表暂无课程。")) : undefined}>
+        <CourseCatalogTable empty={!resource.data?.items.length && !platformCourses.length ? (query ? text("No courses match this search.", "没有符合搜索条件的课程。") : text("No courses in this view.", "当前列表暂无课程。")) : undefined}>
+          {platformCourses.map(course=><CourseCatalogRow key={course.id} course={{...course,ownerScope:"platform"}} title={<button type="button" className="text-left font-semibold text-primary hover:underline" onClick={()=>onEdit(`platform:${course.id}`)}>{course.title}</button>} access={<CourseAccessSummary course={{...course,ownerScope:"platform",platformAudience:course.audienceScope}}/>} status={<StatusPill status={course.archived?text("Archived","已归档"):course.published?text("Published","已发布"):text("Draft","草稿")}/>} actions={<Button type="button" size="sm" variant="ghost" className="text-primary" onClick={()=>onEdit(`platform:${course.id}`)}>{course.archived?text("View","查看"):text("Edit","编辑")}</Button>}/>)}
           {resource.data?.items.map(course => <CourseCatalogRow key={course.id} course={course}
             title={<button type="button" className="text-left font-semibold text-primary hover:underline" onClick={() => course.canManage && !course.archived ? onEdit(course.id) : onOpen(course.id)}>{course.title}</button>}
             access={<span className="text-xs text-muted-foreground">{course.accessScope === "school" ? text("School-wide", "全校可学") : text("Selected classes", "指定班级")}</span>}

@@ -10,7 +10,8 @@ import { coursePaper4LinkKey, type CoursePaper4Link } from "@/components/course-
 import { paper4ShortTitle, type Paper4Paper, type Paper4PaperSummary } from "@/components/paper4/model";
 import { input } from "./shared";
 
-export function CoursePaper4Picker({existing, onClose, onAdd}: {
+export function CoursePaper4Picker({existing, onClose, onAdd, platformCourseId}: {
+  platformCourseId?: string;
   existing: CoursePaper4Link[];
   onClose: () => void;
   onAdd: (links: CoursePaper4Link[]) => void;
@@ -29,17 +30,17 @@ export function CoursePaper4Picker({existing, onClose, onAdd}: {
   useEffect(() => {
     let active = true;
     setError("");
-    void productionApi<{items: Paper4PaperSummary[]}>("paper4/papers?scope=catalog").then(value => {
+    void productionApi<{items: Paper4PaperSummary[]}>(platformCourseId ? `platform/courses/paper4-options?courseId=${encodeURIComponent(platformCourseId)}` : "paper4/papers?scope=catalog").then(value => {
       if (active) setPapers(value.items.filter(item => item.deliveryKind !== "activity" && item.status === "published" && !item.archivedAt));
     }).catch(reason => { if (active) setError(apiMessage(reason)); });
     return () => { active = false; };
-  }, [retry]);
+  }, [retry,platformCourseId]);
   useEffect(() => {
     setPaper(null); setSelected([]); setScope("all");
     if (!paperId) { setLoading(false); return; }
     let active = true;
     setLoading(true); setError("");
-    void productionApi<Paper4Paper>(`paper4/papers/${encodeURIComponent(paperId)}?view=current`).then(value => {
+    void productionApi<Paper4Paper>(platformCourseId ? `platform/courses/paper4-options?courseId=${encodeURIComponent(platformCourseId)}&paperId=${encodeURIComponent(paperId)}` : `paper4/papers/${encodeURIComponent(paperId)}?view=current`).then(value => {
       if (!active) return;
       if (value.status !== "published" || value.archivedAt || value.deliveryKind === "activity" || !value.versionId) throw new Error(tx("试卷尚未公开或已不可用。", "This paper is not public or is unavailable."));
       setPaper(value);
@@ -47,7 +48,7 @@ export function CoursePaper4Picker({existing, onClose, onAdd}: {
     return () => { active = false; };
     // Locale changes only affect future errors; they must not discard the current selection.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paperId, retry]);
+  }, [paperId, retry,platformCourseId]);
   const query = search.trim().toLocaleLowerCase();
   const matches = papers?.filter(item => item.id === paperId || `${item.title} ${paper4ShortTitle(item)} ${item.examYear ?? ""}`.toLocaleLowerCase().includes(query)) ?? [];
   const wholeExists = Boolean(paper && existing.some(link => link.paperId === paper.id && link.versionId === paper.versionId && link.questionKey === null));

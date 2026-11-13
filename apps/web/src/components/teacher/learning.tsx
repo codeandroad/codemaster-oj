@@ -5,6 +5,7 @@ import { CourseAccessSummary, courseStatus, type CourseAccessMetadata } from "@/
 import { CourseCatalogTable, CourseCatalogRow } from "./course-catalog-table";
 import { CourseSettingsDialog } from "./course-settings-dialog";
 import { CourseProgrammingLanguageField } from "./course-programming-language-field";
+import type { PlatformCourse } from "@/components/schools/platform-course-model";
 import { CourseAdmissionsDialog } from "@/components/schools/course-admissions-dialog";
 import { CoursePaper4Picker } from "./course-paper4-picker";
 import { coursePaper4LinkKey, coursePaper4References, coursePaper4UnitCount, mergeCoursePaper4Links, type CoursePaper4Link } from "@/components/course-paper4";
@@ -24,7 +25,7 @@ import {canUseLegacyPythonPractice} from "./legacy-python-practice";
 import {LearningProgressDialog} from "./learning-progress";
 import {LearningImport} from "./learning-import";
 import {downloadLearningMarkdown,type LearningDocument} from "./learning-document";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "@/components/locale-context";
 import { ArrowDown, ArrowUp, Eye, FilePlus2, Plus, Trash2 } from "lucide-react";
@@ -52,6 +53,7 @@ import {
 } from "./shared";
 
 interface ChapterProblem {
+  canEdit?: boolean;
   problemId: string;
   title: string;
   versionId: string;
@@ -100,7 +102,8 @@ interface Chapter {
   localizations?: ChapterLocalizations;
   acslLinks?: CourseAcslLink[];
 }
-interface Path extends CourseAccessMetadata {
+export interface LearningEditorPath extends CourseAccessMetadata {
+  platformData?: PlatformCourse;
   sections?: CourseSection[];
   redirectedFromCourseId?: string;
   redirectedChapterId?: string;
@@ -120,6 +123,12 @@ interface Path extends CourseAccessMetadata {
   practiceBundle?:CoursePractice[];
   chapters?: Chapter[];
 }
+type Path = LearningEditorPath;
+
+export function platformLearningPath(course: PlatformCourse): LearningEditorPath {
+ return {...course,ownerScope:"platform",platformAudience:course.audienceScope,canEdit:true,platformData:course,chapters:course.chapters.map((chapter,position)=>({...chapter,id:chapter.id!,position,problems:(chapter.problems??[]).map(problem=>({...problem,title:problem.title??problem.problemId,published:problem.published,schoolVisibleAt:problem.schoolVisibleAt,rankReviewStatus:problem.rankReviewStatus,readyForCourse:problem.readyForCourse}))}))};
+}
+
 interface Resource {
   id: string;
   type: string;
@@ -140,12 +149,15 @@ export function TeacherLearning({ canManageAdmissions = false }: { canManageAdmi
   const [admissionTarget, setAdmissionTarget] = useState<Path | null>(null);
   const router = useRouter(),
     paths = useData<{ items: Path[] }>(showArchived?"learning-paths?archived=true":"learning-paths"),
+    platformPaths = useData<{items:PlatformCourse[]}>(`platform/courses?schoolId=${LEGACY_SCHOOL_ID}`),
     resources = useData<{ items: Resource[] }>("learning-resources"),
     [tab, setTab] = useState("课程"),
     [create, setCreate] = useState(false),
     [importing,setImporting]=useState(false),
     [editing, setEditing] = useState<Resource | null>(null),
     action = useAction();
+  const courseRows=[...(paths.data?.items??[]),...(platformPaths.data?.items??[]).filter(course=>course.archived===showArchived).map(course=>platformLearningPath({...course,chapters:course.chapters??[]}))];
+  const courseHref=(path:Path)=>`/teacher/courses/${path.id}${path.ownerScope==="platform"?"?source=platform":""}`;
   return (
     <>
       <PageHeader
@@ -168,19 +180,19 @@ export function TeacherLearning({ canManageAdmissions = false }: { canManageAdmi
       <section className={`${panel} mt-4`}>
         {tab === "课程" ? (
           <>
-            <State resource={paths} />
-            <CourseCatalogTable empty={!paths.loading && !paths.data?.items.length ? (showArchived ? tx("暂无已归档课程。", "No archived courses.") : t("暂无课程。点击“新建课程”组织章节内容。")) : undefined}>
-              {paths.data?.items.map(path => (
+            <State resource={paths} /><State resource={platformPaths}/>
+            <CourseCatalogTable empty={!paths.loading && !platformPaths.loading && !courseRows.length ? (showArchived ? tx("暂无已归档课程。", "No archived courses.") : t("暂无课程。点击“新建课程”组织章节内容。")) : undefined}>
+              {courseRows.map(path => (
                 <CourseCatalogRow key={path.id} course={path}
-                  title={<Link className={link} href={`/teacher/courses/${path.id}`}>{path.title}</Link>}
+                  title={<Link className={link} href={courseHref(path)}>{path.title}</Link>}
                   access={<CourseAccessSummary course={path}/>}
                   status={<StatusPill status={courseStatus(path, locale)}/>}
                   actions={<>
-                    <Link className={link} href={`/teacher/courses/${path.mergedIntoCourseId ?? path.id}`}>{path.mergedIntoCourseId ? tx("打开合并课程", "Open combined course") : path.archived ? tx("查看", "View") : path.canEdit ? t("编辑") : t("查看")}</Link>
-                    {!path.archived && <Link className={`${link} ml-4`} href={`/teacher/courses/${path.id}?preview=1`}>{t("学生预览")}</Link>}
-                    {canManageAdmissions && path.published && !path.archived &&
+                    <Link className={link} href={path.mergedIntoCourseId?`/teacher/courses/${path.mergedIntoCourseId}`:courseHref(path)}>{path.mergedIntoCourseId ? tx("打开合并课程", "Open combined course") : path.archived ? tx("查看", "View") : path.canEdit ? t("编辑") : t("查看")}</Link>
+                    {!path.archived && <Link className={`${link} ml-4`} href={`${courseHref(path)}${path.ownerScope==="platform"?"&":"?"}preview=1`}>{t("学生预览")}</Link>}
+                    {canManageAdmissions && path.ownerScope!=="platform" && path.published && !path.archived &&
                       <Button size="sm" variant="ghost" onClick={() => setAdmissionTarget(path)}>{tx("课程准入", "Course admissions")}</Button>}
-                    {path.canEdit && !path.mergedIntoCourseId && <Button size="sm" variant="ghost" disabled={action.busy} onClick={() => setArchiveTarget(path)}>{path.archived ? tx("恢复", "Restore") : tx("归档", "Archive")}</Button>}
+                    {path.canEdit && path.ownerScope!=="platform" && !path.mergedIntoCourseId && <Button size="sm" variant="ghost" disabled={action.busy} onClick={() => setArchiveTarget(path)}>{path.archived ? tx("恢复", "Restore") : tx("归档", "Archive")}</Button>}
                   </>}
                 />
               ))}
@@ -285,15 +297,18 @@ export function TeacherLearning({ canManageAdmissions = false }: { canManageAdmi
     </>
   );
 }
-function CreatePath({
+export function CreatePath({
+  platform = false,
   onClose,
   onCreated,
 }: {
+  platform?: boolean;
   onClose: () => void;
-  onCreated: (id: string) => void;
+  onCreated: (id: string) => void | Promise<void>;
 }) {
   const action = useAction();
-  const {t} = useLocale();
+  const {t,locale} = useLocale();
+  const createRequest = useRef<string | null>(null);
   return (
     <Modal title={t("新建课程")} onClose={onClose}>
       <form
@@ -302,9 +317,10 @@ function CreatePath({
           e.preventDefault();
           const d = new FormData(e.currentTarget);
           void action.run(async () => {
-            const result = await productionApi<Path>("learning-paths", {
+            const result = await productionApi<Path>(platform ? "platform/courses" : "learning-paths", {
               method: "POST",
               body: {
+                ...(platform ? {requestId:createRequest.current??(createRequest.current=crypto.randomUUID())} : {}),
                 title: d.get("title"),
                 description: d.get("description"),
                 category: d.get("category"),
@@ -314,7 +330,7 @@ function CreatePath({
                 requiredLanguage: d.get("requiredLanguage") || null,
               },
             });
-            onCreated(result.id);
+            await onCreated(result.id);
           });
         }}
       >
@@ -363,7 +379,7 @@ function CreatePath({
         </div>
         <CourseProgrammingLanguageField className={input}/>
         <p className="text-xs text-muted-foreground">
-          {t("先创建草稿并添加章节，检查内容后发布给本校学生。")}
+          {platform ? (locale==="en" ? "Create a draft, add chapters, then choose its audience before publishing." : "先创建草稿并添加章节，检查内容并设置公开范围后发布。") : t("先创建草稿并添加章节，检查内容后发布给本校学生。")}
         </p>
         <Feedback action={action} />
         <div className="flex justify-end gap-2">
@@ -491,17 +507,19 @@ function ResourceEditor({
 }
 
 export function TeacherLearningEditor({ id }: { id: string }) {
-  const resource = useData<Path>(`learning-paths/${id}`);
+  const query = useSearchParams(), platform = query.get("source") === "platform";
+  const resource = useData<Path | PlatformCourse>(`${platform ? "platform/courses" : "learning-paths"}/${id}`);
+  const value = useMemo(()=>resource.data ? platform ? platformLearningPath(resource.data as PlatformCourse) : resource.data as Path : null,[platform,resource.data]);
   const reload = resource.reload;
   const router = useRouter();
   useEffect(() => {
-    if (!resource.data?.redirectedFromCourseId) return;
-    const href = canonicalCourseHref(`${window.location.pathname}${window.location.search}${window.location.hash}`, id, resource.data.id);
+    if (!value?.redirectedFromCourseId) return;
+    const href = canonicalCourseHref(`${window.location.pathname}${window.location.search}${window.location.hash}`, id, value.id);
     if (!href) return;
     const target = new URL(href, window.location.origin);
-    if (!target.searchParams.has("chapter") && resource.data.redirectedChapterId) target.searchParams.set("chapter", resource.data.redirectedChapterId);
+    if (!target.searchParams.has("chapter") && value.redirectedChapterId) target.searchParams.set("chapter", value.redirectedChapterId);
     router.replace(`${target.pathname}${target.search}${target.hash}`);
-  }, [id, resource.data, router]);
+  }, [id, value, router]);
   useEffect(() => {
     const onFocus = () => reload();
     window.addEventListener("focus", onFocus);
@@ -513,19 +531,23 @@ export function TeacherLearningEditor({ id }: { id: string }) {
       {resource.data && (
         <LearningEditorForm
           key={resource.data.id}
-          initial={resource.data}
+          initial={value!}
           onSaved={resource.reload}
         />
       )}
     </>
   );
 }
-function LearningEditorForm({
+export function LearningEditorForm({
   initial,
   onSaved,
+  onDirtyChange,
+  onBusyChange,
 }: {
   initial: Path;
   onSaved: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const {t, locale} = useLocale();
   const { language, setLanguage } = useCourseLanguage();
@@ -553,6 +575,7 @@ function LearningEditorForm({
     [batchSelected, setBatchSelected] = useState<string[]>([]),
     batchAction = useAction(),
     action = useAction();
+  useEffect(() => { onBusyChange?.(action.busy || batchAction.busy); }, [action.busy,batchAction.busy,onBusyChange]);
   const { getRange: getBatchRange, resetAnchor: resetBatchAnchor } = useRangeSelection(
     (batchCandidates ?? []).map(item => ({
       id: item.problemId,
@@ -569,6 +592,9 @@ function LearningEditorForm({
     setChapters(mergeReviewStatus(previous.chapters, previous.path.chapters ?? [], initial.chapters ?? []));
   }, [initial]);
   const canEditCourse = path.canEdit && !path.archived;
+  const platform = path.ownerScope === "platform", canPublish = canEditCourse && (!platform || path.platformData?.canManage === true);
+  const acceptPlatform = (course: PlatformCourse) => { const fresh=platformLearningPath(course);setPath(fresh);setSections(fresh.sections??[]);setChapters(fresh.chapters??[]);onSaved();return fresh; };
+  const platformAction = async (operation:string, latest=path) => {const saved=latest.platformData!;const fresh=platformLearningPath(await productionApi<PlatformCourse>(`platform/courses/${path.id}/${operation}`,{method:"POST",body:{expectedRevision:saved.revision,sourceVersion:saved.sourceVersion}}));setPath(fresh);onSaved();return fresh;};
   useEffect(() => {
     if (!path.archived) return;
     setMetadata(false);
@@ -581,6 +607,7 @@ function LearningEditorForm({
   const chapter = chapters.find((x) => x.id === current) ?? chapters[0],
     selectedIndex = chapters.findIndex((x) => x.id === chapter?.id),
     dirty = JSON.stringify(chapters) !== JSON.stringify(path.chapters ?? []) || JSON.stringify(sections) !== JSON.stringify(path.sections ?? []);
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty,onDirtyChange]);
   const original = { title: chapter?.title ?? "", content: chapter?.content ?? "", objective: chapter?.objective ?? "", checkpoint: chapter?.checkpoint ?? "", checkpointAnswer: chapter?.checkpointAnswer ?? "" };
   const originalLanguage = originalLanguages.get(chapter?.id ?? "") ?? null;
   const editingLanguage: ChapterEditingLanguage = editingSelection && editingSelection.chapterId === chapter?.id
@@ -636,6 +663,12 @@ function LearningEditorForm({
     if (!canEditCourse) throw new Error(tr("已归档课程只能查看；请先在课程列表中恢复。", "Archived courses are read-only. Restore the course from the list first."));
     const nextSections = parseCourseSections(sections);
     validateChapterSections(nextSections, chapters);
+    if(platform){
+      const saved=path.platformData!;
+      const fresh=await productionApi<PlatformCourse>(`platform/courses/${path.id}`,{method:"PATCH",body:{expectedRevision:saved.revision,sourceVersion:saved.sourceVersion,sections:nextSections,
+        chapters:orderCourseChapters(nextSections,chapters).map(item=>({...item,id:item.id.startsWith("new-")?undefined:item.id,problems:item.problems.map(({problemId,versionId})=>({problemId,versionId})),paper4Links:coursePaper4References(item.paper4Links),acslLinks:courseAcslReferences(item.acslLinks)}))}});
+      return acceptPlatform(fresh);
+    }
     // Register new topics first, then move lessons before removing their old topics.
     const stagedSections = [...nextSections, ...(path.sections ?? []).filter(section => !nextSections.some(next => next.key === section.key)).map(section => {
       const group = nextSections.find(next => section.groupKey && next.groupKey === section.groupKey);
@@ -778,10 +811,10 @@ function LearningEditorForm({
       <PageHeader
         eyebrow={t("课程编辑")}
         title={path.title}
-        description={tr("课程草稿可先关联校内题库的草稿题；发布课程前，所有关联题须已发布并通过管理员公开审核。", "A course draft can link draft problems in school banks. Before publishing the course, every linked problem must be published and approved for school-wide access.")}
+        description={platform ? tr("CodeMaster 平台课程。章节、双语内容与练习在同一编辑器维护。", "CodeMaster course. Maintain chapters, bilingual content and practice in this editor.") : tr("课程草稿可先关联校内题库的草稿题；发布课程前，所有关联题须已发布并通过管理员公开审核。", "A course draft can link draft problems in school banks. Before publishing the course, every linked problem must be published and approved for school-wide access.")}
         action={
           <div className="flex flex-wrap gap-2">
-            {path.published && canEditCourse && <Button variant="secondary" disabled={action.busy} onClick={() => setWithdraw(true)}>{tr("下架课程", "Withdraw course")}</Button>}
+            {path.published && canPublish && <Button variant="secondary" disabled={action.busy} onClick={() => setWithdraw(true)}>{tr("下架课程", "Withdraw course")}</Button>}
             <Button variant="secondary" onClick={() => setPreview(true)}>
               <Eye size={15} />
               {t("学生预览")}
@@ -797,13 +830,13 @@ function LearningEditorForm({
             >
               {t("保存草稿")}
             </Button>
-            <Button
+            {(!platform || path.platformData?.canManage) && <Button
               variant="secondary"
-              disabled={action.busy || !canEditCourse || path.published || pendingProblems > 0 || unavailablePaper4 > 0}
+              disabled={action.busy || !canPublish || path.published || pendingProblems > 0 || unavailablePaper4 > 0}
               onClick={() => setPublish(true)}
             >
               {path.archived ? tr("已归档", "Archived") : path.published ? courseStatus(path,locale) : path.withdrawnAt ? tr("重新公开", "Republish") : t("发布")}
-            </Button>
+            </Button>}
           </div>
         }
       />
@@ -828,10 +861,10 @@ function LearningEditorForm({
                     ? tr("未通过或已撤下的题目需要创建新修订版，并重新验证、发布和审核。", "Rejected or withdrawn problems need a new revision, validation, publication, and review.")
                     : unavailablePaper4 ? tr("有 Paper 4 引用已不可用，请移除或重新关联公开版本。", "Some Paper 4 references are unavailable. Remove them or link a public version.") : tr("关联练习已公开，课程可以发布。", "Linked practices are public; this course can be published.")}
             </p>
-            {linkedProblemCount > 0 && <p className="text-xs opacity-85">{tr("普通题目审核只对当前关联的具体版本有效。Paper 4 引用须使用已公开试卷。", "Problem approval applies to the exact linked version. Paper 4 references use public papers.")}</p>}
+            {linkedProblemCount > 0 && <p className="text-xs opacity-85">{tr("普通练习使用题目最新的已发布版本，并保留已有 AC 记录。Paper 4 引用保留所选公开试卷版本。", "Ordinary practice uses the latest published problem version and retains previous AC. Paper 4 references retain the selected public paper version.")}</p>}
             {linkedProblemCount > 0 && linkedPaper4Count > 0 && <p className="text-xs opacity-85">{tr(`另关联 ${linkedPaper4Count} 道 Paper 4 大题。`, `Also linked: ${linkedPaper4Count} Paper 4 questions.`)}</p>}
           </div>
-          {canEditCourse && savedUnpublishedProblems > 0 && (
+          {canEditCourse && !platform && savedUnpublishedProblems > 0 && (
             <Button size="sm" variant="secondary" disabled={batchPublishLoading || batchAction.busy} onClick={() => void openBatchPublish()}>
               {tr("批量发布未发布题目", "Publish unpublished problems")}
             </Button>
@@ -842,7 +875,7 @@ function LearningEditorForm({
         <div className="w-24 shrink-0"><LearningCover coverKey={path.coverKey} coverImage={path.coverImage}/></div>
         <div className="min-w-0 flex-1 space-y-1"><CourseAccessSummary course={path} showAuthor/><p className="text-xs text-muted-foreground">{t(courseDifficulties[path.difficulty??"beginner"])} · {chapters.length} {t("章")} · {path.estimatedMinutes??30} {tr("分钟", "minutes")}</p></div>
       <div className="flex flex-wrap items-center gap-2 text-sm">
-        <Button variant="secondary" size="sm" disabled={!path.canEdit} onClick={()=>setProgressOpen(true)}>{t("查看学生进度总览")}</Button>
+        {!platform && <Button variant="secondary" size="sm" disabled={!path.canEdit} onClick={()=>setProgressOpen(true)}>{t("查看学生进度总览")}</Button>}
         <Button size="sm" variant="secondary" onClick={()=>{const doc:LearningDocument={format:"codemaster-learning-path",version:1,sections,localizations:path.localizations,title:path.title,description:path.description,category:path.category,requiredLanguage:path.requiredLanguage,estimatedMinutes:path.estimatedMinutes??30,difficulty:path.difficulty??"beginner",coverKey:path.coverKey??"general",authorName:path.authorName,authoredAt:path.authoredAt,coverImage:path.coverImage,chapters:orderCourseChapters(sections,chapters).map(c=>({sectionKey:c.sectionKey,localizations:c.localizations,acslLinks:courseAcslReferences(c.acslLinks),title:c.title,content:c.content,objective:c.objective??"",checkpoint:c.checkpoint??"",checkpointAnswer:c.checkpointAnswer??"",problemIds:c.problems.map(p=>p.problemId),paper4Links:coursePaper4References(c.paper4Links)}))};void action.run(async()=>{downloadLearningMarkdown(doc);return t("已导出当前编辑内容（包括未保存修改）。");});}}>{t("导出 Markdown")}</Button>
         <Button size="sm" variant="secondary" disabled={!canEditCourse} onClick={() => setMetadata(true)}>
           {tr("课程属性与开放", "Properties and access")}
@@ -851,7 +884,7 @@ function LearningEditorForm({
       </div>
       </div>
       {progressOpen&&<LearningProgressDialog id={path.id} onClose={()=>setProgressOpen(false)}/>}
-      {canEditCourse&&canUseLegacyPythonPractice(path)&&<PythonPracticePanel id={path.id} bundle={path.practiceBundle??[]} disabled={dirty||action.busy} onRefreshStatus={async()=>{const fresh=await productionApi<Path>(`learning-paths/${path.id}`);setPath(current=>({...current,practiceBundle:fresh.practiceBundle}));}} onUpdated={async()=>{const fresh=await productionApi<Path>(`learning-paths/${path.id}`);setPath(fresh);setChapters(fresh.chapters??[]);}}/>}
+      {canEditCourse&&!platform&&canUseLegacyPythonPractice(path)&&<PythonPracticePanel id={path.id} bundle={path.practiceBundle??[]} disabled={dirty||action.busy} onRefreshStatus={async()=>{const fresh=await productionApi<Path>(`learning-paths/${path.id}`);setPath(current=>({...current,practiceBundle:fresh.practiceBundle}));}} onUpdated={async()=>{const fresh=await productionApi<Path>(`learning-paths/${path.id}`);setPath(fresh);setChapters(fresh.chapters??[]);}}/>}
       <div className="mt-5"><CourseSectionsEditor sections={sections} chapters={chapters} onChange={setSections} disabled={!canEditCourse || action.busy}/></div>
       <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
         <aside className={`${panel} self-start lg:sticky lg:top-5`}>
@@ -921,7 +954,7 @@ function LearningEditorForm({
                 onClick={() => {
                   if (window.confirm(t("从本课程移除此章节？题库题目保留。")))
                     void action.run(async () => {
-                      if (!chapter.id.startsWith("new-"))
+                      if (!platform && !chapter.id.startsWith("new-"))
                         await productionApi(`chapters/${chapter.id}`, {
                           method: "DELETE",
                         });
@@ -929,8 +962,8 @@ function LearningEditorForm({
                       setCurrent(
                         chapters.find((x) => x.id !== chapter.id)?.id ?? "",
                       );
-                      onSaved();
-                      return t("章节已移除，题库题目保留。");
+                      if(!platform)onSaved();
+                      return platform ? tr("章节已移除；保存课程后生效。", "Chapter removed; save the course to apply.") : t("章节已移除，题库题目保留。");
                     });
                 }}
               >
@@ -950,7 +983,7 @@ function LearningEditorForm({
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {canEditCourse && !path.published && savedUnpublishedProblems > 0 && (
+                    {canEditCourse && !platform && !path.published && savedUnpublishedProblems > 0 && (
                       <Button size="sm" variant="secondary" disabled={batchPublishLoading || batchAction.busy} onClick={() => void openBatchPublish()}>
                         {tr("批量发布未发布题目", "Publish unpublished")}
                       </Button>
@@ -972,12 +1005,12 @@ function LearningEditorForm({
                     className="flex flex-wrap items-center justify-between gap-2 border-t border-border p-3 text-sm"
                   >
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <Link
-                        href={`/teacher/problems/${p.problemId}/edit`}
+                      {(!platform || p.canEdit) ? <Link
+                        href={`/teacher/problems/${p.problemId}/edit${platform?"?source=platform":""}`}
                         className={link}
                       >
                         {p.title}
-                      </Link>
+                      </Link> : <span className="font-medium">{p.title}</span>}
                       {p.bankName && <span className="text-xs text-muted-foreground">{tr("题库", "Bank")}：{p.bankName}</span>}
                       <span className={`rounded border px-2 py-0.5 text-xs font-medium ${courseProblemReady(p) ? "border-success/25 bg-success-soft text-success" : "border-warning/25 bg-warning-soft text-warning"}`}>
                         {courseProblemReady(p)
@@ -1045,14 +1078,15 @@ function LearningEditorForm({
                   </span>
                 </div>)}
               </section>
-              <CourseAcslEditor schoolId={LEGACY_SCHOOL_ID} links={chapter.acslLinks ?? []} onChange={links => update("acslLinks", links)} disabled={!canEditCourse || action.busy}/>
+              <CourseAcslEditor platform={platform} courseId={platform?path.id:undefined} schoolId={LEGACY_SCHOOL_ID} links={chapter.acslLinks ?? []} onChange={links => update("acslLinks", links)} disabled={!canEditCourse || action.busy}/>
             </div>
           </section>
         )}
       </div>
-      {paper4Picker && chapter && canEditCourse && <CoursePaper4Picker existing={chapter.paper4Links ?? []} onClose={() => setPaper4Picker(false)} onAdd={links => { update("paper4Links", mergeCoursePaper4Links(chapter.paper4Links ?? [], links)); setPaper4Picker(false); }}/> }
+      {paper4Picker && chapter && canEditCourse && <CoursePaper4Picker platformCourseId={platform?path.id:undefined} existing={chapter.paper4Links ?? []} onClose={() => setPaper4Picker(false)} onAdd={links => { update("paper4Links", mergeCoursePaper4Links(chapter.paper4Links ?? [], links)); setPaper4Picker(false); }}/> }
       {picker && chapter && canEditCourse && (
         <ProblemPicker
+          sourcePath={platform?`platform/courses/problem-options?courseId=${path.id}`:undefined}
           courseMode={path.published ? "published" : "draft"}
           selected={chapter.problems.map((x) => x.problemId)}
           onClose={() => setPicker(false)}
@@ -1102,9 +1136,9 @@ function LearningEditorForm({
           </div>
         </div>
       )}
-      {metadata && canEditCourse && <CourseSettingsDialog course={path} onClose={() => setMetadata(false)} onSaved={saved => { setPath(current => ({ ...current, ...saved })); onSaved(); }}/>}
-      {withdraw && canEditCourse && <Modal title={tr("下架课程", "Withdraw course")} onClose={() => setWithdraw(false)}><p className="text-sm leading-6">{tr("下架后学生暂时不能进入课程。章节、学习进度、已布置的任务和历史成绩保留，可随时重新公开。", "Withdrawal pauses student access. Chapters, progress, assigned tasks and past results remain, and the course can be republished.")}</p><Feedback action={action}/><div className="mt-5 flex justify-end gap-2"><Button type="button" variant="secondary" disabled={action.busy} onClick={() => setWithdraw(false)}>{tr("取消", "Cancel")}</Button><Button type="button" disabled={action.busy} onClick={() => void action.run(async () => { const fresh = await productionApi<Path>(`learning-paths/${path.id}/unpublish`, { method: "POST", body: {} }); setPath(current => ({ ...current, ...fresh })); setWithdraw(false); onSaved(); return tr("课程已下架。", "Course withdrawn."); })}>{tr("确认下架", "Withdraw course")}</Button></div></Modal>}
-      {publish && canEditCourse && (
+      {metadata && canEditCourse && <CourseSettingsDialog platformCourse={path.platformData} saveCourse={platform?async body=>{const saved=path.platformData!;const fresh=platformLearningPath(await productionApi<PlatformCourse>(`platform/courses/${path.id}`,{method:"PATCH",body:{...body,expectedRevision:saved.revision,sourceVersion:saved.sourceVersion}}));setPath(fresh);return fresh;}:undefined} course={path} onClose={() => setMetadata(false)} onSaved={saved => { setPath(current => ({ ...current, ...saved })); onSaved(); }}/>}
+      {withdraw && canPublish && <Modal title={tr("下架课程", "Withdraw course")} onClose={() => setWithdraw(false)}><p className="text-sm leading-6">{tr("下架后学生暂时不能进入课程。章节、学习进度、已布置的任务和历史成绩保留，可随时重新公开。", "Withdrawal pauses student access. Chapters, progress, assigned tasks and past results remain, and the course can be republished.")}</p><Feedback action={action}/><div className="mt-5 flex justify-end gap-2"><Button type="button" variant="secondary" disabled={action.busy} onClick={() => setWithdraw(false)}>{tr("取消", "Cancel")}</Button><Button type="button" disabled={action.busy} onClick={() => void action.run(async () => { const fresh = platform ? await platformAction("unpublish") : await productionApi<Path>(`learning-paths/${path.id}/unpublish`, { method: "POST", body: {} }); setPath(current => ({ ...current, ...fresh })); setWithdraw(false); onSaved(); return tr("课程已下架。", "Course withdrawn."); })}>{tr("确认下架", "Withdraw course")}</Button></div></Modal>}
+      {publish && canPublish && (
         <Modal title={t("确认发布课程")} onClose={() => setPublish(false)}>
           <p className="text-sm">
             {tr("公开后，符合课程准入范围与开放时间的学生可阅读章节、练习关联题目。", "Eligible students can read chapters and practise linked problems during the configured availability window.")}
@@ -1119,10 +1153,9 @@ function LearningEditorForm({
               disabled={action.busy || !chapters.length}
               onClick={() =>
                 void action.run(async () => {
-                  await save();
-                  await productionApi(`learning-paths/${path.id}/publish`, {
-                    method: "POST",
-                  });
+                  const saved = await save();
+                  if(platform)await platformAction("publish",saved);
+                  else await productionApi(`learning-paths/${path.id}/publish`, {method:"POST"});
                   setPath((x) => ({ ...x, published: true, withdrawnAt: null }));
                   onSaved();
                   setPublish(false);

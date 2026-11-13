@@ -57,6 +57,7 @@ import {
 type MetadataLine =
   string | { name: string; type: string; description: string };
 interface EditorProblem extends ProductionProblem {
+  ownerScope?: "platform" | "school";
   referenceLanguage?: "python" | "cpp" | "javascript";
   difficulty?: string;
   comparator?: "tokens" | "exact" | "json";
@@ -142,29 +143,33 @@ const editableSnapshot = (p: EditorProblem) =>
     hints: p.hints ?? [],
     hintPolicy: p.hintPolicy ?? "afterAC",
   });
-export function TeacherProblemEditor({ id,user }: { id: string;user:CampusUser }) {
+export function TeacherProblemEditor({ id, user, scope, onClose }: { id: string; user: CampusUser; scope?: "school" | "platform"; onClose?: () => void }) {
   const search = useSearchParams(),
+    platform = scope === "platform" || search.get("source") === "platform",
+    endpoint = platform ? "platform/source-problems" : "problems",
     resource = useData<EditorProblem>(
       id === "new"
         ? null
-        : `problems/${id}${search.get("versionId") ? `?versionId=${search.get("versionId")}` : ""}`,
+        : `${endpoint}/${id}${search.get("versionId") ? `?versionId=${search.get("versionId")}` : ""}`,
     );
   return (
     <>
       <State resource={resource} />
       {(id === "new" || resource.data) && (
-        <ProblemEditorForm key={`${id}:${search.get("versionId")??"latest"}:${search.get("solutionVersionId")??"student"}:${search.get("tab")??"statement"}:${search.get("kind")??"FULL_SOLUTION"}`} initial={resource.data} user={user} />
+        <ProblemEditorForm key={`${id}:${search.get("versionId")??"latest"}:${search.get("solutionVersionId")??"student"}:${search.get("tab")??"statement"}:${search.get("kind")??"FULL_SOLUTION"}`} initial={resource.data} user={user} platform={platform || resource.data?.ownerScope === "platform"} onClose={onClose} />
       )}
     </>
   );
 }
-function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;user:CampusUser }) {
+function ProblemEditorForm({ initial, user, platform, onClose }: { initial: EditorProblem | null; user: CampusUser; platform: boolean; onClose?: () => void }) {
+  const endpoint = platform ? "platform/source-problems" : "problems";
+  const canPublish = !platform || user.platformAdmin === true;
   const { locale } = useLocale();
   const tr = (zh:string,en:string) => locale === "zh" ? zh : en;
   const search = useSearchParams(),
     router = useRouter(),
-    banks = useData<{ items: Bank[] }>("problem-banks"),
-    groups = useData<{ items: Group[] }>("problem-groups"),
+    banks = useData<{ items: Bank[] }>(platform ? null : "problem-banks"),
+    groups = useData<{ items: Group[] }>(platform ? null : "problem-groups"),
     [problem, setProblem] = useState<EditorProblem>(
       initial ?? { ...blank, bankId: search.get("bankId") ?? "" },
     ),
@@ -204,7 +209,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
         ? `/teacher/problems/banks/${problem.bankId}`
         : "/teacher/problems");
   const bankVisibility = banks.data?.items.find((bank) => bank.id === problem.bankId)?.visibility ?? saved?.bankVisibility;
-  const draft=useTeacherDraft({storageKey:teacherDraftKey(user.id,initial?.id??"new",search.get("versionId")??"current",search.get("bankId")??""),baseline:editableSnapshot(initial??{...blank,bankId:search.get("bankId")??""}),snapshot:editableSnapshot(problem),baseVersion:initial?.versionId??"new",dirty,editable,onRestore:snapshot=>{const recovered=JSON.parse(snapshot);setProblem(current=>({...current,...recovered}));}});
+  const draft=useTeacherDraft({storageKey:teacherDraftKey(user.id,saved?.id??"new",search.get("versionId")??"current",platform ? "platform" : search.get("bankId")??""),baseline:editableSnapshot(initial??{...blank,bankId:search.get("bankId")??""}),snapshot:editableSnapshot(problem),baseVersion:initial?.versionId??"new",dirty,editable,onRestore:snapshot=>{const recovered=JSON.parse(snapshot);setProblem(current=>({...current,...recovered}));}});
   useNavigationBlocker(dirty);
   useEffect(() => {
     if (!dirty) return;
@@ -220,7 +225,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
     const controller = new AbortController();
     const timer = setTimeout(() => {
       productionApi<EditorProblem>(
-        `problems/${saved.id}?versionId=${saved.versionId}`,
+        `${endpoint}/${saved.id}?versionId=${saved.versionId}`,
         { signal: controller.signal },
       )
         .then((result) => setSaved(result))
@@ -230,7 +235,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
       controller.abort();
       clearTimeout(timer);
     };
-  }, [saved]);
+  }, [saved, endpoint]);
   const update = <K extends keyof EditorProblem>(
     key: K,
     value: EditorProblem[K],
@@ -245,6 +250,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
     const body = {
       ...problem,
       saveDraft: true,
+      ...(platform ? { expectedVersionId: saved?.versionId } : {}),
       comparator: problem.mode === "function" ? "json" : problem.comparator === "exact" ? "exact" : "tokens",
       tests: equalCaseWeights(tests),
       functionName: problem.mode === "function" ? problem.functionName : "",
@@ -256,25 +262,27 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
       },
     };
     const result = await productionApi<EditorProblem>(
-      saved ? `problems/${saved.id}/versions` : "problems",
+      saved ? `${endpoint}/${saved.id}/versions` : endpoint,
       { method: "POST", body },
     );
     draft.clear();
     setSaved(result);
     setProblem(result);
-    if (!initial && navigate)
+    if (!initial && navigate && !onClose)
       router.replace(
-        `/teacher/problems/${result.id}/edit?returnTo=${encodeURIComponent(back)}${tab === "教程" ? "&tab=tutorial" : tab === "解答与提示" ? "&tab=solutions" : ""}`,
+        `/teacher/problems/${result.id}/edit?${platform ? "source=platform&" : ""}returnTo=${encodeURIComponent(back)}${tab === "教程" ? "&tab=tutorial" : tab === "解答与提示" ? "&tab=solutions" : ""}`,
       );
     return result;
   };
   const list = (kind: "samples" | "tests") => problem[kind] ?? [];
   return (
     <div className={styles.editor} data-od-id="teacher-problem-editor">
+      {onClose && <Button type="button" variant="ghost" disabled={action.busy || solutionPending} onClick={() => { if (window.dispatchEvent(new Event("campus-judge:before-navigate", { cancelable: true })) || window.confirm(tr("当前页面有未保存修改，确定返回吗？", "Discard unsaved changes and return?"))) onClose(); }}>{tr("返回题目列表", "Back to problems")}</Button>}
+      {onClose && <h2 className="mt-2 break-words text-lg font-semibold">{problem.title || tr("新建题目", "New problem")}</h2>}
       <PageHeader
         eyebrow={tr("题目编辑", "Problem editor")}
         title={problem.title || tr("新建题目", "New problem")}
-        description={`${banks.data?.items.find((x) => x.id === problem.bankId)?.name ?? tr("尚未选择题库", "No bank selected")} · ${tr("草稿保存与发布分别进行，已发布版本及历史成绩保留。", "Saving a draft and publishing are separate. Published versions and past results remain.")}`}
+        description={`${platform ? "CodeMaster" : banks.data?.items.find((x) => x.id === problem.bankId)?.name ?? tr("尚未选择题库", "No bank selected")} · ${tr("草稿保存与发布分别进行，已发布版本及历史成绩保留。", "Saving a draft and publishing are separate. Published versions and past results remain.")}`}
         action={
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => setPreview(true)}>
@@ -293,14 +301,14 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
               <Save size={15} />
               {tr("保存题目草稿", "Save problem draft")}
             </Button>
-            <Button
+            {canPublish && <Button
               variant="secondary"
               disabled={action.busy || solutionPending || !saved || dirty || !saved.canPublish}
               onClick={() => setPublish(true)}
             >
               <Send size={15} />
-              {bankVisibility === "school" ? tr("提交公开审核", "Request public review") : tr("启用教学版本", "Release for teaching")}
-            </Button>
+              {platform ? tr("发布版本", "Publish version") : bankVisibility === "school" ? tr("提交公开审核", "Request public review") : tr("启用教学版本", "Release for teaching")}
+            </Button>}
           </div>
         }
       />
@@ -310,7 +318,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
       {draft.status&&<p className="mt-2 text-xs text-muted-foreground" role="status" data-od-id="teacher-autosave-status">{draft.status}</p>}
 
       <div className={styles.toolbar}>
-        <span className="text-muted-foreground">{tr("分组", "Groups")}</span>
+        {!platform && <><span className="text-muted-foreground">{tr("分组", "Groups")}</span>
         <GroupTags
           onClick={saved?.id && editable ? () => setManage(true) : undefined}
           groups={
@@ -326,12 +334,12 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
           onClick={() => {if(saved?.id && saved.bankId===problem.bankId)setManage(true);else void action.run(async()=>{await save(false);setManage(true);return "草稿已保存，可选择分组。";});}}
         >
           {tr("整理分组", "Organize groups")}
-        </Button>
-        {saved ? <ProblemPublicationStatus problem={saved} bankVisibility={bankVisibility}/> : <StatusPill status={tr("草稿", "Draft")}/>}
-        {saved && <span className="text-xs text-muted-foreground">{reviewVisibilityLabel(saved, bankVisibility, locale)}</span>}
+        </Button></>}
+        {saved && !platform ? <ProblemPublicationStatus problem={saved} bankVisibility={bankVisibility}/> : <StatusPill status={saved?.published ? tr("已发布", "Published") : tr("草稿", "Draft")}/>}
+        {saved && !platform && <span className="text-xs text-muted-foreground">{reviewVisibilityLabel(saved, bankVisibility, locale)}</span>}
         {dirty && <span className="text-xs text-warning">{tr("有未保存修改", "Unsaved changes")}</span>}
       </div>
-      {!saved?.id&&<p className="text-xs text-muted-foreground">{tr("整理分组时先保存题目草稿；没有分组可在弹窗中直接新建。", "Save the problem draft before organizing groups. You can create a group in the dialog.")}</p>}
+      {!platform && !saved?.id&&<p className="text-xs text-muted-foreground">{tr("整理分组时先保存题目草稿；没有分组可在弹窗中直接新建。", "Save the problem draft before organizing groups. You can create a group in the dialog.")}</p>}
       <State resource={groups}/>
       <Tabs value={tr(tab, englishTabs[tab] ?? tab)} onChange={value => {
         const next = visibleTabs.find(item => tr(item, englishTabs[item] ?? item) === value) ?? "题面";
@@ -357,7 +365,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
             </div>
             <aside className="space-y-4">
               <Field label={tr("所属题库", "Problem bank")}>
-                <select
+                {platform ? <p className="py-2 text-sm">CodeMaster</p> : <select
                   value={problem.bankId ?? ""}
                   disabled={!!saved || !editable}
                   onChange={(e) => update("bankId", e.target.value)}
@@ -377,7 +385,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                         {x.name}
                       </option>
                     ))}
-                </select>
+                </select>}
               </Field>
               <Field label={tr("主题标签", "Topic tags")}>
                 <input
@@ -680,8 +688,8 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                 <p className="mt-2 text-sm text-muted-foreground">
                   {tr("保存草稿与发布分别进行。已发布题目的修改不会覆盖历史作业仍在使用的旧版本。", "Draft saving and publication are separate. Changes to published problems do not overwrite versions used by past assignments.")}
                 </p>
-                <p className="mt-2 text-sm text-muted-foreground">{bankVisibility === "school" ? tr("发布到校内题库后自动进入管理员审核；审核通过前，仅负责教师及指定作业或训练学生可见，不计入积分排行榜。", "Publishing to a school bank starts admin review. Until approval, only the responsible teacher and assigned students can access it; it earns no leaderboard points.") : tr("当前为教师私有题库。题目发布后可用于指定作业或训练；如需全校开放，请联系管理员纳入校内审核。", "This is a private teacher bank. Published problems can be used in assigned activities. Ask an administrator for school-wide review.")}</p>
-                {saved && <p className="mt-2 text-sm font-medium">{tr("当前状态", "Current status")}: {reviewVisibilityLabel(saved, bankVisibility, locale)}</p>}
+                <p className="mt-2 text-sm text-muted-foreground">{platform ? tr("由平台管理员发布题目版本并设置公开范围。授权编辑者可以保存修改，等待管理员发布。", "Platform administrators publish versions and manage visibility. Authorized editors save changes for administrator publication.") : bankVisibility === "school" ? tr("发布到校内题库后自动进入管理员审核；审核通过前，仅负责教师及指定作业或训练学生可见，不计入积分排行榜。", "Publishing to a school bank starts admin review. Until approval, only the responsible teacher and assigned students can access it; it earns no leaderboard points.") : tr("当前为教师私有题库。题目发布后可用于指定作业或训练；如需全校开放，请联系管理员纳入校内审核。", "This is a private teacher bank. Published problems can be used in assigned activities. Ask an administrator for school-wide review.")}</p>
+                {saved && !platform && <p className="mt-2 text-sm font-medium">{tr("当前状态", "Current status")}: {reviewVisibilityLabel(saved, bankVisibility, locale)}</p>}
                 <p className="mt-3 font-mono text-xs">
                   {saved?.versionId ?? tr("尚未保存", "Not saved")}
                 </p>
@@ -700,7 +708,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                     "正式测试",
                     Boolean(problem.tests?.some((x) => x.enabled !== false)),
                   ],
-                  ["参考解验证", saved?.canPublish === true],
+                  ["参考解验证", saved?.validationStatus === "AC"],
                 ].map(([label, ok]) => (
                   <div
                     key={String(label)}
@@ -730,7 +738,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
                 onClick={() =>
                   void action.run(async () => {
                     const result = await productionApi<EditorProblem>(
-                      `problems/${saved?.id}?versionId=${saved?.versionId}`,
+                      `${endpoint}/${saved?.id}?versionId=${saved?.versionId}`,
                     );
                     setSaved(result);
                     return tr("验证结果已刷新。", "Validation result refreshed.");
@@ -739,13 +747,13 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
               >
                 {tr("刷新验证结果", "Refresh validation")}
               </Button>
-              <Button
+              {canPublish && <Button
                 variant="secondary"
                 disabled={!editable || !saved?.canPublish || dirty || action.busy || solutionPending}
                 onClick={() => setPublish(true)}
               >
-                {bankVisibility === "school" ? tr("提交公开审核", "Request public review") : tr("启用教学版本", "Release for teaching")}
-              </Button>
+                {platform ? tr("发布版本", "Publish version") : bankVisibility === "school" ? tr("提交公开审核", "Request public review") : tr("启用教学版本", "Release for teaching")}
+              </Button>}
             </aside>
           </div>
         )}
@@ -753,6 +761,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
       {solutionsVisited && <section className="space-y-4" role="tabpanel" aria-label={tr("解答与提示", "Solutions and hints")} hidden={tab !== "解答与提示"}>
         {saved?.versionId && editable ? <ProblemAssistanceEditor key={saved.id}
           problemId={saved.id} versionId={saved.versionId}
+          endpoint={platform ? `${endpoint}/${saved.id}/contents` : undefined} canPublish={canPublish}
           initialVersionId={search.get("solutionVersionId") ?? undefined}
           initialKind={search.get("kind") === "FULL_TRANSLATION" ? "FULL_TRANSLATION" : "FULL_SOLUTION"}
           externalBusy={action.busy} hasUnsavedProblemChanges={dirty} onPendingChange={setSolutionPending} />
@@ -818,7 +827,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
       </section>}
       {showTutorial && tutorialVisited && <section className={`${panel} ${styles.body}`}
         role="tabpanel" aria-label={tr("教程", "Tutorial")} hidden={tab !== "教程"}>
-        {saved ? <ProblemTutorialEditor key={saved.id} endpoint={`problems/${encodeURIComponent(saved.id)}/tutorial`} inline disabled={action.busy} /> :
+        {saved ? <ProblemTutorialEditor key={saved.id} endpoint={`${endpoint}/${encodeURIComponent(saved.id)}/tutorial`} inline disabled={action.busy} /> :
           <p className="text-sm text-muted-foreground">{tr("先保存题目草稿，即可在这里设置教程。", "Save the problem draft to set up its tutorial here.")}</p>}
       </section>}
       {test && (
@@ -855,7 +864,7 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
           }}
         />
       )}
-      {manage && saved?.bankId && (
+      {!platform && manage && saved?.bankId && (
         <ManageGroups
           bankId={saved.bankId}
           problemIds={[saved.id]}
@@ -874,10 +883,10 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
           </p>
         </Modal>
       )}
-      {publish && saved && (
-        <Modal title={bankVisibility === "school" ? tr("提交公开审核", "Request public review") : tr("启用教学版本", "Release for teaching")} onClose={() => setPublish(false)}>
+      {canPublish && publish && saved && (
+        <Modal title={platform ? tr("发布版本", "Publish version") : bankVisibility === "school" ? tr("提交公开审核", "Request public review") : tr("启用教学版本", "Release for teaching")} onClose={() => setPublish(false)}>
           <p className="text-sm leading-6">
-            {tr("发布", "Publish")} “{saved.title}” {tr("的已验证版本。历史活动与提交保留原版本。", "as a validated version. Past activities and submissions keep the earlier version.")} {bankVisibility === "school" ? tr("本版本将进入管理员审核；通过前仅指定活动学生可见，也不会计入全校排名积分。", "This version enters admin review. Until approved, it is visible only to assigned activity students and earns no leaderboard points.") : tr("当前题库为教师私有，仅指定活动学生可见；如需全校开放，须由管理员调整题库范围并审核该版本。", "This bank is teacher-private and visible only to assigned activity students. An administrator must adjust the bank scope and approve this version for school-wide access.")}
+            {tr("发布", "Publish")} “{saved.title}” {tr("的已验证版本。历史活动与提交保留原版本。", "as a validated version. Past activities and submissions keep the earlier version.")} {platform ? tr("课程与普通练习使用最新已发布版本。公开范围由平台管理员在题库中另行设置。", "Courses and ordinary practice use the latest published version. Platform administrators manage public visibility separately in the problem bank.") : bankVisibility === "school" ? tr("本版本将进入管理员审核；通过前仅指定活动学生可见，也不会计入全校排名积分。", "This version enters admin review. Until approved, it is visible only to assigned activity students and earns no leaderboard points.") : tr("当前题库为教师私有，仅指定活动学生可见；如需全校开放，须由管理员调整题库范围并审核该版本。", "This bank is teacher-private and visible only to assigned activity students. An administrator must adjust the bank scope and approve this version for school-wide access.")}
           </p>
           <Feedback action={action} />
           <div className="mt-5 flex justify-end gap-2">
@@ -889,13 +898,13 @@ function ProblemEditorForm({ initial,user }: { initial: EditorProblem | null;use
               onClick={() =>
                 void action.run(async () => {
                   const result = await productionApi<EditorProblem>(
-                    `problems/${saved.id}/publish`,
-                    { method: "POST", body: { versionId: saved.versionId } },
+                    `${endpoint}/${saved.id}/publish`,
+                    { method: "POST", body: platform ? { expectedVersionId: saved.versionId } : { versionId: saved.versionId } },
                   );
                   setSaved(result);
                   setProblem(result);
                   setPublish(false);
-                  return tr("题目版本已发布；全校开放和积分资格须经管理员审核。", "Problem version published. School-wide access and point eligibility require admin review.");
+                  return platform ? tr("题目版本已发布。", "Problem version published.") : tr("题目版本已发布；全校开放和积分资格须经管理员审核。", "Problem version published. School-wide access and point eligibility require admin review.");
                 })
               }
             >

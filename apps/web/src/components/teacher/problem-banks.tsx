@@ -2,6 +2,7 @@
 import { ProblemPublicationStatus, PublicationGuide } from "@/components/problem-publication-status";
 import { BankRenameDialog } from "@/components/bank-rename-dialog";
 import { ProblemGroupFilter } from "@/components/problem-group-filter";
+import { isPlatformProblem, mergePlatformProblems, problemEditorHref, type PlatformSourceProblem } from "./platform-problem-source";
 import {ProblemFilter} from "./problem-filter";
 import { useProblemSelection } from "./use-problem-selection";
 import { useProblemBankFilters } from "./use-problem-bank-filters";
@@ -26,7 +27,7 @@ import {
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { useRangeSelection } from "@/components/ui/use-range-selection";
-import { PageHeader } from "@/components/page-chrome";
+import { PageHeader, StatusPill } from "@/components/page-chrome";
 import { useLocale, type AppLocale } from "@/components/locale-context";
 import { productionApi, type CampusUser, type ProductionProblem } from "@/lib/production-api";
 import {
@@ -83,6 +84,7 @@ export function reviewVisibilityLabel(problem: ProductionProblem, bankVisibility
       ? localText(locale, "学生看不到这份草稿，仍可按原权限使用已发布版本。", "This draft is hidden from students. The published version keeps its existing access rules.")
       : localText(locale, "此草稿对学生隐藏。", "This draft is hidden from students.");
   }
+  if (isPlatformProblem(problem)) return compact ? "CodeMaster" : localText(locale, "CodeMaster 平台题目，由平台管理员管理发布与公开范围。", "CodeMaster problem. Platform administrators manage publication and visibility.");
   const visibility = problem.bankVisibility ?? bankVisibility;
   if (visibility !== "school") return localText(locale,"仅指定活动学生可见","Only visible to assigned activity students");
   if (problem.schoolVisibleAt) return problem.rankReviewStatus === "approved" ? localText(locale,"全校自由练习 · 参与积分榜","School-wide practice · leaderboard points") : localText(locale,"全校自由练习 · 积分资格未通过审核","School-wide practice · points not approved");
@@ -91,6 +93,7 @@ export function reviewVisibilityLabel(problem: ProductionProblem, bankVisibility
 }
 export const MAX_BATCH_PUBLISH = 100;
 export function publishEligibilityReason(problem: ProductionProblem, locale: AppLocale) {
+  if (isPlatformProblem(problem)) return localText(locale, "由平台管理员发布", "Published by platform administrators");
   if (!problem.canEdit) return localText(locale, "无编辑权限", "No edit permission");
   if (problem.published) return localText(locale, "当前版本已发布", "Current version already published");
   if (problem.validationStatus !== "AC") return localText(locale, "参考解尚未通过全部测试", "Reference solution has not passed all tests");
@@ -105,6 +108,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
   const router = useRouter(),
     banks = useData<{ items: Bank[] }>("problem-banks?includeArchived=owned"),
     problems = useData<{ items: ProductionProblem[] }>("problems"),
+    platformSources = useData<{ items: PlatformSourceProblem[] }>("platform/source-problems?schoolId=00000000-0000-4000-8000-000000000052"),
     groups = useData<{ items: Group[] }>("problem-groups");
   const { filters, changeFilters } = useProblemBankFilters(user.id, bankId);
   const { query, status: filterStatus, archived: showArchived } = filters;
@@ -139,10 +143,11 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
       ? `${group.name} · ${bankNames.get(group.bankId)}`
       : group.name,
   }));
+  const mergedProblems = mergePlatformProblems(problems.data?.items ?? [], platformSources.data?.items ?? []);
   const waitingForGroups = Boolean(filterGroup && (groups.loading || groups.error));
   const searchText = query.trim().toLowerCase();
   const rows = waitingForGroups ? [] :
-      problems.data?.items.filter(
+      mergedProblems.filter(
         (x) =>
           (!bankId || x.bankId === bankId) &&
           (!filterBank || x.bankId === filterBank) &&
@@ -154,7 +159,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
             .toLowerCase()
             .includes(searchText),
       ) ?? [];
-  const { checked, setChecked, changeRow } = useProblemSelection(rows, JSON.stringify([bankId, tab, query, filterBank, filterGroup, filterStatus]));
+  const { checked, setChecked, changeRow } = useProblemSelection(rows.filter(problem => !isPlatformProblem(problem)), JSON.stringify([bankId, tab, query, filterBank, filterGroup, filterStatus]));
   const checkedProblems = (problems.data?.items ?? []).filter((problem) => checked.includes(problem.id));
   const publishableSelection = checkedProblems.filter((problem) => !publishEligibilityReason(problem, locale));
   const excludedSelection = checkedProblems.filter((problem) => publishEligibilityReason(problem, locale));
@@ -238,6 +243,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
       />
       <State resource={banks} />
       <State resource={problems} />
+      <State resource={platformSources} />
       <State resource={groups} />
       <Feedback action={action} />
       <div className={styles.sectionBar}>
@@ -478,13 +484,14 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                     <input
                       type="checkbox"
                       aria-label={`${tr("选择", "Select")} ${problem.title}`}
+                      disabled={isPlatformProblem(problem)}
                       checked={checked.includes(problem.id)}
                       onChange={(event) => changeRow(problem.id, event)}
                     />
                   </td>
                   <td>
                     <Link
-                      href={`/teacher/problems/${problem.id}/edit?returnTo=${encodeURIComponent(bankId ? `/teacher/problems/banks/${bankId}` : "/teacher/problems")}`}
+                      href={problemEditorHref(problem, bankId ? `/teacher/problems/banks/${bankId}` : "/teacher/problems")}
                       className={styles.problemTitle}
                     >
                       {problem.title}
@@ -495,8 +502,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                   </td>
                   <td className="break-words">
                     {
-                      banks.data?.items.find((x) => x.id === problem.bankId)
-                        ?.name
+                      isPlatformProblem(problem) ? "CodeMaster" : banks.data?.items.find((x) => x.id === problem.bankId)?.name
                     }
                   </td>
                   <td className="break-words">
@@ -504,7 +510,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                       {problem.tags?.join(" · ") || "—"}
                     </p>
                     <GroupTags
-                      onClick={() => openManage([problem.id])}
+                      onClick={isPlatformProblem(problem) ? undefined : () => openManage([problem.id])}
                       groups={
                         groups.data?.items.filter((g) =>
                           g.problemIds.includes(problem.id),
@@ -516,21 +522,21 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                     {problem.mode === "function" ? tr("函数模式", "Function") : tr("标准输入输出", "Standard I/O")}
                   </td>
                   <td className={styles.publicationCell}>
-                    <ProblemPublicationStatus problem={problem} bankVisibility={banks.data?.items.find((x) => x.id === problem.bankId)?.visibility}/>
+                    {isPlatformProblem(problem) ? <StatusPill status={problem.published ? tr("已发布", "Published") : tr("草稿", "Draft")} /> : <ProblemPublicationStatus problem={problem} bankVisibility={banks.data?.items.find((x) => x.id === problem.bankId)?.visibility}/>}
                     {!problem.published && <p className="mt-1 text-xs text-muted-foreground">{tr("参考验证", "Reference check")}: {validationStatusLabel(problem.validationStatus ?? "Draft", locale)}</p>}
                     <p className="mt-1 text-xs leading-4 text-muted-foreground empty:hidden">{reviewVisibilityLabel(problem, banks.data?.items.find((x) => x.id === problem.bankId)?.visibility, locale, true)}</p>
                   </td>
                   <td>
                     <div className="flex flex-col items-start gap-1 text-xs">
                       <Link
-                        href={`/teacher/problems/${problem.id}/edit?returnTo=${encodeURIComponent(bankId ? `/teacher/problems/banks/${bankId}` : "/teacher/problems")}`}
+                        href={problemEditorHref(problem, bankId ? `/teacher/problems/banks/${bankId}` : "/teacher/problems")}
                         className="inline-flex items-center gap-1 font-semibold text-primary"
                       >
                         {problem.canEdit === false ? tr("查看", "View") : tr("编辑", "Edit")} <ArrowRight size={14} />
                       </Link>
-                      <button className={`${link} text-left`} onClick={() => openManage([problem.id])}>
+                      {!isPlatformProblem(problem) && <button type="button" className={`${link} text-left`} onClick={() => openManage([problem.id])}>
                         {tr("整理分组", "Organize groups")}
-                      </button>
+                      </button>}
                     </div>
                   </td>
                 </tr>
@@ -962,7 +968,9 @@ export function ProblemPicker({
   courseMode,
   forAssignment,
   orderedProblemIds,
+  sourcePath,
 }: {
+  sourcePath?: string;
   selected: string[];
   onClose: () => void;
   onAdd: (items: ProductionProblem[]) => void;
@@ -972,9 +980,9 @@ export function ProblemPicker({
 }) {
   const { locale } = useLocale();
   const tr = (zh: string, en: string) => localText(locale, zh, en);
-  const banks = useData<{ items: Bank[] }>("problem-banks"),
-    groups = useData<{ items: Group[] }>("problem-groups"),
-    problems = useData<{ items: ProductionProblem[] }>(forAssignment ? "problems?purpose=assignment" : "problems"),
+  const banks = useData<{ items: Bank[] }>(sourcePath ? null : "problem-banks"),
+    groups = useData<{ items: Group[] }>(sourcePath ? null : "problem-groups"),
+    problems = useData<{ items: ProductionProblem[] }>(sourcePath ?? (forAssignment ? "problems?purpose=assignment" : "problems")),
     [bank, setBank] = useState(""),
     [group, setGroup] = useState(""),
     [query, setQuery] = useState(""),
@@ -983,7 +991,7 @@ export function ProblemPicker({
   const rows =
     orderedProblems.filter(
       (p) =>
-        (!courseMode || (p.bankVisibility === "school" && (courseMode === "published" || p.canEdit))) &&
+        (!courseMode || Boolean(sourcePath) || (p.bankVisibility === "school" && (courseMode === "published" || p.canEdit))) &&
         (!bank || p.bankId === bank) &&
         (!group ||
           groups.data?.items
@@ -994,8 +1002,8 @@ export function ProblemPicker({
           .includes(query.toLowerCase()),
     ).map((problem) => {
       const exists = selected.includes(problem.id);
-      const courseReady = problem.published && problem.bankVisibility === "school" &&
-        Boolean(problem.schoolVisibleAt) && problem.rankReviewStatus === "approved";
+      const courseReady = problem.published && (sourcePath ? true : problem.bankVisibility === "school" &&
+        Boolean(problem.schoolVisibleAt) && problem.rankReviewStatus === "approved");
       const available = courseMode === "draft" || (courseMode === "published"
         ? courseReady
         : problem.published || Boolean(problem.publishedVersionId));
@@ -1003,9 +1011,9 @@ export function ProblemPicker({
     });
   const { getRange, resetAnchor } = useRangeSelection(rows, JSON.stringify([courseMode, bank, group, query, orderedProblemIds]));
   return (
-    <Drawer title={tr("从题库与分组选择", "Choose from banks and groups")} onClose={onClose}>
+    <Drawer title={sourcePath ? tr("选择平台题目", "Choose platform problems") : tr("从题库与分组选择", "Choose from banks and groups")} onClose={onClose}>
       <p className="text-xs text-muted-foreground">
-        {courseMode === "draft"
+        {sourcePath ? tr("选择平台已发布题目。课程与普通练习会使用最新已发布版本，已有学习记录保留。", "Choose published platform problems. Courses and ordinary practice use their latest published version and retain learner history.") : courseMode === "draft"
           ? tr("课程草稿可引用校内题库中你能编辑的题目最新版本；发布课程前，关联题须发布并通过管理员公开审核。", "A course draft can link the latest versions you can edit in school banks. Publish and obtain admin approval for linked problems before publishing the course.")
           : courseMode === "published"
             ? tr("课程只能添加已通过管理员审核的校内公开题目。", "Only admin-approved school-wide problems can be added to a published course.")
@@ -1015,7 +1023,7 @@ export function ProblemPicker({
         {" "}{tr("先勾选一项，再按住 Shift 点击另一项，即可选中当前列表中两者之间的可选题目。", "Select a problem, then Shift-click another to select all eligible problems in between in the current list.")}
       </p>
       <div className="mt-4 grid grid-cols-2 gap-3">
-        <select
+        {!sourcePath && <><select
           aria-label={tr("选择题库", "Choose bank")}
           className={input}
           value={bank}
@@ -1046,7 +1054,7 @@ export function ProblemPicker({
                 {x.name}
               </option>
             ))}
-        </select>
+        </select></>}
         <input
           aria-label={tr("搜索选择题目", "Search problems to select")}
           className={`${input} col-span-2`}
@@ -1086,7 +1094,7 @@ export function ProblemPicker({
                     ? tr("已添加", "Added")
                     : courseMode
                       ? courseReady
-                        ? tr("已审核公开 · 可随课程发布", "Approved and public · ready for the course")
+                        ? sourcePath ? tr("CodeMaster · 已发布", "CodeMaster · Published") : tr("已审核公开 · 可随课程发布", "Approved and public · ready for the course")
                         : p.published
                           ? p.rankReviewStatus === "rejected"
                             ? tr("审核未通过 · 教学可用", "Review rejected · teaching ready")

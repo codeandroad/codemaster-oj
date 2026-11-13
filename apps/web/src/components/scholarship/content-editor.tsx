@@ -29,6 +29,8 @@ export function ContentEditor({
   autoSelect = false,
   showKindSelect = true,
   externalBusy = false,
+  endpoint = "scholarship/contents",
+  canPublish = true,
 }: {
   target: ContentTarget;
   kind: AssistanceKind;
@@ -39,10 +41,12 @@ export function ContentEditor({
   autoSelect?: boolean;
   showKindSelect?: boolean;
   externalBusy?: boolean;
+  endpoint?: string;
+  canPublish?: boolean;
 }) {
   const tx = useText(),
     contents = useContentResource(
-      `scholarship/contents?${new URLSearchParams(target)}`,
+      `${endpoint}?${new URLSearchParams(target)}`,
     );
   const content = contents.data?.items.find(
     (item) =>
@@ -78,7 +82,7 @@ export function ContentEditor({
         </select>}
       </div>
       <p className="text-xs text-muted-foreground">
-        {kind === "FULL_TRANSLATION" ? tx(
+        {!canPublish || contents.data?.canPublish === false ? tx("在此编辑题面译文或学生题解。保存草稿后，由平台管理员审核发布。", "Edit translations or student solutions here. Save a draft for a platform administrator to review and publish.") : kind === "FULL_TRANSLATION" ? tx(
           "在此维护学生阅读的中文题面。先保存草稿，核对内容后审核发布。",
           "Maintain the Chinese problem text students read. Save a draft, check its content, then review and publish.",
         ) : "problemId" in target ? tx(
@@ -94,6 +98,8 @@ export function ContentEditor({
         <ContentForm
           key={`${kind}:${shared && "problemId" in target ? target.problemId : target.versionId}`}
           kind={kind}
+          endpoint={endpoint}
+          canPublish={canPublish && contents.data.canPublish !== false}
           target={target}
           content={content}
           originalSolution={contents.data.originalSolution}

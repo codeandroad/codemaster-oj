@@ -195,6 +195,35 @@ test('platform courses retain original data and enforce audiences through NestJS
    assert.equal(reader.id,chapter.id);assert.equal(reader.body,fields.content);
    for(const key of ['objective','checkpoint','checkpointAnswer','localizations'])assert.deepEqual(reader[key],saved[key],key);
   });
+  await t.test('the shared course editor offers only public Paper 4 metadata and preserves pinned references',async()=>{
+   const paper=(await pool.query("INSERT INTO paper4_papers(owner_account_id,title,status,published_at,delivery_kind) VALUES($1,'Shared editor Paper 4','published',now(),'catalog') RETURNING id",[admin.id])).rows[0];
+   const definition={exam:{examYear:2026},questions:[{key:'Q1',title:'Visible question title',stages:[{id:'s1',judgeMode:'auto',markingScheme:'PRIVATE_PAPER4_MARKSCHEME'}]}]};
+   const runnerCases={s1:[{id:'hidden-case',input:'PRIVATE_PAPER4_INPUT',expected:'PRIVATE_PAPER4_OUTPUT'}]};
+   const paperVersion=(await pool.query("INSERT INTO paper4_versions(paper_id,title,description,definition,runner_cases,reference_solutions,published_at) VALUES($1,'Shared editor Paper 4','',$2,$3,$4,now()) RETURNING id",[paper.id,definition,runnerCases,{s1:'PRIVATE_PAPER4_SOLUTION'}])).rows[0];
+   await pool.query('UPDATE paper4_papers SET current_version_id=$2 WHERE id=$1',[paper.id,paperVersion.id]);
+   const hidden=(await pool.query("INSERT INTO paper4_papers(owner_account_id,title) VALUES($1,'PRIVATE_PAPER4_DRAFT') RETURNING id",[admin.id])).rows[0];
+   const grantPath=`/platform/content-editors/course/${course.id}`,grant={accountId:actors['school-teacher'].id,schoolId:alpha.id};
+   await teacher.send(`/platform/courses/paper4-options?courseId=${course.id}`,undefined,'GET',403);
+   await platform.send(grantPath,grant);
+   const options=await teacher.send(`/platform/courses/paper4-options?courseId=${course.id}`);
+   assert.ok(options.items.some(item=>item.id===paper.id));assert.ok(!options.items.some(item=>item.id===hidden.id));
+   const detail=await teacher.send(`/platform/courses/paper4-options?courseId=${course.id}&paperId=${paper.id}`);
+   assert.deepEqual(detail.questions,[{key:'Q1',title:'Visible question title'}]);assert.equal(detail.versionId,paperVersion.id);
+   assert.ok(!JSON.stringify(detail).includes('PRIVATE_PAPER4'));assert.ok(!JSON.stringify(options).includes('PRIVATE_PAPER4'));
+   await teacher.send(`/platform/courses/paper4-options?courseId=${course.id}&paperId=${hidden.id}`,undefined,'GET',404);
+   await personal.send(`/platform/courses/paper4-options?courseId=${course.id}`,undefined,'GET',403);
+   course=await teacher.send(`/platform/courses/${course.id}`,{expectedRevision:course.revision,sourceVersion:course.sourceVersion,
+    chapters:course.chapters.map(chapter=>({...chapter,paper4Links:[{paperId:paper.id,versionId:paperVersion.id,questionKey:'Q1'}]}))},'PATCH');
+   const chapter=course.chapters[0];assert.equal(chapter.paper4Links[0].versionId,paperVersion.id);
+   const newer=(await pool.query("INSERT INTO paper4_versions(paper_id,version_number,title,description,definition,runner_cases,published_at) VALUES($1,2,'Newer public Paper 4','',$2,$3,now()) RETURNING id",[paper.id,definition,runnerCases])).rows[0];
+   await pool.query('UPDATE paper4_papers SET current_version_id=$2 WHERE id=$1',[paper.id,newer.id]);
+   await change({chapters:course.chapters.map(item=>({...item,title:'Shared editor retained links'}))});
+   assert.equal(course.chapters[0].id,chapter.id);assert.deepEqual(course.chapters[0].localizations,chapter.localizations);
+   assert.equal(course.chapters[0].paper4Links[0].versionId,paperVersion.id);
+   assert.equal((await pool.query('SELECT version_id FROM chapter_paper4_links WHERE chapter_id=$1',[chapter.id])).rows[0].version_id,paperVersion.id);
+   await platform.send(grantPath,grant,'DELETE');
+   await teacher.send(`/platform/courses/paper4-options?courseId=${course.id}`,undefined,'GET',403);
+  });
   await t.test('school audiences block discovery, entry, chapter reads and applications outside the selected schools',async()=>{
    await change({audienceScope:'schools',schoolIds:[alpha.id]});
    assert.ok((await list(a)).some(c=>c.id===course.id));

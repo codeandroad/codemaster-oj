@@ -13,7 +13,11 @@ export function ProblemAssistanceEditor({
   externalBusy = false,
   hasUnsavedProblemChanges = false,
   onPendingChange,
+  endpoint,
+  canPublish,
 }: {
+  endpoint?: string;
+  canPublish?: boolean;
   problemId: string;
   versionId: string;
   initialVersionId?: string;
@@ -41,6 +45,8 @@ export function ProblemAssistanceEditor({
       : "题目还有未保存的修改。你可以直接编辑下方已有的学生题解；如需使用修改后的参考代码或题解素材，请先保存题目草稿。"}</p>}
     <ContentEditor
       key={problemId}
+      endpoint={endpoint}
+      canPublish={canPublish}
       target={{ problemId, versionId: selectedVersion }}
       kind={kind}
       onKindChange={setKind}

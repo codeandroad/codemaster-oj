@@ -19,6 +19,7 @@ export type Definition = {
 };
 
 export type Problem = {
+  ownerScope?: "platform" | "school";
   activity?: {id:string;title:string;kind:"assignment"|"timed";phase:string;endsAt?:string|null;canSubmit:boolean;attempt:{id:string;startedAt:string;deadlineAt:string|null;finishedAt:string|null}|null;resultsPublishedAt:string|null;preview?:boolean;revision?:number};
   staffPractice?: boolean;
   solved?: boolean;

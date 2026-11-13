@@ -11,6 +11,9 @@ import { useRangeSelection } from "@/components/ui/use-range-selection";
 import { apiMessage, productionApi, type SchoolClass } from "@/lib/production-api";
 import { CourseProgrammingLanguageField } from "./course-programming-language-field";
 import { useData } from "./shared";
+import type { PlatformCourse } from "@/components/schools/platform-course-model";
+import { PlatformCourseAudience } from "@/components/schools/platform-course-audience";
+import { activeAdmissionRules, courseAudiencePolicy, courseAudiencePolicyForSave } from "@/components/schools/platform-course-admission-model";
 import { CourseTranslationFields } from "./course-translation-editor";
 import { parseCourseLocalizations, type CourseLocalizations } from "@/components/course-localization";
 import { CourseSettingsInputError, courseSettingsInput, courseCoverByteLength, courseCoverMaxBytes } from "./course-settings-input";
@@ -23,9 +26,10 @@ export interface CourseSettings extends CourseAccessMetadata {
 const input = "min-h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-60";
 function localTime(value?: string | null) { return value ? new Date(new Date(value).getTime() + 8 * 3600000).toISOString().slice(0, 16) : ""; }
 
-export function CourseSettingsDialog({ course, onClose, onSaved }: { course: CourseSettings; onClose: () => void; onSaved: (course: CourseSettings) => void }) {
+export function CourseSettingsDialog({ course, onClose, onSaved, platformCourse, saveCourse }: { course: CourseSettings; onClose: () => void; onSaved: (course: CourseSettings) => void; platformCourse?: PlatformCourse; saveCourse?: (body: Record<string, unknown>) => Promise<CourseSettings> }) {
   const { locale } = useLocale(), tx = (zh: string, en: string) => locale === "en" ? en : zh;
-  const classes = useData<{ items: SchoolClass[] }>("classes");
+  const classes = useData<{ items: SchoolClass[] }>(platformCourse ? null : "classes");
+  const [policy,setPolicy]=useState(()=>platformCourse?courseAudiencePolicy(platformCourse):null),[schools,setSchools]=useState(platformCourse?.schools??[]),[accounts,setAccounts]=useState(platformCourse?.students??[]);
   const [tab, setTab] = useState<"details" | "access">("details");
   const [localizations, setLocalizations] = useState(course.localizations);
   const [requiredLanguage, setRequiredLanguage] = useState(course.requiredLanguage ?? null);
@@ -80,8 +84,12 @@ export function CourseSettingsDialog({ course, onClose, onSaved }: { course: Cou
     };
     try {
       const body = courseSettingsInput({ title, description, category, estimatedMinutes: minutes, difficulty, coverKey, coverImage, authorName, authoredAt, accessScope: scope, classIds, availableFrom: from, availableUntil: until, listed });
+      const audiencePolicy=platformCourse?.canManage&&policy?courseAudiencePolicyForSave(policy):undefined;
+      if(audiencePolicy&&!activeAdmissionRules(audiencePolicy).length){setTab("access");throw new Error(tx("请至少选择一项课程开放范围。", "Choose at least one course audience."));}
+      if(audiencePolicy&&activeAdmissionRules(audiencePolicy).some(rule=>!Number.isSafeInteger(rule.minimumPoints)||rule.minimumPoints<0)){setTab("access");throw new Error(tx("最低积分须为不小于 0 的整数。", "Minimum points must be a non-negative integer."));}
       setBusy(true);
-      const saved = await productionApi<CourseSettings>(`learning-paths/${course.id}`, { method: "PATCH", body: { ...body, requiredLanguage, localizations: localizations ? parseCourseLocalizations(localizations) : undefined } });
+      const payload = { ...body, requiredLanguage, localizations: localizations ? parseCourseLocalizations(localizations) : undefined, ...(audiencePolicy?{audiencePolicy}:{}) };
+      const saved = saveCourse ? await saveCourse(payload) : await productionApi<CourseSettings>(`learning-paths/${course.id}`, { method: "PATCH", body: payload });
       onSaved(saved); onClose();
     } catch (reason) {
       if (reason instanceof CourseSettingsInputError) { setTab(reason.section); fail(messages[reason.code] ?? apiMessage(reason)); }
@@ -91,7 +99,7 @@ export function CourseSettingsDialog({ course, onClose, onSaved }: { course: Cou
   return <Dialog open onOpenChange={open => { if (!open && !busy && !imageBusy) onClose(); }}><DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-3xl" onEscapeKeyDown={event => { if (busy || imageBusy) event.preventDefault(); }} onPointerDownOutside={event => { if (busy || imageBusy) event.preventDefault(); }}>
     <DialogTitle className="flex items-center gap-2"><Settings2 size={18} aria-hidden="true"/>{tx("课程属性与开放设置", "Course properties and access")}</DialogTitle>
     <DialogDescription>{course.title}</DialogDescription>
-    <nav className="flex border-b border-border" aria-label={tx("课程设置分区", "Course settings sections")}>{(["details", "access"] as const).map(value => <button key={value} type="button" onClick={() => setTab(value)} aria-pressed={value === tab} className={`min-h-11 border-b-2 px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-primary ${value === tab ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}>{value === "details" ? tx("基本属性", "Properties") : tx("准入与开放", "Access and availability")}</button>)}</nav>
+    <nav className="flex border-b border-border" aria-label={tx("课程设置分区", "Course settings sections")}>{(["details", ...(!platformCourse||platformCourse.canManage?["access" as const]:[])] as const).map(value => <button key={value} type="button" onClick={() => setTab(value)} aria-pressed={value === tab} className={`min-h-11 border-b-2 px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-primary ${value === tab ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}>{value === "details" ? tx("基本属性", "Properties") : tx("准入与开放", "Access and availability")}</button>)}</nav>
     <form noValidate onSubmit={event => void save(event)} className="space-y-4" aria-busy={busy || imageBusy}>
       {error && <p ref={errorRef} tabIndex={-1} role="alert" className="rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
       {tab === "details" ? <fieldset disabled={busy || imageBusy} className="space-y-4">
@@ -103,7 +111,7 @@ export function CourseSettingsDialog({ course, onClose, onSaved }: { course: Cou
         <label className="grid gap-1 text-sm font-semibold">{tx("简介", "Description")}<textarea className={`${input} min-h-24 py-2 leading-6`} maxLength={4000} value={description} onChange={event => setDescription(event.target.value)}/></label>
         <CourseTranslationFields value={localizations} onChange={setLocalizations} disabled={busy || imageBusy}/>
         <div className="grid items-start gap-4 sm:grid-cols-[180px_minmax(0,1fr)]"><div className="overflow-hidden rounded-md border border-border"><LearningCover coverKey={coverKey} coverImage={coverImage}/></div><div className="space-y-3"><label className="grid gap-1 text-sm font-semibold">{tx("预设封面", "Preset cover")}<select className={input} value={coverKey} onChange={event => { setCoverKey(event.target.value as typeof coverKey); setCoverImage(""); }}>{Object.entries(courseCovers).map(([key, label]) => <option key={key} value={key}>{locale === "en" ? ({ python: "Python", algorithms: "Algorithms", general: "General learning" })[key as typeof coverKey] : label}</option>)}</select></label><div className="flex flex-wrap items-center gap-2"><label className="relative inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border border-border px-3 text-sm font-semibold focus-within:outline-2 focus-within:outline-primary"><Camera size={16} aria-hidden="true"/>{tx("上传预览图", "Upload cover")}<input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy || imageBusy} className="sr-only" onChange={event => { void image(event.target.files?.[0]); event.target.value = ""; }}/></label>{coverImage && <Button type="button" variant="ghost" size="sm" onClick={() => setCoverImage("")}>{tx("移除自定义图片", "Remove image")}</Button>}</div><p className="text-xs text-muted-foreground">{tx("PNG、JPEG、WebP，原图最大 5 MB；裁切为 16:9，压缩后不超过 512 KB。", "PNG, JPEG or WebP, up to 5 MB; cropped to 16:9 and compressed to at most 512 KB.")}</p>{imageBusy && <p role="status" className="text-sm text-muted-foreground">{tx("正在处理图片…", "Processing image…")}</p>}</div></div>
-      </fieldset> : <fieldset disabled={busy || imageBusy} className="space-y-4">
+      </fieldset> : platformCourse && policy ? <fieldset disabled={busy || imageBusy} className="space-y-4"><PlatformCourseAudience courseId={course.id} policy={policy} onChange={setPolicy} schools={schools} accounts={accounts} onSchools={setSchools} onAccounts={setAccounts} disabled={busy || imageBusy} dirty={JSON.stringify(policy)!==JSON.stringify(courseAudiencePolicy(platformCourse))}/></fieldset> : <fieldset disabled={busy || imageBusy} className="space-y-4">
         <label className="grid gap-1 text-sm font-semibold">{tx("准入范围", "Eligible students")}<select className={input} value={scope} onChange={event => setScope(event.target.value as typeof scope)}><option value="school">{tx("全校学生（含未分班）", "All school students (including no class)")}</option><option value="classes">{tx("指定班级（可多选）", "Selected classes (multiple allowed)")}</option></select></label>
         {scope === "classes" && <section className="rounded-md border border-border" aria-label={tx("课程班级", "Course classes")}><div className="border-b border-border bg-surface-subtle px-3 py-2 text-sm font-semibold">{tx(`已选择 ${classIds.length} 个班级`, `${classIds.length} classes selected`)}</div>{classes.loading && <p role="status" className="p-3 text-sm text-muted-foreground">{tx("正在加载班级…", "Loading classes…")}</p>}{classes.error && <p role="alert" className="p-3 text-sm text-destructive">{classes.error}<Button type="button" variant="ghost" size="sm" onClick={classes.reload}>{tx("重试", "Retry")}</Button></p>}<div className="max-h-56 overflow-y-auto">{options.map(item => <label key={item.id} className="flex min-h-11 cursor-pointer items-center gap-3 border-b border-border px-3 py-2 text-sm last:border-0"><input className="size-4 accent-primary" type="checkbox" checked={classIds.includes(item.id)} onChange={event => {
           const range = getRange(item.id, event);

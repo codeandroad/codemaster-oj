@@ -6,6 +6,7 @@ import {assistanceKind,assistanceLanguage,resolveAssistanceTarget,resolveAssista
 import {approvedAssistanceContent,editableAssistanceContent,originalProblemSolution,pendingSolution,readAssistanceDraft} from './problem-solution-bundles.mjs';
 import {sharedSolutionIdSql,sharedProblemSolution,retainSharedSolution,assertSharedSolution} from './shared-problem-solutions.mjs';
 import {withProblemSolutionUsage} from './problem-solution-usage.mjs';
+import {isPlatformAdministrator} from './platform-governance.mjs';
 
 const response=(body,status=200)=>({status,body});
 const one=result=>{if(!result.rowCount)fail(404,'NOT_FOUND','辅助内容不存在');return result.rows[0];};
@@ -20,6 +21,7 @@ async function audit(db,user,action,type,id,metadata={}){
  await db.query('INSERT INTO audit_events(actor_account_id,action,resource_type,resource_id,metadata) VALUES($1,$2,$3,$4,$5)',[user.id,action,type,String(id),metadata]);
 }
 async function publishAssistanceContent(db,user,row,requestId){
+ await requireContentPublisher(db,user,row);
  const saved=one(await db.query(`UPDATE luq_assistance_contents SET
   status='published',reviewer_account_id=$2,published_at=clock_timestamp(),updated_at=clock_timestamp(),
   body=COALESCE(pending_solution->>'body',body),solution_details=COALESCE(pending_solution->'details',solution_details),pending_solution=NULL
@@ -27,6 +29,10 @@ async function publishAssistanceContent(db,user,row,requestId){
  await audit(db,user,'luq.content_publish','luq_content',row.id,{requestId,kind:row.kind,language:row.language,
   subjectKey:row.subject_key,versionId:row.version_id,contentHash:contentHash(row)});
  return saved;
+}
+async function requireContentPublisher(db,user,row){
+ if(row.subject_key.startsWith('problem:')&&(await db.query("SELECT 1 FROM problems WHERE id=$1 AND owner_scope='platform'",[row.subject_key.slice(8)])).rowCount
+  &&!await isPlatformAdministrator(db,user.id))fail(403,'PLATFORM_ADMIN_REQUIRED','仅平台管理员可发布平台题目的辅助内容');
 }
 async function balance(db,identityId){return Number((await db.query('SELECT balance FROM luq_accounts WHERE identity_id=$1',[identityId])).rows[0]?.balance??0);}
 async function aidState(db,user,input,helpers){
@@ -124,6 +130,7 @@ export async function studentAssistanceOperation(db,user,action,body={},helpers=
 
 export async function handleScholarshipAssistance(ctx){
  const {pool,user,route,method,body={},url,helpers={}}=ctx;
+ const authoringTransaction=callback=>ctx.authoringDb?callback(ctx.authoringDb):transaction(pool,callback);
  const studentAction=route.match(/^\/scholarship\/assistance\/(quote|unlock|provide)$/);
  if(studentAction&&method==='POST')return response(await transaction(pool,db=>studentAssistanceOperation(db,user,studentAction[1],body,helpers)));
  if(route==='/scholarship/contents/review'&&method==='GET'){
@@ -189,6 +196,7 @@ export async function handleScholarshipAssistance(ctx){
    for(const item of items){
     const row=one(await db.query('SELECT * FROM luq_assistance_contents WHERE id=$1 FOR UPDATE',[item.contentId]));
     await contentTarget(db,user,row,helpers);
+    await requireContentPublisher(db,user,row);
     await assertSharedSolution(db,row);
     if(row.kind!=='FULL_SOLUTION'||row.language!=='')fail(400,'CONTENT_KIND','批量审核入口仅支持完整题解与参考代码');
     if(contentHash(row)!==item.expectedHash)fail(409,'CONTENT_CHANGED','所选参考答案已修改，请刷新并重新审核；本批次未发布');
@@ -253,7 +261,7 @@ export async function handleScholarshipAssistance(ctx){
  }
  if(route==='/scholarship/contents'&&method==='POST'){
   const kind=assistanceKind(body.kind),language=assistanceLanguage(kind,body.language);
-  return response(await transaction(pool,async db=>{
+  return response(await authoringTransaction(async db=>{
    const target=await resolveAssistanceTarget(db,user,body,{manage:true,helpers});
    const shared=kind==='FULL_SOLUTION'&&!!target.problemId;
    await db.query("SELECT pg_advisory_xact_lock(hashtextextended('luq-content:'||$1,0))",[`${target.subjectKey}:${shared?'shared':target.versionId}:${kind}:${language}`]);
@@ -281,9 +289,10 @@ export async function handleScholarshipAssistance(ctx){
  const publish=route.match(/^\/scholarship\/contents\/([^/]+)\/publish$/);
  if(publish&&method==='POST'){
   if(body.reviewed!==true)fail(400,'REVIEW_REQUIRED','请确认已审核正文，且不含教师私有批注或隐藏测试');
-  return response(await transaction(pool,async db=>{
+  return response(await authoringTransaction(async db=>{
    const row=one(await db.query('SELECT * FROM luq_assistance_contents WHERE id=$1 FOR UPDATE',[uuid(publish[1])]));
    await contentTarget(db,user,row,helpers);
+   await requireContentPublisher(db,user,row);
    await assertSharedSolution(db,row);
    const needsReview=row.status!=='published'||row.pending_solution!==null;
    if((body.expectedHash!==undefined||needsReview&&editableAssistanceContent(row).solutions)&&body.expectedHash!==contentHash(row)){

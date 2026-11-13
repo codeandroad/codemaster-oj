@@ -18,6 +18,7 @@ export interface AssistanceContent extends SolutionDraft {
 }
 
 export interface ContentResponse {
+  canPublish?: boolean;
   items: AssistanceContent[];
   originalSolution?: OriginalSolution;
   inheritedSolution?: InheritedSolution;

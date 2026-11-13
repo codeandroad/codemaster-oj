@@ -15,15 +15,13 @@ const legacyWorkspaces = {
 } as const;
 
 export function AccountMenu({user,role,busy,onLogout,settingsHref,profileHref,leaderboardHref}:{user:CampusUser;role?:CampusRole;busy:boolean;onLogout:()=>void;settingsHref?:string;profileHref?:string;leaderboardHref?:string}) {
- const {t,locale}=useLocale();
+ const {t}=useLocale();
  const pathname=usePathname();
  const settingsPath=settingsHref??(pathname.startsWith("/platform")?"/platform?section=settings":pathname.startsWith("/schools")?"/schools?section=personal-settings":role==="admin"?"/admin/personal-settings":role?`/${role}/settings`:"/practice/settings");
  const profilePath=profileHref??(pathname.startsWith("/platform")?"/platform?section=profile":pathname.startsWith("/schools")?"/schools?section=profile":role?`/${role}/profile`:"/practice/profile");
  const workspaceRoles = role || pathname === "/platform" ? (Object.keys(legacyWorkspaces) as CampusRole[]).filter(candidate =>
   candidate !== role && (user.roles.includes(candidate) || candidate === "teacher" && user.roles.includes("admin"))) : [];
  const [open,setOpen]=useState(false);
- const [editAccess,setEditAccess]=useState(false);
- useEffect(()=>{if(!open)return;let active=true;void productionApi<{canEdit:boolean}>("platform/content-access").then(value=>{if(active)setEditAccess(value.canEdit);}).catch(()=>{if(active)setEditAccess(false);});return()=>{active=false;};},[open,user.id]);
  const [points,setPoints]=useState<{accountId:string;value:number}|null>(null);
  const showPoints = role !== "admin" && role !== "teacher" && (role === "student" || !!leaderboardHref);
  useEffect(() => {
@@ -51,7 +49,6 @@ export function AccountMenu({user,role,busy,onLogout,settingsHref,profileHref,le
  <div className="border-b border-border px-2.5 py-2.5"><p className="break-words font-semibold">{user.nickname||user.name}</p><p className="break-all text-xs text-muted-foreground">{user.username}</p>{showPoints&&<p className="mt-2 text-sm">{t("平台积分")}：{points?.accountId===user.id?points.value:t("暂不可用")}</p>}</div><AppLink role="menuitem" href={profilePath} className={item} onNavigate={()=>setOpen(false)}><UserRound size={16} aria-hidden="true"/>{t("个人资料")}</AppLink>
  <AppLink role="menuitem" href={settingsPath} className={item} onNavigate={()=>setOpen(false)}><Settings size={16} aria-hidden="true"/>{t("个人设置")}</AppLink>
  {(role||leaderboardHref)&&<AppLink role="menuitem" href={leaderboardHref??`/${role}/points`} className={item} onNavigate={()=>setOpen(false)}><Trophy size={16} aria-hidden="true"/>{t("积分排行榜")}</AppLink>}
- {editAccess&&<AppLink role="menuitem" href="/platform?section=courses" className={item} onNavigate={()=>setOpen(false)}><BookOpen size={16} aria-hidden="true"/>{locale==="en"?"Authorized editing":"授权内容编辑"}</AppLink>}
  {workspaceRoles.map(candidate=>{const {href,label,Icon}=legacyWorkspaces[candidate];return <AppLink role="menuitem" key={candidate} href={href} className={item} onNavigate={()=>setOpen(false)}><Icon size={16} aria-hidden="true"/>{t(label)}</AppLink>;})}
  <button role="menuitem" type="button" className={item} disabled={busy} onClick={onLogout}><LogOut size={16}/>{t(busy?"正在退出…":"退出登录")}</button>
  </div>}

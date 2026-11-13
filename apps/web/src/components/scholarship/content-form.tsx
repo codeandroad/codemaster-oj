@@ -30,7 +30,11 @@ export function ContentForm({
   reload,
   onPendingChange,
   onSaved,
+  endpoint = "scholarship/contents",
+  canPublish = true,
 }: {
+  endpoint?: string;
+  canPublish?: boolean;
   target: ContentTarget;
   kind: AssistanceKind;
   content?: AssistanceContent;
@@ -148,7 +152,7 @@ export function ContentForm({
           variant="primary"
           disabled={!canSave}
           aria-busy={action.busy}
-          onClick={() => commit(() => productionApi<AssistanceContent>("scholarship/contents", {
+          onClick={() => commit(() => productionApi<AssistanceContent>(endpoint, {
             method: "POST",
             body: {
               ...target,
@@ -181,7 +185,7 @@ export function ContentForm({
           {kind === "FULL_SOLUTION" ? <SolutionDraftPreview draft={value} /> : <LessonContent content={value.body} />}
         </div>
       )}
-      {content && (!published || content.hasPendingSolutions) && !dirty && !hasConflict && (
+      {canPublish && content && (!published || content.hasPendingSolutions) && !dirty && !hasConflict && (
         <>
           <label className="flex items-start gap-2 text-sm">
             <input
@@ -201,7 +205,7 @@ export function ContentForm({
             size="sm"
             disabled={unavailable || !reviewed}
             aria-busy={action.busy}
-            onClick={() => commit(() => productionApi<AssistanceContent>(`scholarship/contents/${encodeURIComponent(content.id)}/publish`, {
+            onClick={() => commit(() => productionApi<AssistanceContent>(`${endpoint}/${encodeURIComponent(content.id)}/publish`, {
               method: "POST", body: { reviewed: true, expectedHash: content.contentHash },
             }), tx("内容已审核发布。", "Content reviewed and published."))}
           >

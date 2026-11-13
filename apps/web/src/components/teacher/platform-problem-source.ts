@@ -12,6 +12,7 @@ export type PlatformSourceProblem = ProductionProblem & {
   schoolId?: string;
   formalTestCount?: number;
   hasDraftChanges?: boolean;
+  draftTitle?: string;
   hasSolutionDraft?: boolean;
 };
 

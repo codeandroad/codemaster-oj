@@ -199,11 +199,48 @@ test('the complete platform problem editor uses scoped grants without publicatio
       assert.deepEqual(live.tags, input.tags);
       const release = { expectedVersionId: firstDraft.versionId, expectedRevision: firstDraft.editRevision };
       await post(`${source}/${first.id}/publish`, release, 'teacher', 403);
-      await post(`${source}/${first.id}/publish`, release);
-      assert.deepEqual((await get(`/problems/${first.id}?current=1`, 'history-student')).tags, ['Updated topic']);
       const audit = await pool.query("SELECT count(*)::int AS count FROM platform_audit_events WHERE action='platform.problem.request_review' AND detail->>'problemId' = ANY($1)", [[first.id, second.id]]);
       assert.equal(audit.rows[0].count, 2, 'Retries do not duplicate review requests');
       await drain();
+
+      const publishBatch = `${source}/publish-batch`;
+      const adminRows = new Map((await get(`${source}?view=summary`)).items.map(row => [row.id, row]));
+      assert.equal(adminRows.get(first.id).draftTitle, firstDraft.title);
+      assert.equal(adminRows.get(first.id).draftValidationStatus, 'AC');
+      assert.equal(adminRows.get(waiting.id).draftTitle, undefined);
+      assert.equal(saved.draftTitle, undefined, 'Review list title belongs to the administrator summary');
+      assert.equal(adminRows.get(waiting.id).draftValidationStatus, 'AC');
+
+      await post(`${source}/${stale.id}/request-review`, item(await get(`${source}/${stale.id}`, 'teacher')), 'teacher');
+      // Model a validation run whose result is no longer usable at confirmation time.
+      await pool.query(`UPDATE judge_runs SET status='WA' WHERE task_id=(SELECT draft_validation_task_id FROM problem_versions WHERE id=$1)`, [staleDraft.versionId]);
+      const noLongerValidated = await get(`${source}/${stale.id}`, 'teacher');
+      assert.equal(noLongerValidated.validationStatus, 'WA');
+      assert.equal(noLongerValidated.draftReviewStatus, 'pending');
+
+      const publishPayload = { items: [firstDraft, waitingDraft, secondDraft, noLongerValidated].map(item).concat({ ...item(other), expectedRevision: 1 }) };
+      for (const name of ['teacher', 'school-admin', 'student']) await post(publishBatch, publishPayload, name, 403);
+      await request(publishBatch, { method: 'POST', body: publishPayload, csrf: false, status: 403 });
+      await post(publishBatch, { items: [item(firstDraft), item(firstDraft)] }, 'platform', 400);
+      assert.deepEqual((await post(publishBatch, { items: [item(staleDraft)] })).items, [{ problemId: stale.id, status: 'skipped', code: 'REVISION_CONFLICT' }]);
+      const publication = [
+        { problemId: first.id, status: 'published' },
+        { problemId: waiting.id, status: 'skipped', code: 'REVIEW_REQUIRED' },
+        { problemId: second.id, status: 'published' },
+        { problemId: stale.id, status: 'skipped', code: 'NOT_VALIDATED' },
+        { problemId: other.id, status: 'skipped', code: 'REVISION_CONFLICT' },
+      ];
+      assert.deepEqual((await post(publishBatch, publishPayload)).items, publication);
+      assert.deepEqual((await post(publishBatch, publishPayload)).items, publication.map(row => row.status === 'published' ? { ...row, status: 'already_published' } : row));
+      for (const row of [first, second]) {
+        const published = await get(`/problems/${row.id}?current=1`, 'history-student');
+        assert.deepEqual(published.tags, ['Updated topic']);
+        assert.equal(published.versionId, row.versionId);
+        assert.equal((await get(`${source}/${row.id}`)).draftReviewStatus, null);
+      }
+      for (const row of [stale, waiting]) assert.deepEqual((await get(`/problems/${row.id}?current=1`, 'history-student')).tags, input.tags);
+      const releases = await pool.query("SELECT count(*)::int AS count FROM platform_audit_events WHERE action='platform.problem.publish' AND detail->>'problemId' = ANY($1) AND detail ? 'revision'", [[first.id, second.id]]);
+      assert.equal(releases.rows[0].count, 2, 'Retries do not repeat promotions');
       for (const row of fixtures) {
         await request(`/platform/content-editors/problem/${row.id}`, { method: 'DELETE', body: grant('teacher') });
       }

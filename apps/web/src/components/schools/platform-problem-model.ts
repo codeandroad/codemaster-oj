@@ -6,6 +6,12 @@ export type PlatformProblemBank = {
   problemCount: number; archivedProblemCount?: number; archivedAt?: string | null;
 };
 export type PlatformProblemRow = { id: string; title: string; source?: PlatformSourceProblem; publication?: Problem };
+export function platformDraftPublicationTarget(row: PlatformProblemRow) {
+  const { source } = row;
+  if (!source?.canEdit || source.archivedAt || source.draftReviewStatus !== "pending" ||
+    source.draftValidationStatus !== "AC" || !source.versionId || source.editRevision == null || source.editRevision < 1) return null;
+  return { problemId: row.id, title: source.draftTitle ?? row.title, expectedVersionId: source.versionId, expectedRevision: source.editRevision };
+}
 export type ProblemReviewDecision = "approve" | "reject" | "withdraw";
 export function problemReviewTarget(row: PlatformProblemRow) {
   const { publication } = row;
@@ -19,10 +25,10 @@ export function canReviewProblem(row: PlatformProblemRow, decision: ProblemRevie
   if (target.platformPublished) return false;
   return decision === "approve" || target.publicRequestStatus === "pending";
 }
-export type PlatformProblemFilters = { query: string; source: string; bank: string; visibility: string; validation: string; course: string; deleted: boolean };
-export const platformProblemFilterKeys = { query: "problemSearch", source: "problemSource", bank: "problemCategory", visibility: "problemVisibility", validation: "problemValidation", course: "problemCourse", deleted: "deletedProblems" } as const;
+export type PlatformProblemFilters = { query: string; source: string; bank: string; visibility: string; validation: string; course: string; pendingDrafts: boolean; deleted: boolean };
+export const platformProblemFilterKeys = { query: "problemSearch", source: "problemSource", bank: "problemCategory", visibility: "problemVisibility", validation: "problemValidation", course: "problemCourse", pendingDrafts: "pendingProblemDrafts", deleted: "deletedProblems" } as const;
 export function platformProblemFilters(search: Pick<URLSearchParams, "get">): PlatformProblemFilters {
-  return { query: search.get(platformProblemFilterKeys.query) ?? "", source: search.get(platformProblemFilterKeys.source) ?? "", bank: search.get(platformProblemFilterKeys.bank) ?? "", visibility: search.get(platformProblemFilterKeys.visibility) ?? "", validation: search.get(platformProblemFilterKeys.validation) ?? "", course: search.get(platformProblemFilterKeys.course) ?? "", deleted: search.get(platformProblemFilterKeys.deleted) === "1" };
+  return { query: search.get(platformProblemFilterKeys.query) ?? "", source: search.get(platformProblemFilterKeys.source) ?? "", bank: search.get(platformProblemFilterKeys.bank) ?? "", visibility: search.get(platformProblemFilterKeys.visibility) ?? "", validation: search.get(platformProblemFilterKeys.validation) ?? "", course: search.get(platformProblemFilterKeys.course) ?? "", pendingDrafts: search.get(platformProblemFilterKeys.pendingDrafts) === "1", deleted: search.get(platformProblemFilterKeys.deleted) === "1" };
 }
 export function mergePlatformLibrary(sources: PlatformSourceProblem[], publications: Problem[]): PlatformProblemRow[] {
   const rows = new Map<string, PlatformProblemRow>();
@@ -36,15 +42,16 @@ export function problemVisibility(row: PlatformProblemRow) {
   return row.publication?.platformPublished ? "public" : row.publication?.publicRequestStatus === "pending" ? "pending" : row.publication?.publicRequestStatus === "rejected" ? "rejected" : "private";
 }
 export function problemValidation(row: PlatformProblemRow) {
-  const status = row.source?.validationStatus;
+  const status = row.source?.draftReviewStatus === "pending" ? row.source.draftValidationStatus : row.source?.validationStatus;
   return !row.source ? "unknown" : status === "AC" ? "passed" : ["Waiting", "Judging"].includes(status ?? "") ? "running" : !status || ["Draft", "Incomplete"].includes(status) ? "incomplete" : "failed";
 }
 export function matchesPlatformProblem(row: PlatformProblemRow, filter: PlatformProblemFilters) {
   return Boolean(row.source?.archivedAt) === filter.deleted
+    && (!filter.pendingDrafts || row.source?.draftReviewStatus === "pending")
     && (!filter.source || (filter.source === "platform" ? Boolean(row.source) : !row.source && row.publication?.schoolId === filter.source))
     && (!filter.bank || Boolean(row.source) && (filter.bank === "unclassified" ? !row.source?.bankId : row.source?.bankId === filter.bank))
     && (!filter.visibility || problemVisibility(row) === filter.visibility)
     && (!filter.validation || problemValidation(row) === filter.validation)
     && (!filter.course || row.source?.courses?.some(course => course.id === filter.course))
-    && `${row.id} ${row.title} ${row.source ? "CodeMaster" : row.publication?.schoolName ?? ""} ${row.source?.bankName ?? row.publication?.bankName ?? ""} ${row.source?.tags?.join(" ") ?? ""}`.toLocaleLowerCase().includes(filter.query.trim().toLocaleLowerCase());
+    && `${row.id} ${row.title} ${row.source?.draftTitle ?? ""} ${row.source ? "CodeMaster" : row.publication?.schoolName ?? ""} ${row.source?.bankName ?? row.publication?.bankName ?? ""} ${row.source?.tags?.join(" ") ?? ""}`.toLocaleLowerCase().includes(filter.query.trim().toLocaleLowerCase());
 }

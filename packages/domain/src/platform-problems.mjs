@@ -25,7 +25,25 @@ async function requestProblemReview(db, version, item, audit) {
  return true;
 }
 
-async function requestProblemReviews(db, user, admin, body, audit) {
+async function publishPlatformDraft(db, user, version, audit) {
+ await publishProblemDraft(db,user,version,{schoolApproval:true});
+ await audit('platform.problem.publish',version.problem_id,{versionId:version.id,revision:version.edit_revision});
+}
+
+async function publishReviewedDraft(db, user, version, item, audit) {
+ if(item.expectedVersionId!==version.id)fail(409,'REVISION_CONFLICT','题目已更新，请重新载入');
+ requireDraftRevision(version,item.expectedRevision);
+ if(!version.edit_draft){
+  if(version.published_at&&version.published_revision===item.expectedRevision)return 'already_published';
+  fail(409,'NO_DRAFT','没有待发布的草稿');
+ }
+ if(version.draft_review_status!=='pending')fail(409,'REVIEW_REQUIRED','仅可批量发布待审核的草稿');
+ await publishPlatformDraft(db,user,version,audit);
+ return 'published';
+}
+
+async function reviewProblemDrafts(db, user, admin, body, audit, publish) {
+ if(publish&&!admin)fail(403,'PLATFORM_ADMIN_REQUIRED','仅平台管理员可发布题目');
  if(!Array.isArray(body.items)||!body.items.length||body.items.length>50)fail(400,'VALIDATION','每批请选择 1–50 道题目');
  const items=body.items.map(item=>({
   problemId:uuid(item?.problemId,'题目 ID').toLowerCase(),
@@ -49,8 +67,10 @@ async function requestProblemReviews(db, user, admin, body, audit) {
   const version=byProblem.get(problemId);
   if(!version){results.push({problemId,status:'skipped',code:'UNAVAILABLE'});continue;}
   try {
-   const requested=await requestProblemReview(db,version,item,audit);
-   results.push({problemId,status:requested?'submitted':'pending'});
+   const status=publish
+    ? await publishReviewedDraft(db,user,version,item,audit)
+    : await requestProblemReview(db,version,item,audit)?'submitted':'pending';
+   results.push({problemId,status});
   } catch(error) {
    // Expected eligibility failures occur before any writes for this item.
    if(!(error instanceof HttpError)||error.status!==409)throw error;
@@ -63,16 +83,17 @@ async function requestProblemReviews(db, user, admin, body, audit) {
 export async function handlePlatformProblems(ctx) {
  const library=await handlePlatformProblemLibrary(ctx);if(library)return library;
  const {pool,user,route,method,body={},helpers,url}=ctx;
+ const batchPublish=route==='/platform/source-problems/publish-batch'&&method==='POST';
  const batchReview=route==='/platform/source-problems/request-review-batch'&&method==='POST';
  const match=route.match(/^\/platform\/source-problems(?:\/([^/]+)(?:\/(versions|publish|request-review|validate|tutorial|contents|public-statement)(?:\/([^/]+)\/(publish))?)?)?$/);
- if(!match&&!batchReview)return null;
+ if(!match&&!batchReview&&!batchPublish)return null;
  return transaction(pool,async db=>{
   await lockSchoolTeaching(db,LEGACY_SCHOOL_ID,{shared:method==='GET'});
   await activeAccount(db,user.id);
   const admin=await isPlatformAdministrator(db,user.id);
   const audit=(action,id,detail={})=>db.query('INSERT INTO platform_audit_events(actor_account_id,action,detail) VALUES($1,$2,$3)',
    [user.id,action,{problemId:id,...detail}]);
-  if(batchReview)return requestProblemReviews(db,user,admin,body,audit);
+  if(batchReview||batchPublish)return reviewProblemDrafts(db,user,admin,body,audit,batchPublish);
   const detail=async(id,versionId)=>{
    const result=await helpers.problemResult(db,user,id,versionId,{editing:true});
    const category=(await db.query('SELECT p.platform_bank_id,b.name FROM problems p LEFT JOIN platform_problem_banks b ON b.id=p.platform_bank_id WHERE p.id=$1',[id])).rows[0];
@@ -85,7 +106,7 @@ export async function handlePlatformProblems(ctx) {
    const schoolId=url.searchParams.get('schoolId')?uuid(url.searchParams.get('schoolId')):null;
    const bankId=url.searchParams.get('bankId')?uuid(url.searchParams.get('bankId')):null;
    const rows=(await db.query(`SELECT ${summary?problemListColumns('v'):'v.*'},v.edit_draft IS NOT NULL has_draft_changes,v.draft_review_status,
-    ${summary?`v.edit_draft->'tags' draft_tags,v.edit_revision,v.published_revision,
+    ${summary?`v.edit_draft->'tags' draft_tags,v.edit_draft->>'title' draft_title,v.edit_revision,v.published_revision,
     CASE WHEN v.edit_draft IS NULL THEN NULL WHEN v.draft_validation_task_id IS NULL THEN 'Incomplete'
      WHEN t.id IS NULL THEN 'Waiting' ELSE ${draftValidationResultSql} END draft_validation_status,`:''}
     p.bank_id,p.platform_bank_id,category.name category_name,p.archived_at,p.current_version_id AS published_version_id,
@@ -97,7 +118,7 @@ export async function handlePlatformProblems(ctx) {
      WHERE cp.problem_id=p.id AND c.archived_at IS NULL AND lp.archived_at IS NULL AND lp.owner_scope='platform') course),'[]'::jsonb) courses
     FROM problems p LEFT JOIN platform_problem_banks category ON category.id=p.platform_bank_id JOIN LATERAL
     (SELECT * FROM problem_versions WHERE problem_id=p.id ORDER BY created_at DESC,id DESC LIMIT 1) v ON true
-    ${summary?`LEFT JOIN judge_tasks t ON t.id=v.draft_validation_task_id
+    ${summary?`LEFT JOIN judge_tasks t ON t.id=v.draft_validation_task_id AND t.version_id=v.id AND t.draft_revision=v.edit_revision
     LEFT JOIN judge_runs r ON r.task_id=t.id AND r.lease_id=t.lease_id`:''}
     LEFT JOIN luq_assistance_contents solution ON solution.id=${sharedSolutionIdSql('p.id','v.id')}
     WHERE p.owner_scope='platform' AND (p.archived_at IS NULL OR $4) AND ($5::uuid IS NULL OR p.platform_bank_id=$5) AND ($2 OR
@@ -106,6 +127,7 @@ export async function handlePlatformProblems(ctx) {
    return reply({items:rows.map(row=>({...(summary?problemListSummary(row):helpers.problemShape(row)),ownerScope:'platform',schoolId:LEGACY_SCHOOL_ID,bankName:row.category_name??'',
     ...(!row.archived_at&&Array.isArray(row.draft_tags)?{draftTags:row.draft_tags}:{}),
     ...(summary?{editRevision:row.edit_revision,draftValidationStatus:row.draft_validation_status,
+     ...(admin&&row.draft_review_status==='pending'&&row.draft_title?{draftTitle:row.draft_title}:{}),
      canRequestReview:!admin&&!row.archived_at&&row.edit_revision>row.published_revision&&row.draft_review_status!=='pending'&&row.draft_validation_status==='AC'}:{}),
     bankId:row.platform_bank_id,sourceBankId:row.bank_id,courses:row.courses,archivedAt:row.archived_at,canEdit:!row.archived_at,canManageTutorial:!row.archived_at,canPublish:admin&&!row.archived_at&&row.validation_status==='AC'&&!row.published_at,
     hasDraftChanges:row.has_draft_changes,draftReviewStatus:row.draft_review_status,hasSolutionDraft:row.has_solution_draft===true,
@@ -183,8 +205,7 @@ export async function handlePlatformProblems(ctx) {
    if(!admin)fail(403,'PLATFORM_ADMIN_REQUIRED','仅平台管理员可发布题目');
    if(v.edit_draft){
     requireDraftRevision(v,body.expectedRevision);
-    await publishProblemDraft(db,user,v,{schoolApproval:true});
-    await audit('platform.problem.publish',id,{versionId:v.id,revision:v.edit_revision});
+    await publishPlatformDraft(db,user,v,audit);
     return reply(await detail(id));
    }
    if(v.published_at)fail(409,'ALREADY_PUBLISHED','当前版本已发布');

@@ -100,7 +100,7 @@
 }
 
 .fitActions th:first-child {
-  width: 36%;
+  width: 39%;
 }
 
 .fitActions td:first-child {
@@ -126,6 +126,10 @@
 .fitActions th:last-child {
   /* Auto table layout gives this column enough space for the unwrapped controls. */
   width: 1%;
+}
+
+.fitActions td:last-child {
+  padding-inline-end: 2rem;
 }
 
 .fitActions .actions {

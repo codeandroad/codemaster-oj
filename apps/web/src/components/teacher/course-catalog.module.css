@@ -98,3 +98,42 @@
   margin-inline: 0;
   white-space: nowrap;
 }
+
+.fitActions th:first-child {
+  width: 36%;
+}
+
+.fitActions td:first-child {
+  min-width: 19rem;
+}
+
+.fitActions td:nth-child(2) {
+  min-width: 11rem;
+}
+
+.fitActions th:nth-child(3) {
+  width: 6%;
+}
+
+.fitActions th:nth-child(4) {
+  width: 10%;
+}
+
+.fitActions th:nth-child(5) {
+  width: 9%;
+}
+
+.fitActions th:last-child {
+  /* Auto table layout gives this column enough space for the unwrapped controls. */
+  width: 1%;
+}
+
+.fitActions .actions {
+  inline-size: max-content;
+  flex-wrap: nowrap;
+}
+
+.fitActions .category {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}

@@ -22,6 +22,6 @@ export type PlatformCourse = {
   id: string; title: string; description: string; category: string; authorName: string;
   estimatedMinutes: number; requiredLanguage: SubmissionLanguage | null;
   revision: number; sourceVersion: string; published: boolean; archived: boolean;
-  audienceScope: CourseAudience; schoolIds: string[]; studentIds: string[];
+  audienceScope: CourseAudience | "custom"; schoolIds: string[]; studentIds: string[];
   schools: AudienceMember[]; students: AudienceMember[]; chapterCount: number; chapters: PlatformChapter[];
 };

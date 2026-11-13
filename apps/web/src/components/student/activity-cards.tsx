@@ -89,8 +89,8 @@ export function StudentAssignmentCard({
         <p className="mt-0.5">{text(`本作业已提交 ${attempted}/${problemCount} 题`, `${attempted}/${problemCount} problems submitted here`)}</p>
       </div>
     </div>
-    <AppLink href={href} className={`${buttonVariants({ variant: active && !complete ? "primary" : "secondary" })} ${locale === "en" ? "md:w-40" : "md:w-28"}`}>
-      {complete ? text("查看作业", "View assignment") : text("打开", "Open")} <ArrowRight size={15} aria-hidden />
+    <AppLink href={href} className={`${buttonVariants({ variant: active && !complete ? "primary" : "secondary" })} whitespace-nowrap md:w-28`}>
+      {complete ? text("查看作业", "View") : text("打开", "Open")} <ArrowRight size={15} aria-hidden />
     </AppLink>
   </section>;
 }

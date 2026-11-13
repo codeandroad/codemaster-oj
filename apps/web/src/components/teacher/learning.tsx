@@ -209,11 +209,11 @@ export function TeacherLearning({ canManageAdmissions = false }: { canManageAdmi
         {tab === "课程" ? (
           <>
             <State resource={paths} /><State resource={platformPaths}/>
-            <CourseCatalogTable empty={!paths.loading && !platformPaths.loading && !filteredCourses.length ? (hasCourseFilters ? tx("没有符合条件的课程。请调整搜索或筛选。", "No courses match. Adjust your search or filters.") : showArchived ? tx("暂无已归档课程。", "No archived courses.") : t("暂无课程。点击“新建课程”组织章节内容。")) : undefined}>
+            <CourseCatalogTable fitActions empty={!paths.loading && !platformPaths.loading && !filteredCourses.length ? (hasCourseFilters ? tx("没有符合条件的课程。请调整搜索或筛选。", "No courses match. Adjust your search or filters.") : showArchived ? tx("暂无已归档课程。", "No archived courses.") : t("暂无课程。点击“新建课程”组织章节内容。")) : undefined}>
               {filteredCourses.map(path => (
                 <CourseCatalogRow key={path.id} course={path}
                   title={<Link className={link} href={courseHref(path)} title={path.title}>{path.title}</Link>}
-                  access={<CourseAccessSummary course={path}/>}
+                  access={<CourseAccessSummary course={path} showSource={false}/>}
                   status={<StatusPill status={courseStatus(path, locale)}/>}
                   actions={<>
                     <Link className={rowActionClassName} href={path.mergedIntoCourseId?`/teacher/courses/${path.mergedIntoCourseId}`:courseHref(path)}>{path.mergedIntoCourseId ? tx("打开合并课程", "Open combined course") : path.archived ? tx("查看", "View") : path.canEdit ? t("编辑") : t("查看")}</Link>

@@ -5,7 +5,7 @@ import { requiredLanguageText } from "@/components/student/languages";
 import type { SubmissionLanguage } from "@/lib/production-api";
 export interface CourseAccessMetadata {
   ownerScope?: "school" | "platform";
-  platformAudience?: "all" | "schools" | "students";
+  platformAudience?: "all" | "schools" | "students" | "custom";
   requiredLanguage?: SubmissionLanguage | null;
   authorName?: string;
   authoredAt?: string | null;
@@ -26,12 +26,21 @@ export function courseStatus(course: CourseAccessMetadata & { published: boolean
   const tx = (zh: string, en: string) => locale === "en" ? en : zh;
   return course.archived ? tx("已归档", "Archived") : !course.published ? course.withdrawnAt ? tx("已下架", "Withdrawn") : tx("草稿", "Draft") : course.listed === false ? tx("已公开 · 目录隐藏", "Public · Unlisted") : course.availableFrom && Date.parse(course.availableFrom) > Date.now() ? tx("已公开 · 待开放", "Public · Scheduled") : course.availableUntil && Date.parse(course.availableUntil) <= Date.now() ? tx("已公开 · 已关闭", "Public · Closed") : tx("已公开", "Public");
 }
-export function CourseAccessSummary({ course, showAuthor = false, accessLabel }: { course: CourseAccessMetadata; showAuthor?: boolean; accessLabel?: string }) {
+export function CourseAccessSummary({ course, showAuthor = false, showSource = true, accessLabel }: { course: CourseAccessMetadata; showAuthor?: boolean; showSource?: boolean; accessLabel?: string }) {
   const { locale } = useLocale(), tx = (zh: string, en: string) => locale === "en" ? en : zh;
+  const platformLabels = {
+    all: tx("全平台公开", "Platform-wide"),
+    schools: tx("指定学校", "Selected schools"),
+    students: tx("指定学生", "Selected students"),
+    custom: tx("自定义范围", "Custom audience"),
+  };
+  const scope = course.ownerScope === "platform"
+    ? [showSource ? courseSourceName(course) : null, platformLabels[course.platformAudience ?? "all"]].filter(Boolean).join(" · ")
+    : course.accessScope === "classes" ? course.classes?.map(item => item.name).join(" / ") || tx("指定班级", "Selected classes") : tx("全校可学", "School-wide");
   const date = (value: string) => new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "zh-CN", { timeZone: "Asia/Shanghai", dateStyle: "medium" }).format(new Date(value));
   const dateTime = (value: string) => new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "zh-CN", { timeZone: "Asia/Shanghai", dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
   return <span className="flex flex-wrap gap-x-4 gap-y-1 text-xs leading-5 text-muted-foreground">
-    <span>{accessLabel ?? (course.ownerScope === "platform" ? courseSourceName(course) + " · " + (course.platformAudience === "schools" ? tx("指定学校", "Selected schools") : course.platformAudience === "students" ? tx("指定学生", "Selected students") : tx("全平台公开", "Platform-wide")) : course.accessScope === "classes" ? course.classes?.map(item => item.name).join(" / ") || tx("指定班级", "Selected classes") : tx("全校可学", "School-wide"))}</span>
+    <span>{accessLabel ?? scope}</span>
     {course.requiredLanguage && <span>{requiredLanguageText(locale, course.requiredLanguage, "course")}</span>}
     {(course.availableFrom || course.availableUntil) && <span>{course.availableFrom ? dateTime(course.availableFrom) : tx("即日起", "Available now")} – {course.availableUntil ? dateTime(course.availableUntil) : tx("无截止时间", "No closing date")}</span>}
     {showAuthor && course.authorName && <span>{tx("创建者：", "Author: ")}{course.authorName}</span>}

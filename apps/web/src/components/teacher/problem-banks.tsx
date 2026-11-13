@@ -164,11 +164,10 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
   const checkedSchoolIds = checkedProblems.filter(problem => !isPlatformProblem(problem)).map(problem => problem.id);
   const publishableSelection = checkedProblems.filter((problem) => !publishEligibilityReason(problem, locale));
   const excludedSelection = checkedProblems.filter((problem) => publishEligibilityReason(problem, locale));
-  const publishableScope = rows.filter((problem) => !publishEligibilityReason(problem, locale));
-  const selectableScope = publishableScope.slice(0, MAX_BATCH_PUBLISH);
-  const allPublishableScopeSelected = selectableScope.length > 0 && selectableScope.every((problem) => checked.includes(problem.id));
+  const publishableScope = pagination.rows.filter((problem) => !publishEligibilityReason(problem, locale));
+  const allPublishableScopeSelected = publishableScope.length > 0 && publishableScope.every((problem) => checked.includes(problem.id));
   const togglePublishableScope = () => {
-    const scopeIds = new Set(selectableScope.map((problem) => problem.id));
+    const scopeIds = new Set(publishableScope.map((problem) => problem.id));
     setChecked((ids) => allPublishableScopeSelected
       ? ids.filter((id) => !scopeIds.has(id))
       : [...new Set([...ids, ...scopeIds])]);
@@ -422,10 +421,8 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
               {publishableScope.length > 0 && <Button variant="secondary" size="sm" onClick={togglePublishableScope} disabled={action.busy}>
                 <CheckSquare2 size={15} />
                 {allPublishableScopeSelected
-                  ? tr("取消本范围选择", "Deselect in scope")
-                  : publishableScope.length > MAX_BATCH_PUBLISH
-                    ? tr(`选择前 ${MAX_BATCH_PUBLISH} 道可发布题（共 ${publishableScope.length} 道）`, `Select first ${MAX_BATCH_PUBLISH} publishable (${publishableScope.length} total)`)
-                    : `${tr("选择可发布题目", "Select publishable")} (${publishableScope.length})`}
+                  ? tr("取消本页可发布题目选择", "Deselect publishable on this page")
+                  : `${tr("选择本页可发布题目", "Select publishable on this page")} (${publishableScope.length})`}
               </Button>}
               <Link href="/teacher/problems/solutions-review" className={buttonVariants({ variant: "secondary", size: "sm" })}>{tr("题解审核", "Solution review")}</Link>
               {!bankId && (
@@ -471,7 +468,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
               min={1440}
               className={styles.problemTable}
               scrollLabel={tr("题目列表", "Problem list")}
-              firstColumnControl={<ProblemSelectionHeader rows={rows} checked={checked} setChecked={setChecked} busy={action.busy} />}
+              firstColumnControl={<ProblemSelectionHeader rows={pagination.rows} checked={checked} setChecked={setChecked} busy={action.busy} />}
               columnWidths={[4, 7, 21, 8, 11, 12, 8, 14, 8, 7]}
               headers={[
                 tr("选择", "Select"),

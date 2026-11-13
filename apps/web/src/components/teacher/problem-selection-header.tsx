@@ -13,7 +13,7 @@ export function ProblemSelectionHeader({ rows, checked, setChecked, busy }: {
   const selected = new Set(checked);
   const selectedCount = rows.filter(row => selected.has(row.id)).length;
   const allSelected = rows.length > 0 && selectedCount === rows.length;
-  const label = locale === "zh" ? "全选当前筛选结果（包括各页）" : "Select all filtered problems (across pages)";
+  const label = locale === "zh" ? "全选当前页" : "Select all on this page";
 
   return <input type="checkbox" aria-label={label} title={label} checked={allSelected}
     disabled={busy || rows.length === 0}

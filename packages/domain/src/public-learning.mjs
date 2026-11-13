@@ -88,11 +88,11 @@ export async function publicProblemCatalogCourses(db, user, courseId) {
     WHERE l.withdrawn_at IS NULL
       AND NOT EXISTS (SELECT 1 FROM learning_paths p WHERE p.id=l.course_id AND p.owner_scope='platform')`);
   const listings = [...await platformCourseListings(db), ...schoolListings];
-  const courses = [];
+  const courses = [], admissionState = {};
   let versions = new Map();
   for (const listing of listings) {
-    const course = await edition(db, listing, { detail: true });
-    if (!course || await admissionFor(db, listing, course, user.id) !== 'direct') continue;
+    const course = await edition(db, listing, { detail: !listing.platform_owned, progress: listing.platform_owned });
+    if (!course || await admissionFor(db, listing, course, user.id, {state:admissionState}) !== 'direct') continue;
     const available = await publicChapterProblems(db,listing,course,user.id);
     const links = chapterProblemVersions([{problems:[...available.values()]}]);
     if (!links.size) continue;

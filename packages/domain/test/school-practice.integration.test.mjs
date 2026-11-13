@@ -71,14 +71,17 @@ test('isolated school and public practice lifecycle, authorization, queue and fe
    for(const table of ['school_problem_banks','school_problems','school_problem_versions','school_problem_publications','school_identities','school_courses'])await assert.rejects(worker.query(`SELECT * FROM ${table}`),{code:'42501'});
    await assert.rejects(worker.query('UPDATE school_judge_jobs SET payload=payload'),{code:'42501'});
   });
-  await t.test('a public request waiting behind withdrawal rechecks platform authorization',async()=>{
+  await t.test('public detail and list requests waiting behind withdrawal recheck platform authorization',async()=>{
    const writer=await pool.connect();try{
     await writer.query('BEGIN');await lockSchoolTeaching(writer,alpha.id);
+    const writerPid=(await writer.query('SELECT pg_backend_pid() pid')).rows[0].pid;
     const access=call('outsider',`/practice/problems/${p.id}`).then(()=>({allowed:true}),error=>({error}));
-    let waiting=false;for(let i=0;i<100;i++){const count=await pool.query("SELECT count(*)::int n FROM pg_stat_activity WHERE datname=current_database() AND wait_event='advisory' AND query LIKE '%school-teaching:%'");if(count.rows[0].n>0){waiting=true;break;}await new Promise(resolve=>setTimeout(resolve,10));}
-    assert.equal(waiting,true,'reader must wait for school publication lock');
+    const catalog=call('outsider','/practice/problems?page=1').then(value=>({value}),error=>({error}));
+    let waiting=false;for(let i=0;i<100;i++){const count=await pool.query("SELECT count(*)::int n FROM pg_stat_activity WHERE datname=current_database() AND wait_event='advisory' AND query LIKE '%school-teaching:%' AND $1::int=ANY(pg_blocking_pids(pid))",[writerPid]);if(count.rows[0].n===2){waiting=true;break;}await new Promise(resolve=>setTimeout(resolve,10));}
+    assert.equal(waiting,true,'both readers must wait for the school publication lock');
     await writer.query('UPDATE school_problem_publications SET withdrawn_at=clock_timestamp() WHERE problem_id=$1',[p.id]);await writer.query('COMMIT');
     const outcome=await access;assert.equal(outcome.error?.status,404);
+    const listed=await catalog;assert.equal(listed.error,undefined);assert.ok(!listed.value.items.some(item=>item.id===p.id));
    }finally{await writer.query('ROLLBACK');writer.release();}
    await call('platform','/platform/problem-publications','POST',{schoolId:alpha.id,problemId:p.id,versionId:p.versionId});
   });

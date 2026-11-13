@@ -84,11 +84,31 @@ export async function availableLegacyPublicProblemVersions(db, versionIds) {
 // version remains an approval/audit snapshot; learning uses the same current
 // source version as the school catalogue.
 export async function currentLegacyPublicProblems(db, problemIds) {
- const rows=(await db.query(`SELECT ${sourceColumns} FROM ${sourceTables}
+ return (await db.query(`SELECT p.id AS problem_id,v.id,v.title FROM ${sourceTables}
   JOIN school_problem_publications publication ON publication.school_id=$1 AND publication.problem_id=p.id
    AND publication.withdrawn_at IS NULL
   WHERE p.id=ANY($2::uuid[]) AND ${sourceAccess}`,[LEGACY_SCHOOL_ID,problemIds])).rows;
- return (await studentPublicStatementRows(db,rows)).filter(source=>!source.public_statement_pending);
+}
+
+// Listing a current publication does not need a judge snapshot. Preserve the
+// existing snapshot metadata when present, including the revision a later
+// detail request would assign, while keeping prose and private cases in the DB.
+// The caller holds the school's shared teaching lock and its RLS scope.
+export async function legacyPublicProblemCatalogRows(db,problemIds) {
+ return (await db.query(`SELECT p.id,$1::uuid AS "schoolId",
+  COALESCE(projected.bank_id,$3::uuid) AS "bankId",b.name AS "bankName",
+  COALESCE(snapshot.definition->>'title',v.title) title,COALESCE(projected.revision,1) revision,
+  true published,v.id AS "versionId",
+  COALESCE(snapshot.draft_revision,(SELECT COALESCE(max(history.draft_revision),0)+1
+   FROM school_problem_versions history WHERE history.school_id=$1 AND history.problem_id=p.id))
+   <>COALESCE(projected.revision,1) AS "hasDraftChanges"
+  FROM ${sourceTables}
+  JOIN school_problem_publications publication ON publication.school_id=$1 AND publication.problem_id=p.id
+   AND publication.withdrawn_at IS NULL
+  LEFT JOIN school_problems projected ON projected.school_id=$1 AND projected.id=p.id
+  LEFT JOIN school_problem_versions snapshot ON snapshot.school_id=$1 AND snapshot.problem_id=p.id AND snapshot.id=v.id
+  WHERE p.id=ANY($2::uuid[]) AND ${sourceAccess}
+  FOR SHARE OF p,b,v`,[LEGACY_SCHOOL_ID,problemIds,snapshotBankId])).rows;
 }
 
 export async function prepareLegacyPublicProblem(db, problemId) {

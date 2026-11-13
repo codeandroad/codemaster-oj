@@ -21,7 +21,7 @@ import { assertRequiredLanguage } from './course-language-policy.mjs';
 import { LANGUAGES, starterCodesFor } from './languages.mjs';
 import {
  decideLegacyPublicProblem, handleLegacyPublicProblemRequest,
- listLegacyPublicProblemReviews, previewLegacyPublicProblem, prepareLegacyPublicProblem,
+ listLegacyPublicProblemReviews, previewLegacyPublicProblem, prepareLegacyPublicProblem, legacyPublicProblemCatalogRows,
 } from './legacy-public-problems.mjs';
 
 const reply=(body,status=200)=>({status,body});
@@ -163,6 +163,34 @@ async function publicLoaded(db,user,id,courseContext={}){
  const p=await loadProblem(db,publication.school_id,id,user,null,{publicOnly:true});
  return p;
 }
+
+const rowsBySchool=rows=>{
+ const schools=new Map();
+ for(const row of rows){const id=row.school_id??row.schoolId;if(!schools.has(id))schools.set(id,[]);schools.get(id).push(row);}
+ return [...schools].sort(([a],[b])=>a.localeCompare(b));
+};
+async function publicCatalogRows(db,publications,lockedSchools) {
+ const output=new Map();
+ for(const [schoolId,rows] of rowsBySchool(publications)){
+  if(!lockedSchools.has(schoolId)){await lockSchoolTeaching(db,schoolId,{shared:true});lockedSchools.add(schoolId);}
+  await scope(db,schoolId);
+  const ids=rows.map(row=>row.problem_id);
+  // Recheck publication after acquiring the same withdrawal lock as detail
+  // requests. School scopes stay sequential on this transaction's connection.
+  const current=schoolId===LEGACY_SCHOOL_ID?await legacyPublicProblemCatalogRows(db,ids)
+   :(await db.query(`SELECT p.id,p.school_id AS "schoolId",p.bank_id AS "bankId",b.name AS "bankName",
+    v.definition->>'title' title,p.revision,p.published,v.id AS "versionId",v.draft_revision<>p.revision AS "hasDraftChanges"
+    FROM school_problem_publications publication
+    JOIN school_problems p ON p.school_id=publication.school_id AND p.id=publication.problem_id
+    JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id
+    JOIN school_problem_versions v ON v.school_id=p.school_id AND v.problem_id=p.id AND v.id=p.published_version_id
+    WHERE publication.school_id=$1 AND publication.problem_id=ANY($2::uuid[]) AND publication.withdrawn_at IS NULL
+     AND p.published AND NOT b.archived AND b.resource_kind='ordinary'`,[schoolId,ids])).rows;
+  for(const row of current)output.set(row.id,row);
+ }
+ return output;
+}
+
 export async function listPublicProblems(pool,user,url){
  const { courseId, includeCourses } = problemCatalogCourseRequest(url);
  const query=(url?.searchParams?.get('q')??'').slice(0,100).trim();
@@ -177,32 +205,38 @@ export async function listPublicProblems(pool,user,url){
   const courseFilter = includeCourses ? await publicProblemCatalogCourses(db, user, courseId) : null;
   const versions = courseId ? courseFilter.versions : null;
   const problemIds = versions ? [...versions.keys()] : null;
-  const items=[];
+  const items=[],lockedSchools=new Set();
   let cursor=null;
   while(items.length<=limit){
    // Filter after rechecking the current published version and its scope.
    // Seek across publication batches so search also reaches older releases.
-   const {rows}=await db.query(`SELECT problem_id,version_id,approved_at::text AS approved_at
+   const {rows}=await db.query(`SELECT problem_id,school_id,version_id,approved_at::text AS approved_at
     FROM school_problem_publications WHERE withdrawn_at IS NULL AND (
       $1::timestamptz IS NULL OR approved_at<$1 OR (approved_at=$1 AND problem_id>$2::uuid)
     ) AND ($3::uuid[] IS NULL OR problem_id=ANY($3))
     ORDER BY approved_at DESC,problem_id LIMIT 100`,[cursor?.approved_at??null,cursor?.problem_id??null, problemIds]);
+   const current=await publicCatalogRows(db,rows,lockedSchools);
    for(const row of rows){
-    try{
-     const p=await publicLoaded(db,user,row.problem_id);
-     if (versions && !versions.get(row.problem_id)?.has(p.published_version_id)) continue;
-     const item=await shapeProblem(db,p,user,null,{publicOnly:true,accessContext:'public',catalogQuery});
-     if(!item) continue;
+     const item=current.get(row.problem_id);
+     if(!item||versions&&!versions.get(item.id)?.has(item.versionId))continue;
+     if(catalogQuery&&!`${item.id} ${item.title} ${item.bankName}`.toLowerCase().includes(catalogQuery))continue;
      if(skip>0) skip--;
      else items.push(item);
      if(items.length>limit) break;
-    }catch(error){if(error.status!==404) throw error;}
    }
    if(rows.length<100) break;
    cursor=rows.at(-1);
   }
+  const visible=items.slice(0,limit),progress=new Map();
+  for(const [schoolId,rows] of rowsBySchool(visible)){
+   await scope(db,schoolId);
+   for(const [id,state] of await problemProgress(db,user,rows.map(row=>row.id)))progress.set(id,state);
+  }
   return {
-   items: items.slice(0, limit),
+   items:visible.map(item=>({attempts:progress.get(item.id)?.formalCount??0,solved:progress.get(item.id)?.solved===true,
+    hasDraftChanges:item.hasDraftChanges,id:item.id,schoolId:item.schoolId,bankId:item.bankId,bankName:item.bankName,
+    title:item.title,revision:item.revision,published:item.published,versionId:item.versionId,
+    canManage:false,canManageTutorial:false,validation:null})),
    ...(courseFilter && { courseId, courses: courseFilter.courses }),
    ...(page != null && { page, query, hasMore: items.length > limit }),
   };

@@ -58,6 +58,7 @@ type MetadataLine =
   string | { name: string; type: string; description: string };
 interface EditorProblem extends ProductionProblem {
   ownerScope?: "platform" | "school";
+  bankName?: string;
   referenceLanguage?: "python" | "cpp" | "javascript";
   difficulty?: string;
   comparator?: "tokens" | "exact" | "json";
@@ -168,7 +169,7 @@ function ProblemEditorForm({ initial, user, platform, onClose }: { initial: Edit
   const tr = (zh:string,en:string) => locale === "zh" ? zh : en;
   const search = useSearchParams(),
     router = useRouter(),
-    banks = useData<{ items: Bank[] }>(platform ? null : "problem-banks"),
+    banks = useData<{ items: Bank[] }>(platform ? user.platformAdmin ? "platform/problem-banks" : null : "problem-banks"),
     groups = useData<{ items: Group[] }>(platform ? null : "problem-groups"),
     [problem, setProblem] = useState<EditorProblem>(
       initial ?? { ...blank, bankId: search.get("bankId") ?? "" },
@@ -364,8 +365,9 @@ function ProblemEditorForm({ initial, user, platform, onClose }: { initial: Edit
 
             </div>
             <aside className="space-y-4">
-              <Field label={tr("所属题库", "Problem bank")}>
-                {platform ? <p className="py-2 text-sm">CodeMaster</p> : <select
+              {platform && <p className="text-sm text-muted-foreground">{tr("来源", "Source")}: <span className="font-semibold">CodeMaster</span></p>}
+              <Field label={platform ? tr("平台分类", "Platform category") : tr("所属题库", "Problem bank")}>
+                {platform ? saved || !user.platformAdmin ? <p className="py-2 text-sm">{problem.bankName || tr("未分类", "Unclassified")}</p> : <select name="platformCategory" aria-label={tr("平台分类", "Platform category")} value={problem.bankId ?? ""} disabled={!editable || banks.loading} onChange={event => update("bankId", event.target.value)} className={input}><option value="">{tr("未分类", "Unclassified")}</option>{banks.data?.items.map(bank => <option key={bank.id} value={bank.id}>{bank.name}</option>)}</select> : <select
                   value={problem.bankId ?? ""}
                   disabled={!!saved || !editable}
                   onChange={(e) => update("bankId", e.target.value)}
@@ -387,6 +389,7 @@ function ProblemEditorForm({ initial, user, platform, onClose }: { initial: Edit
                     ))}
                 </select>}
               </Field>
+              {platform && user.platformAdmin && <State resource={banks} />}
               <Field label={tr("主题标签", "Topic tags")}>
                 <input
                   value={problem.tags?.join(", ") ?? ""}

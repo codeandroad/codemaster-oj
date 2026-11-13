@@ -14,7 +14,7 @@ import { provisionSchool, LEGACY_SCHOOL_ID } from '../../../packages/domain/src/
 import { provisionPlatformAdministrator } from '../../../packages/domain/src/platform-governance.mjs';
 
 const migration='102_platform_courses.sql';
-const deferredMigrations=[migration,'105_acsl_platform_course.sql','106_platform_course_admissions.sql','108_platform_points_and_requirement_modes.sql','109_python_practice_problem_metadata.sql','110_platform_content_ownership.sql'];
+const deferredMigrations=[migration,'105_acsl_platform_course.sql','106_platform_course_admissions.sql','108_platform_points_and_requirement_modes.sql','109_python_practice_problem_metadata.sql','110_platform_content_ownership.sql','111_platform_problem_banks.sql','112_platform_editor_account_lookup.sql'];
 test('platform courses retain original data and enforce audiences through NestJS and real runtime grants',
  {skip:!process.env.TEST_DATABASE_URL,timeout:90000},async t=>{
  const base=new URL(process.env.TEST_DATABASE_URL);assert.equal(base.pathname,'/campus_qa');assert.ok(['localhost','127.0.0.1'].includes(base.hostname));
@@ -142,7 +142,7 @@ test('platform courses retain original data and enforce audiences through NestJS
    await a.send('/platform/courses/'+source.id,{expectedRevision:edited.revision,sourceVersion:edited.sourceVersion,audienceScope:'students',studentIds:[actors.personal.identityId]},'PATCH',403);
    await a.send('/platform/courses/'+source.id+'/unpublish',{expectedRevision:edited.revision,sourceVersion:edited.sourceVersion},'POST',403);
    await a.send(grantPath,{accountId:actors['student-b'].id,schoolId:beta.id},'POST',403);
-   await a.send('/platform/source-problems/'+problem.id,undefined,'GET',403);
+   assert.equal((await a.send('/platform/source-problems/'+problem.id)).canEdit,true,'course edit grants include currently linked problems');
    const problemGrant=`/platform/content-editors/problem/${problem.id}`;
    await platform.send(problemGrant,grant);
    const draft=await a.send('/platform/source-problems/'+problem.id);assert.equal(draft.tests[0].input,'secret-case');
@@ -159,8 +159,8 @@ test('platform courses retain original data and enforce audiences through NestJS
    await teacher.send(`/platform/content-editors/problem/${problem.id}`,grant,'POST',403);
    await platform.send(problemGrant,teacherGrant,'DELETE');
    await teacher.send('/platform/source-problems/'+problem.id,undefined,'GET',403);
-   await platform.send(problemGrant,grant,'DELETE');await a.send('/platform/source-problems/'+problem.id,undefined,'GET',403);
-   await platform.send(grantPath,grant,'DELETE');await a.send('/platform/courses/'+source.id,undefined,'GET',403);
+   await platform.send(problemGrant,grant,'DELETE');assert.equal((await a.send('/platform/source-problems/'+problem.id)).canEdit,true,'course grant remains after a direct problem grant is revoked');
+   await platform.send(grantPath,grant,'DELETE');await a.send('/platform/courses/'+source.id,undefined,'GET',403);await a.send('/platform/source-problems/'+problem.id,undefined,'GET',403);
    await platform.send(grantPath,{accountId:actors['student-b'].id,schoolId:beta.id});
    await pool.query('UPDATE school_memberships SET revoked_at=now() WHERE school_id=$1 AND account_id=$2',[beta.id,actors['student-b'].id]);
    await b.send('/platform/courses/'+source.id,undefined,'GET',403);

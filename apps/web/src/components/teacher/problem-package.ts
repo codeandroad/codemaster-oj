@@ -648,8 +648,11 @@ function packageRow(
 function validateRows(value: unknown): ImportCandidate[] {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     const pack=value as Record<string,unknown>;
-    if(pack.format!=="codemaster-python-practice" || pack.version!==1) throw new Error("不支持的题目包格式或版本。");
-    value=pack.problems;
+    if (typeof pack.title === "string" && pack.format === undefined) value = [pack];
+    else {
+      if(pack.format!=="codemaster-python-practice" || pack.version!==1) throw new Error("不支持的题目包格式或版本。");
+      value=pack.problems;
+    }
   }
   if (
     !Array.isArray(value) ||

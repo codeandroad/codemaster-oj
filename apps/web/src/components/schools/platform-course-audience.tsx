@@ -13,7 +13,7 @@ export function PlatformCourseAudience({ courseId, policy, onChange, schools, ac
   schools: AudienceMember[]; accounts: AudienceMember[]; onSchools: (items: AudienceMember[]) => void; onAccounts: (items: AudienceMember[]) => void;
   disabled: boolean; dirty: boolean;
 }) {
-  const text = useSchoolText(), courses = useData<{ items: PlatformCourse[] }>("platform/courses");
+  const text = useSchoolText(), courses = useData<{ items: PlatformCourse[] }>("platform/courses?view=summary");
   const [schoolPicker, setSchoolPicker] = useState(policy.schoolRules.length > 0), [accountPicker, setAccountPicker] = useState(policy.accountRules.length > 0);
   const [savedSchools, setSavedSchools] = useState(policy.schoolRules), [savedAccounts, setSavedAccounts] = useState(policy.accountRules), [savedIndependent, setSavedIndependent] = useState(policy.independentRule);
   const prerequisites = (courses.data?.items ?? []).filter(course => course.id !== courseId);

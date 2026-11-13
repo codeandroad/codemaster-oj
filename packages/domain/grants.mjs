@@ -7,6 +7,9 @@ try {
     GRANT USAGE ON SCHEMA public TO campus_app, campus_worker;
     GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO campus_app;
     GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO campus_app;
+    REVOKE ALL ON platform_problem_banks,platform_problem_imports FROM PUBLIC,campus_worker;
+    REVOKE DELETE ON platform_problem_banks FROM campus_app;
+    REVOKE UPDATE,DELETE ON platform_problem_imports FROM campus_app;
     REVOKE ALL ON luq_problem_solutions FROM PUBLIC,campus_worker,campus_app;
     GRANT SELECT,INSERT ON luq_problem_solutions TO campus_app;
     REVOKE INSERT, UPDATE, DELETE ON school_rank_ledger FROM campus_app, campus_worker;

@@ -3,6 +3,9 @@ import type { ProductionProblem } from "@/lib/production-api";
 export type PlatformSourceProblem = ProductionProblem & {
   ownerScope: "platform";
   bankName?: string;
+  sourceBankId?: string | null;
+  archivedAt?: string | null;
+  courses?: { id: string; title: string }[];
   schoolId?: string;
   formalTestCount?: number;
 };
@@ -14,7 +17,10 @@ export function isPlatformProblem(problem: { id: string }): boolean {
 /** A source grant changes editing access, never the identity of the problem. */
 export function mergePlatformProblems<T extends ProductionProblem>(items: T[], sources: PlatformSourceProblem[]): (T | PlatformSourceProblem)[] {
   const merged = new Map<string, T | PlatformSourceProblem>(items.map(problem => [problem.id, problem]));
-  for (const problem of sources) merged.set(problem.id, { ...merged.get(problem.id), ...problem });
+  for (const problem of sources) {
+    const existing = merged.get(problem.id);
+    merged.set(problem.id, { ...existing, ...problem, bankId: existing?.bankId ?? problem.sourceBankId ?? problem.bankId });
+  }
   return [...merged.values()];
 }
 

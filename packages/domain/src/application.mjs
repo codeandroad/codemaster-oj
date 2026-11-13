@@ -128,12 +128,17 @@ export async function createDomainServices(pool,config) {
   if(!rolesInclude(user,'admin')&&!(await db.query('SELECT 1 FROM class_members cm JOIN teacher_classes tc ON tc.class_id=cm.class_id JOIN classes c ON c.id=cm.class_id WHERE cm.identity_id=$1 AND tc.account_id=$2 AND c.archived_at IS NULL',[identityId,user.id])).rowCount)fail(403,'FORBIDDEN','只能添加已在本人负责班级中的学生，新生请由管理员建班授权');
   return identity;
  }
- async function versionAccess(db,user,problemId,versionId) {
+ async function versionAccess(db,user,problemId,versionId,{ownSubmissionSnapshot=false}={}) {
   uuid(problemId,'题目 ID');if(versionId) uuid(versionId,'版本 ID');
   const p=row(await db.query('SELECT * FROM problems WHERE id=$1',[problemId]));
   // Archived entries are hidden from navigation; explicit audit snapshots
   // still go through the activity, ownership and submission permissions below.
   if(p.archived_at&&!versionId)fail(404,'NOT_FOUND','题目不存在');
+  if(p.archived_at&&ownSubmissionSnapshot){
+   const v=row(await db.query(`SELECT v.* FROM problem_versions v WHERE v.id=$1 AND v.problem_id=$2 AND v.published_at IS NOT NULL
+    AND EXISTS(SELECT 1 FROM submissions s WHERE s.identity_id=$3 AND s.problem_id=v.problem_id AND s.version_id=v.id)`,[versionId,problemId,user.identityId]));
+   return {p,v,owner:false,permissions:{canRead:true,canEdit:false,canRunFree:false}};
+  }
   const own=p.owner_scope==='platform'?await canEditPlatformContent(db,user.id,'problem',p.id):isStaff(user)&&(p.owner_account_id===user.id||rolesInclude(user,'admin'));let bankRead=false;
   if(isStaff(user)&&p.owner_scope!=='platform'){try{bankRead=(await bankAccess(db,user,p.bank_id)).canRead;}catch(error){if(!['FORBIDDEN','NOT_FOUND'].includes(error.code))throw error;}}
   if(!versionId&&!own&&!bankRead){
@@ -146,8 +151,8 @@ export async function createDomainServices(pool,config) {
   const v=row(r);
   const permissions=await problemPermissions(db,user,p,v);if(!permissions.canRead)fail(404,'NOT_FOUND','题目不存在');return {p,v,owner:permissions.canEdit,permissions};
  }
- async function problemResult(db,user,problemId,versionId) {
-  const {p,v,owner,permissions}=await versionAccess(db,user,problemId,versionId);
+ async function problemResult(db,user,problemId,versionId,options={}) {
+  const {p,v,owner,permissions}=await versionAccess(db,user,problemId,versionId,options);
   const presented=owner||isStaff(user)?v:(await studentPublicStatementRows(db,[v]))[0];
   const result=problemShape(presented,{includeDisabledSamples:owner});result.publishedVersionId=owner?p.current_version_id:v.id;result.publishedTitle=owner?result.publishedTitle:v.title;result.ownerScope=p.owner_scope;result.bankId=p.bank_id;result.bankVisibility=(await db.query('SELECT visibility FROM problem_banks WHERE id=$1',[p.bank_id])).rows[0]?.visibility;result.canEdit=owner;result.canPublish=owner&&result.canPublish;
   result.canManageTutorial=await canManageLegacyTutorial(db,user,p,owner);
@@ -566,7 +571,7 @@ export async function createDomainServices(pool,config) {
      if(selected)await versionAccess(pool,user,m[1],selected);
      selected=(await resolveLiveProblemVersion(pool,m[1],{lock:false,allowArchived:true})).id;
     }
-    return respond(200,await problemResult(pool,user,m[1],selected));
+    return respond(200,await problemResult(pool,user,m[1],selected,{ownSubmissionSnapshot:!!originalId}));
    }
    m=route.match(/^\/problems\/([^/]+)\/versions$/);
    if(m&&method==='POST'){

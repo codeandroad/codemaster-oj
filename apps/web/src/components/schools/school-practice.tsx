@@ -25,7 +25,6 @@ import { SchoolAssistance, SchoolActivityScholarshipRule } from "./school-schola
 import { LearnerProblemTable, SchoolPracticeCatalog } from "./school-practice-catalog";
 import type { Bank, Problem } from "./school-practice-types";
 import { PlatformProblemEditor } from "./platform-problems";
-import { PlatformContentEditors } from "./platform-content-editors";
 import type { PlatformSourceProblem } from "@/components/teacher/platform-problem-source";
 import { SchoolProblemEditor } from "./school-problem-editor";
 import { practiceCatalogFilters, practiceFilterKeys, practiceLocation, practiceNavigationItems, type PracticeCatalogFilters } from "./school-practice-navigation";
@@ -511,93 +510,4 @@ export function SchoolJudgeStatus({schoolId}:{schoolId:string}){
  return <State data={data}><div className="rounded-lg border border-border bg-surface p-4"><div className="flex items-center justify-between"><strong>{tx("判题服务","Judge service")}</strong><Button size="sm" variant="ghost" onClick={data.reload}><RefreshCw size={15}/>{tx("刷新","Refresh")}</Button></div><p className={`mt-2 text-sm ${data.data?.ready?"text-success":"text-muted-foreground"}`}>{data.data?.ready?tx("隔离执行器已就绪","Isolated executor is ready"):tx("执行器暂不可用，任务将排队等待","Executor unavailable. Requests remain queued.")}</p><div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">{([['queued',tx("等待中","Queued")],['running',tx("运行中","Running")],['completed',tx("已完成","Completed")],['failed',tx("服务异常","Service failures")]] as const).map(([key,label])=><div key={key}><span className="text-muted-foreground">{label}</span><div className="text-xl font-semibold">{data.data?.[key]??0}</div></div>)}</div></div></State>;
 }
 
-export function PublicProblemReview({ user }: { user: CampusUser }) {
-  const { locale } = useLocale();
-  const tx = (zh: string, en: string) => locale === "zh" ? zh : en;
-  const data = useData<{ items: Problem[] }>("platform/problem-publications");
-  const sources = useData<{ items: PlatformSourceProblem[]; canManage: boolean }>("platform/source-problems");
-  const action = useMutation();
-  const [preview, setPreview] = useState<Problem | null>(null);
-  const [editing, setEditing] = useState<string | null>(null);
-  const [grant, setGrant] = useState<PlatformSourceProblem | null>(null);
-  const [query, setQuery] = useState("");
-  const reload = () => { data.reload(); sources.reload(); };
-  const status = (problem: Problem) => problem.platformPublished ? tx("已公开", "Public")
-    : problem.publicRequestStatus === "pending" ? tx("待审核", "Pending review")
-      : problem.publicRequestStatus === "rejected" ? tx("已驳回", "Rejected")
-        : tx("未公开", "Not public");
-  const entries = new Map<string, { id: string; title: string; source?: PlatformSourceProblem; publication?: Problem }>();
-  for (const problem of data.data?.items ?? []) entries.set(problem.id, { id: problem.id, title: problem.title, publication: problem });
-  for (const problem of sources.data?.items ?? []) entries.set(problem.id, { ...entries.get(problem.id), id: problem.id, title: problem.title, source: problem });
-  const rows = [...entries.values()].filter(row => `${row.title} ${row.id} ${row.source ? "CodeMaster" : row.publication?.schoolName ?? ""}`.toLowerCase().includes(query.trim().toLowerCase())).sort((a, b) =>
-    Number(b.publication?.publicRequestStatus === "pending") - Number(a.publication?.publicRequestStatus === "pending"));
-  async function decide(decision: "approve" | "reject" | "withdraw") {
-    if (!preview) return;
-    const suffix = decision === "approve" ? "" : `/${preview.id}/${decision}`;
-    await productionApi(`platform/problem-publications${suffix}`, {
-      method: "POST",
-      body: { schoolId: preview.schoolId, problemId: preview.id, versionId: preview.versionId },
-    });
-    setPreview(null);
-    reload();
-  }
-  if (editing) return <PlatformProblemEditor id={editing} user={user} onClose={() => { setEditing(null); reload(); }} />;
-  return <div className="space-y-3">
-    <div className="flex flex-wrap items-center gap-3">
-      <div className="min-w-60 flex-1"><ProblemCatalogSearch value={query} onChange={setQuery} label={tx("搜索题号、题目或来源", "Search ID, title, or source")} /></div>
-      <Button type="button" size="sm" variant="ghost" onClick={reload} disabled={action.busy || data.loading || sources.loading} aria-label={tx("刷新题库", "Refresh problems")}><RefreshCw size={15} /></Button>
-      {user.platformAdmin && <Button type="button" size="sm" onClick={() => setEditing("new")}>{tx("新建题目", "New problem")}</Button>}
-    </div>
-    <Feedback action={action} />
-    <State data={sources}>{null}</State>
-    <State data={data}>
-      <div className="overflow-auto rounded-lg border border-border bg-surface">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-surface-subtle"><tr>
-            <th scope="col" className="px-4 py-2">{tx("题目", "Problem")}</th>
-            <th scope="col" className="px-4 py-2">{tx("来源", "Source")}</th>
-            <th scope="col" className="px-4 py-2">{tx("状态", "Status")}</th>
-            <th scope="col" className="px-4 py-2">{tx("操作", "Actions")}</th>
-          </tr></thead>
-          <tbody>{rows.map(row => {
-            const reviewSchoolId = row.publication?.schoolId ?? (row.source?.published ? row.source.schoolId : undefined);
-            return <tr key={row.id} className="border-t border-border">
-              <td className="max-w-xl break-words px-4 py-2">{row.source ? <button type="button" className="text-left font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary" onClick={() => setEditing(row.id)}>{row.title}</button> : row.title}<p className="mt-1 font-mono text-xs text-muted-foreground">{row.id.slice(0, 8)}</p></td>
-              <td className="px-4 py-2">{row.source ? "CodeMaster" : row.publication?.schoolName}</td>
-              <td className="px-4 py-2"><p>{row.publication ? status(row.publication) : tx("未公开", "Not public")}</p>{row.source && <p className="mt-1 text-xs text-muted-foreground">{row.source.published ? tx("当前版本已发布", "Current version published") : tx("有未发布草稿", "Unpublished draft")}</p>}</td>
-              <td className="px-4 py-2"><div className="flex flex-wrap gap-2">
-                {row.source && <Button type="button" size="sm" variant="ghost" disabled={action.busy} onClick={() => setEditing(row.id)}>{tx("编辑", "Edit")}</Button>}
-                {row.source && user.platformAdmin && <Button type="button" size="sm" variant="ghost" disabled={action.busy} onClick={() => setGrant(row.source!)}>{tx("编辑授权", "Editors")}</Button>}
-                {reviewSchoolId && <Button type="button" size="sm" variant="secondary" disabled={action.busy} onClick={() => void action.run(async () => {
-                  setPreview(await productionApi<Problem>(`platform/problem-publications/${row.id}?schoolId=${encodeURIComponent(reviewSchoolId)}`));
-                })}>{tx("预览与审核", "Preview & review")}</Button>}
-              </div></td>
-            </tr>;
-          })}</tbody>
-        </table>
-        {!rows.length && <p className="p-4 text-sm text-muted-foreground">{tx("暂无匹配的题目。", "No matching problems.")}</p>}
-      </div>
-    </State>
-    {grant && <PlatformContentEditors kind="problem" id={grant.id} title={grant.title} onClose={() => setGrant(null)} />}
-    <Dialog open={!!preview} onOpenChange={open => { if (!open && !action.busy) setPreview(null); }}>
-      <DialogContent className="max-h-[85vh] max-w-3xl overflow-auto">
-        <DialogTitle>{preview?.title}</DialogTitle>
-        <DialogDescription>{tx("公开后，所有登录用户均可练习此版本。下方仅展示公开题干和样例。", "Publishing lets any signed-in user practice this version. The preview shows the statement and samples.")}</DialogDescription>
-        {preview?.definition && <>
-          <MathContent content={preview.definition.statement} />
-          {preview.definition.samples.map((sample, index) => <pre key={index} className="overflow-auto rounded bg-surface-subtle p-3 text-sm">
-            {tx("输入", "Input")}: {sample.input}{"\n"}{tx("预期输出", "Expected")}: {sample.expected}
-          </pre>)}
-        </>}
-        <Feedback action={action} />
-        <div className="flex justify-end gap-2">
-          {preview?.publicRequestStatus === "pending" && !preview.platformPublished &&
-            <Button variant="secondary" disabled={action.busy} onClick={() => void action.run(() => decide("reject"))}>{tx("驳回", "Reject")}</Button>}
-          <Button disabled={action.busy} onClick={() => void action.run(() => decide(preview?.platformPublished ? "withdraw" : "approve"))}>
-            {preview?.platformPublished ? tx("从公开区下架", "Withdraw public access") : tx("审核并公开", "Approve and publish")}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  </div>;
-}
+export { PublicProblemReview } from "./platform-problem-library";

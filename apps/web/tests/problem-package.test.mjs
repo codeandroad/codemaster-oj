@@ -412,3 +412,12 @@ test('Python practice envelope imports all twenty exercises with solutions and t
  assert.equal(parsed.rows[0].tests.length,5);
  await assert.rejects(readProblemImport(new File([JSON.stringify({...pack,version:2})],'bad.json')),/版本/);
 });
+
+
+test("single JSON problem imports directly and unknown package formats still fail", async () => {
+ const value={title:'Single platform import',mode:'stdio',statement:'Echo one value.',tests:[{input:'1',expected:'1',weight:100}]};
+ const parsed=await readProblemImport(new File([JSON.stringify(value)],'single.json'));
+ assert.equal(parsed.rows.length,1);
+ assert.equal(parsed.rows[0].title,value.title);
+ await assert.rejects(readProblemImport(new File([JSON.stringify({...value,format:'unknown'})],'invalid.json')),/版本/);
+});

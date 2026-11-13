@@ -1,11 +1,11 @@
-import { canEditPlatformContent, requirePlatformContentEditor, staffSchoolSql } from './platform-content-access.mjs';
+import { requirePlatformContentEditor, platformContentEditorSql } from './platform-content-access.mjs';
 import { isDeepStrictEqual } from 'node:util';
 import { courseSections, chapterSectionKey, assertChapterSections } from './course-sections.mjs';
 import { randomUUID } from 'node:crypto';
 import { transaction } from './db.mjs';
 import { activeAccount, LEGACY_SCHOOL_ID, lockSchoolTeaching } from './schools.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
-import { platformAudiencePolicy, platformCourseAudience, savePlatformCourseAudience } from './platform-course-access.mjs';
+import { platformAudiencePolicy, platformAudiencePolicyFromRows, platformCourseAudience, savePlatformCourseAudience } from './platform-course-access.mjs';
 import { courseDisplayProperties } from './course-access.mjs';
 import { courseLocalizations } from './course-localizations.mjs';
 import { assertCoursePaper4Ready, loadCoursePaper4, chapterPaper4Links, setChapterPaper4Links } from './course-paper4.mjs';
@@ -28,13 +28,51 @@ async function get(db,id,{lock=false}={}) {
  if(!p)fail(404,'NOT_FOUND','平台课程不存在');
  return p;
 }
+function courseMetadata(p,{audiencePolicy,schools,students,pendingApplications,chapterCount,admin}) {
+ const schoolIds=audiencePolicy.schoolRules.map(rule=>rule.schoolId),studentIds=audiencePolicy.accountRules.map(rule=>rule.identityId);
+ return {sections:p.sections??[],id:p.id,title:p.title,description:p.description,category:p.category,difficulty:p.difficulty,coverKey:p.cover_key,
+  coverImage:p.cover_image,authorName:p.author_name,authoredAt:p.authored_at,estimatedMinutes:p.estimated_minutes,
+  requiredLanguage:p.required_language,localizations:p.localizations,published:!!p.published_at,archived:!!p.archived_at,
+  revision:p.platform_revision,sourceVersion:p.source_version,sourceSchool:'CodeMaster',ownerScope:'platform',canEdit:true,canManage:admin,
+  audiencePolicy,audienceScope:audiencePolicy.independentRule||schoolIds.length&&studentIds.length?'custom':p.platform_access_scope,schoolIds,studentIds,
+  schools,students,pendingApplications,chapterCount};
+}
+async function list(db,user,{admin,schoolId,summary}) {
+ // Lists never load lesson bodies, exercise projections or private judge data.
+ // Keep metadata reads bounded as the number and size of courses grows.
+ const rows=(await db.query(`SELECT p.id,p.title,p.description,p.category,p.difficulty,p.cover_key,p.author_name,p.authored_at,
+  p.estimated_minutes,p.required_language,p.published_at,p.archived_at,p.platform_revision,${sourceVersion} source_version,
+  p.platform_access_scope,p.platform_audience_scope,p.platform_school_ids,p.platform_student_ids,
+  ${summary?"'[]'::jsonb sections,NULL::text cover_image,NULL::jsonb localizations":'p.sections,p.cover_image,p.localizations'},
+  (SELECT count(*)::int FROM learning_chapters c WHERE c.path_id=p.id AND c.archived_at IS NULL) chapter_count,
+  (SELECT count(*)::int FROM platform_course_admissions a JOIN platform_course_rules r ON r.id=a.rule_id AND r.active AND r.generation=a.generation
+   WHERE a.course_id=p.id AND a.status='pending') pending_applications
+  FROM learning_paths p WHERE p.owner_scope='platform' AND ($1::boolean OR ${platformContentEditorSql('course','p.id','$2::uuid','$3::uuid')})
+  ORDER BY p.archived_at NULLS FIRST,p.updated_at DESC,p.id`,[admin,user.id,schoolId])).rows;
+ if(!rows.length)return [];
+ const ids=rows.map(p=>p.id);
+ const rules=(await db.query('SELECT * FROM platform_course_rules WHERE course_id=ANY($1::uuid[]) AND active ORDER BY course_id,rule_key',[ids])).rows;
+ const invitations=rules.length?(await db.query(`SELECT course_id,rule_id,generation,expires_at,expires_at>clock_timestamp() AS active
+  FROM platform_course_invitations WHERE course_id=ANY($1::uuid[]) AND revoked_at IS NULL`,[ids])).rows:[];
+ const policies=new Map(rows.map(p=>[p.id,platformAudiencePolicyFromRows(p,rules.filter(r=>r.course_id===p.id),invitations.filter(i=>i.course_id===p.id))]));
+ const schoolIds=[...new Set([...policies.values()].flatMap(policy=>policy.schoolRules.map(rule=>rule.schoolId)))];
+ const studentIds=[...new Set([...policies.values()].flatMap(policy=>policy.accountRules.map(rule=>rule.identityId)))];
+ const schools=schoolIds.length?(await db.query('SELECT id,name FROM schools WHERE id=ANY($1::uuid[]) ORDER BY name,id',[schoolIds])).rows:[];
+ const students=studentIds.length?(await db.query(`SELECT i.id,i.name,
+  (SELECT a.username FROM accounts a WHERE a.identity_id=i.id AND a.binding_released_at IS NULL LIMIT 1) username
+  FROM identities i WHERE i.id=ANY($1::uuid[]) ORDER BY i.name,i.id`,[studentIds])).rows:[];
+ return rows.map(p=>{const audiencePolicy=policies.get(p.id);return courseMetadata(p,{audiencePolicy,
+  schools:schools.filter(s=>audiencePolicy.schoolRules.some(rule=>rule.schoolId===s.id)),
+  students:students.filter(s=>audiencePolicy.accountRules.some(rule=>rule.identityId===s.id)),
+  pendingApplications:p.pending_applications,chapterCount:p.chapter_count,admin});});
+}
 async function shape(db,p,{detail=false,admin=true}={}) {
  const audiencePolicy=await platformAudiencePolicy(db,p);
  const schoolIds=audiencePolicy.schoolRules.map(rule=>rule.schoolId),studentIds=audiencePolicy.accountRules.map(rule=>rule.identityId);
  const chapters=(await db.query(`SELECT id,title,content,objective,checkpoint,checkpoint_answer AS "checkpointAnswer",
   localizations,acsl_links AS "acslLinks",section_key AS "sectionKey",
   COALESCE((SELECT jsonb_agg(jsonb_build_object('problemId',cp.problem_id,'versionId',cp.version_id,'title',v.title,'published',v.published_at IS NOT NULL,'schoolVisibleAt',v.school_visible_at,'rankReviewStatus',v.rank_review_status,'readyForCourse',v.published_at IS NOT NULL AND v.validation_status='AC' AND v.rank_review_status='approved',
-   'canEdit',$2 OR EXISTS(SELECT 1 FROM platform_content_editors e WHERE e.resource_kind='problem' AND e.resource_id=cp.problem_id AND e.account_id=current_setting('campus.account_id')::uuid AND e.revoked_at IS NULL AND ${staffSchoolSql('e.account_id','e.school_id')})) ORDER BY cp.position) FROM chapter_problems cp JOIN problems source ON source.id=cp.problem_id JOIN problem_versions v ON v.id=COALESCE(${liveProblemVersionIdSql('source')},cp.version_id) WHERE cp.chapter_id=c.id),'[]'::jsonb) problems,(SELECT count(*)::int FROM chapter_problems WHERE chapter_id=c.id) AS "problemCount"
+   'canEdit',$2 OR ${platformContentEditorSql('problem','cp.problem_id',"current_setting('campus.account_id')::uuid")} ) ORDER BY cp.position) FROM chapter_problems cp JOIN problems source ON source.id=cp.problem_id JOIN problem_versions v ON v.id=COALESCE(${liveProblemVersionIdSql('source')},cp.version_id) WHERE cp.chapter_id=c.id),'[]'::jsonb) problems,(SELECT count(*)::int FROM chapter_problems WHERE chapter_id=c.id) AS "problemCount"
   FROM learning_chapters c WHERE path_id=$1 AND archived_at IS NULL ORDER BY position,created_at,id`,[p.id,admin])).rows;
  const paper4=detail?await loadCoursePaper4(db,[p.id]):null;
  if(paper4)for(const chapter of chapters)chapter.paper4Links=chapterPaper4Links(paper4,chapter.id,null,{includeUnavailable:true});
@@ -45,12 +83,7 @@ async function shape(db,p,{detail=false,admin=true}={}) {
  const pendingApplications=Number((await db.query(`SELECT count(*) n FROM platform_course_admissions a
   JOIN platform_course_rules r ON r.id=a.rule_id AND r.active AND r.generation=a.generation
   WHERE a.course_id=$1 AND a.status='pending'`,[p.id])).rows[0].n);
- return {sections:p.sections??[],id:p.id,title:p.title,description:p.description,category:p.category,difficulty:p.difficulty,coverKey:p.cover_key,
-  coverImage:p.cover_image,authorName:p.author_name,authoredAt:p.authored_at,estimatedMinutes:p.estimated_minutes,
-  requiredLanguage:p.required_language,localizations:p.localizations,published:!!p.published_at,archived:!!p.archived_at,
-  revision:p.platform_revision,sourceVersion:p.source_version,sourceSchool:'CodeMaster',ownerScope:'platform',canEdit:true,canManage:admin,
-  audiencePolicy,audienceScope:audiencePolicy.independentRule||schoolIds.length&&studentIds.length?'custom':p.platform_access_scope,schoolIds,studentIds,
-  schools,students,pendingApplications,chapterCount:chapters.length,...(detail?{chapters}:{})};
+ return {...courseMetadata(p,{audiencePolicy,schools,students,pendingApplications,chapterCount:chapters.length,admin}),...(detail?{chapters}:{})};
 }
 async function audit(db,user,action,p) {
  await db.query(`INSERT INTO platform_audit_events(actor_account_id,action,detail) VALUES($1,$2,$3)`,
@@ -72,7 +105,17 @@ async function assertReady(db,p,user) {
  if(links.some(l=>l.archived_at||l.bank_archived||l.visibility!=='school'||!l.published_at||!l.school_visible_at||l.rank_review_status!=='approved'))
   fail(409,'UNAPPROVED_LESSON_PROBLEM','关联练习尚未发布或未通过审核');
 }
-async function save(db,user,body,old) {
+async function save(db,user,body,old,{admin}) {
+ // Check additions against the pre-save graph: linking an unrelated problem
+ // must not create the very course-derived permission used to authorize it.
+ if(!admin&&Array.isArray(body.chapters)){
+  const existing=new Set((await db.query(`SELECT cp.problem_id FROM chapter_problems cp JOIN learning_chapters c ON c.id=cp.chapter_id
+   WHERE c.path_id=$1 AND c.archived_at IS NULL`,[old.id])).rows.map(row=>row.problem_id));
+  const added=[...new Set(body.chapters.flatMap(chapter=>Array.isArray(chapter?.problems)?chapter.problems.map(link=>uuid(link?.problemId,'题目 ID').toLowerCase()):[]))].filter(id=>!existing.has(id));
+  if(added.length&&(await db.query(`SELECT p.id FROM problems p WHERE p.id=ANY($1::uuid[])
+   AND ${platformContentEditorSql('problem','p.id','$2::uuid')}`,[added,user.id])).rowCount!==added.length)
+   fail(403,'CONTENT_EDITOR_REQUIRED','关联新题目需要先获得该题目的编辑授权');
+ }
  const audience=await platformCourseAudience(db,body,old??{});
  const display=courseDisplayProperties(body,old??{},'平台管理员');
  const title=field(body.title??old?.title,'课程名称',{max:200});
@@ -155,7 +198,8 @@ export async function handlePlatformCourses({pool,user,route,method,body,url}) {
    if(!admin)await requirePlatformContentEditor(db,user,'course',uuid(url.searchParams.get('courseId')));
    return reply({items:(await db.query(`SELECT p.id,p.id AS "problemId",p.bank_id AS "bankId",b.name AS "bankName",v.id AS "versionId",v.title,v.mode,jsonb_build_object('difficulty',v.metadata->'difficulty') metadata,v.tags,true published,v.school_visible_at AS "schoolVisibleAt",v.rank_review_status AS "rankReviewStatus" FROM problems p JOIN problem_banks b ON b.id=p.bank_id
     JOIN problem_versions v ON v.id=${liveProblemVersionIdSql('p')} WHERE p.owner_scope='platform' AND p.archived_at IS NULL
-    AND v.published_at IS NOT NULL AND v.validation_status='AC' AND v.rank_review_status='approved' ORDER BY v.title,p.id`)).rows});
+    AND v.published_at IS NOT NULL AND v.validation_status='AC' AND v.rank_review_status='approved'
+    AND ($1::boolean OR ${platformContentEditorSql('problem','p.id','$2::uuid')}) ORDER BY v.title,p.id`,[admin,user.id])).rows});
   }
   if(match[1]==='paper4-options'&&method==='GET'){
    if(!admin)await requirePlatformContentEditor(db,user,'course',uuid(url.searchParams.get('courseId')));
@@ -181,12 +225,9 @@ export async function handlePlatformCourses({pool,user,route,method,body,url}) {
    return reply({items});
   }
   if(!match[1]&&method==='GET'){
-   const rows=(await db.query(`SELECT p.*,${sourceVersion} source_version FROM learning_paths p WHERE owner_scope='platform' ORDER BY archived_at NULLS FIRST,updated_at DESC,id`)).rows;
    const schoolId=url?.searchParams.get('schoolId');if(schoolId)uuid(schoolId);
-   const items=[];for(const p of rows){
-    if(!admin&&(!await canEditPlatformContent(db,user.id,'course',p.id)||schoolId&&!(await db.query(`SELECT 1 FROM platform_content_editors e WHERE e.resource_kind='course' AND e.resource_id=$1 AND e.account_id=$2 AND e.school_id=$3 AND e.revoked_at IS NULL AND ${staffSchoolSql('e.account_id','e.school_id')}`,[p.id,user.id,schoolId])).rowCount))continue;
-    items.push(await shape(db,p,{admin}));
-   }return reply({items,canManage:admin});
+   const view=enumValue(url?.searchParams.get('view')??'catalog',['catalog','summary'],'列表视图');
+   return reply({items:await list(db,user,{admin,schoolId:schoolId??null,summary:view==='summary'}),canManage:admin});
   }
   if(match[1]&&method==='GET'&&!match[2])return reply(await shape(db,await get(db,match[1]),{detail:true,admin}));
   if(!['POST','PATCH'].includes(method))return null;
@@ -213,7 +254,7 @@ export async function handlePlatformCourses({pool,user,route,method,body,url}) {
   if(!match[2]){
    if(old&&method!=='PATCH'||!old&&method!=='POST')return null;
    if(old?.archived_at)fail(409,'COURSE_ARCHIVED','请先恢复课程');
-   saved=await save(db,user,body,old);
+   saved=await save(db,user,body,old,{admin});
   }else{
    if(method!=='POST')return null;
    const action=match[2];

@@ -38,10 +38,13 @@ export async function platformCourseRules(db,courseId) {
 }
 export async function platformAudiencePolicy(db,course) {
  const rows=await platformCourseRules(db,course.id);
+ const invitations=rows.length?(await db.query(`SELECT rule_id,generation,expires_at,expires_at>clock_timestamp() AS active FROM platform_course_invitations
+  WHERE course_id=$1 AND revoked_at IS NULL`,[course.id])).rows:[];
+ return platformAudiencePolicyFromRows(course,rows,invitations);
+}
+export function platformAudiencePolicyFromRows(course,rows,invitations=[]) {
  if(!rows.length)return course.platform_access_scope==='all'?{scope:'all',allRule:direct(),independentRule:null,schoolRules:[],accountRules:[]}
   :{scope:'custom',allRule:null,independentRule:null,schoolRules:course.platform_school_ids.map(schoolId=>({schoolId,...direct()})),accountRules:course.platform_student_ids.map(identityId=>({identityId,...direct()}))};
- const invitations=(await db.query(`SELECT rule_id,generation,expires_at,expires_at>clock_timestamp() AS active FROM platform_course_invitations
-  WHERE course_id=$1 AND revoked_at IS NULL`,[course.id])).rows;
  const shape=row=>{const invite=invitations.find(item=>item.rule_id===row.id&&item.generation===row.generation);return {ruleId:row.id,generation:row.generation,...config(row),invitation:{active:Boolean(invite?.active),expiresAt:invite?.expires_at??null}};};
  const all=rows.find(r=>r.target_kind==='all'),independent=rows.find(r=>r.target_kind==='independent');
  return {scope:course.platform_audience_scope,allRule:all?shape(all):null,independentRule:independent?shape(independent):null,

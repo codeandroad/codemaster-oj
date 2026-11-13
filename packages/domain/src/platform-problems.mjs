@@ -1,7 +1,8 @@
 import { transaction } from './db.mjs';
 import { activeAccount, LEGACY_SCHOOL_ID, lockSchoolTeaching } from './schools.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
-import { requirePlatformContentEditor, staffSchoolSql } from './platform-content-access.mjs';
+import { requirePlatformContentEditor, platformContentEditorSql } from './platform-content-access.mjs';
+import { handlePlatformProblemLibrary, platformStorageBank, platformCategory } from './platform-problem-library.mjs';
 import { tutorialSettings, saveTutorial } from './problem-tutorials.mjs';
 import { handleScholarshipAssistance } from './scholarship-assistance.mjs';
 import { assertJudgeAdmission } from './system.mjs';
@@ -10,6 +11,7 @@ import { fail, uuid } from './security.mjs';
 const reply=(body,status=200)=>({status,body});
 
 export async function handlePlatformProblems(ctx) {
+ const library=await handlePlatformProblemLibrary(ctx);if(library)return library;
  const {pool,user,route,method,body={},helpers,url}=ctx;
  const match=route.match(/^\/platform\/source-problems(?:\/([^/]+)(?:\/(versions|publish|validate|tutorial|contents)(?:\/([^/]+)\/(publish))?)?)?$/);
  if(!match)return null;
@@ -21,29 +23,29 @@ export async function handlePlatformProblems(ctx) {
    [user.id,action,{problemId:id,...detail}]);
   const detail=async(id,versionId)=>{
    const result=await helpers.problemResult(db,user,id,versionId);
-   return {...result,ownerScope:'platform',schoolId:LEGACY_SCHOOL_ID,bankName:'CodeMaster',canPublish:admin&&result.canPublish,canManage:admin};
+   const category=(await db.query('SELECT p.platform_bank_id,b.name FROM problems p LEFT JOIN platform_problem_banks b ON b.id=p.platform_bank_id WHERE p.id=$1',[id])).rows[0];
+   return {...result,sourceBankId:result.bankId,bankId:category?.platform_bank_id??null,ownerScope:'platform',schoolId:LEGACY_SCHOOL_ID,bankName:category?.name??'',canPublish:admin&&result.canPublish,canManage:admin};
   };
   if(!match[1]&&method==='GET'){
    const schoolId=url.searchParams.get('schoolId')?uuid(url.searchParams.get('schoolId')):null;
-   const rows=(await db.query(`SELECT v.*,p.bank_id,p.current_version_id AS published_version_id,
-    p.created_at AS problem_created_at FROM problems p JOIN LATERAL
+   const rows=(await db.query(`SELECT v.*,p.bank_id,p.platform_bank_id,category.name category_name,p.archived_at,p.current_version_id AS published_version_id,
+    p.created_at AS problem_created_at,
+    COALESCE((SELECT jsonb_agg(course ORDER BY course.title) FROM (SELECT DISTINCT lp.id,lp.title FROM chapter_problems cp
+     JOIN learning_chapters c ON c.id=cp.chapter_id JOIN learning_paths lp ON lp.id=c.path_id
+     WHERE cp.problem_id=p.id AND c.archived_at IS NULL AND lp.archived_at IS NULL AND lp.owner_scope='platform') course),'[]'::jsonb) courses
+    FROM problems p LEFT JOIN platform_problem_banks category ON category.id=p.platform_bank_id JOIN LATERAL
     (SELECT * FROM problem_versions WHERE problem_id=p.id ORDER BY created_at DESC,id DESC LIMIT 1) v ON true
-    WHERE p.owner_scope='platform' AND p.archived_at IS NULL AND ($2 OR EXISTS(
-     SELECT 1 FROM platform_content_editors e WHERE e.resource_kind='problem' AND e.resource_id=p.id
-     AND e.account_id=$1 AND e.revoked_at IS NULL AND ($3::uuid IS NULL OR e.school_id=$3)
-     AND ${staffSchoolSql('e.account_id','e.school_id')})) ORDER BY v.title,p.id`,[user.id,admin,schoolId])).rows;
-   return reply({items:rows.map(row=>({...helpers.problemShape(row),ownerScope:'platform',schoolId:LEGACY_SCHOOL_ID,bankName:'CodeMaster',
-    bankId:row.bank_id,canEdit:true,canManageTutorial:true,canPublish:admin&&row.validation_status==='AC'&&!row.published_at,
+    WHERE p.owner_scope='platform' AND (p.archived_at IS NULL OR $4) AND ($2 OR
+     ${platformContentEditorSql('problem','p.id','$1::uuid','$3::uuid')}) ORDER BY v.title,p.id`,[user.id,admin,schoolId,admin&&url.searchParams.get('includeArchived')==='1'])).rows;
+   return reply({items:rows.map(row=>({...helpers.problemShape(row),ownerScope:'platform',schoolId:LEGACY_SCHOOL_ID,bankName:row.category_name??'',
+    bankId:row.platform_bank_id,sourceBankId:row.bank_id,courses:row.courses,archivedAt:row.archived_at,canEdit:!row.archived_at,canManageTutorial:!row.archived_at,canPublish:admin&&!row.archived_at&&row.validation_status==='AC'&&!row.published_at,
     updatedAt:row.created_at,createdAt:row.problem_created_at})),canManage:admin});
   }
   if(!match[1]&&method==='POST'){
    if(!admin)fail(403,'PLATFORM_ADMIN_REQUIRED','仅平台管理员可创建平台题目');
-   // The source bank is storage only. Public access still requires explicit publication.
-   await db.query("SELECT pg_advisory_xact_lock(hashtextextended('platform-source-bank',0))");
-   let bank=(await db.query("SELECT id FROM problem_banks WHERE name='CodeMaster' AND description='Platform source problems' AND archived_at IS NULL ORDER BY created_at,id LIMIT 1")).rows[0];
-   if(!bank)bank=(await db.query("INSERT INTO problem_banks(name,description,visibility,owner_account_id) VALUES('CodeMaster','Platform source problems','school',$1) RETURNING id",[user.id])).rows[0];
-   const input=helpers.problemInput({...body,bankId:bank.id});
-   const p=(await db.query("INSERT INTO problems(bank_id,owner_account_id,owner_scope) VALUES($1,$2,'platform') RETURNING id",[bank.id,user.id])).rows[0];
+   const categoryId=await platformCategory(db,body.bankId),bankId=await platformStorageBank(db,user.id);
+   const input=helpers.problemInput({...body,bankId});
+   const p=(await db.query("INSERT INTO problems(bank_id,platform_bank_id,owner_account_id,owner_scope) VALUES($1,$2,$3,'platform') RETURNING id",[bankId,categoryId,user.id])).rows[0];
    const v=await helpers.insertVersion(db,user,p.id,input);
    await audit('platform.problem.create',p.id);
    return reply(await detail(p.id,v.id),201);

@@ -1,4 +1,5 @@
 "use client";
+import { RowActionButton } from "@/components/ui/row-action";
 
 import { useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -394,7 +395,7 @@ function CourseList({
   const text = useSchoolText();
   const { language } = useCourseLanguage();
   const resource = useData<CoursePage<SchoolCourse>>(path);
-  const platform = useData<{items:PlatformCourse[]}>(canAuthor?`platform/courses?schoolId=${path.split("/")[1]}`:null);
+  const platform = useData<{items:PlatformCourse[]}>(canAuthor?`platform/courses?schoolId=${path.split("/")[1]}&view=catalog`:null);
   const archived=new URLSearchParams(path.split("?")[1]??"").get("archived")==="true";
   const platformCourses=page===1?(platform.data?.items??[]).filter(course=>course.archived===archived&&`${course.title} ${course.description}`.toLowerCase().includes(query.toLowerCase())):[];
   if (canAuthor) return (
@@ -402,7 +403,7 @@ function CourseList({
       {platform.error&&<p role="alert" className="text-sm text-destructive">{platform.error}</p>}
       <section className={panel}>
         <CourseCatalogTable empty={!resource.data?.items.length && !platformCourses.length ? (query ? text("No courses match this search.", "没有符合搜索条件的课程。") : text("No courses in this view.", "当前列表暂无课程。")) : undefined}>
-          {platformCourses.map(course=><CourseCatalogRow key={course.id} course={{...course,ownerScope:"platform"}} title={<button type="button" className="text-left font-semibold text-primary hover:underline" onClick={()=>onEdit(`platform:${course.id}`)}>{course.title}</button>} access={<CourseAccessSummary course={{...course,ownerScope:"platform",platformAudience:course.audienceScope}}/>} status={<StatusPill status={course.archived?text("Archived","已归档"):course.published?text("Published","已发布"):text("Draft","草稿")}/>} actions={<Button type="button" size="sm" variant="ghost" className="text-primary" onClick={()=>onEdit(`platform:${course.id}`)}>{course.archived?text("View","查看"):text("Edit","编辑")}</Button>}/>)}
+          {platformCourses.map(course=><CourseCatalogRow key={course.id} course={{...course,ownerScope:"platform"}} title={<button type="button" className="text-left font-semibold text-primary hover:underline" onClick={()=>onEdit(`platform:${course.id}`)}>{course.title}</button>} access={<CourseAccessSummary course={{...course,ownerScope:"platform",platformAudience:course.audienceScope}}/>} status={<StatusPill status={course.archived?text("Archived","已归档"):course.published?text("Published","已发布"):text("Draft","草稿")}/>} actions={<RowActionButton type="button" onClick={()=>onEdit(`platform:${course.id}`)}>{course.archived?text("View","查看"):text("Edit","编辑")}</RowActionButton>}/>)}
           {resource.data?.items.map(course => <CourseCatalogRow key={course.id} course={course}
             title={<button type="button" className="text-left font-semibold text-primary hover:underline" onClick={() => course.canManage && !course.archived ? onEdit(course.id) : onOpen(course.id)}>{course.title}</button>}
             access={<span className="text-xs text-muted-foreground">{course.accessScope === "school" ? text("School-wide", "全校可学") : text("Selected classes", "指定班级")}</span>}
@@ -410,20 +411,20 @@ function CourseList({
               <CourseStatus course={course}/>
               {course.hasUnpublishedChanges && <p className="mt-1 text-xs text-muted-foreground">{text("Unpublished edits", "有未发布修改")}</p>}
             </>}
-            actions={<div className="flex flex-wrap items-center gap-1">
-              <Button size="sm" variant="ghost" className="text-primary" onClick={() => course.canManage && !course.archived ? onEdit(course.id) : onOpen(course.id)}>{course.canManage && !course.archived ? text("Edit", "编辑") : text("View", "查看")}</Button>
+            actions={<>
+              <RowActionButton onClick={() => course.canManage && !course.archived ? onEdit(course.id) : onOpen(course.id)}>{course.canManage && !course.archived ? text("Edit", "编辑") : text("View", "查看")}</RowActionButton>
               {course.canManage && <>
-                {!course.archived && <Button size="sm" variant="ghost" className="text-primary" onClick={() => onOpen(course.id, true)}>{text("Student preview", "学生预览")}</Button>}
-                <Button size="sm" variant="ghost" onClick={() => onArchive(course)}>{course.archived ? text("Restore", "恢复") : text("Archive", "归档")}</Button>
-                {!course.archived && (course.status !== "published" || course.hasUnpublishedChanges) && <Button size="sm" variant="secondary" onClick={() => onPublication({ course, publish: true })}>{text("Publish", "发布")}</Button>}
-                {!course.archived && course.status === "published" && <Button size="sm" variant="ghost" onClick={() => onPublication({ course, publish: false })}>{text("Unpublish", "下架")}</Button>}
+                {!course.archived && <RowActionButton onClick={() => onOpen(course.id, true)}>{text("Preview", "预览")}</RowActionButton>}
+                <RowActionButton onClick={() => onArchive(course)}>{course.archived ? text("Restore", "恢复") : text("Archive", "归档")}</RowActionButton>
+                {!course.archived && (course.status !== "published" || course.hasUnpublishedChanges) && <RowActionButton onClick={() => onPublication({ course, publish: true })}>{text("Publish", "发布")}</RowActionButton>}
+                {!course.archived && course.status === "published" && <RowActionButton onClick={() => onPublication({ course, publish: false })}>{text("Unpublish", "下架")}</RowActionButton>}
                 {onAdmissions && course.status === "published" && !course.archived && (
-                  <Button size="sm" variant="ghost" onClick={() => onAdmissions(course)}>
+                  <RowActionButton onClick={() => onAdmissions(course)}>
                     {text("Admissions", "准入与申请")}
-                  </Button>
+                  </RowActionButton>
                 )}
               </>}
-            </div>}
+            </>}
           />)}
         </CourseCatalogTable>
       </section>

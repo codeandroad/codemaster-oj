@@ -1,4 +1,5 @@
 import { legacyProblemCatalogCourses, problemCatalogCourseRequest } from './problem-catalog-courses.mjs';
+import { problemListColumns, problemListSummary } from './problem-list-summary.mjs';
 import { canEditPlatformContent } from './platform-content-access.mjs';
 import { handleAcsl } from './acsl.mjs';
 import { recordPublicPracticeStaffExposure } from './public-scholarship.mjs';
@@ -462,13 +463,30 @@ export async function createDomainServices(pool,config) {
   if(historyMatch&&method==='GET')return respond(200,await transaction(pool,db=>legacyProblemSubmissions(db,user,historyMatch[1],url,{versionAccess,assignmentAccess})));
   for (const handler of [handleFavorites,handleLibrary]) { const result=await handler(context); if(result)return result; }
    if(route==='/problems'&&method==='GET'){
+    const staffSummary=url.searchParams.get('view')==='summary';
+    const studentSummary=url.searchParams.get('view')==='student-summary';
+    const summary=staffSummary||studentSummary;
+    if(staffSummary)staff(user);
     const assignmentPicker=url.searchParams.get('purpose')==='assignment';
     if(assignmentPicker)staff(user);
     const selectedProblem=assignmentPicker&&url.searchParams.get('problemId');
     const { courseId, includeCourses } = problemCatalogCourseRequest(url);
     const courseFilter = !assignmentPicker && includeCourses
      ? await transaction(pool, db => legacyProblemCatalogCourses(db, user, courseId)) : null;
-    const rows=(await pool.query(`SELECT v.*,
+    const studentCatalog=studentSummary&&!isStaff(user);
+    const liveVersionId=studentCatalog?'p.live_version_id':liveProblemVersionIdSql('p');
+    // A learner catalog uses one live publication per stable problem. Resolve
+    // it once before the visibility predicates reuse it for platform, activity
+    // and ordinary school access; preserve those predicates unchanged below.
+    const catalogSources=studentCatalog?`WITH catalog_problems AS MATERIALIZED (
+     SELECT p.id,p.bank_id,p.owner_scope,p.owner_account_id,p.current_version_id,p.created_at,p.archived_at,
+      ${liveProblemVersionIdSql('p')} live_version_id
+     FROM problems p JOIN problem_banks scoped_bank ON scoped_bank.id=p.bank_id
+     WHERE p.archived_at IS NULL AND scoped_bank.archived_at IS NULL
+      AND ($6::uuid IS NULL OR p.bank_id=$6) AND ($8::uuid IS NULL OR p.id=$8)
+      AND ($9::uuid[] IS NULL OR p.id=ANY($9))
+    ) `:'';
+    const rows=(await pool.query(`${catalogSources}SELECT ${summary?problemListColumns('v'):'v.*'},
      (SELECT count(*) FROM test_cases tc WHERE tc.version_id=v.id AND tc.enabled) formal_test_count,
      p.bank_id,bank.name bank_name,p.owner_scope,bank.visibility bank_visibility,
      CASE WHEN NOT $7 AND ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit')))
@@ -479,14 +497,14 @@ export async function createDomainServices(pool,config) {
       THEN pv.metadata->'difficulty' ELSE v.metadata->'difficulty' END published_difficulty,
      (p.owner_scope='school' AND ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission='edit'))) can_edit,
      ($3 AND (${schoolPublishedTutorialProblemSql})) shared_tutorial
-    FROM problems p JOIN problem_banks bank ON bank.id=p.bank_id
+    FROM ${studentCatalog?'catalog_problems':'problems'} p JOIN problem_banks bank ON bank.id=p.bank_id
     LEFT JOIN bank_permissions bp ON bp.bank_id=bank.id AND bp.account_id=$1
     JOIN LATERAL (
      SELECT * FROM problem_versions v WHERE v.problem_id=p.id
-     AND (p.owner_scope='school' OR v.id=${liveProblemVersionIdSql('p')})
-     AND (NOT $7::boolean OR v.id=${liveProblemVersionIdSql('p')})
+     AND (p.owner_scope='school' OR v.id=${liveVersionId})
+     AND (NOT $7::boolean OR v.id=${liveVersionId})
      AND ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit'))
-       OR v.id=${liveProblemVersionIdSql('p')}) AND (
+       OR v.id=${liveVersionId}) AND (
       $2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit'))
       OR v.published_at IS NOT NULL AND bank.visibility='school' AND v.school_visible_at IS NOT NULL
       OR $5 AND v.published_at IS NOT NULL AND EXISTS (
@@ -513,17 +531,17 @@ export async function createDomainServices(pool,config) {
      AND ($9::uuid[] IS NULL OR p.id=ANY($9) AND bank.visibility='school'
        AND v.school_visible_at IS NOT NULL AND v.rank_review_status='approved')
     ORDER BY p.created_at DESC LIMIT 500`,[user.id,rolesInclude(user,'admin'),rolesInclude(user,'teacher'),user.identityId,rolesInclude(user,'student'),url.searchParams.get('bankId')?uuid(url.searchParams.get('bankId')):null,assignmentPicker,selectedProblem?uuid(selectedProblem):null,courseFilter?.problemIds??null])).rows;
-    const problemIds=rows.map(r=>r.problem_id),ownProgress=await problemOwnProgress(pool,user,problemIds);
-    const configured=(await pool.query('SELECT problem_id,points FROM point_rewards WHERE assignment_id IS NULL AND problem_id=ANY($1::uuid[])',[problemIds])).rows;
+    const problemIds=rows.map(r=>r.problem_id),ownProgress=staffSummary?null:await problemOwnProgress(pool,user,problemIds);
+    const configured=staffSummary?[]:(await pool.query('SELECT problem_id,points FROM point_rewards WHERE assignment_id IS NULL AND problem_id=ANY($1::uuid[])',[problemIds])).rows;
     const firstAcPoints=new Map(configured.map(reward=>[reward.problem_id,reward.points]));
     const staffView=isStaff(user);
-    const presented=staffView?rows:await studentPublicStatementRows(pool,rows);
+    const presented=staffView?rows:await studentPublicStatementRows(pool,rows,{summary:studentSummary});
     return respond(200,{...(courseFilter && { courseId, courses: courseFilter.courses }),items:presented.map(r=>({
-     ...problemShape(r,{includeDisabledSamples:!!r.can_edit}),
+     ...(summary?problemListSummary(r):problemShape(r,{includeDisabledSamples:!!r.can_edit})),
      ...(staffView?{publishedDifficulty:typeof r.published_difficulty==='string'?r.published_difficulty:null}:{}),
      bankId:r.bank_id,bankName:r.bank_name,ownerScope:r.owner_scope,canEdit:!!r.can_edit,canPublish:!!r.can_edit&&r.validation_status==='AC'&&!r.published_at,
      canManageTutorial:!!(r.can_edit||r.shared_tutorial),
-     firstAcPoints:firstAcPoints.get(r.problem_id)??10,ownProgress:ownProgress.get(r.problem_id)||emptyOwnProgress(),
+     ...(!staffSummary&&{firstAcPoints:firstAcPoints.get(r.problem_id)??10,ownProgress:ownProgress.get(r.problem_id)||emptyOwnProgress()}),
     }))});
    }
    if(route==='/problems'&&method==='POST'){

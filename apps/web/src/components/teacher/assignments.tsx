@@ -1,5 +1,7 @@
 "use client";
 
+import { RowActionButton, rowActionClassName } from "@/components/ui/row-action";
+
 import { AppLink as Link } from "@/components/navigation";
 import { useEffect, useRef, useState, type ComponentProps } from "react";
 import {activityDate,validateActivity,activeParticipants} from "./activity-validation";
@@ -153,20 +155,20 @@ export function TeacherAssignments() {
                 />
               </td>
               <td>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap items-center gap-2">
                   <Link
                     href={`/teacher/assignments/${item.id}/edit`}
-                    className={link}
+                    className={rowActionClassName}
                   >
                     {item.state === "Draft" ? ui(locale, "编辑", "Edit") : ui(locale, "查看 / 编辑", "View / edit")}
                   </Link>
                   <Link
                     href={`/teacher/assignments/${item.id}/progress`}
-                    className={link}
+                    className={rowActionClassName}
                   >
                     {ui(locale, "进度", "Progress")} →
                   </Link>
-                  <Button size="sm" variant="ghost" disabled={action.busy} onClick={()=>setConfirm(item)}>{showArchived?ui(locale,"恢复","Restore"):ui(locale,"归档","Archive")}</Button>
+                  <RowActionButton disabled={action.busy} onClick={()=>setConfirm(item)}>{showArchived?ui(locale,"恢复","Restore"):ui(locale,"归档","Archive")}</RowActionButton>
                 </div>
               </td>
             </tr>;

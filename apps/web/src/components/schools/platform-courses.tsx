@@ -1,9 +1,11 @@
 "use client";
+import { RowActionButton } from "@/components/ui/row-action";
 
 import { useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Feedback, Loading, useData, useMutation } from "@/components/admin/common";
+import { CourseSettingsDialog } from "@/components/teacher/course-settings-dialog";
 import { Button } from "@/components/ui/button";
 import { useRangeSelection } from "@/components/ui/use-range-selection";
 import { productionApi } from "@/lib/production-api";
@@ -21,6 +23,7 @@ export function PlatformCourses() {
   const action = useMutation();
   const [editor, setEditor] = useState<PlatformCourse | null>(null);
   const [grant, setGrant] = useState<PlatformCourse | null>(null);
+  const [accessId, setAccessId] = useState<string | null>(null);
   const [selected,setSelected]=useState<string[]>([]),[batchGrant,setBatchGrant]=useState<string[]|null>(null);
   const items=courses.data?.items??[],selectedIds=selected.filter(id=>items.some(course=>course.id===id));
   const {getRange}=useRangeSelection(items,JSON.stringify(items.map(course=>course.id)));
@@ -38,8 +41,8 @@ export function PlatformCourses() {
     if (view) url.searchParams.set("view", view); else url.searchParams.delete("view");
     window.history.pushState(null, "", `${url.pathname}${url.search}`);
   }
-  function close() { setEditor(null); if (courseId) navigateToCourse(); requestAnimationFrame(() => trigger.current?.focus()); }
-  function saved(course: PlatformCourse) { close(); courses.reload(); action.success(text(`Saved ${course.title}.`, `已保存「${course.title}」。`)); }
+  function close() { action.clear(); setEditor(null); if (courseId) navigateToCourse(); requestAnimationFrame(() => trigger.current?.focus()); }
+  function saved() { courses.reload(); }
   async function change(course: PlatformCourse, operation: string) {
     await run(async () => {
       await productionApi(`platform/courses/${course.id}/${operation}`, { method: "POST", body: { expectedRevision: course.revision, sourceVersion: course.sourceVersion } });
@@ -56,6 +59,7 @@ export function PlatformCourses() {
         setEditor({ id: "", title: "", description: "", category: "Programming", authorName: text("Platform administrator", "平台管理员"), estimatedMinutes: 60, requiredLanguage: null, revision: 0, sourceVersion: "", published: false, archived: false, audienceScope: "all", schoolIds: [], studentIds: [], schools: [], students: [], chapters: [], chapterCount: 0 });
       }}><Plus size={15}/>{text("Create course", "新建课程")}</Button>}</div>
     <Feedback action={action}/>
+    {accessId && <PlatformCourseAccessSettings key={accessId} id={accessId} onClose={() => { setAccessId(null); requestAnimationFrame(() => trigger.current?.focus()); }} onSaved={() => { courses.reload(); action.success(text("Course settings saved.", "课程设置已保存。")); }}/>}
     {courses.data?.canManage&&items.length>0&&<div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-surface px-4 py-3">
       <label className="flex min-h-10 cursor-pointer items-center gap-2 text-sm"><input type="checkbox" className="size-4 accent-primary" checked={selectedIds.length===items.length} onChange={event=>setSelected(event.target.checked?items.map(course=>course.id):[])}/>{text("Select all courses","选择全部课程")}</label>
       <span className="text-sm text-muted-foreground">{text(`${selectedIds.length} selected`, `已选择 ${selectedIds.length} 项`)}</span>
@@ -67,16 +71,30 @@ export function PlatformCourses() {
       <div className="min-w-0 flex-1"><h2 className="break-words text-sm font-semibold">{course.title}</h2><p className="mt-1 text-xs text-muted-foreground">
         {course.archived ? text("Archived", "已归档") : course.published ? text("Published", "已发布") : text("Draft", "未发布")} · {courseAudiencePolicy(course).scope === "all" ? text("All registered users", "所有注册用户") : text("Custom audience", "自定义范围")} · {text(`${course.chapterCount} chapters`, `${course.chapterCount} 章`)}
       </p></div><div className="flex flex-wrap gap-2">
-        {!course.archived && <Button size="sm" variant="secondary" disabled={action.busy} onClick={event => { trigger.current = event.currentTarget; navigateToCourse(course.id); }}>{text("Edit", "编辑")}</Button>}
-        {courses.data?.canManage && <><Button size="sm" variant="ghost" onClick={() => setGrant(course)}>{text("Editors", "编辑授权")}</Button>
-        <Button size="sm" variant="secondary" disabled={action.busy} onClick={event => { trigger.current = event.currentTarget; navigateToCourse(course.id, "admissions"); }}>{text("Learning applications", "学习申请")}{course.pendingApplications ? ` (${course.pendingApplications})` : ""}</Button>
-        {!course.archived && <Button size="sm" variant="secondary" disabled={action.busy} onClick={() => void change(course, course.published ? "unpublish" : "publish")}>{course.published ? text("Withdraw", "下架") : text("Publish", "发布")}</Button>}
-        <Button size="sm" variant="ghost" disabled={action.busy} onClick={() => void change(course, course.archived ? "restore" : "archive")}>{course.archived ? text("Restore", "恢复") : text("Archive", "归档")}</Button></>}
+        {!course.archived && <RowActionButton disabled={action.busy} onClick={event => { trigger.current = event.currentTarget; navigateToCourse(course.id); }}>{text("Edit", "编辑")}</RowActionButton>}
+        {courses.data?.canManage && <><RowActionButton onClick={() => setGrant(course)}>{text("Editors", "编辑授权")}</RowActionButton>
+        {!course.archived && <RowActionButton disabled={action.busy || !!accessId} onClick={event => { trigger.current = event.currentTarget; setAccessId(course.id); }}>{text("Course access", "课程准入")}</RowActionButton>}
+        <RowActionButton disabled={action.busy} onClick={event => { trigger.current = event.currentTarget; navigateToCourse(course.id, "admissions"); }}>{text("Learning applications", "学习申请")}{course.pendingApplications ? ` (${course.pendingApplications})` : ""}</RowActionButton>
+        {!course.archived && <RowActionButton disabled={action.busy} onClick={() => void change(course, course.published ? "unpublish" : "publish")}>{course.published ? text("Withdraw", "下架") : text("Publish", "发布")}</RowActionButton>}
+        <RowActionButton disabled={action.busy} onClick={() => void change(course, course.archived ? "restore" : "archive")}>{course.archived ? text("Restore", "恢复") : text("Archive", "归档")}</RowActionButton></>}
       </div>
     </li>)}</ul>{!courses.data?.items.length && <p className="py-6 text-sm text-muted-foreground">{text("No platform courses yet. Create your first course.", "暂无可编辑的平台课程。")}</p>}</Loading>
     {grant && <PlatformContentEditors kind="course" id={grant.id} title={grant.title} onClose={() => setGrant(null)}/>}
     {batchGrant&&<PlatformContentEditors kind="course" resourceIds={batchGrant} title={text(`${batchGrant.length} courses`,`${batchGrant.length} 门课程`)} onClose={()=>setBatchGrant(null)}/>}
   </div>;
+}
+
+function PlatformCourseAccessSettings({ id, onClose, onSaved }: { id: string; onClose: () => void; onSaved: () => void }) {
+  const detail = useData<PlatformCourse>(`platform/courses/${encodeURIComponent(id)}`), text = useSchoolText();
+  const course = detail.data;
+  if (!course || detail.pending || detail.error || !course.canManage || course.archived) return <div className="flex items-center gap-3">
+    <Loading resource={detail}><p role="status" className="text-sm text-muted-foreground">{text("Course access settings are unavailable.", "此课程的准入设置不可用。")}</p></Loading>
+    <Button type="button" size="sm" variant="ghost" onClick={onClose}>{text("Close", "关闭")}</Button>
+  </div>;
+  return <CourseSettingsDialog course={course} platformCourse={course} accessOnly onClose={onClose} onSaved={onSaved}
+    saveCourse={body => productionApi<PlatformCourse>(`platform/courses/${course.id}`, {
+      method: "PATCH", body: { ...body, expectedRevision: course.revision, sourceVersion: course.sourceVersion },
+    })}/>;
 }
 
 function PlatformCourseDetail({ id, onClose, onSaved }: { id: string; onClose: () => void; onSaved: (course: PlatformCourse) => void }) {

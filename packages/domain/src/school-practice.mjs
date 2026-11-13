@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { transaction } from './db.mjs';
 import { activeAccount, auditSchool, LEGACY_SCHOOL_ID, lockSchoolTeaching, schoolRole } from './schools.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
-import { bytes, canonicalHash, enumValue, fail, field, integer, uuid } from './security.mjs';
+import { HttpError, bytes, canonicalHash, enumValue, fail, field, integer, uuid } from './security.mjs';
 import { validateTask } from '../judge.mjs';
 import { schoolProblemSubmissions } from './problem-submissions.mjs';
 import { publicProblemMetadata } from './problem-public-statements.mjs';
@@ -276,6 +276,33 @@ export async function listPublicProblems(pool,user,url){
  });
 }
 
+async function decideProblemPublication(db, user, {schoolId, problemId, versionId: expectedVersion}, decision) {
+ await scope(db,schoolId);
+ if (schoolId === LEGACY_SCHOOL_ID) {
+  await decideLegacyPublicProblem(db,{problemId,versionId:expectedVersion,decision,actorId:user.id});
+  return;
+ }
+ const p=await loadProblem(db,schoolId,problemId,user,null,{publicOnly:true});
+ const versionId = p.published_version_id;
+ if ((decision !== 'withdraw' || expectedVersion) && uuid(expectedVersion)!==versionId)
+  fail(409,'REVISION_CONFLICT','Review the current published version.');
+ if (decision === 'withdraw') {
+  await db.query('UPDATE school_problem_publications SET withdrawn_at=clock_timestamp() WHERE school_id=$1 AND problem_id=$2',[schoolId,problemId]);
+ } else {
+  const request = await db.query(`
+   UPDATE school_problem_publication_requests SET status=$4,decided_by=$5,decided_at=clock_timestamp()
+   WHERE school_id=$1 AND problem_id=$2 AND version_id=$3 AND status='pending'
+  `, [schoolId,problemId,versionId,decision==='approve'?'approved':'rejected',user.id]);
+  if (decision === 'reject' && !request.rowCount) fail(409,'NO_PENDING_REQUEST','No request is pending for this version.');
+  if (decision === 'approve') await db.query(`
+   INSERT INTO school_problem_publications(school_id,problem_id,version_id,approved_by) VALUES($1,$2,$3,$4)
+   ON CONFLICT(problem_id) DO UPDATE SET version_id=EXCLUDED.version_id,approved_by=EXCLUDED.approved_by,
+     approved_at=clock_timestamp(),withdrawn_at=NULL
+  `,[schoolId,problemId,versionId,user.id]);
+ }
+ await db.query('INSERT INTO platform_audit_events(actor_account_id,action,school_id,detail) VALUES($1,$2,$3,$4)',[user.id,'problem.'+decision,schoolId,JSON.stringify({problemId,versionId})]);
+}
+
 export async function schoolPracticeOperation({pool,user,route,url,method,body={}}){
  route??=url.pathname.replace(/^\/api\/v1/,'');
  const courseContext={courseId:body.courseId??url?.searchParams.get('courseId'),chapterId:body.chapterId??url?.searchParams.get('chapterId'),versionId:body.versionId??url?.searchParams.get('versionId')};
@@ -325,32 +352,33 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
    items.push(...await listLegacyPublicProblemReviews(db));
    return reply({items});
   }
+  if(method==='POST'&&route==='/platform/problem-publications/batch'){
+   const decision = enumValue(body.decision,['approve','reject','withdraw'],'Review decision');
+   if(!Array.isArray(body.items)||!body.items.length||body.items.length>100)
+    fail(400,'VALIDATION','Select 1–100 problems to review.');
+   const items = body.items.map(item=>({
+    schoolId:uuid(item?.schoolId,'School ID').toLowerCase(),
+    problemId:uuid(item?.problemId,'Problem ID').toLowerCase(),
+    versionId:uuid(item?.versionId,'Version ID').toLowerCase(),
+   }));
+   if(new Set(items.map(item=>item.problemId)).size!==items.length)
+    fail(400,'VALIDATION','Select each problem only once.');
+   // Match the single-review school lock order and hold all locks through commit.
+   for(const schoolId of [...new Set(items.map(item=>item.schoolId))].sort()) await lockSchoolTeaching(db,schoolId);
+   for(const item of items) {
+    try { await decideProblemPublication(db,user,item,decision); }
+    catch(error) {
+     if(error instanceof HttpError) fail(error.status,error.code,`${item.problemId.slice(0,8)}: ${error.message}`);
+     throw error;
+    }
+   }
+   return reply({reviewedCount:items.length});
+  }
   if(method==='POST'){
-   const schoolId=uuid(body.schoolId),problemId=uuid(body.problemId??route.split('/')[3]);await lockSchoolTeaching(db,schoolId);await scope(db,schoolId);
+   const schoolId=uuid(body.schoolId),problemId=uuid(body.problemId??route.split('/')[3]);await lockSchoolTeaching(db,schoolId);
    const decision = route.endsWith('/withdraw') ? 'withdraw' : route.endsWith('/reject') ? 'reject' : 'approve';
-   if (schoolId === LEGACY_SCHOOL_ID) {
-    await decideLegacyPublicProblem(db,{problemId,versionId:body.versionId,decision,actorId:user.id});
-    return reply({ok:true});
-   }
-   const p=await loadProblem(db,schoolId,problemId,user,null,{publicOnly:true});
-   const versionId = p.published_version_id;
-   if ((decision !== 'withdraw' || body.versionId) && uuid(body.versionId)!==versionId)
-    fail(409,'REVISION_CONFLICT','Review the current published version.');
-   if (decision === 'withdraw') {
-    await db.query('UPDATE school_problem_publications SET withdrawn_at=clock_timestamp() WHERE school_id=$1 AND problem_id=$2',[schoolId,problemId]);
-   } else {
-    const request = await db.query(`
-     UPDATE school_problem_publication_requests SET status=$4,decided_by=$5,decided_at=clock_timestamp()
-     WHERE school_id=$1 AND problem_id=$2 AND version_id=$3 AND status='pending'
-    `, [schoolId,problemId,versionId,decision==='approve'?'approved':'rejected',user.id]);
-    if (decision === 'reject' && !request.rowCount) fail(409,'NO_PENDING_REQUEST','No request is pending for this version.');
-    if (decision === 'approve') await db.query(`
-     INSERT INTO school_problem_publications(school_id,problem_id,version_id,approved_by) VALUES($1,$2,$3,$4)
-     ON CONFLICT(problem_id) DO UPDATE SET version_id=EXCLUDED.version_id,approved_by=EXCLUDED.approved_by,
-       approved_at=clock_timestamp(),withdrawn_at=NULL
-    `,[schoolId,problemId,versionId,user.id]);
-   }
-   await db.query('INSERT INTO platform_audit_events(actor_account_id,action,school_id,detail) VALUES($1,$2,$3,$4)',[user.id,'problem.'+decision,schoolId,JSON.stringify({problemId,versionId})]);return reply({ok:true});
+   await decideProblemPublication(db,user,{schoolId,problemId,versionId:body.versionId},decision);
+   return reply({ok:true});
   }return null;
  });
  const m=route.match(/^\/schools\/([^/]+)\/(problem-banks|problems|judge-status|judge-jobs|submissions)(?:\/([^/]+)(?:\/(validate|publish|unpublish|submissions|public-request|tutorial))?)?$/);

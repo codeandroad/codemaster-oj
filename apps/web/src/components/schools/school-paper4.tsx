@@ -1,4 +1,5 @@
 "use client";
+import { RowActionButton } from "@/components/ui/row-action";
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -460,13 +461,11 @@ function SchoolPaper4Contents({
                         )}
                       </td>
                       <td className="px-2 py-1">
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap items-center gap-2">
                           {p.published &&
                             !p.archived &&
                             (!staff || p.canManage) && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
+                              <RowActionButton
                                 disabled={action.busy}
                                 onClick={() =>
                                   staff
@@ -477,22 +476,18 @@ function SchoolPaper4Contents({
                                 {staff
                                   ? tx("布置", "Assign")
                                   : tx("练习", "Practice")}
-                              </Button>
+                              </RowActionButton>
                             )}
                           {staff && p.canManage && (
                             <>
-                              <Button
-                                size="sm"
-                                variant="ghost"
+                              <RowActionButton
                                 onClick={() =>
                                   navigateSchoolPaper4({ paper4Id: p.id })
                                 }
                               >
                                 {tx("编辑", "Edit")}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
+                              </RowActionButton>
+                              <RowActionButton
                                 disabled={action.busy}
                                 aria-label={tx(
                                   p.archived ? "恢复试卷" : "归档试卷",
@@ -517,7 +512,7 @@ function SchoolPaper4Contents({
                                 }
                               >
                                 <Archive size={14} />
-                              </Button>
+                              </RowActionButton>
                             </>
                           )}
                         </div>
@@ -571,19 +566,15 @@ function SchoolPaper4Contents({
                     </td>
                     <td className="px-3 py-2">
                       {a.canManage ? (
-                        <div className="flex flex-wrap gap-1">
-                          <Button
-                            size="sm"
-                            variant="secondary"
+                        <div className="flex flex-wrap items-center gap-2">
+                          <RowActionButton
                             onClick={() =>
                               navigateSchoolPaper4({ paper4Id: a.paperId })
                             }
                           >
                             {tx("查看答卷", "Review attempts")}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
+                          </RowActionButton>
+                          <RowActionButton
                             disabled={action.busy || a.resultsPublished}
                             onClick={() =>
                               void action.run(async () => {
@@ -596,7 +587,7 @@ function SchoolPaper4Contents({
                             }
                           >
                             {tx("公布成绩", "Release results")}
-                          </Button>
+                          </RowActionButton>
                         </div>
                       ) : (
                         <Button

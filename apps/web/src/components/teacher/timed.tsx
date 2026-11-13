@@ -1,5 +1,7 @@
 "use client";
 
+import { RowActionButton, rowActionClassName } from "@/components/ui/row-action";
+
 import { AppLink as Link } from "@/components/navigation";
 import { useState } from "react";
 import {useActivityDraft} from "./use-activity-draft";
@@ -175,21 +177,21 @@ export function TeacherTimedList() {
               <td>
                 <StatusPill status={practiceStatusLabel(p.status, locale)} />
               </td>
-              <td>
+              <td><div className="flex flex-wrap items-center gap-2">
                 <Link
                   href={`/teacher/timed-practice/${p.id}/edit`}
-                  className={link}
+                  className={rowActionClassName}
                 >
                   {p.status === "Draft" ? tr("编辑", "Edit") : tr("查看", "View")}
                 </Link>
                 <Link
                   href={`/teacher/timed-practice/${p.id}/progress`}
-                  className={`${link} ml-4`}
+                  className={rowActionClassName}
                 >
                   {tr("进行情况", "Progress")}
                 </Link>
-                <Button size="sm" variant="ghost" disabled={action.busy} onClick={()=>setConfirm(p)}>{showArchived?tr("恢复","Restore"):tr("归档","Archive")}</Button>
-              </td>
+                <RowActionButton disabled={action.busy} onClick={()=>setConfirm(p)}>{showArchived?tr("恢复","Restore"):tr("归档","Archive")}</RowActionButton>
+              </div></td>
             </tr>
           ))}
           {!practices.loading && !practices.data?.items.length && (

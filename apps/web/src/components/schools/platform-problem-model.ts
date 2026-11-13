@@ -6,6 +6,19 @@ export type PlatformProblemBank = {
   problemCount: number; archivedProblemCount?: number; archivedAt?: string | null;
 };
 export type PlatformProblemRow = { id: string; title: string; source?: PlatformSourceProblem; publication?: Problem };
+export type ProblemReviewDecision = "approve" | "reject" | "withdraw";
+export function problemReviewTarget(row: PlatformProblemRow) {
+  const { publication } = row;
+  if (row.source?.archivedAt || !publication?.schoolId || !publication.versionId) return null;
+  return { ...publication, versionId: publication.versionId };
+}
+export function canReviewProblem(row: PlatformProblemRow, decision: ProblemReviewDecision) {
+  const target = problemReviewTarget(row);
+  if (!target) return false;
+  if (decision === "withdraw") return target.platformPublished === true;
+  if (target.platformPublished) return false;
+  return decision === "approve" || target.publicRequestStatus === "pending";
+}
 export type PlatformProblemFilters = { query: string; source: string; bank: string; visibility: string; validation: string; course: string; deleted: boolean };
 export const platformProblemFilterKeys = { query: "problemSearch", source: "problemSource", bank: "problemCategory", visibility: "problemVisibility", validation: "problemValidation", course: "problemCourse", deleted: "deletedProblems" } as const;
 export function platformProblemFilters(search: Pick<URLSearchParams, "get">): PlatformProblemFilters {

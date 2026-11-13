@@ -1,4 +1,5 @@
 "use client";
+import { RowActionButton } from "@/components/ui/row-action";
 
 import type { ReactNode } from "react";
 import { Plus, RefreshCw } from "lucide-react";
@@ -99,7 +100,7 @@ export function SchoolPracticeCatalog({
           <td><button type="button" className="break-words text-left font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary" onClick={() => onFiltersChange({ bankId: bank.id, status: "", query: "", tab: "problems" })}>{bank.name}</button><p className="mt-1 font-mono text-xs text-muted-foreground">{bank.id.slice(0, 8)}</p></td>
           <td className="tabular-nums">{allProblems.filter(problem => problem.bankId === bank.id).length}</td>
           <td className="tabular-nums">{allProblems.filter(problem => problem.bankId === bank.id && problem.published).length}</td>
-          <td><div className="flex flex-wrap gap-2"><Button size="sm" variant="ghost" onClick={() => onFiltersChange({ bankId: bank.id, status: "", query: "", tab: "problems" })}>{tx("打开", "Open")}</Button>{bank.canManage && <Button size="sm" variant="ghost" disabled={busy} onClick={() => onEditBank(bank)}>{tx("编辑题库", "Edit bank")}</Button>}</div></td>
+          <td><div className="flex flex-wrap gap-2"><RowActionButton onClick={() => onFiltersChange({ bankId: bank.id, status: "", query: "", tab: "problems" })}>{tx("打开", "Open")}</RowActionButton>{bank.canManage && <RowActionButton disabled={busy} onClick={() => onEditBank(bank)}>{tx("编辑题库", "Edit bank")}</RowActionButton>}</div></td>
         </tr>)}
         {!shownBanks.length && <tr><td colSpan={4} className="text-center text-muted-foreground">{bankQuery ? tx("没有匹配的题库。", "No matching banks.") : archived ? tx("暂无已归档题库。", "No archived banks.") : tx("暂无使用中的题库。点击“新建题库”建立空题库。", "No active banks. Create one to get started.")}</td></tr>}
       </Table>

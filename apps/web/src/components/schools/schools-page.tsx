@@ -123,7 +123,7 @@ export function SchoolsPage({
   const teaching = workspaceRole !== "student";
   const role = selected?.roles.includes("school_admin") ? "school_admin" : workspaceRole === "teacher" ? "teacher" : "student";
   const acslEnabled = useAcslEnabled(!selected?.legacy ? selected?.id : undefined, teaching);
-  const sections = workspaceNavigation[workspaceRole].filter(item => item.section !== "acsl" || acslEnabled);
+  const sections = workspaceNavigation[workspaceRole].filter(item => item.section !== "timed" && (item.section !== "acsl" || acslEnabled));
   const active = requestedSection === "acsl" ? (teaching
     ? {section: "acsl", label: "ACSL 题库", shortEnglish: "ACSL papers"} as const
     : {section: "acsl", label: "ACSL 真题练习", shortEnglish: "ACSL practice"} as const)

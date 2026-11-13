@@ -60,7 +60,6 @@ export function TeacherDashboard({ schoolId }: { schoolId?: string }) {
   const classes = useData<{ items: Pick<SchoolClass, "id" | "name">[]; hasMore?: boolean }>(base ? `${base}/classes` : "classes");
   const assignments = useData<{ items: TeacherAssignment[] }>(base ? null : "assignments");
   const schoolAssignments = useData<{ items: SchoolActivity[]; hasMore: boolean }>(base ? `${base}/activities?kind=assignment` : null);
-  const schoolTimed = useData<{ items: SchoolActivity[]; hasMore: boolean }>(base ? `${base}/activities?kind=timed` : null);
   const report = useData<{
     metrics?: {
       incomplete: number;
@@ -103,7 +102,6 @@ export function TeacherDashboard({ schoolId }: { schoolId?: string }) {
   const progressHref = (id: string) => href("assignments", `/teacher/assignments/${id}/progress`, `&activityId=${encodeURIComponent(id)}&activityReport=1`);
   const classCount = classes.data ? `${classes.data.items.length}${classes.data.hasMore ? "+" : ""}` : "—";
   const activeCount = base && !schoolAssignments.data ? "—" : `${active.length}${schoolAssignments.data?.hasMore ? "+" : ""}`;
-  const timedCount = schoolTimed.data ? `${schoolTimed.data.items.filter(item => item.phase === "Open").length}${schoolTimed.data.hasMore ? "+" : ""}` : "—";
   return (
     <>
       <PageHeader
@@ -123,7 +121,6 @@ export function TeacherDashboard({ schoolId }: { schoolId?: string }) {
       />
       <State resource={classes} />
       <State resource={base ? schoolAssignments : assignments} />
-      {base && <State resource={schoolTimed} />}
       <div className="mt-5 grid grid-cols-4 gap-3 max-md:grid-cols-2">
         <Metric
           label={tx("负责班级", "Classes")}
@@ -136,11 +133,6 @@ export function TeacherDashboard({ schoolId }: { schoolId?: string }) {
           note={tx("跨班级汇总", "Across classes")}
         />
         {base ? <>
-          <Metric
-            label={tx("进行中的限时训练", "Open timed practice")}
-            value={timedCount}
-            note={tx("跨班级汇总", "Across classes")}
-          />
           <Metric
             label={tx("待发布作业", "Assignment drafts")}
             value={schoolAssignments.data ? `${schoolAssignments.data.items.filter(item => item.state === "Draft").length}${schoolAssignments.data.hasMore ? "+" : ""}` : "—"}
@@ -292,7 +284,6 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
         <Button variant={showArchived?"default":"secondary"} aria-pressed={showArchived} onClick={()=>{setShowArchived(true);setActiveId("");setSelectedStudentId(null);}}>{tx("已归档", "Archived")}</Button>
         {[
           [tx("课程", "Courses"), "courses"],
-          [tx("限时训练", "Timed practice"), "timed-practice"],
           [tx("教学报告", "Teaching reports"), "reports"],
         ].map(([name, path]) => (
           <Link

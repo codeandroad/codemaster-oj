@@ -3,6 +3,38 @@ import { platformPrerequisiteProgress, unavailablePrerequisite } from './platfor
 import { platformPoints } from './platform-points.mjs';
 
 const denied=()=>({admission:'denied',admissionRules:[]});
+const courseColumns='p.id,p.title,p.school_id,p.owner_scope,p.platform_audience_scope,p.required_language,p.language_credit_cutoffs';
+const eligibleCourseSql=account=>`p.owner_scope='platform' AND p.published_at IS NOT NULL
+ AND p.archived_at IS NULL AND p.withdrawn_at IS NULL
+ AND (p.available_from IS NULL OR p.available_from<=clock_timestamp())
+ AND (p.available_until IS NULL OR p.available_until>clock_timestamp())
+ AND ${platformCourseAudienceSql('p',account)}`;
+
+// One request owns this state and one transaction owns the account setting.
+// Prefetch only admission metadata; lesson bundles, covers and translations
+// are unnecessary for deciding whether the learner can open a course.
+export async function resolvePlatformCourseAdmissions(db,courseIds,accountId) {
+ const state={},output=new Map();
+ if(!courseIds.length)return output;
+ await identityContext(db,accountId,state);
+ if(!state.user)return new Map(courseIds.map(id=>[id,denied()]));
+ const principal=(await db.query("SELECT current_setting('campus.account_id',true) account")).rows[0].account??'';
+ let failed=false;
+ try {
+  await db.query("SELECT set_config('campus.account_id',$1,true)",[accountId]);state.accountScoped=true;
+  const courses=(await db.query(`SELECT ${courseColumns} FROM learning_paths p WHERE p.id=ANY($1::uuid[]) AND ${eligibleCourseSql('$2')}`,[courseIds,accountId])).rows;
+  state.courses=new Map(courseIds.map(id=>[id,null]));for(const course of courses)state.courses.set(course.id,course);
+  const ids=courses.map(course=>course.id);
+  state.rules=new Map(ids.map(id=>[id,[]]));state.records=new Map(ids.map(id=>[id,[]]));
+  if(ids.length){
+   for(const row of (await db.query('SELECT * FROM platform_course_rules WHERE course_id=ANY($1::uuid[]) ORDER BY rule_key',[ids])).rows)state.rules.get(row.course_id).push(row);
+   for(const row of (await db.query('SELECT * FROM platform_course_admissions WHERE course_id=ANY($1::uuid[]) AND account_id=$2',[ids,accountId])).rows)state.records.get(row.course_id).push(row);
+  }
+  for(const id of courseIds)output.set(id,await resolvePlatformCourseAdmission(db,id,accountId,{state}));
+  return output;
+ }catch(error){failed=true;throw error;}
+ finally{try{await db.query("SELECT set_config('campus.account_id',$1,true)",[principal]);}catch(error){if(!failed)throw error;}}
+}
 async function identityContext(db,accountId,state) {
  if(state.user)return;
  state.user=(await db.query(`SELECT a.id,a.identity_id AS "identityId",i.name FROM accounts a JOIN identities i ON i.id=a.identity_id
@@ -18,25 +50,21 @@ export async function resolvePlatformCourseAdmission(db,courseId,accountId,{stat
  await identityContext(db,accountId,state);
  if(!state.user||state.stack.has(courseId))return denied();
  if(state.admissions.has(courseId))return state.admissions.get(courseId);
- const principal=(await db.query("SELECT current_setting('campus.account_id',true) account")).rows[0].account??'';
+ const principal=state.accountScoped?null:(await db.query("SELECT current_setting('campus.account_id',true) account")).rows[0].account??'';
  let failed=false;
  try {
-  await db.query("SELECT set_config('campus.account_id',$1,true)",[accountId]);
+  if(!state.accountScoped)await db.query("SELECT set_config('campus.account_id',$1,true)",[accountId]);
   state.stack.add(courseId);
-  const course=(await db.query(`SELECT p.* FROM learning_paths p WHERE p.id=$1 AND p.owner_scope='platform'
-   AND p.published_at IS NOT NULL AND p.archived_at IS NULL AND p.withdrawn_at IS NULL
-   AND (p.available_from IS NULL OR p.available_from<=clock_timestamp())
-   AND (p.available_until IS NULL OR p.available_until>clock_timestamp())
-   AND ${platformCourseAudienceSql('p','$2')}`,[courseId,accountId])).rows[0];
+  const course=state.courses?.has(courseId)?state.courses.get(courseId):(await db.query(`SELECT ${courseColumns} FROM learning_paths p WHERE p.id=$1 AND ${eligibleCourseSql('$2')}`,[courseId,accountId])).rows[0];
   if(!course)return denied();
-  const rules=(await platformCourseRules(db,courseId)).filter(rule=>(course.platform_audience_scope==='all')===(rule.target_kind==='all')
+  const rules=(state.rules?.has(courseId)?state.rules.get(courseId).filter(rule=>rule.active):await platformCourseRules(db,courseId)).filter(rule=>(course.platform_audience_scope==='all')===(rule.target_kind==='all')
    &&(rule.target_kind==='all'||rule.target_kind==='independent'&&state.schools.size===0
     ||rule.target_kind==='school'&&state.schools.has(rule.school_id)||rule.target_kind==='account'&&rule.identity_id===state.user.identityId));
   if(!rules.length){
-   const any=(await db.query('SELECT 1 FROM platform_course_rules WHERE course_id=$1 LIMIT 1',[courseId])).rowCount;
+   const any=state.rules?.has(courseId)?state.rules.get(courseId).length:(await db.query('SELECT 1 FROM platform_course_rules WHERE course_id=$1 LIMIT 1',[courseId])).rowCount;
    return any?denied():{admission:'direct',admissionRules:[]};
   }
-  const records=(await db.query('SELECT * FROM platform_course_admissions WHERE course_id=$1 AND account_id=$2',[courseId,accountId])).rows;
+  const records=state.records?.get(courseId)??(await db.query('SELECT * FROM platform_course_admissions WHERE course_id=$1 AND account_id=$2',[courseId,accountId])).rows;
   // The shared request cache must not change metadata for courses that do not
   // evaluate points: their standalone entry has always reported zero here.
   const currentPoints = rules.some(rule => rule.minimum_points > 0)
@@ -51,14 +79,14 @@ export async function resolvePlatformCourseAdmission(db,courseId,accountId,{stat
     if(access.admission!=='direct'){
      const blocked=unavailablePrerequisite(prerequisiteId);
      if(access.admission!=='denied'){
-      const meta=(await db.query('SELECT title FROM learning_paths WHERE id=$1',[prerequisiteId])).rows[0];
+      const meta=state.courses?.get(prerequisiteId)??(await db.query('SELECT title FROM learning_paths WHERE id=$1',[prerequisiteId])).rows[0];
       Object.assign(blocked,{title:meta.title,canOpen:true,requiresAdmission:true});
      }
      prerequisites.push(blocked);continue;
     }
     const key=`${prerequisiteId}:${schoolId??'public'}`;
     if(!state.progress.has(key)){
-     const prerequisite=(await db.query("SELECT * FROM learning_paths WHERE id=$1 AND owner_scope='platform'",[prerequisiteId])).rows[0];
+     const prerequisite=state.courses?.get(prerequisiteId)??(await db.query(`SELECT ${courseColumns} FROM learning_paths p WHERE p.id=$1 AND p.owner_scope='platform'`,[prerequisiteId])).rows[0];
      state.progress.set(key,await platformPrerequisiteProgress(db,prerequisite,state.user,{schoolId,schoolIds:[...state.schools.keys()]}));
     }
     prerequisites.push(state.progress.get(key));
@@ -83,6 +111,6 @@ export async function resolvePlatformCourseAdmission(db,courseId,accountId,{stat
  } catch(error){failed=true;throw error;}
  finally {
   state.stack?.delete(courseId);
-  try{await db.query("SELECT set_config('campus.account_id',$1,true)",[principal]);}catch(error){if(!failed)throw error;}
+  try{if(!state.accountScoped)await db.query("SELECT set_config('campus.account_id',$1,true)",[principal]);}catch(error){if(!failed)throw error;}
  }
 }

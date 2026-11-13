@@ -2,7 +2,7 @@
 
 import { CourseSectionsEditor, ChapterSectionSelect } from "@/components/course-sections-editor";
 import { parseCourseSections, validateChapterSections, orderCourseChapters, courseChapterNeighbor } from "@/components/course-sections";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ArrowDown, ArrowUp, Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import {
   Feedback,
@@ -23,6 +23,7 @@ import { localizedChapter, parseCourseLocalizations, parseChapterLocalizations }
 import { CourseTranslationFields, ChapterTranslationEditor } from "@/components/teacher/course-translation-editor";
 import { CourseAcslEditor } from "@/components/teacher/course-acsl-editor";
 import { CourseProgrammingLanguageField } from "@/components/teacher/course-programming-language-field";
+import { courseDraftEqual } from "@/components/teacher/course-draft-equality";
 import { courseAcslReferences } from "@/components/course-acsl";
 import { useNavigationBlocker } from "@/components/navigation";
 import { Button } from "@/components/ui/button";
@@ -111,9 +112,7 @@ export function SchoolCourseEditor({
   const [form, setForm] = useState<CourseInput>(
     () => initialDraft ?? inputFor(initial),
   );
-  const [baseline] = useState(() =>
-    JSON.stringify(initialDraft ?? inputFor(initial)),
-  );
+  const [baseline] = useState(form);
   const [chapterId, setChapterId] = useState(
     (initialDraft ?? initial)?.chapters[0]?.id ?? "",
   );
@@ -131,7 +130,7 @@ export function SchoolCourseEditor({
   const classSection = useRef<HTMLDivElement>(null);
   const cancelDiscard = useRef<HTMLButtonElement>(null);
   const cancelRemove = useRef<HTMLButtonElement>(null);
-  const dirty = JSON.stringify(form) !== baseline;
+  const dirty = useMemo(() => !courseDraftEqual(form, baseline), [form, baseline]);
   useNavigationBlocker(dirty);
   useEffect(() => {
     if (!dirty) return;

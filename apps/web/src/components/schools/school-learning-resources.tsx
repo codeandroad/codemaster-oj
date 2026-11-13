@@ -1,4 +1,5 @@
 "use client";
+import { RowActionButton } from "@/components/ui/row-action";
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import {
   Feedback,
@@ -119,24 +120,20 @@ export function SchoolLearningResources({
                       : text("Maintainer only", "维护教师")}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
+                    <div className="flex flex-wrap items-center gap-2">
+                      <RowActionButton
                         onClick={() => setSelected(r)}
                       >
                         {r.canManage
                           ? text("View / edit", "查看 / 编辑")
                           : text("Read", "阅读")}
-                      </Button>
+                      </RowActionButton>
                       {r.canManage && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
+                        <RowActionButton
                           onClick={() => setRemoving(r)}
                         >
                           {text("Delete", "删除")}
-                        </Button>
+                        </RowActionButton>
                       )}
                     </div>
                   </td>

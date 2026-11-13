@@ -346,9 +346,32 @@ test('personal registration and reviewed public learning use real grants without
    const first = await addProblem('Public practice first', 0);
    await addProblem('PRIVATE-LINK-TITLE', 1);
    const last = await addProblem('Public practice last', 2);
-   for (const problem of [last,first]) await request('/platform/problem-publications', {
-    auth:platform,method:'POST',body:{schoolId:LEGACY_SCHOOL_ID,problemId:problem.problemId,versionId:problem.versionId},
+   const reviewItems = [last, first].map(({problemId,versionId}) => ({schoolId:LEGACY_SCHOOL_ID,problemId,versionId}));
+   const { rows: [{id: bankId}] } = await owner.query("INSERT INTO school_problem_banks(school_id,owner_account_id,name,request_id) VALUES($1,$2,'Review fixtures',$3) RETURNING id",[alpha.id,admin.id,randomUUID()]);
+   const definition = {title:'School review fixture',mode:'stdio',statement:'Return the input.',samples:[],tests:[],time_limit_ms:1000,memory_limit_mb:128};
+   const { rows: [{id: schoolProblem}] } = await owner.query('INSERT INTO school_problems(school_id,bank_id,owner_account_id,draft,request_id) VALUES($1,$2,$3,$4,$5) RETURNING id',[alpha.id,bankId,admin.id,definition,randomUUID()]);
+   const { rows: [{id: schoolVersion}] } = await owner.query('INSERT INTO school_problem_versions(school_id,problem_id,draft_revision,definition) VALUES($1,$2,1,$3) RETURNING id',[alpha.id,schoolProblem,definition]);
+   await owner.query('UPDATE school_problems SET published=true,published_version_id=$3 WHERE school_id=$1 AND id=$2',[alpha.id,schoolProblem,schoolVersion]);
+   const mixedItems = [...reviewItems,{schoolId:alpha.id,problemId:schoolProblem,versionId:schoolVersion}];
+   const batchReview = (decision, items, auth=platform, status=200, csrf=true) => request('/platform/problem-publications/batch', {
+    auth, method:'POST', status, csrf, body:{decision,items},
    });
+   await batchReview('approve',reviewItems,legacy,403);
+   await batchReview('approve',reviewItems,platform,403,false);
+   await batchReview('approve',[reviewItems[0],reviewItems[0]],platform,400);
+   await batchReview('approve',[...reviewItems,{...mixedItems[2],versionId:randomUUID()}],platform,409);
+   const reviewList = async () => (await request('/platform/problem-publications',{auth:platform})).data.items;
+   assert.equal((await reviewList()).find(item=>item.id===last.problemId).platformPublished,false);
+   for (const item of reviewItems) await request(`/admin/problems/${item.problemId}/publication-request`,{
+    auth:legacy, method:'POST', body:{versionId:item.versionId},
+   });
+   assert.equal((await batchReview('reject',reviewItems)).data.reviewedCount,2);
+   assert.equal((await reviewList()).filter(item=>reviewItems.some(target=>target.problemId===item.id)&&item.publicRequestStatus==='rejected').length,2);
+   assert.equal((await batchReview('approve',mixedItems)).data.reviewedCount,3);
+   assert.equal((await reviewList()).filter(item=>mixedItems.some(target=>target.problemId===item.id)&&item.platformPublished).length,3);
+   assert.equal((await batchReview('withdraw',mixedItems)).data.reviewedCount,3);
+   assert.equal((await reviewList()).filter(item=>mixedItems.some(target=>target.problemId===item.id)&&item.platformPublished).length,0);
+   assert.equal((await batchReview('approve',reviewItems)).data.reviewedCount,2);
    const practicePath = '/practice/problems/' + first.problemId;
    const {rows:[{id:draftVersionId}]} = await owner.query(`INSERT INTO problem_versions
     (problem_id,title,mode,statement,reference_code,samples,time_limit_ms,memory_limit_mb,metadata,tags)

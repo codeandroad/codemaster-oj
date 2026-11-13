@@ -1,4 +1,4 @@
-import { ArrowRight, CalendarClock, Check, CheckCircle2, ChevronRight, CircleAlert, Clock3 } from "lucide-react";
+import { ArrowRight, CalendarClock, Check, CheckCircle2, ChevronRight, CircleAlert } from "lucide-react";
 import { useLocale } from "@/components/locale-context";
 import { AppLink } from "@/components/navigation";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
@@ -23,12 +23,6 @@ type DashboardCourse = DashboardItem & {
   chapterCount: number;
   chapters: (DashboardItem & { completed: boolean })[];
 };
-type DashboardPractice = DashboardItem & {
-  startsAt: string | null;
-  endsAt: string | null;
-  count: number;
-  durationMinutes: number | null;
-};
 type DashboardSubmission = DashboardItem & {
   id: string;
   problemId: string;
@@ -49,7 +43,7 @@ export function Progress({ percent, label, complete = false }: { percent: number
 
 export function StudentDashboardView({
   heading, assignmentState, assignment, courseState, course, coursesHref,
-  submissionsState, submissions, submissionsHref, practiceState, practice,
+  submissionsState, submissions, submissionsHref,
 }: {
   heading: string;
   assignmentState: DashboardState;
@@ -60,8 +54,6 @@ export function StudentDashboardView({
   submissionsState: DashboardState;
   submissions: DashboardSubmission[];
   submissionsHref: string;
-  practiceState: DashboardState;
-  practice?: DashboardPractice;
 }) {
   const { locale } = useLocale();
   const text = (zh: string, en: string) => locale === "en" ? en : zh;
@@ -166,15 +158,6 @@ export function StudentDashboardView({
             <h2 className="font-bold">{text("课程", "Courses")}</h2>
             <p className="mt-3 text-sm text-muted-foreground">{text("老师发布的章节会显示在这里。", "Published chapters from your teacher appear here.")}</p>
             <AppLink href={coursesHref} className="mt-4 block text-sm font-semibold text-primary">{text("查看课程", "View paths")}</AppLink>
-          </section>}
-        </State>
-        <State data={practiceState}>
-          {practice && <section className={panel}>
-            <div className="flex items-center gap-2"><Clock3 size={18} className="text-primary" /><h2 className="font-bold">{text("即将开始的限时训练", "Next timed practice")}</h2></div>
-            <p className="mt-4 text-sm font-semibold"><AppLink href={practice.href} className="hover:text-primary hover:underline focus-visible:underline">{practice.title}</AppLink></p>
-            <p className="mt-1 text-sm text-muted-foreground">{displayDate(practice.startsAt)}–{displayDate(practice.endsAt)}</p>
-            <p className="text-xs text-muted-foreground">Asia/Shanghai · {practice.count} {text("题", "problems")} · {practice.durationMinutes} {text("分钟", "min")}</p>
-            <AppLink href={practice.href} className="mt-4 block border-t border-border pt-4 text-sm font-semibold text-primary">{text("查看规则", "View rules")}</AppLink>
           </section>}
         </State>
       </aside>

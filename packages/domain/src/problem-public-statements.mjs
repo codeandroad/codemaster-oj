@@ -43,10 +43,10 @@ function inputMetadata(value){
  return metadata;
 }
 
-export async function studentPublicStatementRows(db,rows){
+export async function studentPublicStatementRows(db,rows,{summary=false}={}){
  if(!rows.length)return rows;
  const ids=[...new Set(rows.map(row=>row.id))];
- const presentations=new Map((await db.query(`SELECT v.id version_id,p.statement,p.metadata,p.language,
+ const presentations=new Map((await db.query(`SELECT v.id version_id,${summary?"jsonb_build_object('difficulty',p.metadata->'difficulty') metadata":'p.statement,p.metadata'},p.language,
   EXISTS(SELECT 1 FROM problem_public_statements configured JOIN problem_versions source ON source.id=configured.version_id
    WHERE source.problem_id=v.problem_id) english_required
   FROM problem_versions v LEFT JOIN problem_public_statements p ON p.version_id=v.id

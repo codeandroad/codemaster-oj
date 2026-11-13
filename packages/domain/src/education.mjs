@@ -1,5 +1,5 @@
 import { platformPoints } from './platform-points.mjs';
-import { problemSolvedSql, withProblemProgressScope } from './problem-progress.mjs';
+import { problemSolvedSql, problemProgressRowsSql, withProblemProgressScope } from './problem-progress.mjs';
 import { handleCourseMerge, canonicalMergedCourseId } from './course-merge.mjs';
 import { courseSections, chapterSectionKey, assertChapterSections } from './course-sections.mjs';
 import { courseLocalizations, localizedFields } from './course-localizations.mjs';
@@ -54,13 +54,28 @@ function assertExpectedDraftRevision(body,path) {
 // achievement belongs to the stable problem across versions and entry points.
 async function taskStats(db,user,ids,draftIds=[]) {
  if(!ids.length)return new Map();
- const rows=(await withProblemProgressScope(db,LEGACY_SCHOOL_ID,client=>client.query(`SELECT c.path_id,count(DISTINCT COALESCE(latest.id,cp.version_id))::int task_count,
- count(DISTINCT COALESCE(latest.id,cp.version_id)) FILTER(WHERE ${problemSolvedSql({problemId:'cp.problem_id',accountId:'$2',requiredLanguage:'path.required_language',languageCreditCutoffs:'path.language_credit_cutoffs'})})::int completed_tasks
- FROM learning_chapters c JOIN learning_paths path ON path.id=c.path_id
- JOIN chapter_problems cp ON cp.chapter_id=c.id JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id JOIN problem_versions v ON v.id=cp.version_id
- ${latestCourseProblemVersion} true
- JOIN problem_versions active ON active.id=COALESCE(latest.id,cp.version_id)
- WHERE c.path_id=ANY($1::uuid[]) AND c.archived_at IS NULL AND p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school' AND active.published_at IS NOT NULL AND active.school_visible_at IS NOT NULL AND active.rank_review_status='approved' GROUP BY c.path_id`,[ids,user.id]))).rows;
+ const rows=(await withProblemProgressScope(db,LEGACY_SCHOOL_ID,client=>client.query(`WITH course_links AS MATERIALIZED (
+  SELECT DISTINCT c.path_id,cp.problem_id,cp.version_id
+  FROM learning_chapters c JOIN chapter_problems cp ON cp.chapter_id=c.id
+  JOIN problem_versions pinned ON pinned.id=cp.version_id
+  WHERE c.path_id=ANY($1::uuid[]) AND c.archived_at IS NULL
+ ), course_versions AS MATERIALIZED (
+  SELECT p.id problem_id,links.version_id pinned_version_id,
+   COALESCE(${liveProblemVersionIdSql('p')},links.version_id) version_id
+  FROM (SELECT DISTINCT problem_id,version_id FROM course_links) links
+  JOIN problems p ON p.id=links.problem_id JOIN problem_banks b ON b.id=p.bank_id
+  WHERE p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school'
+ ), visible_progress AS MATERIALIZED (
+  ${problemProgressRowsSql({problemIds:'ARRAY(SELECT DISTINCT problem_id FROM course_links)',accountId:'$2'})}
+ ) SELECT links.path_id,count(DISTINCT active.id)::int task_count,
+ count(DISTINCT active.id) FILTER(WHERE EXISTS(SELECT 1 FROM visible_progress progress
+  WHERE progress.problem_id=links.problem_id AND progress.status='AC'
+   AND course_language_allows_credit(path.required_language,path.language_credit_cutoffs,progress.language,progress.created_at)))::int completed_tasks
+ FROM course_links links JOIN learning_paths path ON path.id=links.path_id
+ JOIN course_versions versions ON versions.problem_id=links.problem_id AND versions.pinned_version_id=links.version_id
+ JOIN problem_versions active ON active.id=versions.version_id
+ WHERE active.published_at IS NOT NULL AND active.school_visible_at IS NOT NULL AND active.rank_review_status='approved'
+ GROUP BY links.path_id`,[ids,user.id]))).rows;
  const stats=new Map(rows.map(r=>[r.path_id,r]));
  if(draftIds.length){
   const drafts=(await db.query(`SELECT c.path_id,count(DISTINCT cp.version_id)::int task_count
@@ -93,13 +108,19 @@ async function pathResult(ctx, id, db = ctx.pool, allowArchived = false) {
  p.classes=await courseClasses(db,id);
  const chapters = (await db.query(`SELECT c.*, COALESCE(pr.completed,false) completed FROM learning_chapters c
   LEFT JOIN learning_progress pr ON pr.chapter_id=c.id AND pr.identity_id=$2 WHERE c.path_id=$1 AND c.archived_at IS NULL ORDER BY c.position,c.created_at,c.id`, [id, ctx.user.identityId])).rows;
- const links = chapters.length ? (await withProblemProgressScope(db,LEGACY_SCHOOL_ID,client=>client.query(`SELECT cp.*,v.id active_version_id,v.title,v.published_at,v.school_visible_at,v.rank_review_status,b.name bank_name,b.visibility bank_visibility,b.archived_at bank_archived_at,p.archived_at problem_archived_at,
+ const links = chapters.length ? (await withProblemProgressScope(db,LEGACY_SCHOOL_ID,client=>client.query(`WITH course_links AS MATERIALIZED (
+   SELECT cp.* FROM chapter_problems cp JOIN problem_versions pinned ON pinned.id=cp.version_id AND pinned.problem_id=cp.problem_id
+   WHERE cp.chapter_id=ANY($1::uuid[])
+  ), course_versions AS MATERIALIZED (
+   SELECT source.id problem_id,links.version_id pinned_version_id,
+    COALESCE(${liveProblemVersionIdSql('source')},links.version_id) version_id
+   FROM (SELECT DISTINCT problem_id,version_id FROM course_links) links JOIN problems source ON source.id=links.problem_id
+  ) SELECT cp.*,v.id active_version_id,v.title,v.published_at,v.school_visible_at,v.rank_review_status,b.name bank_name,b.visibility bank_visibility,b.archived_at bank_archived_at,p.archived_at problem_archived_at,
   ${problemSolvedSql({problemId:'cp.problem_id',accountId:'$2',requiredLanguage:'$3',languageCreditCutoffs:'$4'})} completed
-  FROM chapter_problems cp JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id
-  JOIN problem_versions linked ON linked.id=cp.version_id AND linked.problem_id=cp.problem_id
-  ${latestCourseProblemVersion} true
-  JOIN problem_versions v ON v.id=COALESCE(latest.id,linked.id)
-  WHERE cp.chapter_id=ANY($1::uuid[]) ORDER BY cp.position`, [chapters.map(c => c.id),ctx.user.id,p.required_language,p.language_credit_cutoffs]))).rows : [];
+  FROM course_links cp JOIN course_versions cv ON cv.problem_id=cp.problem_id AND cv.pinned_version_id=cp.version_id
+  JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id
+  JOIN problem_versions v ON v.id=cv.version_id
+  ORDER BY cp.position`, [chapters.map(c => c.id),ctx.user.id,p.required_language,p.language_credit_cutoffs]))).rows : [];
  const visible = new Map();
  for (const link of links) {
   const publicForStudents=link.bank_visibility==='school'&&!link.bank_archived_at&&!link.problem_archived_at&&!!link.published_at&&!!link.school_visible_at&&link.rank_review_status==='approved';
@@ -107,8 +128,13 @@ async function pathResult(ctx, id, db = ctx.pool, allowArchived = false) {
   if (!p.canEdit && !publicForStudents) continue;
   // A published lesson never grants student access to a private or nonpublic
   // version. Editors may inspect a draft link to repair it before publication.
-  try { await ctx.helpers.versionAccess(db, ctx.user, link.problem_id, link.active_version_id); }
-  catch (error) { if ([403,404].includes(error.status)) continue; throw error; }
+  // School-public approved versions already satisfy problemPermissions.canRead.
+  // Rechecking each such link used to fetch its entire source and repeat account,
+  // bank and grant queries. Private/unpublished repair links retain full checks.
+  if(!publicForStudents){
+   try { await ctx.helpers.versionAccess(db, ctx.user, link.problem_id, link.active_version_id); }
+   catch (error) { if ([403,404].includes(error.status)) continue; throw error; }
+  }
   if (!visible.has(link.chapter_id)) visible.set(link.chapter_id, []);
   visible.get(link.chapter_id).push({ problemId: link.problem_id, title: link.title, versionId: link.active_version_id,
    bankName:link.bank_name,published:!!link.published_at,schoolVisibleAt:link.school_visible_at??null,rankReviewStatus:link.rank_review_status??'pending',readyForCourse,completed:link.completed });
@@ -422,19 +448,32 @@ export async function handleEducation(ctx) {
   return result({ columns:['Identity ID','Student','Assignment','Score','Maximum','State'], rows });
  }
  if (route === '/learning-paths' && method === 'GET') {
+  const summary=ctx.url.searchParams.get('view')==='summary';
+  if(summary)requireStaff(user);
   const archived=ctx.url.searchParams.get('archived')==='true';
   if(archived)requireStaff(user);
-  const paths = (await pool.query(`SELECT p.*,(SELECT count(*) FROM learning_chapters c WHERE c.path_id=p.id AND c.archived_at IS NULL) chapter_count,
-   (SELECT count(*) FROM learning_progress pr JOIN learning_chapters c ON c.id=pr.chapter_id WHERE c.path_id=p.id AND c.archived_at IS NULL AND pr.identity_id=$2 AND pr.completed) completed_chapters
-   FROM learning_paths p WHERE (p.archived_at IS NOT NULL)=$5 AND (NOT $5 AND p.published_at IS NOT NULL OR ($3::boolean AND (p.owner_account_id=$1 OR $4::boolean))) ORDER BY p.updated_at DESC,p.id`, [user.id,user.identityId,staff(user),administrator(user),archived])).rows;
+  const paths = (await pool.query(`SELECT ${summary?`p.id,p.title,p.description,p.category,p.difficulty,p.cover_key,p.cover_image,p.author_name,p.authored_at,
+   p.estimated_minutes,p.required_language,p.published_at,p.archived_at,p.owner_scope,p.owner_account_id,p.merged_into_id,p.localizations,
+   p.access_scope,p.available_from,p.available_until,p.listed,p.withdrawn_at,p.updated_at,p.created_at`:'p.*'},
+   (SELECT count(*) FROM learning_chapters c WHERE c.path_id=p.id AND c.archived_at IS NULL) chapter_count,
+   CASE WHEN $6::boolean THEN 0 ELSE (SELECT count(*) FROM learning_progress pr JOIN learning_chapters c ON c.id=pr.chapter_id WHERE c.path_id=p.id AND c.archived_at IS NULL AND pr.identity_id=$2 AND pr.completed) END completed_chapters
+   FROM learning_paths p WHERE (p.archived_at IS NOT NULL)=$5 AND (NOT $3::boolean OR p.owner_scope='school')
+    AND (NOT $5 AND p.published_at IS NOT NULL OR ($3::boolean AND (p.owner_account_id=$1 OR $4::boolean))) ORDER BY p.updated_at DESC,p.id`, [user.id,user.identityId,staff(user),administrator(user),archived,summary])).rows;
   const {readable,platformAdmissions}=await courseAccess(pool,user,paths.map(p=>p.id),{listed:true});
   const includeAdmission=ctx.url.searchParams.get('includeAdmission')==='true'&&user.roles.includes('student')&&!staff(user);
   const accessible=paths.filter(p=>readable.has(p.id));
-  for(const path of accessible)path.classes=await courseClasses(pool,path.id);
-  const stats=await taskStats(pool,user,accessible.map(p=>p.id),accessible.filter(p=>!p.published_at).map(p=>p.id));
+  const classes=accessible.length?(await pool.query(`SELECT pc.path_id,c.id,c.name,(c.archived_at IS NOT NULL) archived
+   FROM learning_path_classes pc JOIN classes c ON c.id=pc.class_id WHERE pc.path_id=ANY($1::uuid[]) ORDER BY c.name,c.id`,[accessible.map(p=>p.id)])).rows:[];
+  const byPath=new Map(accessible.map(p=>[p.id,[]]));
+  for(const {path_id,...courseClass} of classes)byPath.get(path_id).push(courseClass);
+  for(const path of accessible)path.classes=byPath.get(path.id);
+  const stats=summary?new Map():await taskStats(pool,user,accessible.map(p=>p.id),accessible.filter(p=>!p.published_at).map(p=>p.id));
   return result({items:paths.flatMap(p=>{
-   if(readable.has(p.id)&&(!staff(user)||p.owner_scope!=='platform'))
-    return pathShape({...p,...stats.get(p.id),canEdit:managesCourse(user,p)});
+   if(readable.has(p.id)&&(!staff(user)||p.owner_scope!=='platform')){
+    const item=pathShape({...p,...stats.get(p.id),canEdit:managesCourse(user,p)});
+    if(summary){delete item.taskCount;delete item.completedTasks;delete item.completedChapters;}
+    return item;
+   }
    const entry=includeAdmission?platformAdmissions.get(p.id):null;
    // School discovery may show a matching course before admission, without its learner data.
    if(!entry||entry.admission==='denied'||!entry.admissionRules.some(rule=>rule.targetKind==='school'&&rule.schoolId===LEGACY_SCHOOL_ID))return [];

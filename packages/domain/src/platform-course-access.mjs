@@ -24,6 +24,12 @@ export async function platformCourseAdmission(db,id,accountId,options) {
  return typeof db.release==='function'?resolvePlatformCourseAdmission(db,id,accountId,options)
   :transaction(db,client=>resolvePlatformCourseAdmission(client,id,accountId,options));
 }
+export async function platformCourseAdmissions(db,ids,accountId) {
+ if(!ids.length)return new Map();
+ const {resolvePlatformCourseAdmissions}=await import('./platform-course-eligibility.mjs');
+ return typeof db.release==='function'?resolvePlatformCourseAdmissions(db,ids,accountId)
+  :transaction(db,client=>resolvePlatformCourseAdmissions(client,ids,accountId));
+}
 export async function platformCourseEligible(db,id,accountId,options) {
  return (await platformCourseAdmission(db,id,accountId,options)).admission==='direct';
 }

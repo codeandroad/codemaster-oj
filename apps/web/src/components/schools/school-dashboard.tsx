@@ -37,7 +37,6 @@ export function SchoolStudentDashboard({ school, user }: { school: School; user:
   const href = (section: string, detail: Record<string, string> = {}) =>
     `/schools?${new URLSearchParams({ schoolId: school.id, section, ...detail })}`;
   const assignments = useData<{ items: SchoolActivity[] }>(`${base}/activities?kind=assignment`);
-  const timed = useData<{ items: SchoolActivity[] }>(`${base}/activities?kind=timed`);
   const submissions = useData<SubmissionPage>(`${base}/submissions`);
   const courses = useData<CoursePage<SchoolCourse>>(`${base}/courses`);
 
@@ -48,8 +47,6 @@ export function SchoolStudentDashboard({ school, user }: { school: School; user:
   const next = assignment?.problems.find(problem => !assignment.grade?.items.find(item => item.id === problem.id)?.solved);
   const path = courses.data?.items.find(item => item.completedChapters < item.chapterCount) ?? courses.data?.items[0];
   const pathDetail = useData<CourseDetail>(path ? `${base}/courses/${path.id}` : "");
-  const practice = timed.data?.items.filter(item => ["Upcoming", "Open"].includes(item.phase) && !item.attempt)
-    .sort((a, b) => Date.parse(a.startsAt ?? "") - Date.parse(b.startsAt ?? ""))[0];
 
   return <StudentDashboardView
     heading={text(`Hello, ${user.name}`, `你好，${user.name}`)}
@@ -90,15 +87,6 @@ export function SchoolStudentDashboard({ school, user }: { school: School; user:
       status: submission.status,
       score: submission.score,
     }))}
-    practiceState={timed}
-    practice={practice ? {
-      title: practice.title,
-      href: href("timed", { activityId: practice.id }),
-      startsAt: practice.startsAt,
-      endsAt: practice.endsAt,
-      count: practice.problems.length,
-      durationMinutes: practice.durationMinutes,
-    } : undefined}
   />;
 }
 

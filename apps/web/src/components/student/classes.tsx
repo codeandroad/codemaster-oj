@@ -67,7 +67,7 @@ export function StudentClass({ id }: { id: string }) {
   const resource = useData<StudentClassDetail>(`classes/${encodeURIComponent(id)}`, version);
   const tab = search.get("tab") === "courses" ? "courses" : search.get("tab") === "resources" ? "resources" : "tasks";
   const data = resource.data;
-  const taskCount = (data?.assignments.length ?? 0) + (data?.timedPractices.length ?? 0) + (data?.paper4Activities.length ?? 0);
+  const taskCount = (data?.assignments.length ?? 0) + (data?.paper4Activities.length ?? 0);
   return <>
     <State data={resource}>{data && <>
       <PageHeader title={data.name} description={data.description}/>
@@ -79,7 +79,6 @@ export function StudentClass({ id }: { id: string }) {
       </nav>
       {tab === "tasks" && (taskCount ? <div className={`${surface} mt-4`}>
         {data.assignments.map(task => <ClassTaskRow key={`assignment:${task.id}`} href={`/student/assignments/${task.id}`} title={task.title} kind={tx("作业", "Assignment")} timing={`${tx("截止 ", "Due ")}${date(task.dueAt, locale)}`} course={task} progress={task}/>)}
-        {data.timedPractices.map(task => <ClassTaskRow key={`timed:${task.id}`} href={`/student/timed-practice/${task.id}`} title={task.title} kind={tx("限时训练", "Timed practice")} timing={`${date(task.startsAt, locale)} – ${date(task.endsAt, locale)} · ${task.durationMinutes} ${tx("分钟", "min")}`} course={task} attemptStatus={task.completionStatus}/>)}
         {data.paper4Activities.map(task => <ClassTaskRow key={`paper4:${task.id}`} href={`/student/paper4/${task.id}`} title={task.title} kind={task.activityKind === "exam" ? tx("Paper 4 模拟考试", "Paper 4 mock exam") : tx("Paper 4 班级练习", "Paper 4 class practice")} timing={task.startsAt || task.endsAt ? `${task.startsAt ? date(task.startsAt, locale) : tx("即日起", "Available now")} – ${task.endsAt ? date(task.endsAt, locale) : tx("无截止时间", "No deadline")}` : tx("不限时间", "No time limit")} attemptStatus={task.completionStatus}/>)}
       </div> : <Empty title={tx("暂无布置给你的班级任务", "No class tasks assigned to you")}/>)}
       {tab === "courses" && (data.courses.length ? <div className={`${surface} mt-4`}>{data.courses.map(course => <AppLink key={course.id} href={`/student/learning-paths/${course.id}`} className="flex min-h-16 items-center gap-3 border-b border-border px-4 py-3 last:border-b-0 hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-primary"><BookOpen size={18} aria-hidden="true" className="shrink-0 text-primary"/><span className="min-w-0 flex-1"><strong className="block text-sm text-primary">{course.title}</strong>{course.description && <span className="mt-1 block line-clamp-2 text-xs text-muted-foreground">{course.description}</span>}</span><ChevronRight size={17} aria-hidden="true" className="shrink-0 text-muted-foreground"/></AppLink>)}</div> : <Empty title={tx("暂无关联课程", "No linked courses")}/>)}

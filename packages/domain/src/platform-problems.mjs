@@ -1,4 +1,5 @@
 import { transaction } from './db.mjs';
+import { problemListColumns, problemListSummary } from './problem-list-summary.mjs';
 import { activeAccount, LEGACY_SCHOOL_ID, lockSchoolTeaching } from './schools.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
 import { requirePlatformContentEditor, platformContentEditorSql } from './platform-content-access.mjs';
@@ -27,17 +28,20 @@ export async function handlePlatformProblems(ctx) {
    return {...result,sourceBankId:result.bankId,bankId:category?.platform_bank_id??null,ownerScope:'platform',schoolId:LEGACY_SCHOOL_ID,bankName:category?.name??'',canPublish:admin&&result.canPublish,canManage:admin};
   };
   if(!match[1]&&method==='GET'){
+   const summary=url.searchParams.get('view')==='summary';
    const schoolId=url.searchParams.get('schoolId')?uuid(url.searchParams.get('schoolId')):null;
-   const rows=(await db.query(`SELECT v.*,p.bank_id,p.platform_bank_id,category.name category_name,p.archived_at,p.current_version_id AS published_version_id,
+   const bankId=url.searchParams.get('bankId')?uuid(url.searchParams.get('bankId')):null;
+   const rows=(await db.query(`SELECT ${summary?problemListColumns('v'):'v.*'},p.bank_id,p.platform_bank_id,category.name category_name,p.archived_at,p.current_version_id AS published_version_id,
+    (SELECT count(*) FROM test_cases tc WHERE tc.version_id=v.id AND tc.enabled) formal_test_count,
     p.created_at AS problem_created_at,
     COALESCE((SELECT jsonb_agg(course ORDER BY course.title) FROM (SELECT DISTINCT lp.id,lp.title FROM chapter_problems cp
      JOIN learning_chapters c ON c.id=cp.chapter_id JOIN learning_paths lp ON lp.id=c.path_id
      WHERE cp.problem_id=p.id AND c.archived_at IS NULL AND lp.archived_at IS NULL AND lp.owner_scope='platform') course),'[]'::jsonb) courses
     FROM problems p LEFT JOIN platform_problem_banks category ON category.id=p.platform_bank_id JOIN LATERAL
     (SELECT * FROM problem_versions WHERE problem_id=p.id ORDER BY created_at DESC,id DESC LIMIT 1) v ON true
-    WHERE p.owner_scope='platform' AND (p.archived_at IS NULL OR $4) AND ($2 OR
-     ${platformContentEditorSql('problem','p.id','$1::uuid','$3::uuid')}) ORDER BY v.title,p.id`,[user.id,admin,schoolId,admin&&url.searchParams.get('includeArchived')==='1'])).rows;
-   return reply({items:rows.map(row=>({...helpers.problemShape(row),ownerScope:'platform',schoolId:LEGACY_SCHOOL_ID,bankName:row.category_name??'',
+    WHERE p.owner_scope='platform' AND (p.archived_at IS NULL OR $4) AND ($5::uuid IS NULL OR p.platform_bank_id=$5) AND ($2 OR
+     ${platformContentEditorSql('problem','p.id','$1::uuid','$3::uuid')}) ORDER BY v.title,p.id`,[user.id,admin,schoolId,admin&&url.searchParams.get('includeArchived')==='1',bankId])).rows;
+   return reply({items:rows.map(row=>({...(summary?problemListSummary(row):helpers.problemShape(row)),ownerScope:'platform',schoolId:LEGACY_SCHOOL_ID,bankName:row.category_name??'',
     bankId:row.platform_bank_id,sourceBankId:row.bank_id,courses:row.courses,archivedAt:row.archived_at,canEdit:!row.archived_at,canManageTutorial:!row.archived_at,canPublish:admin&&!row.archived_at&&row.validation_status==='AC'&&!row.published_at,
     updatedAt:row.created_at,createdAt:row.problem_created_at})),canManage:admin});
   }

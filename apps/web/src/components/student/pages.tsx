@@ -10,6 +10,8 @@ import dynamic from "next/dynamic";
 import { StudentScholarshipRule } from "@/components/scholarship/teaching-page";
 import { AppLink } from "@/components/navigation";
 import { LearnerResourceScope } from "@/components/schools/learner-resource-scope";
+import { CatalogPagination, useCatalogPagination } from "@/components/catalog-pagination";
+import { useWorkspaceData } from "@/components/workspace-data";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -21,7 +23,7 @@ import { isPending, productionApi, type Assignment, type AuthResponse, type Camp
 import { CodeBlock, Empty, Feedback, ResultPanel, ResultScore, State, input, kindLabel, panel, shortId, textarea, useData, useMutation, useSubmission } from "./shared";
 import { StudentClasses, StudentClass } from "./classes";
 import { StudentLearningDetail, StudentLearningList, type LearningPath } from "./learning";
-import { StudentTimedDetail, StudentTimedList, type TimedPractice } from "./timed";
+import { StudentTimedDetail, StudentTimedList } from "./timed";
 import { StudentWorkspace } from "./workspace";
 import { Progress, StudentDashboardView } from "./dashboard-view";
 import { StudentAssignmentCard } from "./activity-cards";
@@ -76,7 +78,6 @@ export function StudentDashboard({ user }: { user: CampusUser }) {
   const assignments = useData<{ items: Assignment[]; serverNow?: string }>("assignments");
   const submissions = useData<{ items: Submission[] }>(`submissions?identityId=${user.identityId}&kind=submit,correction`);
   const paths = useData<{ items: LearningPath[] }>("learning-paths");
-  const timed = useData<{ items: TimedPractice[] }>("timed-practices");
   const now = assignments.data?.serverNow ? new Date(assignments.data.serverNow).getTime() : initialNow;
   const ownAssignments = assignments.data?.items.filter(a => !a.grades || a.grades.some(g => g.identityId === user.identityId)) ?? [];
   const current = ownAssignments.filter(a => new Date(a.dueAt).getTime() >= now)
@@ -84,7 +85,6 @@ export function StudentDashboard({ user }: { user: CampusUser }) {
   const progress = current ? assignmentProgress(current, user.identityId) : null;
   const next = current?.problems.find(p => progress?.grade?.problems.find(g => g.problemId === p.problemId)?.status !== "AC");
   const path = paths.data?.items.find(p => p.completedChapters < p.chapterCount) ?? paths.data?.items[0];
-  const practice = timed.data?.items.find(p => ["Published", "Running"].includes(p.status) && !p.attempt);
   const pathDetail = useData<LearningPath>(path ? `learning-paths/${path.id}` : "");
 
   return <StudentDashboardView
@@ -126,15 +126,6 @@ export function StudentDashboard({ user }: { user: CampusUser }) {
       score: submission.score,
       sourceLabel: sourceLabel(submission, assignments.data?.items, locale),
     }))}
-    practiceState={timed}
-    practice={practice ? {
-      title: practice.title,
-      href: `/student/timed-practice/${practice.id}`,
-      startsAt: practice.startsAt,
-      endsAt: practice.endsAt,
-      count: practice.problems.length,
-      durationMinutes: practice.durationMinutes,
-    } : undefined}
   />;
 }
 export function problemHref(problem: { problemId: string; versionId?: string }, context: Record<string, string> = {}) { const params = new URLSearchParams({ ...(problem.versionId ? { versionId: problem.versionId } : {}), ...context }); return `/student/problems/${problem.problemId}${params.size ? `?${params}` : ""}`; }
@@ -158,8 +149,8 @@ export function StudentProblems({ accountId }: { accountId: string }) {
   const { filters, changeFilters, ready: filtersReady } = useCatalogFilterPreferences(preferenceKey, studentFilterDefaults, readStudentFilters);
   const { query, topic, status, mode, savedOnly } = filters;
   const courseId = search.get(problemCourseFilterKey)?.toLowerCase() ?? "";
-  const catalogQuery = new URLSearchParams({ includeCourseFilters: "1", ...(courseId && { courseId }) });
-  const problems = useData<ProblemCatalogResult<ProgressProblem>>(courseReady ? `problems?${catalogQuery}` : "");
+  const catalogQuery = new URLSearchParams({ view: "student-summary", includeCourseFilters: "1", ...(courseId && { courseId }) });
+  const problems = useWorkspaceData<ProblemCatalogResult<ProgressProblem>>(courseReady ? `problems?${catalogQuery}` : "");
   const favorites = useData<{ items: string[] }>("problem-favorites");
   const catalogMatches = (problems.data?.courseId ?? "") === courseId;
   const rows = catalogMatches ? problems.data?.items ?? [] : [];
@@ -167,6 +158,7 @@ export function StudentProblems({ accountId }: { accountId: string }) {
   const topics = [...new Set(rows.flatMap(p => p.tags ?? []))];
   const problemStatus = (p: ProgressProblem) => p.ownProgress ? p.ownProgress.status === "NotStarted" ? "Not started" : p.ownProgress.status : "Unavailable";
   const visible = rows.filter(p => `${p.id} ${p.title} ${p.bankName ?? ""} ${p.tags?.join(" ") ?? ""}`.toLowerCase().includes(query.toLowerCase()) && (!topic || p.tags?.includes(topic)) && (!status || problemStatus(p) === status) && (!mode || p.mode === mode) && (!savedOnly || favorites.data?.items.includes(p.id)));
+  const pagination = useCatalogPagination(visible, JSON.stringify([accountId, courseId, query, topic, status, mode, savedOnly]));
   return <div className={problemStyles.page}>
     <PageHeader title={ui(locale, "题目", "Problems")}/>
     <div className={`${problemStyles.toolbar} flex-wrap`}>
@@ -176,7 +168,7 @@ export function StudentProblems({ accountId }: { accountId: string }) {
     </div>
     <Feedback action={action}/>
     <State data={{ ...problems, loading: !problems.error && (!courseReady || !filtersReady || problems.loading || !catalogMatches), data: catalogMatches ? problems.data : null }}>
-      <LearnerProblemTable rows={visible.map(p => {
+      <LearnerProblemTable rows={pagination.rows.map(p => {
         const returnParams = new URLSearchParams({ scope: "school", ...(courseId && { [problemCourseFilterKey]: courseId }) });
         return { id: p.id, title: p.title, bankName: p.bankName, tags: p.tags, difficulty: p.difficulty, status: problemStatus(p),
           href: problemHref({ problemId: p.id, versionId: p.versionId }, { returnTo: `/student/problems?${returnParams}` }) };
@@ -188,6 +180,7 @@ export function StudentProblems({ accountId }: { accountId: string }) {
       }} empty={rows.length || courseId || query || topic || status || mode || savedOnly
         ? ui(locale, "没有匹配的题目，请调整搜索或筛选条件。", "No matching problems. Try another search or filter.")
         : ui(locale, "学校尚未发布可练习题目。", "Your school has not published any problems yet.")}/>
+      <CatalogPagination {...pagination}/>
     </State>
     {favorites.error && <p role="alert" className="text-sm text-destructive">{ui(locale, "收藏加载失败：", "Could not load bookmarks: ")}{favorites.error}</p>}
     <p className={problemStyles.count}>{ui(locale, `显示 ${visible.length} / ${rows.length} 道题`, `Showing ${visible.length} of ${rows.length} problems`)}</p>

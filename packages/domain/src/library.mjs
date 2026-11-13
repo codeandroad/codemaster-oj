@@ -1,4 +1,5 @@
-import { canEditPlatformContent } from './platform-content-access.mjs';
+import { canEditPlatformContent, platformContentEditorSql } from './platform-content-access.mjs';
+import { isPlatformAdministrator } from './platform-governance.mjs';
 import {moveGroupMembers} from './group-move.mjs';
 import { assertJudgeAdmission } from './system.mjs';
 import { transaction } from './db.mjs';
@@ -33,8 +34,11 @@ const isStaff=user=>isAdmin(user)||user.roles.includes('teacher');
 const required=(result)=>{if(!result.rowCount)fail(404,'NOT_FOUND','题库或分组不存在');return result.rows[0];};
 export async function bankAccess(db,user,id) {
  const bank=required(await db.query('SELECT * FROM problem_banks WHERE id=$1 AND archived_at IS NULL',[uuid(id,'题库 ID')]));
- const owner=isAdmin(user)||(isStaff(user)&&bank.owner_account_id===user.id);
  const granted=(await db.query('SELECT permission FROM bank_permissions WHERE bank_id=$1 AND account_id=$2',[id,user.id])).rows[0]?.permission;
+ return bankAccessFromRow(user,bank,granted);
+}
+function bankAccessFromRow(user,bank,granted) {
+ const owner=isAdmin(user)||(isStaff(user)&&bank.owner_account_id===user.id);
  const canEdit=owner||(isStaff(user)&&granted==='edit');
  const canRead=owner||(isStaff(user)&&['read','edit'].includes(granted));
  const canContribute=canEdit||(bank.is_system&&isStaff(user));
@@ -448,10 +452,93 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
  if(route==='/problem-groups/move'&&method==='POST')return result(await moveGroupMembers({pool,user,body,bankAccess,versionAccess,audit}));
  if(route==='/problem-groups'&&method==='GET') {
   const bankId=url.searchParams.get('bankId');if(bankId)await bankAccess(pool,user,bankId);
-  const groups=(await pool.query(`SELECT g.* FROM problem_groups g JOIN problem_banks b ON b.id=g.bank_id
+  const groups=(await pool.query(`SELECT g.*,b.owner_account_id bank_owner_account_id,
+   b.visibility bank_visibility,b.is_system bank_is_system,bp.permission bank_permission
+   FROM problem_groups g JOIN problem_banks b ON b.id=g.bank_id
+   LEFT JOIN bank_permissions bp ON bp.bank_id=b.id AND bp.account_id=$2
    WHERE g.archived_at IS NULL AND b.archived_at IS NULL AND ($1::uuid IS NULL OR g.bank_id=$1)
-   ORDER BY g.created_at,g.id`,[bankId])).rows;
-  const items=[];for(const g of groups){try{items.push(await groupShape(pool,g));}catch(error){if(!['FORBIDDEN','NOT_FOUND'].includes(error.code))throw error;}}return result({items});
+   ORDER BY g.created_at,g.id`,[bankId,user.id])).rows;
+  const items=[];
+  for(const group of groups){
+   try{
+    const access=bankAccessFromRow(user,{owner_account_id:group.bank_owner_account_id,
+     visibility:group.bank_visibility,is_system:group.bank_is_system},group.bank_permission);
+    items.push({id:group.id,name:group.name,bankId:group.bank_id,problemIds:[],problems:[],
+     canEdit:isStaff(user)&&(group.owner_account_id===user.id||access.canEdit)});
+   }catch(error){if(error.code!=='FORBIDDEN')throw error;}
+  }
+  if(!items.length)return result({items});
+  // Resolve each distinct exercise once, then attach its small projection to
+  // each group. The old loop loaded full versions and checked bank permissions
+  // several times per member, making remote database latency scale with links.
+  const latestAccess="($3::boolean AND p.owner_scope='school' AND ($4::boolean OR p.owner_account_id=$2 OR p.bank_owner_account_id=$2 OR p.bank_permission IN ('read','edit')))";
+  const members=(await pool.query(`WITH member_problems AS MATERIALIZED (
+   SELECT DISTINCT p.id,p.bank_id,p.current_version_id,p.owner_scope,p.owner_account_id,
+    b.archived_at bank_archived_at,b.visibility bank_visibility,b.owner_account_id bank_owner_account_id,bp.permission bank_permission
+   FROM problem_group_members gm JOIN problems p ON p.id=gm.problem_id
+   JOIN problem_banks b ON b.id=p.bank_id
+   LEFT JOIN bank_permissions bp ON bp.bank_id=b.id AND bp.account_id=$2
+   WHERE gm.group_id=ANY($1::uuid[]) AND p.archived_at IS NULL
+  ), resolved AS MATERIALIZED (
+   SELECT p.*,${latestAccess} latest_access,
+    CASE WHEN NOT $3::boolean OR p.owner_scope<>'school' THEN NULL::uuid
+     WHEN ${latestAccess} THEN (SELECT v.id FROM problem_versions v WHERE v.problem_id=p.id ORDER BY v.created_at DESC,v.id DESC LIMIT 1)
+     ELSE ${liveProblemVersionIdSql('p')} END version_id
+   FROM member_problems p
+  )
+  SELECT gm.group_id,gm.problem_id,p.owner_scope,p.bank_archived_at,p.bank_visibility,p.latest_access,
+   v.id version_id,v.title,v.published_at,v.school_visible_at
+  FROM problem_group_members gm JOIN resolved p ON p.id=gm.problem_id
+  LEFT JOIN problem_versions v ON v.id=p.version_id
+  WHERE gm.group_id=ANY($1::uuid[]) ORDER BY gm.group_id,gm.position`,
+  [items.map(group=>group.id),user.id,isStaff(user),isAdmin(user)])).rows;
+  const byGroup=new Map(items.map(group=>[group.id,group])),resolvedMembers=new Map();
+  const platformIds=[...new Set(members.filter(member=>member.owner_scope==='platform').map(member=>member.problem_id))];
+  if(platformIds.length){
+   // Use the same live grant predicate as canEditPlatformContent, including
+   // course-link, teaching-role and grant revocation. Platform reads have no
+   // assignment/history exception: an editor sees latest; everyone else sees
+   // only the school-visible live publication from an unarchived bank.
+   const administrator=await isPlatformAdministrator(pool,user.id);
+   const platformMembers=(await pool.query(`WITH editable AS MATERIALIZED (
+    SELECT p.id,p.bank_id,p.current_version_id,b.archived_at bank_archived_at,
+     ($2::boolean OR ${platformContentEditorSql('problem','p.id','$3::uuid')}) can_edit
+    FROM problems p JOIN problem_banks b ON b.id=p.bank_id
+    WHERE p.id=ANY($1::uuid[]) AND p.owner_scope='platform' AND p.archived_at IS NULL
+   ), resolved AS MATERIALIZED (
+    SELECT p.id,p.can_edit,
+     CASE WHEN p.can_edit THEN (SELECT v.id FROM problem_versions v WHERE v.problem_id=p.id ORDER BY v.created_at DESC,v.id DESC LIMIT 1)
+      WHEN p.bank_archived_at IS NULL THEN ${liveProblemVersionIdSql('p')} ELSE NULL::uuid END version_id
+    FROM editable p
+   )
+   SELECT p.id problem_id,v.id version_id,v.title,v.published_at
+   FROM resolved p JOIN problem_versions v ON v.id=p.version_id
+   WHERE p.can_edit OR (v.published_at IS NOT NULL AND v.school_visible_at IS NOT NULL)`,
+   [platformIds,administrator,user.id])).rows;
+   for(const id of platformIds)resolvedMembers.set(id,null);
+   for(const member of platformMembers)resolvedMembers.set(member.problem_id,
+    {problemId:member.problem_id,versionId:member.version_id,title:member.title,published:!!member.published_at});
+  }
+  for(const member of members){
+   if(!resolvedMembers.has(member.problem_id)){
+    let projection=null;
+    // School navigation with an explicit owner/bank grant or a public live
+    // version can skip the full access helper. School students and
+    // activity/history-only access keep their original checks.
+    if(isStaff(user)&&member.owner_scope==='school'&&!member.bank_archived_at&&member.version_id
+     &&(member.latest_access||member.bank_visibility==='school'&&member.published_at&&member.school_visible_at)){
+     projection={problemId:member.problem_id,versionId:member.version_id,title:member.title,published:!!member.published_at};
+    }else{
+     try{const {v}=await versionAccess(pool,user,member.problem_id);
+      projection={problemId:member.problem_id,versionId:v.id,title:v.title,published:!!v.published_at};
+     }catch(error){if(!['FORBIDDEN','NOT_FOUND'].includes(error.code))throw error;}
+    }
+    resolvedMembers.set(member.problem_id,projection);
+   }
+   const projection=resolvedMembers.get(member.problem_id);
+   if(projection){const group=byGroup.get(member.group_id);group.problemIds.push(projection.problemId);group.problems.push(projection);}
+  }
+  return result({items});
  }
  if(route==='/problem-groups'&&method==='POST') {
   if(!isStaff(user))fail(403,'FORBIDDEN','需要教师权限');const name=field(body.name,'分组名称'),bankId=uuid(body.bankId||SCHOOL_BANK);const group=await transaction(pool,async db=>{const access=await bankAccess(db,user,bankId);if(!access.canContribute)fail(403,'FORBIDDEN','无权管理该题库的分组');const group=required(await db.query('INSERT INTO problem_groups(bank_id,name,owner_account_id) VALUES($1,$2,$3) RETURNING *',[bankId,name,user.id]));await setMembers(db,group.id,bankId,body.problemIds??[]);await audit(db,user.id,'group.create','problem_group',group.id);return group;});return {status:201,body:await groupShape(pool,group)};

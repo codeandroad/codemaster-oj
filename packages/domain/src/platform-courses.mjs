@@ -66,14 +66,35 @@ async function list(db,user,{admin,schoolId,summary}) {
   students:students.filter(s=>audiencePolicy.accountRules.some(rule=>rule.identityId===s.id)),
   pendingApplications:p.pending_applications,chapterCount:p.chapter_count,admin});});
 }
+// Materialize the small course graph before joining versions. An inlined scalar
+// lookup in a version join can otherwise run once per candidate version/link pair.
+const courseProblemVersions = `WITH course_links AS MATERIALIZED (
+ SELECT cp.* FROM chapter_problems cp JOIN learning_chapters c ON c.id=cp.chapter_id
+ WHERE c.path_id=$1 AND c.archived_at IS NULL
+), course_versions AS MATERIALIZED (
+ SELECT source.id AS problem_id,links.version_id AS pinned_version_id,
+  COALESCE(${liveProblemVersionIdSql('source')},links.version_id) AS version_id
+ FROM (SELECT DISTINCT problem_id,version_id FROM course_links) links
+ JOIN problems source ON source.id=links.problem_id
+)`;
 async function shape(db,p,{detail=false,admin=true}={}) {
  const audiencePolicy=await platformAudiencePolicy(db,p);
  const schoolIds=audiencePolicy.schoolRules.map(rule=>rule.schoolId),studentIds=audiencePolicy.accountRules.map(rule=>rule.identityId);
  const chapters=(await db.query(`SELECT id,title,content,objective,checkpoint,checkpoint_answer AS "checkpointAnswer",
-  localizations,acsl_links AS "acslLinks",section_key AS "sectionKey",
-  COALESCE((SELECT jsonb_agg(jsonb_build_object('problemId',cp.problem_id,'versionId',cp.version_id,'title',v.title,'published',v.published_at IS NOT NULL,'schoolVisibleAt',v.school_visible_at,'rankReviewStatus',v.rank_review_status,'readyForCourse',v.published_at IS NOT NULL AND v.validation_status='AC' AND v.rank_review_status='approved',
-   'canEdit',$2 OR ${platformContentEditorSql('problem','cp.problem_id',"current_setting('campus.account_id')::uuid")} ) ORDER BY cp.position) FROM chapter_problems cp JOIN problems source ON source.id=cp.problem_id JOIN problem_versions v ON v.id=COALESCE(${liveProblemVersionIdSql('source')},cp.version_id) WHERE cp.chapter_id=c.id),'[]'::jsonb) problems,(SELECT count(*)::int FROM chapter_problems WHERE chapter_id=c.id) AS "problemCount"
-  FROM learning_chapters c WHERE path_id=$1 AND archived_at IS NULL ORDER BY position,created_at,id`,[p.id,admin])).rows;
+  localizations,acsl_links AS "acslLinks",section_key AS "sectionKey"
+  FROM learning_chapters WHERE path_id=$1 AND archived_at IS NULL ORDER BY position,created_at,id`,[p.id])).rows;
+ if(detail){
+  const links=(await db.query(`${courseProblemVersions}
+   SELECT cp.chapter_id,cp.problem_id AS "problemId",cp.version_id AS "versionId",v.title,
+    v.published_at IS NOT NULL AS published,v.school_visible_at AS "schoolVisibleAt",v.rank_review_status AS "rankReviewStatus",
+    v.published_at IS NOT NULL AND v.validation_status='AC' AND v.rank_review_status='approved' AS "readyForCourse",
+    ${admin?'true':platformContentEditorSql('problem','cp.problem_id',"current_setting('campus.account_id')::uuid")} AS "canEdit"
+   FROM course_links cp JOIN course_versions cv ON cv.problem_id=cp.problem_id AND cv.pinned_version_id=cp.version_id
+   JOIN problem_versions v ON v.id=cv.version_id ORDER BY cp.chapter_id,cp.position`,[p.id])).rows;
+  const byChapter=new Map(chapters.map(chapter=>[chapter.id,[]]));
+  for(const {chapter_id,...link} of links)byChapter.get(chapter_id).push(link);
+  for(const chapter of chapters){chapter.problems=byChapter.get(chapter.id);chapter.problemCount=chapter.problems.length;}
+ }
  const paper4=detail?await loadCoursePaper4(db,[p.id]):null;
  if(paper4)for(const chapter of chapters)chapter.paper4Links=chapterPaper4Links(paper4,chapter.id,null,{includeUnavailable:true});
  const schools=schoolIds.length?(await db.query('SELECT id,name FROM schools WHERE id=ANY($1::uuid[]) ORDER BY name,id',[schoolIds])).rows:[];
@@ -97,11 +118,10 @@ async function assertReady(db,p,user) {
  if(!chapters.length||chapters.some(c=>!c.content.trim()))fail(409,'INCOMPLETE','发布前需要至少一个有正文的章节');
  await assertCoursePaper4Ready(db,p.id);
  await assertPlatformCourseAcslLinksReady(db,user,chapters.flatMap(chapter=>chapter.acsl_links??[]),p.id);
- const links=(await db.query(`SELECT p.archived_at, b.archived_at bank_archived,b.visibility,v.published_at,v.school_visible_at,v.rank_review_status
-  FROM learning_chapters c JOIN chapter_problems cp ON cp.chapter_id=c.id
-  JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id
-  JOIN problem_versions v ON v.id=COALESCE(${liveProblemVersionIdSql('p')},cp.version_id)
-  WHERE c.path_id=$1 AND c.archived_at IS NULL FOR SHARE OF p,b,v`,[p.id])).rows;
+ const links=(await db.query(`${courseProblemVersions}
+  SELECT p.archived_at,b.archived_at bank_archived,b.visibility,v.published_at,v.school_visible_at,v.rank_review_status
+  FROM course_versions cv JOIN problems p ON p.id=cv.problem_id JOIN problem_banks b ON b.id=p.bank_id
+  JOIN problem_versions v ON v.id=cv.version_id FOR SHARE OF p,b,v`,[p.id])).rows;
  if(links.some(l=>l.archived_at||l.bank_archived||l.visibility!=='school'||!l.published_at||!l.school_visible_at||l.rank_review_status!=='approved'))
   fail(409,'UNAPPROVED_LESSON_PROBLEM','关联练习尚未发布或未通过审核');
 }
@@ -165,16 +185,27 @@ async function save(db,user,body,old,{admin}) {
    else await db.query(`INSERT INTO learning_chapters(id,path_id,title,content,position,objective,checkpoint,checkpoint_answer,localizations,acsl_links,section_key)
     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,[chapterId,id,chapterTitle,content,position,objective,checkpoint,checkpointAnswer,chapterLocales,JSON.stringify(acslLinks),sectionKey]);
   }
+  const replacedChapters=[],problemLinks=[];
   for(const [position,c] of body.chapters.entries())if(c.problems!==undefined){
    if(!Array.isArray(c.problems)||c.problems.length>200)fail(400,'VALIDATION','每章最多关联 200 道题');
-   const links=c.problems.map(link=>({problemId:uuid(link.problemId),versionId:uuid(link.versionId)}));
+   const links=c.problems.map(link=>({problemId:uuid(link.problemId).toLowerCase(),versionId:uuid(link.versionId).toLowerCase()}));
    if(new Set(links.map(l=>l.problemId)).size!==links.length)fail(400,'VALIDATION','同一章不能重复关联同一道题');
-   for(const link of links)if(!(await db.query(`SELECT 1 FROM problems p JOIN problem_versions v ON v.problem_id=p.id
-    WHERE p.id=$1 AND v.id=$2 AND p.owner_scope='platform' AND p.archived_at IS NULL
-    AND v.published_at IS NOT NULL AND v.validation_status='AC' AND v.rank_review_status='approved'`,[link.problemId,link.versionId])).rowCount)
+   replacedChapters.push(retained[position]);
+   for(const [index,link] of links.entries())problemLinks.push({chapter_id:retained[position],problem_id:link.problemId,version_id:link.versionId,position:index});
+  }
+  if(replacedChapters.length){
+   // Validate the complete replacement before touching any link. The enclosing
+   // teaching lock and transaction retain the same atomicity as individual saves.
+   const input=JSON.stringify(problemLinks);
+   if((await db.query(`SELECT 1 FROM jsonb_to_recordset($1::jsonb) AS link(problem_id uuid,version_id uuid)
+    WHERE NOT EXISTS(SELECT 1 FROM problems p JOIN problem_versions v ON v.problem_id=p.id
+     WHERE p.id=link.problem_id AND v.id=link.version_id AND p.owner_scope='platform' AND p.archived_at IS NULL
+     AND v.published_at IS NOT NULL AND v.validation_status='AC' AND v.rank_review_status='approved') LIMIT 1`,[input])).rowCount)
     fail(409,'UNAVAILABLE_COURSE_PROBLEM','请选择有效的已发布平台题目');
-   await db.query('DELETE FROM chapter_problems WHERE chapter_id=$1',[retained[position]]);
-   for(const [index,link] of links.entries())await db.query('INSERT INTO chapter_problems(chapter_id,problem_id,version_id,position) VALUES($1,$2,$3,$4)',[retained[position],link.problemId,link.versionId,index]);
+   await db.query('DELETE FROM chapter_problems WHERE chapter_id=ANY($1::uuid[])',[replacedChapters]);
+   if(problemLinks.length)await db.query(`INSERT INTO chapter_problems(chapter_id,problem_id,version_id,position)
+    SELECT chapter_id,problem_id,version_id,position FROM jsonb_to_recordset($1::jsonb)
+    AS link(chapter_id uuid,problem_id uuid,version_id uuid,position integer)`,[input]);
   }
   for(const [position,c] of body.chapters.entries())if(c.paper4Links!==undefined)await setChapterPaper4Links(db,retained[position],c.paper4Links);
   await db.query('UPDATE learning_chapters SET archived_at=clock_timestamp() WHERE path_id=$1 AND archived_at IS NULL AND NOT(id=ANY($2::uuid[]))',[id,retained]);

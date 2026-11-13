@@ -26,6 +26,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
 import { productionApi } from "@/lib/production-api";
 import { State, useData } from "./shared";
+import { useWorkspaceData } from "@/components/workspace-data";
 import {useLocale,type AppLocale} from "@/components/locale-context";
 
 function ui(locale:AppLocale,zh:string,en:string){return locale==="en"?en:zh;}
@@ -56,12 +57,11 @@ type LockedLearningPath = CourseAccessMetadata & Pick<LearningPath, "id" | "titl
 export function StudentLearningList(){
  const {locale}=useLocale();
  const {language}=useCourseLanguage();
- const paths=useData<{items:(LearningPath | LockedLearningPath)[]}>("learning-paths?includeAdmission=true");
+ const paths=useWorkspaceData<{items:(LearningPath | LockedLearningPath)[]}>("learning-paths?includeAdmission=true");
  const [query, setQuery] = useCourseCatalogQuery();
  const visible = filterCourseCatalog((paths.data?.items ?? []).map(path => localizedCourse(path, language)), query);
  const detailHref = (id: string) => courseLanguageHref(`/student/learning-paths/${id}`, language);
  const { busy, openCourse, feedback, dialog } = useCourseAdmissionDialog(detailHref, paths.reload);
- useCourseProgressRefresh(paths);
  return <>
   <PageHeader title={ui(locale,"课程","Courses")} description={ui(locale,"按章节阅读、练习与复盘；已读和判题通过分别记录。","Read, practice, and review each chapter. Reading and accepted submissions are tracked separately.")}/>
   <CourseCatalogSearch query={query} onSearch={setQuery}/>

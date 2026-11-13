@@ -3,14 +3,15 @@ import { schoolActivityJobVisibleSql } from './school-activities.mjs';
 
 // The source problem ID is shared by school practice and its public projection.
 // A version records what was judged, not a separate learner achievement.
-export function problemProgressRowsSql({ problemId, accountId, identityId = null, includeStaff = false }) {
+export function problemProgressRowsSql({ problemId, problemIds = null, accountId, identityId = null, includeStaff = false }) {
  const person=identityId??`(SELECT identity_id FROM accounts WHERE id=${accountId})`;
+ const selected=alias=>problemIds?`${alias}.problem_id=ANY(${problemIds})`:`${alias}.problem_id=${problemId}`;
  return `SELECT 'SUB'||s.id::text id,s.problem_id,s.status,s.score,s.created_at,s.language
   FROM submissions s
   LEFT JOIN LATERAL submission_activity_context(s.original_submission_id) original ON true
   LEFT JOIN timed_attempts ta ON ta.id=COALESCE(s.timed_attempt_id,original.timed_attempt_id)
   LEFT JOIN timed_practices tp ON tp.id=ta.practice_id
-  WHERE s.problem_id=${problemId} AND s.identity_id=${person} AND s.kind IN ('submit','correction')
+  WHERE ${selected('s')} AND s.identity_id=${person} AND s.kind IN ('submit','correction')
    AND (s.original_submission_id IS NULL OR original.resolved)
    AND (COALESCE(s.timed_attempt_id,original.timed_attempt_id) IS NULL OR tp.results_published_at IS NOT NULL)
   UNION ALL
@@ -19,7 +20,7 @@ export function problemProgressRowsSql({ problemId, accountId, identityId = null
     WHEN j.state='leased' THEN 'Judging' ELSE 'Waiting' END,
    CASE WHEN j.state='completed' THEN (j.result->>'score')::numeric END,j.created_at,COALESCE(j.payload->>'language','python')
   FROM school_judge_jobs j
-  WHERE j.problem_id=${problemId} AND j.kind='submit' AND ${schoolActivityJobVisibleSql('j')}
+  WHERE ${selected('j')} AND j.kind='submit' AND ${schoolActivityJobVisibleSql('j')}
    AND ((j.access_context='public' AND j.account_id=${accountId})
     OR (j.access_context='school' AND (
      j.identity_id IS NOT NULL AND EXISTS(SELECT 1 FROM school_identities current_person
@@ -48,9 +49,11 @@ export async function problemProgress(db,user,problemIds,{schoolId=null,includeS
  if(schoolId){
   return withProblemProgressScope(db,schoolId,client=>problemProgress(client,user,problemIds,{includeStaff}));
  }
+ // Read the learner's visible history once for the complete catalog. Running
+ // this union through a lateral lookup per problem repeated scans and made
+ // PostgreSQL JIT compilation dominate otherwise small catalog requests.
  const {rows}=await db.query(`WITH visible AS (
-  SELECT progress.* FROM unnest($2::uuid[]) problem(id)
-  CROSS JOIN LATERAL (${problemProgressRowsSql({problemId:'problem.id',accountId:'$1',identityId:'$3',includeStaff})}) progress
+  ${problemProgressRowsSql({problemIds:'$2::uuid[]',accountId:'$1',identityId:'$3',includeStaff})}
  ), totals AS (SELECT problem_id,count(*)::int formal_count,bool_or(status='AC') solved FROM visible GROUP BY problem_id),
  latest AS (SELECT DISTINCT ON(problem_id) * FROM visible ORDER BY problem_id,created_at DESC,id DESC),
  best AS (SELECT DISTINCT ON(problem_id) * FROM visible WHERE score IS NOT NULL AND status NOT IN ('Waiting','Judging','System Error')

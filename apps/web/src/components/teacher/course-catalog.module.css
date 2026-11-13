@@ -89,7 +89,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 8px;
+  gap: 8px;
   font-size: 12px;
   line-height: 20px;
 }
@@ -97,10 +97,4 @@
 .actions > a {
   margin-inline: 0;
   white-space: nowrap;
-}
-
-.actions > button {
-  height: 28px;
-  padding-inline: 8px;
-  font-size: 12px;
 }

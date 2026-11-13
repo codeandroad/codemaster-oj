@@ -1,19 +1,17 @@
 "use client";
+import dynamic from "next/dynamic";
+import { RowActionButton, rowActionClassName } from "@/components/ui/row-action";
 
 import { AppLink as Link } from "@/components/navigation";
 import { CourseAccessSummary, courseStatus, type CourseAccessMetadata } from "@/components/course-access";
 import { CourseCatalogTable, CourseCatalogRow } from "./course-catalog-table";
 import { CourseCatalogSearch } from "@/components/student/learning-course-search";
-import { CourseSettingsDialog } from "./course-settings-dialog";
 import { CourseProgrammingLanguageField } from "./course-programming-language-field";
 import type { PlatformCourse } from "@/components/schools/platform-course-model";
-import { CourseAdmissionsDialog } from "@/components/schools/course-admissions-dialog";
-import { CoursePaper4Picker } from "./course-paper4-picker";
 import { coursePaper4LinkKey, coursePaper4References, coursePaper4UnitCount, mergeCoursePaper4Links, type CoursePaper4Link } from "@/components/course-paper4";
 import { CourseDirectory } from "@/components/course-directory";
 import { CourseSectionsEditor, ChapterSectionSelect } from "@/components/course-sections-editor";
 import { canonicalCourseHref, courseChapterNeighbor, orderCourseChapters, parseCourseSections, validateChapterSections, type CourseSection } from "@/components/course-sections";
-import { LearningChapterContent } from "../student/learning-course-reader";
 import { useCourseLanguage } from "@/components/course-language";
 import { localizedChapter, parseChapterLocalizations, type CourseLocalizations, type ChapterLocalizations, type CourseLanguage } from "@/components/course-localization";
 import { ChapterContentEditor, ChapterEditingLanguageControl } from "./chapter-content-editor";
@@ -21,11 +19,10 @@ import { findOriginalLanguage, type ChapterEditingLanguage, type ChapterEditorVa
 import { CourseAcslEditor } from "./course-acsl-editor";
 import { courseAcslReferences, courseAcslLabel, type CourseAcslLink } from "@/components/course-acsl";
 import {LearningCover,courseCovers,courseDifficulties} from "@/components/learning-course";
-import {PythonPracticePanel,type CoursePractice} from "./python-practice-panel";
+import type { CoursePractice } from "./python-practice-panel";
 import {canUseLegacyPythonPractice} from "./legacy-python-practice";
-import {LearningProgressDialog} from "./learning-progress";
-import {LearningImport} from "./learning-import";
-import {downloadLearningMarkdown,type LearningDocument} from "./learning-document";
+import type { LearningDocument } from "./learning-document";
+import { courseDraftEqual } from "./course-draft-equality";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "@/components/locale-context";
@@ -33,8 +30,8 @@ import { ArrowDown, ArrowUp, Eye, FilePlus2, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRangeSelection } from "@/components/ui/use-range-selection";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
+import { useWorkspaceData } from "@/components/workspace-data";
 import { productionApi, type ProductionProblem } from "@/lib/production-api";
-import { ProblemPicker } from "./problem-banks";
 import {
   area,
   Empty,
@@ -52,6 +49,17 @@ import {
   useData,
   useDirty,
 } from "./shared";
+
+// Load optional tools on demand, with local boundaries so their chunks never
+// suspend the chapter editor (including the legacy Python practice panel).
+const CourseSettingsDialog = dynamic(() => import("./course-settings-dialog").then(module => module.CourseSettingsDialog), { loading: () => null });
+const CourseAdmissionsDialog = dynamic(() => import("@/components/schools/course-admissions-dialog").then(module => module.CourseAdmissionsDialog), { loading: () => null });
+const CoursePaper4Picker = dynamic(() => import("./course-paper4-picker").then(module => module.CoursePaper4Picker), { loading: () => null });
+const LearningChapterContent = dynamic(() => import("../student/learning-course-reader").then(module => module.LearningChapterContent), { loading: () => null });
+const PythonPracticePanel = dynamic(() => import("./python-practice-panel").then(module => module.PythonPracticePanel), { loading: () => null });
+const LearningProgressDialog = dynamic(() => import("./learning-progress").then(module => module.LearningProgressDialog), { loading: () => null });
+const LearningImport = dynamic(() => import("./learning-import").then(module => module.LearningImport), { loading: () => null });
+const ProblemPicker = dynamic(() => import("./problem-banks").then(module => module.ProblemPicker), { loading: () => null });
 
 interface ChapterProblem {
   canEdit?: boolean;
@@ -78,7 +86,7 @@ function courseProblemReady(problem: ChapterProblem): boolean {
   );
 }
 function mergeReviewStatus(local: Chapter[], previous: Chapter[], fresh: Chapter[]): Chapter[] {
-  if (JSON.stringify(local) === JSON.stringify(previous)) return fresh;
+  if (courseDraftEqual(local, previous)) return fresh;
   const status = new Map(fresh.flatMap((chapter) => chapter.problems)
     .map((problem) => [`${problem.problemId}:${problem.versionId}`, problem]));
   const paper4Status = new Map(fresh.flatMap(chapter => chapter.paper4Links ?? []).map(item => [coursePaper4LinkKey(item), item]));
@@ -149,11 +157,11 @@ export function TeacherLearning({ canManageAdmissions = false }: { canManageAdmi
   const [courseQuery,setCourseQuery]=useState(""),[categoryFilter,setCategoryFilter]=useState(""),[publicationFilter,setPublicationFilter]=useState(""),[sourceFilter,setSourceFilter]=useState("");
   const [archiveTarget,setArchiveTarget]=useState<Path|null>(null);
   const [admissionTarget, setAdmissionTarget] = useState<Path | null>(null);
+  const [tab, setTab] = useState("课程");
   const router = useRouter(),
-    paths = useData<{ items: Path[] }>(showArchived?"learning-paths?archived=true":"learning-paths"),
-    platformPaths = useData<{items:PlatformCourse[]}>(`platform/courses?schoolId=${LEGACY_SCHOOL_ID}`),
-    resources = useData<{ items: Resource[] }>("learning-resources"),
-    [tab, setTab] = useState("课程"),
+    paths = useWorkspaceData<{ items: Path[] }>(`learning-paths?view=summary${showArchived ? "&archived=true" : ""}`),
+    platformPaths = useWorkspaceData<{items:PlatformCourse[]}>(`platform/courses?schoolId=${LEGACY_SCHOOL_ID}&view=catalog`),
+    resources = useData<{ items: Resource[] }>(tab === "学习资料" ? "learning-resources" : null),
     [create, setCreate] = useState(false),
     [importing,setImporting]=useState(false),
     [editing, setEditing] = useState<Resource | null>(null),
@@ -208,11 +216,11 @@ export function TeacherLearning({ canManageAdmissions = false }: { canManageAdmi
                   access={<CourseAccessSummary course={path}/>}
                   status={<StatusPill status={courseStatus(path, locale)}/>}
                   actions={<>
-                    <Link className={link} href={path.mergedIntoCourseId?`/teacher/courses/${path.mergedIntoCourseId}`:courseHref(path)}>{path.mergedIntoCourseId ? tx("打开合并课程", "Open combined course") : path.archived ? tx("查看", "View") : path.canEdit ? t("编辑") : t("查看")}</Link>
-                    {!path.archived && <Link className={`${link} ml-4`} href={`${courseHref(path)}${path.ownerScope==="platform"?"&":"?"}preview=1`}>{t("学生预览")}</Link>}
+                    <Link className={rowActionClassName} href={path.mergedIntoCourseId?`/teacher/courses/${path.mergedIntoCourseId}`:courseHref(path)}>{path.mergedIntoCourseId ? tx("打开合并课程", "Open combined course") : path.archived ? tx("查看", "View") : path.canEdit ? t("编辑") : t("查看")}</Link>
+                    {!path.archived && <Link className={rowActionClassName} href={`${courseHref(path)}${path.ownerScope==="platform"?"&":"?"}preview=1`}>{tx("预览", "Preview")}</Link>}
                     {canManageAdmissions && path.ownerScope!=="platform" && path.published && !path.archived &&
-                      <Button size="sm" variant="ghost" onClick={() => setAdmissionTarget(path)}>{tx("课程准入", "Course admissions")}</Button>}
-                    {path.canEdit && path.ownerScope!=="platform" && !path.mergedIntoCourseId && <Button size="sm" variant="ghost" disabled={action.busy} onClick={() => setArchiveTarget(path)}>{path.archived ? tx("恢复", "Restore") : tx("归档", "Archive")}</Button>}
+                      <RowActionButton onClick={() => setAdmissionTarget(path)}>{tx("课程准入", "Course admissions")}</RowActionButton>}
+                    {path.canEdit && path.ownerScope!=="platform" && !path.mergedIntoCourseId && <RowActionButton disabled={action.busy} onClick={() => setArchiveTarget(path)}>{path.archived ? tx("恢复", "Restore") : tx("归档", "Archive")}</RowActionButton>}
                   </>}
                 />
               ))}
@@ -608,7 +616,7 @@ export function LearningEditorForm({
   useEffect(() => {
     const previous = localCourse.current;
     setPath(initial);
-    setSections(JSON.stringify(previous.sections) === JSON.stringify(previous.path.sections ?? []) ? initial.sections ?? [] : previous.sections);
+    setSections(courseDraftEqual(previous.sections, previous.path.sections ?? []) ? initial.sections ?? [] : previous.sections);
     setChapters(mergeReviewStatus(previous.chapters, previous.path.chapters ?? [], initial.chapters ?? []));
   }, [initial]);
   const canEditCourse = path.canEdit && !path.archived;
@@ -625,8 +633,9 @@ export function LearningEditorForm({
     setBatchPublishOpen(false);
   }, [path.archived]);
   const chapter = chapters.find((x) => x.id === current) ?? chapters[0],
-    selectedIndex = chapters.findIndex((x) => x.id === chapter?.id),
-    dirty = JSON.stringify(chapters) !== JSON.stringify(path.chapters ?? []) || JSON.stringify(sections) !== JSON.stringify(path.sections ?? []);
+    selectedIndex = chapters.findIndex((x) => x.id === chapter?.id);
+  const dirty = useMemo(() => !courseDraftEqual(chapters, path.chapters ?? []) || !courseDraftEqual(sections, path.sections ?? []),
+    [chapters, path.chapters, sections, path.sections]);
   useEffect(() => { onDirtyChange?.(dirty); }, [dirty,onDirtyChange]);
   const original = { title: chapter?.title ?? "", content: chapter?.content ?? "", objective: chapter?.objective ?? "", checkpoint: chapter?.checkpoint ?? "", checkpointAnswer: chapter?.checkpointAnswer ?? "" };
   const originalLanguage = originalLanguages.get(chapter?.id ?? "") ?? null;
@@ -896,7 +905,7 @@ export function LearningEditorForm({
         <div className="min-w-0 flex-1 space-y-1"><CourseAccessSummary course={path} showAuthor/><p className="text-xs text-muted-foreground">{t(courseDifficulties[path.difficulty??"beginner"])} · {chapters.length} {t("章")} · {path.estimatedMinutes??30} {tr("分钟", "minutes")}</p></div>
       <div className="flex flex-wrap items-center gap-2 text-sm">
         {!platform && <Button variant="secondary" size="sm" disabled={!path.canEdit} onClick={()=>setProgressOpen(true)}>{t("查看学生进度总览")}</Button>}
-        <Button size="sm" variant="secondary" onClick={()=>{const doc:LearningDocument={format:"codemaster-learning-path",version:1,sections,localizations:path.localizations,title:path.title,description:path.description,category:path.category,requiredLanguage:path.requiredLanguage,estimatedMinutes:path.estimatedMinutes??30,difficulty:path.difficulty??"beginner",coverKey:path.coverKey??"general",authorName:path.authorName,authoredAt:path.authoredAt,coverImage:path.coverImage,chapters:orderCourseChapters(sections,chapters).map(c=>({sectionKey:c.sectionKey,localizations:c.localizations,acslLinks:courseAcslReferences(c.acslLinks),title:c.title,content:c.content,objective:c.objective??"",checkpoint:c.checkpoint??"",checkpointAnswer:c.checkpointAnswer??"",problemIds:c.problems.map(p=>p.problemId),paper4Links:coursePaper4References(c.paper4Links)}))};void action.run(async()=>{downloadLearningMarkdown(doc);return t("已导出当前编辑内容（包括未保存修改）。");});}}>{t("导出 Markdown")}</Button>
+        <Button size="sm" variant="secondary" onClick={()=>{const doc:LearningDocument={format:"codemaster-learning-path",version:1,sections,localizations:path.localizations,title:path.title,description:path.description,category:path.category,requiredLanguage:path.requiredLanguage,estimatedMinutes:path.estimatedMinutes??30,difficulty:path.difficulty??"beginner",coverKey:path.coverKey??"general",authorName:path.authorName,authoredAt:path.authoredAt,coverImage:path.coverImage,chapters:orderCourseChapters(sections,chapters).map(c=>({sectionKey:c.sectionKey,localizations:c.localizations,acslLinks:courseAcslReferences(c.acslLinks),title:c.title,content:c.content,objective:c.objective??"",checkpoint:c.checkpoint??"",checkpointAnswer:c.checkpointAnswer??"",problemIds:c.problems.map(p=>p.problemId),paper4Links:coursePaper4References(c.paper4Links)}))};void action.run(async()=>{const {downloadLearningMarkdown}=await import("./learning-document");downloadLearningMarkdown(doc);return t("已导出当前编辑内容（包括未保存修改）。");});}}>{t("导出 Markdown")}</Button>
         <Button size="sm" variant="secondary" disabled={!canEditCourse} onClick={() => setMetadata(true)}>
           {tr("课程属性与开放", "Properties and access")}
         </Button>

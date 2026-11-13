@@ -1,4 +1,5 @@
 "use client";
+import { RowActionButton } from "@/components/ui/row-action";
 
 import { useEffect, useRef, useState } from "react";
 import {
@@ -294,7 +295,7 @@ function SchoolList({
         aria-label={text("Schools", "学校")}
       >
         <div
-          className="hidden grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.3fr)_9rem] gap-3 border-b border-border px-4 py-2 text-xs font-semibold text-muted-foreground lg:grid"
+          className="hidden grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.3fr)_15rem] gap-3 border-b border-border px-4 py-2 text-xs font-semibold text-muted-foreground lg:grid"
           aria-hidden="true"
         >
           <span>{text("School", "学校")}</span>
@@ -308,7 +309,7 @@ function SchoolList({
             {schools.data.items.map((school) => (
               <li
                 key={school.id}
-                className="grid min-w-0 gap-3 px-4 py-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.3fr)_9rem] lg:items-start"
+                className="grid min-w-0 gap-3 px-4 py-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.3fr)_15rem] lg:items-start"
               >
                 <div className="min-w-0">
                   <h2 className="text-sm font-semibold break-words">
@@ -383,10 +384,8 @@ function SchoolList({
                     </p>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-1 sm:col-span-2 lg:col-span-1 lg:justify-end">
-                  <Button
-                    size="sm"
-                    variant="secondary"
+                <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-1 lg:flex-nowrap lg:justify-end">
+                  <RowActionButton
                     aria-label={text(
                       `Rename ${school.name}`,
                       `修改 ${school.name} 的名称`,
@@ -396,11 +395,9 @@ function SchoolList({
                     }
                   >
                     {text("Rename", "修改名称")}
-                  </Button>
+                  </RowActionButton>
                   {!school.legacy && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
+                    <RowActionButton
                       aria-label={text(
                         `Assign administrator for ${school.name}`,
                         `为 ${school.name} 指定管理员`,
@@ -413,7 +410,7 @@ function SchoolList({
                       }
                     >
                       {text("Assign admin", "指定管理员")}
-                    </Button>
+                    </RowActionButton>
                   )}
                 </div>
               </li>

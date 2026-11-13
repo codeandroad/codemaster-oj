@@ -265,7 +265,7 @@ function ProductionShell({
     ["/", "/teacher", "/admin"].includes(path)
       ? pathname === path
       : pathname === path || pathname.startsWith(`${path}/`);
-  const links = <WorkspaceNavigation items={workspaceNavigation[role].filter(item => item.section !== "acsl" || acslEnabled).map((item) => ({ ...item, href: item.path, active: activePath(item.path) }))}/>;
+  const links = <WorkspaceNavigation items={workspaceNavigation[role].filter(item => item.section !== "timed" && (item.section !== "acsl" || acslEnabled)).map((item) => ({ ...item, href: item.path, active: activePath(item.path) }))}/>;
   return <PageHeadingProvider pathname={pathname}><WorkspaceThemeProvider theme={shellTheme}><PersonalAppearanceProvider pageTheme={settings.pageTheme} updatePageTheme={pageTheme=>update({pageTheme})}><div style={{colorScheme:shellTheme}} className={shellTheme === "dark" ? "dark" : ""}>
     <WorkspaceFrame student={role === "student"} schoolName={school ? schoolDisplayName(school, locale) : t("校内学习平台")} navigation={links}
       footer={pathname === "/" && <div className="mx-auto max-w-[1500px] px-4 sm:px-6"><SiteFooter locale={locale} /></div>}

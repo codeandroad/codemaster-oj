@@ -1,4 +1,5 @@
 "use client";
+import { RowActionButton } from "@/components/ui/row-action";
 
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -186,9 +187,9 @@ export function TeacherPaper4List() {
             <td className="px-4 py-3 font-semibold">{paper.totalMarks}</td>
             <td className="px-4 py-3"><span className={paper.archivedAt ? "rounded bg-muted px-2 py-1 text-xs font-semibold" : "whitespace-nowrap text-sm"}>{paper.archivedAt ? tx("已归档", "Archived") : status}</span>{paper.archivedAt && <span className="mt-1 block text-xs text-muted-foreground">{status}</span>}</td>
             <td className="px-4 py-3"><div className={listStyles.rowActions}>
-              {catalog && paper.status === "published" && !paper.archivedAt && paper.canAssign && <Button size="sm" variant="secondary" disabled={busy} onClick={() => { setError(""); setMessage(""); setAssignTarget(paper); }}><ClipboardCheck size={14}/>{tx("布置活动", "Assign activity")}</Button>}
-              {paper.canManage && paper.canExport && <Button size="sm" variant="ghost" disabled={busy} title={tx("下载可再次导入的 JSON，包含参考答案和隐藏测试", "Download reimportable JSON with reference solutions and hidden tests")} onClick={() => void exportPaper(paper)}><Download size={14}/>{tx("导出 JSON", "Export JSON")}</Button>}
-              {paper.canManage && <Button size="sm" variant="ghost" disabled={busy} onClick={() => setArchiveTarget(paper)}>{paper.archivedAt ? <RotateCcw size={14}/> : <Archive size={14}/>} {paper.archivedAt ? tx("恢复", "Restore") : tx("归档", "Archive")}</Button>}
+              {catalog && paper.status === "published" && !paper.archivedAt && paper.canAssign && <RowActionButton disabled={busy} onClick={() => { setError(""); setMessage(""); setAssignTarget(paper); }}><ClipboardCheck size={14}/>{tx("布置活动", "Assign activity")}</RowActionButton>}
+              {paper.canManage && paper.canExport && <RowActionButton disabled={busy} title={tx("下载可再次导入的 JSON，包含参考答案和隐藏测试", "Download reimportable JSON with reference solutions and hidden tests")} onClick={() => void exportPaper(paper)}><Download size={14}/>{tx("导出 JSON", "Export JSON")}</RowActionButton>}
+              {paper.canManage && <RowActionButton disabled={busy} onClick={() => setArchiveTarget(paper)}>{paper.archivedAt ? <RotateCcw size={14}/> : <Archive size={14}/>} {paper.archivedAt ? tx("恢复", "Restore") : tx("归档", "Archive")}</RowActionButton>}
             </div></td>
           </tr>;
         })}</tbody>

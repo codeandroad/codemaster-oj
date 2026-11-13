@@ -21,6 +21,8 @@ import { Bank, Group, GroupTags, ManageGroups, MAX_BATCH_PUBLISH, publishEligibi
 import { useLocale } from "@/components/locale-context";
 import { useProblemSelection } from "./use-problem-selection";
 import { useProblemBankFilters } from "./use-problem-bank-filters";
+import { CatalogPagination, useCatalogPagination } from "./catalog-pagination";
+import { useWorkspaceData } from "@/components/workspace-data";
 import styles from "./problem-banks.module.css";
 import {
   Drawer,
@@ -38,11 +40,11 @@ import {
 export function TeacherBankDetail({ id, accountId }: { id: string; accountId: string }) {
   const { locale } = useLocale();
   const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
-  const banks = useData<{ items: Bank[] }>("problem-banks"),
-    problems = useData<{
+  const banks = useWorkspaceData<{ items: Bank[] }>("problem-banks?includeArchived=owned"),
+    problems = useWorkspaceData<{
       items: (ProductionProblem & { formalTestCount?: number })[];
-    }>("problems"),
-    platformSources = useData<{ items: PlatformSourceProblem[] }>("platform/source-problems?schoolId=00000000-0000-4000-8000-000000000052"),
+    }>("problems?view=summary"),
+    platformSources = useWorkspaceData<{ items: PlatformSourceProblem[] }>("platform/source-problems?schoolId=00000000-0000-4000-8000-000000000052&view=summary"),
     groups = useData<{ items: Group[] }>(`problem-groups?bankId=${id}`),
     bank = banks.data?.items.find((x) => x.id === id),
     [confirmPublish, setConfirmPublish] = useState(false),
@@ -73,7 +75,9 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
                 .find((g) => g.id === view)
                 ?.problemIds.includes(p.id),
             );
-  const { checked, setChecked, changeRow } = useProblemSelection(rows.filter(problem => !isPlatformProblem(problem)), JSON.stringify([id, view]));
+  const scope = JSON.stringify([id, view]);
+  const pagination = useCatalogPagination(rows, scope);
+  const { checked, setChecked, changeRow } = useProblemSelection(pagination.rows.filter(problem => !isPlatformProblem(problem)), `${scope}:${pagination.page}`);
   const selected = checked.filter((id) => rows.some((p) => p.id === id)),
     currentGroup = groups.data?.items.find((g) => g.id === view),
     label =
@@ -344,7 +348,7 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((p) => (
+                  {pagination.rows.map((p) => (
                     <tr key={p.id} className="border-t border-border">
                       <td className="px-4 py-3">
                         <input
@@ -425,7 +429,7 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
                 </tbody>
               </table>
             </div>
-          ) : (
+          ) : !problems.loading && !platformSources.loading && !groups.loading && !problems.error && !platformSources.error && !groups.error ? (
             <div className="grid min-h-[320px] place-items-center p-8 text-center">
               <div>
                 <div className="mx-auto grid h-12 w-12 place-items-center rounded-md bg-muted text-muted-foreground">
@@ -458,7 +462,8 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
                 </div>
               </div>
             </div>
-          )}
+          ) : null}
+          <CatalogPagination {...pagination} />
         </section>
       </div>
       {confirmPublish && (

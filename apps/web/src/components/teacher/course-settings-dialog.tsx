@@ -26,11 +26,12 @@ export interface CourseSettings extends CourseAccessMetadata {
 const input = "min-h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-60";
 function localTime(value?: string | null) { return value ? new Date(new Date(value).getTime() + 8 * 3600000).toISOString().slice(0, 16) : ""; }
 
-export function CourseSettingsDialog({ course, onClose, onSaved, platformCourse, saveCourse }: { course: CourseSettings; onClose: () => void; onSaved: (course: CourseSettings) => void; platformCourse?: PlatformCourse; saveCourse?: (body: Record<string, unknown>) => Promise<CourseSettings> }) {
+export function CourseSettingsDialog({ course, onClose, onSaved, platformCourse, saveCourse, accessOnly = false }: { course: CourseSettings; onClose: () => void; onSaved: (course: CourseSettings) => void; platformCourse?: PlatformCourse; saveCourse?: (body: Record<string, unknown>) => Promise<CourseSettings>; accessOnly?: boolean }) {
   const { locale } = useLocale(), tx = (zh: string, en: string) => locale === "en" ? en : zh;
+  const admissionOnly = accessOnly && platformCourse?.canManage === true;
   const classes = useData<{ items: SchoolClass[] }>(platformCourse ? null : "classes");
   const [policy,setPolicy]=useState(()=>platformCourse?courseAudiencePolicy(platformCourse):null),[schools,setSchools]=useState(platformCourse?.schools??[]),[accounts,setAccounts]=useState(platformCourse?.students??[]);
-  const [tab, setTab] = useState<"details" | "access">("details");
+  const [tab, setTab] = useState<"details" | "access">(admissionOnly ? "access" : "details");
   const [localizations, setLocalizations] = useState(course.localizations);
   const [requiredLanguage, setRequiredLanguage] = useState(course.requiredLanguage ?? null);
   const [title, setTitle] = useState(course.title), [description, setDescription] = useState(course.description), [category, setCategory] = useState(course.category);
@@ -83,12 +84,14 @@ export function CourseSettingsDialog({ course, onClose, onSaved, platformCourse,
       COVER_LIMIT: tx("压缩后的封面不能超过 512 KB，请选择较简单的图片。", "The compressed cover must be at most 512 KB. Choose a simpler image."),
     };
     try {
-      const body = courseSettingsInput({ title, description, category, estimatedMinutes: minutes, difficulty, coverKey, coverImage, authorName, authoredAt, accessScope: scope, classIds, availableFrom: from, availableUntil: until, listed });
       const audiencePolicy=platformCourse?.canManage&&policy?courseAudiencePolicyForSave(policy):undefined;
       if(audiencePolicy&&!activeAdmissionRules(audiencePolicy).length){setTab("access");throw new Error(tx("请至少选择一项课程开放范围。", "Choose at least one course audience."));}
       if(audiencePolicy&&activeAdmissionRules(audiencePolicy).some(rule=>!Number.isSafeInteger(rule.minimumPoints)||rule.minimumPoints<0)){setTab("access");throw new Error(tx("最低积分须为不小于 0 的整数。", "Minimum points must be a non-negative integer."));}
       setBusy(true);
-      const payload = { ...body, requiredLanguage, localizations: localizations ? parseCourseLocalizations(localizations) : undefined, ...(audiencePolicy?{audiencePolicy}:{}) };
+      const payload = admissionOnly ? { audiencePolicy } : {
+        ...courseSettingsInput({ title, description, category, estimatedMinutes: minutes, difficulty, coverKey, coverImage, authorName, authoredAt, accessScope: scope, classIds, availableFrom: from, availableUntil: until, listed }),
+        requiredLanguage, localizations: localizations ? parseCourseLocalizations(localizations) : undefined, ...(audiencePolicy ? { audiencePolicy } : {}),
+      };
       const saved = saveCourse ? await saveCourse(payload) : await productionApi<CourseSettings>(`learning-paths/${course.id}`, { method: "PATCH", body: payload });
       onSaved(saved); onClose();
     } catch (reason) {
@@ -97,9 +100,9 @@ export function CourseSettingsDialog({ course, onClose, onSaved, platformCourse,
     } finally { setBusy(false); }
   }
   return <Dialog open onOpenChange={open => { if (!open && !busy && !imageBusy) onClose(); }}><DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-3xl" onEscapeKeyDown={event => { if (busy || imageBusy) event.preventDefault(); }} onPointerDownOutside={event => { if (busy || imageBusy) event.preventDefault(); }}>
-    <DialogTitle className="flex items-center gap-2"><Settings2 size={18} aria-hidden="true"/>{tx("课程属性与开放设置", "Course properties and access")}</DialogTitle>
+    <DialogTitle className="flex items-center gap-2"><Settings2 size={18} aria-hidden="true"/>{admissionOnly ? tx("课程准入", "Course access") : tx("课程属性与开放设置", "Course properties and access")}</DialogTitle>
     <DialogDescription>{course.title}</DialogDescription>
-    <nav className="flex border-b border-border" aria-label={tx("课程设置分区", "Course settings sections")}>{(["details", ...(!platformCourse||platformCourse.canManage?["access" as const]:[])] as const).map(value => <button key={value} type="button" onClick={() => setTab(value)} aria-pressed={value === tab} className={`min-h-11 border-b-2 px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-primary ${value === tab ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}>{value === "details" ? tx("基本属性", "Properties") : tx("准入与开放", "Access and availability")}</button>)}</nav>
+    {!admissionOnly && <nav className="flex border-b border-border" aria-label={tx("课程设置分区", "Course settings sections")}>{(["details", ...(!platformCourse||platformCourse.canManage?["access" as const]:[])] as const).map(value => <button key={value} type="button" onClick={() => setTab(value)} aria-pressed={value === tab} className={`min-h-11 border-b-2 px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-primary ${value === tab ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}>{value === "details" ? tx("基本属性", "Properties") : tx("准入与开放", "Access and availability")}</button>)}</nav>}
     <form noValidate onSubmit={event => void save(event)} className="space-y-4" aria-busy={busy || imageBusy}>
       {error && <p ref={errorRef} tabIndex={-1} role="alert" className="rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
       {tab === "details" ? <fieldset disabled={busy || imageBusy} className="space-y-4">

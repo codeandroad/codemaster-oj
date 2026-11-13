@@ -6,11 +6,13 @@ import { isPlatformProblem, mergePlatformProblems, problemEditorHref, type Platf
 import {ProblemFilter} from "./problem-filter";
 import { useProblemSelection } from "./use-problem-selection";
 import { useProblemBankFilters } from "./use-problem-bank-filters";
+import { CatalogPagination, useCatalogPagination } from "./catalog-pagination";
+import { useWorkspaceData } from "@/components/workspace-data";
 import { courseProblemOrder } from "./assignment-problem-order";
 import styles from "./problem-banks.module.css";
 
 import { AppLink as Link } from "@/components/navigation";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Archive,
@@ -106,12 +108,13 @@ export function publishEligibilityReason(problem: ProductionProblem, locale: App
 export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; user: CampusUser }) {
   const { locale } = useLocale();
   const tr = (zh: string, en: string) => localText(locale, zh, en);
-  const router = useRouter(),
-    banks = useData<{ items: Bank[] }>("problem-banks?includeArchived=owned"),
-    problems = useData<{ items: ProductionProblem[] }>("problems"),
-    platformSources = useData<{ items: PlatformSourceProblem[] }>("platform/source-problems?schoolId=00000000-0000-4000-8000-000000000052"),
-    groups = useData<{ items: Group[] }>("problem-groups");
   const { filters, changeFilters } = useProblemBankFilters(user.id, bankId);
+  const showProblems = Boolean(bankId) || !filters.showBanks;
+  const router = useRouter(),
+    banks = useWorkspaceData<{ items: Bank[] }>("problem-banks?includeArchived=owned"),
+    problems = useWorkspaceData<{ items: ProductionProblem[] }>(showProblems ? "problems?view=summary" : ""),
+    platformSources = useWorkspaceData<{ items: PlatformSourceProblem[] }>(showProblems ? "platform/source-problems?schoolId=00000000-0000-4000-8000-000000000052&view=summary" : ""),
+    groups = useWorkspaceData<{ items: Group[] }>(showProblems ? "problem-groups" : "");
   const { query, status: filterStatus, archived: showArchived } = filters;
   const searchInput = useRef<HTMLInputElement>(null);
   const tab = !bankId && filters.showBanks ? "题库" : "全部题目";
@@ -144,7 +147,16 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
       ? `${group.name} · ${bankNames.get(group.bankId)}`
       : group.name,
   }));
-  const mergedProblems = mergePlatformProblems(problems.data?.items ?? [], platformSources.data?.items ?? []);
+  const mergedProblems = useMemo(() => mergePlatformProblems(problems.data?.items ?? [], platformSources.data?.items ?? []), [problems.data, platformSources.data]);
+  const groupsByProblem = useMemo(() => {
+    const result = new Map<string, Group[]>();
+    for (const group of groups.data?.items ?? []) for (const id of group.problemIds) {
+      const memberships = result.get(id) ?? [];
+      memberships.push(group);
+      result.set(id, memberships);
+    }
+    return result;
+  }, [groups.data]);
   const waitingForGroups = Boolean(filterGroup && (groups.loading || groups.error));
   const searchText = query.trim().toLowerCase();
   const rows = waitingForGroups ? [] :
@@ -160,7 +172,9 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
             .toLowerCase()
             .includes(searchText),
       ) ?? [];
-  const { checked, setChecked, changeRow } = useProblemSelection(rows.filter(problem => !isPlatformProblem(problem)), JSON.stringify([bankId, tab, query, filterBank, filterGroup, filterStatus]));
+  const scope = JSON.stringify([bankId, tab, query, filterBank, filterGroup, filterStatus]);
+  const pagination = useCatalogPagination(rows, scope);
+  const { checked, setChecked, changeRow } = useProblemSelection(pagination.rows.filter(problem => !isPlatformProblem(problem)), `${scope}:${pagination.page}`);
   const checkedProblems = (problems.data?.items ?? []).filter((problem) => checked.includes(problem.id));
   const publishableSelection = checkedProblems.filter((problem) => !publishEligibilityReason(problem, locale));
   const excludedSelection = checkedProblems.filter((problem) => publishEligibilityReason(problem, locale));
@@ -484,7 +498,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                 tr("操作", "Actions"),
               ]}
             >
-              {rows.map((problem) => (
+              {pagination.rows.map((problem) => (
                 <tr key={problem.id}>
                   <td>
                     <input
@@ -521,11 +535,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                     <GroupTags
                       singleLine
                       onClick={isPlatformProblem(problem) ? undefined : () => openManage([problem.id])}
-                      groups={
-                        groups.data?.items.filter((g) =>
-                          g.problemIds.includes(problem.id),
-                        ) ?? []
-                      }
+                      groups={groupsByProblem.get(problem.id) ?? []}
                     />
                   </td>
                   <td className="text-xs">
@@ -555,7 +565,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                   </td>
                 </tr>
               ))}
-              {!problems.loading && !problems.error && !waitingForGroups && !rows.length && (
+              {!problems.loading && !platformSources.loading && !problems.error && !platformSources.error && !waitingForGroups && !rows.length && (
                 <Empty columns={10}>
                   {searchText || filterBank || filterGroup || filterStatus
                     ? tr("没有匹配的题目，请调整搜索或筛选。", "No matching problems. Try another search or filter.")
@@ -563,6 +573,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                 </Empty>
               )}
             </Table>
+            <CatalogPagination {...pagination} />
           </section>
         </div>
       )}

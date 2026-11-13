@@ -190,7 +190,7 @@ export async function createDomainServices(pool,config) {
   return (await db.query(`SELECT ap.problem_id,v.id version_id,ap.points,ap.position,v.title,v.metadata->'difficulty' difficulty,
    COALESCE(global_reward.points,10) first_ac_points,COALESCE(assignment_reward.points,0) reward_points
    FROM assignment_problems ap JOIN problems p ON p.id=ap.problem_id
-   JOIN problem_versions v ON v.id=COALESCE(${liveProblemVersionIdSql('p')},ap.version_id)
+   JOIN problem_versions v ON v.problem_id=ap.problem_id AND v.id=COALESCE(${liveProblemVersionIdSql('p')},ap.version_id)
    LEFT JOIN point_rewards global_reward ON global_reward.problem_id=ap.problem_id AND global_reward.assignment_id IS NULL
    LEFT JOIN point_rewards assignment_reward ON assignment_reward.problem_id=ap.problem_id AND assignment_reward.assignment_id=ap.assignment_id
    LEFT JOIN LATERAL (SELECT chapter.position chapter_position,chapter.created_at chapter_created_at,chapter.id chapter_id,cp.position problem_position

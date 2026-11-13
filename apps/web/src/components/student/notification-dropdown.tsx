@@ -112,7 +112,7 @@ export function NotificationDropdown({ schoolId, scholarshipHref = "/student/sch
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const legacyStudent = workspace === "student" && !schoolId;
-  const assignments = useData<{ items: Assignment[] }>(legacyStudent ? "assignments" : "");
+  const assignments = useData<{ items: Assignment[] }>(legacyStudent && open ? "assignments" : "");
   const site = useData<{ announcement: string }>(legacyStudent ? "site-info" : "");
   const inboxPath = workspace === "platform" || workspace === "public" ? "account-notifications"
     : `${schoolId ? `schools/${encodeURIComponent(schoolId)}/` : ""}${workspace}-notifications`;
@@ -135,7 +135,7 @@ export function NotificationDropdown({ schoolId, scholarshipHref = "/student/sch
     return () => document.removeEventListener("pointerdown", outside);
   }, [open]);
 
-  const refresh = () => { assignments.reload(); site.reload(); messages.reload(); };
+  const refresh = () => { if (open) assignments.reload(); site.reload(); messages.reload(); };
   const unread = messages.data?.unreadCount ?? 0;
   const error = messages.error || assignments.error || site.error;
   const loading = messages.loading || assignments.loading || site.loading;

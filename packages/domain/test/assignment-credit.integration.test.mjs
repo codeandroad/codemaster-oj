@@ -391,6 +391,22 @@ test('ordinary assignments recognize prior formal AC without copying submissions
    const timed = await colleague.api(`/timed-practices/${practice}`);
    assert(!JSON.stringify(timed).includes('other_entry'));
   });
+
+  await t.test('assignment lists preserve current problem versions, ordering and grades from authorized details', async () => {
+   for (const reader of [student,teacher,colleague]) {
+    const {items,serverNow} = await reader.api('/assignments');
+    assert(items.length > 0);
+    assert(Number.isFinite(Date.parse(serverNow)));
+    for (const item of items) {
+     // Completion receipts are deliberately loaded only when opening a detail.
+     const {completion,...detail} = await reader.api(`/assignments/${item.id}`);
+     assert.deepEqual(item,detail,`list/detail mismatch for ${reader.username}: ${item.id}`);
+    }
+    const serialized=JSON.stringify(items);
+    assert(!serialized.includes('PRIVATE_REFERENCE_SENTINEL'));
+    assert(!serialized.includes('PRIVATE_STUDENT_CODE_SENTINEL'));
+   }
+  });
  } finally {
   if (server) await new Promise(resolve => server.close(resolve));
   await pool.end(); await manager.query(`DROP SCHEMA ${schema} CASCADE`); await manager.end();

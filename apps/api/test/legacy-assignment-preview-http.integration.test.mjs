@@ -108,7 +108,7 @@ test('legacy teachers preview the current exercise with private, immutable judge
     const view = await teacher(preview);
     assert.equal(view.problems[0].versionId, latest);
     assert.equal((await student(`/problems/${problemId}?current=1&versionId=${versionId}`)).versionId,latest,'normal workspace reads current content even when a bookmarked URL carries an old version');
-    assert.equal((await student(`/problems/${problemId}?versionId=${versionId}`)).versionId,versionId,'explicit historical reads keep their original snapshot');
+    assert.equal((await student(`/problems/${problemId}?versionId=${versionId}`)).versionId,latest,'ordinary student links use current content even without the current flag');
     assert.equal(view.problems[0].score, null);
     const statement = await teacher(problem);
     assert.equal(statement.problem.title, 'Later library version');
@@ -171,7 +171,7 @@ test('legacy teachers preview the current exercise with private, immutable judge
     assert.deepEqual(await state(), before);
 
     // Positive control proves all four student projections respond to formal work.
-    await student('/submissions', { body: { assignmentId, problemId, versionId: latest, kind: 'submit',
+    const formalSubmission = await student('/submissions', { body: { assignmentId, problemId, versionId: latest, kind: 'submit',
       code: 'print(input())', idempotencyKey: randomUUID() }, status: 201 });
     assert.equal(await processOne({ pool, judge, logger: {} }), true);
     const formal = await state();
@@ -188,6 +188,7 @@ test('legacy teachers preview the current exercise with private, immutable judge
     assert.equal((await teacher(preview)).problems[0].versionId, newest);
     assert.equal((await student(assignment)).problems[0].versionId, newest);
     assert.equal((await student(`/learning-paths/${courseId}`)).chapters[0].problems[0].versionId, newest);
+    assert.equal((await student(`/problems/${problemId}?originalSubmissionId=${formalSubmission.id}`)).versionId,latest,'an owned submission audit keeps its original judged version');
     assert.equal((await pool.query('SELECT version_id FROM assignment_problems WHERE assignment_id=$1',[assignmentId])).rows[0].version_id,versionId,'original assignment pin remains an audit record');
     assert.equal(await processOne({ pool, judge, logger: {} }), true);
     assert.equal((await teacher(`${preview}/jobs/${queuedBeforeUpdate.id}`)).status,'AC');

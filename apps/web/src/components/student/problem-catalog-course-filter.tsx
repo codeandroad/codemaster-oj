@@ -29,7 +29,7 @@ export function ProblemCatalogCourseFilter({ courses, value, onChange }: {
   return <select
     aria-label={label}
     title={label}
-    className={`${styles.courseFilter} ${input} !w-auto max-w-56 sm:max-w-64 !h-[34px] max-md:!h-11`}
+    className={`${styles.courseFilter} ${input} !w-56 sm:!w-64 max-w-full shrink-0 !h-[34px] max-md:!h-11`}
     value={value}
     onChange={event => onChange(event.currentTarget.value)}
     data-od-id="problem-catalog-course-filter"

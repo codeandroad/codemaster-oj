@@ -4,7 +4,6 @@ import { AppLink as Link } from "@/components/navigation";
 import { BankRenameDialog } from "@/components/bank-rename-dialog";
 import { useState } from "react";
 import {
-  BookOpen,
   CheckSquare2,
   FilePlus2,
   FolderPlus,
@@ -19,6 +18,8 @@ import { productionApi, type ProductionProblem } from "@/lib/production-api";
 import { Bank, Group, GroupTags, ManageGroups, MAX_BATCH_PUBLISH, publishEligibilityReason, reviewVisibilityLabel, validationStatusLabel } from "./problem-banks";
 import { useLocale } from "@/components/locale-context";
 import { useProblemSelection } from "./use-problem-selection";
+import { useProblemBankFilters } from "./use-problem-bank-filters";
+import styles from "./problem-banks.module.css";
 import {
   Drawer,
   Feedback,
@@ -32,7 +33,7 @@ import {
   useData,
 } from "./shared";
 
-export function TeacherBankDetail({ id }: { id: string }) {
+export function TeacherBankDetail({ id, accountId }: { id: string; accountId: string }) {
   const { locale } = useLocale();
   const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
   const banks = useData<{ items: Bank[] }>("problem-banks"),
@@ -41,7 +42,6 @@ export function TeacherBankDetail({ id }: { id: string }) {
     }>("problems"),
     groups = useData<{ items: Group[] }>(`problem-groups?bankId=${id}`),
     bank = banks.data?.items.find((x) => x.id === id),
-    [view, setView] = useState("all"),
     [confirmPublish, setConfirmPublish] = useState(false),
     [manage, setManage] = useState<{
       ids: string[];
@@ -53,6 +53,9 @@ export function TeacherBankDetail({ id }: { id: string }) {
     [renamingBank, setRenamingBank] = useState(false),
     [editGroup, setEditGroup] = useState<Group | null>(null),
     action = useAction();
+  const { filters, changeFilters } = useProblemBankFilters(accountId, id);
+  const view = filters.group === "none" || groups.data?.items.some(group => group.id === filters.group) ? filters.group : "all";
+  const setView = (group: string) => changeFilters({ group: group === "all" ? "" : group });
   const all = problems.data?.items.filter((p) => p.bankId === id) ?? [],
     rows =
       view === "all"
@@ -292,7 +295,16 @@ export function TeacherBankDetail({ id }: { id: string }) {
           )}
           {rows.length ? (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[880px] text-left text-sm">
+              <table className="w-full min-w-[950px] table-fixed text-left text-sm">
+                <colgroup>
+                  <col className="w-[5%]" />
+                  <col className="w-[33%]" />
+                  <col className="w-[17%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[10%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[10%]" />
+                </colgroup>
                 <thead className="bg-surface-subtle text-xs text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3">
@@ -335,7 +347,7 @@ export function TeacherBankDetail({ id }: { id: string }) {
                       <td className="px-4 py-3">
                         <Link
                           href={`/teacher/problems/${p.id}/edit?returnTo=${encodeURIComponent(`/teacher/problems/banks/${id}`)}`}
-                          className="font-semibold text-primary hover:underline focus-visible:underline"
+                          className={styles.problemTitle}
                         >
                           {p.title}
                         </Link>
@@ -343,7 +355,7 @@ export function TeacherBankDetail({ id }: { id: string }) {
                           {p.id.slice(0, 8)}
                         </p>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="break-words px-4 py-3">
                         <GroupTags
                           onClick={() => setManage({ ids: [p.id] })}
                           groups={
@@ -379,7 +391,7 @@ export function TeacherBankDetail({ id }: { id: string }) {
                               : validationStatusLabel(p.validationStatus ?? "Draft", locale)
                           }
                         />
-                        <p className="mt-1 max-w-52 text-xs leading-5 text-muted-foreground">{reviewVisibilityLabel(p, bank?.visibility, locale)}</p>
+                        <p className="mt-1 text-xs leading-4 text-muted-foreground empty:hidden">{reviewVisibilityLabel(p, bank?.visibility, locale, true)}</p>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -389,13 +401,9 @@ export function TeacherBankDetail({ id }: { id: string }) {
                           >
                             {p.canEdit === false ? tr("查看", "View") : tr("编辑", "Edit")}
                           </Link>
-                          {p.canManageTutorial && <Link className={buttonVariants({ size: "sm", variant: "ghost" })}
-                            href={`/teacher/problems/${p.id}/edit?tab=tutorial&returnTo=${encodeURIComponent(`/teacher/problems/banks/${id}`)}`}
-                            aria-label={tr(`编辑教程 · ${p.title}`, `Edit tutorial for ${p.title}`)}>
-                            <BookOpen size={15} aria-hidden="true" />{tr("编辑教程", "Edit tutorial")}
-                          </Link>}
                           <button
                             className="text-muted-foreground"
+                            aria-label={tr("整理分组", "Organize groups")}
                             title={tr("整理分组", "Organize groups")}
                             onClick={() => setManage({ ids: [p.id] })}
                           >

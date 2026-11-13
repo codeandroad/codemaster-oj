@@ -4,16 +4,16 @@ import { BankRenameDialog } from "@/components/bank-rename-dialog";
 import { ProblemGroupFilter } from "@/components/problem-group-filter";
 import {ProblemFilter} from "./problem-filter";
 import { useProblemSelection } from "./use-problem-selection";
+import { useProblemBankFilters } from "./use-problem-bank-filters";
 import { courseProblemOrder } from "./assignment-problem-order";
 import styles from "./problem-banks.module.css";
 
 import { AppLink as Link } from "@/components/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Archive,
   ArrowRight,
-  BookOpen,
   BookOpenCheck,
   CheckSquare2,
   FolderPlus,
@@ -22,6 +22,7 @@ import {
   Search,
   Trash2,
   Upload,
+  X,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { useRangeSelection } from "@/components/ui/use-range-selection";
@@ -74,8 +75,14 @@ export function validationStatusLabel(status: string, locale: AppLocale) {
   if (locale === "en") return status;
   return ({ Draft: "草稿", Incomplete: "待完善", Waiting: "排队中", Judging: "评测中", "System Error": "系统错误", Published: "已发布" } as Record<string, string>)[status] ?? status;
 }
-export function reviewVisibilityLabel(problem: ProductionProblem, bankVisibility?: "school" | "private", locale: AppLocale = "en") {
-  if (!problem.published) return problem.publishedVersionId ? localText(locale,"当前草稿未开放 · 旧版保持原范围","Current draft unavailable · previous version retains its scope") : localText(locale,"草稿未向学生开放","Draft unavailable to students");
+export function reviewVisibilityLabel(problem: ProductionProblem, bankVisibility?: "school" | "private", locale: AppLocale = "en", compact = false) {
+  if (!problem.published) {
+    const hasPublishedVersion = problem.publishedVersionId && problem.publishedVersionId !== problem.versionId;
+    if (compact) return hasPublishedVersion ? localText(locale, "已发布版本沿用原权限", "Published access retained") : "";
+    return hasPublishedVersion
+      ? localText(locale, "学生看不到这份草稿，仍可按原权限使用已发布版本。", "This draft is hidden from students. The published version keeps its existing access rules.")
+      : localText(locale, "此草稿对学生隐藏。", "This draft is hidden from students.");
+  }
   const visibility = problem.bankVisibility ?? bankVisibility;
   if (visibility !== "school") return localText(locale,"仅指定活动学生可见","Only visible to assigned activity students");
   if (problem.schoolVisibleAt) return problem.rankReviewStatus === "approved" ? localText(locale,"全校自由练习 · 参与积分榜","School-wide practice · leaderboard points") : localText(locale,"全校自由练习 · 积分资格未通过审核","School-wide practice · points not approved");
@@ -99,13 +106,11 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
     banks = useData<{ items: Bank[] }>("problem-banks?includeArchived=owned"),
     problems = useData<{ items: ProductionProblem[] }>("problems"),
     groups = useData<{ items: Group[] }>("problem-groups");
-  const [tab, setTab] = useState("全部题目"),
-    [showArchived, setShowArchived] = useState(false),
-    [query, setQuery] = useState(""),
-    [filterBank, setFilterBank] = useState(""),
-    [filterGroup, setFilterGroup] = useState(""),
-    [filterStatus, setFilterStatus] = useState(""),
-    [confirmPublish, setConfirmPublish] = useState(false),
+  const { filters, changeFilters } = useProblemBankFilters(user.id, bankId);
+  const { query, status: filterStatus, archived: showArchived } = filters;
+  const searchInput = useRef<HTMLInputElement>(null);
+  const tab = !bankId && filters.showBanks ? "题库" : "全部题目";
+  const [confirmPublish, setConfirmPublish] = useState(false),
     [create, setCreate] = useState(false),
     [renamingBank, setRenamingBank] = useState<Bank | null>(null),
     [deletingBank, setDeletingBank] = useState<Bank | null>(null),
@@ -119,8 +124,10 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
     activeBanks = banks.data?.items.filter((item) => !item.archivedAt) ?? [],
     archivedBanks = banks.data?.items.filter((item) => !!item.archivedAt) ?? [],
     listedBanks = showArchived ? archivedBanks : activeBanks;
+  const filterBank = !bankId && (!banks.data || activeBanks.some(bank => bank.id === filters.bank)) ? filters.bank : "";
   const scopedBank = bankId || filterBank;
   const scopedGroups = (groups.data?.items ?? []).filter(group => !scopedBank || group.bankId === scopedBank);
+  const filterGroup = filters.group === "ungrouped" || !groups.data || scopedGroups.some(group => group.id === filters.group) ? filters.group : "";
   const selectedGroup = scopedGroups.find(group => group.id === filterGroup);
   const groupMembers = new Set(filterGroup === "ungrouped"
     ? scopedGroups.flatMap(group => group.problemIds)
@@ -235,7 +242,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
       <Feedback action={action} />
       <div className={styles.sectionBar}>
         {!bankId && (
-          <Tabs value={tab === "题库" ? tr("题库", "Banks") : tr("全部题目", "All problems")} onChange={value => setTab(value === tr("题库", "Banks") ? "题库" : "全部题目")} items={[tr("全部题目", "All problems"), tr("题库", "Banks")]} />
+          <Tabs value={tab === "题库" ? tr("题库", "Banks") : tr("全部题目", "All problems")} onChange={value => changeFilters({ showBanks: value === tr("题库", "Banks") })} items={[tr("全部题目", "All problems"), tr("题库", "Banks")]} />
         )}
         <div className={styles.accessGuide}>
           <PublicationGuide />
@@ -248,10 +255,10 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
       {!bankId && tab === "题库" ? (
         <section className={`${panel} mt-2`}>
           <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">
-            <Button size="sm" variant={showArchived ? "ghost" : "secondary"} aria-pressed={!showArchived} onClick={() => setShowArchived(false)}>
+            <Button size="sm" variant={showArchived ? "ghost" : "secondary"} aria-pressed={!showArchived} onClick={() => changeFilters({ archived: false })}>
               {tr("使用中", "Active")} · {activeBanks.length}
             </Button>
-            <Button size="sm" variant={showArchived ? "secondary" : "ghost"} aria-pressed={showArchived} onClick={() => setShowArchived(true)}>
+            <Button size="sm" variant={showArchived ? "secondary" : "ghost"} aria-pressed={showArchived} onClick={() => changeFilters({ archived: true })}>
               {tr("已归档", "Archived")} · {archivedBanks.length}
             </Button>
           </div>
@@ -353,7 +360,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                 >
                   <button
                     className="min-h-11 flex-1 px-3 py-3 text-left text-sm"
-                    onClick={() => setFilterGroup(group.id)}
+                    onClick={() => changeFilters({ group: group.id })}
                   >
                     {group.id === "" ? tr("全部题目", "All problems") : group.id === "ungrouped" ? tr("未分组", "Ungrouped") : group.name}
                   </button>
@@ -372,31 +379,38 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
           )}
           <section className={`${panel} min-w-0`}>
             <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
-              <label className="relative min-w-0 flex-1" style={{maxWidth:480,flexBasis:240}}>
+              <div className="relative min-w-0 flex-1" style={{maxWidth:480,flexBasis:240}}>
                 <Search
                   className="absolute left-3 top-3 text-muted-foreground"
                   size={16}
+                  aria-hidden="true"
                 />
                 <input
+                  ref={searchInput}
                   aria-label={tr("搜索题目", "Search problems")}
                   value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  onChange={(e) => changeFilters({ query: e.target.value })}
                   placeholder={tr("搜索题号、标题或主题", "Search ID, title, or topic")}
-                  className={`${input} pl-9`}
+                  className={`${input} pl-9 pr-10`}
                 />
-              </label>
-              <ProblemGroupFilter groups={groupOptions} value={filterGroup} onChange={setFilterGroup} disabled={groups.loading || !groups.data} />
+                {query && <button type="button"
+                  aria-label={tr("清除搜索", "Clear search")}
+                  onClick={() => { changeFilters({ query: "" }); searchInput.current?.focus(); }}
+                  className="absolute inset-y-0 right-1 grid w-9 cursor-pointer place-items-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+                ><X size={16} aria-hidden="true" /></button>}
+              </div>
+              <ProblemGroupFilter groups={groupOptions} value={filterGroup} onChange={group => changeFilters({ group })} disabled={groups.loading || !groups.data} />
               <ProblemFilter
                 banks={activeBanks}
                 bankId={bankId}
                 bank={filterBank}
                 status={filterStatus}
                 onBank={value => {
-                  setFilterBank(value);
-                  if (value && selectedGroup && selectedGroup.bankId !== value) setFilterGroup("");
+                  changeFilters({ bank: value, group: value && filterGroup !== "ungrouped" && selectedGroup?.bankId !== value ? "" : filterGroup });
                 }}
-                onStatus={setFilterStatus}
-                onClearGroup={filterGroup ? () => setFilterGroup("") : undefined}
+                onStatus={status => changeFilters({ status })}
+                groupActive={Boolean(filterGroup)}
+                onClear={() => changeFilters({ bank: "", status: "", group: "" })}
               />
               <Button variant="secondary" size="sm" onClick={togglePublishableScope} disabled={!publishableScope.length || action.busy}>
                 <CheckSquare2 size={15} />
@@ -446,6 +460,8 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
               </div>
             )}
             <Table
+              min={1040}
+              columnWidths={[6, 32, 11, 16, 9, 14, 12]}
               headers={[
                 tr("选择", "Select"),
                 tr("题目", "Problem"),
@@ -468,8 +484,8 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                   </td>
                   <td>
                     <Link
-                      href={`/teacher/problems/${problem.id}/edit?returnTo=${encodeURIComponent(bankId ? `/teacher/problems/banks/${bankId}` : "/teacher/problems?tab=all")}`}
-                      className="font-semibold text-primary hover:underline focus-visible:underline"
+                      href={`/teacher/problems/${problem.id}/edit?returnTo=${encodeURIComponent(bankId ? `/teacher/problems/banks/${bankId}` : "/teacher/problems")}`}
+                      className={styles.problemTitle}
                     >
                       {problem.title}
                     </Link>
@@ -477,13 +493,13 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                       {problem.id.slice(0, 8)}
                     </p>
                   </td>
-                  <td>
+                  <td className="break-words">
                     {
                       banks.data?.items.find((x) => x.id === problem.bankId)
                         ?.name
                     }
                   </td>
-                  <td>
+                  <td className="break-words">
                     <p className="text-xs text-muted-foreground">
                       {problem.tags?.join(" · ") || "—"}
                     </p>
@@ -496,28 +512,23 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                       }
                     />
                   </td>
-                  <td>
+                  <td className="text-xs">
                     {problem.mode === "function" ? tr("函数模式", "Function") : tr("标准输入输出", "Standard I/O")}
                   </td>
-                  <td>
+                  <td className={styles.publicationCell}>
                     <ProblemPublicationStatus problem={problem} bankVisibility={banks.data?.items.find((x) => x.id === problem.bankId)?.visibility}/>
                     {!problem.published && <p className="mt-1 text-xs text-muted-foreground">{tr("参考验证", "Reference check")}: {validationStatusLabel(problem.validationStatus ?? "Draft", locale)}</p>}
-                    <p className="mt-1 max-w-52 text-xs leading-5 text-muted-foreground">{reviewVisibilityLabel(problem, banks.data?.items.find((x) => x.id === problem.bankId)?.visibility, locale)}</p>
+                    <p className="mt-1 text-xs leading-4 text-muted-foreground empty:hidden">{reviewVisibilityLabel(problem, banks.data?.items.find((x) => x.id === problem.bankId)?.visibility, locale, true)}</p>
                   </td>
                   <td>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <div className="flex flex-col items-start gap-1 text-xs">
                       <Link
-                        href={`/teacher/problems/${problem.id}/edit?returnTo=${encodeURIComponent(bankId ? `/teacher/problems/banks/${bankId}` : "/teacher/problems?tab=all")}`}
+                        href={`/teacher/problems/${problem.id}/edit?returnTo=${encodeURIComponent(bankId ? `/teacher/problems/banks/${bankId}` : "/teacher/problems")}`}
                         className="inline-flex items-center gap-1 font-semibold text-primary"
                       >
                         {problem.canEdit === false ? tr("查看", "View") : tr("编辑", "Edit")} <ArrowRight size={14} />
                       </Link>
-                      {problem.canManageTutorial && <Link className={buttonVariants({ size: "sm", variant: "ghost" })}
-                        href={`/teacher/problems/${problem.id}/edit?tab=tutorial&returnTo=${encodeURIComponent(bankId ? `/teacher/problems/banks/${bankId}` : "/teacher/problems?tab=all")}`}
-                        aria-label={tr(`编辑教程 · ${problem.title}`, `Edit tutorial for ${problem.title}`)}>
-                        <BookOpen size={15} aria-hidden="true" />{tr("编辑教程", "Edit tutorial")}
-                      </Link>}
-                      <button className={link} onClick={() => openManage([problem.id])}>
+                      <button className={`${link} text-left`} onClick={() => openManage([problem.id])}>
                         {tr("整理分组", "Organize groups")}
                       </button>
                     </div>

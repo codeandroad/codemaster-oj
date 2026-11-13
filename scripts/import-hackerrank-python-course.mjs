@@ -22,7 +22,7 @@ const hash=createHash('sha256').update(markdown).update('\0').update(source).dig
 const statePath=resolve(privateDir,'native-import-state.json');
 let state;
 try{state=JSON.parse(await readFile(statePath,'utf8'));}catch(e){if(e.code!=='ENOENT')throw e;}
-state??={schema:1,hash,courseId:null,groupId:null,batches:Array.from({length:5},()=>({key:randomUUID(),items:[]}))};
+state??={schema:1,hash,courseId:null,groupId:null,cleanMetadata:true,batches:Array.from({length:5},()=>({key:randomUUID(),items:[]}))};
 assert.equal(state.schema,1);assert.equal(state.hash,hash,'Source changed: review the recorded draft import before changing versions');
 async function save(){await mkdir(privateDir,{recursive:true,mode:0o700});const temp=statePath+'.tmp';await writeFile(temp,JSON.stringify(state,null,2)+'\n',{mode:0o600});await rename(temp,statePath);}
 await save();
@@ -63,7 +63,10 @@ try{
  for(const [i,batch] of state.batches.entries()){
   const expected=problems.slice(i*25,i*25+25);
   if(!batch.items.length){
-   const receipt=await api('problems/import',{idempotencyKey:batch.key,filename:`hackerrank-python/part-${i+1}.json`,rows:expected.map(({chapterNumber,courseKey,sourceSlug,sourceId,...p})=>({...p,saveDraft:true}))});
+   const rows=expected.map(({chapterNumber,courseKey,sourceSlug,sourceId,...p})=>({
+    ...p,...(state.cleanMetadata?{tags:p.tags.filter(tag=>tag!=='Original practice'),source:''}:{}),saveDraft:true,
+   }));
+   const receipt=await api('problems/import',{idempotencyKey:batch.key,filename:`hackerrank-python/part-${i+1}.json`,rows});
    await writeFile(resolve(privateDir,`batch-${i+1}.json`),JSON.stringify(receipt,null,2)+'\n',{mode:0o600});
    assert.equal(receipt.summary.failed,0,'Inspect the private batch receipt; the idempotency key is retained');
    batch.items=receipt.items.map((x,j)=>({courseKey:expected[j].courseKey,chapterNumber:expected[j].chapterNumber,id:x.problem.id,versionId:x.problem.versionId}));await save();

@@ -51,7 +51,7 @@ async function repair(db, apply) {
       AND v.rank_review_status = 'approved' AND v.validation_status = 'AC'
     ORDER BY cp.position, p.id ${apply ? 'FOR SHARE OF p, v' : ''}`, [chapters[0].id, bankId, titles]);
   check(pins.length === titles.length && pins.every((pin, index) => pin.title === titles[index])
-    && pins.slice(1).every(pin => pin.source === supplementSource),
+    && pins.slice(1).every(pin => pin.source === supplementSource || pin.source === ''),
     'The expected Chapter 2 pins are missing, reordered, or not published and approved.');
 
   // Read the complete group, including archived problems omitted by the group API.

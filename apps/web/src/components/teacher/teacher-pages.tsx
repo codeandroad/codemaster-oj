@@ -50,7 +50,7 @@ export function TeacherPages({
   if (path === "/teacher/problems/solutions-review") return <SolutionReviewPage />;
   if (path === "/teacher/problems") return <TeacherBanks user={user} />;
   let match = path.match(/^\/teacher\/problems\/banks\/([^/]+)$/);
-  if (match) return <TeacherBankDetail id={match[1]!} />;
+  if (match) return <TeacherBankDetail id={match[1]!} accountId={user.id} />;
   match = path.match(/^\/teacher\/problems\/([^/]+)\/edit$/);
   if (match) return <TeacherProblemEditor id={match[1]!} user={user} />;
   if (path === "/teacher/assignments") return <TeacherAssignments />;

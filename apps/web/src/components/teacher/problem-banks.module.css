@@ -55,6 +55,33 @@
   line-height: 20px;
 }
 
+.problemTitle {
+  display: block;
+  overflow: hidden;
+  color: var(--primary);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.problemTitle:hover,
+.problemTitle:focus-visible {
+  text-decoration: underline;
+}
+
+.problemTitle:focus-visible {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.publicationCell > span {
+  white-space: normal;
+}
+
+.publicationCell > span > svg {
+  flex-shrink: 0;
+}
+
 .accessGuide:has(details[open]) > .guideNote {
   display: block;
 }

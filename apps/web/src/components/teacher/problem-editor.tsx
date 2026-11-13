@@ -163,6 +163,42 @@ export function TeacherProblemEditor(props: TeacherProblemEditorProps) {
     {...props} platform={platform} versionId={versionId} />;
 }
 
+type DraftPresentation = { editRevision?: number; sourceHash: string; presentation: { statement: string; metadata: Record<string, unknown> } | null };
+
+function ProblemDraftPresentation({ problem, locale, platform }: { problem: EditorProblem; locale: string; platform: boolean }) {
+  const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
+  const [open, setOpen] = useState(false);
+  const [reviewed, setReviewed] = useState(false);
+  const [statement, setStatement] = useState<string | null>(null);
+  const action = useAction();
+  const endpoint = platform ? `platform/source-problems/${encodeURIComponent(problem.id)}/public-statement` : "scholarship/public-statements";
+  const detail = useData<DraftPresentation>(open ? `${endpoint}?${new URLSearchParams({problemId: problem.id, versionId: problem.versionId!, view: "draft"})}` : null);
+  const current = detail.data;
+  const value = statement ?? current?.presentation?.statement ?? problem.statement;
+  return <div className="rounded-md border border-border p-4 text-sm">
+    <Button variant="secondary" onClick={() => setOpen(!open)} aria-expanded={open}>
+      {tr("审核公开英文题面", "Review public English statement")}
+    </Button>
+    {open && <div className="mt-3 space-y-3">
+      <p className="text-muted-foreground">{tr("如题目已有独立的英文题面，修改原题后请在这里核对英文。英文会随本次草稿一起发布。", "If the problem has a separate English statement, check it here after changing the source. It will be released with this draft.")}</p>
+      {detail.loading ? <p role="status">{tr("正在加载…", "Loading…")}</p> : detail.error ? <p role="alert">{detail.error}</p> : current?.editRevision !== problem.editRevision ? <p role="alert">{tr("草稿已更新，请重新打开题目。", "The draft has changed. Reopen the problem.")}</p> : current && <>
+        <MathEditor fieldName="draft-public-statement" label={tr("英文题面", "English statement")} value={value} disabled={action.busy}
+          onChange={text => {setStatement(text);setReviewed(false);action.clear();}} rows={8}/>
+        <label className="flex items-start gap-2"><input type="checkbox" checked={reviewed} onChange={event => setReviewed(event.target.checked)} />
+          {tr("我已核对内容与原题一致，且不含答案或隐藏测试。", "I checked that the statement matches the source and includes no answers or hidden tests.")}</label>
+        <Button variant="secondary" disabled={!reviewed || !value.trim() || action.busy} onClick={() => void action.run(async () => {
+          await productionApi(endpoint, {method: "POST", body: {problemId: problem.id, versionId: problem.versionId,
+            expectedRevision: problem.editRevision, sourceHash: current.sourceHash, language: "en", statement: value,
+            metadata: current.presentation?.metadata ?? {}, reviewed: true}});
+          setReviewed(false);
+          return tr("已为本次草稿保存审核过的英文题面。", "Reviewed English statement saved for this draft.");
+        })}>{tr("保存审核结果", "Save reviewed statement")}</Button>
+        <Feedback action={action}/>
+      </>}
+    </div>}
+  </div>;
+}
+
 function ProblemEditorResource({ id, user, platform, versionId, onClose, navigation }: TeacherProblemEditorProps & { platform: boolean; versionId: string | null }) {
   const { locale } = useLocale();
   const search = useSearchParams();
@@ -271,7 +307,7 @@ function ProblemEditorForm({ initial, user, platform, onClose, navigation }: {
         { signal: controller.signal },
       )
         .then(result => {
-          if (!controller.signal.aborted) setSaved(current => current?.versionId === result.versionId ? result : current);
+          if (!controller.signal.aborted) setSaved(current => current?.versionId === result.versionId && current?.editRevision === result.editRevision ? result : current);
         })
         .catch(() => {});
     }, 1800);
@@ -294,7 +330,7 @@ function ProblemEditorForm({ initial, user, platform, onClose, navigation }: {
     const body = {
       ...problem,
       saveDraft: true,
-      ...(platform ? { expectedVersionId: saved?.versionId } : {}),
+      ...(saved ? { expectedVersionId: saved.versionId, expectedRevision: saved.editRevision } : {}),
       comparator: problem.mode === "function" ? "json" : problem.comparator === "exact" ? "exact" : "tokens",
       tests: equalCaseWeights(tests),
       functionName: problem.mode === "function" ? problem.functionName : "",
@@ -327,7 +363,7 @@ function ProblemEditorForm({ initial, user, platform, onClose, navigation }: {
       <PageHeader
         eyebrow={tr("题目编辑", "Problem editor")}
         title={problem.title || tr("新建题目", "New problem")}
-        description={`${platform ? "CodeMaster" : banks.data?.items.find((x) => x.id === problem.bankId)?.name ?? tr("尚未选择题库", "No bank selected")} · ${tr("草稿保存与发布分别进行，已发布版本及历史成绩保留。", "Saving a draft and publishing are separate. Published versions and past results remain.")}`}
+        description={`${platform ? "CodeMaster" : banks.data?.items.find((x) => x.id === problem.bankId)?.name ?? tr("尚未选择题库", "No bank selected")} · ${tr("保存草稿后，学生仍看到已发布内容。", "Students continue to see the published content after you save a draft.")}`}
         action={
           <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-5 gap-y-2">
             <ProblemEditorSteps navigation={steps} dirty={dirty || tutorialState.dirty} disabled={stepDisabled}
@@ -373,6 +409,8 @@ function ProblemEditorForm({ initial, user, platform, onClose, navigation }: {
       {switchError && <p role="alert" className="mt-3 text-sm text-destructive">{switchError}</p>}
       {nextStep && tutorialState.dirty && <p role="status" className="mt-2 text-sm text-muted-foreground">{tr("请先在“教程”中保存或放弃修改，再使用“保存并编辑下一题”。", "Save or discard your Tutorial changes before using Save and edit next.")}</p>}
       {solutionPending && <p role="status" className="mt-2 text-sm text-muted-foreground">{tr("题解有未保存修改或正在提交。请在“解答与提示”中完成保存，再保存题目草稿。", "Solution changes are unsaved or being submitted. Finish saving them under Solutions and hints before saving the problem draft.")}</p>}
+      {saved?.draftReviewStatus === "pending" && <p role="status" className="mt-2 text-sm text-muted-foreground">{tr("草稿待审核。继续保存修改后，需要重新提交审核。", "This draft is awaiting review. If you save further edits, submit it for review again.")}</p>}
+      {saved?.draftReviewStatus === "rejected" && <p role="status" className="mt-2 text-sm text-destructive">{tr("草稿未通过审核", "Draft rejected")}{saved.draftReviewReason ? `：${saved.draftReviewReason}` : ""}</p>}
       {draft.recovery&&<section className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface-subtle px-3 py-2 text-sm" data-od-id="teacher-draft-recovery"><p>{tr("发现本机未保存草稿", "Unsaved local draft found")} · {new Date(draft.recovery.updatedAt).toLocaleString(locale === "zh" ? "zh-CN" : "en-US")} {draft.recovery.baseVersion!==(initial?.versionId??"new")&&tr("（服务器版本已变化，请核对后保存）", "(The server version changed; review before saving)")}</p><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={!editable || action.busy || switching} onClick={draft.restore}>{tr("恢复草稿", "Restore draft")}</Button><Button size="sm" variant="ghost" disabled={action.busy || switching} onClick={draft.discard}>{tr("忽略草稿", "Discard draft")}</Button></div></section>}
       {draft.status&&<p className="mt-2 text-xs text-muted-foreground" role="status" data-od-id="teacher-autosave-status">{draft.status}</p>}
 
@@ -750,12 +788,12 @@ function ProblemEditorForm({ initial, user, platform, onClose, navigation }: {
               <div className="border border-border p-4">
                 <h3 className="font-bold">{tr("当前版本", "Current version")}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  {tr("保存草稿与发布分别进行。已发布题目的修改不会覆盖历史作业仍在使用的旧版本。", "Draft saving and publication are separate. Changes to published problems do not overwrite versions used by past assignments.")}
+                  {tr("草稿保存在同一道题中。发布后，学生看到更新后的内容；已有提交、成绩和进度保留。", "Drafts are saved to the same problem. On publication, students see the updated content and keep their submissions, grades, and progress.")}
                 </p>
-                <p className="mt-2 text-sm text-muted-foreground">{platform ? tr("由平台管理员发布题目版本并设置公开范围。授权编辑者可以保存修改，等待管理员发布。", "Platform administrators publish versions and manage visibility. Authorized editors save changes for administrator publication.") : bankVisibility === "school" ? tr("发布到校内题库后自动进入管理员审核；审核通过前，仅负责教师及指定作业或训练学生可见，不计入积分排行榜。", "Publishing to a school bank starts admin review. Until approval, only the responsible teacher and assigned students can access it; it earns no leaderboard points.") : tr("当前为教师私有题库。题目发布后可用于指定作业或训练；如需全校开放，请联系管理员纳入校内审核。", "This is a private teacher bank. Published problems can be used in assigned activities. Ask an administrator for school-wide review.")}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{platform ? tr("授权编辑者可以保存草稿，由平台管理员发布。", "Authorized editors can save drafts. A platform administrator publishes them.") : bankVisibility === "school" ? tr("提交草稿后，由学校管理员审核。通过前，学生仍看到上次发布的内容。", "A school administrator reviews submitted drafts. Students keep seeing the last published content until approval.") : tr("这是教师私有题库。发布后，更新可用于指定作业或训练。", "This bank is teacher-private. Published updates can be used in assigned activities.")}</p>
                 {saved && !platform && <p className="mt-2 text-sm font-medium">{tr("当前状态", "Current status")}: {reviewVisibilityLabel(saved, bankVisibility, locale)}</p>}
                 <p className="mt-3 font-mono text-xs">
-                  {saved?.versionId ?? tr("尚未保存", "Not saved")}
+                  {saved?.id ?? tr("尚未保存", "Not saved")}
                 </p>
               </div>
               <div className="border border-border">
@@ -790,6 +828,8 @@ function ProblemEditorForm({ initial, user, platform, onClose, navigation }: {
                   {saved.validationMessage}
                 </p>
               )}
+              {saved?.versionId && (saved.editRevision ?? 0) > (saved.publishedRevision ?? 0) && editable && saved.draftReviewStatus !== "pending" &&
+                <ProblemDraftPresentation key={`${saved.id}:${saved.editRevision}`} problem={saved} locale={locale} platform={platform} />}
             </section>
             <aside className="space-y-3">
               <StatusPill status={validationStatusLabel(saved?.validationStatus ?? "Draft", locale)} />
@@ -943,14 +983,16 @@ function ProblemEditorForm({ initial, user, platform, onClose, navigation }: {
       {impact && (
         <Modal title={tr("版本影响", "Version impact")} onClose={() => setImpact(false)}>
           <p className="text-sm leading-7">
-            {tr("发布后，新练习使用新的已发布版本。作业、计时训练、原提交和订正继续使用各自固定的版本。重判、发布成绩与版本发布分别进行。", "After publishing, new practice uses the new version. Assignments, timed practices, original submissions, and corrections keep their fixed versions. Rejudging, result publication, and version publication are separate actions.")}
+            {tr("发布后，课程、作业和练习会显示更新后的题目。已有提交、成绩和进度不变；已有提交的订正仍使用提交时的判题数据。", "After publishing, courses, assignments, and practice show the updated problem. Existing submissions, grades, and progress stay intact. Corrections use the original submission’s judge data.")}
           </p>
         </Modal>
       )}
       {canPublish && publish && saved && (
         <Modal title={platform ? tr("发布版本", "Publish version") : bankVisibility === "school" ? tr("提交公开审核", "Request public review") : tr("启用教学版本", "Release for teaching")} onClose={() => setPublish(false)}>
           <p className="text-sm leading-6">
-            {tr("发布", "Publish")} “{saved.title}” {tr("的已验证版本。历史活动与提交保留原版本。", "as a validated version. Past activities and submissions keep the earlier version.")} {platform ? tr("课程与普通练习使用最新已发布版本。公开范围由平台管理员在题库中另行设置。", "Courses and ordinary practice use the latest published version. Platform administrators manage public visibility separately in the problem bank.") : bankVisibility === "school" ? tr("本版本将进入管理员审核；通过前仅指定活动学生可见，也不会计入全校排名积分。", "This version enters admin review. Until approved, it is visible only to assigned activity students and earns no leaderboard points.") : tr("当前题库为教师私有，仅指定活动学生可见；如需全校开放，须由管理员调整题库范围并审核该版本。", "This bank is teacher-private and visible only to assigned activity students. An administrator must adjust the bank scope and approve this version for school-wide access.")}
+            {platform || bankVisibility !== "school"
+              ? tr(`发布“${saved.title}”的已验证修改。已有提交、成绩和进度会保留。`, `Publish the validated changes to “${saved.title}”. Existing submissions, grades, and progress will be kept.`)
+              : tr(`提交“${saved.title}”供学校管理员审核。通过前，学生继续看到已发布内容。`, `Send “${saved.title}” to a school administrator for review. Students keep seeing the published content until approval.`)}
           </p>
           <Feedback action={action} />
           <div className="mt-5 flex justify-end gap-2">
@@ -963,13 +1005,13 @@ function ProblemEditorForm({ initial, user, platform, onClose, navigation }: {
                 void action.run(async () => {
                   const result = await productionApi<EditorProblem>(
                     `${endpoint}/${saved.id}/publish`,
-                    { method: "POST", body: platform ? { expectedVersionId: saved.versionId } : { versionId: saved.versionId } },
+                    { method: "POST", body: { ...(platform ? { expectedVersionId: saved.versionId } : { versionId: saved.versionId }), expectedRevision: saved.editRevision } },
                   );
                   setSaved(result);
                   setProblem(result);
                   setTagsText(null);
                   setPublish(false);
-                  return platform ? tr("题目版本已发布。", "Problem version published.") : tr("题目版本已发布；全校开放和积分资格须经管理员审核。", "Problem version published. School-wide access and point eligibility require admin review.");
+                  return !platform && bankVisibility === "school" ? tr("已提交学校管理员审核。", "Sent to a school administrator for review.") : tr("题目已发布。", "Problem published.");
                 })
               }
             >

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
-import { claimTask, completeTask, failTask, renewLease, processOne } from '../worker.mjs';
+import { claimTask, completeTask, failTask, loadTask, renewLease, processOne } from '../worker.mjs';
 import { GoJudge } from '../judge.mjs';
 import { migrate } from '../src/migrate.mjs';
 
@@ -39,6 +39,32 @@ async function enqueue(kind = 'submit', code = 'print(42)', language = 'python')
   return (await pool.query("INSERT INTO judge_tasks(submission_id,version_id,purpose) VALUES($1,$2,'submission') RETURNING *", [submission.id, versionId])).rows[0];
 }
 const ac = { status: 'AC', score: 100, passed: 1, total: 1, publicOutput: '', publicMessage: 'Passed', privateResults: [], environmentVersion: 'test-runtime' };
+
+test('admitted jobs and rejudges keep their original tests after a problem is edited', { skip: !enabled }, async () => {
+  const source = (await pool.query(`INSERT INTO problem_versions
+    (problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code)
+    VALUES($1,'Editable exercise','stdio','Test',500,64,'print(42)') RETURNING id`, [problemId])).rows[0];
+  await pool.query("INSERT INTO test_cases(version_id,position,input,expected,weight) VALUES($1,1,'','42',100)", [source.id]);
+  const submission = (await pool.query(`INSERT INTO submissions
+    (account_id,identity_id,problem_id,version_id,kind,code,idempotency_key,request_hash)
+    VALUES($1,$2,$3,$4,'submit','print(42)',$5,'test-hash') RETURNING id`,
+  [accountId, identityId, problemId, source.id, randomUUID()])).rows[0];
+  const original = (await pool.query(`INSERT INTO judge_tasks(submission_id,version_id,purpose,state)
+    VALUES($1,$2,'submission','completed') RETURNING *`, [submission.id, source.id])).rows[0];
+  await pool.query("UPDATE test_cases SET expected='43' WHERE version_id=$1", [source.id]);
+  const rejudge = (await pool.query(`INSERT INTO judge_tasks(submission_id,version_id,purpose,rejudge,state)
+    VALUES($1,$2,'submission',true,'completed') RETURNING *`, [submission.id, source.id])).rows[0];
+  const correction = (await pool.query(`INSERT INTO submissions
+    (account_id,identity_id,problem_id,version_id,kind,original_submission_id,code,idempotency_key,request_hash)
+    VALUES($1,$2,$3,$4,'correction',$5,'print(42)',$6,'test-hash') RETURNING id`,
+  [accountId, identityId, problemId, source.id, submission.id, randomUUID()])).rows[0];
+  const correctionTask = (await pool.query(`INSERT INTO judge_tasks(submission_id,version_id,purpose,state)
+    VALUES($1,$2,'submission','completed') RETURNING *`, [correction.id, source.id])).rows[0];
+  assert.equal((await loadTask(pool, original)).tests[0].expected, '42');
+  assert.equal((await loadTask(pool, rejudge)).tests[0].expected, '42');
+  assert.equal((await loadTask(pool, correctionTask)).tests[0].expected, '42');
+  await assert.rejects(pool.query("UPDATE judge_tasks SET problem_snapshot='{}' WHERE id=$1", [original.id]), /immutable/);
+});
 
 test('real PostgreSQL leases: concurrent claims differ and duplicate completion is idempotent', { skip: !enabled }, async () => {
   await enqueue(); await enqueue();

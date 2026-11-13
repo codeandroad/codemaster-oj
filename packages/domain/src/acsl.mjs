@@ -257,12 +257,13 @@ async function programmingOperation(db, paper, user, tail, method, body, url) {
     const coding = await codingProgress(db, paper, user.id);
     return reply(await acslSolution(db, paper, user, solution[1], body, coding.solved));
   }
-  const version = (await db.query('SELECT definition FROM school_problem_versions WHERE school_id=$1 AND id=$2', [paper.school_id, paper.programming_version_id])).rows[0].definition;
+  const published = (await db.query('SELECT definition,draft_revision FROM school_problem_versions WHERE school_id=$1 AND id=$2', [paper.school_id, paper.programming_version_id])).rows[0];
+  const version = published.definition;
   if (!tail && method === 'GET') {
     const coding = await codingProgress(db, paper, user.id);
     const programming = paper.definition.programming;
     const tutorialLanguage = url.searchParams.get('language') === 'zh' ? 'zh' : 'en';
-    return reply({ id: paper.programming_problem_id, versionId: paper.programming_version_id, paperVersionId: paper.version_id,
+    return reply({ id: paper.programming_problem_id, versionId: paper.programming_version_id, publishedRevision: published.draft_revision, paperVersionId: paper.version_id,
       title: programming.definition.title, ...programmingStatement(paper, 'en'),
       ...(programming.tutorial?.[tutorialLanguage] ? { tutorial: { source: 'custom', body: programming.tutorial[tutorialLanguage] } } : {}),
       mode: version.mode, functionName: version.function_name, comparator: version.comparator,
@@ -313,7 +314,8 @@ async function programmingOperation(db, paper, user, tail, method, body, url) {
     return reply(result);
   }
   if (tail !== 'submissions' || method !== 'POST') return null;
-  if (uuid(body.versionId) !== paper.programming_version_id) fail(409, 'VERSION_CONFLICT', 'Programming version changed.');
+  if (uuid(body.versionId) !== paper.programming_version_id ||
+    body.publishedRevision != null && body.publishedRevision !== published.draft_revision) fail(409, 'PROBLEM_UPDATED', 'Programming problem changed. Refresh before submitting.');
   const kind = enumValue(body.kind, ['samples', 'custom', 'submit'], 'Submission kind');
   const language = enumValue(body.language ?? 'python', LANGUAGES, 'Language');
   const code = bytes(body.code, 'Code');

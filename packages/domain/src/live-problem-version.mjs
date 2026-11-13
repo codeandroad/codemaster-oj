@@ -31,3 +31,8 @@ export async function resolveLiveProblemVersion(db, problemId, { lock = true, al
 export function assertLiveProblemVersion(requestedId, resolvedId) {
  if (requestedId && requestedId !== resolvedId) fail(409, 'PROBLEM_UPDATED', '题目已更新，请刷新页面后重新运行或提交；已保存的代码和历史成绩不受影响。');
 }
+
+export function assertPublishedRevision(requested, resolved) {
+ if (requested != null && requested !== resolved)
+  fail(409, 'PROBLEM_UPDATED', '题目内容已更新，请刷新后重新运行或提交。');
+}

@@ -1,6 +1,6 @@
 import {transaction} from './db.mjs';
 import {canonicalHash,enumValue,fail,field,uuid} from './security.mjs';
-import {isScholarshipStaff,resolveAssistanceTarget} from './scholarship-access.mjs';
+import {resolveAssistanceTarget} from './scholarship-access.mjs';
 
 const textKeys=['objective','inputDescription','outputDescription','returnType','difficulty'];
 const metadataKeys=[...textKeys,'parameters'];
@@ -65,15 +65,16 @@ export async function studentPublicStatementRows(db,rows,{summary=false}={}){
 }
 
 export async function handleProblemPublicStatements(ctx){
- const {route,method,user,pool,helpers={},url,body={}}=ctx;
+ const {route,method,user,pool,authoringDb,helpers={},url,body={}}=ctx;
  if(route!=='/scholarship/public-statements'||!['GET','POST'].includes(method))return null;
- if(!isScholarshipStaff(user))fail(403,'FORBIDDEN','需要教师权限');
  const input=method==='GET'?Object.fromEntries(url.searchParams):body;
  const problemId=uuid(input.problemId,'题目 ID').toLowerCase(),versionId=uuid(input.versionId,'版本 ID').toLowerCase();
  if(method==='GET'){
   await resolveAssistanceTarget(pool,user,{problemId,versionId},{manage:true,helpers});
-  const source=one(await pool.query('SELECT id,statement,metadata FROM problem_versions WHERE id=$1 AND problem_id=$2',[versionId,problemId]));
+  const source=one(await pool.query('SELECT id,statement,metadata,edit_draft,edit_revision,draft_presentation FROM problem_versions WHERE id=$1 AND problem_id=$2',[versionId,problemId]));
   const published=(await pool.query('SELECT * FROM problem_public_statements WHERE version_id=$1',[versionId])).rows[0];
+  if(input.view==='draft'&&source.edit_draft)return {status:200,body:{problemId,versionId,editRevision:source.edit_revision,
+   sourceHash:publicStatementSourceHash({...source,...source.edit_draft}),presentation:source.draft_presentation??(published?shape(published):null)}};
   return {status:200,body:{problemId,versionId,sourceHash:publicStatementSourceHash(source),presentation:published?shape(published):null}};
  }
  if(body.reviewed!==true)fail(400,'REVIEW_REQUIRED','请确认已核对英文题面与原题等价，且不含答案、隐藏测试或教师私有批注');
@@ -82,10 +83,21 @@ export async function handleProblemPublicStatements(ctx){
  if(!statement.trim())fail(400,'VALIDATION','公开题面不能为空');
  const metadata=inputMetadata(body.metadata);
  if(typeof body.sourceHash!=='string'||!/^[0-9a-f]{64}$/.test(body.sourceHash))fail(400,'VALIDATION','原题快照无效，请重新读取版本');
- return transaction(pool,async db=>{
+ const write=async db=>{
   await resolveAssistanceTarget(db,user,{problemId,versionId},{manage:true,helpers});
   await db.query("SELECT pg_advisory_xact_lock(hashtextextended('problem-public-statement:'||$1,0))",[versionId]);
-  const source=one(await db.query('SELECT id,statement,metadata,published_at FROM problem_versions WHERE id=$1 AND problem_id=$2 FOR SHARE',[versionId,problemId]));
+  const source=one(await db.query('SELECT id,statement,metadata,published_at,edit_draft,edit_revision,draft_review_status FROM problem_versions WHERE id=$1 AND problem_id=$2 FOR UPDATE',[versionId,problemId]));
+  if(body.expectedRevision!=null){
+   if(!source.edit_draft||source.edit_revision!==body.expectedRevision)fail(409,'SOURCE_CHANGED','草稿已更改，请重新核对');
+   if(source.draft_review_status==='pending')fail(409,'REVIEW_PENDING','草稿已提交审核；如需修改，请重新保存草稿后提交');
+   if(publicStatementSourceHash({...source,...source.edit_draft})!==body.sourceHash)fail(409,'SOURCE_CHANGED','原题内容已修改，请重新核对');
+   const contentHash=canonicalHash({versionId,language,statement,metadata,sourceHash:body.sourceHash});
+   const presentation={statement,metadata,contentHash,sourceHash:body.sourceHash,reviewerAccountId:user.id};
+   await db.query('UPDATE problem_versions SET draft_presentation=$2 WHERE id=$1',[versionId,JSON.stringify(presentation)]);
+   await db.query(`INSERT INTO audit_events(actor_account_id,action,resource_type,resource_id,metadata)
+    VALUES($1,'problem.public_statement_review','problem_version',$2,$3)`,[user.id,versionId,{problemId,revision:source.edit_revision,contentHash}]);
+   return {status:200,body:{...presentation,versionId,language,editRevision:source.edit_revision}};
+  }
   if(!source.published_at)fail(409,'VERSION_NOT_PUBLISHED','请先发布题目版本，再审核发布其公开英文题面');
   if(publicStatementSourceHash(source)!==body.sourceHash)fail(409,'SOURCE_CHANGED','原题内容已修改，请重新核对后发布');
   const contentHash=canonicalHash({versionId,language,statement,metadata,sourceHash:body.sourceHash});
@@ -101,5 +113,6 @@ export async function handleProblemPublicStatements(ctx){
    VALUES($1,'problem.public_statement_publish','problem_version',$2,$3)`,
   [user.id,versionId,{problemId,versionId,language,sourceHash:body.sourceHash,contentHash}]);
   return {status:201,body:shape(saved)};
- });
+ };
+ return authoringDb?write(authoringDb):transaction(pool,write);
 }

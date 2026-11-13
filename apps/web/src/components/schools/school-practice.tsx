@@ -315,7 +315,7 @@ function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation
    if (pending || closed || problemUpdated || !code.trim()) return;
    void action.run(async()=>{
      try {
-       const next=await productionApi<{id:string}>(`${path}/submissions`,{method:"POST",body:{kind,code,language,input:custom,requestId:crypto.randomUUID(),versionId:problem.versionId,...courseContext,...(course?.preview ? {coursePreview:true} : {}),...(preview ? {expectedRevision:problem.activity?.revision} : {})}});
+       const next=await productionApi<{id:string}>(`${path}/submissions`,{method:"POST",body:{kind,code,language,input:custom,requestId:crypto.randomUUID(),versionId:problem.versionId,publishedRevision:problem.publishedRevision,...courseContext,...(course?.preview ? {coursePreview:true} : {}),...(preview ? {expectedRevision:problem.activity?.revision} : {})}});
        setJob(null);setJobId(next.id);
      } catch (error) {
        if (error instanceof ApiError && error.code === "COURSE_LANGUAGE_REQUIRED") course?.reload();

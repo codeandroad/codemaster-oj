@@ -97,7 +97,7 @@ export async function currentLegacyPublicProblems(db, problemIds) {
 export async function legacyPublicProblemCatalogRows(db,problemIds) {
  return (await db.query(`SELECT p.id,$1::uuid AS "schoolId",
   COALESCE(projected.bank_id,$3::uuid) AS "bankId",b.name AS "bankName",
-  COALESCE(snapshot.definition->>'title',v.title) title,COALESCE(projected.revision,1) revision,
+  v.title,COALESCE(snapshot.draft_revision,1) revision,
   true published,v.id AS "versionId",v.tags,v.mode,
   CASE WHEN jsonb_typeof(COALESCE(presentation.metadata,v.metadata)->'difficulty')='string'
    THEN COALESCE(presentation.metadata,v.metadata)->>'difficulty' END difficulty,
@@ -186,7 +186,9 @@ async function writeSnapshot(db, source, { activate = true } = {}) {
  [LEGACY_SCHOOL_ID, source.problem_id, snapshotBankId, source.owner_account_id]);
  await db.query(`INSERT INTO school_problem_versions(school_id,id,problem_id,draft_revision,definition)
   SELECT $1,$2,$3,COALESCE(max(draft_revision),0)+1,$4 FROM school_problem_versions WHERE school_id=$1 AND problem_id=$3
-  ON CONFLICT(school_id,id) DO NOTHING`, [LEGACY_SCHOOL_ID, source.id, source.problem_id, JSON.stringify(definition)]);
+  ON CONFLICT(school_id,id) DO UPDATE SET definition=EXCLUDED.definition,
+   draft_revision=EXCLUDED.draft_revision WHERE school_problem_versions.problem_id=EXCLUDED.problem_id
+   AND school_problem_versions.definition IS DISTINCT FROM EXCLUDED.definition`, [LEGACY_SCHOOL_ID, source.id, source.problem_id, JSON.stringify(definition)]);
  if(activate) await db.query(`UPDATE school_problems p SET published=true,published_version_id=v.id,
   revision=v.draft_revision,updated_at=clock_timestamp()
   FROM school_problem_versions v WHERE p.school_id=$1 AND p.id=$2
@@ -215,6 +217,7 @@ export async function decideLegacyPublicProblem(db, { problemId, versionId: expe
   [problemId, versionId, decision === 'approve' ? 'approved' : 'rejected', actorId]);
   if (decision === 'reject' && !request.rowCount) fail(409, 'NO_PENDING_REQUEST', 'No request is pending for this version.');
   if (decision === 'approve') {
+   await db.query("SELECT pg_advisory_xact_lock(hashtextextended('course-problem-snapshot:'||$1,0))",[source.problem_id]);
    await writeSnapshot(db, source);
    const publication = await db.query(`INSERT INTO school_problem_publications(school_id,problem_id,version_id,approved_by)
     VALUES($1,$2,$3,$4) ON CONFLICT(problem_id) DO UPDATE SET version_id=EXCLUDED.version_id,

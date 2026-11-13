@@ -63,6 +63,10 @@ export interface ProductionProblem {
   memoryLimitMb: number;
   languageLimits?: Partial<Record<SubmissionLanguage, { effectiveMemoryMb: number; runtimeMemoryFloorMb?: number }>>;
   versionId?: string;
+  editRevision?: number;
+  publishedRevision?: number;
+  draftReviewStatus?: "pending" | "rejected" | null;
+  draftReviewReason?: string | null;
   published: boolean;
   validationStatus?: string;
   validationMessage?: string;

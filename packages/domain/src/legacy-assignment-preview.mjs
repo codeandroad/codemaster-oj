@@ -19,7 +19,7 @@ const previewJobs = `FROM legacy_assignment_preview_submissions p
 const previewOwner = 'p.assignment_id=$1 AND p.account_id=$2';
 
 async function result(db, scope, id) {
-  const { rows: [job] } = await db.query(`SELECT p.*, v.title, v.mode, v.comparator, v.samples,
+  const { rows: [job] } = await db.query(`SELECT p.*, v.title, t.problem_snapshot,
     ${jobStatus} status,r.score,r.passed,r.total,r.public_output,r.public_message,r.private_results,m.*
     ${previewJobs} JOIN problem_versions v ON v.id=p.version_id
     CROSS JOIN LATERAL (${submissionMeasurementsSql}) m
@@ -31,7 +31,7 @@ async function result(db, scope, id) {
     passed: job.passed, total: job.total, code: job.code, createdAt: job.created_at,
     publicOutput: job.public_output, message: job.public_message,
     ...submissionMeasurements(job),
-    testResults: submissionCaseFeedback(job, job, job.private_results),
+    testResults: submissionCaseFeedback(job, job.problem_snapshot?.version, job.private_results),
   });
 }
 

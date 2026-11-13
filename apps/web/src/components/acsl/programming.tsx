@@ -261,6 +261,7 @@ function ProgrammingWorkspace({
             input: customInput,
             requestId,
             versionId: problem.versionId,
+            publishedRevision: problem.publishedRevision,
             paperVersionId: paper.versionId,
           },
         });

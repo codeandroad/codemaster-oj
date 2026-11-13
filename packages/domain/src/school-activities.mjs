@@ -4,6 +4,7 @@ import { bytes, canonicalHash, enumValue, fail, field, integer, uuid } from './s
 import { validateTask } from '../judge.mjs';
 import { submissionCaseFeedback } from './submission-feedback.mjs';
 import { metadataPage } from './problem-submissions.mjs';
+import { assertPublishedRevision } from './live-problem-version.mjs';
 
 const reply = (body, status = 200) => ({ status, body });
 const scope = (db, schoolId) => db.query("SELECT set_config('campus.school_id',$1,true)", [schoolId]);
@@ -204,7 +205,7 @@ function requireOpenAttempt(a, t) {
   if (!t || !canSubmitActivityWork(a, publicAttempt(t))) fail(409, 'ATTEMPT_CLOSED', 'This attempt has ended. Your saved submissions are preserved.');
 }
 async function activityProblem(db, a, problemId) {
-  const p = (await db.query(`SELECT p.*,v.definition FROM school_activity_problems p JOIN school_problem_versions v
+  const p = (await db.query(`SELECT p.*,v.definition,v.draft_revision FROM school_activity_problems p JOIN school_problem_versions v
     ON v.school_id=p.school_id AND v.problem_id=p.problem_id AND v.id=p.version_id
     WHERE p.school_id=$1 AND p.activity_id=$2 AND p.problem_id=$3`, [a.school_id, a.id, problemId])).rows[0];
   if (!p) fail(404, 'NOT_FOUND', 'Problem not assigned.');
@@ -225,6 +226,7 @@ async function enqueueActivity(db, loaded, problemId, user, body, { preview = fa
   await db.query("SELECT pg_advisory_xact_lock(hashtextextended('school-submit:'||$1,0))", [user.id]);
   const old = (await db.query('SELECT id,state,request_hash FROM school_judge_jobs WHERE account_id=$1 AND request_id=$2', [user.id, requestId])).rows[0];
   if (old) { if (old.request_hash !== hash) fail(409, 'REQUEST_CONFLICT', 'Request ID already used.'); return { id: old.id, state: old.state }; }
+  assertPublishedRevision(body.publishedRevision,p.draft_revision);
   await schoolActivityProblemAccess(db, { schoolId: a.school_id, problemId, user, activityId: a.id });
   let t = null;
   if (!preview) {
@@ -303,7 +305,7 @@ async function assignmentPreview(db, { a, user, method, action, id, submissions,
   }
   const p = await activityProblem(db, a, problemId);
   return reply({
-    id: problemId, schoolId: a.school_id, versionId: p.version_id, title: p.definition.title,
+    id: problemId, schoolId: a.school_id, versionId: p.version_id, publishedRevision:p.draft_revision, title: p.definition.title,
     published: true, canManage: false, definition: safeDefinition(p.definition), solved,
     activity: { id: a.id, title: a.title, kind: a.kind, phase: 'Open', attempt: null,
       resultsPublishedAt: null, canSubmit: true, preview: true, revision: a.revision },
@@ -469,7 +471,7 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
         await schoolActivityProblemAccess(db, { schoolId, problemId, user, activityId: a.id });
         const p = await activityProblem(db, a, problemId);
         const d = await detail(db, loaded, user);
-        return reply({ id: problemId, schoolId, versionId: p.version_id, title: p.definition.title, published: true, canManage: false, definition: safeDefinition(p.definition),
+        return reply({ id: problemId, schoolId, versionId: p.version_id, publishedRevision:p.draft_revision, title: p.definition.title, published: true, canManage: false, definition: safeDefinition(p.definition),
           solved: d.grade?.items.find(item => item.id === problemId)?.solved ?? false, activity: { id: a.id, title: a.title, kind: a.kind, phase: d.phase, endsAt: d.endsAt, attempt: d.attempt, resultsPublishedAt: a.results_published_at, canSubmit: d.canSubmit } });
       }
       return null;

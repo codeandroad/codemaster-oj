@@ -34,6 +34,7 @@ export type Problem = {
   bankName: string;
   title: string;
   revision: number;
+  publishedRevision?: number | null;
   published: boolean;
   versionId: string | null;
   canManage: boolean;

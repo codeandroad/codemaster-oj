@@ -265,7 +265,7 @@ function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProb
         validateFunctionInput(customInput);
       }
       setSubmissionId(null);
-      const body = { problemId: problem.id, versionId: problem.versionId, code, language, kind, ...(assignmentId ? { assignmentId } : {}), ...(timedPracticeId ? { timedPracticeId } : {}), ...(learningPathId && chapterId ? { courseId: learningPathId, chapterId } : {}), ...(originalId ? { originalSubmissionId: originalId } : {}), ...(kind === "custom" ? { customInput } : {}) };
+      const body = { problemId: problem.id, versionId: problem.versionId, publishedRevision: problem.publishedRevision, code, language, kind, ...(assignmentId ? { assignmentId } : {}), ...(timedPracticeId ? { timedPracticeId } : {}), ...(learningPathId && chapterId ? { courseId: learningPathId, chapterId } : {}), ...(originalId ? { originalSubmissionId: originalId } : {}), ...(kind === "custom" ? { customInput } : {}) };
       const signature = JSON.stringify(body), key = keys.current.get(signature) ?? productionId(); keys.current.set(signature, key);
       let accepted: {id: string};
       try {

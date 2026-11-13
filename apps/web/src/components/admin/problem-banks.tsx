@@ -245,9 +245,9 @@ function ManagedProblemDetail({ id, bankArchived, onClose }: { id: string; bankA
   const { locale } = useLocale();
   const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
   const detail = useData<ManagedProblemHistory>(`admin/problems/${encodeURIComponent(id)}`);
-  return <Drawer title={detail.data?.versions[0]?.title ?? tr("题目详情", "Problem details")} eyebrow={tr("题目档案", "PROBLEM HISTORY")} onClose={onClose} wide>
+  return <Drawer title={detail.data?.versions[0]?.title ?? tr("题目详情", "Problem details")} eyebrow={tr("题目档案", "PROBLEM RECORD")} onClose={onClose} wide>
     <Loading resource={detail}>{detail.data && <div className="space-y-4 text-sm">
-      <p className="text-muted-foreground">{detail.data.bankName} · {detail.data.ownerName} · {detail.data.versions.length} {tr("个历史版本", "versions")}</p>
+      <p className="text-muted-foreground">{detail.data.bankName} · {detail.data.ownerName}</p>
       {!bankArchived && !detail.data.archivedAt && <ProblemTutorialEditor endpoint={`problems/${encodeURIComponent(id)}/tutorial`}/>}
       {detail.data.versions.map(version => <section key={version.id} className="rounded-md border border-border p-4">
         <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{version.title}{version.id === detail.data?.currentVersionId ? ` · ${tr("当前版本", "Current version")}` : ""}</h3><ProblemPublicationStatus problem={version} bankVisibility={detail.data?.bankVisibility}/></div>

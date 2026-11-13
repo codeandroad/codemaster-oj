@@ -26,7 +26,7 @@ async function saveRun(client, task, result) {
 async function applyResult(client, task, result, runId) {
   if (task.purpose === 'assignment_preview') return; // The private judge run is the complete result.
   if (task.purpose === 'validation') {
-    await client.query('UPDATE problem_versions SET validation_status=$2,validation_message=$3 WHERE id=$1', [task.version_id, result.status, result.publicMessage]);
+    if (task.draft_revision == null) await client.query('UPDATE problem_versions SET validation_status=$2,validation_message=$3 WHERE id=$1', [task.version_id, result.status, result.publicMessage]);
   } else if (task.rejudge) {
     // A rejudge is a reviewable candidate. Only the audited API confirmation
     // may replace the student's current result, including during retries.
@@ -75,7 +75,7 @@ export async function claimTask(pool, { leaseSeconds = DEFAULT_LEASE_SECONDS, ma
       WHERE id=$1 RETURNING *`, [next.rows[0].id, leaseId, leaseSeconds]);
     if(nodeId)await client.query('UPDATE judge_tasks SET node_id=$2 WHERE id=$1',[next.rows[0].id,nodeId]);
     const task = leased.rows[0];
-    if (task.purpose === 'validation') {
+    if (task.purpose === 'validation' && task.draft_revision == null) {
       await client.query("UPDATE problem_versions SET validation_status='Judging',validation_message=NULL WHERE id=$1", [task.version_id]);
     } else if (task.purpose === 'submission' && !task.rejudge) {
       await client.query("UPDATE submissions SET status='Judging',public_message=NULL WHERE id=$1", [task.submission_id]);
@@ -91,11 +91,11 @@ export async function renewLease(pool, task, leaseSeconds = DEFAULT_LEASE_SECOND
 }
 
 export async function loadTask(pool, task) {
-  // Task identifiers come from the queue transaction, never from a browser.
-  const versionResult = await pool.query('SELECT * FROM problem_versions WHERE id=$1', [task.version_id]);
-  const version = versionResult.rows[0];
-  if (!version) throw new InfrastructureError('Task problem version is missing.');
-  version.samples=(version.samples||[]).filter(sample=>sample.enabled!==false);
+  // Inputs come from the database at admission, never from a browser or a
+  // mutable problem row at execution time.
+  const snapshot = task.problem_snapshot;
+  if (!snapshot?.version || !Array.isArray(snapshot.tests)) throw new InfrastructureError('Task problem snapshot is missing.');
+  const version = { ...snapshot.version, samples: (snapshot.version.samples || []).filter(sample => sample.enabled !== false) };
   let submission;
   if (task.purpose !== 'validation') {
     const preview = task.purpose === 'assignment_preview';
@@ -110,7 +110,7 @@ export async function loadTask(pool, task) {
   let tests;
   if (kind === 'custom') tests = [{ input: submission.custom_input ?? '' }];
   else if (kind === 'samples') tests = version.samples.map((test, position) => ({ ...test, id: `sample-${position + 1}` }));
-  else tests = (await pool.query('SELECT id,input,expected,weight,position FROM test_cases WHERE version_id=$1 AND enabled ORDER BY position', [task.version_id])).rows;
+  else tests = snapshot.tests;
   return { kind, version, code, language, tests };
 }
 

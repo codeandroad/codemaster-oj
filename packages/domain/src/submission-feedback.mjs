@@ -76,8 +76,8 @@ export async function loadSubmissionResult(db, submission, masked, { revealForma
  if (masked.results_visible === false || ['Waiting', 'Judging', 'System Error', 'Submitted'].includes(masked.status)) {
   return { runtimeMs: null, memoryKb: null, testResults: [] };
  }
- const run = (await db.query(`SELECT r.private_results,m.runtime_ms,m.memory_kb FROM (
-  SELECT r.private_results FROM judge_runs r JOIN judge_tasks t ON t.id=r.task_id
+ const run = (await db.query(`SELECT r.private_results,r.problem_snapshot,m.runtime_ms,m.memory_kb FROM (
+  SELECT r.private_results,t.problem_snapshot FROM judge_runs r JOIN judge_tasks t ON t.id=r.task_id
    WHERE r.submission_id=$1 AND r.id IS DISTINCT FROM $2::uuid AND r.status=$3 AND r.score IS NOT DISTINCT FROM $4::numeric
     AND r.version_id=$5
     AND (NOT t.rejudge OR EXISTS(SELECT 1 FROM audit_events e WHERE e.action='submission.rejudge_confirm'
@@ -87,11 +87,10 @@ export async function loadSubmissionResult(db, submission, masked, { revealForma
  [submission.id, submission.pending_judge_run_id ?? null, submission.status, submission.score, submission.version_id])).rows[0];
  const formalIndex = revealFormalFailure ? formalFailureIndex(masked, run?.private_results) : -1;
  const failure = formalIndex >= 0 ? run.private_results[formalIndex] : null;
- const formalTests = typeof failure?.testId === 'string' ? (await db.query(`SELECT t.id,t.input,t.expected,v.comparator
-  FROM test_cases t JOIN problem_versions v ON v.id=t.version_id
-  WHERE t.version_id=$1 AND t.id::text=$2 AND t.enabled`, [submission.version_id, failure.testId])).rows : [];
- const version = ['samples', 'custom'].includes(submission.kind) ?
-  (await db.query('SELECT mode,comparator,samples FROM problem_versions WHERE id=$1', [submission.version_id])).rows[0] : { mode: submission.problem_mode };
+ const snapshot = run?.problem_snapshot;
+ const formalTests = typeof failure?.testId === 'string'
+  ? (snapshot?.tests ?? []).filter(test => test.id === failure.testId) : [];
+ const version = snapshot?.version ?? { mode: submission.problem_mode };
  return { ...submissionMeasurements(run), testResults: submissionCaseFeedback(masked,
-  formalTests.length ? { ...version, comparator: formalTests[0].comparator } : version, run?.private_results, { formalTests }) };
+  version, run?.private_results, { formalTests }) };
 }

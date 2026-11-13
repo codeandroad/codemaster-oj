@@ -33,7 +33,7 @@ test('programming corrections accept only exact reviewed expected-output substit
   }
 });
 
-test('audited programming revision preserves immutable versions, lineage, written work and pending awards',
+test('audited programming correction updates one problem and preserves written work and pending awards',
   { skip: !process.env.TEST_DATABASE_URL, timeout: 180000 }, async t => {
     const base = new URL(process.env.TEST_DATABASE_URL); assert.match(base.pathname, /^\/campus_qa(?:_[a-z0-9_]+)?$/);
     const schema = `acsl_code_revision_${randomBytes(5).toString('hex')}`, manager = createPool(base.href);
@@ -67,8 +67,8 @@ test('audited programming revision preserves immutable versions, lineage, writte
       const grade = (await request('accepted', '/submit', 'POST', { versionId: paper.versionId,
         revisions: Object.fromEntries(original.questions.map(q => [q.id, 1])) })).body;
       await request('pending', '/questions/q1/draft', 'PATCH', { versionId: paper.versionId, expectedRevision: 0, selectedOptionIds: ['A'] });
-      const submit = (user, versionId = programming.versionId) => request(user, '/programming/submissions', 'POST',
-        { paperVersionId: paper.versionId, versionId, requestId: randomUUID(), kind: 'submit', language: 'python', code: 'print(1)\n' });
+      const submit = (user, versionId = programming.versionId, publishedRevision = programming.publishedRevision) => request(user, '/programming/submissions', 'POST',
+        { paperVersionId: paper.versionId, versionId, publishedRevision, requestId: randomUUID(), kind: 'submit', language: 'python', code: 'print(1)\n' });
       const acceptedJob = (await submit('accepted')).body, pendingJob = (await submit('pending')).body;
       const finish = job => worker.query(`UPDATE school_judge_jobs SET state='completed',completed_at=clock_timestamp(),
         result='{"status":"AC","score":100,"passed":5,"total":5}' WHERE school_id=$1 AND id=$2`, [LEGACY_SCHOOL_ID, job.id]);
@@ -95,12 +95,13 @@ test('audited programming revision preserves immutable versions, lineage, writte
       const revisions = await Promise.all([reviseAcslProgramming(pool, args), reviseAcslProgramming(pool, args)]);
       assert.deepEqual(revisions.map(result => result.changed).sort(), [false, true]);
       const revision = revisions.find(result => result.changed);
-      await t.test('only a fresh judge version and current paper pointer are changed', async () => {
+      await t.test('only the pinned judge definition and correction log change', async () => {
         assert.deepEqual(await snapshot(), before);
-        assert.deepEqual((await pool.query('SELECT * FROM school_problem_versions WHERE id=$1', [programming.versionId])).rows[0], oldVersion);
+        assert.equal((await pool.query('SELECT count(*)::integer n FROM school_problem_versions')).rows[0].n, 1);
         const current = (await pool.query('SELECT * FROM acsl_papers WHERE id=$1', [paper.id])).rows[0];
         assert.equal(current.version_id, oldPaper.version_id); assert.equal(current.written_revision, oldPaper.written_revision);
-        assert.equal(current.programming_version_id, revision.afterProgrammingVersionId);
+        assert.equal(current.programming_version_id, oldPaper.programming_version_id);
+        assert.equal(revision.afterProgrammingVersionId, oldVersion.id);
         assert.deepEqual(current.definition, applyAcslProgrammingCorrections(original, corrections));
         const next = (await pool.query('SELECT * FROM school_problem_versions WHERE id=$1', [revision.afterProgrammingVersionId])).rows[0];
         assert.equal(next.draft_revision, oldVersion.draft_revision + 1);
@@ -131,8 +132,8 @@ test('audited programming revision preserves immutable versions, lineage, writte
         assert.equal((await request('pending', `/programming/submissions/${pendingJob.id}`)).body.state, 'queued');
         assert.equal((await request('accepted', `/programming/submissions?view=resume&versionId=${revision.afterProgrammingVersionId}`)).body.submission.code, 'print(1)\n');
         await assert.rejects(request('other', `/programming/submissions/${acceptedJob.id}`), error => error.status === 404);
-        await assert.rejects(submit('other'), error => error.status === 409 && error.code === 'VERSION_CONFLICT');
-        const fresh = (await submit('other', revision.afterProgrammingVersionId)).body;
+        await assert.rejects(submit('other'), error => error.status === 409 && error.code === 'PROBLEM_UPDATED');
+        const fresh = (await submit('other', revision.afterProgrammingVersionId, current.publishedRevision)).body;
         const payload = (await pool.query('SELECT version_id,payload FROM school_judge_jobs WHERE id=$1', [fresh.id])).rows[0];
         assert.equal(payload.version_id, revision.afterProgrammingVersionId); assert.equal(payload.payload.tests[4].expected, afterExpected);
         const queued = (await pool.query('SELECT payload FROM school_judge_jobs WHERE id=$1', [pendingJob.id])).rows[0];

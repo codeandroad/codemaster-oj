@@ -4,7 +4,9 @@
 // after live references were introduced gains problem-level cross-activity credit.
 export const assignmentPassingSubmission = `
  previous.identity_id=part.identity_id AND previous.problem_id=ap.problem_id
- AND (previous.assignment_id=assignment.id OR previous.version_id IN (ap.version_id,ap.prior_version_id)
+ AND (previous.assignment_id=assignment.id
+  OR COALESCE(previous.original_problem_version_id,previous.version_id) IN (
+    COALESCE(ap.original_problem_version_id,ap.version_id),COALESCE(ap.original_prior_problem_version_id,ap.prior_version_id))
   OR previous.created_at>=(SELECT applied_at FROM schema_migrations WHERE name='098_live_problem_activity_results.sql'))
  AND (assignment.required_language IS NULL OR previous.language=assignment.required_language)
  AND previous.kind='submit' AND previous.status='AC' AND previous.score=100 AND previous.created_at<=assignment.due_at

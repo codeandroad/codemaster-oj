@@ -7,6 +7,7 @@ import { fail, field, uuid, enumValue, canonicalHash } from './security.mjs';
 import { handleProblemTutorial } from './problem-tutorials.mjs';
 import { legacyProblemStatement } from './problem-statement-display.mjs';
 import { liveProblemVersionIdSql } from './live-problem-version.mjs';
+import { publishProblemDraft, requireDraftRevision } from './problem-editor-drafts.mjs';
 
 export async function canReviewActivitySubmission(db,user,submission,{readOnly=false}={}){
  if(submission.original_submission_id&&!submission.assignment_id&&!submission.timed_attempt_id){
@@ -106,41 +107,70 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
  const {audit,versionAccess,submissionAccess}=helpers;
  const result=body=>({status:200,body});
  const bankShape=a=>({id:a.bank.id,name:a.bank.name,description:a.bank.description,course:a.bank.course,updatedAt:a.bank.updated_at,createdAt:a.bank.created_at,archivedAt:a.bank.archived_at,problemCount:a.bank.problemCount??0,archivedProblemCount:a.bank.archivedProblemCount??0,visibility:a.bank.visibility,permission:a.permission,canEdit:a.canEdit,canContribute:a.canContribute,isSystem:a.bank.is_system});
- const reviewShape=r=>({problemId:r.problem_id,versionId:r.version_id,title:r.title,bankId:r.bank_id,bankName:r.bank_name,bankVisibility:r.bank_visibility,ownerName:r.owner_name,publishedAt:r.published_at,schoolVisibleAt:r.school_visible_at,validationStatus:r.validation_status,rankReviewStatus:r.rank_review_status,rankApprovedAt:r.rank_approved_at,rankReviewReason:r.rank_review_reason,priorAcCount:Number(r.prior_ac_count),isCurrent:r.is_current});
+ const reviewShape=r=>({problemId:r.problem_id,versionId:r.version_id,editRevision:r.review_revision??null,title:r.title,bankId:r.bank_id,bankName:r.bank_name,bankVisibility:r.bank_visibility,ownerName:r.owner_name,publishedAt:r.published_at,schoolVisibleAt:r.school_visible_at,validationStatus:r.validation_status,rankReviewStatus:r.rank_review_status,rankApprovedAt:r.rank_approved_at,rankReviewReason:r.rank_review_reason,priorAcCount:Number(r.prior_ac_count),isCurrent:r.is_current});
+ async function reviewSavedDraft(db,p,v,revision,decision,reason,batch=false){
+  requireDraftRevision(v,revision);
+  if(p.owner_scope==='platform')fail(403,'PLATFORM_ADMIN_REQUIRED','平台题目须由平台管理员发布');
+  if(v.draft_review_status!=='pending')fail(409,'REVIEW_NOT_PENDING','该草稿未提交审核，请刷新列表');
+  if(decision==='approved'){
+   if(v.edit_draft)await publishProblemDraft(db,user,v,{schoolApproval:true});
+   else {
+    if(v.published_at||v.validation_status!=='AC')fail(409,'NOT_VALIDATED','参考解答须通过全部测试后才能发布');
+    await db.query(`UPDATE problem_versions SET published_at=clock_timestamp(),school_visible_at=clock_timestamp(),
+     rank_review_status='approved',rank_approved_at=clock_timestamp(),rank_reviewed_at=clock_timestamp(),rank_reviewed_by=$2,
+     draft_review_status=NULL,draft_review_at=NULL,draft_review_reason=NULL WHERE id=$1`,[v.id,user.id]);
+    await db.query('UPDATE problems SET current_version_id=$2 WHERE id=$1',[p.id,v.id]);
+   }
+  }
+  else await db.query("UPDATE problem_versions SET draft_review_status='rejected',draft_review_reason=$2 WHERE id=$1",[v.id,reason]);
+  await audit(db,user.id,decision==='approved'?'problem.school_approve':'problem.school_reject','problem_version',v.id,
+   {problemId:p.id,versionId:v.id,revision:v.edit_revision,reason,batch});
+ }
  if(route==='/problems/rank-review'&&method==='GET'){
   if(!isAdmin(user))fail(403,'FORBIDDEN','仅管理员可审核校内公开题');
-  const rows=(await pool.query(`SELECT p.id problem_id,v.id version_id,v.title,b.id bank_id,b.name bank_name,
-    b.visibility bank_visibility,COALESCE(i.name,'管理员') owner_name,v.published_at,
-    v.school_visible_at,v.validation_status,v.rank_review_status,v.rank_approved_at,v.rank_review_reason,
-    (v.id=p.current_version_id) is_current,
+  const rows=(await pool.query(`SELECT p.id problem_id,v.id version_id,
+    CASE WHEN d.in_review THEN COALESCE(v.edit_draft->>'title',v.title) ELSE v.title END title,b.id bank_id,b.name bank_name,
+    b.visibility bank_visibility,COALESCE(i.name,'管理员') owner_name,CASE WHEN d.in_review THEN v.draft_review_at ELSE v.published_at END published_at,
+    CASE WHEN NOT d.in_review THEN v.school_visible_at END school_visible_at,
+    CASE WHEN d.in_review THEN 'AC' ELSE v.validation_status END validation_status,
+    CASE WHEN d.in_review THEN v.draft_review_status ELSE v.rank_review_status END rank_review_status,
+    CASE WHEN NOT d.in_review THEN v.rank_approved_at END rank_approved_at,
+    CASE WHEN d.in_review THEN v.draft_review_reason ELSE v.rank_review_reason END rank_review_reason,
+    (d.in_review OR v.id=p.current_version_id) is_current,
+    CASE WHEN d.in_review THEN v.edit_revision END review_revision,
     (SELECT count(DISTINCT s.identity_id)::int FROM submissions s
      WHERE s.version_id=v.id AND s.status='AC' AND s.kind IN ('submit','correction')) prior_ac_count
    FROM problems p JOIN problem_banks b ON b.id=p.bank_id
-   JOIN problem_versions v ON v.problem_id=p.id AND v.published_at IS NOT NULL
+   JOIN problem_versions v ON v.problem_id=p.id
+   CROSS JOIN LATERAL (SELECT p.owner_scope<>'platform' AND v.draft_review_status IS NOT NULL AS in_review) d
    LEFT JOIN accounts a ON a.id=p.owner_account_id LEFT JOIN identities i ON i.id=a.identity_id
-   WHERE p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school'
-   ORDER BY CASE WHEN v.id=p.current_version_id AND v.rank_review_status='pending' THEN 0
-    WHEN v.rank_review_status='rejected' THEN 1 WHEN v.school_visible_at IS NOT NULL THEN 2 ELSE 3 END,
-    v.published_at DESC,p.id LIMIT 500`)).rows;
+   WHERE p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school' AND (v.published_at IS NOT NULL OR d.in_review)
+   ORDER BY CASE WHEN d.in_review AND v.draft_review_status='pending' OR v.id=p.current_version_id AND v.rank_review_status='pending' THEN 0
+    WHEN d.in_review OR v.rank_review_status='rejected' THEN 1 WHEN v.school_visible_at IS NOT NULL THEN 2 ELSE 3 END,
+    published_at DESC,p.id LIMIT 500`)).rows;
   return result({items:rows.map(reviewShape)});
  }
  if(route==='/problems/rank-review/approve-batch'&&method==='POST'){
   if(!isAdmin(user))fail(403,'FORBIDDEN','仅管理员可审核校内公开题');
   if(!Array.isArray(body.items)||body.items.length<1||body.items.length>100)fail(400,'VALIDATION','请选择 1–100 道题目批量通过');
-  const items=body.items.map(item=>({problemId:uuid(item?.problemId,'题目 ID').toLowerCase(),versionId:uuid(item?.versionId,'版本 ID').toLowerCase()}));
+  const items=body.items.map(item=>({problemId:uuid(item?.problemId,'题目 ID').toLowerCase(),versionId:uuid(item?.versionId,'版本 ID').toLowerCase(),revision:item?.expectedRevision}));
   if(new Set(items.map(item=>item.problemId)).size!==items.length||new Set(items.map(item=>item.versionId)).size!==items.length)fail(400,'VALIDATION','同一题目或版本不能重复选择');
   return result(await transaction(pool,async db=>{
    const checked=[];
    // A stable order prevents two overlapping reviews from locking the same
    // problems in reverse order. Keep the per-item lock order of single review.
    for(const item of [...items].sort((a,b)=>a.problemId.localeCompare(b.problemId))){
-    const p=required(await db.query(`SELECT p.id,p.current_version_id,p.archived_at,b.id bank_id,b.name bank_name,
+    const p=required(await db.query(`SELECT p.id,p.owner_scope,p.current_version_id,p.archived_at,b.id bank_id,b.name bank_name,
      b.visibility bank_visibility,b.archived_at bank_archived_at,i.name owner_name
      FROM problems p JOIN problem_banks b ON b.id=p.bank_id
      LEFT JOIN accounts a ON a.id=p.owner_account_id LEFT JOIN identities i ON i.id=a.identity_id
      WHERE p.id=$1 FOR UPDATE OF p,b`,[item.problemId]));
     if(p.archived_at||p.bank_archived_at||p.bank_visibility!=='school')fail(409,'NOT_SCHOOL_PUBLIC','仅能审核校内题库中未归档题目');
     const v=required(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND problem_id=$2 FOR UPDATE',[item.versionId,item.problemId]));
+    if(item.revision!=null||p.owner_scope!=='platform'&&v.draft_review_status){
+     checked.push({p,v,staged:true,revision:item.revision});
+     continue;
+    }
     if(!v.published_at)fail(409,'UNPUBLISHED',`「${v.title}」尚未发布，不能通过校内公开审核`);
     if(p.current_version_id!==v.id)fail(409,'VERSION_CHANGED',`「${v.title}」不再是当前已发布版本，请刷新列表`);
     if(v.validation_status!=='AC')fail(409,'NOT_VALIDATED',`「${v.title}」的参考解答尚未通过全部正式测试`);
@@ -148,12 +178,15 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
     checked.push({p,v});
    }
    const reviewed=[];
-   for(const {p,v} of checked){
+   for(const {p,v,staged,revision} of checked){
+    if(staged)await reviewSavedDraft(db,p,v,revision,'approved',null,true);
+    else {
     await db.query(`UPDATE problem_versions SET rank_review_status='approved',
      rank_reviewed_at=clock_timestamp(),rank_reviewed_by=$1,rank_review_reason=NULL,
      school_visible_at=COALESCE(school_visible_at,clock_timestamp()),rank_approved_at=clock_timestamp()
      WHERE id=$2`,[user.id,v.id]);
     await audit(db,user.id,'problem.school_approve','problem_version',v.id,{problemId:p.id,versionId:v.id,batch:true});
+    }
     const version=required(await db.query(`SELECT v.id version_id,v.title,v.published_at,v.school_visible_at,v.validation_status,
      v.rank_review_status,v.rank_approved_at,v.rank_review_reason,
      (SELECT count(DISTINCT s.identity_id)::int FROM submissions s WHERE s.version_id=v.id
@@ -171,13 +204,17 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
   const decision=enumValue(body.decision,['approved','rejected','revoked'],'审核决定');
   const reason=decision==='rejected'||decision==='revoked'?field(body.reason,decision==='revoked'?'撤下原因':'驳回原因',{max:1000}):null;
   return result(await transaction(pool,async db=>{
-   const p=required(await db.query(`SELECT p.id,p.current_version_id,p.archived_at,b.id bank_id,b.name bank_name,
+   const p=required(await db.query(`SELECT p.id,p.owner_scope,p.current_version_id,p.archived_at,b.id bank_id,b.name bank_name,
     b.visibility bank_visibility,b.archived_at bank_archived_at,i.name owner_name
     FROM problems p JOIN problem_banks b ON b.id=p.bank_id
     LEFT JOIN accounts a ON a.id=p.owner_account_id LEFT JOIN identities i ON i.id=a.identity_id
     WHERE p.id=$1 FOR UPDATE OF p,b`,[problemId]));
    if(p.archived_at||p.bank_archived_at||p.bank_visibility!=='school')fail(409,'NOT_SCHOOL_PUBLIC','仅能审核校内题库中未归档题目');
    const v=required(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND problem_id=$2 FOR UPDATE',[versionId,problemId]));
+   const staged=decision!=='revoked'&&(body.expectedRevision!=null||p.owner_scope!=='platform'&&v.draft_review_status);
+   if(staged)await reviewSavedDraft(db,p,v,body.expectedRevision,decision,reason);
+   else {
+   if(body.expectedRevision!=null)fail(409,'REVISION_CONFLICT','题目审核状态已变更，请重新载入');
    if(!v.published_at)fail(409,'UNPUBLISHED','只能审核已发布题目版本');
    if(v.rank_review_status==='revoked')fail(409,'REVIEW_TERMINAL','已撤下版本不能恢复；请发布新版本');
    if(decision==='approved'&&v.validation_status!=='AC')fail(409,'NOT_VALIDATED','参考解答尚未通过全部正式测试');
@@ -193,12 +230,14 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
     rank_approved_at=CASE WHEN $1='approved' THEN clock_timestamp() ELSE rank_approved_at END
     WHERE id=$4`,[decision,user.id,reason,versionId]);
    await audit(db,user.id,decision==='approved'?'problem.school_approve':decision==='rejected'?'problem.school_reject':'problem.school_revoke','problem_version',versionId,{problemId,versionId,reason});
+   }
    const reviewed=required(await db.query(`SELECT v.id version_id,v.title,v.published_at,v.school_visible_at,v.validation_status,
     v.rank_review_status,v.rank_approved_at,v.rank_review_reason,
     (SELECT count(DISTINCT s.identity_id)::int FROM submissions s WHERE s.version_id=v.id
      AND s.status='AC' AND s.kind IN ('submit','correction')) prior_ac_count
     FROM problem_versions v WHERE v.id=$1`,[versionId]));
-   return reviewShape({...reviewed,problem_id:problemId,bank_id:p.bank_id,bank_name:p.bank_name,bank_visibility:p.bank_visibility,owner_name:p.owner_name,is_current:p.current_version_id===versionId});
+   return reviewShape({...reviewed,problem_id:problemId,bank_id:p.bank_id,bank_name:p.bank_name,bank_visibility:p.bank_visibility,owner_name:p.owner_name,is_current:staged||p.current_version_id===versionId,
+    ...(staged&&decision==='rejected'?{title:v.edit_draft?.title??v.title,published_at:v.draft_review_at,school_visible_at:null,rank_review_status:'rejected',rank_review_reason:reason,review_revision:v.edit_revision}:{})});
   }));
  }
  if(route==='/admin/problem-banks'&&method==='GET'){

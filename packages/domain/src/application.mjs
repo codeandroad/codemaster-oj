@@ -43,11 +43,12 @@ import { assignmentRequiredLanguage, handleAssignmentAuthoring } from './assignm
 import { handleLegacyAssignmentPreview } from './legacy-assignment-preview.mjs';
 import { loadSubmissionResult } from './submission-feedback.mjs';
 import { assignmentGradeRows } from './assignment-grades.mjs';
+import { draftValidation, publishProblemDraft, requireDraftRevision, saveProblemDraft, validateProblemDraft } from './problem-editor-drafts.mjs';
 import { learnerAssignmentCompletion, learnerSubmissionAssignmentCompletions } from './assignment-completion.mjs';
 import {activityClasses,handleTeachingAudience,handleClassHub} from './activity-audience.mjs';
 import { submissionHistory,problemOwnProgress,emptyOwnProgress } from './submission-history.mjs';
 import { legacyProblemSubmissions, legacyProblemSolved } from './problem-submissions.mjs';
-import { liveProblemVersionIdSql, resolveLiveProblemVersion, assertLiveProblemVersion } from './live-problem-version.mjs';
+import { liveProblemVersionIdSql, resolveLiveProblemVersion, assertLiveProblemVersion, assertPublishedRevision } from './live-problem-version.mjs';
 import { LANGUAGES, languageLimitsFor, starterCodesFor } from './languages.mjs';
 import { avatarForIdentity, isPresetAvatar } from './avatars.mjs';
 import { normalizeNickname, nicknameTooLong } from './nickname-policy.mjs';
@@ -154,11 +155,17 @@ export async function createDomainServices(pool,config) {
  }
  async function problemResult(db,user,problemId,versionId,options={}) {
   const {p,v,owner,permissions}=await versionAccess(db,user,problemId,versionId,options);
-  const presented=owner||isStaff(user)?v:(await studentPublicStatementRows(db,[v]))[0];
-  const result=problemShape(presented,{includeDisabledSamples:owner});result.publishedVersionId=owner?p.current_version_id:v.id;result.publishedTitle=owner?result.publishedTitle:v.title;result.ownerScope=p.owner_scope;result.bankId=p.bank_id;result.bankVisibility=(await db.query('SELECT visibility FROM problem_banks WHERE id=$1',[p.bank_id])).rows[0]?.visibility;result.canEdit=owner;result.canPublish=owner&&result.canPublish;
+  const editing=owner&&options.editing===true;
+  const draft=editing&&options.publishedOnly!==true?v.edit_draft:null;
+  const validation=draft?await draftValidation(db,v):null;
+  const presented=draft?{...v,...draft,published_at:null,school_visible_at:null,rank_review_status:v.draft_review_status,
+   rank_approved_at:null,validation_status:validation.status,validation_message:validation.message}:owner||isStaff(user)?v:(await studentPublicStatementRows(db,[v]))[0];
+  const result=problemShape(presented,{includeDisabledSamples:editing});result.publishedVersionId=owner?p.current_version_id:v.id;result.publishedTitle=v.published_at?v.title:result.publishedTitle;result.ownerScope=p.owner_scope;result.bankId=p.bank_id;result.bankVisibility=(await db.query('SELECT visibility FROM problem_banks WHERE id=$1',[p.bank_id])).rows[0]?.visibility;result.canEdit=owner;result.canPublish=editing&&result.canPublish&&(!draft||v.draft_review_status!=='pending');
+  result.publishedRevision=v.published_revision;
+  if(editing){result.editRevision=v.edit_revision;result.draftReviewStatus=v.draft_review_status;result.draftReviewReason=v.draft_review_reason;result.canPublish&&=v.draft_review_status!=='pending';}
   result.canManageTutorial=await canManageLegacyTutorial(db,user,p,owner);
   result.firstAcPoints=(await db.query('SELECT COALESCE((SELECT points FROM point_rewards WHERE problem_id=$1 AND assignment_id IS NULL),10) first_ac_points',[problemId])).rows[0].first_ac_points;
-  if(owner){await recordPublicPracticeStaffExposure(db,user.id,p.id);Object.assign(result,v.metadata||{});result.referenceCode=v.reference_code;result.tests=(await db.query('SELECT input,expected,weight,name,enabled FROM test_cases WHERE version_id=$1 ORDER BY position',[v.id])).rows.map(t=>({...t,weight:Number(t.weight)}));result.formalTestCount=result.tests.filter(t=>t.enabled).length;}else {
+  if(editing){await recordPublicPracticeStaffExposure(db,user.id,p.id);Object.assign(result,presented.metadata||{});result.referenceCode=presented.reference_code;result.tests=(draft?.tests??(await db.query('SELECT input,expected,weight,name,enabled FROM test_cases WHERE version_id=$1 ORDER BY position',[v.id])).rows).map(({input,expected,weight,name,enabled})=>({input,expected,weight:Number(weight),name,enabled}));result.formalTestCount=result.tests.filter(t=>t.enabled).length;}else {
    // Student assistance is explicitly published and served only by the scholarship
    // provide endpoint. Legacy editorials/hints may include full answers and
    // must not leak through detail requests, SSR or background prefetches.
@@ -545,7 +552,7 @@ export async function createDomainServices(pool,config) {
     }))});
    }
    if(route==='/problems'&&method==='POST'){
-    staff(user);const input=problemInput(body);const v=await transaction(pool,async db=>{const access=await bankAccess(db,user,input.bankId);if(!access.canContribute)fail(403,'FORBIDDEN','无权向该题库添加题目');const p=row(await db.query('INSERT INTO problems(owner_account_id,bank_id) VALUES($1,$2) RETURNING id',[user.id,input.bankId]));return insertVersion(db,user,p.id,input);});return respond(201,await problemResult(pool,user,v.problem_id,v.id));
+    staff(user);const input=problemInput(body);const v=await transaction(pool,async db=>{const access=await bankAccess(db,user,input.bankId);if(!access.canContribute)fail(403,'FORBIDDEN','无权向该题库添加题目');const p=row(await db.query('INSERT INTO problems(owner_account_id,bank_id) VALUES($1,$2) RETURNING id',[user.id,input.bankId]));return insertVersion(db,user,p.id,input);});return respond(201,await problemResult(pool,user,v.problem_id,v.id,{editing:true}));
    }
    if(route==='/problems/publish-batch'&&method==='POST'){
     staff(user);
@@ -560,6 +567,8 @@ export async function createDomainServices(pool,config) {
       const p=row(await db.query('SELECT * FROM problems WHERE id=$1 FOR UPDATE',[item.problemId]));
       const version=row(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND problem_id=$2 FOR UPDATE',[item.versionId,item.problemId]));
       if(p.archived_at)fail(409,'ARCHIVED','已归档题目不能发布');
+      if(p.owner_scope==='platform')fail(403,'PLATFORM_ADMIN_REQUIRED','平台题目须在平台工作台发布');
+      if(version.edit_draft)fail(409,'DRAFT_REVIEW_REQUIRED','请打开题目确认并提交最新草稿');
       const {owner}=await versionAccess(db,user,item.problemId,item.versionId);
       if(!owner)fail(403,'FORBIDDEN','无权发布所选题目');
       if(version.published_at)fail(409,'ALREADY_PUBLISHED',`「${version.title}」已发布，不能再次提交发布；如需修改，请创建新版本`);
@@ -589,11 +598,23 @@ export async function createDomainServices(pool,config) {
      if(selected)await versionAccess(pool,user,m[1],selected);
      selected=(await resolveLiveProblemVersion(pool,m[1],{lock:false,allowArchived:true})).id;
     }
-    return respond(200,await problemResult(pool,user,m[1],selected,{ownSubmissionSnapshot:!!originalId}));
+    return respond(200,await problemResult(pool,user,m[1],selected,{ownSubmissionSnapshot:!!originalId,
+     publishedOnly:url.searchParams.get('view')==='review-published',
+     editing:!originalId&&isStaff(user)&&url.searchParams.get('current')!=='1'&&url.searchParams.get('view')!=='published'}));
    }
    m=route.match(/^\/problems\/([^/]+)\/versions$/);
    if(m&&method==='POST'){
-    staff(user);const input=problemInput(body);const v=await transaction(pool,async db=>{const {owner,p}=await versionAccess(db,user,m[1]);if(!owner)fail(403,'FORBIDDEN','无权修改该题');if(body.bankId&&input.bankId!==p.bank_id)fail(409,'BANK_IMMUTABLE','题目版本仍属于原题库；跨题库请新建副本并保留来源');return insertVersion(db,user,m[1],input);});return respond(201,await problemResult(pool,user,v.problem_id,v.id));
+    staff(user);const input=problemInput(body);return respond(201,await transaction(pool,async db=>{
+     const problemId=uuid(m[1],'题目 ID');
+     await db.query('SELECT id FROM problems WHERE id=$1 FOR UPDATE',[problemId]);
+     const {owner,p,v}=await versionAccess(db,user,problemId);
+     if(!owner)fail(403,'FORBIDDEN','无权修改该题');
+     if(p.owner_scope==='platform')fail(403,'PLATFORM_EDITOR_REQUIRED','平台题目须在平台工作台编辑');
+     if(body.bankId&&input.bankId!==p.bank_id)fail(409,'BANK_IMMUTABLE','题目属于原题库；跨题库请新建副本');
+     if(body.expectedVersionId!==v.id)fail(409,'REVISION_CONFLICT','题目已更新，请重新载入');
+     await saveProblemDraft(db,user,v,input,body.expectedRevision,audit);
+     return problemResult(db,user,problemId,v.id,{editing:true});
+    }));
    }
    m=route.match(/^\/problems\/([^/]+)\/(publish|validate)$/);
    if(m&&method==='POST'){
@@ -604,15 +625,31 @@ export async function createDomainServices(pool,config) {
      if(p.archived_at)fail(409,'ARCHIVED','已归档题目不能发布或验证');
      const {owner}=await versionAccess(db,user,problemId,versionId);
      if(!owner)fail(403,'FORBIDDEN','无权发布该题');
+     if(p.owner_scope==='platform')fail(403,'PLATFORM_ADMIN_REQUIRED','平台题目须在平台工作台验证或发布');
+     if(fresh.edit_draft){
+      if(m[2]==='validate')return validateProblemDraft(db,fresh,body.expectedRevision);
+      requireDraftRevision(fresh,body.expectedRevision);
+      const bank=await bankAccess(db,user,p.bank_id);
+      const reviewRequired=bank.bank.visibility==='school';
+      await publishProblemDraft(db,user,fresh,{reviewRequired,schoolApproval:false});
+      await audit(db,user.id,reviewRequired?'problem.request_review':'problem.publish','problem_version',versionId,{revision:fresh.edit_revision});
+      return problemResult(db,user,problemId,versionId,{editing:true});
+     }
+     if(body.expectedRevision!==undefined)requireDraftRevision(fresh,body.expectedRevision);
      if(m[2]==='publish'){
       if(fresh.published_at)fail(409,'ALREADY_PUBLISHED','此题目版本已发布，不能再次提交发布；如需修改，请创建新版本');
       const latest=row(await db.query('SELECT id FROM problem_versions WHERE problem_id=$1 ORDER BY created_at DESC,id DESC LIMIT 1',[problemId]));
       if(latest.id!==versionId)fail(409,'VERSION_CHANGED','题目已有更新版本，请刷新后发布最新版本');
       if(fresh.validation_status!=='AC')fail(409,'NOT_VALIDATED','参考解答须通过全部正式测试后才能发布');
+      if(body.expectedRevision!==undefined&&(await bankAccess(db,user,p.bank_id)).bank.visibility==='school'){
+       await db.query("UPDATE problem_versions SET draft_review_status='pending',draft_review_at=clock_timestamp(),draft_review_reason=NULL WHERE id=$1",[versionId]);
+       await audit(db,user.id,'problem.request_review','problem_version',versionId,{revision:fresh.edit_revision});
+       return problemResult(db,user,problemId,versionId,{editing:true});
+      }
       await db.query('UPDATE problem_versions SET published_at=now() WHERE id=$1',[versionId]);
       await db.query('UPDATE problems SET current_version_id=$1 WHERE id=$2',[versionId,problemId]);
       await audit(db,user.id,'problem.publish','problem_version',versionId);
-      return problemResult(db,user,problemId,versionId);
+      return problemResult(db,user,problemId,versionId,{editing:true});
      }
      if(fresh.published_at)fail(409,'IMMUTABLE','已发布版本不能重新验证，请创建新版本');
      if(fresh.validation_status==='Incomplete')fail(409,'INCOMPLETE','请补齐题面、参考解答、样例与正式测试并保存新版本后验证');
@@ -705,7 +742,7 @@ export async function createDomainServices(pool,config) {
     if(kind==='correction'&&!originalId)fail(400,'VALIDATION','订正需要原提交编号');
     if(kind==='submit'&&originalId)fail(400,'VALIDATION','正式提交不能设置原提交');
     const target={problemId,code,assignmentId,timedPracticeId,requestedVersion,originalId,customInput};
-    const requestHash=canonicalHash({kind,language,...target,...(courseContext??{})});
+    const requestHash=canonicalHash({kind,language,...target,...(courseContext??{}),...(body.publishedRevision>0&&{publishedRevision:body.publishedRevision})});
     // Requests accepted before migration 013 omitted language from the hash.
     // Their stored rows default to Python; preserve retry semantics without
     // allowing a reused key to silently switch to another language.
@@ -740,7 +777,10 @@ export async function createDomainServices(pool,config) {
      if(!timedPracticeId&&!permissions.canRunFree)fail(403,'TIMED_CONTEXT_REQUIRED','该题目仅授权用于当前计时训练，请从训练工作区提交');
      const requiredLanguage=course?.requiredLanguage??assignment?.required_language??original?.required_language??null;
      assertRequiredLanguage(language,requiredLanguage);
-     if(!original)assertLiveProblemVersion(requestedVersion,v.id);
+     if(!original){
+      assertLiveProblemVersion(requestedVersion,v.id);
+      assertPublishedRevision(body.publishedRevision??0,v.published_revision);
+     }
      await assertJudgeAdmission(db);
      if((await db.query("SELECT count(*)::int count FROM submissions WHERE identity_id=$1 AND status IN ('Waiting','Judging')",[user.identityId])).rows[0].count>=5)fail(429,'TOO_MANY_PENDING','最多同时等待 5 个运行，请等待已有结果');
      // The homework deadline limits official grades and activity rewards,

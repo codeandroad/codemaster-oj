@@ -1,5 +1,5 @@
 import { problemProgress } from './problem-progress.mjs';
-import { assertLiveProblemVersion } from './live-problem-version.mjs';
+import { assertLiveProblemVersion, assertPublishedRevision } from './live-problem-version.mjs';
 import { problemCatalogCourseRequest } from './problem-catalog-courses.mjs';
 import { platformCourseProblem } from './platform-course-problems.mjs';
 import {publicScholarshipOperation,recordPublicPracticeStaffExposure} from './public-scholarship.mjs';
@@ -86,13 +86,13 @@ async function shapeProblem(db,p,user,role,{detail=false,publicOnly=false,access
  const metadata=manage?def.metadata:p.public_metadata??def.metadata,rawTags=manage?def.tags:p.public_tags??def.tags;
  const tags=Array.isArray(rawTags)?rawTags.filter(tag=>typeof tag==='string'&&tag.trim()):[];
  if(catalogQuery && !`${p.id} ${def.title} ${p.bank_name} ${tags.join(' ')}`.toLowerCase().includes(catalogQuery)) return null;
- const validation=manage?(await db.query(`SELECT j.id,j.state,j.result->>'status' AS status FROM school_judge_jobs j JOIN school_problem_versions v ON v.school_id=j.school_id AND v.id=j.version_id WHERE j.school_id=$1 AND j.problem_id=$2 AND v.draft_revision=$3 AND j.kind='validation' ORDER BY j.created_at DESC LIMIT 1`,[p.school_id,p.id,p.revision])).rows[0]:null;
+ const validation=manage?(await db.query(`SELECT j.id,j.state,j.result->>'status' AS status FROM school_judge_jobs j WHERE j.school_id=$1 AND j.problem_id=$2 AND j.validation_revision=$3 AND j.kind='validation' ORDER BY j.created_at DESC LIMIT 1`,[p.school_id,p.id,p.revision])).rows[0]:null;
  const progress=(await problemProgress(db,user,[p.id],{includeStaff:accessContext==='staff_practice'})).get(p.id);
  const publication = !publicOnly && role === 'school_admin' && version && p.published && !p.archived
   ? await publicProblemStatus(db, p, version.id) : undefined;
  return {attempts:progress?.formalCount??0,solved:progress?.solved===true,status:progress?.status??'Not started',
   tags,difficulty:typeof metadata?.difficulty==='string'?metadata.difficulty:null,
-  hasDraftChanges:!!version&&version.draft_revision!==p.revision,id:p.id,schoolId:p.school_id,bankId:p.bank_id,bankName:p.bank_name,title:def.title,revision:p.revision,published:p.published,versionId:version?.id??null,canManage:manage,canManageTutorial:!publicOnly&&canManageTutorial(p,user,role),validation:validation??null,...publication,...(detail?{staffPractice:accessContext==='staff_practice',definition:manage?draftDefinition(def):publicDefinition({...def,statement:p.public_statement??def.statement,metadata:p.public_metadata??def.metadata,tags:p.public_tags??def.tags})}:{})};
+  hasDraftChanges:manage&&!!version&&version.draft_revision!==p.revision,id:p.id,schoolId:p.school_id,bankId:p.bank_id,bankName:p.bank_name,title:def.title,revision:manage?p.revision:version?.draft_revision??null,publishedRevision:version?.draft_revision??null,published:p.published,versionId:version?.id??null,canManage:manage,canManageTutorial:!publicOnly&&canManageTutorial(p,user,role),validation:validation??null,...publication,...(detail?{staffPractice:accessContext==='staff_practice',definition:manage?draftDefinition(def):publicDefinition({...def,statement:p.public_statement??def.statement,metadata:p.public_metadata??def.metadata,tags:p.public_tags??def.tags})}:{})};
 }
 async function publicProblemStatus(db, problem, versionId) {
  const { rows: [state] } = await db.query(`
@@ -113,10 +113,12 @@ async function enqueue(db,{schoolId,p,version,user,role,kind,body,accessContext}
  if(preview&&(!course||accessContext!=='staff_practice'))fail(403,'FORBIDDEN','Course preview requires course management access.');
  const code=kind==='validation'?version.definition.reference_code:bytes(body.code,'Code');
  const customInput=kind==='custom'?bytes(body.input??'','Input',262144):null;
- const requestHash=canonicalHash({problemId:p.id,versionId:version.id,kind,language,code,customInput,accessContext,...course,...(preview&&{coursePreview:true})});
+ const validationRevision=kind==='validation'?p.revision:null;
+ const requestHash=canonicalHash({problemId:p.id,versionId:version.id,kind,language,code,customInput,accessContext,...course,...(preview&&{coursePreview:true}),...(validationRevision!=null&&{validationRevision})});
  await db.query("SELECT pg_advisory_xact_lock(hashtextextended('school-submit:'||$1,0))",[user.id]);
  const old=(await db.query('SELECT * FROM school_judge_jobs WHERE account_id=$1 AND request_id=$2',[user.id,requestId])).rows[0];
  if(old){if(old.request_hash!==requestHash)fail(409,'REQUEST_CONFLICT','Request ID was used for another operation.');return {id:old.id,state:old.state};}
+ if(kind!=='validation')assertPublishedRevision(body.publishedRevision,version.draft_revision);
  if(course){
   if(kind==='validation')fail(400,'VALIDATION','Reference validation cannot use a course context.');
   if(body.versionId!=null&&uuid(body.versionId).toLowerCase()!==version.id)
@@ -131,7 +133,7 @@ async function enqueue(db,{schoolId,p,version,user,role,kind,body,accessContext}
  const payload={kind,version:{...definition,reference_code:undefined,tests:undefined},code,language,tests};
  try{validateTask(payload);}catch{fail(400,'INVALID_CASES','Invalid code, language or input.');}
  const identityId=accessContext==='school'?(await db.query('SELECT id FROM school_identities WHERE school_id=$1 AND account_id=$2',[schoolId,user.id])).rows[0]?.id:null;
- const job=(await db.query(`INSERT INTO school_judge_jobs(school_id,problem_id,version_id,account_id,identity_id,request_id,request_hash,kind,access_context,payload,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,clock_timestamp()) RETURNING id,state`,[schoolId,p.id,version.id,user.id,identityId??null,requestId,requestHash,kind,accessContext,JSON.stringify(payload)])).rows[0];
+ const job=(await db.query(`INSERT INTO school_judge_jobs(school_id,problem_id,version_id,account_id,identity_id,request_id,request_hash,kind,access_context,payload,validation_revision,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,clock_timestamp()) RETURNING id,state`,[schoolId,p.id,version.id,user.id,identityId??null,requestId,requestHash,kind,accessContext,JSON.stringify(payload),validationRevision])).rows[0];
  return job;
 }
 async function projectJob(db,job){
@@ -467,14 +469,17 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
   if(!canManage(p,user,role))fail(403,'FORBIDDEN','You cannot manage this problem.');revision(body,p);
   if(method==='PATCH'&&!m[4]){const definition=normalizeSchoolProblem(body);await db.query('UPDATE school_problems SET draft=$3,revision=revision+1,updated_at=clock_timestamp() WHERE school_id=$1 AND id=$2',[schoolId,id,JSON.stringify(definition)]);await auditSchool(db,schoolId,user.id,'school.problem.update',id);return reply(await shapeProblem(db,await loadProblem(db,schoolId,id,user,role),user,role,{detail:true}));}
   if(method==='POST'&&m[4]==='validate'){
-   await db.query('INSERT INTO school_problem_versions(school_id,problem_id,draft_revision,definition) VALUES($1,$2,$3,$4) ON CONFLICT(school_id,problem_id,draft_revision) DO NOTHING',[schoolId,id,p.revision,JSON.stringify(p.draft)]);
-   const version=(await db.query('SELECT * FROM school_problem_versions WHERE school_id=$1 AND problem_id=$2 AND draft_revision=$3',[schoolId,id,p.revision])).rows[0];
-   return reply(await enqueue(db,{schoolId,p,version,user,kind:'validation',body:{...body,language:'python'},accessContext:'school'}),202);
+   const previous=(await db.query('SELECT id FROM school_problem_versions WHERE school_id=$1 AND problem_id=$2 ORDER BY (id=$3) DESC NULLS LAST,draft_revision DESC LIMIT 1',[schoolId,id,p.published_version_id])).rows[0];
+   const version=previous??(await db.query('INSERT INTO school_problem_versions(school_id,problem_id,draft_revision,definition) VALUES($1,$2,$3,$4) RETURNING id',[schoolId,id,p.revision,JSON.stringify(p.draft)])).rows[0];
+   return reply(await enqueue(db,{schoolId,p,version:{...version,definition:p.draft},user,kind:'validation',body:{...body,language:'python'},accessContext:'school'}),202);
   }
   if(method==='POST'&&m[4]==='publish'){
    if(role!=='school_admin')fail(403,'FORBIDDEN','School administrator review is required.');
-   const version=(await db.query(`SELECT v.* FROM school_problem_versions v WHERE v.school_id=$1 AND v.problem_id=$2 AND v.draft_revision=$3 AND EXISTS(SELECT 1 FROM school_judge_jobs j WHERE j.school_id=v.school_id AND j.version_id=v.id AND j.kind='validation' AND j.state='completed' AND j.result->>'status'='AC')`,[schoolId,id,p.revision])).rows[0];
+   const version=(await db.query(`SELECT j.version_id id FROM school_judge_jobs j WHERE j.school_id=$1 AND j.problem_id=$2 AND j.validation_revision=$3
+    AND j.kind='validation' AND j.state='completed' AND j.result->>'status'='AC'
+    AND ($4::uuid IS NULL OR j.version_id=$4) ORDER BY j.created_at DESC LIMIT 1`,[schoolId,id,p.revision,p.published_version_id])).rows[0];
    if(!version)fail(409,'VALIDATION_REQUIRED','The current reference must pass every formal and sample test before publication.');
+   await db.query('UPDATE school_problem_versions SET definition=$3,draft_revision=$4 WHERE school_id=$1 AND id=$2',[schoolId,version.id,JSON.stringify(p.draft),p.revision]);
    await db.query('UPDATE school_problems SET published=true,published_version_id=$3 WHERE school_id=$1 AND id=$2',[schoolId,id,version.id]);await auditSchool(db,schoolId,user.id,'school.problem.publish',id);
   }else if(method==='POST'&&m[4]==='unpublish'){await db.query('UPDATE school_problems SET published=false WHERE school_id=$1 AND id=$2',[schoolId,id]);await auditSchool(db,schoolId,user.id,'school.problem.unpublish',id);}else return null;
   return reply(await shapeProblem(db,await loadProblem(db,schoolId,id,user,role),user,role,{detail:true}));

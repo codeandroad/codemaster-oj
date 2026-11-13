@@ -82,7 +82,7 @@ export async function learnerAssignmentCompletion(db, assignmentId, identityId) 
 
 export async function learnerSubmissionAssignmentCompletions(db, user, id) {
  if (!user.roles.includes('student')) fail(403,'FORBIDDEN','需要学生权限');
- const own = (await db.query('SELECT problem_id,version_id,assignment_id,created_at,kind,status FROM submissions WHERE id=$1 AND identity_id=$2',
+ const own = (await db.query('SELECT problem_id,COALESCE(original_problem_version_id,version_id) credit_version_id,assignment_id,created_at,kind,status FROM submissions WHERE id=$1 AND identity_id=$2',
   [submissionId(id), user.identityId])).rows[0];
  if (!own) fail(404,'NOT_FOUND','提交不存在');
  if (own.kind !== 'submit' || own.status !== 'AC') return [];
@@ -92,8 +92,9 @@ export async function learnerSubmissionAssignmentCompletions(db, user, id) {
   JOIN assignments a ON a.id=part.assignment_id
   JOIN assignment_problems p ON p.assignment_id=a.id
   WHERE part.identity_id=$1 AND NOT part.exempt AND a.state='Published' AND a.archived_at IS NULL
-   AND p.problem_id=$2 AND (a.id=$4::uuid OR $3 IN (p.version_id,p.prior_version_id)
+   AND p.problem_id=$2 AND (a.id=$4::uuid OR $3 IN (
+    COALESCE(p.original_problem_version_id,p.version_id),COALESCE(p.original_prior_problem_version_id,p.prior_version_id))
     OR $5::timestamptz>=(SELECT applied_at FROM schema_migrations WHERE name='098_live_problem_activity_results.sql'))
- `, [user.identityId, own.problem_id, own.version_id, own.assignment_id, own.created_at])).rows;
+ `, [user.identityId, own.problem_id, own.credit_version_id, own.assignment_id, own.created_at])).rows;
  return completedAssignments(db, user.identityId, candidates.map(a => a.id), submissionId(id));
 }

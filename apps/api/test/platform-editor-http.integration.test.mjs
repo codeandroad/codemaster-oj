@@ -109,22 +109,23 @@ test('the complete platform problem editor uses scoped grants without publicatio
       await get(`${source}/${problem.id}?versionId=${other.versionId}`, 'teacher', 404);
       await post(grantPath, grant('other-teacher', beta.id), 'teacher', 403);
     });
-    await t.test('authorized teachers save complete new versions with CAS, validate, but cannot publish', async () => {
+    await t.test('authorized teachers save a draft on the same problem, validate, but cannot publish', async () => {
       const original = await get(`${source}/${problem.id}`, 'teacher');
-      const changed = { ...input, title: 'Edited platform source', expectedVersionId: original.versionId };
+      const changed = { ...input, title: 'Edited platform source', expectedVersionId: original.versionId, expectedRevision: original.editRevision };
       latest = await post(`${source}/${problem.id}/versions`, changed, 'teacher', 201);
-      assert.notEqual(latest.versionId, original.versionId); assert.equal(latest.tests[0].input, input.tests[0].input);
+      assert.equal(latest.versionId, original.versionId); assert.equal(latest.editRevision, original.editRevision+1);
+      assert.equal(latest.tests[0].input, input.tests[0].input);
       await post(`${source}/${problem.id}/versions`, { ...changed, title: 'Stale edit' }, 'school-admin', 409);
       await post(`${source}/${problem.id}/validate`, { versionId: other.versionId }, 'teacher', 404);
       await post(`${source}/${problem.id}/validate`, { versionId: latest.versionId }, 'student', 403);
-      const validation = await post(`${source}/${problem.id}/validate`, { versionId: latest.versionId }, 'teacher');
+      const validation = await post(`${source}/${problem.id}/validate`, { versionId: latest.versionId, expectedRevision: latest.editRevision }, 'teacher');
       assert.equal(validation.versionId, latest.versionId);
       await post(`${source}/${problem.id}/publish`, { expectedVersionId: latest.versionId }, 'teacher', 403);
-      await post(`${source}/${problem.id}/publish`, { expectedVersionId: latest.versionId }, 'platform', 409);
+      await post(`${source}/${problem.id}/publish`, { expectedVersionId: latest.versionId, expectedRevision: latest.editRevision }, 'platform', 409);
       const judge = { environmentVersion: 'platform-editor-fixture', judge: async () => ({ status: 'AC', score: 100, passed: 1, total: 1, publicOutput: '', publicMessage: '', privateResults: [], environmentVersion: 'platform-editor-fixture' }) };
       for (let count = 0; count < 5 && await processOne({ pool: worker, judge, logger: {} }); count++) { /* Drain only this isolated fixture's validation tasks. */ }
       const checked = await get(`${source}/${problem.id}`, 'teacher'); assert.equal(checked.validationStatus, 'AC');
-      latest = await post(`${source}/${problem.id}/publish`, { expectedVersionId: checked.versionId });
+      latest = await post(`${source}/${problem.id}/publish`, { expectedVersionId: checked.versionId, expectedRevision: checked.editRevision });
       assert.equal(latest.published, true);
       assert.equal((await pool.query('SELECT version_id FROM chapter_problems WHERE problem_id=$1', [problem.id])).rowCount, 0);
       for (const path of [`/problems/${problem.id}/versions`, `/problems/${problem.id}/publish`]) await post(path, { ...changed, versionId: latest.versionId }, 'legacy-editor', 403);
@@ -138,6 +139,49 @@ test('the complete platform problem editor uses scoped grants without publicatio
       await get(`${source}/${other.id}/tutorial`, 'teacher', 403);
       await patch(path, { ...changed, expectedRevision: saved.revision }, 'other-teacher', 403);
       await request(path, { method: 'PATCH', body: { ...changed, expectedRevision: saved.revision }, name: 'teacher', csrf: false, status: 403 });
+    });
+    await t.test('school review keeps the live question and prior submission intact through rejection and approval', async () => {
+      const judge = {environmentVersion:'fixture',judge:async()=>({status:'AC',score:100,passed:1,total:1,publicOutput:'',publicMessage:'',privateResults:[],environmentVersion:'fixture'})};
+      const drain=async()=>{for(let i=0;i<6&&await processOne({pool:worker,judge,logger:{}});i++);};
+      const draft=await post('/problems',{...input,bankId:SCHOOL_BANK},'legacy-editor',201);
+      const path='/problems/'+draft.id, student='history-student', admin='legacy-admin', teacher='legacy-editor';
+      const key={versionId:draft.versionId,expectedRevision:draft.editRevision};
+      await drain();
+      await post(path+'/publish',key,teacher);
+      await get(path+'?current=1',student,404);
+      await patch(path+'/rank-review',{...key,decision:'approved'},admin);
+      const before=await get(path+'?current=1',student);
+      const accepted=await post('/submissions',{problemId:draft.id,versionId:draft.versionId,publishedRevision:before.publishedRevision,
+        kind:'submit',code:'print(input())',idempotencyKey:randomUUID()},student,201);
+      await drain();
+      const history=await get('/submissions/'+accepted.id,student);
+      const baseline=await get(path+'?current=1',student);
+      const save=revision=>post(path+'/versions',{...input,title:'Approved replacement',statement:'Read the next value and echo it.',
+        bankId:SCHOOL_BANK,expectedVersionId:draft.versionId,expectedRevision:revision},teacher,201);
+      const proposal=await save(draft.editRevision);
+      assert.equal(proposal.versionId,draft.versionId);
+      await drain();
+      const revisionKey={versionId:draft.versionId,expectedRevision:proposal.editRevision};
+      await post(path+'/publish',revisionKey,teacher);
+      assert.deepEqual(await get(path+'?current=1',student),baseline);
+      const queued=(await get('/problems/rank-review',admin)).items.find(row=>row.problemId===draft.id);
+      assert.equal(queued.title,proposal.title); assert.equal(queued.editRevision,proposal.editRevision);
+      await patch(path+'/rank-review',{...revisionKey,decision:'rejected',reason:'Check the examples again'},admin);
+      assert.deepEqual(await get(path+'?current=1',student),baseline);
+      const next=await save(proposal.editRevision);
+      await drain();
+      const nextKey={versionId:draft.versionId,expectedRevision:next.editRevision};
+      await post(path+'/publish',nextKey,teacher);
+      await patch(path+'/rank-review',{...revisionKey,decision:'approved'},admin,409);
+      await patch(path+'/rank-review',{...nextKey,decision:'approved'},admin);
+      const after=await get(path+'?current=1',student);
+      assert.equal(after.title,next.title); assert.equal(after.versionId,before.versionId);
+      assert.equal(after.solved,baseline.solved); assert.equal(after.publishedRevision,next.editRevision);
+      const old=await get('/submissions/'+accepted.id,student);
+      assert.equal(old.id,history.id); assert.equal(old.status,'AC'); assert.equal(old.score,history.score);
+      assert.equal((await pool.query('SELECT count(*)::int n FROM problem_versions WHERE problem_id=$1',[draft.id])).rows[0].n,1);
+      await post('/submissions',{problemId:draft.id,versionId:draft.versionId,publishedRevision:before.publishedRevision,
+        kind:'samples',code:'print(input())',idempotencyKey:randomUUID()},student,409);
     });
     await t.test('complete solution drafts are target-bound and delegates cannot publish through either API family', async () => {
       const path = `${source}/${problem.id}/contents`, target = { problemId: problem.id, versionId: latest.versionId };
@@ -273,7 +317,7 @@ test('the complete platform problem editor uses scoped grants without publicatio
       const saved = (await pool.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,language,code,idempotency_key,request_hash,status,score,passed,total)
         VALUES($1,$2,$3,$4,'submit','python','SAVED_STUDENT_HISTORY',$5,'fixture','AC',100,1,1) RETURNING id`,
         [actors['history-student'].id, actors['history-student'].identityId, historical.id, historical.versionId, randomUUID()])).rows[0];
-      await post(`${source}/${historical.id}/versions`, { title: 'PRIVATE_UNPUBLISHED_DRAFT', mode: 'stdio', saveDraft: true, expectedVersionId: historical.versionId }, 'platform', 201);
+      await post(`${source}/${historical.id}/versions`, { title: 'PRIVATE_UNPUBLISHED_DRAFT', mode: 'stdio', saveDraft: true, expectedVersionId: historical.versionId, expectedRevision: historical.editRevision }, 'platform', 201);
       await post(`${source}/batch`, { action: 'archive', problemIds: [historical.id] });
       assert.ok((await pool.query('SELECT withdrawn_at FROM school_problem_publications WHERE problem_id=$1', [historical.id])).rows[0].withdrawn_at);
       await get(`/practice/problems/${historical.id}`, 'history-student', 404);

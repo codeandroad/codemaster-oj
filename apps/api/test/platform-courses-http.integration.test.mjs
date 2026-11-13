@@ -155,8 +155,9 @@ test('platform courses retain original data and enforce audiences through NestJS
    const problemGrant=`/platform/content-editors/problem/${problem.id}`;
    await platform.send(problemGrant,grant);
    const draft=await a.send('/platform/source-problems/'+problem.id);assert.equal(draft.tests[0].input,'secret-case');
-   const revised=await a.send('/platform/source-problems/'+problem.id+'/versions',{...draft,title:'Authorized problem edit',saveDraft:true,referenceCode:'',expectedVersionId:draft.versionId},'POST',201);
-   assert.notEqual(revised.versionId,version.id);
+   const revised=await a.send('/platform/source-problems/'+problem.id+'/versions',{...draft,title:'Authorized problem edit',saveDraft:true,referenceCode:'',expectedVersionId:draft.versionId,expectedRevision:draft.editRevision},'POST',201);
+   assert.equal(revised.versionId,version.id);
+   assert.equal(revised.editRevision,draft.editRevision+1);
    await a.send('/platform/source-problems/'+problem.id+'/publish',{expectedVersionId:revised.versionId},'POST',403);
    await platform.send('/platform/source-problems/'+problem.id+'/publish',{expectedVersionId:revised.versionId},'POST',409);
    const reader=await personal.send('/practice/courses/'+listing.id);assert.equal(reader.chapters[0].problems[0].versionId,version.id);

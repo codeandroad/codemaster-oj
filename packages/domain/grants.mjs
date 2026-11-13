@@ -114,6 +114,7 @@ GRANT SELECT,INSERT,DELETE ON school_activity_problems,school_activity_participa
 GRANT SELECT,INSERT ON school_activity_results TO campus_app;
 GRANT SELECT,INSERT,UPDATE ON school_problem_banks,school_problems,school_problem_publications TO campus_app;
 GRANT SELECT,INSERT ON school_problem_versions,school_judge_jobs TO campus_app;
+GRANT UPDATE(definition,draft_revision) ON school_problem_versions TO campus_app;
 REVOKE ALL ON acsl_papers,acsl_drafts,acsl_submissions FROM PUBLIC,campus_app,campus_worker;
 GRANT SELECT ON acsl_papers TO campus_app;
 GRANT SELECT,INSERT,UPDATE ON acsl_drafts TO campus_app;

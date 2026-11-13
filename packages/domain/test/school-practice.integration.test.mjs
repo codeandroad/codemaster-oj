@@ -64,12 +64,33 @@ test('isolated school and public practice lifecycle, authorization, queue and fe
    for(const kind of ['samples','submit']){const job=await call('student',`${prefix}/problems/${p.id}/submissions`,'POST',{kind,code,requestId:randomUUID()});await processSchoolOne({pool:worker,judge});const result=await call('student',`${prefix}/judge-jobs/${job.id}`);assert.equal(result.status,'AC');}
    const bad=await call('student',`${prefix}/problems/${p.id}/submissions`,'POST',{kind:'samples',code:'print(0)',requestId:randomUUID()});await processSchoolOne({pool:worker,judge});assert.equal((await call('student',`${prefix}/judge-jobs/${bad.id}`)).status,'WA');
   });
-  await t.test('RLS, immutable versions and worker least privilege',async()=>{
+  await t.test('RLS and worker least privilege remain enforced for the published problem',async()=>{
    for(const table of ['school_problem_banks','school_problems','school_problem_versions','school_judge_jobs'])assert.equal((await app.query(`SELECT * FROM ${table}`)).rowCount,0,table);
-   await assert.rejects(app.query('UPDATE school_problem_versions SET definition=definition'),{code:'42501'});
+   assert.equal((await app.query('UPDATE school_problem_versions SET definition=definition')).rowCount,0);
+   await assert.rejects(app.query('UPDATE school_problem_versions SET problem_id=problem_id'),{code:'42501'});
    await assert.rejects(app.query("UPDATE school_judge_jobs SET state='completed'"),{code:'42501'});
    for(const table of ['school_problem_banks','school_problems','school_problem_versions','school_problem_publications','school_identities','school_courses'])await assert.rejects(worker.query(`SELECT * FROM ${table}`),{code:'42501'});
    await assert.rejects(worker.query('UPDATE school_judge_jobs SET payload=payload'),{code:'42501'});
+  });
+  await t.test('updating a school problem requires validating its current draft and preserves student results',async()=>{
+   const path=`${prefix}/problems/${p.id}`, first=await call('student',path);
+   const stats=(await pool.query("SELECT id,version_id,state,result,payload FROM school_judge_jobs WHERE problem_id=$1 AND kind='submit' ORDER BY id",[p.id])).rows;
+   const edit=await call('teacher',path,'PATCH',{...definition,title:'Updated sum pair',expectedRevision:p.revision});
+   assert.equal(edit.versionId,first.versionId);
+   assert.deepEqual(await call('student',path),first);
+   await assert.rejects(call('admin',path+'/publish','POST',{expectedRevision:edit.revision}),e=>e.status===409);
+   await call('teacher',path+'/validate','POST',{expectedRevision:edit.revision,requestId:randomUUID()});
+   await processSchoolOne({pool:worker,judge:{judge:async()=>approvedResult}});
+   assert.deepEqual(await call('student',path),first);
+   p=await call('admin',path+'/publish','POST',{expectedRevision:edit.revision});
+   const updated=await call('student',path);
+   assert.equal(updated.title,edit.title);
+   assert.equal(updated.versionId,first.versionId);
+   assert.equal(updated.solved,first.solved);
+   assert.equal(updated.attempts,first.attempts);
+   assert.equal((await pool.query('SELECT count(*)::int n FROM school_problem_versions WHERE school_id=$1 AND problem_id=$2',[alpha.id,p.id])).rows[0].n,1);
+   assert.deepEqual((await pool.query("SELECT id,version_id,state,result,payload FROM school_judge_jobs WHERE problem_id=$1 AND kind='submit' ORDER BY id",[p.id])).rows,stats);
+   await assert.rejects(call('student',path+'/submissions','POST',{publishedRevision:first.publishedRevision,kind:'samples',code:'print(5)',requestId:randomUUID()}),e=>e.code==='PROBLEM_UPDATED');
   });
   await t.test('public detail and list requests waiting behind withdrawal recheck platform authorization',async()=>{
    const writer=await pool.connect();try{
@@ -85,9 +106,9 @@ test('isolated school and public practice lifecycle, authorization, queue and fe
    }finally{await writer.query('ROLLBACK');writer.release();}
    await call('platform','/platform/problem-publications','POST',{schoolId:alpha.id,problemId:p.id,versionId:p.versionId});
   });
-  await t.test('withdrawal and newer school versions revoke public visibility immediately',async()=>{
-   await call('admin',`${prefix}/problems/${p.id}/unpublish`,'POST',{expectedRevision:1});await assert.rejects(call('outsider',`/practice/problems/${p.id}`),e=>e.status===404);
-   await call('admin',`${prefix}/problems/${p.id}/publish`,'POST',{expectedRevision:1});await call('platform',`/platform/problem-publications/${p.id}/withdraw`,'POST',{schoolId:alpha.id});assert.equal((await call('outsider','/practice/problems')).items.length,0);
+  await t.test('withdrawal from either school or platform revokes public visibility immediately',async()=>{
+   await call('admin',`${prefix}/problems/${p.id}/unpublish`,'POST',{expectedRevision:p.revision});await assert.rejects(call('outsider',`/practice/problems/${p.id}`),e=>e.status===404);
+   await call('admin',`${prefix}/problems/${p.id}/publish`,'POST',{expectedRevision:p.revision});await call('platform',`/platform/problem-publications/${p.id}/withdraw`,'POST',{schoolId:alpha.id});assert.equal((await call('outsider','/practice/problems')).items.length,0);
   });
   await t.test('an original school version can enter public practice without exposing private content',async()=>{
    await pool.query("INSERT INTO account_roles(account_id,role) VALUES($1,'admin')",[users.admin.id]);

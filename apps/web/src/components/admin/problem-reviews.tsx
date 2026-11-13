@@ -11,6 +11,7 @@ import { Drawer, Feedback, Loading, Modal, dateLabel, inputClass, useData, useMu
 import { reviewVersionActions, type ReviewStatus } from "./problem-review-policy";
 
 interface ProblemReview {
+  editRevision?: number | null;
   problemId: string;
   versionId: string;
   title: string;
@@ -104,6 +105,9 @@ function useReviewText() {
 }
 
 function reviewDescription(item: ProblemReview, decision: "rejected" | "revoked", locale: AppLocale) {
+  if (decision === "rejected" && item.editRevision != null) return locale === "en"
+    ? `The draft for “${item.title}” will be sent back for revision. Students keep seeing the published problem.`
+    : `“${item.title}”的草稿将退回修改。学生仍然看到已发布的内容。`;
   if (locale === "en") {
     if (decision === "revoked") return `Withdrawing this version of “${item.title}” removes it from school-wide free practice and stops new leaderboard points. Assigned activities can still access the fixed version; historical points remain.`;
     return `The current published version of “${item.title}” ${item.schoolVisibleAt ? "stops being public" : "remains restricted to assigned students"} and does not award leaderboard points. Past accepted submissions receive no retroactive points.`;
@@ -161,7 +165,7 @@ export function ProblemReviews() {
     void action.run(async () => {
       await productionApi(`problems/${encodeURIComponent(item.problemId)}/rank-review`, {
         method: "PATCH",
-        body: { versionId: item.versionId, decision: "approved" },
+        body: { versionId: item.versionId, expectedRevision: item.editRevision, decision: "approved" },
       });
       setSelectedVersionIds((ids) => ids.filter((versionId) => versionId !== item.versionId));
       resetAnchor();
@@ -171,7 +175,7 @@ export function ProblemReviews() {
   };
   const approveSelected = () => {
     if (!selectedItems.length || selectedItems.length > MAX_BATCH_APPROVE) return;
-    const selected = selectedItems.map((item) => ({ problemId: item.problemId, versionId: item.versionId }));
+    const selected = selectedItems.map((item) => ({ problemId: item.problemId, versionId: item.versionId, expectedRevision: item.editRevision }));
     setApproving("batch");
     void action.run(async () => {
       const result = await productionApi<{ approvedCount: number }>("problems/rank-review/approve-batch", {
@@ -190,6 +194,7 @@ export function ProblemReviews() {
         method: "PATCH",
         body: {
           versionId: candidate.item.versionId,
+          expectedRevision: candidate.item.editRevision,
           decision: candidate.decision,
           reason: reason.trim(),
         },
@@ -334,10 +339,10 @@ export function ProblemReviews() {
 function ReviewProblemDrawer({ item, onClose }: { item: ProblemReview; onClose: () => void }) {
   const { locale } = useLocale();
   const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
-  const detail = useData<ReviewProblemDetail>(`problems/${encodeURIComponent(item.problemId)}?versionId=${encodeURIComponent(item.versionId)}`);
+  const detail = useData<ReviewProblemDetail>(`problems/${encodeURIComponent(item.problemId)}?versionId=${encodeURIComponent(item.versionId)}&view=${item.editRevision == null ? "review-published" : "review-draft"}`);
   const problem = detail.data;
   return <Drawer title={item.title} eyebrow={tr("题目审核 · 只读详情", "REVIEW · READ-ONLY DETAILS")} onClose={onClose} wide>
-    <Loading resource={detail}>{problem && (problem.versionId !== item.versionId
+    <Loading resource={detail}>{problem && (problem.versionId !== item.versionId || (item.editRevision != null && (problem.editRevision !== item.editRevision || problem.draftReviewStatus !== item.rankReviewStatus))
       ? <p role="alert" className="text-sm text-destructive">{tr("题目版本已变化，请关闭并刷新审核列表。", "Problem version changed. Close and refresh the review list.")}</p>
       : <div className="space-y-5 text-sm">
         <div className="rounded-md border border-border bg-surface-subtle p-3">

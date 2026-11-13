@@ -6,15 +6,17 @@ import { requirePlatformContentEditor, platformContentEditorSql } from './platfo
 import { handlePlatformProblemLibrary, platformStorageBank, platformCategory } from './platform-problem-library.mjs';
 import { tutorialSettings, saveTutorial } from './problem-tutorials.mjs';
 import { handleScholarshipAssistance } from './scholarship-assistance.mjs';
+import { handleProblemPublicStatements } from './problem-public-statements.mjs';
 import { assertJudgeAdmission } from './system.mjs';
 import { fail, uuid } from './security.mjs';
+import { publishProblemDraft, requireDraftRevision, saveProblemDraft, validateProblemDraft } from './problem-editor-drafts.mjs';
 
 const reply=(body,status=200)=>({status,body});
 
 export async function handlePlatformProblems(ctx) {
  const library=await handlePlatformProblemLibrary(ctx);if(library)return library;
  const {pool,user,route,method,body={},helpers,url}=ctx;
- const match=route.match(/^\/platform\/source-problems(?:\/([^/]+)(?:\/(versions|publish|validate|tutorial|contents)(?:\/([^/]+)\/(publish))?)?)?$/);
+ const match=route.match(/^\/platform\/source-problems(?:\/([^/]+)(?:\/(versions|publish|validate|tutorial|contents|public-statement)(?:\/([^/]+)\/(publish))?)?)?$/);
  if(!match)return null;
  return transaction(pool,async db=>{
   await lockSchoolTeaching(db,LEGACY_SCHOOL_ID,{shared:method==='GET'});
@@ -23,7 +25,7 @@ export async function handlePlatformProblems(ctx) {
   const audit=(action,id,detail={})=>db.query('INSERT INTO platform_audit_events(actor_account_id,action,detail) VALUES($1,$2,$3)',
    [user.id,action,{problemId:id,...detail}]);
   const detail=async(id,versionId)=>{
-   const result=await helpers.problemResult(db,user,id,versionId);
+   const result=await helpers.problemResult(db,user,id,versionId,{editing:true});
    const category=(await db.query('SELECT p.platform_bank_id,b.name FROM problems p LEFT JOIN platform_problem_banks b ON b.id=p.platform_bank_id WHERE p.id=$1',[id])).rows[0];
    return {...result,sourceBankId:result.bankId,bankId:category?.platform_bank_id??null,ownerScope:'platform',schoolId:LEGACY_SCHOOL_ID,bankName:category?.name??'',canPublish:admin&&result.canPublish,canManage:admin};
   };
@@ -59,6 +61,13 @@ export async function handlePlatformProblems(ctx) {
   if(!p)fail(404,'NOT_FOUND','平台题目不存在');
   await requirePlatformContentEditor(db,user,'problem',id);
   if(method==='GET'&&!match[2])return reply(await detail(id,url.searchParams.get('versionId')));
+  if(match[2]==='public-statement'&&!match[3]&&['GET','POST'].includes(method)){
+   if(method==='POST'&&body.expectedRevision==null)fail(409,'REVISION_CONFLICT','请核对待发布草稿');
+   const targetUrl=new URL(url);
+   targetUrl.searchParams.set('problemId',id);
+   targetUrl.searchParams.set('view','draft');
+   return handleProblemPublicStatements({...ctx,pool:db,authoringDb:db,route:'/scholarship/public-statements',url:targetUrl,body:{...body,problemId:id}});
+  }
   if(match[2]==='tutorial'&&!match[3]){
    if(method==='GET')return reply(tutorialSettings(p));
    if(method==='PATCH')return reply(await saveTutorial(db,p,body,metadata=>audit('platform.problem.tutorial_update',id,metadata)));
@@ -87,6 +96,7 @@ export async function handlePlatformProblems(ctx) {
   if(match[2]==='validate'){
    const versionId=uuid(body.versionId),version=(await db.query('SELECT * FROM problem_versions WHERE problem_id=$1 AND id=$2 FOR UPDATE',[id,versionId])).rows[0];
    if(!version)fail(404,'NOT_FOUND','题目版本不存在');
+   if(version.edit_draft)return reply(await validateProblemDraft(db,version,body.expectedRevision));
    if(version.published_at)fail(409,'IMMUTABLE','已发布版本不能重新验证，请创建新版本');
    if(version.validation_status==='Incomplete')fail(409,'INCOMPLETE','请补齐题面、参考解答、样例与正式测试并保存新版本后验证');
    if(!['Waiting','Judging'].includes(version.validation_status)){
@@ -99,9 +109,16 @@ export async function handlePlatformProblems(ctx) {
   }
   if(body.expectedVersionId!==v.id)fail(409,'REVISION_CONFLICT','题目已更新，请重新载入');
   if(match[2]==='versions'){
-   await helpers.insertVersion(db,user,id,helpers.problemInput({...body,bankId:p.bank_id}));
+   await saveProblemDraft(db,user,v,helpers.problemInput({...body,bankId:p.bank_id}),body.expectedRevision,
+    (_db,_actor,action,_type,_version,metadata)=>audit(`platform.${action}`,id,{versionId:v.id,...metadata}));
   }else{
    if(!admin)fail(403,'PLATFORM_ADMIN_REQUIRED','仅平台管理员可发布题目');
+   if(v.edit_draft){
+    requireDraftRevision(v,body.expectedRevision);
+    await publishProblemDraft(db,user,v,{schoolApproval:true});
+    await audit('platform.problem.publish',id,{versionId:v.id,revision:v.edit_revision});
+    return reply(await detail(id));
+   }
    if(v.published_at)fail(409,'ALREADY_PUBLISHED','当前版本已发布');
    if(v.validation_status!=='AC')fail(409,'NOT_VALIDATED','参考解答须通过全部测试后才能发布');
    await db.query(`UPDATE problem_versions SET published_at=clock_timestamp(),school_visible_at=clock_timestamp(),

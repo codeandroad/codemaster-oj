@@ -89,20 +89,21 @@ export async function reviseAcslProgramming(pool, args) {
     const result = { dryRun, changed: true, paperId: paper.id, versionId: paper.version_id,
       beforeProgrammingVersionId: paper.programming_version_id, beforeHash: paper.content_hash, afterHash };
     if (dryRun) return { ...result, id: null, afterProgrammingVersionId: null };
-    const newVersion = (await db.query(`INSERT INTO school_problem_versions(school_id,problem_id,draft_revision,definition)
-      SELECT $1,$2,coalesce(max(draft_revision),0)+1,$3 FROM school_problem_versions WHERE school_id=$1 AND problem_id=$2 RETURNING id`,
-      [schoolId, paper.programming_problem_id, JSON.stringify(afterJudge)])).rows[0];
     const audit = (await db.query(`INSERT INTO acsl_programming_revisions(school_id,paper_id,version_id,problem_id,
       before_programming_version_id,after_programming_version_id,request_id,request_hash,actor_account_id,reason,source_evidence,corrections,
       before_hash,after_hash,before_definition,after_definition,before_judge_definition,after_judge_definition)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id`,
-      [schoolId, paper.id, paper.version_id, paper.programming_problem_id, paper.programming_version_id, newVersion.id,
+      [schoolId, paper.id, paper.version_id, paper.programming_problem_id, paper.programming_version_id, paper.programming_version_id,
         requestId, requestHash, actorAccountId, reason, JSON.stringify(sourceEvidence), JSON.stringify(corrections), paper.content_hash, afterHash,
         JSON.stringify(paper.definition), JSON.stringify(after), JSON.stringify(beforeVersion.definition), JSON.stringify(afterJudge)])).rows[0];
-    const updated = await db.query(`UPDATE acsl_papers SET programming_version_id=$4,definition=$5,content_hash=$6
-      WHERE school_id=$1 AND id=$2 AND content_hash=$3`, [schoolId, paper.id, expectedContentHash, newVersion.id, JSON.stringify(after), afterHash]);
+    await db.query("SELECT set_config('campus.acsl_programming_correction',$1,true)",[audit.id]);
+    await db.query('UPDATE school_problem_versions SET definition=$3,draft_revision=draft_revision+1 WHERE school_id=$1 AND id=$2',
+      [schoolId,paper.programming_version_id,JSON.stringify(afterJudge)]);
+    await db.query("SELECT set_config('campus.acsl_programming_correction','',true)");
+    const updated = await db.query(`UPDATE acsl_papers SET definition=$4,content_hash=$5
+      WHERE school_id=$1 AND id=$2 AND content_hash=$3`, [schoolId, paper.id, expectedContentHash, JSON.stringify(after), afterHash]);
     if (updated.rowCount !== 1) throw new Error('ACSL programming content changed during revision.');
-    return { ...result, id: audit.id, afterProgrammingVersionId: newVersion.id };
+    return { ...result, id: audit.id, afterProgrammingVersionId: paper.programming_version_id };
   });
 }
 

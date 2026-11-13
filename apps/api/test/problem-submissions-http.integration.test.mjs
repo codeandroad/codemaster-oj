@@ -19,7 +19,7 @@ test('problem submission metadata: real Nest, scoped runtime DB, no private reco
   await owner.query(`CREATE SCHEMA ${schema}`);await migrate(pool);
   const grants=(await readFile(new URL('../../../packages/domain/grants.mjs',import.meta.url),'utf8')).match(/await pool\.query\(`([\s\S]*?)`\);/)[1];await pool.query(grants.replaceAll('SCHEMA public',`SCHEMA ${schema}`));
   const password=randomBytes(24).toString('base64url'),hash=await hashPassword(password),users={};
-  for(const [name,kind] of Object.entries({admin:'admin',student:'student',peer:'student',newadmin:'personal',newstudent:'personal',newpeer:'personal',outsider:'personal'})){
+  for(const [name,kind] of Object.entries({admin:'admin',student:'student',peer:'student',completion:'student',newadmin:'personal',newstudent:'personal',newpeer:'personal',outsider:'personal'})){
    users[name]=await transaction(pool,async db=>{const identityId=(await db.query('INSERT INTO identities(kind,number,name) VALUES($1,$2,$2) RETURNING id',[kind,name])).rows[0].id;
     const id=(await db.query('INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,$2,$3) RETURNING id',[identityId,name,hash])).rows[0].id;
     if(kind!=='personal')await db.query('INSERT INTO account_roles(account_id,role) VALUES($1,$2)',[id,kind]);return{id,identityId};});
@@ -30,7 +30,7 @@ test('problem submission metadata: real Nest, scoped runtime DB, no private reco
   for(const name of Object.keys(users)){const r=await req('/auth/login',{user:name,method:'POST',body:{username:name,password}});auth[name]={cookie:r.cookie,csrf:r.data.csrfToken};}
   const problem=(await pool.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id',[users.admin.id])).rows[0].id;
   async function version(){return(await pool.query("INSERT INTO problem_versions(problem_id,title,mode,statement,samples,time_limit_ms,memory_limit_mb,reference_code,validation_status,published_at,school_visible_at) VALUES($1,'Metadata','stdio','Public statement','[]',1000,64,'SECRET reference','AC',now(),now()) RETURNING id",[problem])).rows[0].id;}
-  const v=await version();await pool.query('UPDATE problems SET current_version_id=$2 WHERE id=$1',[problem,v]);
+  const historicalVersion=await version(),v=await version();await pool.query('UPDATE problems SET current_version_id=$2 WHERE id=$1',[problem,v]);
   async function submission(who='student',{status='AC',kind='submit',versionId=v,timed=null,language='python',metrics=null,assignment=null,rejudge=false}={}){
    const u=users[who],s=(await pool.query("INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,code,idempotency_key,request_hash,status,score,passed,total,timed_attempt_id,language,assignment_id) VALUES($1,$2,$3,$4,$5,'SECRET student code',$6,'fixture',$7,$8,1,1,$9,$10,$11) RETURNING id",[u.id,u.identityId,problem,versionId,kind,randomUUID(),status,status==='AC'?100:0,timed,language,assignment])).rows[0];
    if(metrics){const task=(await pool.query("INSERT INTO judge_tasks(submission_id,version_id,purpose,state,rejudge) VALUES($1,$2,'submission','completed',$3) RETURNING id",[s.id,versionId,rejudge])).rows[0];
@@ -39,16 +39,18 @@ test('problem submission metadata: real Nest, scoped runtime DB, no private reco
   }
   const own=await submission('student',{status:'WA',metrics:[{cpuMs:3,memoryBytes:1025,stdout:'SECRET output',input:'SECRET input'},{cpuMs:5,memoryBytes:4096}]}),peer=await submission('peer',{language:'cpp',metrics:[{cpuMs:1,memoryBytes:2048}]});
   await pool.query('INSERT INTO review_entries(submission_id,author_account_id,note) VALUES($1,$2,$3)',[peer.id,users.admin.id,'SECRET teacher note']);
-  await submission('student',{kind:'samples'});await submission('student',{versionId:await version()});
+  await submission('student',{kind:'samples'});
+  const earlierVersionAc=await submission('student',{versionId:historicalVersion});
+  await pool.query("UPDATE submissions SET created_at=(SELECT created_at-interval '1 day' FROM submissions WHERE id=$1) WHERE id=$2",[own.id,earlierVersionAc.id]);
   const route=`/problems/${problem}/submissions?versionId=${v}`;
-  await t.test('formal exact-version metadata sorts/paginates without student code or identities',async()=>{
-   const data=(await req(route+'&sort=runtimeMs&order=asc&pageSize=1')).data;safe(data);assert.equal(data.total,2);assert.equal(data.hasMore,true);assert.equal(data.solved,false);assert.equal(data.items[0].id,'SUB'+peer.id);assert.equal(data.items[0].isOwn,false);assert.equal(data.items[0].memoryKb,2);
+  await t.test('formal metadata sorts/paginates with problem-level AC without private code or identities',async()=>{
+   const data=(await req(route+'&sort=runtimeMs&order=asc&pageSize=1')).data;safe(data);assert.equal(data.total,2);assert.equal(data.hasMore,true);assert.equal(data.solved,true);assert.equal(data.items[0].id,'SUB'+peer.id);assert.equal(data.items[0].isOwn,false);assert.equal(data.items[0].memoryKb,2);
    const second=(await req(route+'&sort=runtimeMs&order=asc&pageSize=1&page=2')).data;assert.equal(second.items[0].id,'SUB'+own.id);assert.equal(second.items[0].runtimeMs,8);assert.equal(second.items[0].memoryKb,4);assert.equal(second.hasMore,false);
    const detail=(await req('/submissions/SUB'+own.id)).data;
    assert.deepEqual([detail.runtimeMs,detail.memoryKb],[second.items[0].runtimeMs,second.items[0].memoryKb]);
    assert.deepEqual(detail.testResults.map(result=>[result.timeMs,result.memoryKb]),[[3,2],[5,4]]);
    assert.doesNotMatch(JSON.stringify(detail.testResults),/SECRET/);
-   assert.equal((await req(`/problems/${problem}?versionId=${v}`)).data.solved,false);
+   assert.equal((await req(`/problems/${problem}?versionId=${v}`)).data.solved,true);
    await req('/submissions/SUB'+peer.id,{status:403});
    await req(route,{user:'anonymous',status:401});
    assert.deepEqual((await req(route+'&view=resume')).data,{submission:{code:'SECRET student code',language:'python'}});
@@ -104,9 +106,9 @@ test('problem submission metadata: real Nest, scoped runtime DB, no private reco
   await pool.query("UPDATE timed_practices SET state='Published' WHERE id=$1",[practice]);
   const timed=(await pool.query("INSERT INTO timed_attempts(practice_id,identity_id,account_id,started_at,deadline_at) VALUES($1,$2,$3,now(),now()+interval '30 minutes') RETURNING id",[practice,users.student.identityId,users.student.id])).rows[0].id;
   const held=await submission('student',{timed,metrics:[{cpuMs:0,memoryBytes:0}]});
-  await t.test('unreleased exams stay absent across free/assignment/timed entry; solved is persistent formal current-version only',async()=>{
+  await t.test('unreleased exams stay absent across entries while previously earned AC remains visible',async()=>{
    await pool.query("UPDATE submissions SET code='timed own code' WHERE id=$1",[held.id]);
-   for(const path of [route,route+'&timedPracticeId='+practice]){const data=(await req(path)).data;assert.equal(data.total,2);assert.equal(data.solved,false);assert.ok(!data.items.some(r=>r.id==='SUB'+held.id));}
+   for(const path of [route,route+'&timedPracticeId='+practice]){const data=(await req(path)).data;assert.equal(data.total,2);assert.equal(data.solved,true);assert.ok(!data.items.some(r=>r.id==='SUB'+held.id));}
    assert.deepEqual((await req(route+'&view=resume')).data,{submission:{code:'SECRET student code',language:'python'}});
    assert.deepEqual((await req(route+'&timedPracticeId='+practice+'&view=resume')).data,{submission:{code:'timed own code',language:'python'}});
    await req(route+'&timedPracticeId='+practice+'&view=resume',{user:'peer',status:404});
@@ -176,15 +178,18 @@ test('problem submission metadata: real Nest, scoped runtime DB, no private reco
    const {id:assignment}=(await pool.query(`INSERT INTO assignments(title,class_id,owner_account_id,due_at,state,published_at)
     VALUES('Completion',$1,$2,now()+interval '1 day','Published',now()) RETURNING id`,[cls,users.admin.id])).rows[0];
    await pool.query('INSERT INTO assignment_problems(assignment_id,problem_id,version_id,points,position) VALUES($1,$2,$3,100,1)',[assignment,problem,pinned]);
-   await pool.query('INSERT INTO assignment_participants(assignment_id,identity_id) VALUES($1,$2)',[assignment,users.student.identityId]);
-   const attempt=await submission('student',{assignment,versionId:pinned});
+   // Use a learner without earlier mastery: the first qualifying AC is the
+   // completion event, and a repeated AC must not replay an old celebration.
+   await pool.query('INSERT INTO assignment_participants(assignment_id,identity_id) VALUES($1,$2)',[assignment,users.completion.identityId]);
+   const attempt=await submission('completion',{assignment,versionId:pinned});
    const path=`/submissions/SUB${attempt.id}/assignment-completions`;
-   const {data}=await req(path);
+   const {data}=await req(path,{user:'completion'});
    assert.equal(data.items.length,1);
    assert.equal(data.items[0].id,assignment);
    assert.equal(data.items[0].completion.completedBySubmissionId,`SUB${attempt.id}`);
    assert.equal(data.items[0].completion.completedProblems,1);
    assert.doesNotMatch(JSON.stringify(data),/SECRET/);
+   await req(path,{user:'student',status:404});
    await req(path,{user:'peer',status:404});
    await req(path,{user:'admin',status:403});
    await req(path,{user:'anonymous',status:401});
@@ -200,14 +205,17 @@ test('problem submission metadata: real Nest, scoped runtime DB, no private reco
   async function schoolJob(who,context,status='AC',kind='submit',{identityId=null,cpuMs=2}={}){return(await pool.query("INSERT INTO school_judge_jobs(school_id,problem_id,version_id,account_id,request_id,request_hash,kind,access_context,payload,state,result,identity_id) VALUES($1,$2,$3,$4,$5,'qa',$6,$7,$8,'completed',$9,$10) RETURNING id",[school.id,sp,sv,users[who].id,randomUUID(),kind,context,{language:'python',code:'SECRET school code',version:def},{status,privateResults:[{cpuMs,memoryBytes:1024,stdout:'SECRET'}]},identityId])).rows[0].id;}
   const sj=await schoolJob('newstudent','school','WA');await schoolJob('newpeer','school');const pj=await schoolJob('newstudent','public');await schoolJob('newpeer','school','AC','samples');
   const sr=`/schools/${school.id}/problems/${sp}/submissions`,pr=`/practice/problems/${sp}/submissions`;
-  await t.test('school and explicitly public lists remain separate with strict publication/member gates',async()=>{
-   const s=(await req(sr,{user:'newstudent'})).data;safe(s);assert.equal(s.total,2);assert.equal(s.solved,false);assert.ok(s.items.some(r=>r.id===sj));assert.ok(!s.items.some(r=>r.id===pj));
+  await t.test('school and public metadata keep privacy gates while sharing the learner AC',async()=>{
+   const s=(await req(sr,{user:'newstudent'})).data;safe(s);assert.equal(s.total,2);assert.equal(s.solved,true);assert.ok(s.items.some(r=>r.id===sj));assert.ok(!s.items.some(r=>r.id===pj));
    const p=(await req(pr,{user:'newstudent'})).data;safe(p);assert.equal(p.total,1);assert.equal(p.solved,true);assert.equal(p.items[0].id,pj);
-   assert.equal((await req(`/schools/${school.id}/problems/${sp}`,{user:'newstudent'})).data.solved,false);assert.equal((await req(`/practice/problems/${sp}`,{user:'newstudent'})).data.solved,true);
+   assert.equal((await req(`/schools/${school.id}/problems/${sp}`,{user:'newstudent'})).data.solved,true);assert.equal((await req(`/practice/problems/${sp}`,{user:'newstudent'})).data.solved,true);
    await req(sr,{user:'anonymous',status:401});await req(pr,{user:'anonymous',status:401});
    await req(sr,{user:'outsider',status:404});await req(`/schools/${beta.id}/problems/${sp}/submissions`,{user:'newstudent',status:404});await req(sr+'?versionId='+randomUUID(),{user:'newstudent',status:404});
   });
   await t.test('school grouping freezes receipt identity and does not assign unlinked history to a later student',async()=>{
+   // Remove independent public mastery so the following assertions isolate
+   // school receipt ownership rather than a valid cross-entry AC.
+   await pool.query("UPDATE school_judge_jobs SET result=jsonb_set(result,'{status}','\"WA\"') WHERE id=$1",[pj]);
    const identityId=(await pool.query("INSERT INTO school_identities(school_id,kind,number,name,account_id) VALUES($1,'student','Student','Student',$2) RETURNING id",[school.id,users.newstudent.id])).rows[0].id;
    const oldUnlinked=await schoolJob('newstudent','school','AC','submit',{cpuMs:2});
    assert.equal((await req(sr,{user:'newstudent'})).data.solved,false);
@@ -224,7 +232,7 @@ test('problem submission metadata: real Nest, scoped runtime DB, no private reco
    assert.equal((await req(sr,{user:'newstudent'})).data.total,3);
    const replacement=(await pool.query("INSERT INTO school_identities(school_id,kind,number,name,account_id) VALUES($1,'student','Replacement','Replacement',$2) RETURNING id",[school.id,users.newstudent.id])).rows[0].id;
    const after=(await req(sr,{user:'newstudent'})).data;assert.equal(after.total,3);assert.equal(after.solved,false);assert.equal(after.items.find(r=>r.id===mine).isOwn,false);
-   const problemAfter=(await req(`/schools/${school.id}/problems/${sp}`,{user:'newstudent'})).data;assert.equal(problemAfter.solved,false);assert.equal(problemAfter.attempts,0);
+   const problemAfter=(await req(`/schools/${school.id}/problems/${sp}`,{user:'newstudent'})).data;assert.equal(problemAfter.solved,false);assert.equal(problemAfter.attempts,1,'only the independent public attempt remains; former pupil and unlinked school attempts are excluded');
    await schoolJob('newstudent','school','AC','submit',{identityId:replacement,cpuMs:3});assert.equal((await req(sr,{user:'newstudent'})).data.solved,true);assert.equal((await req(`/schools/${school.id}/problems/${sp}`,{user:'newstudent'})).data.solved,true);
   });
   await t.test('public latest uses the stable person, keeps historical AC, and cannot pull school submissions',async()=>{

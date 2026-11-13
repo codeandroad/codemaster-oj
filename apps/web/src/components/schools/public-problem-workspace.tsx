@@ -22,12 +22,12 @@ const normalizeJob = (result: DetailedSubmission) => ({...result, testResults: (
 const unavailableStorage = {getItem: () => null, setItem: () => { throw new Error("Storage unavailable"); }};
 
 export function PublicProblemWorkspace({ id, catalog }: { id:string; catalog:{data:{items:Problem[]}|null;loading:boolean;error:string;reload:()=>void} }) {
-  const params = useSearchParams(), version = params.get("versionId");
+  const params = useSearchParams();
   const user = useData<{user:CampusUser}>("auth/me");
-  const problem = useData<Problem>(`practice/problems/${encodeURIComponent(id)}?${new URLSearchParams({view:"practice", ...(version ? {versionId:version} : {}), ...(params.get("publicCourseId") ? {courseId:params.get("publicCourseId")!,chapterId:params.get("publicChapterId")!} : {})})}`);
-  return <State data={user}><State data={problem}>{user.data?.user && problem.data?.definition && <PublicWorkspace key={`${user.data.user.id}:${problem.data.id}:${problem.data.versionId}:${params.get("publicCourseId")??""}:${params.get("publicChapterId")??""}`} user={user.data.user} problem={problem.data} catalog={catalog}/>}</State></State>;
+  const problem = useData<Problem>(`practice/problems/${encodeURIComponent(id)}?${new URLSearchParams({view:"practice", ...(params.get("publicCourseId") ? {courseId:params.get("publicCourseId")!,chapterId:params.get("publicChapterId")!} : {})})}`);
+  return <State data={user}><State data={problem}>{user.data?.user && problem.data?.definition && <PublicWorkspace key={`${user.data.user.id}:${problem.data.id}:${problem.data.versionId}:${params.get("publicCourseId")??""}:${params.get("publicChapterId")??""}`} user={user.data.user} problem={problem.data} catalog={catalog} reloadProblem={problem.reload}/>}</State></State>;
 }
-function PublicWorkspace({user, problem, catalog}:{user:CampusUser;problem:Problem;catalog:{data:{items:Problem[]}|null;loading:boolean;error:string;reload:()=>void}}) {
+function PublicWorkspace({user, problem, catalog, reloadProblem}:{user:CampusUser;problem:Problem;catalog:{data:{items:Problem[]}|null;loading:boolean;error:string;reload:()=>void};reloadProblem:()=>void}) {
   const params = useSearchParams(), search = params.toString(), router = useRouter(), {locale} = useLocale();
   const courseId = params.get("publicCourseId"), chapterId = params.get("publicChapterId");
   const course = useData<PublicCourse>(courseId && chapterId ? `practice/courses/${encodeURIComponent(courseId)}` : "");
@@ -61,7 +61,7 @@ function PublicWorkspace({user, problem, catalog}:{user:CampusUser;problem:Probl
       resumeSubmission: true,
       submit: ({kind,code,language,customInput,requestId})=>productionApi(`${path}/submissions`, {method:"POST",body:{kind,code,language,input:customInput,requestId,versionId:problem.versionId,...(inCourse ? {courseId,chapterId} : {})}}),
       submissionPath: id=>`${path}/submissions/${encodeURIComponent(id)}`, normalizeSubmission:normalizeJob,
-      ...publicDraftStorage(user.id,problem,storage),
+      ...publicDraftStorage(user.id,problem,storage), draftVersion:"current",
       assistance: (kind, language)=><ScholarshipAssistance preferredLanguage={language} key={`${problem.id}:${problem.versionId}:${kind}`} target={{problemId:problem.id,versionId:problem.versionId!}} kind={kind} endpoint="practice/scholarship/assistance"/>,
       presence:<><StudentPresenceHeartbeat identityId={user.id} endpoint="practice/presence"/><OnlineStudents identityId={user.id} endpoint="practice/presence"/></>,
       account:hasUnsavedChanges=><><ScholarshipBalance identityId={user.id} endpoint="practice/scholarship/me" href="/practice/scholarship"/><NotificationDropdown key={user.id} workspace="public"/><AccountMenu user={user} busy={logout.busy} leaderboardHref="/practice/leaderboard" onLogout={()=>{
@@ -79,5 +79,5 @@ function PublicWorkspace({user, problem, catalog}:{user:CampusUser;problem:Probl
       <State data={{ ...course, data: undefined, error }}>{null}</State>
     </div>;
   }
-  return <ProblemWorkspace problem={publicWorkspaceProblem(problem)} user={user} adapter={adapter}/>;
+  return <ProblemWorkspace problem={publicWorkspaceProblem(problem)} user={user} adapter={adapter} onReloadProblem={()=>{reloadProblem();reloadCourse();catalog.reload();}}/>;
 }

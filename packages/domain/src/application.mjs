@@ -556,7 +556,16 @@ export async function createDomainServices(pool,config) {
    }
    m=route.match(/^\/problems\/([^/]+)$/);
    if(m&&method==='GET'){
-    const selected=url.searchParams.get('current')==='1'?(await resolveLiveProblemVersion(pool,m[1],{lock:false,allowArchived:true})).id:url.searchParams.get('versionId');
+    const originalId=url.searchParams.get('originalSubmissionId');
+    let selected=url.searchParams.get('versionId');
+    if(originalId){
+     const original=await submissionAccess(pool,user,originalId);
+     if(original.identity_id!==user.identityId||original.problem_id!==m[1])fail(404,'NOT_FOUND','原提交不存在');
+     selected=original.version_id;
+    }else if(url.searchParams.get('current')==='1'||!isStaff(user)){
+     if(selected)await versionAccess(pool,user,m[1],selected);
+     selected=(await resolveLiveProblemVersion(pool,m[1],{lock:false,allowArchived:true})).id;
+    }
     return respond(200,await problemResult(pool,user,m[1],selected));
    }
    m=route.match(/^\/problems\/([^/]+)\/versions$/);

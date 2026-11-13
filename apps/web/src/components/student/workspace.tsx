@@ -45,9 +45,9 @@ import { validateFunctionInput } from "@/lib/function-input";
 
 export function StudentWorkspace({ id, user }: { id: string; user: CampusUser }) {
   const { locale } = useLocale();
-  const search = useSearchParams(), originalId = search.get("originalSubmissionId"), version = search.get("versionId");
-  const original = useData<Submission>(originalId ? `submissions/${encodeURIComponent(originalId)}` : ""), pinned = originalId ? original.data?.versionId : user.roles.some(role => role === "admin" || role === "teacher") ? version : null;
-  const problem = useData<ProductionProblem>(!originalId || original.data ? `problems/${id}${pinned ? `?versionId=${encodeURIComponent(pinned)}` : "?current=1"}` : "");
+  const search = useSearchParams(), originalId = search.get("originalSubmissionId");
+  const original = useData<Submission>(originalId ? `submissions/${encodeURIComponent(originalId)}` : ""), pinned = originalId ? original.data?.versionId : null;
+  const problem = useData<ProductionProblem>(!originalId || original.data ? `problems/${id}${pinned ? `?originalSubmissionId=${encodeURIComponent(originalId!)}&versionId=${encodeURIComponent(pinned)}` : "?current=1"}` : "");
   const context = workspaceDraftContext({
     originalSubmissionId: originalId ? original.data?.originalSubmissionId ?? original.data?.id ?? originalId : null,
     timedPracticeId: search.get("timedPracticeId"),

@@ -1,4 +1,5 @@
 import { platformPoints } from './platform-points.mjs';
+import { problemSolvedSql, withProblemProgressScope } from './problem-progress.mjs';
 import { handleCourseMerge, canonicalMergedCourseId } from './course-merge.mjs';
 import { courseSections, chapterSectionKey, assertChapterSections } from './course-sections.mjs';
 import { courseLocalizations, localizedFields } from './course-localizations.mjs';
@@ -49,27 +50,17 @@ function assertExpectedDraftRevision(body,path) {
   fail(409,'COURSE_DRAFT_CONFLICT','课程已修改或发布，请重新读取草稿；未修改任何内容。');
 }
 
-// Published lessons open the latest approved revision. Keep the linked
-// revision available for progress already earned before it was replaced.
-const courseAcceptedSubmission = `s.kind IN ('submit','correction') AND s.status='AC'
- AND (s.timed_attempt_id IS NULL OR EXISTS(SELECT 1 FROM timed_attempts ta JOIN timed_practices tp ON tp.id=ta.practice_id
-  WHERE ta.id=s.timed_attempt_id AND tp.results_published_at IS NOT NULL))`;
-const courseCompletedRevision = linked => `s.problem_id=cp.problem_id AND (
- s.version_id=cp.version_id OR EXISTS(SELECT 1 FROM problem_versions attempted
-  WHERE attempted.id=s.version_id AND attempted.problem_id=cp.problem_id
-   AND attempted.published_at>=${linked}.published_at AND attempted.rank_approved_at IS NOT NULL))`;
-
+// Current teaching always opens the latest approved revision; a learner's
+// achievement belongs to the stable problem across versions and entry points.
 async function taskStats(db,user,ids,draftIds=[]) {
  if(!ids.length)return new Map();
- const rows=(await db.query(`SELECT c.path_id,count(DISTINCT COALESCE(latest.id,cp.version_id))::int task_count,
- count(DISTINCT COALESCE(latest.id,cp.version_id)) FILTER(WHERE EXISTS(SELECT 1 FROM submissions s WHERE s.identity_id=$2
-  AND ${courseCompletedRevision('v')} AND ${courseAcceptedSubmission}
-  AND course_language_allows_credit(path.required_language,path.language_credit_cutoffs,s.language,s.created_at)))::int completed_tasks
+ const rows=(await withProblemProgressScope(db,LEGACY_SCHOOL_ID,client=>client.query(`SELECT c.path_id,count(DISTINCT COALESCE(latest.id,cp.version_id))::int task_count,
+ count(DISTINCT COALESCE(latest.id,cp.version_id)) FILTER(WHERE ${problemSolvedSql({problemId:'cp.problem_id',accountId:'$2',requiredLanguage:'path.required_language',languageCreditCutoffs:'path.language_credit_cutoffs'})})::int completed_tasks
  FROM learning_chapters c JOIN learning_paths path ON path.id=c.path_id
  JOIN chapter_problems cp ON cp.chapter_id=c.id JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id JOIN problem_versions v ON v.id=cp.version_id
  ${latestCourseProblemVersion} true
  JOIN problem_versions active ON active.id=COALESCE(latest.id,cp.version_id)
- WHERE c.path_id=ANY($1::uuid[]) AND c.archived_at IS NULL AND p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school' AND active.published_at IS NOT NULL AND active.school_visible_at IS NOT NULL AND active.rank_review_status='approved' GROUP BY c.path_id`,[ids,user.identityId])).rows;
+ WHERE c.path_id=ANY($1::uuid[]) AND c.archived_at IS NULL AND p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school' AND active.published_at IS NOT NULL AND active.school_visible_at IS NOT NULL AND active.rank_review_status='approved' GROUP BY c.path_id`,[ids,user.id]))).rows;
  const stats=new Map(rows.map(r=>[r.path_id,r]));
  if(draftIds.length){
   const drafts=(await db.query(`SELECT c.path_id,count(DISTINCT cp.version_id)::int task_count
@@ -102,15 +93,13 @@ async function pathResult(ctx, id, db = ctx.pool, allowArchived = false) {
  p.classes=await courseClasses(db,id);
  const chapters = (await db.query(`SELECT c.*, COALESCE(pr.completed,false) completed FROM learning_chapters c
   LEFT JOIN learning_progress pr ON pr.chapter_id=c.id AND pr.identity_id=$2 WHERE c.path_id=$1 AND c.archived_at IS NULL ORDER BY c.position,c.created_at,c.id`, [id, ctx.user.identityId])).rows;
- const links = chapters.length ? (await db.query(`SELECT cp.*,v.id active_version_id,v.title,v.published_at,v.school_visible_at,v.rank_review_status,b.name bank_name,b.visibility bank_visibility,b.archived_at bank_archived_at,p.archived_at problem_archived_at,
-  EXISTS(SELECT 1 FROM submissions s WHERE s.identity_id=$3 AND ${courseAcceptedSubmission}
-   AND course_language_allows_credit($4,$5,s.language,s.created_at)
-   AND (s.version_id=cp.version_id OR $2 AND ${courseCompletedRevision('linked')})) completed
+ const links = chapters.length ? (await withProblemProgressScope(db,LEGACY_SCHOOL_ID,client=>client.query(`SELECT cp.*,v.id active_version_id,v.title,v.published_at,v.school_visible_at,v.rank_review_status,b.name bank_name,b.visibility bank_visibility,b.archived_at bank_archived_at,p.archived_at problem_archived_at,
+  ${problemSolvedSql({problemId:'cp.problem_id',accountId:'$2',requiredLanguage:'$3',languageCreditCutoffs:'$4'})} completed
   FROM chapter_problems cp JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id
   JOIN problem_versions linked ON linked.id=cp.version_id AND linked.problem_id=cp.problem_id
   ${latestCourseProblemVersion} true
   JOIN problem_versions v ON v.id=COALESCE(latest.id,linked.id)
-  WHERE cp.chapter_id=ANY($1::uuid[]) ORDER BY cp.position`, [chapters.map(c => c.id),Boolean(p.published_at),ctx.user.identityId,p.required_language,p.language_credit_cutoffs])).rows : [];
+  WHERE cp.chapter_id=ANY($1::uuid[]) ORDER BY cp.position`, [chapters.map(c => c.id),ctx.user.id,p.required_language,p.language_credit_cutoffs]))).rows : [];
  const visible = new Map();
  for (const link of links) {
   const publicForStudents=link.bank_visibility==='school'&&!link.bank_archived_at&&!link.problem_archived_at&&!!link.published_at&&!!link.school_visible_at&&link.rank_review_status==='approved';
@@ -522,20 +511,18 @@ export async function handleEducation(ctx) {
   requireStaff(user);const path=await pathAccess(pool,user,courseMatch[1],true);
   const counts=await taskStats(pool,user,[path.id],path.published_at?[]:[path.id]);
   const chapterCount=(await pool.query('SELECT count(*)::int n FROM learning_chapters WHERE path_id=$1 AND archived_at IS NULL',[path.id])).rows[0].n;
-  const students=(await pool.query(`SELECT i.id,i.name,i.number,
+  const students=(await withProblemProgressScope(pool,LEGACY_SCHOOL_ID,db=>db.query(`SELECT i.id,i.name,i.number,
    (SELECT count(*)::int FROM learning_progress pr JOIN learning_chapters c ON c.id=pr.chapter_id WHERE c.path_id=$1 AND c.archived_at IS NULL AND pr.identity_id=i.id AND pr.completed) completed_chapters,
    (SELECT count(DISTINCT COALESCE(latest.id,cp.version_id))::int FROM chapter_problems cp JOIN learning_chapters c ON c.id=cp.chapter_id
     JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id JOIN problem_versions v ON v.id=cp.version_id
     ${latestCourseProblemVersion} true
     JOIN problem_versions active ON active.id=COALESCE(latest.id,cp.version_id)
     WHERE c.path_id=$1 AND c.archived_at IS NULL AND p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school'
-    AND active.published_at IS NOT NULL AND active.school_visible_at IS NOT NULL AND active.rank_review_status='approved' AND EXISTS(SELECT 1 FROM submissions s WHERE s.identity_id=i.id
-     AND ${courseCompletedRevision('v')} AND ${courseAcceptedSubmission}
-     AND course_language_allows_credit($4,$5,s.language,s.created_at))) completed_tasks
+    AND active.published_at IS NOT NULL AND active.school_visible_at IS NOT NULL AND active.rank_review_status='approved' AND ${problemSolvedSql({problemId:'cp.problem_id',identityId:'i.id',accountId:'(SELECT account.id FROM accounts account WHERE account.identity_id=i.id AND account.binding_released_at IS NULL AND account.disabled_at IS NULL LIMIT 1)',requiredLanguage:'$4',languageCreditCutoffs:'$5'})}) completed_tasks
    FROM identities i WHERE i.kind='student' AND i.archived_at IS NULL AND ($2::boolean
     OR EXISTS(SELECT 1 FROM class_members cm JOIN teacher_classes tc ON tc.class_id=cm.class_id JOIN classes cl ON cl.id=cm.class_id WHERE cm.identity_id=i.id AND tc.account_id=$3 AND cl.archived_at IS NULL)
     OR EXISTS(SELECT 1 FROM assignment_participants part JOIN assignments a ON a.id=part.assignment_id WHERE part.identity_id=i.id AND NOT part.exempt AND a.owner_account_id=$3 AND a.course_path_id=$1 AND a.state='Published')
-    OR EXISTS(SELECT 1 FROM timed_practice_participants part JOIN timed_practices t ON t.id=part.practice_id WHERE part.identity_id=i.id AND NOT part.exempt AND t.owner_account_id=$3 AND t.course_path_id=$1 AND t.state<>'Draft')) ORDER BY i.number,i.id`,[path.id,administrator(user),user.id,path.required_language,path.language_credit_cutoffs])).rows;
+    OR EXISTS(SELECT 1 FROM timed_practice_participants part JOIN timed_practices t ON t.id=part.practice_id WHERE part.identity_id=i.id AND NOT part.exempt AND t.owner_account_id=$3 AND t.course_path_id=$1 AND t.state<>'Draft')) ORDER BY i.number,i.id`,[path.id,administrator(user),user.id,path.required_language,path.language_credit_cutoffs]))).rows;
   const paper4=await loadCoursePaper4(pool,[path.id],students.map(s=>s.id));
   const acslCompleted=new Map();
   if((await pool.query("SELECT 1 FROM learning_chapters WHERE path_id=$1 AND archived_at IS NULL AND acsl_links<>'[]'::jsonb LIMIT 1",[path.id])).rowCount){

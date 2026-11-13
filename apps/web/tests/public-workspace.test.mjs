@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { publicWorkspaceProblem, publicPracticeHref, publicPracticeReturnHref, publicDraftStorage } from '../src/components/schools/public-workspace-model.ts';
 
 const problem = {id:'p1',schoolId:'s1',versionId:'v1',title:'Example',published:true,definition:{mode:'stdio',statement:'Task',difficulty:'easy',objective:'Practice input',tags:['Introduction'],starterCode:'# starter',starterCodes:{python:'# starter',cpp:'// starter'},samples:[{input:'2',expected:'4'}],timeLimitMs:1000,memoryLimitMb:64,tests:[{input:'secret'}],referenceCode:'private',teacherNotes:'private'}};
-const memory = () => { const data=new Map(); return {getItem:key=>data.get(key)??null,setItem:(key,value)=>data.set(key,value)}; };
+const memory = () => { const data=new Map(); return {getItem:key=>data.get(key)??null,setItem:(key,value)=>data.set(key,value),get length(){return data.size;},key:index=>[...data.keys()][index]??null}; };
 test('workspace data only contains student-facing fields', () => {
   const value=publicWorkspaceProblem(problem);
   assert.equal(value.difficulty,'easy'); assert.equal(value.objective,'Practice input'); assert.deepEqual(value.tags,['Introduction']);
@@ -11,10 +11,10 @@ test('workspace data only contains student-facing fields', () => {
   assert.deepEqual(value.samples,[{input:'2',expected:'4'}]);
   assert.ok(!JSON.stringify(value).includes('secret')); assert.ok(!JSON.stringify(value).includes('private'));
 });
-test('chapter navigation pins each target version and returns to the same chapter and search', () => {
+test('chapter navigation follows the current problem and returns to the same chapter and search', () => {
   const search='publicCourseId=c1&publicChapterId=ch1&versionId=old&courseQ=Python&problemId=p1';
   const next=new URL(publicPracticeHref({problemId:'p2',versionId:'v2'},search),'https://example.test');
-  assert.equal(next.pathname,'/practice/problems');assert.equal(next.searchParams.get('versionId'),'v2');
+  assert.equal(next.pathname,'/practice/problems');assert.equal(next.searchParams.has('versionId'),false);
   assert.equal(next.searchParams.get('publicChapterId'),'ch1');assert.equal(next.searchParams.get('publicCourseId'),'c1');
   assert.equal(publicPracticeReturnHref(search),'/practice/courses/c1?chapterId=ch1&courseQ=Python');
 });
@@ -29,16 +29,31 @@ test('old Python drafts survive migration without claiming they were submitted',
   assert.equal(drafts.saveDraft('python',value),true); assert.equal(storage.getItem(legacy),'print(42)');
   assert.equal(drafts.readDraft('cpp'),null);
 });
-test('saved submission baseline and drafts remain isolated by user, version and language', () => {
+test('drafts follow the current exercise across published versions while isolating users and languages', () => {
   const storage=memory(),drafts=publicDraftStorage('u1',problem,storage);
   const draft={code:'print(42)',receivedCode:'print(42)',updatedAt:'2026-11-08T00:00:00Z'};
   drafts.saveDraft('python',draft); assert.deepEqual(drafts.readDraft('python'),draft);
   assert.equal(publicDraftStorage('u2',problem,storage).readDraft('python'),null);
-  assert.equal(publicDraftStorage('u1',{...problem,versionId:'v2'},storage).readDraft('python'),null);
+  assert.deepEqual(publicDraftStorage('u1',{...problem,versionId:'v2'},storage).readDraft('python'),draft);
+  assert.equal(publicDraftStorage('u1',{...problem,id:'another'},storage).readDraft('python'),null);
   assert.equal(drafts.readDraft('javascript'),null);
 });
 test('storage failures do not mark drafts saved', () => {
   const drafts=publicDraftStorage('u1',problem,{getItem:()=>{throw Error('denied');},setItem:()=>{throw Error('quota');}});
   assert.equal(drafts.readDraft('python'),null);
   assert.equal(drafts.saveDraft('python',{code:'x',receivedCode:'',updatedAt:''}),false);
+});
+
+test('publishing a new version recovers the newest earlier public draft without rewriting history', () => {
+  const storage=memory();
+  const older={code:'old draft',receivedCode:'',updatedAt:'2026-11-12T00:00:00Z'};
+  const newer={code:'work in progress',receivedCode:'previous submit',updatedAt:'2026-11-13T00:00:00Z'};
+  storage.setItem('codemaster:public-workspace:u1:p1:v0:python',JSON.stringify(older));
+  storage.setItem('codemaster:public-workspace:u1:p1:v1:python',JSON.stringify(newer));
+  storage.setItem('codemaster:public-workspace:u2:p1:v3:python',JSON.stringify({...newer,code:'someone else'}));
+  const next=publicDraftStorage('u1',{...problem,versionId:'v2'},storage);
+  assert.deepEqual(next.readDraft('python'),newer);
+  assert.equal(next.readDraft('cpp'),null);
+  assert.equal(next.saveDraft('python',newer),true);
+  assert.equal(storage.getItem('codemaster:public-workspace:u1:p1:v1:python'),JSON.stringify(newer));
 });

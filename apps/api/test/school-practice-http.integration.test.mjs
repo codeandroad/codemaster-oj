@@ -91,7 +91,7 @@ test('school and public practice Nest transport requires scoped membership, CSRF
   assert.match(detail.headers.get('cache-control')??'',/no-store/);
   assert.doesNotMatch(JSON.stringify(detail.data),/SPOOFED_|PRIVATE_STDOUT|TEACHER_PRIVATE_NOTE/);
   for(const viewer of ['teacher','admin','platform','personal'])await request(`${prefix}/judge-jobs/${formal.id}`,{auth:auth[viewer],status:404});
-  for(const [viewer,attempts] of [['personal',1],['student',0]]){
+  for(const [viewer,attempts] of [['personal',1],['student',1]]){
    const {items:[row]}=(await request('/practice/problems?page=1&q=Double',{auth:auth[viewer]})).data;
    assert.equal(row.attempts,attempts);assert.equal(row.solved,false);
   }

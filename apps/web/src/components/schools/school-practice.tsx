@@ -182,21 +182,22 @@ function SchoolPracticeContents({ schoolId, role, initialProblemId }: { schoolId
 type CoursePracticeContext = { courseId: string; chapterId: string; requiredLanguage?: SubmissionLanguage | null; solved: boolean; preview: boolean; reload: () => void };
 type PracticeProblemProps = { path: string; jobPath: (id: string) => string; onBack: () => void; backLabel?: string; navigation?: PracticeNavigation; expectedVersionId?: string; course?: CoursePracticeContext };
 export function PracticeProblem({path,jobPath,onBack,backLabel,navigation,expectedVersionId,course}:PracticeProblemProps){
- const query = new URLSearchParams({ view: "practice", ...(expectedVersionId && { versionId: expectedVersionId }) });
- const data=useData<Problem>(`${path}?${query}`),auth=useData<{user:CampusUser}>("auth/me");return <>{(!data.data?.definition||!auth.data?.user||data.error||auth.error)&&<PracticeToolbar title={data.data?.title??""} onBack={onBack} backLabel={backLabel} navigation={navigation}/>}<State data={data}><State data={auth}>{data.data?.definition&&auth.data?.user&&<PracticeEditor key={`${path}:${data.data.versionId}:${data.data.activity?.revision ?? ""}:${course?.courseId ?? ""}:${course?.chapterId ?? ""}:${course?.requiredLanguage ?? ""}`} problem={data.data} userId={auth.data.user.id} path={path} jobPath={jobPath} onBack={onBack} backLabel={backLabel} navigation={navigation} expectedVersionId={expectedVersionId} course={course}/>}</State></State></>;
+ const query = new URLSearchParams({ view: "practice", ...(!course && expectedVersionId && { versionId: expectedVersionId }) });
+ const data=useData<Problem>(`${path}?${query}`),auth=useData<{user:CampusUser}>("auth/me");return <>{(!data.data?.definition||!auth.data?.user||data.error||auth.error)&&<PracticeToolbar title={data.data?.title??""} onBack={onBack} backLabel={backLabel} navigation={navigation}/>}<State data={data}><State data={auth}>{data.data?.definition&&auth.data?.user&&<PracticeEditor key={`${path}:${data.data.versionId}:${data.data.activity?.revision ?? ""}:${course?.courseId ?? ""}:${course?.chapterId ?? ""}:${course?.requiredLanguage ?? ""}`} problem={data.data} userId={auth.data.user.id} path={path} jobPath={jobPath} onBack={onBack} backLabel={backLabel} navigation={navigation} course={course} reloadProblem={data.reload}/>}</State></State></>;
 }
-function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation,expectedVersionId,course}:PracticeProblemProps&{problem:Problem;userId:string}){
+function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation,course,reloadProblem}:PracticeProblemProps&{problem:Problem;userId:string;reloadProblem:()=>void}){
  const {locale,t}=useLocale(),tx=(zh:string,en:string)=>locale==="zh"?zh:en,workspace=useWorkspaceSettings(userId),action=useMutation(),def=problem.definition!;
  const activity=problem.activity;
  const preview=problem.activity?.preview===true;
  const draftBase=preview
    ? `codemaster:assignment-preview:${userId}:${problem.schoolId}:${problem.activity?.id}:${problem.activity?.revision}:${problem.id}:${problem.versionId}`
-   : `codemaster:school-practice:${userId}:${problem.schoolId}:${problem.id}:${problem.versionId}`;
+   : `codemaster:school-practice:${userId}:${problem.schoolId}:${problem.id}:${activity ? problem.versionId : "current"}`;
  const requiredLanguage=course?.requiredLanguage ?? null;
  const languageKey = `${draftBase}:language`;
  const draftKey = (language: SubmissionLanguage) => language === "python" ? draftBase : `${draftBase}:${language}`;
  function readCode(language: SubmissionLanguage) {
-   try { return localStorage.getItem(draftKey(language)) ?? starterFor(def, language); }
+   const prior=`codemaster:school-practice:${userId}:${problem.schoolId}:${problem.id}:${problem.versionId}${language === "python" ? "" : `:${language}`}`;
+   try { return localStorage.getItem(draftKey(language)) ?? (!activity ? localStorage.getItem(prior) : null) ?? starterFor(def, language); }
    catch { return starterFor(def, language); }
  }
  const [language,setLanguage]=useState<SubmissionLanguage>(()=>{
@@ -207,6 +208,7 @@ function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation
  const [code,setCode]=useState(()=>readCode(language)),[settingsOpen,setSettingsOpen]=useState(false),[job,setJob]=useState<Job|null>(null),[jobId,setJobId]=useState<string|null>(null),[custom,setCustom]=useState(""),[pollError,setPollError]=useState("");
  const key=draftKey(language);
  const [draftSaved,setDraftSaved]=useState(false);
+ const [problemUpdated,setProblemUpdated]=useState(false);
  const courseContext=course ? {courseId:course.courseId,chapterId:course.chapterId} : undefined;
  const canReadTutorial=!preview&&(problem.activity?.kind!=="timed"||Boolean(problem.activity.resultsPublishedAt));
  const tutorialEndpoint=canReadTutorial&&problem.versionId?`schools/${encodeURIComponent(problem.schoolId)}/problems/${encodeURIComponent(problem.id)}/tutorial?${new URLSearchParams({
@@ -257,19 +259,21 @@ function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation
    setLanguage(next); setCode(readCode(next)); setJob(null); setJobId(null); setPollError(""); action.reset();
  }
  function run(kind:"samples"|"custom"|"submit") {
-   if (pending || closed || !code.trim()) return;
+   if (pending || closed || problemUpdated || !code.trim()) return;
    void action.run(async()=>{
      try {
-       const next=await productionApi<{id:string}>(`${path}/submissions`,{method:"POST",body:{kind,code,language,input:custom,requestId:crypto.randomUUID(),...courseContext,...(course?.preview ? {coursePreview:true} : {}),...(preview ? {versionId:problem.versionId,expectedRevision:problem.activity?.revision} : expectedVersionId&&{versionId:expectedVersionId})}});
+       const next=await productionApi<{id:string}>(`${path}/submissions`,{method:"POST",body:{kind,code,language,input:custom,requestId:crypto.randomUUID(),versionId:problem.versionId,...courseContext,...(course?.preview ? {coursePreview:true} : {}),...(preview ? {expectedRevision:problem.activity?.revision} : {})}});
        setJob(null);setJobId(next.id);
      } catch (error) {
        if (error instanceof ApiError && error.code === "COURSE_LANGUAGE_REQUIRED") course?.reload();
+       if (error instanceof ApiError && error.code === "PROBLEM_UPDATED") setProblemUpdated(true);
        throw error;
      }
    });
  }
  return <div className="space-y-3">
   <PracticeToolbar title={problem.title} onBack={onBack} backLabel={backLabel} navigation={navigation}/>
+  {problemUpdated&&<div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded border border-border bg-info-soft p-3 text-sm"><p>{tx("题目已更新，请保留代码并加载最新题面后继续。","This problem was updated. Keep your code and load the latest statement to continue.")}</p><Button size="sm" disabled={pending} onClick={()=>{try{localStorage.setItem(key,code);reloadProblem();course?.reload();}catch{action.reset();setPollError(tx("草稿保存失败，请先复制代码后刷新。","Draft could not be saved. Copy your code before refreshing."));}}}>{tx("保留代码并刷新题目","Keep code and refresh problem")}</Button></div>}
   {problem.staffPractice&&<p className="text-sm text-muted-foreground">{tx("教师练习 · 结果仅供个人查看，不计入学生成绩、奖学金或排名。","Teacher practice · Results are personal and do not count toward student grades, scholarship or rankings.")}</p>}
   {activity&&<div className="flex flex-wrap items-start justify-between gap-2 text-sm">
     <div className="min-w-0">
@@ -369,16 +373,16 @@ function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation
           onEnableVim={()=>workspace.update({keyBinding:"vim"})}/>
       </div>
       <div className="flex justify-end gap-2 border-t border-border p-2">
-        <Button size="sm" variant="secondary" disabled={pending||closed||!code.trim()||!def.samples.length}
+        <Button size="sm" variant="secondary" disabled={pending||closed||problemUpdated||!code.trim()||!def.samples.length}
           onClick={()=>run("samples")}>{tx("运行样例","Run")}</Button>
-        <Button size="sm" disabled={pending||closed||!code.trim()} onClick={()=>run("submit")}>{tx("提交","Submit")}</Button>
+        <Button size="sm" disabled={pending||closed||problemUpdated||!code.trim()} onClick={()=>run("submit")}>{tx("提交","Submit")}</Button>
       </div>
     </section>
     <details ref={customDetailsRef} className="rounded-lg border border-border bg-surface p-3 text-sm">
       <summary className="cursor-pointer">{tx("自定义输入","Custom input")}</summary>
       <textarea ref={customInputRef} aria-label={tx("自定义输入","Custom input")} className={`${textarea} mt-2 font-mono`}
         rows={3} value={custom} onChange={e=>setCustom(e.target.value)}/>
-      <Button size="sm" variant="secondary" disabled={pending||closed||!code.trim()} onClick={()=>run("custom")}>
+      <Button size="sm" variant="secondary" disabled={pending||closed||problemUpdated||!code.trim()} onClick={()=>run("custom")}>
         {tx("运行输入","Run input")}
       </Button>
     </details>

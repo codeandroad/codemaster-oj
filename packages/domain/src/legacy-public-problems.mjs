@@ -58,7 +58,7 @@ function visibleProblem(source, state, schoolName) {
 async function statusFor(db, problemId, versionId) {
  const { rows: [state] } = await db.query(`
   SELECT EXISTS(SELECT 1 FROM school_problem_publications WHERE school_id=$1 AND problem_id=$2
-    AND version_id=$3 AND withdrawn_at IS NULL) AS "platformPublished",
+    AND withdrawn_at IS NULL) AS "platformPublished",
   (SELECT status FROM legacy_public_problem_requests WHERE problem_id=$2 AND version_id=$3) AS "publicRequestStatus"
  `, [LEGACY_SCHOOL_ID, problemId, versionId]);
  return state;
@@ -80,12 +80,32 @@ export async function availableLegacyPublicProblemVersions(db, versionIds) {
  return new Set(rows.map(row => row.id));
 }
 
+// An active publication grants public access to the stable problem. Its saved
+// version remains an approval/audit snapshot; learning uses the same current
+// source version as the school catalogue.
+export async function currentLegacyPublicProblems(db, problemIds) {
+ const rows=(await db.query(`SELECT ${sourceColumns} FROM ${sourceTables}
+  JOIN school_problem_publications publication ON publication.school_id=$1 AND publication.problem_id=p.id
+   AND publication.withdrawn_at IS NULL
+  WHERE p.id=ANY($2::uuid[]) AND ${sourceAccess}`,[LEGACY_SCHOOL_ID,problemIds])).rows;
+ return (await studentPublicStatementRows(db,rows)).filter(source=>!source.public_statement_pending);
+}
+
+export async function prepareLegacyPublicProblem(db, problemId) {
+ const source=await findSource(db,problemId,null,{lock:true});
+ if(!source)return null;
+ const publication=await db.query(`SELECT 1 FROM school_problem_publications
+  WHERE school_id=$1 AND problem_id=$2 AND withdrawn_at IS NULL`,[LEGACY_SCHOOL_ID,problemId]);
+ if(!publication.rowCount)return null;
+ return snapshotProblem(db,source);
+}
+
 export async function listLegacyPublicProblemReviews(db) {
  await scope(db);
  const { rows } = await db.query(`
   SELECT p.id AS problem_id,p.bank_id,b.name AS bank_name,v.id,v.title,CASE WHEN p.owner_scope='platform' THEN 'CodeMaster' ELSE s.name END AS school_name,
    EXISTS(SELECT 1 FROM school_problem_publications publication WHERE publication.school_id=s.id
-    AND publication.problem_id=p.id AND publication.version_id=v.id AND publication.withdrawn_at IS NULL) AS "platformPublished",
+    AND publication.problem_id=p.id AND publication.withdrawn_at IS NULL) AS "platformPublished",
    request.status AS "publicRequestStatus"
   FROM ${sourceTables}
   LEFT JOIN legacy_public_problem_requests request ON request.problem_id=p.id AND request.version_id=v.id
@@ -156,7 +176,7 @@ export async function decideLegacyPublicProblem(db, { problemId, versionId: expe
  if (decision === 'withdraw') {
   const { rows: [publication] } = await db.query(`UPDATE school_problem_publications
    SET withdrawn_at=clock_timestamp() WHERE school_id=$1 AND problem_id=$2 AND withdrawn_at IS NULL
-   AND ($3::uuid IS NULL OR version_id=$3) RETURNING version_id`,
+   AND ($3::uuid IS NULL OR version_id=$3 OR $3=(SELECT ${liveProblemVersionIdSql('p')} FROM problems p WHERE p.id=$2)) RETURNING version_id`,
   [LEGACY_SCHOOL_ID, problemId, expectedVersion ? uuid(expectedVersion) : null]);
   if (!publication) fail(409, 'REVISION_CONFLICT', 'Refresh the current platform listing.');
   versionId = publication.version_id;
@@ -212,18 +232,22 @@ export async function handleLegacyPublicProblemRequest({ pool, user, route, meth
  });
 }
 
-// A course-scoped snapshot is not a public-bank publication. Preserve the pin
-// and expose only the learner projection; the judge receives its private tests.
-export async function preparePlatformCourseProblem(db,problemId,versionId) {
+// Course links identify the problem; stored version references remain audit
+// history. New practice always receives the current published source version.
+export async function preparePlatformCourseProblem(db,problemId) {
  const {platformProblemReadySql}=await import('./platform-course-problems.mjs');
  const rows=(await db.query(`SELECT ${sourceColumns} FROM problems p
- JOIN problem_banks b ON b.id=p.bank_id JOIN problem_versions v ON v.problem_id=p.id
- WHERE p.id=$1 AND v.id=$2 AND ${platformProblemReadySql()} FOR SHARE OF p,b,v`,[problemId,versionId])).rows;
+ JOIN problem_banks b ON b.id=p.bank_id JOIN problem_versions v ON v.id=${liveProblemVersionIdSql('p')}
+ WHERE p.id=$1 AND ${platformProblemReadySql()} FOR SHARE OF p,b,v`,[problemId])).rows;
  const [source]=await studentPublicStatementRows(db,rows);
  if(!source||source.public_statement_pending)return null;
- await db.query("SELECT pg_advisory_xact_lock(hashtextextended('course-problem-snapshot:'||$1,0))",[problemId]);
+ return snapshotProblem(db,source);
+}
+
+async function snapshotProblem(db,source) {
+ await db.query("SELECT pg_advisory_xact_lock(hashtextextended('course-problem-snapshot:'||$1,0))",[source.problem_id]);
  await writeSnapshot(db,source,{activate:false});
- const p=(await db.query('SELECT * FROM school_problems WHERE school_id=$1 AND id=$2',[LEGACY_SCHOOL_ID,problemId])).rows[0];
- return {...p,published:true,published_version_id:versionId,archived:false,bank_name:'CodeMaster',
+ const p=(await db.query('SELECT * FROM school_problems WHERE school_id=$1 AND id=$2',[LEGACY_SCHOOL_ID,source.problem_id])).rows[0];
+ return {...p,published:true,published_version_id:source.id,archived:false,bank_name:source.bank_name,
  public_statement:learnerStatement(source),public_metadata:publicProblemMetadata(source.metadata),public_tags:source.tags};
 }

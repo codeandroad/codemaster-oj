@@ -1,6 +1,7 @@
 import { platformChapterProblems } from './platform-course-problems.mjs';
 import { LEGACY_SCHOOL_ID } from './schools.mjs';
-import { availableLegacyPublicProblemVersions } from './legacy-public-problems.mjs';
+import { currentLegacyPublicProblems } from './legacy-public-problems.mjs';
+import { problemSolvedSql } from './problem-progress.mjs';
 import { loadCoursePaper4, paper4Progress } from './course-paper4.mjs';
 import { latestCourseProblemVersion } from './course-problem-version.mjs';
 
@@ -19,22 +20,15 @@ export const unavailablePrerequisite=courseId=>({courseId,available:false,comple
 // context; a platform course never grants access to a school's private bank.
 async function legacyChapterProblems(db,course,user,chapterIds) {
  if(!chapterIds.length)return new Map();
- const rows=(await db.query(`SELECT cp.problem_id,cp.version_id,EXISTS(
-  SELECT 1 FROM submissions s WHERE s.identity_id=$2 AND s.problem_id=cp.problem_id
-   AND s.kind IN ('submit','correction') AND s.status='AC'
-   AND (s.timed_attempt_id IS NULL OR EXISTS(SELECT 1 FROM timed_attempts ta
-    JOIN timed_practices tp ON tp.id=ta.practice_id WHERE ta.id=s.timed_attempt_id AND tp.results_published_at IS NOT NULL))
-   AND course_language_allows_credit($3,$4,s.language,s.created_at)
-   AND (s.version_id=cp.version_id OR EXISTS(SELECT 1 FROM problem_versions attempted
-    WHERE attempted.id=s.version_id AND attempted.problem_id=cp.problem_id
-     AND attempted.published_at>=linked.published_at AND attempted.rank_approved_at IS NOT NULL))) solved
+ const rows=(await db.query(`SELECT cp.problem_id,cp.version_id,
+  ${problemSolvedSql({problemId:'cp.problem_id',accountId:'$2',requiredLanguage:'$3',languageCreditCutoffs:'$4'})} solved
   FROM chapter_problems cp JOIN problems p ON p.id=cp.problem_id
   JOIN problem_banks b ON b.id=p.bank_id
   JOIN problem_versions linked ON linked.id=cp.version_id AND linked.problem_id=cp.problem_id
   ${latestCourseProblemVersion} true JOIN problem_versions v ON v.id=COALESCE(latest.id,linked.id)
   WHERE cp.chapter_id=ANY($1::uuid[]) AND p.archived_at IS NULL AND b.archived_at IS NULL
    AND b.visibility='school' AND v.published_at IS NOT NULL AND v.school_visible_at IS NOT NULL
-   AND v.rank_review_status='approved'`,[chapterIds,user.identityId,course.required_language,course.language_credit_cutoffs])).rows;
+   AND v.rank_review_status='approved'`,[chapterIds,user.id,course.required_language,course.language_credit_cutoffs])).rows;
  return new Map(rows.map(row=>[`${row.problem_id}:${row.version_id}`,row]));
 }
 
@@ -100,30 +94,22 @@ export async function publicChapterProblems(db, listing, course, accountId) {
     SELECT DISTINCT "problemId","versionId"
     FROM jsonb_to_recordset($2::jsonb) AS link("problemId" uuid,"versionId" uuid)
   )
-  SELECT links.*,v.definition->>'title' AS title, EXISTS (
-    SELECT 1 FROM school_judge_jobs j WHERE j.school_id=p.school_id
-      AND j.problem_id=p.id AND j.version_id=v.id AND j.account_id=$3
-      AND j.access_context='public' AND j.kind='submit' AND j.activity_id IS NULL
-      AND j.state='completed' AND j.result->>'status'='AC'
-      AND course_language_allows_credit($4,$5,j.payload->>'language',j.created_at)
-  ) AS solved
+  SELECT links."problemId",links."versionId" AS "linkedVersionId",v.id AS "versionId",v.definition->>'title' AS title,
+   ${problemSolvedSql({problemId:'p.id',accountId:'$3',requiredLanguage:'$4',languageCreditCutoffs:'$5'})} solved
   FROM links
-  JOIN school_problem_publications pub ON pub.school_id=$1 AND pub.problem_id=links."problemId"
-    AND pub.version_id=links."versionId" AND pub.withdrawn_at IS NULL
-  JOIN school_problems p ON p.school_id=pub.school_id AND p.id=pub.problem_id
-    AND p.published AND p.published_version_id=pub.version_id
+  JOIN school_problem_publications pub ON pub.school_id=$1 AND pub.problem_id=links."problemId" AND pub.withdrawn_at IS NULL
+  JOIN school_problems p ON p.school_id=pub.school_id AND p.id=pub.problem_id AND p.published
   JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id AND NOT b.archived
-  JOIN school_problem_versions v ON v.school_id=p.school_id AND v.problem_id=p.id AND v.id=pub.version_id`,
+  JOIN school_problem_versions v ON v.school_id=p.school_id AND v.problem_id=p.id AND v.id=p.published_version_id`,
   [listing.school_id, JSON.stringify(links), accountId, course.required_language, course.language_credit_cutoffs]);
-  const legacyVersions = listing.school_id === LEGACY_SCHOOL_ID && rows.length
-    ? await availableLegacyPublicProblemVersions(db, rows.map(row => row.versionId))
+  const legacy = listing.school_id === LEGACY_SCHOOL_ID && rows.length
+    ? new Map((await currentLegacyPublicProblems(db,rows.map(row=>row.problemId))).map(source=>[source.problem_id,source]))
     : null;
-  for (const row of rows) {
-    if (!legacyVersions || legacyVersions.has(row.versionId)) {
-      const key=`${row.problemId}:${row.versionId}`;
-      problems.set(key, {...row,solved:row.solved||problems.get(key)?.solved||false});
-    }
+  for (const {linkedVersionId,...row} of rows) {
+    const current=legacy?.get(row.problemId);
+    if (legacy&&!current) continue;
+    const key=`${row.problemId}:${linkedVersionId}`;
+    problems.set(key, {...row,...(current?{versionId:current.id,title:current.title}:{}),solved:row.solved||problems.get(key)?.solved||false});
   }
   return problems;
 }
-

@@ -296,7 +296,7 @@ test('school course HTTP lifecycle preserves published boundaries and stable lea
     assert.ok((await pool.query('SELECT deleted_at FROM school_learning_resources WHERE id=$1',[r.id])).rows[0].deleted_at);
    });
 
-   await t.test('chapter practice pins the approved school version and uses stable identity formal AC', async () => {
+   await t.test('chapter practice follows the current published version and preserves stable identity AC', async () => {
     const bank=randomUUID(),problem=randomUUID(),unpublished=randomUUID(),version=randomUUID(),nextVersion=randomUUID();
     const definition=normalizeSchoolProblem({title:'Safe title',statement:'Read an integer and output it.',mode:'stdio',referenceCode:'print(input()) # PRIVATE_CODE',samples:[{input:'1',expected:'1'}],tests:[{input:'SECRET_TEST',expected:'SECRET_TEST',weight:100}]});
     await transaction(pool,async db=>{
@@ -382,11 +382,14 @@ test('school course HTTP lifecycle preserves published boundaries and stable lea
     await patch(bind,admin,{accountId:null,expectedAccountId:student.id});await patch(bind,admin,{accountId:newLogin.id});
     assert.equal((await request(cp,{auth:newLogin})).data.completedExercises,1);assert.equal((await request(cp,{auth:student})).data.completedExercises,0);
     await patch(bind,admin,{accountId:null,expectedAccountId:newLogin.id});await patch(bind,admin,{accountId:student.id});
-    await pool.query('INSERT INTO school_problem_versions(school_id,id,problem_id,draft_revision,definition) VALUES($1,$2,$3,2,$4)',[alpha.id,nextVersion,problem,{title:'New current title'}]);
+    await pool.query('INSERT INTO school_problem_versions(school_id,id,problem_id,draft_revision,definition) VALUES($1,$2,$3,2,$4)',[alpha.id,nextVersion,problem,{...definition,title:'New current title'}]);
     await pool.query('UPDATE school_problems SET published_version_id=$3 WHERE school_id=$1 AND id=$2',[alpha.id,problem,nextVersion]);
-    view=(await request(cp,{auth:student})).data;assert.equal(view.chapters[0].problems[0].available,false);assert.equal(view.chapters[0].problems[0].title,'Safe title');
-    assert.deepEqual((await request(bankCatalogue,{auth:student})).data.items,[]);
-    await post(cp+'/publish',teacher,{expectedRevision:c.revision},409);
+    view=(await request(cp,{auth:student})).data;assert.equal(view.chapters[0].problems[0].available,true);assert.equal(view.chapters[0].problems[0].title,'New current title');
+    assert.equal(view.chapters[0].problems[0].versionId,nextVersion);assert.equal(view.completedExercises,1,'prior AC remains valid after publication');
+    assert.deepEqual((await request(bankCatalogue,{auth:student})).data.items.map(item=>[item.id,item.versionId]),[[problem,nextVersion]]);
+    assert.equal((await pool.query('SELECT chapters FROM school_course_publications WHERE school_id=$1 AND course_id=$2 AND revision=$3',[alpha.id,c.id,c.publishedRevision])).rows[0].chapters[0].problems[0].versionId,version,'the earlier course publication remains an immutable audit snapshot');
+    const refreshed=(await post(cp+'/publish',teacher,{expectedRevision:c.revision},200)).data;
+    assert.equal(refreshed.chapters[0].problems[0].versionId,nextVersion);
    });
 
    await t.test('typed content whitelist, school composite foreign keys, pagination and validation', async () => {

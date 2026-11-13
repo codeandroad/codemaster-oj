@@ -90,16 +90,10 @@ export async function publicProblemCatalogCourses(db, user, courseId) {
   const courses = [];
   let versions = new Map();
   for (const listing of listings) {
-    const course = await edition(db, listing, { detail: !listing.platform_owned });
+    const course = await edition(db, listing, { detail: true });
     if (!course || await admissionFor(db, listing, course, user.id) !== 'direct') continue;
-    let chapters = course.chapters;
-    if (listing.platform_owned) {
-      const { rows } = await db.query(`SELECT cp.problem_id AS "problemId",cp.version_id AS "versionId"
-        FROM learning_chapters c JOIN chapter_problems cp ON cp.chapter_id=c.id
-        WHERE c.path_id=$1 AND c.archived_at IS NULL`, [listing.course_id]);
-      chapters = [{ problems: rows }];
-    }
-    const links = chapterProblemVersions(chapters);
+    const available = await publicChapterProblems(db,listing,course,user.id);
+    const links = chapterProblemVersions([{problems:[...available.values()]}]);
     if (!links.size) continue;
     courses.push(problemCatalogCourseOption(listing.id, course));
     if (courseId === listing.id) versions = links;
@@ -158,7 +152,8 @@ export async function publicCourseProblemLanguage(db, user, { courseId, chapterI
     fail(403, 'COURSE_APPLICATION_REQUIRED', '请先申请加入课程');
   }
   const chapter = course.chapters.find(item => item.id === chapterId);
-  if (!chapter?.problems?.some(link => link.problemId === problemId && link.versionId === versionId)) {
+  const available=await publicChapterProblems(db,listing,course,user.id);
+  if (!chapter?.problems?.some(link => {const current=available.get(`${link.problemId}:${link.versionId}`);return current?.problemId===problemId&&current.versionId===versionId;})) {
     fail(404, 'COURSE_PROBLEM_UNAVAILABLE', '此题不在可访问的公开课程章节中');
   }
   return course.required_language;

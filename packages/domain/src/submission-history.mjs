@@ -1,3 +1,5 @@
+import { problemProgress } from './problem-progress.mjs';
+import { LEGACY_SCHOOL_ID } from './schools.mjs';
 import {createHmac,timingSafeEqual} from 'node:crypto';
 import {canonicalHash,enumValue,fail,integer,submissionId,uuid} from './security.mjs';
 
@@ -55,18 +57,7 @@ export async function submissionHistory(ctx){
 }
 
 export async function problemOwnProgress(pool,user,problemIds){
- if(!problemIds.length)return new Map();
- const {rows}=await pool.query(`WITH scoped AS(
-  SELECT s.id,s.problem_id,s.status,s.score,s.created_at,(${maskedCondition}) masked
-  FROM submissions s LEFT JOIN timed_attempts attempt ON attempt.id=s.timed_attempt_id LEFT JOIN timed_practices practice ON practice.id=attempt.practice_id
-  WHERE s.identity_id=$4 AND s.kind='submit' AND s.problem_id=ANY($5::uuid[])
- ), visible AS(SELECT scoped.*,${maskedFields} FROM scoped),
- totals AS(SELECT problem_id,count(*)::int formal_count FROM visible GROUP BY problem_id),
- latest AS(SELECT DISTINCT ON(problem_id) * FROM visible ORDER BY problem_id,created_at DESC,id DESC),
- best AS(SELECT DISTINCT ON(problem_id) * FROM visible WHERE displayed_score IS NOT NULL AND displayed_status NOT IN ('Waiting','Judging','System Error') ORDER BY problem_id,displayed_score DESC,created_at DESC,id DESC)
- SELECT totals.problem_id,totals.formal_count,COALESCE(best.displayed_status,latest.displayed_status) status,best.displayed_score best_score,latest.id last_id,latest.created_at last_created_at
- FROM totals JOIN latest USING(problem_id) LEFT JOIN best USING(problem_id)`,[user.id,user.roles.includes('admin'),user.roles.includes('teacher'),user.identityId,problemIds]);
- return new Map(rows.map(row=>[row.problem_id,{status:row.status,bestScore:row.best_score===null?null:Number(row.best_score),formalCount:row.formal_count,lastSubmissionId:`SUB${row.last_id}`,lastSubmittedAt:row.last_created_at}]));
+ return problemProgress(pool,user,problemIds,{schoolId:LEGACY_SCHOOL_ID});
 }
 
 export const emptyOwnProgress=()=>({status:'NotStarted',bestScore:null,formalCount:0,lastSubmissionId:null,lastSubmittedAt:null});

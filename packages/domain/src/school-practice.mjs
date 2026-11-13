@@ -1,3 +1,5 @@
+import { problemProgress } from './problem-progress.mjs';
+import { assertLiveProblemVersion } from './live-problem-version.mjs';
 import { problemCatalogCourseRequest } from './problem-catalog-courses.mjs';
 import { platformCourseProblem } from './platform-course-problems.mjs';
 import {publicScholarshipOperation,recordPublicPracticeStaffExposure} from './public-scholarship.mjs';
@@ -18,8 +20,8 @@ import { publicCourseProblemLanguage, publicProblemCatalogCourses } from './publ
 import { assertRequiredLanguage } from './course-language-policy.mjs';
 import { LANGUAGES, starterCodesFor } from './languages.mjs';
 import {
- decideLegacyPublicProblem, handleLegacyPublicProblemRequest, legacyPublicProblemPresentation,
- listLegacyPublicProblemReviews, previewLegacyPublicProblem,
+ decideLegacyPublicProblem, handleLegacyPublicProblemRequest,
+ listLegacyPublicProblemReviews, previewLegacyPublicProblem, prepareLegacyPublicProblem,
 } from './legacy-public-problems.mjs';
 
 const reply=(body,status=200)=>({status,body});
@@ -35,7 +37,7 @@ async function schoolCourseTutorial(db,problem,user,role,url) {
  const {rows}=await db.query(`SELECT c.id FROM school_courses c
   JOIN school_course_publications p ON p.school_id=c.school_id AND p.course_id=c.id AND p.revision=c.published_revision
   WHERE c.school_id=$1 AND c.published AND c.archived_at IS NULL AND p.chapters @> $2::jsonb
-  ORDER BY (c.id=$3) DESC NULLS LAST,c.id`,[problem.school_id,JSON.stringify([{problems:[link]}]),courseId]);
+  ORDER BY (c.id=$3) DESC NULLS LAST,c.id`,[problem.school_id,JSON.stringify([{problems:[{problemId:link.problemId}]}]),courseId]);
  for(const {id} of rows){
   let view;
   try { ({view}=await loadSchoolCourse(db,problem.school_id,id,user,role,{publishedOnly:true})); }
@@ -83,19 +85,14 @@ async function shapeProblem(db,p,user,role,{detail=false,publicOnly=false,access
  if(!def)fail(404,'NOT_FOUND','Problem is unavailable.');
  if(catalogQuery && !`${p.id} ${def.title} ${p.bank_name}`.toLowerCase().includes(catalogQuery)) return null;
  const validation=manage?(await db.query(`SELECT j.id,j.state,j.result->>'status' AS status FROM school_judge_jobs j JOIN school_problem_versions v ON v.school_id=j.school_id AND v.id=j.version_id WHERE j.school_id=$1 AND j.problem_id=$2 AND v.draft_revision=$3 AND j.kind='validation' ORDER BY j.created_at DESC LIMIT 1`,[p.school_id,p.id,p.revision])).rows[0]:null;
- const progressIdentity=accessContext==='school'?(await db.query('SELECT id FROM school_identities WHERE school_id=$1 AND account_id=$2',[p.school_id,user.id])).rows[0]?.id??null:null;
- const progress=(await db.query(`SELECT count(*)::integer AS attempts,bool_or(state='completed' AND result->>'status'='AC') AS solved FROM school_judge_jobs j
-  WHERE ${schoolActivityJobVisibleSql('j')} AND school_id=$1 AND problem_id=$2 AND kind='submit' AND version_id=$4
-   AND (access_context=$5 OR $5='staff_practice' AND access_context='school' AND activity_id IS NULL)
-   AND CASE WHEN $5 IN ('public','staff_practice') THEN account_id=$3 WHEN $6::uuid IS NOT NULL THEN identity_id=$6 ELSE identity_id IS NULL AND account_id=$3 END`,
- [p.school_id,p.id,user.id,version?.id??null,accessContext,progressIdentity])).rows[0];
+ const progress=(await problemProgress(db,user,[p.id],{includeStaff:accessContext==='staff_practice'})).get(p.id);
  const publication = !publicOnly && role === 'school_admin' && version && p.published && !p.archived
   ? await publicProblemStatus(db, p, version.id) : undefined;
- return {attempts:progress.attempts,solved:progress.solved===true,hasDraftChanges:!!version&&version.draft_revision!==p.revision,id:p.id,schoolId:p.school_id,bankId:p.bank_id,bankName:p.bank_name,title:def.title,revision:p.revision,published:p.published,versionId:version?.id??null,canManage:manage,canManageTutorial:!publicOnly&&canManageTutorial(p,user,role),validation:validation??null,...publication,...(detail?{staffPractice:accessContext==='staff_practice',definition:manage?draftDefinition(def):publicDefinition({...def,statement:p.public_statement??def.statement,metadata:p.public_metadata??def.metadata,tags:p.public_tags??def.tags})}:{})};
+ return {attempts:progress?.formalCount??0,solved:progress?.solved===true,hasDraftChanges:!!version&&version.draft_revision!==p.revision,id:p.id,schoolId:p.school_id,bankId:p.bank_id,bankName:p.bank_name,title:def.title,revision:p.revision,published:p.published,versionId:version?.id??null,canManage:manage,canManageTutorial:!publicOnly&&canManageTutorial(p,user,role),validation:validation??null,...publication,...(detail?{staffPractice:accessContext==='staff_practice',definition:manage?draftDefinition(def):publicDefinition({...def,statement:p.public_statement??def.statement,metadata:p.public_metadata??def.metadata,tags:p.public_tags??def.tags})}:{})};
 }
 async function publicProblemStatus(db, problem, versionId) {
  const { rows: [state] } = await db.query(`
-  SELECT EXISTS(SELECT 1 FROM school_problem_publications WHERE school_id=$1 AND problem_id=$2 AND version_id=$3
+  SELECT EXISTS(SELECT 1 FROM school_problem_publications WHERE school_id=$1 AND problem_id=$2
     AND withdrawn_at IS NULL) AS "platformPublished",
    (SELECT status FROM school_problem_publication_requests WHERE school_id=$1 AND problem_id=$2 AND version_id=$3) AS "publicRequestStatus"
  `, [problem.school_id, problem.id, versionId]);
@@ -158,15 +155,12 @@ async function publicLoaded(db,user,id,courseContext={}){
  publication=(await db.query('SELECT * FROM school_problem_publications WHERE problem_id=$1 AND withdrawn_at IS NULL',[uuid(id)])).rows[0];
  if(!publication)fail(404,'NOT_FOUND','Problem is unavailable.');
  await scope(db,publication.school_id);
- const p=await loadProblem(db,publication.school_id,id,user,null,{publicOnly:true});
- if(p.published_version_id!==publication.version_id)fail(404,'NOT_FOUND','The current version is awaiting platform review.');
- if (publication.school_id === LEGACY_SCHOOL_ID) {
-  const presentation = await legacyPublicProblemPresentation(db,id,publication.version_id);
-  if (!presentation) fail(404,'NOT_FOUND','Problem is unavailable.');
-  p.public_statement = presentation.statement;
-  p.public_metadata = presentation.metadata;
-  p.public_tags = presentation.tags;
+ if(publication.school_id===LEGACY_SCHOOL_ID){
+  const p=await prepareLegacyPublicProblem(db,id);
+  if(!p)fail(404,'NOT_FOUND','Problem is unavailable.');
+  return p;
  }
+ const p=await loadProblem(db,publication.school_id,id,user,null,{publicOnly:true});
  return p;
 }
 export async function listPublicProblems(pool,user,url){
@@ -194,7 +188,6 @@ export async function listPublicProblems(pool,user,url){
     ) AND ($3::uuid[] IS NULL OR problem_id=ANY($3))
     ORDER BY approved_at DESC,problem_id LIMIT 100`,[cursor?.approved_at??null,cursor?.problem_id??null, problemIds]);
    for(const row of rows){
-    if (versions && !versions.get(row.problem_id)?.has(row.version_id)) continue;
     try{
      const p=await publicLoaded(db,user,row.problem_id);
      if (versions && !versions.get(row.problem_id)?.has(p.published_version_id)) continue;
@@ -231,9 +224,19 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
  const pub=route.match(/^\/practice\/problems\/([^/]+)(?:\/submissions(?:\/([^/]+))?)?$/);
  if(pub)return transaction(pool,async db=>{
   const p=await loadPublic(db,user,pub[1]);
-  const expectedVersion = method === 'POST' ? body.versionId : url?.searchParams.get('versionId');
-  if (expectedVersion != null && uuid(expectedVersion).toLowerCase() !== p.published_version_id) {
-   fail(404, 'NOT_FOUND', 'This version is no longer available in public practice.');
+  const expectedVersion=method==='POST'?body.versionId:url?.searchParams.get('versionId');
+  if(expectedVersion!=null){
+   const requested=uuid(expectedVersion).toLowerCase();
+   if(requested!==p.published_version_id&&p.school_id===LEGACY_SCHOOL_ID&&!(await db.query(
+    'SELECT 1 FROM problem_versions WHERE id=$1 AND problem_id=$2 AND published_at IS NOT NULL',[requested,p.id])).rowCount)
+    fail(404,'NOT_FOUND','This version is not available.');
+   if(requested!==p.published_version_id&&p.school_id!==LEGACY_SCHOOL_ID&&!(await db.query(`SELECT 1
+    FROM school_problem_versions requested JOIN school_problem_versions current ON current.school_id=requested.school_id
+     AND current.problem_id=requested.problem_id AND current.id=$4
+    WHERE requested.school_id=$1 AND requested.problem_id=$2 AND requested.id=$3
+     AND requested.draft_revision<=current.draft_revision`,[p.school_id,p.id,requested,p.published_version_id])).rowCount)
+    fail(404,'NOT_FOUND','This version is not available.');
+   if(method==='POST')assertLiveProblemVersion(requested,p.published_version_id);
   }
   await schoolActivityProblemAccess(db,{schoolId:p.school_id,problemId:p.id,user});
   if(method==='GET'&&!route.includes('/submissions'))return reply(await shapeProblem(db,p,user,null,{detail:true,publicOnly:true,accessContext:'public'}));
@@ -362,6 +365,7 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
   if(method==='GET'&&m[4]==='submissions')return reply(await schoolProblemSubmissions(db,p,user,url,practiceContext(role)));
   if(method==='GET'){const practice=url.searchParams.get('view')==='practice';if(practice&&(!p.published||p.archived))fail(404,'NOT_FOUND','Problem unavailable.');return reply(await shapeProblem(db,p,user,role,{detail:true,publicOnly:practice}));}
   if(m[4]==='submissions'&&method==='POST'){
+   if(body.versionId!=null)assertLiveProblemVersion(uuid(body.versionId).toLowerCase(),p.published_version_id);
    if(!p.published||p.archived)fail(409,'NOT_PUBLISHED','Publish the problem before student practice.');
    const version=(await db.query('SELECT * FROM school_problem_versions WHERE school_id=$1 AND id=$2',[schoolId,p.published_version_id])).rows[0];return reply(await enqueue(db,{schoolId,p,version,user,role,kind:enumValue(body.kind,['samples','custom','submit'],'Run type'),body,accessContext:practiceContext(role)}),202);
   }

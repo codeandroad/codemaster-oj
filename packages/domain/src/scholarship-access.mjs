@@ -1,3 +1,4 @@
+import { problemSolvedSql, withProblemProgressScope } from './problem-progress.mjs';
 import {fail,uuid,field,enumValue} from './security.mjs';
 import {problemPermissions} from './library.mjs';
 import {scholarshipActivityAccess} from './scholarship-rules.mjs';
@@ -20,21 +21,12 @@ export async function hasProvidedSolution(db,identityId,subjectKey){
 }
 
 export async function hasPublicPracticeAc(db,accountId,schoolId,problemId){
- await db.query("SELECT set_config('campus.public_history_account_id',$1,true)",[accountId]);
- return (await db.query(`SELECT EXISTS(SELECT 1 FROM school_judge_jobs
-  WHERE school_id=$1 AND account_id=$2 AND problem_id=$3
-   AND access_context='public' AND activity_id IS NULL AND kind='submit'
-   AND state='completed' AND result->>'status'='AC') accepted`,[schoolId,accountId,problemId])).rows[0].accepted;
+ return withProblemProgressScope(db,schoolId,async client=>(await client.query(
+  `SELECT ${problemSolvedSql({problemId:'$1',accountId:'$2'})} accepted`,[problemId,accountId])).rows[0].accepted);
 }
 
 export async function hasLegacyPracticeAc(db,user,{problemId}){
- // Solutions belong to the problem, including after a new version is published.
- const {rows:[{accepted}]}=await db.query(`SELECT EXISTS(SELECT 1 FROM submissions s
-  WHERE s.identity_id=$1 AND s.problem_id=$2 AND s.kind='submit' AND s.status='AC'
-   AND (s.timed_attempt_id IS NULL OR EXISTS (
-    SELECT 1 FROM timed_attempts ta JOIN timed_practices tp ON tp.id=ta.practice_id
-    WHERE ta.id=s.timed_attempt_id AND tp.results_published_at IS NOT NULL))) accepted`,[user.identityId,problemId]);
- return accepted||hasPublicPracticeAc(db,user.id,LEGACY_SCHOOL_ID,problemId);
+ return hasPublicPracticeAc(db,user.id,LEGACY_SCHOOL_ID,problemId);
 }
 
 // Read only public statement/version identifiers here; never reference code or judge data.

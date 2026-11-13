@@ -516,6 +516,7 @@ export async function createDomainServices(pool,config) {
       THEN pv.metadata->'difficulty' ELSE v.metadata->'difficulty' END published_difficulty,
      (p.owner_scope='school' AND ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission='edit'))) can_edit,
      ($3 AND (${schoolPublishedTutorialProblemSql})) shared_tutorial
+     ${staffSummary&&!assignmentPicker?", v.edit_draft->'tags' draft_tags":''}
     FROM ${studentCatalog?'catalog_problems':'problems'} p JOIN problem_banks bank ON bank.id=p.bank_id
     LEFT JOIN bank_permissions bp ON bp.bank_id=bank.id AND bp.account_id=$1
     JOIN LATERAL (
@@ -558,6 +559,7 @@ export async function createDomainServices(pool,config) {
     return respond(200,{...(courseFilter && { courseId, courses: courseFilter.courses }),items:presented.map(r=>({
      ...(summary?problemListSummary(r):problemShape(r,{includeDisabledSamples:!!r.can_edit})),
      ...(staffView?{publishedDifficulty:typeof r.published_difficulty==='string'?r.published_difficulty:null}:{}),
+     ...(r.can_edit&&Array.isArray(r.draft_tags)?{draftTags:r.draft_tags}:{}),
      bankId:r.bank_id,bankName:r.bank_name,ownerScope:r.owner_scope,canEdit:!!r.can_edit,canPublish:!!r.can_edit&&r.validation_status==='AC'&&!r.published_at,
      canManageTutorial:!!(r.can_edit||r.shared_tutorial),
      ...(!staffSummary&&{firstAcPoints:firstAcPoints.get(r.problem_id)??10,ownProgress:ownProgress.get(r.problem_id)||emptyOwnProgress()}),

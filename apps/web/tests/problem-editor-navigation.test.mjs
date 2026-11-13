@@ -30,6 +30,17 @@ test("bank detail steps use the visible bank and group without reordering by mem
   assert.deepEqual(filterTeacherBankDetailRows(items, "python", "none", groups).rows, [readOnly, saved]);
 });
 
+test("topic search uses the displayed draft tags, including an empty draft", () => {
+  const items = [
+    { ...first, tags: ["Original topic"], draftTags: ["Draft topic"] },
+    { ...last, tags: ["Original topic"], draftTags: [] },
+    { ...readOnly, tags: ["Original topic"] },
+  ];
+  const search = query => filterTeacherProblemRows({ items, filters: { ...filters, query }, banks }).rows;
+  assert.deepEqual(search("draft topic"), [items[0]]);
+  assert.deepEqual(search("original topic"), [items[2]]);
+});
+
 test("editor links preserve the originating list and explicitly select the platform editor for platform problems", () => {
   const origin = "/teacher/problems/banks/python";
   const platform = { ...last, ownerScope: "platform" };

@@ -24,7 +24,7 @@ export function filterTeacherProblemRows<T extends ProductionProblem>({
     (!filterGroup || (filterGroup === "ungrouped" ? !groupMembers.has(problem.id) : groupMembers.has(problem.id))) &&
     (problem.id === currentId || (
       (!filters.status || (filters.status === "published" ? problem.published : !problem.published)) &&
-      `${problem.title} ${problem.tags?.join(" ")} ${problem.id}`.toLowerCase().includes(searchText)
+      `${problem.title} ${(problem.draftTags ?? problem.tags)?.join(" ")} ${problem.id}`.toLowerCase().includes(searchText)
     )),
   );
   return { rows, scopedBank, scopedGroups, filterBank, filterGroup, selectedGroup, searchText };

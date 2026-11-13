@@ -78,6 +78,7 @@ export interface ProductionProblem {
   bankId?: string | null;
   bankName?: string | null;
   tags?: string[];
+  draftTags?: string[];
   difficulty?: string;
   objective?: string;
   parameters?: (string | { name: string; type?: string; description?: string })[];

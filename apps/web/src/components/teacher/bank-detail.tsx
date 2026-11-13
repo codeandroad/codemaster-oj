@@ -3,6 +3,7 @@
 import { AppLink as Link } from "@/components/navigation";
 import { isPlatformProblem, mergePlatformProblems, problemEditorHref, teacherPlatformProblemSummaries, teacherProblemSummaries, type PlatformSourceProblem } from "./platform-problem-source";
 import { filterTeacherBankDetailRows } from "./problem-bank-rows";
+import { ProblemTopic } from "./problem-topic";
 import { BankRenameDialog } from "@/components/bank-rename-dialog";
 import { ProblemPublicationStatus } from "@/components/problem-publication-status";
 import { useState } from "react";
@@ -360,7 +361,7 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
                         </Link>
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">
-                        <span className={styles.singleLine} title={p.tags?.join(" · ")}>{p.tags?.join(" · ") || "—"}</span>
+                        <ProblemTopic tags={p.tags} draftTags={p.draftTags} />
                       </td>
                       <td className="px-4 py-3">
                         <GroupTags

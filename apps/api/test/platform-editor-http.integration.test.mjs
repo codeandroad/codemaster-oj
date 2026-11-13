@@ -111,10 +111,15 @@ test('the complete platform problem editor uses scoped grants without publicatio
     });
     await t.test('authorized teachers save a draft on the same problem, validate, but cannot publish', async () => {
       const original = await get(`${source}/${problem.id}`, 'teacher');
-      const changed = { ...input, title: 'Edited platform source', expectedVersionId: original.versionId, expectedRevision: original.editRevision };
+      const changed = { ...input, title: 'Edited platform source', tags: ['Draft Topic'], expectedVersionId: original.versionId, expectedRevision: original.editRevision };
       latest = await post(`${source}/${problem.id}/versions`, changed, 'teacher', 201);
       assert.equal(latest.versionId, original.versionId); assert.equal(latest.editRevision, original.editRevision+1);
       assert.equal(latest.tests[0].input, input.tests[0].input);
+      const summary = `${source}?schoolId=${alpha.id}&view=summary`;
+      const editableRow = (await get(summary, 'teacher')).items.find(row => row.id === problem.id);
+      assert.deepEqual(editableRow.tags, input.tags);
+      assert.deepEqual(editableRow.draftTags, changed.tags);
+      for (const name of ['other-teacher', 'student']) assert.deepEqual((await get(summary, name)).items, []);
       await post(`${source}/${problem.id}/versions`, { ...changed, title: 'Stale edit' }, 'school-admin', 409);
       await post(`${source}/${problem.id}/validate`, { versionId: other.versionId }, 'teacher', 404);
       await post(`${source}/${problem.id}/validate`, { versionId: latest.versionId }, 'student', 403);
@@ -137,6 +142,9 @@ test('the complete platform problem editor uses scoped grants without publicatio
       assert.equal((await get(`${source}/${problem.id}`)).canPublish,true);
       latest = await post(`${source}/${problem.id}/publish`, { expectedVersionId: checked.versionId, expectedRevision: checked.editRevision });
       assert.equal(latest.published, true);
+      const publishedRow = (await get(summary, 'teacher')).items.find(row => row.id === problem.id);
+      assert.deepEqual(publishedRow.tags, changed.tags);
+      assert.equal(publishedRow.draftTags, undefined);
       assert.equal((await pool.query('SELECT version_id FROM chapter_problems WHERE problem_id=$1', [problem.id])).rowCount, 0);
       for (const path of [`/problems/${problem.id}/versions`, `/problems/${problem.id}/publish`]) await post(path, { ...changed, versionId: latest.versionId }, 'legacy-editor', 403);
     });
@@ -166,10 +174,18 @@ test('the complete platform problem editor uses scoped grants without publicatio
       await drain();
       const history=await get('/submissions/'+accepted.id,student);
       const baseline=await get(path+'?current=1',student);
-      const save=revision=>post(path+'/versions',{...input,title:'Approved replacement',statement:'Read the next value and echo it.',
+      const save=revision=>post(path+'/versions',{...input,title:'Approved replacement',statement:'Read the next value and echo it.',tags:[],
         bankId:SCHOOL_BANK,expectedVersionId:draft.versionId,expectedRevision:revision},teacher,201);
       const proposal=await save(draft.editRevision);
       assert.equal(proposal.versionId,draft.versionId);
+      const teacherRow=(await get('/problems?view=summary',teacher)).items.find(row=>row.id===draft.id);
+      assert.deepEqual(teacherRow.tags,input.tags);
+      assert.deepEqual(teacherRow.draftTags,[]);
+      const pickerRow=(await get('/problems?view=summary&purpose=assignment',teacher)).items.find(row=>row.id===draft.id);
+      assert.equal(pickerRow.draftTags,undefined);
+      const studentRow=(await get('/problems?view=student-summary',student)).items.find(row=>row.id===draft.id);
+      assert.deepEqual(studentRow.tags,input.tags);
+      assert.equal(studentRow.draftTags,undefined);
       await drain();
       const revisionKey={versionId:draft.versionId,expectedRevision:proposal.editRevision};
       await post(path+'/publish',revisionKey,teacher);
@@ -186,6 +202,7 @@ test('the complete platform problem editor uses scoped grants without publicatio
       await patch(path+'/rank-review',{...nextKey,decision:'approved'},admin);
       const after=await get(path+'?current=1',student);
       assert.equal(after.title,next.title); assert.equal(after.versionId,before.versionId);
+      assert.deepEqual(after.tags,[]);
       assert.equal(after.solved,baseline.solved); assert.equal(after.publishedRevision,next.editRevision);
       const old=await get('/submissions/'+accepted.id,student);
       assert.equal(old.id,history.id); assert.equal(old.status,'AC'); assert.equal(old.score,history.score);

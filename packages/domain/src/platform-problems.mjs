@@ -37,6 +37,7 @@ export async function handlePlatformProblems(ctx) {
    const schoolId=url.searchParams.get('schoolId')?uuid(url.searchParams.get('schoolId')):null;
    const bankId=url.searchParams.get('bankId')?uuid(url.searchParams.get('bankId')):null;
    const rows=(await db.query(`SELECT ${summary?problemListColumns('v'):'v.*'},v.edit_draft IS NOT NULL has_draft_changes,v.draft_review_status,
+    ${summary?"v.edit_draft->'tags' draft_tags,":''}
     p.bank_id,p.platform_bank_id,category.name category_name,p.archived_at,p.current_version_id AS published_version_id,
     (solution.status='draft' OR solution.pending_solution IS NOT NULL) has_solution_draft,
     (SELECT count(*) FROM test_cases tc WHERE tc.version_id=v.id AND tc.enabled) formal_test_count,
@@ -51,6 +52,7 @@ export async function handlePlatformProblems(ctx) {
      ${platformContentEditorSql('problem','p.id','$1::uuid','$3::uuid')})
     ORDER BY (v.draft_review_status IS NOT DISTINCT FROM 'pending') DESC,v.title,p.id`,[user.id,admin,schoolId,admin&&url.searchParams.get('includeArchived')==='1',bankId])).rows;
    return reply({items:rows.map(row=>({...(summary?problemListSummary(row):helpers.problemShape(row)),ownerScope:'platform',schoolId:LEGACY_SCHOOL_ID,bankName:row.category_name??'',
+    ...(!row.archived_at&&Array.isArray(row.draft_tags)?{draftTags:row.draft_tags}:{}),
     bankId:row.platform_bank_id,sourceBankId:row.bank_id,courses:row.courses,archivedAt:row.archived_at,canEdit:!row.archived_at,canManageTutorial:!row.archived_at,canPublish:admin&&!row.archived_at&&row.validation_status==='AC'&&!row.published_at,
     hasDraftChanges:row.has_draft_changes,draftReviewStatus:row.draft_review_status,hasSolutionDraft:row.has_solution_draft===true,
     updatedAt:row.created_at,createdAt:row.problem_created_at})),canManage:admin});

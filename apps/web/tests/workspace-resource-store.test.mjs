@@ -54,6 +54,22 @@ test('leaving a workspace keeps the confirmed entry visible while fresh progress
   assert.equal(h.store.snapshot(catalog).data.items[0].solved, true);
 });
 
+test('refresh after a save replaces a request started before the save', async () => {
+  const h = harness(), path = 'problems?view=summary';
+  await seed(h, path, { items: [{ tags: ['Published topic'] }] });
+  const old = await start(h, path);
+  const fresh = h.store.refresh(path);
+  assert.equal(h.store.load(path), fresh);
+  await Promise.resolve();
+  assert.equal(old.request.signal.aborted, true);
+  const data = { items: [{ tags: ['Published topic'], draftTags: ['Draft topic'] }] };
+  h.requests.at(-1).resolve(data);
+  await fresh;
+  old.request.resolve({ items: [] });
+  await old.done;
+  assert.deepEqual(h.store.snapshot(path).data, data);
+});
+
 test('temporary network failure preserves confirmed availability; explicit denial clears it', async () => {
   const h = harness();
   await seed(h, catalog, { enabled: true, items: [] });

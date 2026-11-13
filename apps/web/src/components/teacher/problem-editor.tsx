@@ -4,10 +4,12 @@ import { ProblemTutorialEditor } from "./problem-tutorial-editor";
 import { ProblemAssistanceEditor } from "./problem-assistance-editor";
 import { ProblemEditorSteps, SaveAndEditNext } from "./problem-editor-steps";
 import type { ProblemEditorNavigation, ProblemEditorTarget } from "./problem-editor-navigation";
+import { teacherPlatformProblemSummaries, teacherProblemSummaries } from "./platform-problem-source";
 
 import { useEffect, useId, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useNavigationBlocker } from "@/components/navigation";
+import { useRefreshWorkspaceData } from "@/components/workspace-data";
 import {
   Copy,
   Eye,
@@ -224,6 +226,8 @@ function ProblemEditorForm({ initial, user, platform, onClose, navigation, initi
   onClose?: () => void; navigation?: ProblemEditorNavigation; initialTab: string | null;
 }) {
   const endpoint = platform ? "platform/source-problems" : "problems";
+  const summaryPath = platform ? teacherPlatformProblemSummaries : teacherProblemSummaries;
+  const refreshWorkspaceData = useRefreshWorkspaceData();
   const canPublish = !platform || user.platformAdmin === true;
   const requestsPlatformReview = platform && !canPublish;
   const { locale } = useLocale();
@@ -349,6 +353,7 @@ function ProblemEditorForm({ initial, user, platform, onClose, navigation, initi
       saved ? `${endpoint}/${saved.id}/versions` : endpoint,
       { method: "POST", body },
     );
+    void refreshWorkspaceData?.(summaryPath);
     draft.clear();
     setSaved(result);
     setProblem(result);
@@ -1016,6 +1021,7 @@ function ProblemEditorForm({ initial, user, platform, onClose, navigation, initi
                     `${endpoint}/${saved.id}/${requestsPlatformReview ? "request-review" : "publish"}`,
                     { method: "POST", body: { ...(platform ? { expectedVersionId: saved.versionId } : { versionId: saved.versionId }), expectedRevision: saved.editRevision } },
                   );
+                  void refreshWorkspaceData?.(summaryPath);
                   setSaved(result);
                   setProblem(result);
                   setTagsText(null);

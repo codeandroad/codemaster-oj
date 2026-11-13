@@ -44,3 +44,7 @@ export function useWorkspaceData<T>(path: string) {
   const reload = useCallback(() => { void store.load(path); }, [path, store]);
   return { ...state, data: state.data as T | null, reload };
 }
+
+export function useRefreshWorkspaceData() {
+  return useContext(WorkspaceDataContext)?.refresh;
+}

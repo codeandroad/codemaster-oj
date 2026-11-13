@@ -3,6 +3,7 @@ import { ProblemPublicationStatus, PublicationGuide } from "@/components/problem
 import { BankRenameDialog } from "@/components/bank-rename-dialog";
 import { ProblemGroupFilter } from "@/components/problem-group-filter";
 import { isPlatformProblem, mergePlatformProblems, problemEditorHref, teacherPlatformProblemSummaries, teacherProblemSummaries, type PlatformSourceProblem } from "./platform-problem-source";
+import { ProblemTopic } from "./problem-topic";
 import { filterTeacherProblemRows } from "./problem-bank-rows";
 import {ProblemFilter} from "./problem-filter";
 import { useProblemSelection } from "./use-problem-selection";
@@ -510,9 +511,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                     </span>
                   </td>
                   <td>
-                    <span className={`${styles.singleLine} text-xs text-muted-foreground`} title={problem.tags?.join(" · ")}>
-                      {problem.tags?.join(" · ") || "—"}
-                    </span>
+                    <ProblemTopic tags={problem.tags} draftTags={problem.draftTags} />
                   </td>
                   <td>
                     <GroupTags

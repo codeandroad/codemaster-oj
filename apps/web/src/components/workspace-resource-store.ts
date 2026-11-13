@@ -102,6 +102,14 @@ export function createWorkspaceResourceStore(
       return () => { value.listeners.delete(listener); };
     },
     load,
+    refresh(path: string) {
+      const value = entries.get(path);
+      if (!value) return;
+      value.controller?.abort();
+      value.controller = undefined;
+      value.request = undefined;
+      return load(path);
+    },
     refreshObserved() {
       for (const [path, value] of entries) if (value.listeners.size) void load(path);
     },

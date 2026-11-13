@@ -1,3 +1,4 @@
+import { acceptDraftValidation, draftIdentity, reviewIdentity } from './problem-draft-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -68,7 +69,7 @@ test('learning and reports: real persistence, publication, progress isolation an
    await teacher(`/chapters/${chapter.id}`,{problemIds:[hidden.id]},'PATCH',409);
    assert.equal((await student(`/learning-paths/${draft.id}`)).chapters[0].problems[0].problemId,problem.id);
   });
-  await t.test('draft course links pin editable versions and cannot publish before school review',async()=>{
+  await t.test('draft course links follow one problem and require school approval',async()=>{
    const pending=await teacher('/problems',{title:'Draft course exercise',mode:'stdio',statement:'Print 4',samples:[{input:'',expected:'4'}],tests:[{input:'',expected:'4',weight:100}],referenceCode:'print(4)',starterCode:''},'POST',201);
    const course=await teacher('/learning-paths',{title:'Separate draft course',category:'Python'},'POST',201);
    const lesson=await teacher(`/learning-paths/${course.id}/chapters`,{title:'Draft lesson',content:'Solve this exercise.',problemIds:[pending.id]},'POST',201);
@@ -89,27 +90,27 @@ test('learning and reports: real persistence, publication, progress isolation an
    await teacher(`/learning-paths/${course.id}/publish`,{},'POST',409);
    assert.equal((await pool.query('SELECT published_at FROM learning_paths WHERE id=$1',[course.id])).rows[0].published_at,null);
 
-   const replacement=await teacher(`/problems/${pending.id}/versions`,{title:'Replacement exercise',mode:'stdio',statement:'Print 5',samples:[{input:'',expected:'5'}],tests:[{input:'',expected:'5',weight:100}],referenceCode:'print(5)',starterCode:''},'POST',201);
+   const replacement=await teacher(`/problems/${pending.id}/versions`,{
+    ...draftIdentity(pending),title:'Replacement exercise',mode:'stdio',statement:'Print 5',
+    samples:[{input:'',expected:'5'}],tests:[{input:'',expected:'5',weight:100}],referenceCode:'print(5)',starterCode:'',
+   },'POST',201);
+   assert.equal(replacement.versionId,pending.versionId);
    await teacher(`/chapters/${lesson.id}`,{content:'Revised lesson.',problemIds:[pending.id]},'PATCH');
-   assert.equal((await teacher(`/learning-paths/${course.id}`)).chapters[0].problems[0].versionId,pending.versionId,'editing lesson text must not silently replace a linked version');
-   await teacher(`/chapters/${lesson.id}`,{problemIds:[]},'PATCH');
-   await teacher(`/chapters/${lesson.id}`,{problemIds:[pending.id]},'PATCH');
-   assert.equal((await teacher(`/learning-paths/${course.id}`)).chapters[0].problems[0].versionId,replacement.versionId,'removing then readding explicitly selects the latest version');
-   await admin(`/problems/${pending.id}/rank-review`,{versionId:replacement.versionId,decision:'approved'},'PATCH',409);
-   await pool.query("UPDATE problem_versions SET validation_status='AC' WHERE id=$1",[replacement.versionId]);
-   await teacher(`/problems/${pending.id}/publish`,{versionId:replacement.versionId});
+   assert.equal((await teacher(`/learning-paths/${course.id}`)).chapters[0].problems[0].versionId,pending.versionId);
+   await admin(`/problems/${pending.id}/rank-review`,{...reviewIdentity(replacement),decision:'approved'},'PATCH',409);
+   await acceptDraftValidation(pool,replacement);
+   await teacher(`/problems/${pending.id}/publish`,reviewIdentity(replacement));
    await teacher(`/learning-paths/${course.id}/publish`,{},'POST',409);
    teacherView=await teacher(`/learning-paths/${course.id}`);
-   assert.equal(teacherView.chapters[0].problems[0].published,true);
-   assert.equal(teacherView.chapters[0].problems[0].rankReviewStatus,'pending');
+   assert.equal(teacherView.chapters[0].problems[0].published,false);
    assert.equal(teacherView.chapters[0].problems[0].readyForCourse,false);
-   await admin(`/problems/${pending.id}/rank-review`,{versionId:replacement.versionId,decision:'approved'},'PATCH');
+   await admin(`/problems/${pending.id}/rank-review`,{...reviewIdentity(replacement),decision:'approved'},'PATCH');
    teacherView=await teacher(`/learning-paths/${course.id}`);
    assert.equal(teacherView.chapters[0].problems[0].readyForCourse,true);
    assert.equal(teacherView.chapters[0].problems[0].rankReviewStatus,'approved');
-   assert.ok(teacherView.chapters[0].problems[0].bankName,'course details identify the exact linked bank');
+   assert.ok(teacherView.chapters[0].problems[0].bankName);
    await teacher(`/learning-paths/${course.id}/publish`,{});
-   assert.equal((await student(`/learning-paths/${course.id}`)).chapters[0].problems[0].versionId,replacement.versionId);
+   assert.equal((await student(`/learning-paths/${course.id}`)).chapters[0].problems[0].versionId,pending.versionId);
    await admin(`/problems/${pending.id}/rank-review`,{versionId:replacement.versionId,decision:'revoked',reason:'Test publication revocation'},'PATCH');
    assert.equal((await student(`/learning-paths/${course.id}`)).chapters[0].problems.length,0,'a revoked version must disappear from published course details');
    assert.equal((await student('/learning-paths')).items.find(item=>item.id===course.id).taskCount,0,'student course counts must exclude revoked versions');
@@ -117,7 +118,7 @@ test('learning and reports: real persistence, publication, progress isolation an
    await teacher(`/chapters/${lesson.id}`,{problemIds:[pending.id]},'PATCH',409);
    await teacher(`/learning-paths/${course.id}/publish`,{},'POST',409);
   });
-  await t.test('historically school-visible pending versions remain visible in existing courses',async()=>{
+  await t.test('legacy school-visible pending problems still require approval to appear in courses',async()=>{
    const legacy=await teacher('/problems',{title:'Legacy public exercise',mode:'stdio',statement:'Print 6',samples:[{input:'',expected:'6'}],tests:[{input:'',expected:'6',weight:100}],referenceCode:'print(6)',starterCode:''},'POST',201);
    await pool.query("UPDATE problem_versions SET validation_status='AC' WHERE id=$1",[legacy.versionId]);
    await teacher(`/problems/${legacy.id}/publish`,{versionId:legacy.versionId});
@@ -127,9 +128,9 @@ test('learning and reports: real persistence, publication, progress isolation an
    await teacher(`/learning-paths/${course.id}/publish`,{});
    await pool.query('INSERT INTO chapter_problems(chapter_id,problem_id,version_id,position) VALUES($1,$2,$3,0)',[lesson.id,legacy.id,legacy.versionId]);
    const visible=await student(`/learning-paths/${course.id}`);
-   assert.equal(visible.chapters[0].problems[0].versionId,legacy.versionId);
-   assert.equal(visible.chapters[0].problems[0].readyForCourse,false,'pending historical visibility is not a new publication approval');
-   assert.equal((await student('/learning-paths')).items.find(item=>item.id===course.id).taskCount,1);
+   assert.equal((await student(`/problems/${legacy.id}`)).versionId,legacy.versionId);
+   assert.deepEqual(visible.chapters[0].problems,[]);
+   assert.equal((await student('/learning-paths')).items.find(item=>item.id===course.id).taskCount,0);
    await teacher(`/learning-paths/${course.id}/publish`,{},'POST',409);
   });
   const assignment=await teacher('/assignments',{title:'Class exercise',classId:cls.id,dueAt:new Date(Date.now()+3600000).toISOString(),problems:[{problemId:problem.id,points:50}]},'POST',201);

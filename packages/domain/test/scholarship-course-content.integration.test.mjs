@@ -1,3 +1,4 @@
+import { acceptDraftValidation, draftIdentity, reviewIdentity } from './problem-draft-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -62,7 +63,7 @@ async function fixture(run){
  }
 }
 
-test('course-pinned Luq solutions need exact-version reviewed content; pricing neither publishes nor bypasses an exam',options,()=>fixture(async({pool,teacher,student,admin})=>{
+test('course and practice share one reviewed Luq solution through problem edits and assessment restrictions',options,()=>fixture(async({pool,teacher,student,admin})=>{
  const privateMarkers=['PRIVATE_REFERENCE_SENTINEL','PRIVATE_TEST_INPUT','PRIVATE_TEST_OUTPUT','PRIVATE_EDITORIAL_SENTINEL','PRIVATE_HINT_SENTINEL'];
  const input={
   title:'Course pinned problem',mode:'stdio',statement:'Print the number 1.',
@@ -84,30 +85,18 @@ test('course-pinned Luq solutions need exact-version reviewed content; pricing n
   title:'Practice',content:'Public lesson',problemIds:[first.id],
  },'POST',201);
  await teacher.send(`/learning-paths/${course.id}/publish`,{});
- const second=await teacher.send(`/problems/${first.id}/versions`,{...input,statement:'Print the number 2.'},'POST',201);
- await publishProblem(second);
- assert.notEqual(first.versionId,second.versionId);
-
- const courseView=await student.send(`/learning-paths/${course.id}`);
- const linked=courseView.chapters.find(item=>item.id===chapter.id).problems[0];
+ const path=`/problems/${first.id}`;
+ const before=await student.send(path);
+ const second=await teacher.send(path+'/versions',{...input,statement:'Print the number 2.',...draftIdentity(first)},'POST',201);
+ assert.equal(first.versionId,second.versionId);
+ await acceptDraftValidation(pool,second);
+ await teacher.send(path+'/publish',reviewIdentity(second));
+ assert.deepEqual(await student.send(path),before);
+ const courseBefore=await student.send(`/learning-paths/${course.id}`);
+ const linked=courseBefore.chapters.find(item=>item.id===chapter.id).problems[0];
  assert.equal(linked.problemId,first.id);
- assert.equal(linked.versionId,first.versionId,'chapter retains the version selected before the problem changed');
- const oldView=await student.send(`/problems/${linked.problemId}?versionId=${linked.versionId}`);
- const currentView=await student.send(`/problems/${linked.problemId}`);
- assert.equal(oldView.versionId,first.versionId);
- assert.equal(currentView.versionId,second.versionId);
- for(const view of [courseView,oldView,currentView]){
-  const serialized=JSON.stringify(view);
-  for(const marker of privateMarkers)assert.equal(serialized.includes(marker),false,`${marker} must not reach student detail or course responses`);
- }
- assert.equal(Object.hasOwn(oldView,'referenceCode'),false);
- assert.equal(Object.hasOwn(oldView,'tests'),false);
- assert.equal(oldView.editorial,'');
- assert.deepEqual(oldView.hints,[]);
-
- // Use the same exact target sent by StudentWorkspace after the chapter link.
- const oldTarget={problemId:linked.problemId,versionId:oldView.versionId,kind:'FULL_SOLUTION'};
- const currentTarget={...oldTarget,versionId:currentView.versionId};
+ assert.equal(linked.versionId,first.versionId);
+ const target={problemId:first.id,versionId:first.versionId,kind:'FULL_SOLUTION'};
  const quote=target=>student.send('/scholarship/assistance/quote',target);
  const provide=(target,status=200)=>student.send('/scholarship/assistance/provide',target,'POST',status);
  const balance=async()=>Number((await pool.query('SELECT balance FROM luq_accounts WHERE identity_id=$1',[student.user.identityId])).rows[0].balance);
@@ -116,8 +105,8 @@ test('course-pinned Luq solutions need exact-version reviewed content; pricing n
   requestId:randomUUID(),targetType:'problem',targetIds:[linked.problemId],prices:{FULL_SOLUTION:6},
  });
  assert.equal(batch.count,1);
- assert.equal((await quote(oldTarget)).available,false,'setting a price must not publish private reference code');
- await provide(oldTarget,404);
+ assert.equal((await quote(target)).available,false,'setting a price must not publish private reference code');
+ await provide(target,404);
  assert.equal((await pool.query('SELECT count(*)::int n FROM luq_assistance_contents')).rows[0].n,0);
  assert.equal(await balance(),balanceBefore);
 
@@ -127,41 +116,44 @@ test('course-pinned Luq solutions need exact-version reviewed content; pricing n
  async function publish(content){
   await teacher.send(`/scholarship/contents/${content.id}/publish`,{reviewed:true});
  }
- const currentBody='Reviewed solution for version 2 only.\n```python\nprint(2)\n```';
- const currentContent=await draft(currentTarget,currentBody);
- await publish(currentContent);
- assert.equal((await quote(currentTarget)).available,true);
- assert.equal((await quote(oldTarget)).available,false,'new-version content must not leak into a pinned older question');
- await provide(oldTarget,404);
- const oldBody='Reviewed solution for the course version.\n```python\nprint(1)\n```';
- const oldContent=await draft(oldTarget,oldBody);
- assert.equal((await quote(oldTarget)).available,false,'a draft is not a published solution');
- await teacher.send(`/scholarship/contents/${oldContent.id}/publish`,{},'POST',400);
- await publish(oldContent);
- const priced=await quote(oldTarget);
+ const solutionBody='Reviewed solution for the course exercise.\n```python\nprint(2)\n```';
+ const solution=await draft(target,solutionBody);
+ assert.equal((await quote(target)).available,false,'a draft is not a published solution');
+ await teacher.send(`/scholarship/contents/${solution.id}/publish`,{},'POST',400);
+ await publish(solution);
+ await admin.send(path+'/rank-review',{...reviewIdentity(second),decision:'approved'},'PATCH');
+ const current=await student.send(path);
+ assert.equal(current.versionId,first.versionId);
+ assert.equal(current.statement,second.statement);
+ assert.equal(current.referenceCode,undefined);
+ assert.equal(current.tests,undefined);
+ assert.equal(current.editorial,'');
+ assert.deepEqual(current.hints,[]);
+ for(const view of [courseBefore,before,current]){
+  for(const marker of privateMarkers)assert.ok(!JSON.stringify(view).includes(marker),marker);
+ }
+ const priced=await quote(target);
  assert.equal(priced.available,true);
  assert.equal(priced.price,6);
- assert.equal(priced.contentId,oldContent.id);
+ assert.equal(priced.contentId,solution.id);
  assert.equal(Object.hasOwn(priced,'body'),false,'quotes contain metadata only');
- assert.equal(JSON.stringify(priced).includes('Reviewed solution for the course version.'),false);
- await provide(oldTarget,403);
+ assert.equal(JSON.stringify(priced).includes('Reviewed solution for the course exercise.'),false);
+ await provide(target,403);
  assert.equal(await balance(),balanceBefore);
  assert.equal((await pool.query('SELECT count(*)::int n FROM luq_assistance_deliveries')).rows[0].n,0);
  const purchase=await student.send('/scholarship/assistance/unlock',{
-  ...oldTarget,requestKey:randomUUID(),confirmedPrice:priced.price,confirmedContentId:priced.contentId,
+  ...target,requestKey:randomUUID(),confirmedPrice:priced.price,confirmedContentId:priced.contentId,
  });
  assert.equal(purchase.charged,6);
  assert.equal(Object.hasOwn(purchase,'body'),false,'purchasing is separate from providing an answer');
- assert.equal(JSON.stringify(purchase).includes('Reviewed solution for the course version.'),false);
- assert.equal((await provide(oldTarget)).body,oldBody);
+ assert.equal(JSON.stringify(purchase).includes('Reviewed solution for the course exercise.'),false);
+ assert.equal((await provide(target)).body,solutionBody);
  assert.equal(await balance(),balanceBefore-6);
- assert.equal((await quote(currentTarget)).price,0,'permanent entitlement crosses versions, reviewed content does not');
- assert.equal((await provide(currentTarget)).body,currentBody);
+ assert.equal((await quote(target)).price,0,'the same problem keeps its permanent entitlement');
  assert.equal((await pool.query("SELECT count(*)::int n FROM luq_ledger WHERE kind='purchase'")).rows[0].n,1);
  const deliveryCount=(await pool.query('SELECT count(*)::int n FROM luq_assistance_deliveries')).rows[0].n;
 
- // An active exam assigned on V2 restricts the stable problem through the V1
- // course link as well, even after a previous purchase or a zero-price change.
+ // An active exam restricts assistance through the course link, including after a purchase.
  const exam=(await pool.query(`INSERT INTO timed_practices(title,owner_account_id,starts_at,ends_at,duration_minutes,state)
   VALUES('Course bypass check',$1,now()-interval '1 minute',now()+interval '1 hour',60,'Draft') RETURNING id`,[teacher.user.id])).rows[0];
  await pool.query('INSERT INTO timed_practice_problems(practice_id,problem_id,version_id,points,position) VALUES($1,$2,$3,100,0)',[exam.id,first.id,second.versionId]);
@@ -170,17 +162,15 @@ test('course-pinned Luq solutions need exact-version reviewed content; pricing n
  await teacher.send('/scholarship/policies/batch-prices',{
   requestId:randomUUID(),targetType:'problem',targetIds:[first.id],prices:{FULL_SOLUTION:0},
  });
- for(const target of [oldTarget,currentTarget]){
-  const blocked=await quote(target);
-  assert.equal(blocked.available,false);
-  assert.equal(blocked.mode,'disabled');
-  assert.equal(blocked.contentId,null);
-  assert.equal((await provide(target,403)).error.code,'ASSISTANCE_LOCKED');
- }
+ const blocked=await quote(target);
+ assert.equal(blocked.available,false);
+ assert.equal(blocked.mode,'disabled');
+ assert.equal(blocked.contentId,null);
+ assert.equal((await provide(target,403)).error.code,'ASSISTANCE_LOCKED');
  assert.equal(await balance(),balanceBefore-6);
  assert.equal((await pool.query('SELECT count(*)::int n FROM luq_assistance_deliveries')).rows[0].n,deliveryCount);
  await pool.query('UPDATE timed_practices SET results_published_at=clock_timestamp() WHERE id=$1',[exam.id]);
- assert.equal((await quote(oldTarget)).available,true);
- assert.equal((await provide(oldTarget)).body,oldBody);
+ assert.equal((await quote(target)).available,true);
+ assert.equal((await provide(target)).body,solutionBody);
  assert.equal((await student.send(`/learning-paths/${course.id}`)).chapters[0].problems[0].versionId,first.versionId);
 }));

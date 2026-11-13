@@ -38,6 +38,7 @@ async function fixture(run,{beforeUpgrade=false}={}){
   const actors={admin};
   for(const [tag,kind] of [['teacher','teacher'],['otherTeacher','teacher'],['classmate','student'],['cross','student'],['unassigned','student'],['excluded','student']]){
    const api=client(),person=await admin.send('/people',{kind,number:`P4-${tag}`,name:tag},'POST',201);
+   if(beforeUpgrade)await pool.query('INSERT INTO legacy_school_identity_ownership(identity_id) VALUES($1) ON CONFLICT DO NOTHING',[person.person.id]);
    await api.send('/auth/register',{kind,number:person.person.number,name:tag,activationCode:person.activationCode,username:`p4-${tag.toLowerCase()}`,password},'POST',201);
    if(beforeUpgrade)await markHistoricalLegacyActor(pool,api.user.id);
    actors[tag]=api;

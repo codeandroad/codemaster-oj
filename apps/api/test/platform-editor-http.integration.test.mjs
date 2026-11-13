@@ -125,6 +125,16 @@ test('the complete platform problem editor uses scoped grants without publicatio
       const judge = { environmentVersion: 'platform-editor-fixture', judge: async () => ({ status: 'AC', score: 100, passed: 1, total: 1, publicOutput: '', publicMessage: '', privateResults: [], environmentVersion: 'platform-editor-fixture' }) };
       for (let count = 0; count < 5 && await processOne({ pool: worker, judge, logger: {} }); count++) { /* Drain only this isolated fixture's validation tasks. */ }
       const checked = await get(`${source}/${problem.id}`, 'teacher'); assert.equal(checked.validationStatus, 'AC');
+      assert.equal(checked.canRequestReview,true);
+      const review={expectedVersionId:checked.versionId,expectedRevision:checked.editRevision};
+      await post(`${source}/${problem.id}/request-review`,{...review,expectedRevision:0},'teacher',409);
+      await post(`${source}/${problem.id}/request-review`,review,'student',403);
+      const submitted=await post(`${source}/${problem.id}/request-review`,review,'teacher');
+      assert.equal(submitted.draftReviewStatus,'pending');
+      assert.equal(submitted.canRequestReview,false);
+      assert.equal((await get(source)).items[0].id,problem.id,'requested reviews appear first');
+      assert.equal((await get(source)).items[0].draftReviewStatus,'pending');
+      assert.equal((await get(`${source}/${problem.id}`)).canPublish,true);
       latest = await post(`${source}/${problem.id}/publish`, { expectedVersionId: checked.versionId, expectedRevision: checked.editRevision });
       assert.equal(latest.published, true);
       assert.equal((await pool.query('SELECT version_id FROM chapter_problems WHERE problem_id=$1', [problem.id])).rowCount, 0);
@@ -179,6 +189,11 @@ test('the complete platform problem editor uses scoped grants without publicatio
       assert.equal(after.solved,baseline.solved); assert.equal(after.publishedRevision,next.editRevision);
       const old=await get('/submissions/'+accepted.id,student);
       assert.equal(old.id,history.id); assert.equal(old.status,'AC'); assert.equal(old.score,history.score);
+      const freshBody={problemId:draft.id,versionId:draft.versionId,publishedRevision:after.publishedRevision,
+        kind:'submit',code:'print(input())'};
+      const fresh=await post('/submissions',{...freshBody,idempotencyKey:randomUUID()},student,201);
+      assert.notEqual(fresh.id,accepted.id,'old AC must not block code on the new definition');
+      await post('/submissions',{...freshBody,idempotencyKey:randomUUID()},student,409);
       assert.equal((await pool.query('SELECT count(*)::int n FROM problem_versions WHERE problem_id=$1',[draft.id])).rows[0].n,1);
       await post('/submissions',{problemId:draft.id,versionId:draft.versionId,publishedRevision:before.publishedRevision,
         kind:'samples',code:'print(input())',idempotencyKey:randomUUID()},student,409);
@@ -200,6 +215,18 @@ test('the complete platform problem editor uses scoped grants without publicatio
       const published = await post(`${path}/${content.id}/publish`, { reviewed: true, expectedHash: content.contentHash }); assert.equal(published.status, 'published');
       const queried = await get(`${path}?versionId=${latest.versionId}`, 'teacher'); assert.equal(queried.items[0].id, content.id);
       assert.ok(!JSON.stringify(queried).includes('OTHER_PRIVATE_'));
+      const retiredSourceId = randomUUID();
+      await pool.query('UPDATE luq_assistance_contents SET version_id=$2 WHERE id=$1', [content.id, retiredSourceId]);
+      const retained = (await get(`${path}?versionId=${latest.versionId}`, 'teacher')).items[0];
+      assert.equal(retained.versionId, retiredSourceId);
+      const update = await post(path, { ...draft, expectedHash: retained.contentHash,
+        solutions: [{ title: 'Updated method', body: 'Read the input and print it once.', programmingLanguage: 'python' }] }, 'teacher', 201);
+      assert.equal(update.id, content.id); assert.equal(update.hasPendingSolutions, true);
+      await post(`${path}/${content.id}/publish`, { reviewed: true, expectedHash: update.contentHash }, 'teacher', 403);
+      const promoted = await post(`${path}/${content.id}/publish`, { reviewed: true, expectedHash: update.contentHash });
+      assert.equal(promoted.id, content.id); assert.equal(promoted.versionId, retiredSourceId);
+      assert.equal(promoted.solutions[0].title, 'Updated method');
+      assert.equal(Boolean(promoted.hasPendingSolutions), false);
     });
     await t.test('course grants also merge by school without inheriting publication or audience powers', async () => {
       const course = await post('/platform/courses', { requestId: randomUUID(), title: 'Scoped course editor', chapters: [{ title: 'Lesson', content: 'Lesson source.', problems: [{ problemId: problem.id, versionId: latest.versionId }] }] }, 'platform', 201);

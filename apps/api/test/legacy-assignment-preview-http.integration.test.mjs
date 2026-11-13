@@ -9,6 +9,8 @@ import { loadConfig } from '../../../packages/domain/src/application.mjs';
 import { provisionPlatformAdministrator } from '../../../packages/domain/src/platform-governance.mjs';
 import { GoJudge } from '../../../packages/domain/judge.mjs';
 import { processOne } from '../../../packages/domain/worker.mjs';
+import { SCHOOL_BANK } from '../../../packages/domain/src/library.mjs';
+import { acceptDraftValidation, draftIdentity, reviewIdentity } from '../../../packages/domain/test/problem-draft-fixture.mjs';
 
 test('legacy teachers preview the current exercise with private, immutable judged results', {
   skip: !process.env.TEST_DATABASE_URL, timeout: 90000,
@@ -61,18 +63,26 @@ test('legacy teachers preview the current exercise with private, immutable judge
     await platform('/auth/register-personal', { body: { username: 'qa-platform', displayName: 'QA platform', password }, status: 201 });
     await provisionPlatformAdministrator(pool, { username: 'qa-platform' });
 
-    const { rows: [{ id: problemId }] } = await pool.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id', [owner.id]);
-    async function publish(title) {
-      const { rows: [{ id }] } = await pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,
-        time_limit_ms,memory_limit_mb,reference_code,validation_status,samples)
-        VALUES($1,$2,'stdio','Echo an integer.',1000,64,'print(input())','AC',$3) RETURNING id`,
-      [problemId, title, JSON.stringify([{ input: '5', expected: '5' }])]);
-      await pool.query("INSERT INTO test_cases(version_id,position,input,expected,weight) VALUES($1,1,'84713','84713',100)", [id]);
-      await teacher(`/problems/${problemId}/publish`, { body: { versionId: id } });
-      await admin(`/problems/${problemId}/rank-review`, { method: 'PATCH', body: { versionId: id, decision: 'approved' } });
-      return id;
+    async function publish(title, previous, sample = '5') {
+      const draft = await teacher(previous ? `/problems/${previous.id}/versions` : '/problems', { status: 201, body: {
+        ...(previous && draftIdentity(previous)), title, statement: 'Echo an integer.', mode: 'stdio', comparator: 'tokens',
+        bankId: SCHOOL_BANK, timeLimitMs: 1000, memoryLimitMb: 64, referenceCode: 'print(input())',
+        samples: [{ input: sample, expected: sample }], tests: [{ input: '84713', expected: '84713', weight: 100 }],
+      } });
+      if (previous) await acceptDraftValidation(pool, draft);
+      else assert.equal(await processOne({ pool, logger: {}, judge: {
+        environmentVersion: 'preview-fixture',
+        async judge() {
+          return { status: 'AC', score: 100, passed: 1, total: 1, publicOutput: '', publicMessage: '',
+            privateResults: [], environmentVersion: this.environmentVersion };
+        },
+      } }), true);
+      await teacher(`/problems/${draft.id}/publish`, { body: reviewIdentity(draft) });
+      await admin(`/problems/${draft.id}/rank-review`, { method: 'PATCH', body: { ...reviewIdentity(draft), decision: 'approved' } });
+      return draft;
     }
-    const versionId = await publish('Pinned preview task');
+    const original = await publish('Pinned preview task');
+    const { id: problemId, versionId } = original;
     const { rows: [{ id: courseId }] } = await pool.query(
       "INSERT INTO learning_paths(owner_account_id,title,published_at) VALUES($1,'Preview course',now()) RETURNING id", [owner.id]);
     const { rows: [{ id: chapterId }] } = await pool.query(
@@ -85,8 +95,8 @@ test('legacy teachers preview the current exercise with private, immutable judge
     await pool.query(`INSERT INTO luq_activity_rules(activity_type,activity_id,rule_version,amount,minimum_ac,minimum_score,task_kind,created_by)
       VALUES('assignment',$1,1,6,1,100,'challenge',$2)`, [assignmentId, owner.id]);
     await pool.query("UPDATE assignments SET state='Published',published_at=now() WHERE id=$1", [assignmentId]);
-    const latest = await publish('Later library version');
-    assert.notEqual(latest, versionId);
+    const latest = await publish('Reviewed preview task', original);
+    assert.equal(latest.versionId, versionId);
 
     const assignment = `/assignments/${assignmentId}`, preview = assignment + '/preview';
     const problem = `${preview}/problems/${problemId}`, enqueue = problem + '/submissions';
@@ -106,18 +116,19 @@ test('legacy teachers preview the current exercise with private, immutable judge
     assert.equal(before.chapterComplete, false);
     assert.equal(before.grades[0].score, 0);
     const view = await teacher(preview);
-    assert.equal(view.problems[0].versionId, latest);
-    assert.equal((await student(`/problems/${problemId}?current=1&versionId=${versionId}`)).versionId,latest,'normal workspace reads current content even when a bookmarked URL carries an old version');
-    assert.equal((await student(`/problems/${problemId}?versionId=${versionId}`)).versionId,latest,'ordinary student links use current content even without the current flag');
+    assert.equal(view.problems[0].versionId, versionId);
+    assert.equal((await student(`/problems/${problemId}`)).publishedRevision, latest.editRevision);
     assert.equal(view.problems[0].score, null);
     const statement = await teacher(problem);
-    assert.equal(statement.problem.title, 'Later library version');
-    assert.deepEqual(statement.problem.samples, [{ input: '5', expected: '5' }]);
+    assert.equal(statement.problem.title, 'Reviewed preview task');
+    assert.equal(statement.problem.publishedRevision, latest.editRevision);
+    assert.equal(statement.problem.samples[0].expected, '5');
     assert.equal(statement.problem.referenceCode, undefined);
     assert.equal(statement.problem.tests, undefined);
-    const body = { kind: 'submit', code: 'print(input())', language: 'python', requestId: randomUUID(), versionId: latest, revision: view.revision };
+    const body = { kind: 'submit', code: 'print(input())', language: 'python', requestId: randomUUID(),
+      versionId, publishedRevision: latest.editRevision, revision: view.revision };
     await teacher(enqueue, { body, includeCsrf: false, status: 403 });
-    await teacher(enqueue, { body: { ...body, versionId }, status: 409 });
+    await teacher(enqueue, { body: { ...body, publishedRevision: original.editRevision }, status: 409 });
     await student(preview, { status: 404 });
     await student(enqueue, { body, status: 404 });
     await colleague(preview, { status: 403 });
@@ -131,7 +142,7 @@ test('legacy teachers preview the current exercise with private, immutable judge
     const { rows: [task] } = await pool.query('SELECT id,purpose,submission_id,version_id FROM judge_tasks WHERE preview_submission_id=$1', [queued.id]);
     assert.equal(task.purpose, 'assignment_preview');
     assert.equal(task.submission_id, null);
-    assert.equal(task.version_id, latest);
+    assert.equal(task.version_id, versionId);
     await admin(`/judge-tasks/${task.id}`, { status: 404 });
     await admin(`/judge-tasks/${task.id}/retry`, { body: { reason: 'QA privacy' }, status: 404 });
 
@@ -171,7 +182,7 @@ test('legacy teachers preview the current exercise with private, immutable judge
     assert.deepEqual(await state(), before);
 
     // Positive control proves all four student projections respond to formal work.
-    const formalSubmission = await student('/submissions', { body: { assignmentId, problemId, versionId: latest, kind: 'submit',
+    const formalSubmission = await student('/submissions', { body: { assignmentId, problemId, versionId, publishedRevision: latest.editRevision, kind: 'submit',
       code: 'print(input())', idempotencyKey: randomUUID() }, status: 201 });
     assert.equal(await processOne({ pool, judge, logger: {} }), true);
     const formal = await state();
@@ -184,16 +195,21 @@ test('legacy teachers preview the current exercise with private, immutable judge
     const queuedBeforeUpdate = await teacher(enqueue, {
       body: { ...body, kind: 'samples', requestId: randomUUID() }, status: 202,
     });
-    const newest = await publish('Updated everywhere');
-    assert.equal((await teacher(preview)).problems[0].versionId, newest);
-    assert.equal((await student(assignment)).problems[0].versionId, newest);
-    assert.equal((await student(`/learning-paths/${courseId}`)).chapters[0].problems[0].versionId, newest);
-    assert.equal((await student(`/problems/${problemId}?originalSubmissionId=${formalSubmission.id}`)).versionId,latest,'an owned submission audit keeps its original judged version');
-    assert.equal((await pool.query('SELECT version_id FROM assignment_problems WHERE assignment_id=$1',[assignmentId])).rows[0].version_id,versionId,'original assignment pin remains an audit record');
+    const newest = await publish('Updated everywhere', latest, '6');
+    assert.equal(newest.versionId, versionId);
+    assert.equal((await teacher(problem)).problem.publishedRevision, newest.editRevision);
+    assert.equal((await student(assignment)).problems[0].title, newest.title);
+    assert.equal((await student(`/learning-paths/${courseId}`)).chapters[0].problems[0].title, newest.title);
+    assert.equal((await student(`/submissions/${formalSubmission.id}`)).status, 'AC');
+    assert.equal((await student(`/problems/${problemId}`)).samples[0].input, '6');
+    assert.equal((await student(`/problems/${problemId}?originalSubmissionId=${formalSubmission.id}`)).samples[0].input, '5');
+    assert.equal((await pool.query('SELECT version_id FROM assignment_problems WHERE assignment_id=$1',[assignmentId])).rows[0].version_id, versionId);
     assert.equal(await processOne({ pool, judge, logger: {} }), true);
-    assert.equal((await teacher(`${preview}/jobs/${queuedBeforeUpdate.id}`)).status,'AC');
-    assert.equal((await pool.query('SELECT version_id FROM judge_tasks WHERE preview_submission_id=$1',[queuedBeforeUpdate.id])).rows[0].version_id,latest,'queued work retains its original judge definition');
+    const queuedResult = await teacher(`${preview}/jobs/${queuedBeforeUpdate.id}`);
+    assert.equal(queuedResult.status, 'AC');
+    assert.equal(queuedResult.testResults[0].input, '5');
     await teacher(enqueue,{body:{...body,requestId:randomUUID()},status:409});
+    await teacher(enqueue, { body: { ...body, requestId: randomUUID(), publishedRevision: newest.editRevision }, status: 202 });
     assert.equal((await state()).grades[0].score,20,'new content does not erase historical grades');
     await pool.query("UPDATE assignments SET due_at=clock_timestamp()-interval '1 second', edit_revision=edit_revision+1 WHERE id=$1", [assignmentId]);
     await teacher(enqueue, { body: { ...body, requestId: randomUUID() }, status: 409 });

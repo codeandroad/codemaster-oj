@@ -68,7 +68,7 @@ export function TeacherAssignmentPreview({ id, user }: { id: string; user: Campu
       submissionsPath: `${problemPath}/submissions`,
       submissionPath: jobId => `${base}/jobs/${encodeURIComponent(jobId)}`,
       submit: input => productionApi(`${problemPath}/submissions`, {
-        method: "POST", body: { ...input, revision, versionId: problem.versionId },
+        method: "POST", body: { ...input, revision, versionId: problem.versionId, publishedRevision: problem.publishedRevision },
       }),
       normalizeSubmission: result => result,
       draftVersion: "current",

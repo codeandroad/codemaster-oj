@@ -156,7 +156,7 @@ export function AdminProblemBanks({ accountId }: { accountId: string }) {
             </div>
           </div>
           <p className="mt-3 text-xs leading-5 text-muted-foreground">{selectedBank.publicVersionCount ? tr(`该库仍有 ${selectedBank.publicVersionCount} 个公开题目版本；归档前须在题目审核中撤下。`, `${selectedBank.publicVersionCount} versions are still public. Withdraw them in problem review before archiving.`) : tr("归档不会硬删除数据；被已发布课程或未归档训练引用时会阻止归档。", "Archiving preserves data and is blocked while published courses or active practices reference the bank.")}</p>
-          {selectedBank.publicVersionCount > 0 && <AppLink href="/admin/settings?tab=problem-reviews" className="mt-2 inline-block text-sm font-medium text-primary hover:underline">{tr("前往题目审核", "Open problem review")}</AppLink>}
+          {selectedBank.visibility === "school" && <AppLink href="/admin/settings?tab=problem-reviews" className="mt-2 inline-block text-sm font-medium text-primary hover:underline">{tr("前往题目审核", "Open problem review")}</AppLink>}
         </section>
         <ManagedProblemList key={activeId} bank={selectedBank} preferenceKey={`${preferenceKey}:${activeId}`} onChanged={banks.reload} />
       </div>}

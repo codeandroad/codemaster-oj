@@ -70,16 +70,20 @@ test('legacy school ownership upgrades real PostgreSQL without rewriting history
       [previousAccount, student.identityId, problemId, versionId, assignmentId, randomUUID(), randomBytes(32).toString('hex')]);
     const tables = (await pool.query('SELECT tablename FROM pg_tables WHERE schemaname=$1 ORDER BY tablename', [schema])).rows.map(r => r.tablename);
     const mutable = new Set(['schema_migrations', 'schools', 'school_audit_events', 'site_settings']);
+    const originalColumns=new Map();
     const before = {};
-    for (const table of tables.filter(name => !mutable.has(name))) before[table] = await digest(table);
+    for(const table of tables.filter(name=>!mutable.has(name))){
+      const columns=(await pool.query('SELECT column_name FROM information_schema.columns WHERE table_schema=$1 AND table_name=$2',[schema,table])).rows;
+      originalColumns.set(table,new Set(columns.map(row=>row.column_name)));
+      before[table]=await digest(table);
+    }
     const originalSettings = (await pool.query('SELECT settings FROM site_settings')).rows[0].settings;
 
     await t.test('upgrade preserves every pre-existing business row and all old FK associations', async () => {
       await migrate(pool);
       for (const [table, fingerprint] of Object.entries(before)) {
-        const added = roots.includes(table) ? ['school_id'] : {
-          accounts: ['default_school_id'], leaderboard_settings: ['show_luq_balance'],
-        }[table] ?? [];
+        const columns=(await pool.query('SELECT column_name FROM information_schema.columns WHERE table_schema=$1 AND table_name=$2',[schema,table])).rows;
+        const added=columns.map(row=>row.column_name).filter(column=>!originalColumns.get(table).has(column));
         assert.deepEqual(await digest(table, added), fingerprint, table);
       }
       assert.equal((await pool.query('SELECT count(*)::int n FROM accounts WHERE default_school_id IS NOT NULL')).rows[0].n, 0);

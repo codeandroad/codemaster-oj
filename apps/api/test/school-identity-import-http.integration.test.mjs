@@ -99,10 +99,10 @@ test('school identity import previews and atomic commits enforce tenant, account
 
       const importTables = ['school_identities', 'school_class_roster', 'school_identity_imports', 'school_audit_events'];
       // Include every legacy/account/Luq/grading table, plus other school state.
-      // Session activity is the only permitted side effect outside the import.
+      // New student identities receive the configured school allowance. Preserve all existing wallets and ledger entries.
       const protectedTables = (await pool.query(`SELECT table_name FROM information_schema.tables
         WHERE table_schema = $1 AND table_type = 'BASE TABLE' AND NOT (table_name = ANY($2::text[]))
-        ORDER BY table_name`, [schema, [...importTables, 'sessions']])).rows.map(row => row.table_name);
+        ORDER BY table_name`, [schema, [...importTables, 'sessions', 'school_scholarship_accounts', 'school_scholarship_ledger']])).rows.map(row => row.table_name);
       async function snapshot(tables = importTables) {
         const entries = await Promise.all(tables.map(async table => {
           const { rows: [row] } = await pool.query(
@@ -112,6 +112,11 @@ test('school identity import previews and atomic commits enforce tenant, account
         return Object.fromEntries(entries);
       }
       const protectedBefore = await snapshot(protectedTables);
+      const walletState=async()=>({
+        accounts:(await pool.query('SELECT * FROM school_scholarship_accounts ORDER BY school_id,identity_id')).rows,
+        ledger:(await pool.query('SELECT * FROM school_scholarship_ledger ORDER BY id')).rows,
+      });
+      const originalWallets=await walletState();
       const numberRows = async numbers => (await pool.query(`
         SELECT id, kind, number, name, account_id AS "accountId" FROM school_identities
         WHERE school_id = $1 AND number = ANY($2::text[]) ORDER BY kind, number`, [alpha.id, numbers])).rows;
@@ -402,6 +407,21 @@ test('school identity import previews and atomic commits enforce tenant, account
 
       await t.test('imports preserve accounts, legacy teaching data, Luq, grades, and account bindings', async () => {
         assert.deepEqual(await snapshot(protectedTables), protectedBefore);
+        const wallets=await walletState();
+        const walletKey=row=>row.school_id+':'+row.identity_id;
+        const existingKeys=new Set(originalWallets.accounts.map(walletKey));
+        const originalLedgerIds=new Set(originalWallets.ledger.map(row=>row.id));
+        assert.deepEqual(wallets.accounts.filter(row=>existingKeys.has(walletKey(row))),originalWallets.accounts);
+        assert.deepEqual(wallets.ledger.filter(row=>originalLedgerIds.has(row.id)),originalWallets.ledger);
+        const newWallets=wallets.accounts.filter(row=>!existingKeys.has(walletKey(row)));
+        const grants=wallets.ledger.filter(row=>!originalLedgerIds.has(row.id));
+        assert.equal(grants.length,newWallets.length);
+        for(const wallet of newWallets){
+          const entries=grants.filter(entry=>walletKey(entry)===walletKey(wallet));
+          assert.equal(entries.length,1);
+          assert.equal(entries[0].kind,'initial_grant');
+          assert.equal(entries[0].delta,wallet.balance);
+        }
         assert.deepEqual((await pool.query(`SELECT id, account_id FROM school_identities
           WHERE account_id IS NOT NULL ORDER BY id`)).rows,
         [{ id: existingStudent.id, account_id: student.id }, { id: existingTeacher.id, account_id: teacher.id }]

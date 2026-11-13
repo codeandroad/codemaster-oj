@@ -1,3 +1,4 @@
+import { acceptDraftValidation, draftIdentity, reviewIdentity } from './problem-draft-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -76,10 +77,11 @@ test('prototype flows persist identity claims, imports, drafts, favorites, setti
   assert.equal((await teacher(`/problems/${complete.id}`)).firstAcPoints,13);
   assert.equal((await teacher('/problems')).items.find(p=>p.id===complete.id).firstAcPoints,13);
   const onlyDisabled=await teacher('/problems',{...complete,saveDraft:true,title:'没有启用公开样例',samples:[{input:'',expected:'wrong',name:'仅停用样例',enabled:false}]},'POST',201);assert.equal(onlyDisabled.validationStatus,'Incomplete');assert.equal((await pool.query('SELECT count(*)::int n FROM judge_tasks WHERE version_id=$1',[onlyDisabled.versionId])).rows[0].n,0);await teacher(`/problems/${onlyDisabled.id}/validate`,{versionId:onlyDisabled.versionId},'POST',409);await admin('/submissions',{kind:'samples',problemId:onlyDisabled.id,code:'print(1)',idempotencyKey:randomUUID()},'POST',404);
-  const revisedSample=await teacher(`/problems/${complete.id}/versions`,{...complete,saveDraft:true,title:'样例编辑保存',difficulty:'进阶',samples:complete.samples},'POST',201);assert.equal(revisedSample.samples[1].name,'停用公开样例');assert.equal(revisedSample.samples[1].enabled,false);assert.equal((await teacher(`/problems/${complete.id}?versionId=${revisedSample.versionId}`)).samples[1].name,'停用公开样例');
+  const revisedSample=await teacher(`/problems/${complete.id}/versions`,{...complete,saveDraft:true,title:'样例编辑保存',difficulty:'进阶',samples:complete.samples,...draftIdentity(complete)},'POST',201);assert.equal(revisedSample.samples[1].name,'停用公开样例');assert.equal(revisedSample.samples[1].enabled,false);assert.equal((await teacher(`/problems/${complete.id}?versionId=${revisedSample.versionId}`)).samples[1].name,'停用公开样例');
   const catalogProblem=(await teacher('/problems')).items.find(item=>item.id===complete.id);
   assert.equal(catalogProblem.versionId,revisedSample.versionId);
-  assert.equal(catalogProblem.difficulty,'进阶');
+  assert.equal(catalogProblem.difficulty,'入门');
+  assert.equal((await teacher(`/problems/${complete.id}`)).difficulty,'进阶');
   assert.equal(catalogProblem.publishedVersionId,complete.versionId);
   assert.equal(catalogProblem.publishedDifficulty,'入门');
   assert.equal(Object.hasOwn((await student('/problems')).items.find(item=>item.id===complete.id),'publishedDifficulty'),false);
@@ -100,24 +102,33 @@ test('prototype flows persist identity claims, imports, drafts, favorites, setti
   const studentAssignment=await student(`/assignments/${draft.id}`);
   assert.equal(studentAssignment.problems.length,2);
   assert.equal(Object.hasOwn(studentAssignment.problems[0],'difficulty'),false);
-  await pool.query("UPDATE problem_versions SET validation_status='AC' WHERE id=$1",[revisedSample.versionId]);await teacher(`/problems/${complete.id}/publish`,{versionId:revisedSample.versionId});
-  const pinnedAfterPublish=await editPublished({description:'题库更新后仅改说明',reason:'核对版本保持固定'});assert.equal(pinnedAfterPublish.problems[0].versionId,complete.versionId);
-  assert.deepEqual(pinnedAfterPublish.problems.map(p=>p.rewardPoints),[12,7]);
-  assert.deepEqual(pinnedAfterPublish.problems.map(p=>p.difficulty),['入门',undefined]);
+  const beforePublish=await teacher(`/assignments/${draft.id}`);
+  await acceptDraftValidation(pool,revisedSample);
+  await teacher(`/problems/${complete.id}/publish`,reviewIdentity(revisedSample));
+  assert.equal((await teacher(`/assignments/${draft.id}`)).problems[0].difficulty,'入门');
+  await admin(`/problems/${complete.id}/rank-review`,{...reviewIdentity(revisedSample),decision:'approved'},'PATCH');
+  const afterPublish=await teacher(`/assignments/${draft.id}`);
+  assert.equal(afterPublish.problems[0].versionId,complete.versionId);
+  assert.deepEqual(afterPublish.problems.map(p=>p.rewardPoints),[12,7]);
+  assert.deepEqual(afterPublish.problems.map(p=>p.difficulty),['进阶',undefined]);
+  assert.deepEqual(afterPublish.grades,beforePublish.grades);
   const clearedReward=await editPublished({problems:[{problemId:complete.id,points:20,rewardPoints:0},{problemId:problem.id,points:80}]});assert.deepEqual(clearedReward.problems.map(p=>p.rewardPoints),[0,7]);
   const restoredReward=await editPublished({problems:[{problemId:complete.id,points:20,rewardPoints:12},{problemId:problem.id,points:80}]});assert.deepEqual(restoredReward.problems.map(p=>p.rewardPoints),[12,7]);
   await editPublished({problems:[{problemId:complete.id,points:20,rewardPoints:21},{problemId:problem.id,points:80}]},400);
-  const updatedVersion=await editPublished({problems:[{problemId:complete.id,versionId:revisedSample.versionId,points:20},{problemId:problem.id,points:80}],reason:'显式采用修正后的题目版本'});assert.equal(updatedVersion.problems[0].versionId,revisedSample.versionId);
-  assert.deepEqual(updatedVersion.problems.map(p=>p.difficulty),['进阶',undefined]);
-  const versionAudit=(await pool.query("SELECT metadata FROM audit_events WHERE action='assignment.published_edit' AND resource_id=$1 ORDER BY id DESC LIMIT 1",[draft.id])).rows[0];assert.equal(versionAudit.metadata.revision[0].previousVersionId,complete.versionId);assert.equal(versionAudit.metadata.revision[0].versionId,revisedSample.versionId);
   const subset=await editPublished({participants:[si.person.id],reason:'仅向第一位学生布置'});assert.deepEqual(subset.participants,[si.person.id]);
-  const sampleRun=await student('/submissions',{kind:'samples',problemId:complete.id,assignmentId:draft.id,code:'print(1)',idempotencyKey:randomUUID()},'POST',201);
+  const sampleRun=await student('/submissions',{kind:'samples',problemId:complete.id,publishedRevision:revisedSample.editRevision,assignmentId:draft.id,code:'print(1)',idempotencyKey:randomUUID()},'POST',201);
   const afterSample=await teacher(`/assignments/${draft.id}`);assert.equal(afterSample.hasActivity,true);assert.equal(afterSample.hasSubmissions,false);assert.deepEqual(afterSample.protectedParticipantIds,[si.person.id]);assert.equal(afterSample.participantDetails[0].hasActivity,true);
   const reordered=await editPublished({problems:[{problemId:problem.id,points:70},{problemId:complete.id,points:30}],reason:'样例运行后调整分值与顺序'});assert.deepEqual(reordered.problems.map(p=>p.points),[70,30]);assert.equal(reordered.problems[1].versionId,revisedSample.versionId);
   await editPublished({problems:[{problemId:complete.id,points:20},{problemId:problem.id,points:80}],reason:'恢复原先分值与顺序'});
-  const third=await teacher(`/problems/${complete.id}/versions`,{...complete,saveDraft:true,title:'第三题目版本',samples:complete.samples},'POST',201);await pool.query("UPDATE problem_versions SET validation_status='AC' WHERE id=$1",[third.versionId]);await teacher(`/problems/${complete.id}/publish`,{versionId:third.versionId});
-  await editPublished({problems:[{problemId:complete.id,versionId:third.versionId,points:20},{problemId:problem.id,points:80}],reason:'尝试更换已有样例历史的版本'},409);
-  assert.equal((await student(`/submissions/${sampleRun.id}`)).versionId,revisedSample.versionId);
+  const originalTask=(await pool.query('SELECT problem_snapshot FROM judge_tasks WHERE submission_id=$1',[sampleRun.id.slice(3)])).rows[0];
+  const third=await teacher(`/problems/${complete.id}/versions`,{...complete,saveDraft:true,title:'第三次修订',
+   samples:complete.samples,...draftIdentity(revisedSample)},'POST',201);
+  await acceptDraftValidation(pool,third);
+  await teacher(`/problems/${complete.id}/publish`,reviewIdentity(third));
+  await admin(`/problems/${complete.id}/rank-review`,{...reviewIdentity(third),decision:'approved'},'PATCH');
+  assert.equal((await teacher(`/assignments/${draft.id}`)).problems[0].title,third.title);
+  assert.equal((await student(`/submissions/${sampleRun.id}`)).versionId,complete.versionId);
+  assert.deepEqual((await pool.query('SELECT problem_snapshot FROM judge_tasks WHERE submission_id=$1',[sampleRun.id.slice(3)])).rows[0],originalTask);
   await editPublished({dueAt:new Date(Date.now()+86400000).toISOString(),reason:'尝试缩短截止时间'},400);
   await student(`/assignments/${draft.id}`,{title:'越权更改',reason:'无权限'},'PATCH',403);
   const editAudit=(await pool.query("SELECT metadata FROM audit_events WHERE action='assignment.published_edit' AND resource_id=$1 AND metadata->>'reason'='仅向第一位学生布置' LIMIT 1",[draft.id])).rows[0];assert.equal(editAudit.metadata.reason,'仅向第一位学生布置');
@@ -164,22 +175,20 @@ test('prototype flows persist identity claims, imports, drafts, favorites, setti
   const exemptEdit=await editPublished({description:'豁免后仍可修正文案',reason:'补充说明'});assert.equal(exemptEdit.exemptCount,1);assert.deepEqual(exemptEdit.participants,[]);
   const secondTeacher=client(),secondTi=await admin('/people',{kind:'teacher',number:'T2',name:'新任教师',classIds:[cls.id]},'POST',201);
   await secondTeacher('/auth/register',{kind:'teacher',number:'T2',name:'新任教师',activationCode:secondTi.activationCode,username:'alignment-teacher-two',password:'Alignment-teacher-two-2026!'},'POST',201);
-  const draftPin=await teacher('/assignments',{state:'Draft',title:'待发布的固定题目',classId:cls.id,dueAt:extendedDueAt,problems:[{problemId:complete.id,points:100}],participants:[si.person.id]},'POST',201);
   const archivedStudentAssignment=await teacher('/assignments',{state:'Published',title:'归档后仍可查看',classId:cls.id,dueAt:extendedDueAt,problems:[{problemId:complete.id,points:100}],participants:[si.person.id]},'POST',201);
   const raceAssignment=await teacher('/assignments',{state:'Published',title:'并发固定版本检查',classId:cls.id,dueAt:extendedDueAt,problems:[{problemId:complete.id,points:100}],participants:[si.person.id]},'POST',201);
   const lock=await pool.connect();let pendingSubmit;
   try{
    await lock.query('BEGIN');await lock.query('SELECT id FROM assignments WHERE id=$1 FOR UPDATE',[raceAssignment.id]);
    pendingSubmit=student('/submissions',{kind:'samples',problemId:complete.id,assignmentId:raceAssignment.id,versionId:third.versionId,code:'print(1)',idempotencyKey:randomUUID()},'POST',409);
-   // Observe the request blocked on the assignment before switching its pin.
-   // This catches a regression where version authorization ran first.
+   // A stale page cannot submit while an assignment is being changed.
    let waiting=false;
    for(let attempt=0;attempt<100;attempt++){
     waiting=!!(await manager.query("SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE '%SELECT id FROM assignments WHERE id=$1 FOR SHARE%' LIMIT 1")).rowCount;
     if(waiting)break;await new Promise(resolve=>setTimeout(resolve,20));
    }
    assert.equal(waiting,true,'student submission must lock the assignment before version access');
-   await lock.query('UPDATE assignment_problems SET version_id=$1 WHERE assignment_id=$2 AND problem_id=$3',[revisedSample.versionId,raceAssignment.id,complete.id]);
+   await lock.query('UPDATE assignments SET edit_revision=edit_revision+1 WHERE id=$1',[raceAssignment.id]);
    await lock.query('COMMIT');
   }catch(error){await lock.query('ROLLBACK');throw error;}finally{lock.release();}
   await pendingSubmit;
@@ -195,7 +204,7 @@ test('prototype flows persist identity claims, imports, drafts, favorites, setti
   const bonusRetry=await student('/submissions',{kind:'submit',problemId:problem.id,assignmentId:rewardAssignment.id,code:'print(1) # revised',idempotencyKey:randomUUID()},'POST',201);
   await pool.query("UPDATE submissions SET status='AC',score=100 WHERE id=$1",[bonusRetry.id.slice(3)]);
   assert.deepEqual((await pool.query("SELECT points FROM point_ledger WHERE identity_id=$1 AND assignment_id=$2 AND problem_id=$3 AND reason='assignment'",[si.person.id,rewardAssignment.id,problem.id])).rows.map(entry=>entry.points),[8]);
-  const beforeDue=await student('/submissions',{kind:'submit',problemId:complete.id,assignmentId:rewardAssignment.id,code:'print(0)',idempotencyKey:randomUUID()},'POST',201);
+  const beforeDue=await student('/submissions',{kind:'submit',problemId:complete.id,publishedRevision:third.editRevision,assignmentId:rewardAssignment.id,code:'print(0)',idempotencyKey:randomUUID()},'POST',201);
   await pool.query("UPDATE submissions SET status='WA',score=0 WHERE id=$1",[beforeDue.id.slice(3)]);
   await pool.query("UPDATE assignments SET due_at=now()-interval '1 minute' WHERE id=$1",[rewardAssignment.id]);
   const lateCorrection=await student('/submissions',{kind:'correction',problemId:complete.id,assignmentId:rewardAssignment.id,originalSubmissionId:beforeDue.id,code:'print(1)',idempotencyKey:randomUUID()},'POST',201);
@@ -221,16 +230,14 @@ test('prototype flows persist identity claims, imports, drafts, favorites, setti
   await teacher(`/timed-practices/${practice.id}/archive`,{});
   await admin(`/problem-banks/${bank.id}`,{visibility:'private'},'PATCH');
   assert.equal((await secondTeacher('/problem-banks')).items.some(item=>item.id===bank.id),false);
-  // Optional class source tags do not grant a co-teacher access to another
-  // owner’s private activity versions. Named students retain their exact pins.
-  await secondTeacher(`/problems/${complete.id}?versionId=${revisedSample.versionId}`,undefined,'GET',404);
-  await secondTeacher(`/problems/${complete.id}?versionId=${draftPin.problems[0].versionId}`,undefined,'GET',404);
+  // A co-teacher has no access to another teacher's private assignment.
   await secondTeacher(`/problems/${complete.id}?versionId=${complete.versionId}`,undefined,'GET',404);
   await pool.query('UPDATE problems SET archived_at=now() WHERE id=$1',[complete.id]);
-  await secondTeacher(`/problems/${complete.id}?versionId=${revisedSample.versionId}`,undefined,'GET',404);
-  assert.equal((await student(`/problems/${complete.id}?versionId=${archivedStudentAssignment.problems[0].versionId}`)).versionId,third.versionId);
+  await secondTeacher(`/problems/${complete.id}?versionId=${complete.versionId}`,undefined,'GET',404);
+  const assignedArchived=await student(`/problems/${complete.id}?versionId=${archivedStudentAssignment.problems[0].versionId}`);
+  assert.equal(assignedArchived.versionId,complete.versionId);
+  assert.equal(assignedArchived.publishedRevision,third.editRevision);
   await secondTeacher(`/problems/${complete.id}`,undefined,'GET',404);
-  await student(`/problems/${complete.id}?versionId=${complete.versionId}`,undefined,'GET',404);
   const failed=(await pool.query("INSERT INTO judge_tasks(version_id,purpose,state) VALUES($1,'validation','failed') RETURNING id",[incomplete.versionId])).rows[0];const taskDetail=await admin(`/judge-tasks/${failed.id}`);assert.equal(taskDetail.status,'System Error');await admin(`/judge-tasks/${failed.id}/retry`,{reason:'修复执行器'});assert.equal((await admin(`/judge-tasks/${failed.id}`)).state,'queued');await student(`/judge-tasks/${failed.id}`,undefined,'GET',403);
  }finally{if(server)await new Promise(r=>server.close(r));await pool.end();await manager.query(`DROP SCHEMA ${schema} CASCADE`);await manager.end();}
 });

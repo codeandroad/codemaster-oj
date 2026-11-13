@@ -158,8 +158,12 @@ export async function createDomainServices(pool,config) {
   const editing=owner&&options.editing===true;
   const draft=editing&&options.publishedOnly!==true?v.edit_draft:null;
   const validation=draft?await draftValidation(db,v):null;
-  const presented=draft?{...v,...draft,published_at:null,school_visible_at:null,rank_review_status:v.draft_review_status,
+  let presented=draft?{...v,...draft,published_at:null,school_visible_at:null,rank_review_status:v.draft_review_status,
    rank_approved_at:null,validation_status:validation.status,validation_message:validation.message}:owner||isStaff(user)?v:(await studentPublicStatementRows(db,[v]))[0];
+  if(options.originalSubmissionId){
+   const inputs=await originalSubmissionInputs(db,options.originalSubmissionId);
+   if(inputs)presented={...presented,...inputs};
+  }
   const result=problemShape(presented,{includeDisabledSamples:editing});result.publishedVersionId=owner?p.current_version_id:v.id;result.publishedTitle=v.published_at?v.title:result.publishedTitle;result.ownerScope=p.owner_scope;result.bankId=p.bank_id;result.bankVisibility=(await db.query('SELECT visibility FROM problem_banks WHERE id=$1',[p.bank_id])).rows[0]?.visibility;result.canEdit=owner;result.canPublish=editing&&result.canPublish&&(!draft||v.draft_review_status!=='pending');
   result.publishedRevision=v.published_revision;
   if(editing){result.editRevision=v.edit_revision;result.draftReviewStatus=v.draft_review_status;result.draftReviewReason=v.draft_review_reason;result.canPublish&&=v.draft_review_status!=='pending';}
@@ -171,6 +175,14 @@ export async function createDomainServices(pool,config) {
    // must not leak through detail requests, SSR or background prefetches.
    result.editorial='';result.hints=[];
   }result.solved=await legacyProblemSolved(db,user,problemId,v.id);return result;
+ }
+ async function originalSubmissionInputs(db,id) {
+  return (await db.query(`SELECT problem_snapshot->'version'->>'mode' mode,
+   problem_snapshot->'version'->>'function_name' function_name,
+   problem_snapshot->'version'->>'comparator' comparator,
+   problem_snapshot->'version'->'samples' samples
+   FROM judge_tasks WHERE submission_id=$1 AND purpose='submission' AND NOT rejudge
+   ORDER BY created_at,id LIMIT 1`,[id])).rows[0];
  }
  async function submissionAccess(db,user,id) {
   const s=row(await db.query('SELECT s.*,COALESCE(s.assignment_id,original.assignment_id) access_assignment_id,COALESCE(s.timed_attempt_id,original.timed_attempt_id) access_timed_attempt_id,(s.original_submission_id IS NULL OR original.resolved) context_resolved,v.title problem_title,v.mode problem_mode,i.name student_name FROM submissions s LEFT JOIN LATERAL submission_activity_context(s.original_submission_id) original ON true JOIN problem_versions v ON v.id=s.version_id JOIN identities i ON i.id=s.identity_id WHERE s.id=$1',[submissionId(id)]));
@@ -589,16 +601,18 @@ export async function createDomainServices(pool,config) {
    m=route.match(/^\/problems\/([^/]+)$/);
    if(m&&method==='GET'){
     const originalId=url.searchParams.get('originalSubmissionId');
+    let originalSubmission;
     let selected=url.searchParams.get('versionId');
     if(originalId){
-     const original=await submissionAccess(pool,user,originalId);
-     if(original.identity_id!==user.identityId||original.problem_id!==m[1])fail(404,'NOT_FOUND','原提交不存在');
-     selected=original.version_id;
+     originalSubmission=await submissionAccess(pool,user,originalId);
+     if(originalSubmission.identity_id!==user.identityId||originalSubmission.problem_id!==m[1])fail(404,'NOT_FOUND','原提交不存在');
+     selected=originalSubmission.version_id;
     }else if(url.searchParams.get('current')==='1'||!isStaff(user)){
      if(selected)await versionAccess(pool,user,m[1],selected);
      selected=(await resolveLiveProblemVersion(pool,m[1],{lock:false,allowArchived:true})).id;
     }
     return respond(200,await problemResult(pool,user,m[1],selected,{ownSubmissionSnapshot:!!originalId,
+     originalSubmissionId:originalSubmission?.id,
      publishedOnly:url.searchParams.get('view')==='review-published',
      editing:!originalId&&isStaff(user)&&url.searchParams.get('current')!=='1'&&url.searchParams.get('view')!=='published'}));
    }
@@ -666,7 +680,10 @@ export async function createDomainServices(pool,config) {
 
  async function assignmentsOperation(context) {
   const preview=await handleLegacyAssignmentPreview(context,{submitLimiter,assignmentProblemRows,
-   projectProblem:async (db,version)=>problemShape((await studentPublicStatementRows(db,[version]))[0])});
+   projectProblem:async (db,version)=>({
+    ...problemShape((await studentPublicStatementRows(db,[version]))[0]),
+    publishedRevision:version.published_revision,
+   })});
   if(preview)return preview;
   const authored=await handleAssignmentAuthoring(context);if(authored)return authored;
   const {route,method,body,url,user,sess,ip}=context;
@@ -786,17 +803,23 @@ export async function createDomainServices(pool,config) {
      // The homework deadline limits official grades and activity rewards,
      // not admission to the judge. Persist the server's receipt time as usual.
      let acceptedAt=row(await db.query('SELECT clock_timestamp()::text AS accepted_at')).accepted_at;
-     const timedContext=await timed.prepareSubmission(db,user,body,v);if(timedContext){v=timedContext.version;acceptedAt=timedContext.acceptedAt;}if(kind==='samples'&&!(v.samples||[]).some(sample=>sample.enabled!==false))fail(409,'NO_PUBLIC_SAMPLES','此版本没有启用的公开样例，请联系教师补齐后运行');if(kind==='custom'&&v.mode==='function'){try{parseFunctionInput(customInput);}catch{fail(400,'VALIDATION','函数自测输入须为 JSON 参数数组或合法的 args/kwargs 对象');}}
+     const timedContext=await timed.prepareSubmission(db,user,body,v);
+     if(timedContext){v=timedContext.version;acceptedAt=timedContext.acceptedAt;}
+     const inputs=original&&['samples','custom'].includes(kind)?await originalSubmissionInputs(db,original.id)??v:v;
+     if(kind==='samples'&&!(inputs.samples||[]).some(sample=>sample.enabled!==false))fail(409,'NO_PUBLIC_SAMPLES','此版本没有启用的公开样例，请联系教师补齐后运行');
+     if(kind==='custom'&&inputs.mode==='function'){try{parseFunctionInput(customInput);}catch{fail(400,'VALIDATION','函数自测输入须为 JSON 参数数组或合法的 args/kwargs 对象');}}
      if(kind==='submit'){
       // A new request key cannot create a second attempt for identical code
-      // while it is in flight or already accepted in this grading context.
+      // while it is in flight or already accepted on this published definition.
       const scope=[user.identityId,v.problem_id,v.id,assignment?.id??null,timedContext?.timedAttemptId??null,language];
       await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`submission-code:${canonicalHash([...scope,code])}`]);
       const duplicate=(await db.query(`SELECT status FROM submissions
         WHERE identity_id=$1 AND problem_id=$2 AND version_id=$3
           AND assignment_id IS NOT DISTINCT FROM $4::uuid AND timed_attempt_id IS NOT DISTINCT FROM $5::uuid
           AND language=$6 AND kind='submit' AND code=$7 AND status IN ('Waiting','Judging','AC')
-        ORDER BY (status='AC') DESC LIMIT 1`,[...scope,code])).rows[0];
+          AND COALESCE(original_problem_version_id,version_id)=$3
+          AND ($8::timestamptz IS NULL OR created_at>=$8)
+        ORDER BY (status='AC') DESC LIMIT 1`,[...scope,code,v.published_revision>0?v.published_at:null])).rows[0];
       if(duplicate?.status==='AC')fail(409,'SUBMISSION_ALREADY_ACCEPTED','相同代码已通过，不会重复计入提交次数。修改代码后可再次提交。');
       if(duplicate)fail(409,'SUBMISSION_ALREADY_PENDING','相同代码已提交，请等待当前判题结果。');
      }

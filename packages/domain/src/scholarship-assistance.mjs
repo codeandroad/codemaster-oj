@@ -77,8 +77,16 @@ function assertAvailable(state){
 }
 async function contentTarget(db,user,row,helpers){
  const bits=row.subject_key.split(':');
- const paper=bits[0]==='paper4'?one(await db.query('SELECT paper_id FROM paper4_versions WHERE id=$1',[row.version_id])):null;
- return resolveAssistanceTarget(db,user,bits[0]==='problem'?{problemId:bits[1],versionId:row.version_id}:{paperId:paper.paper_id,versionId:row.version_id,questionKey:bits[2]}, {manage:true,helpers});
+ if(bits[0]==='problem'){
+  // A shared solution keeps its authoring provenance through consolidation.
+  // Its surviving problem supplies the permission target.
+  const pointer=row.kind==='FULL_SOLUTION'&&row.language===''?(await db.query(`SELECT COALESCE(p.current_version_id,$3::uuid) version_id
+   FROM luq_problem_solutions s JOIN problems p ON p.id=s.problem_id
+   WHERE s.problem_id=$1 AND s.content_id=$2`,[bits[1],row.id,row.version_id])).rows[0]:null;
+  return resolveAssistanceTarget(db,user,{problemId:bits[1],versionId:pointer?.version_id??row.version_id},{manage:true,helpers});
+ }
+ const paper=one(await db.query('SELECT paper_id FROM paper4_versions WHERE id=$1',[row.version_id]));
+ return resolveAssistanceTarget(db,user,{paperId:paper.paper_id,versionId:row.version_id,questionKey:bits[2]},{manage:true,helpers});
 }
 
 export async function studentAssistanceOperation(db,user,action,body={},helpers={}){

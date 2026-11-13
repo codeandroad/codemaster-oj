@@ -26,6 +26,7 @@ export function PublicProblemReview({ user }: { user: CampusUser }) {
   const sources = useData<{ items: PlatformSourceProblem[] }>(`platform/source-problems${user.platformAdmin ? "?includeArchived=1" : ""}`);
   const publications = useData<{ items: Problem[] }>("platform/problem-publications"), banks = useData<{ items: PlatformProblemBank[] }>(user.platformAdmin ? "platform/problem-banks?includeArchived=1" : null);
   const action = useAction(), [editing, setEditing] = useState<string | null>(null), [preview, setPreview] = useState<Problem | null>(null), [grant, setGrant] = useState<PlatformProblemRow[] | null>(null);
+  const [reviewTab, setReviewTab] = useState<"publication" | "solutions">();
   const [batchReview, setBatchReview] = useState<PlatformProblemRow[] | null>(null), [reviewMessage, setReviewMessage] = useState("");
   const [manageBanks, setManageBanks] = useState(false), [upload, setUpload] = useState(false), [operation, setOperation] = useState<ProblemBatchOperation | null>(null), [selection, setSelection] = useState<{ scope: string; ids: string[] }>({ scope: "", ids: [] });
   const rows = useMemo(() => mergePlatformLibrary(sources.data?.items ?? [], publications.data?.items ?? []), [sources.data, publications.data]);
@@ -45,6 +46,7 @@ export function PublicProblemReview({ user }: { user: CampusUser }) {
     params.delete("problemPage"); window.history.replaceState(null, "", `${window.location.pathname}?${params}`);
   }
   function changePage(next: number) { const params = new URLSearchParams(window.location.search); params.set("problemPage", String(next)); window.history.replaceState(null, "", `${window.location.pathname}?${params}`); }
+  function openEditor(id: string, tab?: "publication" | "solutions") { setReviewTab(tab); setEditing(id); }
   function review(row: PlatformProblemRow) {
     const schoolId = row.publication?.schoolId ?? row.source?.schoolId;
     if (schoolId) void action.run(async () => { setPreview(await productionApi<Problem>(`platform/problem-publications/${row.id}?schoolId=${encodeURIComponent(schoolId)}`)); return " "; });
@@ -55,16 +57,16 @@ export function PublicProblemReview({ user }: { user: CampusUser }) {
     const { previous, next } = adjacentProblemRows(editableRows, editing);
     const target = (row?: PlatformProblemRow) => row && ({
       title: row.title,
-      select: () => setEditing(row.id),
+      select: () => openEditor(row.id),
     });
-    return <PlatformProblemEditor id={editing} user={user} navigation={{ previous: target(previous), next: target(next) }}
+    return <PlatformProblemEditor id={editing} user={user} initialTab={reviewTab} navigation={{ previous: target(previous), next: target(next) }}
       onClose={() => { setEditing(null); reload(); }} />;
   }
   return <div className="min-w-0 space-y-4">
     <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-2" aria-label={tx("题目列表", "Problem lists")}>
       <Button type="button" variant={filters.deleted ? "ghost" : "secondary"} size="sm" aria-pressed={!filters.deleted} onClick={() => updateFilters({ deleted: false })}>{tx("全部题目", "Active problems")}</Button>
       {user.platformAdmin && <Button type="button" variant={filters.deleted ? "secondary" : "ghost"} size="sm" aria-pressed={filters.deleted} onClick={() => updateFilters({ deleted: true })}>{tx("已删除", "Deleted")}</Button>}
-    </div><div className="flex flex-wrap gap-2"><Button type="button" size="sm" variant="ghost" aria-label={tx("刷新题库", "Refresh library")} disabled={busy} onClick={reload}><RefreshCw size={15} /></Button>{user.platformAdmin && <><Button type="button" size="sm" variant="secondary" disabled={busy || !!banks.error} onClick={() => setManageBanks(true)}>{tx("管理分类", "Manage categories")}</Button><Button type="button" size="sm" variant="secondary" disabled={busy || !!banks.error} onClick={() => setUpload(true)}>{tx("上传题目", "Upload problems")}</Button><Button type="button" size="sm" onClick={() => setEditing("new")}>{tx("新建题目", "New problem")}</Button></>}</div></div>
+    </div><div className="flex flex-wrap gap-2"><Button type="button" size="sm" variant="ghost" aria-label={tx("刷新题库", "Refresh library")} disabled={busy} onClick={reload}><RefreshCw size={15} /></Button>{user.platformAdmin && <><Button type="button" size="sm" variant="secondary" disabled={busy || !!banks.error} onClick={() => setManageBanks(true)}>{tx("管理分类", "Manage categories")}</Button><Button type="button" size="sm" variant="secondary" disabled={busy || !!banks.error} onClick={() => setUpload(true)}>{tx("上传题目", "Upload problems")}</Button><Button type="button" size="sm" onClick={() => openEditor("new")}>{tx("新建题目", "New problem")}</Button></>}</div></div>
     <PlatformProblemFiltersBar value={filters} onChange={updateFilters} banks={bankItems} rows={rows} />
     <Feedback action={action} /><State resource={sources} /><State resource={publications} /><State resource={banks} />
     {reviewMessage && <p role="status" className="text-sm text-success">{reviewMessage}</p>}
@@ -77,7 +79,7 @@ export function PublicProblemReview({ user }: { user: CampusUser }) {
       </>}
       <Button type="button" size="sm" variant="ghost" onClick={() => setSelection({ scope, ids: [] })}>{tx("取消选择", "Clear selection")}</Button>
     </div>}
-    {sources.data && publications.data && <><PlatformProblemTable rows={pageRows} selected={selectedIds} busy={busy} canManage={user.platformAdmin === true} onSelect={ids => setSelection({ scope, ids })} onEdit={setEditing} onReview={review} onGrant={setGrant} onBatch={setOperation} />
+    {sources.data && publications.data && <><PlatformProblemTable rows={pageRows} selected={selectedIds} busy={busy} canManage={user.platformAdmin === true} onSelect={ids => setSelection({ scope, ids })} onEdit={openEditor} onReview={review} onGrant={setGrant} onBatch={setOperation} />
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm"><p className="text-muted-foreground">{tx(`共 ${filtered.length} 道题目`, `${filtered.length} problems`)}</p><div className="flex items-center gap-2"><Button type="button" size="sm" variant="secondary" disabled={page <= 1} onClick={() => changePage(page - 1)}>{tx("上一页", "Previous")}</Button><span className="tabular-nums">{page} / {pageCount}</span><Button type="button" size="sm" variant="secondary" disabled={page >= pageCount} onClick={() => changePage(page + 1)}>{tx("下一页", "Next")}</Button></div></div></>}
     {manageBanks && <PlatformProblemBanks banks={bankItems} onClose={() => setManageBanks(false)} onSaved={reload} />}
     {upload && <PlatformProblemImport banks={bankItems} initialBankId={bankItems.some(bank => bank.id === filters.bank && !bank.archivedAt) ? filters.bank : undefined} onClose={() => setUpload(false)} onImported={reload} />}

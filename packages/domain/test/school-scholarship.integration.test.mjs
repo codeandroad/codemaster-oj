@@ -246,7 +246,7 @@ test('scholarship migration preserves historical AC and grants only the configur
  try{
   await manager.query(`CREATE SCHEMA ${schema}`);
   // This disposable schema defers scholarship tables and dependent migrations.
-  const deferred=['070_school_scholarship.sql','076_student_system_notifications.sql','077_assignment_completion_scholarship.sql','080_public_scholarship.sql','082_activity_bonus_scholarship.sql','085_public_practice_preferences.sql','096_problem_solution_bundles.sql'];
+  const deferred=['070_school_scholarship.sql','076_student_system_notifications.sql','077_assignment_completion_scholarship.sql','080_public_scholarship.sql','082_activity_bonus_scholarship.sql','085_public_practice_preferences.sql','096_problem_solution_bundles.sql','107_public_practice_profiles.sql'];
   await db.query('CREATE TABLE schema_migrations(name text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');await db.query('INSERT INTO schema_migrations(name) SELECT unnest($1::text[])',[deferred]);await migrate(db);
   const person=(await db.query("INSERT INTO identities(kind,number,name) VALUES('personal','history','History') RETURNING id")).rows[0],user=(await db.query("INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,'history','unusable-qa') RETURNING id",[person.id])).rows[0];
   const school=await provisionSchool(db,{slug:'history-alpha',name:'History',adminUsername:'history'});await db.query("UPDATE school_memberships SET role='student' WHERE school_id=$1 AND account_id=$2",[school.id,user.id]);

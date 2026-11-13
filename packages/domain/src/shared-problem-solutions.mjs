@@ -20,7 +20,9 @@ export async function sharedProblemSolution(db, problemId, versionId, {lock=fals
 }
 
 export async function retainSharedSolution(db, problemId, contentId) {
- await db.query('INSERT INTO luq_problem_solutions(problem_id,content_id) VALUES($1,$2) ON CONFLICT(problem_id) DO NOTHING',[problemId,contentId]);
+ await db.query(`INSERT INTO luq_problem_solutions(problem_id,content_id)
+  SELECT $1::uuid,$2::uuid WHERE NOT EXISTS(SELECT 1 FROM luq_problem_solutions WHERE problem_id=$1)
+  ON CONFLICT(problem_id) DO NOTHING`,[problemId,contentId]);
  const {rows:[pointer]}=await db.query('SELECT content_id FROM luq_problem_solutions WHERE problem_id=$1',[problemId]);
  if(pointer.content_id!==contentId)fail(409,'CONTENT_CHANGED','题解已更新，请重新载入统一题解后再保存');
 }

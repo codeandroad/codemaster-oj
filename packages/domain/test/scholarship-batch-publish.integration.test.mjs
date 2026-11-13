@@ -242,7 +242,8 @@ test('bulk-published shared solutions preserve purchases and require the current
  assert.equal((await f.pool.query('SELECT count(*)::int n FROM luq_assistance_entitlements')).rows[0].n,1);
 }));
 
-test('Luq content batch runtime grants allow application append/read only and deny all judge-worker access',options,async()=>{
+test('Luq content batch runtime grants allow application append/read only and deny all judge-worker access',
+ {...options,timeout:120000},async()=>{
  const url=testUrl(),manager=createPool(url.href),database=`campus_test_luq_publish_roles_${randomBytes(5).toString('hex')}`;
  let pool,created=false;
  try{
@@ -269,5 +270,19 @@ test('Luq content batch runtime grants allow application append/read only and de
   await assert.rejects(asRole('campus_worker','INSERT INTO luq_content_batches(request_id,actor_account_id,request_hash,result) VALUES($1,$2,$3,$4)',[randomUUID(),account,'e'.repeat(64),{}]),error=>error.code==='42501');
   await assert.rejects(asRole('campus_worker','UPDATE luq_content_batches SET result=$1',[{}]),error=>error.code==='42501');
   await assert.rejects(asRole('campus_worker','DELETE FROM luq_content_batches'),error=>error.code==='42501');
- }finally{if(pool)await pool.end();if(created)await manager.query(`DROP DATABASE ${database}`);await manager.end();}
+ }finally{
+  try{
+   if(pool)await pool.end();
+   if(created){
+    const cleanup=await manager.connect();
+    try{
+     // PostgreSQL can wait for a checkpoint before removing a database.
+     await cleanup.query("SET statement_timeout='90s'");
+     await cleanup.query(`DROP DATABASE ${database}`);
+    }finally{cleanup.release();}
+   }
+  }finally{
+   await manager.end();
+  }
+ }
 });

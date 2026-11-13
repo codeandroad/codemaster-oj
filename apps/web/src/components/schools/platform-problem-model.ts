@@ -28,7 +28,9 @@ export function mergePlatformLibrary(sources: PlatformSourceProblem[], publicati
   const rows = new Map<string, PlatformProblemRow>();
   for (const publication of publications) rows.set(publication.id, { id: publication.id, title: publication.title, publication });
   for (const source of sources) rows.set(source.id, { ...rows.get(source.id), id: source.id, title: source.title, source });
-  return [...rows.values()].sort((a, b) => Number(b.publication?.publicRequestStatus === "pending") - Number(a.publication?.publicRequestStatus === "pending") || a.title.localeCompare(b.title));
+  const needsReview = (row: PlatformProblemRow) =>
+    row.source?.draftReviewStatus === "pending" || row.source?.hasSolutionDraft || row.publication?.publicRequestStatus === "pending";
+  return [...rows.values()].sort((a, b) => Number(Boolean(needsReview(b))) - Number(Boolean(needsReview(a))) || a.title.localeCompare(b.title));
 }
 export function problemVisibility(row: PlatformProblemRow) {
   return row.publication?.platformPublished ? "public" : row.publication?.publicRequestStatus === "pending" ? "pending" : row.publication?.publicRequestStatus === "rejected" ? "rejected" : "private";

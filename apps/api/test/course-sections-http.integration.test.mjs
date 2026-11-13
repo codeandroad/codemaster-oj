@@ -97,7 +97,7 @@ test('course sections retain ownership, publication snapshots and shared lesson 
    const schoolPublic=await request('/practice/courses/'+schoolListing.id,'outsider');assert.deepEqual(schoolPublic.sections,schoolCourse.sections);assert.equal(schoolPublic.chapters[0].sectionKey,'number-systems');noPrivateAnswers(schoolPublic);
   });
   await t.test('platform courses validate references and expose the same directory through the public reader',async()=>{
-   await request('/platform/courses','teacher',{status:403});
+   assert.deepEqual((await request('/platform/courses','teacher')).items,[]);
    platform=await post('/platform/courses','admin',{requestId:randomUUID(),title:'Unified platform course',audienceScope:'all',sections,chapters:[{title:'Digits',content:'Place values',sectionKey:'number-systems'}]},201);
    const path='/platform/courses/'+platform.id,revision=()=>({expectedRevision:platform.revision,sourceVersion:platform.sourceVersion});
    assert.deepEqual(platform.sections,sections);assert.equal(platform.chapters[0].sectionKey,'number-systems');

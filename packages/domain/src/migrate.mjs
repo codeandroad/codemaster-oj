@@ -9,7 +9,7 @@ import { createPool, transaction } from './db.mjs';
 const definerPath = 'SECURITY DEFINER SET search_path=public,pg_temp';
 function quoteIdentifier(value) { return `"${value.replaceAll('"', '""')}"`; }
 
-export async function migrate(pool) {
+export async function migrate(pool, { through } = {}) {
  const path = fileURLToPath(new URL('../migrations/',import.meta.url));
  await transaction(pool, async db => {
   await db.query("SELECT pg_advisory_xact_lock(798943)");
@@ -17,6 +17,7 @@ export async function migrate(pool) {
   if (!schema || schema.startsWith('pg_temp_')) throw new Error('Migrations require a persistent application schema.');
   await db.query('CREATE TABLE IF NOT EXISTS schema_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
   for (const name of (await readdir(path)).filter(n=>n.endsWith('.sql')).sort()) {
+   if (through && name > through) break;
    if (!(await db.query('SELECT 1 FROM schema_migrations WHERE name=$1',[name])).rowCount) {
     const sql = await readFile(`${path}${name}`,'utf8');
     const fixedPath = `SECURITY DEFINER SET search_path=${quoteIdentifier(schema)},pg_temp`;

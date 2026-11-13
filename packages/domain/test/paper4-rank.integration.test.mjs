@@ -7,7 +7,6 @@ import { handlePaper4 } from '../src/paper4.mjs';
 import { handleEducation } from '../src/education.mjs';
 import { handleCommunity } from '../src/community.mjs';
 import { completePaper4Task } from '../paper4-worker.mjs';
-import { suspendSchoolOwnershipForHistoricalMigration } from './helpers/historical-school-ownership.mjs';
 
 test('only final Paper 4 whole-question AC awards 10 points once across revisions and periods',
  { skip: !process.env.TEST_DATABASE_URL, timeout: 60000 }, async () => {
@@ -231,13 +230,8 @@ test('Paper 4 rank migration preserves historical attempts and never retroactive
   const url=new URL(process.env.TEST_DATABASE_URL);
   url.searchParams.set('options',`-csearch_path=${schema}`);
   const pool=createPool(url.href);
-  // The school scholarship migration reads the legacy Luq settings.
-  const deferredMigrations=['035_paper4_rank_points.sql','036_paper4_rank_verdict_consistency.sql','037_paper4_catalog_activities.sql','039_paper4_activity_audiences.sql','042_course_paper4_links.sql','043_luq.sql','044_luq_initial_grant.sql','045_luq_assistance_prices.sql','046_luq_content_batches.sql','047_problem_public_statements.sql','049_luq_translation_credit.sql','070_school_scholarship.sql','076_student_system_notifications.sql','077_assignment_completion_scholarship.sql'];
   try{
-   await pool.query('CREATE TABLE schema_migrations(name text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');
-   await pool.query('INSERT INTO schema_migrations(name) SELECT unnest($1::text[])',[deferredMigrations]);
-   await migrate(pool);
-   const restoreSchoolOwnership=await suspendSchoolOwnershipForHistoricalMigration(pool);
+   await migrate(pool, { through: '034_paper4_archive.sql' });
    const teacherIdentity=(await pool.query("INSERT INTO identities(kind,number,name) VALUES('teacher',$1,'Teacher') RETURNING id",[randomUUID()])).rows[0].id;
    const studentIdentity=(await pool.query("INSERT INTO identities(kind,number,name) VALUES('student',$1,'Student') RETURNING id",[randomUUID()])).rows[0].id;
    const teacher=(await pool.query('INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,$2,$3) RETURNING id',[teacherIdentity,randomUUID(),'hash'])).rows[0].id;
@@ -254,9 +248,7 @@ test('Paper 4 rank migration preserves historical attempts and never retroactive
    const oldTask=(await pool.query('INSERT INTO paper4_run_tasks(snapshot_id) VALUES($1) RETURNING id',[oldSnapshot])).rows[0].id;
    await pool.query(`INSERT INTO paper4_runs(task_id,lease_id,snapshot_id,status,private_results,environment_version)
     VALUES($1,$2,$3,'AC',$4::jsonb,'legacy')`,[oldTask,randomUUID(),oldSnapshot,JSON.stringify([{stageId:'s1',caseId:'case1',status:'AC'}])]);
-   await pool.query('DELETE FROM schema_migrations WHERE name=ANY($1::text[])',[deferredMigrations]);
    await migrate(pool);
-   await restoreSchoolOwnership();
    assert.equal((await pool.query('SELECT origin FROM paper4_snapshots WHERE id=$1',[oldSnapshot])).rows[0].origin,'practice');
    assert.equal((await pool.query('SELECT count(*)::int n FROM paper4_rank_ledger')).rows[0].n,0);
    assert.equal((await pool.query('SELECT count(*)::int n FROM paper4_runs WHERE id IS NOT NULL')).rows[0].n,1);

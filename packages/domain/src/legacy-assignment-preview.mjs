@@ -8,7 +8,7 @@ import { metadataPage } from './problem-submissions.mjs';
 import { bytes, canonicalHash, enumValue, fail, integer, uuid } from './security.mjs';
 import { submissionCaseFeedback, submissionMeasurements, submissionMeasurementsSql } from './submission-feedback.mjs';
 import { assertJudgeAdmission } from './system.mjs';
-import { resolveLiveProblemVersion, assertLiveProblemVersion } from './live-problem-version.mjs';
+import { resolveLiveProblemVersion, assertLiveProblemVersion, assertPublishedRevision } from './live-problem-version.mjs';
 
 const reply = (body, status = 200) => ({ status, body });
 const jobStatus = `CASE t.state WHEN 'queued' THEN 'Waiting' WHEN 'leased' THEN 'Judging'
@@ -44,7 +44,8 @@ async function enqueue(db, { a, user, body, config, submitLimiter, version, requ
   const requestId = uuid(body.requestId, '请求 ID');
   const versionId = uuid(body.versionId, '题目版本');
   const revision = integer(body.revision, 0, 2147483647, '作业修订版本');
-  const hash = canonicalHash({ assignmentId: a.id, problemId: version.problem_id, revision, versionId, kind, language, code, customInput });
+  const hash = canonicalHash({ assignmentId: a.id, problemId: version.problem_id, revision, versionId, kind, language, code, customInput,
+    ...(body.publishedRevision>0&&{publishedRevision:body.publishedRevision}) });
   await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`assignment-preview:${user.id}:${requestId}`]);
   const { rows: [old] } = await db.query('SELECT id,request_hash FROM legacy_assignment_preview_submissions WHERE account_id=$1 AND request_id=$2', [user.id, requestId]);
   if (old) {
@@ -52,6 +53,7 @@ async function enqueue(db, { a, user, body, config, submitLimiter, version, requ
     return reply({ id: old.id }, 202);
   }
   assertLiveProblemVersion(versionId,version.id);
+  assertPublishedRevision(body.publishedRevision??0,version.published_revision);
   if (revision !== a.edit_revision) fail(409, 'STALE_ASSIGNMENT', '作业已更新，请重新进入试做。');
   assertRequiredLanguage(language, requiredLanguage);
   if (kind === 'samples' && !version.samples.some(sample => sample.enabled !== false)) {

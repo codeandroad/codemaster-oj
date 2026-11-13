@@ -223,7 +223,7 @@ test('solution use reveals only readable course names and managed activity names
  const newest=await f.version(original.problemId,undefined,undefined,{published:false,approved:false});
  detail=await get(f.teacher);
  assert.equal(detail.recommendedVersionId,newest.versionId,'when there is no student use, start from the latest saved draft');
- await rejects(get(f.student),'FORBIDDEN');await rejects(get(f.otherTeacher),'FORBIDDEN');
+ await rejects(get(f.student),'NOT_FOUND');await rejects(get(f.otherTeacher),'FORBIDDEN');
 }));
 
 test('one shared solution retains published content, pending changes and historical source material across problem updates',options,async()=>fixture(async f=>{

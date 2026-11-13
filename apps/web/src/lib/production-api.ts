@@ -67,6 +67,7 @@ export interface ProductionProblem {
   publishedRevision?: number;
   draftReviewStatus?: "pending" | "rejected" | null;
   draftReviewReason?: string | null;
+  canRequestReview?: boolean;
   published: boolean;
   validationStatus?: string;
   validationMessage?: string;

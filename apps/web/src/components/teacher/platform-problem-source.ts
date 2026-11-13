@@ -11,6 +11,8 @@ export type PlatformSourceProblem = ProductionProblem & {
   courses?: { id: string; title: string }[];
   schoolId?: string;
   formalTestCount?: number;
+  hasDraftChanges?: boolean;
+  hasSolutionDraft?: boolean;
 };
 
 export function isPlatformProblem(problem: { id: string }): boolean {

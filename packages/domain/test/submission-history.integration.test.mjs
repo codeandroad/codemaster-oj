@@ -25,10 +25,10 @@ test('complete formal progress and keyset history preserve ownership and timed f
   await pool.query("INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,code,idempotency_key,request_hash,status,score,created_at) SELECT $1,$2,$3,$4,CASE WHEN n%2=0 THEN 'samples' ELSE 'custom' END,'print(1)','self-'||n,'fixture',CASE WHEN n%2=0 THEN 'AC' ELSE 'Executed' END,CASE WHEN n%2=0 THEN 100 ELSE NULL END,clock_timestamp()+n*interval '1 second' FROM generate_series(1,230) n",[learner.id,learner.identityId,p1.id,p1.versionId]);
   await pool.query("INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,code,idempotency_key,request_hash,status,score,created_at) SELECT $1,$2,$3,$4,'submit','print(0)','formal-'||n,'fixture','WA',50,'2020-01-01T00:00:00.123456Z'::timestamptz FROM generate_series(1,240) n",[learner.id,learner.identityId,p2.id,p2.versionId]);
   await pool.query("INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,code,idempotency_key,request_hash,status,score) VALUES($1,$2,$3,$4,'submit','print(1)','outsider-formal','fixture','AC',100)",[outsider.id,outsider.identityId,p1.id,p1.versionId]);
-  await t.test('self-tests and independent corrections cannot erase or inflate original formal progress',async()=>{
+  await t.test('self-tests do not count and a successful correction contributes to mastery',async()=>{
    assert.equal((await student('/submissions')).items.some(sub=>sub.kind==='submit'||sub.kind==='correction'),false);
    const progress=(await student('/problems')).items.find(problem=>problem.id===p1.id).ownProgress;
-   assert.equal(progress.status,'WA');assert.equal(progress.bestScore,75);assert.equal(progress.formalCount,1);assert.equal(progress.lastSubmissionId,formal.id);
+   assert.equal(progress.status,'AC');assert.equal(progress.bestScore,100);assert.equal(progress.formalCount,2);assert.equal(progress.lastSubmissionId,correction.id);
    const history=await student(`/submissions?kind=submit,correction&problemId=${p1.id}&limit=50`);assert.deepEqual(history.items.map(sub=>sub.id),[correction.id,formal.id]);assert.equal(history.nextCursor,null);
    assert.equal((await student(`/submissions?kind=submit&context=practice&problemId=${p1.id}`)).items[0].id,formal.id);
    assert.equal((await student(`/submissions?kind=submit,correction&context=correction&problemId=${p1.id}`)).items[0].id,correction.id);
@@ -51,7 +51,7 @@ test('complete formal progress and keyset history preserve ownership and timed f
    const practice=await teacher('/timed-practices',{title:'历史遮罩验证',classId:cls.id,startsAt:new Date(Date.now()-60000).toISOString(),endsAt:new Date(Date.now()+3600000).toISOString(),durationMinutes:30,showVerdict:false,problems:[{problemId:hidden.id,points:100}],participants:[learner.identityId]},'POST',201);
    await teacher(`/timed-practices/${practice.id}/publish`,{});await student(`/timed-practices/${practice.id}/start`,{});
    const submitted=await student('/submissions',{problemId:hidden.id,timedPracticeId:practice.id,kind:'submit',code:'print(1)',idempotencyKey:randomUUID()},'POST',201);await pool.query("UPDATE submissions SET status='AC',score=100,passed=1,total=1 WHERE id=$1",[submitted.id.slice(3)]);
-   const progress=(await student('/problems')).items.find(problem=>problem.id===hidden.id).ownProgress;assert.equal(progress.status,'AC');assert.equal(progress.bestScore,null);assert.equal(progress.formalCount,1);
+   const progress=(await student('/problems')).items.find(problem=>problem.id===hidden.id).ownProgress;assert.equal(progress.status,'NotStarted');assert.equal(progress.bestScore,null);assert.equal(progress.formalCount,0);
    const filtered=`/submissions?kind=submit&problemId=${hidden.id}&context=timed&timedPracticeId=${practice.id}`;
    assert.equal((await student(filtered+'&status=Executed')).items.length,0);const masked=(await student(filtered+'&status=AC')).items[0];assert.equal(masked.id,submitted.id);assert.equal(masked.score,null);
    assert.equal((await teacher(filtered+'&status=AC')).items[0].score,100);assert.equal((await other('/problems')).items.some(problem=>problem.id===hidden.id),false);

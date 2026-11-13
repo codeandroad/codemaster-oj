@@ -244,7 +244,7 @@ function SolutionPreview({ item, onClose, onRefresh }: { item: ReviewItem; onClo
     : { paperId: item.targetId, versionId: item.versionId, questionKey: item.questionKey! };
   const contents = useData<{ items: ReviewContent[] }>(`scholarship/contents?${new URLSearchParams(target)}`);
   const content = contents.data?.items.find(value => value.id === item.contentId && value.kind === "FULL_SOLUTION"
-    && value.versionId === item.versionId && value.contentHash === item.contentHash);
+    && (item.targetType === "problem" || value.versionId === item.versionId) && value.contentHash === item.contentHash);
   return <Modal title={tx("参考答案预览", "Solution preview")} onClose={onClose} wide>
     <div className="space-y-3">
       <p className="text-sm font-medium">{itemLabel(item)}</p>

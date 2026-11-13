@@ -6,7 +6,7 @@ import type { ProblemBatchOperation } from "./platform-problem-batch-dialog";
 
 export function PlatformProblemTable({ rows, selected, busy, canManage, onSelect, onEdit, onReview, onGrant, onBatch }: {
   rows: PlatformProblemRow[]; selected: string[]; busy: boolean; canManage: boolean;
-  onSelect: (ids: string[]) => void; onEdit: (id: string) => void; onReview: (row: PlatformProblemRow) => void;
+  onSelect: (ids: string[]) => void; onEdit: (id: string, tab?: "publication" | "solutions") => void; onReview: (row: PlatformProblemRow) => void;
   onGrant: (rows: PlatformProblemRow[]) => void; onBatch: (operation: ProblemBatchOperation) => void;
 }) {
   const { locale } = useLocale(), tx = (zh: string, en: string) => locale === "en" ? en : zh;
@@ -25,7 +25,12 @@ export function PlatformProblemTable({ rows, selected, busy, canManage, onSelect
         <th scope="row" className="min-w-56 max-w-md break-words px-3 py-3 font-normal">{editable ? <button type="button" className="text-left font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary" onClick={() => onEdit(row.id)}>{row.title}</button> : row.title}<p className="mt-1 font-mono text-xs text-muted-foreground">{row.id.slice(0, 8)}</p></th>
         <td className="max-w-40 break-words px-3 py-3">{row.source ? <span className="inline-flex rounded border border-border px-1.5 py-0.5 text-xs font-semibold">CodeMaster</span> : row.publication?.schoolName}</td>
         <td className="max-w-44 break-words px-3 py-3">{(row.source ? row.source.bankName : row.publication?.bankName) || tx("未分类", "Unclassified")}</td>
-        <td className="min-w-32 px-3 py-3"><p>{deleted ? tx("已删除", "Deleted") : visibility[problemVisibility(row)]}</p>{row.source && !deleted && <p className="mt-1 text-xs text-muted-foreground">{row.source.published ? tx("当前版本已发布", "Current version published") : tx("有未发布草稿", "Unpublished draft")}</p>}</td>
+        <td className="min-w-32 px-3 py-3"><p>{deleted ? tx("已删除", "Deleted") : visibility[problemVisibility(row)]}</p>{row.source && !deleted && <>
+          {row.source.draftReviewStatus === "pending" && editable
+            ? <button type="button" className="mt-1 block text-left text-xs text-primary underline" onClick={() => onEdit(row.id, "publication")}>{tx("审核题目草稿", "Review problem draft")}</button>
+            : <p className="mt-1 text-xs text-muted-foreground">{row.source.hasDraftChanges || !row.source.published ? tx("有未发布草稿", "Unpublished draft") : tx("题目已发布", "Problem published")}</p>}
+          {row.source.hasSolutionDraft && editable && <button type="button" className="mt-1 block text-left text-xs text-primary underline" onClick={() => onEdit(row.id, "solutions")}>{tx("审核题解草稿", "Review solution draft")}</button>}
+        </>}</td>
         <td className="whitespace-nowrap px-3 py-3">{validation[problemValidation(row)]}</td>
         <td className="w-px whitespace-nowrap px-3 py-3"><div className="flex items-center gap-2">
           {editable && <RowActionButton type="button" disabled={busy} onClick={() => onEdit(row.id)}>{tx("编辑", "Edit")}</RowActionButton>}

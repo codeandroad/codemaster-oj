@@ -6,12 +6,6 @@ import { migrate } from '../src/migrate.mjs';
 import { handlePaper4 } from '../src/paper4.mjs';
 import { handleEducation } from '../src/education.mjs';
 import { completePaper4Task } from '../paper4-worker.mjs';
-import { suspendSchoolOwnershipForHistoricalMigration } from './helpers/historical-school-ownership.mjs';
-
-const upgrade = '037_paper4_catalog_activities.sql';
-const audienceUpgrade = '039_paper4_activity_audiences.sql';
-const courseLinksUpgrade = '042_course_paper4_links.sql';
-const scholarshipUpgrades = ['043_luq.sql', '044_luq_initial_grant.sql', '045_luq_assistance_prices.sql', '046_luq_content_batches.sql', '047_problem_public_statements.sql', '049_luq_translation_credit.sql'];
 const questions = [{ key: 'Q1', title: 'Preserve a queue', statement: 'Implement the queue in English.',
   starterCode: '# Start here\n', initialFiles: { 'Data.txt': 'original\r\n' }, outputFiles: ['Result.txt'],
   stages: [{ id: 'Q1a', title: 'Queue operations', maxMarks: 75, judgeMode: 'auto' }] }];
@@ -32,12 +26,7 @@ async function fixture(run, { beforeUpgrade = false } = {}) {
   url.searchParams.set('options', `-csearch_path=${schema}`);
   const pool = createPool(url.href);
   try {
-    if (beforeUpgrade) {
-      await pool.query('CREATE TABLE schema_migrations(name text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');
-      await pool.query('INSERT INTO schema_migrations(name) SELECT unnest($1::text[])', [[upgrade,audienceUpgrade,courseLinksUpgrade,...scholarshipUpgrades]]);
-    }
-    await migrate(pool);
-    const restoreSchoolOwnership = beforeUpgrade ? await suspendSchoolOwnershipForHistoricalMigration(pool) : null;
+    await migrate(pool, { through: beforeUpgrade ? '036_paper4_rank_verdict_consistency.sql' : undefined });
     async function account(role) {
       const identityId = (await pool.query('INSERT INTO identities(kind,number,name) VALUES($1,$2,$3) RETURNING id',
         [role, randomUUID(), `${role} Paper 4 library`])).rows[0].id;
@@ -93,7 +82,7 @@ async function fixture(run, { beforeUpgrade = false } = {}) {
       assert.equal(tasks.length, 1); await finish(tasks[0].id);
     }
     await run({ pool, teacher, otherTeacher, admin, student, outsider, classA, classB, foreignClass,
-      request, rejected, finish, validate, draft, publish, completeAttempt, restoreSchoolOwnership });
+      request, rejected, finish, validate, draft, publish, completeAttempt });
   } finally {
     await pool.end(); await manager.query(`DROP SCHEMA ${schema} CASCADE`); await manager.end();
   }
@@ -236,7 +225,7 @@ test('free Paper 4 retries preserve submitted work and earn one canonical questi
 
 test('Paper 4 catalogue migration retains legacy class access, saved files, formal results and immutable rewards', options, async () => {
   await fixture(async f => {
-    const { pool, teacher, student, outsider, classA, request, rejected, finish, restoreSchoolOwnership } = f;
+    const { pool, teacher, student, outsider, classA, request, rejected } = f;
     const definition = { language: 'python', totalMarks: 75, questions };
     const legacyPaper = (await pool.query(`INSERT INTO paper4_papers(owner_account_id,class_id,title,status,published_at)
       VALUES($1,$2,'Legacy class paper','published',now()) RETURNING id`, [teacher.id, classA])).rows[0].id;
@@ -250,21 +239,30 @@ test('Paper 4 catalogue migration retains legacy class access, saved files, form
     const snapshot = (await pool.query(`INSERT INTO paper4_snapshots(attempt_id,question_key,source_code,revision,origin)
       VALUES($1,'Q1','saved legacy code',7,'formal') RETURNING id`, [attempt])).rows[0].id;
     const task = (await pool.query('INSERT INTO paper4_run_tasks(snapshot_id) VALUES($1) RETURNING id', [snapshot])).rows[0].id;
-    await finish(task);
+    const lease = randomUUID();
+    await pool.query("UPDATE paper4_run_tasks SET state='leased',lease_id=$2,lease_expires_at=now()+interval '1 minute' WHERE id=$1", [task, lease]);
+    await pool.query(`INSERT INTO paper4_runs(task_id,lease_id,snapshot_id,status,private_results,environment_version)
+      VALUES($1,$2,$3,'AC',$4,'historical-fixture')`, [task, lease, snapshot, JSON.stringify(acCases)]);
     const preserve = async () => ({
       versions: (await pool.query('SELECT * FROM paper4_versions ORDER BY id')).rows,
-      snapshots: (await pool.query(`SELECT to_jsonb(s)-'luq_solution_assisted'-'luq_first_ac_amount'-'luq_reward_rule_version' AS data FROM paper4_snapshots s ORDER BY id`)).rows.map(r=>r.data),
+      snapshots: (await pool.query('SELECT * FROM paper4_snapshots ORDER BY id')).rows,
       files: (await pool.query('SELECT * FROM paper4_attempt_files ORDER BY attempt_id,question_key')).rows,
       ledger: (await pool.query('SELECT * FROM paper4_rank_ledger ORDER BY identity_id,paper_id,question_key')).rows,
       runs: (await pool.query('SELECT * FROM paper4_runs ORDER BY id')).rows,
     });
     const before = await preserve(); assert.equal(before.ledger.length, 1);
     const attemptBefore = (await pool.query('SELECT * FROM paper4_attempts WHERE id=$1', [attempt])).rows[0];
-    await pool.query('DELETE FROM schema_migrations WHERE name=ANY($1::text[])', [[upgrade,audienceUpgrade,courseLinksUpgrade,...scholarshipUpgrades]]); await migrate(pool);
-    await restoreSchoolOwnership();
-    assert.deepEqual(await preserve(), before, 'upgrade does not rewrite evidence or historical awards');
+    await migrate(pool);
+    const originalFields = (current, previous) => Object.fromEntries(Object.keys(previous).map(key => [key, current[key]]));
+    const evidence = await preserve();
+    for (const [table, rows] of Object.entries(before)) {
+      assert.equal(evidence[table].length, rows.length);
+      assert.deepEqual(evidence[table].map((row, index) => originalFields(row, rows[index])), rows,
+        `upgrade preserves existing ${table}`);
+    }
     const after = (await pool.query('SELECT * FROM paper4_attempts WHERE id=$1', [attempt])).rows[0];
-    assert.deepEqual(after, { ...attemptBefore, attempt_number: 1 });
+    assert.deepEqual(originalFields(after, attemptBefore), attemptBefore);
+    assert.equal(after.attempt_number, 1);
     const legacy = await request(teacher, `/paper4/papers/${legacyPaper}`);
     assert.equal(legacy.deliveryKind, 'activity'); assert.equal(legacy.activityKind, 'practice');
     assert.equal(legacy.sourcePaperId, null); assert.equal(legacy.classId, classA);

@@ -3,6 +3,7 @@
 import { LegacyAcslPage } from "@/components/acsl/acsl-page";
 
 import {StudentProblemFilter} from "./problem-filter";
+import { LearnerProblemTable } from "./learner-problem-table";
 import { ReviewNotebookView, SubmissionHistory, studyRecordScore as score, studyRecordVerdict as statusLabel } from "./study-record-views";
 import dynamic from "next/dynamic";
 
@@ -12,7 +13,7 @@ import { LearnerResourceScope } from "@/components/schools/learner-resource-scop
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Bookmark, CalendarClock, Check, CheckCircle2, CircleAlert, Code2, KeyRound, MessageSquareText, NotebookPen, Pencil, ShieldCheck, X } from "lucide-react";
+import { ArrowRight, CalendarClock, Check, CheckCircle2, CircleAlert, Code2, KeyRound, MessageSquareText, NotebookPen, Pencil, ShieldCheck, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
@@ -164,38 +165,30 @@ export function StudentProblems({ accountId }: { accountId: string }) {
   const rows = catalogMatches ? problems.data?.items ?? [] : [];
   const action = useMutation();
   const topics = [...new Set(rows.flatMap(p => p.tags ?? []))];
-  const details = (p: ProgressProblem) => ({ bestScore: p.ownProgress?.bestScore, status: p.ownProgress ? p.ownProgress.status === "NotStarted" ? "Not started" : p.ownProgress.status : "Unavailable" });
-  const visible = rows.filter(p => `${p.id} ${p.title} ${p.tags?.join(" ") ?? ""}`.toLowerCase().includes(query.toLowerCase()) && (!topic || p.tags?.includes(topic)) && (!status || details(p).status === status) && (!mode || p.mode === mode) && (!savedOnly || favorites.data?.items.includes(p.id)));
+  const problemStatus = (p: ProgressProblem) => p.ownProgress ? p.ownProgress.status === "NotStarted" ? "Not started" : p.ownProgress.status : "Unavailable";
+  const visible = rows.filter(p => `${p.id} ${p.title} ${p.bankName ?? ""} ${p.tags?.join(" ") ?? ""}`.toLowerCase().includes(query.toLowerCase()) && (!topic || p.tags?.includes(topic)) && (!status || problemStatus(p) === status) && (!mode || p.mode === mode) && (!savedOnly || favorites.data?.items.includes(p.id)));
   return <div className={problemStyles.page}>
     <PageHeader title={ui(locale, "题目", "Problems")}/>
     <div className={`${problemStyles.toolbar} flex-wrap`}>
-      <ProblemCatalogSearch value={query} onChange={query => changeFilters({ query })} label={ui(locale, "搜索编号、标题或专题", "Search ID, title, or topic")}/>
+      <ProblemCatalogSearch value={query} onChange={query => changeFilters({ query })} label={ui(locale, "搜索编号、标题、题库或主题", "Search ID, title, bank, or topic")}/>
       <ProblemCatalogCourseFilter courses={problems.data?.courses} value={courseId} onChange={value => changeUrlFilters({ [problemCourseFilterKey]: value })}/>
       <StudentProblemFilter topics={topics} topic={topic} status={status} mode={mode} savedOnly={savedOnly} onTopic={topic => changeFilters({ topic })} onStatus={status => changeFilters({ status })} onMode={mode => changeFilters({ mode })} onSaved={savedOnly => changeFilters({ savedOnly })}/>
     </div>
     <Feedback action={action}/>
-    <State data={{ ...problems, loading: !problems.error && (!courseReady || !filtersReady || problems.loading || !catalogMatches), data: catalogMatches ? problems.data : null }}>{!rows.length && !courseId ? <Empty title={ui(locale, "暂无可练习题目", "No problems are available")} description={ui(locale, "老师尚未开放题目；如有疑问请联系老师。", "Your teacher has not made problems available for this class. Please contact your teacher if this looks incorrect.")}/> : !visible.length ? <Empty title={ui(locale, "没有匹配的题目", "No matching problems")} description={ui(locale, "请尝试其他编号、标题、专题或筛选条件。", "Try a different ID, title, topic, or filter.")}/> : <div className={problemStyles.tableWrap}>
-      <table className={problemStyles.table}>
-        <colgroup><col style={{width:"3%"}}/><col style={{width:"12.5%"}}/><col style={{width:"8%"}}/><col style={{width:"24.5%"}}/><col style={{width:"16%"}}/><col style={{width:"10%"}}/><col style={{width:"10%"}}/><col style={{width:"10%"}}/><col style={{width:"6%"}}/></colgroup>
-        <thead><tr>{["", ui(locale, "完成状态", "Your status"), "ID", ui(locale, "标题", "Title"), ui(locale, "专题", "Topic"), ui(locale, "难度", "Level"), ui(locale, "题目形式", "Interface"), ui(locale, "最佳成绩", "Best"), ui(locale, "操作", "Action")].map((text, i) => <th key={i} scope="col">{text}</th>)}</tr></thead>
-        <tbody>{visible.map(p => {
-          const detail = details(p), saved = favorites.data?.items.includes(p.id), tags = p.tags?.join(" · ") || "—";
-          const returnParams = new URLSearchParams({ scope: "school", ...(courseId && { [problemCourseFilterKey]: courseId }) });
-          const href = problemHref({ problemId: p.id, versionId: p.versionId }, { returnTo: `/student/problems?${returnParams}` });
-          return <tr key={p.id}>
-            <td><button type="button" aria-label={saved ? ui(locale, `取消收藏 ${p.title}`, `Remove bookmark ${p.title}`) : ui(locale, `收藏 ${p.title}`, `Bookmark ${p.title}`)} aria-pressed={Boolean(saved)} disabled={action.busy || favorites.loading || Boolean(favorites.error)} onClick={() => action.run(async () => { await productionApi(`problem-favorites/${p.id}`, { method: "PUT", body: { favorite: !saved } }); favorites.reload(); })} className={`${problemStyles.bookmark} ${saved ? "text-primary" : "text-muted-foreground"}`}><Bookmark size={15} fill={saved ? "currentColor" : "none"}/></button></td>
-            <td><StatusPill status={statusLabel(locale, detail.status)}/></td>
-            <td title={p.id} className="font-mono text-xs font-semibold">{shortId(p.id)}</td>
-            <td><AppLink href={href} title={p.title} className={`${problemStyles.title} font-semibold text-primary hover:underline focus-visible:underline`}>{p.title}</AppLink></td>
-            <td title={tags} className="text-muted-foreground"><span className={problemStyles.truncate}>{tags}</span></td>
-            <td className="text-muted-foreground"><span className={problemStyles.truncate}>{(p as ProductionProblem & {difficulty?:string}).difficulty || "—"}</span></td>
-            <td><span className={problemStyles.mode}>{p.mode === "function" ? ui(locale, "函数题", "Function") : ui(locale, "标准输入输出", "Standard I/O")}</span></td>
-            <td className="font-semibold">{detail.bestScore == null ? "—" : `${Number(detail.bestScore).toFixed(2)}/100`}</td>
-            <td><AppLink href={href} className={`${problemStyles.open} font-semibold text-primary hover:underline focus-visible:underline`}>{ui(locale, "打开", "Open")}</AppLink></td>
-          </tr>;
-        })}</tbody>
-      </table>
-    </div>}</State>
+    <State data={{ ...problems, loading: !problems.error && (!courseReady || !filtersReady || problems.loading || !catalogMatches), data: catalogMatches ? problems.data : null }}>
+      <LearnerProblemTable rows={visible.map(p => {
+        const returnParams = new URLSearchParams({ scope: "school", ...(courseId && { [problemCourseFilterKey]: courseId }) });
+        return { id: p.id, title: p.title, bankName: p.bankName, tags: p.tags, difficulty: p.difficulty, status: problemStatus(p),
+          href: problemHref({ problemId: p.id, versionId: p.versionId }, { returnTo: `/student/problems?${returnParams}` }) };
+      })} bookmark={{ savedIds: favorites.data?.items ?? [], disabled: action.busy || favorites.loading || Boolean(favorites.error),
+        onToggle: id => action.run(async () => {
+          await productionApi(`problem-favorites/${id}`, { method: "PUT", body: { favorite: !favorites.data?.items.includes(id) } });
+          favorites.reload();
+        }),
+      }} empty={rows.length || courseId || query || topic || status || mode || savedOnly
+        ? ui(locale, "没有匹配的题目，请调整搜索或筛选条件。", "No matching problems. Try another search or filter.")
+        : ui(locale, "学校尚未发布可练习题目。", "Your school has not published any problems yet.")}/>
+    </State>
     {favorites.error && <p role="alert" className="text-sm text-destructive">{ui(locale, "收藏加载失败：", "Could not load bookmarks: ")}{favorites.error}</p>}
     <p className={problemStyles.count}>{ui(locale, `显示 ${visible.length} / ${rows.length} 道题`, `Showing ${visible.length} of ${rows.length} problems`)}</p>
   </div>;

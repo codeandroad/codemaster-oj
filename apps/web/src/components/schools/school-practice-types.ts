@@ -24,6 +24,8 @@ export type Problem = {
   staffPractice?: boolean;
   solved?: boolean;
   status?: string;
+  tags?: string[];
+  difficulty?: string | null;
   attempts?: number;
   hasDraftChanges?: boolean;
   id: string;

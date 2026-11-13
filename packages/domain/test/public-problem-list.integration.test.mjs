@@ -47,7 +47,7 @@ test('public problem discovery batches current publications without writing judg
      VALUES($1,$2,$3,$7,'tokens','PRIVATE_REFERENCE',$4,$5,$6,1000,128,'AC') RETURNING id`,
      [problem.id, edition === 3 ? `Private draft ${index}` : `Published ${String(index).padStart(3, '0')} edition ${edition}`,
       'PRIVATE_STATEMENT_PROSE'.repeat(200), JSON.stringify([{input:'PUBLIC_SAMPLE',expected:'1',enabled:true}]),
-      {difficulty:'easy',teacherNote:'PRIVATE_TEACHER_NOTE'},JSON.stringify(tags),edition===2&&index%2?'function':'stdio'])).rows[0]);
+      {difficulty:edition===1?'Old level':edition===3?'Unpublished level':index===5?{note:'PRIVATE_INVALID_DIFFICULTY'}:index===6?3:'easy',teacherNote:'PRIVATE_TEACHER_NOTE'},JSON.stringify(tags),edition===2&&index%2?'function':'stdio'])).rows[0]);
     await owner.query("INSERT INTO test_cases(version_id,position,input,expected,weight) VALUES($1,1,'PRIVATE_HIDDEN_TEST','1',100)", [versions.at(-1).id]);
     if (edition < 3) await owner.query(`UPDATE problem_versions SET published_at=now()+$2*interval '1 second',
      school_visible_at=now(),rank_review_status='approved',rank_approved_at=now() WHERE id=$1`, [versions.at(-1).id, edition]);
@@ -76,7 +76,7 @@ test('public problem discovery batches current publications without writing judg
   for (const [offset, hidden] of ['archived','bank-archived','withdrawn','statement-pending','timed'].entries()) await addProblem(53 + offset, { hidden });
   for (const versionId of [problems[4].originalVersionId, problems[4].versionId]) await owner.query(`INSERT INTO problem_public_statements
    (version_id,language,statement,metadata,source_hash,content_hash,author_account_id,reviewer_account_id)
-   VALUES($1,'en','Reviewed English statement','{}',$2,$2,$3,$3)`, [versionId, 'b'.repeat(64), author.id]);
+   VALUES($1,'en','Reviewed English statement','{"difficulty":"advanced"}',$2,$2,$3,$3)`, [versionId, 'b'.repeat(64), author.id]);
   const timed = problems.find(problem => problem.hidden === 'timed');
   const schoolClass = (await owner.query("INSERT INTO classes(name,owner_account_id) VALUES('Private timed class',$1) RETURNING id", [author.id])).rows[0];
   const practice = (await owner.query(`INSERT INTO timed_practices(title,class_id,owner_account_id,starts_at,ends_at,duration_minutes)
@@ -161,6 +161,8 @@ test('public problem discovery batches current publications without writing judg
     assert.equal(row.definition, undefined);
     assert.equal(row.mode,source.index%2?'function':'stdio');
     assert.deepEqual(row.tags,['Common',source.index%2?'Odd':'Even']);
+    assert.equal(row.bankName,'Searchable source bank');
+    assert.equal(row.difficulty,source.index===4?'advanced':[5,6].includes(source.index)?null:'easy');
    }
    assert.equal((await owner.query('SELECT count(*)::int n FROM school_problem_versions WHERE id=ANY($1::uuid[])', [problems.map(problem=>problem.versionId)])).rows[0].n, 0, 'discovery never materializes the new live editions');
    assertReadOnly(first);
@@ -178,6 +180,9 @@ test('public problem discovery batches current publications without writing judg
    assert.equal(search.body.query, 'Published 052 edition 2');
    assert.equal(search.body.hasMore, false);
    assertReadOnly(search);
+   const topicSearch=await call('page=1&q=Tail%20topic');
+   assert.deepEqual(topicSearch.body.items.map(problem=>problem.id),[problems[52].id]);
+   assertReadOnly(topicSearch);
   });
   await t.test('historical school and public achievements are shared, without other learners or sample runs', async () => {
    const byId = new Map(first.body.items.map(problem => [problem.id, problem]));
@@ -271,7 +276,7 @@ test('public problem discovery batches current publications without writing judg
      await db.query("INSERT INTO school_memberships(school_id,account_id,role) VALUES($1,$2,'student')",[school.id,learner.id]);
      const {rows:[identity]}=await db.query(`INSERT INTO school_identities(school_id,kind,number,name,account_id)
       VALUES($1,'student','FILTER','Filter learner',$2) RETURNING id`,[school.id,learner.id]);
-     const definition={title:`NativeFilter ${name}`,mode:'stdio',tags:[`Native ${name}`],statement:'PRIVATE_NATIVE_STATEMENT',reference_code:'PRIVATE_NATIVE_REFERENCE',tests:[{input:'PRIVATE_NATIVE_CASE'}]};
+     const definition={title:`NativeFilter ${name}`,mode:'stdio',tags:[`Native ${name}`],metadata:{difficulty:name==='alpha'?'medium':'hard',teacherNote:'PRIVATE_NATIVE_METADATA'},statement:'PRIVATE_NATIVE_STATEMENT',reference_code:'PRIVATE_NATIVE_REFERENCE',tests:[{input:'PRIVATE_NATIVE_CASE'}]};
      const {rows:[problem]}=await db.query(`INSERT INTO school_problems(school_id,bank_id,owner_account_id,draft,request_id)
       VALUES($1,$2,$3,$4,$5) RETURNING id`,[school.id,bank.id,author.id,definition,randomUUID()]);
      const {rows:[version]}=await db.query(`INSERT INTO school_problem_versions(school_id,problem_id,draft_revision,definition)
@@ -291,6 +296,8 @@ test('public problem discovery batches current publications without writing judg
    for(const status of ['AC','WA']){
     const request=await call(`page=1&q=NativeFilter&status=${status}`);
     assert.deepEqual(request.body.items.map(item=>[item.id,item.schoolId,item.status]),native.filter(item=>item.status===status).map(item=>[item.id,item.schoolId,item.status]));
+    assert.equal(request.body.items[0].difficulty,status==='AC'?'medium':'hard');
+    assert.equal(request.body.items[0].bankName,'Native filter bank');
     assert(request.body.topics.includes('Native alpha')&&request.body.topics.includes('Native beta'));
     assertReadOnly(request);
    }

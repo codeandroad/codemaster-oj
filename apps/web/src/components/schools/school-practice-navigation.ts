@@ -38,7 +38,7 @@ export function practicePublicationState(problem: Problem) {
 export function practiceProblemMatches(problem: Problem, filters: PracticeCatalogFilters, staff: boolean) {
   const progress = problem.solved ? "accepted" : (problem.attempts ?? 0) > 0 ? "attempted" : "not-started";
   return (!filters.bankId || filters.bankId === problem.bankId)
-    && `${problem.id} ${problem.title} ${problem.bankName}`.toLocaleLowerCase().includes(filters.query.trim().toLocaleLowerCase())
+    && `${problem.id} ${problem.title} ${problem.bankName} ${problem.tags?.join(" ") ?? ""}`.toLocaleLowerCase().includes(filters.query.trim().toLocaleLowerCase())
     && (!filters.status || (staff ? practicePublicationState(problem) : progress) === filters.status);
 }
 

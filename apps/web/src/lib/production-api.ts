@@ -71,6 +71,7 @@ export interface ProductionProblem {
   publishedTitle?: string | null;
   publishedDifficulty?: string | null;
   bankId?: string | null;
+  bankName?: string | null;
   tags?: string[];
   difficulty?: string;
   objective?: string;

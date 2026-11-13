@@ -83,12 +83,16 @@ async function shapeProblem(db,p,user,role,{detail=false,publicOnly=false,access
  if(manage&&detail)await recordPublicPracticeStaffExposure(db,user.id,p.id);
  const def=manage?p.draft:version?.definition;
  if(!def)fail(404,'NOT_FOUND','Problem is unavailable.');
- if(catalogQuery && !`${p.id} ${def.title} ${p.bank_name}`.toLowerCase().includes(catalogQuery)) return null;
+ const metadata=manage?def.metadata:p.public_metadata??def.metadata,rawTags=manage?def.tags:p.public_tags??def.tags;
+ const tags=Array.isArray(rawTags)?rawTags.filter(tag=>typeof tag==='string'&&tag.trim()):[];
+ if(catalogQuery && !`${p.id} ${def.title} ${p.bank_name} ${tags.join(' ')}`.toLowerCase().includes(catalogQuery)) return null;
  const validation=manage?(await db.query(`SELECT j.id,j.state,j.result->>'status' AS status FROM school_judge_jobs j JOIN school_problem_versions v ON v.school_id=j.school_id AND v.id=j.version_id WHERE j.school_id=$1 AND j.problem_id=$2 AND v.draft_revision=$3 AND j.kind='validation' ORDER BY j.created_at DESC LIMIT 1`,[p.school_id,p.id,p.revision])).rows[0]:null;
  const progress=(await problemProgress(db,user,[p.id],{includeStaff:accessContext==='staff_practice'})).get(p.id);
  const publication = !publicOnly && role === 'school_admin' && version && p.published && !p.archived
   ? await publicProblemStatus(db, p, version.id) : undefined;
- return {attempts:progress?.formalCount??0,solved:progress?.solved===true,hasDraftChanges:!!version&&version.draft_revision!==p.revision,id:p.id,schoolId:p.school_id,bankId:p.bank_id,bankName:p.bank_name,title:def.title,revision:p.revision,published:p.published,versionId:version?.id??null,canManage:manage,canManageTutorial:!publicOnly&&canManageTutorial(p,user,role),validation:validation??null,...publication,...(detail?{staffPractice:accessContext==='staff_practice',definition:manage?draftDefinition(def):publicDefinition({...def,statement:p.public_statement??def.statement,metadata:p.public_metadata??def.metadata,tags:p.public_tags??def.tags})}:{})};
+ return {attempts:progress?.formalCount??0,solved:progress?.solved===true,status:progress?.status??'Not started',
+  tags,difficulty:typeof metadata?.difficulty==='string'?metadata.difficulty:null,
+  hasDraftChanges:!!version&&version.draft_revision!==p.revision,id:p.id,schoolId:p.school_id,bankId:p.bank_id,bankName:p.bank_name,title:def.title,revision:p.revision,published:p.published,versionId:version?.id??null,canManage:manage,canManageTutorial:!publicOnly&&canManageTutorial(p,user,role),validation:validation??null,...publication,...(detail?{staffPractice:accessContext==='staff_practice',definition:manage?draftDefinition(def):publicDefinition({...def,statement:p.public_statement??def.statement,metadata:p.public_metadata??def.metadata,tags:p.public_tags??def.tags})}:{})};
 }
 async function publicProblemStatus(db, problem, versionId) {
  const { rows: [state] } = await db.query(`
@@ -180,6 +184,7 @@ async function publicCatalogRows(db,publications,lockedSchools) {
   const current=schoolId===LEGACY_SCHOOL_ID?await legacyPublicProblemCatalogRows(db,ids)
    :(await db.query(`SELECT p.id,p.school_id AS "schoolId",p.bank_id AS "bankId",b.name AS "bankName",
     v.definition->>'title' title,v.definition->'tags' tags,v.definition->>'mode' mode,
+    CASE WHEN jsonb_typeof(v.definition->'metadata'->'difficulty')='string' THEN v.definition->'metadata'->>'difficulty' END difficulty,
     p.revision,p.published,v.id AS "versionId",v.draft_revision<>p.revision AS "hasDraftChanges"
     FROM school_problem_publications publication
     JOIN school_problems p ON p.school_id=publication.school_id AND p.id=publication.problem_id
@@ -240,7 +245,7 @@ export async function listPublicProblems(pool,user,url){
      // when another filter or the current page contains no matching problems.
      for(const tag of item.tags)topics.add(tag);
      if(items.length>limit)continue;
-     if(catalogQuery&&!`${item.id} ${item.title} ${item.bankName}`.toLowerCase().includes(catalogQuery))continue;
+     if(catalogQuery&&!`${item.id} ${item.title} ${item.bankName} ${item.tags.join(' ')}`.toLowerCase().includes(catalogQuery))continue;
      if(filters.topic&&!item.tags.includes(filters.topic)||filters.mode&&item.mode!==filters.mode||favorites&&!favorites.has(item.id))continue;
      candidates.push(item);
    }
@@ -260,7 +265,7 @@ export async function listPublicProblems(pool,user,url){
   if(!filters.status)await loadProgress(visible);
   return {
    items:visible.map(item=>({attempts:progress.get(item.id)?.formalCount??0,solved:progress.get(item.id)?.solved===true,
-    status:progress.get(item.id)?.status??'Not started',tags:item.tags,mode:item.mode,
+    status:progress.get(item.id)?.status??'Not started',tags:item.tags,mode:item.mode,difficulty:item.difficulty,
     hasDraftChanges:item.hasDraftChanges,id:item.id,schoolId:item.schoolId,bankId:item.bankId,bankName:item.bankName,
     title:item.title,revision:item.revision,published:item.published,versionId:item.versionId,
     canManage:false,canManageTutorial:false,validation:null})),

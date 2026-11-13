@@ -470,7 +470,7 @@ export async function createDomainServices(pool,config) {
      ? await transaction(pool, db => legacyProblemCatalogCourses(db, user, courseId)) : null;
     const rows=(await pool.query(`SELECT v.*,
      (SELECT count(*) FROM test_cases tc WHERE tc.version_id=v.id AND tc.enabled) formal_test_count,
-     p.bank_id,p.owner_scope,bank.visibility bank_visibility,
+     p.bank_id,bank.name bank_name,p.owner_scope,bank.visibility bank_visibility,
      CASE WHEN NOT $7 AND ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit')))
       THEN p.current_version_id ELSE v.id END published_version_id,
      CASE WHEN NOT $7 AND ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit')))
@@ -521,7 +521,7 @@ export async function createDomainServices(pool,config) {
     return respond(200,{...(courseFilter && { courseId, courses: courseFilter.courses }),items:presented.map(r=>({
      ...problemShape(r,{includeDisabledSamples:!!r.can_edit}),
      ...(staffView?{publishedDifficulty:typeof r.published_difficulty==='string'?r.published_difficulty:null}:{}),
-     bankId:r.bank_id,ownerScope:r.owner_scope,canEdit:!!r.can_edit,canPublish:!!r.can_edit&&r.validation_status==='AC'&&!r.published_at,
+     bankId:r.bank_id,bankName:r.bank_name,ownerScope:r.owner_scope,canEdit:!!r.can_edit,canPublish:!!r.can_edit&&r.validation_status==='AC'&&!r.published_at,
      canManageTutorial:!!(r.can_edit||r.shared_tutorial),
      firstAcPoints:firstAcPoints.get(r.problem_id)??10,ownProgress:ownProgress.get(r.problem_id)||emptyOwnProgress(),
     }))});

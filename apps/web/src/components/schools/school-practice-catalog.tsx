@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Table, Tabs } from "@/components/teacher/shared";
 import { State, input } from "@/components/student/shared";
 import { ProblemCatalogCourseFilter, type ProblemCatalogResult } from "@/components/student/problem-catalog-course-filter";
+import { LearnerProblemTable as SharedLearnerProblemTable } from "@/components/student/learner-problem-table";
 import { ProblemCatalogSearch } from "@/components/student/problem-catalog-search";
 import problemStyles from "@/components/student/problems-page.module.css";
 import bankStyles from "@/components/teacher/problem-banks.module.css";
@@ -58,7 +59,7 @@ export function SchoolPracticeCatalog({
     courseFilter?.onChange("");
   };
   const toolbar = <div className={`${problemStyles.toolbar} flex-wrap`}>
-    <ProblemCatalogSearch value={query} onChange={query => onFiltersChange({ query })} label={tx("搜索编号、标题或题库", "Search ID, title, or bank")} />
+    <ProblemCatalogSearch value={query} onChange={query => onFiltersChange({ query })} label={tx("搜索编号、标题、题库或主题", "Search ID, title, bank, or topic")} />
     <select aria-label={tx("题库", "Problem bank")} className={`${input} max-w-56 !h-[34px] max-md:!h-11`} value={bankId} onChange={event => onFiltersChange({ bankId: event.target.value })}>
       <option value="">{tx("全部题库", "All banks")}</option>
       {banks.filter(bank => !bank.archived || staff).map(bank => <option key={bank.id} value={bank.id}>{bank.name}{bank.archived ? ` (${tx("已归档", "Archived")})` : ""}</option>)}
@@ -128,19 +129,8 @@ export function LearnerProblemTable({ rows, onOpen, empty }: {
 }) {
   const { locale } = useLocale();
   const tx = (zh: string, en: string) => locale === "zh" ? zh : en;
-  return <div className={problemStyles.tableWrap}>
-    <table className={problemStyles.table} style={{ minWidth: 720 }}>
-      <colgroup><col style={{ width: "15%" }} /><col style={{ width: "12%" }} /><col style={{ width: "35%" }} /><col style={{ width: "19%" }} /><col style={{ width: "11%" }} /><col style={{ width: "8%" }} /></colgroup>
-      <thead><tr>{[tx("完成状态", "Your status"), "ID", tx("题目", "Title"), tx("题库", "Bank"), tx("我的提交", "My submissions"), tx("操作", "Action")].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
-      <tbody>{rows.map(problem => <tr key={problem.id}>
-        <td><StatusPill status={problem.solved ? "AC" : problem.status ?? ((problem.attempts ?? 0) > 0 ? tx("已尝试", "Attempted") : tx("未开始", "Not started"))} /></td>
-        <td className="font-mono text-xs font-semibold" title={problem.id}>{problem.id.slice(0, 8)}</td>
-        <td><button type="button" className={`${problemStyles.title} max-w-full text-left font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary`} title={problem.title} onClick={() => onOpen(problem.id)}>{problem.title}</button></td>
-        <td title={problem.bankName}><span className={`${problemStyles.truncate} text-muted-foreground`}>{problem.bankName}</span></td>
-        <td className="tabular-nums" title={tx("当前题目版本的本人正式提交次数", "Your formal submissions on this problem version")}>{problem.attempts ?? 0}</td>
-        <td><button type="button" className={`${problemStyles.open} font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary`} onClick={() => onOpen(problem.id)}>{tx("打开", "Open")}</button></td>
-      </tr>)}</tbody>
-    </table>
-    {!rows.length && <div className="px-4 py-8 text-center text-sm text-muted-foreground">{empty}</div>}
-  </div>;
+  return <SharedLearnerProblemTable rows={rows.map(problem => ({
+    id: problem.id, title: problem.title, bankName: problem.bankName, tags: problem.tags, difficulty: problem.difficulty,
+    status: problem.solved ? "AC" : problem.status ?? ((problem.attempts ?? 0) > 0 ? tx("已尝试", "Attempted") : tx("未开始", "Not started")),
+  }))} onOpen={onOpen} empty={empty}/>;
 }

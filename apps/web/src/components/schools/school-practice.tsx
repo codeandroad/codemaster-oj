@@ -520,7 +520,7 @@ function PublicPracticeContents({ accountId, problemId }: { accountId: string; p
 
   return <div className={problemStyles.page}>
     <div className={`${problemStyles.toolbar} flex-wrap`}>
-      <ProblemCatalogSearch value={query} maxLength={100} label={tx("搜索编号、标题或题库", "Search ID, title, or bank")}
+      <ProblemCatalogSearch value={query} maxLength={100} label={tx("搜索编号、标题、题库或主题", "Search ID, title, bank, or topic")}
         onChange={changeQuery}
         onCompositionStart={() => { composing.current = true; clearTimeout(timer.current); }}
         onCompositionEnd={value => { composing.current = false; changeQuery(value); }} />

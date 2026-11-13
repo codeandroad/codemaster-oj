@@ -67,9 +67,10 @@ test('ordinary problem versions and personal progress agree across school, platf
     const bank = (await owner.query("INSERT INTO problem_banks(owner_account_id,name,visibility) VALUES($1,'Unified fixture bank','school') RETURNING id", [actors.author.id])).rows[0];
     const problem = (await owner.query("INSERT INTO problems(owner_account_id,bank_id,owner_scope) VALUES($1,$2,'platform') RETURNING id", [actors.author.id, bank.id])).rows[0];
     const createVersion = async (title, { published = true, mode = 'stdio' } = {}) => {
-      const v = (await owner.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,function_name,reference_code,samples,time_limit_ms,memory_limit_mb,validation_status)
-        VALUES($1,$2,$3,$2,$4,$5,$6,1000,128,'AC') RETURNING id`, [problem.id, title, mode, mode === 'function' ? 'solve' : null,
-        mode === 'function' ? 'def solve(data):\n return data' : 'print(input())', JSON.stringify([{ input: mode === 'function' ? '[7]' : '7', expected: '7' }])])).rows[0];
+      const v = (await owner.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,function_name,reference_code,samples,metadata,time_limit_ms,memory_limit_mb,validation_status)
+        VALUES($1,$2,$3,$2,$4,$5,$6,$7,1000,128,'AC') RETURNING id`, [problem.id, title, mode, mode === 'function' ? 'solve' : null,
+        mode === 'function' ? 'def solve(data):\n return data' : 'print(input())', JSON.stringify([{ input: mode === 'function' ? '[7]' : '7', expected: '7' }]),
+        {difficulty:published?(mode==='function'?'hard':'easy'):'Unpublished level',editorial:'PRIVATE_METADATA_EDITORIAL'}])).rows[0];
       await owner.query("INSERT INTO test_cases(version_id,position,input,expected,weight) VALUES($1,1,$2,'937',100)", [v.id, mode === 'function' ? '[937]' : '937']);
       if (published) await owner.query("UPDATE problem_versions SET published_at=clock_timestamp(),school_visible_at=clock_timestamp(),rank_review_status='approved',rank_approved_at=clock_timestamp() WHERE id=$1", [v.id]);
       await owner.query('UPDATE problems SET current_version_id=$2 WHERE id=$1', [problem.id, v.id]);
@@ -109,6 +110,10 @@ test('ordinary problem versions and personal progress agree across school, platf
         const schoolCourseDetail = await get(`/learning-paths/${legacyCourse.id}`, name);
         const courseProblem = await get(`/practice/problems/${problem.id}?${courseQuery}`, name);
         assert.ok(publicRow, 'a publication continues to expose the updated problem');
+        for(const row of [schoolRow,publicRow]){
+          assert.equal(row.bankName,'Unified fixture bank');assert.equal(row.difficulty,'hard');
+          assert(!JSON.stringify(row).includes('PRIVATE_METADATA_EDITORIAL'));
+        }
         for (const view of [schoolRow, publicRow, schoolDetail, schoolOldLink, publicDetail, courseDetail.chapters[0].problems[0], schoolCourseDetail.chapters[0].problems[0], courseProblem]) {
           assert.equal(view.versionId, v2.id); assert.equal(view.title ?? view.definition?.title, 'Current function exercise');
           assert.ok(!JSON.stringify(view).includes('Unpublished private draft'));
@@ -178,7 +183,8 @@ test('ordinary problem versions and personal progress agree across school, platf
       const definition = { title: 'Native original', mode: 'stdio', comparator: 'tokens', statement: 'Print the input.', reference_code: 'print(input())', samples: [{ input: '7', expected: '7' }], tests: [{ position: 1, input: '937', expected: '937', weight: 100 }], time_limit_ms: 1000, memory_limit_mb: 128 };
       const bankId = (await owner.query("INSERT INTO school_problem_banks(school_id,owner_account_id,name,request_id) VALUES($1,$2,'Native bank',$3) RETURNING id", [school.id, actors.author.id, randomUUID()])).rows[0].id;
       const id = (await owner.query('INSERT INTO school_problems(school_id,bank_id,owner_account_id,draft,request_id) VALUES($1,$2,$3,$4,$5) RETURNING id', [school.id, bankId, actors.author.id, definition, randomUUID()])).rows[0].id;
-      const version = async (revision, title) => (await owner.query('INSERT INTO school_problem_versions(school_id,problem_id,draft_revision,definition) VALUES($1,$2,$3,$4) RETURNING id', [school.id, id, revision, { ...definition, title }])).rows[0].id;
+      const version = async (revision, title) => (await owner.query('INSERT INTO school_problem_versions(school_id,problem_id,draft_revision,definition) VALUES($1,$2,$3,$4) RETURNING id', [school.id, id, revision,
+        { ...definition,title,tags:[`Native topic ${revision}`],metadata:{difficulty:revision===1?'easy':'hard',teacherNote:'PRIVATE_NATIVE_METADATA'} }])).rows[0].id;
       const first = await version(1, 'Native original');
       await owner.query('UPDATE school_problems SET published=true,published_version_id=$3 WHERE school_id=$1 AND id=$2', [school.id, id, first]);
       await owner.query('INSERT INTO school_problem_publications(school_id,problem_id,version_id,approved_by) VALUES($1,$2,$3,$4)', [school.id, id, first, actors.author.id]);
@@ -201,6 +207,9 @@ test('ordinary problem versions and personal progress agree across school, platf
         for (const path of [prefix, '/practice/problems']) {
           const row = (await get(path, name)).items.find(p => p.id === id);
           assert.equal(row.versionId, latest); assert.equal(row.solved, true); assert.equal(row.attempts, 1);
+          assert.equal(row.status,'AC');assert.equal(row.bankName,'Native bank');assert.equal(row.difficulty,'hard');
+          assert.deepEqual(row.tags,['Native topic 2']);assert(!JSON.stringify(row).includes('PRIVATE_NATIVE_METADATA'));
+          assert.deepEqual((await get(path+'?q=Native%20topic%202',name)).items.map(p=>p.id),[id]);
         }
         for (const path of [`${nativeCoursePath}/${nativeCourse.id}`, `/practice/courses/${nativeListing.id}`]) {
           const detail = await get(path, name);

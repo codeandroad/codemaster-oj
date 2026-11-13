@@ -99,6 +99,8 @@ export async function legacyPublicProblemCatalogRows(db,problemIds) {
   COALESCE(projected.bank_id,$3::uuid) AS "bankId",b.name AS "bankName",
   COALESCE(snapshot.definition->>'title',v.title) title,COALESCE(projected.revision,1) revision,
   true published,v.id AS "versionId",v.tags,v.mode,
+  CASE WHEN jsonb_typeof(COALESCE(presentation.metadata,v.metadata)->'difficulty')='string'
+   THEN COALESCE(presentation.metadata,v.metadata)->>'difficulty' END difficulty,
   COALESCE(snapshot.draft_revision,(SELECT COALESCE(max(history.draft_revision),0)+1
    FROM school_problem_versions history WHERE history.school_id=$1 AND history.problem_id=p.id))
    <>COALESCE(projected.revision,1) AS "hasDraftChanges"
@@ -107,6 +109,7 @@ export async function legacyPublicProblemCatalogRows(db,problemIds) {
    AND publication.withdrawn_at IS NULL
   LEFT JOIN school_problems projected ON projected.school_id=$1 AND projected.id=p.id
   LEFT JOIN school_problem_versions snapshot ON snapshot.school_id=$1 AND snapshot.problem_id=p.id AND snapshot.id=v.id
+  LEFT JOIN problem_public_statements presentation ON presentation.version_id=v.id
   WHERE p.id=ANY($2::uuid[]) AND ${sourceAccess}
   FOR SHARE OF p,b,v`,[LEGACY_SCHOOL_ID,problemIds,snapshotBankId])).rows;
 }

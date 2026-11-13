@@ -10,6 +10,7 @@ import { MathContent } from "@/components/math-content";
 import { ApiError, apiMessage, productionApi, type CampusUser, type SubmissionLanguage } from "@/lib/production-api";
 import problemStyles from "@/components/student/problems-page.module.css";
 import { ProblemCatalogSearch } from "@/components/student/problem-catalog-search";
+import { ProblemCatalogCourseFilter, problemCourseFilterKey, publicProblemCourseFilterKey, type ProblemCatalogResult } from "@/components/student/problem-catalog-course-filter";
 import { CodeEditor } from "@/components/student/code-editor";
 import { CopyCodeButton } from "@/components/student/copy-code-button";
 import { ProblemSubmissionsTable, SolvedStatus, useProblemSubmissions } from "@/components/student/problem-submissions";
@@ -50,10 +51,17 @@ function SchoolPracticeContents({ schoolId, role, initialProblemId }: { schoolId
   const staff = role === "teacher" || role === "school_admin";
   const filters = practiceCatalogFilters(search, staff);
   const { bankId } = filters;
+  const courseId = staff ? "" : search.get(problemCourseFilterKey)?.toLowerCase() ?? "";
   const banks = useData<{ items: Bank[] }>(`${base}/problem-banks`);
-  const allProblems = useData<{ items: Problem[] }>(`${base}/problems`);
-  const bankProblems = useData<{ items: Problem[] }>(bankId ? `${base}/problems?bankId=${encodeURIComponent(bankId)}` : "");
+  const catalogQuery = new URLSearchParams(staff ? {} : { includeCourseFilters: "1", ...(courseId && { courseId }) });
+  const allProblems = useData<ProblemCatalogResult<Problem>>(`${base}/problems${catalogQuery.size ? `?${catalogQuery}` : ""}`);
+  const bankQuery = new URLSearchParams(catalogQuery);
+  if (bankId) bankQuery.set("bankId", bankId);
+  const bankProblems = useData<ProblemCatalogResult<Problem>>(bankId ? `${base}/problems?${bankQuery}` : "");
   const problems = bankId ? bankProblems : allProblems;
+  const catalogMatches = staff || (problems.data?.courseId ?? "") === courseId;
+  const catalog = { ...problems, loading: !problems.error && (problems.loading || !catalogMatches), data: catalogMatches ? problems.data : null };
+  const navigationProblems = (allProblems.data?.courseId ?? "") === courseId ? allProblems.data?.items ?? [] : [];
   const selected = search.get("problemId") ?? initialProblemId ?? null;
   const [editing, setEditing] = useState<Problem | "new" | null>(null);
   const [bankEdit, setBankEdit] = useState<Bank | "new" | null>(null);
@@ -82,64 +90,68 @@ function SchoolPracticeContents({ schoolId, role, initialProblemId }: { schoolId
     return () => clearInterval(timer);
   }, [problems.data, problems.reload]);
 
-  if (selected) return <PracticeProblem key={`${schoolId}:${selected}`} path={`${base}/problems/${encodeURIComponent(selected)}`} jobPath={id => `${base}/judge-jobs/${id}`} onBack={() => { selectProblem(null); refresh(); }} navigation={{ currentId: selected, items: practiceNavigationItems(allProblems.data?.items ?? [], filters, staff, selected, banks.data?.items.filter(bank => bank.archived).map(bank => bank.id)), onSelect: selectProblem }} />;
+  if (selected) return <PracticeProblem key={`${schoolId}:${selected}`} path={`${base}/problems/${encodeURIComponent(selected)}`} jobPath={id => `${base}/judge-jobs/${id}`} onBack={() => { selectProblem(null); refresh(); }} navigation={{ currentId: selected, items: practiceNavigationItems(navigationProblems, filters, staff, selected, banks.data?.items.filter(bank => bank.archived).map(bank => bank.id)), onSelect: selectProblem }} />;
 
+  const catalogView = <SchoolPracticeCatalog
+    banks={banks.data?.items ?? []}
+    problems={catalog.data?.items ?? []}
+    learnerResource={staff ? undefined : catalog}
+    courseFilter={staff ? undefined : {
+      value: courseId, courses: allProblems.data?.courses,
+      onChange: value => updatePracticeLocation({ [problemCourseFilterKey]: value }, true),
+    }}
+    allProblems={allProblems.data?.items ?? []}
+    role={role}
+    filters={filters}
+    onFiltersChange={changeFilters}
+    busy={action.busy}
+    onRefresh={refresh}
+    onEditBank={editBank}
+    onNewProblem={() => setEditing("new")}
+    onOpen={id => {
+      const problem = problems.data?.items.find(item => item.id === id);
+      if (staff && problem?.canManage) editProblem(problem);
+      else selectProblem(id);
+    }}
+    renderActions={problem => <>
+      {problem.canManage && <Button size="sm" variant="ghost" disabled={action.busy} onClick={() => editProblem(problem)}>{tx("编辑", "Edit")}</Button>}
+      {problem.canManageTutorial && <ProblemTutorialEditor
+        endpoint={`${base}/problems/${encodeURIComponent(problem.id)}/tutorial`}
+        problemTitle={problem.title}
+        size="sm"
+        variant="ghost"
+        disabled={action.busy}
+      />}
+      {problem.canManage && <>
+        <Button size="sm" variant="secondary" title={tx("验证参考程序", "Validate reference program")} disabled={action.busy || ["queued", "leased"].includes(problem.validation?.state ?? "")} onClick={() => void action.run(async () => {
+          await productionApi(`${base}/problems/${problem.id}/validate`, { method: "POST", body: { expectedRevision: problem.revision, requestId: crypto.randomUUID() } }); refresh();
+        })}>{tx("验证", "Validate")}</Button>
+        {role === "school_admin" && (!problem.published || problem.hasDraftChanges) && <Button size="sm" disabled={action.busy || problem.validation?.status !== "AC"} onClick={() => void action.run(async () => {
+          await productionApi(`${base}/problems/${problem.id}/publish`, { method: "POST", body: { expectedRevision: problem.revision } }); refresh();
+        })}>{tx("审核发布", "Review & publish")}</Button>}
+        {problem.published && <Button size="sm" variant="ghost" disabled={action.busy} onClick={() => void action.run(async () => {
+          await productionApi(`${base}/problems/${problem.id}/unpublish`, { method: "POST", body: { expectedRevision: problem.revision } }); refresh();
+        })}>{tx("下架", "Unpublish")}</Button>}
+      </>}
+      {role === "school_admin" && problem.published && problem.versionId &&
+        !banks.data?.items.find(bank => bank.id === problem.bankId)?.archived && (
+        problem.platformPublished ? <span className="px-2 text-xs text-success">{tx("已公开", "Public")}</span>
+          : <Button size="sm" variant="ghost" disabled={action.busy || problem.publicRequestStatus === "pending"}
+            onClick={() => void action.run(async () => {
+              await productionApi(`${base}/problems/${problem.id}/public-request`, { method: "POST", body: { versionId: problem.versionId } });
+              refresh();
+            })}>
+            {problem.publicRequestStatus === "pending" ? tx("待平台审核", "Awaiting review")
+              : problem.publicRequestStatus === "rejected" ? tx("被退回 · 重新申请", "Rejected · Request again")
+                : tx("申请平台公开", "Request public release")}
+          </Button>
+      )}
+      {problem.published && !banks.data?.items.find(bank => bank.id === problem.bankId)?.archived && <Button size="sm" variant="ghost" onClick={() => selectProblem(problem.id)}>{tx("练习", "Practice")}</Button>}
+    </>}
+  />;
   return <div className="space-y-3">
     <Feedback action={action} />
-    <State data={banks}><State data={problems}>
-      <SchoolPracticeCatalog
-        banks={banks.data?.items ?? []}
-        problems={problems.data?.items ?? []}
-        allProblems={allProblems.data?.items ?? []}
-        role={role}
-        filters={filters}
-        onFiltersChange={changeFilters}
-        busy={action.busy}
-        onRefresh={refresh}
-        onEditBank={editBank}
-        onNewProblem={() => setEditing("new")}
-        onOpen={id => {
-          const problem = problems.data?.items.find(item => item.id === id);
-          if (staff && problem?.canManage) editProblem(problem);
-          else selectProblem(id);
-        }}
-        renderActions={problem => <>
-          {problem.canManage && <Button size="sm" variant="ghost" disabled={action.busy} onClick={() => editProblem(problem)}>{tx("编辑", "Edit")}</Button>}
-          {problem.canManageTutorial && <ProblemTutorialEditor
-            endpoint={`${base}/problems/${encodeURIComponent(problem.id)}/tutorial`}
-            problemTitle={problem.title}
-            size="sm"
-            variant="ghost"
-            disabled={action.busy}
-          />}
-          {problem.canManage && <>
-            <Button size="sm" variant="secondary" title={tx("验证参考程序", "Validate reference program")} disabled={action.busy || ["queued", "leased"].includes(problem.validation?.state ?? "")} onClick={() => void action.run(async () => {
-              await productionApi(`${base}/problems/${problem.id}/validate`, { method: "POST", body: { expectedRevision: problem.revision, requestId: crypto.randomUUID() } }); refresh();
-            })}>{tx("验证", "Validate")}</Button>
-            {role === "school_admin" && (!problem.published || problem.hasDraftChanges) && <Button size="sm" disabled={action.busy || problem.validation?.status !== "AC"} onClick={() => void action.run(async () => {
-              await productionApi(`${base}/problems/${problem.id}/publish`, { method: "POST", body: { expectedRevision: problem.revision } }); refresh();
-            })}>{tx("审核发布", "Review & publish")}</Button>}
-            {problem.published && <Button size="sm" variant="ghost" disabled={action.busy} onClick={() => void action.run(async () => {
-              await productionApi(`${base}/problems/${problem.id}/unpublish`, { method: "POST", body: { expectedRevision: problem.revision } }); refresh();
-            })}>{tx("下架", "Unpublish")}</Button>}
-          </>}
-          {role === "school_admin" && problem.published && problem.versionId &&
-            !banks.data?.items.find(bank => bank.id === problem.bankId)?.archived && (
-            problem.platformPublished ? <span className="px-2 text-xs text-success">{tx("已公开", "Public")}</span>
-              : <Button size="sm" variant="ghost" disabled={action.busy || problem.publicRequestStatus === "pending"}
-                onClick={() => void action.run(async () => {
-                  await productionApi(`${base}/problems/${problem.id}/public-request`, { method: "POST", body: { versionId: problem.versionId } });
-                  refresh();
-                })}>
-                {problem.publicRequestStatus === "pending" ? tx("待平台审核", "Awaiting review")
-                  : problem.publicRequestStatus === "rejected" ? tx("被退回 · 重新申请", "Rejected · Request again")
-                    : tx("申请平台公开", "Request public release")}
-              </Button>
-          )}
-          {problem.published && !banks.data?.items.find(bank => bank.id === problem.bankId)?.archived && <Button size="sm" variant="ghost" onClick={() => selectProblem(problem.id)}>{tx("练习", "Practice")}</Button>}
-        </>}
-      />
-    </State></State>
+    <State data={banks}>{staff ? <State data={problems}>{catalogView}</State> : catalogView}</State>
     <Dialog open={bankEdit !== null} onOpenChange={open => { if (!open && !bankPending.current) setBankEdit(null); }}>
       <DialogContent>
         <DialogTitle>{bankEdit === "new" ? tx("新建题库", "New bank") : tx("编辑题库", "Edit bank")}</DialogTitle>
@@ -391,6 +403,7 @@ function PublicPracticeContents({ problemId }: { problemId?: string }) {
   const search = useSearchParams();
   const selected = search.get("problemId") ?? problemId ?? null;
   const urlQuery = (search.get("publicProblemQuery") ?? "").slice(0, 100);
+  const courseId = search.get(publicProblemCourseFilterKey)?.toLowerCase() ?? "";
   const rawPage = Number(search.get("publicProblemPage") ?? 1);
   const page = Number.isInteger(rawPage) && rawPage >= 1 && rawPage <= 100000 ? rawPage : 1;
   const [draft, setDraft] = useState<string | null>(null);
@@ -431,13 +444,17 @@ function PublicPracticeContents({ problemId }: { problemId?: string }) {
     }, 180);
   }
 
-  const list = useData<{ items: Problem[]; page: number; query: string; hasMore: boolean }>(
-    `practice/problems?${new URLSearchParams({ q: urlQuery.trim(), page: String(page) })}`,
+  const list = useData<ProblemCatalogResult<Problem> & { page: number; query: string; hasMore: boolean }>(
+    `practice/problems?${new URLSearchParams({ q: urlQuery.trim(), page: String(page), includeCourseFilters: "1", ...(courseId && { courseId }) })}`,
   );
-  const matchesFilters = list.data?.query === query.trim() && list.data?.page === page;
+  const matchesFilters = list.data?.query === query.trim() && list.data?.page === page && (list.data?.courseId ?? "") === courseId;
   const rows = matchesFilters ? list.data?.items ?? [] : [];
   const pending = !list.error && (list.loading || !matchesFilters);
   const selectProblem = (id: string | null) => updatePracticeLocation({ problemId: id });
+  function changeCourse(value: string) {
+    clearTimeout(timer.current);
+    updatePracticeLocation({ [publicProblemCourseFilterKey]: value, publicProblemQuery: query, publicProblemPage: null }, true);
+  }
   const changePage = (next: number) => updatePracticeLocation({ publicProblemPage: next === 1 ? null : String(next) });
   if (selected) return <PublicProblemWorkspace key={`${selected}:${search.get("versionId") ?? ""}`} id={selected} catalog={{ ...list, data: pending ? null : { items: rows }, loading: pending }} />;
 
@@ -447,13 +464,14 @@ function PublicPracticeContents({ problemId }: { problemId?: string }) {
         onChange={changeQuery}
         onCompositionStart={() => { composing.current = true; clearTimeout(timer.current); }}
         onCompositionEnd={value => { composing.current = false; changeQuery(value); }} />
+      <ProblemCatalogCourseFilter courses={list.data?.courses} value={courseId} onChange={changeCourse}/>
       <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={list.reload} aria-label={tx("刷新题目", "Refresh problems")}>
         <RefreshCw size={15} aria-hidden="true"/>
       </Button>
     </div>
     <State data={{ ...list, loading: pending, data: pending ? null : list.data }}>
-      <LearnerProblemTable rows={rows} onOpen={selectProblem} empty={query.trim()
-        ? tx("没有匹配的题目，请尝试其他搜索。", "No matching problems. Try another search.")
+      <LearnerProblemTable rows={rows} onOpen={selectProblem} empty={query.trim() || courseId
+        ? tx("没有匹配的题目，请调整搜索或课程筛选。", "No matching problems. Try another search or course.")
         : tx("暂时没有可显示的公开题目。", "There are no public problems to show.")} />
       {(page > 1 || list.data?.hasMore) && <nav className="flex flex-wrap items-center justify-end gap-2" aria-label={tx("题目分页", "Problem pages")}>
         <Button size="sm" variant="secondary" disabled={page === 1} onClick={() => changePage(page - 1)}>{tx("上一页", "Previous")}</Button>

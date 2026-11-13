@@ -23,6 +23,7 @@
 @media(max-width:760px) {
   .page { gap:8px; }
   .toolbar { padding:4px 6px; }
+  .toolbar:has(> .courseFilter) .search { flex-basis:100%;max-width:none; }
   .search > input,.toolbar :global([data-od-id="student-problem-filter"]) > button { height:44px; }
   .table td { height:48px;padding-block:2px; }
   .bookmark { width:28px;height:44px; }

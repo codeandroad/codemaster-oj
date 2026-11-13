@@ -489,6 +489,8 @@ test('platform course admission combines audience, requirements and grants acros
       await owner.query('INSERT INTO chapter_problems(chapter_id,problem_id,version_id,position) VALUES($1,$2,$3,0)', [chapter.id, problemId, versionId]);
       await post('/platform/problem-publications', { schoolId: LEGACY_SCHOOL_ID, problemId, versionId });
       const before = await f.snapshot(), jobCount = (await owner.query('SELECT count(*)::int n FROM school_judge_jobs')).rows[0].n;
+      const problemCatalogues = ['/problems', '/practice/problems'];
+      const catalogueQuery = `?includeCourseFilters=1&courseId=${course.id}`;
       await get(`/learning-resources/${resourceId}`, 'legacy-admin', 404);
       assert.ok(!(await get('/learning-resources', 'legacy-admin')).items.some(item => item.id === resourceId), 'former resource owner and school administrator cannot bypass a platform gate');
       await patch(`/learning-resources/${resourceId}`, { content: 'Unauthorized update', pathId: null, chapterId: null }, 'legacy-admin', 403);
@@ -497,6 +499,11 @@ test('platform course admission combines audience, requirements and grants acros
       assert.equal(preservedResource.content, bodySentinel); assert.equal(preservedResource.path_id, course.id); assert.equal(preservedResource.archived_at, null);
       const blocked = async () => {
         await read(course, 'legacy-peer', 403);
+        for (const path of problemCatalogues) {
+          const result = await get(path + catalogueQuery, 'legacy-peer');
+          assert.deepEqual(result.items, []);
+          assert.ok(!result.courses.some(item => item.id === course.id));
+        }
         await get(`/learning-paths/${course.id}`, 'legacy-peer', [403, 404]); await get(`/learning-paths/${aliasId}`, 'legacy-peer', [403, 404]);
         assert.ok(!(await get('/learning-paths', 'legacy-peer')).items.some(item => item.id === course.id));
         await get(`/learning-resources/${resourceId}`, 'legacy-peer', 404);
@@ -513,6 +520,13 @@ test('platform course admission combines audience, requirements and grants acros
       assert.equal((await owner.query('SELECT count(*)::int n FROM school_judge_jobs')).rows[0].n, jobCount);
       assert.deepEqual(await f.snapshot(), before);
       let application = (await admissions(course)).items[0]; await decision(course, application, 'approve');
+      for (const path of problemCatalogues) {
+        const result = await get(path + catalogueQuery, 'legacy-peer');
+        assert.equal(result.courseId, course.id);
+        assert.deepEqual(result.items.map(item => [item.id, item.versionId]), [[problemId, versionId]]);
+        assert.ok(result.courses.some(item => item.id === course.id));
+        assert.doesNotMatch(JSON.stringify(result), /referenceCode|reference_code|checkpoint/);
+      }
       assert.equal((await get(`/learning-paths/${course.id}`, 'legacy-peer')).id, course.id);
       assert.equal((await get(`/learning-paths/${aliasId}`, 'legacy-peer')).id, course.id);
       assert.ok((await get('/learning-paths', 'legacy-peer')).items.some(item => item.id === course.id));

@@ -1,3 +1,4 @@
+import { problemCatalogCourseRequest } from './problem-catalog-courses.mjs';
 import { platformCourseProblem } from './platform-course-problems.mjs';
 import {publicScholarshipOperation,recordPublicPracticeStaffExposure} from './public-scholarship.mjs';
 import { schoolActivityJobVisibleSql, schoolActivityProblemAccess, schoolJobFeedback } from './school-activities.mjs';
@@ -12,8 +13,8 @@ import { publicProblemMetadata } from './problem-public-statements.mjs';
 import { handlePublicPracticeRecords } from './public-practice-records.mjs';
 import { publicPracticeLeaderboard } from './public-practice-leaderboard.mjs';
 import { customTutorial, saveTutorial, tutorialContext, tutorialSettings } from './problem-tutorials.mjs';
-import { loadSchoolCourse, schoolCourseProblemLanguage } from './school-courses.mjs';
-import { publicCourseProblemLanguage } from './public-learning.mjs';
+import { loadSchoolCourse, schoolCourseProblemLanguage, schoolProblemCatalogCourses } from './school-courses.mjs';
+import { publicCourseProblemLanguage, publicProblemCatalogCourses } from './public-learning.mjs';
 import { assertRequiredLanguage } from './course-language-policy.mjs';
 import { LANGUAGES, starterCodesFor } from './languages.mjs';
 import {
@@ -169,6 +170,7 @@ async function publicLoaded(db,user,id,courseContext={}){
  return p;
 }
 export async function listPublicProblems(pool,user,url){
+ const { courseId, includeCourses } = problemCatalogCourseRequest(url);
  const query=(url?.searchParams?.get('q')??'').slice(0,100).trim();
  const catalogQuery=query.toLowerCase();
  const rawPage=url?.searchParams?.get('page');
@@ -178,19 +180,24 @@ export async function listPublicProblems(pool,user,url){
  let skip=page==null?0:(page-1)*pageSize;
  return transaction(pool,async db=>{
   await activeAccount(db,user.id);
+  const courseFilter = includeCourses ? await publicProblemCatalogCourses(db, user, courseId) : null;
+  const versions = courseId ? courseFilter.versions : null;
+  const problemIds = versions ? [...versions.keys()] : null;
   const items=[];
   let cursor=null;
   while(items.length<=limit){
    // Filter after rechecking the current published version and its scope.
    // Seek across publication batches so search also reaches older releases.
-   const {rows}=await db.query(`SELECT problem_id,approved_at::text AS approved_at
+   const {rows}=await db.query(`SELECT problem_id,version_id,approved_at::text AS approved_at
     FROM school_problem_publications WHERE withdrawn_at IS NULL AND (
       $1::timestamptz IS NULL OR approved_at<$1 OR (approved_at=$1 AND problem_id>$2::uuid)
-    )
-    ORDER BY approved_at DESC,problem_id LIMIT 100`,[cursor?.approved_at??null,cursor?.problem_id??null]);
+    ) AND ($3::uuid[] IS NULL OR problem_id=ANY($3))
+    ORDER BY approved_at DESC,problem_id LIMIT 100`,[cursor?.approved_at??null,cursor?.problem_id??null, problemIds]);
    for(const row of rows){
+    if (versions && !versions.get(row.problem_id)?.has(row.version_id)) continue;
     try{
      const p=await publicLoaded(db,user,row.problem_id);
+     if (versions && !versions.get(row.problem_id)?.has(p.published_version_id)) continue;
      const item=await shapeProblem(db,p,user,null,{publicOnly:true,accessContext:'public',catalogQuery});
      if(!item) continue;
      if(skip>0) skip--;
@@ -201,7 +208,11 @@ export async function listPublicProblems(pool,user,url){
    if(rows.length<100) break;
    cursor=rows.at(-1);
   }
-  return page==null?{items:items.slice(0,limit)}:{items:items.slice(0,limit),page,query,hasMore:items.length>limit};
+  return {
+   items: items.slice(0, limit),
+   ...(courseFilter && { courseId, courses: courseFilter.courses }),
+   ...(page != null && { page, query, hasMore: items.length > limit }),
+  };
  });
 }
 
@@ -296,7 +307,28 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
    if(method==='PATCH'&&id){const bank=(await db.query('SELECT * FROM school_problem_banks WHERE resource_kind=\'ordinary\' AND school_id=$1 AND id=$2 FOR UPDATE',[schoolId,id])).rows[0];if(!bank||!canManage(bank,user,role))fail(404,'NOT_FOUND','Bank unavailable.');revision(body,bank);const name=field(body.name??bank.name,'Bank name',{max:120});const archived=body.archived??bank.archived;if(typeof archived!=='boolean')fail(400,'VALIDATION','Invalid archive flag.');await db.query('UPDATE school_problem_banks SET name=$3,archived=$4,revision=revision+1 WHERE school_id=$1 AND id=$2',[schoolId,id,name,archived]);await auditSchool(db,schoolId,user.id,'school.bank.update',id);return reply({id,name,archived,revision:bank.revision+1});}return null;
   }
   if(m[2]!=='problems')return null;
-  if(method==='GET'&&!id){const bankId=url.searchParams.get('bankId');if(bankId)uuid(bankId);const rows=(await db.query(`SELECT p.*,b.name AS bank_name,b.archived,EXISTS(SELECT 1 FROM problems original WHERE original.id=p.id AND original.owner_scope='platform') platform_owned FROM school_problems p JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id WHERE b.resource_kind=\'ordinary\' AND p.school_id=$1 AND ($4::uuid IS NULL OR p.bank_id=$4) AND ($3='school_admin' OR p.owner_account_id=$2 AND $3='teacher' OR p.published AND NOT b.archived) ORDER BY p.created_at,p.id LIMIT 500`,[schoolId,user.id,role,bankId])).rows;const items=[];for(const p of rows)items.push(await shapeProblem(db,p,user,role));return reply({items});}
+  if(method==='GET'&&!id){
+   const bankId = url.searchParams.get('bankId');
+   if (bankId) uuid(bankId);
+   const { courseId, includeCourses } = problemCatalogCourseRequest(url);
+   const courseFilter = role === 'student' && includeCourses
+    ? await schoolProblemCatalogCourses(db, schoolId, user, role, courseId) : null;
+   const links = courseId && courseFilter
+    ? [...courseFilter.versions].flatMap(([problemId, versions]) => [...versions].map(versionId => ({ problemId, versionId }))) : null;
+   const { rows } = await db.query(`SELECT p.*,b.name AS bank_name,b.archived,
+      EXISTS(SELECT 1 FROM problems original WHERE original.id=p.id AND original.owner_scope='platform') platform_owned
+    FROM school_problems p JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id
+    WHERE b.resource_kind='ordinary' AND p.school_id=$1 AND ($4::uuid IS NULL OR p.bank_id=$4)
+      AND ($3='school_admin' OR p.owner_account_id=$2 AND $3='teacher' OR p.published AND NOT b.archived)
+      AND ($5::jsonb IS NULL OR EXISTS (
+       SELECT 1 FROM jsonb_to_recordset($5::jsonb) link("problemId" uuid,"versionId" uuid)
+       WHERE link."problemId"=p.id AND link."versionId"=p.published_version_id
+      ))
+    ORDER BY p.created_at,p.id LIMIT 500`, [schoolId, user.id, role, bankId, links && JSON.stringify(links)]);
+   const items = [];
+   for (const p of rows) items.push(await shapeProblem(db, p, user, role));
+   return reply({ ...(courseFilter && { courseId, courses: courseFilter.courses }), items });
+  }
   if(method==='POST'&&!id){if(!['teacher','school_admin'].includes(role))fail(403,'FORBIDDEN','Teaching role required.');const bankId=uuid(body.bankId),bank=(await db.query('SELECT * FROM school_problem_banks WHERE resource_kind=\'ordinary\' AND school_id=$1 AND id=$2',[schoolId,bankId])).rows[0];if(!bank||bank.archived||!canManage(bank,user,role))fail(404,'NOT_FOUND','Bank unavailable.');const requestId=uuid(body.requestId),old=(await db.query('SELECT * FROM school_problems WHERE school_id=$1 AND owner_account_id=$2 AND request_id=$3',[schoolId,user.id,requestId])).rows[0];const definition=normalizeSchoolProblem(body);if(old){if(old.bank_id!==bankId||canonicalHash(draftDefinition(old.draft))!==canonicalHash(draftDefinition(definition)))fail(409,'REQUEST_CONFLICT','Request ID already used.');return reply(await shapeProblem(db,await loadProblem(db,schoolId,old.id,user,role),user,role,{detail:true}));}const p=(await db.query('INSERT INTO school_problems(school_id,bank_id,owner_account_id,draft,request_id) VALUES($1,$2,$3,$4,$5) RETURNING id',[schoolId,bankId,user.id,JSON.stringify(definition),requestId])).rows[0];await auditSchool(db,schoolId,user.id,'school.problem.create',p.id);return reply(await shapeProblem(db,await loadProblem(db,schoolId,p.id,user,role),user,role,{detail:true}),201);}
   if(!id)return null;const p=await loadProblem(db,schoolId,id,user,role);
   if(m[4]==='tutorial'&&['GET','PATCH'].includes(method)){

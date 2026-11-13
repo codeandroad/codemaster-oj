@@ -6,7 +6,8 @@ import { useLocale } from "@/components/locale-context";
 import { StatusPill } from "@/components/page-chrome";
 import { Button } from "@/components/ui/button";
 import { Table, Tabs } from "@/components/teacher/shared";
-import { input } from "@/components/student/shared";
+import { State, input } from "@/components/student/shared";
+import { ProblemCatalogCourseFilter, type ProblemCatalogResult } from "@/components/student/problem-catalog-course-filter";
 import { ProblemCatalogSearch } from "@/components/student/problem-catalog-search";
 import problemStyles from "@/components/student/problems-page.module.css";
 import bankStyles from "@/components/teacher/problem-banks.module.css";
@@ -15,7 +16,7 @@ import { practiceProblemMatches, practicePublicationState, type PracticeCatalogF
 
 export function SchoolPracticeCatalog({
   problems, allProblems, banks, role, filters, onFiltersChange, onOpen, onEditBank,
-  onNewProblem, onRefresh, busy, renderActions,
+  onNewProblem, onRefresh, busy, renderActions, courseFilter, learnerResource,
 }: {
   problems: Problem[];
   allProblems: Problem[];
@@ -29,6 +30,8 @@ export function SchoolPracticeCatalog({
   onRefresh: () => void;
   busy: boolean;
   renderActions: (problem: Problem) => ReactNode;
+  learnerResource?: { data: unknown; loading: boolean; error: string; reload: () => void };
+  courseFilter?: { value: string; courses: ProblemCatalogResult<Problem>["courses"]; onChange: (id: string) => void };
 }) {
   const { locale } = useLocale();
   const tx = (zh: string, en: string) => locale === "zh" ? zh : en;
@@ -50,29 +53,33 @@ export function SchoolPracticeCatalog({
     ? Object.entries(stateNames)
     : [["accepted", tx("已通过", "Accepted")], ["attempted", tx("已尝试", "Attempted")], ["not-started", tx("未开始", "Not started")]];
   const countLabel = tx(`显示 ${rows.length} / ${problems.length} 道题`, `Showing ${rows.length} of ${problems.length} problems`);
-  const clearFilters = () => onFiltersChange({ query: "", status: "", bankId: "" });
+  const clearFilters = () => {
+    onFiltersChange({ query: "", status: "", bankId: "" });
+    courseFilter?.onChange("");
+  };
   const toolbar = <div className={`${problemStyles.toolbar} flex-wrap`}>
     <ProblemCatalogSearch value={query} onChange={query => onFiltersChange({ query })} label={tx("搜索编号、标题或题库", "Search ID, title, or bank")} />
     <select aria-label={tx("题库", "Problem bank")} className={`${input} max-w-56 !h-[34px] max-md:!h-11`} value={bankId} onChange={event => onFiltersChange({ bankId: event.target.value })}>
       <option value="">{tx("全部题库", "All banks")}</option>
       {banks.filter(bank => !bank.archived || staff).map(bank => <option key={bank.id} value={bank.id}>{bank.name}{bank.archived ? ` (${tx("已归档", "Archived")})` : ""}</option>)}
     </select>
+    {courseFilter && <ProblemCatalogCourseFilter {...courseFilter}/>}
     <select aria-label={tx("状态", "Status")} className={`${input} max-w-44 !h-[34px] max-md:!h-11`} value={filter} onChange={event => onFiltersChange({ status: event.target.value })}>
       <option value="">{tx("全部状态", "All statuses")}</option>
       {filterChoices.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
     </select>
-    {(query || bankId || filter) && <Button size="sm" variant="ghost" onClick={clearFilters}>{tx("清除筛选", "Clear filters")}</Button>}
+    {(query || bankId || filter || courseFilter?.value) && <Button size="sm" variant="ghost" onClick={clearFilters}>{tx("清除筛选", "Clear filters")}</Button>}
     <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={onRefresh} aria-label={tx("刷新题目", "Refresh problems")}><RefreshCw size={15} aria-hidden="true" /></Button>
     {staff && <Button size="sm" disabled={busy || !activeBanks.some(bank => bank.canManage)} onClick={onNewProblem}><Plus size={14} aria-hidden="true" />{tx("新建题目", "New problem")}</Button>}
   </div>;
 
   if (!staff) return <div className={problemStyles.page}>
     {toolbar}
-    <LearnerProblemTable rows={rows} onOpen={onOpen}
-      empty={problems.length
+    <State data={learnerResource ?? { data: null, loading: false, error: "", reload: onRefresh }}><LearnerProblemTable rows={rows} onOpen={onOpen}
+      empty={problems.length || courseFilter?.value
         ? tx("没有匹配的题目，请调整搜索或筛选。", "No matching problems. Try another search or filter.")
         : tx("学校尚未发布可练习题目。", "Your school has not published any problems yet.")} />
-    <p className={problemStyles.count}>{countLabel}</p>
+    <p className={problemStyles.count}>{countLabel}</p></State>
   </div>;
 
   return <div className="min-w-0 space-y-2">

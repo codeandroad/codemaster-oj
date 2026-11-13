@@ -1,3 +1,4 @@
+import { chapterProblemVersions, problemCatalogCourseOption } from './problem-catalog-courses.mjs';
 import { courseSections, chapterSectionKey } from './course-sections.mjs';
 import { courseLocalizations, localizedFields } from './course-localizations.mjs';
 import { normalizeCourseAcslLinks, resolveCourseAcslLinks, projectCourseAcslLinks, acslLinkCounts } from './course-acsl.mjs';
@@ -116,6 +117,27 @@ export async function loadSchoolCourse(db,schoolId,id,user,role,{publishedOnly=f
  }
  return {course,view,canManage:false,identityId};
 }
+export async function schoolProblemCatalogCourses(db, schoolId, user, role, courseId) {
+ const { rows } = await db.query(`SELECT c.id FROM school_courses c
+  JOIN school_course_publications p ON p.school_id=c.school_id AND p.course_id=c.id AND p.revision=c.published_revision
+  WHERE c.school_id=$1 AND c.published AND c.archived_at IS NULL
+    AND EXISTS (SELECT 1 FROM jsonb_array_elements(p.chapters) chapter
+      WHERE jsonb_array_length(COALESCE(chapter->'problems','[]'::jsonb))>0)
+  ORDER BY p.title,c.id`, [schoolId]);
+ const courses = [];
+ let versions = new Map();
+ for (const { id } of rows) {
+  try {
+   const { view } = await loadSchoolCourse(db, schoolId, id, user, role, { publishedOnly: true });
+   courses.push(problemCatalogCourseOption(id, { title: view.title, localizations: view.properties?.localizations }));
+   if (courseId === id) versions = chapterProblemVersions(view.chapters);
+  } catch (error) {
+   if (error.status !== 404) throw error;
+  }
+ }
+ return { courses, versions };
+}
+
 async function schoolCoursePreviewView(db,schoolId,loaded){
  if(!loaded.canManage)fail(403,'FORBIDDEN','需要课程管理权限');
  const course=loaded.course;

@@ -18,6 +18,7 @@ import { CopyCodeButton } from "./copy-code-button";
 import { isPending, productionApi, productionId, type Assignment, type CampusUser, type ProductionProblem, type Submission, type SubmissionLanguage } from "@/lib/production-api";
 import { MAX_CUSTOM_INPUT_LENGTH } from "./result-feedback";
 import { Feedback, LessonContent, ResultPanel, State, textarea, useData, useMutation, useSubmission, type DetailedSubmission } from "./shared";
+import { problemCourseFilterKey } from "./problem-catalog-course-filter";
 import { draftKey, initialWorkspaceLanguage, readDraft, readDraftLanguage, readCurrentDraft, readCurrentDraftLanguage, saveDraft, saveDraftLanguage, workspaceDraftContext, workspaceEditorCode, type WorkspaceSubmission } from "./drafts";
 import {formatCode,downloadCode} from "./code-format";
 import {WorkspaceThemeProvider} from "@/components/ui/theme-context";
@@ -164,6 +165,9 @@ function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProb
   const statementId = useId();
   const courseValid=!!courseChapter?.problems.some(p=>p.problemId===problem.id&&p.versionId===problem.versionId);
   const returnTo = adapter?.returnTo ?? (learningPathId&&chapterId?`/student/learning-paths/${encodeURIComponent(learningPathId)}/chapters/${encodeURIComponent(chapterId)}`:safeReturn(params.get("returnTo"))) ?? (timedPracticeId ? `/student/timed-practice/${timedPracticeId}` : assignmentId ? `/student/assignments/${assignmentId}` : originalId ? `/student/submissions/${originalId}` : "/student/problems");
+  const [returnPath, returnQuery] = returnTo.split("?", 2);
+  const catalogReturn = returnPath === "/student/problems";
+  const catalogCourseId = catalogReturn ? new URLSearchParams(returnQuery).get(problemCourseFilterKey) : null;
   const sourceLabel = params.get("sourceLabel") ?? (timedPracticeId ? tx("限时训练", "Timed Practice") : assignmentId ? tx("作业", "Assignment") : originalId ? tx("订正本", "Review Notebook") : tx("题目", "Problems"));
   const sourceDisplay = sourceLabel === "Assignment" ? tx("作业", "Assignment") : t(sourceLabel);
   const context = adapter?.context ?? workspaceDraftContext({ originalSubmissionId: originalId, timedPracticeId, assignmentId, learningPathId, chapterId });
@@ -204,7 +208,8 @@ function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProb
     && formalResult.kind === "submit" && formalResult.status === "AC" ? formalResult.id : null;
   const celebrations = useAssignmentCelebrations(user.id, finishingSubmissionId);
   const celebration = !settingsOpen && !confirm && !layoutOpen && !problemListOpen ? celebrations.current : undefined;
-  const library=useData<{items:ProductionProblem[]}>(!adapter&&!learningPathId&&!assignmentId&&!timedPracticeId?"problems":"");
+  const catalogPath = catalogCourseId ? `problems?${new URLSearchParams({ courseId: catalogCourseId })}` : "problems";
+  const library=useData<{items:ProductionProblem[]}>(!adapter&&!learningPathId&&!assignmentId&&!timedPracticeId?catalogPath:"");
   const assignmentProblem = assignment.data?.problems.find(p => p.problemId === problem.id && p.versionId === problem.versionId);
   const assignmentValid = Boolean(assignmentProblem);
   const problemReward = assignmentProblem?.rewardPoints ?? 0;
@@ -308,7 +313,7 @@ function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProb
   }, [setLayoutMessage,tx]);
   const runRef = useRef(run);
   const leaveRef=useRef<()=>void>(()=>{});
-  useEffect(()=>{leaveRef.current=()=>navigateWorkspace(adapter?.returnTo ?? "/student/problems");});
+  useEffect(()=>{leaveRef.current=()=>navigateWorkspace(adapter?.returnTo ?? (catalogReturn ? returnTo : "/student/problems"));});
   useEffect(() => { runRef.current = run; });
   useEffect(() => {
     function shortcut(event: globalThis.KeyboardEvent) {
@@ -416,7 +421,7 @@ function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProb
           <button type="button" className={styles.tool} title={navigation.next?`${tx("下一题：","Next: ")}${navigation.next.title??""}`:tx("没有下一题","No next problem")} aria-label={tx("下一题","Next problem")} disabled={pending||navigationLoading||Boolean(navigationError)||!navigation.next} onClick={()=>switchProblem(navigation.next)} data-od-id="next-problem"><ChevronRight size={20}/></button>
           <button type="button" className={styles.tool} title={tx("随机选择当前列表中的另一题","Choose another problem at random")} aria-label={tx("随机选题","Random problem")} disabled={pending||navigationLoading||Boolean(navigationError)||!navigation.random.length} onClick={randomProblem} data-od-id="random-problem"><Shuffle size={18}/></button>
         </div>
-        <button type="button" className={styles.contextReturn} onClick={()=>navigateWorkspace(returnTo)} title={adapter?.returnLabel ?? `${tx("返回 ","Back to ")}${sourceDisplay}`} data-od-id={returnTo === "/student/problems" ? "workspace-back-to-problems" : "workspace-context-return"}>{adapter ? adapter.returnLabel : learningPathId?tx("返回章节","Back to chapter"):assignmentId?tx("返回作业","Back to assignment"):timedPracticeId?tx("返回练习","Back to practice"):originalId?tx("返回原提交","Back to original submission"):returnTo === "/student/problems"?tx("返回题目","Back to Problems"):tx("返回来源","Back to source")}</button>
+        <button type="button" className={styles.contextReturn} onClick={()=>navigateWorkspace(returnTo)} title={adapter?.returnLabel ?? `${tx("返回 ","Back to ")}${sourceDisplay}`} data-od-id={catalogReturn ? "workspace-back-to-problems" : "workspace-context-return"}>{adapter ? adapter.returnLabel : learningPathId?tx("返回章节","Back to chapter"):assignmentId?tx("返回作业","Back to assignment"):timedPracticeId?tx("返回练习","Back to practice"):originalId?tx("返回原提交","Back to original submission"):catalogReturn?tx("返回题目","Back to Problems"):tx("返回来源","Back to source")}</button>
       </div>
       {timedPracticeId?<div className="min-w-0 shrink-0" data-od-id="timed-navigation-clock"><TimedClock session={timedSession} compact/></div>:settings.actionPlacement === "toolbar" && <div className={styles.actions}>{runButtons}</div>}
       <div className={styles.tools}>
@@ -543,7 +548,7 @@ function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProb
     </Dialog>
     <Dialog open={confirm !== null} onOpenChange={open => { if (!open) setConfirm(null); }}><DialogContent><DialogTitle>{confirm === "leave" ? tx("离开答题页面？","Leave workspace?") : confirm === "reset" ? tx("重置初始代码？","Reset starter code?") : tx("答题帮助","Workspace help")}</DialogTitle><DialogDescription>{confirm === "leave" ? tx("草稿保留在当前浏览器会话中，但尚未正式提交，离开不会自动交卷。","The draft remains in this browser session but has not been submitted. Leaving will not submit it.") : confirm === "reset" ? tx("当前草稿将替换为题目初始代码；服务器已接收的提交仍保留。","Your current draft will be replaced with the starter code. Existing submissions remain on the server.") : tx("运行仅测试公开样例；自定义输入只运行程序，不判断正确性；提交才创建正式记录。Ctrl / ⌘ + 单引号运行样例，Ctrl / ⌘ + Enter 正式提交，Ctrl / ⌘ + S 保存草稿，代码区按 Esc 启用或返回 Vim 普通模式；其他区域按 Esc 退出面板最大化。","Run checks only the public samples; custom input runs without checking correctness. Submit creates a formal record. Ctrl / ⌘ + apostrophe runs samples, Ctrl / ⌘ + Enter submits, Ctrl / ⌘ + S saves the draft, and Esc enables or returns to Vim normal mode in the code editor. Outside the editor, Esc exits panel maximization.")}</DialogDescription><DialogFooter><Button variant="secondary" onClick={() => setConfirm(null)}>{confirm === "leave" ? tx("继续编辑","Keep editing") : tx("关闭","Close")}</Button>{confirm === "leave" && <Button variant="danger" onClick={() => { const destination=pendingDestination??returnTo;setConfirm(null);router.push(destination); }}>{tx("离开，不提交","Leave without submitting")}</Button>}{confirm === "reset" && <Button onClick={() => { setCode(starterFor(problem,language));setConfirm(null); }}>{tx("重置代码","Reset code")}</Button>}</DialogFooter></DialogContent></Dialog>
 
-    <ProblemListDrawer open={problemListOpen} onOpenChange={setProblemListOpen} title={adapter?.navigation.title ?? (learningPathId?tx("本章练习","Chapter practice"):assignmentId?tx("作业题目","Assignment problems"):timedPracticeId?tx("训练题目","Practice problems"):tx("题目列表","Problem list"))} description={adapter?.navigation.description ?? (learningPathId?`${course.data?.title??tx("课程","Course")} › ${courseChapter?.title??tx("加载章节…","Loading chapter…")}`:undefined)} items={scopedProblemList?navigationItems.map(p=>({id:p.problemId,title:p.title??tx("练习","Practice")})):library.data?.items??[]} currentId={problem.id} loading={scopedProblemList?navigationLoading:library.loading} error={scopedProblemList?navigationError:library.error} onRetry={adapter?.navigation.reload ?? (learningPathId?course.reload:assignmentId?assignment.reload:timedPracticeId?timedSession.reload:library.reload)} onSelect={target=>{setProblemListOpen(false);if(target.id!==problem.id){if(scopedProblemList)switchProblem(navigationItems.find(p=>p.problemId===target.id)??null);else navigateWorkspace(`/student/problems/${encodeURIComponent(target.id)}`);}}}/>
+    <ProblemListDrawer open={problemListOpen} onOpenChange={setProblemListOpen} title={adapter?.navigation.title ?? (learningPathId?tx("本章练习","Chapter practice"):assignmentId?tx("作业题目","Assignment problems"):timedPracticeId?tx("训练题目","Practice problems"):tx("题目列表","Problem list"))} description={adapter?.navigation.description ?? (learningPathId?`${course.data?.title??tx("课程","Course")} › ${courseChapter?.title??tx("加载章节…","Loading chapter…")}`:undefined)} items={scopedProblemList?navigationItems.map(p=>({id:p.problemId,title:p.title??tx("练习","Practice")})):library.data?.items??[]} currentId={problem.id} loading={scopedProblemList?navigationLoading:library.loading} error={scopedProblemList?navigationError:library.error} onRetry={adapter?.navigation.reload ?? (learningPathId?course.reload:assignmentId?assignment.reload:timedPracticeId?timedSession.reload:library.reload)} onSelect={target=>{setProblemListOpen(false);if(target.id!==problem.id){if(scopedProblemList)switchProblem(navigationItems.find(p=>p.problemId===target.id)??null);else navigateWorkspace(`/student/problems/${encodeURIComponent(target.id)}${catalogCourseId ? `?${new URLSearchParams({ returnTo })}` : ""}`);}}}/>
 
     <WorkspaceSettingsDialog key={settingsScope} editorOnly={settingsScope==="editor"} initialSection={settingsScope==="editor"?"editor":"layout"} open={settingsOpen} onOpenChange={setSettingsOpen} settings={settings} update={update} reset={reset}/>
   </div></WorkspaceThemeProvider>;

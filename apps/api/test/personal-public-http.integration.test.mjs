@@ -363,6 +363,7 @@ test('personal registration and reviewed public learning use real grants without
    await request(admissionPath,{auth:legacy,method:'POST',body:{expectedRevision:version.revision},status:409});
    const listing = (await request(admissionPath,{auth:legacy,method:'POST',body:expected,status:201})).data;
    const publicPath = `/practice/courses/${listing.id}`;
+   const problemCatalogue = `/practice/problems?courseId=${listing.id}`;
    assert.equal((await request(publicPath+'/entry',{auth:legacy})).data.admission,'direct');
    const summary = (await request(publicPath+'/entry',{auth:outsider})).data;
    assert.equal(summary.admission,'apply');
@@ -410,6 +411,9 @@ test('personal registration and reviewed public learning use real grants without
    assert.equal(pendingSummary.admission,'pending');
    assert.equal(pendingSummary.totalExercises,undefined,'pending applicants do not receive private course progress');
    assert.doesNotMatch(JSON.stringify(pendingSummary),/Reviewed original lesson|Public practice first|PRIVATE-/);
+   const pendingProblems = (await request(problemCatalogue+'&page=1',{auth:outsider})).data;
+   assert.deepEqual(pendingProblems.items,[]);
+   assert.ok(!pendingProblems.courses.some(item=>item.id===listing.id));
    const application = (await request(admissionPath,{auth:legacy})).data.applications[0];
    const admissionQueue = `/schools/${LEGACY_SCHOOL_ID}/course-admissions`;
    assert.deepEqual((await request(admissionQueue,{auth:legacy})).data.items,
@@ -441,6 +445,14 @@ test('personal registration and reviewed public learning use real grants without
    assert.deepEqual([content.chapterCount,content.completedChapters,content.totalExercises,content.completedExercises],[2,0,2,0]);
    assert.match(response.headers.get('cache-control')??'',/no-store/);
    assert.doesNotMatch(JSON.stringify(content),/PRIVATE-/);
+   const filtered = (await request(problemCatalogue+'&page=1',{auth:outsider})).data;
+   assert.equal(filtered.courseId,listing.id);
+   assert.equal(filtered.courses.find(item=>item.id===listing.id).title,original.title);
+   assert.deepEqual(new Set(filtered.items.map(item=>item.id)),new Set([first.problemId,last.problemId]));
+   assert.doesNotMatch(JSON.stringify(filtered),/Reviewed original lesson|PRIVATE-/);
+   const searched = (await request(problemCatalogue+'&page=1&q='+encodeURIComponent(last.title),{auth:outsider})).data;
+   assert.deepEqual(searched.items.map(item=>item.id),[last.problemId]);
+   assert.deepEqual((await request(problemCatalogue+'&page=2',{auth:outsider})).data.items,[]);
    const submitted = (await request(practicePath+'/submissions',{auth:outsider,method:'POST',status:202,
     body:{versionId:first.versionId,kind:'submit',code:'print(7)',requestId:randomUUID()}})).data;
    const resultPath = practicePath+'/submissions/'+submitted.id;
@@ -476,6 +488,7 @@ test('personal registration and reviewed public learning use real grants without
    const withdrawn = (await request(publicPath,{auth:outsider})).data;
    assert.deepEqual(withdrawn.chapters[0].problems,[{...last,solved:false}]);
    assert.deepEqual([withdrawn.totalExercises,withdrawn.completedExercises],[1,0]);
+   assert.deepEqual((await request(problemCatalogue+'&page=1',{auth:outsider})).data.items.map(item=>item.id),[last.problemId]);
    await request(practicePath+'?versionId='+first.versionId,{auth:outsider,status:404});
    await request(practicePath+'/submissions',{auth:outsider,method:'POST',status:404,
     body:{versionId:first.versionId,kind:'submit',code:'print(7)',requestId:randomUUID()}});

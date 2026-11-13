@@ -1,3 +1,4 @@
+import { legacyProblemCatalogCourses, problemCatalogCourseRequest } from './problem-catalog-courses.mjs';
 import { canEditPlatformContent } from './platform-content-access.mjs';
 import { handleAcsl } from './acsl.mjs';
 import { recordPublicPracticeStaffExposure } from './public-scholarship.mjs';
@@ -459,6 +460,9 @@ export async function createDomainServices(pool,config) {
     const assignmentPicker=url.searchParams.get('purpose')==='assignment';
     if(assignmentPicker)staff(user);
     const selectedProblem=assignmentPicker&&url.searchParams.get('problemId');
+    const { courseId, includeCourses } = problemCatalogCourseRequest(url);
+    const courseFilter = !assignmentPicker && includeCourses
+     ? await transaction(pool, db => legacyProblemCatalogCourses(db, user, courseId)) : null;
     const rows=(await pool.query(`SELECT v.*,
      (SELECT count(*) FROM test_cases tc WHERE tc.version_id=v.id AND tc.enabled) formal_test_count,
      p.bank_id,bank.visibility bank_visibility,
@@ -501,13 +505,15 @@ export async function createDomainServices(pool,config) {
     LEFT JOIN problem_versions pv ON pv.id=p.current_version_id AND pv.published_at IS NOT NULL
     WHERE p.archived_at IS NULL AND bank.archived_at IS NULL
      AND ($6::uuid IS NULL OR bank.id=$6) AND ($8::uuid IS NULL OR p.id=$8)
-    ORDER BY p.created_at DESC LIMIT 500`,[user.id,rolesInclude(user,'admin'),rolesInclude(user,'teacher'),user.identityId,rolesInclude(user,'student'),url.searchParams.get('bankId')?uuid(url.searchParams.get('bankId')):null,assignmentPicker,selectedProblem?uuid(selectedProblem):null])).rows;
+     AND ($9::uuid[] IS NULL OR p.id=ANY($9) AND bank.visibility='school'
+       AND v.school_visible_at IS NOT NULL AND v.rank_review_status='approved')
+    ORDER BY p.created_at DESC LIMIT 500`,[user.id,rolesInclude(user,'admin'),rolesInclude(user,'teacher'),user.identityId,rolesInclude(user,'student'),url.searchParams.get('bankId')?uuid(url.searchParams.get('bankId')):null,assignmentPicker,selectedProblem?uuid(selectedProblem):null,courseFilter?.problemIds??null])).rows;
     const problemIds=rows.map(r=>r.problem_id),ownProgress=await problemOwnProgress(pool,user,problemIds);
     const configured=(await pool.query('SELECT problem_id,points FROM point_rewards WHERE assignment_id IS NULL AND problem_id=ANY($1::uuid[])',[problemIds])).rows;
     const firstAcPoints=new Map(configured.map(reward=>[reward.problem_id,reward.points]));
     const staffView=isStaff(user);
     const presented=staffView?rows:await studentPublicStatementRows(pool,rows);
-    return respond(200,{items:presented.map(r=>({
+    return respond(200,{...(courseFilter && { courseId, courses: courseFilter.courses }),items:presented.map(r=>({
      ...problemShape(r,{includeDisabledSamples:!!r.can_edit}),
      ...(staffView?{publishedDifficulty:typeof r.published_difficulty==='string'?r.published_difficulty:null}:{}),
      bankId:r.bank_id,canEdit:!!r.can_edit,canPublish:!!r.can_edit&&r.validation_status==='AC'&&!r.published_at,

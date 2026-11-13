@@ -313,6 +313,20 @@ test('school course HTTP lifecycle preserves published boundaries and stable lea
     c=(await post(cp+'/publish',teacher,{expectedRevision:c.revision},200)).data;
     let view=(await request(cp,{auth:student})).data;assert.equal(view.totalExercises,1);assert.equal(view.completedExercises,0);
     assert.equal(JSON.stringify(view).includes('PRIVATE_CODE'),false);assert.equal(JSON.stringify(view).includes('SECRET_TEST'),false);
+    const bankCatalogue=school(alpha.id,'problems')+'?'+new URLSearchParams({bankId:bank,includeCourseFilters:'1',courseId:c.id});
+    const catalogue=(await request(bankCatalogue,{auth:student})).data;
+    assert.equal(catalogue.courseId,c.id);
+    assert.deepEqual(catalogue.items.map(item=>[item.id,item.versionId]),[[problem,version]]);
+    assert.equal(catalogue.courses.find(item=>item.id===c.id).title,ci.title);
+    assert.doesNotMatch(JSON.stringify(catalogue),/PRIVATE_CODE|SECRET_TEST/);
+    await request(bankCatalogue,{auth:betaAdmin,status:404});
+    const restricted=(await post(courses,teacher,{...ci,requestId:randomUUID(),accessScope:'classes',classIds:[classA.id]})).data;
+    await post(`${courses}/${restricted.id}/publish`,teacher,{expectedRevision:restricted.revision},200);
+    const restrictedCatalogue=bankCatalogue.replace(c.id,restricted.id);
+    const hidden=(await request(restrictedCatalogue,{auth:unlinked})).data;
+    assert.deepEqual(hidden.items,[]);
+    assert.ok(!hidden.courses.some(item=>item.id===restricted.id));
+    assert.deepEqual((await request(restrictedCatalogue,{auth:student})).data.items.map(item=>item.id),[problem]);
     const tutorialPath=school(alpha.id,`problems/${problem}/tutorial`);
     const tutorialView=tutorialPath+'?'+new URLSearchParams({versionId:version,courseId:c.id,chapterId:chapterA.id});
     const originalTutorial={source:'course',courseTitle:ci.title,title:chapterA.title,body:chapterA.body};
@@ -371,6 +385,7 @@ test('school course HTTP lifecycle preserves published boundaries and stable lea
     await pool.query('INSERT INTO school_problem_versions(school_id,id,problem_id,draft_revision,definition) VALUES($1,$2,$3,2,$4)',[alpha.id,nextVersion,problem,{title:'New current title'}]);
     await pool.query('UPDATE school_problems SET published_version_id=$3 WHERE school_id=$1 AND id=$2',[alpha.id,problem,nextVersion]);
     view=(await request(cp,{auth:student})).data;assert.equal(view.chapters[0].problems[0].available,false);assert.equal(view.chapters[0].problems[0].title,'Safe title');
+    assert.deepEqual((await request(bankCatalogue,{auth:student})).data.items,[]);
     await post(cp+'/publish',teacher,{expectedRevision:c.revision},409);
    });
 

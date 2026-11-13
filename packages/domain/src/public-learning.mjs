@@ -1,3 +1,4 @@
+import { chapterProblemVersions, problemCatalogCourseOption } from './problem-catalog-courses.mjs';
 import { handlePlatformContentEditors } from './platform-content-editors.mjs';
 import { handlePlatformProblems } from './platform-problems.mjs';
 import { courseEntry } from './public-course-entry.mjs';
@@ -77,6 +78,34 @@ async function admissionFor(db, listing, course, accountId) {
   return application ? 'rejected' : 'apply';
 }
 
+
+// Use the same edition and admission checks as the course reader. The filter
+// returns only links that also exist in the published problem catalogue.
+export async function publicProblemCatalogCourses(db, user, courseId) {
+  await context(db, user);
+  const { rows: schoolListings } = await db.query(`SELECT l.* FROM public_course_listings l
+    WHERE l.withdrawn_at IS NULL
+      AND NOT EXISTS (SELECT 1 FROM learning_paths p WHERE p.id=l.course_id AND p.owner_scope='platform')`);
+  const listings = [...await platformCourseListings(db), ...schoolListings];
+  const courses = [];
+  let versions = new Map();
+  for (const listing of listings) {
+    const course = await edition(db, listing, { detail: !listing.platform_owned });
+    if (!course || await admissionFor(db, listing, course, user.id) !== 'direct') continue;
+    let chapters = course.chapters;
+    if (listing.platform_owned) {
+      const { rows } = await db.query(`SELECT cp.problem_id AS "problemId",cp.version_id AS "versionId"
+        FROM learning_chapters c JOIN chapter_problems cp ON cp.chapter_id=c.id
+        WHERE c.path_id=$1 AND c.archived_at IS NULL`, [listing.course_id]);
+      chapters = [{ problems: rows }];
+    }
+    const links = chapterProblemVersions(chapters);
+    if (!links.size) continue;
+    courses.push(problemCatalogCourseOption(listing.id, course));
+    if (courseId === listing.id) versions = links;
+  }
+  return { courses, versions };
+}
 
 async function catalogue(pool, user, url) {
   return transaction(pool, async db => {

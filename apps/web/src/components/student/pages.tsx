@@ -11,7 +11,7 @@ import { AppLink } from "@/components/navigation";
 import { LearnerResourceScope } from "@/components/schools/learner-resource-scope";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Bookmark, CalendarClock, Check, CheckCircle2, CircleAlert, Code2, KeyRound, MessageSquareText, NotebookPen, Pencil, ShieldCheck, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -27,6 +27,7 @@ import { StudentAssignmentCard } from "./activity-cards";
 import { AssignmentCompletionDialog } from "./assignment-completion";
 export { Progress } from "./dashboard-view";
 import { ProblemCatalogSearch } from "./problem-catalog-search";
+import { ProblemCatalogCourseFilter, problemCourseFilterKey, type ProblemCatalogResult } from "./problem-catalog-course-filter";
 import problemStyles from "./problems-page.module.css";
 const StudentPaper4List = dynamic(() => import("@/components/paper4/student-paper4").then(module => module.StudentPaper4List));
 const StudentPaper4Detail = dynamic(() => import("@/components/paper4/student-paper4").then(module => module.StudentPaper4Detail));
@@ -139,26 +140,39 @@ export function problemHref(problem: { problemId: string; versionId?: string }, 
 interface ProgressProblem extends ProductionProblem { ownProgress?: { status: string; bestScore: number | null; formalCount: number; lastSubmissionId: string | null; lastSubmittedAt: string | null }; }
 export function StudentProblems() {
   const { locale } = useLocale();
-  const problems = useData<{ items: ProgressProblem[] }>("problems"), favorites = useData<{ items: string[] }>("problem-favorites");
+  const courseId = useSearchParams().get(problemCourseFilterKey)?.toLowerCase() ?? "";
+  const catalogQuery = new URLSearchParams({ includeCourseFilters: "1", ...(courseId && { courseId }) });
+  const problems = useData<ProblemCatalogResult<ProgressProblem>>(`problems?${catalogQuery}`);
+  const favorites = useData<{ items: string[] }>("problem-favorites");
+  const catalogMatches = (problems.data?.courseId ?? "") === courseId;
+  const rows = catalogMatches ? problems.data?.items ?? [] : [];
+  function changeCourse(value: string) {
+    const url = new URL(window.location.href);
+    if (value) url.searchParams.set(problemCourseFilterKey, value);
+    else url.searchParams.delete(problemCourseFilterKey);
+    window.history.replaceState(null, "", url);
+  }
   const [query, setQuery] = useState(""), [topic, setTopic] = useState(""), [status, setStatus] = useState(""), [mode, setMode] = useState(""), [savedOnly, setSavedOnly] = useState(false);
   const action = useMutation();
-  const topics = [...new Set(problems.data?.items.flatMap(p => p.tags ?? []) ?? [])];
+  const topics = [...new Set(rows.flatMap(p => p.tags ?? []))];
   const details = (p: ProgressProblem) => ({ bestScore: p.ownProgress?.bestScore, status: p.ownProgress ? p.ownProgress.status === "NotStarted" ? "Not started" : p.ownProgress.status : "Unavailable" });
-  const visible = problems.data?.items.filter(p => `${p.id} ${p.title} ${p.tags?.join(" ") ?? ""}`.toLowerCase().includes(query.toLowerCase()) && (!topic || p.tags?.includes(topic)) && (!status || details(p).status === status) && (!mode || p.mode === mode) && (!savedOnly || favorites.data?.items.includes(p.id))) ?? [];
+  const visible = rows.filter(p => `${p.id} ${p.title} ${p.tags?.join(" ") ?? ""}`.toLowerCase().includes(query.toLowerCase()) && (!topic || p.tags?.includes(topic)) && (!status || details(p).status === status) && (!mode || p.mode === mode) && (!savedOnly || favorites.data?.items.includes(p.id)));
   return <div className={problemStyles.page}>
     <PageHeader title={ui(locale, "题目", "Problems")}/>
-    <div className={problemStyles.toolbar}>
+    <div className={`${problemStyles.toolbar} flex-wrap`}>
       <ProblemCatalogSearch value={query} onChange={setQuery} label={ui(locale, "搜索编号、标题或专题", "Search ID, title, or topic")}/>
+      <ProblemCatalogCourseFilter courses={problems.data?.courses} value={courseId} onChange={changeCourse}/>
       <StudentProblemFilter topics={topics} topic={topic} status={status} mode={mode} savedOnly={savedOnly} onTopic={setTopic} onStatus={setStatus} onMode={setMode} onSaved={setSavedOnly}/>
     </div>
     <Feedback action={action}/>
-    <State data={problems}>{!problems.data?.items.length ? <Empty title={ui(locale, "暂无可练习题目", "No problems are available")} description={ui(locale, "老师尚未开放题目；如有疑问请联系老师。", "Your teacher has not made problems available for this class. Please contact your teacher if this looks incorrect.")}/> : !visible.length ? <Empty title={ui(locale, "没有匹配的题目", "No matching problems")} description={ui(locale, "请尝试其他编号、标题、专题或筛选条件。", "Try a different ID, title, topic, or filter.")}/> : <div className={problemStyles.tableWrap}>
+    <State data={{ ...problems, loading: !problems.error && (problems.loading || !catalogMatches), data: catalogMatches ? problems.data : null }}>{!rows.length && !courseId ? <Empty title={ui(locale, "暂无可练习题目", "No problems are available")} description={ui(locale, "老师尚未开放题目；如有疑问请联系老师。", "Your teacher has not made problems available for this class. Please contact your teacher if this looks incorrect.")}/> : !visible.length ? <Empty title={ui(locale, "没有匹配的题目", "No matching problems")} description={ui(locale, "请尝试其他编号、标题、专题或筛选条件。", "Try a different ID, title, topic, or filter.")}/> : <div className={problemStyles.tableWrap}>
       <table className={problemStyles.table}>
         <colgroup><col style={{width:"3%"}}/><col style={{width:"12.5%"}}/><col style={{width:"8%"}}/><col style={{width:"24.5%"}}/><col style={{width:"16%"}}/><col style={{width:"10%"}}/><col style={{width:"10%"}}/><col style={{width:"10%"}}/><col style={{width:"6%"}}/></colgroup>
         <thead><tr>{["", ui(locale, "完成状态", "Your status"), "ID", ui(locale, "标题", "Title"), ui(locale, "专题", "Topic"), ui(locale, "难度", "Level"), ui(locale, "题目形式", "Interface"), ui(locale, "最佳成绩", "Best"), ui(locale, "操作", "Action")].map((text, i) => <th key={i} scope="col">{text}</th>)}</tr></thead>
         <tbody>{visible.map(p => {
           const detail = details(p), saved = favorites.data?.items.includes(p.id), tags = p.tags?.join(" · ") || "—";
-          const href = problemHref({ problemId: p.id, versionId: p.versionId });
+          const href = problemHref({ problemId: p.id, versionId: p.versionId }, courseId
+            ? { returnTo: `/student/problems?${new URLSearchParams({ [problemCourseFilterKey]: courseId })}` } : {});
           return <tr key={p.id}>
             <td><button type="button" aria-label={saved ? ui(locale, `取消收藏 ${p.title}`, `Remove bookmark ${p.title}`) : ui(locale, `收藏 ${p.title}`, `Bookmark ${p.title}`)} aria-pressed={Boolean(saved)} disabled={action.busy || favorites.loading || Boolean(favorites.error)} onClick={() => action.run(async () => { await productionApi(`problem-favorites/${p.id}`, { method: "PUT", body: { favorite: !saved } }); favorites.reload(); })} className={`${problemStyles.bookmark} ${saved ? "text-primary" : "text-muted-foreground"}`}><Bookmark size={15} fill={saved ? "currentColor" : "none"}/></button></td>
             <td><StatusPill status={statusLabel(locale, detail.status)}/></td>
@@ -174,7 +188,7 @@ export function StudentProblems() {
       </table>
     </div>}</State>
     {favorites.error && <p role="alert" className="text-sm text-destructive">{ui(locale, "收藏加载失败：", "Could not load bookmarks: ")}{favorites.error}</p>}
-    <p className={problemStyles.count}>{ui(locale, `显示 ${visible.length} / ${problems.data?.items.length ?? 0} 道题`, `Showing ${visible.length} of ${problems.data?.items.length ?? 0} problems`)}</p>
+    <p className={problemStyles.count}>{ui(locale, `显示 ${visible.length} / ${rows.length} 道题`, `Showing ${visible.length} of ${rows.length} problems`)}</p>
   </div>;
 }
 

@@ -64,7 +64,7 @@ export function PracticePage({ user, pathname, onLogout, onUserSaved }: {
       content = <StudentPublicProfile key={courseId} profileId={courseId} viewer={user} workspace="practice"/>;
       break;
     case "problems":
-      content = <PublicPractice/>;
+      content = <PublicPractice accountId={user.id}/>;
       break;
     case "courses":
       content = courseId ? <PublicCoursePage key={courseId} id={courseId} homeHref="/practice/courses"/> : <PublicCourseCatalog courseHref={publicCourseHref}/>;

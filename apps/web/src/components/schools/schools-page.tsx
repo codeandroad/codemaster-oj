@@ -220,6 +220,7 @@ export function SchoolsPage({
   if (!teaching && active.section === "acsl" && search.get("coding") === "1") return <AcslPage key={selected.id} schoolId={selected.id} user={user} baseHref={href("acsl")} />;
   const problems = <SchoolPractice
     key={search.get("problemId") ?? "list"}
+    accountId={user.id}
     schoolId={selected.id}
     role={role}
     initialProblemId={search.get("problemId") ?? undefined}
@@ -342,7 +343,7 @@ export function SchoolsPage({
                     refreshRevision={refreshRevision}
                   />
                 ) : active.section === "problems" ? (
-                  teaching ? problems : <LearnerResourceScope section="problems" schoolHref={href("problems")}>{problems}</LearnerResourceScope>
+                  teaching ? problems : <LearnerResourceScope section="problems" schoolHref={href("problems")} accountId={user.id}>{problems}</LearnerResourceScope>
                 ) : active.section === "course-admissions" ? (
                   <SchoolCourseAdmissions schoolId={selected.id} href={href("course-admissions")}
                     coursesHref={schoolWorkspaceHref(selected.id, "courses", "teacher")}/>

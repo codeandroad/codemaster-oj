@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useCatalogFilterUrl } from "@/components/use-catalog-filter-preferences";
 import { BookOpen, History, Languages, Lightbulb, RefreshCw, Settings } from "lucide-react";
 import { useLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
@@ -33,33 +34,39 @@ import { PracticeToolbar, type PracticeNavigation } from "./school-practice-tool
 
 type Job=DetailedSubmission&{state:string;caseFeedback:ResultCase[]};
 
-function updatePracticeLocation(patch: Record<string, string | null>, replace = false) {
+function updatePracticeLocation(patch: Record<string, string | null>) {
   const current = window.location;
   const href = practiceLocation(current.pathname, current.search, patch, current.hash);
   if (href === `${current.pathname}${current.search}${current.hash}`) return;
-  if (replace) window.history.replaceState(null, "", href);
-  else window.history.pushState(null, "", href);
+  window.history.pushState(null, "", href);
 }
 
-export function SchoolPractice(props: { schoolId: string; role: string; initialProblemId?: string }) {
+const schoolCatalogKeys = [...Object.values(practiceFilterKeys), problemCourseFilterKey];
+
+export function SchoolPractice(props: { accountId: string; schoolId: string; role: string; initialProblemId?: string }) {
   return <SchoolPracticeContents key={`${props.schoolId}:${props.role}:${props.initialProblemId ?? "list"}`} {...props} />;
 }
 
-function SchoolPracticeContents({ schoolId, role, initialProblemId }: { schoolId: string; role: string; initialProblemId?: string }) {
+function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }: { accountId: string; schoolId: string; role: string; initialProblemId?: string }) {
   const { locale } = useLocale();
   const tx = (zh: string, en: string) => locale === "zh" ? zh : en;
   const base = `schools/${schoolId}`;
-  const search = useSearchParams();
+  const params = useSearchParams();
+  const selected = params.get("problemId") ?? initialProblemId ?? null;
+  const { search, changeUrlFilters, ready } = useCatalogFilterUrl(
+    `campus-judge:school-problems:v1:${accountId}:${schoolId}:${role}`, schoolCatalogKeys,
+    !selected || !params.has("courseId"),
+  );
   const staff = role === "teacher" || role === "school_admin";
   const filters = practiceCatalogFilters(search, staff);
   const { bankId } = filters;
   const courseId = staff ? "" : search.get(problemCourseFilterKey)?.toLowerCase() ?? "";
   const banks = useData<{ items: Bank[] }>(`${base}/problem-banks`);
   const catalogQuery = new URLSearchParams(staff ? {} : { includeCourseFilters: "1", ...(courseId && { courseId }) });
-  const allProblems = useData<ProblemCatalogResult<Problem>>(`${base}/problems${catalogQuery.size ? `?${catalogQuery}` : ""}`);
+  const allProblems = useData<ProblemCatalogResult<Problem>>(ready ? `${base}/problems${catalogQuery.size ? `?${catalogQuery}` : ""}` : "");
   const bankQuery = new URLSearchParams(catalogQuery);
   if (bankId) bankQuery.set("bankId", bankId);
-  const bankProblems = useData<ProblemCatalogResult<Problem>>(bankId && bankId !== "platform" ? `${base}/problems?${bankQuery}` : "");
+  const bankProblems = useData<ProblemCatalogResult<Problem>>(ready && bankId && bankId !== "platform" ? `${base}/problems?${bankQuery}` : "");
   const problems = bankId && bankId !== "platform" ? bankProblems : allProblems;
   const platformSources = useData<{ items: PlatformSourceProblem[] }>(staff ? `platform/source-problems?schoolId=${schoolId}` : "");
   const sourceProblems: Problem[] = (platformSources.data?.items ?? []).map(problem => ({
@@ -74,9 +81,8 @@ function SchoolPracticeContents({ schoolId, role, initialProblemId }: { schoolId
   };
   const catalogBanks = [...(banks.data?.items ?? []), ...(sourceProblems.length ? [{ id: "platform", name: "CodeMaster", revision: 1, archived: false, canManage: false }] : [])];
   const catalogMatches = staff || (problems.data?.courseId ?? "") === courseId;
-  const catalog = { ...problems, loading: !problems.error && (problems.loading || !catalogMatches), data: catalogMatches ? problems.data : null };
+  const catalog = { ...problems, loading: !problems.error && (!ready || problems.loading || !catalogMatches), data: catalogMatches ? problems.data : null };
   const navigationProblems = (allProblems.data?.courseId ?? "") === courseId ? allProblems.data?.items ?? [] : [];
-  const selected = search.get("problemId") ?? initialProblemId ?? null;
   const [editing, setEditing] = useState<Problem | "new" | null>(null);
   const [platformEditing, setPlatformEditing] = useState<string | null>(null);
   const [bankEdit, setBankEdit] = useState<Bank | "new" | null>(null);
@@ -88,7 +94,7 @@ function SchoolPracticeContents({ schoolId, role, initialProblemId }: { schoolId
   function selectProblem(problemId: string | null) { updatePracticeLocation({ problemId }); }
   function changeFilters(patch: Partial<PracticeCatalogFilters>) {
     const fields = Object.fromEntries(Object.entries(patch).map(([key, value]) => [practiceFilterKeys[key as keyof PracticeCatalogFilters], typeof value === "boolean" ? value ? "1" : null : value]));
-    updatePracticeLocation(fields, true);
+    changeUrlFilters(fields);
   }
   function editProblem(problem: Problem) {
     if (problem.ownerScope === "platform") { setPlatformEditing(problem.id); return; }
@@ -116,7 +122,7 @@ function SchoolPracticeContents({ schoolId, role, initialProblemId }: { schoolId
     learnerResource={staff ? undefined : catalog}
     courseFilter={staff ? undefined : {
       value: courseId, courses: allProblems.data?.courses,
-      onChange: value => updatePracticeLocation({ [problemCourseFilterKey]: value }, true),
+      onChange: value => changeUrlFilters({ [problemCourseFilterKey]: value }),
     }}
     allProblems={staff ? withSources(allProblems.data?.items ?? []) : allProblems.data?.items ?? []}
     role={role}
@@ -419,11 +425,19 @@ function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation
 
 }
 
-export function PublicPractice(props:{problemId?:string}={}){return <PublicPracticeContents key={props.problemId??"list"} {...props}/>;}
-function PublicPracticeContents({ problemId }: { problemId?: string }) {
+const publicCatalogKeys = ["publicProblemQuery", publicProblemCourseFilterKey, "publicProblemPage"];
+
+export function PublicPractice(props: { accountId: string; problemId?: string }) {
+  return <PublicPracticeContents key={props.problemId ?? "list"} {...props} />;
+}
+function PublicPracticeContents({ accountId, problemId }: { accountId: string; problemId?: string }) {
   const { locale } = useLocale();
   const tx = (zh: string, en: string) => locale === "zh" ? zh : en;
-  const search = useSearchParams();
+  const params = useSearchParams();
+  const { search, changeUrlFilters, rememberUrlFilters, ready } = useCatalogFilterUrl(
+    `campus-judge:public-problems:v1:${accountId}`, publicCatalogKeys,
+    !(params.get("problemId") ?? problemId) || !params.has("publicCourseId"),
+  );
   const selected = search.get("problemId") ?? problemId ?? null;
   const urlQuery = (search.get("publicProblemQuery") ?? "").slice(0, 100);
   const courseId = search.get(publicProblemCourseFilterKey)?.toLowerCase() ?? "";
@@ -457,28 +471,30 @@ function PublicPracticeContents({ problemId }: { problemId?: string }) {
     const currentQuery = new URLSearchParams(window.location.search).get("publicProblemQuery") ?? "";
     setDraft(value === currentQuery && value === urlQuery ? null : value);
     clearTimeout(timer.current);
+    if (currentQuery !== value) rememberUrlFilters({ publicProblemQuery: value, publicProblemPage: null });
+    else rememberUrlFilters({});
     if (composing.current || currentQuery === value) return;
     timer.current = setTimeout(() => {
       if (window.location.href !== source) {
         setDraft(null);
         return;
       }
-      updatePracticeLocation({ publicProblemQuery: value, publicProblemPage: null }, true);
+      changeUrlFilters({ publicProblemQuery: value, publicProblemPage: null });
     }, 180);
   }
 
   const list = useData<ProblemCatalogResult<Problem> & { page: number; query: string; hasMore: boolean }>(
-    `practice/problems?${new URLSearchParams({ q: urlQuery.trim(), page: String(page), includeCourseFilters: "1", ...(courseId && { courseId }) })}`,
+    ready ? `practice/problems?${new URLSearchParams({ q: urlQuery.trim(), page: String(page), includeCourseFilters: "1", ...(courseId && { courseId }) })}` : "",
   );
   const matchesFilters = list.data?.query === query.trim() && list.data?.page === page && (list.data?.courseId ?? "") === courseId;
   const rows = matchesFilters ? list.data?.items ?? [] : [];
-  const pending = !list.error && (list.loading || !matchesFilters);
-  const selectProblem = (id: string | null) => updatePracticeLocation({ problemId: id });
+  const pending = !list.error && (!ready || list.loading || !matchesFilters);
+  const selectProblem = (id: string | null) => changeUrlFilters({ problemId: id, publicProblemQuery: query }, true);
   function changeCourse(value: string) {
     clearTimeout(timer.current);
-    updatePracticeLocation({ [publicProblemCourseFilterKey]: value, publicProblemQuery: query, publicProblemPage: null }, true);
+    changeUrlFilters({ [publicProblemCourseFilterKey]: value, publicProblemQuery: query, publicProblemPage: null });
   }
-  const changePage = (next: number) => updatePracticeLocation({ publicProblemPage: next === 1 ? null : String(next) });
+  const changePage = (next: number) => changeUrlFilters({ publicProblemPage: next === 1 ? null : String(next) }, true);
   if (selected) return <PublicProblemWorkspace key={`${selected}:${search.get("versionId") ?? ""}`} id={selected} catalog={{ ...list, data: pending ? null : { items: rows }, loading: pending }} />;
 
   return <div className={problemStyles.page}>

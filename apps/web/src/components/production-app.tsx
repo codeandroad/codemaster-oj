@@ -296,7 +296,7 @@ function ProductionView({pathname,role,user,profileVersion,onProfileSaved}:{path
   if (pathname==="/admin/accounts") return <AdminAccountsPage currentAccountId={user.id}/>;
   if (pathname==="/admin/people") return <AdminPeoplePage/>;
   if (pathname==="/admin/imports") return <AdminImportPage/>;
-  if (pathname==="/admin/problem-banks") return <AdminProblemBanks/>;
+  if (pathname==="/admin/problem-banks") return <AdminProblemBanks accountId={user.id}/>;
   if (pathname === "/admin/problems/solutions-review") return <SolutionReviewPage admin />;
   const problemSolutions = pathname.match(/^\/admin\/problems\/([^/]+)\/edit$/);
   if (problemSolutions) return <AdminProblemSolutionsPage id={problemSolutions[1]!} />;

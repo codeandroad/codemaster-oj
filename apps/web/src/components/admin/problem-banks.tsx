@@ -5,6 +5,7 @@ import { ProblemTutorialEditor } from "@/components/teacher/problem-tutorial-edi
 import { ProblemPublicationStatus } from "@/components/problem-publication-status";
 import { BankRenameDialog } from "@/components/bank-rename-dialog";
 import { ProblemGroupFilter } from "@/components/problem-group-filter";
+import { useCatalogFilterPreferences } from "@/components/use-catalog-filter-preferences";
 import { useState } from "react";
 import { Archive, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { AppLink } from "@/components/navigation";
@@ -58,12 +59,28 @@ interface ManagedProblemHistory {
 type BankAction = { bank: ManagedBank; kind: "archive" | "restore" | "school" | "private" | "delete" };
 type ProblemAction = { problem: ManagedProblem; kind: "archive" | "restore" };
 
-export function AdminProblemBanks() {
+const adminBankDefaults = { bank: "" };
+function readBankPreference(saved: Partial<typeof adminBankDefaults>) {
+  return { bank: typeof saved.bank === "string" ? saved.bank : "" };
+}
+const managedListDefaults = { query: "", search: "", group: "", page: 1 };
+function readManagedListFilters(saved: Partial<typeof managedListDefaults>) {
+  return {
+    query: typeof saved.query === "string" ? saved.query.slice(0, 100) : "",
+    search: typeof saved.search === "string" ? saved.search.slice(0, 100) : "",
+    group: typeof saved.group === "string" ? saved.group : "",
+    page: typeof saved.page === "number" && Number.isSafeInteger(saved.page) && saved.page >= 1 ? saved.page : 1,
+  };
+}
+
+export function AdminProblemBanks({ accountId }: { accountId: string }) {
   const { locale } = useLocale();
   const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
   const banks = useData<{ items: ManagedBank[] }>("admin/problem-banks");
   const action = useMutation();
-  const [selectedId, setSelectedId] = useState("");
+  const preferenceKey = `campus-judge:admin-problem-banks:v1:${accountId}`;
+  const { filters: { bank: selectedId }, changeFilters, ready } = useCatalogFilterPreferences(preferenceKey, adminBankDefaults, readBankPreference);
+  const setSelectedId = (bank: string) => changeFilters({ bank });
   const [bankAction, setBankAction] = useState<BankAction | null>(null);
   const [renamingBank, setRenamingBank] = useState<ManagedBank | null>(null);
   const [creating, setCreating] = useState(false);
@@ -71,7 +88,9 @@ export function AdminProblemBanks() {
   const [newDescription, setNewDescription] = useState("");
   const [newCourse, setNewCourse] = useState("Python");
   const [newVisibility, setNewVisibility] = useState<"school" | "private">("private");
-  const activeId = selectedId || banks.data?.items.find(bank => !bank.archivedAt)?.id || banks.data?.items[0]?.id || "";
+  const bankItems = banks.data?.items ?? [];
+  const activeId = !ready ? "" : bankItems.find(bank => bank.id === selectedId)?.id
+    || bankItems.find(bank => !bank.archivedAt)?.id || bankItems[0]?.id || "";
   const selectedBank = banks.data?.items.find(bank => bank.id === activeId);
 
   const changeBank = async () => {
@@ -139,7 +158,7 @@ export function AdminProblemBanks() {
           <p className="mt-3 text-xs leading-5 text-muted-foreground">{selectedBank.publicVersionCount ? tr(`该库仍有 ${selectedBank.publicVersionCount} 个公开题目版本；归档前须在题目审核中撤下。`, `${selectedBank.publicVersionCount} versions are still public. Withdraw them in problem review before archiving.`) : tr("归档不会硬删除数据；被已发布课程或未归档训练引用时会阻止归档。", "Archiving preserves data and is blocked while published courses or active practices reference the bank.")}</p>
           {selectedBank.publicVersionCount > 0 && <AppLink href="/admin/settings?tab=problem-reviews" className="mt-2 inline-block text-sm font-medium text-primary hover:underline">{tr("前往题目审核", "Open problem review")}</AppLink>}
         </section>
-        <ManagedProblemList key={activeId} bank={selectedBank} onChanged={banks.reload} />
+        <ManagedProblemList key={activeId} bank={selectedBank} preferenceKey={`${preferenceKey}:${activeId}`} onChanged={banks.reload} />
       </div>}
     </div>
     {renamingBank && <BankRenameDialog bank={renamingBank} onClose={() => setRenamingBank(null)}
@@ -166,20 +185,18 @@ export function AdminProblemBanks() {
   </>;
 }
 
-function ManagedProblemList({ bank, onChanged }: { bank: ManagedBank; onChanged: () => void }) {
+function ManagedProblemList({ bank, preferenceKey, onChanged }: { bank: ManagedBank; preferenceKey: string; onChanged: () => void }) {
   const { locale } = useLocale();
   const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
-  const [query, setQuery] = useState("");
-  const [search, setSearch] = useState("");
-  const [group, setGroup] = useState("");
-  const [page, setPage] = useState(1);
+  const { filters, changeFilters, ready } = useCatalogFilterPreferences(preferenceKey, managedListDefaults, readManagedListFilters);
+  const { query, search, group, page } = filters;
   const [candidate, setCandidate] = useState<ProblemAction | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const params = new URLSearchParams({ page: String(page), search });
   if (group) params.set("groupId", group);
   const list = useData<{ groups: { id: string; name: string }[]; items: ManagedProblem[]; total: number; pageSize: number }>(`admin/problem-banks/${encodeURIComponent(bank.id)}/problems?${params}`);
   const action = useMutation();
-  const result = list.pending || list.error ? null : list.data;
+  const result = !ready || list.pending || list.error ? null : list.data;
   const pages = result ? Math.max(1, Math.ceil(result.total / result.pageSize)) : 1;
   const updateProblem = async () => {
     if (!candidate) return;
@@ -193,17 +210,17 @@ function ManagedProblemList({ bank, onChanged }: { bank: ManagedBank; onChanged:
   };
   return <section className={`${panelClass} min-w-0`}>
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4"><div><h2 className="font-semibold">{tr("题目列表", "Problems")}</h2><p aria-live="polite" className="mt-1 min-h-4 text-xs text-muted-foreground">{result && `${result.total} ${tr("题，包含已归档题目", "problems including archived")}`}</p></div>
-      <form noValidate className="flex w-full min-w-0 flex-wrap gap-2 sm:w-auto" onSubmit={event => { event.preventDefault(); setPage(1); setSearch(query.trim()); }}>
+      <form noValidate className="flex w-full min-w-0 flex-wrap gap-2 sm:w-auto" onSubmit={event => { event.preventDefault(); changeFilters({ page: 1, search: query.trim() }); }}>
         <div className="flex min-w-0 flex-1 gap-2 sm:flex-none">
           <label className="sr-only" htmlFor="admin-bank-search">{tr("搜索题目标题", "Search titles")}</label>
-          <input id="admin-bank-search" value={query} maxLength={100} onChange={event => setQuery(event.target.value)} className={`${inputClass} sm:w-56`} placeholder={tr("搜索题目标题", "Search problem titles")} />
+          <input id="admin-bank-search" value={query} maxLength={100} onChange={event => changeFilters({ query: event.target.value })} className={`${inputClass} sm:w-56`} placeholder={tr("搜索题目标题", "Search problem titles")} />
           <Button type="submit" variant="secondary" aria-label={tr("搜索", "Search")}><Search size={16} aria-hidden="true" /></Button>
         </div>
-        <ProblemGroupFilter groups={list.data?.groups ?? []} value={group} disabled={!list.data} onChange={value => { setPage(1); setGroup(value); }} />
+        <ProblemGroupFilter groups={list.data?.groups ?? []} value={group} disabled={!list.data} onChange={group => changeFilters({ page: 1, group })} />
       </form>
     </div>
     <Feedback action={action} />
-    <Loading resource={{ ...list, loading: list.pending }}><div className="overflow-x-auto"><table className="w-full min-w-[780px] text-left text-sm">
+    <Loading resource={{ ...list, loading: !ready || list.pending }}><div className="overflow-x-auto"><table className="w-full min-w-[780px] text-left text-sm">
       <thead className="bg-surface-subtle text-xs text-muted-foreground"><tr>{[tr("题目", "Problem"), tr("上传教师", "Teacher"), tr("版本状态", "Version"), tr("引用 / 提交", "Links / submissions"), tr("操作", "Actions")].map(label => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead>
       <tbody>{result?.items.map(problem => <tr key={problem.id} className="border-t border-border">
         <td className="px-4 py-3"><div><button type="button" className="font-semibold text-primary hover:underline focus-visible:underline" onClick={() => setDetailId(problem.id)}>{problem.title}</button></div><span className="text-xs text-muted-foreground">{problem.id.slice(0, 8)}{problem.archivedAt ? ` · ${tr("已归档", "Archived")}` : ""}</span></td>
@@ -213,7 +230,7 @@ function ManagedProblemList({ bank, onChanged }: { bank: ManagedBank; onChanged:
         <td className="px-4 py-3"><Button size="sm" variant="ghost" disabled={Boolean(bank.archivedAt && problem.archivedAt)} onClick={() => setCandidate({ problem, kind: problem.archivedAt ? "restore" : "archive" })}>{problem.archivedAt ? tr("恢复题目", "Restore") : tr("归档题目", "Archive")}</Button></td>
       </tr>)}{result?.items.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">{tr("此题库暂无符合条件的题目。", "No matching problems in this bank.")}</td></tr>}</tbody>
     </table></div></Loading>
-    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3 text-sm"><span className="text-muted-foreground">{result && tr(`第 ${page} / ${pages} 页`, `Page ${page} of ${pages}`)}</span><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={list.pending || page <= 1} onClick={() => setPage(value => value - 1)}>{tr("上一页", "Previous")}</Button><Button size="sm" variant="secondary" disabled={!result || page >= pages} onClick={() => setPage(value => value + 1)}>{tr("下一页", "Next")}</Button></div></div>
+    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3 text-sm"><span className="text-muted-foreground">{result && tr(`第 ${page} / ${pages} 页`, `Page ${page} of ${pages}`)}</span><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={list.pending || page <= 1} onClick={() => changeFilters({ page: page - 1 })}>{tr("上一页", "Previous")}</Button><Button size="sm" variant="secondary" disabled={!result || page >= pages} onClick={() => changeFilters({ page: page + 1 })}>{tr("下一页", "Next")}</Button></div></div>
     {candidate && <Modal title={candidate.kind === "archive" ? tr("归档题目", "Archive problem") : tr("恢复题目", "Restore problem")}
       description={candidate.kind === "archive" ? tr("归档将同步撤下该题所有已公开版本，停止新的自由练习与榜单积分；历史提交和成绩保留，已分配作业仍可按原版本访问。被已发布课程或未归档训练引用时会阻止归档。", "Archiving withdraws all public versions, stops new free practice and leaderboard points, and retains submissions and grades. Assigned work keeps its exact version. Published courses or active practices block archiving.") : tr("恢复只重新显示题目，不补发积分；已撤下版本不能再次通过审核，如需校内公开须发布新版本。", "Restoring only reopens the record and does not grant past points. Withdrawn versions cannot be reapproved; publish a new version for school-wide review.")}
       onClose={() => setCandidate(null)}>

@@ -27,7 +27,7 @@ const english: Record<string, string> = {
   "个人资料": "Profile", "积分排行榜": "Leaderboard", "个人设置": "Settings",
   "管理工作区": "Admin workspace", "教学工作区": "Teacher workspace", "学生工作区": "Student workspace",
   "学校工作区": "School workspaces",
-  "退出登录": "Sign out", "正在退出…": "Signing out…", "累计积分": "Total points", "积分": "Points",
+  "退出登录": "Sign out", "正在退出…": "Signing out…", "累计积分": "Total points", "积分": "Points", "平台积分": "Platform points",
   "暂不可用": "Unavailable", "页面外观": "Appearance", "颜色主题": "Color theme",
   "跟随系统": "System", "浅色": "Light", "深色": "Dark",
   "选择主页面的颜色主题，设置保存在当前浏览器中。": "Choose the site's color theme. This preference is saved in this browser.",

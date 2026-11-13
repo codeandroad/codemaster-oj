@@ -23,12 +23,12 @@ export function PlatformCourseAdmissionGate({ entry, onUpdated, onClose, returnF
   const [selected, setSelected] = useState(""), [code, setCode] = useState("");
   const rule = rules.find(item => item.ruleId === selected) ?? rules.find(item => item.requirementsMet && item.applicationStatus === "none") ?? rules[0];
   const prerequisiteHref = (id: string) => {
-    const schoolId = rule?.points.schoolId ?? location.get("schoolId");
+    const schoolId = rule?.schoolId ?? location.get("schoolId");
     const query = schoolId ? `?${new URLSearchParams({ schoolId })}` : "";
     return courseLanguageHref(`/practice/courses/${encodeURIComponent(id)}${query}`, language);
   };
-  const ruleLabel = (value: LearnerAdmissionRule) => value.targetKind === "school" || value.points.source === "school"
-    ? value.schoolName ?? value.points.schoolName ?? text("School membership", "学校成员资格")
+  const ruleLabel = (value: LearnerAdmissionRule) => value.targetKind === "school"
+    ? value.schoolName ?? text("School membership", "学校成员资格")
     : value.targetKind === "independent" ? text("Personal user without a school", "未加入学校的个人用户")
       : value.targetKind === "account" ? text("Selected account", "指定账号") : text("All registered users", "所有注册用户");
   const status = !rule ? text("This account does not match the course audience.", "当前账号不在此课程的开放范围内。")
@@ -65,8 +65,11 @@ export function PlatformCourseAdmissionGate({ entry, onUpdated, onClose, returnF
       {course.description && <p className="line-clamp-3 text-sm text-muted-foreground">{course.description}</p>}
       {rules.length > 1 ? <label className="grid gap-1 text-sm font-medium">{text("Choose an applicable admission rule", "选择适用的准入规则")}<select className={inputClass} disabled={action.busy} value={rule?.ruleId ?? ""} onChange={event => { setSelected(event.target.value); setCode(""); action.clear(); }}>{rules.map(item => <option key={item.ruleId} value={item.ruleId}>{ruleLabel(item)} · {item.admissionMode === "direct" ? text("Direct", "直接学习") : item.admissionMode === "application" ? text("Platform approval", "平台审批") : text("Invitation", "邀请码")}</option>)}</select></label>
         : rule && <p className="text-sm font-medium">{ruleLabel(rule)}</p>}
-      {rule && <div className="space-y-3 rounded-md border border-border bg-surface-subtle p-3" data-od-id="course-admission-requirements">
+      {rule && (rule.prerequisites.length > 0 || rule.points.required > 0) && <div className="space-y-3 rounded-md border border-border bg-surface-subtle p-3" data-od-id="course-admission-requirements">
         <h3 className="text-sm font-semibold">{text("Learning requirements", "学习门槛")}</h3>
+        <p className="text-xs text-muted-foreground">{rule.requirementMode === "any"
+          ? text("Meet any one of these requirements.", "满足以下任一项即可。")
+          : text("Meet all of these requirements.", "须满足以下全部条件。")}</p>
         {rule.prerequisites.map(item => <div key={item.courseId} className="flex items-start gap-2 text-sm">
           {item.completed ? <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-success" aria-hidden="true"/> : <Circle size={16} className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true"/>}
           <div className="min-w-0"><p className="break-words">{(item.canOpen ?? item.available) ? <AppLink href={prerequisiteHref(item.courseId)} className="font-medium text-primary hover:underline">{item.title ?? text("Prerequisite course", "前置课程")}</AppLink> : item.title ?? text("Unavailable prerequisite course", "前置课程暂不可用")}</p>
@@ -74,11 +77,11 @@ export function PlatformCourseAdmissionGate({ entry, onUpdated, onClose, returnF
             {item.requiresAdmission ? <p className="mt-1 text-xs text-muted-foreground">{text("Open this prerequisite course to request admission first.", "请先打开此前置课程，按其准入方式加入。")}</p> : !item.available && <p className="mt-1 text-xs text-warning">{text("This prerequisite is unavailable. Contact a platform administrator.", "此前置课程暂不可用，请联系平台管理员。")}</p>}
           </div>
         </div>)}
-        <div className="flex items-start gap-2 text-sm">{rule.points.current >= rule.points.required ? <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-success" aria-hidden="true"/> : <Circle size={16} className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true"/>}<div className="min-w-0">
-          <p>{rule.points.source === "school" ? text(`${rule.points.schoolName ?? rule.schoolName ?? "School"} school points`, `${rule.points.schoolName ?? rule.schoolName ?? "本校"}校内积分`) : text("Public practice points", "公开练习积分")}</p>
+        {rule.points.required > 0 && <div className="flex items-start gap-2 text-sm">{rule.points.current >= rule.points.required ? <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-success" aria-hidden="true"/> : <Circle size={16} className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true"/>}<div className="min-w-0">
+          <p>{text("Platform points", "平台通用积分")}</p>
           <p className="text-xs text-muted-foreground">{text(`Current ${rule.points.current} · Required ${rule.points.required}`, `当前 ${rule.points.current} · 要求 ${rule.points.required}`)}</p>
-        </div></div>
-        <p className="text-xs leading-5 text-muted-foreground">{text("Reading and formal practice are both required. Points are checked, not spent; scholarship balances do not count.", "前置课程须完成阅读和正式练习。积分仅校验、不扣除，奖学金余额不计入。")}</p>
+        </div></div>}
+        {rule.points.required > 0 && <p className="text-xs leading-5 text-muted-foreground">{text("Points follow your account and are only checked for eligibility.", "积分随账号保留，加入课程时只校验门槛。")}</p>}
       </div>}
       <p className="text-sm" role="status">{status}</p><Feedback action={action}/>
       {canJoin && <form onSubmit={event => { event.preventDefault(); void join(); }} className="space-y-3">

@@ -31,8 +31,8 @@ const ids=(value,maximum,label)=>{
  if(!Array.isArray(value)||value.length>maximum)fail(400,'VALIDATION',`${label}数量无效`);
  return [...new Set(value.map(id=>uuid(id,label).toLowerCase()))].sort();
 };
-const direct=()=>({admissionMode:'direct',prerequisiteCourseIds:[],minimumPoints:0});
-const config=rule=>({admissionMode:rule.admission_mode??rule.admissionMode,prerequisiteCourseIds:rule.prerequisite_course_ids??rule.prerequisiteCourseIds,minimumPoints:rule.minimum_points??rule.minimumPoints});
+const direct=()=>({admissionMode:'direct',prerequisiteCourseIds:[],minimumPoints:0,requirementMode:'all'});
+const config=rule=>({admissionMode:rule.admission_mode??rule.admissionMode,prerequisiteCourseIds:rule.prerequisite_course_ids??rule.prerequisiteCourseIds,minimumPoints:rule.minimum_points??rule.minimumPoints,requirementMode:rule.requirement_mode??rule.requirementMode});
 export async function platformCourseRules(db,courseId) {
  return (await db.query('SELECT * FROM platform_course_rules WHERE course_id=$1 AND active ORDER BY rule_key',[courseId])).rows;
 }
@@ -56,7 +56,8 @@ function normalizeRule(value,target,oldRules) {
   fail(409,'COURSE_POLICY_CHANGED','准入规则已更改，请重新载入');
  return {key,kind:target.kind,targetId:target.id??null,
   admissionMode:enumValue(value.admissionMode??'direct',['direct','application','invite'],'准入方式'),
-  prerequisiteCourseIds:ids(value.prerequisiteCourseIds??[],20,'前置课程 ID'),minimumPoints:integer(value.minimumPoints??0,0,1000000000,'积分门槛')};
+  prerequisiteCourseIds:ids(value.prerequisiteCourseIds??[],20,'前置课程 ID'),minimumPoints:integer(value.minimumPoints??0,0,1000000000,'积分门槛'),
+  requirementMode:enumValue(value.requirementMode??previous?.requirement_mode??'all',['all','any'],'门槛满足方式')};
 }
 export async function platformCourseAudience(db,body,old={}) {
  await db.query("SELECT pg_advisory_xact_lock(hashtextextended('platform-course-dependencies',0))");
@@ -115,9 +116,9 @@ export async function savePlatformCourseAudience(db,courseId,audience) {
  for(const rule of audience.rules){
   const before=previous.find(row=>row.rule_key===rule.key),changed=!before?.active||!isDeepStrictEqual(config(before),config(rule));
   if(before){if(changed)await db.query(`UPDATE platform_course_rules SET active=true,admission_mode=$2,prerequisite_course_ids=$3,
-   minimum_points=$4,generation=$5,updated_at=clock_timestamp() WHERE id=$1`,[before.id,rule.admissionMode,rule.prerequisiteCourseIds,rule.minimumPoints,randomUUID()]);}
-  else await db.query(`INSERT INTO platform_course_rules(course_id,rule_key,target_kind,school_id,identity_id,admission_mode,prerequisite_course_ids,minimum_points)
-   VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,[courseId,rule.key,rule.kind,rule.kind==='school'?rule.targetId:null,rule.kind==='account'?rule.targetId:null,rule.admissionMode,rule.prerequisiteCourseIds,rule.minimumPoints]);
+   minimum_points=$4,generation=$5,requirement_mode=$6,updated_at=clock_timestamp() WHERE id=$1`,[before.id,rule.admissionMode,rule.prerequisiteCourseIds,rule.minimumPoints,randomUUID(),rule.requirementMode]);}
+  else await db.query(`INSERT INTO platform_course_rules(course_id,rule_key,target_kind,school_id,identity_id,admission_mode,prerequisite_course_ids,minimum_points,requirement_mode)
+   VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,[courseId,rule.key,rule.kind,rule.kind==='school'?rule.targetId:null,rule.kind==='account'?rule.targetId:null,rule.admissionMode,rule.prerequisiteCourseIds,rule.minimumPoints,rule.requirementMode]);
  }
  await db.query('UPDATE platform_course_rules SET active=false,updated_at=clock_timestamp() WHERE course_id=$1 AND active AND NOT(rule_key=ANY($2::text[]))',[courseId,audience.rules.map(r=>r.key)]);
 }

@@ -1,5 +1,6 @@
 import { platformCourseAudienceSql, platformCourseRules } from './platform-course-access.mjs';
-import { platformAdmissionPoints, platformPrerequisiteProgress, unavailablePrerequisite } from './platform-course-progress.mjs';
+import { platformPrerequisiteProgress, unavailablePrerequisite } from './platform-course-progress.mjs';
+import { platformPoints } from './platform-points.mjs';
 
 const denied=()=>({admission:'denied',admissionRules:[]});
 async function identityContext(db,accountId,state) {
@@ -10,7 +11,7 @@ async function identityContext(db,accountId,state) {
  state.schools=new Map((await db.query(`SELECT s.id,s.name FROM schools s WHERE EXISTS(
   SELECT 1 FROM school_memberships m WHERE m.school_id=s.id AND m.account_id=$1 AND m.revoked_at IS NULL)
   OR EXISTS(SELECT 1 FROM legacy_school_account_ownership o WHERE o.school_id=s.id AND o.account_id=$1) ORDER BY s.id`,[accountId])).rows.map(row=>[row.id,row.name]));
- state.points=new Map();state.admissions=new Map();state.stack=new Set();state.progress=new Map();
+ state.admissions=new Map();state.stack=new Set();state.progress=new Map();
 }
 
 export async function resolvePlatformCourseAdmission(db,courseId,accountId,{state={}}={}) {
@@ -36,11 +37,11 @@ export async function resolvePlatformCourseAdmission(db,courseId,accountId,{stat
    return any?denied():{admission:'direct',admissionRules:[]};
   }
   const records=(await db.query('SELECT * FROM platform_course_admissions WHERE course_id=$1 AND account_id=$2',[courseId,accountId])).rows;
+  if (rules.some(rule => rule.minimum_points > 0)) state.points ??= await platformPoints(db, accountId);
   const output=[];
   for(const rule of rules){
-   const schoolId=rule.target_kind==='school'?rule.school_id:null,pointsKey=schoolId??'public';
-   if(!state.points.has(pointsKey))state.points.set(pointsKey,await platformAdmissionPoints(db,state.user,schoolId));
-   const points={...state.points.get(pointsKey),...(schoolId?{schoolName:state.schools.get(schoolId)}:{}),required:rule.minimum_points};
+   const schoolId = rule.target_kind === 'school' ? rule.school_id : null;
+   const points = { source: 'platform', current: state.points ?? 0, required: rule.minimum_points };
    const prerequisites=[];
    for(const prerequisiteId of rule.prerequisite_course_ids){
     const access=await resolvePlatformCourseAdmission(db,prerequisiteId,accountId,{state});
@@ -60,12 +61,16 @@ export async function resolvePlatformCourseAdmission(db,courseId,accountId,{stat
     prerequisites.push(state.progress.get(key));
    }
    const record=records.find(row=>row.rule_id===rule.id&&row.generation===rule.generation);
-   const requirementsMet=points.current>=points.required&&prerequisites.every(item=>item.completed);
+   const requirementMode = rule.requirement_mode;
+   const conditions = prerequisites.map(item => item.completed);
+   if (points.required > 0) conditions.push(points.current >= points.required);
+   const requirementsMet = !conditions.length || (requirementMode === 'any'
+    ? conditions.some(Boolean) : conditions.every(Boolean));
    const granted=requirementsMet&&(rule.admission_mode==='direct'||record?.status==='approved'&&record.origin===rule.admission_mode);
    output.push({ruleId:rule.id,generation:rule.generation,targetKind:rule.target_kind,
     ...(rule.target_kind==='account'?{accountName:state.user.name}:{}),
     ...(schoolId?{schoolId,schoolName:state.schools.get(schoolId)}:{}),admissionMode:rule.admission_mode,
-    requirementsMet,granted,applicationStatus:record?.status??'none',...(record?{applicationId:record.id}:{}),points,prerequisites});
+    requirementMode,requirementsMet,granted,applicationStatus:record?.status??'none',...(record?{applicationId:record.id}:{}),points,prerequisites});
   }
   const ready=output.filter(rule=>rule.requirementsMet);
   const admission=output.some(rule=>rule.granted)?'direct':ready.some(rule=>rule.admissionMode==='application'&&rule.applicationStatus==='none')?'apply'

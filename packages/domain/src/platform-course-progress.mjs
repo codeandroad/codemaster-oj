@@ -11,18 +11,6 @@ async function schoolScope(db,schoolId,fn) {
  finally {try{await db.query("SELECT set_config('campus.school_id',$1,true)",[previous]);}catch(error){if(!failed)throw error;}}
 }
 
-export async function platformAdmissionPoints(db,user,schoolId=null) {
- if(!schoolId){const row=(await db.query('SELECT solved*10 AS points FROM public_practice_leaderboard($1,1,1) WHERE is_own',[user.id])).rows[0];return {source:'public',current:Number(row?.points??0)};}
- const row=await schoolScope(db,schoolId,async()=>schoolId===LEGACY_SCHOOL_ID
-  ?(await db.query(`SELECT ((SELECT COALESCE(sum(points),0) FROM school_rank_ledger WHERE identity_id=$1)
-    +(SELECT COALESCE(sum(points),0) FROM paper4_rank_ledger WHERE identity_id=$1)
-    +(SELECT COALESCE(sum(points),0) FROM acsl_point_awards WHERE school_id=$2 AND identity_id=$1))::integer points`,[user.identityId,schoolId])).rows[0]
-  :(await db.query(`SELECT COALESCE(sum(a.points),0)::integer points FROM school_rank_awards a
-    JOIN school_identities i ON i.school_id=a.school_id AND i.id=a.identity_id
-    WHERE a.school_id=$1 AND i.account_id=$2 AND i.kind='student' AND i.archived_at IS NULL`,[schoolId,user.id])).rows[0]);
- return {source:'school',schoolId,current:Number(row?.points??0)};
-}
-
 export const unavailablePrerequisite=courseId=>({courseId,available:false,completed:false,canOpen:false,requiresAdmission:false,readChapters:0,totalChapters:0,completedExercises:0,totalExercises:0});
 
 // Match the ordinary legacy learning page's current published exercise and

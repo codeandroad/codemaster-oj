@@ -9,9 +9,9 @@ import type { AdmissionRule } from "./platform-course-admission-model";
 import type { PlatformCourse } from "./platform-course-model";
 import { useSchoolText } from "./school-ui";
 
-export function PlatformCourseRuleEditor({ rule, onChange, courses, pointsSource, disabled }: {
+export function PlatformCourseRuleEditor({ rule, onChange, courses, disabled }: {
   rule: AdmissionRule; onChange: (rule: AdmissionRule) => void; courses: PlatformCourse[];
-  pointsSource: string; disabled?: boolean;
+  disabled?: boolean;
 }) {
   const text = useSchoolText(), [query, setQuery] = useState("");
   const options = courses.filter(course => course.published && !course.archived && `${course.title} ${course.description}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
@@ -27,7 +27,13 @@ export function PlatformCourseRuleEditor({ rule, onChange, courses, pointsSource
     <details className="rounded-md border border-border p-3">
       <summary className="cursor-pointer text-sm font-medium">{text("Learning requirements", "学习门槛")} · {count ? text(`${count} set`, `${count} 项`) : text("None", "无")}</summary>
       <div className="mt-3 space-y-3">
-        <p className="text-xs leading-5 text-muted-foreground">{text("Complete every prerequisite course: read all chapters and finish all linked formal practice. Checkpoint self-checks do not count as formal practice.", "须完成所有前置课程：读完全部章节并完成全部关联正式练习。章节自测不作为正式练习计入。")}</p>
+        <label className="grid gap-1 text-sm font-medium">{text("How to meet the requirements", "门槛满足方式")}
+          <select className={inputClass} value={rule.requirementMode ?? "all"} onChange={event => onChange({ ...rule, requirementMode: event.target.value === "any" ? "any" : "all" })}>
+            <option value="all">{text("Meet all requirements", "全部满足")}</option>
+            <option value="any">{text("Meet any one requirement", "满足任一项")}</option>
+          </select>
+        </label>
+        <p className="text-xs leading-5 text-muted-foreground">{text("Each selected course and the points threshold are separate requirements. A prerequisite course is complete after reading all chapters and finishing all linked formal practice.", "每门前置课和积分门槛各算一项。读完前置课的全部章节并完成关联正式练习，即视为完成该课程。")}</p>
         {rule.prerequisiteCourseIds.length > 0 && <ul className="space-y-1">{rule.prerequisiteCourseIds.map(id => {
           const course = courses.find(item => item.id === id);
           return <li key={id} className="flex items-start justify-between gap-2 text-sm"><span className="min-w-0 break-words">{course?.title ?? text("Unavailable prerequisite course", "前置课程暂不可用")}{course && (!course.published || course.archived) && <span className="ml-1 text-warning">{text("(unavailable)", "（暂不可用）")}</span>}</span>
@@ -37,8 +43,8 @@ export function PlatformCourseRuleEditor({ rule, onChange, courses, pointsSource
         <div className="max-h-40 overflow-y-auto rounded border border-border">{options.map(course => <label key={course.id} className="flex min-h-11 cursor-pointer items-start gap-2 border-b border-border p-2 text-sm last:border-0">
           <input type="checkbox" className="mt-1 size-4 shrink-0 accent-primary" checked={rule.prerequisiteCourseIds.includes(course.id)} onChange={event => onChange({ ...rule, prerequisiteCourseIds: event.target.checked ? [...rule.prerequisiteCourseIds, course.id] : rule.prerequisiteCourseIds.filter(id => id !== course.id) })}/><span className="min-w-0 break-words">{course.title}</span>
         </label>)}{!options.length && <p className="p-3 text-sm text-muted-foreground">{text("No matching published platform courses.", "没有符合条件的已发布平台课程。")}</p>}</div>
-        <label className="grid gap-1 text-sm font-medium">{text("Minimum points", "最低积分")}<input type="number" min={0} step={1} className={inputClass} value={rule.minimumPoints} onChange={event => onChange({ ...rule, minimumPoints: event.target.value === "" ? 0 : Number(event.target.value) })}/></label>
-        <p className="text-xs leading-5 text-muted-foreground">{pointsSource} · {text("Eligibility check only; no points are spent. This is not your scholarship balance.", "仅校验门槛，不扣除积分；不是奖学金余额。")}</p>
+        <label className="grid gap-1 text-sm font-medium">{text("Minimum platform points", "最低平台积分")}<input type="number" min={0} step={1} className={inputClass} value={rule.minimumPoints} onChange={event => onChange({ ...rule, minimumPoints: event.target.value === "" ? 0 : Number(event.target.value) })}/></label>
+        <p className="text-xs leading-5 text-muted-foreground">{text("Platform points follow the account across workspaces. Enter 0 to disable this requirement.", "平台积分随账号保留。填 0 表示不设积分门槛。")}</p>
       </div>
     </details>
   </fieldset>;

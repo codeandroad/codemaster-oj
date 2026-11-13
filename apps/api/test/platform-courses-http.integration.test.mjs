@@ -12,6 +12,7 @@ import { provisionSchool, LEGACY_SCHOOL_ID } from '../../../packages/domain/src/
 import { provisionPlatformAdministrator } from '../../../packages/domain/src/platform-governance.mjs';
 
 const migration='102_platform_courses.sql';
+const deferredMigrations=[migration,'105_acsl_platform_course.sql','106_platform_course_admissions.sql','108_platform_points_and_requirement_modes.sql'];
 test('platform courses retain original data and enforce audiences through NestJS and real runtime grants',
  {skip:!process.env.TEST_DATABASE_URL,timeout:90000},async t=>{
  const base=new URL(process.env.TEST_DATABASE_URL);assert.equal(base.pathname,'/campus_qa');assert.ok(['localhost','127.0.0.1'].includes(base.hostname));
@@ -22,7 +23,7 @@ test('platform courses retain original data and enforce audiences through NestJS
  const password=randomBytes(24).toString('base64url'),origin='http://platform-course.test';
  try{
   await pool.query('CREATE TABLE schema_migrations(name text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');
-  await pool.query('INSERT INTO schema_migrations(name) VALUES($1),($2),($3)',[migration,'105_acsl_platform_course.sql','106_platform_course_admissions.sql']);await migrate(pool);
+  await pool.query('INSERT INTO schema_migrations(name) SELECT unnest($1::text[])',[deferredMigrations]);await migrate(pool);
   await bootstrap(pool,{name:'Original school administrator',number:'A',username:'school-admin',password});
   const admin=(await pool.query("SELECT id,identity_id FROM accounts WHERE username='school-admin'")).rows[0];
   const hash=await hashPassword(password),actors={};
@@ -44,7 +45,7 @@ test('platform courses retain original data and enforce audiences through NestJS
    SELECT school_id,id,1,extract(epoch FROM updated_at)::text,title,description,access_scope,$2 FROM learning_paths WHERE id=$1`,[first.p.id,JSON.stringify([{id:first.c.id,title:first.c.title,body:first.c.content,problems:[]}])]);
   const listing=(await pool.query('INSERT INTO public_course_listings(school_id,course_id,revision,approved_by) VALUES($1,$2,1,$3) RETURNING id',[LEGACY_SCHOOL_ID,first.p.id,admin.id])).rows[0];
   await provisionPlatformAdministrator(pool,{username:'platform'});
-  await pool.query('DELETE FROM schema_migrations WHERE name=ANY($1::text[])',[[migration,'105_acsl_platform_course.sql','106_platform_course_admissions.sql']]);await migrate(pool);
+  await pool.query('DELETE FROM schema_migrations WHERE name=ANY($1::text[])',[deferredMigrations]);await migrate(pool);
   await t.test('migration changes only ownership fields of the two named courses',async()=>{
    for(const [index,{p,c}] of originals.entries()){
     const after=(await pool.query('SELECT * FROM learning_paths WHERE id=$1',[p.id])).rows[0];

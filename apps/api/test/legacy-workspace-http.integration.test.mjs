@@ -78,7 +78,7 @@ test('legacy business endpoints require original-school ownership on the real Ne
         const paths = ['/problems', `/problems/${id}?versionId=${version.id}`, '/problem-banks', '/problem-groups', '/problem-favorites',
           '/problems/import', '/admin/problem-banks', '/problems/rank-review', '/classes', '/people', '/accounts', '/teaching/audience',
           '/learning-paths', `/learning-paths/${id}`, '/learning-resources', '/assignments', `/assignments/${id}`, '/timed-practices',
-          '/submissions', '/submissions/SUB1', '/review-notebook', '/reports', '/reports/export', '/points/me', '/points/leaderboard',
+          '/submissions', '/submissions/SUB1', '/review-notebook', '/reports', '/reports/export', '/points/leaderboard',
           '/paper4/papers', `/paper4/papers/${id}`, '/scholarship/me', '/scholarship/ledger', '/scholarship/contents', '/scholarship/public-statements',
           `/profiles/${originalStudent.identityId}`, `/profiles/${originalStudent.identityId}/activity`, '/presence',
           '/student-notifications', '/system-settings', '/audit-events', '/judge-status'];

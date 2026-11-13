@@ -7,6 +7,7 @@ import { fail } from './security.mjs';
 const SHARED_ENDPOINTS = new Set([
   'GET /site-info',
   'GET /auth/me',
+  'GET /points/me',
   'GET /auth/activation-schools',
   'POST /auth/login',
   'POST /auth/logout',

@@ -17,21 +17,27 @@ export function PlatformCourseAudience({ courseId, policy, onChange, schools, ac
   const [schoolPicker, setSchoolPicker] = useState(policy.schoolRules.length > 0), [accountPicker, setAccountPicker] = useState(policy.accountRules.length > 0);
   const [savedSchools, setSavedSchools] = useState(policy.schoolRules), [savedAccounts, setSavedAccounts] = useState(policy.accountRules), [savedIndependent, setSavedIndependent] = useState(policy.independentRule);
   const prerequisites = (courses.data?.items ?? []).filter(course => course.id !== courseId);
-  const publicPoints = text("Public practice points", "公开练习积分");
   const schoolName = (id: string) => schools.find(item => item.id === id)?.name ?? text("Selected school", "指定学校");
   const accountName = (id: string) => {
     const account = accounts.find(item => item.id === id);
     return account ? `${account.name}${account.username ? ` (@${account.username})` : ""}` : text("Selected account", "指定账号");
   };
-  const ruleView = (key: string, label: string, rule: AdmissionRule, update: (value: AdmissionRule) => void, pointsSource = publicPoints) => <div key={key} className="space-y-3" data-rule-target={key}>
-    <PlatformCourseRuleEditor rule={rule} onChange={update} courses={prerequisites} pointsSource={pointsSource} disabled={disabled}/>
+  const ruleView = (key: string, label: string, rule: AdmissionRule, update: (value: AdmissionRule) => void) => <div key={key} className="space-y-3" data-rule-target={key}>
+    <PlatformCourseRuleEditor rule={rule} onChange={update} courses={prerequisites} disabled={disabled}/>
     {rule.admissionMode === "invite" && <PlatformCourseInvitation key={`${courseId}:${rule.ruleId ?? key}:${rule.generation ?? 0}`} courseId={courseId} rule={rule} label={label} disabled={disabled || dirty}/>}
   </div>;
-  const summary = (rule: AdmissionRule) => [
-    rule.admissionMode === "direct" ? text("direct access", "直接学习") : rule.admissionMode === "application" ? text("platform approval", "由平台管理员审批") : text("6-character invitation", "6 位邀请码加入"),
-    ...(rule.prerequisiteCourseIds.length ? [text(`complete ${rule.prerequisiteCourseIds.length} prerequisite courses`, `完成 ${rule.prerequisiteCourseIds.length} 门前置课程`)] : []),
-    ...(rule.minimumPoints > 0 ? [text(`at least ${rule.minimumPoints} points`, `积分至少 ${rule.minimumPoints}`)] : []),
-  ].join(" · ");
+  const summary = (rule: AdmissionRule) => {
+    const method = rule.admissionMode === "direct" ? text("direct access", "直接学习") : rule.admissionMode === "application" ? text("platform approval", "由平台管理员审批") : text("6-character invitation", "6 位邀请码加入");
+    const conditions = [
+      ...rule.prerequisiteCourseIds.map(id => {
+        const title = prerequisites.find(course => course.id === id)?.title;
+        return title ? text(`Complete ${title}`, `完成「${title}」`) : text("Complete a prerequisite course", "完成一门前置课");
+      }),
+      ...(rule.minimumPoints > 0 ? [text(`${rule.minimumPoints} platform points`, `平台积分至少 ${rule.minimumPoints}`)] : []),
+    ];
+    const join = rule.requirementMode === "any" ? text(" or ", " 或 ") : text(" and ", " 且 ");
+    return conditions.length ? `${method} · ${conditions.join(join)}` : method;
+  };
   return <section className="min-w-0 space-y-4" data-od-id="platform-course-policy">
     <h3 className="text-sm font-semibold">{text("Audience and admission", "开放范围与准入")}</h3>
     <label className="grid gap-2 text-sm font-medium">{text("Audience", "开放范围")}<select className={inputClass} disabled={disabled} value={policy.scope} onChange={event => onChange({ ...policy, scope: event.target.value as AudiencePolicy["scope"], allRule: policy.allRule ?? directAdmissionRule() })}>
@@ -57,7 +63,7 @@ export function PlatformCourseAudience({ courseId, policy, onChange, schools, ac
             onSchools(items); onChange({ ...policy, schoolRules: items.map(item => policy.schoolRules.find(rule => rule.schoolId === item.id) ?? { schoolId: item.id, ...directAdmissionRule() }) });
           }}/>
           {policy.schoolRules.map(rule => <div key={rule.schoolId} className="space-y-3 border-t border-border pt-3"><h4 className="break-words text-sm font-semibold">{schoolName(rule.schoolId)}</h4>
-            {ruleView(`school:${rule.schoolId}`, schoolName(rule.schoolId), rule, value => onChange({ ...policy, schoolRules: policy.schoolRules.map(item => item.schoolId === rule.schoolId ? { ...value, schoolId: rule.schoolId } : item) }), text(`${schoolName(rule.schoolId)} school points`, `${schoolName(rule.schoolId)}校内积分`))}
+            {ruleView(`school:${rule.schoolId}`, schoolName(rule.schoolId), rule, value => onChange({ ...policy, schoolRules: policy.schoolRules.map(item => item.schoolId === rule.schoolId ? { ...value, schoolId: rule.schoolId } : item) }))}
           </div>)}
         </>}
       </div>
@@ -78,10 +84,10 @@ export function PlatformCourseAudience({ courseId, policy, onChange, schools, ac
     </div>}
     <div className="space-y-2 rounded-md border border-border bg-surface-subtle p-3 text-xs leading-5" data-od-id="platform-admission-summary">
       <p className="font-semibold">{text("Effective rules after saving", "保存后生效的规则")}</p>
-      {policy.scope === "all" ? <p>{text("All registered users", "所有注册用户")}：{summary(policy.allRule ?? directAdmissionRule())} · {publicPoints}</p> : <>
-        {policy.independentRule && <p>{text("Personal users without a school", "未加入学校的个人用户")}：{summary(policy.independentRule)} · {publicPoints}</p>}
-        {policy.schoolRules.map(rule => <p key={rule.schoolId}>{schoolName(rule.schoolId)}：{summary(rule)} · {text("school points", "校内积分")}</p>)}
-        {policy.accountRules.map(rule => <p key={rule.identityId}>{accountName(rule.identityId)}：{summary(rule)} · {publicPoints}</p>)}
+      {policy.scope === "all" ? <p>{text("All registered users", "所有注册用户")}：{summary(policy.allRule ?? directAdmissionRule())}</p> : <>
+        {policy.independentRule && <p>{text("Personal users without a school", "未加入学校的个人用户")}：{summary(policy.independentRule)}</p>}
+        {policy.schoolRules.map(rule => <p key={rule.schoolId}>{schoolName(rule.schoolId)}：{summary(rule)}</p>)}
+        {policy.accountRules.map(rule => <p key={rule.identityId}>{accountName(rule.identityId)}：{summary(rule)}</p>)}
         {!policy.independentRule && !policy.schoolRules.length && !policy.accountRules.length && <p className="text-warning">{text("Choose at least one audience before saving.", "保存前请至少选择一项开放范围。")}</p>}
       </>}
       <p className="text-muted-foreground">{text("Requirements apply before direct access, an application, or invitation redemption. No points are spent.", "直接学习、申请或兑换邀请码均须满足对应门槛，不扣除积分。")}</p>

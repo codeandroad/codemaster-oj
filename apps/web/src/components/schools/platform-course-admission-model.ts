@@ -1,10 +1,12 @@
 import type { PlatformCourse } from "./platform-course-model";
 
 export type AdmissionMode = "direct" | "application" | "invite";
+export type RequirementMode = "all" | "any";
 export type AdmissionRule = {
   admissionMode: AdmissionMode;
   prerequisiteCourseIds: string[];
   minimumPoints: number;
+  requirementMode?: RequirementMode;
   ruleId?: string;
   generation?: string;
   invitation?: { active: boolean; expiresAt: string | null };
@@ -22,13 +24,15 @@ export type LearnerAdmissionRule = {
   admissionMode: AdmissionMode;
   targetKind?: "all" | "independent" | "school" | "account";
   schoolName?: string;
+  schoolId?: string;
+  requirementMode?: RequirementMode;
   requirementsMet: boolean;
   granted: boolean;
   applicationStatus: "none" | "pending" | "approved" | "rejected" | "revoked";
-  points: { source: "public" | "school"; schoolId?: string; schoolName?: string; current: number; required: number };
+  points: { source: "platform"; current: number; required: number };
   prerequisites: { courseId: string; title?: string; available: boolean; canOpen?: boolean; requiresAdmission?: boolean; completed: boolean; readChapters: number; totalChapters: number; completedExercises: number; totalExercises: number }[];
 };
-export const directAdmissionRule = (): AdmissionRule => ({ admissionMode: "direct", prerequisiteCourseIds: [], minimumPoints: 0 });
+export const directAdmissionRule = (): AdmissionRule => ({ admissionMode: "direct", prerequisiteCourseIds: [], minimumPoints: 0, requirementMode: "all" });
 
 /** Older course scopes keep their permissions; no independent group is enabled implicitly. */
 export function courseAudiencePolicy(course: Pick<PlatformCourse, "audiencePolicy" | "audienceScope" | "schoolIds" | "studentIds">): AudiencePolicy {
@@ -41,7 +45,7 @@ export function courseAudiencePolicy(course: Pick<PlatformCourse, "audiencePolic
   };
 }
 export function admissionRuleSettings(rule: AdmissionRule) {
-  return { admissionMode: rule.admissionMode, prerequisiteCourseIds: rule.prerequisiteCourseIds, minimumPoints: rule.minimumPoints };
+  return { admissionMode: rule.admissionMode, prerequisiteCourseIds: rule.prerequisiteCourseIds, minimumPoints: rule.minimumPoints, requirementMode: rule.requirementMode ?? "all" };
 }
 export function activeAdmissionRules(policy: AudiencePolicy): AdmissionRule[] {
   return policy.scope === "all" ? policy.allRule ? [policy.allRule] : []

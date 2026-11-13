@@ -13,7 +13,7 @@ import { LEGACY_SCHOOL_ID, provisionSchool } from '../../../packages/domain/src/
 import { provisionPlatformAdministrator } from '../../../packages/domain/src/platform-governance.mjs';
 import { importAcslPaper } from '../../../packages/domain/src/acsl-import.mjs';
 
-const migration = '106_platform_course_admissions.sql';
+const migrations = ['106_platform_course_admissions.sql', '108_platform_points_and_requirement_modes.sql'];
 const bodySentinel = 'LOCKED_LESSON_CONTENT_NOT_FOR_APPLICANTS';
 const policy = ({ all, independent, schools = [], accounts = [] } = {}) => ({
   scope: all ? 'all' : 'custom', allRule: all ?? null, independentRule: independent ?? null,
@@ -44,7 +44,7 @@ async function fixture() {
   const password = randomBytes(24).toString('base64url'), origin = 'http://platform-admissions.test';
   try {
     await owner.query('CREATE TABLE schema_migrations(name text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');
-    await owner.query('INSERT INTO schema_migrations(name) VALUES($1)', [migration]);
+    await owner.query('INSERT INTO schema_migrations(name) SELECT unnest($1::text[])', [migrations]);
     await migrate(owner);
     await bootstrap(owner, { name: 'Fixture legacy admin', number: 'ADMIN', username: 'legacy-admin', password });
     const actors = {};
@@ -82,7 +82,7 @@ async function fixture() {
     }
     const alias = (await owner.query("INSERT INTO learning_paths(owner_account_id,title,archived_at,merged_into_id,merged_first_chapter_id) VALUES($1,'Historical alias',now(),$2,$3) RETURNING *", [actors['legacy-admin'].id, oldCourses[0].path.id, oldCourses[0].chapter.id])).rows[0];
     const oldProgress = (await owner.query('SELECT * FROM learning_progress ORDER BY chapter_id')).rows;
-    await owner.query('DELETE FROM schema_migrations WHERE name=$1', [migration]); await migrate(owner);
+    await owner.query('DELETE FROM schema_migrations WHERE name=ANY($1::text[])', [migrations]); await migrate(owner);
     const grants = (await readFile(new URL('../../../packages/domain/grants.mjs', import.meta.url), 'utf8')).match(/await pool\.query\(`([\s\S]*?)`\);/)[1];
     await owner.query(grants.replaceAll('SCHEMA public', `SCHEMA ${schema}`));
     const runtime = new URL(scoped); runtime.searchParams.set('options', `-crole=campus_app -csearch_path=${schema}`);
@@ -163,21 +163,25 @@ test('platform course admission combines audience, requirements and grants acros
   const redeem = (course, r, code, name, status = 200, at) => request(`/practice/courses/${course.id}/invitations/redeem`, { method: 'POST', name, status, at, body: { ruleId: r.ruleId, generation: r.generation, code } });
   const admissions = course => get(`/platform/courses/${course.id}/admissions`);
   const decision = (course, application, action, name = 'platform', status = 200) => post(`/platform/courses/${course.id}/admissions/${application.id}/decision`, { action, expectedStatus: application.status, generation: application.generation }, name, status);
-  const publicProblem = async () => {
+  const publicProblem = async ({ approved = true } = {}) => {
     const bankId = (await owner.query("INSERT INTO school_problem_banks(school_id,owner_account_id,name,request_id) VALUES($1,$2,'Fixture bank',$3) RETURNING id", [alpha.id, actors['alpha-admin'].id, randomUUID()])).rows[0].id;
     const definition = { title: 'Fixture public input', mode: 'stdio', statement: 'Return the input.', reference_code: 'print(input())', samples: [{ input: '2', expected: '2', enabled: true }], tests: [{ position: 1, input: '3', expected: '3' }], time_limit_ms: 1000, memory_limit_mb: 128, languages: ['python'] };
     const problemId = (await owner.query('INSERT INTO school_problems(school_id,bank_id,owner_account_id,draft,request_id) VALUES($1,$2,$3,$4,$5) RETURNING id', [alpha.id, bankId, actors['alpha-admin'].id, definition, randomUUID()])).rows[0].id;
     const versionId = (await owner.query('INSERT INTO school_problem_versions(school_id,problem_id,draft_revision,definition) VALUES($1,$2,1,$3) RETURNING id', [alpha.id, problemId, definition])).rows[0].id;
     await owner.query('UPDATE school_problems SET published=true,published_version_id=$3 WHERE school_id=$1 AND id=$2', [alpha.id, problemId, versionId]);
-    await owner.query('INSERT INTO school_problem_publications(school_id,problem_id,version_id,approved_by) VALUES($1,$2,$3,$4)', [alpha.id, problemId, versionId, actors.platform.id]);
+    if (approved) await owner.query('INSERT INTO school_problem_publications(school_id,problem_id,version_id,approved_by) VALUES($1,$2,$3,$4)', [alpha.id, problemId, versionId, actors.platform.id]);
     return { schoolId: alpha.id, problemId, versionId };
   };
   const seedJob = async (problem, name, { context = 'public', kind = 'submit', status = 'AC', state = 'completed' } = {}) => {
     // Trusted fixture result, never execution of user code. Only transport and
     // eligibility projection are under test in this suite.
-    return (await owner.query(`INSERT INTO school_judge_jobs(school_id,problem_id,version_id,account_id,request_id,request_hash,kind,access_context,payload,state,result,completed_at)
-      VALUES($1,$2,$3,$4,$5,'fixture',$6,$7,$8,$9,$10,now()) RETURNING id`, [problem.schoolId, problem.problemId, problem.versionId, actors[name].id, randomUUID(), kind, context,
-      { language: 'python', code: '# fixture result' }, state, { status }])).rows[0].id;
+    const deferSchoolResult = context === 'school' && state === 'completed';
+    const id = (await owner.query(`INSERT INTO school_judge_jobs(school_id,problem_id,version_id,account_id,request_id,request_hash,kind,access_context,payload,state,result,completed_at,identity_id)
+      VALUES($1,$2,$3,$4,$5,'fixture',$6,$7,$8,$9,$10,now(),$11) RETURNING id`, [problem.schoolId, problem.problemId, problem.versionId, actors[name].id, randomUUID(), kind, context,
+      { language: 'python', code: '# fixture result' }, deferSchoolResult ? 'queued' : state, deferSchoolResult ? null : { status },
+      context === 'school' ? actors[name].schoolIdentities?.[problem.schoolId] : null])).rows[0].id;
+    if (deferSchoolResult) await owner.query("UPDATE school_judge_jobs SET state='completed',result=$3,completed_at=now() WHERE school_id=$1 AND id=$2", [problem.schoolId, id, { status }]);
+    return id;
   };
   try {
     await run('migration preserves existing scopes, stable chapters, aliases and reading history', async () => {
@@ -321,12 +325,13 @@ test('platform course admission combines audience, requirements and grants acros
       const failure = await redeem(course, r, issued.code, 'free', 400);
       assert.equal(failure.data.error.code, 'INVALID_COURSE_INVITATION');
       assert.equal((await owner.query('SELECT count(*)::int n FROM platform_course_admissions WHERE rule_id=$1', [r.ruleId])).rows[0].n, 0);
+      await assert.rejects(f.worker.query('SELECT platform_points_for_account(NULL)'), /permission denied/);
       for (const table of ['platform_course_rules', 'platform_course_admissions', 'platform_course_invitations', 'platform_course_invitation_attempts']) {
         await assert.rejects(f.worker.query(`SELECT * FROM ${table}`), /permission denied/);
       }
     });
 
-    await run('school points and prerequisites are both required and never consume scholarship balances', async () => {
+    await run('platform points and prerequisites are both required and never consume scholarship balances', async () => {
       const prerequisite = await create(policy({ all: rule() }), 'Required reading');
       const learner = actors['alpha-student'];
       const markPrerequisite = read => post(`/practice/courses/${prerequisite.id}/chapters/${prerequisite.chapters[0].id}/read`, { read, expectedRevision: prerequisite.revision }, 'alpha-student');
@@ -337,14 +342,14 @@ test('platform course admission combines audience, requirements and grants acros
       const r = course.audiencePolicy.schoolRules[0];
       let state = await entry(course, 'alpha-student'), evaluated = state.admissionRules[0];
       assert.equal(state.admission, 'requirements'); assert.equal(evaluated.requirementsMet, false);
-      assert.equal(evaluated.points.source, 'school'); assert.equal(evaluated.points.schoolId, alpha.id);
-      assert.equal(evaluated.points.current, 9); assert.equal(evaluated.points.required, 10);
+      assert.equal(evaluated.points.source, 'platform'); assert.equal(evaluated.schoolId, alpha.id);
+      assert.equal(evaluated.points.current, 0); assert.equal(evaluated.points.required, 10);
       assert.equal(evaluated.prerequisites[0].completed, false);
       await apply(course, r, 'alpha-student', 403);
       await post(`/practice/courses/${prerequisite.id}/chapters/${prerequisite.chapters[0].id}/read`, { read: true, expectedRevision: prerequisite.revision }, 'alpha-student');
       evaluated = (await entry(course, 'alpha-student')).admissionRules[0];
       assert.equal(evaluated.prerequisites[0].completed, true); assert.equal(evaluated.requirementsMet, false);
-      await owner.query("INSERT INTO school_rank_awards(school_id,identity_id,subject_key,points) VALUES($1,$2,'fixture:admission-next',1)", [alpha.id, learner.schoolIdentities[alpha.id]]);
+      await seedJob(await publicProblem(), 'alpha-student', { context: 'school' });
       assert.equal((await entry(course, 'alpha-student')).admission, 'apply');
       await apply(course, r, 'alpha-student'); let application = (await admissions(course)).items[0];
       await markPrerequisite(false);
@@ -364,16 +369,30 @@ test('platform course admission combines audience, requirements and grants acros
       await read(course, 'alpha-student');
     });
 
-    await run('each school uses its own score and matching rules form alternatives without pooling credits', async () => {
-      const learner = actors['multi-student'];
-      for (const [schoolId, points] of [[alpha.id, 6], [beta.id, 7]]) await owner.query("INSERT INTO school_rank_awards(school_id,identity_id,subject_key,points) VALUES($1,$2,'fixture:separate-score',$3)", [schoolId, learner.schoolIdentities[schoolId], points]);
-      const course = await create(policy({ schools: [alpha, beta].map(school => ({ schoolId: school.id, ...rule('direct', { minimumPoints: 10 }) })) }));
-      let state = await entry(course, 'multi-student');
-      assert.equal(state.admission, 'requirements'); assert.deepEqual(state.admissionRules.map(r => r.points.current).sort(), [6, 7]);
-      await read(course, 'multi-student', 403);
-      await owner.query("INSERT INTO school_rank_awards(school_id,identity_id,subject_key,points) VALUES($1,$2,'fixture:separate-score-next',3)", [beta.id, learner.schoolIdentities[beta.id]]);
-      state = await entry(course, 'multi-student'); assert.equal(state.admission, 'direct');
-      assert.equal(state.admissionRules.filter(r => r.granted).length, 1); await read(course, 'multi-student');
+    await run('all audiences share platform points and optional requirements accept either condition', async () => {
+      const learner = 'multi-student';
+      const prerequisite = await create(policy({ all: rule() }));
+      const requirements = { minimumPoints: 10, prerequisiteCourseIds: [prerequisite.id], requirementMode: 'any' };
+      let course = await create(policy({ schools: [alpha, beta].map(school => ({ schoolId: school.id, ...rule('direct', requirements) })) }));
+      await read(course, learner, 403);
+      await post(`/practice/courses/${prerequisite.id}/chapters/${prerequisite.chapters[0].id}/read`, { read: true, expectedRevision: prerequisite.revision }, learner);
+      await read(course, learner);
+      await post(`/practice/courses/${prerequisite.id}/chapters/${prerequisite.chapters[0].id}/read`, { read: false, expectedRevision: prerequisite.revision }, learner);
+      const problem = await publicProblem();
+      await seedJob(problem, learner, { context: 'school' });
+      await seedJob(problem, learner);
+      const state = await entry(course, learner);
+      assert.deepEqual(state.admissionRules.map(r => r.points.current), [10, 10]);
+      assert.ok(state.admissionRules.every(r => r.requirementMode === 'any' && r.granted));
+      assert.equal((await get('/points/me', learner)).points, 10);
+      course = await change(course, { audiencePolicy: policy({ all: rule('direct', requirements) }) });
+      await read(course, learner);
+      await owner.query('UPDATE school_problem_publications SET withdrawn_at=clock_timestamp() WHERE problem_id=$1', [problem.problemId]);
+      await owner.query('UPDATE school_memberships SET revoked_at=now() WHERE account_id=$1', [actors[learner].id]);
+      await owner.query('UPDATE school_identities SET account_id=NULL,archived_at=now() WHERE account_id=$1', [actors[learner].id]);
+      assert.equal((await get('/points/me', learner)).points, 10);
+      await read(course, learner);
+      await change(course, { audiencePolicy: policy({ all: rule('direct', { requirementMode: 'other' }) }) }, 400);
     });
 
     await run('self-referential or cyclic prerequisites are rejected atomically', async () => {
@@ -396,22 +415,22 @@ test('platform course admission combines audience, requirements and grants acros
       assert.equal(hiddenPrerequisite.completed, false); assert.ok(!JSON.stringify(hidden).includes(gated.title)); noLesson(hidden);
     });
 
-    await run('public thresholds use ranked public formal solves, not wallets, private AC or duplicated AC', async () => {
+    await run('platform points count formal public solves independent of ranking and exclude private or duplicated AC', async () => {
       const name = 'free-third';
       await owner.query('INSERT INTO public_practice_preferences(account_id,ranking_enabled,scholarship_enabled) VALUES($1,true,false) ON CONFLICT(account_id) DO UPDATE SET ranking_enabled=true,scholarship_enabled=false', [actors[name].id]);
       const ranked = await publicProblem(); await seedJob(ranked, name); await seedJob(ranked, name);
       const sample = await publicProblem(); await seedJob(sample, name, { kind: 'samples' });
-      const privatePractice = await publicProblem(); await seedJob(privatePractice, name, { context: 'school' });
+      const privatePractice = await publicProblem({ approved: false }); await seedJob(privatePractice, name, { context: 'school' });
       await owner.query('UPDATE public_practice_preferences SET ranking_enabled=false WHERE account_id=$1', [actors[name].id]);
       const unranked = await publicProblem(); await seedJob(unranked, name);
       await owner.query('UPDATE public_practice_preferences SET ranking_enabled=true WHERE account_id=$1', [actors[name].id]);
       await owner.query('INSERT INTO luq_accounts(identity_id,balance) VALUES($1,999) ON CONFLICT(identity_id) DO UPDATE SET balance=999', [actors[name].identityId]);
-      const course = await create(policy({ accounts: [{ identityId: actors[name].identityId, ...rule('direct', { minimumPoints: 11 }) }] }));
+      const course = await create(policy({ accounts: [{ identityId: actors[name].identityId, ...rule('direct', { minimumPoints: 21 }) }] }));
       let state = await entry(course, name); assert.equal(state.admission, 'requirements');
-      assert.equal(state.admissionRules[0].points.source, 'public'); assert.equal(state.admissionRules[0].points.current, 10);
-      assert.equal(state.admissionRules[0].points.required, 11); await read(course, name, 403);
+      assert.equal(state.admissionRules[0].points.source, 'platform'); assert.equal(state.admissionRules[0].points.current, 20);
+      assert.equal(state.admissionRules[0].points.required, 21); await read(course, name, 403);
       const second = await publicProblem(); await seedJob(second, name);
-      state = await entry(course, name); assert.equal(state.admissionRules[0].points.current, 20); assert.equal(state.admission, 'direct');
+      state = await entry(course, name); assert.equal(state.admissionRules[0].points.current, 30); assert.equal(state.admission, 'direct');
       const before = await f.snapshot(); await read(course, name); await entry(course, name);
       assert.deepEqual(await f.snapshot(), before);
       await entry(course, 'free-peer', 404);
@@ -568,7 +587,7 @@ test('platform course admission combines audience, requirements and grants acros
       await redeem(course, r, issued.code, 'alpha-peer', 403); await redeem(course, r, issued.code, 'beta-student', 404);
       await post(`/practice/courses/${prerequisite.id}/chapters/${prerequisite.chapters[0].id}/read`, { read: true, expectedRevision: prerequisite.revision }, 'alpha-peer');
       await redeem(course, r, issued.code, 'alpha-peer', 403);
-      await owner.query("INSERT INTO school_rank_awards(school_id,identity_id,subject_key,points) VALUES($1,$2,'fixture:invite-gate',10)", [alpha.id, learner.schoolIdentities[alpha.id]]);
+      await seedJob(await publicProblem(), 'alpha-peer');
       await redeem(course, r, issued.code, 'alpha-peer'); await read(course, 'alpha-peer');
       await post(`/practice/courses/${prerequisite.id}/chapters/${prerequisite.chapters[0].id}/read`, { read: false, expectedRevision: prerequisite.revision }, 'alpha-peer');
       await read(course, 'alpha-peer', 403);
@@ -578,6 +597,26 @@ test('platform course admission combines audience, requirements and grants acros
       await read(course, 'alpha-peer', 404);
       await owner.query('UPDATE school_memberships SET revoked_at=NULL WHERE school_id=$1 AND account_id=$2', [alpha.id, learner.id]);
       await read(course, 'alpha-peer');
+    });
+
+    await run('earned legacy points follow the same login through a real school exit', async () => {
+      const name = 'legacy-peer';
+      const problem = (await owner.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id', [actors['legacy-admin'].id])).rows[0];
+      const version = (await owner.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,reference_code,time_limit_ms,memory_limit_mb,validation_status,
+        published_at,school_visible_at,rank_review_status,rank_approved_at)
+        VALUES($1,'Legacy earned points','stdio','Print the input.','print(input())',1000,128,'AC',now(),now(),'approved',now()) RETURNING id`, [problem.id])).rows[0];
+      const bank = (await owner.query("INSERT INTO problem_banks(owner_account_id,name,visibility) VALUES($1,'Legacy points bank','school') RETURNING id", [actors['legacy-admin'].id])).rows[0];
+      await owner.query('UPDATE problems SET bank_id=$2,current_version_id=$3 WHERE id=$1', [problem.id, bank.id, version.id]);
+      const pointsBefore = (await get('/points/me', name)).points;
+      await owner.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,language,code,idempotency_key,request_hash,status,score,passed,total)
+        VALUES($1,$2,$3,$4,'submit','python','fixture',$5,'fixture','AC',100,1,1)`, [actors[name].id, actors[name].identityId, problem.id, version.id, randomUUID()]);
+      const earned = (await get('/points/me', name)).points;
+      assert.equal(earned, pointsBefore + 10);
+      const exit = await post(`/schools/${LEGACY_SCHOOL_ID}/exit-request`, {}, name, 201);
+      await post(`/schools/${LEGACY_SCHOOL_ID}/exit-requests/${exit.request.id}/decision`, { decision: 'approve' }, 'legacy-admin');
+      assert.equal((await get('/points/me', name)).points, earned);
+      const course = await create(policy({ independent: rule('direct', { minimumPoints: earned }) }));
+      await read(course, name);
     });
 
     await run('concurrent edits cannot introduce a prerequisite cycle across two courses', async () => {
@@ -592,7 +631,7 @@ test('platform course admission combines audience, requirements and grants acros
       assert.equal(paths.filter(course => course.audiencePolicy.allRule.prerequisiteCourseIds.length === 1).length, 1);
     });
 
-    if (process.env.TEST_KEEP_PLATFORM_ADMISSION_FIXTURE && passedCases === 17) {
+    if (process.env.TEST_KEEP_PLATFORM_ADMISSION_FIXTURE && passedCases === 18) {
       const browserCourse = await create(policy({ independent: rule('application'), schools: [{ schoolId: alpha.id, ...rule() }, { schoolId: beta.id, ...rule('invite') }] }), 'QA platform admission: three routes', [
         { title: 'An original bilingual lesson', content: 'Read the explanation before completing the checkpoint.', objective: 'Understand the admission flow', checkpoint: 'Explain one rule in your own words.', checkpointAnswer: 'Rules combine an audience with requirements and an admission method.', localizations: { en: { title: 'An original bilingual lesson', content: 'Read the explanation before completing the checkpoint.', objective: 'Understand the admission flow', checkpoint: 'Explain one rule in your own words.', checkpointAnswer: 'Rules combine an audience with requirements and an admission method.' }, zh: { title: '原创双语课时', content: '阅读讲解，再完成检查点。', objective: '理解课程准入流程', checkpoint: '用自己的话解释一条规则。', checkpointAnswer: '规则由目标人群、前置条件和准入方式组成。' } } },
       ]);

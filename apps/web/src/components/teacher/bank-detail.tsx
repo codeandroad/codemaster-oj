@@ -3,7 +3,7 @@
 import { AppLink as Link } from "@/components/navigation";
 import { isPlatformProblem, mergePlatformProblems, problemEditorHref, teacherPlatformProblemSummaries, teacherProblemSummaries, type PlatformSourceProblem } from "./platform-problem-source";
 import { filterTeacherBankDetailRows } from "./problem-bank-rows";
-import { ProblemTopic } from "./problem-topic";
+import { ProblemTopic, ProblemTopicDraftStatus } from "./problem-topic";
 import { BankRenameDialog } from "@/components/bank-rename-dialog";
 import { ProblemPublicationStatus } from "@/components/problem-publication-status";
 import { useState } from "react";
@@ -22,6 +22,7 @@ import { productionApi, type ProductionProblem } from "@/lib/production-api";
 import { Bank, Group, GroupTags, ManageGroups, MAX_BATCH_PUBLISH, publishEligibilityReason, reviewVisibilityLabel, validationStatusLabel } from "./problem-banks";
 import { useLocale } from "@/components/locale-context";
 import { useProblemSelection } from "./use-problem-selection";
+import { ProblemSelectionHeader } from "./problem-selection-header";
 import { useProblemBankFilters } from "./use-problem-bank-filters";
 import { CatalogPagination, useCatalogPagination } from "./catalog-pagination";
 import { useWorkspaceData } from "@/components/workspace-data";
@@ -67,7 +68,7 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
   const setView = (group: string) => changeFilters({ group: group === "all" ? "" : group });
   const scope = JSON.stringify([id, view]);
   const pagination = useCatalogPagination(rows, scope);
-  const { checked, setChecked, changeRow } = useProblemSelection(pagination.rows.filter(problem => !isPlatformProblem(problem)), `${scope}:${pagination.page}`);
+  const { checked, setChecked, changeRow } = useProblemSelection(pagination.rows, `${scope}:${pagination.page}`);
   const selected = checked.filter((id) => rows.some((p) => p.id === id)),
     label =
       view === "all"
@@ -80,6 +81,7 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
       bank?.canEdit ||
       ["owner", "edit"].includes(bank?.permission ?? "");
   const selectedProblems = rows.filter((problem) => selected.includes(problem.id));
+  const selectedSchoolIds = selectedProblems.filter(problem => !isPlatformProblem(problem)).map(problem => problem.id);
   const publishableSelection = selectedProblems.filter((problem) => !publishEligibilityReason(problem, locale));
   const excludedSelection = selectedProblems.filter((problem) => publishEligibilityReason(problem, locale));
   const publishableScope = rows.filter((problem) => !publishEligibilityReason(problem, locale));
@@ -206,42 +208,43 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
                 {rows.length} {tr("道题 · 导入题与手工题统一归类", "problems · imported and manually created problems are grouped together")}
               </p>
             </div>
-            <Button size="sm" variant="secondary" disabled={!publishableScope.length || action.busy} onClick={togglePublishableScope}>
+            {publishableScope.length > 0 && <Button size="sm" variant="secondary" disabled={action.busy} onClick={togglePublishableScope}>
               <CheckSquare2 size={15} />
               {allPublishableScopeSelected
                 ? tr("取消可发布题目选择", "Deselect publishable")
                 : publishableScope.length > MAX_BATCH_PUBLISH
                   ? tr(`选择前 ${MAX_BATCH_PUBLISH} 道可发布题`, `Select first ${MAX_BATCH_PUBLISH} publishable`)
                   : `${tr("选择可发布题目", "Select publishable")} (${publishableScope.length})`}
-            </Button>
+            </Button>}
           </div>
           {selected.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 border-b border-border bg-surface-subtle px-4 py-3 text-sm">
               <b>{tr("已选", "Selected")} {selected.length} {tr("道", "problems")}</b>
-              <Button
+              {selectedSchoolIds.length > 0 && <Button
                 size="sm"
                 disabled={!publishableSelection.length || publishableSelection.length > MAX_BATCH_PUBLISH || action.busy}
                 onClick={() => { action.clear(); setConfirmPublish(true); }}
               >
                 {tr("批量发布", "Publish selected")} ({publishableSelection.length})
-              </Button>
-              <Button size="sm" onClick={() => setManage({ ids: selected })}>
+              </Button>}
+              {selectedSchoolIds.length > 0 && <Button size="sm" onClick={() => setManage({ ids: selectedSchoolIds })}>
                 {view === "none" ? tr("分配分组", "Assign group") : tr("添加到分组", "Add to group")}
-              </Button>
-              <Button
+              </Button>}
+              {selectedSchoolIds.length > 0 && <Button
                 size="sm"
                 variant="secondary"
                 onClick={() =>
                   setManage({
-                    ids: selected,
+                    ids: selectedSchoolIds,
                     mode: "移动分组",
                     source: currentGroup?.id,
                   })
                 }
               >
                 {tr("移动到分组", "Move to group")}
-              </Button>
-              {currentGroup && (
+              </Button>}
+              {!selectedSchoolIds.length && <span className="text-xs text-muted-foreground">{tr("平台题目可在编辑页提交审核。", "Request review for platform problems from the editor.")}</span>}
+              {currentGroup && selectedSchoolIds.length > 0 && (
                 <Button
                   size="sm"
                   variant="secondary"
@@ -249,7 +252,7 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
                   onClick={() => {
                     if (
                       window.confirm(
-                        `从“${currentGroup.name}”移除所选 ${selected.length} 道题？题目与其他分组保留。`,
+                        `从“${currentGroup.name}”移除所选 ${selectedSchoolIds.length} 道题？题目与其他分组保留。`,
                       )
                     )
                       void action.run(async () => {
@@ -259,7 +262,7 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
                             method: "PATCH",
                             body: {
                               problemIds: currentGroup.problemIds.filter(
-                                (p) => !selected.includes(p),
+                                (p) => !selectedSchoolIds.includes(p),
                               ),
                             },
                           },
@@ -281,7 +284,7 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
                   {tr(`单次最多发布 ${MAX_BATCH_PUBLISH} 道题，请分批选择。`, `Publish at most ${MAX_BATCH_PUBLISH} problems per batch. Narrow your selection.`)}
                 </p>
               )}
-              {excludedSelection.length > 0 && (
+              {selectedSchoolIds.length > 0 && excludedSelection.length > 0 && (
                 <p role="status" className="w-full text-xs leading-5 text-muted-foreground">
                   {tr("未纳入发布", "Excluded from publishing")} ({excludedSelection.length})：
                   {excludedSelection.slice(0, 3).map((problem) => `${problem.title}（${publishEligibilityReason(problem, locale)}）`).join("、")}
@@ -308,16 +311,7 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
                 <thead className="bg-surface-subtle text-xs text-muted-foreground">
                   <tr>
                     <th scope="col" className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        aria-label={tr("全选题库题目", "Select all bank problems")}
-                        checked={rows.some(p => !isPlatformProblem(p)) && selected.length === rows.filter(p => !isPlatformProblem(p)).length}
-                        onChange={(e) =>
-                          setChecked(
-                            e.target.checked ? rows.filter(p => !isPlatformProblem(p)).map((p) => p.id) : [],
-                          )
-                        }
-                      />
+                      <ProblemSelectionHeader rows={rows} checked={checked} setChecked={setChecked} busy={action.busy} />
                     </th>
                     {[
                       "题号",
@@ -343,7 +337,7 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
                         <input
                           aria-label={`${tr("选择", "Select")} ${p.title}`}
                           type="checkbox"
-                          disabled={isPlatformProblem(p)}
+                          disabled={action.busy}
                           checked={checked.includes(p.id)}
                           onChange={(event) => changeRow(p.id, event)}
                         />
@@ -388,6 +382,7 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
                       <td className="px-4 py-3">
                         <span role="group" className={styles.statusInline} title={reviewVisibilityLabel(p, bank?.visibility, locale)} aria-label={reviewVisibilityLabel(p, bank?.visibility, locale)}>
                           {isPlatformProblem(p) ? <StatusPill status={p.published ? tr("已发布", "Published") : tr("草稿", "Draft")} /> : <ProblemPublicationStatus problem={p} bankVisibility={bank?.visibility} />}
+                          <ProblemTopicDraftStatus problem={p} />
                           {!p.published && p.validationStatus && p.validationStatus !== "Draft" && <span className="text-xs text-muted-foreground" title={`${tr("参考验证", "Reference check")}: ${validationStatusLabel(p.validationStatus, locale)}`}>{validationStatusLabel(p.validationStatus, locale)}</span>}
                         </span>
                       </td>

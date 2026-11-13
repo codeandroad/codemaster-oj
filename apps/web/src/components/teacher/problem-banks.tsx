@@ -3,10 +3,11 @@ import { ProblemPublicationStatus, PublicationGuide } from "@/components/problem
 import { BankRenameDialog } from "@/components/bank-rename-dialog";
 import { ProblemGroupFilter } from "@/components/problem-group-filter";
 import { isPlatformProblem, mergePlatformProblems, problemEditorHref, teacherPlatformProblemSummaries, teacherProblemSummaries, type PlatformSourceProblem } from "./platform-problem-source";
-import { ProblemTopic } from "./problem-topic";
+import { ProblemTopic, ProblemTopicDraftStatus } from "./problem-topic";
 import { filterTeacherProblemRows } from "./problem-bank-rows";
 import {ProblemFilter} from "./problem-filter";
 import { useProblemSelection } from "./use-problem-selection";
+import { ProblemSelectionHeader } from "./problem-selection-header";
 import { useProblemBankFilters } from "./use-problem-bank-filters";
 import { CatalogPagination, useCatalogPagination } from "./catalog-pagination";
 import { useWorkspaceData } from "@/components/workspace-data";
@@ -158,8 +159,9 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
   const rows = waitingForGroups ? [] : matchedRows;
   const scope = JSON.stringify([bankId, tab, query, filterBank, filterGroup, filterStatus]);
   const pagination = useCatalogPagination(rows, scope);
-  const { checked, setChecked, changeRow } = useProblemSelection(pagination.rows.filter(problem => !isPlatformProblem(problem)), `${scope}:${pagination.page}`);
-  const checkedProblems = (problems.data?.items ?? []).filter((problem) => checked.includes(problem.id));
+  const { checked, setChecked, changeRow } = useProblemSelection(pagination.rows, `${scope}:${pagination.page}`);
+  const checkedProblems = rows.filter((problem) => checked.includes(problem.id));
+  const checkedSchoolIds = checkedProblems.filter(problem => !isPlatformProblem(problem)).map(problem => problem.id);
   const publishableSelection = checkedProblems.filter((problem) => !publishEligibilityReason(problem, locale));
   const excludedSelection = checkedProblems.filter((problem) => publishEligibilityReason(problem, locale));
   const publishableScope = rows.filter((problem) => !publishEligibilityReason(problem, locale));
@@ -417,14 +419,14 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                 groupActive={Boolean(filterGroup)}
                 onClear={() => changeFilters({ bank: "", status: "", group: "" })}
               />
-              <Button variant="secondary" size="sm" onClick={togglePublishableScope} disabled={!publishableScope.length || action.busy}>
+              {publishableScope.length > 0 && <Button variant="secondary" size="sm" onClick={togglePublishableScope} disabled={action.busy}>
                 <CheckSquare2 size={15} />
                 {allPublishableScopeSelected
                   ? tr("取消本范围选择", "Deselect in scope")
                   : publishableScope.length > MAX_BATCH_PUBLISH
                     ? tr(`选择前 ${MAX_BATCH_PUBLISH} 道可发布题（共 ${publishableScope.length} 道）`, `Select first ${MAX_BATCH_PUBLISH} publishable (${publishableScope.length} total)`)
                     : `${tr("选择可发布题目", "Select publishable")} (${publishableScope.length})`}
-              </Button>
+              </Button>}
               <Link href="/teacher/problems/solutions-review" className={buttonVariants({ variant: "secondary", size: "sm" })}>{tr("题解审核", "Solution review")}</Link>
               {!bankId && (
                 <Link
@@ -436,16 +438,17 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                 </Link>
               )}
             </div>
-            {checked.length > 0 && (
+            {checkedProblems.length > 0 && (
               <div className="border-b border-border bg-surface-subtle px-4 py-3 text-sm">
                 <div className="flex flex-wrap items-center gap-2">
                   <b>{tr("已选", "Selected")} {checkedProblems.length} {tr("道", "problems")}</b>
-                  <Button size="sm" onClick={() => { action.clear(); setConfirmPublish(true); }} disabled={!publishableSelection.length || publishableSelection.length > MAX_BATCH_PUBLISH || action.busy}>
+                  {checkedSchoolIds.length > 0 && <Button size="sm" onClick={() => { action.clear(); setConfirmPublish(true); }} disabled={!publishableSelection.length || publishableSelection.length > MAX_BATCH_PUBLISH || action.busy}>
                     {tr("批量发布", "Publish selected")} ({publishableSelection.length})
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={() => openManage(checked)} disabled={action.busy}>
+                  </Button>}
+                  {checkedSchoolIds.length > 0 && <Button variant="secondary" size="sm" onClick={() => openManage(checkedSchoolIds)} disabled={action.busy}>
                     {tr("批量整理分组", "Organize groups")}
-                  </Button>
+                  </Button>}
+                  {checkedSchoolIds.length === 0 && <span className="text-xs text-muted-foreground">{tr("平台题目可在编辑页提交审核。", "Request review for platform problems from the editor.")}</span>}
                   <Button variant="ghost" size="sm" onClick={() => setChecked([])} disabled={action.busy}>
                     {tr("取消选择", "Clear selection")}
                   </Button>
@@ -455,7 +458,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                     {tr(`单次最多发布 ${MAX_BATCH_PUBLISH} 道题，请分批选择。`, `Publish at most ${MAX_BATCH_PUBLISH} problems per batch. Narrow your selection.`)}
                   </p>
                 )}
-                {excludedSelection.length > 0 && (
+                {checkedSchoolIds.length > 0 && excludedSelection.length > 0 && (
                   <p role="status" className="mt-2 text-xs leading-5 text-muted-foreground">
                     {tr("未纳入发布", "Excluded from publishing")} ({excludedSelection.length})：
                     {excludedSelection.slice(0, 3).map((problem) => `${problem.title}（${publishEligibilityReason(problem, locale)}）`).join("、")}
@@ -468,6 +471,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
               min={1440}
               className={styles.problemTable}
               scrollLabel={tr("题目列表", "Problem list")}
+              firstColumnControl={<ProblemSelectionHeader rows={rows} checked={checked} setChecked={setChecked} busy={action.busy} />}
               columnWidths={[4, 7, 21, 8, 11, 12, 8, 14, 8, 7]}
               headers={[
                 tr("选择", "Select"),
@@ -488,7 +492,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                     <input
                       type="checkbox"
                       aria-label={`${tr("选择", "Select")} ${problem.title}`}
-                      disabled={isPlatformProblem(problem)}
+                      disabled={action.busy}
                       checked={checked.includes(problem.id)}
                       onChange={(event) => changeRow(problem.id, event)}
                     />
@@ -526,6 +530,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                   <td>
                     <span role="group" className={styles.statusInline} title={reviewVisibilityLabel(problem, banks.data?.items.find((x) => x.id === problem.bankId)?.visibility, locale)} aria-label={reviewVisibilityLabel(problem, banks.data?.items.find((x) => x.id === problem.bankId)?.visibility, locale)}>
                       {isPlatformProblem(problem) ? <StatusPill status={problem.published ? tr("已发布", "Published") : tr("草稿", "Draft")} /> : <ProblemPublicationStatus problem={problem} bankVisibility={banks.data?.items.find((x) => x.id === problem.bankId)?.visibility}/>}
+                      <ProblemTopicDraftStatus problem={problem} />
                       {!problem.published && problem.validationStatus && problem.validationStatus !== "Draft" && <span className="text-xs text-muted-foreground" title={`${tr("参考验证", "Reference check")}: ${validationStatusLabel(problem.validationStatus, locale)}`}>{validationStatusLabel(problem.validationStatus, locale)}</span>}
                     </span>
                   </td>

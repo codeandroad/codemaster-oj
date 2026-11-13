@@ -228,6 +228,7 @@ export function Table({
   columnWidths,
   className,
   scrollLabel,
+  firstColumnControl,
 }: {
   headers: string[];
   children: ReactNode;
@@ -235,6 +236,7 @@ export function Table({
   columnWidths?: readonly number[];
   className?: string;
   scrollLabel?: string;
+  firstColumnControl?: ReactNode;
 }) {
   return (
     <div className="overflow-x-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary" role={scrollLabel ? "region" : undefined} aria-label={scrollLabel} tabIndex={scrollLabel ? 0 : undefined}>
@@ -248,7 +250,7 @@ export function Table({
           <tr>
             {headers.map((header, i) => (
               <th className="px-4 py-3" key={`${header}-${i}`} scope="col">
-                {header}
+                {i === 0 && firstColumnControl ? firstColumnControl : header}
               </th>
             ))}
           </tr>

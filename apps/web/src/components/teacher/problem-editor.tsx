@@ -282,6 +282,11 @@ function ProblemEditorForm({ initial, user, platform, onClose, navigation, initi
         : "/teacher/problems");
   const bankVisibility = banks.data?.items.find((bank) => bank.id === problem.bankId)?.visibility ?? saved?.bankVisibility;
   const draft=useTeacherDraft({storageKey:teacherDraftKey(user.id,saved?.id??"new",search.get("versionId")??"current",platform ? "platform" : search.get("bankId")??""),baseline:editableSnapshot(initial??{...blank,bankId:search.get("bankId")??""}),snapshot:editableSnapshot(problem),baseVersion:initial?.versionId??"new",dirty,editable,onRestore:snapshot=>{const recovered=JSON.parse(snapshot);setTagsText(null);setProblem(current=>({...current,...recovered}));}});
+  const draftMessage = draft.status === "failed" ? tr("自动保存失败，请手动保存草稿。", "Local autosave failed. Save the draft manually.")
+    : draft.savedLocally ? tr("本机草稿已自动保存 · 待保存到服务器", "Autosaved locally · Server save pending")
+    : draft.status === "restored" ? tr("本机草稿已恢复 · 待保存到服务器", "Local draft restored · Server save pending")
+    : dirty ? tr("有未保存修改", "Unsaved changes")
+    : draft.status === "discarded" ? tr("已忽略本机草稿。", "Local draft discarded.") : "";
   const steps = initial && editable ? navigation : undefined;
   const nextStep = steps?.next;
   const stepDisabled = action.busy || switching || solutionPending || tutorialState.busy;
@@ -424,7 +429,7 @@ function ProblemEditorForm({ initial, user, platform, onClose, navigation, initi
       {requestsPlatformReview && editable && saved && !saved.draftReviewStatus && <p className="mt-2 text-sm text-muted-foreground">{tr("这道题由平台管理。保存后等待参考解验证通过，即可提交平台管理员审核。学生题解需在「解答与提示」单独保存，由平台管理员发布。", "This is a platform problem. After saving, wait for reference validation to pass, then request platform review. Save student solutions separately under Solutions and hints for a platform administrator to publish.")}</p>}
       {saved?.draftReviewStatus === "rejected" && <p role="status" className="mt-2 text-sm text-destructive">{tr("草稿未通过审核", "Draft rejected")}{saved.draftReviewReason ? `：${saved.draftReviewReason}` : ""}</p>}
       {draft.recovery&&<section className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface-subtle px-3 py-2 text-sm" data-od-id="teacher-draft-recovery"><p>{tr("发现本机未保存草稿", "Unsaved local draft found")} · {new Date(draft.recovery.updatedAt).toLocaleString(locale === "zh" ? "zh-CN" : "en-US")} {draft.recovery.baseVersion!==(initial?.versionId??"new")&&tr("（服务器版本已变化，请核对后保存）", "(The server version changed; review before saving)")}</p><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={!editable || action.busy || switching} onClick={draft.restore}>{tr("恢复草稿", "Restore draft")}</Button><Button size="sm" variant="ghost" disabled={action.busy || switching} onClick={draft.discard}>{tr("忽略草稿", "Discard draft")}</Button></div></section>}
-      {draft.status&&<p className="mt-2 text-xs text-muted-foreground" role="status" data-od-id="teacher-autosave-status">{draft.status}</p>}
+      {editable && <p className={`${styles.draftStatus} text-xs ${draft.status === "failed" || dirty && !draft.savedLocally ? "text-warning" : "text-muted-foreground"}`} role="status" data-od-id="teacher-autosave-status">{draftMessage}</p>}
 
       <div className={styles.toolbar}>
         {!platform && <><span className="text-muted-foreground">{tr("分组", "Groups")}</span>
@@ -446,7 +451,6 @@ function ProblemEditorForm({ initial, user, platform, onClose, navigation, initi
         </Button></>}
         {saved && !platform ? <ProblemPublicationStatus problem={saved} bankVisibility={bankVisibility}/> : <StatusPill status={saved?.published ? tr("已发布", "Published") : tr("草稿", "Draft")}/>}
         {saved && !platform && <span className="text-xs text-muted-foreground">{reviewVisibilityLabel(saved, bankVisibility, locale)}</span>}
-        {dirty && <span className="text-xs text-warning">{tr("有未保存修改", "Unsaved changes")}</span>}
       </div>
       {!platform && !saved?.id&&<p className="text-xs text-muted-foreground">{tr("整理分组时先保存题目草稿；没有分组可在弹窗中直接新建。", "Save the problem draft before organizing groups. You can create a group in the dialog.")}</p>}
       <State resource={groups}/>

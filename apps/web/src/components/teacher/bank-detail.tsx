@@ -3,6 +3,7 @@
 import { AppLink as Link } from "@/components/navigation";
 import { isPlatformProblem, mergePlatformProblems, problemEditorHref, type PlatformSourceProblem } from "./platform-problem-source";
 import { BankRenameDialog } from "@/components/bank-rename-dialog";
+import { ProblemPublicationStatus } from "@/components/problem-publication-status";
 import { useState } from "react";
 import {
   CheckSquare2,
@@ -297,20 +298,23 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
             </div>
           )}
           {rows.length ? (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[950px] table-fixed text-left text-sm">
+            <div className={`${styles.tableScroll} overflow-x-auto`} tabIndex={0} role="region" aria-label={tr("题库题目", "Bank problems")}>
+              <table className={`${styles.problemTable} w-full min-w-[1440px] table-fixed text-left text-sm`}>
                 <colgroup>
-                  <col className="w-[5%]" />
-                  <col className="w-[33%]" />
-                  <col className="w-[17%]" />
+                  <col className="w-[4%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[21%]" />
+                  <col className="w-[12%]" />
                   <col className="w-[10%]" />
-                  <col className="w-[10%]" />
-                  <col className="w-[15%]" />
-                  <col className="w-[10%]" />
+                  <col className="w-[9%]" />
+                  <col className="w-[7%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[7%]" />
                 </colgroup>
                 <thead className="bg-surface-subtle text-xs text-muted-foreground">
                   <tr>
-                    <th className="px-4 py-3">
+                    <th scope="col" className="px-4 py-3">
                       <input
                         type="checkbox"
                         aria-label={tr("全选题库题目", "Select all bank problems")}
@@ -323,15 +327,18 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
                       />
                     </th>
                     {[
-                      "题号与标题",
+                      "题号",
+                      "题目",
+                      "主题",
                       "分组",
                       "接口",
                       "正式测试",
                       "状态",
+                      "来源",
                       "操作",
                     ].map((x) => (
-                      <th className="px-4 py-3" key={x}>
-                        {tr(x, ({"题号与标题":"ID and title","分组":"Group","接口":"Interface","正式测试":"Formal tests","状态":"Status","操作":"Actions"} as Record<string,string>)[x] ?? x)}
+                      <th scope="col" className="px-4 py-3" key={x}>
+                        {tr(x, ({"题号":"ID","题目":"Problem","主题":"Topic","分组":"Group","接口":"Interface","正式测试":"Formal tests","状态":"Status","来源":"Source","操作":"Actions"} as Record<string,string>)[x] ?? x)}
                       </th>
                     ))}
                   </tr>
@@ -348,20 +355,24 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
                           onChange={(event) => changeRow(p.id, event)}
                         />
                       </td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                        <span className={styles.singleLine} title={p.id}>{p.id.slice(0, 8)}</span>
+                      </td>
                       <td className="px-4 py-3">
                         <Link
                           href={problemEditorHref(p, `/teacher/problems/banks/${id}`)}
                           className={styles.problemTitle}
+                          title={p.title}
                         >
                           {p.title}
                         </Link>
-                        {isPlatformProblem(p) && <span className="ml-2 text-xs text-muted-foreground">CodeMaster</span>}
-                        <p className="mt-1 font-mono text-xs text-muted-foreground">
-                          {p.id.slice(0, 8)}
-                        </p>
                       </td>
-                      <td className="break-words px-4 py-3">
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                        <span className={styles.singleLine} title={p.tags?.join(" · ")}>{p.tags?.join(" · ") || "—"}</span>
+                      </td>
+                      <td className="px-4 py-3">
                         <GroupTags
+                          singleLine
                           onClick={isPlatformProblem(p) ? undefined : () => setManage({ ids: [p.id] })}
                           groups={
                             groups.data?.items.filter((g) =>
@@ -369,37 +380,29 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
                             ) ?? []
                           }
                         />
-                        {!groups.data?.items.some((g) =>
-                          g.problemIds.includes(p.id),
-                        ) && (
-                          <span className="text-xs text-muted-foreground">
-                            {tr("未分组", "Ungrouped")}
-                          </span>
-                        )}
                       </td>
                       <td className="px-4 py-3">
-                        {p.mode === "function" ? tr("函数模式", "Function") : tr("标准输入输出", "Standard I/O")}
+                        <span className={styles.singleLine} title={p.mode === "function" ? tr("函数模式", "Function") : tr("标准输入输出", "Standard I/O")}>{p.mode === "function" ? tr("函数模式", "Function") : tr("标准输入输出", "Standard I/O")}</span>
                       </td>
                       <td className="px-4 py-3">
-                        {p.formalTestCount ??
+                        <span className={styles.singleLine} title={String(p.formalTestCount ?? p.tests?.filter(x => (x as {enabled?: boolean}).enabled !== false).length ?? tr("按版本查看", "View by version"))}>{p.formalTestCount ??
                           p.tests?.filter(
                             (x) =>
                               (x as { enabled?: boolean }).enabled !== false,
                           ).length ??
-                          tr("按版本查看", "View by version")}
+                          tr("按版本查看", "View by version")}</span>
                       </td>
                       <td className="px-4 py-3">
-                        <StatusPill
-                          status={
-                            p.published
-                              ? tr("已发布", "Published")
-                              : validationStatusLabel(p.validationStatus ?? "Draft", locale)
-                          }
-                        />
-                        <p className="mt-1 text-xs leading-4 text-muted-foreground empty:hidden">{reviewVisibilityLabel(p, bank?.visibility, locale, true)}</p>
+                        <span role="group" className={styles.statusInline} title={reviewVisibilityLabel(p, bank?.visibility, locale)} aria-label={reviewVisibilityLabel(p, bank?.visibility, locale)}>
+                          {isPlatformProblem(p) ? <StatusPill status={p.published ? tr("已发布", "Published") : tr("草稿", "Draft")} /> : <ProblemPublicationStatus problem={p} bankVisibility={bank?.visibility} />}
+                          {!p.published && p.validationStatus && p.validationStatus !== "Draft" && <span className="text-xs text-muted-foreground" title={`${tr("参考验证", "Reference check")}: ${validationStatusLabel(p.validationStatus, locale)}`}>{validationStatusLabel(p.validationStatus, locale)}</span>}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                        <span className={styles.singleLine} title={isPlatformProblem(p) ? "CodeMaster" : tr("本校", "My school")}>{isPlatformProblem(p) ? "CodeMaster" : tr("本校", "My school")}</span>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <div className="flex items-center gap-x-3">
                           <Link
                             className={link}
                             href={problemEditorHref(p, `/teacher/problems/banks/${id}`)}

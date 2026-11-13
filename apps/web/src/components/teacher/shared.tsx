@@ -226,15 +226,19 @@ export function Table({
   children,
   min = 850,
   columnWidths,
+  className,
+  scrollLabel,
 }: {
   headers: string[];
   children: ReactNode;
   min?: number;
   columnWidths?: readonly number[];
+  className?: string;
+  scrollLabel?: string;
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className={`w-full text-left text-sm${columnWidths ? " table-fixed" : ""}`} style={{ minWidth: min }}>
+    <div className="overflow-x-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary" role={scrollLabel ? "region" : undefined} aria-label={scrollLabel} tabIndex={scrollLabel ? 0 : undefined}>
+      <table className={`w-full text-left text-sm${columnWidths ? " table-fixed" : ""} ${className ?? ""}`} style={{ minWidth: min }}>
         {columnWidths && (
           <colgroup>
             {columnWidths.map((width, index) => <col key={headers[index]} style={{ width: `${width}%` }} />)}

@@ -1,0 +1,106 @@
+.summary {
+  display: grid;
+  grid-template-columns: 144px minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.cover {
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.cover img {
+  height: 100%;
+  object-fit: cover;
+}
+
+.copy {
+  display: flex;
+  min-width: 0;
+  height: 81px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.title,
+.title > a,
+.title > button {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metadata {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.description {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 16px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.category {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.access {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.status {
+  display: flex;
+  min-width: 0;
+}
+
+.status > span {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.actions > a {
+  margin-inline: 0;
+  white-space: nowrap;
+}
+
+.actions > button {
+  height: 28px;
+  padding-inline: 8px;
+  font-size: 12px;
+}

@@ -3,6 +3,7 @@
 import { AppLink as Link } from "@/components/navigation";
 import { CourseAccessSummary, courseStatus, type CourseAccessMetadata } from "@/components/course-access";
 import { CourseCatalogTable, CourseCatalogRow } from "./course-catalog-table";
+import { CourseCatalogSearch } from "@/components/student/learning-course-search";
 import { CourseSettingsDialog } from "./course-settings-dialog";
 import { CourseProgrammingLanguageField } from "./course-programming-language-field";
 import type { PlatformCourse } from "@/components/schools/platform-course-model";
@@ -145,6 +146,7 @@ export function TeacherLearning({ canManageAdmissions = false }: { canManageAdmi
   const {t,locale} = useLocale();
   const tx=(zh:string,en:string)=>locale==="en"?en:zh;
   const [showArchived,setShowArchived]=useState(false);
+  const [courseQuery,setCourseQuery]=useState(""),[categoryFilter,setCategoryFilter]=useState(""),[publicationFilter,setPublicationFilter]=useState(""),[sourceFilter,setSourceFilter]=useState("");
   const [archiveTarget,setArchiveTarget]=useState<Path|null>(null);
   const [admissionTarget, setAdmissionTarget] = useState<Path | null>(null);
   const router = useRouter(),
@@ -157,6 +159,14 @@ export function TeacherLearning({ canManageAdmissions = false }: { canManageAdmi
     [editing, setEditing] = useState<Resource | null>(null),
     action = useAction();
   const courseRows=[...(paths.data?.items??[]),...(platformPaths.data?.items??[]).filter(course=>course.archived===showArchived).map(course=>platformLearningPath({...course,chapters:course.chapters??[]}))];
+  const categories=[...new Set([...courseRows.map(course=>course.category),...(categoryFilter?[categoryFilter]:[])])].sort((a,b)=>a.localeCompare(b,locale));
+  const publication=(course:Path)=>course.published?"published":course.withdrawnAt?"withdrawn":"draft";
+  const publicationOptions=[{id:"published",label:tx("已发布","Published")},{id:"draft",label:tx("草稿","Draft")},{id:"withdrawn",label:tx("已下架","Withdrawn")}].filter(option=>option.id===publicationFilter||courseRows.some(course=>publication(course)===option.id));
+  const sourceOptions=[{id:"school",label:tx("本校","My school")},{id:"platform",label:"CodeMaster"}].filter(option=>option.id===sourceFilter||courseRows.some(course=>(course.ownerScope??"school")===option.id));
+  const normalizedQuery=courseQuery.trim().toLocaleLowerCase(locale);
+  const filteredCourses=courseRows.filter(course=>(!categoryFilter||course.category===categoryFilter)&&(!publicationFilter||publication(course)===publicationFilter)&&(!sourceFilter||(course.ownerScope??"school")===sourceFilter)&&(!normalizedQuery||[course.title,course.description,...Object.values(course.localizations??{}).flatMap(value=>[value?.title,value?.description])].filter(Boolean).join(" ").toLocaleLowerCase(locale).includes(normalizedQuery)));
+  const hasCourseFilters=Boolean(courseQuery||categoryFilter||publicationFilter||sourceFilter);
+  const clearCourseFilters=()=>{setCourseQuery("");setCategoryFilter("");setPublicationFilter("");setSourceFilter("");};
   const courseHref=(path:Path)=>`/teacher/courses/${path.id}${path.ownerScope==="platform"?"?source=platform":""}`;
   return (
     <>
@@ -176,15 +186,25 @@ export function TeacherLearning({ canManageAdmissions = false }: { canManageAdmi
       <Tabs items={[t("课程"), t("学习资料")]} value={t(tab)} onChange={label=>{const next=label===t("课程")?"课程":"学习资料";setTab(next);if(next!=="课程")setShowArchived(false);}} />
       <Feedback action={action} />
       {tab==="课程"&&<div className="mt-4 flex gap-2"><Button variant={showArchived?"secondary":"default"} aria-pressed={!showArchived} onClick={()=>setShowArchived(false)}>{tx("使用中","Active")}</Button><Button variant={showArchived?"default":"secondary"} aria-pressed={showArchived} onClick={()=>setShowArchived(true)}>{tx("已归档","Archived")}</Button></div>}
-      {tab==="课程"&&<section data-od-id="learning-structure-guide" className="mt-4 rounded-lg border border-border bg-surface px-5 py-4"><h2 className="font-semibold">{t("按章节编排课程")}</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">{locale === "en" ? "Add lessons, practice and checkpoints to a course. Set eligible classes, availability and catalogue visibility in Properties and access. Publishing opens the course according to those settings; it does not create classes or activities." : "新建课程后添加讲解、练习与检查点；在课程属性中设置准入班级、开放时间和目录显示，发布后按设置开放学习。课程不会自动创建班级、作业或训练。"}</p></section>}
+      {tab==="课程"&&<div className="mt-4 space-y-3 rounded-lg border border-border bg-surface px-4 py-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <CourseCatalogSearch query={courseQuery} onSearch={setCourseQuery} onRefresh={()=>{paths.reload();platformPaths.reload();}}/>
+          <div className="flex min-w-0 flex-wrap items-end gap-3">
+            <label className="grid w-40 gap-1 text-xs font-semibold">{tx("分类","Category")}<select aria-label={tx("课程分类","Course category")} className={input} value={categoryFilter} onChange={event=>setCategoryFilter(event.target.value)}><option value="">{tx("全部分类","All categories")}</option>{categories.map(category=><option key={category} value={category}>{category} ({courseRows.filter(course=>course.category===category).length})</option>)}</select></label>
+            <label className="grid w-36 gap-1 text-xs font-semibold">{tx("发布状态","Publication status")}<select aria-label={tx("发布状态","Publication status")} className={input} value={publicationFilter} onChange={event=>setPublicationFilter(event.target.value)}><option value="">{tx("全部状态","All statuses")}</option>{publicationOptions.map(option=><option key={option.id} value={option.id}>{option.label} ({courseRows.filter(course=>publication(course)===option.id).length})</option>)}</select></label>
+            <label className="grid w-36 gap-1 text-xs font-semibold">{tx("来源","Source")}<select aria-label={tx("课程来源","Course source")} className={input} value={sourceFilter} onChange={event=>setSourceFilter(event.target.value)}><option value="">{tx("全部来源","All sources")}</option>{sourceOptions.map(option=><option key={option.id} value={option.id}>{option.label} ({courseRows.filter(course=>(course.ownerScope??"school")===option.id).length})</option>)}</select></label>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground"><span role="status">{tx(`显示 ${filteredCourses.length} / ${courseRows.length} 门课程`,`Showing ${filteredCourses.length} of ${courseRows.length} courses`)}</span>{hasCourseFilters&&<Button type="button" size="sm" variant="ghost" onClick={clearCourseFilters}>{tx("清除筛选","Clear filters")}</Button>}</div>
+      </div>}
       <section className={`${panel} mt-4`}>
         {tab === "课程" ? (
           <>
             <State resource={paths} /><State resource={platformPaths}/>
-            <CourseCatalogTable empty={!paths.loading && !platformPaths.loading && !courseRows.length ? (showArchived ? tx("暂无已归档课程。", "No archived courses.") : t("暂无课程。点击“新建课程”组织章节内容。")) : undefined}>
-              {courseRows.map(path => (
+            <CourseCatalogTable empty={!paths.loading && !platformPaths.loading && !filteredCourses.length ? (hasCourseFilters ? tx("没有符合条件的课程。请调整搜索或筛选。", "No courses match. Adjust your search or filters.") : showArchived ? tx("暂无已归档课程。", "No archived courses.") : t("暂无课程。点击“新建课程”组织章节内容。")) : undefined}>
+              {filteredCourses.map(path => (
                 <CourseCatalogRow key={path.id} course={path}
-                  title={<Link className={link} href={courseHref(path)}>{path.title}</Link>}
+                  title={<Link className={link} href={courseHref(path)} title={path.title}>{path.title}</Link>}
                   access={<CourseAccessSummary course={path}/>}
                   status={<StatusPill status={courseStatus(path, locale)}/>}
                   actions={<>

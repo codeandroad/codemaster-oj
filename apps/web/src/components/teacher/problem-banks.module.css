@@ -70,16 +70,50 @@
 }
 
 .problemTitle:focus-visible {
-  overflow-wrap: anywhere;
-  white-space: normal;
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
 }
 
-.publicationCell > span {
-  white-space: normal;
+.problemTable :is(th, td) {
+  padding-inline: 12px;
+  white-space: nowrap;
 }
 
-.publicationCell > span > svg {
+.singleLine {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusInline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.statusInline > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusInline > span > svg {
   flex-shrink: 0;
+}
+
+.tableScroll {
+  overflow-x: auto;
+}
+
+.tableScroll:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
 }
 
 .accessGuide:has(details[open]) > .guideNote {

@@ -18,6 +18,7 @@ import {
   BookOpenCheck,
   CheckSquare2,
   FolderPlus,
+  MoreHorizontal,
   Plus,
   RotateCcw,
   Search,
@@ -466,15 +467,20 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
               </div>
             )}
             <Table
-              min={1040}
-              columnWidths={[6, 32, 11, 16, 9, 14, 12]}
+              min={1440}
+              className={styles.problemTable}
+              scrollLabel={tr("题目列表", "Problem list")}
+              columnWidths={[4, 7, 21, 8, 11, 12, 8, 14, 8, 7]}
               headers={[
                 tr("选择", "Select"),
+                tr("题号", "ID"),
                 tr("题目", "Problem"),
                 tr("题库", "Bank"),
-                tr("主题 / 分组", "Topics / groups"),
+                tr("主题", "Topic"),
+                tr("分组", "Group"),
                 tr("接口", "Interface"),
                 tr("状态", "Status"),
+                tr("来源", "Source"),
                 tr("操作", "Actions"),
               ]}
             >
@@ -489,27 +495,31 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                       onChange={(event) => changeRow(problem.id, event)}
                     />
                   </td>
+                  <td className="font-mono text-xs text-muted-foreground" title={problem.id}>
+                    {problem.id.slice(0, 8)}
+                  </td>
                   <td>
                     <Link
                       href={problemEditorHref(problem, bankId ? `/teacher/problems/banks/${bankId}` : "/teacher/problems")}
                       className={styles.problemTitle}
+                      title={problem.title}
                     >
                       {problem.title}
                     </Link>
-                    <p className="mt-1 font-mono text-xs text-muted-foreground">
-                      {problem.id.slice(0, 8)}
-                    </p>
                   </td>
-                  <td className="break-words">
-                    {
-                      isPlatformProblem(problem) ? "CodeMaster" : banks.data?.items.find((x) => x.id === problem.bankId)?.name
-                    }
+                  <td>
+                    <span className={styles.singleLine} title={banks.data?.items.find((x) => x.id === problem.bankId)?.name}>
+                      {banks.data?.items.find((x) => x.id === problem.bankId)?.name || "—"}
+                    </span>
                   </td>
-                  <td className="break-words">
-                    <p className="text-xs text-muted-foreground">
+                  <td>
+                    <span className={`${styles.singleLine} text-xs text-muted-foreground`} title={problem.tags?.join(" · ")}>
                       {problem.tags?.join(" · ") || "—"}
-                    </p>
+                    </span>
+                  </td>
+                  <td>
                     <GroupTags
+                      singleLine
                       onClick={isPlatformProblem(problem) ? undefined : () => openManage([problem.id])}
                       groups={
                         groups.data?.items.filter((g) =>
@@ -521,28 +531,32 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                   <td className="text-xs">
                     {problem.mode === "function" ? tr("函数模式", "Function") : tr("标准输入输出", "Standard I/O")}
                   </td>
-                  <td className={styles.publicationCell}>
-                    {isPlatformProblem(problem) ? <StatusPill status={problem.published ? tr("已发布", "Published") : tr("草稿", "Draft")} /> : <ProblemPublicationStatus problem={problem} bankVisibility={banks.data?.items.find((x) => x.id === problem.bankId)?.visibility}/>}
-                    {!problem.published && <p className="mt-1 text-xs text-muted-foreground">{tr("参考验证", "Reference check")}: {validationStatusLabel(problem.validationStatus ?? "Draft", locale)}</p>}
-                    <p className="mt-1 text-xs leading-4 text-muted-foreground empty:hidden">{reviewVisibilityLabel(problem, banks.data?.items.find((x) => x.id === problem.bankId)?.visibility, locale, true)}</p>
+                  <td>
+                    <span role="group" className={styles.statusInline} title={reviewVisibilityLabel(problem, banks.data?.items.find((x) => x.id === problem.bankId)?.visibility, locale)} aria-label={reviewVisibilityLabel(problem, banks.data?.items.find((x) => x.id === problem.bankId)?.visibility, locale)}>
+                      {isPlatformProblem(problem) ? <StatusPill status={problem.published ? tr("已发布", "Published") : tr("草稿", "Draft")} /> : <ProblemPublicationStatus problem={problem} bankVisibility={banks.data?.items.find((x) => x.id === problem.bankId)?.visibility}/>}
+                      {!problem.published && problem.validationStatus && problem.validationStatus !== "Draft" && <span className="text-xs text-muted-foreground" title={`${tr("参考验证", "Reference check")}: ${validationStatusLabel(problem.validationStatus, locale)}`}>{validationStatusLabel(problem.validationStatus, locale)}</span>}
+                    </span>
+                  </td>
+                  <td className="text-xs text-muted-foreground">
+                    {isPlatformProblem(problem) ? "CodeMaster" : tr("本校", "My school")}
                   </td>
                   <td>
-                    <div className="flex flex-col items-start gap-1 text-xs">
+                    <div className="flex items-center gap-3 text-xs">
                       <Link
                         href={problemEditorHref(problem, bankId ? `/teacher/problems/banks/${bankId}` : "/teacher/problems")}
                         className="inline-flex items-center gap-1 font-semibold text-primary"
                       >
                         {problem.canEdit === false ? tr("查看", "View") : tr("编辑", "Edit")} <ArrowRight size={14} />
                       </Link>
-                      {!isPlatformProblem(problem) && <button type="button" className={`${link} text-left`} onClick={() => openManage([problem.id])}>
-                        {tr("整理分组", "Organize groups")}
+                      {!isPlatformProblem(problem) && <button type="button" className="text-muted-foreground" title={tr("整理分组", "Organize groups")} aria-label={tr("整理分组", "Organize groups")} onClick={() => openManage([problem.id])}>
+                        <MoreHorizontal size={18} aria-hidden="true" />
                       </button>}
                     </div>
                   </td>
                 </tr>
               ))}
               {!problems.loading && !problems.error && !waitingForGroups && !rows.length && (
-                <Empty columns={7}>
+                <Empty columns={10}>
                   {searchText || filterBank || filterGroup || filterStatus
                     ? tr("没有匹配的题目，请调整搜索或筛选。", "No matching problems. Try another search or filter.")
                     : tr("当前范围暂无题目。新建题目或导入后，它们会显示在这里。", "No problems in this scope yet. Create or import problems to show them here.")}
@@ -696,10 +710,18 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
 export function GroupTags({
   groups,
   onClick,
+  singleLine = false,
 }: {
   groups: Group[];
   onClick?: (() => void) | undefined;
+  singleLine?: boolean;
 }) {
+  if (singleLine) {
+    const names = groups.map(group => group.name).join(" · ") || "—";
+    return onClick && groups.length > 0 ? (
+      <button type="button" className={`${styles.singleLine} max-w-full rounded bg-accent px-1.5 py-0.5 text-left text-xs text-primary`} onClick={onClick} title={names}>{names}</button>
+    ) : <span className={`${styles.singleLine} text-xs text-muted-foreground`} title={names}>{names}</span>;
+  }
   return (
     <span className="mt-1 inline-flex flex-wrap gap-1">
       {groups.slice(0, 2).map((g) => (

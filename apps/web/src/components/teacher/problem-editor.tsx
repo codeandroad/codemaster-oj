@@ -5,7 +5,7 @@ import { ProblemAssistanceEditor } from "./problem-assistance-editor";
 import { ProblemEditorSteps, SaveAndEditNext } from "./problem-editor-steps";
 import type { ProblemEditorNavigation, ProblemEditorTarget } from "./problem-editor-navigation";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useId, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useNavigationBlocker } from "@/components/navigation";
 import {
@@ -189,6 +189,8 @@ function ProblemEditorForm({ initial, user, platform, onClose, navigation }: {
   const canPublish = !platform || user.platformAdmin === true;
   const { locale } = useLocale();
   const tr = (zh:string,en:string) => locale === "zh" ? zh : en;
+  const tagsHintId = useId();
+  const [tagsText, setTagsText] = useState<string | null>(null);
   const search = useSearchParams(),
     router = useRouter(),
     banks = useData<{ items: Bank[] }>(platform ? user.platformAdmin ? "platform/problem-banks" : null : "problem-banks"),
@@ -235,7 +237,7 @@ function ProblemEditorForm({ initial, user, platform, onClose, navigation }: {
         ? `/teacher/problems/banks/${problem.bankId}`
         : "/teacher/problems");
   const bankVisibility = banks.data?.items.find((bank) => bank.id === problem.bankId)?.visibility ?? saved?.bankVisibility;
-  const draft=useTeacherDraft({storageKey:teacherDraftKey(user.id,saved?.id??"new",search.get("versionId")??"current",platform ? "platform" : search.get("bankId")??""),baseline:editableSnapshot(initial??{...blank,bankId:search.get("bankId")??""}),snapshot:editableSnapshot(problem),baseVersion:initial?.versionId??"new",dirty,editable,onRestore:snapshot=>{const recovered=JSON.parse(snapshot);setProblem(current=>({...current,...recovered}));}});
+  const draft=useTeacherDraft({storageKey:teacherDraftKey(user.id,saved?.id??"new",search.get("versionId")??"current",platform ? "platform" : search.get("bankId")??""),baseline:editableSnapshot(initial??{...blank,bankId:search.get("bankId")??""}),snapshot:editableSnapshot(problem),baseVersion:initial?.versionId??"new",dirty,editable,onRestore:snapshot=>{const recovered=JSON.parse(snapshot);setTagsText(null);setProblem(current=>({...current,...recovered}));}});
   const steps = initial && editable ? navigation : undefined;
   const nextStep = steps?.next;
   const stepDisabled = action.busy || switching || solutionPending || tutorialState.busy;
@@ -310,6 +312,7 @@ function ProblemEditorForm({ initial, user, platform, onClose, navigation }: {
     draft.clear();
     setSaved(result);
     setProblem(result);
+    setTagsText(null);
     if (!initial && navigate && !onClose)
       router.replace(
         `/teacher/problems/${result.id}/edit?${platform ? "source=platform&" : ""}returnTo=${encodeURIComponent(back)}${tab === "教程" ? "&tab=tutorial" : tab === "解答与提示" ? "&tab=solutions" : ""}`,
@@ -445,22 +448,25 @@ function ProblemEditorForm({ initial, user, platform, onClose, navigation }: {
                 </select>}
               </Field>
               {platform && user.platformAdmin && <State resource={banks} />}
-              <Field label={tr("主题标签", "Topic tags")}>
-                <input
-                  value={problem.tags?.join(", ") ?? ""}
-                  disabled={!editable}
-                  onChange={(e) =>
-                    update(
-                      "tags",
-                      e.target.value
-                        .split(/[,，]/)
-                        .map((x) => x.trim())
-                        .filter(Boolean),
-                    )
-                  }
-                  className={input}
-                />
-              </Field>
+              <div>
+                <Field label={tr("主题标签", "Topic tags")}>
+                  <input
+                    name="tags"
+                    value={tagsText ?? problem.tags?.join(", ") ?? ""}
+                    aria-describedby={tagsHintId}
+                    disabled={!editable}
+                    onChange={event => {
+                      const value = event.target.value;
+                      setTagsText(value);
+                      update("tags", value.split(/[,，]/).map(tag => tag.trim()).filter(Boolean));
+                    }}
+                    className={input}
+                  />
+                </Field>
+                <span id={tagsHintId} className="mt-1 block text-xs text-muted-foreground">
+                  {tr("用逗号分隔标签，标签内可以有空格。", "Separate tags with commas. Tags can contain spaces.")}
+                </span>
+              </div>
               <Field label={tr("难度", "Difficulty")}>
                 <select
                   value={problem.difficulty ?? "基础"}
@@ -961,6 +967,7 @@ function ProblemEditorForm({ initial, user, platform, onClose, navigation }: {
                   );
                   setSaved(result);
                   setProblem(result);
+                  setTagsText(null);
                   setPublish(false);
                   return platform ? tr("题目版本已发布。", "Problem version published.") : tr("题目版本已发布；全校开放和积分资格须经管理员审核。", "Problem version published. School-wide access and point eligibility require admin review.");
                 })

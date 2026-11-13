@@ -23,6 +23,7 @@ import { Bank, Group, GroupTags, ManageGroups, MAX_BATCH_PUBLISH, publishEligibi
 import { useLocale } from "@/components/locale-context";
 import { useProblemSelection } from "./use-problem-selection";
 import { ProblemSelectionHeader } from "./problem-selection-header";
+import { PlatformProblemReviewAction } from "./platform-problem-review-action";
 import { useProblemBankFilters } from "./use-problem-bank-filters";
 import { CatalogPagination, useCatalogPagination } from "./catalog-pagination";
 import { useWorkspaceData } from "@/components/workspace-data";
@@ -240,7 +241,8 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
               >
                 {tr("移动到分组", "Move to group")}
               </Button>}
-              {!selectedSchoolIds.length && <span className="text-xs text-muted-foreground">{tr("平台题目可在编辑页提交审核。", "Request review for platform problems from the editor.")}</span>}
+              <PlatformProblemReviewAction selected={pagination.rows.filter(problem => checked.includes(problem.id))} action={action}
+                onSubmitted={ids => setChecked(previous => previous.filter(id => !ids.has(id)))} />
               {currentGroup && selectedSchoolIds.length > 0 && (
                 <Button
                   size="sm"

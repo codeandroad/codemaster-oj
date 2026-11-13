@@ -8,6 +8,7 @@ import { filterTeacherProblemRows } from "./problem-bank-rows";
 import {ProblemFilter} from "./problem-filter";
 import { useProblemSelection } from "./use-problem-selection";
 import { ProblemSelectionHeader } from "./problem-selection-header";
+import { PlatformProblemReviewAction } from "./platform-problem-review-action";
 import { useProblemBankFilters } from "./use-problem-bank-filters";
 import { CatalogPagination, useCatalogPagination } from "./catalog-pagination";
 import { useWorkspaceData } from "@/components/workspace-data";
@@ -445,7 +446,8 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                   {checkedSchoolIds.length > 0 && <Button variant="secondary" size="sm" onClick={() => openManage(checkedSchoolIds)} disabled={action.busy}>
                     {tr("批量整理分组", "Organize groups")}
                   </Button>}
-                  {checkedSchoolIds.length === 0 && <span className="text-xs text-muted-foreground">{tr("平台题目可在编辑页提交审核。", "Request review for platform problems from the editor.")}</span>}
+                  <PlatformProblemReviewAction selected={pagination.rows.filter(problem => checked.includes(problem.id))} action={action}
+                    onSubmitted={ids => setChecked(previous => previous.filter(id => !ids.has(id)))} />
                   <Button variant="ghost" size="sm" onClick={() => setChecked([])} disabled={action.busy}>
                     {tr("取消选择", "Clear selection")}
                   </Button>

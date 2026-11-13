@@ -148,6 +148,67 @@ test('the complete platform problem editor uses scoped grants without publicatio
       assert.equal((await pool.query('SELECT version_id FROM chapter_problems WHERE problem_id=$1', [problem.id])).rowCount, 0);
       for (const path of [`/problems/${problem.id}/versions`, `/problems/${problem.id}/publish`]) await post(path, { ...changed, versionId: latest.versionId }, 'legacy-editor', 403);
     });
+    await t.test('batch review queues only authorized and validated draft revisions and keeps published content live', async () => {
+      const batch = `${source}/request-review-batch`;
+      const summary = `${source}?schoolId=${alpha.id}&view=summary`;
+      const judge = { environmentVersion: 'platform-batch-review-fixture', judge: async () => ({ status: 'AC', score: 100, passed: 1, total: 1, publicOutput: '', publicMessage: '', privateResults: [], environmentVersion: 'platform-batch-review-fixture' }) };
+      const drain = async () => { while (await processOne({ pool: worker, judge, logger: {} })) { /* Isolated fixture queue. */ } };
+      const makePublished = async title => {
+        const created = await post(source, { ...input, title }, 'platform', 201);
+        await drain();
+        return post(`${source}/${created.id}/publish`, { expectedVersionId: created.versionId });
+      };
+      const fixtures = [];
+      for (const name of ['First', 'Second', 'Waiting', 'Stale']) fixtures.push(await makePublished(`${name} batch review fixture`));
+      const [first, second, waiting, stale] = fixtures;
+      for (const row of fixtures) {
+        await post(`/platform/content-editors/problem/${row.id}`, grant('teacher'));
+      }
+      const update = row => post(`${source}/${row.id}/versions`, {
+        ...input, title: row.title + ' draft', tags: ['Updated topic'], expectedVersionId: row.versionId, expectedRevision: row.editRevision,
+      }, 'teacher', 201);
+      const firstDraft = await update(first), secondDraft = await update(second), staleDraft = await update(stale);
+      await drain();
+      const waitingDraft = await update(waiting);
+      await update(staleDraft);
+      const itemsById = new Map((await get(summary, 'teacher')).items.map(row => [row.id, row]));
+      assert.equal(itemsById.get(first.id).draftValidationStatus, 'AC');
+      assert.equal(itemsById.get(first.id).editRevision, firstDraft.editRevision);
+      assert.equal(itemsById.get(first.id).canRequestReview, true);
+      assert.equal(itemsById.get(waiting.id).draftValidationStatus, 'Waiting');
+      assert.equal(itemsById.get(waiting.id).canRequestReview, false);
+      const item = row => ({ problemId: row.id, expectedVersionId: row.versionId, expectedRevision: row.editRevision });
+      await post(batch, { items: [item(firstDraft)] }, 'student', 403);
+      await request(batch, { name: 'teacher', method: 'POST', body: { items: [item(firstDraft)] }, csrf: false, status: 403 });
+      await post(batch, { items: [item(firstDraft), item(firstDraft)] }, 'teacher', 400);
+      const payload = { items: [firstDraft, waitingDraft, staleDraft, secondDraft].map(item).concat({ ...item(other), expectedRevision: 1 }) };
+      const expected = [
+        { problemId: first.id, status: 'submitted' },
+        { problemId: waiting.id, status: 'skipped', code: 'NOT_VALIDATED' },
+        { problemId: stale.id, status: 'skipped', code: 'REVISION_CONFLICT' },
+        { problemId: second.id, status: 'submitted' },
+        { problemId: other.id, status: 'skipped', code: 'UNAVAILABLE' },
+      ];
+      assert.deepEqual((await post(batch, payload, 'teacher')).items, expected);
+      assert.deepEqual((await post(batch, payload, 'teacher')).items, expected.map(row => row.status === 'submitted' ? { ...row, status: 'pending' } : row));
+      const saved = (await get(summary, 'teacher')).items.find(row => row.id === first.id);
+      assert.equal(saved.draftReviewStatus, 'pending');
+      assert.equal(saved.canRequestReview, false);
+      assert.deepEqual(saved.tags, input.tags);
+      const live = await get(`/problems/${first.id}?current=1`, 'history-student');
+      assert.deepEqual(live.tags, input.tags);
+      const release = { expectedVersionId: firstDraft.versionId, expectedRevision: firstDraft.editRevision };
+      await post(`${source}/${first.id}/publish`, release, 'teacher', 403);
+      await post(`${source}/${first.id}/publish`, release);
+      assert.deepEqual((await get(`/problems/${first.id}?current=1`, 'history-student')).tags, ['Updated topic']);
+      const audit = await pool.query("SELECT count(*)::int AS count FROM platform_audit_events WHERE action='platform.problem.request_review' AND detail->>'problemId' = ANY($1)", [[first.id, second.id]]);
+      assert.equal(audit.rows[0].count, 2, 'Retries do not duplicate review requests');
+      await drain();
+      for (const row of fixtures) {
+        await request(`/platform/content-editors/problem/${row.id}`, { method: 'DELETE', body: grant('teacher') });
+      }
+      await post(batch, payload, 'teacher', 403);
+    });
     await t.test('the shared tutorial editor is available to grantees, uses revisions, and cannot read another source', async () => {
       const path = `${source}/${problem.id}/tutorial`, current = await get(path, 'teacher');
       assert.equal(current.mode, 'course');

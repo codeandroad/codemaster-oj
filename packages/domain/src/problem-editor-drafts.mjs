@@ -4,11 +4,13 @@ import { canonicalHash, fail } from './security.mjs';
 import { publicProblemMetadata, publicStatementSourceHash } from './problem-public-statements.mjs';
 import { assertJudgeAdmission, getSettings } from './system.mjs';
 
+export const draftValidationResultSql = `CASE t.state WHEN 'queued' THEN 'Waiting' WHEN 'leased' THEN 'Judging'
+ ELSE COALESCE(r.status,'System Error') END`;
+
 export async function draftValidation(db, version) {
  if (!version.edit_draft) return { status: version.validation_status, message: version.validation_message };
  if (!version.draft_validation_task_id) return { status: 'Incomplete', message: null };
- const { rows: [result] } = await db.query(`SELECT CASE t.state WHEN 'queued' THEN 'Waiting' WHEN 'leased' THEN 'Judging'
-  ELSE COALESCE(r.status,'System Error') END status,r.public_message message
+ const { rows: [result] } = await db.query(`SELECT ${draftValidationResultSql} status,r.public_message message
   FROM judge_tasks t LEFT JOIN judge_runs r ON r.task_id=t.id AND r.lease_id=t.lease_id WHERE t.id=$1`, [version.draft_validation_task_id]);
  return result ?? { status: 'Waiting', message: null };
 }

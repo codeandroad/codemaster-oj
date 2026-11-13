@@ -1,7 +1,8 @@
 "use client";
 
 import { AppLink as Link } from "@/components/navigation";
-import { isPlatformProblem, mergePlatformProblems, problemEditorHref, type PlatformSourceProblem } from "./platform-problem-source";
+import { isPlatformProblem, mergePlatformProblems, problemEditorHref, teacherPlatformProblemSummaries, teacherProblemSummaries, type PlatformSourceProblem } from "./platform-problem-source";
+import { filterTeacherBankDetailRows } from "./problem-bank-rows";
 import { BankRenameDialog } from "@/components/bank-rename-dialog";
 import { ProblemPublicationStatus } from "@/components/problem-publication-status";
 import { useState } from "react";
@@ -43,8 +44,8 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
   const banks = useWorkspaceData<{ items: Bank[] }>("problem-banks?includeArchived=owned"),
     problems = useWorkspaceData<{
       items: (ProductionProblem & { formalTestCount?: number })[];
-    }>("problems?view=summary"),
-    platformSources = useWorkspaceData<{ items: PlatformSourceProblem[] }>("platform/source-problems?schoolId=00000000-0000-4000-8000-000000000052&view=summary"),
+    }>(teacherProblemSummaries),
+    platformSources = useWorkspaceData<{ items: PlatformSourceProblem[] }>(teacherPlatformProblemSummaries),
     groups = useData<{ items: Group[] }>(`problem-groups?bankId=${id}`),
     bank = banks.data?.items.find((x) => x.id === id),
     [confirmPublish, setConfirmPublish] = useState(false),
@@ -59,27 +60,14 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
     [editGroup, setEditGroup] = useState<Group | null>(null),
     action = useAction();
   const { filters, changeFilters } = useProblemBankFilters(accountId, id);
-  const view = filters.group === "none" || groups.data?.items.some(group => group.id === filters.group) ? filters.group : "all";
+  const { all, rows, view, currentGroup } = filterTeacherBankDetailRows(
+    mergePlatformProblems(problems.data?.items ?? [], platformSources.data?.items ?? []), id, filters.group, groups.data?.items,
+  );
   const setView = (group: string) => changeFilters({ group: group === "all" ? "" : group });
-  const all = mergePlatformProblems(problems.data?.items ?? [], platformSources.data?.items ?? []).filter((p) => p.bankId === id),
-    rows =
-      view === "all"
-        ? all
-        : view === "none"
-          ? all.filter(
-              (p) =>
-                !groups.data?.items.some((g) => g.problemIds.includes(p.id)),
-            )
-          : all.filter((p) =>
-              groups.data?.items
-                .find((g) => g.id === view)
-                ?.problemIds.includes(p.id),
-            );
   const scope = JSON.stringify([id, view]);
   const pagination = useCatalogPagination(rows, scope);
   const { checked, setChecked, changeRow } = useProblemSelection(pagination.rows.filter(problem => !isPlatformProblem(problem)), `${scope}:${pagination.page}`);
   const selected = checked.filter((id) => rows.some((p) => p.id === id)),
-    currentGroup = groups.data?.items.find((g) => g.id === view),
     label =
       view === "all"
         ? "全部题目"

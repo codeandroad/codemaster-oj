@@ -18,6 +18,7 @@ import { CopyCodeButton } from "@/components/student/copy-code-button";
 import { ProblemSubmissionsTable, SolvedStatus, useProblemSubmissions } from "@/components/student/problem-submissions";
 import { ProblemTutorial, useProblemTutorial } from "@/components/student/problem-tutorial";
 import { ProblemTutorialEditor } from "@/components/teacher/problem-tutorial-editor";
+import { adjacentProblemRows, type ProblemEditorNavigation } from "@/components/teacher/problem-editor-navigation";
 import { RunResultPanel } from "@/components/student/run-result-panel";
 import { languageInfo, requiredLanguageText, starterFor, submissionLanguage, supportedLanguages } from "@/components/student/languages";
 import { useWorkspaceSettings, WorkspaceSettingsDialog } from "@/components/student/workspace-settings";
@@ -29,11 +30,12 @@ import type { Bank, Problem } from "./school-practice-types";
 import { PlatformProblemEditor } from "./platform-problems";
 import type { PlatformSourceProblem } from "@/components/teacher/platform-problem-source";
 import { SchoolProblemEditor } from "./school-problem-editor";
-import { practiceCatalogFilters, practiceFilterKeys, practiceLocation, practiceNavigationItems, type PracticeCatalogFilters } from "./school-practice-navigation";
+import { practiceCatalogFilters, practiceFilterKeys, practiceLocation, practiceNavigationItems, practiceProblemMatches, type PracticeCatalogFilters } from "./school-practice-navigation";
 import { PublicProblemWorkspace } from "./public-problem-workspace";
 import { PracticeToolbar, type PracticeNavigation } from "./school-practice-toolbar";
 
 type Job=DetailedSubmission&{state:string;caseFeedback:ResultCase[]};
+type EditableProblem = { scope: "school"; problem: Problem } | { scope: "platform"; id: string };
 
 function updatePracticeLocation(patch: Record<string, string | null>) {
   const current = window.location;
@@ -83,23 +85,32 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
   const catalogBanks = [...(banks.data?.items ?? []), ...(sourceProblems.length ? [{ id: "platform", name: "CodeMaster", revision: 1, archived: false, canManage: false }] : [])];
   const catalogMatches = staff || (problems.data?.courseId ?? "") === courseId;
   const catalog = { ...problems, loading: !problems.error && (!ready || problems.loading || !catalogMatches), data: catalogMatches ? problems.data : null };
+  const catalogProblems = staff ? withSources(catalog.data?.items ?? []) : catalog.data?.items ?? [];
   const navigationProblems = (allProblems.data?.courseId ?? "") === courseId ? allProblems.data?.items ?? [] : [];
-  const [editing, setEditing] = useState<Problem | "new" | null>(null);
-  const [platformEditing, setPlatformEditing] = useState<string | null>(null);
+  const [editing, setEditing] = useState<EditableProblem | "new" | null>(null);
   const [bankEdit, setBankEdit] = useState<Bank | "new" | null>(null);
   const [bankName, setBankName] = useState("");
   const bankRequest = useRef("");
   const bankPending = useRef(false);
   const action = useMutation();
   function refresh() { banks.reload(); allProblems.reload(); bankProblems.reload(); platformSources.reload(); }
+  function closeProblemEditor() { setEditing(null); refresh(); }
   function selectProblem(problemId: string | null) { updatePracticeLocation({ problemId }); }
   function changeFilters(patch: Partial<PracticeCatalogFilters>) {
     const fields = Object.fromEntries(Object.entries(patch).map(([key, value]) => [practiceFilterKeys[key as keyof PracticeCatalogFilters], typeof value === "boolean" ? value ? "1" : null : value]));
     changeUrlFilters(fields);
   }
+  async function openProblemEditor(problem: Problem) {
+    if (problem.ownerScope === "platform") {
+      setEditing({ scope: "platform", id: problem.id });
+      return;
+    }
+    const detail = await productionApi<Problem>(`${base}/problems/${encodeURIComponent(problem.id)}`);
+    if (!detail.canManage) throw new Error(tx("此题目前不可编辑。", "This problem is currently read-only."));
+    setEditing({ scope: "school", problem: detail });
+  }
   function editProblem(problem: Problem) {
-    if (problem.ownerScope === "platform") { setPlatformEditing(problem.id); return; }
-    void action.run(async () => setEditing(await productionApi<Problem>(`${base}/problems/${problem.id}`)));
+    void action.run(() => openProblemEditor(problem));
   }
   function editBank(bank: Bank | "new") {
     action.reset();
@@ -113,13 +124,26 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
     return () => clearInterval(timer);
   }, [problems.data, problems.reload]);
 
-  if (platformEditing) return <PlatformProblemEditor id={platformEditing} onClose={() => { setPlatformEditing(null); refresh(); }} />;
+  let editorNavigation: ProblemEditorNavigation | undefined;
+  if (editing && editing !== "new") {
+    const currentId = editing.scope === "platform" ? editing.id : editing.problem.id;
+    const rows = catalogProblems.filter(problem => problem.canManage
+      && (problem.id === currentId || practiceProblemMatches(problem, filters, staff)));
+    const { previous, next } = adjacentProblemRows(rows, currentId);
+    const target = (problem?: Problem) => problem && ({
+      title: problem.title,
+      select: () => openProblemEditor(problem),
+    });
+    editorNavigation = { previous: target(previous), next: target(next) };
+    if (editing.scope === "platform") return <PlatformProblemEditor id={editing.id} navigation={editorNavigation}
+      onClose={closeProblemEditor} />;
+  }
 
   if (selected) return <PracticeProblem key={`${schoolId}:${selected}`} path={`${base}/problems/${encodeURIComponent(selected)}`} jobPath={id => `${base}/judge-jobs/${id}`} onBack={() => { selectProblem(null); refresh(); }} navigation={{ currentId: selected, items: practiceNavigationItems(navigationProblems, filters, staff, selected, banks.data?.items.filter(bank => bank.archived).map(bank => bank.id)), onSelect: selectProblem }} />;
 
   const catalogView = <SchoolPracticeCatalog
     banks={catalogBanks}
-    problems={staff ? withSources(catalog.data?.items ?? []) : catalog.data?.items ?? []}
+    problems={catalogProblems}
     learnerResource={staff ? undefined : catalog}
     courseFilter={staff ? undefined : {
       value: courseId, courses: allProblems.data?.courses,
@@ -134,7 +158,7 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
     onEditBank={editBank}
     onNewProblem={() => setEditing("new")}
     onOpen={id => {
-      const problem = withSources(problems.data?.items ?? []).find(item => item.id === id);
+      const problem = catalogProblems.find(item => item.id === id);
       if (staff && problem?.canManage) editProblem(problem);
       else selectProblem(id);
     }}
@@ -201,7 +225,10 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
         </form>
       </DialogContent>
     </Dialog>
-    {editing && <SchoolProblemEditor key={editing === "new" ? "new" : editing.id} problem={editing === "new" ? null : editing} banks={banks.data?.items.filter(bank => bank.canManage && !bank.archived) ?? []} bankId={banks.data?.items.find(bank => bank.id === bankId && bank.canManage && !bank.archived)?.id ?? ""} base={base} close={() => setEditing(null)} saved={() => { setEditing(null); refresh(); }} />}
+    {editing && <SchoolProblemEditor key={editing === "new" ? "new" : editing.problem.id} problem={editing === "new" ? null : editing.problem}
+      banks={banks.data?.items.filter(bank => bank.canManage && !bank.archived) ?? []}
+      bankId={banks.data?.items.find(bank => bank.id === bankId && bank.canManage && !bank.archived)?.id ?? ""}
+      base={base} navigation={editorNavigation} close={closeProblemEditor} saved={closeProblemEditor} />}
   </div>;
 }
 

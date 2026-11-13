@@ -16,9 +16,10 @@ type ProblemTutorialEditorProps = Pick<ButtonProps, "disabled" | "size" | "varia
   endpoint: string;
   problemTitle?: string;
   inline?: boolean;
+  onEditStateChange?: (state: { dirty: boolean; busy: boolean }) => void;
 };
 
-export function ProblemTutorialEditor({ endpoint, disabled, size, variant = "secondary", problemTitle, inline = false }: ProblemTutorialEditorProps) {
+export function ProblemTutorialEditor({ endpoint, disabled, size, variant = "secondary", problemTitle, inline = false, onEditStateChange }: ProblemTutorialEditorProps) {
   const { locale } = useLocale();
   const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
   const label = tr("编辑教程", "Edit tutorial");
@@ -32,11 +33,15 @@ export function ProblemTutorialEditor({ endpoint, disabled, size, variant = "sec
   const [conflict, setConflict] = useState(false);
   const saved = committed && committed.revision >= (resource.data?.revision ?? -1) ? committed : resource.data;
   const value = draft ?? saved;
-  const dirty = Boolean(saved && value && (saved.mode !== value.mode || saved.body !== (value.mode === "custom" ? value.body : "")));
+  // A closed tutorial dialog drops its fetched resource while retaining the local draft.
+  const dirty = !!draft && (!saved || saved.mode !== draft.mode || saved.body !== (draft.mode === "custom" ? draft.body : ""));
   const canSave = !disabled && !resource.loading && !resource.error && !action.busy && dirty && !conflict
     && (value?.mode !== "custom" || Boolean(value.body.trim()));
   const blockNavigation = inline && dirty;
   useNavigationBlocker(blockNavigation);
+  useEffect(() => {
+    onEditStateChange?.({ dirty, busy: action.busy });
+  }, [onEditStateChange, dirty, action.busy]);
   useEffect(() => {
     if (!blockNavigation) return;
     const block = (event: BeforeUnloadEvent) => event.preventDefault();
@@ -46,7 +51,7 @@ export function ProblemTutorialEditor({ endpoint, disabled, size, variant = "sec
 
   function close(discard: boolean) {
     if (pending.current) return;
-    if (discard) setDraft(null);
+    if (discard || !dirty) setDraft(null);
     setOpen(false);
   }
 

@@ -2,8 +2,10 @@
 
 import { ProblemTutorialEditor } from "./problem-tutorial-editor";
 import { ProblemAssistanceEditor } from "./problem-assistance-editor";
+import { ProblemEditorSteps, SaveAndEditNext } from "./problem-editor-steps";
+import type { ProblemEditorNavigation, ProblemEditorTarget } from "./problem-editor-navigation";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useNavigationBlocker } from "@/components/navigation";
 import {
@@ -20,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { ProblemPublicationStatus } from "@/components/problem-publication-status";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
 import {
+  apiMessage,
   isPending,
   productionApi,
   type ProductionProblem,
@@ -144,25 +147,44 @@ const editableSnapshot = (p: EditorProblem) =>
     hints: p.hints ?? [],
     hintPolicy: p.hintPolicy ?? "afterAC",
   });
-export function TeacherProblemEditor({ id, user, scope, onClose }: { id: string; user: CampusUser; scope?: "school" | "platform"; onClose?: () => void }) {
-  const search = useSearchParams(),
-    platform = scope === "platform" || search.get("source") === "platform",
-    endpoint = platform ? "platform/source-problems" : "problems",
-    resource = useData<EditorProblem>(
-      id === "new"
-        ? null
-        : `${endpoint}/${id}${search.get("versionId") ? `?versionId=${search.get("versionId")}` : ""}`,
-    );
+type TeacherProblemEditorProps = {
+  id: string;
+  user: CampusUser;
+  scope?: "school" | "platform";
+  onClose?: () => void;
+  navigation?: ProblemEditorNavigation;
+};
+
+export function TeacherProblemEditor(props: TeacherProblemEditorProps) {
+  const search = useSearchParams();
+  const platform = props.scope === "platform" || search.get("source") === "platform";
+  const versionId = search.get("versionId");
+  return <ProblemEditorResource key={`${platform}:${props.id}:${versionId ?? "latest"}`}
+    {...props} platform={platform} versionId={versionId} />;
+}
+
+function ProblemEditorResource({ id, user, platform, versionId, onClose, navigation }: TeacherProblemEditorProps & { platform: boolean; versionId: string | null }) {
+  const { locale } = useLocale();
+  const search = useSearchParams();
+  const endpoint = platform ? "platform/source-problems" : "problems";
+  const resource = useData<EditorProblem>(id === "new" ? null
+    : `${endpoint}/${encodeURIComponent(id)}${versionId ? `?versionId=${encodeURIComponent(versionId)}` : ""}`);
   return (
     <>
+      {id !== "new" && !resource.data && onClose && <Button type="button" variant="ghost" onClick={onClose}>
+        {locale === "zh" ? "返回题目列表" : "Back to problems"}
+      </Button>}
       <State resource={resource} />
       {(id === "new" || resource.data) && (
-        <ProblemEditorForm key={`${id}:${search.get("versionId")??"latest"}:${search.get("solutionVersionId")??"student"}:${search.get("tab")??"statement"}:${search.get("kind")??"FULL_SOLUTION"}`} initial={resource.data} user={user} platform={platform || resource.data?.ownerScope === "platform"} onClose={onClose} />
+        <ProblemEditorForm key={`${search.get("solutionVersionId")??"student"}:${search.get("tab")??"statement"}:${search.get("kind")??"FULL_SOLUTION"}`} initial={resource.data} user={user} platform={platform || resource.data?.ownerScope === "platform"} onClose={onClose} navigation={navigation} />
       )}
     </>
   );
 }
-function ProblemEditorForm({ initial, user, platform, onClose }: { initial: EditorProblem | null; user: CampusUser; platform: boolean; onClose?: () => void }) {
+function ProblemEditorForm({ initial, user, platform, onClose, navigation }: {
+  initial: EditorProblem | null; user: CampusUser; platform: boolean;
+  onClose?: () => void; navigation?: ProblemEditorNavigation;
+}) {
   const endpoint = platform ? "platform/source-problems" : "problems";
   const canPublish = !platform || user.platformAdmin === true;
   const { locale } = useLocale();
@@ -184,6 +206,9 @@ function ProblemEditorForm({ initial, user, platform, onClose }: { initial: Edit
     [solutionsVisited, setSolutionsVisited] = useState(() => search.get("tab") === "solutions"),
     [solutionPending, setSolutionPending] = useState(false),
     [tutorialVisited, setTutorialVisited] = useState(() => search.get("tab") === "tutorial"),
+    [tutorialState, setTutorialState] = useState({ dirty: false, busy: false }),
+    [switching, startSwitch] = useTransition(),
+    [switchError, setSwitchError] = useState(""),
     [templateLanguage,setTemplateLanguage]=useState<SubmissionLanguage>("python"),
     [preview, setPreview] = useState(false),
     [manage, setManage] = useState(false),
@@ -211,6 +236,20 @@ function ProblemEditorForm({ initial, user, platform, onClose }: { initial: Edit
         : "/teacher/problems");
   const bankVisibility = banks.data?.items.find((bank) => bank.id === problem.bankId)?.visibility ?? saved?.bankVisibility;
   const draft=useTeacherDraft({storageKey:teacherDraftKey(user.id,saved?.id??"new",search.get("versionId")??"current",platform ? "platform" : search.get("bankId")??""),baseline:editableSnapshot(initial??{...blank,bankId:search.get("bankId")??""}),snapshot:editableSnapshot(problem),baseVersion:initial?.versionId??"new",dirty,editable,onRestore:snapshot=>{const recovered=JSON.parse(snapshot);setProblem(current=>({...current,...recovered}));}});
+  const steps = initial && editable ? navigation : undefined;
+  const nextStep = steps?.next;
+  const stepDisabled = action.busy || switching || solutionPending || tutorialState.busy;
+  function switchProblem(target: ProblemEditorTarget, afterSave = false) {
+    setSwitchError("");
+    startSwitch(async () => {
+      try {
+        await target.select();
+        if (dirty && !afterSave && !draft.recovery) draft.discard();
+      } catch (error) {
+        setSwitchError(apiMessage(error));
+      }
+    });
+  }
   useNavigationBlocker(dirty);
   useEffect(() => {
     if (!dirty) return;
@@ -229,7 +268,9 @@ function ProblemEditorForm({ initial, user, platform, onClose }: { initial: Edit
         `${endpoint}/${saved.id}?versionId=${saved.versionId}`,
         { signal: controller.signal },
       )
-        .then((result) => setSaved(result))
+        .then(result => {
+          if (!controller.signal.aborted) setSaved(current => current?.versionId === result.versionId ? result : current);
+        })
         .catch(() => {});
     }, 1800);
     return () => {
@@ -278,50 +319,64 @@ function ProblemEditorForm({ initial, user, platform, onClose }: { initial: Edit
   const list = (kind: "samples" | "tests") => problem[kind] ?? [];
   return (
     <div className={styles.editor} data-od-id="teacher-problem-editor">
-      {onClose && <Button type="button" variant="ghost" disabled={action.busy || solutionPending} onClick={() => { if (window.dispatchEvent(new Event("campus-judge:before-navigate", { cancelable: true })) || window.confirm(tr("当前页面有未保存修改，确定返回吗？", "Discard unsaved changes and return?"))) onClose(); }}>{tr("返回题目列表", "Back to problems")}</Button>}
+      {onClose && <Button type="button" variant="ghost" disabled={stepDisabled} onClick={() => { if (window.dispatchEvent(new Event("campus-judge:before-navigate", { cancelable: true })) || window.confirm(tr("当前页面有未保存修改，确定返回吗？", "Discard unsaved changes and return?"))) onClose(); }}>{tr("返回题目列表", "Back to problems")}</Button>}
       {onClose && <h2 className="mt-2 break-words text-lg font-semibold">{problem.title || tr("新建题目", "New problem")}</h2>}
       <PageHeader
         eyebrow={tr("题目编辑", "Problem editor")}
         title={problem.title || tr("新建题目", "New problem")}
         description={`${platform ? "CodeMaster" : banks.data?.items.find((x) => x.id === problem.bankId)?.name ?? tr("尚未选择题库", "No bank selected")} · ${tr("草稿保存与发布分别进行，已发布版本及历史成绩保留。", "Saving a draft and publishing are separate. Published versions and past results remain.")}`}
         action={
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={() => setPreview(true)}>
-              <Eye size={15} />
-              {tr("学生预览", "Student preview")}
-            </Button>
-            <Button
-              disabled={action.busy || solutionPending || !editable}
-              onClick={() =>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-5 gap-y-2">
+            <ProblemEditorSteps navigation={steps} dirty={dirty || tutorialState.dirty} disabled={stepDisabled}
+              onSelect={switchProblem} />
+            <div className="ml-auto flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => setPreview(true)}>
+                <Eye size={15} />
+                {tr("学生预览", "Student preview")}
+              </Button>
+              <Button
+                disabled={action.busy || switching || solutionPending || !editable}
+                onClick={() =>
+                  void action.run(async () => {
+                    await save();
+                    return tr("草稿已保存，参考解验证结果在版本与发布页查看。", "Draft saved. Check reference validation under Versions and publication.");
+                  })
+                }
+              >
+                <Save size={15} />
+                {tr("保存题目草稿", "Save problem draft")}
+              </Button>
+              {nextStep && <SaveAndEditNext target={nextStep} disabled={stepDisabled || tutorialState.dirty} onClick={() => {
+                if (!dirty) { switchProblem(nextStep); return; }
                 void action.run(async () => {
-                  await save();
-                  return tr("草稿已保存，参考解验证结果在版本与发布页查看。", "Draft saved. Check reference validation under Versions and publication.");
-                })
-              }
-            >
-              <Save size={15} />
-              {tr("保存题目草稿", "Save problem draft")}
-            </Button>
-            {canPublish && <Button
-              variant="secondary"
-              disabled={action.busy || solutionPending || !saved || dirty || !saved.canPublish}
-              onClick={() => setPublish(true)}
-            >
-              <Send size={15} />
-              {platform ? tr("发布版本", "Publish version") : bankVisibility === "school" ? tr("提交公开审核", "Request public review") : tr("启用教学版本", "Release for teaching")}
-            </Button>}
+                  await save(false);
+                  switchProblem(nextStep, true);
+                  return tr("草稿已保存。", "Draft saved.");
+                });
+              }} />}
+              {canPublish && <Button
+                variant="secondary"
+                disabled={action.busy || switching || solutionPending || !saved || dirty || !saved.canPublish}
+                onClick={() => setPublish(true)}
+              >
+                <Send size={15} />
+                {platform ? tr("发布版本", "Publish version") : bankVisibility === "school" ? tr("提交公开审核", "Request public review") : tr("启用教学版本", "Release for teaching")}
+              </Button>}
+            </div>
           </div>
         }
       />
       <Feedback action={action} />
+      {switchError && <p role="alert" className="mt-3 text-sm text-destructive">{switchError}</p>}
+      {nextStep && tutorialState.dirty && <p role="status" className="mt-2 text-sm text-muted-foreground">{tr("请先在“教程”中保存或放弃修改，再使用“保存并编辑下一题”。", "Save or discard your Tutorial changes before using Save and edit next.")}</p>}
       {solutionPending && <p role="status" className="mt-2 text-sm text-muted-foreground">{tr("题解有未保存修改或正在提交。请在“解答与提示”中完成保存，再保存题目草稿。", "Solution changes are unsaved or being submitted. Finish saving them under Solutions and hints before saving the problem draft.")}</p>}
-      {draft.recovery&&<section className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface-subtle px-3 py-2 text-sm" data-od-id="teacher-draft-recovery"><p>{tr("发现本机未保存草稿", "Unsaved local draft found")} · {new Date(draft.recovery.updatedAt).toLocaleString(locale === "zh" ? "zh-CN" : "en-US")} {draft.recovery.baseVersion!==(initial?.versionId??"new")&&tr("（服务器版本已变化，请核对后保存）", "(The server version changed; review before saving)")}</p><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={!editable} onClick={draft.restore}>{tr("恢复草稿", "Restore draft")}</Button><Button size="sm" variant="ghost" onClick={draft.discard}>{tr("忽略草稿", "Discard draft")}</Button></div></section>}
+      {draft.recovery&&<section className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface-subtle px-3 py-2 text-sm" data-od-id="teacher-draft-recovery"><p>{tr("发现本机未保存草稿", "Unsaved local draft found")} · {new Date(draft.recovery.updatedAt).toLocaleString(locale === "zh" ? "zh-CN" : "en-US")} {draft.recovery.baseVersion!==(initial?.versionId??"new")&&tr("（服务器版本已变化，请核对后保存）", "(The server version changed; review before saving)")}</p><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={!editable || action.busy || switching} onClick={draft.restore}>{tr("恢复草稿", "Restore draft")}</Button><Button size="sm" variant="ghost" disabled={action.busy || switching} onClick={draft.discard}>{tr("忽略草稿", "Discard draft")}</Button></div></section>}
       {draft.status&&<p className="mt-2 text-xs text-muted-foreground" role="status" data-od-id="teacher-autosave-status">{draft.status}</p>}
 
       <div className={styles.toolbar}>
         {!platform && <><span className="text-muted-foreground">{tr("分组", "Groups")}</span>
         <GroupTags
-          onClick={saved?.id && editable ? () => setManage(true) : undefined}
+          onClick={saved?.id && editable && !stepDisabled ? () => setManage(true) : undefined}
           groups={
             groups.data?.items.filter((g) =>
               g.problemIds.includes(saved?.id ?? ""),
@@ -331,7 +386,7 @@ function ProblemEditorForm({ initial, user, platform, onClose }: { initial: Edit
         <Button
           size="sm"
           variant="secondary"
-          disabled={!editable || action.busy || solutionPending}
+          disabled={!editable || stepDisabled}
           onClick={() => {if(saved?.id && saved.bankId===problem.bankId)setManage(true);else void action.run(async()=>{await save(false);setManage(true);return "草稿已保存，可选择分组。";});}}
         >
           {tr("整理分组", "Organize groups")}
@@ -348,7 +403,7 @@ function ProblemEditorForm({ initial, user, platform, onClose }: { initial: Edit
         if (next === "解答与提示") setSolutionsVisited(true);
         setTab(next);
       }} items={visibleTabs.map(item => tr(item, englishTabs[item] ?? item))} />
-      <section className={`${panel} ${styles.body}`} hidden={tab === "教程" || tab === "解答与提示"} data-od-id="teacher-editor-tab-content"><fieldset disabled={!editable || action.busy || solutionPending}>
+      <section className={`${panel} ${styles.body}`} hidden={tab === "教程" || tab === "解答与提示"} data-od-id="teacher-editor-tab-content"><fieldset disabled={!editable || action.busy || switching || solutionPending}>
         {tab === "题面" && (
           <div className="grid grid-cols-[minmax(0,1fr)_260px] gap-5 max-lg:grid-cols-1">
             <div className="space-y-4">
@@ -767,14 +822,14 @@ function ProblemEditorForm({ initial, user, platform, onClose }: { initial: Edit
           endpoint={platform ? `${endpoint}/${saved.id}/contents` : undefined} canPublish={canPublish}
           initialVersionId={search.get("solutionVersionId") ?? undefined}
           initialKind={search.get("kind") === "FULL_TRANSLATION" ? "FULL_TRANSLATION" : "FULL_SOLUTION"}
-          externalBusy={action.busy} hasUnsavedProblemChanges={dirty} onPendingChange={setSolutionPending} />
+          externalBusy={action.busy || switching} hasUnsavedProblemChanges={dirty} onPendingChange={setSolutionPending} />
           : <p className={`${panel} p-4 text-sm text-muted-foreground`}>{saved
             ? tr("你对此题只有查看权限，无法编辑或发布学生题解。", "You have read-only access to this problem and cannot edit or publish student solutions.")
             : tr("先保存题目草稿，即可在这里修改学生题解、添加多种解法并审核发布。", "Save the problem draft first, then edit student solutions, add approaches and review them for publication here.")}</p>}
         <details className={`${panel} p-4`} open={!saved || undefined}>
           <summary className="cursor-pointer font-semibold">{tr("判题参考代码与提示", "Reference validation code and hints")}</summary>
           <p className="my-3 text-sm text-muted-foreground">{tr("这里的代码用于验证题目，素材与提示随题目草稿保存。学生阅读的题解在上方单独保存并审核发布。", "This code validates the problem. Notes and hints are saved with the problem draft. Save and review student-facing solutions separately above.")}</p>
-          <fieldset disabled={!editable || action.busy}>
+          <fieldset disabled={!editable || action.busy || switching}>
           <div className="grid grid-cols-[minmax(0,1fr)_260px] gap-5 max-lg:grid-cols-1">
             <div className="space-y-4">
               <CodeField
@@ -830,7 +885,7 @@ function ProblemEditorForm({ initial, user, platform, onClose }: { initial: Edit
       </section>}
       {showTutorial && tutorialVisited && <section className={`${panel} ${styles.body}`}
         role="tabpanel" aria-label={tr("教程", "Tutorial")} hidden={tab !== "教程"}>
-        {saved ? <ProblemTutorialEditor key={saved.id} endpoint={`${endpoint}/${encodeURIComponent(saved.id)}/tutorial`} inline disabled={action.busy} /> :
+        {saved ? <ProblemTutorialEditor key={saved.id} endpoint={`${endpoint}/${encodeURIComponent(saved.id)}/tutorial`} inline disabled={action.busy || switching} onEditStateChange={setTutorialState} /> :
           <p className="text-sm text-muted-foreground">{tr("先保存题目草稿，即可在这里设置教程。", "Save the problem draft to set up its tutorial here.")}</p>}
       </section>}
       {test && (

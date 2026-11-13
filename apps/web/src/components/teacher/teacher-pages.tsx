@@ -11,6 +11,7 @@ import { TeacherBankDetail } from "./bank-detail";
 import { TeacherBanks } from "./problem-banks";
 import { SolutionReviewPage } from "./solution-review-page";
 import { TeacherProblemEditor } from "./problem-editor";
+import { useTeacherProblemEditorNavigation } from "./use-teacher-problem-editor-navigation";
 import { TeacherAssignmentPreview } from "./assignment-preview";
 import {
   TeacherAssignments,
@@ -52,7 +53,7 @@ export function TeacherPages({
   let match = path.match(/^\/teacher\/problems\/banks\/([^/]+)$/);
   if (match) return <TeacherBankDetail id={match[1]!} accountId={user.id} />;
   match = path.match(/^\/teacher\/problems\/([^/]+)\/edit$/);
-  if (match) return <TeacherProblemEditor id={match[1]!} user={user} />;
+  if (match) return <TeacherProblemEditRoute id={match[1]!} user={user} />;
   if (path === "/teacher/assignments") return <TeacherAssignments />;
   match = path.match(/^\/teacher\/assignments\/([^/]+)\/preview$/);
   if (match) return <TeacherAssignmentPreview id={match[1]!} user={user}/>;
@@ -80,6 +81,12 @@ export function TeacherPages({
   if (path === "/teacher/imports") return <TeacherImports user={user} />;
   return null;
 }
+
+function TeacherProblemEditRoute({ id, user }: { id: string; user: CampusUser }) {
+  const navigation = useTeacherProblemEditorNavigation(id, user.id);
+  return <TeacherProblemEditor id={id} user={user} navigation={navigation} />;
+}
+
 function TeacherImports({ user }: { user: CampusUser }) {
   const search = useSearchParams();
   const { t } = useLocale();

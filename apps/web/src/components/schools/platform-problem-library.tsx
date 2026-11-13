@@ -5,6 +5,7 @@ import { RefreshCw } from "lucide-react";
 import { useLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
 import { Feedback, State, useAction, useData } from "@/components/teacher/shared";
+import { adjacentProblemRows } from "@/components/teacher/problem-editor-navigation";
 import type { PlatformSourceProblem } from "@/components/teacher/platform-problem-source";
 import { productionApi, type CampusUser } from "@/lib/production-api";
 import { PlatformContentEditors } from "./platform-content-editors";
@@ -48,7 +49,17 @@ export function PublicProblemReview({ user }: { user: CampusUser }) {
     const schoolId = row.publication?.schoolId ?? row.source?.schoolId;
     if (schoolId) void action.run(async () => { setPreview(await productionApi<Problem>(`platform/problem-publications/${row.id}?schoolId=${encodeURIComponent(schoolId)}`)); return " "; });
   }
-  if (editing) return <PlatformProblemEditor id={editing} user={user} onClose={() => { setEditing(null); reload(); }} />;
+  if (editing) {
+    const editableRows = rows.filter(row => row.source?.canEdit === true && !row.source.archivedAt
+      && (row.id === editing || matchesPlatformProblem(row, filters)));
+    const { previous, next } = adjacentProblemRows(editableRows, editing);
+    const target = (row?: PlatformProblemRow) => row && ({
+      title: row.title,
+      select: () => setEditing(row.id),
+    });
+    return <PlatformProblemEditor id={editing} user={user} navigation={{ previous: target(previous), next: target(next) }}
+      onClose={() => { setEditing(null); reload(); }} />;
+  }
   return <div className="min-w-0 space-y-4">
     <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-2" aria-label={tx("题目列表", "Problem lists")}>
       <Button type="button" variant={filters.deleted ? "ghost" : "secondary"} size="sm" aria-pressed={!filters.deleted} onClick={() => updateFilters({ deleted: false })}>{tx("全部题目", "Active problems")}</Button>

@@ -3,9 +3,9 @@
 import { useCatalogFilterPreferences } from "@/components/use-catalog-filter-preferences";
 
 const defaults = { query: "", bank: "", group: "", status: "", archived: false, showBanks: false };
-type Filters = typeof defaults;
+export type ProblemBankFilters = typeof defaults;
 
-function readFilters(saved: Partial<Filters>): Filters {
+function readFilters(saved: Partial<ProblemBankFilters>): ProblemBankFilters {
   return {
     query: typeof saved.query === "string" ? saved.query : "",
     bank: typeof saved.bank === "string" ? saved.bank : "",

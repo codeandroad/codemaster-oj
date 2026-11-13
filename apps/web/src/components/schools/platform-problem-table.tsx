@@ -19,15 +19,16 @@ export function PlatformProblemTable({ rows, selected, busy, canManage, onSelect
       {[tx("题目", "Problem"), tx("来源", "Source"), tx("分类", "Category"), tx("公开状态", "Visibility"), tx("验证状态", "Validation"), tx("操作", "Actions")].map(label => <th scope="col" key={label} className="whitespace-nowrap px-3 py-3">{label}</th>)}
     </tr></thead><tbody>{rows.map(row => {
       const deleted = !!row.source?.archivedAt, reviewable = !!(row.publication?.schoolId ?? (row.source?.published ? row.source.schoolId : undefined));
+      const editable = row.source?.canEdit === true && !deleted;
       return <tr key={row.id} className="border-t border-border">
         {canManage && <td className="px-3 py-3">{(row.source || problemReviewTarget(row)) && <input type="checkbox" aria-label={tx(`选择 ${row.title}`, `Select ${row.title}`)} checked={selected.includes(row.id)} disabled={busy || !selected.includes(row.id) && selected.length >= 100} onChange={event => onSelect(event.target.checked ? [...selected, row.id] : selected.filter(id => id !== row.id))} />}</td>}
-        <th scope="row" className="min-w-56 max-w-md break-words px-3 py-3 font-normal">{row.source && !deleted ? <button type="button" className="text-left font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary" onClick={() => onEdit(row.id)}>{row.title}</button> : row.title}<p className="mt-1 font-mono text-xs text-muted-foreground">{row.id.slice(0, 8)}</p></th>
+        <th scope="row" className="min-w-56 max-w-md break-words px-3 py-3 font-normal">{editable ? <button type="button" className="text-left font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary" onClick={() => onEdit(row.id)}>{row.title}</button> : row.title}<p className="mt-1 font-mono text-xs text-muted-foreground">{row.id.slice(0, 8)}</p></th>
         <td className="max-w-40 break-words px-3 py-3">{row.source ? <span className="inline-flex rounded border border-border px-1.5 py-0.5 text-xs font-semibold">CodeMaster</span> : row.publication?.schoolName}</td>
         <td className="max-w-44 break-words px-3 py-3">{(row.source ? row.source.bankName : row.publication?.bankName) || tx("未分类", "Unclassified")}</td>
         <td className="min-w-32 px-3 py-3"><p>{deleted ? tx("已删除", "Deleted") : visibility[problemVisibility(row)]}</p>{row.source && !deleted && <p className="mt-1 text-xs text-muted-foreground">{row.source.published ? tx("当前版本已发布", "Current version published") : tx("有未发布草稿", "Unpublished draft")}</p>}</td>
         <td className="whitespace-nowrap px-3 py-3">{validation[problemValidation(row)]}</td>
         <td className="w-px whitespace-nowrap px-3 py-3"><div className="flex items-center gap-2">
-          {row.source && !deleted && <RowActionButton type="button" disabled={busy} onClick={() => onEdit(row.id)}>{tx("编辑", "Edit")}</RowActionButton>}
+          {editable && <RowActionButton type="button" disabled={busy} onClick={() => onEdit(row.id)}>{tx("编辑", "Edit")}</RowActionButton>}
           {row.source && canManage && <RowActionButton type="button" disabled={busy} onClick={() => onBatch({ action: "move", rows: [row] })}>{tx("分类", "Category")}</RowActionButton>}
           {row.source && canManage && !deleted && <RowActionButton type="button" disabled={busy} onClick={() => onGrant([row])}>{tx("授权", "Editors")}</RowActionButton>}
           {reviewable && !deleted && <RowActionButton type="button" disabled={busy} onClick={() => onReview(row)}>{tx("预览与审核", "Preview & review")}</RowActionButton>}

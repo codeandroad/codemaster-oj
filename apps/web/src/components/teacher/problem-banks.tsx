@@ -2,7 +2,8 @@
 import { ProblemPublicationStatus, PublicationGuide } from "@/components/problem-publication-status";
 import { BankRenameDialog } from "@/components/bank-rename-dialog";
 import { ProblemGroupFilter } from "@/components/problem-group-filter";
-import { isPlatformProblem, mergePlatformProblems, problemEditorHref, type PlatformSourceProblem } from "./platform-problem-source";
+import { isPlatformProblem, mergePlatformProblems, problemEditorHref, teacherPlatformProblemSummaries, teacherProblemSummaries, type PlatformSourceProblem } from "./platform-problem-source";
+import { filterTeacherProblemRows } from "./problem-bank-rows";
 import {ProblemFilter} from "./problem-filter";
 import { useProblemSelection } from "./use-problem-selection";
 import { useProblemBankFilters } from "./use-problem-bank-filters";
@@ -112,8 +113,8 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
   const showProblems = Boolean(bankId) || !filters.showBanks;
   const router = useRouter(),
     banks = useWorkspaceData<{ items: Bank[] }>("problem-banks?includeArchived=owned"),
-    problems = useWorkspaceData<{ items: ProductionProblem[] }>(showProblems ? "problems?view=summary" : ""),
-    platformSources = useWorkspaceData<{ items: PlatformSourceProblem[] }>(showProblems ? "platform/source-problems?schoolId=00000000-0000-4000-8000-000000000052&view=summary" : ""),
+    problems = useWorkspaceData<{ items: ProductionProblem[] }>(showProblems ? teacherProblemSummaries : ""),
+    platformSources = useWorkspaceData<{ items: PlatformSourceProblem[] }>(showProblems ? teacherPlatformProblemSummaries : ""),
     groups = useWorkspaceData<{ items: Group[] }>(showProblems ? "problem-groups" : "");
   const { query, status: filterStatus, archived: showArchived } = filters;
   const searchInput = useRef<HTMLInputElement>(null);
@@ -132,14 +133,10 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
     activeBanks = banks.data?.items.filter((item) => !item.archivedAt) ?? [],
     archivedBanks = banks.data?.items.filter((item) => !!item.archivedAt) ?? [],
     listedBanks = showArchived ? archivedBanks : activeBanks;
-  const filterBank = !bankId && (!banks.data || activeBanks.some(bank => bank.id === filters.bank)) ? filters.bank : "";
-  const scopedBank = bankId || filterBank;
-  const scopedGroups = (groups.data?.items ?? []).filter(group => !scopedBank || group.bankId === scopedBank);
-  const filterGroup = filters.group === "ungrouped" || !groups.data || scopedGroups.some(group => group.id === filters.group) ? filters.group : "";
-  const selectedGroup = scopedGroups.find(group => group.id === filterGroup);
-  const groupMembers = new Set(filterGroup === "ungrouped"
-    ? scopedGroups.flatMap(group => group.problemIds)
-    : selectedGroup?.problemIds);
+  const mergedProblems = useMemo(() => mergePlatformProblems(problems.data?.items ?? [], platformSources.data?.items ?? []), [problems.data, platformSources.data]);
+  const { rows: matchedRows, filterBank, scopedBank, filterGroup, selectedGroup, scopedGroups, searchText } = filterTeacherProblemRows({
+    items: mergedProblems, banks: banks.data?.items, groups: groups.data?.items, filters, bankId,
+  });
   const bankNames = new Map(activeBanks.map(bank => [bank.id, bank.name]));
   const groupOptions = scopedGroups.map(group => ({
     id: group.id,
@@ -147,7 +144,6 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
       ? `${group.name} · ${bankNames.get(group.bankId)}`
       : group.name,
   }));
-  const mergedProblems = useMemo(() => mergePlatformProblems(problems.data?.items ?? [], platformSources.data?.items ?? []), [problems.data, platformSources.data]);
   const groupsByProblem = useMemo(() => {
     const result = new Map<string, Group[]>();
     for (const group of groups.data?.items ?? []) for (const id of group.problemIds) {
@@ -158,20 +154,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
     return result;
   }, [groups.data]);
   const waitingForGroups = Boolean(filterGroup && (groups.loading || groups.error));
-  const searchText = query.trim().toLowerCase();
-  const rows = waitingForGroups ? [] :
-      mergedProblems.filter(
-        (x) =>
-          (!bankId || x.bankId === bankId) &&
-          (!filterBank || x.bankId === filterBank) &&
-          (!filterGroup ||
-            (filterGroup === "ungrouped" ? !groupMembers.has(x.id) : groupMembers.has(x.id))) &&
-          (!filterStatus ||
-            (filterStatus === "published" ? x.published : !x.published)) &&
-          `${x.title} ${x.tags?.join(" ")} ${x.id}`
-            .toLowerCase()
-            .includes(searchText),
-      ) ?? [];
+  const rows = waitingForGroups ? [] : matchedRows;
   const scope = JSON.stringify([bankId, tab, query, filterBank, filterGroup, filterStatus]);
   const pagination = useCatalogPagination(rows, scope);
   const { checked, setChecked, changeRow } = useProblemSelection(pagination.rows.filter(problem => !isPlatformProblem(problem)), `${scope}:${pagination.page}`);

@@ -13,6 +13,8 @@ import { Feedback, useMutation } from "@/components/student/shared";
 import { Field, Table, input, area } from "@/components/teacher/shared";
 import { ProblemTutorialEditor } from "@/components/teacher/problem-tutorial-editor";
 import { MathEditor } from "@/components/teacher/math-editor";
+import { ProblemEditorSteps, SaveAndEditNext } from "@/components/teacher/problem-editor-steps";
+import type { ProblemEditorNavigation, ProblemEditorTarget } from "@/components/teacher/problem-editor-navigation";
 import { productionApi } from "@/lib/production-api";
 import type { Bank, Definition, Problem } from "./school-practice-types";
 import { equalSchoolTestWeights, schoolProblemDefaults, schoolProblemDraftIssue, schoolProblemMode, type ProblemEditorSection } from "./school-problem-draft";
@@ -20,16 +22,20 @@ import { equalSchoolTestWeights, schoolProblemDefaults, schoolProblemDraftIssue,
 type EditorProps = {
   problem: Problem | null; banks: Bank[]; bankId: string; base: string;
   close: () => void; saved: () => void;
+  navigation?: ProblemEditorNavigation;
 };
 
-export function SchoolProblemEditor({ problem, banks, bankId, base, close, saved }: EditorProps) {
+export function SchoolProblemEditor({ problem, banks, bankId, base, close, saved, navigation }: EditorProps) {
   const { locale } = useLocale();
   const tx = (en: string, zh: string) => locale === "zh" ? zh : en;
   const [draft, setDraft] = useState<Definition>(problem?.definition ?? schoolProblemDefaults);
+  const [committed, setCommitted] = useState(problem);
+  const [tutorialState, setTutorialState] = useState({ dirty: false, busy: false });
   const [bank, setBank] = useState(problem?.bankId || bankId || banks[0]?.id || "");
   const [section, setSection] = useState<ProblemEditorSection>("statement");
   const action = useMutation(), id = useId();
   const pending = useRef(false), request = useRef({ body: "", id: "" });
+  const heading = useRef<HTMLHeadingElement>(null);
   const change = (patch: Partial<Definition>) => setDraft(value => ({ ...value, ...patch }));
   const sections: { id: ProblemEditorSection; label: string }[] = [
     { id: "statement", label: tx("Statement", "题面") },
@@ -37,32 +43,50 @@ export function SchoolProblemEditor({ problem, banks, bankId, base, close, saved
     { id: "tests", label: tx("Test data", "测试数据") },
     { id: "reference", label: tx("Reference program", "参考程序") },
   ];
-  const canEdit = !problem || problem.canManage;
+  const canEdit = !committed || committed.canManage;
+  const dirty = JSON.stringify(draft) !== JSON.stringify(committed?.definition ?? schoolProblemDefaults);
+  const steps = committed && canEdit ? navigation : undefined;
+  const nextStep = steps?.next;
+  function run(operation: () => Promise<void>) {
+    if (pending.current) return;
+    pending.current = true;
+    void action.run(operation).finally(() => { pending.current = false; });
+  }
+  function saveDraft(next?: ProblemEditorTarget) {
+    if (!canEdit) return;
+    run(async () => {
+      if (next && !dirty) { await next.select(); return; }
+      const issue = schoolProblemDraftIssue(draft, locale);
+      if (issue) { setSection(issue.section); throw new Error(issue.message); }
+      if (!bank) { setSection("statement"); throw new Error(tx("Choose a problem bank.", "请选择题库。")); }
+      const body = { ...draft, bankId: bank, expectedRevision: committed?.revision };
+      const serialized = JSON.stringify(body);
+      if (request.current.body !== serialized) request.current = { body: serialized, id: crypto.randomUUID() };
+      const result = await productionApi<Problem>(`${base}/problems${committed ? `/${encodeURIComponent(committed.id)}` : ""}`, {
+        method: committed ? "PATCH" : "POST", body: { ...body, requestId: request.current.id },
+      });
+      if (!next) { saved(); return; }
+      setCommitted(result);
+      if (result.definition) setDraft(result.definition);
+      action.success(tx("Draft saved.", "草稿已保存。"));
+      await next.select();
+    });
+  }
   function dismiss() { if (!pending.current) close(); }
   return <Dialog open onOpenChange={open => { if (!open) dismiss(); }}>
-    <DialogContent className="flex max-h-[92vh] max-w-6xl flex-col gap-3 overflow-hidden p-4 sm:p-6">
-      <DialogTitle className="pr-9">{problem ? tx("Edit problem", "编辑题目") : tx("New problem", "新建题目")}</DialogTitle>
+    <DialogContent className="flex max-h-[92vh] max-w-6xl flex-col gap-3 overflow-hidden p-4 sm:p-6"
+      onOpenAutoFocus={event => { event.preventDefault(); heading.current?.focus(); }}>
+      <DialogTitle ref={heading} tabIndex={-1} className="break-words pr-9">{committed ? `${tx("Edit problem", "编辑题目")} · ${committed.title}` : tx("New problem", "新建题目")}</DialogTitle>
       <DialogDescription>{tx("Save the draft, then validate its reference program and review it for publication from the problem list.", "保存草稿后，可在题目列表验证参考程序并审核发布。")}</DialogDescription>
-      {problem?.canManageTutorial && <div className="shrink-0">
-        <ProblemTutorialEditor endpoint={`${base}/problems/${encodeURIComponent(problem.id)}/tutorial`}
-          problemTitle={problem.title} disabled={action.busy} />
+      {(steps || committed?.canManageTutorial) && <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <ProblemEditorSteps navigation={steps} dirty={dirty || tutorialState.dirty} disabled={action.busy || tutorialState.busy}
+          onSelect={target => run(async () => { await target.select(); })} />
+        {committed?.canManageTutorial && <ProblemTutorialEditor endpoint={`${base}/problems/${encodeURIComponent(committed.id)}/tutorial`}
+          problemTitle={committed.title} disabled={action.busy} onEditStateChange={setTutorialState} />}
       </div>}
       <form noValidate className="flex min-h-0 flex-1 flex-col" onSubmit={event => {
         event.preventDefault();
-        if (pending.current || !canEdit) return;
-        pending.current = true;
-        void action.run(async () => {
-          const issue = schoolProblemDraftIssue(draft, locale);
-          if (issue) { setSection(issue.section); throw new Error(issue.message); }
-          if (!bank) { setSection("statement"); throw new Error(tx("Choose a problem bank.", "请选择题库。")); }
-          const body = { ...draft, bankId: bank, expectedRevision: problem?.revision };
-          const serialized = JSON.stringify(body);
-          if (request.current.body !== serialized) request.current = { body: serialized, id: crypto.randomUUID() };
-          await productionApi(`${base}/problems${problem ? `/${problem.id}` : ""}`, {
-            method: problem ? "PATCH" : "POST", body: { ...body, requestId: request.current.id },
-          });
-          saved();
-        }).finally(() => { pending.current = false; });
+        saveDraft();
       }}>
         <div className="mb-3 flex shrink-0 overflow-x-auto border-b border-border" role="tablist" aria-label={tx("Problem editor", "题目编辑")}>
           {sections.map((item, index) => <button type="button" key={item.id} id={`${id}-tab-${item.id}`} role="tab" aria-selected={section === item.id} aria-controls={`${id}-panel-${item.id}`} tabIndex={section === item.id ? 0 : -1}
@@ -117,7 +141,12 @@ export function SchoolProblemEditor({ problem, banks, bankId, base, close, saved
         </div>
         <footer className="mt-4 shrink-0 border-t border-border pt-3">
           <Feedback action={action} />
-          <div className="flex justify-end gap-2"><Button type="button" variant="secondary" disabled={action.busy} onClick={dismiss}>{tx("Cancel", "取消")}</Button><Button type="submit" disabled={action.busy || !canEdit}>{action.busy ? tx("Saving…", "保存中…") : tx("Save draft", "保存草稿")}</Button></div>
+          {nextStep && tutorialState.dirty && <p role="status" className="mb-2 text-sm text-muted-foreground">{tx("Save or discard your tutorial changes before using Save and edit next.", "请先保存或放弃教程修改，再使用“保存并编辑下一题”。")}</p>}
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button type="button" variant="secondary" disabled={action.busy} onClick={dismiss}>{tx("Cancel", "取消")}</Button>
+            <Button type="submit" disabled={action.busy || !canEdit}>{tx("Save draft", "保存草稿")}</Button>
+            {nextStep && <SaveAndEditNext target={nextStep} disabled={action.busy || tutorialState.busy || tutorialState.dirty} onClick={() => saveDraft(nextStep)} />}
+          </div>
         </footer>
       </form>
     </DialogContent>

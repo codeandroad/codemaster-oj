@@ -1,3 +1,5 @@
+import { processSchoolOne } from '../../../packages/domain/school-worker.mjs';
+import { GoJudge } from '../../../packages/domain/judge.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -12,7 +14,7 @@ import { provisionSchool, LEGACY_SCHOOL_ID } from '../../../packages/domain/src/
 import { provisionPlatformAdministrator } from '../../../packages/domain/src/platform-governance.mjs';
 
 const migration='102_platform_courses.sql';
-const deferredMigrations=[migration,'105_acsl_platform_course.sql','106_platform_course_admissions.sql','108_platform_points_and_requirement_modes.sql'];
+const deferredMigrations=[migration,'105_acsl_platform_course.sql','106_platform_course_admissions.sql','108_platform_points_and_requirement_modes.sql','109_python_practice_problem_metadata.sql','110_platform_content_ownership.sql'];
 test('platform courses retain original data and enforce audiences through NestJS and real runtime grants',
  {skip:!process.env.TEST_DATABASE_URL,timeout:90000},async t=>{
  const base=new URL(process.env.TEST_DATABASE_URL);assert.equal(base.pathname,'/campus_qa');assert.ok(['localhost','127.0.0.1'].includes(base.hostname));
@@ -27,7 +29,7 @@ test('platform courses retain original data and enforce audiences through NestJS
   await bootstrap(pool,{name:'Original school administrator',number:'A',username:'school-admin',password});
   const admin=(await pool.query("SELECT id,identity_id FROM accounts WHERE username='school-admin'")).rows[0];
   const hash=await hashPassword(password),actors={};
-  for(const name of ['platform','student-a','student-b','personal']){
+  for(const name of ['platform','student-a','student-b','personal','school-teacher']){
    const i=(await pool.query("INSERT INTO identities(kind,number,name) VALUES('student',$1,$1) RETURNING id",[name])).rows[0];
    const a=(await pool.query('INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,$2,$3) RETURNING id',[i.id,name,hash])).rows[0];
    await pool.query("INSERT INTO account_roles(account_id,role) VALUES($1,'student')",[a.id]);actors[name]={id:a.id,identityId:i.id};
@@ -41,6 +43,15 @@ test('platform courses retain original data and enforce audiences through NestJS
   }
   await pool.query("SELECT set_config('campus.school_id',$1,false)",[LEGACY_SCHOOL_ID]);
   const first=originals[0];
+  const problem=(await pool.query("INSERT INTO problems(bank_id,owner_account_id) VALUES('00000000-0000-4000-8000-000000000001',$1) RETURNING *",[admin.id])).rows[0];
+  const version=(await pool.query(`INSERT INTO problem_versions(problem_id,title,statement,mode,comparator,reference_code,samples,time_limit_ms,memory_limit_mb,validation_status,
+   published_at,school_visible_at,rank_review_status,rank_approved_at)
+   VALUES($1,'Platform linked exercise','Read a value and print it.','stdio','tokens','print(input())',$2,1000,128,'AC',NULL,now(),'approved',now()) RETURNING *`,
+   [problem.id,JSON.stringify([{input:'7',expected:'7'}])])).rows[0];
+  await pool.query('UPDATE problems SET current_version_id=$2 WHERE id=$1',[problem.id,version.id]);
+  await pool.query("INSERT INTO test_cases(version_id,position,input,expected,weight) VALUES($1,0,'secret-case','secret-case',100)",[version.id]);
+  version.published_at=(await pool.query('UPDATE problem_versions SET published_at=now() WHERE id=$1 RETURNING published_at',[version.id])).rows[0].published_at;
+  await pool.query('INSERT INTO chapter_problems(chapter_id,problem_id,version_id,position) VALUES($1,$2,$3,0)',[first.c.id,problem.id,version.id]);
   await pool.query(`INSERT INTO legacy_course_publication_versions(school_id,course_id,revision,source_version,title,description,access_scope,chapters)
    SELECT school_id,id,1,extract(epoch FROM updated_at)::text,title,description,access_scope,$2 FROM learning_paths WHERE id=$1`,[first.p.id,JSON.stringify([{id:first.c.id,title:first.c.title,body:first.c.content,problems:[]}])]);
   const listing=(await pool.query('INSERT INTO public_course_listings(school_id,course_id,revision,approved_by) VALUES($1,$2,1,$3) RETURNING id',[LEGACY_SCHOOL_ID,first.p.id,admin.id])).rows[0];
@@ -58,6 +69,7 @@ test('platform courses retain original data and enforce audiences through NestJS
   });
   const alpha=await provisionSchool(pool,{slug:'platform-alpha',name:'Alpha school',adminUsername:'student-a'});
   const beta=await provisionSchool(pool,{slug:'platform-beta',name:'Beta school',adminUsername:'student-b'});
+  await pool.query("INSERT INTO school_memberships(school_id,account_id,role) VALUES($1,$2,'teacher')",[alpha.id,actors['school-teacher'].id]);
   const grants=(await readFile(new URL('../../../packages/domain/grants.mjs',import.meta.url),'utf8')).match(/await pool\.query\(`([\s\S]*?)`\);/)[1];
   await pool.query(grants.replaceAll('SCHEMA public',`SCHEMA ${schema}`));
   const runtime=new URL(connection);runtime.searchParams.set('options',`-crole=campus_app -csearch_path=${schema}`);
@@ -72,7 +84,7 @@ test('platform courses retain original data and enforce audiences through NestJS
    };
    await send('/auth/login',{username:name,password});return {send};
   }
-  const platform=await client('platform'),school=await client('school-admin'),a=await client('student-a'),b=await client('student-b'),personal=await client('personal');
+  const platform=await client('platform'),school=await client('school-admin'),a=await client('student-a'),b=await client('student-b'),personal=await client('personal'),teacher=await client('school-teacher');
   const list=async api=>(await api.send('/practice/catalog')).courses;
   let course;
   const change=async(patch,status=200)=>{const next=await platform.send('/platform/courses/'+course.id,{...patch,expectedRevision:course.revision,sourceVersion:course.sourceVersion},'PATCH',status);if(status===200)course=next;return next;};
@@ -85,11 +97,74 @@ test('platform courses retain original data and enforce audiences through NestJS
    for(const operation of ['publish','unpublish','restore'])await school.send(`/learning-paths/${first.p.id}/${operation}`,{},'POST',403);
    await school.send('/learning-paths/'+first.p.id,{title:'steal'},'PATCH',403);
    await school.send('/chapters/'+first.c.id,{content:'steal'},'PATCH',403);
-   await school.send('/platform/courses',undefined,'GET',403);
+   assert.deepEqual((await school.send('/platform/courses')).items,[]);
    await personal.send('/platform/courses',{},'POST',403);
    assert.ok(!(await platform.send('/platform/course-publications')).items.some(c=>c.courseId===first.p.id));
    await school.send(`/schools/${LEGACY_SCHOOL_ID}/course-admissions/${first.p.id}`,undefined,'GET',404);
    await platform.send('/platform/courses',{requestId:randomUUID(),title:'CSRF'},'POST',403,false);
+  });
+  await t.test('linked problem ownership, learner access and private judge data survive migration',async()=>{
+   assert.equal((await pool.query('SELECT owner_scope FROM problems WHERE id=$1',[problem.id])).rows[0].owner_scope,'platform');
+   assert.deepEqual((await pool.query('SELECT * FROM problem_versions WHERE id=$1',[version.id])).rows[0],version);
+   assert.equal((await pool.query('SELECT count(*)::int n FROM school_problem_publications WHERE problem_id=$1',[problem.id])).rows[0].n,0);
+   const reader=await personal.send('/practice/courses/'+listing.id);
+   assert.equal(reader.totalExercises,1);assert.equal(reader.chapters[0].problems[0].problemId,problem.id);
+   const detail=await personal.send(`/practice/problems/${problem.id}?courseId=${listing.id}&chapterId=${first.c.id}&versionId=${version.id}`);
+   assert.equal(detail.definition.title,version.title);assert.ok(!JSON.stringify(detail).includes('secret-case'));
+   assert.equal(detail.definition.tests,undefined);assert.equal(detail.definition.referenceCode,undefined);
+   const job=await personal.send(`/practice/problems/${problem.id}/submissions`,{requestId:randomUUID(),kind:'submit',language:'python',code:'print(input())',versionId:version.id,courseId:listing.id,chapterId:first.c.id},'POST',202);
+   if(process.env.GO_JUDGE_TEST_URL){
+    const workerUrl=new URL(connection);workerUrl.searchParams.set('options',`-crole=campus_worker -csearch_path=${schema}`);
+    const worker=createPool(workerUrl.href),judge=new GoJudge({url:process.env.GO_JUDGE_TEST_URL,token:process.env.GO_JUDGE_TEST_TOKEN,environmentVersion:'platform-course-qa'});
+    try{assert.equal(await processSchoolOne({pool:worker,judge}),true);}finally{await worker.end();}
+    const result=await personal.send(`/practice/problems/${problem.id}/submissions/${job.id}`);assert.equal(result.status,'AC');
+    assert.ok(!JSON.stringify(result).includes('secret-case'));
+    assert.equal((await personal.send('/practice/courses/'+listing.id)).completedExercises,1);
+   }
+   await school.send(`/problems/${problem.id}/versions`,{title:'steal'},'POST',403);
+   await school.send(`/admin/problems/${problem.id}`,{archived:true},'PATCH',403);
+   const source=await platform.send('/platform/courses/'+first.p.id);
+   await platform.send('/platform/courses/'+source.id,{expectedRevision:source.revision,sourceVersion:source.sourceVersion,audienceScope:'schools',schoolIds:[alpha.id]},'PATCH');
+   await personal.send(`/practice/problems/${problem.id}?versionId=${version.id}`,undefined,'GET',404);
+   await personal.send(`/practice/problems/${problem.id}/submissions`,{requestId:randomUUID(),kind:'submit',language:'python',code:'',versionId:version.id,courseId:listing.id,chapterId:first.c.id},'POST',404);
+   await a.send(`/practice/problems/${problem.id}?courseId=${listing.id}&chapterId=${first.c.id}&versionId=${version.id}`);
+   const restricted=await platform.send('/platform/courses/'+first.p.id);
+   await platform.send('/platform/courses/'+restricted.id,{expectedRevision:restricted.revision,sourceVersion:restricted.sourceVersion,audienceScope:'all'},'PATCH');
+  });
+  await t.test('per-resource grants allow editing but never publication, audience changes or delegation',async()=>{
+   const grantPath=`/platform/content-editors/course/${first.p.id}`,grant={accountId:actors['student-a'].id,schoolId:alpha.id};
+   await a.send('/platform/courses/'+first.p.id,undefined,'GET',403);
+   await platform.send(grantPath,{accountId:actors.personal.id,schoolId:alpha.id},'POST',400);
+   await platform.send(grantPath,grant);
+   assert.ok((await a.send('/platform/content-access')).canEdit);
+   const source=await a.send('/platform/courses/'+first.p.id);assert.equal(source.canManage,false);
+   const edited=await a.send('/platform/courses/'+source.id,{expectedRevision:source.revision,sourceVersion:source.sourceVersion,description:'Authorized teacher edit'},'PATCH');
+   await a.send('/platform/courses/'+source.id,{expectedRevision:edited.revision,sourceVersion:edited.sourceVersion,audienceScope:'students',studentIds:[actors.personal.identityId]},'PATCH',403);
+   await a.send('/platform/courses/'+source.id+'/unpublish',{expectedRevision:edited.revision,sourceVersion:edited.sourceVersion},'POST',403);
+   await a.send(grantPath,{accountId:actors['student-b'].id,schoolId:beta.id},'POST',403);
+   await a.send('/platform/source-problems/'+problem.id,undefined,'GET',403);
+   const problemGrant=`/platform/content-editors/problem/${problem.id}`;
+   await platform.send(problemGrant,grant);
+   const draft=await a.send('/platform/source-problems/'+problem.id);assert.equal(draft.tests[0].input,'secret-case');
+   const revised=await a.send('/platform/source-problems/'+problem.id+'/versions',{...draft,title:'Authorized problem edit',saveDraft:true,referenceCode:'',expectedVersionId:draft.versionId},'POST',201);
+   assert.notEqual(revised.versionId,version.id);
+   await a.send('/platform/source-problems/'+problem.id+'/publish',{expectedVersionId:revised.versionId},'POST',403);
+   await platform.send('/platform/source-problems/'+problem.id+'/publish',{expectedVersionId:revised.versionId},'POST',409);
+   const reader=await personal.send('/practice/courses/'+listing.id);assert.equal(reader.chapters[0].problems[0].versionId,version.id);
+   const oldSchoolView=await school.send('/problems/'+problem.id);assert.equal(oldSchoolView.canEdit,false);assert.equal(oldSchoolView.versionId,version.id);
+   assert.equal((await school.send('/problems')).items.find(item=>item.id===problem.id)?.canEdit,false);
+   const teacherGrant={accountId:actors['school-teacher'].id,schoolId:alpha.id};
+   await platform.send(problemGrant,teacherGrant);
+   assert.equal((await teacher.send('/platform/source-problems/'+problem.id)).canEdit,true);
+   await teacher.send(`/platform/content-editors/problem/${problem.id}`,grant,'POST',403);
+   await platform.send(problemGrant,teacherGrant,'DELETE');
+   await teacher.send('/platform/source-problems/'+problem.id,undefined,'GET',403);
+   await platform.send(problemGrant,grant,'DELETE');await a.send('/platform/source-problems/'+problem.id,undefined,'GET',403);
+   await platform.send(grantPath,grant,'DELETE');await a.send('/platform/courses/'+source.id,undefined,'GET',403);
+   await platform.send(grantPath,{accountId:actors['student-b'].id,schoolId:beta.id});
+   await pool.query('UPDATE school_memberships SET revoked_at=now() WHERE school_id=$1 AND account_id=$2',[beta.id,actors['student-b'].id]);
+   await b.send('/platform/courses/'+source.id,undefined,'GET',403);
+   await pool.query('UPDATE school_memberships SET revoked_at=NULL WHERE school_id=$1 AND account_id=$2',[beta.id,actors['student-b'].id]);
   });
   await t.test('create, edit and publish use stale-write checks and retain chapter IDs',async()=>{
    const create={requestId:randomUUID(),title:'Platform course',audienceScope:'all',chapters:[{title:'Lesson',content:'Platform **lesson**'}]};
@@ -158,7 +233,7 @@ test('platform courses retain original data and enforce audiences through NestJS
    const workerConnection=new URL(connection);workerConnection.searchParams.set('options',`-crole=campus_worker -csearch_path=${schema}`);
    const worker=createPool(workerConnection.href);try{await assert.rejects(worker.query('SELECT platform_student_ids FROM learning_paths'),/permission denied/);}finally{await worker.end();}
    await pool.query('UPDATE platform_admins SET revoked_at=now() WHERE account_id=$1',[actors.platform.id]);
-   await platform.send('/platform/courses',undefined,'GET',403);
+   assert.deepEqual((await platform.send('/platform/courses')).items,[]);
   });
  }finally{if(app)await app.close();await pool.end();await manager.query(`DROP SCHEMA ${schema} CASCADE`);await manager.end();}
 });

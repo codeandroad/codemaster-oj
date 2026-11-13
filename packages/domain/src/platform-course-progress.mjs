@@ -1,3 +1,4 @@
+import { platformChapterProblems } from './platform-course-problems.mjs';
 import { LEGACY_SCHOOL_ID } from './schools.mjs';
 import { availableLegacyPublicProblemVersions } from './legacy-public-problems.mjs';
 import { loadCoursePaper4, paper4Progress } from './course-paper4.mjs';
@@ -90,8 +91,9 @@ export async function platformPrerequisiteProgress(db,course,user,{schoolId=null
 }
 
 export async function publicChapterProblems(db, listing, course, accountId) {
+  const platformProblems=listing.platform_owned||course.owner_scope==='platform'?await platformChapterProblems(db,course,accountId):new Map();
   const links = course.chapters.flatMap(chapter => chapter.problems ?? []);
-  const problems = new Map();
+  const problems = new Map(platformProblems);
   if (!links.length) return problems;
 
   const { rows } = await db.query(`WITH links AS (
@@ -118,7 +120,8 @@ export async function publicChapterProblems(db, listing, course, accountId) {
     : null;
   for (const row of rows) {
     if (!legacyVersions || legacyVersions.has(row.versionId)) {
-      problems.set(`${row.problemId}:${row.versionId}`, row);
+      const key=`${row.problemId}:${row.versionId}`;
+      problems.set(key, {...row,solved:row.solved||problems.get(key)?.solved||false});
     }
   }
   return problems;

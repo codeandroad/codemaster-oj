@@ -7,11 +7,13 @@ import type { CourseAcslLink } from "@/components/course-acsl";
 export type CourseAudience = "all" | "schools" | "students";
 export type AudienceMember = { id: string; name: string; username?: string | null };
 export type PlatformChapter = {
+  problems?: import("./platform-course-problem-links").PlatformProblemLink[];
   sectionKey?: string | null; id?: string; title: string; content: string; problemCount?: number;
   objective?: string; checkpoint?: string; checkpointAnswer?: string;
   localizations?: ChapterLocalizations; acslLinks?: CourseAcslLink[];
 };
 export type PlatformCourse = {
+  canManage?: boolean;
   audiencePolicy?: AudiencePolicy;
   pendingApplications?: number;
   sections?: CourseSection[];

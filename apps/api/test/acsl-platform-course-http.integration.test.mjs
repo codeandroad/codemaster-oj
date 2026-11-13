@@ -178,7 +178,7 @@ test('ACSL platform course migration and directory enforce ownership without los
       const chapters = (await pool.query('SELECT * FROM learning_chapters WHERE path_id=$1 ORDER BY id', [targetId])).rows;
       const auditCount = (await pool.query('SELECT count(*)::int n FROM platform_audit_events')).rows[0].n;
       for (const name of ['legacy-owner', 'legacy-teacher', 'legacy-admin', 'alpha-admin', 'alpha-teacher', 'alpha-student', 'outsider']) {
-        await get('/platform/courses', name, 403); await get('/platform/courses/acsl-links', name, 403);
+        assert.deepEqual((await get('/platform/courses', name)).items, []); await get('/platform/courses/acsl-links', name, 403);
         await patch('/platform/courses/' + targetId, { ...cas(), title: 'Unauthorized replacement' }, name, 403);
         for (const operation of ['publish', 'unpublish', 'archive', 'restore']) await post(`/platform/courses/${targetId}/${operation}`, cas(), name, 403);
         for (const operation of ['publish', 'unpublish', 'restore']) await post(`/learning-paths/${targetId}/${operation}`, {}, name, 403);

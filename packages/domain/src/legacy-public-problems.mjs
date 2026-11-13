@@ -83,7 +83,7 @@ export async function availableLegacyPublicProblemVersions(db, versionIds) {
 export async function listLegacyPublicProblemReviews(db) {
  await scope(db);
  const { rows } = await db.query(`
-  SELECT p.id AS problem_id,p.bank_id,b.name AS bank_name,v.id,v.title,s.name AS school_name,
+  SELECT p.id AS problem_id,p.bank_id,b.name AS bank_name,v.id,v.title,CASE WHEN p.owner_scope='platform' THEN 'CodeMaster' ELSE s.name END AS school_name,
    EXISTS(SELECT 1 FROM school_problem_publications publication WHERE publication.school_id=s.id
     AND publication.problem_id=p.id AND publication.version_id=v.id AND publication.withdrawn_at IS NULL) AS "platformPublished",
    request.status AS "publicRequestStatus"
@@ -115,9 +115,9 @@ export async function previewLegacyPublicProblem(db, problemId) {
  };
 }
 
-async function writeSnapshot(db, source) {
+async function writeSnapshot(db, source, { activate = true } = {}) {
  const { rows } = await db.query(`SELECT position,input,expected,weight FROM test_cases
-  WHERE version_id=$1 ORDER BY position`, [source.id]);
+  WHERE version_id=$1 AND enabled ORDER BY position`, [source.id]);
  const definition = {
   title: source.title, statement: learnerStatement(source), mode: source.mode,
   metadata: publicProblemMetadata(source.metadata),
@@ -144,7 +144,7 @@ async function writeSnapshot(db, source) {
  await db.query(`INSERT INTO school_problem_versions(school_id,id,problem_id,draft_revision,definition)
   SELECT $1,$2,$3,COALESCE(max(draft_revision),0)+1,$4 FROM school_problem_versions WHERE school_id=$1 AND problem_id=$3
   ON CONFLICT(school_id,id) DO NOTHING`, [LEGACY_SCHOOL_ID, source.id, source.problem_id, JSON.stringify(definition)]);
- await db.query(`UPDATE school_problems p SET published=true,published_version_id=v.id,
+ if(activate) await db.query(`UPDATE school_problems p SET published=true,published_version_id=v.id,
   revision=v.draft_revision,updated_at=clock_timestamp()
   FROM school_problem_versions v WHERE p.school_id=$1 AND p.id=$2
    AND v.school_id=p.school_id AND v.problem_id=p.id AND v.id=$3`, [LEGACY_SCHOOL_ID, source.problem_id, source.id]);
@@ -210,4 +210,20 @@ export async function handleLegacyPublicProblemRequest({ pool, user, route, meth
   await auditSchool(db, LEGACY_SCHOOL_ID, user.id, 'problem.public_request', versionId);
   return { status: 200, body: { eligible: true, platformPublished: false, publicRequestStatus: 'pending' } };
  });
+}
+
+// A course-scoped snapshot is not a public-bank publication. Preserve the pin
+// and expose only the learner projection; the judge receives its private tests.
+export async function preparePlatformCourseProblem(db,problemId,versionId) {
+ const {platformProblemReadySql}=await import('./platform-course-problems.mjs');
+ const rows=(await db.query(`SELECT ${sourceColumns} FROM problems p
+ JOIN problem_banks b ON b.id=p.bank_id JOIN problem_versions v ON v.problem_id=p.id
+ WHERE p.id=$1 AND v.id=$2 AND ${platformProblemReadySql()} FOR SHARE OF p,b,v`,[problemId,versionId])).rows;
+ const [source]=await studentPublicStatementRows(db,rows);
+ if(!source||source.public_statement_pending)return null;
+ await db.query("SELECT pg_advisory_xact_lock(hashtextextended('course-problem-snapshot:'||$1,0))",[problemId]);
+ await writeSnapshot(db,source,{activate:false});
+ const p=(await db.query('SELECT * FROM school_problems WHERE school_id=$1 AND id=$2',[LEGACY_SCHOOL_ID,problemId])).rows[0];
+ return {...p,published:true,published_version_id:versionId,archived:false,bank_name:'CodeMaster',
+ public_statement:learnerStatement(source),public_metadata:publicProblemMetadata(source.metadata),public_tags:source.tags};
 }

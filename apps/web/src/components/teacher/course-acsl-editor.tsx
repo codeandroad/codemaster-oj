@@ -22,12 +22,14 @@ import { input } from "./shared";
 
 export function CourseAcslEditor({
   schoolId,
+  courseId,
   platform = false,
   links,
   onChange,
   disabled = false,
 }: {
   schoolId?: string;
+  courseId?: string;
   platform?: boolean;
   links: CourseAcslLink[];
   onChange: (links: CourseAcslLink[]) => void;
@@ -99,7 +101,7 @@ export function CourseAcslEditor({
       ))}
       {open && (
         <CourseAcslPicker
-          endpoint={platform ? "platform/courses/acsl-links" : `schools/${schoolId}/acsl/links`}
+          endpoint={platform ? `platform/courses/acsl-links${courseId ? `?courseId=${courseId}` : ""}` : `schools/${schoolId}/acsl/links`}
           existing={links}
           onClose={() => setOpen(false)}
           onAdd={(link) => {

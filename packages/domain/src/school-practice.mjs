@@ -1,3 +1,4 @@
+import { platformCourseProblem } from './platform-course-problems.mjs';
 import {publicScholarshipOperation,recordPublicPracticeStaffExposure} from './public-scholarship.mjs';
 import { schoolActivityJobVisibleSql, schoolActivityProblemAccess, schoolJobFeedback } from './school-activities.mjs';
 import { randomUUID } from 'node:crypto';
@@ -21,7 +22,7 @@ import {
 } from './legacy-public-problems.mjs';
 
 const reply=(body,status=200)=>({status,body});
-const canManage=(p,u,role)=>role==='school_admin'||role==='teacher'&&p.owner_account_id===u.id;
+const canManage=(p,u,role)=>!p.platform_owned&&(role==='school_admin'||role==='teacher'&&p.owner_account_id===u.id);
 const practiceContext=role=>role==='student'?'school':'staff_practice';
 const canManageTutorial=(p,u,role)=>!p.archived&&(canManage(p,u,role)||role==='teacher'&&p.published&&!!p.published_version_id);
 const scope=(db,id)=>db.query("SELECT set_config('campus.school_id',$1,true)",[id]);
@@ -68,7 +69,7 @@ const publicDefinition=v=>({title:v.title,statement:v.statement,mode:v.mode,func
  samples:v.samples.map(t=>({input:t.input,expected:t.expected}))});
 const draftDefinition=v=>({...publicDefinition(v),referenceCode:v.reference_code,tests:v.tests.map(t=>({input:t.input,expected:t.expected,weight:t.weight}))});
 async function loadProblem(db,schoolId,id,user,role,{publicOnly=false}={}){
- const p=(await db.query(`SELECT p.*,b.name AS bank_name,b.archived FROM school_problems p JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id WHERE b.resource_kind=\'ordinary\' AND p.school_id=$1 AND p.id=$2`,[schoolId,id])).rows[0];
+ const p=(await db.query(`SELECT p.*,b.name AS bank_name,b.archived,EXISTS(SELECT 1 FROM problems original WHERE original.id=p.id AND original.owner_scope='platform') platform_owned FROM school_problems p JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id WHERE b.resource_kind=\'ordinary\' AND p.school_id=$1 AND p.id=$2`,[schoolId,id])).rows[0];
  if(!p||(!publicOnly&&!canManage(p,user,role)&&(!p.published||p.archived))||publicOnly&&(!p.published||p.archived))fail(404,'NOT_FOUND','Problem is unavailable.');
  return p;
 }
@@ -146,10 +147,12 @@ async function projectJob(db,job){
   runtimeMs,memoryKb,
   message:r?.publicMessage??'',...feedback};
 }
-async function publicLoaded(db,user,id){
+async function publicLoaded(db,user,id,courseContext={}){
+ if(courseContext.courseId&&(await db.query(`SELECT 1 FROM learning_paths p LEFT JOIN public_course_listings l ON l.course_id=p.id
+ WHERE p.owner_scope='platform' AND (p.id=$1 OR l.id=$1)`,[uuid(courseContext.courseId)])).rowCount){const scoped=await platformCourseProblem(db,user,id,courseContext);if(scoped)return scoped;}
  await activeAccount(db,user.id);
  let publication=(await db.query('SELECT * FROM school_problem_publications WHERE problem_id=$1 AND withdrawn_at IS NULL',[uuid(id)])).rows[0];
- if(!publication)fail(404,'NOT_FOUND','Problem is unavailable.');
+ if(!publication){const scoped=await platformCourseProblem(db,user,id,courseContext);if(scoped)return scoped;fail(404,'NOT_FOUND','Problem is unavailable.');}
  await lockSchoolTeaching(db,publication.school_id,{shared:true});
  publication=(await db.query('SELECT * FROM school_problem_publications WHERE problem_id=$1 AND withdrawn_at IS NULL',[uuid(id)])).rows[0];
  if(!publication)fail(404,'NOT_FOUND','Problem is unavailable.');
@@ -204,7 +207,9 @@ export async function listPublicProblems(pool,user,url){
 
 export async function schoolPracticeOperation({pool,user,route,url,method,body={}}){
  route??=url.pathname.replace(/^\/api\/v1/,'');
- const scholarship=await publicScholarshipOperation({pool,user,route,url,method,body},publicLoaded);
+ const courseContext={courseId:body.courseId??url?.searchParams.get('courseId'),chapterId:body.chapterId??url?.searchParams.get('chapterId'),versionId:body.versionId??url?.searchParams.get('versionId')};
+ const loadPublic=(db,user,id)=>publicLoaded(db,user,id,courseContext);
+ const scholarship=await publicScholarshipOperation({pool,user,route,url,method,body},loadPublic);
  if(scholarship)return scholarship;
  if(route==='/practice/leaderboard'&&method==='GET')return publicPracticeLeaderboard({pool,user,url});
  const personalRecords = await handlePublicPracticeRecords({pool,user,route,url,method,body}, projectJob);
@@ -214,7 +219,7 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
  if(route==='/practice/problems'&&method==='GET')return reply(await listPublicProblems(pool,user,url));
  const pub=route.match(/^\/practice\/problems\/([^/]+)(?:\/submissions(?:\/([^/]+))?)?$/);
  if(pub)return transaction(pool,async db=>{
-  const p=await publicLoaded(db,user,pub[1]);
+  const p=await loadPublic(db,user,pub[1]);
   const expectedVersion = method === 'POST' ? body.versionId : url?.searchParams.get('versionId');
   if (expectedVersion != null && uuid(expectedVersion).toLowerCase() !== p.published_version_id) {
    fail(404, 'NOT_FOUND', 'This version is no longer available in public practice.');
@@ -291,7 +296,7 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
    if(method==='PATCH'&&id){const bank=(await db.query('SELECT * FROM school_problem_banks WHERE resource_kind=\'ordinary\' AND school_id=$1 AND id=$2 FOR UPDATE',[schoolId,id])).rows[0];if(!bank||!canManage(bank,user,role))fail(404,'NOT_FOUND','Bank unavailable.');revision(body,bank);const name=field(body.name??bank.name,'Bank name',{max:120});const archived=body.archived??bank.archived;if(typeof archived!=='boolean')fail(400,'VALIDATION','Invalid archive flag.');await db.query('UPDATE school_problem_banks SET name=$3,archived=$4,revision=revision+1 WHERE school_id=$1 AND id=$2',[schoolId,id,name,archived]);await auditSchool(db,schoolId,user.id,'school.bank.update',id);return reply({id,name,archived,revision:bank.revision+1});}return null;
   }
   if(m[2]!=='problems')return null;
-  if(method==='GET'&&!id){const bankId=url.searchParams.get('bankId');if(bankId)uuid(bankId);const rows=(await db.query(`SELECT p.*,b.name AS bank_name,b.archived FROM school_problems p JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id WHERE b.resource_kind=\'ordinary\' AND p.school_id=$1 AND ($4::uuid IS NULL OR p.bank_id=$4) AND ($3='school_admin' OR p.owner_account_id=$2 AND $3='teacher' OR p.published AND NOT b.archived) ORDER BY p.created_at,p.id LIMIT 500`,[schoolId,user.id,role,bankId])).rows;const items=[];for(const p of rows)items.push(await shapeProblem(db,p,user,role));return reply({items});}
+  if(method==='GET'&&!id){const bankId=url.searchParams.get('bankId');if(bankId)uuid(bankId);const rows=(await db.query(`SELECT p.*,b.name AS bank_name,b.archived,EXISTS(SELECT 1 FROM problems original WHERE original.id=p.id AND original.owner_scope='platform') platform_owned FROM school_problems p JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id WHERE b.resource_kind=\'ordinary\' AND p.school_id=$1 AND ($4::uuid IS NULL OR p.bank_id=$4) AND ($3='school_admin' OR p.owner_account_id=$2 AND $3='teacher' OR p.published AND NOT b.archived) ORDER BY p.created_at,p.id LIMIT 500`,[schoolId,user.id,role,bankId])).rows;const items=[];for(const p of rows)items.push(await shapeProblem(db,p,user,role));return reply({items});}
   if(method==='POST'&&!id){if(!['teacher','school_admin'].includes(role))fail(403,'FORBIDDEN','Teaching role required.');const bankId=uuid(body.bankId),bank=(await db.query('SELECT * FROM school_problem_banks WHERE resource_kind=\'ordinary\' AND school_id=$1 AND id=$2',[schoolId,bankId])).rows[0];if(!bank||bank.archived||!canManage(bank,user,role))fail(404,'NOT_FOUND','Bank unavailable.');const requestId=uuid(body.requestId),old=(await db.query('SELECT * FROM school_problems WHERE school_id=$1 AND owner_account_id=$2 AND request_id=$3',[schoolId,user.id,requestId])).rows[0];const definition=normalizeSchoolProblem(body);if(old){if(old.bank_id!==bankId||canonicalHash(draftDefinition(old.draft))!==canonicalHash(draftDefinition(definition)))fail(409,'REQUEST_CONFLICT','Request ID already used.');return reply(await shapeProblem(db,await loadProblem(db,schoolId,old.id,user,role),user,role,{detail:true}));}const p=(await db.query('INSERT INTO school_problems(school_id,bank_id,owner_account_id,draft,request_id) VALUES($1,$2,$3,$4,$5) RETURNING id',[schoolId,bankId,user.id,JSON.stringify(definition),requestId])).rows[0];await auditSchool(db,schoolId,user.id,'school.problem.create',p.id);return reply(await shapeProblem(db,await loadProblem(db,schoolId,p.id,user,role),user,role,{detail:true}),201);}
   if(!id)return null;const p=await loadProblem(db,schoolId,id,user,role);
   if(m[4]==='tutorial'&&['GET','PATCH'].includes(method)){

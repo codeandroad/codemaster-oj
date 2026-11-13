@@ -32,6 +32,7 @@ import { useWorkspaceSettings } from "@/components/student/workspace-settings";
 import { productionApi, type CampusUser } from "@/lib/production-api";
 import { useSchoolText } from "./school-ui";
 import { PlatformSchoolDialog } from "./platform-school-dialog";
+import { PlatformProblems } from "./platform-problems";
 import { PlatformCourses } from "./platform-courses";
 import { PublicCourseReview } from "./public-course-review";
 import { PublicProblemReview } from "./school-practice";
@@ -42,6 +43,7 @@ import {
 } from "./platform-ui";
 
 const platformSections = {
+  "source-problems": { icon: BookOpenCheck, en: "Platform problems", zh: "平台题目" },
   schools: { icon: Building2, en: "Schools", zh: "学校" },
   courses: { icon: BookOpen, en: "Platform courses", zh: "平台课程" },
   "course-review": { icon: BookOpenCheck, en: "Course review", zh: "课程公开审核" },
@@ -71,7 +73,7 @@ export function PlatformPage({
   const personalPage = personalSettings || personalProfile;
   const [action, setAction] = useState<PlatformSchoolAction | null>(null);
   const requestedSection = search.get("section") ?? "";
-  const section = Object.hasOwn(platformSections, requestedSection) ? requestedSection as PlatformSection : "schools";
+  const section = Object.hasOwn(platformSections, requestedSection) ? requestedSection as PlatformSection : user.platformAdmin ? "schools" : "courses";
   const setSection = (next: PlatformSection) =>
     router.push(`/platform?section=${next}`);
   const [revision, setRevision] = useState(0);
@@ -105,13 +107,13 @@ export function PlatformPage({
           style={{ colorScheme: resolvedPageTheme }}
         >
           <WorkspaceFrame
-            schoolName={text("Platform administration", "平台管理")}
+            schoolName={user.platformAdmin ? text("Platform administration", "平台管理") : text("Authorized editing", "授权内容编辑")}
             navigation={
               <nav
                 className="space-y-1 p-3"
                 aria-label={text("Platform navigation", "平台导航")}
               >
-                {(Object.keys(platformSections) as PlatformSection[]).map((item) => {
+                {(Object.keys(platformSections) as PlatformSection[]).filter(item => user.platformAdmin || item === "courses" || item === "source-problems").map((item) => {
                   const { icon: Icon, en, zh } = platformSections[item];
                   return (
                     <Button
@@ -208,7 +210,7 @@ export function PlatformPage({
                 </div>
                 <Feedback action={logout} />
                 <Feedback action={{ error: "", message }} />
-                {user.platformAdmin ? (
+                {user.platformAdmin || section === "courses" || section === "source-problems" ? (
                   <>
                     {section === "schools" ? (
                       <>
@@ -225,6 +227,8 @@ export function PlatformPage({
                           onAction={openAction}
                         />
                       </>
+                    ) : section === "source-problems" ? (
+                      <PlatformProblems />
                     ) : section === "courses" ? (
                       <PlatformCourses />
                     ) : section === "course-review" ? (

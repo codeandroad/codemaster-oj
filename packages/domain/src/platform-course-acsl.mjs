@@ -1,3 +1,4 @@
+import { canEditPlatformContent } from './platform-content-access.mjs';
 import { transaction } from './db.mjs';
 import { activeAccount, LEGACY_SCHOOL_ID, lockSchoolTeaching } from './schools.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
@@ -6,10 +7,10 @@ import { fail } from './security.mjs';
 
 // Authoring checks read only source metadata. They never borrow a school role,
 // calculate a learner's grade or weaken the student ACSL access boundary.
-async function sourceContext(db, user, fn) {
+async function sourceContext(db, user, fn, courseId=null) {
  const run=async client=>{
   await activeAccount(client,user.id);
-  if(!await isPlatformAdministrator(client,user.id))fail(403,'PLATFORM_ADMIN_REQUIRED','需要平台管理员权限');
+  if(!await isPlatformAdministrator(client,user.id)&&!(courseId&&await canEditPlatformContent(client,user.id,'course',courseId)))fail(403,'PLATFORM_ADMIN_REQUIRED','需要平台管理员权限');
   await lockSchoolTeaching(client,LEGACY_SCHOOL_ID,{shared:true});
   const previous=(await client.query("SELECT current_setting('campus.school_id',true) AS school")).rows[0].school??'';
   let failed=false;
@@ -39,7 +40,7 @@ const available=(paper,link,versionId)=>paper?.enabled&&(!versionId||paper.versi
  &&(link.kind!=='programming'||Boolean(paper.programming_problem_id))
  &&(link.kind!=='question'||paper.questions.some(question=>question.id===link.questionId));
 
-export async function resolvePlatformCourseAcslLinks(db,user,value,previous=[]) {
+export async function resolvePlatformCourseAcslLinks(db,user,value,previous=[],courseId=null) {
  const input=normalizeCourseAcslLinks(value);
  return sourceContext(db,user,async client=>{
   if(!input.length)return [];
@@ -55,21 +56,21 @@ export async function resolvePlatformCourseAcslLinks(db,user,value,previous=[]) 
    }
    return {...link,versionId:versionId??paper.version_id};
   });
- });
+ },courseId);
 }
 
-export async function assertPlatformCourseAcslLinksReady(db,user,value) {
+export async function assertPlatformCourseAcslLinksReady(db,user,value,courseId=null) {
  return sourceContext(db,user,async client=>{
   if(!value.length)return;
   const bySlug=new Map((await papers(client,[...new Set(value.map(link=>link.paperSlug))])).map(paper=>[paper.slug,paper]));
   if(value.some(link=>!link.versionId||!available(bySlug.get(link.paperSlug),link,link.versionId)))
    fail(409,'UNAVAILABLE_ACSL_LINK','请修复不可用的 ACSL 引用');
- });
+ },courseId);
 }
 
-export async function platformCourseAcslPicker(db,user) {
+export async function platformCourseAcslPicker(db,user,courseId=null) {
  return sourceContext(db,user,async client=>({items:(await papers(client)).filter(paper=>paper.enabled).map(paper=>({
   paperId:paper.id,versionId:paper.version_id,paperSlug:paper.slug,title:paper.title,division:paper.division,
   season:paper.season,round:paper.round,hasProgramming:Boolean(paper.programming_problem_id),questions:paper.questions,
- }))}));
+ }))}),courseId);
 }

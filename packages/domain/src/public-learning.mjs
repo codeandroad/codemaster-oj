@@ -1,3 +1,5 @@
+import { handlePlatformContentEditors } from './platform-content-editors.mjs';
+import { handlePlatformProblems } from './platform-problems.mjs';
 import { courseEntry } from './public-course-entry.mjs';
 import { localizedFields, publicChapterLocalizations } from './course-localizations.mjs';
 import { projectCourseAcslLinks, acslLinkCounts, requireCourseAcslSchool } from './course-acsl.mjs';
@@ -409,6 +411,7 @@ async function platformPublications({ pool, user, method, body }) {
 }
 
 export async function handlePublicLearning(ctx) {
+  for(const handler of [handlePlatformContentEditors,handlePlatformProblems]){const result=await handler(ctx);if(result)return result;}
   const admissions=await handlePlatformCourseAdmissions(ctx);if(admissions)return admissions;
   const { pool, user, route, method, url } = ctx;
   if(/^\/platform\/courses(?:\/|$)/.test(route))return handlePlatformCourses(ctx);

@@ -1,3 +1,4 @@
+import { canEditPlatformContent } from './platform-content-access.mjs';
 import {moveGroupMembers} from './group-move.mjs';
 import { assertJudgeAdmission } from './system.mjs';
 import { transaction } from './db.mjs';
@@ -42,6 +43,11 @@ export async function bankAccess(db,user,id) {
  return {bank,owner,canRead,canEdit,canContribute,permission};
 }
 export async function problemPermissions(db,user,problem,version) {
+ if(problem.owner_scope==='platform'){
+  const canEdit=!problem.archived_at&&await canEditPlatformContent(db,user.id,'problem',problem.id);
+  const canRead=canEdit||!!version.published_at&&!!version.school_visible_at&&!problem.archived_at;
+  return {canRead,canEdit,canRunFree:canRead};
+ }
  const own=isAdmin(user)||(isStaff(user)&&problem.owner_account_id===user.id);
  const bank=(await db.query('SELECT * FROM problem_banks WHERE id=$1',[problem.bank_id])).rows[0];
  if(!bank)return {canRead:false,canEdit:false};

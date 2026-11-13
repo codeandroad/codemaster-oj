@@ -8,7 +8,7 @@ export const customTutorial = row => row.tutorial_mode === 'custom' ? { source: 
 
 // A published school problem can have teaching material maintained separately
 // from its draft, reference solution, tests, and publication.
-export const schoolPublishedTutorialProblemSql = `p.archived_at IS NULL AND bank.archived_at IS NULL AND bank.visibility='school'
+export const schoolPublishedTutorialProblemSql = `p.owner_scope='school' AND p.archived_at IS NULL AND bank.archived_at IS NULL AND bank.visibility='school'
  AND EXISTS (SELECT 1 FROM problem_versions tv WHERE tv.problem_id=p.id AND tv.published_at IS NOT NULL
   AND tv.school_visible_at IS NOT NULL AND tv.rank_review_status='approved')`;
 

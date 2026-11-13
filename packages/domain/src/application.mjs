@@ -1,3 +1,4 @@
+import { canEditPlatformContent } from './platform-content-access.mjs';
 import { handleAcsl } from './acsl.mjs';
 import { recordPublicPracticeStaffExposure } from './public-scholarship.mjs';
 import {handlePublicPresence} from './public-presence.mjs';
@@ -132,8 +133,8 @@ export async function createDomainServices(pool,config) {
   // Archived entries are hidden from navigation; explicit audit snapshots
   // still go through the activity, ownership and submission permissions below.
   if(p.archived_at&&!versionId)fail(404,'NOT_FOUND','题目不存在');
-  const own=isStaff(user)&&(p.owner_account_id===user.id||rolesInclude(user,'admin'));let bankRead=false;
-  if(isStaff(user)){try{bankRead=(await bankAccess(db,user,p.bank_id)).canRead;}catch(error){if(!['FORBIDDEN','NOT_FOUND'].includes(error.code))throw error;}}
+  const own=p.owner_scope==='platform'?await canEditPlatformContent(db,user.id,'problem',p.id):isStaff(user)&&(p.owner_account_id===user.id||rolesInclude(user,'admin'));let bankRead=false;
+  if(isStaff(user)&&p.owner_scope!=='platform'){try{bankRead=(await bankAccess(db,user,p.bank_id)).canRead;}catch(error){if(!['FORBIDDEN','NOT_FOUND'].includes(error.code))throw error;}}
   if(!versionId&&!own&&!bankRead){
    const v=await resolveLiveProblemVersion(db,problemId,{lock:false});
    const permissions=await problemPermissions(db,user,p,v);
@@ -146,7 +147,7 @@ export async function createDomainServices(pool,config) {
  }
  async function problemResult(db,user,problemId,versionId) {
   const {p,v,owner,permissions}=await versionAccess(db,user,problemId,versionId);
-  const presented=isStaff(user)?v:(await studentPublicStatementRows(db,[v]))[0];
+  const presented=owner||isStaff(user)?v:(await studentPublicStatementRows(db,[v]))[0];
   const result=problemShape(presented,{includeDisabledSamples:owner});result.publishedVersionId=owner?p.current_version_id:v.id;result.publishedTitle=owner?result.publishedTitle:v.title;result.bankId=p.bank_id;result.bankVisibility=(await db.query('SELECT visibility FROM problem_banks WHERE id=$1',[p.bank_id])).rows[0]?.visibility;result.canEdit=owner;result.canPublish=owner&&result.canPublish;
   result.canManageTutorial=await canManageLegacyTutorial(db,user,p,owner);
   result.firstAcPoints=(await db.query('SELECT COALESCE((SELECT points FROM point_rewards WHERE problem_id=$1 AND assignment_id IS NULL),10) first_ac_points',[problemId])).rows[0].first_ac_points;
@@ -439,6 +440,16 @@ export async function createDomainServices(pool,config) {
  }
 
  async function libraryOperation(context) {
+  if(!['GET','HEAD'].includes(context.method)){
+   const problemMatch=context.route.match(/^\/(?:admin\/)?problems\/([0-9a-f-]{36})(?:\/|$)/i);
+   const ids=problemMatch?[problemMatch[1]]:(context.body.items??[]).map?.(item=>item.problemId)??[];
+   if(ids.length&&(await pool.query("SELECT 1 FROM problems WHERE id=ANY($1::uuid[]) AND owner_scope='platform'",[ids])).rowCount)
+    fail(403,'PLATFORM_SOURCE_REQUIRED','平台题目请从平台内容编辑入口维护');
+   const bankMatch=context.route.match(/^\/(?:admin\/)?problem-banks\/([0-9a-f-]{36})(?:\/|$)/i);
+   if(bankMatch&&(await pool.query("SELECT 1 FROM problems WHERE bank_id=$1 AND owner_scope='platform'",[bankMatch[1]])).rowCount)
+    fail(403,'PLATFORM_SOURCE_REQUIRED','此来源题库包含平台题目，不能通过校内入口修改题库权限或归档');
+  }
+
   const {route,method,body,url,user,sess,ip}=context;
   let m;
   const historyMatch=route.match(/^\/problems\/([^/]+)\/submissions$/);
@@ -457,12 +468,13 @@ export async function createDomainServices(pool,config) {
       THEN pv.title ELSE v.title END published_title,
      CASE WHEN NOT $7 AND ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit')))
       THEN pv.metadata->'difficulty' ELSE v.metadata->'difficulty' END published_difficulty,
-     ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission='edit')) can_edit,
+     (p.owner_scope='school' AND ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission='edit'))) can_edit,
      ($3 AND (${schoolPublishedTutorialProblemSql})) shared_tutorial
     FROM problems p JOIN problem_banks bank ON bank.id=p.bank_id
     LEFT JOIN bank_permissions bp ON bp.bank_id=bank.id AND bp.account_id=$1
     JOIN LATERAL (
      SELECT * FROM problem_versions v WHERE v.problem_id=p.id
+     AND (p.owner_scope='school' OR v.id=${liveProblemVersionIdSql('p')})
      AND (NOT $7::boolean OR v.id=${liveProblemVersionIdSql('p')})
      AND ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit'))
        OR v.id=${liveProblemVersionIdSql('p')}) AND (

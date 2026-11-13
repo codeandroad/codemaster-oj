@@ -16,6 +16,7 @@ import { localizedChapter, parseCourseLocalizations, parseChapterLocalizations, 
 import { courseAcslReferences, parseCourseAcslReferences } from "@/components/course-acsl";
 import { CourseAcslEditor } from "@/components/teacher/course-acsl-editor";
 import { productionApi } from "@/lib/production-api";
+import { PlatformCourseProblemLinks } from "./platform-course-problem-links";
 import { PlatformCourseAudience } from "./platform-course-audience";
 import { activeAdmissionRules, courseAudiencePolicy, courseAudiencePolicyForSave } from "./platform-course-admission-model";
 import { PlatformCourseDetailsEditor } from "./platform-course-details-editor";
@@ -83,7 +84,7 @@ export function PlatformCourseEditor({ course, onSaved, onClose }: {
           chapters: orderCourseChapters(draft.sections, draft.chapters).map(chapter => ({ ...chapter,
             localizations: parseChapterLocalizations(chapter.localizations ?? {}), acslLinks: parseCourseAcslReferences(courseAcslReferences(chapter.acslLinks)),
           })), requestId, expectedRevision: course.revision, sourceVersion: course.sourceVersion,
-          audiencePolicy: policy, audienceScope: undefined, schoolIds: undefined, studentIds: undefined,
+          audiencePolicy: course.canManage === false ? undefined : policy, audienceScope: undefined, schoolIds: undefined, studentIds: undefined,
         },
       });
       onSaved(saved);
@@ -106,9 +107,9 @@ export function PlatformCourseEditor({ course, onSaved, onClose }: {
           <label className="grid gap-2 text-sm font-semibold">{text("Displayed author", "显示作者")}<input className={inputClass} maxLength={200} value={draft.authorName} onChange={event => update({ authorName: event.target.value })}/></label></div>
         <CourseProgrammingLanguageField className={inputClass} value={draft.requiredLanguage} onChange={requiredLanguage => update({ requiredLanguage })}/>
       </div>
-      <div className="min-w-0 rounded-lg border border-border bg-surface p-4"><PlatformCourseAudience courseId={course.id} policy={draft.audiencePolicy}
+      {course.canManage !== false && <div className="min-w-0 rounded-lg border border-border bg-surface p-4"><PlatformCourseAudience courseId={course.id} policy={draft.audiencePolicy}
         onChange={audiencePolicy => update({ audiencePolicy })} schools={draft.schools} accounts={draft.students}
-        onSchools={schools => update({ schools })} onAccounts={students => update({ students })} disabled={action.busy} dirty={dirty}/></div>
+        onSchools={schools => update({ schools })} onAccounts={students => update({ students })} disabled={action.busy} dirty={dirty}/></div>}
     </fieldset>
     <CourseSectionsEditor sections={draft.sections ?? []} chapters={draft.chapters} onChange={sections => update({ sections })} disabled={action.busy}/>
     <fieldset disabled={action.busy} className="min-w-0 space-y-4 rounded-lg border border-border bg-surface p-4">
@@ -126,7 +127,8 @@ export function PlatformCourseEditor({ course, onSaved, onClose }: {
           {editingLanguage !== "original" && !chapter.localizations?.[editingLanguage] && <p role="status" className="text-sm text-muted-foreground">{text("Translation unavailable; showing the original content.", "暂无此语言译文，显示原有内容。")}</p>}
           <LearningChapterContent chapter={previewFields} language={editingLanguage === "original" ? originalLanguage ?? undefined : editingLanguage}/>
         </div> : <ChapterContentEditor original={original} localizations={chapter.localizations} originalLanguage={originalLanguage} language={editingLanguage} onLanguageChange={changeEditingLanguage} onChange={updateChapterContent} disabled={action.busy}/>}
-        <CourseAcslEditor platform links={chapter.acslLinks ?? []} onChange={acslLinks => changeChapter({ acslLinks })} disabled={action.busy}/>
+        <PlatformCourseProblemLinks courseId={course.id} links={chapter.problems ?? []} onChange={problems => changeChapter({ problems })}/>
+        <CourseAcslEditor platform courseId={course.id} links={chapter.acslLinks ?? []} onChange={acslLinks => changeChapter({ acslLinks })} disabled={action.busy}/>
       </>}
     </fieldset>
   </form>;

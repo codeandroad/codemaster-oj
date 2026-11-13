@@ -1,3 +1,5 @@
+import { canEditPlatformContent, requirePlatformContentEditor } from './platform-content-access.mjs';
+import { isDeepStrictEqual } from 'node:util';
 import { courseSections, chapterSectionKey, assertChapterSections } from './course-sections.mjs';
 import { randomUUID } from 'node:crypto';
 import { transaction } from './db.mjs';
@@ -16,7 +18,7 @@ const sourceVersion='extract(epoch FROM p.updated_at)::text';
 
 async function authorize(db,user) {
  await activeAccount(db,user.id);
- if(!await isPlatformAdministrator(db,user.id))fail(403,'PLATFORM_ADMIN_REQUIRED','需要平台管理员权限');
+
  await db.query("SELECT set_config('campus.account_id',$1,true)",[user.id]);
  await db.query("SELECT set_config('campus.school_id',$1,true)",[LEGACY_SCHOOL_ID]);
 }
@@ -26,11 +28,12 @@ async function get(db,id,{lock=false}={}) {
  if(!p)fail(404,'NOT_FOUND','平台课程不存在');
  return p;
 }
-async function shape(db,p,{detail=false}={}) {
+async function shape(db,p,{detail=false,admin=true}={}) {
  const audiencePolicy=await platformAudiencePolicy(db,p);
  const schoolIds=audiencePolicy.schoolRules.map(rule=>rule.schoolId),studentIds=audiencePolicy.accountRules.map(rule=>rule.identityId);
  const chapters=(await db.query(`SELECT id,title,content,objective,checkpoint,checkpoint_answer AS "checkpointAnswer",
-  localizations,acsl_links AS "acslLinks",section_key AS "sectionKey",(SELECT count(*)::int FROM chapter_problems WHERE chapter_id=c.id) AS "problemCount"
+  localizations,acsl_links AS "acslLinks",section_key AS "sectionKey",
+  COALESCE((SELECT jsonb_agg(jsonb_build_object('problemId',cp.problem_id,'versionId',cp.version_id,'title',v.title) ORDER BY cp.position) FROM chapter_problems cp JOIN problem_versions v ON v.id=cp.version_id WHERE cp.chapter_id=c.id),'[]'::jsonb) problems,(SELECT count(*)::int FROM chapter_problems WHERE chapter_id=c.id) AS "problemCount"
   FROM learning_chapters c WHERE path_id=$1 AND archived_at IS NULL ORDER BY position,created_at,id`,[p.id])).rows;
  const schools=schoolIds.length?(await db.query('SELECT id,name FROM schools WHERE id=ANY($1::uuid[]) ORDER BY name,id',[schoolIds])).rows:[];
  const students=studentIds.length?(await db.query(`SELECT i.id,i.name,
@@ -42,7 +45,7 @@ async function shape(db,p,{detail=false}={}) {
  return {sections:p.sections??[],id:p.id,title:p.title,description:p.description,category:p.category,difficulty:p.difficulty,coverKey:p.cover_key,
   coverImage:p.cover_image,authorName:p.author_name,authoredAt:p.authored_at,estimatedMinutes:p.estimated_minutes,
   requiredLanguage:p.required_language,localizations:p.localizations,published:!!p.published_at,archived:!!p.archived_at,
-  revision:p.platform_revision,sourceVersion:p.source_version,sourceSchool:'平台管理员',ownerScope:'platform',canEdit:true,
+  revision:p.platform_revision,sourceVersion:p.source_version,sourceSchool:'平台管理员',ownerScope:'platform',canEdit:true,canManage:admin,
   audiencePolicy,audienceScope:audiencePolicy.independentRule||schoolIds.length&&studentIds.length?'custom':p.platform_access_scope,schoolIds,studentIds,
   schools,students,pendingApplications,chapterCount:chapters.length,...(detail?{chapters}:{})};
 }
@@ -57,7 +60,7 @@ async function assertReady(db,p,user) {
  const chapters=(await db.query('SELECT content,acsl_links FROM learning_chapters WHERE path_id=$1 AND archived_at IS NULL',[p.id])).rows;
  if(!chapters.length||chapters.some(c=>!c.content.trim()))fail(409,'INCOMPLETE','发布前需要至少一个有正文的章节');
  await assertCoursePaper4Ready(db,p.id);
- await assertPlatformCourseAcslLinksReady(db,user,chapters.flatMap(chapter=>chapter.acsl_links??[]));
+ await assertPlatformCourseAcslLinksReady(db,user,chapters.flatMap(chapter=>chapter.acsl_links??[]),p.id);
  const links=(await db.query(`SELECT p.archived_at, b.archived_at bank_archived,b.visibility,v.published_at,v.school_visible_at,v.rank_review_status
   FROM learning_chapters c JOIN chapter_problems cp ON cp.chapter_id=c.id
   JOIN problems p ON p.id=cp.problem_id JOIN problem_banks b ON b.id=p.bank_id
@@ -109,12 +112,23 @@ async function save(db,user,body,old) {
    const checkpoint=field(c.checkpoint===undefined?before?.checkpoint??'':c.checkpoint,'检查点',{min:0,max:10000,trim:false});
    const checkpointAnswer=field(c.checkpointAnswer===undefined?before?.checkpoint_answer??'':c.checkpointAnswer,'检查点答案',{min:0,max:10000,trim:false});
    const chapterLocales=c.localizations===undefined?before?.localizations??null:courseLocalizations(c.localizations,{chapter:true});
-   const acslLinks=c.acslLinks===undefined?before?.acsl_links??[]:await resolvePlatformCourseAcslLinks(db,user,c.acslLinks,before?.acsl_links??[]);
+   const acslLinks=c.acslLinks===undefined?before?.acsl_links??[]:await resolvePlatformCourseAcslLinks(db,user,c.acslLinks,before?.acsl_links??[],id);
    if(existing.has(chapterId))await db.query(`UPDATE learning_chapters SET title=$2,content=$3,position=$4,archived_at=NULL,
     objective=$5,checkpoint=$6,checkpoint_answer=$7,localizations=$8,acsl_links=$9,section_key=$10,updated_at=clock_timestamp() WHERE id=$1`,
    [chapterId,chapterTitle,content,position,objective,checkpoint,checkpointAnswer,chapterLocales,JSON.stringify(acslLinks),sectionKey]);
    else await db.query(`INSERT INTO learning_chapters(id,path_id,title,content,position,objective,checkpoint,checkpoint_answer,localizations,acsl_links,section_key)
     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,[chapterId,id,chapterTitle,content,position,objective,checkpoint,checkpointAnswer,chapterLocales,JSON.stringify(acslLinks),sectionKey]);
+  }
+  for(const [position,c] of body.chapters.entries())if(c.problems!==undefined){
+   if(!Array.isArray(c.problems)||c.problems.length>200)fail(400,'VALIDATION','每章最多关联 200 道题');
+   const links=c.problems.map(link=>({problemId:uuid(link.problemId),versionId:uuid(link.versionId)}));
+   if(new Set(links.map(l=>l.problemId)).size!==links.length)fail(400,'VALIDATION','同一章不能重复关联同一道题');
+   for(const link of links)if(!(await db.query(`SELECT 1 FROM problems p JOIN problem_versions v ON v.problem_id=p.id
+    WHERE p.id=$1 AND v.id=$2 AND p.owner_scope='platform' AND p.archived_at IS NULL
+    AND v.published_at IS NOT NULL AND v.validation_status='AC' AND v.rank_review_status='approved'`,[link.problemId,link.versionId])).rowCount)
+    fail(409,'UNAVAILABLE_COURSE_PROBLEM','请选择有效的已发布平台题目');
+   await db.query('DELETE FROM chapter_problems WHERE chapter_id=$1',[retained[position]]);
+   for(const [index,link] of links.entries())await db.query('INSERT INTO chapter_problems(chapter_id,problem_id,version_id,position) VALUES($1,$2,$3,$4)',[retained[position],link.problemId,link.versionId,index]);
   }
   await db.query('UPDATE learning_chapters SET archived_at=clock_timestamp() WHERE path_id=$1 AND archived_at IS NULL AND NOT(id=ANY($2::uuid[]))',[id,retained]);
  }
@@ -127,8 +141,19 @@ export async function handlePlatformCourses({pool,user,route,method,body,url}) {
  const match=route.match(/^\/platform\/courses(?:\/([^/]+)(?:\/(publish|unpublish|archive|restore))?)?$/);
  if(!match)return null;
  return transaction(pool,async db=>{
+  await lockSchoolTeaching(db,LEGACY_SCHOOL_ID,{shared:method==='GET'});
   await authorize(db,user);
-  if(match[1]==='acsl-links'&&method==='GET'&&!match[2])return reply(await platformCourseAcslPicker(db,user));
+  const admin=await isPlatformAdministrator(db,user.id);
+  const courseId=match[1]&& !['audience','acsl-links','problem-options'].includes(match[1])?uuid(match[1]):null;
+  if(courseId)await requirePlatformContentEditor(db,user,'course',courseId);
+  if(!admin&&((method!=='GET'&&!courseId)||match[2]||match[1]==='audience'))fail(403,'PLATFORM_ADMIN_REQUIRED','需要平台管理员权限');
+  if(match[1]==='problem-options'&&method==='GET'){
+   if(!admin)await requirePlatformContentEditor(db,user,'course',uuid(url.searchParams.get('courseId')));
+   return reply({items:(await db.query(`SELECT p.id AS "problemId",v.id AS "versionId",v.title FROM problems p
+    JOIN problem_versions v ON v.id=p.current_version_id WHERE p.owner_scope='platform' AND p.archived_at IS NULL
+    AND v.published_at IS NOT NULL AND v.validation_status='AC' AND v.rank_review_status='approved' ORDER BY v.title,p.id`)).rows});
+  }
+  if(match[1]==='acsl-links'&&method==='GET'&&!match[2])return reply(await platformCourseAcslPicker(db,user,url.searchParams.get('courseId')));
   if(match[1]==='audience'&&method==='GET'){
    const q=field(url.searchParams.get('q')??'','搜索',{min:0,max:100}).toLowerCase();
    const kind=enumValue(url.searchParams.get('kind')??'schools',['schools','students'],'选择类型');
@@ -141,9 +166,9 @@ export async function handlePlatformCourses({pool,user,route,method,body,url}) {
   }
   if(!match[1]&&method==='GET'){
    const rows=(await db.query(`SELECT p.*,${sourceVersion} source_version FROM learning_paths p WHERE owner_scope='platform' ORDER BY archived_at NULLS FIRST,updated_at DESC,id`)).rows;
-   const items=[];for(const p of rows)items.push(await shape(db,p));return reply({items});
+   const items=[];for(const p of rows)if(admin||await canEditPlatformContent(db,user.id,'course',p.id))items.push(await shape(db,p,{admin}));return reply({items,canManage:admin});
   }
-  if(match[1]&&method==='GET'&&!match[2])return reply(await shape(db,await get(db,match[1]),{detail:true}));
+  if(match[1]&&method==='GET'&&!match[2])return reply(await shape(db,await get(db,match[1]),{detail:true,admin}));
   if(!['POST','PATCH'].includes(method))return null;
   await lockSchoolTeaching(db,LEGACY_SCHOOL_ID);
   if(!match[1]&&method==='POST'){
@@ -158,6 +183,12 @@ export async function handlePlatformCourses({pool,user,route,method,body,url}) {
   const old=match[1]?await get(db,match[1],{lock:true}):null;
   if(old&&(body.expectedRevision!==old.platform_revision||body.sourceVersion!==old.source_version))
    fail(409,'REVISION_CONFLICT','课程已更新，请重新载入后保存');
+  if(!admin&&old){
+   for(const key of ['audiencePolicy','audienceScope','schoolIds','studentIds'])if(body[key]!==undefined){
+    const shaped=await shape(db,old,{admin});
+    if(!isDeepStrictEqual(body[key],shaped[key]))fail(403,'PLATFORM_ADMIN_REQUIRED','编辑授权不包含更改开放范围和准入规则');
+   }
+  }
   let saved;
   if(!match[2]){
    if(old&&method!=='PATCH'||!old&&method!=='POST')return null;
@@ -181,6 +212,6 @@ export async function handlePlatformCourses({pool,user,route,method,body,url}) {
    if(action==='restore'&&saved.published_at)await assertReady(db,saved,user);
   }
   await audit(db,user,match[2]??(old?'updated':'created'),saved);
-  return reply(await shape(db,saved,{detail:true}),old?200:201);
+  return reply(await shape(db,saved,{detail:true,admin}),old?200:201);
  });
 }

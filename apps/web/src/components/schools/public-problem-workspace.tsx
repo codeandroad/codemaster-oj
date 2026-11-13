@@ -24,7 +24,7 @@ const unavailableStorage = {getItem: () => null, setItem: () => { throw new Erro
 export function PublicProblemWorkspace({ id, catalog }: { id:string; catalog:{data:{items:Problem[]}|null;loading:boolean;error:string;reload:()=>void} }) {
   const params = useSearchParams(), version = params.get("versionId");
   const user = useData<{user:CampusUser}>("auth/me");
-  const problem = useData<Problem>(`practice/problems/${encodeURIComponent(id)}?${new URLSearchParams({view:"practice", ...(version ? {versionId:version} : {})})}`);
+  const problem = useData<Problem>(`practice/problems/${encodeURIComponent(id)}?${new URLSearchParams({view:"practice", ...(version ? {versionId:version} : {}), ...(params.get("publicCourseId") ? {courseId:params.get("publicCourseId")!,chapterId:params.get("publicChapterId")!} : {})})}`);
   return <State data={user}><State data={problem}>{user.data?.user && problem.data?.definition && <PublicWorkspace key={`${user.data.user.id}:${problem.data.id}:${problem.data.versionId}:${params.get("publicCourseId")??""}:${params.get("publicChapterId")??""}`} user={user.data.user} problem={problem.data} catalog={catalog}/>}</State></State>;
 }
 function PublicWorkspace({user, problem, catalog}:{user:CampusUser;problem:Problem;catalog:{data:{items:Problem[]}|null;loading:boolean;error:string;reload:()=>void}}) {

@@ -28,6 +28,25 @@ export async function platformCourseEdition(db,listing,{detail=false,lock=false}
  if(p&&detail)p.chapters=await platformCourseChapters(db,p.id);
  return p;
 }
+
+// Catalogue statistics need references, not lesson prose or answer content.
+// Migrated public reading records are the sole exception: their existing hash
+// still has to be checked against the current title/body until native reading
+// progress has been recorded for that chapter.
+export async function platformCourseProgressEdition(db,listing,{contentHashChapterIds=[]}={}) {
+ const course=await platformCourseEdition(db,listing);
+ if(!course)return course;
+ course.chapters=(await db.query(`SELECT c.id,c.acsl_links AS "acslLinks",
+  COALESCE((SELECT jsonb_agg(jsonb_build_object('problemId',cp.problem_id,'versionId',cp.version_id)
+   ORDER BY cp.position,cp.problem_id) FROM chapter_problems cp WHERE cp.chapter_id=c.id),'[]'::jsonb) problems
+  FROM learning_chapters c WHERE c.path_id=$1 AND c.archived_at IS NULL ORDER BY c.position,c.created_at,c.id`,[course.id])).rows;
+ if(contentHashChapterIds.length){
+  const historical=new Map((await db.query(`SELECT id,title,content body FROM learning_chapters
+   WHERE path_id=$1 AND archived_at IS NULL AND id=ANY($2::uuid[])`,[course.id,contentHashChapterIds])).rows.map(chapter=>[chapter.id,chapter]));
+  for(const chapter of course.chapters)Object.assign(chapter,historical.get(chapter.id));
+ }
+ return course;
+}
 export async function platformReadProgress(db,listing,accountId) {
  return (await db.query(`SELECT c.id chapter_id,pr.completed read FROM learning_chapters c
   JOIN learning_progress pr ON pr.chapter_id=c.id JOIN accounts a ON a.identity_id=pr.identity_id

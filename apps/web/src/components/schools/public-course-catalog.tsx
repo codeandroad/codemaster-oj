@@ -123,7 +123,7 @@ export function useCourseAdmissionDialog(detailHref: (id: string) => string, rel
 export function PublicCourseCatalog({ courseHref, showSearch = true }: { courseHref: (id: string) => string; showSearch?: boolean }) {
   const text = useSchoolText();
   const { language } = useCourseLanguage();
-  const catalog = useData<{ courses: PublicCourseEntry[] }>("practice/catalog");
+  const catalog = useData<{ courses: PublicCourseEntry[] }>("practice/courses");
   useCourseProgressRefresh(catalog);
   const [catalogQuery, setQuery] = useCourseCatalogQuery();
   const query = showSearch ? catalogQuery : "";

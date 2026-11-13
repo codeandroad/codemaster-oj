@@ -13,7 +13,7 @@ import { canonicalHash, enumValue, fail, integer, uuid } from './security.mjs';
 import { handlePlatformCourses } from './platform-courses.mjs';
 import { platformCourseAdmission } from './platform-course-access.mjs';
 import { handlePlatformCourseAdmissions } from './platform-course-admissions.mjs';
-import { platformCourseListings, platformCourseEdition, platformReadProgress } from './platform-public-course.mjs';
+import { platformCourseListings, platformCourseEdition, platformCourseProgressEdition, platformReadProgress } from './platform-public-course.mjs';
 
 const respond = (body, status = 200) => ({ status, body });
 const setSchool = (db, id) => db.query("SELECT set_config('campus.school_id',$1,true)", [id]);
@@ -28,8 +28,9 @@ async function context(db, user, { platform = false } = {}) {
   }
 }
 
-async function edition(db, listing, { detail = false, lock = false } = {}) {
+async function edition(db, listing, { detail = false, lock = false, progress = false, contentHashChapterIds = [] } = {}) {
   await setSchool(db, listing.school_id);
+  if(listing.platform_owned&&progress)return platformCourseProgressEdition(db,listing,{contentHashChapterIds});
   if(listing.platform_owned)return platformCourseEdition(db,listing,{detail,lock});
   if (listing.school_id === LEGACY_SCHOOL_ID) return legacyEdition(db, listing, { detail, lock });
   return (await db.query(`SELECT p.title, p.description, p.revision, p.access_scope, p.properties->'localizations' AS localizations,p.properties->'sections' AS sections,
@@ -54,8 +55,8 @@ async function activeListing(db, id, { includeWithdrawn = false } = {}) {
     AND ($2 OR withdrawn_at IS NULL)`, [id, includeWithdrawn])).rows[0];
 }
 
-async function admissionFor(db, listing, course, accountId) {
-  if(listing.platform_owned){const access=await platformCourseAdmission(db,listing.course_id,accountId);course.admissionRules=access.admissionRules;return access.admission;}
+async function admissionFor(db, listing, course, accountId, options) {
+  if(listing.platform_owned){const access=await platformCourseAdmission(db,listing.course_id,accountId,options);course.admissionRules=access.admissionRules;return access.admission;}
   if (listing.access_mode === 'direct') return 'direct';
   const eligible = listing.school_id === LEGACY_SCHOOL_ID
     ? await legacyDirectAccess(db, listing, course.access_scope, accountId)
@@ -116,25 +117,28 @@ async function catalogue(pool, user, url) {
       if (!readByListing.has(row.listing_id)) readByListing.set(row.listing_id, new Map());
       readByListing.get(row.listing_id).set(row.chapter_id, row.content_hash);
     }
-    const courses = [];
+    const courses = [], admissionState = {};
     for (const listing of rows) {
       const course = await edition(db, listing);
       if (!course) continue;
-      const admission = await admissionFor(db, listing, course, user.id);
+      const admission = await admissionFor(db, listing, course, user.id, {state:admissionState});
       if(admission==='denied')continue;
       const entry = courseEntry(listing, course, admission);
       if (admission === 'direct') {
         const read = readByListing.get(listing.id);
-        const detail = await edition(db, listing, { detail: true });
-        if (!detail) continue;
         const platformRead=listing.platform_owned?await platformReadProgress(db,listing,user.id):[];
-        entry.completedChapters = detail.chapters.filter(chapter => platformRead.find(p=>p.chapter_id===chapter.id)?.read ?? (read?.get(chapter.id) === contentHash(chapter))).length;
+        const platformReadByChapter=new Map(platformRead.map(row=>[row.chapter_id,row.read]));
+        const contentHashChapterIds=listing.platform_owned?[...(read?.keys()??[])].filter(id=>!platformReadByChapter.has(id)):[];
+        const detail = await edition(db, listing, { detail: !listing.platform_owned, progress: listing.platform_owned, contentHashChapterIds });
+        if (!detail) continue;
+        entry.completedChapters = detail.chapters.filter(chapter => platformReadByChapter.get(chapter.id) ?? (read?.has(chapter.id) && read.get(chapter.id) === contentHash(chapter))).length;
         const available = await publicChapterProblems(db, listing, detail, user.id);
         const exercises = detail.chapters.flatMap(chapter => chapter.problems ?? [])
           .flatMap(link => available.get(`${link.problemId}:${link.versionId}`) ?? []);
         entry.totalExercises = exercises.length;
         entry.completedExercises = exercises.filter(problem => problem.solved).length;
-        for(const chapter of detail.chapters){const links=await projectCourseAcslLinks(db,listing.platform_owned?acslSchoolId:listing.school_id,user,chapter.acslLinks??[]),counts=acslLinkCounts(links);entry.totalExercises+=counts.total;entry.completedExercises+=counts.completed;}
+        const acslLinks=await projectCourseAcslLinks(db,listing.platform_owned?acslSchoolId:listing.school_id,user,detail.chapters.flatMap(chapter=>chapter.acslLinks??[]));
+        const counts=acslLinkCounts(acslLinks);entry.totalExercises+=counts.total;entry.completedExercises+=counts.completed;
       }
       courses.push(entry);
     }
@@ -439,6 +443,7 @@ export async function handlePublicLearning(ctx) {
   const admissions=await handlePlatformCourseAdmissions(ctx);if(admissions)return admissions;
   const { pool, user, route, method, url } = ctx;
   if(/^\/platform\/courses(?:\/|$)/.test(route))return handlePlatformCourses(ctx);
+  if (route === '/practice/courses' && method === 'GET') return respond({courses:await catalogue(pool,user,url)});
   if (route === '/practice/catalog' && method === 'GET') {
     const { listPublicProblems } = await import('./school-practice.mjs');
     const courses = await catalogue(pool, user, url);

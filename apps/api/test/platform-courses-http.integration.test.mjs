@@ -85,10 +85,19 @@ test('platform courses retain original data and enforce audiences through NestJS
    await send('/auth/login',{username:name,password});return {send};
   }
   const platform=await client('platform'),school=await client('school-admin'),a=await client('student-a'),b=await client('student-b'),personal=await client('personal'),teacher=await client('school-teacher');
-  const list=async api=>(await api.send('/practice/catalog')).courses;
+  const list=async api=>(await api.send('/practice/courses')).courses;
   let course;
   const change=async(patch,status=200)=>{const next=await platform.send('/platform/courses/'+course.id,{...patch,expectedRevision:course.revision,sourceVersion:course.sourceVersion},'PATCH',status);if(status===200)course=next;return next;};
   const action=async(name,status=200)=>{const next=await platform.send(`/platform/courses/${course.id}/${name}`,{expectedRevision:course.revision,sourceVersion:course.sourceVersion},'POST',status);if(status===200)course=next;return next;};
+  await t.test('course-only discovery works before any problem materialization and matches the compatible catalog',async()=>{
+   assert.equal((await pool.query('SELECT count(*)::int n FROM school_problems WHERE id=$1',[problem.id])).rows[0].n,0);
+   const onlyCourses=await personal.send('/practice/courses');
+   assert.deepEqual(Object.keys(onlyCourses),['courses']);
+   assert.equal(onlyCourses.courses.find(c=>c.id===listing.id).totalExercises,1);
+   assert.equal((await pool.query('SELECT count(*)::int n FROM school_problems WHERE id=$1',[problem.id])).rows[0].n,0);
+   const compatible=await personal.send('/practice/catalog');
+   assert.deepEqual(onlyCourses.courses,compatible.courses);assert.ok(Array.isArray(compatible.problems));
+  });
   await t.test('platform-only administrator manages migrated sources; school administrator cannot',async()=>{
    const managed=await platform.send('/platform/courses');assert.equal(managed.items.length,2);
    const entry=(await list(personal)).find(c=>c.id===listing.id);assert.equal(entry.sourceSchool,'平台管理员');

@@ -17,7 +17,7 @@ class PublicLearningController {
  @Patch('platform/courses/:id') platformCourseUpdate(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
  @Get('platform/courses/:id/admissions') platformAdmissions(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
  @Post(['platform/courses/:id/admissions/:applicationId/decision','platform/courses/:id/rules/:ruleId/invitation']) platformAdmissionAction(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
- @Get('practice/catalog') catalog(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
+ @Get(['practice/catalog','practice/courses']) catalog(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
  @Get('practice/courses/:id') course(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
  @Get('practice/courses/:id/entry') entry(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}
  @Post('practice/courses/:id/applications') apply(@Req() req:DomainRequest,@Res({passthrough:true}) res:Response){return this.execute(req,res);}

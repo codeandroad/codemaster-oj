@@ -395,6 +395,22 @@ test('platform course admission combines audience, requirements and grants acros
       await change(course, { audiencePolicy: policy({ all: rule('direct', { requirementMode: 'other' }) }) }, 400);
     });
 
+    await run('shared catalog evaluation keeps point-free course metadata independent of earlier point requirements', async () => {
+      const learner = 'multi-student';
+      assert.equal((await get('/points/me', learner)).points, 10);
+      const open = await create(policy({ all: rule() }), 'Point-free course after scored courses');
+      const eligible = await create(policy({ all: rule('direct', { minimumPoints: 10 }) }), 'Met points threshold');
+      const blocked = await create(policy({ all: rule('direct', { minimumPoints: 11 }) }), 'Unmet points threshold');
+      const courses = (await get('/practice/courses', learner)).courses;
+      assert.ok(courses.findIndex(course => course.id === eligible.id) < courses.findIndex(course => course.id === open.id));
+      const listed = course => courses.find(item => item.id === course.id);
+      for (const course of [eligible, blocked]) assert.equal(listed(course).admissionRules[0].points.current, 10);
+      assert.equal(listed(eligible).admission, 'direct'); assert.equal(listed(blocked).admission, 'requirements');
+      assert.equal(listed(open).admission, 'direct');
+      assert.deepEqual(listed(open).admissionRules[0].points, { source: 'platform', current: 0, required: 0 });
+      assert.deepEqual(listed(open).admissionRules, (await entry(open, learner)).admissionRules);
+    });
+
     await run('self-referential or cyclic prerequisites are rejected atomically', async () => {
       const first = await create(policy({ all: rule() }), 'Cycle first');
       const second = await create(policy({ all: rule('direct', { prerequisiteCourseIds: [first.id] }) }), 'Cycle second');

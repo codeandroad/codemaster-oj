@@ -37,11 +37,14 @@ export async function resolvePlatformCourseAdmission(db,courseId,accountId,{stat
    return any?denied():{admission:'direct',admissionRules:[]};
   }
   const records=(await db.query('SELECT * FROM platform_course_admissions WHERE course_id=$1 AND account_id=$2',[courseId,accountId])).rows;
-  if (rules.some(rule => rule.minimum_points > 0)) state.points ??= await platformPoints(db, accountId);
+  // The shared request cache must not change metadata for courses that do not
+  // evaluate points: their standalone entry has always reported zero here.
+  const currentPoints = rules.some(rule => rule.minimum_points > 0)
+   ? (state.points ??= await platformPoints(db, accountId)) : 0;
   const output=[];
   for(const rule of rules){
    const schoolId = rule.target_kind === 'school' ? rule.school_id : null;
-   const points = { source: 'platform', current: state.points ?? 0, required: rule.minimum_points };
+   const points = { source: 'platform', current: currentPoints, required: rule.minimum_points };
    const prerequisites=[];
    for(const prerequisiteId of rule.prerequisite_course_ids){
     const access=await resolvePlatformCourseAdmission(db,prerequisiteId,accountId,{state});

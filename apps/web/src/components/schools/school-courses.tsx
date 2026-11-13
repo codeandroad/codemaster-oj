@@ -394,7 +394,7 @@ function CourseList({
   const text = useSchoolText();
   const { language } = useCourseLanguage();
   const resource = useData<CoursePage<SchoolCourse>>(path);
-  const platform = useData<{items:PlatformCourse[]}>(canAuthor?`platform/courses?schoolId=${path.split("/")[1]}`:"");
+  const platform = useData<{items:PlatformCourse[]}>(canAuthor?`platform/courses?schoolId=${path.split("/")[1]}`:null);
   const archived=new URLSearchParams(path.split("?")[1]??"").get("archived")==="true";
   const platformCourses=page===1?(platform.data?.items??[]).filter(course=>course.archived===archived&&`${course.title} ${course.description}`.toLowerCase().includes(query.toLowerCase())):[];
   if (canAuthor) return (

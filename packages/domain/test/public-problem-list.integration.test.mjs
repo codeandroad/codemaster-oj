@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { createPool } from '../src/db.mjs';
 import { migrate } from '../src/migrate.mjs';
 import { bootstrap } from '../src/bootstrap.mjs';
-import { LEGACY_SCHOOL_ID } from '../src/schools.mjs';
+import { LEGACY_SCHOOL_ID, provisionSchool } from '../src/schools.mjs';
 import { listPublicProblems } from '../src/school-practice.mjs';
 
 test('public problem discovery batches current publications without writing judge snapshots',
@@ -41,11 +41,13 @@ test('public problem discovery batches current publications without writing judg
     VALUES($1,$2,'platform') RETURNING id`, [hidden === 'bank-archived' ? archivedBank.id : bank.id, author.id])).rows[0];
    const versions = [];
    for (let edition = 1; edition <= 3; edition++) {
-    versions.push((await owner.query(`INSERT INTO problem_versions(problem_id,title,statement,mode,comparator,reference_code,samples,metadata,time_limit_ms,memory_limit_mb,validation_status)
-     VALUES($1,$2,$3,'stdio','tokens','PRIVATE_REFERENCE',$4,$5,1000,128,'AC') RETURNING id`,
+    const tags=hidden?[`Hidden ${hidden}`]:edition===3?['Unpublished topic']:edition===1?['Old topic']
+     :['Common',index===52?'Tail topic':index%2?'Odd':'Even'];
+    versions.push((await owner.query(`INSERT INTO problem_versions(problem_id,title,statement,mode,comparator,reference_code,samples,metadata,tags,time_limit_ms,memory_limit_mb,validation_status)
+     VALUES($1,$2,$3,$7,'tokens','PRIVATE_REFERENCE',$4,$5,$6,1000,128,'AC') RETURNING id`,
      [problem.id, edition === 3 ? `Private draft ${index}` : `Published ${String(index).padStart(3, '0')} edition ${edition}`,
       'PRIVATE_STATEMENT_PROSE'.repeat(200), JSON.stringify([{input:'PUBLIC_SAMPLE',expected:'1',enabled:true}]),
-      {difficulty:'easy',teacherNote:'PRIVATE_TEACHER_NOTE'}])).rows[0]);
+      {difficulty:'easy',teacherNote:'PRIVATE_TEACHER_NOTE'},JSON.stringify(tags),edition===2&&index%2?'function':'stdio'])).rows[0]);
     await owner.query("INSERT INTO test_cases(version_id,position,input,expected,weight) VALUES($1,1,'PRIVATE_HIDDEN_TEST','1',100)", [versions.at(-1).id]);
     if (edition < 3) await owner.query(`UPDATE problem_versions SET published_at=now()+$2*interval '1 second',
      school_visible_at=now(),rank_review_status='approved',rank_approved_at=now() WHERE id=$1`, [versions.at(-1).id, edition]);
@@ -85,11 +87,11 @@ test('public problem discovery batches current publications without writing judg
    (account_id,identity_id,problem_id,version_id,kind,code,idempotency_key,request_hash,status,score)
    VALUES($1,$2,$3,$4,$5,'PRIVATE_STUDENT_CODE',$6,'fixture',$7,$8)`,
    [user.id,user.identityId,problem.id,versionId,kind,randomUUID(),status,status==='AC'?100:0]);
-  const job = async (user, problem, access, status, kind = 'submit') => owner.query(`INSERT INTO school_judge_jobs
+  const job = async (user, problem, access, status, kind = 'submit', state = 'completed') => owner.query(`INSERT INTO school_judge_jobs
    (school_id,problem_id,version_id,account_id,request_id,request_hash,kind,access_context,payload,state,result)
-   VALUES($1,$2,$3,$4,$5,'fixture',$6,$7,$8,'completed',$9)`,
+   VALUES($1,$2,$3,$4,$5,'fixture',$6,$7,$8,$10,$9)`,
    [LEGACY_SCHOOL_ID,problem.id,problem.originalVersionId,user.id,randomUUID(),kind,access,
-    {language:'python',code:'PRIVATE_PUBLIC_CODE'}, {status,score:status==='AC'?100:0}]);
+    {language:'python',code:'PRIVATE_PUBLIC_CODE'}, state==='completed'?{status,score:status==='AC'?100:0}:null,state]);
   await submission(learner, problems[0], problems[0].originalVersionId, 'AC');
   await submission(learner, problems[0], problems[0].versionId, 'WA');
   await job(learner, problems[0], 'public', 'WA');
@@ -99,6 +101,12 @@ test('public problem discovery batches current publications without writing judg
   await job(learner, problems[2], 'public', 'AC');
   await submission(other, problems[3], problems[3].versionId, 'AC');
   await job(other, problems[3], 'public', 'AC');
+  const filteredStatuses=['WA','CE','RE','TLE','MLE','OLE','Waiting','Judging','Executed','System Error'];
+  for(const [offset,status] of filteredStatuses.entries())await job(learner,problems[offset+5],'public',status,'submit',
+   status==='Waiting'?'queued':status==='Judging'?'leased':status==='System Error'?'failed':'completed');
+  await submission(learner,problems[52],problems[52].originalVersionId,'AC');
+  for(const index of [1,52,53,55])await owner.query('INSERT INTO problem_favorites(identity_id,problem_id) VALUES($1,$2)',[learner.identityId,problems[index].id]);
+  await owner.query('INSERT INTO problem_favorites(identity_id,problem_id) VALUES($1,$2)',[other.identityId,problems[2].id]);
 
   const course = (await owner.query(`INSERT INTO learning_paths(owner_account_id,title,owner_scope,published_at)
    VALUES($1,'Current catalogue course','platform',now()) RETURNING id`, [author.id])).rows[0];
@@ -139,6 +147,8 @@ test('public problem discovery batches current publications without writing judg
    assert.equal(first.body.page, 1);
    assert.equal(first.body.hasMore, true);
    assert.equal(first.body.query, '');
+   assert.deepEqual(first.body.filters,{topic:'',status:'',mode:'',savedOnly:false});
+   assert.deepEqual(first.body.topics,['Common','Even','Odd','Tail topic']);
    assert.ok(first.trace.length < 70, `page required ${first.trace.length} database round trips`);
    for (const row of first.body.items) {
     const source = problems.find(problem => problem.id === row.id);
@@ -149,6 +159,8 @@ test('public problem discovery batches current publications without writing judg
     assert.equal(row.canManage, false);
     assert.equal(row.canManageTutorial, false);
     assert.equal(row.definition, undefined);
+    assert.equal(row.mode,source.index%2?'function':'stdio');
+    assert.deepEqual(row.tags,['Common',source.index%2?'Odd':'Even']);
    }
    assert.equal((await owner.query('SELECT count(*)::int n FROM school_problem_versions WHERE id=ANY($1::uuid[])', [problems.map(problem=>problem.versionId)])).rows[0].n, 0, 'discovery never materializes the new live editions');
    assertReadOnly(first);
@@ -183,8 +195,109 @@ test('public problem discovery batches current publications without writing judg
    assert.equal(filtered.body.courseId, course.id);
    assert.deepEqual(new Set(filtered.body.items.map(problem => problem.id)), new Set(problems.slice(0,4).map(problem=>problem.id)));
    assert.equal(filtered.body.hasMore, false);
+   assert.deepEqual(filtered.body.topics,['Common','Even','Odd']);
    assertReadOnly(filtered);
    assert.ok(first.trace.length <= filtered.trace.length + 12, 'returning fifty rows must not add one database request per row');
+  });
+  await t.test('topic and interface filters reach later pages and retain complete accessible topic choices',async()=>{
+   const tail=await call('page=1&topic=Tail%20topic');
+   assert.deepEqual(tail.body.items.map(item=>item.id),[problems[52].id]);
+   assert.equal(tail.body.hasMore,false);
+   assert.deepEqual(tail.body.topics,first.body.topics);
+   assert.equal(tail.body.filters.topic,'Tail topic');
+   assertReadOnly(tail);
+   const mode=await call('page=1&mode=function');
+   assert.deepEqual(new Set(mode.body.items.map(item=>item.id)),new Set(problems.filter(item=>!item.hidden&&item.index%2).map(item=>item.id)));
+   assert.equal(mode.body.filters.mode,'function');
+   assert.deepEqual(mode.body.topics,first.body.topics);
+   assertReadOnly(mode);
+   const empty=await call(`page=1&courseId=${course.id}&topic=Tail%20topic&status=WA&mode=function`);
+   assert.deepEqual(empty.body.items,[]);
+   assert.deepEqual(empty.body.topics,['Common','Even','Odd']);
+   assertReadOnly(empty);
+  });
+  await t.test('status filters share historical AC, ignore other learners and apply before pagination',async()=>{
+   const accepted=await call('page=1&status=AC');
+   assert.deepEqual(accepted.body.items.map(item=>item.id),[0,1,2,52].map(index=>problems[index].id));
+   assert(accepted.body.items.every(item=>item.status==='AC'&&item.solved));
+   assert.deepEqual(accepted.body.topics,first.body.topics);
+   assertReadOnly(accepted);
+   for(const [offset,status] of filteredStatuses.entries()){
+    const request=await call('page=1&status='+encodeURIComponent(status));
+    assert.deepEqual(request.body.items.map(item=>item.id),[problems[offset+5].id],status);
+    assert.equal(request.body.items[0].status,status);
+    assertReadOnly(request);
+   }
+   const unstarted=await call('page=1&status=Not%20started');
+   assert(unstarted.body.items.some(item=>item.id===problems[3].id),'another learner\'s AC must not change this learner\'s status');
+   assert(unstarted.body.items.every(item=>item.status==='Not started'&&!item.solved&&item.attempts===0));
+   assertReadOnly(unstarted);
+   const foreign=await call('page=1&status=AC',other);
+   assert.deepEqual(foreign.body.items.map(item=>item.id),[problems[3].id]);
+  });
+  await t.test('bookmarks are identity scoped and cannot expose private, withdrawn or unrelated course problems',async()=>{
+   const saved=await call('page=1&savedOnly=1');
+   assert.deepEqual(saved.body.items.map(item=>item.id),[problems[1].id,problems[52].id]);
+   assert.equal(saved.body.filters.savedOnly,true);
+   assert.deepEqual(saved.body.topics,first.body.topics);
+   assertReadOnly(saved);
+   const foreign=await call('page=1&savedOnly=1',other);
+   assert.deepEqual(foreign.body.items.map(item=>item.id),[problems[2].id]);
+   const combined=await call(`page=1&courseId=${course.id}&savedOnly=1&status=AC&mode=function&topic=Odd`);
+   assert.deepEqual(combined.body.items.map(item=>item.id),[problems[1].id]);
+   assert.deepEqual(combined.body.filters,{topic:'Odd',status:'AC',mode:'function',savedOnly:true});
+   assertReadOnly(combined);
+   for(const hidden of problems.filter(item=>item.hidden)){
+    const request=await call('page=1&topic='+encodeURIComponent(`Hidden ${hidden.hidden}`));
+    assert.deepEqual(request.body.items,[]);
+    assert.deepEqual(request.body.topics,first.body.topics);
+   }
+  });
+  await t.test('invalid filter values are rejected without broadening discovery',async()=>{
+   for(const query of ['status=unknown','mode=script','topic='+encodeURIComponent('x'.repeat(201))]){
+    await assert.rejects(call(query),error=>error.status===400);
+   }
+  });
+  await t.test('status filtering switches native school scopes without mixing learners or exposing private snapshots',async()=>{
+   const native=[];
+   for(const [name,status] of [['alpha','AC'],['beta','WA']]){
+    const school=await provisionSchool(owner,{slug:`filter-${name}`,name:`Filter ${name}`,adminUsername:'public-list-owner'});
+    const db=await owner.connect();
+    try{
+     await db.query('BEGIN');
+     await db.query("SELECT set_config('campus.school_id',$1,true)",[school.id]);
+     const {rows:[bank]}=await db.query(`INSERT INTO school_problem_banks(school_id,owner_account_id,name,request_id)
+      VALUES($1,$2,'Native filter bank',$3) RETURNING id`,[school.id,author.id,randomUUID()]);
+     await db.query("INSERT INTO school_memberships(school_id,account_id,role) VALUES($1,$2,'student')",[school.id,learner.id]);
+     const {rows:[identity]}=await db.query(`INSERT INTO school_identities(school_id,kind,number,name,account_id)
+      VALUES($1,'student','FILTER','Filter learner',$2) RETURNING id`,[school.id,learner.id]);
+     const definition={title:`NativeFilter ${name}`,mode:'stdio',tags:[`Native ${name}`],statement:'PRIVATE_NATIVE_STATEMENT',reference_code:'PRIVATE_NATIVE_REFERENCE',tests:[{input:'PRIVATE_NATIVE_CASE'}]};
+     const {rows:[problem]}=await db.query(`INSERT INTO school_problems(school_id,bank_id,owner_account_id,draft,request_id)
+      VALUES($1,$2,$3,$4,$5) RETURNING id`,[school.id,bank.id,author.id,definition,randomUUID()]);
+     const {rows:[version]}=await db.query(`INSERT INTO school_problem_versions(school_id,problem_id,draft_revision,definition)
+      VALUES($1,$2,1,$3) RETURNING id`,[school.id,problem.id,definition]);
+     await db.query('UPDATE school_problems SET published=true,published_version_id=$3 WHERE school_id=$1 AND id=$2',[school.id,problem.id,version.id]);
+     await db.query(`INSERT INTO school_problem_publications(school_id,problem_id,version_id,approved_by)
+      VALUES($1,$2,$3,$4)`,[school.id,problem.id,version.id,author.id]);
+     for(const [user,identityId,verdict,context] of [[learner,identity.id,status,'school'],[other,null,'AC','public']]){
+      await db.query(`INSERT INTO school_judge_jobs(school_id,problem_id,version_id,account_id,identity_id,request_id,request_hash,kind,access_context,payload,state,result)
+       VALUES($1,$2,$3,$4,$5,$6,'fixture','submit',$7,'{"code":"PRIVATE_NATIVE_CODE"}','completed',$8)`,
+      [school.id,problem.id,version.id,user.id,identityId,randomUUID(),context,{status:verdict,score:verdict==='AC'?100:0}]);
+     }
+     native.push({id:problem.id,schoolId:school.id,status});
+     await db.query('COMMIT');
+    }catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
+   }
+   for(const status of ['AC','WA']){
+    const request=await call(`page=1&q=NativeFilter&status=${status}`);
+    assert.deepEqual(request.body.items.map(item=>[item.id,item.schoolId,item.status]),native.filter(item=>item.status===status).map(item=>[item.id,item.schoolId,item.status]));
+    assert(request.body.topics.includes('Native alpha')&&request.body.topics.includes('Native beta'));
+    assertReadOnly(request);
+   }
+   const foreign=await call('page=1&q=NativeFilter&status=AC',other);
+   assert.deepEqual(new Set(foreign.body.items.map(item=>item.id)),new Set(native.map(item=>item.id)));
+   assertReadOnly(foreign);
+   assert.equal((await runtime.query('SELECT count(*)::int n FROM school_judge_jobs')).rows[0].n,0,'request-local school scopes must not survive the transaction');
   });
   t.diagnostic(JSON.stringify({visibleProblems:53,pageSize:first.body.items.length,queries:first.trace.length,dbBytes:first.trace.reduce((sum,row)=>sum+row.bytes,0),responseBytes:Buffer.byteLength(JSON.stringify(first.body)),ms:first.ms}));
  } finally {

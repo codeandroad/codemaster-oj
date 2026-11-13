@@ -179,20 +179,29 @@ async function publicCatalogRows(db,publications,lockedSchools) {
   // requests. School scopes stay sequential on this transaction's connection.
   const current=schoolId===LEGACY_SCHOOL_ID?await legacyPublicProblemCatalogRows(db,ids)
    :(await db.query(`SELECT p.id,p.school_id AS "schoolId",p.bank_id AS "bankId",b.name AS "bankName",
-    v.definition->>'title' title,p.revision,p.published,v.id AS "versionId",v.draft_revision<>p.revision AS "hasDraftChanges"
+    v.definition->>'title' title,v.definition->'tags' tags,v.definition->>'mode' mode,
+    p.revision,p.published,v.id AS "versionId",v.draft_revision<>p.revision AS "hasDraftChanges"
     FROM school_problem_publications publication
     JOIN school_problems p ON p.school_id=publication.school_id AND p.id=publication.problem_id
     JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id
     JOIN school_problem_versions v ON v.school_id=p.school_id AND v.problem_id=p.id AND v.id=p.published_version_id
     WHERE publication.school_id=$1 AND publication.problem_id=ANY($2::uuid[]) AND publication.withdrawn_at IS NULL
      AND p.published AND NOT b.archived AND b.resource_kind='ordinary'`,[schoolId,ids])).rows;
-  for(const row of current)output.set(row.id,row);
+  for(const row of current)output.set(row.id,{...row,
+   tags:Array.isArray(row.tags)?row.tags.filter(tag=>typeof tag==='string'&&tag.trim()):[],
+   mode:row.mode==='function'?'function':'stdio'});
  }
  return output;
 }
 
 export async function listPublicProblems(pool,user,url){
  const { courseId, includeCourses } = problemCatalogCourseRequest(url);
+ const filters={
+  topic:field(url?.searchParams?.get('topic')??'','Topic',{min:0,max:200}),
+  status:enumValue(url?.searchParams?.get('status')??'',['','Not started','AC','WA','CE','RE','TLE','MLE','OLE','Waiting','Judging','Executed','System Error'],'Status'),
+  mode:enumValue(url?.searchParams?.get('mode')??'',['','stdio','function'],'Mode'),
+  savedOnly:url?.searchParams?.get('savedOnly')==='1',
+ };
  const query=(url?.searchParams?.get('q')??'').slice(0,100).trim();
  const catalogQuery=query.toLowerCase();
  const rawPage=url?.searchParams?.get('page');
@@ -205,9 +214,16 @@ export async function listPublicProblems(pool,user,url){
   const courseFilter = includeCourses ? await publicProblemCatalogCourses(db, user, courseId) : null;
   const versions = courseId ? courseFilter.versions : null;
   const problemIds = versions ? [...versions.keys()] : null;
-  const items=[],lockedSchools=new Set();
+  const favorites=filters.savedOnly?new Set((await db.query('SELECT problem_id FROM problem_favorites WHERE identity_id=$1',[user.identityId])).rows.map(row=>row.problem_id)):null;
+  const items=[],lockedSchools=new Set(),topics=new Set(),progress=new Map();
+  const loadProgress=async rows=>{
+   for(const [schoolId,schoolRows] of rowsBySchool(rows)){
+    await scope(db,schoolId);
+    for(const [id,state] of await problemProgress(db,user,schoolRows.map(row=>row.id)))progress.set(id,state);
+   }
+  };
   let cursor=null;
-  while(items.length<=limit){
+  while(true){
    // Filter after rechecking the current published version and its scope.
    // Seek across publication batches so search also reaches older releases.
    const {rows}=await db.query(`SELECT problem_id,school_id,version_id,approved_at::text AS approved_at
@@ -216,10 +232,23 @@ export async function listPublicProblems(pool,user,url){
     ) AND ($3::uuid[] IS NULL OR problem_id=ANY($3))
     ORDER BY approved_at DESC,problem_id LIMIT 100`,[cursor?.approved_at??null,cursor?.problem_id??null, problemIds]);
    const current=await publicCatalogRows(db,rows,lockedSchools);
+   const candidates=[];
    for(const row of rows){
      const item=current.get(row.problem_id);
      if(!item||versions&&!versions.get(item.id)?.has(item.versionId))continue;
+     // Topic choices describe the entire accessible course/catalogue, even
+     // when another filter or the current page contains no matching problems.
+     for(const tag of item.tags)topics.add(tag);
+     if(items.length>limit)continue;
      if(catalogQuery&&!`${item.id} ${item.title} ${item.bankName}`.toLowerCase().includes(catalogQuery))continue;
+     if(filters.topic&&!item.tags.includes(filters.topic)||filters.mode&&item.mode!==filters.mode||favorites&&!favorites.has(item.id))continue;
+     candidates.push(item);
+   }
+   // Only status filters need progress before pagination. The default route
+   // still aggregates achievements for the displayed page alone.
+   if(filters.status)await loadProgress(candidates);
+   for(const item of candidates){
+     if(filters.status&&(progress.get(item.id)?.status??'Not started')!==filters.status)continue;
      if(skip>0) skip--;
      else items.push(item);
      if(items.length>limit) break;
@@ -227,16 +256,15 @@ export async function listPublicProblems(pool,user,url){
    if(rows.length<100) break;
    cursor=rows.at(-1);
   }
-  const visible=items.slice(0,limit),progress=new Map();
-  for(const [schoolId,rows] of rowsBySchool(visible)){
-   await scope(db,schoolId);
-   for(const [id,state] of await problemProgress(db,user,rows.map(row=>row.id)))progress.set(id,state);
-  }
+  const visible=items.slice(0,limit);
+  if(!filters.status)await loadProgress(visible);
   return {
    items:visible.map(item=>({attempts:progress.get(item.id)?.formalCount??0,solved:progress.get(item.id)?.solved===true,
+    status:progress.get(item.id)?.status??'Not started',tags:item.tags,mode:item.mode,
     hasDraftChanges:item.hasDraftChanges,id:item.id,schoolId:item.schoolId,bankId:item.bankId,bankName:item.bankName,
     title:item.title,revision:item.revision,published:item.published,versionId:item.versionId,
     canManage:false,canManageTutorial:false,validation:null})),
+   topics:[...topics].sort((a,b)=>a.localeCompare(b)),filters,
    ...(courseFilter && { courseId, courses: courseFilter.courses }),
    ...(page != null && { page, query, hasMore: items.length > limit }),
   };

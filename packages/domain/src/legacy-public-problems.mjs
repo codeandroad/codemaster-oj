@@ -98,7 +98,7 @@ export async function legacyPublicProblemCatalogRows(db,problemIds) {
  return (await db.query(`SELECT p.id,$1::uuid AS "schoolId",
   COALESCE(projected.bank_id,$3::uuid) AS "bankId",b.name AS "bankName",
   COALESCE(snapshot.definition->>'title',v.title) title,COALESCE(projected.revision,1) revision,
-  true published,v.id AS "versionId",
+  true published,v.id AS "versionId",v.tags,v.mode,
   COALESCE(snapshot.draft_revision,(SELECT COALESCE(max(history.draft_revision),0)+1
    FROM school_problem_versions history WHERE history.school_id=$1 AND history.problem_id=p.id))
    <>COALESCE(projected.revision,1) AS "hasDraftChanges"

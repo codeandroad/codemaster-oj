@@ -133,7 +133,7 @@ export function LearnerProblemTable({ rows, onOpen, empty }: {
       <colgroup><col style={{ width: "15%" }} /><col style={{ width: "12%" }} /><col style={{ width: "35%" }} /><col style={{ width: "19%" }} /><col style={{ width: "11%" }} /><col style={{ width: "8%" }} /></colgroup>
       <thead><tr>{[tx("完成状态", "Your status"), "ID", tx("题目", "Title"), tx("题库", "Bank"), tx("我的提交", "My submissions"), tx("操作", "Action")].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
       <tbody>{rows.map(problem => <tr key={problem.id}>
-        <td><StatusPill status={problem.solved ? "AC" : (problem.attempts ?? 0) > 0 ? tx("已尝试", "Attempted") : tx("未开始", "Not started")} /></td>
+        <td><StatusPill status={problem.solved ? "AC" : problem.status ?? ((problem.attempts ?? 0) > 0 ? tx("已尝试", "Attempted") : tx("未开始", "Not started"))} /></td>
         <td className="font-mono text-xs font-semibold" title={problem.id}>{problem.id.slice(0, 8)}</td>
         <td><button type="button" className={`${problemStyles.title} max-w-full text-left font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary`} title={problem.title} onClick={() => onOpen(problem.id)}>{problem.title}</button></td>
         <td title={problem.bankName}><span className={`${problemStyles.truncate} text-muted-foreground`}>{problem.bankName}</span></td>

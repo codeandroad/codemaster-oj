@@ -38,7 +38,7 @@ test('school and public practice Nest transport requires scoped membership, CSRF
   const visible=await request(`${prefix}/problems/${problem.id}`,{auth:auth.student});assert.ok(!JSON.stringify(visible.data).includes('[937]'));assert.equal(visible.data.definition.tests,undefined);assert.equal(visible.data.definition.referenceCode,undefined);assert.match(visible.headers.get('cache-control')??'',/no-store/);
   await request('/practice/problems?page=1&q=Double',{status:401});
   assert.deepEqual((await request('/practice/problems?page=1&q=Double',{auth:auth.personal})).data,
-   {items:[],page:1,query:'Double',hasMore:false});
+   {items:[],topics:[],filters:{topic:'',status:'',mode:'',savedOnly:false},page:1,query:'Double',hasMore:false});
   const requestPath = `${prefix}/problems/${problem.id}/public-request`;
   const exactVersion = { versionId: published.versionId };
   await request(requestPath,{auth:auth.teacher,method:'POST',body:exactVersion,status:403});
@@ -53,6 +53,20 @@ test('school and public practice Nest transport requires scoped membership, CSRF
   await request(requestPath,{auth:auth.admin,method:'POST',body:exactVersion});
   await request('/platform/problem-publications',{auth:auth.platform,method:'POST',body:{schoolId:school.id,problemId:problem.id,versionId:published.versionId}});
   assert.equal((await request('/practice/problems',{auth:auth.personal})).data.items.length,1);
+  await t.test('personal accounts can filter native public problems without legacy school membership',async()=>{
+   const filtered=(await request('/practice/problems?page=1&status=Not%20started&mode=function',{auth:auth.personal})).data;
+   assert.deepEqual(filtered.items.map(item=>item.id),[problem.id]);
+   assert.deepEqual(filtered.filters,{topic:'',status:'Not started',mode:'function',savedOnly:false});
+   assert.deepEqual(filtered.topics,[]);
+   assert.deepEqual(filtered.items[0].tags,[]);
+   assert.equal(filtered.items[0].mode,'function');
+   assert.equal(filtered.items[0].status,'Not started');
+   for(const query of ['mode=stdio','status=AC','topic=Unpublished','savedOnly=1']){
+    assert.deepEqual((await request('/practice/problems?page=1&'+query,{auth:auth.personal})).data.items,[]);
+   }
+   await request('/practice/problems?status=unknown',{auth:auth.personal,status:400});
+   await request('/practice/problems?mode=script',{auth:auth.personal,status:400});
+  });
   for(const query of ['  dOuBLE  ', 'PYTHON', problem.id.slice(0,8)]){
    const match=(await request(`/practice/problems?${new URLSearchParams({q:query,page:'1'})}`,{auth:auth.personal})).data;
    assert.deepEqual(match.items.map(item=>item.id),[problem.id]);
@@ -63,6 +77,8 @@ test('school and public practice Nest transport requires scoped membership, CSRF
   }
   await request('/practice/problems?page=0',{auth:auth.personal,status:400});
   const publicRun = (await request(`/practice/problems/${problem.id}/submissions`,{auth:auth.personal,method:'POST',body:{kind:'submit',code:'def solve(data):\n return data*2',requestId:randomUUID()},status:202})).data;
+  assert.deepEqual((await request('/practice/problems?page=1&status=Waiting',{auth:auth.personal})).data.items.map(item=>item.id),[problem.id]);
+  assert.deepEqual((await request('/practice/problems?page=1&status=Waiting',{auth:auth.student})).data.items,[]);
   // Submission navigation is scoped to this account and school; it never returns worker payloads.
   await request(`${prefix}/submissions`,{status:401});
   await request(`${prefix}/submissions`,{auth:auth.personal,status:404});
@@ -94,6 +110,8 @@ test('school and public practice Nest transport requires scoped membership, CSRF
   for(const [viewer,attempts] of [['personal',1],['student',1]]){
    const {items:[row]}=(await request('/practice/problems?page=1&q=Double',{auth:auth[viewer]})).data;
    assert.equal(row.attempts,attempts);assert.equal(row.solved,false);
+   assert.equal(row.status,'WA');
+   assert.deepEqual((await request('/practice/problems?page=1&status=WA&mode=function',{auth:auth[viewer]})).data.items.map(item=>item.id),[problem.id]);
   }
   const publicDetail = `/practice/submissions/${school.id}/${publicRun.id}`;
   await request('/practice/submissions',{status:401});
@@ -265,7 +283,8 @@ test('school and public practice Nest transport requires scoped membership, CSRF
    await seed.query('BEGIN');
    await seed.query("SELECT set_config('campus.school_id',$1,true)",[school.id]);
    const {rows}=await seed.query(`INSERT INTO school_problems(school_id,bank_id,owner_account_id,draft,request_id)
-    SELECT $1,$2,$3,jsonb_build_object('title', CASE WHEN n=1 THEN 'Old unique result' ELSE 'Batch public title' END),gen_random_uuid()
+    SELECT $1,$2,$3,jsonb_build_object('title', CASE WHEN n=1 THEN 'Old unique result' ELSE 'Batch public title' END,
+     'mode',CASE WHEN n=1 THEN 'function' ELSE 'stdio' END,'tags',jsonb_build_array(CASE WHEN n=1 THEN 'Tail topic' ELSE 'Batch topic' END)),gen_random_uuid()
     FROM generate_series(1,101) n RETURNING id,draft`,[school.id,bank.id,users.teacher.id]);
    for(const {id,draft} of rows){
     const {rows:[version]}=await seed.query(`INSERT INTO school_problem_versions(school_id,problem_id,draft_revision,definition)
@@ -287,6 +306,18 @@ test('school and public practice Nest transport requires scoped membership, CSRF
   assert.equal(third.items.length,1);assert.equal(third.hasMore,false);
   assert.equal(third.items[0].title,'Old unique result');
   assert.deepEqual(olderSearch.items,third.items);assert.equal(olderSearch.hasMore,false);
+  await t.test('native topic and status filters paginate all accessible rows and keep complete topic options',async()=>{
+   const topics=['Batch topic','Tail topic'];
+   assert.deepEqual(first.topics,topics);assert.deepEqual(second.topics,topics);assert.deepEqual(third.topics,topics);
+   const tail=(await request('/practice/problems?page=1&topic=Tail%20topic&mode=function&status=Not%20started',{auth:auth.personal})).data;
+   assert.deepEqual(tail.items,third.items);assert.equal(tail.hasMore,false);assert.deepEqual(tail.topics,topics);
+   const secondUnstarted=(await request('/practice/problems?page=2&status=Not%20started',{auth:auth.personal})).data;
+   assert.deepEqual(secondUnstarted.items,second.items);assert.equal(secondUnstarted.hasMore,true);
+   const saved=(await request('/practice/problems?page=1&savedOnly=1',{auth:auth.personal})).data;
+   assert.deepEqual(saved.items,[]);assert.equal(saved.hasMore,false);assert.deepEqual(saved.topics,topics);
+   const impossible=(await request('/practice/problems?page=1&topic=Tail%20topic&mode=stdio',{auth:auth.personal})).data;
+   assert.deepEqual(impossible.items,[]);assert.deepEqual(impossible.topics,topics);
+  });
   assert.equal((await pool.query('SELECT count(*)::int n FROM submissions')).rows[0].n,0);
   assert.deepEqual((await pool.query(`SELECT a.username,l.kind,l.delta FROM luq_ledger l
    JOIN accounts a ON a.identity_id=l.identity_id ORDER BY a.username`)).rows,[],

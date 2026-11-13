@@ -11,6 +11,7 @@ import { MathContent } from "@/components/math-content";
 import { ApiError, apiMessage, productionApi, type CampusUser, type SubmissionLanguage } from "@/lib/production-api";
 import problemStyles from "@/components/student/problems-page.module.css";
 import { ProblemCatalogSearch } from "@/components/student/problem-catalog-search";
+import { StudentProblemFilter } from "@/components/student/problem-filter";
 import { ProblemCatalogCourseFilter, problemCourseFilterKey, publicProblemCourseFilterKey, type ProblemCatalogResult } from "@/components/student/problem-catalog-course-filter";
 import { CodeEditor } from "@/components/student/code-editor";
 import { CopyCodeButton } from "@/components/student/copy-code-button";
@@ -425,7 +426,14 @@ function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation
 
 }
 
-const publicCatalogKeys = ["publicProblemQuery", publicProblemCourseFilterKey, "publicProblemPage"];
+const publicFilterKeys = {
+  topic: "publicProblemTopic", status: "publicProblemStatus", mode: "publicProblemMode", savedOnly: "publicProblemSavedOnly",
+};
+const publicCatalogKeys = ["publicProblemQuery", publicProblemCourseFilterKey, "publicProblemPage", ...Object.values(publicFilterKeys)];
+type PublicProblemCatalog = ProblemCatalogResult<Problem> & {
+  page: number; query: string; hasMore: boolean; topics: string[];
+  filters: { topic: string; status: string; mode: string; savedOnly: boolean };
+};
 
 export function PublicPractice(props: { accountId: string; problemId?: string }) {
   return <PublicPracticeContents key={props.problemId ?? "list"} {...props} />;
@@ -441,6 +449,10 @@ function PublicPracticeContents({ accountId, problemId }: { accountId: string; p
   const selected = search.get("problemId") ?? problemId ?? null;
   const urlQuery = (search.get("publicProblemQuery") ?? "").slice(0, 100);
   const courseId = search.get(publicProblemCourseFilterKey)?.toLowerCase() ?? "";
+  const topic = (search.get(publicFilterKeys.topic) ?? "").trim();
+  const status = search.get(publicFilterKeys.status) ?? "";
+  const mode = search.get(publicFilterKeys.mode) ?? "";
+  const savedOnly = search.get(publicFilterKeys.savedOnly) === "1";
   const rawPage = Number(search.get("publicProblemPage") ?? 1);
   const page = Number.isInteger(rawPage) && rawPage >= 1 && rawPage <= 100000 ? rawPage : 1;
   const [draft, setDraft] = useState<string | null>(null);
@@ -483,16 +495,25 @@ function PublicPracticeContents({ accountId, problemId }: { accountId: string; p
     }, 180);
   }
 
-  const list = useData<ProblemCatalogResult<Problem> & { page: number; query: string; hasMore: boolean }>(
-    ready ? `practice/problems?${new URLSearchParams({ q: urlQuery.trim(), page: String(page), includeCourseFilters: "1", ...(courseId && { courseId }) })}` : "",
+  const list = useData<PublicProblemCatalog>(
+    ready ? `practice/problems?${new URLSearchParams({
+      q: urlQuery.trim(), page: String(page), includeCourseFilters: "1", ...(courseId && { courseId }),
+      ...(topic && { topic }), ...(status && { status }), ...(mode && { mode }), ...(savedOnly && { savedOnly: "1" }),
+    })}` : "",
   );
-  const matchesFilters = list.data?.query === query.trim() && list.data?.page === page && (list.data?.courseId ?? "") === courseId;
+  const matchesFilters = list.data?.query === query.trim() && list.data?.page === page && (list.data?.courseId ?? "") === courseId
+    && list.data?.filters?.topic === topic && list.data?.filters?.status === status
+    && list.data?.filters?.mode === mode && list.data?.filters?.savedOnly === savedOnly;
   const rows = matchesFilters ? list.data?.items ?? [] : [];
   const pending = !list.error && (!ready || list.loading || !matchesFilters);
   const selectProblem = (id: string | null) => changeUrlFilters({ problemId: id, publicProblemQuery: query }, true);
   function changeCourse(value: string) {
     clearTimeout(timer.current);
     changeUrlFilters({ [publicProblemCourseFilterKey]: value, publicProblemQuery: query, publicProblemPage: null });
+  }
+  function changeFilter(key: keyof typeof publicFilterKeys, value: string) {
+    clearTimeout(timer.current);
+    changeUrlFilters({ [publicFilterKeys[key]]: value, publicProblemQuery: query, publicProblemPage: null });
   }
   const changePage = (next: number) => changeUrlFilters({ publicProblemPage: next === 1 ? null : String(next) }, true);
   if (selected) return <PublicProblemWorkspace key={`${selected}:${search.get("versionId") ?? ""}`} id={selected} catalog={{ ...list, data: pending ? null : { items: rows }, loading: pending }} />;
@@ -504,13 +525,13 @@ function PublicPracticeContents({ accountId, problemId }: { accountId: string; p
         onCompositionStart={() => { composing.current = true; clearTimeout(timer.current); }}
         onCompositionEnd={value => { composing.current = false; changeQuery(value); }} />
       <ProblemCatalogCourseFilter courses={list.data?.courses} value={courseId} onChange={changeCourse}/>
-      <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={list.reload} aria-label={tx("刷新题目", "Refresh problems")}>
-        <RefreshCw size={15} aria-hidden="true"/>
-      </Button>
+      <StudentProblemFilter topics={list.data?.topics ?? []} topic={topic} status={status} mode={mode} savedOnly={savedOnly}
+        onTopic={value => changeFilter("topic", value)} onStatus={value => changeFilter("status", value)}
+        onMode={value => changeFilter("mode", value)} onSaved={value => changeFilter("savedOnly", value ? "1" : "")}/>
     </div>
     <State data={{ ...list, loading: pending, data: pending ? null : list.data }}>
-      <LearnerProblemTable rows={rows} onOpen={selectProblem} empty={query.trim() || courseId
-        ? tx("没有匹配的题目，请调整搜索或课程筛选。", "No matching problems. Try another search or course.")
+      <LearnerProblemTable rows={rows} onOpen={selectProblem} empty={query.trim() || courseId || topic || status || mode || savedOnly
+        ? tx("没有匹配的题目，请调整搜索或筛选条件。", "No matching problems. Try another search or filter.")
         : tx("暂时没有可显示的公开题目。", "There are no public problems to show.")} />
       {(page > 1 || list.data?.hasMore) && <nav className="flex flex-wrap items-center justify-end gap-2" aria-label={tx("题目分页", "Problem pages")}>
         <Button size="sm" variant="secondary" disabled={page === 1} onClick={() => changePage(page - 1)}>{tx("上一页", "Previous")}</Button>

@@ -247,7 +247,7 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
     COALESCE(i.name,'系统') owner_name,
     (SELECT count(*)::int FROM problems p WHERE p.bank_id=b.id AND p.archived_at IS NULL) problem_count,
     (SELECT count(*)::int FROM problems p WHERE p.bank_id=b.id AND p.archived_at IS NOT NULL) archived_problem_count,
-    (SELECT count(*)::int FROM problems p JOIN problem_versions v ON v.problem_id=p.id
+    (SELECT count(DISTINCT p.id)::int FROM problems p JOIN problem_versions v ON v.problem_id=p.id
      WHERE p.bank_id=b.id AND p.archived_at IS NULL AND v.school_visible_at IS NOT NULL) public_version_count
    FROM problem_banks b LEFT JOIN accounts a ON a.id=b.owner_account_id
    LEFT JOIN identities i ON i.id=a.identity_id
@@ -278,24 +278,26 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
    )`:''}`;
   const total=(await pool.query(`SELECT count(*)::int count FROM problems p WHERE ${where}`,params)).rows[0].count;
   const groups=(await pool.query('SELECT id,name FROM problem_groups WHERE bank_id=$1 AND archived_at IS NULL ORDER BY created_at,id',[bankId])).rows;
-  const rows=(await pool.query(`SELECT p.id,p.archived_at,p.created_at,COALESCE(i.name,'管理员') owner_name,
-    v.id version_id,v.title,v.published_at,v.validation_status,v.rank_review_status,v.school_visible_at,
-    (SELECT count(*)::int FROM problem_versions pv WHERE pv.problem_id=p.id AND pv.school_visible_at IS NOT NULL) public_version_count,
+  const rows=(await pool.query(`SELECT p.id,p.owner_scope,p.archived_at,p.created_at,COALESCE(i.name,'管理员') owner_name,
+    v.id version_id,v.title,v.published_at,v.validation_status,v.rank_review_status,v.school_visible_at,v.course_only_published,
+    d.draft_review_status,
     (SELECT count(*)::int FROM submissions s WHERE s.problem_id=p.id) submission_count,
     (SELECT count(*)::int FROM assignment_problems ap WHERE ap.problem_id=p.id) assignment_count,
     (SELECT count(*)::int FROM timed_practice_problems tp WHERE tp.problem_id=p.id) timed_count,
     (SELECT count(*)::int FROM chapter_problems cp WHERE cp.problem_id=p.id) course_count
    FROM problems p LEFT JOIN accounts a ON a.id=p.owner_account_id LEFT JOIN identities i ON i.id=a.identity_id
-   LEFT JOIN LATERAL (SELECT v.id,v.title,v.published_at,v.validation_status,v.rank_review_status,v.school_visible_at
+   LEFT JOIN LATERAL (SELECT v.id,v.title,v.published_at,v.validation_status,v.rank_review_status,v.school_visible_at,v.course_only_published
     FROM problem_versions v WHERE v.problem_id=p.id
-    ORDER BY (v.id=p.current_version_id) DESC,v.created_at DESC,v.id DESC LIMIT 1) v ON true
+    ORDER BY (v.id=p.current_version_id) DESC NULLS LAST,v.created_at DESC,v.id DESC LIMIT 1) v ON true
+   LEFT JOIN LATERAL (SELECT pv.draft_review_status FROM problem_versions pv WHERE pv.problem_id=p.id
+    ORDER BY pv.created_at DESC,pv.id DESC LIMIT 1) d ON p.owner_scope='platform'
    WHERE ${where}
    ORDER BY p.archived_at NULLS FIRST,p.created_at DESC,p.id DESC LIMIT 100 OFFSET $${params.length+1}`,
    [...params,(page-1)*100])).rows;
   return result({bank:{id:bank.id,name:bank.name,archivedAt:bank.archived_at},groups,page,pageSize:100,total,
-   items:rows.map(p=>({id:p.id,title:p.title??'未命名题目',versionId:p.version_id,ownerName:p.owner_name,
+   items:rows.map(p=>({id:p.id,ownerScope:p.owner_scope,title:p.title??'未命名题目',versionId:p.version_id,ownerName:p.owner_name,
     archivedAt:p.archived_at,createdAt:p.created_at,publishedAt:p.published_at,validationStatus:p.validation_status,
-    rankReviewStatus:p.rank_review_status,schoolVisibleAt:p.school_visible_at,publicVersionCount:p.public_version_count,
+    rankReviewStatus:p.rank_review_status,schoolVisibleAt:p.school_visible_at,courseOnlyPublished:p.course_only_published,draftReviewStatus:p.draft_review_status,
     submissionCount:p.submission_count,assignmentCount:p.assignment_count,timedCount:p.timed_count,courseCount:p.course_count}))});
  }
  adminBankMatch=route.match(/^\/admin\/problem-banks\/([^/]+)$/);
@@ -329,16 +331,16 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
  if(adminProblemMatch&&method==='GET'){
   if(!isAdmin(user))fail(403,'FORBIDDEN','仅管理员可查看题目档案');
   const problemId=uuid(adminProblemMatch[1],'题目 ID');
-  const p=required(await pool.query(`SELECT p.id,p.archived_at,p.current_version_id,b.id bank_id,b.name bank_name,b.visibility bank_visibility,
+  const p=required(await pool.query(`SELECT p.id,p.owner_scope,p.archived_at,p.current_version_id,b.id bank_id,b.name bank_name,b.visibility bank_visibility,
    COALESCE(i.name,'管理员') owner_name FROM problems p JOIN problem_banks b ON b.id=p.bank_id
    LEFT JOIN accounts a ON a.id=p.owner_account_id LEFT JOIN identities i ON i.id=a.identity_id WHERE p.id=$1`,[problemId]));
   const versions=(await pool.query(`SELECT id,title,statement,source,validation_status,published_at,school_visible_at,
-   rank_review_status,created_at FROM problem_versions WHERE problem_id=$1 ORDER BY created_at DESC,id DESC`,[problemId])).rows;
-  return result({id:p.id,bankId:p.bank_id,bankName:p.bank_name,bankVisibility:p.bank_visibility,ownerName:p.owner_name,
+   rank_review_status,course_only_published,draft_review_status,created_at FROM problem_versions WHERE problem_id=$1 ORDER BY created_at DESC,id DESC`,[problemId])).rows;
+  return result({id:p.id,ownerScope:p.owner_scope,bankId:p.bank_id,bankName:p.bank_name,bankVisibility:p.bank_visibility,ownerName:p.owner_name,
    archivedAt:p.archived_at,currentVersionId:p.current_version_id,
    versions:versions.map(v=>({id:v.id,title:v.title,statement:legacyProblemStatement(v),
     validationStatus:v.validation_status,publishedAt:v.published_at,schoolVisibleAt:v.school_visible_at,
-    rankReviewStatus:v.rank_review_status,createdAt:v.created_at}))});
+    rankReviewStatus:v.rank_review_status,courseOnlyPublished:v.course_only_published,draftReviewStatus:v.draft_review_status,createdAt:v.created_at}))});
  }
  if(adminProblemMatch&&method==='PATCH'){
   if(!isAdmin(user))fail(403,'FORBIDDEN','仅管理员可归档题目');
@@ -542,7 +544,7 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
    // only the school-visible live publication from an unarchived bank.
    const administrator=await isPlatformAdministrator(pool,user.id);
    const platformMembers=(await pool.query(`WITH editable AS MATERIALIZED (
-    SELECT p.id,p.bank_id,p.current_version_id,b.archived_at bank_archived_at,
+    SELECT p.id,p.bank_id,p.owner_scope,p.current_version_id,b.archived_at bank_archived_at,
      ($2::boolean OR ${platformContentEditorSql('problem','p.id','$3::uuid')}) can_edit
     FROM problems p JOIN problem_banks b ON b.id=p.bank_id
     WHERE p.id=ANY($1::uuid[]) AND p.owner_scope='platform' AND p.archived_at IS NULL

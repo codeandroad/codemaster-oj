@@ -2,8 +2,14 @@
 -- Run as the migration role while API and workers are stopped. Approve
 -- reviewed drafts first; this script deliberately refuses to choose for you.
 -- Set expected_database to the intended database and apply=1 to commit.
+-- An optional comma-separated problem_ids limits the repair to selected legacy problems.
+\if :{?problem_ids}
+\else
+\set problem_ids ''
+\endif
 BEGIN;
 SELECT set_config('campus.consolidation_expected_db', :'expected_database', true);
+SELECT nullif(:'problem_ids','') IS NULL AS consolidate_all \gset
 DO $$ BEGIN
  IF current_database() <> current_setting('campus.consolidation_expected_db',true) THEN RAISE EXCEPTION 'Wrong database for consolidation'; END IF;
  IF NOT EXISTS (SELECT 1 FROM schema_migrations WHERE name='115_acsl_stable_problem.sql') THEN
@@ -19,11 +25,14 @@ CREATE TEMP TABLE legacy_keep ON COMMIT DROP AS
 SELECT p.id problem_id, COALESCE(
  (SELECT v.id FROM problem_versions v JOIN problem_banks b ON b.id=p.bank_id
    WHERE v.problem_id=p.id AND v.published_at IS NOT NULL
-   ORDER BY (b.visibility='school' AND v.school_visible_at IS NOT NULL AND v.rank_review_status='approved') DESC,
+   ORDER BY (p.owner_scope='platform' AND v.id=p.current_version_id
+    AND v.rank_review_status='approved' AND v.school_visible_at IS NOT NULL) DESC NULLS LAST,
+    (b.visibility='school' AND v.school_visible_at IS NOT NULL AND v.rank_review_status='approved') DESC,
     (b.visibility<>'school' AND v.id=p.current_version_id) DESC,
     v.published_at DESC,v.created_at DESC,v.id DESC LIMIT 1),
  (SELECT v.id FROM problem_versions v WHERE v.problem_id=p.id ORDER BY v.created_at DESC,v.id DESC LIMIT 1)
-) keep_id FROM problems p;
+) keep_id FROM problems p
+WHERE nullif(:'problem_ids','') IS NULL OR p.id=ANY(string_to_array(:'problem_ids',',')::uuid[]);
 CREATE TEMP TABLE legacy_move ON COMMIT DROP AS
 SELECT v.problem_id,v.id old_id,k.keep_id FROM problem_versions v JOIN legacy_keep k USING (problem_id)
 WHERE v.id<>k.keep_id;
@@ -54,7 +63,9 @@ SELECT p.school_id,p.id problem_id, COALESCE(
  p.published_version_id,
  (SELECT v.id FROM school_problem_versions v WHERE v.school_id=p.school_id AND v.problem_id=p.id
    ORDER BY v.draft_revision DESC,v.id DESC LIMIT 1)
-) keep_id FROM school_problems p;
+) keep_id FROM school_problems p
+WHERE :'consolidate_all'::boolean OR EXISTS(SELECT 1 FROM legacy_keep k WHERE k.problem_id=p.id)
+ AND p.school_id='00000000-0000-4000-8000-000000000052' AND p.bank_id='00000000-0000-4000-8000-000000000074';
 CREATE TEMP TABLE school_move ON COMMIT DROP AS
 SELECT v.school_id,v.problem_id,v.id old_id,k.keep_id FROM school_problem_versions v JOIN school_keep k USING (school_id,problem_id)
 WHERE v.id<>k.keep_id;
@@ -170,13 +181,13 @@ ALTER TABLE judge_tasks ALTER CONSTRAINT judge_tasks_preview_submission_id_versi
 ALTER TABLE school_judge_jobs ALTER CONSTRAINT school_job_activity_problem_fk DEFERRABLE;
 SET CONSTRAINTS ALL DEFERRED;
 
-UPDATE assignment_problems a SET original_problem_version_id=a.version_id,
- original_prior_problem_version_id=a.prior_version_id, version_id=k.keep_id, prior_version_id=NULL
+UPDATE assignment_problems a SET original_problem_version_id=COALESCE(a.original_problem_version_id,a.version_id),
+ original_prior_problem_version_id=COALESCE(a.original_prior_problem_version_id,a.prior_version_id), version_id=k.keep_id, prior_version_id=NULL
  FROM legacy_keep k WHERE a.problem_id=k.problem_id AND k.keep_id IS NOT NULL
  AND (a.version_id<>k.keep_id OR a.prior_version_id IS NOT NULL);
 UPDATE chapter_problems t SET version_id=m.keep_id FROM legacy_move m WHERE t.version_id=m.old_id;
 UPDATE timed_practice_problems t SET version_id=m.keep_id FROM legacy_move m WHERE t.version_id=m.old_id;
-UPDATE submissions t SET original_problem_version_id=t.version_id,version_id=m.keep_id FROM legacy_move m WHERE t.version_id=m.old_id;
+UPDATE submissions t SET original_problem_version_id=COALESCE(t.original_problem_version_id,t.version_id),version_id=m.keep_id FROM legacy_move m WHERE t.version_id=m.old_id;
 UPDATE judge_tasks t SET version_id=m.keep_id FROM legacy_move m WHERE t.version_id=m.old_id;
 UPDATE judge_runs t SET version_id=m.keep_id FROM legacy_move m WHERE t.version_id=m.old_id;
 UPDATE legacy_assignment_preview_submissions t SET version_id=m.keep_id FROM legacy_move m WHERE t.version_id=m.old_id;
@@ -222,8 +233,10 @@ ALTER TABLE school_rank_ledger ENABLE TRIGGER school_rank_ledger_immutable;
 ALTER TABLE test_cases ENABLE TRIGGER published_tests_immutable;
 ALTER TABLE problem_public_statements ENABLE TRIGGER problem_public_statements_immutable;
 ALTER TABLE school_problem_versions ENABLE TRIGGER acsl_programming_version_immutable;
+\if :consolidate_all
 CREATE UNIQUE INDEX IF NOT EXISTS problem_versions_one_per_problem ON problem_versions(problem_id);
 CREATE UNIQUE INDEX IF NOT EXISTS school_problem_versions_one_per_problem ON school_problem_versions(school_id,problem_id);
+\endif
 
 DO $$ DECLARE changed text; BEGIN
  SELECT string_agg(v.name,', ' ORDER BY v.name) INTO changed FROM verification_set v JOIN protected_state p USING(name)

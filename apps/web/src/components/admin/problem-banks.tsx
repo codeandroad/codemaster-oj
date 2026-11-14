@@ -2,7 +2,7 @@
 
 import { contentAuthoringHref } from "@/components/scholarship/authoring-links";
 import { ProblemTutorialEditor } from "@/components/teacher/problem-tutorial-editor";
-import { ProblemPublicationStatus } from "@/components/problem-publication-status";
+import { ProblemPublicationStatus, type ProblemPublication } from "@/components/problem-publication-status";
 import { BankRenameDialog } from "@/components/bank-rename-dialog";
 import { ProblemGroupFilter } from "@/components/problem-group-filter";
 import { useCatalogFilterPreferences } from "@/components/use-catalog-filter-preferences";
@@ -29,7 +29,7 @@ interface ManagedBank {
   publicVersionCount: number;
 }
 
-interface ManagedProblem {
+interface ManagedProblem extends ProblemPublication {
   id: string;
   title: string;
   versionId: string | null;
@@ -39,7 +39,6 @@ interface ManagedProblem {
   validationStatus: string | null;
   rankReviewStatus: string | null;
   schoolVisibleAt: string | null;
-  publicVersionCount: number;
   submissionCount: number;
   assignmentCount: number;
   timedCount: number;
@@ -48,12 +47,13 @@ interface ManagedProblem {
 
 interface ManagedProblemHistory {
   id: string;
+  ownerScope: "school" | "platform";
   bankName: string;
   bankVisibility?: "school" | "private";
   ownerName: string;
   archivedAt: string | null;
   currentVersionId: string | null;
-  versions: { id: string; title: string; statement: string; validationStatus: string; publishedAt: string | null; schoolVisibleAt: string | null; rankReviewStatus: string; createdAt: string }[];
+  versions: (ProblemPublication & { id: string; title: string; statement: string; validationStatus: string; createdAt: string })[];
 }
 
 type BankAction = { bank: ManagedBank; kind: "archive" | "restore" | "school" | "private" | "delete" };
@@ -155,7 +155,7 @@ export function AdminProblemBanks({ accountId }: { accountId: string }) {
               {!selectedBank.isSystem && <Button size="sm" variant="secondary" disabled={selectedBank.problemCount + selectedBank.archivedProblemCount > 0} title={selectedBank.problemCount + selectedBank.archivedProblemCount > 0 ? tr("题库有题目时请使用归档", "Archive banks that contain problems") : undefined} onClick={() => setBankAction({ bank: selectedBank, kind: "delete" })}><Trash2 size={14} aria-hidden="true" />{tr("删除空题库", "Delete empty bank")}</Button>}
             </div>
           </div>
-          <p className="mt-3 text-xs leading-5 text-muted-foreground">{selectedBank.publicVersionCount ? tr(`该库仍有 ${selectedBank.publicVersionCount} 个公开题目版本；归档前须在题目审核中撤下。`, `${selectedBank.publicVersionCount} versions are still public. Withdraw them in problem review before archiving.`) : tr("归档不会硬删除数据；被已发布课程或未归档训练引用时会阻止归档。", "Archiving preserves data and is blocked while published courses or active practices reference the bank.")}</p>
+          <p className="mt-3 text-xs leading-5 text-muted-foreground">{selectedBank.publicVersionCount ? tr(`该库有 ${selectedBank.publicVersionCount} 道题可供全校练习。`, `${selectedBank.publicVersionCount} problems are available for school-wide practice.`) : tr("归档不会硬删除数据；被已发布课程或未归档训练引用时会阻止归档。", "Archiving preserves data and is blocked while published courses or active practices reference the bank.")}</p>
           {selectedBank.visibility === "school" && <AppLink href="/admin/settings?tab=problem-reviews" className="mt-2 inline-block text-sm font-medium text-primary hover:underline">{tr("前往题目审核", "Open problem review")}</AppLink>}
         </section>
         <ManagedProblemList key={activeId} bank={selectedBank} preferenceKey={`${preferenceKey}:${activeId}`} onChanged={banks.reload} />
@@ -220,14 +220,17 @@ function ManagedProblemList({ bank, preferenceKey, onChanged }: { bank: ManagedB
       </form>
     </div>
     <Feedback action={action} />
-    <Loading resource={{ ...list, loading: !ready || list.pending }}><div className="overflow-x-auto"><table className="w-full min-w-[780px] text-left text-sm">
-      <thead className="bg-surface-subtle text-xs text-muted-foreground"><tr>{[tr("题目", "Problem"), tr("上传教师", "Teacher"), tr("版本状态", "Version"), tr("引用 / 提交", "Links / submissions"), tr("操作", "Actions")].map(label => <th key={label} className="px-4 py-3">{label}</th>)}</tr></thead>
+    <Loading resource={{ ...list, loading: !ready || list.pending }}><div className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-primary" tabIndex={0} role="region" aria-label={tr("题库题目列表", "Problem bank list")}><table className="w-full min-w-[780px] text-left text-sm">
+      <thead className="bg-surface-subtle text-xs text-muted-foreground"><tr>{[tr("题目", "Problem"), tr("上传教师", "Teacher"), tr("发布状态", "Publication status"), tr("引用 / 提交", "Links / submissions"), tr("操作", "Actions")].map(label => <th key={label} scope="col" className="px-4 py-3">{label}</th>)}</tr></thead>
       <tbody>{result?.items.map(problem => <tr key={problem.id} className="border-t border-border">
         <td className="px-4 py-3"><div><button type="button" className="font-semibold text-primary hover:underline focus-visible:underline" onClick={() => setDetailId(problem.id)}>{problem.title}</button></div><span className="text-xs text-muted-foreground">{problem.id.slice(0, 8)}{problem.archivedAt ? ` · ${tr("已归档", "Archived")}` : ""}</span></td>
         <td className="px-4 py-3">{problem.ownerName}</td>
-        <td className="px-4 py-3"><ProblemPublicationStatus problem={problem} bankVisibility={bank.visibility}/><span className="block text-xs text-muted-foreground">{problem.publicVersionCount ? tr(`${problem.publicVersionCount} 个公开版本`, `${problem.publicVersionCount} public versions`) : problem.rankReviewStatus === "pending" && problem.publishedAt ? tr("待审核", "Pending review") : problem.validationStatus ?? "—"}</span></td>
+        <td className="px-4 py-3"><ProblemPublicationStatus problem={problem} bankVisibility={bank.visibility}/>
+          {problem.ownerScope === "platform" && problem.publishedAt && <span className="mt-1 block text-xs text-muted-foreground">{problem.schoolVisibleAt ? tr("全校可练习", "School-wide practice") : problem.courseOnlyPublished ? tr("按课程准入开放", "Available through course access") : tr("按活动分配开放", "Available through assigned activities")}</span>}
+          {problem.ownerScope === "platform" && problem.publishedAt && problem.draftReviewStatus === "pending" && <span className="mt-1 block text-xs text-warning">{tr("修改待平台审核", "Changes awaiting review")}</span>}
+        </td>
         <td className="px-4 py-3 text-xs text-muted-foreground">{tr(`课程 ${problem.courseCount} · 作业 ${problem.assignmentCount} · 训练 ${problem.timedCount} · 提交 ${problem.submissionCount}`, `Courses ${problem.courseCount} · Assignments ${problem.assignmentCount} · Practices ${problem.timedCount} · Submissions ${problem.submissionCount}`)}</td>
-        <td className="px-4 py-3"><Button size="sm" variant="ghost" disabled={Boolean(bank.archivedAt && problem.archivedAt)} onClick={() => setCandidate({ problem, kind: problem.archivedAt ? "restore" : "archive" })}>{problem.archivedAt ? tr("恢复题目", "Restore") : tr("归档题目", "Archive")}</Button></td>
+        <td className="px-4 py-3">{problem.ownerScope === "platform" ? <span className="text-xs text-muted-foreground">{tr("平台维护", "Platform managed")}</span> : <Button size="sm" variant="ghost" disabled={Boolean(bank.archivedAt && problem.archivedAt)} onClick={() => setCandidate({ problem, kind: problem.archivedAt ? "restore" : "archive" })}>{problem.archivedAt ? tr("恢复题目", "Restore") : tr("归档题目", "Archive")}</Button>}</td>
       </tr>)}{result?.items.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">{tr("此题库暂无符合条件的题目。", "No matching problems in this bank.")}</td></tr>}</tbody>
     </table></div></Loading>
     <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3 text-sm"><span className="text-muted-foreground">{result && tr(`第 ${page} / ${pages} 页`, `Page ${page} of ${pages}`)}</span><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={list.pending || page <= 1} onClick={() => changeFilters({ page: page - 1 })}>{tr("上一页", "Previous")}</Button><Button size="sm" variant="secondary" disabled={!result || page >= pages} onClick={() => changeFilters({ page: page + 1 })}>{tr("下一页", "Next")}</Button></div></div>
@@ -248,9 +251,9 @@ function ManagedProblemDetail({ id, bankArchived, onClose }: { id: string; bankA
   return <Drawer title={detail.data?.versions[0]?.title ?? tr("题目详情", "Problem details")} eyebrow={tr("题目档案", "PROBLEM RECORD")} onClose={onClose} wide>
     <Loading resource={detail}>{detail.data && <div className="space-y-4 text-sm">
       <p className="text-muted-foreground">{detail.data.bankName} · {detail.data.ownerName}</p>
-      {!bankArchived && !detail.data.archivedAt && <ProblemTutorialEditor endpoint={`problems/${encodeURIComponent(id)}/tutorial`}/>}
+      {detail.data.ownerScope !== "platform" && !bankArchived && !detail.data.archivedAt && <ProblemTutorialEditor endpoint={`problems/${encodeURIComponent(id)}/tutorial`}/>}
       {detail.data.versions.map(version => <section key={version.id} className="rounded-md border border-border p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{version.title}{version.id === detail.data?.currentVersionId ? ` · ${tr("当前版本", "Current version")}` : ""}</h3><ProblemPublicationStatus problem={version} bankVisibility={detail.data?.bankVisibility}/></div>
+        <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{version.title}{version.id === detail.data?.currentVersionId ? ` · ${tr("当前版本", "Current version")}` : ""}</h3><ProblemPublicationStatus problem={{ ...version, ownerScope: detail.data?.ownerScope }} bankVisibility={detail.data?.bankVisibility}/></div>
         <p className="mt-2 whitespace-pre-wrap leading-6">{version.statement || tr("暂无题面", "No statement")}</p>
         <p className="mt-2 text-xs text-muted-foreground">{tr("验证", "Validation")}: {version.validationStatus} · {tr("校内公开", "School-wide")}: {version.schoolVisibleAt ? tr("是", "Yes") : tr("否", "No")}</p>
         {!bankArchived && !detail.data?.archivedAt && <AppLink className={buttonVariants({ size: "sm", variant: "secondary", className: "mt-3" })}

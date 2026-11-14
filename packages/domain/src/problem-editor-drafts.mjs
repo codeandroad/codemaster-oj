@@ -46,14 +46,16 @@ export async function saveProblemDraft(db, user, version, input, expectedRevisio
  await audit(db,user.id,'problem.draft_save','problem_version',version.id,{revision:saved.edit_revision});
 }
 
-export async function prepareDraftPublication(db, version) {
+export async function prepareDraftPublication(db, version, { previousVersionId = version.id } = {}) {
  if ((await draftValidation(db,version)).status !== 'AC') fail(409,'NOT_VALIDATED','参考解答须通过全部测试后才能发布');
  if (version.draft_presentation) return;
- const { rows: [current] } = await db.query('SELECT * FROM problem_public_statements WHERE version_id=$1', [version.id]);
+ const { rows: [current] } = await db.query(`SELECT presentation.*,published.statement source_statement,published.metadata source_metadata
+  FROM problem_versions published JOIN problem_public_statements presentation ON presentation.version_id=published.id
+  WHERE published.id=$1 AND published.problem_id=$2`, [previousVersionId,version.problem_id]);
  if (!current) return;
  const source = {...version,...version.edit_draft};
- const equivalentStatement = source.statement === version.statement || source.statement.trim() === current.statement.trim();
- if (!equivalentStatement || !isDeepStrictEqual(publicProblemMetadata(source.metadata,{complete:true}),publicProblemMetadata(version.metadata,{complete:true})))
+ const equivalentStatement = source.statement === current.source_statement || source.statement.trim() === current.statement.trim();
+ if (!equivalentStatement || !isDeepStrictEqual(publicProblemMetadata(source.metadata,{complete:true}),publicProblemMetadata(current.source_metadata,{complete:true})))
   fail(409,'PRESENTATION_REVIEW_REQUIRED','题面已修改，请先审核本次草稿的公开英文题面');
  const sourceHash=publicStatementSourceHash(source);
  const contentHash=canonicalHash({versionId:version.id,language:current.language,statement:current.statement,metadata:current.metadata,sourceHash});
@@ -62,9 +64,9 @@ export async function prepareDraftPublication(db, version) {
  })]);
 }
 
-export async function publishProblemDraft(db, user, version, {schoolApproval, reviewRequired=false}) {
+export async function publishProblemDraft(db, user, version, {schoolApproval, reviewRequired=false, previousVersionId}) {
  if(reviewRequired&&version.draft_review_status==='pending')return;
- await prepareDraftPublication(db, version);
+ await prepareDraftPublication(db, version, {previousVersionId});
  if (reviewRequired) {
   await db.query(`UPDATE problem_versions SET draft_review_status='pending',draft_review_at=clock_timestamp(),draft_review_reason=NULL WHERE id=$1`, [version.id]);
  } else {

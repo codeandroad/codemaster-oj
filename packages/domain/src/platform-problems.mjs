@@ -11,22 +11,28 @@ import { assertJudgeAdmission } from './system.mjs';
 import { fail, HttpError, integer, uuid } from './security.mjs';
 import { draftValidationResultSql, prepareDraftPublication, publishProblemDraft, requireDraftRevision, saveProblemDraft, validateProblemDraft } from './problem-editor-drafts.mjs';
 import { sharedSolutionIdSql } from './shared-problem-solutions.mjs';
+import { liveProblemVersionIdSql } from './live-problem-version.mjs';
 
 const reply=(body,status=200)=>({status,body});
+
+async function previousPlatformPublication(db, version) {
+ if(version.published_at)return version.id;
+ return (await db.query(`SELECT ${liveProblemVersionIdSql('p')} id FROM problems p WHERE p.id=$1`,[version.problem_id])).rows[0]?.id??version.id;
+}
 
 async function requestProblemReview(db, version, item, audit) {
  if(item.expectedVersionId!==version.id)fail(409,'REVISION_CONFLICT','题目已更新，请重新载入');
  requireDraftRevision(version,item.expectedRevision);
  if(!version.edit_draft)fail(409,'NO_DRAFT','请先保存题目草稿');
  if(version.draft_review_status==='pending')return false;
- await prepareDraftPublication(db,version);
+ await prepareDraftPublication(db,version,{previousVersionId:await previousPlatformPublication(db,version)});
  await db.query("UPDATE problem_versions SET draft_review_status='pending',draft_review_at=clock_timestamp(),draft_review_reason=NULL WHERE id=$1",[version.id]);
  await audit('platform.problem.request_review',version.problem_id,{versionId:version.id,revision:version.edit_revision});
  return true;
 }
 
 async function publishPlatformDraft(db, user, version, audit, schoolApproval=false) {
- await publishProblemDraft(db,user,version,{schoolApproval});
+ await publishProblemDraft(db,user,version,{schoolApproval,previousVersionId:await previousPlatformPublication(db,version)});
  await audit('platform.problem.publish',version.problem_id,{versionId:version.id,revision:version.edit_revision});
 }
 
@@ -214,7 +220,7 @@ export async function handlePlatformProblems(ctx) {
    }
    if(v.edit_draft){
     requireDraftRevision(v,body.expectedRevision);
-    const firstStandaloneRelease=!v.published_at&&!(await db.query(`SELECT 1 FROM chapter_problems cp JOIN learning_chapters ch ON ch.id=cp.chapter_id
+    const firstStandaloneRelease=!v.published_at&&await previousPlatformPublication(db,v)===v.id&&!(await db.query(`SELECT 1 FROM chapter_problems cp JOIN learning_chapters ch ON ch.id=cp.chapter_id
      JOIN learning_paths c ON c.id=ch.path_id WHERE cp.problem_id=$1 AND ch.archived_at IS NULL AND c.owner_scope='platform' AND c.archived_at IS NULL LIMIT 1`,[id])).rowCount;
     await publishPlatformDraft(db,user,v,audit,firstStandaloneRelease);
     return reply(await detail(id));

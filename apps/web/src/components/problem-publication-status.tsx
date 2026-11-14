@@ -4,16 +4,23 @@ import { Clock3, FileEdit, Globe2, LockKeyhole, Archive, CircleX } from "lucide-
 import { useLocale, type AppLocale } from "@/components/locale-context";
 
 export interface ProblemPublication {
+  ownerScope?: "school" | "platform";
   published?: boolean;
   publishedAt?: string | null;
   publishedVersionId?: string | null;
   schoolVisibleAt?: string | null;
+  courseOnlyPublished?: boolean | null;
+  draftReviewStatus?: string | null;
   rankReviewStatus?: string | null;
   bankVisibility?: "school" | "private";
   archivedAt?: string | null;
 }
 export function problemPublicationState(problem: ProblemPublication, bankVisibility?: "school" | "private") {
   if (problem.archivedAt) return "archived";
+  if (problem.ownerScope === "platform") {
+    if (!(problem.published ?? Boolean(problem.publishedAt))) return problem.draftReviewStatus === "pending" ? "platformReview" : "draft";
+    return "published";
+  }
   if (!(problem.published ?? Boolean(problem.publishedAt))) return "draft";
   if ((problem.bankVisibility ?? bankVisibility) === "private") return "teaching";
   if (problem.schoolVisibleAt) return "public";
@@ -25,6 +32,8 @@ const states = {
   draft: { zh: "草稿", en: "Draft", icon: FileEdit, color: "border-border bg-muted text-muted-foreground" },
   teaching: { zh: "教学可用", en: "Teaching ready", icon: LockKeyhole, color: "border-border bg-surface-subtle text-muted-foreground" },
   pending: { zh: "待公开审核", en: "Awaiting public review", icon: Clock3, color: "border-warning/25 bg-warning-soft text-warning" },
+  platformReview: { zh: "待平台审核", en: "In review", icon: Clock3, color: "border-warning/25 bg-warning-soft text-warning" },
+  published: { zh: "已发布", en: "Published", icon: Globe2, color: "border-success/25 bg-success-soft text-success" },
   public: { zh: "已公开", en: "Public", icon: Globe2, color: "border-success/25 bg-success-soft text-success" },
   rejected: { zh: "审核未通过", en: "Review rejected", icon: CircleX, color: "border-warning/25 bg-warning-soft text-warning" },
   withdrawn: { zh: "已撤下", en: "Withdrawn", icon: Archive, color: "border-border bg-muted text-muted-foreground" },

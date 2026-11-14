@@ -2,14 +2,16 @@ import { fail, uuid } from './security.mjs';
 
 // Activity links identify the exercise. Their stored version remains an audit
 // snapshot; current teaching always uses this one publication decision.
-// School approval is independent of teaching publication: a pending replacement
-// must not displace the approved exercise already used across the school.
+// A platform release advances its current definition. School-owned problems
+// keep their school-approved definition while a replacement awaits approval.
 export function liveProblemVersionIdSql(problemAlias = 'p') {
  if (!/^[a-z_][a-z0-9_]*$/i.test(problemAlias)) throw new TypeError('Invalid problem SQL alias');
  return `(SELECT live_version.id FROM problem_versions live_version
   JOIN problem_banks live_bank ON live_bank.id=${problemAlias}.bank_id
   WHERE live_version.problem_id=${problemAlias}.id AND live_version.published_at IS NOT NULL
-  ORDER BY (live_bank.visibility='school' AND live_version.school_visible_at IS NOT NULL
+  ORDER BY (${problemAlias}.owner_scope='platform' AND live_version.id=${problemAlias}.current_version_id
+    AND live_version.rank_review_status='approved' AND live_version.school_visible_at IS NOT NULL) DESC NULLS LAST,
+   (live_bank.visibility='school' AND live_version.school_visible_at IS NOT NULL
     AND live_version.rank_review_status='approved') DESC,
    (live_bank.visibility<>'school' AND live_version.id=${problemAlias}.current_version_id) DESC,
    live_version.published_at DESC,live_version.created_at DESC,live_version.id DESC LIMIT 1)`;

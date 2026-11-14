@@ -398,6 +398,23 @@ test('the complete platform problem editor uses scoped grants without publicatio
       assert.equal((await post(batch, { items: [target] })).items[0].status, 'already_published');
       assert.deepEqual((await get(`/problems/${problem.id}?current=1`, 'history-student')).tags, ['Delegated change']);
       assert.equal((await pool.query('SELECT 1 FROM school_problem_publications WHERE problem_id=$1 AND withdrawn_at IS NULL', [problem.id])).rowCount, 0);
+      // Older imports may still have a separate, unpublished definition.
+      const former = (await pool.query('SELECT * FROM problem_versions WHERE id=$1', [draft.versionId])).rows[0];
+      const legacy = (await pool.query(`INSERT INTO problem_versions(problem_id,title,statement,mode,comparator,time_limit_ms,memory_limit_mb,reference_code,created_at)
+        SELECT problem_id,title,statement,mode,comparator,time_limit_ms,memory_limit_mb,reference_code,clock_timestamp()+interval '1 second'
+        FROM problem_versions WHERE id=$1 RETURNING id`, [former.id])).rows[0];
+      const replacement = await post(`${source}/${problem.id}/versions`, { ...input, tags: ['Revised legacy draft'],
+        expectedVersionId: legacy.id, expectedRevision: 0 }, 'teacher', 201);
+      while (await processOne({ pool: worker, judge, logger: {} })) { /* Drain this isolated fixture. */ }
+      const replacementTarget = { problemId: problem.id, expectedVersionId: replacement.versionId, expectedRevision: replacement.editRevision };
+      await post(`${source}/${problem.id}/request-review`, replacementTarget, 'teacher');
+      assert.equal((await get(`/problems/${problem.id}?current=1`, 'history-student')).versionId, former.id);
+      await post(`${source}/${problem.id}/publish`, replacementTarget, 'school-admin');
+      const latestReader = await get(`/problems/${problem.id}?current=1`, 'history-student');
+      assert.equal(latestReader.versionId, replacement.versionId);
+      assert.deepEqual(latestReader.tags, ['Revised legacy draft']);
+      const retainedAccess = (await pool.query('SELECT school_visible_at,rank_approved_at,course_only_published FROM problem_versions WHERE id=$1', [replacement.versionId])).rows[0];
+      assert.deepEqual(retainedAccess, { school_visible_at: former.school_visible_at, rank_approved_at: former.rank_approved_at, course_only_published: false });
       await request(path, { method: 'DELETE', body: grant('school-admin') });
       latest = await get(`${source}/${problem.id}`);
 
@@ -432,6 +449,8 @@ test('the complete platform problem editor uses scoped grants without publicatio
       await get(practice, 'history-student', 404);
       assert.deepEqual((await get(`/practice/problems?q=${courseOnly.id}`, 'student')).items, []);
       const bankId = courseOnly.sourceBankId;
+      const inventory = await get(`/admin/problem-banks/${bankId}/problems?search=${encodeURIComponent(courseOnly.title)}`, 'legacy-admin');
+      assert.deepEqual(inventory.items.map(row => [row.id,row.ownerScope,row.courseOnlyPublished,row.draftReviewStatus]), [[courseOnly.id,'platform',true,null]]);
       const platformGrant = `/platform/content-editors/problem/${courseOnly.id}`;
       const legacyGrant = grant('legacy-editor', LEGACY_SCHOOL_ID);
       await post(platformGrant, legacyGrant);

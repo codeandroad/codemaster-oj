@@ -14,7 +14,7 @@ import { provisionSchool, LEGACY_SCHOOL_ID } from '../../../packages/domain/src/
 import { provisionPlatformAdministrator } from '../../../packages/domain/src/platform-governance.mjs';
 
 const migration='102_platform_courses.sql';
-const deferredMigrations=[migration,'105_acsl_platform_course.sql','106_platform_course_admissions.sql','108_platform_points_and_requirement_modes.sql','109_python_practice_problem_metadata.sql','110_platform_content_ownership.sql','111_platform_problem_banks.sql','112_platform_editor_account_lookup.sql','116_platform_course_problem_review.sql'];
+const deferredMigrations=[migration,'105_acsl_platform_course.sql','106_platform_course_admissions.sql','108_platform_points_and_requirement_modes.sql','109_python_practice_problem_metadata.sql','110_platform_content_ownership.sql','111_platform_problem_banks.sql','112_platform_editor_account_lookup.sql','116_platform_course_problem_review.sql','117_platform_problem_publication_scope.sql'];
 test('platform courses retain original data and enforce audiences through NestJS and real runtime grants',
  {skip:!process.env.TEST_DATABASE_URL,timeout:90000},async t=>{
  const base=new URL(process.env.TEST_DATABASE_URL);assert.equal(base.pathname,'/campus_qa');assert.ok(['localhost','127.0.0.1'].includes(base.hostname));

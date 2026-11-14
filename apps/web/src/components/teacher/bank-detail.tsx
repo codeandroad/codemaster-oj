@@ -19,7 +19,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { useRangeSelection } from "@/components/ui/use-range-selection";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
 import { productionApi, type ProductionProblem } from "@/lib/production-api";
-import { Bank, Group, GroupTags, ManageGroups, MAX_BATCH_PUBLISH, publishEligibilityReason, reviewVisibilityLabel, validationStatusLabel } from "./problem-banks";
+import { Bank, canOrganizeProblem, Group, GroupTags, ManageGroups, MAX_BATCH_PUBLISH, publishEligibilityReason, reviewVisibilityLabel, validationStatusLabel } from "./problem-banks";
 import { useLocale } from "@/components/locale-context";
 import { useProblemSelection } from "./use-problem-selection";
 import { ProblemSelectionHeader } from "./problem-selection-header";
@@ -83,6 +83,7 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
       ["owner", "edit"].includes(bank?.permission ?? "");
   const selectedProblems = rows.filter((problem) => selected.includes(problem.id));
   const selectedSchoolIds = selectedProblems.filter(problem => !isPlatformProblem(problem)).map(problem => problem.id);
+  const mayOrganizeSelection = selectedProblems.every(canOrganizeProblem);
   const publishableSelection = selectedProblems.filter((problem) => !publishEligibilityReason(problem, locale));
   const excludedSelection = selectedProblems.filter((problem) => publishEligibilityReason(problem, locale));
   const publishableScope = pagination.rows.filter((problem) => !publishEligibilityReason(problem, locale));
@@ -225,15 +226,16 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
               >
                 {tr("批量发布", "Publish selected")} ({publishableSelection.length})
               </Button>}
-              {selectedSchoolIds.length > 0 && <Button size="sm" onClick={() => setManage({ ids: selectedSchoolIds })}>
-                {view === "none" ? tr("分配分组", "Assign group") : tr("添加到分组", "Add to group")}
-              </Button>}
-              {selectedSchoolIds.length > 0 && <Button
+              <Button variant="secondary" size="sm" disabled={!mayOrganizeSelection || action.busy} onClick={() => setManage({ ids: selected })}>
+                {tr("批量整理分组", "Organize groups")}
+              </Button>
+              {view !== "none" && <Button
                 size="sm"
                 variant="secondary"
+                disabled={!mayOrganizeSelection || action.busy}
                 onClick={() =>
                   setManage({
-                    ids: selectedSchoolIds,
+                    ids: selected,
                     mode: "移动分组",
                     source: currentGroup?.id,
                   })
@@ -241,36 +243,15 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
               >
                 {tr("移动到分组", "Move to group")}
               </Button>}
-              <PlatformProblemReviewAction selected={pagination.rows.filter(problem => checked.includes(problem.id))} action={action}
+              {!mayOrganizeSelection && <span className="text-xs text-muted-foreground">{tr("整理平台题分组需要题目编辑授权。", "Organizing platform problems requires edit access.")}</span>}
+              <PlatformProblemReviewAction selected={selectedProblems} action={action}
                 onSubmitted={ids => setChecked(previous => previous.filter(id => !ids.has(id)))} />
-              {currentGroup && selectedSchoolIds.length > 0 && (
+              {currentGroup?.canEdit && (
                 <Button
                   size="sm"
                   variant="secondary"
-                  disabled={action.busy}
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        `从“${currentGroup.name}”移除所选 ${selectedSchoolIds.length} 道题？题目与其他分组保留。`,
-                      )
-                    )
-                      void action.run(async () => {
-                        await productionApi(
-                          `problem-groups/${currentGroup.id}`,
-                          {
-                            method: "PATCH",
-                            body: {
-                              problemIds: currentGroup.problemIds.filter(
-                                (p) => !selectedSchoolIds.includes(p),
-                              ),
-                            },
-                          },
-                        );
-                        groups.reload();
-                        setChecked([]);
-                        return "已仅从当前分组移除。";
-                      });
-                  }}
+                  disabled={!mayOrganizeSelection || action.busy}
+                  onClick={() => setManage({ ids: selected, mode: "移出分组", source: currentGroup.id })}
                 >
                   {tr("从本分组移除", "Remove from this group")}
                 </Button>
@@ -359,7 +340,7 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
                       <td className="px-4 py-3">
                         <GroupTags
                           singleLine
-                          onClick={isPlatformProblem(p) ? undefined : () => setManage({ ids: [p.id] })}
+                          onClick={canOrganizeProblem(p) ? () => setManage({ ids: [p.id] }) : undefined}
                           groups={
                             groups.data?.items.filter((g) =>
                               g.problemIds.includes(p.id),
@@ -396,12 +377,12 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
                           >
                             {p.canEdit === false ? tr("查看", "View") : tr("编辑", "Edit")}
                           </Link>
-                          {!isPlatformProblem(p) && <button
+                          {canOrganizeProblem(p) && <button
                             type="button"
                             className="text-muted-foreground"
                             aria-label={tr("整理分组", "Organize groups")}
                             title={tr("整理分组", "Organize groups")}
-                            onClick={isPlatformProblem(p) ? undefined : () => setManage({ ids: [p.id] })}
+                            onClick={() => setManage({ ids: [p.id] })}
                           >
                             <MoreHorizontal size={18} />
                           </button>}
@@ -484,11 +465,13 @@ export function TeacherBankDetail({ id, accountId }: { id: string; accountId: st
           problemIds={manage.ids}
           initialMode={manage.mode}
           initialSource={manage.source}
+          canCreate={Boolean(canContribute)}
           onClose={() => setManage(null)}
           onSaved={() => {
             setManage(null);
             setChecked([]);
             groups.reload();
+            void action.run(async () => tr("分组已更新。", "Groups updated."));
           }}
         />
       )}

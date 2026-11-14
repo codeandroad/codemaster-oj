@@ -175,8 +175,8 @@ export class LibraryController {
     return applyResponse(response, await this.domain.execute('library', request.domainContext));
   }
 
-  @Post('problem-groups/move')
-  async moveGroups(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+  @Post(['problem-groups/move', 'problem-groups/members'])
+  async changeGroupMembers(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('library', request.domainContext));
   }
 

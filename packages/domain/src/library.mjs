@@ -1,6 +1,6 @@
 import { canEditPlatformContent, platformContentEditorSql } from './platform-content-access.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
-import {moveGroupMembers} from './group-move.mjs';
+import {changeGroupMembers} from './group-move.mjs';
 import { assertJudgeAdmission } from './system.mjs';
 import { transaction } from './db.mjs';
 import { fail, field, uuid, enumValue, canonicalHash } from './security.mjs';
@@ -110,7 +110,6 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
  const reviewShape=r=>({problemId:r.problem_id,versionId:r.version_id,editRevision:r.review_revision??null,title:r.title,bankId:r.bank_id,bankName:r.bank_name,bankVisibility:r.bank_visibility,ownerName:r.owner_name,publishedAt:r.published_at,schoolVisibleAt:r.school_visible_at,validationStatus:r.validation_status,rankReviewStatus:r.rank_review_status,rankApprovedAt:r.rank_approved_at,rankReviewReason:r.rank_review_reason,priorAcCount:Number(r.prior_ac_count),isCurrent:r.is_current});
  async function reviewSavedDraft(db,p,v,revision,decision,reason,batch=false){
   requireDraftRevision(v,revision);
-  if(p.owner_scope==='platform')fail(403,'PLATFORM_ADMIN_REQUIRED','平台题目须由平台管理员发布');
   if(v.draft_review_status!=='pending')fail(409,'REVIEW_NOT_PENDING','该草稿未提交审核，请刷新列表');
   if(decision==='approved'){
    if(v.edit_draft)await publishProblemDraft(db,user,v,{schoolApproval:true});
@@ -142,9 +141,9 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
      WHERE s.version_id=v.id AND s.status='AC' AND s.kind IN ('submit','correction')) prior_ac_count
    FROM problems p JOIN problem_banks b ON b.id=p.bank_id
    JOIN problem_versions v ON v.problem_id=p.id
-   CROSS JOIN LATERAL (SELECT p.owner_scope<>'platform' AND v.draft_review_status IS NOT NULL AS in_review) d
+   CROSS JOIN LATERAL (SELECT v.draft_review_status IS NOT NULL AS in_review) d
    LEFT JOIN accounts a ON a.id=p.owner_account_id LEFT JOIN identities i ON i.id=a.identity_id
-   WHERE p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school' AND (v.published_at IS NOT NULL OR d.in_review)
+   WHERE p.owner_scope='school' AND p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school' AND (v.published_at IS NOT NULL OR d.in_review)
    ORDER BY CASE WHEN d.in_review AND v.draft_review_status='pending' OR v.id=p.current_version_id AND v.rank_review_status='pending' THEN 0
     WHEN d.in_review OR v.rank_review_status='rejected' THEN 1 WHEN v.school_visible_at IS NOT NULL THEN 2 ELSE 3 END,
     published_at DESC,p.id LIMIT 500`)).rows;
@@ -165,9 +164,10 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
      FROM problems p JOIN problem_banks b ON b.id=p.bank_id
      LEFT JOIN accounts a ON a.id=p.owner_account_id LEFT JOIN identities i ON i.id=a.identity_id
      WHERE p.id=$1 FOR UPDATE OF p,b`,[item.problemId]));
+    if(p.owner_scope!=='school')fail(403,'PLATFORM_SOURCE_REQUIRED','平台题目请在平台授权待审入口处理');
     if(p.archived_at||p.bank_archived_at||p.bank_visibility!=='school')fail(409,'NOT_SCHOOL_PUBLIC','仅能审核校内题库中未归档题目');
     const v=required(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND problem_id=$2 FOR UPDATE',[item.versionId,item.problemId]));
-    if(item.revision!=null||p.owner_scope!=='platform'&&v.draft_review_status){
+    if(item.revision!=null||v.draft_review_status){
      checked.push({p,v,staged:true,revision:item.revision});
      continue;
     }
@@ -209,9 +209,10 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
     FROM problems p JOIN problem_banks b ON b.id=p.bank_id
     LEFT JOIN accounts a ON a.id=p.owner_account_id LEFT JOIN identities i ON i.id=a.identity_id
     WHERE p.id=$1 FOR UPDATE OF p,b`,[problemId]));
+   if(p.owner_scope!=='school')fail(403,'PLATFORM_SOURCE_REQUIRED','平台题目请在平台授权待审入口处理');
    if(p.archived_at||p.bank_archived_at||p.bank_visibility!=='school')fail(409,'NOT_SCHOOL_PUBLIC','仅能审核校内题库中未归档题目');
    const v=required(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND problem_id=$2 FOR UPDATE',[versionId,problemId]));
-   const staged=decision!=='revoked'&&(body.expectedRevision!=null||p.owner_scope!=='platform'&&v.draft_review_status);
+   const staged=decision!=='revoked'&&(body.expectedRevision!=null||v.draft_review_status);
    if(staged)await reviewSavedDraft(db,p,v,body.expectedRevision,decision,reason);
    else {
    if(body.expectedRevision!=null)fail(409,'REVISION_CONFLICT','题目审核状态已变更，请重新载入');
@@ -488,7 +489,8 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
   for(const id of ids){const {p}=await versionAccess(db,user,id);if(p.bank_id!==bankId)fail(400,'BANK_MISMATCH','分组只能引用所属题库的题目；跨题库须复制新题并保留来源');}
   await db.query('DELETE FROM problem_group_members WHERE group_id=$1',[groupId]);for(let i=0;i<ids.length;i++)await db.query('INSERT INTO problem_group_members(group_id,problem_id,position) VALUES($1,$2,$3)',[groupId,ids[i],i]);
  }
- if(route==='/problem-groups/move'&&method==='POST')return result(await moveGroupMembers({pool,user,body,bankAccess,versionAccess,audit}));
+ if(method==='POST'&&['/problem-groups/move','/problem-groups/members'].includes(route))
+  return result(await changeGroupMembers({pool,user,body,bankAccess,versionAccess,audit,move:route.endsWith('/move')}));
  if(route==='/problem-groups'&&method==='GET') {
   const bankId=url.searchParams.get('bankId');if(bankId)await bankAccess(pool,user,bankId);
   const groups=(await pool.query(`SELECT g.*,b.owner_account_id bank_owner_account_id,

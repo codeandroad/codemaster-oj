@@ -70,6 +70,9 @@ export interface Bank {
   problemCount?: number;
   archivedProblemCount?: number;
 }
+export function canOrganizeProblem(problem: ProductionProblem) {
+  return Boolean(problem.bankId && (!isPlatformProblem(problem) || problem.canEdit === true));
+}
 export interface Group {
   id: string;
   name: string;
@@ -161,8 +164,10 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
   const scope = JSON.stringify([bankId, tab, query, filterBank, filterGroup, filterStatus]);
   const pagination = useCatalogPagination(rows, scope);
   const { checked, setChecked, changeRow } = useProblemSelection(pagination.rows, `${scope}:${pagination.page}`);
-  const checkedProblems = rows.filter((problem) => checked.includes(problem.id));
+  const checkedProblems = pagination.rows.filter((problem) => checked.includes(problem.id));
   const checkedSchoolIds = checkedProblems.filter(problem => !isPlatformProblem(problem)).map(problem => problem.id);
+  const groupBankIds = new Set(checkedProblems.map(problem => problem.bankId));
+  const groupSelectionBlocked = checkedProblems.some(problem => !canOrganizeProblem(problem)) || groupBankIds.size !== 1;
   const publishableSelection = checkedProblems.filter((problem) => !publishEligibilityReason(problem, locale));
   const excludedSelection = checkedProblems.filter((problem) => publishEligibilityReason(problem, locale));
   const publishableScope = pagination.rows.filter((problem) => !publishEligibilityReason(problem, locale));
@@ -173,18 +178,9 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
       ? ids.filter((id) => !scopeIds.has(id))
       : [...new Set([...ids, ...scopeIds])]);
   };
-  const openManage = (ids: string[]) => {
-    const selected = (problems.data?.items ?? []).filter((x) =>
-        ids.includes(x.id),
-      ),
-      bankIds = [...new Set(selected.map((x) => x.bankId))];
-    if (bankIds.length !== 1 || !bankIds[0]) {
-      void action.run(async () => {
-        throw new Error("请选择同一题库内的题目后整理分组。勾选已保留。");
-      });
-      return;
-    }
-    setManage({ ids, bankId: bankIds[0] });
+  const openManage = (selected: ProductionProblem[]) => {
+    const bankId = selected[0]?.bankId;
+    if (bankId) setManage({ ids: selected.map(problem => problem.id), bankId });
   };
   const removeEmptyBank = () => {
     if (!deletingBank) return;
@@ -443,10 +439,13 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                   {checkedSchoolIds.length > 0 && <Button size="sm" onClick={() => { action.clear(); setConfirmPublish(true); }} disabled={!publishableSelection.length || publishableSelection.length > MAX_BATCH_PUBLISH || action.busy}>
                     {tr("批量发布", "Publish selected")} ({publishableSelection.length})
                   </Button>}
-                  {checkedSchoolIds.length > 0 && <Button variant="secondary" size="sm" onClick={() => openManage(checkedSchoolIds)} disabled={action.busy}>
+                  <Button variant="secondary" size="sm" onClick={() => openManage(checkedProblems)} disabled={action.busy || groupSelectionBlocked}>
                     {tr("批量整理分组", "Organize groups")}
-                  </Button>}
-                  <PlatformProblemReviewAction selected={pagination.rows.filter(problem => checked.includes(problem.id))} action={action}
+                  </Button>
+                  {groupSelectionBlocked && <span className="text-xs text-muted-foreground">{groupBankIds.size > 1
+                    ? tr("请选择同一题库内的题目。", "Select problems from one bank.")
+                    : tr("整理平台题分组需要题目编辑授权。", "Organizing platform problems requires edit access.")}</span>}
+                  <PlatformProblemReviewAction selected={checkedProblems} action={action}
                     onSubmitted={ids => setChecked(previous => previous.filter(id => !ids.has(id)))} />
                   <Button variant="ghost" size="sm" onClick={() => setChecked([])} disabled={action.busy}>
                     {tr("取消选择", "Clear selection")}
@@ -519,7 +518,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                   <td>
                     <GroupTags
                       singleLine
-                      onClick={isPlatformProblem(problem) ? undefined : () => openManage([problem.id])}
+                      onClick={canOrganizeProblem(problem) ? () => openManage([problem]) : undefined}
                       groups={groupsByProblem.get(problem.id) ?? []}
                     />
                   </td>
@@ -544,7 +543,7 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
                       >
                         {problem.canEdit === false ? tr("查看", "View") : tr("编辑", "Edit")} <ArrowRight size={14} />
                       </Link>
-                      {!isPlatformProblem(problem) && <button type="button" className="text-muted-foreground" title={tr("整理分组", "Organize groups")} aria-label={tr("整理分组", "Organize groups")} onClick={() => openManage([problem.id])}>
+                      {canOrganizeProblem(problem) && <button type="button" className="text-muted-foreground" title={tr("整理分组", "Organize groups")} aria-label={tr("整理分组", "Organize groups")} onClick={() => openManage([problem])}>
                         <MoreHorizontal size={18} aria-hidden="true" />
                       </button>}
                     </div>
@@ -635,10 +634,13 @@ export function TeacherBanks({ bankId, user }: { bankId?: string | undefined; us
         <ManageGroups
           bankId={manage.bankId}
           problemIds={manage.ids}
+          canCreate={activeBanks.find(bank => bank.id === manage.bankId)?.canContribute === true}
           onClose={() => setManage(null)}
           onSaved={() => {
             groups.reload();
             setManage(null);
+            setChecked([]);
+            void action.run(async () => tr("分组已更新。", "Groups updated."));
           }}
         />
       )}
@@ -825,11 +827,13 @@ export function ManageGroups({
   onSaved,
   initialMode,
   initialSource,
+  canCreate = true,
 }: {
   bankId: string;
   problemIds: string[];
   initialMode?: string | undefined;
   initialSource?: string | undefined;
+  canCreate?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -837,7 +841,7 @@ export function ManageGroups({
   const tr = (zh: string, en: string) => localText(locale, zh, en);
   const groups = useData<{ items: Group[] }>(`problem-groups?bankId=${bankId}`),
     [query, setQuery] = useState(""),
-    [picked, setPicked] = useState<string[]>([]),
+    [picked, setPicked] = useState<string[]>(initialMode === "移出分组" && initialSource ? [initialSource] : []),
     [newName, setNewName] = useState(""),
     [mode, setMode] = useState(initialMode ?? "添加到分组"),
     [source, setSource] = useState(initialSource ?? ""),
@@ -851,7 +855,7 @@ export function ManageGroups({
     }));
   const { getRange } = useRangeSelection(rows, JSON.stringify([bankId, mode, query, source]));
   return (
-    <Modal title={tr("整理分组", "Organize groups")} onClose={onClose}>
+    <Modal title={tr("整理分组", "Organize groups")} onClose={() => { if (!action.busy) onClose(); }}>
       <Tabs
         items={[tr("添加到分组", "Add to groups"), tr("移动分组", "Move groups"), tr("移出分组", "Remove from groups")]}
         value={mode === "添加到分组" ? tr("添加到分组", "Add to groups") : mode === "移动分组" ? tr("移动分组", "Move groups") : tr("移出分组", "Remove from groups")}
@@ -862,6 +866,7 @@ export function ManageGroups({
         {tr("道题。添加保留原有分组；移动需要明确选择来源与目标。", "problems. Adding keeps existing groups; moving requires a source and a target.")}
       </p>
       <input
+        autoFocus
         aria-label={tr("搜索分组", "Search groups")}
         className={`${input} mt-3`}
         value={query}
@@ -915,9 +920,10 @@ export function ManageGroups({
               </span>
             </label>
           ))}
-        {!groups.loading&&!groups.error&&!rows.length&&<p className="p-3 text-sm text-muted-foreground">{query?tr("没有匹配的分组。","No matching groups."):mode==="移出分组"?tr("所选题目尚未加入任何分组。","Selected problems are not in any group."):tr("此题库暂无分组，可在下方新建。","No groups yet. Create one below.")}</p>}
+        {!groups.loading&&!groups.error&&!rows.length&&<p className="p-3 text-sm text-muted-foreground">{query?tr("没有匹配的分组。","No matching groups."):mode==="移出分组"?tr("所选题目尚未加入任何分组。","Selected problems are not in any group."):tr("此题库暂无分组。","This bank has no groups.")}</p>}
+        {rows.length > 0 && rows.every(group => !group.canEdit) && <p className="p-3 text-sm text-muted-foreground">{tr("你没有修改这些分组的权限。", "You do not have permission to modify these groups.")}</p>}
       </div>
-      {mode === "添加到分组" && (
+      {mode === "添加到分组" && canCreate && (
         <Field label={tr("新建分组（可选）", "New group (optional)")}>
           <input
             value={newName}
@@ -929,13 +935,13 @@ export function ManageGroups({
       )}
       <Feedback action={action} />
       <div className="mt-5 flex justify-end gap-2">
-        <Button variant="secondary" onClick={onClose}>
+        <Button variant="secondary" disabled={action.busy} onClick={onClose}>
           {tr("取消", "Cancel")}
         </Button>
         <Button
           disabled={
             action.busy || groups.loading || !!groups.error ||
-            (!picked.length && !(mode==="添加到分组"&&newName.trim())) ||
+            (!picked.length && !(mode === "添加到分组" && canCreate && newName.trim())) ||
             (mode === "移动分组" && !source)
           }
           onClick={() =>
@@ -944,27 +950,11 @@ export function ManageGroups({
                 await productionApi("problem-groups/move",{method:"POST",body:{bankId,sourceGroupId:source,targetGroupIds:picked,problemIds}});
                 onSaved();return "题目已通过服务端事务移动。";
               }
-              const fresh=await productionApi<{items:Group[]}>(`problem-groups?bankId=${encodeURIComponent(bankId)}`);
-              const selected=picked.map(id=>fresh.items.find(g=>g.id===id));
-              if(selected.some(g=>!g?.canEdit))throw new Error("分组已删除或权限已变更，请重新加载后选择。");
-              if (mode === "添加到分组" && newName.trim())
-                await productionApi("problem-groups", {
-                  method: "POST",
-                  body: { bankId, name: newName.trim(), problemIds },
-                });
-              for (const id of picked) {
-                const g = fresh.items.find((x) => x.id === id);
-                if (!g) continue;
-                await productionApi(`problem-groups/${id}`, {
-                  method: "PATCH",
-                  body: {
-                    problemIds:
-                      mode === "移出分组"
-                        ? g.problemIds.filter((x) => !problemIds.includes(x))
-                        : [...new Set([...g.problemIds, ...problemIds])],
-                  },
-                });
-              }
+              const operation = mode === "移出分组" ? "remove" : "add";
+              await productionApi("problem-groups/members", { method: "POST", body: {
+                bankId, operation, groupIds: picked, problemIds,
+                newGroupName: operation === "add" && canCreate ? newName.trim() || undefined : undefined,
+              } });
               onSaved();
               return "分组关系已更新。";
             })

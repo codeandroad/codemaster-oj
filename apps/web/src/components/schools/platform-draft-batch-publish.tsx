@@ -44,8 +44,8 @@ export function PlatformDraftBatchPublish({ targets, skipped, onClose, onPublish
   return <Dialog open onOpenChange={open => { if (!open && !pending.current) onClose(); }}>
     <DialogContent className="grid-cols-[minmax(0,1fr)] max-h-[85dvh] overflow-auto overscroll-contain sm:max-w-xl"
       onOpenAutoFocus={event => { event.preventDefault(); cancel.current?.focus(); }}>
-      <DialogTitle>{tx("批量审核发布", "Approve and publish drafts")}</DialogTitle>
-      <DialogDescription>{tx(`将发布本页所选的 ${targets.length} 份已通过参考解验证的待审核草稿。发布后学生即可看到修改。`, `Publish ${targets.length} validated drafts awaiting review from this page. Students will see the updated content after publication.`)}</DialogDescription>
+      <DialogTitle>{tx("批量发布题目修改", "Publish draft changes")}</DialogTitle>
+      <DialogDescription>{tx(`将发布本页所选的 ${targets.length} 份已通过参考解验证的待审核草稿。发布后，已有访问权限的学生即可看到修改。`, `Publish ${targets.length} validated drafts awaiting review from this page. Students with existing access will see the updated content after publication.`)}</DialogDescription>
       {skipped > 0 && <p className="text-sm text-muted-foreground">{tx(`本页另有 ${skipped} 道所选题目不符合发布条件。`, `${skipped} other selected problems on this page are ineligible.`)}</p>}
       <ul className="max-h-48 list-disc space-y-1 overflow-auto pl-5 text-sm" aria-label={tx("待发布草稿", "Drafts to publish")}>
         {targets.map(target => <li key={target.problemId} className="break-words">{target.title} <span className="font-mono text-xs text-muted-foreground">{target.problemId.slice(0, 8)}</span></li>)}

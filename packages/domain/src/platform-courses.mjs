@@ -87,7 +87,7 @@ async function shape(db,p,{detail=false,admin=true}={}) {
   const links=(await db.query(`${courseProblemVersions}
    SELECT cp.chapter_id,cp.problem_id AS "problemId",cp.version_id AS "versionId",v.title,
     v.published_at IS NOT NULL AS published,v.school_visible_at AS "schoolVisibleAt",v.rank_review_status AS "rankReviewStatus",
-    v.published_at IS NOT NULL AND v.validation_status='AC' AND v.rank_review_status='approved' AS "readyForCourse",
+    v.published_at IS NOT NULL AND v.validation_status='AC' AND (v.rank_review_status='approved' OR v.course_only_published AND v.rank_review_status='pending') AS "readyForCourse",
     ${admin?'true':platformContentEditorSql('problem','cp.problem_id',"current_setting('campus.account_id')::uuid")} AS "canEdit"
    FROM course_links cp JOIN course_versions cv ON cv.problem_id=cp.problem_id AND cv.pinned_version_id=cp.version_id
    JOIN problem_versions v ON v.id=cv.version_id ORDER BY cp.chapter_id,cp.position`,[p.id])).rows;
@@ -119,10 +119,11 @@ async function assertReady(db,p,user) {
  await assertCoursePaper4Ready(db,p.id);
  await assertPlatformCourseAcslLinksReady(db,user,chapters.flatMap(chapter=>chapter.acsl_links??[]),p.id);
  const links=(await db.query(`${courseProblemVersions}
-  SELECT p.archived_at,b.archived_at bank_archived,b.visibility,v.published_at,v.school_visible_at,v.rank_review_status
+  SELECT p.archived_at,b.archived_at bank_archived,b.visibility,v.published_at,v.school_visible_at,v.rank_review_status,v.course_only_published,v.validation_status
   FROM course_versions cv JOIN problems p ON p.id=cv.problem_id JOIN problem_banks b ON b.id=p.bank_id
   JOIN problem_versions v ON v.id=cv.version_id FOR SHARE OF p,b,v`,[p.id])).rows;
- if(links.some(l=>l.archived_at||l.bank_archived||l.visibility!=='school'||!l.published_at||!l.school_visible_at||l.rank_review_status!=='approved'))
+ if(links.some(l=>l.archived_at||l.bank_archived||l.visibility!=='school'||!l.published_at||l.validation_status!=='AC'||
+  !(l.school_visible_at&&l.rank_review_status==='approved'||l.course_only_published&&l.rank_review_status==='pending')))
   fail(409,'UNAPPROVED_LESSON_PROBLEM','关联练习尚未发布或未通过审核');
 }
 async function save(db,user,body,old,{admin}) {
@@ -200,7 +201,7 @@ async function save(db,user,body,old,{admin}) {
    if((await db.query(`SELECT 1 FROM jsonb_to_recordset($1::jsonb) AS link(problem_id uuid,version_id uuid)
     WHERE NOT EXISTS(SELECT 1 FROM problems p JOIN problem_versions v ON v.problem_id=p.id
      WHERE p.id=link.problem_id AND v.id=link.version_id AND p.owner_scope='platform' AND p.archived_at IS NULL
-     AND v.published_at IS NOT NULL AND v.validation_status='AC' AND v.rank_review_status='approved') LIMIT 1`,[input])).rowCount)
+     AND v.published_at IS NOT NULL AND v.validation_status='AC' AND (v.rank_review_status='approved' OR v.course_only_published AND v.rank_review_status='pending')) LIMIT 1`,[input])).rowCount)
     fail(409,'UNAVAILABLE_COURSE_PROBLEM','请选择有效的已发布平台题目');
    await db.query('DELETE FROM chapter_problems WHERE chapter_id=ANY($1::uuid[])',[replacedChapters]);
    if(problemLinks.length)await db.query(`INSERT INTO chapter_problems(chapter_id,problem_id,version_id,position)
@@ -229,7 +230,7 @@ export async function handlePlatformCourses({pool,user,route,method,body,url}) {
    if(!admin)await requirePlatformContentEditor(db,user,'course',uuid(url.searchParams.get('courseId')));
    return reply({items:(await db.query(`SELECT p.id,p.id AS "problemId",p.bank_id AS "bankId",b.name AS "bankName",v.id AS "versionId",v.title,v.mode,jsonb_build_object('difficulty',v.metadata->'difficulty') metadata,v.tags,true published,v.school_visible_at AS "schoolVisibleAt",v.rank_review_status AS "rankReviewStatus" FROM problems p JOIN problem_banks b ON b.id=p.bank_id
     JOIN problem_versions v ON v.id=${liveProblemVersionIdSql('p')} WHERE p.owner_scope='platform' AND p.archived_at IS NULL
-    AND v.published_at IS NOT NULL AND v.validation_status='AC' AND v.rank_review_status='approved'
+    AND v.published_at IS NOT NULL AND v.validation_status='AC' AND (v.rank_review_status='approved' OR v.course_only_published AND v.rank_review_status='pending')
     AND ($1::boolean OR ${platformContentEditorSql('problem','p.id','$2::uuid')}) ORDER BY v.title,p.id`,[admin,user.id])).rows});
   }
   if(match[1]==='paper4-options'&&method==='GET'){

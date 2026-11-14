@@ -127,7 +127,7 @@ export function AdminProblemBanks({ accountId }: { accountId: string }) {
   return <>
     <PageHeader eyebrow={tr("题库管理", "PROBLEM BANKS")} title={tr("题库管理", "Problem banks")}
       description={tr("查看全校和教师私有题库。题目以归档代替删除：停止新的自由练习，但保留题目版本、提交与成绩。", "Manage school and teacher-private banks. Archive instead of deleting problems: stop new free practice while retaining versions, submissions, and grades.")}
-      action={<div className="flex flex-wrap gap-2"><AppLink href="/admin/problems/solutions-review" className={buttonVariants({ variant: "secondary" })}>{tr("题解审核", "Solution review")}</AppLink><Button variant="secondary" onClick={() => banks.reload()}>{tr("刷新", "Refresh")}</Button><Button onClick={() => setCreating(true)}><Plus size={15} aria-hidden="true" />{tr("新建题库", "New bank")}</Button></div>} />
+      action={<div className="flex flex-wrap gap-2"><AppLink href="/admin/settings?tab=problem-reviews&reviewScope=platform" className={buttonVariants({ variant: "secondary" })}>{tr("平台授权待审", "Delegated platform reviews")}</AppLink><AppLink href="/admin/problems/solutions-review" className={buttonVariants({ variant: "secondary" })}>{tr("题解审核", "Solution review")}</AppLink><Button variant="secondary" onClick={() => banks.reload()}>{tr("刷新", "Refresh")}</Button><Button onClick={() => setCreating(true)}><Plus size={15} aria-hidden="true" />{tr("新建题库", "New bank")}</Button></div>} />
     <Feedback action={action} />
     <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(250px,290px)_minmax(0,1fr)]">
       <section className={`${panelClass} min-w-0 self-start`}>

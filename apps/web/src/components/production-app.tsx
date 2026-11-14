@@ -323,7 +323,7 @@ function ProductionView({pathname,role,user,profileVersion,onProfileSaved}:{path
   const paperSolutions = pathname.match(/^\/admin\/paper4\/([^/]+)$/);
   if (paperSolutions) return <Paper4AssistancePage id={paperSolutions[1]!} admin />;
   if (pathname==="/admin/judge-service") return <AdminJudgePage/>;
-  if (pathname==="/admin/settings") return <AdminSettingsPage/>;
+  if (pathname==="/admin/settings") return <AdminSettingsPage user={user}/>;
   if (pathname===legacyCourseAdmissionsHref) return <SchoolCourseAdmissions schoolId={legacyCourseAdmissionsSchoolId} href={legacyCourseAdmissionsHref} coursesHref="/teacher/courses"/>;
   return <div className={`${panel} p-5`}><h1 className="text-xl font-bold">页面不存在</h1><AppLink href={roleHome(user)} className={`${buttonVariants()} mt-4`}>返回工作台</AppLink></div>;
 }

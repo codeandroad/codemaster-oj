@@ -16,8 +16,9 @@ const sourceTables = `problems p
 // A problem reused by a timed practice remains outside public practice, even
 // if the author creates another edition with the same exercise.
 const sourceAccess = `p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school'
- AND v.published_at IS NOT NULL AND v.school_visible_at IS NOT NULL
- AND v.rank_review_status='approved' AND v.validation_status='AC'
+ AND v.published_at IS NOT NULL AND v.validation_status='AC'
+ AND (v.school_visible_at IS NOT NULL AND v.rank_review_status='approved'
+  OR p.owner_scope='platform' AND v.course_only_published AND v.rank_review_status='pending')
  AND NOT EXISTS(SELECT 1 FROM timed_practice_problems t WHERE t.problem_id=p.id)
  AND (EXISTS(SELECT 1 FROM problem_public_statements current WHERE current.version_id=v.id)
    OR NOT EXISTS(SELECT 1 FROM problem_public_statements configured

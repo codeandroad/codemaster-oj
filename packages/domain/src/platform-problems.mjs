@@ -25,8 +25,8 @@ async function requestProblemReview(db, version, item, audit) {
  return true;
 }
 
-async function publishPlatformDraft(db, user, version, audit) {
- await publishProblemDraft(db,user,version,{schoolApproval:true});
+async function publishPlatformDraft(db, user, version, audit, schoolApproval=false) {
+ await publishProblemDraft(db,user,version,{schoolApproval});
  await audit('platform.problem.publish',version.problem_id,{versionId:version.id,revision:version.edit_revision});
 }
 
@@ -37,13 +37,12 @@ async function publishReviewedDraft(db, user, version, item, audit) {
   if(version.published_at&&version.published_revision===item.expectedRevision)return 'already_published';
   fail(409,'NO_DRAFT','没有待发布的草稿');
  }
- if(version.draft_review_status!=='pending')fail(409,'REVIEW_REQUIRED','仅可批量发布待审核的草稿');
+ if(version.draft_review_status!=='pending')fail(409,'REVIEW_REQUIRED','仅可发布待审核的草稿');
  await publishPlatformDraft(db,user,version,audit);
  return 'published';
 }
 
 async function reviewProblemDrafts(db, user, admin, body, audit, publish) {
- if(publish&&!admin)fail(403,'PLATFORM_ADMIN_REQUIRED','仅平台管理员可发布题目');
  if(!Array.isArray(body.items)||!body.items.length||body.items.length>50)fail(400,'VALIDATION','每批请选择 1–50 道题目');
  const items=body.items.map(item=>({
   problemId:uuid(item?.problemId,'题目 ID').toLowerCase(),
@@ -52,14 +51,15 @@ async function reviewProblemDrafts(db, user, admin, body, audit, publish) {
  }));
  const ids=[...new Set(items.map(item=>item.problemId))];
  if(ids.length!==items.length)fail(400,'VALIDATION','同一道题只能提交一次');
+ const access=publish?'p.id IN (SELECT problem_id FROM platform_problem_review_grants($3))':platformContentEditorSql('problem','p.id','$3::uuid');
  const allowed=(await db.query(`SELECT p.id FROM problems p
   WHERE p.id=ANY($1::uuid[]) AND p.owner_scope='platform' AND p.archived_at IS NULL
-   AND ($2 OR ${platformContentEditorSql('problem','p.id','$3::uuid')})
+   AND ($2 OR ${access})
   ORDER BY p.id FOR UPDATE`,[ids,admin,user.id])).rows;
- if(!allowed.length)fail(403,'CONTENT_EDITOR_REQUIRED','未获所选平台题目的编辑授权，或授权已失效');
+ if(!allowed.length)fail(403,publish?'CONTENT_REVIEWER_REQUIRED':'CONTENT_EDITOR_REQUIRED',publish?'未获所选题目的审核授权':'未获所选平台题目的编辑授权，或授权已失效');
  const versions=(await db.query(`SELECT v.* FROM problems p JOIN LATERAL
   (SELECT * FROM problem_versions WHERE problem_id=p.id ORDER BY created_at DESC,id DESC LIMIT 1) v ON true
-  WHERE p.id=ANY($1::uuid[]) AND ($2 OR ${platformContentEditorSql('problem','p.id','$3::uuid')})`,[allowed.map(problem=>problem.id),admin,user.id])).rows;
+  WHERE p.id=ANY($1::uuid[]) AND ($2 OR ${access})`,[allowed.map(problem=>problem.id),admin,user.id])).rows;
  const byProblem=new Map(versions.map(version=>[version.problem_id,version]));
  const results=[];
  for(const item of items){
@@ -94,18 +94,21 @@ export async function handlePlatformProblems(ctx) {
   const audit=(action,id,detail={})=>db.query('INSERT INTO platform_audit_events(actor_account_id,action,detail) VALUES($1,$2,$3)',
    [user.id,action,{problemId:id,...detail}]);
   if(batchReview||batchPublish)return reviewProblemDrafts(db,user,admin,body,audit,batchPublish);
+  const canReview=async id=>admin||(await db.query('SELECT 1 FROM platform_problem_review_grants($1) WHERE problem_id=$2',[user.id,id])).rowCount>0;
   const detail=async(id,versionId)=>{
    const result=await helpers.problemResult(db,user,id,versionId,{editing:true});
    const category=(await db.query('SELECT p.platform_bank_id,b.name FROM problems p LEFT JOIN platform_problem_banks b ON b.id=p.platform_bank_id WHERE p.id=$1',[id])).rows[0];
    return {...result,sourceBankId:result.bankId,bankId:category?.platform_bank_id??null,ownerScope:'platform',schoolId:LEGACY_SCHOOL_ID,bankName:category?.name??'',
-    canPublish:admin&&(result.canPublish||result.draftReviewStatus==='pending'&&result.validationStatus==='AC'),
+    canPublish:(admin&&result.canPublish)||(result.draftReviewStatus==='pending'&&result.validationStatus==='AC'&&await canReview(id)),
     canRequestReview:!admin&&result.canPublish&&result.editRevision>result.publishedRevision,canManage:admin};
   };
   if(!match[1]&&method==='GET'){
    const summary=url.searchParams.get('view')==='summary';
+   const reviewQueue=url.searchParams.get('reviewQueue')==='1';
    const schoolId=url.searchParams.get('schoolId')?uuid(url.searchParams.get('schoolId')):null;
    const bankId=url.searchParams.get('bankId')?uuid(url.searchParams.get('bankId')):null;
    const rows=(await db.query(`SELECT ${summary?problemListColumns('v'):'v.*'},v.edit_draft IS NOT NULL has_draft_changes,v.draft_review_status,
+    ($2 OR g.problem_id IS NOT NULL) can_review_draft,
     ${summary?`v.edit_draft->'tags' draft_tags,v.edit_draft->>'title' draft_title,v.edit_revision,v.published_revision,
     CASE WHEN v.edit_draft IS NULL THEN NULL WHEN v.draft_validation_task_id IS NULL THEN 'Incomplete'
      WHEN t.id IS NULL THEN 'Waiting' ELSE ${draftValidationResultSql} END draft_validation_status,`:''}
@@ -121,13 +124,15 @@ export async function handlePlatformProblems(ctx) {
     ${summary?`LEFT JOIN judge_tasks t ON t.id=v.draft_validation_task_id AND t.version_id=v.id AND t.draft_revision=v.edit_revision
     LEFT JOIN judge_runs r ON r.task_id=t.id AND r.lease_id=t.lease_id`:''}
     LEFT JOIN luq_assistance_contents solution ON solution.id=${sharedSolutionIdSql('p.id','v.id')}
+    LEFT JOIN platform_problem_review_grants($1,$3) g ON g.problem_id=p.id
     WHERE p.owner_scope='platform' AND (p.archived_at IS NULL OR $4) AND ($5::uuid IS NULL OR p.platform_bank_id=$5) AND ($2 OR
      ${platformContentEditorSql('problem','p.id','$1::uuid','$3::uuid')})
-    ORDER BY (v.draft_review_status IS NOT DISTINCT FROM 'pending') DESC,v.title,p.id`,[user.id,admin,schoolId,admin&&url.searchParams.get('includeArchived')==='1',bankId])).rows;
+     AND (NOT $6 OR v.draft_review_status='pending' AND ($2 OR g.problem_id IS NOT NULL))
+    ORDER BY (v.draft_review_status IS NOT DISTINCT FROM 'pending') DESC,v.title,p.id`,[user.id,admin,schoolId,admin&&url.searchParams.get('includeArchived')==='1',bankId,reviewQueue])).rows;
    return reply({items:rows.map(row=>({...(summary?problemListSummary(row):helpers.problemShape(row)),ownerScope:'platform',schoolId:LEGACY_SCHOOL_ID,bankName:row.category_name??'',
     ...(!row.archived_at&&Array.isArray(row.draft_tags)?{draftTags:row.draft_tags}:{}),
     ...(summary?{editRevision:row.edit_revision,draftValidationStatus:row.draft_validation_status,
-     ...(admin&&row.draft_review_status==='pending'&&row.draft_title?{draftTitle:row.draft_title}:{}),
+     ...(row.can_review_draft&&row.draft_review_status==='pending'&&row.draft_title?{draftTitle:row.draft_title}:{}),
      canRequestReview:!admin&&!row.archived_at&&row.edit_revision>row.published_revision&&row.draft_review_status!=='pending'&&row.draft_validation_status==='AC'}:{}),
     bankId:row.platform_bank_id,sourceBankId:row.bank_id,courses:row.courses,archivedAt:row.archived_at,canEdit:!row.archived_at,canManageTutorial:!row.archived_at,canPublish:admin&&!row.archived_at&&row.validation_status==='AC'&&!row.published_at,
     hasDraftChanges:row.has_draft_changes,draftReviewStatus:row.draft_review_status,hasSolutionDraft:row.has_solution_draft===true,
@@ -202,10 +207,16 @@ export async function handlePlatformProblems(ctx) {
    await saveProblemDraft(db,user,v,helpers.problemInput({...body,bankId:p.bank_id}),body.expectedRevision,
     (_db,_actor,action,_type,_version,metadata)=>audit(`platform.${action}`,id,{versionId:v.id,...metadata}));
   }else{
-   if(!admin)fail(403,'PLATFORM_ADMIN_REQUIRED','仅平台管理员可发布题目');
+   if(!admin){
+    if(!await canReview(id))fail(403,'CONTENT_REVIEWER_REQUIRED','未获此题目的审核授权');
+    await publishReviewedDraft(db,user,v,body,audit);
+    return reply(await detail(id));
+   }
    if(v.edit_draft){
     requireDraftRevision(v,body.expectedRevision);
-    await publishPlatformDraft(db,user,v,audit);
+    const firstStandaloneRelease=!v.published_at&&!(await db.query(`SELECT 1 FROM chapter_problems cp JOIN learning_chapters ch ON ch.id=cp.chapter_id
+     JOIN learning_paths c ON c.id=ch.path_id WHERE cp.problem_id=$1 AND ch.archived_at IS NULL AND c.owner_scope='platform' AND c.archived_at IS NULL LIMIT 1`,[id])).rowCount;
+    await publishPlatformDraft(db,user,v,audit,firstStandaloneRelease);
     return reply(await detail(id));
    }
    if(v.published_at)fail(409,'ALREADY_PUBLISHED','当前版本已发布');

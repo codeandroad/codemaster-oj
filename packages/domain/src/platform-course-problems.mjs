@@ -8,7 +8,8 @@ import { problemSolvedSql } from './problem-progress.mjs';
 
 export const platformProblemReadySql=(p='p',v='v',b='b')=>`${p}.owner_scope='platform' AND ${p}.archived_at IS NULL
  AND ${b}.archived_at IS NULL AND ${v}.published_at IS NOT NULL AND ${v}.validation_status='AC'
- AND ${v}.rank_review_status='approved' AND NOT EXISTS(SELECT 1 FROM timed_practice_problems t WHERE t.problem_id=${p}.id)`;
+ AND (${v}.rank_review_status='approved' OR ${v}.course_only_published AND ${v}.rank_review_status='pending')
+ AND NOT EXISTS(SELECT 1 FROM timed_practice_problems t WHERE t.problem_id=${p}.id)`;
 
 // Admission grants only this linked exercise, never the source school's bank.
 export async function platformCourseProblem(db,user,id,{courseId=null,chapterId=null,versionId=null}={}) {

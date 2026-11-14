@@ -366,6 +366,69 @@ test('the complete platform problem editor uses scoped grants without publicatio
       await pool.query('UPDATE school_memberships SET revoked_at=NULL WHERE school_id=$1 AND account_id=$2', [alpha.id, actors.teacher.id]);
       for (const [name, schoolId] of [['teacher', alpha.id], ['teacher', beta.id], ['other-teacher', beta.id]]) await request(`/platform/content-editors/course/${course.id}`, { method: 'DELETE', body: grant(name, schoolId) });
     });
+    await t.test('a platform course review grant lets only an active school administrator publish linked pending drafts', async () => {
+      const course = await post('/platform/courses', { requestId: randomUUID(), title: 'Scoped reviewer course', chapters: [{ title: 'Lesson', content: 'Lesson source.', problems: [{ problemId: problem.id, versionId: latest.versionId }] }] }, 'platform', 201);
+      const path = `/platform/content-editors/course/${course.id}`;
+      const body = { ...grant('school-admin'), canReviewLinkedProblems: true };
+      await post(path, { ...grant('teacher'), canReviewLinkedProblems: true }, 'platform', 400);
+      await post(path, body, 'school-admin', 403);
+      await post(path, grant('school-admin'));
+      const queue = `${source}?view=summary&reviewQueue=1&schoolId=${alpha.id}`;
+      const judge = { environmentVersion: 'review-grant', judge: async () => ({ status: 'AC', score: 100, passed: 1, total: 1, publicOutput: '', publicMessage: '', privateResults: [], environmentVersion: 'review-grant' }) };
+      const old = await get(`${source}/${problem.id}`, 'teacher');
+      const draft = await post(`${source}/${problem.id}/versions`, { ...input, tags: ['Delegated change'], expectedVersionId: old.versionId, expectedRevision: old.editRevision }, 'teacher', 201);
+      while (await processOne({ pool: worker, judge, logger: {} })) { /* Drain this isolated fixture. */ }
+      const target = { problemId: problem.id, expectedVersionId: draft.versionId, expectedRevision: draft.editRevision };
+      const batch = `${source}/publish-batch`;
+      await post(batch, { items: [target] }, 'school-admin', 403);
+      const authorization = await post(path, body);
+      assert.deepEqual(authorization.items[0].reviewResourceIds, [course.id]);
+      assert.deepEqual((await post(batch, { items: [target] }, 'school-admin')).items, [{ problemId: problem.id, status: 'skipped', code: 'REVIEW_REQUIRED' }]);
+      await post(`${source}/${problem.id}/request-review`, target, 'teacher');
+      assert.deepEqual((await get(queue, 'school-admin')).items.map(row => row.id), [problem.id]);
+      assert.deepEqual((await get(queue, 'teacher')).items, []);
+      await post(batch, { items: [{ ...target, problemId: other.id }] }, 'school-admin', 403);
+      await post('/platform/problem-publications', { schoolId: LEGACY_SCHOOL_ID, problemId: problem.id, versionId: draft.versionId }, 'school-admin', 403);
+      await post(path, { ...body, canReviewLinkedProblems: false });
+      assert.deepEqual((await get(queue, 'school-admin')).items, []);
+      await post(batch, { items: [target] }, 'school-admin', 403);
+      await post(path, body);
+      const published = (await post(batch, { items: [target] }, 'school-admin')).items[0];
+      assert.equal(published.status, 'published');
+      assert.equal((await post(batch, { items: [target] })).items[0].status, 'already_published');
+      assert.deepEqual((await get(`/problems/${problem.id}?current=1`, 'history-student')).tags, ['Delegated change']);
+      assert.equal((await pool.query('SELECT 1 FROM school_problem_publications WHERE problem_id=$1 AND withdrawn_at IS NULL', [problem.id])).rowCount, 0);
+      await request(path, { method: 'DELETE', body: grant('school-admin') });
+      latest = await get(`${source}/${problem.id}`);
+
+      const courseOnly = await post(source, { ...input, title: 'Practice for admitted learners' }, 'platform', 201);
+      const restrictedCourse = await post('/platform/courses', { requestId: randomUUID(), title: 'Restricted practice course',
+        audienceScope: 'students', studentIds: [actors.student.identityId], chapters: [{ title: 'Practice', content: 'Practice lesson.' }] }, 'platform', 201);
+      const chapterId = restrictedCourse.chapters[0].id;
+      // Imported course links can already reference an unpublished source.
+      await pool.query('INSERT INTO chapter_problems(chapter_id,problem_id,version_id,position) VALUES($1,$2,$3,0)', [chapterId, courseOnly.id, courseOnly.versionId]);
+      await post(`/platform/content-editors/course/${restrictedCourse.id}`, body);
+      await post(`/platform/content-editors/course/${restrictedCourse.id}`, grant('teacher'));
+      const initialDraft = await post(`${source}/${courseOnly.id}/versions`, { ...input, title: courseOnly.title,
+        expectedVersionId: courseOnly.versionId, expectedRevision: courseOnly.editRevision }, 'teacher', 201);
+      while (await processOne({ pool: worker, judge, logger: {} })) { /* Drain this isolated fixture. */ }
+      const initialTarget = { problemId: courseOnly.id, expectedVersionId: courseOnly.versionId, expectedRevision: initialDraft.editRevision };
+      await post(`${source}/${courseOnly.id}/request-review`, initialTarget, 'teacher');
+      assert.equal((await get(`${source}/${courseOnly.id}`, 'school-admin')).canPublish, true);
+      await post(`${source}/${courseOnly.id}/publish`, initialTarget, 'school-admin');
+      const audience = await pool.query('SELECT course_only_published,school_visible_at FROM problem_versions WHERE id=$1', [courseOnly.versionId]);
+      assert.deepEqual(audience.rows[0], { course_only_published: true, school_visible_at: null });
+      assert.equal((await get(`/platform/courses/${restrictedCourse.id}`)).chapters[0].problems[0].readyForCourse, true);
+      await post(`/platform/courses/${restrictedCourse.id}/publish`, { expectedRevision: restrictedCourse.revision, sourceVersion: restrictedCourse.sourceVersion });
+      const practice = `/practice/problems/${courseOnly.id}`;
+      const inCourse = `${practice}?courseId=${restrictedCourse.id}&chapterId=${chapterId}`;
+      assert.equal((await get(inCourse, 'student')).id, courseOnly.id);
+      await get(inCourse, 'history-student', 404);
+      await get(practice, 'history-student', 404);
+      assert.deepEqual((await get(`/practice/problems?q=${courseOnly.id}`, 'student')).items, []);
+      await request(`/platform/content-editors/course/${restrictedCourse.id}`, { method: 'DELETE', body: grant('teacher') });
+      await request(`/platform/content-editors/course/${restrictedCourse.id}`, { method: 'DELETE', body: grant('school-admin') });
+    });
     await t.test('batch grants are atomic and current course links derive revocable, school-specific problem editing', async () => {
       const makeCourse = title => post('/platform/courses', { requestId: randomUUID(), title, chapters: [{ title: 'Linked lesson', content: 'Original lesson', problems: [{ problemId: problem.id, versionId: latest.versionId }] }] }, 'platform', 201);
       const first = await makeCourse('Inherited editor one'), second = await makeCourse('Inherited editor two');

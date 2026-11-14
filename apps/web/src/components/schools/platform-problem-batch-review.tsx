@@ -20,7 +20,7 @@ export function PlatformProblemBatchReview({ rows, onClose, onSaved }: {
     const target = canReviewProblem(row, decision) && problemReviewTarget(row);
     return target ? [target] : [];
   }) : [];
-  const labels = { approve: tx("审核并公开", "Approve and publish"), reject: tx("驳回待审核申请", "Reject pending requests"), withdraw: tx("从公开区下架", "Withdraw public access") };
+  const labels = { approve: tx("审核并向全平台公开", "Approve platform-wide access"), reject: tx("驳回全平台公开申请", "Reject platform-wide access requests"), withdraw: tx("撤下全平台公开", "Withdraw platform-wide access") };
   const skipped = rows.length - targets.length;
 
   function submit() {
@@ -37,8 +37,8 @@ export function PlatformProblemBatchReview({ rows, onClose, onSaved }: {
 
   return <Dialog open onOpenChange={open => { if (!open && !pending.current) onClose(); }}>
     <DialogContent className="grid-cols-[minmax(0,1fr)] max-h-[85dvh] overflow-auto overscroll-contain sm:max-w-xl" onOpenAutoFocus={event => { event.preventDefault(); cancel.current?.focus(); }}>
-      <DialogTitle>{tx("批量审核", "Batch review")}</DialogTitle>
-      <DialogDescription>{tx("选择审核操作并核对题目名单。公开后，所有登录用户均可练习。", "Choose a decision and review the affected problems. Any signed-in user can practice public problems.")}</DialogDescription>
+      <DialogTitle>{tx("批量管理全平台公开", "Manage platform-wide access in bulk")}</DialogTitle>
+      <DialogDescription>{tx("此处管理公开练习区。向全平台公开后，所有已登录用户均可练习所列题目的已发布内容。", "This controls the public practice catalog. Platform-wide access lets any signed-in user practice the published content of the listed problems.")}</DialogDescription>
       <label className="grid gap-1 text-sm font-medium">{tx("审核操作", "Review decision")}
         <select className={input} value={decision} disabled={action.busy} onChange={event => { setDecision(event.target.value as typeof decision); action.clear(); }}>
           <option value="">{tx("请选择", "Choose a decision")}</option>

@@ -23,7 +23,7 @@ import { TeacherDashboard } from "@/components/teacher/dashboard-classes";
 import { SchoolStaffImports, SchoolTeachingReports } from "./school-staff-pages";
 import { SchoolSettings } from "./school-settings";
 import { schoolWorkspaceHref, schoolWorkspaceRole } from "./school-workspace-location";
-import { SchoolPractice, SchoolJudgeStatus } from "./school-practice";
+import { PublicProblemReview, SchoolPractice, SchoolJudgeStatus } from "./school-practice";
 import { PersonalWorkspaceProfile } from "./personal-workspace-profile";
 import { SchoolClasses } from "./school-classes";
 import { SchoolStudentDashboard, SchoolSubmissions } from "./school-dashboard";
@@ -35,7 +35,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { PersonalAppearanceProvider } from "@/components/personal-appearance-settings";
 import { WorkspaceThemeProvider } from "@/components/ui/theme-context";
 import { useWorkspaceSettings } from "@/components/student/workspace-settings";
@@ -218,13 +218,21 @@ export function SchoolsPage({
     onRefresh={refresh}
   />;
   if (!teaching && active.section === "acsl" && search.get("coding") === "1") return <AcslPage key={selected.id} schoolId={selected.id} user={user} baseHref={href("acsl")} />;
-  const problems = <SchoolPractice
+  const platformReviews = admin && search.get("reviewScope") === "platform";
+  const schoolProblems = <SchoolPractice
     key={search.get("problemId") ?? "list"}
     accountId={user.id}
     schoolId={selected.id}
     role={role}
     initialProblemId={search.get("problemId") ?? undefined}
   />;
+  const problems = admin ? <div className="space-y-4">
+    <nav className="flex flex-wrap gap-2" aria-label={text("Problem banks", "题库")}>
+      <AppLink href={href("problems")} aria-current={!platformReviews ? "page" : undefined} className={buttonVariants({ size: "sm", variant: !platformReviews ? "secondary" : "ghost" })}>{text("School problems", "校内题目")}</AppLink>
+      <AppLink href={`${href("problems")}&reviewScope=platform`} aria-current={platformReviews ? "page" : undefined} className={buttonVariants({ size: "sm", variant: platformReviews ? "secondary" : "ghost" })}>{text("Delegated platform reviews", "平台授权待审")}</AppLink>
+    </nav>
+    {platformReviews ? <PublicProblemReview user={user} reviewSchoolId={selected.id} /> : schoolProblems}
+  </div> : schoolProblems;
   return (
     <WorkspaceThemeProvider theme={resolvedPageTheme}>
       <PersonalAppearanceProvider

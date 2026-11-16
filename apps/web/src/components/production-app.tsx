@@ -25,12 +25,12 @@ import { resolveLoginDestination } from "./auth/login-destination";
 import { readSchoolPreference, writeSchoolPreference } from "./schools/school-selection";
 import { PageHeadingProvider } from "@/components/page-heading-context";
 import { PageBreadcrumbs, ShellPageHeading } from "@/components/page-breadcrumbs";
-import { AuthNotice } from "@/components/auth/auth-shell";
+import { AuthConnectionNotice } from "@/components/auth/auth-shell";
 import { Feedback, panelClass as panel, useMutation as useAction } from "@/components/admin/data-state";
 import {useWorkspaceSettings} from "@/components/student/workspace-settings";
 import {WorkspaceThemeProvider} from "@/components/ui/theme-context";
 import {PersonalAppearanceProvider, PersonalAppearanceSettings} from "@/components/personal-appearance-settings";
-import {AppLocaleProvider,useLocale} from "@/components/locale-context";
+import { AppLocaleProvider, HomeLocaleProvider, useLocale } from "@/components/locale-context";
 import { ApiError, apiMessage, clearProductionSession, productionApi, productionSessionExpiredEvent, roleHome, type AuthResponse, type CampusRole, type CampusUser } from "@/lib/production-api";
 
 
@@ -150,14 +150,18 @@ export function ProductionApp() {
   };
   if (!isCampusRoute(pathname)) return null;
   const authPage = pathname === "/" || isCampusAuthRoute(pathname);
-  if (loading && authPage) return <AuthNotice title={pathname === "/register" ? "Create account" : "Sign in"} message="Connecting to CodeMaster…" />;
+  const publicHome = pathname === "/" && !user;
+  const retryConnection = () => { setLoading(true); setError(""); setCheck(value => value + 1); };
+  if (authPage && (loading || error)) {
+    const notice = <AuthConnectionNotice register={pathname === "/register"} error={loading ? "" : error} onRetry={retryConnection} />;
+    return publicHome ? <HomeLocaleProvider>{notice}</HomeLocaleProvider> : notice;
+  }
   if (loading)
     return (
       <main className="grid min-h-screen place-items-center bg-background">
         <p role="status">Connecting to CodeMaster…</p>
       </main>
     );
-  if (error && authPage) return <AuthNotice error title="Unable to connect" message={error}><Button className="mt-5 w-fit" onClick={() => { setLoading(true); setError(""); setCheck(value => value + 1); }}>Retry</Button></AuthNotice>;
   if (error)
     return (
       <main className="mx-auto max-w-lg p-8">
@@ -167,11 +171,7 @@ export function ProductionApp() {
         </p>
         <Button
           className="mt-5"
-          onClick={() => {
-            setLoading(true);
-            setError("");
-            setCheck((value) => value + 1);
-          }}
+          onClick={retryConnection}
         >
           Retry
         </Button>
@@ -179,7 +179,10 @@ export function ProductionApp() {
     );
   if (pathname === "/activate") return <ProductionRegisterPage />;
   if (pathname === "/register") return <PersonalRegisterPage onRegistered={loggedIn} joinIntent={joinIntent}/>;
-  if (!user || pathname === "/login") return <ProductionLoginPage key={resetIntent ? "reset" : "login"} onLogin={loggedIn} joinIntent={joinIntent} resetIntent={resetIntent} />;
+  if (!user || pathname === "/login") {
+    const login = <ProductionLoginPage key={resetIntent ? "reset" : "login"} onLogin={loggedIn} joinIntent={joinIntent} resetIntent={resetIntent} />;
+    return publicHome ? <HomeLocaleProvider>{login}</HomeLocaleProvider> : login;
+  }
   const logout = () => {
     setUser(null);
     clearProductionSession();

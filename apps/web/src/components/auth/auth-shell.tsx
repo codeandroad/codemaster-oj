@@ -1,14 +1,19 @@
 "use client";
 
+import { Languages } from "lucide-react";
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { BrandLogo } from "@/components/brand-logo";
 import { useLocale } from "@/components/locale-context";
 import { SiteFooter } from "@/components/site-footer";
+import { Button } from "@/components/ui/button";
 import styles from "./auth-shell.module.css";
 
 /** Public authentication uses the system's light palette, outside workspace themes. */
 export function AuthShell({ children, titleId = "login-title" }: { children: ReactNode; titleId?: string }) {
-  const { locale } = useLocale();
+  const { locale, setLocale } = useLocale();
+  const isHome = usePathname() === "/";
+  const nextLocale = locale === "zh" ? "en" : "zh";
   const tx = (zh: string, en: string) => locale === "en" ? en : zh;
   const roles = [
     { name: tx("学生", "Students"), description: tx("课程学习、自由练习", "Courses and coding practice") },
@@ -30,6 +35,10 @@ export function AuthShell({ children, titleId = "login-title" }: { children: Rea
         </aside>
         <section className={styles.formPanel} aria-labelledby={titleId}>
           <BrandLogo className={styles.mobileLogo} />
+          {isHome && <Button type="button" variant="outline" className={`${styles.language} mb-2 self-end`}
+            lang={nextLocale === "zh" ? "zh-CN" : "en"} onClick={() => setLocale(nextLocale)}>
+            <Languages size={16} aria-hidden="true" />{nextLocale === "zh" ? "简体中文" : "English"}
+          </Button>}
           {children}
         </section>
       </div>
@@ -38,6 +47,15 @@ export function AuthShell({ children, titleId = "login-title" }: { children: Rea
   </div>;
 }
 
-export function AuthNotice({ title, message, error = false, children }: { title: string; message: string; error?: boolean; children?: ReactNode }) {
-  return <AuthShell><h2 id="login-title" className={styles.title}>{title}</h2><p className={styles.description} role={error ? "alert" : "status"}>{message}</p>{children}</AuthShell>;
+export function AuthConnectionNotice({ register, error, onRetry }: { register: boolean; error: string; onRetry: () => void }) {
+  const { locale, t } = useLocale();
+  const connecting = locale === "zh" ? "正在连接 CodeMaster…" : "Connecting to CodeMaster…";
+  const title = error
+    ? locale === "zh" ? "无法连接" : "Unable to connect"
+    : register ? "Create account" : t("登录");
+  return <AuthShell>
+    <h2 id="login-title" className={styles.title}>{title}</h2>
+    <p className={styles.description} role={error ? "alert" : "status"}>{error || connecting}</p>
+    {error && <Button className="mt-5 w-fit" onClick={onRetry}>{locale === "zh" ? "重试" : "Retry"}</Button>}
+  </AuthShell>;
 }

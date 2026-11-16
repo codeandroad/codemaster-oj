@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { accountLocaleStorageKey, DEFAULT_APP_LOCALE, resolveAppLocale, type AppLocale } from "@/lib/app-locale";
 
 export type { AppLocale } from "@/lib/app-locale";
@@ -205,7 +205,18 @@ type LocaleContextValue = { locale: AppLocale; setLocale: (locale: AppLocale) =>
 const LocaleContext = createContext<LocaleContextValue | null>(null);
 
 export function AppLocaleProvider({ accountId, children }: { accountId: string; children: ReactNode }) {
-  const storageKey = accountLocaleStorageKey(accountId);
+  return <LocaleProvider storageKey={accountLocaleStorageKey(accountId)}>{children}</LocaleProvider>;
+}
+
+const subscribeToHydration = () => () => {};
+
+export function HomeLocaleProvider({ children }: { children: ReactNode }) {
+  // The public connection screen is rendered on the server before browser preferences are available.
+  const hydrated = useSyncExternalStore(subscribeToHydration, () => true, () => false);
+  return hydrated ? <LocaleProvider storageKey="campus-judge:home-locale:v1">{children}</LocaleProvider> : children;
+}
+
+function LocaleProvider({ storageKey, children }: { storageKey: string; children: ReactNode }) {
   const [locale, setCurrentLocale] = useState<AppLocale>(() => {
     try { return resolveAppLocale(localStorage.getItem(storageKey)); }
     catch { return DEFAULT_APP_LOCALE; }

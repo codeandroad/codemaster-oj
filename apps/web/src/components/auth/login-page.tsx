@@ -10,7 +10,7 @@ import { AuthShell } from "./auth-shell";
 import styles from "./auth-shell.module.css";
 
 type Field = "username" | "password" | "resetCode" | "confirmation";
-type FormIssue = { field?: Field; kind: "username" | "password" | "resetCode" | "passwordLength" | "confirmation" | "login" | "disabled" | "server"; message?: string };
+type FormIssue = { field?: Field; kind: "username" | "password" | "resetCode" | "passwordLength" | "confirmation" | "login" | "disabled" | "resetFailed" | "server"; message?: string };
 
 export function ProductionLoginPage({ onLogin, joinIntent = false, resetIntent = false }: { onLogin: (user: CampusUser) => void; joinIntent?: boolean; resetIntent?: boolean }) {
   const { t, locale } = useLocale();
@@ -34,6 +34,7 @@ export function ProductionLoginPage({ onLogin, joinIntent = false, resetIntent =
     confirmation: t("两次输入的新密码不一致。"),
     login: t("用户名或密码不正确"),
     disabled: t("账号已禁用"),
+    resetFailed: tx("重置凭据无效或已过期。请打开管理员提供的重置入口，并使用最新的一次性凭据。", "The reset code is invalid or expired. Open the reset link from your administrator and use the newest code."),
     server: issue.message ?? "",
   }[issue.kind] : "";
 
@@ -76,7 +77,7 @@ export function ProductionLoginPage({ onLogin, joinIntent = false, resetIntent =
     } catch (reason) {
       const next: FormIssue = reason instanceof ApiError && reason.code === "ACCOUNT_DISABLED" ? { kind: "disabled", field: "username" }
         : reason instanceof ApiError && reason.code === "LOGIN_FAILED" ? { kind: "login", field: "password" }
-        : reason instanceof ApiError && reason.code === "RESET_FAILED" ? { kind: "server", field: "resetCode", message: tx("重置凭据无效或已过期。请打开管理员提供的重置入口，并使用最新的一次性凭据。", "The reset code is invalid or expired. Open the reset link from your administrator and use the newest code.") }
+        : reason instanceof ApiError && reason.code === "RESET_FAILED" ? { kind: "resetFailed", field: "resetCode" }
         : { kind: "server", message: apiMessage(reason) };
       setIssue(next);
       // The focused error remains associated after the busy fieldset is enabled.

@@ -1,3 +1,4 @@
+import { WrittenPapersModule } from './modules/written-papers.module.js';
 import { AcslModule } from './modules/acsl.module.js';
 import { SchoolScholarshipModule } from './modules/school-scholarship.module.js';
 import { SchoolLeaderboardModule } from './modules/school-leaderboard.module.js';
@@ -32,7 +33,7 @@ class HealthController {
 export class AppModule {
   static register(options: RuntimeOptions): DynamicModule {
     return {module: AppModule,
-      imports: [CoreModule.register(options), AcslModule, AuthModule, PeopleModule, ClassesModule, LibraryModule, AssignmentsModule, SubmissionsModule, EducationModule, CommunityModule, SystemModule, Paper4Module, ScholarshipModule, SchoolsModule, PlatformModule, SchoolSettingsModule, SchoolPracticeModule, PublicLearningModule, SchoolActivitiesModule, SchoolPaper4Module, SchoolScholarshipModule, SchoolLeaderboardModule],
+      imports: [CoreModule.register(options), WrittenPapersModule, AcslModule, AuthModule, PeopleModule, ClassesModule, LibraryModule, AssignmentsModule, SubmissionsModule, EducationModule, CommunityModule, SystemModule, Paper4Module, ScholarshipModule, SchoolsModule, PlatformModule, SchoolSettingsModule, SchoolPracticeModule, PublicLearningModule, SchoolActivitiesModule, SchoolPaper4Module, SchoolScholarshipModule, SchoolLeaderboardModule],
       controllers: [HealthController]};
   }
 }

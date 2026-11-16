@@ -1,4 +1,5 @@
 const availablePages = new Set([
+  "/student/exam-preparation", "/teacher/exam-preparation", "/admin/exam-preparation",
   "/student/acsl",
   "/teacher/acsl", "/admin/acsl",
   "/student/scholarship", "/teacher/scholarship", "/admin/scholarship",
@@ -15,6 +16,7 @@ const availablePages = new Set([
 ]);
 
 const detailPages = [
+  /^\/(student|teacher|admin)\/exam-preparation\/computer-science-9618(?:\/paper1)?$/,
   /^\/admin\/problems\/[^/]+\/edit$/,
   /^\/admin\/paper4\/[^/]+$/,
   /^\/practice\/courses\/[^/]+$/,

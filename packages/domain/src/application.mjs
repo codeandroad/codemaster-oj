@@ -1,3 +1,4 @@
+import { handleWrittenPapers } from './written-papers.mjs';
 import { legacyProblemCatalogCourses, problemCatalogCourseRequest } from './problem-catalog-courses.mjs';
 import { problemListColumns, problemListSummary } from './problem-list-summary.mjs';
 import { canEditPlatformContent } from './platform-content-access.mjs';
@@ -906,7 +907,7 @@ export async function createDomainServices(pool,config) {
   return await handleSchoolSettings(context) ?? await handleSchools(context) ?? await handleSchoolActivation(context) ?? await handleSchoolTeaching(context) ?? await handleSchoolIdentityImports(context) ?? await handleSchoolCourses(context);
  }
 
- const operations={acsl:handleAcsl,publicPresence:handlePublicPresence,schoolScholarship:handleSchoolScholarship,schoolLeaderboard:handleSchoolLeaderboard,schoolPaper4:handleSchoolPaper4,schoolActivities:schoolActivitiesOperation,schoolPractice:schoolPracticeOperation,publicLearning:handlePublicLearning,auth:authOperation,people:peopleOperation,classes:classesOperation,library:libraryOperation,assignments:assignmentsOperation,submissions:submissionsOperation,education:educationOperation,community:handleCommunity,presence:handlePresence,platform:async ctx=>await handlePublicLearning(ctx)??await schoolPracticeOperation(ctx)??await handlePlatformGovernance(ctx),schools:schoolsOperation,system:systemOperation,paper4:handlePaper4,scholarship:handleScholarship};
+ const operations={writtenPapers:handleWrittenPapers,acsl:handleAcsl,publicPresence:handlePublicPresence,schoolScholarship:handleSchoolScholarship,schoolLeaderboard:handleSchoolLeaderboard,schoolPaper4:handleSchoolPaper4,schoolActivities:schoolActivitiesOperation,schoolPractice:schoolPracticeOperation,publicLearning:handlePublicLearning,auth:authOperation,people:peopleOperation,classes:classesOperation,library:libraryOperation,assignments:assignmentsOperation,submissions:submissionsOperation,education:educationOperation,community:handleCommunity,presence:handlePresence,platform:async ctx=>await handlePublicLearning(ctx)??await schoolPracticeOperation(ctx)??await handlePlatformGovernance(ctx),schools:schoolsOperation,system:systemOperation,paper4:handlePaper4,scholarship:handleScholarship};
  const helpers={problemShape,audit,classAccess,versionAccess,submissionAccess,assignmentAccess,assignmentResult,problemResult,problemInput,insertVersion,issueActivation,personShape,maskSubmission:timed.maskSubmission};
  async function prepareRequest({url:rawUrl,method,headers={},body={},ip='unknown'}) {
   const url=new URL(rawUrl,'http://api.local'),path=url.pathname.replace(/\/$/,'');
@@ -933,6 +934,7 @@ export async function createDomainServices(pool,config) {
 }
 function respond(status,body,cookie){return {status,body,...(cookie?{cookie}:{})};}
 export function resourceArea(route) {
+ if(/^\/schools\/[^/]+\/written-papers(?:\/|$)/.test(route))return 'writtenPapers';
  if(/^\/schools\/[^/]+\/acsl(?:\/|$)/.test(route))return 'acsl';
  if(/^\/admin\/problems\/[^/]+\/publication-request$/.test(route))return 'schoolPractice';
  if(/^\/schools\/[^/]+\/scholarship(?:\/|$)/.test(route))return 'schoolScholarship';

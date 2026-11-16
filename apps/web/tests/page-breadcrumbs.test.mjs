@@ -7,6 +7,37 @@ import { isCampusRoute, resolvePublicLearningBookmark } from '../src/lib/campus-
 const identity = '6d1e89c5-83fd-48ce-8025-303e63d4eba0';
 const roleFor = path => path.startsWith('/teacher') ? 'teacher' : path.startsWith('/admin') ? 'admin' : 'student';
 
+test('Paper 1 breadcrumbs retain the subject and preparation ancestors', () => {
+  for (const role of ['student', 'teacher', 'admin']) {
+    const center = `/${role}/exam-preparation`, subject = `${center}/computer-science-9618`, paper = `${subject}/paper1`;
+    assert.equal(isCampusRoute(paper), true);
+    for (const locale of ['zh', 'en']) {
+      const trail = pageBreadcrumbs(paper, role, locale);
+      assert.deepEqual(trail.slice(-3).map(item => item.href), [center, subject, paper]);
+      assert.ok(trail.at(-2).label.includes('9618'));
+      assert.ok(trail.at(-1).label.includes('Paper 1'));
+    }
+  }
+});
+
+test('exam resources keep their original URLs under the preparation directory', () => {
+  for (const role of ['student', 'teacher', 'admin']) {
+    const center = `/${role}/exam-preparation`;
+    assert.equal(isCampusRoute(center), true);
+    for (const resource of role === 'admin' ? ['acsl'] : ['paper4', 'acsl']) {
+      const path = `/${role}/${resource}`;
+      assert.equal(isCampusRoute(path), true);
+      const trail = pageBreadcrumbs(path, role, 'zh');
+      assert.equal(trail.at(-2).href, center);
+      assert.equal(trail.at(-2).label, role === 'student' ? '备考中心' : '备考资源');
+      assert.equal(trail.at(-1).href, path);
+    }
+  }
+  assert.equal(pageBreadcrumbs('/student/paper4', 'student', 'zh').at(-1).label, 'Paper 4 真题练习');
+  assert.equal(pageBreadcrumbs(`/admin/paper4/${identity}`, 'admin', 'zh').at(-2).href, '/admin/problem-banks');
+  assert.equal(isCampusRoute('/practice/exam-preparation'), false);
+});
+
 test('every declared campus landing page has a readable breadcrumb in both languages', () => {
   const routeSource = readFileSync(new URL('../src/lib/campus-routes.ts', import.meta.url), 'utf8');
   const landingPages = [...routeSource.split('const detailPages')[0].matchAll(/"(\/[^"]*)"/g)].map(match => match[1]);
@@ -59,7 +90,7 @@ test('all campus detail route shapes hide identifiers and only link valid ancest
 
 test('nested reviews and chapters provide safe navigation to their owning paper or course', () => {
   const review = pageBreadcrumbs(`/teacher/paper4/${identity}/review/attempt-1`, 'teacher', 'en');
-  assert.deepEqual(review.map(item => item.href), ['/teacher', '/teacher/paper4', `/teacher/paper4/${identity}`, `/teacher/paper4/${identity}/review/attempt-1`]);
+  assert.deepEqual(review.map(item => item.href), ['/teacher', '/teacher/exam-preparation', '/teacher/paper4', `/teacher/paper4/${identity}`, `/teacher/paper4/${identity}/review/attempt-1`]);
   const chapter = pageBreadcrumbs(`/student/learning-paths/${identity}/chapters/chapter-1`, 'student', 'en');
   assert.equal(chapter.at(-2).href, `/student/learning-paths/${identity}`);
 });

@@ -136,6 +136,11 @@ REVOKE ALL ON FUNCTION acsl_edit_paper(uuid,uuid,uuid,text,text) FROM PUBLIC,cam
 GRANT EXECUTE ON FUNCTION acsl_edit_paper(uuid,uuid,uuid,text,text) TO campus_app;
 GRANT SELECT ON school_judge_jobs TO campus_worker;
 GRANT UPDATE(state,attempts,lease_id,lease_expires_at,node_id,available_at,result,completed_at) ON school_judge_jobs TO campus_worker;
+REVOKE ALL ON written_papers,written_paper_versions,written_assets,written_attempts,written_attachments,written_events FROM PUBLIC,campus_app,campus_worker;
+GRANT SELECT,INSERT ON written_papers,written_paper_versions,written_assets,written_attempts,written_attachments,written_events TO campus_app;
+GRANT UPDATE(draft_version_id,published_version_id) ON written_papers TO campus_app;
+GRANT UPDATE(answers,revision,save_request_id,save_hash,state,updated_at,submitted_at,released_at,score,marks,grading_revision,review_request_id,review_hash,self_marks,notes) ON written_attempts TO campus_app;
+
 `);
   console.log('Runtime role grants applied.');
 } finally { await pool.end(); }

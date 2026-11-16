@@ -17,3 +17,17 @@ test('sign-in can return to the exact chapter and rejects unsafe destinations', 
     assert.equal(loginReturnTo(href), null, href);
   }
 });
+
+test('preparation directories and bookmarked practices remain valid sign-in destinations', () => {
+  for (const href of [
+    '/student/exam-preparation', '/teacher/exam-preparation', '/admin/exam-preparation',
+    '/student/exam-preparation/computer-science-9618',
+    '/student/exam-preparation/computer-science-9618/paper1?attemptId=attempt',
+    '/teacher/exam-preparation/computer-science-9618/paper1?paperId=paper',
+    '/schools?schoolId=school&schoolRole=student&section=exam-preparation&subject=computer-science-9618&component=paper1&attemptId=attempt',
+    '/student/paper4/paper?versionId=version&learningPathId=course&chapterId=chapter&question=2',
+    '/student/acsl?paperVersionId=paper&questionId=question&coding=1&contentLanguage=en',
+    '/schools?schoolId=school&schoolRole=teacher&section=paper4&paperId=paper',
+  ]) assert.equal(loginReturnTo(href), href);
+  assert.equal(loginReturnTo('/practice/exam-preparation'), null);
+});

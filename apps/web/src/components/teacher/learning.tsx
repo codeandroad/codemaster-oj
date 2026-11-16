@@ -1025,7 +1025,7 @@ export function LearningEditorForm({
                       <Plus size={14} />
                       {tr("普通题目", "Problems")}
                     </Button>
-                    <Button size="sm" variant="secondary" disabled={!canEditCourse} onClick={() => setPaper4Picker(true)}><Plus size={14}/>{tr("Paper 4 练习", "Paper 4 practice")}</Button>
+                    <Button size="sm" variant="secondary" disabled={!canEditCourse} onClick={() => setPaper4Picker(true)}><Plus size={14}/>{tr("Paper 4 真题练习", "Paper 4 past papers")}</Button>
                   </div>
                 </div>
                 {chapter.problems.map((p, i) => (
@@ -1101,8 +1101,8 @@ export function LearningEditorForm({
                     <span className={`mt-2 inline-flex rounded border px-2 py-0.5 text-xs font-medium ${item.available === false || item.readyForCourse === false ? "border-warning/25 bg-warning-soft text-warning" : "border-success/25 bg-success-soft text-success"}`}>{item.available === false || item.readyForCourse === false ? tr("引用不可用，请重新关联", "Unavailable; relink a public version") : tr("已公开 · 固定版本", "Public · pinned version")}</span>
                   </div>
                   <span className="flex shrink-0 gap-1">
-                    <Button size="icon" variant="ghost" title={tr("Paper 4 练习上移", "Move Paper 4 practice up")} disabled={index === 0 || !canEditCourse} onClick={() => update("paper4Links", move(chapter.paper4Links ?? [], index, -1))}><ArrowUp size={14}/></Button>
-                    <Button size="icon" variant="ghost" title={tr("Paper 4 练习下移", "Move Paper 4 practice down")} disabled={index === (chapter.paper4Links ?? []).length - 1 || !canEditCourse} onClick={() => update("paper4Links", move(chapter.paper4Links ?? [], index, 1))}><ArrowDown size={14}/></Button>
+                    <Button size="icon" variant="ghost" title={tr("Paper 4 真题练习上移", "Move Paper 4 past-paper practice up")} disabled={index === 0 || !canEditCourse} onClick={() => update("paper4Links", move(chapter.paper4Links ?? [], index, -1))}><ArrowUp size={14}/></Button>
+                    <Button size="icon" variant="ghost" title={tr("Paper 4 真题练习下移", "Move Paper 4 past-paper practice down")} disabled={index === (chapter.paper4Links ?? []).length - 1 || !canEditCourse} onClick={() => update("paper4Links", move(chapter.paper4Links ?? [], index, 1))}><ArrowDown size={14}/></Button>
                     <Button size="sm" variant="ghost" disabled={!canEditCourse} onClick={() => update("paper4Links", (chapter.paper4Links ?? []).filter(link => coursePaper4LinkKey(link) !== coursePaper4LinkKey(item)))}>{tr("移除引用", "Remove link")}</Button>
                   </span>
                 </div>)}

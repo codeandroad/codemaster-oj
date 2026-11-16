@@ -9,6 +9,7 @@ import { WorkspaceFrame } from "@/components/workspace-frame";
 import { AccountMenu } from "@/components/account-menu";
 import { NotificationDropdown } from "@/components/student/notification-dropdown";
 import { AppLink } from "@/components/navigation";
+import { PreparationRouter } from "@/components/written-papers/preparation-router";
 import { resolvePublicLearningBookmark } from "@/lib/campus-routes";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LearnerResourceScope } from "./learner-resource-scope";
@@ -76,6 +77,8 @@ type Invitation = { token: string; role: SchoolRole; expiresAt: string };
 const teacherOnly = new Set<string>(workspaceNavigation.teacher
   .filter(item => !workspaceNavigation.admin.some(admin => admin.section === item.section))
   .map(item => item.section));
+// Paper 4 bookmarks predate the shared preparation entry and still open the teaching workspace.
+teacherOnly.add("paper4");
 
 export function SchoolsPage({
   user,
@@ -123,12 +126,18 @@ export function SchoolsPage({
   const teaching = workspaceRole !== "student";
   const role = selected?.roles.includes("school_admin") ? "school_admin" : workspaceRole === "teacher" ? "teacher" : "student";
   const acslEnabled = useAcslEnabled(!selected?.legacy ? selected?.id : undefined, teaching);
-  const sections = workspaceNavigation[workspaceRole].filter(item => item.section !== "timed" && (item.section !== "acsl" || acslEnabled));
+  const sections = workspaceNavigation[workspaceRole].filter(item => item.section !== "timed" && true);
   const active = requestedSection === "acsl" ? (teaching
     ? {section: "acsl", label: "ACSL 题库", shortEnglish: "ACSL papers"} as const
     : {section: "acsl", label: "ACSL 真题练习", shortEnglish: "ACSL practice"} as const)
+    : requestedSection === "paper4" && !admin ? (teaching
+      ? {section: "paper4", label: "Paper 4 试卷", shortEnglish: "Paper 4 papers"} as const
+      : {section: "paper4", label: "Paper 4 真题练习", shortEnglish: "Paper 4 past papers"} as const)
     : requestedSection === "leaderboard" ? {section: "leaderboard", label: "积分排行榜", shortEnglish: "Leaderboard"} as const
-    : sections.find(item => item.section === requestedSection) ?? sections[0];
+    : workspaceNavigation[workspaceRole].find(item => item.section === requestedSection && item.section !== "timed") ?? sections[0];
+  const preparationResource = active.section === "paper4" || active.section === "acsl";
+  const preparationPage = preparationResource || active.section === "exam-preparation";
+  const navigationSection = preparationResource ? "exam-preparation" : active.section;
   const navigationLabel = useWorkspaceNavigationLabel();
   const publicBookmark = lostSchool ? resolvePublicLearningBookmark("/schools", search) : null;
   const redirect =
@@ -248,7 +257,7 @@ export function SchoolsPage({
             schoolName={schoolName}
             navigation={
               <WorkspaceNavigation
-                items={sections.map(item => ({...item, href: href(item.section), active: !personalPage && active.section === item.section}))}
+                items={sections.map(item => ({...item, href: href(item.section), active: !personalPage && navigationSection === item.section}))}
                 disabled={issuingInvitation}
               />
             }
@@ -258,7 +267,7 @@ export function SchoolsPage({
                   <>
                     <AppLink
                       href={href("home")}
-                      className="truncate text-muted-foreground hover:text-foreground"
+                      className={`${preparationPage && !personalPage ? "hidden sm:block " : ""}truncate text-muted-foreground hover:text-foreground`}
                     >
                       {text(
                         admin
@@ -269,9 +278,17 @@ export function SchoolsPage({
                         admin ? "管理工作台" : teaching ? "教师工作台" : "首页",
                       )}
                     </AppLink>
-                    <span aria-hidden="true">›</span>
+                    <span aria-hidden="true" className={preparationPage && !personalPage ? "hidden sm:block" : undefined}>›</span>
                   </>
                 ) : null}
+                {!personalPage && preparationResource && (
+                  <>
+                    <AppLink href={href("exam-preparation")} className="hidden shrink-0 text-muted-foreground hover:text-foreground sm:block">
+                      {teaching ? text("Exam resources", "备考资源") : text("Exam preparation", "备考中心")}
+                    </AppLink>
+                    <span aria-hidden="true" className="hidden sm:block">›</span>
+                  </>
+                )}
                 <h1 className="truncate font-semibold">
                   {personalSettings
                     ? text("Settings", "设置")
@@ -330,6 +347,8 @@ export function SchoolsPage({
                   <SchoolStudentDashboard school={selected} user={user}/>
                 ) : active.section === "assignments" || active.section === "timed" ? (
                   <SchoolActivities school={selected} kind={active.section === "timed" ? "timed" : "assignment"} />
+                ) : active.section === "exam-preparation" ? (
+                  <PreparationRouter schoolId={selected.id} rootHref={href("exam-preparation")} staff={teaching} paper4Href={!admin ? href("paper4") : undefined} acslHref={acslEnabled ? href("acsl") : undefined} />
                 ) : active.section === "acsl" ? (
                   teaching ? <AcslTeacherPage schoolId={selected.id} user={user} baseHref={href("acsl")} />
                     : <AcslPage schoolId={selected.id} user={user} baseHref={href("acsl")} />

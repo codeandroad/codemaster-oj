@@ -27,7 +27,7 @@ const sections: Record<string, Label> = {
   "/student/classes": ["我的班级", "My classes"],
   "/student/assignments": ["作业", "Assignments"],
   "/student/timed-practice": ["限时训练", "Timed practice"],
-  "/student/paper4": ["Paper 4 练习", "Paper 4 practice"],
+  "/student/paper4": ["Paper 4 真题练习", "Paper 4 past papers"],
   "/student/submissions": ["提交记录", "Submissions"],
   "/student/review-notebook": ["订正本", "Review notebook"],
   "/teacher/classes": ["班级与学生", "Classes"],
@@ -48,6 +48,7 @@ const sections: Record<string, Label> = {
   "/admin/course-admissions": ["课程申请", "Course applications"],
 };
 for (const role of ["student", "teacher", "admin"]) {
+  sections[`/${role}/exam-preparation`] = role === "student" ? ["备考中心", "Exam preparation"] : ["备考资源", "Exam resources"];
   sections[`/${role}/profile`] = ["个人资料", "Profile"];
   sections[`/${role}/points`] = ["积分排行榜", "Leaderboard"];
   sections[`/${role}/${role === "admin" ? "personal-settings" : "settings"}`] = ["个人设置", "Settings"];
@@ -59,12 +60,23 @@ export function pageBreadcrumbs(pathname: string, role: BreadcrumbRole, locale: 
   const home = role === "student" ? "/" : `/${role}`;
   const root: PageBreadcrumb = { href: home, label: label(role === "student" ? ["首页", "Home"] : role === "teacher" ? ["教师工作台", "Teacher workspace"] : ["管理工作台", "Admin workspace"]) };
   if (pathname === home || pathname === "/") return [root];
+  const preparationParent = (ancestor: string): PageBreadcrumb[] => {
+    if (!/^\/(?:student|teacher)\/paper4$/.test(ancestor) && !/^\/(?:student|teacher|admin)\/acsl$/.test(ancestor)) return [];
+    const href = `/${role}/exam-preparation`;
+    return [{ href, label: label(sections[href]) }];
+  };
   const detail = (ancestor: string, fallback: Label, middle?: PageBreadcrumb) => [
     root,
+    ...preparationParent(ancestor),
     { href: ancestor, label: label(sections[ancestor]) },
     ...(middle ? [middle] : []),
     { href: pathname, label: currentTitle.trim() || label(fallback) },
   ];
+  if (/^\/(student|teacher|admin)\/exam-preparation\/computer-science-9618(?:\/paper1)?$/.test(pathname)) {
+    const center = `/${role}/exam-preparation`, subject = `${center}/computer-science-9618`;
+    return [root, {href:center,label:label(sections[center])}, {href:subject,label:label(["计算机科学 · 9618","Computer Science · 9618"])},
+      ...(pathname.endsWith("/paper1") ? [{href:pathname,label:label(["Paper 1 真题练习","Paper 1 past papers"])}] : [])];
+  }
   if (pathname === "/admin/imports") {
     const trail = detail("/admin/people", sections[pathname]);
     const kind = search?.get("kind");
@@ -81,7 +93,7 @@ export function pageBreadcrumbs(pathname: string, role: BreadcrumbRole, locale: 
   if (pathname === "/admin/problems/solutions-review") return detail("/admin/problem-banks", ["题解审核", "Solution review"]);
   if (/^\/admin\/problems\/[^/]+\/edit$/.test(pathname)) return detail("/admin/problem-banks", ["编辑学生题解", "Edit student solutions"]);
   if (/^\/admin\/paper4\/[^/]+$/.test(pathname)) return detail("/admin/problem-banks", ["Paper 4 题解与翻译", "Paper 4 solutions and translations"]);
-  if (sections[pathname]) return [root, { href: pathname, label: label(sections[pathname]) }];
+  if (sections[pathname]) return [root, ...preparationParent(pathname), { href: pathname, label: label(sections[pathname]) }];
   if (/^\/teacher\/problems\/banks\/[^/]+$/.test(pathname)) return detail("/teacher/problems", ["题库详情", "Bank details"]);
   if (/^\/teacher\/problems\/[^/]+\/edit$/.test(pathname)) {
     const trail = detail("/teacher/problems", ["编辑题目", "Edit problem"]);

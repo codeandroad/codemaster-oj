@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, BookOpen, BookOpenCheck, ClipboardList, Clock3, Code2, Database, FileClock, FileCode2, Gauge, Home, LayoutDashboard, Library, NotebookPen, Settings, UserRound, Users } from "lucide-react";
+import { BarChart3, BookOpen, BookOpenCheck, ClipboardList, Clock3, Code2, Database, FileClock, Gauge, GraduationCap, Home, LayoutDashboard, Library, NotebookPen, Settings, UserRound, Users } from "lucide-react";
 import { AppLink } from "./navigation";
 import { useLocale } from "./locale-context";
 import { ScholarshipIcon } from "./scholarship/scholarship-icon";
@@ -20,9 +20,8 @@ export const workspaceNavigation = {
     { section: "courses", path: "/student/learning-paths", label: "课程", icon: BookOpen },
     { section: "classes", path: "/student/classes", label: "我的班级", shortEnglish: "My classes", icon: Users },
     { section: "assignments", path: "/student/assignments", label: "我的作业", shortEnglish: "My assignments", icon: Library },
+    { section: "exam-preparation", path: "/student/exam-preparation", label: "备考中心", shortEnglish: "Exam preparation", icon: GraduationCap },
     { section: "timed", path: "/student/timed-practice", label: "限时训练", icon: FileClock },
-    { section: "paper4", path: "/student/paper4", label: "Paper 4 练习", icon: FileCode2 },
-    { section: "acsl", path: "/student/acsl", label: "ACSL 真题练习", shortEnglish: "ACSL practice", icon: ClipboardList },
     { section: "submissions", path: "/student/submissions", label: "提交记录", icon: FileClock },
     { section: "review-notebook", path: "/student/review-notebook", label: "订正本", icon: NotebookPen },
     { section: "scholarship", path: "/student/scholarship", label: "我的奖学金", shortEnglish: "Scholarship", icon: ScholarshipIcon },
@@ -32,10 +31,9 @@ export const workspaceNavigation = {
     { section: "classes", path: "/teacher/classes", label: "班级与学生", shortEnglish: "Classes", icon: Users },
     { section: "problems", path: "/teacher/problems", label: "题库", icon: BookOpenCheck },
     { section: "courses", path: "/teacher/courses", label: "课程", icon: BookOpen },
+    { section: "exam-preparation", path: "/teacher/exam-preparation", label: "备考资源", shortEnglish: "Exam resources", icon: GraduationCap },
     { section: "assignments", path: "/teacher/assignments", label: "作业管理", shortEnglish: "Assignments", icon: ClipboardList },
     { section: "timed", path: "/teacher/timed-practice", label: "限时训练", icon: Clock3 },
-    { section: "paper4", path: "/teacher/paper4", label: "Paper 4 试卷", shortEnglish: "Paper 4", icon: FileCode2 },
-    { section: "acsl", path: "/teacher/acsl", label: "ACSL 题库", shortEnglish: "ACSL papers", icon: ClipboardList },
     { section: "reports", path: "/teacher/reports", label: "教学报告", shortEnglish: "Reports", icon: BarChart3 },
     { section: "scholarship", path: "/teacher/scholarship", label: "奖学金管理", shortEnglish: "Scholarship", icon: ScholarshipIcon },
     { section: "imports", path: "/teacher/imports", label: "导入中心", shortEnglish: "Imports", icon: Database },
@@ -46,7 +44,7 @@ export const workspaceNavigation = {
     { section: "identities", path: "/admin/people", label: "身份档案", shortEnglish: "Identities", icon: UserRound },
     { section: "imports", path: "/admin/imports", label: "导入中心", shortEnglish: "Imports", icon: Database },
     { section: "problems", path: "/admin/problem-banks", label: "题库管理", shortEnglish: "Problem banks", icon: BookOpenCheck },
-    { section: "acsl", path: "/admin/acsl", label: "ACSL 题库", shortEnglish: "ACSL papers", icon: ClipboardList },
+    { section: "exam-preparation", path: "/admin/exam-preparation", label: "备考资源", shortEnglish: "Exam resources", icon: GraduationCap },
     { section: "course-admissions", path: "/admin/course-admissions", label: "课程申请", shortEnglish: "Course applications", icon: ClipboardList },
     { section: "judge", path: "/admin/judge-service", label: "判题服务", icon: Gauge },
     { section: "system-settings", path: "/admin/settings", label: "系统设置", icon: Settings },

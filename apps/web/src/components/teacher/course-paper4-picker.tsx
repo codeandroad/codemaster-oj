@@ -62,7 +62,7 @@ export function CoursePaper4Picker({existing, onClose, onAdd, platformCourseId}:
   const selectedQuestions = paper ? (scope === "all" ? paper.questions : paper.questions.filter(question => selected.includes(question.key))) : [];
   const canAdd = Boolean(paper && !loading && !wholeExists && selectedQuestions.length);
   return <Dialog open onOpenChange={open => { if (!open) onClose(); }}><DialogContent className="max-h-[calc(100dvh-2rem)] max-w-2xl overflow-y-auto">
-    <DialogTitle>{tx("关联 Paper 4 练习", "Link Paper 4 practice")}</DialogTitle>
+    <DialogTitle>{tx("关联 Paper 4 真题练习", "Link Paper 4 past papers")}</DialogTitle>
     <DialogDescription>{tx("选择整套已公开试卷，或指定其中的大题。关联版本会固定保存，正式 AC 自动计入课程练习进度。", "Choose a public paper or individual questions. The published version is pinned; formal AC automatically counts toward course practice progress.")}</DialogDescription>
     <div className="space-y-4">
       <label className="block text-sm font-semibold">{tx("搜索试卷", "Search papers")}<input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder={tx("名称、年份或简写", "Title, year or short name")} className={`${input} mt-2`}/></label>

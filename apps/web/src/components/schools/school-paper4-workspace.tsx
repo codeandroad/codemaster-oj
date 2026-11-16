@@ -296,7 +296,7 @@ function PaperWorkspace({
           disabled={action.busy}
           onClick={() => navigate(onBack)}
         >
-          {tx("返回 Paper 4 练习", "Back to Paper 4 Practice")}
+          {tx("返回 Paper 4 真题练习", "Back to Paper 4 past papers")}
         </Button>
         <strong
           className="min-w-0 flex-1 truncate px-2 text-sm"
@@ -663,7 +663,7 @@ function PaperWorkspace({
             disabled={action.busy}
             onClick={() => navigate(onBack)}
           >
-            {tx("返回试卷列表", "Back to Paper 4 Practice")}
+            {tx("返回试卷列表", "Back to Paper 4 past papers")}
           </Button>
         </DialogContent>
       </Dialog>

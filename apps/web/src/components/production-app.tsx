@@ -150,11 +150,11 @@ export function ProductionApp() {
   };
   if (!isCampusRoute(pathname)) return null;
   const authPage = pathname === "/" || isCampusAuthRoute(pathname);
-  const publicHome = pathname === "/" && !user;
+  const publicSignIn = pathname === "/login" || (pathname === "/" && !user);
   const retryConnection = () => { setLoading(true); setError(""); setCheck(value => value + 1); };
   if (authPage && (loading || error)) {
     const notice = <AuthConnectionNotice register={pathname === "/register"} error={loading ? "" : error} onRetry={retryConnection} />;
-    return publicHome ? <HomeLocaleProvider>{notice}</HomeLocaleProvider> : notice;
+    return publicSignIn ? <HomeLocaleProvider>{notice}</HomeLocaleProvider> : notice;
   }
   if (loading)
     return (
@@ -181,7 +181,7 @@ export function ProductionApp() {
   if (pathname === "/register") return <PersonalRegisterPage onRegistered={loggedIn} joinIntent={joinIntent}/>;
   if (!user || pathname === "/login") {
     const login = <ProductionLoginPage key={resetIntent ? "reset" : "login"} onLogin={loggedIn} joinIntent={joinIntent} resetIntent={resetIntent} />;
-    return publicHome ? <HomeLocaleProvider>{login}</HomeLocaleProvider> : login;
+    return publicSignIn ? <HomeLocaleProvider>{login}</HomeLocaleProvider> : login;
   }
   const logout = () => {
     setUser(null);

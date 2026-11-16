@@ -12,7 +12,8 @@ import styles from "./auth-shell.module.css";
 /** Public authentication uses the system's light palette, outside workspace themes. */
 export function AuthShell({ children, titleId = "login-title" }: { children: ReactNode; titleId?: string }) {
   const { locale, setLocale } = useLocale();
-  const isHome = usePathname() === "/";
+  const pathname = usePathname();
+  const showLanguageToggle = pathname === "/" || pathname === "/login";
   const nextLocale = locale === "zh" ? "en" : "zh";
   const tx = (zh: string, en: string) => locale === "en" ? en : zh;
   const roles = [
@@ -35,7 +36,7 @@ export function AuthShell({ children, titleId = "login-title" }: { children: Rea
         </aside>
         <section className={styles.formPanel} aria-labelledby={titleId}>
           <BrandLogo className={styles.mobileLogo} />
-          {isHome && <Button type="button" variant="outline" className={`${styles.language} mb-2 self-end`}
+          {showLanguageToggle && <Button type="button" variant="outline" className={`${styles.language} mb-2 self-end`}
             lang={nextLocale === "zh" ? "zh-CN" : "en"} onClick={() => setLocale(nextLocale)}>
             <Languages size={16} aria-hidden="true" />{nextLocale === "zh" ? "简体中文" : "English"}
           </Button>}

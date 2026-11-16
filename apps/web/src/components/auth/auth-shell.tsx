@@ -34,14 +34,17 @@ export function AuthShell({ children, titleId = "login-title" }: { children: Rea
             </li>)}
           </ul>
         </aside>
-        <section className={styles.formPanel} aria-labelledby={titleId}>
-          <BrandLogo className={styles.mobileLogo} />
-          {showLanguageToggle && <Button type="button" variant="outline" className={`${styles.language} mb-2 self-end`}
-            lang={nextLocale === "zh" ? "zh-CN" : "en"} onClick={() => setLocale(nextLocale)}>
-            <Languages size={16} aria-hidden="true" />{nextLocale === "zh" ? "简体中文" : "English"}
+        <div className="flex min-w-0 flex-col">
+          {showLanguageToggle && <Button type="button" variant="outline" size="icon" className="mb-2 self-end"
+            lang={nextLocale === "zh" ? "zh-CN" : "en"} aria-label={nextLocale === "zh" ? "切换到简体中文" : "Switch to English"}
+            onClick={() => setLocale(nextLocale)}>
+            <Languages size={18} aria-hidden="true" />
           </Button>}
-          {children}
-        </section>
+          <section className={styles.formPanel} aria-labelledby={titleId}>
+            <BrandLogo className={styles.mobileLogo} />
+            {children}
+          </section>
+        </div>
       </div>
     </main>
     <SiteFooter locale={locale} className={styles.footer} />

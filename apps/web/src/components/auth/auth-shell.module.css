@@ -71,7 +71,6 @@
 .help summary { cursor: pointer; width: fit-content; min-height: 28px; color: var(--primary); }
 .help p { margin: 8px 0; }
 .footer { margin-inline: auto; width: calc(100% - 48px); max-width: 1120px; }
-.language { min-height: 36px; height: auto; padding-inline: 8px; font-size: 12px; font-weight: 500; }
 .steps { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin: 18px 0 0; padding: 0 0 12px; border-bottom: 1px solid var(--border); list-style: none; color: var(--muted-foreground); font-size: 12px; }
 .step { display: flex; align-items: center; gap: 6px; }
 .step[aria-current="step"] { color: var(--primary); font-weight: 600; }

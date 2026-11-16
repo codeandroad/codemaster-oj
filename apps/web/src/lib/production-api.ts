@@ -180,13 +180,23 @@ export interface AuthResponse {
 }
 
 export class ApiError extends Error {
-  constructor(
-    public readonly status: number,
-    public readonly code: string,
-    message: string,
-  ) {
+  readonly status: number;
+  readonly code: string;
+
+  constructor(status: number, code: string, message: string) {
     super(message);
     this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+export const apiConnectionMessage = "暂时无法连接到服务，请检查网络后重试。";
+
+export class ApiConnectionError extends Error {
+  constructor(cause: TypeError) {
+    super(cause.message, { cause });
+    this.name = "ApiConnectionError";
   }
 }
 
@@ -214,8 +224,12 @@ export async function productionApi<T>(
     credentials: "same-origin",
     ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
     ...(options.signal ? { signal: options.signal } : {}),
+  }).catch(connectionFailure);
+  const payload = await response.json().catch(reason => {
+    options.signal?.throwIfAborted();
+    if (!response.ok || reason instanceof SyntaxError) return null;
+    return connectionFailure(reason);
   });
-  const payload = await response.json().catch(() => null);
   const currentSession = requestToken === csrfToken && !options.signal?.aborted;
   if (!response.ok) {
     const code = payload?.error?.code;
@@ -238,6 +252,11 @@ export async function productionApi<T>(
   }
   if (currentSession && payload?.csrfToken) csrfToken = payload.csrfToken;
   return payload as T;
+
+  function connectionFailure(reason: unknown): never {
+    if (!options.signal?.aborted && reason instanceof TypeError) throw new ApiConnectionError(reason);
+    throw reason;
+  }
 }
 
 export function apiMessage(error: unknown): string {

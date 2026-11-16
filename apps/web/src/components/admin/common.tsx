@@ -6,10 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { inputClass } from "./data-state";
 import { useLocale } from "@/components/locale-context";
+import { apiConnectionMessage } from "@/lib/production-api";
 
 const adminEnglish: Record<string, string> = {
   "正在加载…": "Loading…",
   "重新加载": "Reload",
+  "重试": "Retry",
+  "刷新整个页面": "Refresh page",
+  "当前显示上次加载的内容。": "Showing the last loaded content.",
+  [apiConnectionMessage]: "Couldn’t connect to the service. Check your connection and try again.",
   "复制": "Copy",
   "已复制": "Copied",
   "复制失败，请选中文本手动复制。": "Copy failed. Select and copy the text manually.",
@@ -347,11 +352,26 @@ export function useAdminText() {
 
 export { inputClass, panelClass, useData, useMutation, Feedback } from "./data-state";
 
-export function Loading({resource,children}:{resource:{loading:boolean;error:string;reload:()=>void};children:ReactNode}) {
-  const t=useAdminText();
-  if(resource.loading)return <p role="status" className="py-8 text-sm text-muted-foreground">{t("正在加载…")}</p>;
-  if(resource.error)return <div role="alert" className="mt-4 border border-destructive/30 p-4"><p className="text-sm text-destructive">{resource.error}</p><Button variant="secondary" className="mt-3" onClick={resource.reload}>{t("重新加载")}</Button></div>;
-  return children;
+export function Loading({ resource, children }: {
+  resource: { loading: boolean; error: string; reload: () => void; data?: unknown; connectionError?: boolean };
+  children: ReactNode;
+}) {
+  const t = useAdminText();
+  if (resource.loading) return <p role="status" className="py-8 text-sm text-muted-foreground">{t("正在加载…")}</p>;
+  const keepContent = resource.connectionError && resource.data != null;
+  return <>
+    {resource.error && <div className="mt-4 border border-destructive/30 p-4">
+      <p role="alert" className="text-sm text-destructive">
+        {resource.connectionError ? t(apiConnectionMessage) : resource.error}
+        {keepContent && <> {t("当前显示上次加载的内容。")}</>}
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button type="button" variant="secondary" onClick={resource.reload}>{t(resource.connectionError ? "重试" : "重新加载")}</Button>
+        {resource.connectionError && <Button type="button" variant="ghost" onClick={() => window.location.reload()}>{t("刷新整个页面")}</Button>}
+      </div>
+    </div>}
+    {(!resource.error || keepContent) && children}
+  </>;
 }
 export function SearchInput({value,onChange,placeholder}:{value:string;onChange:(s:string)=>void;placeholder:string}) {
   return <label className="relative"><span className="sr-only">{placeholder}</span><Search className="absolute left-3 top-3 text-muted-foreground" size={15}/><input value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} className={`${inputClass} pl-9`}/></label>;

@@ -1,12 +1,7 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import ts from 'typescript';
-
-const source = readFileSync(new URL('../src/lib/production-api.ts', import.meta.url), 'utf8');
-const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext } });
-const { ApiError, clearProductionSession, productionApi, productionSessionExpiredEvent } =
-  await import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`);
+import { ApiConnectionError, ApiError, clearProductionSession, productionApi, productionSessionExpiredEvent }
+  from '../src/lib/production-api.ts';
 
 test('only an unauthenticated response for the current session requests sign-in', async (t) => {
   const window = new EventTarget();
@@ -60,4 +55,22 @@ test('only an unauthenticated response for the current session requests sign-in'
   await productionApi('new-mutation', { method: 'POST' });
   assert.equal(expiredEvents, 1);
   assert.equal(mutationToken, 'new-token');
+});
+
+test('transport failures are distinct from aborts and explicit access denials', async (t) => {
+  const networkFailure = new TypeError('Failed to fetch');
+  const disconnected = () => new ReadableStream({ start(controller) { controller.error(networkFailure); } });
+  const fetch = t.mock.method(globalThis, 'fetch', async (path, { signal }) => {
+    if (signal?.aborted) throw signal.reason;
+    if (path.endsWith('/denied')) return new Response(disconnected(), { status: 403 });
+    if (path.endsWith('/partial')) return new Response(disconnected());
+    throw networkFailure;
+  });
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(productionApi('catalog', { signal: controller.signal }), { name: 'AbortError' });
+  await assert.rejects(productionApi('partial'), ApiConnectionError);
+  await assert.rejects(productionApi('denied'), error => error instanceof ApiError && error.status === 403);
+  await assert.rejects(productionApi('answers', { method: 'POST', body: {} }), ApiConnectionError);
+  assert.equal(fetch.mock.calls.length, 4);
 });

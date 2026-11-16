@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorkspaceResourceStore } from '../src/components/workspace-resource-store.ts';
+import { ApiConnectionError } from '../src/lib/production-api.ts';
 
 const catalog = 'schools/school-a/acsl';
 function deferred() {
@@ -70,16 +71,58 @@ test('refresh after a save replaces a request started before the save', async ()
   assert.deepEqual(h.store.snapshot(path).data, data);
 });
 
-test('temporary network failure preserves confirmed availability; explicit denial clears it', async () => {
+test('network failure preserves the catalog; reconnect retries it and respects explicit denial', async () => {
   const h = harness();
   await seed(h, catalog, { enabled: true, items: [] });
-  let pending = await start(h, catalog);
-  pending.request.reject(new Error('Network unavailable')); await pending.done;
+  const unsubscribe = h.store.subscribe(catalog, () => {});
+  const pending = await start(h, catalog);
+  pending.request.reject(new ApiConnectionError(new TypeError('Failed to fetch'))); await pending.done;
   assert.equal(h.store.snapshot(catalog).data.enabled, true);
-  pending = await start(h, catalog);
-  pending.request.reject(Object.assign(new Error('Forbidden'), { status: 403 })); await pending.done;
+  assert.equal(h.store.snapshot(catalog).connectionError, true);
+
+  h.store.recoverObserved();
+  const retry = await start(h, catalog);
+  assert.notEqual(retry.request, pending.request);
+  retry.request.reject(Object.assign(new Error('Forbidden'), { status: 403 })); await retry.done;
   assert.equal(h.store.snapshot(catalog).data, null);
   assert.equal(h.store.snapshot(catalog).error, 'Forbidden');
+  assert.equal(h.store.snapshot(catalog).connectionError, false);
+  h.store.recoverObserved();
+  await Promise.resolve();
+  assert.equal(h.requests.at(-1), retry.request);
+  unsubscribe();
+});
+
+test('reconnect replaces a stalled observed request and ignores its late reply', async () => {
+  const h = harness();
+  const old = await start(h, catalog);
+  const unsubscribe = h.store.subscribe(catalog, () => {});
+  const unobserved = await start(h, 'schools/other/acsl');
+  h.store.recoverObserved();
+  const fresh = await start(h, catalog);
+  assert.equal(old.request.signal.aborted, true);
+  assert.equal(unobserved.request.signal.aborted, false);
+  fresh.request.resolve({ enabled: true }); await fresh.done;
+  old.request.reject(new ApiConnectionError(new TypeError('Failed to fetch'))); await old.done;
+  assert.equal(h.store.snapshot(catalog).data.enabled, true);
+  assert.equal(h.store.snapshot(catalog).error, '');
+  unobserved.request.resolve({ enabled: false }); await unobserved.done;
+  unsubscribe();
+});
+
+test('a load with no response times out and can be retried', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const h = harness();
+  const old = await start(h, catalog);
+  t.mock.timers.tick(15_000);
+  assert.equal(old.request.signal.aborted, true);
+  assert.equal(h.store.snapshot(catalog).loading, false);
+  assert.equal(h.store.snapshot(catalog).connectionError, true);
+  const fresh = await start(h, catalog);
+  fresh.request.resolve({ enabled: true }); await fresh.done;
+  old.request.resolve({ enabled: false }); await old.done;
+  assert.equal(h.store.snapshot(catalog).data.enabled, true);
+  assert.equal(h.store.snapshot(catalog).connectionError, false);
 });
 
 test('school, student and management catalogs remain separate', async () => {

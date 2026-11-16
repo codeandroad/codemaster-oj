@@ -19,11 +19,13 @@ export function WorkspaceDataProvider({ children }: { children: ReactNode }) {
     };
     const membershipsChanged = () => { void store.load("schools"); };
     window.addEventListener("focus", refresh);
+    window.addEventListener("online", store.recoverObserved);
     document.addEventListener("visibilitychange", refresh);
     window.addEventListener("codemaster:schools-changed", membershipsChanged);
     window.addEventListener("codemaster:school-access-check", membershipsChanged);
     return () => {
       window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", store.recoverObserved);
       document.removeEventListener("visibilitychange", refresh);
       window.removeEventListener("codemaster:schools-changed", membershipsChanged);
       window.removeEventListener("codemaster:school-access-check", membershipsChanged);
@@ -41,7 +43,7 @@ export function useWorkspaceData<T>(path: string) {
   const snapshot = useCallback(() => store.snapshot(path), [path, store]);
   const state = useSyncExternalStore(subscribe, snapshot, serverSnapshot);
   useEffect(() => { void store.load(path); }, [path, store]);
-  const reload = useCallback(() => { void store.load(path); }, [path, store]);
+  const reload = useCallback(() => { void store.refresh(path); }, [path, store]);
   return { ...state, data: state.data as T | null, reload };
 }
 

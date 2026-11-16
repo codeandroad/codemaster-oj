@@ -46,7 +46,8 @@ sudo /usr/local/sbin/ali99-release status
 
 The entry point saves the prior Compose configuration and image IDs in the
 release's private `rollback/` directory before activation. Cleanup runs after
-`verify` and the HTTPS checks for the database, login page and Web assets pass.
+`verify`, the database checks for learner problem projection permissions, and
+the HTTPS checks for the database, login page and Web assets pass.
 It retains archives for the current and preceding verified releases, plus any
 older verified release that supplied an image still used by either release.
 It removes inspected application archives from other verified releases and

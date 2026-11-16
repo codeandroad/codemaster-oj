@@ -108,6 +108,36 @@ class ReleaseCleanupTest(unittest.TestCase):
         cleanup.assert_not_called()
         self.assertEqual(release.load_history()[-1]['name'], current.name)
 
+    def test_projection_grant_failure_keeps_release_unverified(self):
+        previous = self.directory('previous')
+        current = self.directory('current')
+        candidate = self.directory('candidate')
+        verifier = candidate / 'verify'
+        verifier.write_text('#!/bin/sh\nexit 0\n')
+        verifier.chmod(0o700)
+        old = images(web='web:previous')
+        before = images(web='web:current')
+        after = images(web='web:candidate')
+        records = [release.record(previous.name, old, {}), release.record(current.name, before, old)]
+        release.save_history(records)
+        with patch.object(release, 'snapshot', return_value=after), patch.object(release, 'check_images'), \
+                patch.object(release, 'output', return_value='f') as probe_command, \
+                patch.object(release, 'cleanup') as cleanup:
+            with self.assertRaisesRegex(RuntimeError, 'learner problem projection grants'):
+                release.verify_release(candidate, records, before, after)
+        self.assertEqual(probe_command.call_args.args[:3], ('docker', 'exec', release.PROJECT + '-db-1'))
+        cleanup.assert_not_called()
+        self.assertEqual(release.load_history()[-1]['name'], current.name)
+
+    def test_probe_checks_https_after_validating_projection_grants(self):
+        with patch.object(release, 'output', side_effect=[
+            't', '{"ok":true,"database":true}', '<script src="/_next/static/chunks/app.js"></script>', '',
+        ]) as probe_command:
+            release.probe()
+        self.assertEqual([call.args[-1] for call in probe_command.call_args_list[1:]], [
+            release.ORIGIN + path for path in ('/healthz', '/login', '/_next/static/chunks/app.js')
+        ])
+
     def test_run_verifies_before_rotating_releases_and_clearing_artifacts(self):
         previous = self.directory('previous')
         current = self.directory('current')

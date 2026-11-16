@@ -81,6 +81,18 @@ def check_images(images):
 
 
 def probe():
+    # A stale migration image can remove these grants while /healthz stays green.
+    projection_grants = output(
+        'docker', 'exec', PROJECT + '-db-1', 'psql', '-XAt', '-v', 'ON_ERROR_STOP=1',
+        '-U', 'campus_migrator', '-d', 'campus', '-c', """
+        SELECT has_column_privilege('campus_app', 'school_problem_versions', 'definition', 'UPDATE')
+           AND has_column_privilege('campus_app', 'school_problem_versions', 'draft_revision', 'UPDATE')
+           AND NOT has_table_privilege('campus_app', 'school_problem_versions', 'UPDATE')
+           AND NOT has_any_column_privilege('campus_worker', 'school_problem_versions', 'UPDATE')
+        """,
+    )
+    require(projection_grants == 't',
+            'Incorrect learner problem projection grants after migration. Check the migrate image and runtime grants.')
     curl = ('curl', '-fsS', '--noproxy', '*', '--max-time', '15', '--cacert', str(CA),
             '--connect-to', '139.196.155.201:8443:127.0.0.1:8443')
     health = json.loads(output(*curl, ORIGIN + '/healthz'))

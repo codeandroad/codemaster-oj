@@ -238,7 +238,7 @@ function AssignmentEditorForm({
   const router = useRouter(),
     searchParams = useSearchParams(),
     classes = useData<{ items: SchoolClass[] }>("classes"),
-    courses = useData<{ items: { id: string; title: string; published: boolean; canEdit: boolean; requiredLanguage?: SubmissionLanguage | null }[] }>("learning-paths"),
+    courses = useData<{ items: { id: string; title: string; published: boolean; requiredLanguage?: SubmissionLanguage | null }[] }>("learning-paths?purpose=assignment"),
     audience = useData<AudienceDirectory>("teaching/audience"),
     [tab, setTab] = useState(searchParams.get("tab") === "problems" ? "Problems" : assignmentTabs[0]!),
     [saved, setSaved] = useState(initial),
@@ -270,7 +270,7 @@ function AssignmentEditorForm({
     [stale, setStale] = useState(false),
     action = useAction();
   const rewardResource = useData<RuleResponse>(`scholarship/reward-rules?activityType=assignment${saved ? `&activityId=${encodeURIComponent(saved.id)}` : ""}`);
-  const courseOutline = useData<{ id: string; requiredLanguage?: SubmissionLanguage | null; chapters: { problems: { problemId: string }[] }[] }>(coursePathId ? `learning-paths/${coursePathId}` : null);
+  const courseOutline = useData<{ id: string; requiredLanguage?: SubmissionLanguage | null; chapters: { problems: { problemId: string }[] }[] }>(coursePathId ? `learning-paths/${coursePathId}?purpose=assignment` : null);
   const needsCourseOrder = problemOrder === "course" && Boolean(coursePathId);
   const matchingCourseOutline = courseOutline.data?.id === coursePathId;
   const courseOrderReady = !needsCourseOrder ||
@@ -677,12 +677,13 @@ function AssignmentEditorForm({
                 />
               </Field>
               <Field label={ui(locale, "关联课程（可选）", "Linked course (optional)")}>
-                <select value={coursePathId} disabled={action.busy || courses.loading} onChange={(e) => setCoursePathId(e.target.value)} className={input}>
+                <select value={coursePathId} disabled={action.busy || courses.loading} onChange={(e) => setCoursePathId(e.target.value)} className={input} aria-describedby="assignment-course-policy">
                   <option value="">{ui(locale, "不关联课程", "No linked course")}</option>
                   {initial?.coursePathId && !courses.data?.items.some((item) => item.id === initial.coursePathId && item.published) && <option value={initial.coursePathId} disabled>{initial.courseTitle ?? ui(locale, "原关联课程", "Previous course")}{ui(locale, "（当前不可用）", " (unavailable)")}</option>}
                   {courses.data?.items.filter((item) => item.published).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
                 </select>
-                <p className="mt-1 text-xs text-muted-foreground">{ui(locale, "仅显示已发布课程；学生可从作业进入所关联的课程。", "Only published courses are shown. Students can open the linked course from their assignment.")}</p>
+                <p id="assignment-course-policy" className="mt-1 text-xs text-muted-foreground">{ui(locale, "可关联已发布的校内课程和获授权的平台课程。有课程访问权限的学生可从作业打开课程。", "Link a published school course or a platform course you are authorized to use. Students with course access can open it from the assignment.")}</p>
+                {courses.error && <p role="alert" className="mt-1 text-xs text-destructive">{courses.error}</p>}
                 {languageRequirement && <p className="mt-1 text-xs font-semibold">{languageRequirement}</p>}
               </Field>
               <Field label={ui(locale, "布置学生", "Recipients")}>

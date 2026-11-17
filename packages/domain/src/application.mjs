@@ -41,6 +41,7 @@ import {legacyProblemStatement} from './problem-statement-display.mjs';
 import { handleSystem, assertJudgeAdmission, getSettings } from './system.mjs';
 import { handlePeopleAlignment, handleFavorites, bindPendingTeacherClasses } from './alignment.mjs';
 import { assignmentRequiredLanguage, handleAssignmentAuthoring } from './assignment-authoring.mjs';
+import { assignmentCourseMetadata, platformProblemAssignableSql } from './assignment-courses.mjs';
 import { handleLegacyAssignmentPreview } from './legacy-assignment-preview.mjs';
 import { loadSubmissionResult } from './submission-feedback.mjs';
 import { assignmentGradeRows } from './assignment-grades.mjs';
@@ -223,7 +224,8 @@ export async function createDomainServices(pool,config) {
  async function assignmentResult(db,user,id,{includeCompletion=false}={}) {
   const a=await assignmentAccess(db,user,id);
   const ps=await assignmentProblemRows(db,a);
-  const linkedCourse=await courseMetadataForUser(db,user,a.course_path_id);
+  const linkedCourse=await courseMetadataForUser(db,user,a.course_path_id)
+   ?? (a.canManage?await assignmentCourseMetadata(db,user,a.course_path_id):null);
   const visibleCourse=Boolean(linkedCourse?.published_at&&!linkedCourse.archived_at);
   const requiredLanguage=await assignmentRequiredLanguage(db,a);
   const linkedClasses=await activityClasses(db,id);
@@ -232,7 +234,7 @@ export async function createDomainServices(pool,config) {
    points:Number(p.points),firstAcPoints:Number(p.first_ac_points),rewardPoints:Number(p.reward_points),
    ...(a.canManage&&typeof p.difficulty==='string'?{difficulty:p.difficulty}:{}),
   }));
-  const result={id:a.id,title:a.title,canManage:a.canManage,classIds:linkedClasses.map(c=>c.id),classes:linkedClasses,classId:a.class_id,className:(await db.query('SELECT name FROM classes WHERE id=$1',[a.class_id])).rows[0]?.name,state:a.state,archived:!!a.archived_at,description:a.description,course:a.course,coursePathId:linkedCourse?.id??null,courseTitle:linkedCourse?.title??null,courseAvailable:visibleCourse,requiredLanguage,problemOrder:a.problem_order,published:a.state==='Published',publishedAt:a.published_at,createdAt:a.created_at,dueAt:a.due_at,editRevision:a.edit_revision,problems};
+  const result={id:a.id,title:a.title,canManage:a.canManage,classIds:linkedClasses.map(c=>c.id),classes:linkedClasses,classId:a.class_id,className:(await db.query('SELECT name FROM classes WHERE id=$1',[a.class_id])).rows[0]?.name,state:a.state,archived:!!a.archived_at,description:a.description,course:a.course,coursePathId:a.canManage?a.course_path_id:linkedCourse?.id??null,courseTitle:linkedCourse?.title??null,courseAvailable:visibleCourse,requiredLanguage,problemOrder:a.problem_order,published:a.state==='Published',publishedAt:a.published_at,createdAt:a.created_at,dueAt:a.due_at,editRevision:a.edit_revision,problems};
   {
    const protectedParticipantIds=a.canManage?(await db.query('SELECT DISTINCT identity_id FROM submissions WHERE assignment_id=$1',[id])).rows.map(person=>person.identity_id):[];
    if(a.canManage)result.protectedParticipantIds=protectedParticipantIds;
@@ -524,6 +526,7 @@ export async function createDomainServices(pool,config) {
      SELECT * FROM problem_versions v WHERE v.problem_id=p.id
      AND (p.owner_scope='school' OR v.id=${liveVersionId})
      AND (NOT $7::boolean OR v.id=${liveVersionId})
+     AND (NOT $7::boolean OR p.owner_scope='school' OR (${platformProblemAssignableSql('v')}))
      AND ($2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit'))
        OR v.id=${liveVersionId}) AND (
       $2 OR $3 AND (p.owner_account_id=$1 OR bank.owner_account_id=$1 OR bp.permission IN ('read','edit'))

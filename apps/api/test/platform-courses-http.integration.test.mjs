@@ -1,4 +1,5 @@
 import { processSchoolOne } from '../../../packages/domain/school-worker.mjs';
+import { processOne } from '../../../packages/domain/worker.mjs';
 import { GoJudge } from '../../../packages/domain/judge.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -75,14 +76,17 @@ test('platform courses retain original data and enforce audiences through NestJS
   const runtime=new URL(connection);runtime.searchParams.set('options',`-crole=campus_app -csearch_path=${schema}`);
   app=await createApiApplication({databaseUrl:runtime.href,logger:false,config:loadConfig({SESSION_SECRET:randomBytes(32).toString('hex'),APP_ORIGIN:origin,COOKIE_SECURE:'false'})});
   await app.listen(0,'127.0.0.1');const endpoint=await app.getUrl();
-  async function client(name){
+  async function client(name,registration){
    let cookie='',csrf='';
    const send=async(path,body,method=body===undefined?'GET':'POST',status=200,validCsrf=true)=>{
     const response=await fetch(endpoint+'/api/v1'+path,{method,headers:{Origin:origin,...(cookie?{Cookie:cookie,'X-CSRF-Token':validCsrf?csrf:'invalid'}:{}),...(body!==undefined?{'Content-Type':'application/json'}:{})},body:body===undefined?undefined:JSON.stringify(body)});
     const data=await response.json();assert.equal(response.status,status,`${method} ${path}: ${JSON.stringify(data.error??data)}`);
     if(response.headers.get('set-cookie'))cookie=response.headers.get('set-cookie').split(';')[0];if(data.csrfToken)csrf=data.csrfToken;return data;
    };
-   await send('/auth/login',{username:name,password});return {send};
+   const {user}=registration
+    ? await send('/auth/register',{...registration,username:name,password},'POST',201)
+    : await send('/auth/login',{username:name,password});
+   return {send,user};
   }
   const platform=await client('platform'),school=await client('school-admin'),a=await client('student-a'),b=await client('student-b'),personal=await client('personal'),teacher=await client('school-teacher');
   const list=async api=>(await api.send('/practice/courses')).courses;
@@ -175,6 +179,78 @@ test('platform courses retain original data and enforce audiences through NestJS
    await pool.query('UPDATE school_memberships SET revoked_at=now() WHERE school_id=$1 AND account_id=$2',[beta.id,actors['student-b'].id]);
    await b.send('/platform/courses/'+source.id,undefined,'GET',403);
    await pool.query('UPDATE school_memberships SET revoked_at=NULL WHERE school_id=$1 AND account_id=$2',[beta.id,actors['student-b'].id]);
+  });
+  await t.test('a legacy school administrator can assign a granted platform course without changing its learner audience',async()=>{
+   async function register(name){
+    const identity={kind:'student',number:name,name};
+    const {activationCode}=await school.send('/people',identity,'POST',201);
+    return client(name,{...identity,activationCode});
+   }
+   const student=await register('assignment-learner'),other=await register('assignment-outside-course');
+   const courseId=first.p.id,sourcePath='/platform/courses/'+courseId;
+   const options='/learning-paths?purpose=assignment',outline=`/learning-paths/${courseId}?purpose=assignment`;
+   const editorPath=`/platform/content-editors/course/${courseId}`,editor={accountId:admin.id,schoolId:LEGACY_SCHOOL_ID};
+   const visible=async()=> (await school.send(options)).items.some(item=>item.id===courseId);
+   const homework={title:'Platform Python homework',dueAt:new Date(Date.now()+86400000).toISOString(),
+    participants:[student.user.identityId,other.user.identityId],coursePathId:courseId,
+    problems:[{problemId:problem.id,points:20}]};
+   assert.equal(await visible(),false);
+   assert.ok((await school.send(options)).items.some(item=>item.id===originals[2].p.id));
+   await school.send(outline,undefined,'GET',404);
+   await student.send(options,undefined,'GET',403);
+   assert.equal((await school.send('/assignments',homework,'POST',409)).error.code,'COURSE_UNAVAILABLE');
+
+   const source=await platform.send(sourcePath);
+   const restricted=await platform.send(sourcePath,{expectedRevision:source.revision,sourceVersion:source.sourceVersion,
+    audienceScope:'students',studentIds:[student.user.identityId],requiredLanguage:'python'},'PATCH');
+   await platform.send(editorPath,editor);
+   assert.equal(await visible(),true);
+   assert.ok(!(await school.send('/learning-paths')).items.some(item=>item.id===courseId));
+   assert.deepEqual(await school.send(outline),{id:courseId,title:first.p.title,requiredLanguage:'python',published:true,
+    chapters:[{id:first.c.id,problems:[{problemId:problem.id}]}]});
+   await student.send(outline,undefined,'GET',403);
+   const picker='/problems?purpose=assignment&view=summary';
+   assert.equal((await school.send(picker)).items.find(item=>item.id===problem.id)?.versionId,version.id);
+
+   const privateProblem=(await pool.query("INSERT INTO problems(owner_account_id,owner_scope) VALUES($1,'platform') RETURNING id",[admin.id])).rows[0];
+   await pool.query(`INSERT INTO problem_versions(problem_id,title,statement,mode,time_limit_ms,memory_limit_mb,
+    reference_code,validation_status,published_at,course_only_published)
+    VALUES($1,'Restricted exercise','Private prompt','stdio',1000,128,'print(input())','AC',now(),true)`,[privateProblem.id]);
+   await platform.send(`/platform/content-editors/problem/${privateProblem.id}`,editor);
+   assert.ok(!(await school.send(picker)).items.some(item=>item.id===privateProblem.id));
+   assert.equal((await school.send('/assignments',{...homework,problems:[{problemId:privateProblem.id,points:20}]},'POST',409)).error.code,'PROBLEM_UNAVAILABLE');
+
+   const draft=await school.send('/assignments',{...homework,state:'Draft'},'POST',201);
+   assert.equal(draft.coursePathId,courseId);
+   assert.equal(draft.requiredLanguage,'python');
+   await platform.send(editorPath,editor,'DELETE');
+   assert.equal(await visible(),false);
+   await school.send(outline,undefined,'GET',404);
+   const draftPath='/assignments/'+draft.id;
+   assert.equal((await school.send(draftPath+'/publish',{},'POST',409)).error.code,'COURSE_UNAVAILABLE');
+   await platform.send(editorPath,editor);
+   const assigned=await school.send(draftPath+'/publish',{});
+   assert.equal(assigned.coursePathId,courseId);
+   assert.equal(assigned.requiredLanguage,'python');
+   assert.equal(assigned.problems[0].versionId,version.id);
+   assert.equal((await student.send(draftPath)).coursePathId,courseId);
+   assert.equal((await other.send(draftPath)).coursePathId,null);
+   await other.send('/learning-paths/'+courseId,undefined,'GET',404);
+   const submission=await student.send('/submissions',{assignmentId:draft.id,problemId:problem.id,versionId:version.id,
+    kind:'submit',language:'python',code:'print(input())',idempotencyKey:randomUUID()},'POST',201);
+   assert.equal(submission.requiredLanguage,'python');
+   if(process.env.GO_JUDGE_TEST_URL){
+    const workerUrl=new URL(connection);workerUrl.searchParams.set('options',`-crole=campus_worker -csearch_path=${schema}`);
+    const worker=createPool(workerUrl.href),judge=new GoJudge({url:process.env.GO_JUDGE_TEST_URL,token:process.env.GO_JUDGE_TEST_TOKEN,environmentVersion:'platform-course-qa'});
+    try{assert.equal(await processOne({pool:worker,judge,logger:{}}),true);}finally{await worker.end();}
+    const graded=await student.send(draftPath);
+    assert.equal(graded.grades[0].problems[0].status,'AC');
+    assert.equal(graded.grades[0].score,20);
+   }
+   await platform.send(editorPath,editor,'DELETE');
+   assert.equal((await school.send(draftPath)).coursePathId,courseId,'revocation retains the published assignment link');
+   assert.equal((await student.send(draftPath)).coursePathId,courseId);
+   await platform.send(sourcePath,{expectedRevision:restricted.revision,sourceVersion:restricted.sourceVersion,audienceScope:'all',requiredLanguage:null},'PATCH');
   });
   await t.test('create, edit and publish use stale-write checks and retain chapter IDs',async()=>{
    const create={requestId:randomUUID(),title:'Platform course',audienceScope:'all',chapters:[{title:'Lesson',content:'Platform **lesson**'}]};

@@ -4,18 +4,11 @@ import {audienceClasses,audienceStudents,defaultClassStudents,replaceAudienceCla
 import {getScholarshipSettings} from './scholarship-ledger.mjs';
 import {checkScholarshipRuleVersion,readScholarshipRule,saveScholarshipRule} from './scholarship-rules.mjs';
 import {resolveLiveProblemVersion} from './live-problem-version.mjs';
+import {requireAssignmentCourse} from './assignment-courses.mjs';
 const staff=u=>{if(!u.roles.some(r=>['teacher','admin'].includes(r)))fail(403,'FORBIDDEN','需要教师权限');};
 const row=r=>{if(!r.rowCount)fail(404,'NOT_FOUND','资源不存在');return r.rows[0];};
 const rewardPoints=(value,fallback=0)=>value===undefined?fallback:integer(value,0,20,'作业每题额外奖学金');
 function checkRewardBudget(problems){if(problems.reduce((sum,problem)=>sum+problem.rewardPoints,0)>100)fail(400,'REWARD_BUDGET','每份作业额外奖学金最多 100');}
-async function linkedCourse(db,value){
- if(value===null||value==='')return null;
- const id=uuid(value,'关联课程 ID');
- const course=row(await db.query('SELECT id,published_at,archived_at,required_language FROM learning_paths WHERE id=$1 FOR SHARE',[id]));
- if(course.archived_at||!course.published_at)fail(409,'COURSE_UNAVAILABLE','作业只能关联已发布且未归档的课程');
- return course;
-}
-
 export async function assignmentRequiredLanguage(db,assignment,{lock=false}={}){
  if(assignment.state==='Published')return assignment.required_language;
  if(!assignment.course_path_id)return null;
@@ -28,7 +21,9 @@ async function syncRewards(db,id,problems,accountId){
 }
 async function currentAssignmentVersion(ctx,db,problemId){
  const current=await resolveLiveProblemVersion(db,problemId);
- const {v}=await ctx.helpers.versionAccess(db,ctx.user,problemId,current.id);
+ const {p,v}=await ctx.helpers.versionAccess(db,ctx.user,problemId,current.id);
+ if(p.owner_scope==='platform'&&(!v.school_visible_at||v.rank_review_status!=='approved'||v.course_only_published))
+  fail(409,'PROBLEM_UNAVAILABLE','仅在课程内开放的平台题目不能用于校内作业');
  return v.id;
 }
 async function input(ctx,db,body,old,{publishing=false}={}) {
@@ -37,7 +32,7 @@ async function input(ctx,db,body,old,{publishing=false}={}) {
  const dueAt=body.dueAt===undefined?new Date(old?.due_at):new Date(body.dueAt);if(!Number.isFinite(dueAt.getTime()))fail(400,'VALIDATION','截止时间格式无效');
  const description=body.description===undefined?old?.description??'':field(body.description,'作业说明',{min:0,max:10000});
  const requestedCourse=body.coursePathId===undefined?old?.course_path_id??null:body.coursePathId;
- const linked=publishing||body.coursePathId!==undefined?await linkedCourse(db,requestedCourse):null;
+ const linked=publishing||body.coursePathId!==undefined?await requireAssignmentCourse(db,ctx.user,requestedCourse):null;
  const coursePathId=body.coursePathId===undefined?requestedCourse:linked?.id??null;
  const requiredLanguage=linked?.required_language??null;
  const existingRewards=old?new Map((await db.query('SELECT problem_id,points FROM point_rewards WHERE assignment_id=$1',[old.id])).rows.map(reward=>[reward.problem_id,reward.points])):new Map();
@@ -87,7 +82,7 @@ async function editPublished(ctx,db,id,old,body){
  const title=body.title===undefined?old.title:field(body.title,'作业标题');
  const description=body.description===undefined?old.description:field(body.description,'作业说明',{min:0,max:10000});
  const course=body.course===undefined?old.course:field(body.course,'课程标签',{max:100});
- const coursePathId=body.coursePathId===undefined?old.course_path_id:(await linkedCourse(db,body.coursePathId))?.id??null;
+ const coursePathId=body.coursePathId===undefined?old.course_path_id:(await requireAssignmentCourse(db,ctx.user,body.coursePathId))?.id??null;
  const problemOrder=enumValue(body.problemOrder??old.problem_order,['course','custom'],'题目显示顺序');
  const dueAt=body.dueAt===undefined?new Date(old.due_at):new Date(body.dueAt);
  if(!Number.isFinite(dueAt.getTime()))fail(400,'VALIDATION','截止时间格式无效');

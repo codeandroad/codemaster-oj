@@ -15,6 +15,7 @@ import { getTimedPracticeResult } from './timed.mjs';
 import { avatarForIdentity } from './avatars.mjs';
 import {managesCourse,readableCourseIds,courseAccess,courseClasses,courseProperties,saveCourseProperties,assertCoursePublicationAccess,validateCoverImage} from './course-access.mjs';
 import { assignmentProgressById } from './assignment-grades.mjs';
+import { handleAssignmentCourses } from './assignment-courses.mjs';
 import { latestCourseProblemVersion } from './course-problem-version.mjs';
 import { liveProblemVersionIdSql, resolveLiveProblemVersion } from './live-problem-version.mjs';
 
@@ -424,6 +425,7 @@ ${leaderboardPaperAttempts}
 
 export async function handleEducation(ctx) {
  const merged=await handleCourseMerge(ctx);if(merged)return merged;
+ const assignmentCourses=await handleAssignmentCourses(ctx);if(assignmentCourses)return assignmentCourses;
  const { pool, user, route, method, body, helpers } = ctx;
  if(route==='/points/me'&&method==='GET'){
   const points = await platformPoints(pool, user.id);

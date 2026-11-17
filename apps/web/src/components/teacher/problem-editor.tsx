@@ -3,7 +3,7 @@
 import { ProblemTutorialEditor } from "./problem-tutorial-editor";
 import { ProblemAssistanceEditor } from "./problem-assistance-editor";
 import { ProblemEditorSteps, SaveAndEditNext } from "./problem-editor-steps";
-import type { ProblemEditorNavigation, ProblemEditorTarget } from "./problem-editor-navigation";
+import type { ProblemEditorNavigation, ProblemEditorTab, ProblemEditorTarget } from "./problem-editor-navigation";
 import { teacherPlatformProblemSummaries, teacherProblemSummaries } from "./platform-problem-source";
 
 import { useEffect, useId, useState, useTransition } from "react";
@@ -77,16 +77,16 @@ interface EditorProblem extends ProductionProblem {
   samples: EditorCase[];
   tests?: EditorCase[];
 }
-const tabs = [
-  "题面",
-  "接口与模板",
-  "测试数据",
-  "判题设置",
-  "解答与提示",
-  "教程",
-  "版本与发布",
-];
-const englishTabs: Record<string,string> = { "题面":"Statement", "接口与模板":"Interface and templates", "测试数据":"Test data", "判题设置":"Judge settings", "解答与提示":"Solutions and hints", "教程":"Tutorial", "版本与发布":"Versions and publication" };
+const editorTabs = {
+  "题面": { id: "statement", en: "Statement" },
+  "接口与模板": { id: "interface", en: "Interface and templates" },
+  "测试数据": { id: "tests", en: "Test data" },
+  "判题设置": { id: "judge", en: "Judge settings" },
+  "解答与提示": { id: "solutions", en: "Solutions and hints" },
+  "教程": { id: "tutorial", en: "Tutorial" },
+  "版本与发布": { id: "publication", en: "Versions and publication" },
+} as const satisfies Record<string, { id: ProblemEditorTab; en: string }>;
+const tabs = Object.keys(editorTabs) as (keyof typeof editorTabs)[];
 const blank: EditorProblem = {
   id: "new",
   title: "",
@@ -154,8 +154,9 @@ type TeacherProblemEditorProps = {
   user: CampusUser;
   scope?: "school" | "platform";
   delegatedReview?: boolean;
-  initialTab?: "solutions" | "publication";
+  initialTab?: ProblemEditorTab;
   onClose?: () => void;
+  closeLabel?: string;
   navigation?: ProblemEditorNavigation;
 };
 
@@ -203,7 +204,7 @@ function ProblemDraftPresentation({ problem, locale, platform }: { problem: Edit
   </div>;
 }
 
-function ProblemEditorResource({ id, user, platform, versionId, onClose, navigation, initialTab, delegatedReview }: TeacherProblemEditorProps & { platform: boolean; versionId: string | null }) {
+function ProblemEditorResource({ id, user, platform, versionId, onClose, closeLabel, navigation, initialTab, delegatedReview }: TeacherProblemEditorProps & { platform: boolean; versionId: string | null }) {
   const { locale } = useLocale();
   const search = useSearchParams();
   const endpoint = platform ? "platform/source-problems" : "problems";
@@ -213,18 +214,18 @@ function ProblemEditorResource({ id, user, platform, versionId, onClose, navigat
   return (
     <>
       {id !== "new" && !resource.data && onClose && <Button type="button" variant="ghost" onClick={onClose}>
-        {locale === "zh" ? "返回题目列表" : "Back to problems"}
+        {closeLabel ?? (locale === "zh" ? "返回题目列表" : "Back to problems")}
       </Button>}
       <State resource={resource} />
       {(id === "new" || resource.data) && (
-        <ProblemEditorForm key={`${search.get("solutionVersionId")??"student"}:${tab??"statement"}:${search.get("kind")??"FULL_SOLUTION"}`} initial={resource.data} user={user} platform={platform || resource.data?.ownerScope === "platform"} delegatedReview={delegatedReview} onClose={onClose} navigation={navigation} initialTab={tab} />
+        <ProblemEditorForm key={`${search.get("solutionVersionId")??"student"}:${tab??"statement"}:${search.get("kind")??"FULL_SOLUTION"}`} initial={resource.data} user={user} platform={platform || resource.data?.ownerScope === "platform"} delegatedReview={delegatedReview} onClose={onClose} closeLabel={closeLabel} navigation={navigation} initialTab={tab} />
       )}
     </>
   );
 }
-function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, navigation, initialTab }: {
+function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, closeLabel, navigation, initialTab }: {
   initial: EditorProblem | null; user: CampusUser; platform: boolean; delegatedReview?: boolean;
-  onClose?: () => void; navigation?: ProblemEditorNavigation; initialTab: string | null;
+  onClose?: () => void; closeLabel?: string; navigation?: ProblemEditorNavigation; initialTab: string | null;
 }) {
   const endpoint = platform ? "platform/source-problems" : "problems";
   const summaryPath = platform ? teacherPlatformProblemSummaries : teacherProblemSummaries;
@@ -243,13 +244,7 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
       initial ?? { ...blank, bankId: search.get("bankId") ?? "" },
     ),
     [saved, setSaved] = useState<EditorProblem | null>(initial),
-    [requestedTab, setTab] = useState(() => {
-      if (initialTab === "tests") return "测试数据";
-      if (initialTab === "tutorial") return "教程";
-      if (initialTab === "solutions") return "解答与提示";
-      if (initialTab === "publication") return "版本与发布";
-      return "题面";
-    }),
+    [requestedTab, setTab] = useState(() => tabs.find(item => editorTabs[item].id === initialTab) ?? "题面"),
     [solutionsVisited, setSolutionsVisited] = useState(initialTab === "solutions"),
     [solutionPending, setSolutionPending] = useState(false),
     [tutorialVisited, setTutorialVisited] = useState(initialTab === "tutorial"),
@@ -294,11 +289,12 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
   const steps = initial && editable ? navigation : undefined;
   const nextStep = steps?.next;
   const stepDisabled = action.busy || switching || solutionPending || tutorialState.busy;
+  const hasUnsavedEdits = dirty || tutorialState.dirty;
   function switchProblem(target: ProblemEditorTarget, afterSave = false) {
     setSwitchError("");
     startSwitch(async () => {
       try {
-        await target.select();
+        await target.select(editorTabs[tab].id);
         if (dirty && !afterSave && !draft.recovery) draft.discard();
       } catch (error) {
         setSwitchError(apiMessage(error));
@@ -376,7 +372,9 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
   const list = (kind: "samples" | "tests") => problem[kind] ?? [];
   return (
     <div className={styles.editor} data-od-id="teacher-problem-editor">
-      {onClose && <Button type="button" variant="ghost" disabled={stepDisabled} onClick={() => { if (window.dispatchEvent(new Event("campus-judge:before-navigate", { cancelable: true })) || window.confirm(tr("当前页面有未保存修改，确定返回吗？", "Discard unsaved changes and return?"))) onClose(); }}>{tr("返回题目列表", "Back to problems")}</Button>}
+      {onClose && <Button type="button" variant="ghost" disabled={stepDisabled} onClick={() => {
+        if (!hasUnsavedEdits || window.confirm(tr("当前页面有未保存修改，确定返回吗？", "Discard unsaved changes and return?"))) onClose();
+      }}>{closeLabel ?? tr("返回题目列表", "Back to problems")}</Button>}
       {onClose && <h2 className="mt-2 break-words text-lg font-semibold">{problem.title || tr("新建题目", "New problem")}</h2>}
       <PageHeader
         eyebrow={tr("题目编辑", "Problem editor")}
@@ -384,7 +382,7 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
         description={`${platform ? "CodeMaster" : banks.data?.items.find((x) => x.id === problem.bankId)?.name ?? tr("尚未选择题库", "No bank selected")} · ${tr("保存草稿后，学生仍看到已发布内容。", "Students continue to see the published content after you save a draft.")}`}
         action={
           <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-x-5 gap-y-2">
-            <ProblemEditorSteps navigation={steps} dirty={dirty || tutorialState.dirty} disabled={stepDisabled}
+            <ProblemEditorSteps navigation={steps} dirty={hasUnsavedEdits} disabled={stepDisabled}
               onSelect={switchProblem} />
             <div className="ml-auto flex flex-wrap gap-2">
               <Button variant="secondary" onClick={() => setPreview(true)}>
@@ -458,12 +456,12 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
       </div>
       {!platform && !saved?.id&&<p className="text-xs text-muted-foreground">{tr("整理分组时先保存题目草稿；没有分组可在弹窗中直接新建。", "Save the problem draft before organizing groups. You can create a group in the dialog.")}</p>}
       <State resource={groups}/>
-      <Tabs value={tr(tab, englishTabs[tab] ?? tab)} onChange={value => {
-        const next = visibleTabs.find(item => tr(item, englishTabs[item] ?? item) === value) ?? "题面";
+      <Tabs value={tr(tab, editorTabs[tab].en)} onChange={value => {
+        const next = visibleTabs.find(item => tr(item, editorTabs[item].en) === value) ?? "题面";
         if (next === "教程") setTutorialVisited(true);
         if (next === "解答与提示") setSolutionsVisited(true);
         setTab(next);
-      }} items={visibleTabs.map(item => tr(item, englishTabs[item] ?? item))} />
+      }} items={visibleTabs.map(item => tr(item, editorTabs[item].en))} />
       <section className={`${panel} ${styles.body}`} hidden={tab === "教程" || tab === "解答与提示"} data-od-id="teacher-editor-tab-content"><fieldset disabled={!editable || action.busy || switching || solutionPending}>
         {tab === "题面" && (
           <div className="grid grid-cols-[minmax(0,1fr)_260px] gap-5 max-lg:grid-cols-1">
@@ -892,6 +890,10 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
           : <p className={`${panel} p-4 text-sm text-muted-foreground`}>{saved
             ? tr("你对此题只有查看权限，无法编辑或发布学生题解。", "You have read-only access to this problem and cannot edit or publish student solutions.")
             : tr("先保存题目草稿，即可在这里修改学生题解、添加多种解法并审核发布。", "Save the problem draft first, then edit student solutions, add approaches and review them for publication here.")}</p>}
+        {steps?.repeatAfterSolutions && (steps.previous || steps.next) && <div className="flex justify-end">
+          <ProblemEditorSteps navigation={steps} dirty={hasUnsavedEdits} disabled={stepDisabled}
+            label={tr("从题解切换题目", "Switch problem from solutions")} onSelect={switchProblem} />
+        </div>}
         <details className={`${panel} p-4`} open={!saved || undefined}>
           <summary className="cursor-pointer font-semibold">{tr("判题参考代码与提示", "Reference validation code and hints")}</summary>
           <p className="my-3 text-sm text-muted-foreground">{tr("这里的代码用于验证题目，素材与提示随题目草稿保存。学生阅读的题解在上方单独保存并审核发布。", "This code validates the problem. Notes and hints are saved with the problem draft. Save and review student-facing solutions separately above.")}</p>

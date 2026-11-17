@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { filterTeacherBankDetailRows, filterTeacherProblemRows } from "../src/components/teacher/problem-bank-rows.ts";
-import { adjacentProblemRows } from "../src/components/teacher/problem-editor-navigation.ts";
+import { orderCourseChapters } from "../src/components/course-sections.ts";
+import { adjacentProblemRows, courseProblemEditorEntries } from "../src/components/teacher/problem-editor-navigation.ts";
 import { problemEditorHref } from "../src/components/teacher/platform-problem-source.ts";
 
 const first = { id: "first", title: "Python 01", bankId: "python", canEdit: true, published: false };
@@ -22,6 +23,29 @@ test("editor steps follow filtered list order, skip read-only rows, and keep the
   assert.equal(adjacentProblemRows(editableRows, last.id).next, undefined);
   assert.deepEqual(adjacentProblemRows(editableRows, other.id), {});
   assert.deepEqual(filterTeacherProblemRows({ items, filters, banks }).rows, [first, readOnly, last]);
+});
+
+test("course editor steps follow directory order across chapters and distinguish repeated problem links", () => {
+  const sections = [{ key: "basics", title: "Basics" }, { key: "advanced", title: "Advanced" }];
+  const firstLink = { problemId: "shared", title: "Shared problem", canEdit: true };
+  const chapters = [
+    { id: "third", sectionKey: "advanced", problems: [
+      { problemId: "locked", title: "Locked", canEdit: false },
+      firstLink,
+      { problemId: "last", title: "Last", canEdit: true },
+    ] },
+    { id: "first", sectionKey: "basics", problems: [firstLink] },
+    { id: "second", sectionKey: "basics", problems: [{ problemId: "unavailable", title: "Unavailable" }] },
+    { id: "empty", problems: [] },
+  ];
+  const entries = courseProblemEditorEntries(orderCourseChapters(sections, chapters));
+  assert.deepEqual(entries.map(({ chapterId, problemId }) => [chapterId, problemId]), [
+    ["first", "shared"], ["third", "shared"], ["third", "last"],
+  ]);
+  const [firstEntry, repeated, final] = entries;
+  assert.deepEqual(adjacentProblemRows(entries, firstEntry.id), { previous: undefined, next: repeated });
+  assert.deepEqual(adjacentProblemRows(entries, repeated.id), { previous: firstEntry, next: final });
+  assert.deepEqual(adjacentProblemRows(entries, final.id), { previous: repeated, next: undefined });
 });
 
 test("bank detail steps use the visible bank and group without reordering by membership", () => {

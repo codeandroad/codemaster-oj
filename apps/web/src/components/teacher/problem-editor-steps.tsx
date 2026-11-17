@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import type { ProblemEditorNavigation, ProblemEditorTarget } from "./problem-editor-navigation";
 
-export function ProblemEditorSteps({ navigation, dirty, disabled, onSelect }: {
+export function ProblemEditorSteps({ navigation, dirty, disabled, label, onSelect }: {
   navigation?: ProblemEditorNavigation;
   dirty: boolean;
   disabled: boolean;
+  label?: string;
   onSelect: (target: ProblemEditorTarget) => void;
 }) {
   const { locale } = useLocale();
@@ -29,7 +30,7 @@ export function ProblemEditorSteps({ navigation, dirty, disabled, onSelect }: {
   }
 
   return <>
-    <div role="group" aria-label={zh ? "切换编辑题目" : "Switch problem"} className="flex flex-wrap gap-2">
+    <div role="group" aria-label={label ?? (zh ? "切换编辑题目" : "Switch problem")} className="flex flex-wrap gap-2">
       <Button type="button" variant="secondary" className="cursor-pointer"
         title={navigation.previous?.title ?? (zh ? "没有上一题" : "No previous problem")}
         disabled={disabled || !navigation.previous} onClick={event => requestSwitch(navigation.previous, event.currentTarget)}>

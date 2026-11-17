@@ -23,7 +23,8 @@ import type { CoursePractice } from "./python-practice-panel";
 import {canUseLegacyPythonPractice} from "./legacy-python-practice";
 import type { LearningDocument } from "./learning-document";
 import { courseDraftEqual } from "./course-draft-equality";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { courseProblemEditorEntries, courseProblemEditorEntryId, type CourseProblemEditorEntry } from "./problem-editor-navigation";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "@/components/locale-context";
 import { ArrowDown, ArrowUp, Eye, FilePlus2, Plus, Trash2 } from "lucide-react";
@@ -566,20 +567,29 @@ export function TeacherLearningEditor({ id }: { id: string }) {
     </>
   );
 }
+export type CourseProblemEditorSelection = {
+  exercise: CourseProblemEditorEntry;
+  exercises: CourseProblemEditorEntry[];
+  returnToExercise: (exercise: CourseProblemEditorEntry) => void;
+};
+
 export function LearningEditorForm({
   initial,
   onSaved,
   onDirtyChange,
   onBusyChange,
+  onEditPlatformProblem,
 }: {
   initial: Path;
   onSaved: () => void;
   onDirtyChange?: (dirty: boolean) => void;
   onBusyChange?: (busy: boolean) => void;
+  onEditPlatformProblem?: (selection: CourseProblemEditorSelection) => void;
 }) {
   const {t, locale} = useLocale();
   const { language, setLanguage } = useCourseLanguage();
   const tr = (zh: string, en: string) => locale === "zh" ? zh : en;
+  const exerciseListId = useId();
   const search = useSearchParams(),
     [path, setPath] = useState(initial),
     [chapters, setChapters] = useState(initial.chapters ?? []),
@@ -634,6 +644,15 @@ export function LearningEditorForm({
   }, [path.archived]);
   const chapter = chapters.find((x) => x.id === current) ?? chapters[0],
     selectedIndex = chapters.findIndex((x) => x.id === chapter?.id);
+  function openPlatformExercise(chapterId: string, problemId: string) {
+    const exercises = courseProblemEditorEntries(orderCourseChapters(sections, chapters));
+    const exercise = exercises.find(item => item.id === courseProblemEditorEntryId(chapterId, problemId));
+    if (!exercise) return;
+    onEditPlatformProblem?.({ exercise, exercises, returnToExercise: entry => {
+      setCurrent(entry.chapterId);
+      requestAnimationFrame(() => document.getElementById(`${exerciseListId}-${entry.id}`)?.focus());
+    } });
+  }
   const dirty = useMemo(() => !courseDraftEqual(chapters, path.chapters ?? []) || !courseDraftEqual(sections, path.sections ?? []),
     [chapters, path.chapters, sections, path.sections]);
   useEffect(() => { onDirtyChange?.(dirty); }, [dirty,onDirtyChange]);
@@ -1034,7 +1053,15 @@ export function LearningEditorForm({
                     className="flex flex-wrap items-center justify-between gap-2 border-t border-border p-3 text-sm"
                   >
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      {(!platform || p.canEdit) ? <Link
+                      {platform && p.canEdit && onEditPlatformProblem ? <button
+                        type="button"
+                        id={`${exerciseListId}-${courseProblemEditorEntryId(chapter.id, p.problemId)}`}
+                        className={`${link} min-h-6 text-left disabled:opacity-50`}
+                        disabled={action.busy}
+                        onClick={() => openPlatformExercise(chapter.id, p.problemId)}
+                      >
+                        {p.title}
+                      </button> : (!platform || p.canEdit) ? <Link
                         href={`/teacher/problems/${p.problemId}/edit${platform?"?source=platform":""}`}
                         className={link}
                       >

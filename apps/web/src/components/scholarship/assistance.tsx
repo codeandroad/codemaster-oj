@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Languages } from "lucide-react";
 import { useLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/teacher/shared";
@@ -81,7 +80,7 @@ function AssistanceContents<Content extends Provided>({
     [provided, setProvided] = useState<Content | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [reload, setReload] = useState(0);
-  const [busy, setBusy] = useState(isSolution),
+  const [busy, setBusy] = useState(true),
     [error, setError] = useState("");
   const lock = useRef(false),
     requestKey = useRef<string | null>(null);
@@ -93,6 +92,7 @@ function AssistanceContents<Content extends Provided>({
   const serializedBody = JSON.stringify(body);
   const schoolAssistance = "type" in target;
   const problemSolutions = isSolution && (schoolAssistance ? target.type === "problem" : "problemId" in target);
+  const canOpenDialog = quote?.available && (quote.requiresConfirmation || !isSolution);
   const title =
     kind === "FULL_TRANSLATION"
       ? tx("中文题面", "Chinese translation")
@@ -101,7 +101,6 @@ function AssistanceContents<Content extends Provided>({
         : tx("完整题解与参考代码", "Full solution and reference code");
 
   useEffect(() => {
-    if (!isSolution) return;
     const controller = new AbortController();
     const signal = controller.signal;
     const options = { method: "POST", body: JSON.parse(serializedBody), signal };
@@ -110,7 +109,7 @@ function AssistanceContents<Content extends Provided>({
         const next = await productionApi<Quote>(`${endpoint}/quote`, options);
         if (signal.aborted) return;
         setQuote(next);
-        if (next.available && (next.mode === "free" || next.unlocked)) {
+        if (isSolution && next.available && (next.mode === "free" || next.unlocked)) {
           const content = await productionApi<Content>(`${endpoint}/provide`, options);
           if (!signal.aborted) setProvided(content);
         }
@@ -130,26 +129,6 @@ function AssistanceContents<Content extends Provided>({
     setError("");
     setBusy(true);
     setReload(previous => previous + 1);
-  }
-  async function prepare() {
-    if (lock.current) return;
-    lock.current = true;
-    setBusy(true);
-    setError("");
-    try {
-      setQuote(
-        await productionApi<Quote>(`${endpoint}/quote`, {
-          method: "POST",
-          body,
-        }),
-      );
-      setDialogOpen(true);
-    } catch (cause) {
-      setError(apiMessage(cause));
-    } finally {
-      lock.current = false;
-      setBusy(false);
-    }
   }
   async function provide() {
     if (lock.current || !quote?.available) return;
@@ -190,7 +169,7 @@ function AssistanceContents<Content extends Provided>({
       setDialogOpen(false);
       setQuote(null);
     } catch (cause) {
-      if (isSolution && cause instanceof ApiError && cause.code === "QUOTE_CHANGED") {
+      if (cause instanceof ApiError && (cause.code === "QUOTE_CHANGED" || cause.code === "UNLOCK_REQUIRED")) {
         requestKey.current = null;
         reloadAccess();
         return;
@@ -219,41 +198,29 @@ function AssistanceContents<Content extends Provided>({
             ) : tx("已解锁的内容可免费重看。", "Unlocked content can be viewed again free.")}
           </p>}
         </>
-      ) : isSolution ? (
-        <>
-          {busy && !dialogOpen && <p role="status" className="text-sm text-muted-foreground">{tx("正在加载题解…", "Loading solutions…")}</p>}
-          {!busy && quote && !quote.available && <p role="status" className="text-sm text-muted-foreground">
-            {quote.reason || tx("当前暂无可查看的题解。", "No solution is available here yet.")}
-          </p>}
-          {!busy && !dialogOpen && quote?.available && quote.requiresConfirmation && <>
-            {description && <p className="text-sm text-muted-foreground">{description}</p>}
-            <Button size="sm" variant="secondary" onClick={() => { setError(""); setDialogOpen(true); }}>
-              {tx(`解锁题解（${quote.price} 奖学金）`, `Unlock solution (${quote.price} scholarship)`)}
-            </Button>
-          </>}
-          {!busy && !dialogOpen && error && !quote?.requiresConfirmation && <Button size="sm" variant="secondary" onClick={reloadAccess}>
-            {tx("重新加载题解", "Retry loading solutions")}
-          </Button>}
-        </>
       ) : (
         <>
-          <p className="text-sm text-muted-foreground">
-            {description ?? tx(
-              "查看已审核的中文题面。翻译不影响首次 AC 的奖学金奖励。",
-              "Read the reviewed Chinese statement. Translation does not affect first-AC scholarship rewards.",
-            )}
-          </p>
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={busy}
-            onClick={() => void prepare()}
-          >
-            <Languages size={15} />{" "}
-            {busy
-              ? tx("正在查询…", "Checking…")
-              : tx("查看开放方式与价格", "Check access and price")}
-          </Button>
+          {busy && !dialogOpen && <p role="status" className="text-sm text-muted-foreground">
+            {isSolution ? tx("正在加载题解…", "Loading solutions…") : tx("正在查询译文…", "Checking translation access…")}
+          </p>}
+          {!busy && quote && !quote.available && <p role="status" className="text-sm text-muted-foreground">
+            {quote.reason || (isSolution
+              ? tx("当前暂无可查看的题解。", "No solution is available here yet.")
+              : tx("当前暂无可查看的译文。", "No translation is available here yet."))}
+          </p>}
+          {quote && canOpenDialog && <>
+            {description && <p className="text-sm text-muted-foreground">{description}</p>}
+            <Button type="button" size="sm" variant="secondary" aria-haspopup="dialog" onClick={() => { setError(""); setDialogOpen(true); }}>
+              {isSolution
+                ? tx(`解锁题解（${quote.price} 奖学金）`, `Unlock solution (${quote.price} scholarship)`)
+                : quote.requiresConfirmation
+                  ? tx(`解锁翻译（${quote.price} 奖学金）`, `Unlock translation (${quote.price} scholarship)`)
+                  : tx("免费查看翻译", "View translation (free)")}
+            </Button>
+          </>}
+          {!busy && !dialogOpen && error && !canOpenDialog && <Button size="sm" variant="secondary" onClick={reloadAccess}>
+            {isSolution ? tx("重新加载题解", "Retry loading solutions") : tx("重新查询译文", "Retry checking translation access")}
+          </Button>}
         </>
       )}
       {error && !dialogOpen && (
@@ -324,6 +291,11 @@ function AssistanceContents<Content extends Provided>({
                           "Pay once per problem and assistance type. Revisit published content for the relevant version across pages and activities.",
                         )}
                 </p>
+                {!isSolution && (
+                  <p className="text-muted-foreground">
+                    {tx("查看翻译不影响首次 AC 的奖学金奖励。", "Viewing the translation does not affect first-AC scholarship rewards.")}
+                  </p>
+                )}
                 {kind === "FULL_SOLUTION" && quote.affectsFirstAcScholarship !== false && (
                   <p className="rounded-md border border-warning/30 bg-warning/5 p-3">
                     {tx(

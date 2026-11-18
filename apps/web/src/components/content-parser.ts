@@ -1,5 +1,5 @@
 export type TableAlignment = 'left'|'center'|'right';
-export interface ContentBlock {kind:'paragraph'|'heading'|'code'|'math'|'list'|'table';text:string;level?:number;language?:string;ordered?:boolean;items?:string[];headers?:string[];rows?:string[][];alignments?:TableAlignment[]}
+export interface ContentBlock {kind:'paragraph'|'heading'|'code'|'math'|'list'|'table'|'blank';text:string;level?:number;language?:string;ordered?:boolean;items?:string[];headers?:string[];rows?:string[][];alignments?:TableAlignment[]}
 export interface InlineToken {kind:'text'|'code'|'math'|'strong';text:string;display?:boolean}
 function escaped(text:string,index:number){let count=0;for(let i=index-1;i>=0&&text[i]==='\\';i--)count++;return count%2===1;}
 function closeAt(text:string,delimiter:string,start:number,dollar=false){
@@ -42,7 +42,7 @@ function tableAt(lines:string[],index:number):{block:ContentBlock;end:number}|nu
   const rows:string[][]=[];let end=index+1;
   while(end+1<lines.length){
     const next=lines[end+1].trim();
-    if(!next||/^(?:#{1,6}\s|`{3,}|~{3,}|\$\$|\\\[|[-*+]\s|\d+\.\s|>|(?:-{3,}|\*{3,}|_{3,})\s*$)/.test(next))break;
+    if(!next||next==='[blank]'||/^(?:#{1,6}\s|`{3,}|~{3,}|\$\$|\\\[|[-*+]\s|\d+\.\s|>|(?:-{3,}|\*{3,}|_{3,})\s*$)/.test(next))break;
     const row=tableRow(lines[++end]).cells;
     rows.push(header.cells.map((_,column)=>row[column]??''));
   }
@@ -76,6 +76,7 @@ export function contentBlocks(content:string):ContentBlock[]{
   for(let i=0;i<lines.length;i++){
     const line=lines[i],trimmed=line.trim();
     if(!trimmed){flush();continue;}
+    if(trimmed==='[blank]'){flush();out.push({kind:'blank',text:''});continue;}
     const fence=trimmed.match(/^(`{3,}|~{3,})([^\s]*)/);
     if(fence){flush();const code:string[]=[];let next=i+1;for(;next<lines.length&&!lines[next].trim().startsWith(fence[1]);next++)code.push(lines[next]);out.push({kind:'code',text:code.join('\n'),language:fence[2]});i=next;continue;}
     const delimiter=trimmed.startsWith('$$')?'$$':trimmed.startsWith('\\[')?'\\[':null;

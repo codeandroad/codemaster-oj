@@ -721,7 +721,7 @@ export function SchoolCourseEditor({
                 >
                   {text("Cancel", "取消")}
                 </Button>
-                <Button type="submit" disabled={mutation.busy}>
+                <Button type="submit" disabled={mutation.busy || (Boolean(initial) && !dirty)}>
                   {text("Save draft", "保存草稿")}
                 </Button>
               </div>

@@ -7,7 +7,7 @@
 .content ul,.content ol { padding-left:24px;margin:14px 0; }
 .content ul { list-style:disc; }.content ol { list-style:decimal; }
 .content li { margin-bottom:7px; }
-.inlineCode { border:1px solid var(--border);border-radius:4px;background:var(--surface-subtle);padding:1px 5px;font:12px var(--font-mono); }
+.inlineCode { border:1px solid var(--border);border-radius:4px;background:var(--surface-subtle);padding:1px 5px;font-family:var(--font-mono);font-size:12px;font-weight:inherit; }
 .codeBlock { max-width:100%;overflow:auto;background:var(--surface-subtle);border:1px solid var(--border);border-radius:6px;padding:14px;font:12px/1.7 var(--font-mono);white-space:pre;overflow-wrap:normal; }
 .inlineMath { font-size:1em;max-width:100%; }
 .displayMath { display:block;max-width:100%;overflow-x:auto;overflow-y:hidden;padding:4px 0; }
@@ -26,3 +26,11 @@
 .table th:last-child,.table td:last-child { border-right:0; }
 .table tbody tr:last-child td { border-bottom:0; }
 .table thead:last-child th { border-bottom:0; }
+
+.content h1 { font-size:26px;font-weight:700;margin:28px 0 12px; }
+.content h2 { font-size:23px; }
+.content h3 { font-size:20px;font-weight:650;margin:22px 0 10px; }
+.content h4 { font-size:18px;font-weight:650;margin:20px 0 8px; }
+.content h5 { font-size:16px;font-weight:650;margin:18px 0 8px; }
+.content h6 { font-size:14px;font-weight:650;margin:16px 0 8px; }
+.blankLine { height:1lh; }

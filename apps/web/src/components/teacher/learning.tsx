@@ -868,7 +868,7 @@ export function LearningEditorForm({
               {t("学生预览")}
             </Button>
             <Button
-              disabled={action.busy || !canEditCourse}
+              disabled={action.busy || !canEditCourse || !dirty}
               onClick={() =>
                 void action.run(async () => {
                   await save();
@@ -888,7 +888,7 @@ export function LearningEditorForm({
           </div>
         }
       />
-      <Feedback action={action} />
+      <div className="flow-root min-h-8" data-od-id="course-save-feedback"><Feedback action={action} /></div>
       {!batchPublishOpen && <Feedback action={batchAction} />}
       {path.archived && <p role="status" className="mt-4 rounded-md border border-border bg-surface-subtle px-4 py-3 text-sm text-muted-foreground">{tr("课程已归档，目前只可查看。若需继续修改、发布课程或关联题目，请先在课程列表中恢复。", "This course is archived and read-only. Restore it from the course list before editing or publishing.")}</p>}
       {!path.archived && !path.published && (

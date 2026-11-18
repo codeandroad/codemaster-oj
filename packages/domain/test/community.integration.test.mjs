@@ -190,7 +190,7 @@ test('school-wide profiles, first-AC activity and guestbook keep administrator m
    assert.equal(posted.author.nickname,'Beta');
    assert.equal(posted.author.avatar,defaultAvatarPath(beta.identityId));
    assert.equal(posted.canDelete,true);
-   assert.equal(posted.canReport,false);
+   assert.equal(posted.canReport,undefined);
    const notificationRoute='/student-notifications';
    const inbox=(await call(alpha,notificationRoute)).body;
    assert.equal(inbox.total,1);
@@ -228,15 +228,14 @@ test('school-wide profiles, first-AC activity and guestbook keep administrator m
     'class teachers cannot moderate guestbook messages');
    assert.equal((await call(outsider,messageRoute)).body.total,1);
 
-   const reportRoute=`${messageRoute}/${posted.id}/report`;
-   await assert.rejects(call(beta,reportRoute,'POST',{reason:'abuse'}),e=>e.status===400);
-   assert.deepEqual((await call(alpha,reportRoute,'POST',{reason:'abuse'})).body,{ok:true});
-   await assert.rejects(call(alpha,reportRoute,'POST',{reason:'abuse'}),e=>e.status===409);
+   const historicalReport=(message,reporter,reason)=>pool.query(
+    'INSERT INTO student_guestbook_reports(message_id,reporter_account_id,reason) VALUES($1,$2,$3)',
+    [message.id,reporter.id,reason]);
+   assert.equal(await call(alpha,`${messageRoute}/${posted.id}/report`,'POST',{reason:'abuse'}),null);
+   await historicalReport(posted,alpha,'abuse');
    const reportedOwnerView=(await call(alpha,messageRoute)).body;
    assert.equal(reportedOwnerView.total,1,'profile owner retains removal access after reporting');
-   assert.equal(reportedOwnerView.items[0].reportedByMe,true);
    assert.equal(reportedOwnerView.items[0].canDelete,true);
-   assert.equal(reportedOwnerView.items[0].canReport,false);
    assert.equal((await call(beta,messageRoute)).body.total,1,'other users still see it pending moderation');
    const reportList=(await call(admin,`/profiles/${alpha.identityId}/message-reports`)).body;
    assert.equal(reportList.total,1);
@@ -271,8 +270,7 @@ test('school-wide profiles, first-AC activity and guestbook keep administrator m
     [allReports.items[0].id])).rows[0].resolution,'delete');
 
    const second=(await call(gamma,messageRoute,'POST',{body:'继续加油'})).body;
-   assert.deepEqual((await call(alpha,`${messageRoute}/${second.id}/report`,'POST',
-    {reason:'other'})).body,{ok:true});
+   await historicalReport(second,alpha,'other');
    const secondReport=(await call(admin,'/profile-message-reports')).body.items[0];
    assert.equal(secondReport.status,'pending');
    await assert.rejects(call(teacher,`/profile-message-reports/${secondReport.id}/dismiss`,'POST'),
@@ -287,9 +285,7 @@ test('school-wide profiles, first-AC activity and guestbook keep administrator m
    assert.equal(dismissed.items[0].status,'dismissed');
    assert.ok(dismissed.items[0].resolvedAt);
    const ownerAfterDismiss=(await call(alpha,messageRoute)).body.items[0];
-   assert.equal(ownerAfterDismiss.reportedByMe,true);
    assert.equal(ownerAfterDismiss.canDelete,true);
-   assert.equal(ownerAfterDismiss.canReport,false);
    await assert.rejects(call(teacher,`${messageRoute}/${second.id}`,'DELETE'),e=>e.status===403);
    assert.deepEqual((await call(admin,`${messageRoute}/${second.id}`,'DELETE')).body,{ok:true});
    assert.equal((await call(admin,'/profile-message-reports','GET',{},'?status=deleted')).body.total,2);
@@ -305,7 +301,7 @@ test('school-wide profiles, first-AC activity and guestbook keep administrator m
     [secondReport.id])).rows[0].n,1,'earlier dismissal remains in the audit trail');
    assert.equal((await pool.query(`SELECT count(*)::int n FROM audit_events
     WHERE action IN ('profile.message_create','profile.message_report','profile.message_delete',
-     'profile.message_report_dismiss')`)).rows[0].n,9);
+     'profile.message_report_dismiss')`)).rows[0].n,7);
 
    const schoolwideNote=(await call(outsider,`/profiles/${beta.identityId}/messages`,'POST',
     {body:'跨班也能互相鼓励'})).body;
@@ -328,7 +324,7 @@ test('school-wide profiles, first-AC activity and guestbook keep administrator m
       [firstClass,person.identityId]);
     const targetMessages=`/profiles/${target.identityId}/messages`;
     const note=(await call(writer,targetMessages,'POST',{body:`Report on ${kind} profile`})).body;
-    await call(target,`${targetMessages}/${note.id}/report`,'POST',{reason:'privacy'});
+    await historicalReport(note,target,'privacy');
     const pending=(await call(admin,'/profile-message-reports')).body.items
      .find(item=>item.messageId===note.id);
     assert.ok(pending,'admin queue retains the reported message');

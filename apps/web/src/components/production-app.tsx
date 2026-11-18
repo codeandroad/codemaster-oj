@@ -291,7 +291,7 @@ function ProductionShell({
     <WorkspaceFrame student={role === "student"} schoolName={school ? schoolDisplayName(school, locale) : t("校内学习平台")} navigation={links}
       footer={pathname === "/" && <div className="mx-auto max-w-[1500px] px-4 sm:px-6"><SiteFooter locale={locale} /></div>}
       breadcrumb={<div className="flex min-w-0 items-center"><PageBreadcrumbs pathname={pathname} role={role}/><ShellPageHeading pathname={pathname} role={role}/></div>}
-      account={<>{role === "student" && <ScholarshipBalance identityId={user.identityId}/>}<NotificationDropdown key={`${user.id}:${role}`} workspace={role === "student" ? "student" : "staff"}/><AccountMenu user={user} role={role} busy={action.busy} onLogout={() => action.run(async () => {
+      account={<>{role === "student" && <ScholarshipBalance identityId={user.identityId}/>}<NotificationDropdown key={`${user.id}:${role}`} workspace={role === "student" ? "student" : "staff"} role={role}/><AccountMenu user={user} role={role} busy={action.busy} onLogout={() => action.run(async () => {
         try { await productionApi("auth/logout", {method:"POST"}); } catch(reason) { if (!(reason instanceof ApiError && reason.status === 401)) throw reason; } onLogout();
       })}/></>}>
       <Feedback action={action}/>{children}

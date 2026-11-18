@@ -115,6 +115,8 @@ export interface Assignment {
   courseAvailable?: boolean;
   requiredLanguage?: SubmissionLanguage | null;
   problemOrder?: "course" | "custom";
+  publishedAt?: string | null;
+  createdAt?: string;
   dueAt: string;
   completion?: AssignmentCompletion | null;
   problems: { problemId: string; points: number; title?: string; versionId?: string; position?: number; firstAcPoints?: number; rewardPoints?: number; difficulty?: string | null }[];

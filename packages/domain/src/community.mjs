@@ -28,6 +28,7 @@ async function activeStudent(db, identityId) {
  const row = (await db.query(`SELECT i.id, a.id account_id,
   COALESCE(NULLIF(btrim(a.nickname),''),'同学') nickname, a.avatar, a.bio
   FROM identities i JOIN accounts a ON a.identity_id=i.id
+  JOIN legacy_school_account_ownership ownership ON ownership.account_id=a.id
   WHERE i.id=$1 AND i.kind='student' AND i.archived_at IS NULL
    AND a.disabled_at IS NULL AND a.binding_released_at IS NULL
    AND EXISTS (SELECT 1 FROM account_roles r WHERE r.account_id=a.id AND r.role='student')`,
@@ -54,17 +55,61 @@ function messageShape(row, user, own, moderator, publicPractice) {
  return {id:row.id,body:row.body,createdAt:row.created_at,
   author:authorShape(row,publicPractice),
   canDelete:row.author_account_id===user.id || own || moderator,
-  reportedByMe:!!row.reported_by_me,
-  canReport:(publicPractice || student(user)) && row.author_account_id!==user.id && !row.reported_by_me};
+  threadId:row.thread_id??null, replyCount:row.reply_count??0,
+  quote:row.quote_id ? {id:row.quote_id,body:row.quote_body??null,nickname:row.quote_nickname??null} : null,
+  mentions:row.mentions??[], likeCount:row.like_count??0, liked:!!row.liked};
 }
 
-const visibleMessageSql = `FROM student_guestbook_messages m
- JOIN accounts a ON a.id=m.author_account_id AND a.disabled_at IS NULL AND a.binding_released_at IS NULL
- JOIN identities i ON i.id=a.identity_id AND i.archived_at IS NULL
+const activeAuthors = `JOIN accounts a ON a.id=m.author_account_id AND a.disabled_at IS NULL AND a.binding_released_at IS NULL
+ JOIN identities i ON i.id=a.identity_id AND i.archived_at IS NULL`;
+const visibleMessageSql = `FROM student_guestbook_messages m ${activeAuthors}
  WHERE ($4::uuid IS NOT NULL OR m.profile_identity_id=$1) AND m.deleted_at IS NULL
   AND m.practice_profile_account_id IS NOT DISTINCT FROM $4::uuid
   AND ($3::boolean OR NOT EXISTS (SELECT 1 FROM student_guestbook_reports r
    WHERE r.message_id=m.id AND r.reporter_account_id=$2 AND r.resolution IS NULL))`;
+
+const publicNickname = (practice, account='a') => practice
+ ? publicName(account) : `COALESCE(NULLIF(btrim(${account}.nickname),''),'同学')`;
+
+async function mentionCandidates(db, profile, practice, query, ids = null) {
+ const nickname = publicNickname(practice);
+ const audience = practice
+  ? 'JOIN public_practice_preferences p ON p.account_id=a.id AND p.profile_enabled'
+  : `JOIN legacy_school_account_ownership o ON o.account_id=a.id
+     JOIN account_roles r ON r.account_id=a.id AND r.role='student'`;
+ const {rows} = await db.query(`SELECT a.id AS account_id,
+    CASE WHEN $1::boolean THEN a.id ELSE i.id END id,${nickname} nickname
+  FROM accounts a JOIN identities i ON i.id=a.identity_id ${audience}
+  WHERE a.disabled_at IS NULL AND a.binding_released_at IS NULL AND i.archived_at IS NULL
+    AND (${practice ? 'true' : "i.kind='student'"})
+    AND ($2::uuid[] IS NULL OR CASE WHEN $1 THEN a.id ELSE i.id END=ANY($2))
+    AND (strpos(lower(${nickname}),lower($3))>0 OR $3='')
+  ORDER BY (a.id=$4) DESC, nickname,a.id LIMIT 8`,[practice,ids,query,profile.account_id]);
+ return rows;
+}
+
+async function guestbookProfile(db, ctx, identityId, practiceAccountId) {
+ if (practiceAccountId) {
+  const target=await practiceProfileTarget(db,ctx.user,practiceAccountId,false);
+  return {...target,account_id:practiceAccountId};
+ }
+ return visibleProfile(db,ctx.user,identityId);
+}
+
+async function listMentionCandidates(ctx, identityId, practiceAccountId) {
+ const profile=await guestbookProfile(ctx.pool,ctx,identityId,practiceAccountId);
+ const query=field(ctx.url.searchParams.get('q')??'','昵称',{min:0,max:50});
+ const rows=await mentionCandidates(ctx.pool,profile,Boolean(practiceAccountId),query);
+ return response({items:rows.map(({id,nickname})=>({id,nickname})),query});
+}
+
+async function visibleMessage(db, params, messageId, { root = false, lock = false } = {}) {
+ const {rows:[row]}=await db.query(`SELECT m.id,m.thread_id,m.author_account_id,i.id author_identity_id
+  ${visibleMessageSql} AND m.id=$5 ${root ? 'AND m.thread_id IS NULL' : ''} ${lock ? 'FOR SHARE OF m' : ''}`,
+  [...params,messageId]);
+ if (!row) fail(404,'NOT_FOUND','留言不存在');
+ return row;
+}
 
 async function profile(ctx, identityId) {
  const p = await visibleProfile(ctx.pool, ctx.user, identityId);
@@ -121,7 +166,7 @@ async function practiceProfileTarget(db, user, accountId, deleting) {
  return target;
 }
 
-async function practiceProfileOperation(ctx, accountId, section, messageId, report) {
+async function practiceProfileOperation(ctx, accountId, section, messageId, action) {
  const {user,method}=ctx, own=user.id===accountId;
  if (!section && method==='PATCH') {
   if (!own) fail(403,'FORBIDDEN','You can only manage your own practice profile.');
@@ -135,11 +180,14 @@ async function practiceProfileOperation(ctx, accountId, section, messageId, repo
   });
  }
  const target=await practiceProfileTarget(ctx.pool,user,accountId,method==='DELETE');
+ if (section==='mentions' && method==='GET') return listMentionCandidates(ctx,target.identity_id,accountId);
  if (section==='messages') {
   if (!messageId && method==='GET') return listMessages(ctx,target.identity_id,accountId);
   if (!messageId && method==='POST') return createMessage(ctx,target.identity_id,accountId);
-  if (messageId && !report && method==='DELETE') return deleteMessage(ctx,target.identity_id,messageId,accountId);
-  if (messageId && report && method==='POST') return reportMessage(ctx,target.identity_id,messageId,accountId);
+  if (action==='replies' && method==='GET') return listMessages(ctx,target.identity_id,accountId,messageId);
+  if (action==='like' && method==='POST') return reactToMessage(ctx,target.identity_id,messageId,accountId);
+  if (messageId && !action && method==='DELETE') return deleteMessage(ctx,target.identity_id,messageId,accountId);
+  return null;
  }
  if (method!=='GET') return null;
  if (section==='activity' && !own) fail(404,'NOT_FOUND','This activity is private.');
@@ -164,35 +212,79 @@ async function practiceProfileOperation(ctx, accountId, section, messageId, repo
  });
 }
 
-async function listMessages(ctx, identityId, practiceAccountId = null) {
+async function listMessages(ctx, identityId, practiceAccountId = null, threadId = null) {
  const publicPractice=practiceAccountId!==null;
  if (!publicPractice) await visibleProfile(ctx.pool, ctx.user, identityId);
  const {page,pageSize} = paging(ctx.url);
  const own=publicPractice ? ctx.user.id===practiceAccountId : ctx.user.identityId===identityId;
  const params=[identityId,ctx.user.id,own,practiceAccountId];
- const total=(await ctx.pool.query(`SELECT count(*)::int total ${visibleMessageSql}`,params)).rows[0].total;
- const rows=(await ctx.pool.query(`SELECT m.id,m.body,m.created_at,m.author_account_id,
-  EXISTS (SELECT 1 FROM student_guestbook_reports r
-   WHERE r.message_id=m.id AND r.reporter_account_id=$2) reported_by_me,
-  ${publicPractice ? `${publicAlias()} author_alias,${publicName()} author_nickname`
-    : `i.id author_identity_id,COALESCE(NULLIF(btrim(a.nickname),''),'同学') author_nickname,a.avatar author_avatar`}
-  ${visibleMessageSql} ORDER BY m.created_at DESC,m.id DESC LIMIT $5 OFFSET $6`,
-  [...params,pageSize,(page-1)*pageSize])).rows;
+ if (threadId) await visibleMessage(ctx.pool,params,threadId,{root:true});
+ const {rows}=await ctx.pool.query(`WITH visible AS MATERIALIZED (
+   SELECT m.id,m.body,m.created_at,m.author_account_id,m.thread_id,m.quote_id,
+    i.id author_identity_id,a.avatar author_avatar,${publicAlias()} author_alias,${publicNickname(publicPractice)} author_nickname
+   ${visibleMessageSql}
+ ), page AS (
+   SELECT * FROM visible WHERE thread_id IS NOT DISTINCT FROM $5::uuid
+    AND ($5::uuid IS NULL OR EXISTS(SELECT 1 FROM visible WHERE id=$5 AND thread_id IS NULL))
+   ORDER BY created_at DESC,id DESC LIMIT $6 OFFSET $7
+ ), totals AS (
+   SELECT count(*) FILTER (WHERE thread_id IS NOT DISTINCT FROM $5::uuid)::int total,
+    count(*) FILTER (WHERE thread_id IS NOT NULL AND EXISTS(SELECT 1 FROM visible root WHERE root.id=visible.thread_id))::int reply_total
+   FROM visible
+ )
+ SELECT totals.*,p.*,q.body quote_body,q.author_nickname quote_nickname,
+  (SELECT count(*)::int FROM visible r WHERE r.thread_id=p.id) reply_count,
+  (SELECT count(*)::int FROM student_guestbook_likes l WHERE l.message_id=p.id) like_count,
+  EXISTS(SELECT 1 FROM student_guestbook_likes l WHERE l.message_id=p.id AND l.account_id=$2) liked,
+  (SELECT jsonb_agg(jsonb_build_object('id',${publicPractice ? 'tagged.id' : 'tagged_identity.id'},
+      'nickname',${publicNickname(publicPractice,'tagged')},'ranges',tag.text_ranges) ORDER BY tagged.id)
+   FROM student_guestbook_mentions tag
+   JOIN accounts tagged ON tagged.id=tag.account_id AND tagged.disabled_at IS NULL AND tagged.binding_released_at IS NULL
+   JOIN identities tagged_identity ON tagged_identity.id=tagged.identity_id AND tagged_identity.archived_at IS NULL
+   ${publicPractice ? 'JOIN public_practice_preferences pref ON pref.account_id=tagged.id AND pref.profile_enabled' : ''}
+   WHERE tag.message_id=p.id) mentions
+ FROM totals LEFT JOIN page p ON true LEFT JOIN visible q ON q.id=p.quote_id
+ ORDER BY p.created_at DESC,p.id DESC`,[...params,threadId,pageSize,(page-1)*pageSize]);
  const moderator=publicPractice ? await isPlatformAdministrator(ctx.pool,ctx.user.id) : admin(ctx.user);
- return response({items:rows.map(r=>messageShape(r,ctx.user,own,moderator,publicPractice)),total,page,pageSize});
+ return response({items:rows.filter(row=>row.id).map(row=>messageShape(row,ctx.user,own,moderator,publicPractice)),
+  total:rows[0].total,replyTotal:rows[0].reply_total,page,pageSize});
 }
 
 async function createMessage(ctx, identityId, practiceAccountId = null) {
  const publicPractice=practiceAccountId!==null;
- if (!publicPractice && !student(ctx.user)) fail(403,'FORBIDDEN','只有学生可以留言');
- if (ctx.user.identityId===identityId) fail(400,'VALIDATION','不能给自己的主页留言');
- const body=field(ctx.body.body,'留言',{min:1,max:500});
+ const quoteId=ctx.body.quoteId==null ? null : uuid(ctx.body.quoteId,'引用留言 ID');
+ if (!quoteId && !publicPractice && !student(ctx.user)) fail(403,'FORBIDDEN','只有学生可以留言');
+ const own=publicPractice ? ctx.user.id===practiceAccountId : ctx.user.identityId===identityId;
+ if (!quoteId && own) fail(400,'VALIDATION','不能给自己的主页留言');
+ const mentionIds=ctx.body.mentionIds??[];
+ const inlineMentions=ctx.body.mentions??[];
+ if (!Array.isArray(mentionIds) || !Array.isArray(inlineMentions) || mentionIds.length+inlineMentions.length>5)
+  fail(400,'VALIDATION','最多可提及 5 次');
+ const body=field(ctx.body.body,quoteId?'回复':'留言',{min:1,max:quoteId?300:500});
+ const ranges=inlineMentions.map(mention=>({
+  id:uuid(mention?.id,'提及用户 ID').toLowerCase(),
+  start:integer(mention?.start,0,body.length-1,'提及起点'),
+  end:integer(mention?.end,1,body.length,'提及终点'),
+ })).sort((left,right)=>left.start-right.start);
+ const requestedMentions=[...new Set([...mentionIds.map(id=>uuid(id,'提及用户 ID').toLowerCase()),...ranges.map(range=>range.id)])];
  if (/[\u0001-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(body))
   fail(400,'VALIDATION','留言包含无效字符');
  if (/(?:https?:\/\/|www\.)/iu.test(body))
   fail(400,'VALIDATION','留言不支持外部链接');
  const created=await transaction(ctx.pool,async db=>{
-  if (!publicPractice) await visibleProfile(db,ctx.user,identityId);
+  const profile=await guestbookProfile(db,ctx,identityId,practiceAccountId);
+  const params=[identityId,ctx.user.id,own,practiceAccountId];
+  const quote=quoteId ? await visibleMessage(db,params,quoteId,{lock:true}) : null;
+  const threadId=quote ? quote.thread_id??quote.id : null;
+  if (quote?.thread_id) await visibleMessage(db,params,threadId,{root:true,lock:true});
+  const mentions=requestedMentions.length ? await mentionCandidates(db,profile,publicPractice,'',requestedMentions) : [];
+  if (mentions.length!==requestedMentions.length) fail(400,'VALIDATION','部分提及用户已不可用');
+  const names=new Map(mentions.map(tag=>[tag.id,tag.nickname]));
+  for (const [index, range] of ranges.entries()) {
+   if (range.start>=range.end || (index>0 && ranges[index-1].end>range.start)
+     || body.slice(range.start,range.end)!==`@${names.get(range.id)}`)
+    fail(400,'VALIDATION','提及内容已变更，请重新选择用户');
+  }
   // The account-scoped transaction lock makes the database throttle work even
   // with multiple API processes. Count only successfully created messages.
   await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1::text,78314))',[ctx.user.id]);
@@ -201,13 +293,25 @@ async function createMessage(ctx, identityId, practiceAccountId = null) {
    count(*) FILTER (WHERE created_at>clock_timestamp()-interval '1 day')::int daily
    FROM student_guestbook_messages WHERE author_account_id=$1`,[ctx.user.id])).rows[0];
   if(recent.recent || recent.daily>=20) fail(429,'RATE_LIMIT','留言过于频繁，请稍后再试');
-  const m=(await db.query(`INSERT INTO student_guestbook_messages(profile_identity_id,author_account_id,body,practice_profile_account_id)
-   VALUES($1,$2,$3,$4) RETURNING id,body,created_at,author_account_id`,
-   [identityId,ctx.user.id,body,practiceAccountId])).rows[0];
-  if (!publicPractice) await db.query(`INSERT INTO student_guestbook_notifications(recipient_identity_id,message_id)
-   VALUES($1,$2)`,[identityId,m.id]);
+  const m=(await db.query(`INSERT INTO student_guestbook_messages(profile_identity_id,author_account_id,body,practice_profile_account_id,thread_id,quote_id)
+   VALUES($1,$2,$3,$4,$5,$6) RETURNING id,body,created_at,author_account_id,thread_id,quote_id`,
+   [identityId,ctx.user.id,body,practiceAccountId,threadId,quoteId])).rows[0];
+  const recipients=new Map(mentions.map(tag=>[tag.account_id,'mention']));
+  if (quote) recipients.set(quote.author_account_id,'reply');
+  if (!recipients.has(profile.account_id)) recipients.set(profile.account_id,quote?'reply':'message');
+  recipients.delete(ctx.user.id);
+  if (mentions.length) await db.query(`INSERT INTO student_guestbook_mentions(message_id,account_id,text_ranges)
+   SELECT $1,tag.account_id,tag.ranges FROM jsonb_to_recordset($2::jsonb) tag(account_id uuid,ranges jsonb)`,
+   [m.id,JSON.stringify(mentions.map(tag=>{
+    const occurrences=ranges.filter(range=>range.id===tag.id).map(({start,end})=>({start,end}));
+    return {account_id:tag.account_id,ranges:occurrences.length ? occurrences : null};
+   }))]);
+  if (recipients.size) await db.query(`INSERT INTO student_guestbook_notifications(recipient_identity_id,recipient_account_id,message_id,interaction)
+   SELECT a.identity_id,a.id,$1,recipient.interaction
+   FROM unnest($2::uuid[],$3::text[]) recipient(account_id,interaction)
+   JOIN accounts a ON a.id=recipient.account_id`,[m.id,[...recipients.keys()],[...recipients.values()]]);
   await ctx.helpers.audit(db,ctx.user.id,'profile.message_create','student_guestbook_message',m.id,
-   {profileIdentityId:identityId});
+   {profileIdentityId:identityId,threadId,quoteId});
   if (!publicPractice) return {...m,author_identity_id:ctx.user.identityId,
    author_nickname:ctx.user.nickname?.trim()||'同学',author_avatar:ctx.user.avatar||''};
   const {rows:[author]}=await db.query(`SELECT ${publicAlias()} author_alias,${publicName()} author_nickname
@@ -215,6 +319,23 @@ async function createMessage(ctx, identityId, practiceAccountId = null) {
   return {...m,...author};
  });
  return response(messageShape(created,ctx.user,false,false,publicPractice),201);
+}
+
+async function reactToMessage(ctx, identityId, messageId, practiceAccountId = null) {
+ const {liked}=ctx.body;
+ if (typeof liked!=='boolean') fail(400,'VALIDATION','点赞状态无效');
+ return transaction(ctx.pool,async db=>{
+  await guestbookProfile(db,ctx,identityId,practiceAccountId);
+  const own=practiceAccountId ? ctx.user.id===practiceAccountId : ctx.user.identityId===identityId;
+  const params=[identityId,ctx.user.id,own,practiceAccountId];
+  const message=await visibleMessage(db,params,messageId,{lock:true});
+  if (message.thread_id) await visibleMessage(db,params,message.thread_id,{root:true,lock:true});
+  if (liked) await db.query(`INSERT INTO student_guestbook_likes(message_id,account_id) VALUES($1,$2)
+   ON CONFLICT DO NOTHING`,[messageId,ctx.user.id]);
+  else await db.query('DELETE FROM student_guestbook_likes WHERE message_id=$1 AND account_id=$2',[messageId,ctx.user.id]);
+  const {rows:[{count}]}=await db.query('SELECT count(*)::int count FROM student_guestbook_likes WHERE message_id=$1',[messageId]);
+  return response({liked,likeCount:count});
+ });
 }
 
 async function deleteMessage(ctx, identityId, messageId, practiceAccountId = null) {
@@ -242,32 +363,6 @@ async function deleteMessage(ctx, identityId, messageId, practiceAccountId = nul
   await ctx.helpers.audit(db,ctx.user.id,'profile.message_delete','student_guestbook_message',messageId,
    {profileIdentityId:identityId,authorAccountId:m.author_account_id,
     moderation:m.author_account_id!==ctx.user.id});
- });
- return response({ok:true});
-}
-
-async function reportMessage(ctx, identityId, messageId, practiceAccountId = null) {
- const publicPractice=practiceAccountId!==null;
- if (!publicPractice && !student(ctx.user)) fail(403,'FORBIDDEN','只有学生可以举报留言');
- const reason=enumValue(ctx.body.reason,['spam','abuse','privacy','other'],'举报原因');
- await transaction(ctx.pool,async db=>{
-  if (!publicPractice) await visibleProfile(db,ctx.user,identityId);
-  const m=(await db.query(`SELECT id,author_account_id,deleted_at FROM student_guestbook_messages
-   WHERE id=$1 AND ($3::uuid IS NOT NULL OR profile_identity_id=$2)
-    AND practice_profile_account_id IS NOT DISTINCT FROM $3::uuid FOR UPDATE`,[messageId,identityId,practiceAccountId])).rows[0];
-  if(!m || m.deleted_at) fail(404,'NOT_FOUND','留言不存在');
-  if(m.author_account_id===ctx.user.id) fail(400,'VALIDATION','不能举报自己的留言');
-  if((await db.query(`SELECT 1 FROM student_guestbook_reports
-    WHERE message_id=$1 AND reporter_account_id=$2`,[messageId,ctx.user.id])).rowCount)
-   fail(409,'ALREADY_REPORTED','已举报该留言');
-  await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1::text,78315))',[ctx.user.id]);
-  const daily=(await db.query(`SELECT count(*)::int n FROM student_guestbook_reports
-   WHERE reporter_account_id=$1 AND created_at>clock_timestamp()-interval '1 day'`,[ctx.user.id])).rows[0].n;
-  if(daily>=10) fail(429,'RATE_LIMIT','举报过于频繁，请稍后再试');
-  await db.query(`INSERT INTO student_guestbook_reports(message_id,reporter_account_id,reason)
-   VALUES($1,$2,$3)`,[messageId,ctx.user.id,reason]);
-  await ctx.helpers.audit(db,ctx.user.id,'profile.message_report','student_guestbook_message',messageId,
-   {profileIdentityId:identityId,reason});
  });
  return response({ok:true});
 }
@@ -364,7 +459,7 @@ async function dismissReport(ctx, reportId, publicPractice = false) {
 }
 
 export async function handleCommunity(ctx) {
- const practice=ctx.route.match(/^\/practice\/profiles\/([^/]+)(?:\/(activity|messages)(?:\/([^/]+)(\/report)?)?)?$/);
+ const practice=ctx.route.match(/^\/practice\/profiles\/([^/]+)(?:\/(activity|messages|mentions)(?:\/([^/]+)(?:\/(replies|like))?)?)?$/);
  if (practice) return practiceProfileOperation(ctx,uuid(practice[1],'Account ID'),practice[2],
   practice[3] && uuid(practice[3],'Message ID'),practice[4]);
  if(ctx.route==='/platform/profile-message-reports' && ctx.method==='GET') return allReports(ctx,true);
@@ -392,17 +487,19 @@ export async function handleCommunity(ctx) {
  if(reportAction && ctx.method==='POST') return dismissReport(ctx,uuid(reportAction[1],'举报 ID'));
  const reportList=ctx.route.match(/^\/profiles\/([^/]+)\/message-reports$/);
  if(reportList && ctx.method==='GET') return reports(ctx,uuid(reportList[1],'学生 ID'));
- const message=ctx.route.match(/^\/profiles\/([^/]+)\/messages\/([^/]+)(\/report)?$/);
+ const message=ctx.route.match(/^\/profiles\/([^/]+)\/messages\/([^/]+)(?:\/(replies|like))?$/);
  if(message) {
   const identityId=uuid(message[1],'学生 ID'),messageId=uuid(message[2],'留言 ID');
-  if(message[3] && ctx.method==='POST') return reportMessage(ctx,identityId,messageId);
+  if(message[3]==='replies' && ctx.method==='GET') return listMessages(ctx,identityId,null,messageId);
+  if(message[3]==='like' && ctx.method==='POST') return reactToMessage(ctx,identityId,messageId);
   if(!message[3] && ctx.method==='DELETE') return deleteMessage(ctx,identityId,messageId);
   return null;
  }
- const section=ctx.route.match(/^\/profiles\/([^/]+)\/(activity|messages)$/);
+ const section=ctx.route.match(/^\/profiles\/([^/]+)\/(activity|messages|mentions)$/);
  if(section) {
   const identityId=uuid(section[1],'学生 ID');
   if(section[2]==='activity' && ctx.method==='GET') return activity(ctx,identityId);
+  if(section[2]==='mentions' && ctx.method==='GET') return listMentionCandidates(ctx,identityId,null);
   if(section[2]==='messages' && ctx.method==='GET') return listMessages(ctx,identityId);
   if(section[2]==='messages' && ctx.method==='POST') return createMessage(ctx,identityId);
   return null;

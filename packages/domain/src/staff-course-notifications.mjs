@@ -4,6 +4,7 @@ import { legacyCourseStaffRole } from './legacy-public-course.mjs';
 import { currentCourseAdmissionsJoin } from './public-learning.mjs';
 import { LEGACY_SCHOOL_ID, lockSchoolTeaching, schoolRole } from './schools.mjs';
 import { fail, uuid } from './security.mjs';
+import { guestbookNotificationRows, readGuestbookNotification } from './guestbook-notifications.mjs';
 
 const response = body => ({ status: 200, body });
 
@@ -46,6 +47,7 @@ export function listStaffCourseNotifications(ctx, { page, pageSize }) {
         ON r.school_id=$1 AND r.account_id=$2 AND r.application_id=a.id
       WHERE $5::boolean
       UNION ALL ${courseAdmissionNotificationRows}
+      ${ctx.notificationSchoolId ? '' : `UNION ALL ${guestbookNotificationRows(false)}`}
     )
     SELECT totals.total, totals.unread, items.*
     FROM (
@@ -82,6 +84,10 @@ export function markStaffCourseNotificationsRead(ctx, notificationId = null) {
     }
     const decision = await readCourseAdmissionNotification(db, notificationId);
     if (notificationId && decision) return response({ ok: true, readAt: decision.read_at });
+    if (!ctx.notificationSchoolId) {
+      const guestbook = await readGuestbookNotification(db, notificationId, false);
+      if (notificationId && guestbook) return response({ ok: true, readAt: guestbook.read_at });
+    }
     if (notificationId) fail(404, 'NOT_FOUND', '通知不存在');
     return response({ ok: true });
   });

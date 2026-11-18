@@ -21,6 +21,9 @@ test('school and public practice Nest transport requires scoped membership, CSRF
   for(const role of ['teacher','student'])await pool.query('INSERT INTO school_memberships(school_id,account_id,role) VALUES($1,$2,$3)',[school.id,users[role].id,role]);
   await pool.query('INSERT INTO platform_admins(account_id) VALUES($1)',[users.platform.id]);
   const runtime=new URL(scoped);runtime.searchParams.set('options',`-crole=campus_app -csearch_path=${schema}`);const workerUrl=new URL(scoped);workerUrl.searchParams.set('options',`-crole=campus_worker -csearch_path=${schema}`);worker=createPool(workerUrl.href);
+  for (const table of ['student_guestbook_likes','student_guestbook_mentions']) {
+   await assert.rejects(worker.query(`SELECT 1 FROM ${table} LIMIT 1`),{code:'42501'});
+  }
   const origin='http://practice.test';server=await createApiApplication({databaseUrl:runtime.href,logger:false,config:loadConfig({SESSION_SECRET:randomBytes(32).toString('base64url'),APP_ORIGIN:origin,COOKIE_SECURE:'false'})});await server.listen(0,'127.0.0.1');const base=await server.getUrl();
   const request=async(path,{auth,method='GET',body,status=200,csrf=true}={})=>{const response=await fetch(`${base}/api/v1${path}`,{method,headers:{Origin:origin,...(body?{'Content-Type':'application/json'}:{}),...(auth?{Cookie:auth.cookie,...(csrf?{'X-CSRF-Token':auth.csrfToken}:{})}:{})},body:body?JSON.stringify(body):undefined});const data=await response.json();assert.equal(response.status,status,`${method} ${path}: ${JSON.stringify(data.error??{})}`);return {data,cookie:response.headers.get('set-cookie')?.split(';')[0],headers:response.headers};};
   const auth={};for(const name of Object.keys(users)){const login=await request('/auth/login',{method:'POST',body:{username:name,password}});auth[name]={cookie:login.cookie,csrfToken:login.data.csrfToken};assert.deepEqual(login.data.user.roles,[]);}
@@ -185,12 +188,23 @@ test('school and public practice Nest transport requires scoped membership, CSRF
    assert.equal(message.author.id,undefined);
    assert.equal((await request(`${profile}/messages`,{auth:auth.personal})).data.items[0].canDelete,true);
    await request(`${profile}/messages/${message.id}`,{auth:auth.teacher,method:'DELETE',status:403});
-   await request(`${profile}/messages/${message.id}/report`,{auth:auth.personal,method:'POST',body:{reason:'other'}});
+   await request(`${profile}/messages/${message.id}/report`,{auth:auth.personal,method:'POST',body:{reason:'other'},status:404});
+   const reply=(await request(`${profile}/messages`,{auth:auth.personal,method:'POST',body:{body:'Thanks! 🎉',quoteId:message.id},status:201})).data;
+   const replyInbox=(await request('/account-notifications',{auth:auth.student})).data.items;
+   assert.equal(replyInbox[0].messageId,reply.id);
+   assert.equal(replyInbox[0].interaction,'reply');
+   assert.equal(replyInbox[0].practice,true);
+   assert.match(replyInbox[0].authorNickname,/^Learner-/);
+   assert.match((await request(`${profile}/messages/${message.id}/replies`,{auth:auth.student})).data.items[0].quote.nickname,/^Learner-/);
+   assert.deepEqual((await request(`${profile}/messages/${reply.id}/like`,{auth:auth.student,method:'POST',body:{liked:true}})).data,{liked:true,likeCount:1});
+   await pool.query(`INSERT INTO student_guestbook_reports(message_id,reporter_account_id,reason)
+    VALUES($1,$2,'other')`,[message.id,users.personal.id]);
    await request('/platform/profile-message-reports',{auth:auth.admin,status:403});
    const reports=(await request('/platform/profile-message-reports',{auth:auth.platform})).data;
    assert.deepEqual(reports.items.map(report=>[report.profileAccountId,report.messageId]),[[users.personal.id,message.id]]);
    await request(profile,{auth:auth.personal,method:'PATCH',body:{profileEnabled:false}});
    await request(`${profile}/messages`,{auth:auth.student,status:404});
+   assert.equal((await request('/account-notifications',{auth:auth.student})).data.items.some(item=>item.messageId===reply.id),false);
    assert.equal((await request(`${profile}/messages`,{auth:auth.personal})).data.total,1);
    await request(`${profile}/messages/${message.id}`,{auth:auth.platform,method:'DELETE'});
    assert.equal((await request(`${profile}/messages`,{auth:auth.personal})).data.total,0);

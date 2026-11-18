@@ -70,7 +70,9 @@ export class CommunityController {
  async activity(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
- @Get(['profiles/:identityId/messages','practice/profiles/:accountId/messages'])
+ @Get(['profiles/:identityId/messages','practice/profiles/:accountId/messages',
+  'profiles/:identityId/messages/:messageId/replies','practice/profiles/:accountId/messages/:messageId/replies',
+  'profiles/:identityId/mentions','practice/profiles/:accountId/mentions'])
  async messages(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
@@ -82,8 +84,8 @@ export class CommunityController {
  async deleteMessage(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
- @Post(['profiles/:identityId/messages/:messageId/report','practice/profiles/:accountId/messages/:messageId/report'])
- async reportMessage(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
+ @Post(['profiles/:identityId/messages/:messageId/like','practice/profiles/:accountId/messages/:messageId/like'])
+ async likeMessage(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
  @Get('profiles/:identityId/message-reports')

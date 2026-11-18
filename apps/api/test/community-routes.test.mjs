@@ -31,6 +31,7 @@ test('Nest profile routes preserve authentication, class access and CSRF for gue
     return {id,identityId,username:`community-${number}`};
    }
    const alpha=await student('alpha','Alpha'),beta=await student('beta','Beta'),outsider=await student('outsider','Outside');
+   const participant=await student('participant','Participant');
    const adminId=(await pool.query("SELECT id FROM accounts WHERE username='community-admin'")).rows[0].id;
    const classId=(await pool.query("INSERT INTO classes(name,owner_account_id) VALUES('Class A',$1) RETURNING id",[adminId])).rows[0].id;
    for(const person of [alpha,beta])await pool.query('INSERT INTO class_members(class_id,identity_id) VALUES($1,$2)',[classId,person.identityId]);
@@ -52,6 +53,7 @@ test('Nest profile routes preserve authentication, class access and CSRF for gue
     return {cookie:r.cookie,csrfToken:r.data.csrfToken};
    };
    const a=await login(alpha.username),b=await login(beta.username),o=await login(outsider.username),admin=await login('community-admin');
+   const participantAuth=await login(participant.username);
    const profile=`/api/v1/profiles/${alpha.identityId}`;
    assert.equal((await request(profile)).status,401);
    const visible=await request(profile,{auth:b});
@@ -90,11 +92,55 @@ test('Nest profile routes preserve authentication, class access and CSRF for gue
    assert.equal((await request(`${notifications}/read-all`,{method:'POST',auth:a})).status,200);
    assert.equal((await request(`${notifications}/read-all`,{method:'POST',auth:a})).status,200);
    assert.equal((await request(notifications,{auth:a})).data.unreadCount,0);
-   assert.equal((await request(`${messages}/${posted.data.id}/report`,{method:'POST',body:{reason:'spam'},auth:a})).status,200);
+   const message=`${messages}/${posted.data.id}`;
+   assert.equal((await request(`${message}/report`,{method:'POST',body:{reason:'spam'},auth:a})).status,404);
    const ownerMessages=await request(messages,{auth:a});
-   assert.equal(ownerMessages.data.items[0].reportedByMe,true);
    assert.equal(ownerMessages.data.items[0].canDelete,true);
-   assert.equal(ownerMessages.data.items[0].canReport,false);
+   assert.equal(ownerMessages.data.items[0].canReport,undefined);
+
+   const mentionPath=`${profile}/mentions?q=Outside`;
+   assert.equal((await request(mentionPath)).status,401);
+   assert.deepEqual((await request(mentionPath,{auth:a})).data.items,[{id:outsider.identityId,nickname:'Outside'}]);
+   const beforeMention='谢谢 👍🎉 ';
+   const range={start:beforeMention.length,end:beforeMention.length+'@Outside'.length};
+   const replyBody={body:`${beforeMention}@Outside 欢迎一起练习`,quoteId:posted.data.id,mentions:[{id:outsider.identityId,...range}]};
+   assert.equal((await request(messages,{method:'POST',body:replyBody,auth:a,csrf:false})).status,403);
+   assert.equal((await request(`/api/v1/profiles/${outsider.identityId}/messages`,{method:'POST',body:replyBody,auth:a})).status,404);
+   assert.equal((await request(messages,{method:'POST',body:{...replyBody,mentions:[{id:outsider.identityId,start:0,end:range.end}]},auth:a})).status,400);
+   const reply=await request(messages,{method:'POST',body:replyBody,auth:a});
+   assert.equal(reply.status,201);
+   assert.equal(reply.data.threadId,posted.data.id);
+   const replies=`${message}/replies`;
+   const thread=(await request(replies,{auth:b})).data;
+   assert.equal(thread.total,1);
+   assert.equal(thread.items[0].body,replyBody.body);
+   assert.deepEqual(thread.items[0].quote,{id:posted.data.id,nickname:'Beta',body:'Great work'});
+   assert.deepEqual(thread.items[0].mentions,[{id:outsider.identityId,nickname:'Outside',ranges:[range]}]);
+   assert.equal((await request(notifications,{auth:b})).data.items[0].interaction,'reply');
+   const mention=(await request(notifications,{auth:o})).data.items[0];
+   assert.equal(mention.interaction,'mention');
+   assert.equal(mention.profileIdentityId,alpha.identityId);
+   assert.equal((await request(`${notifications}/${mention.id}/read`,{method:'POST',auth:b})).status,404);
+   assert.equal((await request(`${notifications}/${mention.id}/read`,{method:'POST',auth:o})).status,200);
+   const like=`${messages}/${reply.data.id}/like`;
+   assert.equal((await request(like,{method:'POST',body:{liked:true},auth:b,csrf:false})).status,403);
+   for (let repeat=0;repeat<2;repeat++) {
+    assert.deepEqual((await request(like,{method:'POST',body:{liked:true},auth:b})).data,{liked:true,likeCount:1});
+   }
+   assert.deepEqual((await request(like,{method:'POST',body:{liked:false},auth:b})).data,{liked:false,likeCount:0});
+   const nested=await request(messages,{method:'POST',body:{body:'我也来加油 🤝',quoteId:reply.data.id},auth:participantAuth});
+   assert.equal(nested.status,201);
+   assert.equal(nested.data.threadId,posted.data.id);
+   assert.equal((await request(`${messages}/${reply.data.id}`,{method:'DELETE',auth:o})).status,403);
+   assert.equal((await request(`${messages}/${reply.data.id}`,{method:'DELETE',auth:a})).status,200);
+   const remaining=(await request(replies,{auth:b})).data;
+   assert.equal(remaining.total,1);
+   assert.deepEqual(remaining.items[0].quote,{id:reply.data.id,body:null,nickname:null});
+   assert.equal((await request(notifications,{auth:o})).data.total,0);
+   assert.equal((await request(like,{method:'POST',body:{liked:true},auth:b})).status,404);
+
+   await pool.query(`INSERT INTO student_guestbook_reports(message_id,reporter_account_id,reason)
+    VALUES($1,$2,'spam')`,[posted.data.id,alpha.id]);
    assert.equal((await request(`${profile}/message-reports`,{auth:admin})).status,200);
    assert.equal((await request('/api/v1/profile-message-reports',{auth:b})).status,403);
    const reports=await request('/api/v1/profile-message-reports',{auth:admin});

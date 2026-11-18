@@ -1,6 +1,7 @@
 import { transaction } from './db.mjs';
 import { activeAccount } from './schools.mjs';
 import { fail } from './security.mjs';
+import { guestbookNotificationRows, readGuestbookNotification } from './guestbook-notifications.mjs';
 
 export function setAccountNotificationRecipient(db, accountId) {
   return db.query("SELECT set_config('campus.account_notification_account_id',$1,true)", [accountId]);
@@ -28,8 +29,12 @@ export function listAccountNotifications({ pool, user }, { page, pageSize }) {
     await activeAccount(db, user.id);
     await setAccountNotificationRecipient(db, user.id);
     const { rows: [totals] } = await db.query(`SELECT count(*)::int total,
-      count(*) FILTER (WHERE read_at IS NULL)::int unread FROM course_admission_notifications`);
-    const { rows } = await db.query(`${courseAdmissionNotificationRows}
+      count(*) FILTER (WHERE read_at IS NULL)::int unread FROM (
+        ${courseAdmissionNotificationRows} UNION ALL ${guestbookNotificationRows(true)}
+      ) visible`);
+    const { rows } = await db.query(`SELECT * FROM (
+      ${courseAdmissionNotificationRows} UNION ALL ${guestbookNotificationRows(true)}
+    ) visible
       ORDER BY created_at DESC,id DESC LIMIT $1 OFFSET $2`, [pageSize, (page - 1) * pageSize]);
     return { status: 200, body: {
       items: rows.map(inboxItem), total: totals.total, unreadCount: totals.unread, page, pageSize,
@@ -41,7 +46,8 @@ export function markAccountNotificationsRead({ pool, user }, notificationId = nu
   return transaction(pool, async db => {
     await activeAccount(db, user.id);
     await setAccountNotificationRecipient(db, user.id);
-    const item = await readCourseAdmissionNotification(db, notificationId);
+    let item = await readCourseAdmissionNotification(db, notificationId);
+    if (!notificationId || !item) item = await readGuestbookNotification(db, notificationId, true);
     if (notificationId && !item) fail(404, 'NOT_FOUND', '通知不存在');
     return { status: 200, body: notificationId ? { ok: true, readAt: item.read_at } : { ok: true } };
   });

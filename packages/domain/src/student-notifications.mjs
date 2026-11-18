@@ -2,6 +2,7 @@ import { courseAdmissionNotificationRows, inboxItem, readCourseAdmissionNotifica
 import { transaction } from './db.mjs';
 import { LEGACY_SCHOOL_ID, lockSchoolTeaching, schoolRole } from './schools.mjs';
 import { fail, uuid } from './security.mjs';
+import { guestbookNotificationRows, readGuestbookNotification } from './guestbook-notifications.mjs';
 
 const response = body => ({ status: 200, body });
 
@@ -44,12 +45,6 @@ const visibleSystemNotification = `n.school_id=$1 AND COALESCE(n.legacy_identity
     OR EXISTS(SELECT 1 FROM timed_practices timed
       WHERE timed.id::text=n.data->>'timedPracticeId' AND timed.results_published_at IS NOT NULL))`;
 
-const visibleGuestbookNotification = `FROM student_guestbook_notifications n
-  JOIN student_guestbook_messages m ON m.id=n.message_id AND m.deleted_at IS NULL
-  JOIN accounts a ON a.id=m.author_account_id AND a.disabled_at IS NULL AND a.binding_released_at IS NULL
-  JOIN identities i ON i.id=a.identity_id AND i.archived_at IS NULL
-  WHERE n.recipient_identity_id=$2`;
-
 export async function listStudentNotifications(ctx, { page, pageSize }) {
   return transaction(ctx.pool, async db => {
     const { schoolId, identityId } = await inboxRecipient(db, ctx);
@@ -58,16 +53,13 @@ export async function listStudentNotifications(ctx, { page, pageSize }) {
       count(*) FILTER(WHERE read_at IS NULL)::int unread FROM (
       SELECT n.read_at FROM student_system_notifications n WHERE ${visibleSystemNotification}
       UNION ALL SELECT read_at FROM course_admission_notifications
-      ${legacy ? `UNION ALL SELECT n.read_at ${visibleGuestbookNotification}` : ''}
+      ${legacy ? `UNION ALL SELECT read_at FROM (${guestbookNotificationRows(false,'$2')}) guestbook` : ''}
     ) visible`, [schoolId, identityId])).rows[0];
     const { rows } = await db.query(`SELECT * FROM (
       SELECT n.id,n.kind,n.data,n.created_at,n.read_at FROM student_system_notifications n
       WHERE ${visibleSystemNotification}
       UNION ALL ${courseAdmissionNotificationRows}
-      ${legacy ? `UNION ALL SELECT n.id,'guestbook',
-        jsonb_build_object('messageId',n.message_id,'profileIdentityId',n.recipient_identity_id,
-          'body',m.body,'authorNickname',COALESCE(NULLIF(btrim(a.nickname),''),'同学')),
-        n.created_at,n.read_at ${visibleGuestbookNotification}` : ''}
+      ${legacy ? `UNION ALL ${guestbookNotificationRows(false,'$2')}` : ''}
     ) visible ORDER BY created_at DESC,id DESC LIMIT $3 OFFSET $4`,
     [schoolId, identityId, pageSize, (page-1)*pageSize]);
     const items = rows.map(inboxItem);
@@ -86,12 +78,7 @@ export async function markStudentNotificationsRead(ctx, notificationId = null) {
     if (notificationId && system) return response({ ok: true, readAt: system.read_at });
 
     if (schoolId === LEGACY_SCHOOL_ID) {
-      const { rows: [guestbook] } = await db.query(`UPDATE student_guestbook_notifications n
-        SET read_at=coalesce(n.read_at,clock_timestamp())
-        FROM student_guestbook_messages m
-        WHERE n.message_id=m.id AND m.deleted_at IS NULL AND n.recipient_identity_id=$1
-          AND ($2::uuid IS NULL OR n.id=$2) AND ($2::uuid IS NOT NULL OR n.read_at IS NULL)
-        RETURNING n.read_at`, [identityId, notificationId]);
+      const guestbook = await readGuestbookNotification(db, notificationId, false, identityId);
       if (notificationId && guestbook) return response({ ok: true, readAt: guestbook.read_at });
     }
 

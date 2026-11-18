@@ -1,4 +1,4 @@
-import type { EditSnapshot } from "./editor-behavior";
+import { editKey, type EditOptions, type EditSnapshot } from "./editor-behavior.ts";
 
 /** A bounded Vim keymap for our existing textarea, not an Ex interpreter. */
 export type VimMode = "normal" | "insert" | "visual" | "visual-line";
@@ -19,8 +19,11 @@ export interface VimState {
 export const createVimState = (): VimState => ({ mode: "normal", count: "", operator: "", operatorCount: 1, pending: "", register: "", linewise: false, anchor: 0, head: 0, column: null, search: "", query: null });
 export interface VimResult { state: VimState; snapshot: EditSnapshot; history?: "undo" | "redo" }
 type Key = { key: string; ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean; shiftKey?: boolean };
+type VimEditOptions = Pick<EditOptions, "autoIndent" | "language" | "tabSize">;
+type WordDirection = "w" | "b" | "e";
 const lineStart = (text: string, at: number) => at <= 0 ? 0 : text.lastIndexOf("\n", at - 1) + 1;
 const lineEnd = (text: string, at: number) => { const end = text.indexOf("\n", at); return end < 0 ? text.length : end; };
+const leadingIndent = (text: string, at: number) => text.slice(lineStart(text, at), lineEnd(text, at)).match(/^[ \t]*/)?.[0] ?? "";
 const previousChar = (text: string, at: number) => Math.max(0, at - (/[\uDC00-\uDFFF]/.test(text[at - 1] ?? "") && /[\uD800-\uDBFF]/.test(text[at - 2] ?? "") ? 2 : 1));
 const nextChar = (text: string, at: number) => Math.min(text.length, at + (/[\uD800-\uDBFF]/.test(text[at] ?? "") && /[\uDC00-\uDFFF]/.test(text[at + 1] ?? "") ? 2 : 1));
 function characters(text: string, at: number, count: number) { for (let n = 0; n < Math.abs(count); n++) at = count < 0 ? previousChar(text, at) : nextChar(text, at); return at; }
@@ -30,23 +33,38 @@ const caret = (text: string, at: number) => {
   return /[\uDC00-\uDFFF]/.test(text[at] ?? "") && at > 0 ? at - 1 : at;
 };
 const wordClass = (char: string | undefined) => !char || /\s/u.test(char) ? 0 : /[\p{L}\p{N}_]/u.test(char) ? 1 : 2;
-function word(text: string, at: number, direction: "w" | "b" | "e") {
-  if (direction === "b") {
-    at = Math.max(0, at - 1);
-    while (at > 0 && !wordClass(text[at])) at--;
-    const kind = wordClass(text[at]);
-    while (at > 0 && wordClass(text[at - 1]) === kind) at--;
-  } else if (direction === "w") {
-    const kind = wordClass(text[at]);
-    while (at < text.length && wordClass(text[at]) === kind) at++;
-    while (at < text.length && !wordClass(text[at])) at++;
-  } else {
-    at = Math.min(text.length, at + 1);
-    while (at < text.length && !wordClass(text[at])) at++;
-    const kind = wordClass(text[at]);
-    while (at + 1 < text.length && wordClass(text[at + 1]) === kind) at++;
+const isWordMotion = (key: string): key is WordDirection | Uppercase<WordDirection> =>
+  key.length === 1 && "wbeWBE".includes(key);
+const emptyLineAt = (text: string, at: number) => text[at] === "\n" && (at === 0 || text[at - 1] === "\n");
+
+function wordClassAt(text: string, at: number, wide: boolean) {
+  const kind = wordClass(text.slice(at, nextChar(text, at)));
+  return wide && kind ? 1 : kind;
+}
+
+function wordEnd(text: string, at: number, wide: boolean) {
+  const kind = wordClassAt(text, at, wide);
+  for (let next = nextChar(text, at); next < text.length && wordClassAt(text, next, wide) === kind; next = nextChar(text, at)) {
+    at = next;
   }
   return at;
+}
+
+function word(text: string, at: number, direction: WordDirection, wide: boolean) {
+  if (direction === "b") {
+    at = previousChar(text, at);
+    while (at > 0 && !wordClassAt(text, at, wide) && !emptyLineAt(text, at)) at = previousChar(text, at);
+    const kind = wordClassAt(text, at, wide);
+    while (kind && at > 0 && wordClassAt(text, previousChar(text, at), wide) === kind) at = previousChar(text, at);
+    return at;
+  }
+
+  if (direction === "w" && wordClassAt(text, at, wide)) at = nextChar(text, wordEnd(text, at, wide));
+  else if (direction === "e" || emptyLineAt(text, at)) at = nextChar(text, at);
+  while (at < text.length && !wordClassAt(text, at, wide) && (direction === "e" || !emptyLineAt(text, at))) {
+    at = nextChar(text, at);
+  }
+  return direction === "e" ? wordEnd(text, at, wide) : at;
 }
 function vertical(text: string, at: number, delta: number, column: number) {
   let start = lineStart(text, at);
@@ -60,7 +78,7 @@ function lineRange(text: string, a: number, b: number): [number, number] {
   const start = lineStart(text, Math.min(a, b)), end = lineEnd(text, Math.max(a, b));
   return [start, end < text.length ? end + 1 : end];
 }
-export function vimKey(snapshot: EditSnapshot, previous: VimState, event: Key, autoIndent = true): VimResult | null {
+export function vimKey(snapshot: EditSnapshot, previous: VimState, event: Key, options: VimEditOptions): VimResult | null {
   const state = { ...previous }, text = snapshot.value;
   let at = state.mode.startsWith("visual") ? caret(text, state.head) : state.mode === "insert" ? snapshot.start : caret(text, snapshot.start);
   const reset = () => { state.count = ""; state.operator = ""; state.operatorCount = 1; state.pending = ""; };
@@ -101,10 +119,14 @@ export function vimKey(snapshot: EditSnapshot, previous: VimState, event: Key, a
     let replacement = "";
     // Deleting the last line also removes its preceding separator; keep it for cc.
     if (linewise && end === text.length && start > 0 && operation !== "c") start--;
-    if (linewise && operation === "c" && end < text.length) replacement = "\n";
+    const indent = linewise && operation === "c" && options.autoIndent ? leadingIndent(text, start) : "";
+    if (linewise && operation === "c") {
+      replacement = indent;
+      if (end < text.length || (end > start && text[end - 1] === "\n")) replacement += "\n";
+    }
     const value = text.slice(0, start) + replacement + text.slice(end);
     const next = normal(value, start);
-    if (operation === "c") { state.mode = "insert"; next.snapshot.start = next.snapshot.end = start; }
+    if (operation === "c") { state.mode = "insert"; next.snapshot.start = next.snapshot.end = start + indent.length; }
     return next;
   };
   const selection = () => state.mode === "visual-line" ? lineRange(text, state.anchor, at) : [Math.min(state.anchor, at), nextChar(text, Math.max(state.anchor, at))] as [number, number];
@@ -150,16 +172,18 @@ export function vimKey(snapshot: EditSnapshot, previous: VimState, event: Key, a
   } else if (key === "0" || key === "Home") target = lineStart(text, at);
   else if (key === "^") target = lineStart(text, at) + (text.slice(lineStart(text, at), lineEnd(text, at)).match(/^\s*/)?.[0].length ?? 0);
   else if (key === "$" || key === "End") { target = Math.max(lineStart(text, at), lineEnd(text, at) - 1); inclusive = true; }
-  else if (["w", "b", "e"].includes(key)) {
+  else if (isWordMotion(key)) {
+    const direction = key.toLowerCase() as WordDirection, wide = key !== direction;
     target = at;
-    if (state.operator === "c" && key === "w" && wordClass(text[at])) {
-      for (let n = 0; n < count; n++) {
-        if (n) target = word(text, target, "w");
-        const kind = wordClass(text[target]);
-        while (target + 1 < text.length && wordClass(text[target + 1]) === kind) target++;
-      }
+    if (state.operator === "c" && direction === "w" && wordClassAt(text, at, wide)) {
+      // cw and cW change through the end of the word without the trailing space.
+      target = wordEnd(text, at, wide);
+      for (let n = 1; n < count; n++) target = word(text, target, "e", wide);
       inclusive = true;
-    } else { for (let n = 0; n < count; n++) target = word(text, target, key as "w" | "b" | "e"); inclusive = key === "e"; }
+    } else {
+      for (let n = 0; n < count; n++) target = word(text, target, direction, wide);
+      inclusive = direction === "e";
+    }
   }
   else if (key === "G") { target = state.count || state.operatorCount > 1 ? vertical(text, 0, count - 1, 0) : lineStart(text, text.length); linewise = true; }
   else if ((key === "n" || key === "N") && state.search) {
@@ -191,12 +215,16 @@ export function vimKey(snapshot: EditSnapshot, previous: VimState, event: Key, a
     reset(); state.mode = "insert";
     if (key === "a") at = Math.min(lineEnd(text, at), nextChar(text, at));
     if (key === "A") at = lineEnd(text, at);
-    if (key === "I") at = lineStart(text, at) + (text.slice(lineStart(text, at), lineEnd(text, at)).match(/^[ \t]*/)?.[0].length ?? 0);
-    if (key === "o" || key === "O") {
-      const indent = autoIndent ? text.slice(lineStart(text, at), lineEnd(text, at)).match(/^[ \t]*/)?.[0] ?? "" : "";
-      const start = key === "o" ? lineEnd(text, at) : lineStart(text, at);
-      const addition = key === "o" ? "\n" + indent : indent + "\n";
-      return result(text.slice(0, start) + addition + text.slice(start), start + (key === "o" ? addition.length : indent.length));
+    if (key === "I") at = lineStart(text, at) + leadingIndent(text, at).length;
+    if (key === "o") {
+      const start = lineEnd(text, at);
+      const newline = editKey({ value: text, start, end: start }, "Enter", { ...options, autoClose: false });
+      if (newline) return result(newline.value, newline.start);
+      return result(text.slice(0, start) + "\n" + text.slice(start), start + 1);
+    }
+    if (key === "O") {
+      const start = lineStart(text, at), indent = options.autoIndent ? leadingIndent(text, at) : "";
+      return result(text.slice(0, start) + indent + "\n" + text.slice(start), start + indent.length);
     }
     return result();
   }

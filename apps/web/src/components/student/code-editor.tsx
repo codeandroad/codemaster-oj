@@ -56,14 +56,14 @@ export function CodeEditor({ code, onChange, language, settings, status,idPrefix
   const caretOffset=useCallback((at:number)=>{
     const mirror=caretMirror.current,field=fieldRef.current,node=mirror?.firstChild;
     if(!mirror||!field||!node)return null;
-    // A normal-mode caret belongs ON the current character, not at the insertion
-    // boundary before it. A non-collapsed range also resolves wrapped boundaries.
+    // Use the character's full box for a block cursor. On an empty row the
+    // collapsed range can have no box, so measure that row's newline instead.
     const usableWidth=field.clientWidth;mirror.style.width=`${usableWidth}px`;
     at=Math.max(0,Math.min(at,code.length));
     const character=String.fromCodePoint(code.codePointAt(at)??32),block=vimRef.current.mode!=='insert';
     const blank=character==='\n'||character==='\t'||at===code.length;
     const range=document.createRange();range.setStart(node,at);
-    if(block&&!blank)range.setEnd(node,at+character.length);else range.collapse(true);
+    if((block&&!blank)||character==='\n')range.setEnd(node,at+character.length);else range.collapse(true);
     const rect=range.getClientRects()[0]??range.getBoundingClientRect(),base=mirror.getBoundingClientRect();
     // Client rects include CSS zoom/transforms; overlay coordinates are local CSS
     // pixels. Keep measurement and painting in the same coordinate system.
@@ -194,7 +194,13 @@ export function CodeEditor({ code, onChange, language, settings, status,idPrefix
     const enableVim=event.key==='Escape'&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&!vimEnabled;
     if(enableVim){setEscapeVim(true);onEnableVim?.();}
     if(vimEnabled||enableVim){
-      const previous=enableVim?{...createVimState(),mode:'insert' as const}:vimRef.current,next=vimKey({value:field.value,start:field.selectionStart,end:field.selectionEnd},previous,event,settings.autoIndent);
+      const previous=enableVim?{...createVimState(),mode:'insert' as const}:vimRef.current;
+      const next=vimKey(
+        {value:field.value,start:field.selectionStart,end:field.selectionEnd},
+        previous,
+        event,
+        {autoIndent:settings.autoIndent,tabSize:settings.tabSize,language},
+      );
       if(next){event.preventDefault();event.stopPropagation();
         if(previous.mode!=='insert'&&next.state.mode==='insert')insertGroup.current={checkpoint:{...history.current.current},recorded:false};
         if(next.state.mode!=='insert')insertGroup.current=null;

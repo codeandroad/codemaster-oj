@@ -1,11 +1,11 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createVimState,vimKey} from '../src/components/student/editor-vim.ts';
-function editor(value, at=0) {
+function editor(value, at=0, options={}) {
  let state=createVimState(),snapshot={value,start:at,end:at};
  return {
   get state(){return state;},get snapshot(){return snapshot;},
-  key(key,mod={}){const next=vimKey(snapshot,state,{key,...mod});if(next){state=next.state;snapshot=next.snapshot;}return next;},
+  key(key,mod={}){const next=vimKey(snapshot,state,{key,...mod},{autoIndent:true,language:'python',tabSize:4,...options});if(next){state=next.state;snapshot=next.snapshot;}return next;},
   keys(keys){for(const key of keys)this.key(key);return this;},
   insert(value){assert.equal(state.mode,'insert');snapshot={value:snapshot.value.slice(0,snapshot.start)+value+snapshot.value.slice(snapshot.end),start:snapshot.start+value.length,end:snapshot.start+value.length};return this;}
  };
@@ -15,6 +15,19 @@ test('normal, insert, Escape and Ctrl+[ preserve text and consume normal typing'
 });
 test('counts, horizontal, word and line motions',()=>{
  const e=editor('alpha beta gamma\nsecond\nthird');e.keys(['2','w']);assert.equal(e.snapshot.start,11);e.key('b');assert.equal(e.snapshot.start,6);e.key('e');assert.equal(e.snapshot.start,9);e.key('0');assert.equal(e.snapshot.start,0);e.key('$');assert.equal(e.snapshot.start,15);e.keys(['g','g']);assert.equal(e.snapshot.start,0);e.key('G');assert.equal(e.snapshot.start,24);e.keys(['2','g','g']);assert.equal(e.snapshot.start,17);
+});
+test('W, E and B treat punctuation and Unicode as part of a whitespace-delimited WORD',()=>{
+ const text='foo.bar  变量😀:值\n\nnext';
+ const e=editor(text);
+ e.key('w'); assert.equal(e.snapshot.start,3);
+ e.keys(['0','E']); assert.equal(e.snapshot.start,text.indexOf('r'));
+ e.key('W'); assert.equal(e.snapshot.start,text.indexOf('变'));
+ e.key('E'); assert.equal(e.snapshot.start,text.indexOf('值'));
+ e.key('B'); assert.equal(e.snapshot.start,text.indexOf('变'));
+ e.keys(['2','W']); assert.equal(e.snapshot.start,text.indexOf('next'));
+ e.keys(['2','B']); assert.equal(e.snapshot.start,text.indexOf('变'));
+ const f=editor('foo.bar next');f.keys(['c','W']);assert.equal(f.snapshot.value,' next');assert.equal(f.state.mode,'insert');
+ const v=editor('foo.bar next');v.keys(['v','E']);assert.equal(v.snapshot.end,'foo.bar'.length);
 });
 test('vertical motion restores preferred column after a short line',()=>{const e=editor('abcdef\nx\nabcdef',4);e.key('j');assert.equal(e.snapshot.start,7);e.key('j');assert.equal(e.snapshot.start,13);e.key('k');e.key('k');assert.equal(e.snapshot.start,4);});
 test('dd, yy, counts, last-line delete and linewise paste',()=>{
@@ -28,9 +41,21 @@ test('dw, de, d$, dgg, dG and backwards operators',()=>{
 });
 test('ciw and caw enter insert with the right register and cursor',()=>{const e=editor('alpha beta',2);e.keys(['c','i','w']);assert.equal(e.snapshot.value,' beta');assert.equal(e.state.mode,'insert');assert.equal(e.snapshot.start,0);e.insert('new');e.key('Escape');assert.equal(e.snapshot.value,'new beta');const f=editor('alpha beta',2);f.keys(['d','a','w']);assert.equal(f.snapshot.value,'beta');});
 test('cc preserves a separator, O/o inherit indentation without changing original lines',()=>{
- const e=editor('  alpha\nbeta');e.keys(['c','c']);assert.equal(e.snapshot.value,'\nbeta');assert.equal(e.state.mode,'insert');
+ const e=editor('  alpha\nbeta');e.keys(['c','c']);assert.equal(e.snapshot.value,'  \nbeta');assert.equal(e.snapshot.start,2);assert.equal(e.state.mode,'insert');
  const o=editor('  alpha\nbeta');o.key('o');assert.equal(o.snapshot.value,'  alpha\n  \nbeta');assert.equal(o.snapshot.start,10);
  const O=editor('  alpha\nbeta');O.key('O');assert.equal(O.snapshot.value,'  \n  alpha\nbeta');assert.equal(O.snapshot.start,2);
+});
+test('o applies the language indentation rules and cc/S keep the indent of the changed line',()=>{
+ const python=editor('def solve(): # comment\n  pass',0,{tabSize:2});
+ python.key('o');assert.equal(python.snapshot.value,'def solve(): # comment\n  \n  pass');assert.equal(python.snapshot.start,25);
+ for(const language of ['cpp','javascript']){
+  const brace=editor('  if (ready) {\n  }',2,{language,tabSize:2});
+  brace.key('o');assert.equal(brace.snapshot.value,'  if (ready) {\n    \n  }');assert.equal(brace.snapshot.start,19);
+ }
+ const disabled=editor('def solve():\n  pass',0,{autoIndent:false});
+ disabled.key('o');assert.equal(disabled.snapshot.value,'def solve():\n\n  pass');
+ const changed=editor('before\n\tcode',8);
+ changed.key('S');assert.deepEqual(changed.snapshot,{value:'before\n\t',start:8,end:8});assert.equal(changed.state.mode,'insert');
 });
 test('characterwise and linewise visual selection work in both directions',()=>{
  const e=editor('alpha beta',2);e.keys(['v','h','h']);assert.deepEqual([e.snapshot.start,e.snapshot.end],[0,3]);e.key('y');assert.equal(e.state.register,'alp');e.key('p');assert.equal(e.snapshot.value,'aalplpha beta');

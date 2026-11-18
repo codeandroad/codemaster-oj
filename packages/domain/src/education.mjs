@@ -26,8 +26,9 @@ const requireStaff = user => { if (!staff(user)) fail(403, 'FORBIDDEN', '需要�
 const exists = query => { if (!query.rowCount) fail(404, 'NOT_FOUND', '内容不存在'); return query.rows[0]; };
 const catalogCandidateSql=`(p.archived_at IS NOT NULL)=$5 AND (NOT $3::boolean OR p.owner_scope='school')
  AND (NOT $5 AND p.published_at IS NOT NULL OR ($3::boolean AND (p.owner_account_id=$1 OR $4::boolean)))`;
-const discoverableAdmission=(user,entry)=>user.roles.includes('student')&&!staff(user)&&entry&&entry.admission!=='denied'
- &&entry.admissionRules.some(rule=>rule.targetKind==='school'&&rule.schoolId===LEGACY_SCHOOL_ID);
+// Course access has already applied the audience, listing, and availability
+// rules. An unmet admission condition limits lesson access, not discovery.
+const discoverableAdmission=(user,entry)=>user.roles.includes('student')&&!staff(user)&&entry&&entry.admission!=='denied';
 
 async function catalogCover(pool,user,id,archived) {
  if(archived)requireStaff(user);

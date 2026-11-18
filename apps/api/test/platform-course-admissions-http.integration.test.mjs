@@ -101,7 +101,8 @@ async function fixture() {
       const response = await fetch(at + path, { method, headers: { Origin: origin,
         ...(actor ? { Cookie: actor.cookie, ...(csrf ? { 'X-CSRF-Token': actor.csrf } : {}) } : {}),
         ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) }, body: body === undefined ? undefined : JSON.stringify(body) });
-      const data = await response.json();
+      const image = response.headers.get('content-type')?.startsWith('image/');
+      const data = image ? await response.arrayBuffer() : await response.json();
       assert.ok([status].flat().includes(response.status), `${method} ${path} as ${name}: ${response.status} ${JSON.stringify(data.error ?? {})}`);
       return { data, status: response.status, cookie: response.headers.get('set-cookie')?.split(';')[0] };
     };
@@ -247,6 +248,39 @@ test('platform course admission combines audience, requirements and grants acros
       assert.equal(admitted.completedChapters, 0);
       assert.ok(!('admission' in admitted));
       assert.equal((await get(`/learning-paths/${course.id}`, name)).id, course.id);
+    });
+
+    await run('the school catalog keeps all-user and individually targeted courses visible behind admission gates', async () => {
+      const name = 'legacy-student';
+      const gated = rule('direct', { minimumPoints: 300 });
+      const catalog = actor => get('/learning-paths?view=student-summary&includeAdmission=true', actor);
+      const coverImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jF2kAAAAASUVORK5CYII=';
+      const policies = [
+        policy({ all: gated }),
+        policy({ accounts: [{ identityId: actors[name].identityId, ...gated }] }),
+      ];
+      for (const audiencePolicy of policies) {
+        const course = await create(audiencePolicy);
+        await owner.query('UPDATE learning_paths SET cover_image=$2 WHERE id=$1', [course.id, coverImage]);
+        const summary = (await catalog(name)).items.find(item => item.id === course.id);
+        assert.equal(summary?.admission, 'requirements');
+        assert.equal(summary.coverImage, `/api/v1/learning-paths/${course.id}/cover`);
+        for (const key of ['chapters', 'completedChapters', 'taskCount', 'admissionRules']) assert.ok(!(key in summary));
+        const publicCourse = (await get('/practice/catalog', name)).courses.find(item => item.id === course.id);
+        assert.equal(publicCourse?.admission, 'requirements');
+        const coverPath = summary.coverImage.slice('/api/v1'.length);
+        const cover = await get(coverPath, name);
+        assert.deepEqual(Buffer.from(cover), Buffer.from(coverImage.split(',')[1], 'base64'));
+        await get(`/learning-paths/${course.id}`, name, 404);
+        await read(course, name, 403);
+        if (audiencePolicy.scope !== 'all') {
+          assert.ok(!(await catalog('legacy-peer')).items.some(item => item.id === course.id));
+          await get(coverPath, 'legacy-peer', 404);
+        }
+        await owner.query('UPDATE learning_paths SET listed=false WHERE id=$1', [course.id]);
+        assert.ok(!(await catalog(name)).items.some(item => item.id === course.id));
+        await get(coverPath, name, 404);
+      }
     });
 
     await run('applications expose metadata only and require platform approval; content edits retain grants', async () => {

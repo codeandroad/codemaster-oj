@@ -2,17 +2,15 @@
 
 import { useId } from "react";
 import { useLocale } from "@/components/locale-context";
-import { AppLink } from "@/components/navigation";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { productionApi } from "@/lib/production-api";
 import { Feedback, State, useData, useMutation } from "./shared";
 
 export type PracticeProfileSharing = { profile: { isSelf: boolean; profileEnabled?: boolean } };
 
-export function ProfileSharingControls({ accountId, resource, showLink = false }: {
+export function ProfileSharingControls({ accountId, resource }: {
   accountId: string;
   resource: ReturnType<typeof useData<PracticeProfileSharing>>;
-  showLink?: boolean;
 }) {
   const { locale } = useLocale();
   const action = useMutation();
@@ -31,9 +29,6 @@ export function ProfileSharingControls({ accountId, resource, showLink = false }
         await productionApi(`practice/profiles/${id}`, { method: "PATCH", body: { profileEnabled: !enabled } });
         resource.reload();
       })}>{enabled ? tx("关闭公开主页", "Turn off profile sharing") : tx("开启公开主页和留言", "Enable profile sharing and messages")}</Button>
-      {enabled && showLink && <AppLink href={`/practice/people/${id}`} className={buttonVariants({ size: "sm", variant: "ghost" })}>
-        {tx("查看公开练习主页", "View public practice profile")}
-      </AppLink>}
     </div>
     <Feedback action={action}/>
   </div>}</State>;
@@ -41,5 +36,5 @@ export function ProfileSharingControls({ accountId, resource, showLink = false }
 
 export function PublicPracticeProfileSharing({ accountId }: { accountId: string }) {
   const resource = useData<PracticeProfileSharing>(`practice/profiles/${encodeURIComponent(accountId)}`);
-  return <ProfileSharingControls accountId={accountId} resource={resource} showLink/>;
+  return <ProfileSharingControls accountId={accountId} resource={resource}/>;
 }

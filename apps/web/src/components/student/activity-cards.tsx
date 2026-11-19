@@ -67,27 +67,32 @@ export function StudentAssignmentCard({
   const { locale } = useLocale();
   const text = (zh: string, en: string) => locale === "en" ? en : zh;
   const complete = problemCount > 0 && solved === problemCount;
+  const percent = problemCount ? solved / problemCount * 100 : 0;
   let overdueStatus: string | undefined;
   if (overdue && !archived && !complete) {
     if (pending) overdueStatus = overdue.canSubmit ? "已截止，可补交" : "已截止";
     else overdueStatus = overdue.canSubmit ? "已截止，未完成 · 可补交" : "已截止，未完成";
   }
-  const percent = problemCount ? solved / problemCount * 100 : 0;
+  const progressStatus = complete ? undefined
+    : pending ? text("评测中", "Judging")
+    : solved > 0 || attempted > 0 ? text("进行中", "In progress")
+    : text("未开始", "Not started");
+  const progressTone = pending || solved > 0 || attempted > 0 ? "info" : undefined;
   return <section className="grid items-center gap-4 border border-border bg-surface p-5 panel-shadow md:grid-cols-[minmax(0,1fr)_200px_auto] md:gap-5">
     <div className="min-w-0">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="min-w-0 font-bold">
+        <h2 className="min-w-0 text-lg font-bold">
           <AppLink href={href} className="flex items-start gap-2 hover:text-primary hover:underline focus-visible:underline">
             <ClipboardList size={17} aria-hidden className="mt-0.5 shrink-0 text-primary" />
             <span className="min-w-0 [overflow-wrap:anywhere]">{title}</span>
           </AppLink>
         </h2>
         {complete && <AssignmentCompletedStatus late={completedLate} />}
-        {(!complete || archived) && <StatusPill status={overdueStatus ?? status} tone={overdueStatus ? "warning" : undefined} />}
+        {(!complete || archived) && <StatusPill status={overdueStatus ?? progressStatus ?? status} tone={overdueStatus ? "warning" : progressTone} />}
         {overdueStatus && pending && <StatusPill status="Judging" />}
       </div>
       {audience && <p className="mt-1 text-sm text-muted-foreground">{audience}</p>}
-      {course && <p className="mt-1 text-sm"><AppLink href={course.href} className="font-medium text-primary hover:underline focus-visible:underline">{text("关联课程：", "Course: ")}{course.title}</AppLink></p>}
+      {course && <p className="mt-1 text-xs text-muted-foreground"><AppLink href={course.href} className="text-muted-foreground underline-offset-2 hover:text-primary hover:underline focus-visible:underline">{text("关联课程：", "Course: ")}{course.title}</AppLink></p>}
       <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"><CalendarClock size={14} aria-hidden className="shrink-0" />{text("截止", "Due")} {date(dueAt, locale)} · Asia/Shanghai</p>
     </div>
     <div className="min-w-0">

@@ -95,11 +95,13 @@ export function StudentDashboard({ user }: { user: CampusUser }) {
       href: `/student/assignments/${current.id}`,
       continueHref: next ? problemHref(next, { assignmentId: current.id, sourceLabel: current.title }) : undefined,
       dueAt: current.dueAt,
+      overdue: new Date(current.dueAt).getTime() < now && !current.archived ? { canSubmit: true } : undefined,
       solved: progress.solved,
       attempted: progress.attempted,
       count: current.problems.length,
       score: progress.deadlineGrade?.score ?? null,
       maxScore: progress.max,
+      completedLate: progress.completedLate,
       pending: progress.grade?.pending,
     } : undefined}
     courseState={paths}

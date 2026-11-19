@@ -11,11 +11,13 @@ type DashboardItem = { title: string; href: string };
 type DashboardAssignment = DashboardItem & {
   continueHref?: string;
   dueAt: string | null;
+  overdue?: { canSubmit: boolean };
   solved: number;
   attempted: number;
   count: number;
   score: number | null;
   maxScore: number;
+  completedLate?: boolean;
   pending?: boolean;
 };
 type DashboardCourse = DashboardItem & {
@@ -66,6 +68,15 @@ export function StudentDashboardView({
   const percent = assignment?.count ? assignment.solved / assignment.count * 100 : 0;
   const complete = Boolean(assignment && assignment.count > 0 && assignment.solved === assignment.count);
   const continueHref = complete ? undefined : assignment?.continueHref;
+  const overdueStatus = assignment?.overdue && !complete
+    ? (assignment.pending
+      ? text("已截止，可补交", "Past due · can still submit")
+      : text("已截止，未完成 · 可补交", "Past due · unfinished, can still submit"))
+    : undefined;
+  const progressStatus = complete ? undefined
+    : assignment?.pending ? { label: text("评测中", "Judging"), tone: "info" as const }
+    : (assignment && (assignment.solved > 0 || assignment.attempted > 0)) ? { label: text("进行中", "In progress"), tone: "info" as const }
+    : { label: text("未开始", "Not started"), tone: undefined };
   const statusLabel = (status: string) => locale === "zh"
     ? ({ Waiting: "等待中", Judging: "评测中", "System Error": "系统错误", Submitted: "已提交" }[status] ?? status)
     : status;
@@ -80,7 +91,17 @@ export function StudentDashboardView({
                 <p className="text-xs font-semibold text-muted-foreground">{text("作业进度", "Assignment progress")}</p>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <h2 className="min-w-0 text-lg font-bold [overflow-wrap:anywhere]"><AppLink href={assignment.href} className="hover:text-primary hover:underline focus-visible:underline">{assignment.title}</AppLink></h2>
-                  {complete && <StatusPill status="Completed" icon={<Check size={13} />} />}
+                  {complete
+                    ? <StatusPill status="Completed" icon={<Check size={13} />} />
+                    : overdueStatus && <StatusPill status={overdueStatus} tone="warning" />}
+                  {!complete && !overdueStatus && progressStatus && (
+                    <StatusPill status={progressStatus.label} tone={progressStatus.tone} />
+                  )}
+                  {complete && assignment.completedLate && (
+                    <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs text-warning">
+                      {text("逾期完成", "Completed late")}
+                    </span>
+                  )}
                 </div>
               </div>
               <span className={`shrink-0 text-sm font-semibold tabular-nums ${complete ? "text-success" : "text-primary"}`}>{Math.round(percent)}%</span>

@@ -21,15 +21,17 @@ export function PageHeader({ title, action, className }: {
   );
 }
 
-export function StatusPill({ status, icon, tone }: { status: string; icon?: ReactNode; tone?: "warning" }) {
+export function StatusPill({ status, icon, tone }: { status: string; icon?: ReactNode; tone?: "warning" | "info" | "success" }) {
   const {t,locale}=useLocale();
   const label = status === "NotPassed" ? (locale === "en" ? "Not passed" : "未通过") : status === "NeedsReview" ? (locale === "en" ? "Needs review" : "待复核") : t(status);
   const positive = /^(AC|Solved)(?:\b|\s|·)/.test(status) || ["已发布", "可用", "完成", "Available", "Active", "Completed", "Published", "已公开", "Public", "已布置", "Assigned"].includes(status);
   const warning = tone === "warning" || /^(WA|TLE|MLE|RE|CE|Attempted)(?:\b|\s|·)/.test(status) || ["等待验证", "Unavailable", "Failed", "Disabled", "Waiting", "System Error", "NotPassed", "NeedsReview"].includes(status);
-  const colors = positive && tone !== "warning"
+  const colors = (positive || tone === "success") && tone !== "warning"
     ? "border-success/25 bg-success-soft text-success"
     : warning
       ? "border-warning/25 bg-warning-soft text-warning"
-      : "border-border bg-muted text-muted-foreground";
+      : tone === "info"
+        ? "border-primary/25 bg-info-soft text-primary"
+        : "border-border bg-muted text-muted-foreground";
   return <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${colors}`}><span aria-hidden className="shrink-0">{icon ?? "●"}</span>{label}</span>;
 }

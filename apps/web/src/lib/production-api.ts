@@ -124,6 +124,11 @@ export interface Assignment {
   problems: { problemId: string; points: number; title?: string; versionId?: string; position?: number; firstAcPoints?: number; rewardPoints?: number; difficulty?: string | null }[];
   participants: string[];
   participantDetails?: { identityId: string; name: string; exempt: boolean; dueAt: string; hasActivity?: boolean }[];
+  applicableCount?: number;
+  exemptCount?: number;
+  averagePercent?: number | null;
+  submittedStudents?: number;
+  completedStudents?: number;
   grades?: {
     identityId: string;
     name: string;

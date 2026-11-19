@@ -109,7 +109,7 @@ export function TeacherAssignments() {
             ui(locale, "班级", "Class"),
             ui(locale, "已布置学生", "Assigned students"),
             ui(locale, "已豁免", "Exempt"),
-            ui(locale, "平均分 / 状态", "Average / status"),
+            ui(locale, "状态", "Status"),
             ui(locale, "操作", "Actions"),
           ]}
         >
@@ -118,6 +118,7 @@ export function TeacherAssignments() {
               item.participantDetails?.filter((person) => !person.exempt).length ?? 0;
             const exempt = item.exemptCount ??
               item.participantDetails?.filter((person) => person.exempt).length ?? 0;
+            const allCompleted = assigned > 0 && (item.completedStudents ?? 0) >= assigned;
             const classSummary = item.classes?.map(group => group.name).join(" / ") || item.classNames?.join(" / ") || item.className || classes.data?.items.find(group => group.id === item.classId)?.name || ui(locale, "按学生名单", "Selected students");
             return <tr key={item.id}>
               <td>
@@ -127,6 +128,7 @@ export function TeacherAssignments() {
                 >
                   {item.title}
                 </Link>
+                {allCompleted && <span className="ml-2 inline-flex rounded-full border border-success/25 bg-success-soft px-2 py-0.5 text-xs font-semibold text-success">{ui(locale, "全部完成", "All completed")}</span>}
                 <p className="mt-1 text-xs text-muted-foreground">
                   {ui(locale, "截止", "Due")} {date(item.dueAt)}
                 </p>
@@ -148,11 +150,13 @@ export function TeacherAssignments() {
                   status={
                     item.cancelledAt ? ui(locale, "已取消", "Cancelled") : item.state === "Draft"
                       ? ui(locale, "草稿", "Draft")
-                      : item.averagePercent === null ||
-                          item.averagePercent === undefined
-                        ? ui(locale, "未开始", "Not started")
-                        : `${item.averagePercent.toFixed(1)}%`
+                      : allCompleted
+                        ? ui(locale, "全部完成", "All completed")
+                        : item.averagePercent === null || item.averagePercent === undefined
+                          ? ui(locale, "未开始", "Not started")
+                          : ui(locale, "进行中", "In progress")
                   }
+                  tone={allCompleted ? "success" : item.averagePercent === null || item.averagePercent === undefined || item.cancelledAt || item.state === "Draft" ? undefined : "info"}
                 />
               </td>
               <td>
@@ -170,7 +174,7 @@ export function TeacherAssignments() {
                     {ui(locale, "进度", "Progress")} →
                   </Link>
                   {!item.cancelledAt && <RowActionButton disabled={action.busy} onClick={()=>setConfirm(item)}>{showArchived?ui(locale,"恢复","Restore"):ui(locale,"归档","Archive")}</RowActionButton>}
-                  {item.canManage && item.published && !item.archived && <CancelAssignment path={`assignments/${item.id}`} title={item.title} onSaved={assignments.reload}/>}
+                  {item.canManage && item.published && !item.archived && !allCompleted && <CancelAssignment path={`assignments/${item.id}`} title={item.title} onSaved={assignments.reload}/>}
                 </div>
               </td>
             </tr>;

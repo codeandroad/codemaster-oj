@@ -15,7 +15,7 @@ interface Message {
   id: string;
   body: string;
   createdAt: string;
-  author: { nickname: string; avatar: string | null };
+  author: { id?: string; nickname: string; avatar: string | null };
   canDelete: boolean;
   threadId: string | null;
   replyCount: number;
@@ -218,12 +218,17 @@ function MessageRow({ item, base, peoplePath, onReply, onDelete, children }: {
   const like = useMutation();
   const [reaction, setReaction] = useState<{ source: Message; liked: boolean; likeCount: number }>();
   const { liked, likeCount } = reaction?.source === item ? reaction : item;
+  const authorPath = item.author.id ? `${peoplePath}/${encodeURIComponent(item.author.id)}` : null;
+  const avatar = item.author.avatar
+    ? <Image src={item.author.avatar} width={32} height={32} unoptimized alt="" className="size-8 shrink-0 rounded-full object-cover"/>
+    : <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-sm font-semibold text-primary">{Array.from(item.author.nickname)[0]}</span>;
   return <article className="flex min-w-0 gap-2.5">
-    {item.author.avatar ? <Image src={item.author.avatar} width={32} height={32} unoptimized alt="" className="size-8 shrink-0 rounded-full object-cover"/>
-      : <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-sm font-semibold text-primary">{Array.from(item.author.nickname)[0]}</span>}
+    {authorPath ? <AppLink href={authorPath} className="shrink-0 self-start">{avatar}</AppLink> : avatar}
     <div className="min-w-0 flex-1">
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
-        <span className="max-w-full break-words text-sm font-semibold">{item.author.nickname}</span>
+        {authorPath
+          ? <AppLink href={authorPath} className="max-w-full break-words text-sm font-semibold hover:underline">{item.author.nickname}</AppLink>
+          : <span className="max-w-full break-words text-sm font-semibold">{item.author.nickname}</span>}
         <time className="text-xs text-muted-foreground" dateTime={item.createdAt}>{date(item.createdAt, locale)}</time>
       </div>
       <div className="mt-1.5">

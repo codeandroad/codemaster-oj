@@ -1,4 +1,4 @@
-import { notifyLegacyAssignmentChange } from './assignment-changes.mjs';
+import { notifyLegacyAssignmentAssigned, notifyLegacyAssignmentChange } from './assignment-changes.mjs';
 import { transaction } from './db.mjs';
 import { fail,field,uuid,enumValue,integer } from './security.mjs';
 import {audienceClasses,audienceStudents,defaultClassStudents,replaceAudienceClasses} from './activity-audience.mjs';
@@ -171,6 +171,7 @@ export async function handleAssignmentAuthoring(ctx){
    await apply(db,id,i,user.id);
    const completionReward=await assignmentCompletionReward(ctx,db,id,published);
    if(published)await db.query("UPDATE assignments SET state='Published',published_at=now(),required_language=$2 WHERE id=$1",[id,i.requiredLanguage]);
+   if(published)await notifyLegacyAssignmentAssigned(db,id);
    await helpers.audit(db,user.id,published?'assignment.create':'assignment.draft_create','assignment',id);
    const assignment=await helpers.assignmentResult(db,user,id);
    return completionReward?{...assignment,completionReward}:assignment;
@@ -204,6 +205,7 @@ export async function handleAssignmentAuthoring(ctx){
    await db.query("UPDATE assignments SET state='Published',published_at=now(),required_language=$2 WHERE id=$1",[id,i.requiredLanguage]);
   }
   await db.query('UPDATE assignments SET edit_revision=edit_revision+1 WHERE id=$1',[id]);
+   if(publishing)await notifyLegacyAssignmentAssigned(db,id);
   await helpers.audit(db,user.id,publishing?'assignment.publish':'assignment.draft_edit','assignment',id);
   const assignment=await helpers.assignmentResult(db,user,id);
   return completionReward?{...assignment,completionReward}:assignment;

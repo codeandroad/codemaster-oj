@@ -438,6 +438,7 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
       if (!data.problems.length || !data.participantCount) fail(400, 'VALIDATION', 'Select at least one problem and student before publishing.');
       if (a.ends_at && +new Date(a.ends_at) <= Date.now()) fail(400, 'VALIDATION', 'The closing time must be in the future.');
       await db.query("UPDATE school_activities SET state='Published',published_at=clock_timestamp(),revision=revision+1 WHERE school_id=$1 AND id=$2", [schoolId, a.id]);
+      if (a.kind === 'assignment') await notifySchoolAssignmentChange(db, a, 'assigned');
       await auditSchool(db, schoolId, user.id, 'school.activity.publish', a.id);
     } else if (action === 'cancel' && method === 'POST') {
       if (a.cancelled_at) return reply(await detail(db, loaded, user));

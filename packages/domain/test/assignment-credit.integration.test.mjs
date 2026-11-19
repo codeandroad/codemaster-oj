@@ -60,9 +60,9 @@ test('ordinary assignments recognize prior formal AC without copying submissions
    await pool.query("UPDATE assignments SET state='Published',published_at=now() WHERE id=$1", [id]);
    return id;
   }
-  async function submit(p, { user = student, assignmentId = null, timedAttemptId = null, status = 'AC', score = status === 'AC' ? 100 : status === 'WA' ? 60 : null, kind = 'submit', createdAt = new Date().toISOString(), originalId = null } = {}) {
+  async function submit(p, { user = student, assignmentId = null, timedAttemptId = null, status = 'AC', score = status === 'AC' ? 100 : status === 'WA' ? 60 : null, kind = 'submit', createdAt = null, originalId = null } = {}) {
    return (await pool.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,assignment_id,timed_attempt_id,kind,code,idempotency_key,request_hash,status,score,created_at,original_submission_id)
-    VALUES($1,$2,$3,$4,$5,$6,$7,'PRIVATE_STUDENT_CODE_SENTINEL',$8,'credit-fixture',$9,$10,$11,$12) RETURNING id`,
+    VALUES($1,$2,$3,$4,$5,$6,$7,'PRIVATE_STUDENT_CODE_SENTINEL',$8,'credit-fixture',$9,$10,COALESCE($11::timestamptz,clock_timestamp()),$12) RETURNING id`,
    [user.id, user.identityId, p.id, p.versionId, assignmentId, timedAttemptId, kind, randomUUID(), status, score, createdAt, originalId])).rows[0].id;
   }
   const result = id => student.api(`/assignments/${id}`);

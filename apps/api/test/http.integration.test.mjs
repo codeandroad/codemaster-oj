@@ -332,10 +332,15 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
       assert.deepEqual(history.data.items.map(s=>[s.id,s.status]),[[queued.data.id,'AC']]);
       const overdue=await homeworkDetail(late);
       assert.equal(overdue.grades[0].score,0);
-      assert.equal(overdue.completion,null);
+      assert.equal(overdue.progress[0].score,100);
+      assert.equal(overdue.progress[0].problems[0].status,'AC');
+      assert.equal(overdue.completedStudents,1);
+      assert.equal(overdue.completion.completedProblems,1);
+      assert.equal(overdue.completion.rewards.assignment,0);
       const event=await request('/api/v1/submissions/'+queued.data.id+'/assignment-completions',{auth:student});
       assert.equal(event.status,200);
-      assert.deepEqual(event.data.items,[]);
+      assert.equal(event.data.items[0].completion.completedProblems,1);
+      assert.equal(event.data.items[0].completion.rewards.assignment,0);
       assert.deepEqual(await completionAwards(late),[]);
       assert.deepEqual((await pool.query('SELECT reason FROM point_ledger WHERE submission_id=$1',[queued.data.id.slice(3)])).rows,
         [{reason:'first_ac'}]);
@@ -356,6 +361,40 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
       assert.equal(graded.grades[0].score,100);
       assert.equal(graded.completion.rewards.assignment,12);
       assert.deepEqual(await completionAwards(timely),[{delta:12}]);
+
+      const adjusted=await homework('Individual homework extension',true);
+      const path='/api/v1/assignments/'+adjusted.assignmentId;
+      const participant=path+'/participants/'+identityId;
+      const dueAt=new Date(Date.now()+3600000).toISOString();
+      const extend={method:'PATCH',body:{dueAt,reason:'Extra practice time'}};
+      assert.equal((await request(participant,{...extend,auth:student})).status,403);
+      for(let retry=0;retry<2;retry++)assert.equal((await request(participant,{...extend,auth:admin})).status,200);
+      assert.equal((await homeworkDetail(adjusted)).dueAt,dueAt);
+      const assigned=await submit(adjusted);
+      assert.equal(assigned.status,201,JSON.stringify(assigned.data));
+      assert.equal((await pool.query('SELECT luq_activity_deadline FROM submissions WHERE id=$1',[assigned.data.id.slice(3)])).rows[0].luq_activity_deadline.toISOString(),dueAt);
+      await accept(assigned.data.id);
+      assert.equal((await homeworkDetail(adjusted)).grades[0].score,100);
+      assert.deepEqual(await completionAwards(adjusted),[{delta:12}]);
+      const exemption={method:'PATCH',auth:admin,body:{exempt:true,reason:'Excused'}};
+      for(let retry=0;retry<2;retry++)assert.equal((await request(participant,exemption)).status,200);
+      assert.equal((await request(path,{auth:student})).status,403);
+      assert.equal((await request(participant,{...exemption,body:{exempt:false,reason:'Reinstated'}})).status,200);
+      const allDueAt=new Date(Date.now()+7200000).toISOString();
+      assert.equal((await request(path+'/extend',{method:'POST',auth:admin,body:{dueAt:allDueAt,reason:'New class deadline'}})).status,200);
+      assert.equal((await homeworkDetail(adjusted)).dueAt,allDueAt);
+      assert.equal((await request(path+'/cancel',{method:'POST',auth:student,body:{}})).status,403);
+      for(let retry=0;retry<2;retry++)assert.ok((await request(path+'/cancel',{method:'POST',auth:admin,body:{}})).data.cancelledAt);
+      assert.equal((await request(path+'/restore',{method:'POST',auth:admin,body:{}})).data.error.code,'ASSIGNMENT_CANCELLED');
+      const stopped=await submit({...adjusted,idempotencyKey:randomBytes(12).toString('hex'),code:'print(1) # cancelled'});
+      assert.equal(stopped.data.error.code,'ASSIGNMENT_CANCELLED');
+      assert.equal((await homeworkDetail(adjusted)).grades[0].score,100);
+      const inbox=(await request('/api/v1/student-notifications',{auth:student})).data.items
+        .filter(item=>item.kind==='assignment_change'&&item.assignmentId===adjusted.assignmentId);
+      assert.deepEqual(inbox.map(item=>[item.action,item.dueAt?new Date(item.dueAt).toISOString():null]),[
+        ['cancelled',null],['extended',allDueAt],['reinstated',dueAt],['exempted',null],['extended',dueAt],
+      ]);
+
     });
     const unknown=await request('/api/v1/does-not-exist',{auth:admin});
     assert.equal(unknown.status,404);assert.equal(unknown.data.error.code,'NOT_FOUND');

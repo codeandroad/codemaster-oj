@@ -6,17 +6,18 @@ export type ActivityAttempt = { id: string; startedAt: string; deadlineAt: strin
 export type SchoolActivity = {
   id: string; schoolId: string; kind: ActivityKind; title: string; description: string;
   state: "Draft" | "Published" | "Archived"; phase: string; revision: number;
+  cancelledAt?: string | null;
   startsAt: string | null; endsAt: string | null; durationMinutes: number | null;
   publishedAt: string | null; resultsPublishedAt: string | null; canManage: boolean; participantCount: number;
   canPreview?: boolean; canSubmit?: boolean; preview?: boolean;
-  problems: ActivityProblem[]; attempt: ActivityAttempt | null; grade: ActivityGrade | null; identityIds?: string[]; classIds?: string[];
+  problems: ActivityProblem[]; attempt: ActivityAttempt | null; grade: ActivityGrade | null; progress?: ActivityGrade | null; identityIds?: string[]; classIds?: string[];
 };
 export type ActivityOptions = {
   problems: { problemId: string; versionId: string; title: string; bankName: string; bankId: string }[];
   students: { id: string; name: string; number: string; activated: boolean; classIds: string[] }[];
   classes: { id: string; name: string }[];
 };
-export type ActivityReport = { activity: SchoolActivity; items: { id: string; name: string; number: string; attempt: ActivityAttempt | null; grade: ActivityGrade }[] };
+export type ActivityReport = { activity: SchoolActivity; items: { id: string; name: string; number: string; exempt: boolean; dueAt: string | null; attempt: ActivityAttempt | null; grade: ActivityGrade }[] };
 export function activityDateInput(value: string | null) {
   return value ? new Date(new Date(value).getTime() + 8 * 3600000).toISOString().slice(0, 16) : "";
 }

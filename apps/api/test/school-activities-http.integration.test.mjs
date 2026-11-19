@@ -165,7 +165,7 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       await request(activityPath() + '/start', { auth: auth.student, method: 'POST' });
       const problem = await request(activityPath() + '/problems/' + p.id, { auth: auth.student });
       assert.equal(problem.cache, 'no-store'); assert.equal(problem.data.activity.canSubmit, true);
-      for (const secret of ['PRIVATE_REFERENCE', '1874', '937']) assert.ok(!JSON.stringify(problem.data).includes(secret));
+      assert.doesNotMatch(JSON.stringify(problem.data), /PRIVATE_REFERENCE|"1874"|"\[937\]"/);
       await request(activityPath() + '/problems/' + p.id + '/submissions', { auth: auth.student, method: 'POST', status: 202, body: { kind: 'submit', code: 'def solve(data):\n return data*2', requestId: randomUUID(), deadlineAt: '2099-01-01' } });
       await processSchoolOne({ pool: worker, judge: { judge: async () => completed } });
       failedJob = (await request(activityPath() + '/problems/' + p.id + '/submissions', { auth: auth.student, method: 'POST', status: 202, body: { kind: 'submit', code: 'def solve(data): return 0', requestId: randomUUID() } })).data;
@@ -280,9 +280,14 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       assert.equal(verdict.status, 'AC');
       const history = (await request(problem + '/submissions', peer)).data;
       assert.ok(history.items.some(item => item.id === late.id && item.status === 'AC'));
-      const { grade } = (await request(path, peer)).data;
+      const { grade, progress } = (await request(path, peer)).data;
       assert.equal(grade.score, 0);
       assert.equal(grade.items[0].activityAttempts, 0);
+      assert.equal(progress.solved, 1);
+      assert.equal(progress.items[0].status, 'AC');
+      assert.equal(progress.items[0].activityAttempts, 1);
+      assert.equal((await request(problem, peer)).data.solved, true);
+      assert.equal(history.solved, true);
       assert.deepEqual(await awards(), [{ identity_id: ids.student, delta: 12 }]);
 
       await request(path + '/finish', { ...peer, method: 'POST' });
@@ -290,6 +295,61 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       await submit('peer', { ...solution, requestId: randomUUID() }, 409);
       await request(path + '/archive', { ...teacher, method: 'POST' });
       await submit('student', { ...solution, requestId: randomUUID() }, 404);
+    });
+    await t.test('assignment changes notify affected students, preserve history, and use the personal cutoff', async () => {
+      const teacher = { auth: auth.teacher }, student = { auth: auth.student }, peer = { auth: auth.peer };
+      const judge = process.env.GO_JUDGE_TEST_URL
+        ? new GoJudge({ url: process.env.GO_JUDGE_TEST_URL, token: process.env.GO_JUDGE_TEST_TOKEN, environmentVersion: 'assignment-change-qa' })
+        : { judge: async () => completed };
+      const { data: a } = await request(activities, { ...teacher, method: 'POST', status: 201, body: {
+        ...config, kind: 'assignment', title: 'Adjusted homework', requestId: randomUUID(),
+      } });
+      const path = activities + '/' + a.id, submit = path + '/problems/' + p.id + '/submissions';
+      const studentPath = path + '/participants/' + ids.student;
+      const peerPath = path + '/participants/' + ids.peer;
+      const notices = async auth => (await request(prefix + '/student-notifications', auth)).data.items
+        .filter(item => item.kind === 'assignment_change' && item.assignmentId === a.id);
+      await request(prefix + '/scholarship/activity-rule', { ...teacher, method: 'POST', body: {
+        activityId: a.id, amount: 12, requireAll: true, expectedRevision: 0,
+      } });
+      await request(path + '/publish', { ...teacher, method: 'POST', body: { expectedRevision: 1 } });
+      await pool.query('UPDATE school_activities SET ends_at=clock_timestamp() WHERE school_id=$1 AND id=$2', [school.id, a.id]);
+      const dueAt = new Date(Date.now() + 7200000).toISOString();
+      const extend = { method: 'PATCH', body: { dueAt, reason: 'Extra practice time' } };
+      await request(studentPath, { ...student, ...extend, status: 404 });
+      await request(studentPath, { auth: auth.outside, ...extend, status: 404 });
+      await request(studentPath, { ...teacher, ...extend });
+      await request(studentPath, { ...teacher, ...extend });
+      assert.equal((await request(path, student)).data.endsAt, dueAt);
+      assert.notEqual((await request(path, peer)).data.endsAt, dueAt);
+      assert.deepEqual((await notices(student)).map(item => [item.action, new Date(item.dueAt).toISOString()]), [['extended', dueAt]]);
+      assert.deepEqual(await notices(peer), []);
+      const run = { method: 'POST', body: { kind: 'submit', code: 'def solve(data): return data*2', requestId: randomUUID() } };
+      const { data: job } = await request(submit, { ...student, ...run, status: 202 });
+      const receipt = (await pool.query('SELECT activity_deadline_at FROM school_judge_jobs WHERE school_id=$1 AND id=$2', [school.id, job.id])).rows[0];
+      assert.equal(receipt.activity_deadline_at.toISOString(), dueAt);
+      const exempt = { method: 'PATCH', body: { exempt: true, reason: 'Excused' } };
+      await request(peerPath, { ...teacher, ...exempt });
+      await request(peerPath, { ...teacher, ...exempt });
+      await request(path, { ...peer, status: 404 });
+      await request(submit, { ...peer, ...run, status: 404 });
+      assert.deepEqual((await notices(peer)).map(item => item.action), ['exempted']);
+      await request(peerPath, { ...teacher, method: 'PATCH', body: { exempt: false, reason: 'Reinstated' } });
+      const cancel = { method: 'POST' };
+      await request(activityPath() + '/cancel', { ...teacher, ...cancel, status: 409 });
+      await request(path + '/cancel', { ...student, ...cancel, status: 404 });
+      assert.ok((await request(path + '/cancel', { ...teacher, ...cancel })).data.cancelledAt);
+      await request(path + '/cancel', { ...teacher, ...cancel });
+      assert.deepEqual((await notices(student)).map(item => item.action), ['cancelled', 'extended']);
+      assert.deepEqual((await notices(peer)).map(item => item.action), ['cancelled', 'reinstated', 'exempted']);
+      await request(submit, { ...student, ...run, body: { ...run.body, requestId: randomUUID() }, status: 404 });
+      await processSchoolOne({ pool: worker, judge });
+      assert.equal((await request(path + '/jobs/' + job.id, student)).data.status, 'AC');
+      await request(path + '/jobs/' + job.id, { ...peer, status: 404 });
+      const report = (await request(path + '/report', teacher)).data;
+      assert.equal(report.items.find(item => item.id === ids.student).grade.score, config.problems[0].points);
+      const awards = (await pool.query('SELECT identity_id FROM school_scholarship_activity_awards WHERE school_id=$1 AND activity_id=$2', [school.id, a.id])).rows;
+      assert.deepEqual(awards, [{ identity_id: ids.student }]);
     });
   } finally {
     await server?.close(); await worker?.end(); await pool.end(); await owner.query('DROP SCHEMA IF EXISTS ' + schema + ' CASCADE'); await owner.end();

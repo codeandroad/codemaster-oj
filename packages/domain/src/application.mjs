@@ -23,6 +23,7 @@ import { canManageLegacyTutorial, schoolPublishedTutorialProblemSql } from './pr
 import { handleEducation } from './education.mjs';
 import { handleCommunity } from './community.mjs';
 import { notifyStudent } from './student-notifications.mjs';
+import { assignmentChange, notifyLegacyAssignmentChange } from './assignment-changes.mjs';
 import { handlePresence } from './presence.mjs';
 import { handlePlatformGovernance } from './platform-governance.mjs';
 import { protectPlatformAccount } from './platform-account-protection.mjs';
@@ -44,7 +45,7 @@ import { assignmentRequiredLanguage, handleAssignmentAuthoring } from './assignm
 import { assignmentCourseMetadata, platformProblemAssignableSql } from './assignment-courses.mjs';
 import { handleLegacyAssignmentPreview } from './legacy-assignment-preview.mjs';
 import { loadSubmissionResult } from './submission-feedback.mjs';
-import { assignmentGradeRows } from './assignment-grades.mjs';
+import { assignmentGradeRows, assignmentGradeSummaries } from './assignment-grades.mjs';
 import { draftValidation, publishProblemDraft, requireDraftRevision, saveProblemDraft, validateProblemDraft } from './problem-editor-drafts.mjs';
 import { learnerAssignmentCompletion, learnerSubmissionAssignmentCompletions } from './assignment-completion.mjs';
 import {activityClasses,handleTeachingAudience,handleClassHub} from './activity-audience.mjs';
@@ -202,11 +203,15 @@ export async function createDomainServices(pool,config) {
  }
  async function assignmentAccess(db,user,id) {
   const a=row(await db.query('SELECT * FROM assignments WHERE id=$1',[uuid(id,'作业 ID')]));
-  const isParticipant=rolesInclude(user,'student')&&!!(await db.query('SELECT 1 FROM assignment_participants WHERE assignment_id=$1 AND identity_id=$2 AND NOT exempt',[id,user.identityId])).rowCount;
+  const participant=rolesInclude(user,'student')&&(await db.query('SELECT extended_due_at FROM assignment_participants WHERE assignment_id=$1 AND identity_id=$2 AND NOT exempt',[id,user.identityId])).rows[0];
+  const isParticipant=Boolean(participant);
   // Former class teachers retain historical access after a class is archived.
   // Every mutation of an archived assignment is rejected separately below.
   const canManage=rolesInclude(user,'admin')||(rolesInclude(user,'teacher')&&a.owner_account_id===user.id);
-  if(a.state==='Draft'&&!canManage)fail(404,'NOT_FOUND','作业尚未发布');if(!isParticipant&&!canManage)fail(403,'FORBIDDEN','未分配该作业或无权管理');if(a.state==='Draft'&&!canManage)fail(404,'NOT_FOUND','作业尚未发布');return {...a,isParticipant:isParticipant&&a.state==='Published',canManage};
+  if(a.state==='Draft'&&!canManage)fail(404,'NOT_FOUND','作业尚未发布');
+  if(!isParticipant&&!canManage)fail(403,'FORBIDDEN','未分配该作业或无权管理');
+  const dueAt=!canManage&&participant?.extended_due_at>a.due_at?participant.extended_due_at:a.due_at;
+  return {...a,due_at:dueAt,isParticipant:isParticipant&&a.state==='Published',canManage};
  }
  async function assignmentProblemRows(db,a) {
   return (await db.query(`SELECT ap.problem_id,v.id version_id,ap.points,ap.position,v.title,v.metadata->'difficulty' difficulty,
@@ -234,16 +239,27 @@ export async function createDomainServices(pool,config) {
    points:Number(p.points),firstAcPoints:Number(p.first_ac_points),rewardPoints:Number(p.reward_points),
    ...(a.canManage&&typeof p.difficulty==='string'?{difficulty:p.difficulty}:{}),
   }));
-  const result={id:a.id,title:a.title,canManage:a.canManage,classIds:linkedClasses.map(c=>c.id),classes:linkedClasses,classId:a.class_id,className:(await db.query('SELECT name FROM classes WHERE id=$1',[a.class_id])).rows[0]?.name,state:a.state,archived:!!a.archived_at,description:a.description,course:a.course,coursePathId:a.canManage?a.course_path_id:linkedCourse?.id??null,courseTitle:linkedCourse?.title??null,courseAvailable:visibleCourse,requiredLanguage,problemOrder:a.problem_order,published:a.state==='Published',publishedAt:a.published_at,createdAt:a.created_at,dueAt:a.due_at,editRevision:a.edit_revision,problems};
+  const result={id:a.id,title:a.title,canManage:a.canManage,classIds:linkedClasses.map(c=>c.id),classes:linkedClasses,classId:a.class_id,className:(await db.query('SELECT name FROM classes WHERE id=$1',[a.class_id])).rows[0]?.name,state:a.state,archived:!!a.archived_at,cancelledAt:a.cancelled_at,description:a.description,course:a.course,coursePathId:a.canManage?a.course_path_id:linkedCourse?.id??null,courseTitle:linkedCourse?.title??null,courseAvailable:visibleCourse,requiredLanguage,problemOrder:a.problem_order,published:a.state==='Published',publishedAt:a.published_at,createdAt:a.created_at,dueAt:a.due_at,editRevision:a.edit_revision,problems};
   {
    const protectedParticipantIds=a.canManage?(await db.query('SELECT DISTINCT identity_id FROM submissions WHERE assignment_id=$1',[id])).rows.map(person=>person.identity_id):[];
    if(a.canManage)result.protectedParticipantIds=protectedParticipantIds;
    if(a.canManage)result.hasSubmissions=!!(await db.query("SELECT 1 FROM submissions WHERE assignment_id=$1 AND kind='submit' LIMIT 1",[id])).rowCount;
    if(a.canManage)result.hasActivity=protectedParticipantIds.length>0;
    if(a.canManage)result.participants=(await db.query('SELECT identity_id FROM assignment_participants WHERE assignment_id=$1 AND NOT exempt',[id])).rows.map(p=>p.identity_id);
-   if(a.canManage)result.participantDetails=(await db.query('SELECT part.identity_id,i.name,part.exempt FROM assignment_participants part JOIN identities i ON i.id=part.identity_id WHERE assignment_id=$1 ORDER BY i.name',[id])).rows.map(p=>({identityId:p.identity_id,name:p.name,exempt:p.exempt,hasActivity:protectedParticipantIds.includes(p.identity_id)}));
-   const grades=await assignmentGradeRows(db,a,a.canManage?null:user.identityId);
-   const byStudent=new Map();for(const g of grades){let s=byStudent.get(g.identity_id);if(!s){s={identityId:g.identity_id,name:g.name,score:0,maxScore:0,pending:false,hasScore:false,problems:[]};byStudent.set(g.identity_id,s);}const points=Number(g.points),score=g.score===null?null:Number(g.score);s.score+=score===null?0:score*points/100;s.maxScore+=points;s.pending ||= g.unresolved;s.hasScore ||= score!==null;s.problems.push({problemId:g.problem_id,submissionId:g.submission_id?`SUB${g.submission_id}`:null,score,status:g.status||'NotSubmitted',pending:g.unresolved,pendingStatus:g.pending_status,completionSource:g.credited_ac?'other_entry':null,creditedAt:g.credited_at??null,hasAssignmentSubmission:g.has_assignment_submission,assignmentAttempts:Number(g.assignment_attempts)});}result.grades=[...byStudent.values()].map(({hasScore,...g})=>({...g,score:g.pending&&!hasScore?null:Math.round(g.score*100)/100}));const graded=result.grades.filter(g=>!g.pending&&g.problems.some(p=>(p.submissionId||p.completionSource==='other_entry')&&p.score!==null));result.applicableCount=a.canManage?result.participantDetails.filter(p=>!p.exempt).length:1;result.exemptCount=a.canManage?result.participantDetails.filter(p=>p.exempt).length:0;result.averagePercent=graded.length?Math.round(graded.reduce((total,g)=>total+(g.maxScore?100*g.score/g.maxScore:0),0)/graded.length*100)/100:null;result.submittedStudents=result.grades.filter(g=>g.problems.some(p=>p.hasAssignmentSubmission)).length;result.completedStudents=result.grades.filter(g=>g.problems.length&&g.problems.every(p=>p.status==='AC')).length;
+   if(a.canManage)result.participantDetails=(await db.query('SELECT part.identity_id,i.name,part.exempt,greatest(a.due_at,part.extended_due_at) due_at FROM assignment_participants part JOIN identities i ON i.id=part.identity_id JOIN assignments a ON a.id=part.assignment_id WHERE assignment_id=$1 ORDER BY i.name',[id])).rows.map(p=>({identityId:p.identity_id,name:p.name,exempt:p.exempt,dueAt:p.due_at,hasActivity:protectedParticipantIds.includes(p.identity_id)}));
+   const identityId = a.canManage ? null : user.identityId;
+   const [grades, progress] = await Promise.all([
+    assignmentGradeRows(db,a,identityId),
+    assignmentGradeRows(db,a,identityId,{includeLate:true}),
+   ]);
+   result.grades = assignmentGradeSummaries(grades);
+   result.progress = assignmentGradeSummaries(progress);
+   const graded = result.grades.filter(g => !g.pending && g.problems.some(p => (p.submissionId || p.completionSource === 'other_entry') && p.score !== null));
+   result.applicableCount = a.canManage ? result.participantDetails.filter(p => !p.exempt).length : 1;
+   result.exemptCount = a.canManage ? result.participantDetails.filter(p => p.exempt).length : 0;
+   result.averagePercent = graded.length ? Math.round(graded.reduce((total,g) => total + (g.maxScore ? 100*g.score/g.maxScore : 0),0)/graded.length*100)/100 : null;
+   result.submittedStudents = result.progress.filter(g => g.problems.some(p => p.hasAssignmentSubmission)).length;
+   result.completedStudents = result.progress.filter(g => g.problems.length && g.problems.every(p => p.status === 'AC')).length;
   }
   if (includeCompletion && a.isParticipant && !a.canManage) {
    result.completion = result.completedStudents === 1 ? await learnerAssignmentCompletion(db,id,user.identityId) : null;
@@ -696,24 +712,32 @@ export async function createDomainServices(pool,config) {
   let m;
    if(route==='/assignments'&&method==='GET'){
     const archived=url.searchParams.get('archived')==='true';
-    const rows=(await pool.query(`SELECT a.* FROM assignments a WHERE (a.archived_at IS NOT NULL)=$6 AND ($1 OR $2 AND a.owner_account_id=$3 OR $4 AND a.state='Published' AND EXISTS(SELECT 1 FROM assignment_participants p WHERE p.assignment_id=a.id AND p.identity_id=$5 AND NOT p.exempt)) ORDER BY a.created_at DESC LIMIT 200`,[rolesInclude(user,'admin'),rolesInclude(user,'teacher'),user.id,rolesInclude(user,'student'),user.identityId,archived])).rows;const items=[];for(const a of rows)items.push(await assignmentResult(pool,user,a.id));return respond(200,{items,serverNow:row(await pool.query('SELECT clock_timestamp() AS server_now')).server_now});
+    const rows=(await pool.query(`SELECT a.* FROM assignments a WHERE (a.archived_at IS NOT NULL)=$6 AND ($1 OR $2 AND a.owner_account_id=$3 OR $4 AND a.state='Published' AND a.cancelled_at IS NULL AND EXISTS(SELECT 1 FROM assignment_participants p WHERE p.assignment_id=a.id AND p.identity_id=$5 AND NOT p.exempt)) ORDER BY a.created_at DESC LIMIT 200`,[rolesInclude(user,'admin'),rolesInclude(user,'teacher'),user.id,rolesInclude(user,'student'),user.identityId,archived])).rows;const items=[];for(const a of rows)items.push(await assignmentResult(pool,user,a.id));return respond(200,{items,serverNow:row(await pool.query('SELECT clock_timestamp() AS server_now')).server_now});
    }
    m=route.match(/^\/assignments\/([^/]+)$/);
    if(m&&method==='GET')return respond(200,await assignmentResult(pool,user,m[1],{includeCompletion:true}));
-   m=route.match(/^\/assignments\/([^/]+)\/(archive|restore)$/);
+   m=route.match(/^\/assignments\/([^/]+)\/(archive|restore|cancel)$/);
    if(m&&method==='POST'){
     staff(user);const id=uuid(m[1],'作业 ID'),action=m[2];
     await transaction(pool,async db=>{
      await db.query('SELECT id FROM assignments WHERE id=$1 FOR UPDATE',[id]);
      const assignment=await assignmentAccess(db,user,id);
      if(!assignment.canManage)fail(403,'FORBIDDEN','无权管理该作业');
-     if(action==='archive'){
+     if(action==='cancel'){
+      if(assignment.cancelled_at)return;
+      if(assignment.state!=='Published'||assignment.archived_at)fail(409,'NOT_ACTIVE','只能取消正在使用的已布置作业');
+      await db.query('UPDATE assignments SET cancelled_at=statement_timestamp(),archived_at=statement_timestamp(),edit_revision=edit_revision+1 WHERE id=$1',[id]);
+      await notifyLegacyAssignmentChange(db,id,'cancelled');
+     }else if(action==='archive'){
       if(assignment.archived_at)return;
-      if(assignment.state==='Published'&&assignment.due_at>new Date())fail(409,'ASSIGNMENT_IN_PROGRESS','作业尚未截止，请在截止后归档，以免影响学生提交');
+      if(assignment.state==='Published'&&(await db.query(`SELECT 1 FROM assignments a
+        WHERE a.id=$1 AND (a.due_at>clock_timestamp() OR EXISTS(SELECT 1 FROM assignment_participants p
+          WHERE p.assignment_id=a.id AND NOT p.exempt AND p.extended_due_at>clock_timestamp()))`,[id])).rowCount)fail(409,'ASSIGNMENT_IN_PROGRESS','作业尚未截止，请在截止后归档，以免影响学生提交');
       if((await db.query("SELECT 1 FROM submissions WHERE assignment_id=$1 AND status IN ('Waiting','Judging') LIMIT 1",[id])).rowCount)fail(409,'PENDING_JUDGMENT','仍有待判题提交，请等待判题完成');
       await db.query('UPDATE assignments SET archived_at=clock_timestamp() WHERE id=$1',[id]);
      }else{
       if(!assignment.archived_at)return;
+      if(assignment.cancelled_at)fail(409,'ASSIGNMENT_CANCELLED','已取消的作业不能恢复');
       if(assignment.class_id&&!(await db.query('SELECT 1 FROM classes WHERE id=$1 AND archived_at IS NULL',[assignment.class_id])).rowCount)fail(409,'CLASS_ARCHIVED','请先恢复班级，再恢复作业');
       if(assignment.state==='Published'){
        const linked=(await db.query(`SELECT ap.problem_id,p.archived_at problem_archived_at,
@@ -731,13 +755,34 @@ export async function createDomainServices(pool,config) {
    }
    m=route.match(/^\/assignments\/([^/]+)\/participants\/([^/]+)$/);
    if(m&&method==='PATCH') {
-    staff(user);if(typeof body.exempt!=='boolean')fail(400,'VALIDATION','豁免状态无效');const assignmentId=uuid(m[1]),identityId=uuid(m[2]),reason=field(body.reason,'豁免原因',{max:2000});
-    await transaction(pool,async db=>{await db.query('SELECT id FROM assignments WHERE id=$1 FOR UPDATE',[assignmentId]);const a=await assignmentAccess(db,user,assignmentId);if(!a.canManage)fail(403,'FORBIDDEN','无权管理该作业');if(a.archived_at)fail(409,'ARCHIVED','已归档作业不能修改，请先恢复');if(!(await db.query('SELECT clock_timestamp()<=$1 allowed',[a.due_at])).rows[0].allowed)fail(409,'DEADLINE_PASSED','截止后变更名单须先明确延期并审计');row(await db.query('UPDATE assignment_participants SET exempt=$1 WHERE assignment_id=$2 AND identity_id=$3 RETURNING identity_id',[body.exempt,assignmentId,identityId]));await db.query('UPDATE assignments SET edit_revision=edit_revision+1 WHERE id=$1',[assignmentId]);await audit(db,user.id,'assignment.participant_exempt','assignment',assignmentId,{identityId,exempt:body.exempt,reason});});return respond(200,await assignmentResult(pool,user,assignmentId));
+    staff(user);
+    const assignmentId=uuid(m[1]),identityId=uuid(m[2]),change=assignmentChange(body);
+    await transaction(pool,async db=>{
+     await db.query('SELECT id FROM assignments WHERE id=$1 FOR UPDATE',[assignmentId]);
+     const a=await assignmentAccess(db,user,assignmentId);
+     if(!a.canManage)fail(403,'FORBIDDEN','无权管理该作业');
+     if(a.archived_at||a.state!=='Published')fail(409,'NOT_ACTIVE','只能调整正在使用的已布置作业');
+     const participant=row(await db.query(`SELECT exempt,greatest($3::timestamptz,extended_due_at) AS due_at
+       FROM assignment_participants WHERE assignment_id=$1 AND identity_id=$2`,[assignmentId,identityId,a.due_at]));
+     if(change.action==='extended'){
+      if(participant.exempt)fail(409,'EXEMPT','请先恢复该学生参与');
+      if(+change.dueAt===+participant.due_at)return;
+      if(change.dueAt<=participant.due_at)fail(400,'VALIDATION','延期须晚于该学生当前的截止时间');
+      await db.query('UPDATE assignment_participants SET extended_due_at=$3 WHERE assignment_id=$1 AND identity_id=$2',[assignmentId,identityId,change.dueAt]);
+     }else{
+      if(participant.exempt===change.exempt)return;
+      await db.query('UPDATE assignment_participants SET exempt=$3 WHERE assignment_id=$1 AND identity_id=$2',[assignmentId,identityId,change.exempt]);
+     }
+     await db.query('UPDATE assignments SET edit_revision=edit_revision+1 WHERE id=$1',[assignmentId]);
+     await notifyLegacyAssignmentChange(db,assignmentId,change.action,{identityId,reason:change.reason});
+     await audit(db,user.id,change.action==='extended'?'assignment.participant_extend':'assignment.participant_exempt','assignment',assignmentId,{identityId,...change,previousDueAt:participant.due_at});
+    });
+    return respond(200,await assignmentResult(pool,user,assignmentId));
    }
    m=route.match(/^\/assignments\/([^/]+)\/extend$/);
    if(m&&method==='POST') {
     staff(user);const assignmentId=uuid(m[1]),reason=field(body.reason,'延期原因',{max:2000}),dueAt=new Date(body.dueAt);if(!Number.isFinite(dueAt.getTime())||dueAt<=new Date())fail(400,'VALIDATION','新截止时间须晚于现在');
-    await transaction(pool,async db=>{await db.query('SELECT id FROM assignments WHERE id=$1 FOR UPDATE',[assignmentId]);const a=await assignmentAccess(db,user,assignmentId);if(!a.canManage)fail(403,'FORBIDDEN','无权管理该作业');if(a.archived_at)fail(409,'ARCHIVED','已归档作业不能修改，请先恢复');if(dueAt<=new Date(a.due_at))fail(400,'VALIDATION','延期须晚于原截止时间');await db.query('UPDATE assignments SET due_at=$1,edit_revision=edit_revision+1 WHERE id=$2',[dueAt,assignmentId]);await audit(db,user.id,'assignment.extend','assignment',assignmentId,{previousDueAt:a.due_at,dueAt:dueAt.toISOString(),reason});});return respond(200,await assignmentResult(pool,user,assignmentId));
+    await transaction(pool,async db=>{await db.query('SELECT id FROM assignments WHERE id=$1 FOR UPDATE',[assignmentId]);const a=await assignmentAccess(db,user,assignmentId);if(!a.canManage)fail(403,'FORBIDDEN','无权管理该作业');if(a.archived_at)fail(409,'ARCHIVED','已归档作业不能修改，请先恢复');if(+dueAt===+a.due_at)return;if(dueAt<=new Date(a.due_at))fail(400,'VALIDATION','延期须晚于原截止时间');await db.query('UPDATE assignments SET due_at=$1,edit_revision=edit_revision+1 WHERE id=$2',[dueAt,assignmentId]);await notifyLegacyAssignmentChange(db,assignmentId,'extended',{previousDueAt:a.due_at,reason});await audit(db,user.id,'assignment.extend','assignment',assignmentId,{previousDueAt:a.due_at,dueAt:dueAt.toISOString(),reason});});return respond(200,await assignmentResult(pool,user,assignmentId));
    }
   return null;
  }
@@ -781,6 +826,7 @@ export async function createDomainServices(pool,config) {
       await db.query('SELECT id FROM assignments WHERE id=$1 FOR SHARE',[assignmentId]);
       assignment=await assignmentAccess(db,user,assignmentId);
       if(!assignment.isParticipant)fail(403,'FORBIDDEN','只能作为被分配的学生提交作业，教师请使用练习预览');
+      if(assignment.cancelled_at)fail(409,'ASSIGNMENT_CANCELLED','作业已取消');
       if(assignment.archived_at)fail(409,'ASSIGNMENT_ARCHIVED','作业已归档，不能在此作业中继续运行或提交；可从题库独立练习');
       row(await db.query('SELECT problem_id FROM assignment_problems WHERE assignment_id=$1 AND problem_id=$2',[assignmentId,problemId]));
      }

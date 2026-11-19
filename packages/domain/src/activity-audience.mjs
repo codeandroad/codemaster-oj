@@ -109,11 +109,12 @@ export async function handleClassHub(ctx){
    AND EXISTS(SELECT 1 FROM account_roles r WHERE r.account_id=a.id AND r.role='student')`,[id,user.identityId,user.id])).rowCount;
  if(!manager&&!member)fail(403,'FORBIDDEN','仅班级成员可查看班级内容');
  if(match[2])return {status:200,body:{items:await classMembers(pool,id)}};
- const assignments=(await pool.query(`SELECT a.id,a.title,a.due_at "dueAt",a.course_path_id "coursePathId",p.title "courseTitle"
-  FROM assignments a LEFT JOIN learning_paths p ON p.id=a.course_path_id AND p.published_at IS NOT NULL AND p.archived_at IS NULL
+ const assignments=(await pool.query(`SELECT a.id,a.title,greatest(a.due_at,part.extended_due_at) "dueAt",a.course_path_id "coursePathId",p.title "courseTitle"
+  FROM assignments a LEFT JOIN assignment_participants part ON part.assignment_id=a.id AND part.identity_id=$2 AND NOT part.exempt
+  LEFT JOIN learning_paths p ON p.id=a.course_path_id AND p.published_at IS NOT NULL AND p.archived_at IS NULL
   WHERE a.state='Published' AND a.archived_at IS NULL
    AND (a.class_id=$1 OR EXISTS(SELECT 1 FROM assignment_classes ac WHERE ac.assignment_id=a.id AND ac.class_id=$1))
-   AND ($3::boolean AND (a.owner_account_id=$4 OR $5::boolean) OR EXISTS(SELECT 1 FROM assignment_participants part WHERE part.assignment_id=a.id AND part.identity_id=$2 AND NOT part.exempt))
+   AND ($3::boolean AND (a.owner_account_id=$4 OR $5::boolean) OR part.identity_id IS NOT NULL)
   ORDER BY a.created_at DESC,a.id`,[id,user.identityId,manager,user.id,admin(user)])).rows;
  if(member){
   const progress=await assignmentProgressById(pool,assignments.map(a=>a.id),user.identityId);

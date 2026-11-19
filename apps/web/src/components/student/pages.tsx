@@ -14,20 +14,20 @@ import { StudentScholarshipRule } from "@/components/scholarship/teaching-page";
 import { AppLink } from "@/components/navigation";
 import { LearnerResourceScope } from "@/components/schools/learner-resource-scope";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, CalendarClock, Check, CheckCircle2, CircleAlert, Code2, KeyRound, MessageSquareText, NotebookPen, Pencil, ShieldCheck, X } from "lucide-react";
+import { ArrowRight, CalendarClock, CheckCircle2, CircleAlert, Code2, KeyRound, MessageSquareText, NotebookPen, Pencil, ShieldCheck, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
 import { isPending, productionApi, type Assignment, type AuthResponse, type CampusUser, type ReviewEntry, type SchoolClass, type Submission } from "@/lib/production-api";
-import { CodeBlock, Empty, Feedback, ResultPanel, ResultScore, State, input, kindLabel, panel, shortId, textarea, useData, useMutation, useSubmission } from "./shared";
+import { CodeBlock, Empty, Feedback, ResultPanel, ResultScore, State, input, kindLabel, panel, shortId, textarea, useData, useMutation, useRefreshOnReturn, useSubmission } from "./shared";
 import { StudentClasses, StudentClass } from "./classes";
 import { StudentLearningDetail, StudentLearningList, type LearningPath } from "./learning";
 import { StudentTimedDetail, StudentTimedList } from "./timed";
 import { StudentWorkspace } from "./workspace";
 import { Progress, StudentDashboardView } from "./dashboard-view";
-import { StudentAssignmentCard } from "./activity-cards";
+import { AssignmentCompletedStatus, StudentAssignmentCard } from "./activity-cards";
 import { AssignmentCompletionDialog } from "./assignment-completion";
 export { Progress } from "./dashboard-view";
 const StudentPaper4List = dynamic(() => import("@/components/paper4/student-paper4").then(module => module.StudentPaper4List));
@@ -59,13 +59,16 @@ export function StudentPages({ pathname, user }: { pathname: string; user: Campu
 function formal(items: Submission[]) { return items.filter(s => ["submit", "correction"].includes(s.kind)); }
 function gradeFor(assignment: Assignment, identityId?: string) { return assignment.grades?.find(g => !identityId || g.identityId === identityId); }
 function assignmentProgress(assignment: Assignment, identityId?: string) {
-  const grade = gradeFor(assignment, identityId), max = assignment.problems.reduce((sum, p) => sum + p.points, 0);
+  const deadlineGrade = gradeFor(assignment, identityId);
+  const grade = assignment.progress?.find(g => !identityId || g.identityId === identityId) ?? deadlineGrade;
+  const max = assignment.problems.reduce((sum, p) => sum + p.points, 0);
   const results = new Map(grade?.problems.map(problem => [problem.problemId, problem]));
   const required = assignment.problems.map(problem => results.get(problem.problemId));
   const attempted = required.filter(p => p && (p.assignmentAttempts != null ? p.assignmentAttempts > 0 : p.hasAssignmentSubmission ?? Boolean(p.submissionId))).length;
   const solved = required.filter(p => p?.status === "AC").length;
   const complete = required.length > 0 && solved === required.length;
-  return { grade, max, attempted, solved, complete, percent: required.length ? solved / required.length * 100 : 0 };
+  const completedLate = complete && Boolean(deadlineGrade?.problems.some(problem => problem.status !== "AC"));
+  return { grade, deadlineGrade, max, attempted, solved, complete, completedLate, percent: required.length ? solved / required.length * 100 : 0 };
 }
 function sourceLabel(submission: Submission, assignments: Assignment[] = [], locale: AppLocale = "en") { return submission.originalSubmissionId ? ui(locale, "订正", "Correction") : submission.assignmentId ? assignments.find(a => a.id === submission.assignmentId)?.title ?? ui(locale, "作业", "Assignment") : submission.timedPracticeId ? ui(locale, "限时训练", "Timed Practice") : ui(locale, "题库练习", "Practice library"); }
 
@@ -95,7 +98,7 @@ export function StudentDashboard({ user }: { user: CampusUser }) {
       solved: progress.solved,
       attempted: progress.attempted,
       count: current.problems.length,
-      score: progress.grade?.score ?? null,
+      score: progress.deadlineGrade?.score ?? null,
       maxScore: progress.max,
       pending: progress.grade?.pending,
     } : undefined}
@@ -127,9 +130,10 @@ export function StudentDashboard({ user }: { user: CampusUser }) {
 }
 export function StudentAssignments({ user }: { user: CampusUser }) {
   const { locale } = useLocale();
+  const { version } = useRefreshOnReturn();
   const [initialNow] = useState(() => Date.now());
   const [showArchived, setShowArchived] = useState(false);
-  const assignments = useData<{ items: Assignment[]; serverNow?: string }>(showArchived ? "assignments?archived=true" : "assignments"), classes = useData<{ items: SchoolClass[] }>("classes");
+  const assignments = useData<{ items: Assignment[]; serverNow?: string }>(showArchived ? "assignments?archived=true" : "assignments", version), classes = useData<{ items: SchoolClass[] }>("classes");
   const now = assignments.data?.serverNow ? new Date(assignments.data.serverNow).getTime() : initialNow;
   const visible = assignments.data?.items.filter(a => Boolean(a.archived) === showArchived &&
     (!a.grades || a.grades.some(g => g.identityId === user.identityId))) ?? [];
@@ -162,7 +166,8 @@ export function StudentAssignments({ user }: { user: CampusUser }) {
             dueAt={assignment.dueAt}
             active={!assignment.archived && !ended}
             problemCount={assignment.problems.length}
-            score={progress.grade?.score ?? null}
+            completedLate={progress.completedLate}
+            score={progress.deadlineGrade?.score ?? null}
             maxScore={progress.max}
             pending={progress.grade?.pending}
             attempted={progress.attempted}
@@ -184,10 +189,17 @@ export function StudentAssignments({ user }: { user: CampusUser }) {
 }
 export function StudentAssignment({ id, user }: { id: string; user: CampusUser }) {
   const { locale, t } = useLocale();
+  const { version } = useRefreshOnReturn();
   const [completionOpen, setCompletionOpen] = useState(false);
-  const assignment = useData<Assignment>(`assignments/${id}`), submissions = useData<{ items: Submission[] }>(`submissions?assignmentId=${encodeURIComponent(id)}&identityId=${user.identityId}&kind=submit,correction`), classes = useData<{ items: SchoolClass[] }>("classes");
+  const assignment = useData<Assignment>(`assignments/${id}`, version), submissions = useData<{ items: Submission[] }>(`submissions?assignmentId=${encodeURIComponent(id)}&identityId=${user.identityId}&kind=submit,correction`, version), classes = useData<{ items: SchoolClass[] }>("classes");
   const a = assignment.data, p = a ? assignmentProgress(a, user.identityId) : null, formalSubmissions = formal(submissions.data?.items ?? []);
   const needsCorrection = formalSubmissions.find(s => s.kind === "submit" && s.status === "WA" && p?.grade?.problems.find(g => g.problemId === s.problemId)?.status !== "AC");
+  const { reload: reloadAssignment } = assignment, { reload: reloadSubmissions } = submissions;
+  useEffect(() => {
+    if (!submissions.data?.items.some(item => isPending(item.status))) return;
+    const timer = setTimeout(() => { reloadAssignment(); reloadSubmissions(); }, 1500);
+    return () => clearTimeout(timer);
+  }, [submissions.data, reloadAssignment, reloadSubmissions]);
   return <State data={assignment}>{a && p && <>
     {completionOpen && a.completion && <AssignmentCompletionDialog assignment={{ id: a.id, title: a.title, completion: a.completion }}
       onDismiss={() => setCompletionOpen(false)} />}
@@ -198,7 +210,7 @@ export function StudentAssignment({ id, user }: { id: string; user: CampusUser }
           <p className="text-xs font-semibold uppercase text-primary">{shortId(a.id)}</p>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <h1 className="min-w-0 text-2xl font-bold [overflow-wrap:anywhere]">{a.title}</h1>
-            {p.complete && <StatusPill status="Completed" icon={<Check size={13} />} />}
+            {p.complete && <AssignmentCompletedStatus late={p.completedLate} />}
             {p.complete && a.completion && <Button type="button" size="sm" variant="ghost" onClick={() => setCompletionOpen(true)}>
               {ui(locale, "查看完成统计", "View completion stats")}
             </Button>}
@@ -206,10 +218,12 @@ export function StudentAssignment({ id, user }: { id: string; user: CampusUser }
           {a.coursePathId && a.courseTitle && <p className="mt-2 text-sm"><AppLink href={`/student/learning-paths/${a.coursePathId}`} className="font-semibold text-primary hover:underline focus-visible:underline">{ui(locale, "关联课程：", "Course: ")}{a.courseTitle} →</AppLink></p>}
           {a.requiredLanguage && <p className="mt-2 text-sm font-semibold">{requiredLanguageText(locale, a.requiredLanguage, "assignment")}</p>}
           <p className="mt-2 text-sm leading-6 text-muted-foreground">{a.classNames?.join(" / ") || a.classes?.map(item => item.name).join(" / ") || a.className || classes.data?.items.find(c => c.id === a.classId)?.name || ui(locale, "按学生名单布置", "Direct assignment")} · {ui(locale, "截止", "Due")} {displayDate(a.dueAt, locale)} Asia/Shanghai</p>
-          {!a.archived && <p className="mt-1 text-sm leading-6 text-muted-foreground">{t("截止后仍可提交并查看判题结果。补交不计入作业成绩，也不发放作业完成奖学金等作业奖励。")}</p>}
+          {a.cancelledAt && <p className="mt-1 text-sm font-semibold">{ui(locale, "这份作业已取消。", "This assignment was cancelled.")}</p>}
+          {!a.archived && <p className="mt-1 text-sm leading-6 text-muted-foreground">{t("截止后补交会更新题目状态和完成进度。作业成绩与奖励以截止前收到的提交为准。")}</p>}
         </div>
         <div className="sm:text-right">
-          <div className="text-3xl font-bold">{p.grade?.score == null && p.grade?.pending ? ui(locale, "等待判题", "Waiting for judging") : p.grade?.score ?? 0}/{p.max}</div>
+          <p className="text-xs text-muted-foreground">{ui(locale, "截止成绩", "Deadline score")}</p>
+          <div className="text-3xl font-bold">{p.deadlineGrade?.score == null && p.deadlineGrade?.pending ? ui(locale, "等待判题", "Waiting for judging") : p.deadlineGrade?.score ?? 0}/{p.max}</div>
           <div className="text-xs text-muted-foreground">{p.attempted}/{a.problems.length} {ui(locale, "本作业已提交", "submitted here")} · {p.solved}/{a.problems.length} {ui(locale, "已解决", "solved")}</div>
         </div>
       </div>

@@ -332,7 +332,7 @@ function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation
     <div className="min-w-0">
       <span className="font-medium">{activity.title}</span>
       {activity.kind==="assignment"&&activity.canSubmit&&activity.endsAt&&!preview&&
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">{t("截止后仍可提交并查看判题结果。补交不计入作业成绩，也不发放作业完成奖学金等作业奖励。")}</p>}
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{t("截止后补交会更新题目状态和完成进度。作业成绩与奖励以截止前收到的提交为准。")}</p>}
     </div>
     <div className="flex items-center gap-3">
       {!preview&&<SchoolActivityScholarshipRule schoolId={problem.schoolId} activityId={activity.id}/>}

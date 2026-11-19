@@ -36,6 +36,7 @@ import {
 } from "@/lib/production-api";
 import { TeacherAssignment } from "./dashboard-classes";
 import { ProblemPicker } from "./problem-banks";
+import { AssignmentParticipantForm, CancelAssignment } from "./assignment-changes";
 import { AssignmentPreviewLink } from "./assignment-preview";
 import {
   area,
@@ -145,7 +146,7 @@ export function TeacherAssignments() {
               <td>
                 <StatusPill
                   status={
-                    item.state === "Draft"
+                    item.cancelledAt ? ui(locale, "已取消", "Cancelled") : item.state === "Draft"
                       ? ui(locale, "草稿", "Draft")
                       : item.averagePercent === null ||
                           item.averagePercent === undefined
@@ -168,7 +169,8 @@ export function TeacherAssignments() {
                   >
                     {ui(locale, "进度", "Progress")} →
                   </Link>
-                  <RowActionButton disabled={action.busy} onClick={()=>setConfirm(item)}>{showArchived?ui(locale,"恢复","Restore"):ui(locale,"归档","Archive")}</RowActionButton>
+                  {!item.cancelledAt && <RowActionButton disabled={action.busy} onClick={()=>setConfirm(item)}>{showArchived?ui(locale,"恢复","Restore"):ui(locale,"归档","Archive")}</RowActionButton>}
+                  {item.canManage && item.published && !item.archived && <CancelAssignment path={`assignments/${item.id}`} title={item.title} onSaved={assignments.reload}/>}
                 </div>
               </td>
             </tr>;
@@ -1150,8 +1152,6 @@ function AssignmentEditorForm({
 type Grade = NonNullable<Assignment["grades"]>[number];
 export function TeacherAssignmentProgress({ id }: { id: string }) {
   const { locale } = useLocale();
-  const [now,setNow] = useState(() => Date.now());
-  useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer);},[]);
   const resource = useData<TeacherAssignment>(`assignments/${id}`),
     [selected, setSelected] = useState<{
       student: Grade;
@@ -1183,9 +1183,10 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
         action={
           <div className="flex flex-wrap gap-2">
             {assignment?.canManage && !assignment.archived && assignment.problems.length > 0 && <AssignmentPreviewLink id={id} from="progress"/>}
-            <Button variant="secondary" onClick={() => setManage(true)}>
-              延期 / 豁免
-            </Button>
+            {assignment?.canManage && assignment.published && !assignment.archived && <>
+              <Button variant="secondary" onClick={() => setManage(true)}>{ui(locale, "延期 / 豁免", "Extend / exempt")}</Button>
+              <CancelAssignment path={`assignments/${id}`} title={assignment.title} onSaved={resource.reload}/>
+            </>}
             <Link
               href={`/teacher/assignments/${id}/edit`}
               className={buttonVariants({ variant: "secondary" })}
@@ -1198,6 +1199,7 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
       <State resource={resource} />
       {assignment && (
         <>
+          {assignment.cancelledAt && <p className="my-3 text-sm font-medium">{ui(locale, "作业已取消", "Assignment cancelled")}</p>}
           <div className="mt-5 grid grid-cols-6 gap-3 max-lg:grid-cols-3 max-sm:grid-cols-2">
             {[
               [ui(locale, "已完成", "Complete"), complete],
@@ -1330,7 +1332,8 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
         />
       )}
       {manage && assignment && (
-        <Modal title="作业延期与适用名单" onClose={() => setManage(false)} wide>
+        <Modal title={ui(locale, "作业延期与适用名单", "Assignment deadlines and exemptions")} onClose={() => setManage(false)} wide>
+          <h3 className="mb-3 text-sm font-semibold">{ui(locale, "整份作业延期", "Extend assignment for everyone")}</h3>
           <form
             className="grid grid-cols-2 gap-3 max-sm:grid-cols-1"
             onSubmit={(e) => {
@@ -1345,7 +1348,7 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
                   },
                 });
                 resource.reload();
-                return "截止时间已延后。";
+                return ui(locale, "截止时间已延后，受影响的学生已收到通知。", "Deadline extended and affected students notified.");
               });
             }}
           >
@@ -1361,53 +1364,15 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
               <input name="reason" required className={input} />
             </Field>
             <Button variant="secondary" disabled={action.busy}>
-              确认延期
+              {ui(locale, "延期并通知学生", "Extend and notify students")}
             </Button>
           </form>
-          <div className="mt-5 divide-y divide-border">
-            {assignment.participantDetails?.map((p) => (
-              <form
-                key={p.identityId}
-                className="flex flex-wrap items-center gap-3 py-3"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const d = new FormData(e.currentTarget);
-                  void action.run(async () => {
-                    await productionApi(
-                      `assignments/${id}/participants/${p.identityId}`,
-                      {
-                        method: "PATCH",
-                        body: { exempt: !p.exempt, reason: d.get("reason") },
-                      },
-                    );
-                    resource.reload();
-                    return "参与状态已更新。";
-                  });
-                }}
-              >
-                <b className="text-sm">
-                  {p.name} · {p.exempt ? "已豁免" : "参与中"}
-                </b>
-                <input
-                  name="reason"
-                  aria-label={`${p.name} 变更原因`}
-                  placeholder="变更原因"
-                  required
-                  className={`${input} min-w-40 flex-1`}
-                />
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={
-                    action.busy || new Date(assignment.dueAt).getTime() <= now
-                  }
-                >
-                  {p.exempt ? "恢复参与" : "豁免本次作业"}
-                </Button>
-              </form>
-            ))}
-          </div>
           <Feedback action={action} />
+          <div className="mt-5 border-t border-border pt-4">
+            <h3 className="mb-3 text-sm font-semibold">{ui(locale, "个人延期或豁免", "Individual deadline or exemption")}</h3>
+            <AssignmentParticipantForm path={`assignments/${id}`} participants={assignment.participantDetails ?? []}
+              toDeadline={value => activityDate(value, ui(locale, "新的截止时间", "new deadline"))} onSaved={resource.reload}/>
+          </div>
         </Modal>
       )}
     </>

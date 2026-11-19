@@ -1,3 +1,4 @@
+import { notifyLegacyAssignmentChange } from './assignment-changes.mjs';
 import { transaction } from './db.mjs';
 import { fail,field,uuid,enumValue,integer } from './security.mjs';
 import {audienceClasses,audienceStudents,defaultClassStudents,replaceAudienceClasses} from './activity-audience.mjs';
@@ -155,6 +156,7 @@ async function editPublished(ctx,db,id,old,body){
  if(classChanged)await replaceAudienceClasses(db,id,classIds);
  if(removed.length)await db.query('DELETE FROM assignment_participants WHERE assignment_id=$1 AND identity_id=ANY($2::uuid[])',[id,removed]);
  for(const identityId of added)await db.query('INSERT INTO assignment_participants(assignment_id,identity_id) VALUES($1,$2)',[id,identityId]);
+ if(dueChanged)await notifyLegacyAssignmentChange(db,id,'extended',{previousDueAt:old.due_at,reason});
  await ctx.helpers.audit(db,ctx.user.id,'assignment.published_edit','assignment',id,{...(reason?{reason}:{}),fields,revision:versionChanges,previousDueAt:dueChanged?old.due_at:undefined,dueAt:dueChanged?dueAt.toISOString():undefined,added:added.length,participants:participants.length});
 }
 export async function handleAssignmentAuthoring(ctx){

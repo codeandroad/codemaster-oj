@@ -172,7 +172,9 @@ async function pathResult(ctx, id, db = ctx.pool, allowArchived = false) {
  const bundle=Array.isArray(p.practice_bundle)?p.practice_bundle:[];
  const state=p.canEdit&&bundle.length?(await db.query('SELECT id,validation_status,published_at FROM problem_versions WHERE id=ANY($1::uuid[])',[bundle.map(x=>x.versionId)])).rows:[];
  const status=new Map(state.map(v=>[v.id,v]));
- const linkedAssignments=p.published_at&&ctx.user.roles.includes('student')?(await db.query(`SELECT a.id,a.title,a.due_at FROM assignments a WHERE a.course_path_id=$1 AND a.state='Published' AND a.archived_at IS NULL AND EXISTS(SELECT 1 FROM assignment_participants ap WHERE ap.assignment_id=a.id AND ap.identity_id=$2 AND NOT ap.exempt) ORDER BY a.due_at DESC,a.created_at DESC`,[id,ctx.user.identityId])).rows:[];
+ const linkedAssignments=p.published_at&&ctx.user.roles.includes('student')?(await db.query(`SELECT a.id,a.title,greatest(a.due_at,ap.extended_due_at) due_at
+  FROM assignments a JOIN assignment_participants ap ON ap.assignment_id=a.id AND ap.identity_id=$2 AND NOT ap.exempt
+  WHERE a.course_path_id=$1 AND a.state='Published' AND a.archived_at IS NULL ORDER BY due_at DESC,a.created_at DESC`,[id,ctx.user.identityId])).rows:[];
  const assignmentProgress=await assignmentProgressById(db,linkedAssignments.map(a=>a.id),ctx.user.identityId);
  return { ...(id!==redirectedFromCourseId?{redirectedFromCourseId,redirectedChapterId}:{}),...pathShape({ ...p, task_count:versions.size+paper4Total.taskCount+acslTotal.total,completed_tasks:solved.size+paper4Total.completedTasks+acslTotal.completed,chapter_count: chapters.length, completed_chapters: chapters.filter(c => c.completed).length }),
   assignments:linkedAssignments.map(a=>({id:a.id,title:a.title,dueAt:a.due_at,...assignmentProgress.get(a.id)})),

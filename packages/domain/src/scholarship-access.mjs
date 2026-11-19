@@ -137,7 +137,7 @@ export async function resolveAssistancePolicy(db,user,target,kind){
  if(target.problemId){
   const assignments=(await db.query(`SELECT a.id FROM assignments a JOIN assignment_problems ap ON ap.assignment_id=a.id
    JOIN assignment_participants part ON part.assignment_id=a.id AND part.identity_id=$1 AND NOT part.exempt
-   WHERE ap.problem_id=$2 AND a.state='Published' AND a.archived_at IS NULL AND a.due_at>=clock_timestamp()`,[user.identityId,target.problemId])).rows;
+   WHERE ap.problem_id=$2 AND a.state='Published' AND a.archived_at IS NULL AND greatest(a.due_at,part.extended_due_at)>=clock_timestamp()`,[user.identityId,target.problemId])).rows;
   relevant.push(...assignments.map(a=>({type:'assignment',id:a.id,defaultMode:'paid'})));
   const timed=(await db.query(`SELECT tp.id FROM timed_practices tp JOIN timed_practice_problems p ON p.practice_id=tp.id
    JOIN timed_practice_participants part ON part.practice_id=tp.id AND part.identity_id=$1 AND NOT part.exempt

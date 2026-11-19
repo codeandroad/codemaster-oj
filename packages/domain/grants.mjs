@@ -114,6 +114,7 @@ GRANT EXECUTE ON FUNCTION school_scholarship_entry(uuid,uuid,integer,text,text,u
 REVOKE ALL ON school_activities,school_activity_problems,school_activity_participants,school_activity_classes,school_activity_attempts,school_activity_results FROM PUBLIC,campus_app,campus_worker;
 GRANT SELECT,INSERT,UPDATE ON school_activities,school_activity_attempts TO campus_app;
 GRANT SELECT,INSERT,DELETE ON school_activity_problems,school_activity_participants,school_activity_classes TO campus_app;
+GRANT UPDATE(exempt,extended_due_at) ON school_activity_participants TO campus_app;
 GRANT SELECT,INSERT ON school_activity_results TO campus_app;
 GRANT SELECT,INSERT,UPDATE ON school_problem_banks,school_problems,school_problem_publications TO campus_app;
 GRANT SELECT,INSERT ON school_problem_versions,school_judge_jobs TO campus_app;

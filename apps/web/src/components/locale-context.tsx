@@ -15,7 +15,7 @@ const english: Record<string, string> = {
   "已截止": "Deadline passed", "已截止，可补交": "Late submissions open",
   "已截止，未完成": "Overdue · Incomplete",
   "已截止，未完成 · 可补交": "Overdue · Incomplete · Late submissions open",
-  "截止后仍可提交并查看判题结果。补交不计入作业成绩，也不发放作业完成奖学金等作业奖励。": "You can still submit after the deadline and see the judge results. Late submissions do not count toward your grade or qualify for assignment rewards, including the completion scholarship.",
+  "截止后补交会更新题目状态和完成进度。作业成绩与奖励以截止前收到的提交为准。": "Late submissions update problem status and completion progress. Assignment scores and rewards use work received by the deadline.",
   "教师首页": "Teacher dashboard", "班级与学生": "Classes & students", "题库": "Problem banks",
   "课程": "Courses", "题目编辑": "Problem editor", "作业管理": "Assignment management", "教学报告": "Teaching reports",
   "导入中心": "Import center", "管理员首页": "Admin dashboard", "账号与角色": "Accounts & roles",

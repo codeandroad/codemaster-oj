@@ -101,6 +101,7 @@ export interface AssignmentCompletion {
   rewards: { firstAc: number; assignment: number; total: number };
 }
 export interface Assignment {
+  cancelledAt?: string | null;
   id: string;
   title: string;
   archived?: boolean;
@@ -119,9 +120,10 @@ export interface Assignment {
   createdAt?: string;
   dueAt: string;
   completion?: AssignmentCompletion | null;
+  progress?: Assignment["grades"];
   problems: { problemId: string; points: number; title?: string; versionId?: string; position?: number; firstAcPoints?: number; rewardPoints?: number; difficulty?: string | null }[];
   participants: string[];
-  participantDetails?: { identityId: string; name: string; exempt: boolean; hasActivity?: boolean }[];
+  participantDetails?: { identityId: string; name: string; exempt: boolean; dueAt: string; hasActivity?: boolean }[];
   grades?: {
     identityId: string;
     name: string;

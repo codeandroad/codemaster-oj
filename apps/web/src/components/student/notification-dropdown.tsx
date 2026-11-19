@@ -33,6 +33,22 @@ function notificationContent(item: Notification, locale: AppLocale, scholarshipH
         title: ui(locale, "收到教师反馈", "New teacher feedback"), body: item.problemTitle,
         href: `/student/review-notebook/${encodeURIComponent(item.reviewId)}`, icon: MessageSquareText,
       };
+    case "assignment_change": {
+      const labels = {
+        cancelled: ui(locale, "作业已取消", "Assignment cancelled"),
+        extended: ui(locale, "作业截止时间已延后", "Assignment deadline extended"),
+        exempted: ui(locale, "你已获作业豁免", "You have been exempted"),
+        reinstated: ui(locale, "已恢复作业参与", "Assignment reinstated"),
+      };
+      const deadline = item.dueAt ? ui(locale, `截止 ${date(item.dueAt, locale)}`, `Due ${date(item.dueAt, locale)}`) : undefined;
+      const query = schoolId ? new URLSearchParams({ schoolId, section: "assignments" }) : null;
+      return {
+        title: labels[item.action],
+        body: [item.activityTitle, deadline, item.reason].filter(Boolean).join(" · "),
+        href: query ? `/schools?${query}` : "/student/assignments",
+        icon: BookOpen,
+      };
+    }
     case "course_application": {
       const query = new URLSearchParams({ courseId: item.courseId, applicationId: item.id });
       if (schoolId) {

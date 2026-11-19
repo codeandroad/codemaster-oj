@@ -1,4 +1,4 @@
-import { assignmentPassingSubmission } from './assignment-grades.mjs';
+import { assignmentPassingProgressSubmission } from './assignment-grades.mjs';
 import { fail, submissionId } from './security.mjs';
 
 // Derive the event from the first visible, qualifying result for each
@@ -20,13 +20,13 @@ async function completedAssignments(db, identityId, assignmentIds, matchedSubmis
     LEFT JOIN luq_submission_results result ON result.submission_id=previous.id AND result.status='AC'
     LEFT JOIN timed_first_ac_candidates candidate ON candidate.submission_id=previous.id
     LEFT JOIN timed_practices practice ON practice.id=candidate.practice_id
-    WHERE ${assignmentPassingSubmission}
+    WHERE ${assignmentPassingProgressSubmission}
     ORDER BY ready_at,previous.id LIMIT 1
    ) first_ac ON true
    LEFT JOIN LATERAL (
     SELECT min(s.created_at) AS first_at FROM submissions s
     WHERE s.assignment_id=assignment.id AND s.identity_id=part.identity_id AND s.problem_id=ap.problem_id
-     AND s.kind='submit' AND s.created_at<=assignment.due_at
+     AND s.kind='submit'
      AND (assignment.required_language IS NULL OR s.language=assignment.required_language)
    ) attempt ON true
    WHERE assignment.id=ANY($1::uuid[]) AND assignment.state='Published'

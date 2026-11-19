@@ -2,14 +2,16 @@
 // submission, changing its original context, or settling any reward. Existing
 // cross-activity credit retains its original version scope; only work received
 // after live references were introduced gains problem-level cross-activity credit.
-export const assignmentPassingSubmission = `
+const effectiveDue = 'greatest(assignment.due_at,part.extended_due_at)';
+const assignmentPassingResult = `
  previous.identity_id=part.identity_id AND previous.problem_id=ap.problem_id
  AND (previous.assignment_id=assignment.id
   OR COALESCE(previous.original_problem_version_id,previous.version_id) IN (
     COALESCE(ap.original_problem_version_id,ap.version_id),COALESCE(ap.original_prior_problem_version_id,ap.prior_version_id))
   OR previous.created_at>=(SELECT applied_at FROM schema_migrations WHERE name='098_live_problem_activity_results.sql'))
  AND (assignment.required_language IS NULL OR previous.language=assignment.required_language)
- AND previous.kind='submit' AND previous.status='AC' AND previous.score=100 AND previous.created_at<=assignment.due_at
+ AND (assignment.cancelled_at IS NULL OR previous.created_at<=assignment.cancelled_at)
+ AND previous.kind='submit' AND previous.status='AC' AND previous.score=100
  AND (previous.timed_attempt_id IS NULL OR EXISTS (
   SELECT 1 FROM timed_first_ac_candidates candidate
   JOIN timed_practices practice ON practice.id=candidate.practice_id
@@ -17,14 +19,17 @@ export const assignmentPassingSubmission = `
  ))
 `;
 
-export async function assignmentGradeRows(db, assignment, identityId) {
- return loadAssignmentGradeRows(db, [assignment.id], identityId);
+export const assignmentPassingSubmission = `${assignmentPassingResult} AND previous.created_at<=${effectiveDue}`;
+export const assignmentPassingProgressSubmission = assignmentPassingResult;
+
+export async function assignmentGradeRows(db, assignment, identityId, { includeLate = false } = {}) {
+ return loadAssignmentGradeRows(db, [assignment.id], identityId, includeLate);
 }
 
 export async function assignmentProgressById(db, assignmentIds, identityId) {
  if (!assignmentIds.length) return new Map();
  const progress = new Map(assignmentIds.map(id => [id, {completedProblems:0,totalProblems:0,completed:false}]));
- for (const grade of await loadAssignmentGradeRows(db, assignmentIds, identityId)) {
+ for (const grade of await loadAssignmentGradeRows(db, assignmentIds, identityId, true)) {
   const summary = progress.get(grade.assignment_id);
   summary.totalProblems++;
   if (grade.status === 'AC') summary.completedProblems++;
@@ -35,7 +40,7 @@ export async function assignmentProgressById(db, assignmentIds, identityId) {
  return progress;
 }
 
-async function loadAssignmentGradeRows(db, assignmentIds, identityId) {
+async function loadAssignmentGradeRows(db, assignmentIds, identityId, includeLate = false) {
  return (await db.query(`
   SELECT part.assignment_id,i.id identity_id,i.name,ap.problem_id,ap.points,
    CASE WHEN credit.id IS NOT NULL THEN NULL ELSE s.id END submission_id,
@@ -59,12 +64,12 @@ async function loadAssignmentGradeRows(db, assignmentIds, identityId) {
    WHERE assignment_id=part.assignment_id AND identity_id=part.identity_id
     AND problem_id=ap.problem_id AND kind='submit'
     AND (assignment.required_language IS NULL OR language=assignment.required_language)
-    AND created_at<=assignment.due_at AND score IS NOT NULL AND status NOT IN ('Waiting','Judging','System Error')
+    AND ($3::boolean OR created_at<=${effectiveDue}) AND score IS NOT NULL AND status NOT IN ('Waiting','Judging','System Error')
    ORDER BY score DESC,created_at,id LIMIT 1
   ) s ON true
   LEFT JOIN LATERAL (
    SELECT status FROM submissions WHERE assignment_id=part.assignment_id AND identity_id=part.identity_id
-    AND problem_id=ap.problem_id AND kind='submit' AND created_at<=assignment.due_at
+    AND problem_id=ap.problem_id AND kind='submit' AND ($3::boolean OR created_at<=${effectiveDue})
     AND (assignment.required_language IS NULL OR language=assignment.required_language)
     AND status IN ('Waiting','Judging','System Error') ORDER BY created_at DESC LIMIT 1
   ) pending ON true
@@ -72,10 +77,33 @@ async function loadAssignmentGradeRows(db, assignmentIds, identityId) {
    SELECT previous.id,previous.created_at FROM submissions previous
    WHERE COALESCE(s.score,0)<100
     AND previous.assignment_id IS DISTINCT FROM part.assignment_id
-    AND ${assignmentPassingSubmission}
+    AND ${includeLate ? assignmentPassingProgressSubmission : assignmentPassingSubmission}
    ORDER BY previous.created_at,previous.id LIMIT 1
   ) credit ON true
   WHERE part.assignment_id=ANY($1::uuid[]) AND NOT part.exempt AND ($2::uuid IS NULL OR part.identity_id=$2)
   ORDER BY i.name,ap.position
- `, [assignmentIds, identityId])).rows;
+ `, [assignmentIds, identityId, includeLate])).rows;
+}
+
+// Both views use the same grading rules. Only the receipt cutoff differs.
+export function assignmentGradeSummaries(rows) {
+ const students = new Map();
+ for (const row of rows) {
+  let student = students.get(row.identity_id);
+  if (!student) {
+   student = { identityId:row.identity_id, name:row.name, score:0, maxScore:0, pending:false, hasScore:false, problems:[] };
+   students.set(row.identity_id, student);
+  }
+  const points = Number(row.points), score = row.score === null ? null : Number(row.score);
+  student.score += score === null ? 0 : score * points / 100;
+  student.maxScore += points;
+  student.pending ||= row.unresolved;
+  student.hasScore ||= score !== null;
+  student.problems.push({ problemId:row.problem_id, submissionId:row.submission_id ? `SUB${row.submission_id}` : null,
+   score, status:row.status || 'NotSubmitted', pending:row.unresolved, pendingStatus:row.pending_status,
+   completionSource:row.credited_ac ? 'other_entry' : null, creditedAt:row.credited_at ?? null,
+   hasAssignmentSubmission:row.has_assignment_submission, assignmentAttempts:Number(row.assignment_attempts) });
+ }
+ return [...students.values()].map(({ hasScore, ...student }) => ({ ...student,
+  score:student.pending && !hasScore ? null : Math.round(student.score * 100) / 100 }));
 }

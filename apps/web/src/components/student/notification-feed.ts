@@ -37,7 +37,16 @@ interface CourseApplicationResultNotification extends NotificationBase {
   outcome: "approved" | "rejected";
 }
 
-export type Notification = GuestbookNotification | ScholarshipNotification | FeedbackNotification | CourseApplicationNotification | CourseApplicationResultNotification;
+interface AssignmentChangeNotification extends NotificationBase {
+  kind: "assignment_change";
+  assignmentId: string;
+  activityTitle: string;
+  action: "cancelled" | "extended" | "exempted" | "reinstated";
+  dueAt?: string;
+  reason?: string;
+}
+
+export type Notification = AssignmentChangeNotification | GuestbookNotification | ScholarshipNotification | FeedbackNotification | CourseApplicationNotification | CourseApplicationResultNotification;
 export type AssignmentReminder = Pick<Assignment, "id" | "title" | "dueAt" | "publishedAt" | "createdAt">;
 
 export const notificationTabs = ["social", "updates", "events"] as const;
@@ -50,6 +59,7 @@ const tabByKind = {
   course_application: "updates",
   course_application_result: "updates",
   activity_reward: "events",
+  assignment_change: "events",
 } satisfies Record<Notification["kind"], NotificationTab>;
 
 type FeedEntry = { tab: NotificationTab; timestamp: number } & (

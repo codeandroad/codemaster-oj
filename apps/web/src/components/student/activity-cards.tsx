@@ -40,13 +40,24 @@ type ActivityCard = {
   active: boolean;
 };
 
+export function AssignmentCompletedStatus({ late }: { late?: boolean }) {
+  const { locale } = useLocale();
+  return <>
+    <StatusPill status="Completed" icon={<Check size={13} />} />
+    {late && <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs text-warning">
+      {locale === "zh" ? "逾期完成" : "Completed late"}
+    </span>}
+  </>;
+}
+
 export function StudentAssignmentCard({
-  title, href, status, audience, course, active, archived, overdue, dueAt, problemCount, score, maxScore, pending, attempted, solved,
+  title, href, status, audience, course, active, archived, overdue, dueAt, problemCount, completedLate, score, maxScore, pending, attempted, solved,
 }: ActivityCard & {
   dueAt: string | null;
   archived?: boolean;
   overdue?: { canSubmit: boolean };
   problemCount: number;
+  completedLate?: boolean;
   score: number | null;
   maxScore: number;
   pending?: boolean;
@@ -71,7 +82,7 @@ export function StudentAssignmentCard({
             <span className="min-w-0 [overflow-wrap:anywhere]">{title}</span>
           </AppLink>
         </h2>
-        {complete && <StatusPill status="Completed" icon={<Check size={13} />} />}
+        {complete && <AssignmentCompletedStatus late={completedLate} />}
         {(!complete || archived) && <StatusPill status={overdueStatus ?? status} tone={overdueStatus ? "warning" : undefined} />}
         {overdueStatus && pending && <StatusPill status="Judging" />}
       </div>
@@ -85,7 +96,7 @@ export function StudentAssignmentCard({
       </p>
       <Progress percent={percent} complete={complete} label={text("必做题进度", "Required problem progress")} />
       <div className="mt-2 text-xs tabular-nums text-muted-foreground">
-        <p>{text("成绩", "Score")} <span className="font-semibold text-foreground">{score == null && pending ? "—" : score ?? 0}/{maxScore}</span></p>
+        <p>{text("截止成绩", "Deadline score")} <span className="font-semibold text-foreground">{score == null && pending ? "—" : score ?? 0}/{maxScore}</span></p>
         <p className="mt-0.5">{text(`本作业已提交 ${attempted}/${problemCount} 题`, `${attempted}/${problemCount} problems submitted here`)}</p>
       </div>
     </div>

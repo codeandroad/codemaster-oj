@@ -5,6 +5,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { createPool } from '../src/db.mjs';
 import { migrate } from '../src/migrate.mjs';
 import { bootstrap } from '../src/bootstrap.mjs';
+import { assignmentProgressById } from '../src/assignment-grades.mjs';
 import { createApp, loadConfig } from '../src/app.mjs';
 
 // Adjudicated synthetic submissions exercise real PostgreSQL triggers and HTTP
@@ -262,6 +263,47 @@ test('ordinary assignments recognize prior formal AC without copying submissions
    assert.ok((await student.api(`/submissions/SUB${fresh}/assignment-completions`)).items.some(item=>item.id===id));
    const history = await student.api(`/submissions/SUB${historical}`);
    assert.equal(history.versionId,old.versionId);assert.equal(history.score,60);
+  });
+
+  await t.test('late formal AC updates progress and completion without changing deadline grades or assignment rewards', async () => {
+   const p = await problem(), id = await assignment([p], { dueAt:new Date(Date.now()-60000).toISOString() });
+   const readProgress = async () => (await result(id)).progress[0];
+   const waiting = await submit(p, { assignmentId:id, status:'Waiting' });
+   assert.equal((await readProgress()).pending, true);
+   assert.equal((await result(id)).grades[0].pending, false);
+   await pool.query("UPDATE submissions SET status='AC',score=100 WHERE id=$1", [waiting]);
+   const detail = await result(id);
+   assert.equal(detail.grades[0].score, 0);
+   assert.equal(detail.progress[0].problems[0].status, 'AC');
+   assert.equal(detail.progress[0].problems[0].submissionId, `SUB${waiting}`);
+   assert.equal(detail.completedStudents, 1);
+   assert.deepEqual((await assignmentProgressById(pool,[id],student.identityId)).get(id), {
+    completedProblems:1, totalProblems:1, completed:true,
+   });
+   assert.equal(detail.completion.completedProblems, 1);
+   assert.equal(detail.completion.rewards.assignment, 0);
+   assert.equal((await student.api('/assignments')).items.find(a => a.id === id).progress[0].problems[0].status, 'AC');
+   await submit(p, { assignmentId:id, status:'WA' });
+   assert.equal((await readProgress()).problems[0].status, 'AC', 'later failed attempts retain the passing result');
+   const otherProblem = await problem(), otherAssignment = await assignment([otherProblem], { dueAt:new Date(Date.now()-60000).toISOString() });
+   await submit(otherProblem, { kind:'samples' });
+   await submit(otherProblem, { kind:'custom' });
+   await submit(otherProblem, { kind:'correction' });
+   await submit(otherProblem, { user:other });
+   assert.equal((await result(otherAssignment)).progress[0].problems[0].status, 'NotSubmitted');
+   const source = await submit(otherProblem);
+   const inherited = await result(otherAssignment);
+   assert.equal(inherited.progress[0].problems[0].status, 'AC');
+   assert.equal(inherited.progress[0].problems[0].completionSource, 'other_entry');
+   assert.equal(inherited.grades[0].score, 0);
+   assert.equal(inherited.completion.rewards.assignment, 0);
+   const rewardsBeforeReads = await counts();
+   await result(id); await result(otherAssignment);
+   await student.api(`/submissions/SUB${source}/assignment-completions`);
+   assert.deepEqual(await counts(), rewardsBeforeReads, 'progress reads never award or rewrite results');
+   assert.equal(Number((await pool.query("SELECT count(*) FROM luq_activity_awards WHERE activity_id=ANY($1::uuid[])", [[id,otherAssignment]])).rows[0].count), 0);
+   await pool.query("UPDATE submissions SET status='WA',score=60 WHERE id=$1", [source]);
+   assert.equal((await result(otherAssignment)).progress[0].problems[0].status, 'NotSubmitted');
   });
 
   await t.test('deadline is inclusive; samples, custom runs, corrections and non-AC results do not count', async () => {

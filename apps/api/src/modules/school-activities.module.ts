@@ -10,9 +10,9 @@ export class SchoolActivitiesController {
  constructor(private readonly domain: DomainService) {}
  @Get(['','options',':activityId',':activityId/report',':activityId/problems/:problemId', ':activityId/problems/:problemId/submissions',':activityId/jobs/:jobId',':activityId/preview',':activityId/preview/problems/:problemId',':activityId/preview/problems/:problemId/submissions',':activityId/preview/jobs/:jobId'])
  async read(@Req() request: DomainRequest,@Res({passthrough:true}) response: Response){return applyResponse(response,await this.domain.execute('schoolActivities',request.domainContext));}
- @Post(['',':activityId/publish',':activityId/archive',':activityId/start',':activityId/finish',':activityId/end',':activityId/publish-results',':activityId/problems/:problemId/submissions',':activityId/preview/problems/:problemId/submissions'])
+ @Post(['',':activityId/publish',':activityId/archive',':activityId/cancel',':activityId/start',':activityId/finish',':activityId/end',':activityId/publish-results',':activityId/problems/:problemId/submissions',':activityId/preview/problems/:problemId/submissions'])
  async create(@Req() request: DomainRequest,@Res({passthrough:true}) response: Response){return applyResponse(response,await this.domain.execute('schoolActivities',request.domainContext));}
- @Patch(':activityId')
+ @Patch([':activityId', ':activityId/participants/:identityId'])
  async update(@Req() request: DomainRequest,@Res({passthrough:true}) response: Response){return applyResponse(response,await this.domain.execute('schoolActivities',request.domainContext));}
 }
 @Module({controllers:[SchoolActivitiesController]})

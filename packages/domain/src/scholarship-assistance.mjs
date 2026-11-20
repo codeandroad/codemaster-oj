@@ -274,7 +274,7 @@ export async function handleScholarshipAssistance(ctx){
    const shared=kind==='FULL_SOLUTION'&&!!target.problemId;
    await db.query("SELECT pg_advisory_xact_lock(hashtextextended('luq-content:'||$1,0))",[`${target.subjectKey}:${shared?'shared':target.versionId}:${kind}:${language}`]);
    const old=shared?await sharedProblemSolution(db,target.problemId,target.versionId,{lock:true}):(await db.query('SELECT * FROM luq_assistance_contents WHERE subject_key=$1 AND version_id=$2 AND kind=$3 AND language=$4 FOR UPDATE',[target.subjectKey,target.versionId,kind,language])).rows[0];
-   if(old?.status==='published'&&body.solutions===undefined)fail(409,'PUBLISHED_CONTENT_IMMUTABLE',kind==='FULL_SOLUTION'?'已发布题解不可直接覆盖，请在题解编辑器中保存待审核修改':'已发布译文不可直接覆盖，请通过内容编辑器提交修改');
+   if(old?.status==='published'&&kind==='FULL_SOLUTION'&&body.solutions===undefined)fail(409,'PUBLISHED_CONTENT_IMMUTABLE','已发布题解不可直接覆盖，请在题解编辑器中保存待审核修改');
    const draft=readAssistanceDraft(body,{subjectKey:target.subjectKey,kind,previous:old,requireNonBlank:true});
    if(old&&(body.solutions!==undefined||editableAssistanceContent(old).solutions||body.expectedHash!==undefined)&&body.expectedHash!==contentHash(old)){
     fail(409,'CONTENT_CHANGED','辅助内容已修改，请重新载入后再保存');

@@ -2,6 +2,8 @@
 
 import { ProblemTutorialEditor } from "./problem-tutorial-editor";
 import { ProblemAssistanceEditor } from "./problem-assistance-editor";
+import { useContentResource } from "@/components/scholarship/content-resource";
+import type { AssistanceContent } from "@/components/scholarship/content-model";
 import { ProblemEditorSteps, SaveAndEditNext } from "./problem-editor-steps";
 import type { ProblemEditorNavigation, ProblemEditorTab, ProblemEditorTarget } from "./problem-editor-navigation";
 import { teacherPlatformProblemSummaries, teacherProblemSummaries } from "./platform-problem-source";
@@ -245,6 +247,7 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
     ),
     [saved, setSaved] = useState<EditorProblem | null>(initial),
     [requestedTab, setTab] = useState(() => tabs.find(item => editorTabs[item].id === initialTab) ?? "题面"),
+    [statementLang, setStatementLang] = useState<"en" | "zh">("en"),
     [solutionsVisited, setSolutionsVisited] = useState(initialTab === "solutions"),
     [solutionPending, setSolutionPending] = useState(false),
     [tutorialVisited, setTutorialVisited] = useState(initialTab === "tutorial"),
@@ -276,6 +279,12 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
       (problem.bankId
         ? `/teacher/problems/banks/${problem.bankId}`
         : "/teacher/problems");
+  const translation = useProblemTranslation({
+    problemId: saved?.versionId && editable ? saved.id : undefined,
+    versionId: saved?.versionId && editable ? saved.versionId : undefined,
+    endpoint: platform && saved ? `${endpoint}/${saved.id}/contents` : undefined,
+    onPendingChange: setSolutionPending,
+  });
   const bankVisibility = banks.data?.items.find((bank) => bank.id === problem.bankId)?.visibility ?? saved?.bankVisibility;
   const publicationLabel = requestsPlatformReview ? tr("提交平台审核", "Request platform review")
     : platform ? saved?.published || saved?.draftReviewStatus === "pending" ? tr("发布题目修改", "Publish draft changes") : tr("发布题目", "Publish problem")
@@ -424,7 +433,9 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
       <Feedback action={action} />
       {switchError && <p role="alert" className="mt-3 text-sm text-destructive">{switchError}</p>}
       {nextStep && tutorialState.dirty && <p role="status" className="mt-2 text-sm text-muted-foreground">{tr("请先在“教程”中保存或放弃修改，再使用“保存并编辑下一题”。", "Save or discard your Tutorial changes before using Save and edit next.")}</p>}
-      {solutionPending && <p role="status" className="mt-2 text-sm text-muted-foreground">{tr("题解有未保存修改或正在提交。请在“解答与提示”中完成保存，再保存题目草稿。", "Solution changes are unsaved or being submitted. Finish saving them under Solutions and hints before saving the problem draft.")}</p>}
+      {solutionPending && <p role="status" className="mt-2 text-sm text-muted-foreground">{tab === "题面"
+        ? tr("中文题面有未保存修改或正在提交。请先保存译文草稿，再保存题目草稿。", "Unsaved Chinese statement changes. Save the translation draft before saving the problem draft.")
+        : tr("题解有未保存修改或正在提交。请在“解答与提示”中完成保存，再保存题目草稿。", "Solution changes are unsaved or being submitted. Finish saving them under Solutions and hints before saving the problem draft.")}</p>}
       {saved?.draftReviewStatus === "pending" && <p role="status" className="mt-2 text-sm text-muted-foreground">{platform
         ? tr("草稿待平台审核。学生仍看到已发布内容。继续修改后需重新提交。", "Awaiting platform review. Students still see the published content. Submit again after further edits.")
         : tr("草稿待学校审核。继续保存修改后，需要重新提交审核。", "Awaiting school review. Submit again after further edits.")}</p>}
@@ -462,7 +473,7 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
         if (next === "解答与提示") setSolutionsVisited(true);
         setTab(next);
       }} items={visibleTabs.map(item => tr(item, editorTabs[item].en))} />
-      <section className={`${panel} ${styles.body}`} hidden={tab === "教程" || tab === "解答与提示"} data-od-id="teacher-editor-tab-content"><fieldset disabled={!editable || action.busy || switching || solutionPending}>
+      <section className={`${panel} ${styles.body}`} hidden={tab === "教程" || tab === "解答与提示"} data-od-id="teacher-editor-tab-content"><fieldset disabled={!editable || action.busy || switching}>
         {tab === "题面" && (
           <div className="grid grid-cols-[minmax(0,1fr)_260px] gap-5 max-lg:grid-cols-1">
             <div className="space-y-4">
@@ -475,7 +486,35 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
                   className={input}
                 />
               </Field>
-              <MathEditor fieldName="statement" label={tr("题面 / Markdown 与 LaTeX", "Statement / Markdown and LaTeX")} value={problem.statement} disabled={!editable} onChange={value=>update("statement",value)} rows={10} initialPreview/>
+              <MathEditor
+                fieldName="statement"
+                label={tr("题面 / Markdown 与 LaTeX", "Statement / Markdown and LaTeX")}
+                labelControl={saved?.versionId && editable ? (
+                  <select
+                    aria-label={tr("题面语言", "Statement language")}
+                    className={`${input} max-w-56`}
+                    value={statementLang}
+                    onChange={(event) => setStatementLang(event.target.value === "zh" ? "zh" : "en")}
+                  >
+                    <option value="en">{tr("英文题面", "English statement")}</option>
+                    <option value="zh">{tr("中文题面（译文）", "Chinese statement (translation)")}</option>
+                  </select>
+                ) : undefined}
+                value={statementLang === "zh" ? translation.value : problem.statement}
+                disabled={!editable}
+                onChange={statementLang === "zh" ? (value) => translation.setText(value) : (value) => update("statement", value)}
+                rows={10}
+                initialPreview
+              />
+              {statementLang === "zh" && saved?.versionId && editable && (
+                <ProblemTranslationActions
+                  target={{ problemId: saved.id, versionId: saved.versionId }}
+                  endpoint={platform ? `${endpoint}/${saved.id}/contents` : undefined}
+                  canPublish={canPublish}
+                  translation={translation}
+                  disabled={!editable || action.busy || switching}
+                />
+              )}
 
             </div>
             <aside className="space-y-4">
@@ -1068,6 +1107,125 @@ function CodeField({label,value,onChange,language="python"}:{label:string;value:
  const isReference=label.includes("参考")||label.toLowerCase().includes("reference");
  return <Field label={label}><div className="flex justify-end"><CopyCodeButton code={value}/></div><div className={styles.code} data-od-id={`teacher-code-${isReference?"reference":language}`}><CodeEditor idPrefix={`teacher-${isReference?"reference":language}`} inputLabel={label} status={locale==="zh"?"修改后需保存草稿":"Save draft after editing"} code={value} onChange={onChange} language={language} settings={{...defaultWorkspaceSettings,theme:pageTheme==="dark"?"vs_dark":"vs",fontSize:13}}/></div></Field>;
 }
+
+function useProblemTranslation({
+  problemId,
+  versionId,
+  endpoint,
+  onPendingChange,
+}: {
+  problemId?: string;
+  versionId?: string;
+  endpoint?: string;
+  onPendingChange: (pending: boolean) => void;
+}) {
+  const path = `${endpoint ?? "scholarship/contents"}?${new URLSearchParams({
+    problemId: problemId ?? "00000000-0000-0000-0000-000000000000",
+    versionId: versionId ?? "00000000-0000-0000-0000-000000000000",
+  })}`;
+  const contents = useContentResource(path);
+  const content = contents.data?.items.find(
+    (item) => item.kind === "FULL_TRANSLATION" && item.language === "zh-CN",
+  );
+  const [text, setText] = useState<string | null>(null);
+  const value = text ?? content?.body ?? "";
+  const dirty = text !== null && text !== (content?.body ?? "");
+  useEffect(() => {
+    onPendingChange(dirty);
+    return () => onPendingChange(false);
+  }, [dirty, onPendingChange]);
+  return { contents, content, value, setText, dirty, reset: () => setText(null) };
+}
+
+function ProblemTranslationActions({
+  target,
+  endpoint,
+  canPublish,
+  translation,
+  disabled,
+}: {
+  target: { problemId: string; versionId: string };
+  endpoint?: string;
+  canPublish: boolean;
+  translation: ReturnType<typeof useProblemTranslation>;
+  disabled: boolean;
+}) {
+  const { locale } = useLocale();
+  const tx = (zh: string, en: string) => (locale === "zh" ? zh : en);
+  const action = useAction();
+  const [reviewed, setReviewed] = useState(false);
+  const { contents, content, value, dirty, reset } = translation;
+  const base = endpoint ?? "scholarship/contents";
+  const awaitingReview = Boolean(content?.hasPendingSolutions) || content?.status === "draft";
+  const status = content?.hasPendingSolutions
+    ? tx("已发布 · 更新待审核", "Published · updates awaiting review")
+    : content?.status === "published"
+      ? tx("已发布", "Published")
+      : content?.status === "draft"
+        ? tx("草稿", "Draft")
+        : tx("尚未录入", "Not authored");
+  function commit(operation: () => Promise<AssistanceContent>, message: string) {
+    void action.run(async () => {
+      const next = await operation();
+      contents.setData((previous) => ({
+        ...previous,
+        items: [...(previous?.items.filter((item) => item.id !== next.id) ?? []), next],
+      }));
+      reset();
+      return message;
+    });
+  }
+  return (
+    <div className="space-y-3 rounded-md border border-border bg-surface-subtle p-3">
+      <p className="text-xs text-muted-foreground">
+        {tx("中文题面状态：", "Chinese statement status: ")}{status}
+        {content?.status === "published" && tx(" · 修改存为待审核草稿，学生仍看已发布版本，审核发布后生效。", " · Edits stay pending for review; students keep the published version until release.")}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="primary"
+          disabled={disabled || !dirty || !value.trim()}
+          aria-busy={action.busy}
+          onClick={() => commit(() => productionApi<AssistanceContent>(base, {
+            method: "POST",
+            body: { ...target, body: value, kind: "FULL_TRANSLATION", language: "zh-CN", expectedHash: content?.contentHash },
+          }), tx("译文草稿已保存。", "Translation draft saved."))}
+        >
+          {tx("保存译文草稿", "Save translation draft")}
+        </Button>
+        {dirty && (
+          <Button type="button" size="sm" variant="ghost" disabled={disabled} onClick={reset}>
+            {tx("放弃修改", "Discard changes")}
+          </Button>
+        )}
+        {canPublish && content && (!content.hasPendingSolutions ? content.status !== "published" : true) && !dirty && (
+          <>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" className="accent-primary" checked={reviewed} disabled={disabled}
+                onChange={(event) => setReviewed(event.target.checked)} />
+              {tx("已核对译文。", "Translation reviewed.")}
+            </label>
+            <Button
+              type="button"
+              size="sm"
+              disabled={disabled || !reviewed}
+              aria-busy={action.busy}
+              onClick={() => commit(() => productionApi<AssistanceContent>(`${base}/${encodeURIComponent(content.id)}/publish`, {
+                method: "POST", body: { reviewed: true, expectedHash: content.contentHash },
+              }), tx("译文已审核发布。", "Translation reviewed and published."))}
+            >
+              {tx("审核并发布", "Review and publish")}
+            </Button>
+          </>
+        )}
+      </div>
+      <Feedback action={action} />
+    </div>
+  );
+}
+
 function ProblemPreview({
   problem,
   onClose,

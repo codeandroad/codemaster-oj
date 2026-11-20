@@ -64,7 +64,7 @@ export function validateAcslDiagrams(value) {
     for (const diagram of diagrams) {
       if (!only(diagram, ['id', 'width', 'height', 'alt', 'elements']) || !/^[A-Za-z0-9-]{1,100}$/.test(diagram.id ?? '') || ids.has(diagram.id) ||
           !finite(diagram.width, 1, 4096) || !finite(diagram.height, 1, 4096) || !only(diagram.alt, ['en', 'zh']) ||
-          !boundedText(diagram.alt.en, 1000) || !boundedText(diagram.alt.zh, 1000) ||
+          !(boundedText(diagram.alt.en, 1000) || boundedText(diagram.alt.zh, 1000)) ||
           !Array.isArray(diagram.elements) || !diagram.elements.length || diagram.elements.length > 1000 ||
           !diagram.elements.every(element)) throw new Error('Invalid safe ACSL diagram.');
       ids.add(diagram.id);

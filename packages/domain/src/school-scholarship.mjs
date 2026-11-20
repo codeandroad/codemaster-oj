@@ -202,7 +202,7 @@ export async function handleSchoolScholarship({pool,user,route,method,body={},ur
    }
    if(integer(body.expectedRevision??0,0,2147483646,'Revision')!==(old?.revision??0))fail(409,'REVISION_CONFLICT','Content changed. Refresh first.');
    const draft=readAssistanceDraft(body,{subjectKey:t.subject,kind:k,previous:old});
-   const staged=old?.status==='published'&&body.solutions!==undefined;
+   const staged=old?.status==='published'&&(body.solutions!==undefined||k==='FULL_TRANSLATION');
    const {rows:[saved]}=staged?await db.query(`UPDATE school_scholarship_contents SET pending_solution=$3,
     revision=revision+1,updated_at=clock_timestamp() WHERE school_id=$1 AND id=$2 RETURNING *`,[s,old.id,pendingSolution(old,draft)]):
     await db.query(`INSERT INTO school_scholarship_contents(school_id,subject_key,version_id,kind,language,body,author_account_id,solution_details)

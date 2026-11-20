@@ -31,6 +31,7 @@ export function ContentEditor({
   externalBusy = false,
   endpoint = "scholarship/contents",
   canPublish = true,
+  bare = false,
 }: {
   target: ContentTarget;
   kind: AssistanceKind;
@@ -43,6 +44,7 @@ export function ContentEditor({
   externalBusy?: boolean;
   endpoint?: string;
   canPublish?: boolean;
+  bare?: boolean;
 }) {
   const tx = useText(),
     contents = useContentResource(
@@ -61,8 +63,9 @@ export function ContentEditor({
   // Retain the mounted form while reference metadata refreshes after saving a
   // problem snapshot. Its unsaved solution draft belongs to the problem.
   const readyToEdit = contents.data && (shared || !autoSelect);
+  const Wrapper = bare ? "div" : "section";
   return (
-    <section className={`${panel} space-y-3 p-4`}>
+    <Wrapper className={bare ? "space-y-3" : `${panel} space-y-3 p-4`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-semibold">
           {kind === "FULL_TRANSLATION" ? tx("中文题面", "Chinese translation") : tx("学生题解", "Student solutions")}
@@ -117,7 +120,7 @@ export function ContentEditor({
           }))}
         />
       )}
-    </section>
+    </Wrapper>
   );
 }
 

@@ -1,5 +1,5 @@
 export type TableAlignment = 'left'|'center'|'right';
-export interface ContentBlock {kind:'paragraph'|'heading'|'code'|'math'|'list'|'table'|'blank';text:string;level?:number;language?:string;ordered?:boolean;items?:string[];headers?:string[];rows?:string[][];alignments?:TableAlignment[]}
+export interface ContentBlock {kind:'paragraph'|'heading'|'code'|'math'|'list'|'table'|'blank';text:string;level?:number;language?:string;ordered?:boolean;items?:string[];numbers?:number[];headers?:string[];rows?:string[][];alignments?:TableAlignment[]}
 export interface InlineToken {kind:'text'|'code'|'math'|'strong';text:string;display?:boolean}
 function escaped(text:string,index:number){let count=0;for(let i=index-1;i>=0&&text[i]==='\\';i--)count++;return count%2===1;}
 function closeAt(text:string,delimiter:string,start:number,dollar=false){
@@ -88,7 +88,7 @@ export function contentBlocks(content:string):ContentBlock[]{
     }
     const heading=line.match(/^(#{1,6})\s+(.+)$/);if(heading){flush();out.push({kind:'heading',level:heading[1].length,text:heading[2]});continue;}
     const list=line.match(/^\s*(?:([-*+])|(\d+)\.)\s+(.+)$/);
-    if(list){flush();const items=[list[3]],ordered=Boolean(list[2]);while(i+1<lines.length){const next=lines[i+1].match(/^\s*(?:([-*+])|(\d+)\.)\s+(.+)$/);if(!next||Boolean(next[2])!==ordered)break;items.push(next[3]);i++;}out.push({kind:'list',text:'',items,ordered});continue;}
+    if(list){flush();const items=[list[3]],numbers=[Number(list[2]??0)],ordered=Boolean(list[2]);while(i+1<lines.length){const next=lines[i+1].match(/^\s*(?:([-*+])|(\d+)\.)\s+(.+)$/);if(!next||Boolean(next[2])!==ordered)break;items.push(next[3]);numbers.push(Number(next[2]??0));i++;}out.push({kind:'list',text:'',items,numbers:ordered?numbers:undefined,ordered});continue;}
     const table=tableAt(lines,i);if(table){flush();out.push(table.block);i=table.end;continue;}
     paragraph.push(line);
   }flush();return out;

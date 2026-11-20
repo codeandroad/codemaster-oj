@@ -65,7 +65,7 @@ export function ContentForm({
   const hasConflict = conflict || Boolean(draftBase && (draftBase.id !== content?.id || draftBase.hash !== content?.contentHash));
   const published = content?.status === "published";
   const unavailable = disabled || action.busy;
-  const canEdit = !unavailable && (!published || multiple);
+  const canEdit = !unavailable;
   const canSave = canEdit && dirty && !hasConflict && !solutionDraftError(value);
   useSolutionDraftNavigation(unsavedEdits || action.busy);
   useEffect(() => {
@@ -115,8 +115,8 @@ export function ContentForm({
         <code>{target.versionId.slice(0, 8)}</code>
         {published && !multiple &&
           tx(
-            " \u00b7 \u5df2\u53d1\u5e03\u5185\u5bb9\u5df2\u51bb\u7ed3\uff0c\u4fee\u6539\u9700\u8981\u65b0\u9898\u76ee\u7248\u672c\u5e76\u91cd\u65b0\u5ba1\u6838\u3002",
-            " \u00b7 Published content is frozen. Use a new problem version and review changes again.",
+            " \u00b7 \u4fee\u6539\u4f1a\u4fdd\u5b58\u4e3a\u5f85\u5ba1\u6838\u8349\u7a3f\uff1b\u5b66\u751f\u7ee7\u7eed\u770b\u5230\u5df2\u53d1\u5e03\u7248\u672c\uff0c\u5ba1\u6838\u53d1\u5e03\u540e\u751f\u6548\u3002",
+            " \u00b7 Edits save as a pending draft. Students keep the published version until reviewed and released.",
           )}
       </p>}
       <p className="text-xs text-muted-foreground">

@@ -186,6 +186,13 @@ test('reviewed public English statements bind exact versions without leaking pai
   assert.equal(Number((await pool.query('SELECT balance FROM luq_accounts WHERE identity_id=$1',[student.identityId])).rows[0].balance),oldBalance-3);
   assert.equal((await pool.query("SELECT count(*)::int n FROM luq_assistance_deliveries WHERE kind='FULL_SOLUTION'")).rows[0].n,0);
   assert.equal((await student.call(`/problems/${first.problemId}?versionId=${first.versionId}`,{language:'zh-CN'})).statement,secondEnglish,'Ordinary practice uses the current reviewed English; paid Chinese does not silently replace it');
+  // Staff can revise a published translation into a pending draft; paying students keep the reviewed text until it is re-published.
+  const revisedBody=translatedBody+'\n补充修订说明。';
+  const revision=await teacher.call('/scholarship/contents',{body:{...target,body:revisedBody,expectedHash:translated.contentHash},expected:201});
+  assert.equal(revision.status,'published');assert.ok(revision.hasPendingSolutions);
+  assert.equal((await student.call('/scholarship/assistance/provide',{body:target})).body,translatedBody,'Pending translation edits do not reach paying students');
+  await teacher.call(`/scholarship/contents/${translated.id}/publish`,{body:{reviewed:true,expectedHash:revision.contentHash}});
+  assert.equal((await student.call('/scholarship/assistance/provide',{body:target})).body,revisedBody,'Reviewed translation updates reach paying students');
   const exam=(await pool.query(`INSERT INTO timed_practices(title,owner_account_id,starts_at,ends_at,duration_minutes,state)
    VALUES('Translation restriction',$1,now()-interval '1 minute',now()+interval '1 hour',60,'Draft') RETURNING id`,[teacher.id])).rows[0];
   await pool.query('INSERT INTO timed_practice_problems(practice_id,problem_id,version_id,points,position) VALUES($1,$2,$3,100,0)',[exam.id,first.problemId,second.versionId]);

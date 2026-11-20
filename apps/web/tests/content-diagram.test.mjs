@@ -21,8 +21,11 @@ test('invalid diagram geometry and executable SVG/HTML/URLs cannot enter the ren
   changed(d=>d.onclick='alert(1)'),changed(d=>d.width=Infinity),changed(d=>d.elements.push({type:'script',text:'alert(1)'})),
   changed(d=>d.elements[0].stroke='url(https://invalid.test/a)'),changed(d=>d.elements.push({type:'image',href:'https://invalid.test/a'})),
   changed(d=>d.elements[0].x1=20000),changed(d=>d.elements.push({type:'path',d:'M 0 0 L javascript:alert(1)'})),
-  changed(d=>delete d.alt.zh),changed(d=>d.elements=Array.from({length:1001},()=>d.elements[0])),
+  changed(d=>{delete d.alt.en;delete d.alt.zh;}),changed(d=>{d.alt.en='   ';d.alt.zh='';}),changed(d=>d.elements=Array.from({length:1001},()=>d.elements[0])),
  ])assert.equal(parseContentDiagram(source),null);
+  // A statement may drop the unused language alt text; at least one localized alt is still required.
+  assert.equal(parseContentDiagram(changed(d=>delete d.alt.zh))?.alt.en,'Root P with left child Q.');
+  assert.equal(parseContentDiagram(changed(d=>delete d.alt.en))?.alt.zh,'根 P 的左子节点为 Q。');
  // Text labels remain plain React text, even when they resemble markup.
  assert.equal(parseContentDiagram(changed(d=>d.elements[1].text='<script>plain text</script>')).elements[1].text,'<script>plain text</script>');
 });

@@ -53,6 +53,7 @@ interface ManagedProblemHistory {
   ownerName: string;
   archivedAt: string | null;
   currentVersionId: string | null;
+  canEdit?: boolean;
   versions: (ProblemPublication & { id: string; title: string; statement: string; validationStatus: string; createdAt: string })[];
 }
 
@@ -258,8 +259,14 @@ function ManagedProblemDetail({ id, bankArchived, onClose }: { id: string; bankA
         <p className="mt-2 text-xs text-muted-foreground">{tr("验证", "Validation")}: {version.validationStatus} · {tr("校内公开", "School-wide")}: {version.schoolVisibleAt ? tr("是", "Yes") : tr("否", "No")}</p>
         {!bankArchived && !detail.data?.archivedAt && <AppLink className={buttonVariants({ size: "sm", variant: "secondary", className: "mt-3" })}
           href={contentAuthoringHref({ targetType: "problem", targetId: id, versionId: version.id }, true)}>
-          {tr("管理学员题解", "Manage student solutions")}
+          {tr("管理题解", "Manage solutions")}
         </AppLink>}
+        {version.id === detail.data?.currentVersionId && detail.data?.canEdit === true &&
+          !bankArchived && !detail.data?.archivedAt &&
+          <AppLink className={buttonVariants({ size: "sm", className: "mt-3 ml-2" })}
+            href={`/teacher/problems/${encodeURIComponent(id)}/edit?returnTo=${encodeURIComponent("/admin/problem-banks")}${detail.data?.ownerScope === "platform" ? "&source=platform" : ""}`}>
+            {tr("编辑题目", "Edit problem")}
+          </AppLink>}
         {version.id === detail.data?.currentVersionId && detail.data.bankVisibility === "school" &&
           !detail.data.archivedAt && version.rankReviewStatus === "approved" && version.schoolVisibleAt &&
           <PlatformProblemRequest key={version.id} problemId={id} versionId={version.id}/>}

@@ -34,7 +34,7 @@ export function MathContent({content,renderCode,preserveHeadingLevels=true,compa
     if(block.kind==='code')return <Fragment key={index}>{renderCode?renderCode(block.text,block.language):<pre className={styles.codeBlock}><code>{contentCodeLanguage(block.language)?<CodeTokens code={block.text} language={contentCodeLanguage(block.language)!}/>:block.text}</code></pre>}</Fragment>;
     if(block.kind==='math')return <div key={index} className={styles.mathBlock}><Formula text={block.text} display/></div>;
     if(block.kind==='heading')return createElement(preserveHeadingLevels?`h${block.level??1}`:'h2',{key:index},<Inline text={block.text}/>);
-    if(block.kind==='list'){const items=block.items?.map((item,i)=><li key={i}><Inline text={item}/></li>);return block.ordered?<ol key={index}>{items}</ol>:<ul key={index}>{items}</ul>;}
+    if(block.kind==='list'){const items=block.items?.map((item,i)=><li key={i} value={block.numbers?.[i]}><Inline text={item}/></li>);return block.ordered?<ol key={index} start={block.numbers?.[0]||1}>{items}</ol>:<ul key={index}>{items}</ul>;}
     if(block.kind==='table')return <div key={index} className={styles.tableScroll} role="region" aria-label={locale==='en'?'Table, scroll horizontally if needed':'表格，可横向滚动'} tabIndex={0}>
       <table className={styles.table}>
         <thead><tr>{block.headers?.map((header,column)=><th key={column} scope="col" style={{textAlign:block.alignments?.[column]??'left'}}><Inline text={header}/></th>)}</tr></thead>

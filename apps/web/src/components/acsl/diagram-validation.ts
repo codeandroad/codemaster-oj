@@ -164,8 +164,7 @@ export function validAcslDiagrams(value: unknown): value is AcslDiagrams {
         !number(diagram.height, 1, 4096) ||
         !record(diagram.alt) ||
         !keys(diagram.alt, ["en", "zh"]) ||
-        !text(diagram.alt.en, 1000) ||
-        !text(diagram.alt.zh, 1000) ||
+        !(text(diagram.alt.en, 1000) || text(diagram.alt.zh, 1000)) ||
         !Array.isArray(diagram.elements) ||
         !diagram.elements.length ||
         diagram.elements.length > 1000 ||

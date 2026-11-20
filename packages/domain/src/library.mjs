@@ -336,8 +336,9 @@ export async function handleLibrary({pool,user,route,method,body,url,helpers}) {
    LEFT JOIN accounts a ON a.id=p.owner_account_id LEFT JOIN identities i ON i.id=a.identity_id WHERE p.id=$1`,[problemId]));
   const versions=(await pool.query(`SELECT id,title,statement,source,validation_status,published_at,school_visible_at,
    rank_review_status,course_only_published,draft_review_status,created_at FROM problem_versions WHERE problem_id=$1 ORDER BY created_at DESC,id DESC`,[problemId])).rows;
+  const canEdit=!p.archived_at&&(p.owner_scope==='platform'?await canEditPlatformContent(pool,user.id,'problem',problemId):true);
   return result({id:p.id,ownerScope:p.owner_scope,bankId:p.bank_id,bankName:p.bank_name,bankVisibility:p.bank_visibility,ownerName:p.owner_name,
-   archivedAt:p.archived_at,currentVersionId:p.current_version_id,
+   archivedAt:p.archived_at,currentVersionId:p.current_version_id,canEdit,
    versions:versions.map(v=>({id:v.id,title:v.title,statement:legacyProblemStatement(v),
     validationStatus:v.validation_status,publishedAt:v.published_at,schoolVisibleAt:v.school_visible_at,
     rankReviewStatus:v.rank_review_status,courseOnlyPublished:v.course_only_published,draftReviewStatus:v.draft_review_status,createdAt:v.created_at}))});

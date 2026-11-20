@@ -36,6 +36,7 @@ function notificationContent(item: Notification, locale: AppLocale, scholarshipH
       };
     case "assignment_change": {
       const labels = {
+        assigned: ui(locale, "新作业已发布", "New assignment published"),
         cancelled: ui(locale, "作业已取消", "Assignment cancelled"),
         extended: ui(locale, "作业截止时间已延后", "Assignment deadline extended"),
         exempted: ui(locale, "你已获作业豁免", "You have been exempted"),

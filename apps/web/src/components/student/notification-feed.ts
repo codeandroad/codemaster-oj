@@ -42,7 +42,7 @@ interface AssignmentChangeNotification extends NotificationBase {
   kind: "assignment_change";
   assignmentId: string;
   activityTitle: string;
-  action: "cancelled" | "extended" | "exempted" | "reinstated";
+  action: "assigned" | "cancelled" | "extended" | "exempted" | "reinstated";
   dueAt?: string;
   reason?: string;
 }

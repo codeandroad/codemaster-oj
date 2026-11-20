@@ -228,7 +228,7 @@ export function NotificationDropdown({ schoolId, scholarshipHref = "/student/sch
           const row = <>
             {badge}
             <span className="min-w-0">
-              <span className="block break-words text-sm font-medium">{title}</span>
+              <span className={`block break-words text-sm ${item.readAt ? "font-normal" : "font-medium"}`}>{title}</span>
               {body && <span className="mt-1 line-clamp-2 block break-words text-xs text-muted-foreground">{body}</span>}
               <time dateTime={item.createdAt} className="mt-1 block text-xs text-muted-foreground">{date(item.createdAt, locale)}</time>
             </span>

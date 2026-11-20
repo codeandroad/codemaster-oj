@@ -3,6 +3,7 @@ import { transaction } from './db.mjs';
 import { LEGACY_SCHOOL_ID, lockSchoolTeaching, schoolRole } from './schools.mjs';
 import { fail, uuid } from './security.mjs';
 import { guestbookNotificationRows, readGuestbookNotification } from './guestbook-notifications.mjs';
+import { insertLegacyAssignmentReminders, insertSchoolAssignmentReminders } from './assignment-changes.mjs';
 
 const response = body => ({ status: 200, body });
 
@@ -41,23 +42,30 @@ async function inboxRecipient(db, { user, notificationSchoolId: requestedSchool 
 }
 
 const visibleSystemNotification = `n.school_id=$1 AND COALESCE(n.legacy_identity_id,n.school_identity_id)=$2
+  AND n.kind<>'assignment_reminder'
   AND (n.kind<>'teacher_feedback' OR n.data->>'timedPracticeId' IS NULL
     OR EXISTS(SELECT 1 FROM timed_practices timed
       WHERE timed.id::text=n.data->>'timedPracticeId' AND timed.results_published_at IS NOT NULL))`;
 
+const unreadReminderNotification = `n.kind='assignment_reminder' AND n.read_at IS NULL`;
+
 export async function listStudentNotifications(ctx, { page, pageSize }) {
   return transaction(ctx.pool, async db => {
     const { schoolId, identityId } = await inboxRecipient(db, ctx);
+    if (identityId) {
+      if (schoolId === LEGACY_SCHOOL_ID) await insertLegacyAssignmentReminders(db, identityId);
+      else await insertSchoolAssignmentReminders(db, schoolId, identityId);
+    }
     const legacy = schoolId === LEGACY_SCHOOL_ID;
     const totals = (await db.query(`SELECT count(*)::int total,
       count(*) FILTER(WHERE read_at IS NULL)::int unread FROM (
-      SELECT n.read_at FROM student_system_notifications n WHERE ${visibleSystemNotification}
+      SELECT n.read_at FROM student_system_notifications n WHERE ${visibleSystemNotification} OR ${unreadReminderNotification}
       UNION ALL SELECT read_at FROM course_admission_notifications
       ${legacy ? `UNION ALL SELECT read_at FROM (${guestbookNotificationRows(false,'$2')}) guestbook` : ''}
     ) visible`, [schoolId, identityId])).rows[0];
     const { rows } = await db.query(`SELECT * FROM (
       SELECT n.id,n.kind,n.data,n.created_at,n.read_at FROM student_system_notifications n
-      WHERE ${visibleSystemNotification}
+      WHERE ${visibleSystemNotification} OR ${unreadReminderNotification}
       UNION ALL ${courseAdmissionNotificationRows}
       ${legacy ? `UNION ALL ${guestbookNotificationRows(false,'$2')}` : ''}
     ) visible ORDER BY created_at DESC,id DESC LIMIT $3 OFFSET $4`,
@@ -72,7 +80,7 @@ export async function markStudentNotificationsRead(ctx, notificationId = null) {
     const { schoolId, identityId } = await inboxRecipient(db, ctx);
     const { rows: [system] } = await db.query(`UPDATE student_system_notifications n
       SET read_at=coalesce(n.read_at,clock_timestamp())
-      WHERE ${visibleSystemNotification} AND ($3::uuid IS NULL OR n.id=$3)
+      WHERE (${visibleSystemNotification} OR ${unreadReminderNotification}) AND ($3::uuid IS NULL OR n.id=$3)
         AND ($3::uuid IS NOT NULL OR n.read_at IS NULL)
       RETURNING n.read_at`, [schoolId, identityId, notificationId]);
     if (notificationId && system) return response({ ok: true, readAt: system.read_at });

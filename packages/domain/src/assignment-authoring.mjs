@@ -204,7 +204,7 @@ export async function handleAssignmentAuthoring(ctx){
    assertPublishable(i);
    await db.query("UPDATE assignments SET state='Published',published_at=now(),required_language=$2 WHERE id=$1",[id,i.requiredLanguage]);
   }
-  await db.query('UPDATE assignments SET edit_revision=edit_revision+1 WHERE id=$1',[id]);
+   await db.query('UPDATE assignments SET edit_revision=edit_revision+1 WHERE id=$1',[id]);
    if(publishing)await notifyLegacyAssignmentAssigned(db,id);
   await helpers.audit(db,user.id,publishing?'assignment.publish':'assignment.draft_edit','assignment',id);
   const assignment=await helpers.assignmentResult(db,user,id);

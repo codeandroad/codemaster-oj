@@ -351,6 +351,29 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       const awards = (await pool.query('SELECT identity_id FROM school_scholarship_activity_awards WHERE school_id=$1 AND activity_id=$2', [school.id, a.id])).rows;
       assert.deepEqual(awards, [{ identity_id: ids.student }]);
     });
+
+    await t.test('publishes an assigned notice and a readable deadline reminder', async () => {
+      const teacher = { auth: auth.teacher }, student = { auth: auth.student };
+      const { data: a } = await request(activities, { ...teacher, method: 'POST', status: 201, body: {
+        ...config, kind: 'assignment', title: 'Reminder homework', requestId: randomUUID(),
+        endsAt: new Date(Date.now() + 24 * 3600000).toISOString(),
+      } });
+      const path = activities + '/' + a.id;
+      const inbox = prefix + '/student-notifications';
+      const allNotices = async auth => (await request(inbox, auth)).data.items;
+      const changeNotices = async auth => (await allNotices(auth)).filter(item => item.kind === 'assignment_change' && item.assignmentId === a.id);
+      const reminderNotices = async auth => (await allNotices(auth)).filter(item => item.kind === 'assignment_reminder' && item.assignmentId === a.id);
+      await request(path + '/publish', { ...teacher, method: 'POST', body: { expectedRevision: 1 } });
+      assert.deepEqual((await changeNotices(student)).map(item => item.action), ['assigned']);
+      assert.equal((await reminderNotices(student)).length, 1);
+      assert.equal((await reminderNotices(student))[0].activityTitle, 'Reminder homework');
+      assert.ok((await reminderNotices(student))[0].dueAt);
+      const { data: inboxData } = await request(inbox, { auth: student });
+      const reminder = inboxData.items.find(item => item.kind === 'assignment_reminder' && item.assignmentId === a.id);
+      assert.ok(reminder && !reminder.readAt);
+      assert.equal((await request(inbox + '/' + reminder.id + '/read', { ...student, method: 'POST' })).data.ok, true);
+      assert.equal((await reminderNotices(student))[0].readAt !== null, true);
+    });
   } finally {
     await server?.close(); await worker?.end(); await pool.end(); await owner.query('DROP SCHEMA IF EXISTS ' + schema + ' CASCADE'); await owner.end();
   }

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useLocale, type AppLocale } from "@/components/locale-context";
 import { productionApi } from "@/lib/production-api";
 import { date, useData } from "./data-state";
-import { notificationFeed, notificationTabs, type AssignmentReminder, type Notification, type NotificationTab } from "./notification-feed";
+import { notificationFeed, notificationTabs, type Notification, type NotificationTab } from "./notification-feed";
 
 interface NotificationPage {
   items: Notification[];
@@ -17,6 +17,18 @@ interface NotificationPage {
 }
 const ui = (locale: AppLocale, zh: string, en: string) => locale === "en" ? en : zh;
 const tabNames = { social: ["互动", "Social"], updates: ["动态", "Updates"], events: ["活动", "Events"] } as const;
+const tabStorageKey = "notification-dropdown-tab";
+
+function readStoredTab(): NotificationTab | null {
+  try {
+    const value = window.localStorage.getItem(tabStorageKey);
+    return value && (notificationTabs as readonly string[]).includes(value) ? value as NotificationTab : null;
+  } catch { return null; }
+}
+
+function writeStoredTab(tab: NotificationTab) {
+  try { window.localStorage.setItem(tabStorageKey, tab); } catch { /* ignore */ }
+}
 
 function notificationContent(item: Notification, locale: AppLocale, scholarshipHref: string, schoolId?: string, role: "student" | "teacher" | "admin" = "student") {
   switch (item.kind) {
@@ -48,6 +60,15 @@ function notificationContent(item: Notification, locale: AppLocale, scholarshipH
         title: labels[item.action],
         body: [item.activityTitle, deadline, item.reason].filter(Boolean).join(" · "),
         href: query ? `/schools?${query}` : "/student/assignments",
+        icon: BookOpen,
+      };
+    }
+    case "assignment_reminder": {
+      const query = schoolId ? new URLSearchParams({ schoolId, section: "assignments" }) : null;
+      return {
+        title: ui(locale, "作业截止提醒", "Assignment deadline reminder"),
+        body: [item.activityTitle, ui(locale, `截止 ${date(item.dueAt, locale)}`, `Due ${date(item.dueAt, locale)}`)].join(" · "),
+        href: query ? `/schools?${query}` : `/student/assignments/${encodeURIComponent(item.assignmentId)}`,
         icon: BookOpen,
       };
     }
@@ -97,13 +118,17 @@ export function NotificationDropdown({ schoolId, scholarshipHref = "/student/sch
   const panelId = useId();
   const [open, setOpen] = useState(false);
   const [selectedTab, setSelectedTab] = useState<NotificationTab | null>(null);
+
+  function selectTab(tab: NotificationTab) {
+    setSelectedTab(tab);
+    writeStoredTab(tab);
+  }
   const [position, setPosition] = useState({ left: 0, top: 0, width: 360 });
   const [markError, setMarkError] = useState("");
   const [marking, setMarking] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const legacyStudent = workspace === "student" && !schoolId;
-  const assignments = useData<{ items: AssignmentReminder[] }>(legacyStudent && open ? "assignments" : "");
   const site = useData<{ announcement: string }>(legacyStudent ? "site-info" : "");
   const inboxPath = workspace === "platform" || workspace === "public" ? "account-notifications"
     : `${schoolId ? `schools/${encodeURIComponent(schoolId)}/` : ""}${workspace}-notifications`;
@@ -126,19 +151,16 @@ export function NotificationDropdown({ schoolId, scholarshipHref = "/student/sch
     return () => document.removeEventListener("pointerdown", outside);
   }, [open]);
 
-  const notificationItems = messages.data?.items;
-  const assignmentItems = assignments.data?.items;
-  const feed = useMemo(() => notificationFeed(notificationItems, assignmentItems), [notificationItems, assignmentItems]);
+  const feed = useMemo(() => notificationFeed(messages.data?.items), [messages.data?.items]);
   const activeTab = selectedTab ?? feed.latestTab;
   const nativeTabFocus = open && Object.hasOwn(HTMLElement.prototype, "focusGroup");
   const activeEntries = feed.entries[activeTab];
   const announcement = activeTab === "updates" ? site.data?.announcement : undefined;
-  const showAssignments = legacyStudent && activeTab === "events";
   const unread = messages.data?.unreadCount ?? 0;
-  const error = messages.error || (showAssignments && assignments.error) || (activeTab === "updates" && site.error);
-  const loading = messages.loading || (showAssignments && (assignments.loading || (!assignments.data && !assignments.error))) || (activeTab === "updates" && site.loading);
+  const error = messages.error || (activeTab === "updates" && site.error);
+  const loading = messages.loading || (activeTab === "updates" && site.loading);
   const empty = !announcement && !activeEntries.length;
-  const refresh = () => { if (showAssignments) assignments.reload(); if (activeTab === "updates") site.reload(); reloadMessages(); };
+  const refresh = () => { if (activeTab === "updates") site.reload(); reloadMessages(); };
 
   function markRead(item: Notification) {
     if (!item.readAt) void productionApi(`${inboxPath}/${encodeURIComponent(item.id)}/read`, { method: "POST" })
@@ -167,7 +189,7 @@ export function NotificationDropdown({ schoolId, scholarshipHref = "/student/sch
           const width = Math.min(360, window.innerWidth - 24);
           setPosition({ width, left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)), top: rect.bottom + 8 });
         }
-        setSelectedTab(null);
+        setSelectedTab(readStoredTab());
         setOpen(true);
         site.reload();
         reloadMessages();
@@ -184,7 +206,7 @@ export function NotificationDropdown({ schoolId, scholarshipHref = "/student/sch
           {notificationTabs.map((tab, index) => <button key={tab} type="button" role="tab" id={`${panelId}-${tab}`}
             aria-selected={activeTab === tab} tabIndex={nativeTabFocus ? undefined : activeTab === tab ? 0 : -1}
             {...(activeTab === tab ? { focusgroupstart: "" } : {})}
-            onFocus={() => setSelectedTab(tab)} onClick={() => setSelectedTab(tab)}
+            onFocus={() => selectTab(tab)} onClick={() => selectTab(tab)}
             onKeyDown={event => {
               const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? notificationTabs.length - 1
                 : !nativeTabFocus && event.key === "ArrowRight" ? (index + 1) % notificationTabs.length
@@ -212,11 +234,6 @@ export function NotificationDropdown({ schoolId, scholarshipHref = "/student/sch
         {error && <div role="alert" className="border-b border-border p-4 text-sm"><p className="text-destructive">{error}</p><button type="button" className="mt-2 min-h-9 rounded border border-border px-3 hover:bg-muted" onClick={refresh}>{ui(locale, "重试", "Retry")}</button></div>}
         {announcement && <article className="border-b border-border px-4 py-3"><h3 className="text-sm font-semibold">{ui(locale, "站点公告", "Announcement")}</h3><p className="mt-1 whitespace-pre-wrap break-words text-sm leading-5">{announcement}</p></article>}
         {activeEntries.map(entry => {
-          if (entry.type === "assignment") return <AppLink key={`assignment-${entry.item.id}`} href={`/student/assignments/${entry.item.id}`} onNavigate={() => setOpen(false)}
-            className="flex gap-3 border-b border-border px-4 py-3 text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary">
-            <BookOpen size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-primary"/>
-            <span className="min-w-0"><span className="block break-words text-sm font-medium">{entry.item.title}</span><span className="mt-1 block text-xs text-muted-foreground">{ui(locale, "截止：", "Due: ")}<time dateTime={entry.item.dueAt}>{date(entry.item.dueAt, locale)}</time></span></span>
-          </AppLink>;
           const { item } = entry;
           const { title, body, href, icon: Icon } = notificationContent(item, locale, scholarshipHref, schoolId, role);
           const rowClass = `flex w-full gap-3 border-b border-border px-4 py-3 text-left text-foreground ${item.readAt ? "" : "bg-accent/40"}`;
@@ -249,7 +266,7 @@ export function NotificationDropdown({ schoolId, scholarshipHref = "/student/sch
         {!loading && empty && !error && <div className="flex min-h-32 flex-col items-center justify-center gap-3 px-4 py-6 text-muted-foreground"><Inbox size={26} strokeWidth={1.4} aria-hidden="true"/><p className="text-sm">{ui(locale, "暂无近期通知", "No recent notifications")}</p></div>}
         </>}
       </div>)}
-      {showAssignments && <footer className="shrink-0 px-4 py-2"><AppLink href="/student/assignments" onNavigate={() => setOpen(false)} className="flex min-h-10 items-center justify-center rounded-md text-sm text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary">{ui(locale, "查看全部作业", "View all assignments")}</AppLink></footer>}
+      {legacyStudent && activeTab === "events" && <footer className="shrink-0 px-4 py-2"><AppLink href="/student/assignments" onNavigate={() => setOpen(false)} className="flex min-h-10 items-center justify-center rounded-md text-sm text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary">{ui(locale, "查看全部作业", "View all assignments")}</AppLink></footer>}
     </section>}
   </div>;
 }

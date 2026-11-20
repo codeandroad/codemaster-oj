@@ -1,3 +1,4 @@
+import { assignmentPassingProgressSubmission } from './assignment-grades.mjs';
 import { LEGACY_SCHOOL_ID } from './schools.mjs';
 import { fail, field } from './security.mjs';
 
@@ -42,5 +43,40 @@ export async function notifySchoolAssignmentChange(db, activity, action, { ident
     WHERE a.school_id=$1 AND a.id=$2 AND ($4::uuid IS NULL OR p.identity_id=$4)
       AND (NOT p.exempt OR $3='exempted')
     ON CONFLICT DO NOTHING`, [activity.school_id, activity.id, action, identityId, reason]);
+}
+
+const reminderHorizon = `interval '48 hours'`;
+
+export async function insertLegacyAssignmentReminders(db, identityId) {
+  await db.query(`INSERT INTO student_system_notifications(school_id,legacy_identity_id,kind,source_key,data)
+    SELECT $1,part.identity_id,'assignment_reminder',concat('reminder:',assignment.id),
+      jsonb_build_object('assignmentId',assignment.id,'activityTitle',assignment.title,'dueAt',greatest(assignment.due_at,part.extended_due_at))
+    FROM assignments assignment JOIN assignment_participants part ON part.assignment_id=assignment.id AND part.identity_id=$2 AND NOT part.exempt
+    WHERE assignment.state='Published' AND assignment.cancelled_at IS NULL AND assignment.archived_at IS NULL
+      AND greatest(assignment.due_at,part.extended_due_at)>clock_timestamp()
+      AND greatest(assignment.due_at,part.extended_due_at)<=clock_timestamp()+${reminderHorizon}
+      AND EXISTS(SELECT 1 FROM assignment_problems ap WHERE ap.assignment_id=assignment.id
+        AND NOT EXISTS(SELECT 1 FROM submissions previous
+          WHERE previous.identity_id=part.identity_id AND previous.problem_id=ap.problem_id
+            AND ${assignmentPassingProgressSubmission}))
+    ON CONFLICT DO NOTHING`, [LEGACY_SCHOOL_ID, identityId]);
+}
+
+export async function insertSchoolAssignmentReminders(db, schoolId, identityId) {
+  await db.query(`INSERT INTO student_system_notifications(school_id,school_identity_id,kind,source_key,data)
+    SELECT a.school_id,p.identity_id,'assignment_reminder',concat('reminder:',a.id),
+      jsonb_build_object('assignmentId',a.id,'activityTitle',a.title,'dueAt',greatest(a.ends_at,p.extended_due_at))
+    FROM school_activities a JOIN school_activity_participants p ON p.school_id=a.school_id AND p.activity_id=a.id
+      AND p.identity_id=$2 AND NOT p.exempt
+    WHERE a.school_id=$1 AND a.kind='assignment' AND a.state='Published' AND a.cancelled_at IS NULL
+      AND greatest(a.ends_at,p.extended_due_at)>clock_timestamp()
+      AND greatest(a.ends_at,p.extended_due_at)<=clock_timestamp()+${reminderHorizon}
+      AND EXISTS(SELECT 1 FROM school_activity_problems ap WHERE ap.school_id=a.school_id AND ap.activity_id=a.id
+        AND NOT EXISTS(SELECT 1 FROM school_judge_jobs j
+          WHERE j.school_id=a.school_id AND j.identity_id=p.identity_id AND j.problem_id=ap.problem_id
+            AND j.access_context='school' AND j.kind='submit' AND j.state='completed' AND j.result->>'status'='AC'
+            AND (j.activity_id=a.id AND j.version_id=ap.version_id
+              OR j.activity_id IS DISTINCT FROM a.id AND j.created_at<=greatest(a.ends_at,p.extended_due_at))))
+    ON CONFLICT DO NOTHING`, [schoolId, identityId]);
 }
 

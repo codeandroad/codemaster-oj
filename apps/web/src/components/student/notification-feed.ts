@@ -1,5 +1,3 @@
-import type { Assignment } from "@/lib/production-api";
-
 interface NotificationBase {
   id: string;
   createdAt: string;
@@ -47,9 +45,14 @@ interface AssignmentChangeNotification extends NotificationBase {
   reason?: string;
 }
 
-export type Notification = AssignmentChangeNotification | GuestbookNotification | ScholarshipNotification | FeedbackNotification | CourseApplicationNotification | CourseApplicationResultNotification;
-export type AssignmentReminder = Pick<Assignment, "id" | "title" | "dueAt" | "publishedAt" | "createdAt">;
+interface AssignmentReminderNotification extends NotificationBase {
+  kind: "assignment_reminder";
+  assignmentId: string;
+  activityTitle: string;
+  dueAt: string;
+}
 
+export type Notification = AssignmentChangeNotification | AssignmentReminderNotification | GuestbookNotification | ScholarshipNotification | FeedbackNotification | CourseApplicationNotification | CourseApplicationResultNotification;
 export const notificationTabs = ["social", "updates", "events"] as const;
 export type NotificationTab = typeof notificationTabs[number];
 
@@ -61,11 +64,11 @@ const tabByKind = {
   course_application_result: "updates",
   activity_reward: "events",
   assignment_change: "events",
+  assignment_reminder: "events",
 } satisfies Record<Notification["kind"], NotificationTab>;
 
 type FeedEntry = { tab: NotificationTab; timestamp: number } & (
   | { type: "notification"; item: Notification }
-  | { type: "assignment"; item: AssignmentReminder }
 );
 
 function timestamp(value: string | null | undefined) {
@@ -73,10 +76,9 @@ function timestamp(value: string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : Number.MIN_SAFE_INTEGER;
 }
 
-export function notificationFeed(notifications: readonly Notification[] = [], assignments: readonly AssignmentReminder[] = []) {
+export function notificationFeed(notifications: readonly Notification[] = []) {
   const ordered: FeedEntry[] = [
     ...notifications.map(item => ({ type: "notification" as const, item, tab: tabByKind[item.kind], timestamp: timestamp(item.createdAt) })),
-    ...assignments.map(item => ({ type: "assignment" as const, item, tab: "events" as const, timestamp: timestamp(item.publishedAt ?? item.createdAt) })),
   ];
   ordered.sort((left, right) => right.timestamp - left.timestamp);
 

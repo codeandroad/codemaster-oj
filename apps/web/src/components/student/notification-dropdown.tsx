@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { Bell, BookOpen, CircleCheck, CircleX, Gift, Inbox, MessageCircle, MessageSquareText } from "lucide-react";
 import { AppLink } from "@/components/navigation";
 import { Button } from "@/components/ui/button";
@@ -219,8 +220,13 @@ export function NotificationDropdown({ schoolId, scholarshipHref = "/student/sch
           const { title, body, href, icon: Icon } = notificationContent(item, locale, scholarshipHref, schoolId, role);
           const rowClass = `flex w-full gap-3 border-b border-border px-4 py-3 text-left text-foreground ${item.readAt ? "" : "bg-accent/40"}`;
           const interactiveClass = `${rowClass} hover:bg-muted focus-visible:outline-2 focus-visible:outline-primary`;
+          const badge = item.kind === "guestbook"
+            ? (item.authorAvatar
+              ? <Image src={item.authorAvatar} width={40} height={40} unoptimized alt="" className="size-10 shrink-0 rounded-full object-cover"/>
+              : <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-full bg-accent text-sm font-semibold text-primary">{Array.from(item.authorNickname)[0]}</span>)
+            : <Icon size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-primary"/>;
           const row = <>
-            <Icon size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-primary"/>
+            {badge}
             <span className="min-w-0">
               <span className="block break-words text-sm font-medium">{title}</span>
               {body && <span className="mt-1 line-clamp-2 block break-words text-xs text-muted-foreground">{body}</span>}

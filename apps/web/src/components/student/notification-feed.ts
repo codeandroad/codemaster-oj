@@ -11,6 +11,7 @@ interface GuestbookNotification extends NotificationBase {
   profileIdentityId: string;
   body: string;
   authorNickname: string;
+  authorAvatar?: string | null;
   practice?: boolean;
   interaction?: "message" | "reply" | "mention";
 }

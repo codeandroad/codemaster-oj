@@ -32,7 +32,9 @@ export function guestbookNotificationRows(practice, identity = null) {
   : `COALESCE(NULLIF(btrim(a.nickname),''),'同学')`;
  return `SELECT n.id,'guestbook'::text kind,
    jsonb_build_object('messageId',m.id,'profileIdentityId',${practice ? 'm.practice_profile_account_id' : 'm.profile_identity_id'},
-    'practice',${practice},'interaction',n.interaction,'body',m.body,'authorNickname',${nickname}) data,n.created_at,n.read_at
+    'practice',${practice},'interaction',n.interaction,'body',m.body,'authorNickname',${nickname},
+    'authorAvatar',a.avatar,'authorIdentityId',i.id,
+    'authorAlias','Learner-'||upper(left(md5('public-practice:'||a.id::text),8))) data,n.created_at,n.read_at
   ${source} JOIN student_guestbook_notifications n ON n.message_id=m.id
   WHERE ${visible(practice,accountRecipient)} AND ${recipientFilter(identity)}`;
 }

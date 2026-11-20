@@ -198,6 +198,7 @@ test('school-wide profiles, first-AC activity and guestbook keep administrator m
    assert.equal(inbox.items[0].messageId,posted.id);
    assert.equal(inbox.items[0].profileIdentityId,alpha.identityId);
    assert.equal(inbox.items[0].authorNickname,'Beta');
+   assert.equal(inbox.items[0].authorAvatar,defaultAvatarPath(beta.identityId));
    assert.equal(inbox.items[0].body,'做得好！');
    assert.equal((await call(beta,notificationRoute)).body.total,0,'author sees no target notification');
    await assert.rejects(call(teacher,notificationRoute),e=>e.status===403);

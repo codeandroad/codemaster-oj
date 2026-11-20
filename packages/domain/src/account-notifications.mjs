@@ -2,6 +2,7 @@ import { transaction } from './db.mjs';
 import { activeAccount } from './schools.mjs';
 import { fail } from './security.mjs';
 import { guestbookNotificationRows, readGuestbookNotification } from './guestbook-notifications.mjs';
+import { avatarForIdentity, defaultAvatarPath } from './avatars.mjs';
 
 export function setAccountNotificationRecipient(db, accountId) {
   return db.query("SELECT set_config('campus.account_notification_account_id',$1,true)", [accountId]);
@@ -13,7 +14,13 @@ export const courseAdmissionNotificationRows = `SELECT id,'course_application_re
   FROM course_admission_notifications`;
 
 export function inboxItem(row) {
-  return { ...row.data, id: row.id, kind: row.kind, createdAt: row.created_at, readAt: row.read_at };
+  const { authorAlias, authorIdentityId, ...data } = row.data;
+  if (row.kind === 'guestbook') {
+    data.authorAvatar = data.practice
+      ? defaultAvatarPath(authorAlias)
+      : avatarForIdentity(data.authorAvatar, authorIdentityId);
+  }
+  return { ...data, id: row.id, kind: row.kind, createdAt: row.created_at, readAt: row.read_at };
 }
 
 export async function readCourseAdmissionNotification(db, notificationId) {

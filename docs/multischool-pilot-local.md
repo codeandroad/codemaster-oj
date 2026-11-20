@@ -1,10 +1,10 @@
 # 本地多校试点启动
 
-本试点使用 `codex/multischool-foundation` 工作区。运行需要 Docker 和 Node.js，不要求用户自行提供 `DATABASE_URL`。
+本试点在主仓库根目录运行。运行需要 Docker 和 Node.js，不要求用户自行提供 `DATABASE_URL`。私有初始化状态保存在 `.campus-local/multischool-pilot/`，与工作区 checkout 解耦；在任何包含该私有目录的 checkout 中运行 `npm run start:pilot` 都会接管同一数据库卷。
 
 ## 首次启动
 
-在试点工作区根目录运行以下命令。`--assets-from` 应指向本生产仓库的原 checkout，供复制 Git 忽略的 Paper 4 原题资源。此参数不读取相邻原型。
+在仓库根目录运行以下命令。`--assets-from` 应指向本生产仓库的原 checkout，供复制 Git 忽略的 Paper 4 原题资源。此参数不读取相邻原型。
 
 ```sh
 npm run start:pilot -- --assets-from /absolute/path/to/myoj
@@ -12,7 +12,7 @@ npm run start:pilot -- --assets-from /absolute/path/to/myoj
 
 没有需要复制的原题资源时可以直接运行 `npm run start:pilot`。
 
-启动器先创建独立随机凭据，构建当前工作区的 API、domain 和 web。执行器优先复用本机已有的生产判题镜像，运行在试点独立执行网络中。原镜像不存在时才构建本工作区执行器镜像。
+启动器先创建独立随机凭据，构建当前 checkout 的 API、domain 和 web。执行器优先复用本机已有的生产判题镜像，运行在试点独立执行网络中。原镜像不存在时才构建当前 checkout 的执行器镜像。
 
 首次启动从正在运行的 `campus-judge-local-db-1` 中只读备份 `campus_demo`，恢复到独立试点数据库。应用新增迁移和运行角色授权时，验证迁移前所有原有业务表的行数与字段指纹一致；055 首次执行仅允许明确的学校归属字段、原校名称及一条归属迁移审计变化，其余字段均参与比对。随后才启动 API、worker、web 和 gateway。不运行正常 demo 初始化，不重设原有账号密码。
 
@@ -78,7 +78,7 @@ npm run stop:pilot
 
 后续启动保留试点数据库和所有试用记录，不再从原库覆盖恢复。停止也保留数据卷。初始化记录丢失、已有卷与配置不匹配，或者第一次恢复中断时，脚本会停止并要求明确恢复，避免自动覆盖数据。数据库恢复使用单事务。
 
-维护者在试点工作区可以让 Node 自动读取生成的迁移账号连接，无需手动拼接数据库密码。
+维护者可以在仓库根目录让 Node 自动读取生成的迁移账号连接，无需手动拼接数据库密码。
 
 ```sh
 node --env-file=.campus-local/multischool-pilot/cli.env \

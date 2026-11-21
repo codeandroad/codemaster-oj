@@ -201,12 +201,19 @@ export class ApiError extends Error {
 }
 
 export const apiConnectionMessage = "暂时无法连接到服务，请检查网络后重试。";
+export const apiRequestTimeoutMs = 15_000;
 
 export class ApiConnectionError extends Error {
   constructor(cause: TypeError) {
     super(cause.message, { cause });
     this.name = "ApiConnectionError";
   }
+}
+
+export function isApiConnectionError(error: unknown): boolean {
+  if (error instanceof ApiConnectionError) return true;
+  const status = typeof error === "object" && error !== null && "status" in error ? error.status : null;
+  return status === 502 || status === 503 || status === 504;
 }
 
 export const productionSessionExpiredEvent = "codemaster:session-expired";
@@ -219,7 +226,7 @@ export function clearProductionSession() {
 /** Same-origin session cookies; credentials and activation codes never enter browser storage. */
 export async function productionApi<T>(
   path: string,
-  options: { method?: string; body?: unknown; signal?: AbortSignal } = {},
+  options: { method?: string; body?: unknown; signal?: AbortSignal; timeoutMs?: number } = {},
 ): Promise<T> {
   const route = path.replace(/^\//, "");
   const method = options.method ?? "GET";
@@ -227,48 +234,67 @@ export async function productionApi<T>(
   const headers: Record<string, string> = { Accept: "application/json" };
   if (options.body !== undefined) headers["Content-Type"] = "application/json";
   if (method !== "GET" && requestToken) headers["X-CSRF-Token"] = requestToken;
-  const response = await fetch(`/api/v1/${route}`, {
-    method,
-    headers,
-    credentials: "same-origin",
-    ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
-    ...(options.signal ? { signal: options.signal } : {}),
-  }).catch(connectionFailure);
-  const payload = await response.json().catch(reason => {
-    options.signal?.throwIfAborted();
-    if (!response.ok || reason instanceof SyntaxError) return null;
-    return connectionFailure(reason);
-  });
-  const currentSession = requestToken === csrfToken && !options.signal?.aborted;
-  if (!response.ok) {
-    const code = payload?.error?.code;
-    if (typeof window !== "undefined" && currentSession && response.status === 401
-      && code === "UNAUTHENTICATED" && route !== "auth/logout") {
-      window.dispatchEvent(new Event(productionSessionExpiredEvent));
-    }
-    // A missing school resource may mean that the membership was revoked.
-    // Confirm with the school list before switching workspaces.
-    if (typeof window !== "undefined" && (code === "LEGACY_WORKSPACE_REQUIRED"
-      || response.status === 404 && /^\/?schools\/[^/]+\//.test(path))) {
-      window.dispatchEvent(new Event("codemaster:school-access-check"));
-    }
-    throw new ApiError(
-      response.status,
-      payload?.error?.code ?? "REQUEST_FAILED",
-      payload?.error?.message ??
-        (response.status === 401 ? "登录已失效，请重新登录。" : "请求失败，请稍后重试。"),
-    );
+  let timedOut = false;
+  const internalController = options.timeoutMs ? new AbortController() : null;
+  const onOuterAbort = () => internalController?.abort(options.signal?.reason);
+  if (internalController && options.signal) {
+    if (options.signal.aborted) internalController.abort(options.signal.reason);
+    else options.signal.addEventListener("abort", onOuterAbort, { once: true });
   }
-  if (currentSession && payload?.csrfToken) csrfToken = payload.csrfToken;
-  return payload as T;
+  const timer = internalController && options.timeoutMs
+    ? setTimeout(() => { timedOut = true; internalController.abort(); }, options.timeoutMs)
+    : undefined;
+  const signal = internalController ? internalController.signal : options.signal;
+  try {
+    const response = await fetch(`/api/v1/${route}`, {
+      method,
+      headers,
+      credentials: "same-origin",
+      ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+      ...(signal ? { signal } : {}),
+    }).catch(connectionFailure);
+    const payload = await response.json().catch(reason => {
+      options.signal?.throwIfAborted();
+      if (timedOut) return connectionFailure(reason);
+      if (!response.ok || reason instanceof SyntaxError) return null;
+      return connectionFailure(reason);
+    });
+    const currentSession = requestToken === csrfToken && !options.signal?.aborted;
+    if (!response.ok) {
+      const code = payload?.error?.code;
+      if (typeof window !== "undefined" && currentSession && response.status === 401
+        && code === "UNAUTHENTICATED" && route !== "auth/logout") {
+        window.dispatchEvent(new Event(productionSessionExpiredEvent));
+      }
+      // A missing school resource may mean that the membership was revoked.
+      // Confirm with the school list before switching workspaces.
+      if (typeof window !== "undefined" && (code === "LEGACY_WORKSPACE_REQUIRED"
+        || response.status === 404 && /^\/?schools\/[^/]+\//.test(path))) {
+        window.dispatchEvent(new Event("codemaster:school-access-check"));
+      }
+      throw new ApiError(
+        response.status,
+        payload?.error?.code ?? "REQUEST_FAILED",
+        payload?.error?.message ??
+          (response.status === 401 ? "登录已失效，请重新登录。" : "请求失败，请稍后重试。"),
+      );
+    }
+    if (currentSession && payload?.csrfToken) csrfToken = payload.csrfToken;
+    return payload as T;
+  } finally {
+    clearTimeout(timer);
+    options.signal?.removeEventListener("abort", onOuterAbort);
+  }
 
   function connectionFailure(reason: unknown): never {
+    if (timedOut && !options.signal?.aborted) throw new ApiConnectionError(new TypeError("Request timed out"));
     if (!options.signal?.aborted && reason instanceof TypeError) throw new ApiConnectionError(reason);
     throw reason;
   }
 }
 
 export function apiMessage(error: unknown): string {
+  if (isApiConnectionError(error)) return apiConnectionMessage;
   const message = error instanceof Error ? error.message : "操作失败，请稍后重试。";
   // Present the current name without changing API codes or historical ledger data.
   const scholarshipMessages: Record<string, string> = {

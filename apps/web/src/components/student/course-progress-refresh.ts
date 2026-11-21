@@ -5,10 +5,11 @@ import { useEffect, useRef } from "react";
 export function useCourseProgressRefresh({ reload, loading, error, data, pending = false }: { reload: () => void; loading: boolean; error: string; data: unknown; pending?: boolean }) {
   const polls = useRef(0);
   useEffect(() => {
-    const refresh = () => { if (document.visibilityState === "visible") reload(); };
+    const refresh = () => { if (document.visibilityState === "visible" && navigator.onLine !== false) reload(); };
     window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
     document.addEventListener("visibilitychange", refresh);
-    return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
+    return () => { window.removeEventListener("focus", refresh); window.removeEventListener("online", refresh); document.removeEventListener("visibilitychange", refresh); };
   }, [reload]);
   useEffect(() => {
     if (!pending) { polls.current = 0; return; }

@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ApiConnectionError, ApiError, clearProductionSession, productionApi, productionSessionExpiredEvent }
-  from '../src/lib/production-api.ts';
+import {
+  ApiConnectionError,
+  ApiError,
+  apiConnectionMessage,
+  apiMessage,
+  clearProductionSession,
+  isApiConnectionError,
+  productionApi,
+  productionSessionExpiredEvent,
+} from '../src/lib/production-api.ts';
 
 test('only an unauthenticated response for the current session requests sign-in', async (t) => {
   const window = new EventTarget();
@@ -73,4 +81,28 @@ test('transport failures are distinct from aborts and explicit access denials', 
   await assert.rejects(productionApi('denied'), error => error instanceof ApiError && error.status === 403);
   await assert.rejects(productionApi('answers', { method: 'POST', body: {} }), ApiConnectionError);
   assert.equal(fetch.mock.calls.length, 4);
+});
+
+test('connection errors map to friendly message and request timeout aborts stalled fetches', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const connErr = new ApiConnectionError(new TypeError('Failed to fetch'));
+  assert.equal(isApiConnectionError(connErr), true);
+  assert.equal(apiMessage(connErr), apiConnectionMessage);
+  assert.equal(isApiConnectionError(new ApiError(502, 'BAD_GATEWAY', 'Bad Gateway')), true);
+  assert.equal(apiMessage(new ApiError(503, 'UNAVAILABLE', 'Unavailable')), apiConnectionMessage);
+  assert.equal(isApiConnectionError(new ApiError(403, 'FORBIDDEN', 'Forbidden')), false);
+
+  t.mock.method(globalThis, 'fetch', async (_path, { signal }) => new Promise((_resolve, reject) => {
+    if (signal?.aborted) { reject(signal.reason); return; }
+    signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+  }));
+
+  const stalled = productionApi('learning-paths/demo', { timeoutMs: 15_000 });
+  t.mock.timers.tick(15_000);
+  await assert.rejects(stalled, ApiConnectionError);
+
+  const caller = new AbortController();
+  const cancelled = productionApi('learning-paths/demo', { signal: caller.signal, timeoutMs: 15_000 });
+  caller.abort();
+  await assert.rejects(cancelled, { name: 'AbortError' });
 });

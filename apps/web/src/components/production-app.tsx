@@ -31,7 +31,7 @@ import {useWorkspaceSettings} from "@/components/student/workspace-settings";
 import {WorkspaceThemeProvider} from "@/components/ui/theme-context";
 import {PersonalAppearanceProvider, PersonalAppearanceSettings} from "@/components/personal-appearance-settings";
 import { AppLocaleProvider, HomeLocaleProvider, useLocale } from "@/components/locale-context";
-import { ApiError, apiMessage, clearProductionSession, productionApi, productionSessionExpiredEvent, roleHome, type AuthResponse, type CampusRole, type CampusUser } from "@/lib/production-api";
+import { ApiError, apiMessage, apiRequestTimeoutMs, clearProductionSession, productionApi, productionSessionExpiredEvent, roleHome, type AuthResponse, type CampusRole, type CampusUser } from "@/lib/production-api";
 
 
 // Keep unrelated workspaces and editors out of the authentication/catalog bundle.
@@ -83,7 +83,7 @@ export function ProductionApp() {
   const [profileVersion, setProfileVersion] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
-    productionApi<AuthResponse>("auth/me", { signal: controller.signal })
+    productionApi<AuthResponse>("auth/me", { signal: controller.signal, timeoutMs: apiRequestTimeoutMs })
       .then((response) => {
         setUser(response.user);
         setError("");
@@ -97,6 +97,12 @@ export function ProductionApp() {
       });
     return () => controller.abort();
   }, [check]);
+  useEffect(() => {
+    if (!error && !loading) return;
+    const recover = () => { setLoading(true); setError(""); setCheck(value => value + 1); };
+    window.addEventListener("online", recover);
+    return () => window.removeEventListener("online", recover);
+  }, [error, loading]);
   const signedInAccount = user?.id;
   useEffect(() => {
     if (!signedInAccount) return;
@@ -109,23 +115,25 @@ export function ProductionApp() {
       if (returnTo) router.replace(`/login?${new URLSearchParams({ returnTo })}`);
     }
     function refreshAccount() {
-      if (controller) return;
+      if (controller || navigator.onLine === false) return;
       const request = new AbortController();
       controller = request;
-      void productionApi<AuthResponse>("auth/me", { signal: request.signal })
+      void productionApi<AuthResponse>("auth/me", { signal: request.signal, timeoutMs: apiRequestTimeoutMs })
         .then(({ user: latest }) => {
           if (!request.signal.aborted) setUser(current => current?.id === signedInAccount ? latest : current);
         })
         .catch(() => undefined)
-        .finally(() => { controller = undefined; });
+        .finally(() => { if (controller === request) controller = undefined; });
     }
     window.addEventListener("focus", refreshAccount);
+    window.addEventListener("online", refreshAccount);
     window.addEventListener("codemaster:schools-changed", refreshAccount);
     window.addEventListener("codemaster:school-access-check", refreshAccount);
     window.addEventListener(productionSessionExpiredEvent, expireSession);
     return () => {
       controller?.abort();
       window.removeEventListener("focus", refreshAccount);
+      window.removeEventListener("online", refreshAccount);
       window.removeEventListener("codemaster:schools-changed", refreshAccount);
       window.removeEventListener("codemaster:school-access-check", refreshAccount);
       window.removeEventListener(productionSessionExpiredEvent, expireSession);
@@ -165,16 +173,14 @@ export function ProductionApp() {
   if (error)
     return (
       <main className="mx-auto max-w-lg p-8">
-        <h1 className="text-xl font-bold">Unable to connect</h1>
+        <h1 className="text-xl font-bold">无法连接服务</h1>
         <p role="alert" className="mt-3 text-sm text-destructive">
           {error}
         </p>
-        <Button
-          className="mt-5"
-          onClick={retryConnection}
-        >
-          Retry
-        </Button>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <Button onClick={retryConnection}>重试</Button>
+          <Button type="button" variant="secondary" onClick={() => window.location.reload()}>刷新整个页面</Button>
+        </div>
       </main>
     );
   if (pathname === "/activate") return <ProductionRegisterPage />;

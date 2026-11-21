@@ -60,6 +60,9 @@ export function AuthConnectionNotice({ register, error, onRetry }: { register: b
   return <AuthShell>
     <h2 id="login-title" className={styles.title}>{title}</h2>
     <p className={styles.description} role={error ? "alert" : "status"}>{error || connecting}</p>
-    {error && <Button className="mt-5 w-fit" onClick={onRetry}>{locale === "zh" ? "重试" : "Retry"}</Button>}
+    {error && <div className="mt-5 flex flex-wrap gap-2">
+      <Button className="w-fit" onClick={onRetry}>{locale === "zh" ? "重试" : "Retry"}</Button>
+      <Button type="button" variant="secondary" className="w-fit" onClick={() => window.location.reload()}>{locale === "zh" ? "刷新整个页面" : "Refresh page"}</Button>
+    </div>}
   </AuthShell>;
 }

@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigationBlocker } from "@/components/navigation";
 import { useLocale } from "@/components/locale-context";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { apiMessage, productionApi } from "@/lib/production-api";
+import { ApiError, apiConnectionMessage, apiMessage, apiRequestTimeoutMs, isApiConnectionError, productionApi } from "@/lib/production-api";
 
 export const input =
   "h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm outline-none focus:border-primary";
@@ -16,34 +16,53 @@ export const link = "font-semibold text-primary hover:underline";
 export function useData<T>(path: string | null) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState("");
+  const [connectionError, setConnectionError] = useState(false);
   const [loading, setLoading] = useState(Boolean(path));
   const [revision, setRevision] = useState(0);
+  const reload = useCallback(() => setRevision((x) => x + 1), []);
   useEffect(() => {
     const controller = new AbortController();
     if (!path) {
       setLoading(false);
+      setError("");
+      setConnectionError(false);
       return () => controller.abort();
     }
     setLoading(true);
     setError("");
-    productionApi<T>(path, { signal: controller.signal })
+    setConnectionError(false);
+    productionApi<T>(path, { signal: controller.signal, timeoutMs: apiRequestTimeoutMs })
       .then((value) => {
-        if (!controller.signal.aborted) setData(value);
+        if (!controller.signal.aborted) {
+          setData(value);
+          setError("");
+          setConnectionError(false);
+        }
       })
-      .catch((error) => {
-        if (!controller.signal.aborted) setError(apiMessage(error));
+      .catch((reason) => {
+        if (controller.signal.aborted) return;
+        setConnectionError(isApiConnectionError(reason));
+        setError(apiMessage(reason));
+        if (reason instanceof ApiError && (reason.status === 403 || reason.status === 404)) setData(null);
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
   }, [path, revision]);
+  useEffect(() => {
+    if (!path || (!connectionError && !loading)) return;
+    const recover = () => reload();
+    window.addEventListener("online", recover);
+    return () => window.removeEventListener("online", recover);
+  }, [path, connectionError, loading, reload]);
   return {
     data,
     setData,
     error,
+    connectionError,
     loading,
-    reload: () => setRevision((x) => x + 1),
+    reload,
   };
 }
 export function useAction() {
@@ -74,9 +93,14 @@ export function useAction() {
 export function State({
   resource,
 }: {
-  resource: { loading: boolean; error: string; reload: () => void };
+  resource: { loading: boolean; error: string; connectionError?: boolean; reload: () => void };
 }) {
   const { locale } = useLocale();
+  const message = resource.connectionError
+    ? locale === "en"
+      ? "Couldn’t connect to the service. Check your connection and try again."
+      : apiConnectionMessage
+    : resource.error;
   return resource.loading ? (
     <p role="status" className="mt-4 text-sm text-muted-foreground">
       {locale === "en" ? "Loading…" : "正在加载…"}
@@ -86,15 +110,27 @@ export function State({
       role="alert"
       className="mt-4 border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
     >
-      {resource.error}
-      <Button
-        variant="secondary"
-        size="sm"
-        className="ml-3"
-        onClick={resource.reload}
-      >
-        {locale === "en" ? "Retry" : "重试"}
-      </Button>
+      <span>{message}</span>
+      <span className="ml-3 inline-flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={resource.reload}
+        >
+          {locale === "en" ? "Retry" : "重试"}
+        </Button>
+        {resource.connectionError && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => window.location.reload()}
+          >
+            {locale === "en" ? "Refresh page" : "刷新整个页面"}
+          </Button>
+        )}
+      </span>
     </div>
   ) : null;
 }

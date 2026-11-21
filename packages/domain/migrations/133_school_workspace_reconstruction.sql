@@ -103,12 +103,16 @@ INSERT INTO school_problem_banks(school_id,id,owner_account_id,name,archived,req
  FROM problem_banks b WHERE b.school_id=current_setting('campus.school_id')::uuid AND EXISTS
  (SELECT 1 FROM problems p WHERE p.bank_id=b.id AND p.owner_scope='school');
 CREATE TEMP TABLE catalog_editions ON COMMIT DROP AS
- SELECT p.bank_id,p.owner_account_id,p.created_at problem_created,p.current_version_id,coalesce(p.current_version_id,first_value(v.id) OVER(PARTITION BY p.id ORDER BY v.created_at DESC,v.id DESC)) authoring_version_id,p.archived_at,p.tutorial_mode,p.tutorial_body,p.tutorial_revision,
+ SELECT p.bank_id,p.owner_scope,p.owner_account_id,p.created_at problem_created,p.current_version_id,coalesce(p.current_version_id,first_value(v.id) OVER(PARTITION BY p.id ORDER BY v.created_at DESC,v.id DESC)) authoring_version_id,p.archived_at,p.tutorial_mode,p.tutorial_body,p.tutorial_revision,
  v.*,b.school_id,b.archived_at bank_archived,b.visibility,ps.statement reviewed_statement,ps.metadata reviewed_metadata,
  row_number() OVER(PARTITION BY v.problem_id ORDER BY v.created_at,v.id)::int ordinal
  FROM problems p JOIN problem_banks b ON b.id=p.bank_id JOIN problem_versions v ON v.problem_id=p.id
  LEFT JOIN problem_public_statements ps ON ps.version_id=v.id
- WHERE p.owner_scope='school' AND b.school_id=current_setting('campus.school_id')::uuid;
+ WHERE b.school_id=current_setting('campus.school_id')::uuid AND (p.owner_scope='school' OR
+  EXISTS(SELECT 1 FROM assignment_problems pin JOIN assignments a ON a.id=pin.assignment_id
+   WHERE (pin.problem_id,pin.version_id,a.school_id)=(p.id,v.id,b.school_id)) OR
+  EXISTS(SELECT 1 FROM timed_practice_problems pin JOIN timed_practices t ON t.id=pin.practice_id
+   WHERE (pin.problem_id,pin.version_id,t.school_id)=(p.id,v.id,b.school_id)));
 CREATE TEMP TABLE prior_publications ON COMMIT DROP AS TABLE school_problem_publications;
 CREATE TEMP TABLE scoped_versions ON COMMIT DROP AS SELECT e.*,
  jsonb_build_object('title',title,'statement',coalesce(reviewed_statement,statement),'metadata',coalesce(reviewed_metadata,metadata),
@@ -119,14 +123,34 @@ CREATE TEMP TABLE scoped_versions ON COMMIT DROP AS SELECT e.*,
  FROM catalog_editions e;
 INSERT INTO school_problems(school_id,id,bank_id,owner_account_id,draft,revision,request_id,created_at,updated_at,tutorial_mode,tutorial_body,tutorial_revision)
  SELECT school_id,problem_id,bank_id,owner_account_id,coalesce(edit_draft,definition || jsonb_build_object('statement',statement,'metadata',metadata)),ordinal+CASE WHEN edit_draft IS NOT NULL THEN 1 ELSE 0 END,problem_id,
- problem_created,created_at,tutorial_mode,tutorial_body,tutorial_revision FROM scoped_versions WHERE authoring_version_id=id;
+ problem_created,created_at,tutorial_mode,tutorial_body,tutorial_revision FROM scoped_versions WHERE owner_scope='school' AND authoring_version_id=id;
 INSERT INTO school_problem_versions(school_id,id,problem_id,draft_revision,definition,created_at)
- SELECT school_id,id,problem_id,ordinal,definition,created_at FROM scoped_versions;
+ SELECT school_id,id,problem_id,ordinal,definition,created_at FROM scoped_versions WHERE owner_scope='school';
 UPDATE school_problem_publication_requests r SET catalog_version_id=NULL FROM scoped_versions e
- WHERE (r.school_id,r.problem_id,r.catalog_version_id)=(e.school_id,e.problem_id,e.id);
+ WHERE e.owner_scope='school' AND (r.school_id,r.problem_id,r.catalog_version_id)=(e.school_id,e.problem_id,e.id);
 UPDATE school_problems p SET published_version_id=CASE WHEN e.published_at IS NOT NULL THEN e.id END,published=e.archived_at IS NULL AND e.bank_archived IS NULL AND e.visibility='school'
  AND e.published_at IS NOT NULL AND e.school_visible_at IS NOT NULL AND e.rank_review_status='approved'
- FROM scoped_versions e WHERE e.current_version_id=e.id AND (p.school_id,p.id)=(e.school_id,e.problem_id);
+ FROM scoped_versions e WHERE e.owner_scope='school' AND e.current_version_id=e.id AND (p.school_id,p.id)=(e.school_id,e.problem_id);
+-- Historical assignments can pin platform-owned versions that never entered the
+-- public judge. Use the service-managed bank without changing catalog ownership,
+-- publication, or the school's authoring access.
+INSERT INTO school_problem_banks(school_id,id,owner_account_id,name,request_id,resource_kind)
+ SELECT DISTINCT ON(school_id) school_id,'00000000-0000-4000-8000-000000000074',owner_account_id,
+ 'Public practice','00000000-0000-4000-8000-000000000074','publication'
+ FROM scoped_versions WHERE owner_scope='platform' ORDER BY school_id,problem_id,id
+ ON CONFLICT(school_id,id) DO NOTHING;
+INSERT INTO school_problems(school_id,id,bank_id,owner_account_id,draft,request_id,created_at)
+ SELECT DISTINCT ON(school_id,problem_id) school_id,problem_id,'00000000-0000-4000-8000-000000000074',
+ owner_account_id,'{}',problem_id,problem_created FROM scoped_versions WHERE owner_scope='platform'
+ ORDER BY school_id,problem_id,id ON CONFLICT(school_id,id) DO NOTHING;
+INSERT INTO school_problem_versions(school_id,id,problem_id,draft_revision,definition,created_at)
+ SELECT e.school_id,e.id,e.problem_id,e.ordinal+coalesce(existing.last_revision,0),
+ e.definition-'reference_code'-'reference_language',e.created_at
+ FROM scoped_versions e LEFT JOIN LATERAL (
+  SELECT max(v.draft_revision) last_revision FROM school_problem_versions v
+  WHERE (v.school_id,v.problem_id)=(e.school_id,e.problem_id)
+ ) existing ON true WHERE e.owner_scope='platform'
+ ON CONFLICT(school_id,id) DO NOTHING;
 CREATE TEMP TABLE migrating_courses ON COMMIT DROP AS SELECT p.*,
  coalesce((SELECT jsonb_agg(jsonb_build_object('id',c.id,'title',c.title,'body',c.content,'sectionKey',c.section_key,'localizations',c.localizations,
  'objective',c.objective,'checkpoint',c.checkpoint,'checkpointAnswer',c.checkpoint_answer,'acslLinks',c.acsl_links,
@@ -176,7 +200,7 @@ INSERT INTO school_activity_classes(school_id,activity_id,class_id)
 INSERT INTO school_activity_attempts(school_id,id,activity_id,identity_id,account_id,started_at,deadline_at,finished_at)
  SELECT p.school_id,t.id,p.id,t.identity_id,t.account_id,t.started_at,t.deadline_at,t.finished_at FROM timed_attempts t JOIN timed_practices p ON p.id=t.practice_id;
 DO $$ BEGIN
- IF EXISTS(SELECT school_id,problem_id,id,definition FROM scoped_versions EXCEPT SELECT school_id,problem_id,id,definition FROM school_problem_versions)
+ IF EXISTS(SELECT school_id,problem_id,id,definition FROM scoped_versions WHERE owner_scope='school' EXCEPT SELECT school_id,problem_id,id,definition FROM school_problem_versions)
  OR EXISTS(TABLE pins EXCEPT SELECT school_id,activity_id,problem_id,version_id,position,points FROM school_activity_problems)
  OR EXISTS(SELECT c.school_id,c.id,c.chapters,c.properties FROM migrating_courses c EXCEPT SELECT school_id,id,chapters,properties FROM school_courses)
  OR EXISTS(SELECT c.school_id,cp.chapter_id,cp.problem_id,cp.version_id FROM migrating_courses c JOIN learning_chapters lc ON lc.path_id=c.id JOIN chapter_problems cp ON cp.chapter_id=lc.id

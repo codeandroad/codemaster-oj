@@ -22,10 +22,13 @@ import { CourseAccessSummary } from "@/components/course-access";
 import { LearningCourseReader } from "@/components/student/learning-course-reader";
 import { useCourseProgressRefresh } from "@/components/student/course-progress-refresh";
 import { LearningCourseList, LearningCourseRow, learningCourseTitleClass } from "@/components/student/learning-course-list";
-import { CourseCatalogSearch } from "@/components/student/learning-course-search";
+import { CourseCatalogSearch, useCourseCatalogQuery } from "@/components/student/learning-course-search";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
 import { panel } from "@/components/teacher/shared";
 import { CourseCatalogRow, CourseCatalogTable } from "@/components/teacher/course-catalog-table";
+import { courseSearchHref } from "@/components/student/learning-course-search-model";
+import { useCourseAdmissionDialog, type PublicCourseEntry } from "./course-admission";
+import { PublicCourseRow } from "./public-course-catalog";
 import { CourseAdmissionsDialog } from "./course-admissions-dialog";
 import { SchoolCourseImport } from "./school-course-import";
 import { SchoolChapterResources } from "./school-learning-resources";
@@ -88,10 +91,12 @@ export function SchoolCourses({
     (r) => r === "school_admin" || r === "teacher",
   );
   const canReviewAdmissions = school.roles.includes("school_admin");
+  const [learnerQuery, setLearnerQuery] = useCourseCatalogQuery();
   const [archived, setArchived] = useState(false),
-    [query, setQuery] = useState(""),
+    [staffQuery, setStaffQuery] = useState(""),
     [page, setPage] = useState(1),
     [revision, setRevision] = useState(0);
+  const query = canAuthor ? staffQuery : learnerQuery;
   const [edit, setEdit] = useState<string | null>(null),
     [draft, setDraft] = useState<CourseInput | undefined>(),
     [importing, setImporting] = useState(false);
@@ -184,13 +189,15 @@ export function SchoolCourses({
           </div>
         )}
         <CourseCatalogSearch query={query} onSearch={value => {
-          setQuery(value);
+          if (canAuthor) setStaffQuery(value);
+          else setLearnerQuery(value);
           setPage(1);
         }} onRefresh={onRefresh}/>
       </div>
       <CourseList
         key={`${school.id}:${query}:${page}:${archived}:${revision}:${refreshRevision}`}
-        path={`${base}?page=${page}&q=${encodeURIComponent(query)}&archived=${archived}`}
+        path={`${base}?page=${page}&q=${encodeURIComponent(query)}&archived=${archived}${canAuthor ? "" : "&includePlatform=true"}`}
+        schoolId={school.id}
         page={page}
         onPage={setPage}
         canAuthor={canAuthor}
@@ -335,6 +342,7 @@ export function SchoolCourses({
 }
 function CourseList({
   path,
+  schoolId,
   page,
   onPage,
   canAuthor,
@@ -346,6 +354,7 @@ function CourseList({
   onAdmissions,
 }: {
   path: string;
+  schoolId: string;
   page: number;
   onPage: (page: number) => void;
   canAuthor: boolean;
@@ -358,10 +367,14 @@ function CourseList({
 }) {
   const text = useSchoolText();
   const { language } = useCourseLanguage();
-  const resource = useData<CoursePage<SchoolCourse>>(path);
-  const platform = useData<{items:PlatformCourse[]}>(canAuthor?`platform/courses?schoolId=${path.split("/")[1]}&view=catalog`:null);
+  const resource = useData<CoursePage<SchoolCourse> & { platformCourses?: PublicCourseEntry[] }>(path);
+  const platform = useData<{items:PlatformCourse[]}>(canAuthor?`platform/courses?schoolId=${schoolId}&view=catalog`:null);
   const archived=new URLSearchParams(path.split("?")[1]??"").get("archived")==="true";
   const platformCourses=page===1?(platform.data?.items??[]).filter(course=>course.archived===archived&&`${course.title} ${course.description}`.toLowerCase().includes(query.toLowerCase())):[];
+  const platformHref = (id: string) => courseSearchHref(
+    `/schools?${new URLSearchParams({schoolId,section:"courses",scope:"school",publicCourseId:id})}`, query,
+  );
+  const admission = useCourseAdmissionDialog(platformHref, resource.reload);
   if (canAuthor) return (
     <Loading resource={resource}>
       {platform.error&&<p role="alert" className="text-sm text-destructive">{platform.error}</p>}
@@ -397,15 +410,19 @@ function CourseList({
   );
   return (
     <Loading resource={resource}>
-      <LearningCourseList empty={!resource.data?.items.length ? (query
+      {admission.feedback}
+      <LearningCourseList empty={!resource.data?.items.length && !resource.data?.platformCourses?.length ? (query
         ? text("No courses match this search.", "没有符合搜索条件的课程。")
         : text("No courses in this view.", "当前列表暂无课程。")) : undefined}>
+        {resource.data?.platformCourses?.map(item => localizedCourse(item, language)).map(course =>
+          <PublicCourseRow key={`platform:${course.id}`} course={course} href={platformHref(course.id)} admission={admission}/>)}
         {resource.data?.items.map(item => localizedCourse(item, language)).map(course => <LearningCourseRow key={course.id} course={course}
           title={<button type="button" className={learningCourseTitleClass} onClick={() => onOpen(course.id)}>{course.title}</button>}
           status={course.accessScope === "school" ? text("School-wide", "本校学生") : text("Selected classes", "指定班级")}
           reading={{ value: course.completedChapters, total: course.chapterCount }}
           practice={{ value: course.completedExercises, total: course.totalExercises }} />)}
       </LearningCourseList>
+      {admission.dialog}
       <CoursePagination
         page={page}
         hasMore={resource.data?.hasMore ?? false}

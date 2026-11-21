@@ -116,40 +116,44 @@ async function catalogue(pool, user, url) {
     const { rows } = await db.query(`SELECT l.* FROM public_course_listings l WHERE withdrawn_at IS NULL
       AND NOT EXISTS(SELECT 1 FROM learning_paths p WHERE p.id=l.course_id AND p.owner_scope='platform') ORDER BY approved_at DESC,id`);
     rows.unshift(...await platformCourseListings(db));
-    const { rows: progress } = await db.query(`SELECT listing_id,chapter_id,content_hash FROM public_course_progress
-      WHERE listing_id=ANY($1::uuid[]) AND account_id=$2 AND read`, [rows.map(row => row.id), user.id]);
-    const readByListing = new Map();
-    for (const row of progress) {
-      if (!readByListing.has(row.listing_id)) readByListing.set(row.listing_id, new Map());
-      readByListing.get(row.listing_id).set(row.chapter_id, row.content_hash);
-    }
-    const courses = [], admissionState = {};
-    for (const listing of rows) {
-      const course = await edition(db, listing);
-      if (!course) continue;
-      const admission = await admissionFor(db, listing, course, user.id, {state:admissionState});
-      if(admission==='denied')continue;
-      const entry = courseEntry(listing, course, admission);
-      if (admission === 'direct') {
-        const read = readByListing.get(listing.id);
-        const platformRead=listing.platform_owned?await platformReadProgress(db,listing,user.id):[];
-        const platformReadByChapter=new Map(platformRead.map(row=>[row.chapter_id,row.read]));
-        const contentHashChapterIds=listing.platform_owned?[...(read?.keys()??[])].filter(id=>!platformReadByChapter.has(id)):[];
-        const detail = await edition(db, listing, { detail: !listing.platform_owned, progress: listing.platform_owned, contentHashChapterIds });
-        if (!detail) continue;
-        entry.completedChapters = detail.chapters.filter(chapter => platformReadByChapter.get(chapter.id) ?? (read?.has(chapter.id) && read.get(chapter.id) === contentHash(chapter))).length;
-        const available = await publicChapterProblems(db, listing, detail, user.id);
-        const exercises = detail.chapters.flatMap(chapter => chapter.problems ?? [])
-          .flatMap(link => available.get(`${link.problemId}:${link.versionId}`) ?? []);
-        entry.totalExercises = exercises.length;
-        entry.completedExercises = exercises.filter(problem => problem.solved).length;
-        const acslLinks=await projectCourseAcslLinks(db,listing.platform_owned?acslSchoolId:listing.school_id,user,detail.chapters.flatMap(chapter=>chapter.acslLinks??[]));
-        const counts=acslLinkCounts(acslLinks);entry.totalExercises+=counts.total;entry.completedExercises+=counts.completed;
-      }
-      courses.push(entry);
-    }
-    return courses;
+    return courseCatalogueEntries(db, user, rows, acslSchoolId);
   });
+}
+
+export async function courseCatalogueEntries(db, user, rows, acslSchoolId) {
+  const { rows: progress } = await db.query(`SELECT listing_id,chapter_id,content_hash FROM public_course_progress
+    WHERE listing_id=ANY($1::uuid[]) AND account_id=$2 AND read`, [rows.map(row => row.id), user.id]);
+  const readByListing = new Map();
+  for (const row of progress) {
+    if (!readByListing.has(row.listing_id)) readByListing.set(row.listing_id, new Map());
+    readByListing.get(row.listing_id).set(row.chapter_id, row.content_hash);
+  }
+  const courses = [], admissionState = {};
+  for (const listing of rows) {
+    const course = await edition(db, listing);
+    if (!course) continue;
+    const admission = await admissionFor(db, listing, course, user.id, {state:admissionState});
+    if(admission==='denied')continue;
+    const entry = courseEntry(listing, course, admission);
+    if (admission === 'direct') {
+      const read = readByListing.get(listing.id);
+      const platformRead=listing.platform_owned?await platformReadProgress(db,listing,user.id):[];
+      const platformReadByChapter=new Map(platformRead.map(row=>[row.chapter_id,row.read]));
+      const contentHashChapterIds=listing.platform_owned?[...(read?.keys()??[])].filter(id=>!platformReadByChapter.has(id)):[];
+      const detail = await edition(db, listing, { detail: !listing.platform_owned, progress: listing.platform_owned, contentHashChapterIds });
+      if (!detail) continue;
+      entry.completedChapters = detail.chapters.filter(chapter => platformReadByChapter.get(chapter.id) ?? (read?.has(chapter.id) && read.get(chapter.id) === contentHash(chapter))).length;
+      const available = await publicChapterProblems(db, listing, detail, user.id);
+      const exercises = detail.chapters.flatMap(chapter => chapter.problems ?? [])
+        .flatMap(link => available.get(`${link.problemId}:${link.versionId}`) ?? []);
+      entry.totalExercises = exercises.length;
+      entry.completedExercises = exercises.filter(problem => problem.solved).length;
+      const acslLinks=await projectCourseAcslLinks(db,listing.platform_owned?acslSchoolId:listing.school_id,user,detail.chapters.flatMap(chapter=>chapter.acslLinks??[]));
+      const counts=acslLinkCounts(acslLinks);entry.totalExercises+=counts.total;entry.completedExercises+=counts.completed;
+    }
+    courses.push(entry);
+  }
+  return courses;
 }
 
 

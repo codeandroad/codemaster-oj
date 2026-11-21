@@ -22,4 +22,7 @@ test('returning from a public course exercise inside a school preserves the chap
   const url=new URL(href,'http://localhost');
   assert.equal(url.pathname,'/schools');
   assert.deepEqual(Object.fromEntries(url.searchParams),{schoolId:'s',section:'courses',scope:'public',publicCourseId:'c',chapterId:'h'});
+  const schoolHref=publicPracticeReturnHref('schoolId=s&section=problems&scope=public&publicCourseId=c&publicChapterId=h&problemId=p&courseScope=school&courseQ=Python','/schools');
+  const schoolCourse=new URL(schoolHref,'http://localhost');
+  assert.deepEqual(Object.fromEntries(schoolCourse.searchParams),{schoolId:'s',section:'courses',scope:'school',publicCourseId:'c',chapterId:'h',courseQ:'Python'});
 });

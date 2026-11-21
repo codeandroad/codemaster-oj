@@ -25,12 +25,12 @@ export function publicPracticeReturnHref(search: string, pathname = "/practice/p
   const params = new URLSearchParams(search);
   const course = params.get("publicCourseId"), chapter = params.get("publicChapterId");
   if (pathname === "/schools" && course && chapter && params.get("fromProblemCatalog") !== "1") {
-    const query = new URLSearchParams({schoolId:params.get("schoolId") ?? "",section:"courses",scope:"public",publicCourseId:course,chapterId:chapter});
+    const query = new URLSearchParams({schoolId:params.get("schoolId") ?? "",section:"courses",scope:params.get("courseScope")==="school"?"school":"public",publicCourseId:course,chapterId:chapter});
     if (params.get("courseQ")) query.set("courseQ",params.get("courseQ")!);
     return `/schools?${query}`;
   }
   if (course && chapter && params.get("fromProblemCatalog") !== "1") return `/practice/courses/${encodeURIComponent(course)}?${new URLSearchParams({chapterId: chapter, ...(params.get("workspaceSchoolId") ? {workspaceSchoolId: params.get("workspaceSchoolId")!} : {}), ...(params.get("courseQ") ? {courseQ: params.get("courseQ")!} : {})})}`;
-  for (const key of ["problemId", "versionId", "publicCourseId", "publicChapterId", "courseQ", "fromProblemCatalog"]) params.delete(key);
+  for (const key of ["problemId", "versionId", "publicCourseId", "publicChapterId", "courseScope", "courseQ", "fromProblemCatalog"]) params.delete(key);
   return `${pathname}${params.size ? `?${params}` : ""}`;
 }
 export function publicDraftStorage(userId: string, problem: Problem, storage: Pick<Storage,"getItem"|"setItem"> & Partial<Pick<Storage,"key"|"length">>) {

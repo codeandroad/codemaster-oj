@@ -11,12 +11,19 @@ async function platformCourseChapters(db,courseId) {
 // Keep existing catalogue URLs when a school source moves to platform ownership.
 // New platform courses use their own stable ID and do not impersonate a school
 // publication or create a school approval record.
-export async function platformCourseListings(db,id=null) {
+export async function platformCourseListings(db,id=null,{schoolId=null,query=''}={}) {
  return (await db.query(`SELECT COALESCE(l.id,p.id) id,p.id course_id,p.school_id,
   p.platform_revision revision,'direct'::text access_mode,true platform_owned
   FROM learning_paths p LEFT JOIN public_course_listings l ON l.course_id=p.id AND l.school_id=p.school_id
   WHERE p.owner_scope='platform' AND ($1::uuid IS NULL OR p.id=$1 OR l.id=$1)
-  ORDER BY p.updated_at DESC,p.id`,[id])).rows;
+  AND ($2::uuid IS NULL OR (p.published_at IS NOT NULL AND p.archived_at IS NULL AND p.withdrawn_at IS NULL AND p.listed
+    AND (p.available_from IS NULL OR p.available_from<=now()) AND (p.available_until IS NULL OR p.available_until>now())
+    AND (p.platform_audience_scope='custom' AND EXISTS(SELECT 1 FROM platform_course_rules r
+      WHERE r.course_id=p.id AND r.target_kind='school' AND r.school_id=$2 AND r.active)
+      OR p.platform_access_scope='schools' AND $2=ANY(p.platform_school_ids)
+        AND NOT EXISTS(SELECT 1 FROM platform_course_rules r WHERE r.course_id=p.id))))
+  AND ($3='' OR strpos(lower(p.title||' '||p.description||' '||COALESCE(p.localizations,'{}'::jsonb)::text),lower($3))>0)
+  ORDER BY p.updated_at DESC,p.id`,[id,schoolId,query])).rows;
 }
 export async function platformCourseEdition(db,listing,{detail=false,lock=false}={}) {
  const p=(await db.query(`SELECT p.*,p.platform_revision revision,'平台管理员'::text school_name,

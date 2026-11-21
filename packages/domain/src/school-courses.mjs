@@ -243,6 +243,11 @@ export async function handleSchoolCourses(context){
    if(archived&&role==='student')fail(403,'FORBIDDEN','学生不能访问归档课程');
    const q=field(url.searchParams.get('q')??'','搜索关键词',{min:0,max:100});
    const identityId=role==='student'?await studentIdentity(db,schoolId,user.id):null;
+   const includePlatform=role==='student'&&url.searchParams.get('includePlatform')==='true';
+   const platform=includePlatform?await platformCourseListings(db,null,{schoolId,query:q}):[];
+   const offset=(page-1)*PAGE_SIZE;
+   const selectedPlatform=platform.slice(offset,offset+PAGE_SIZE);
+   const remaining=PAGE_SIZE-selectedPlatform.length;
    const {rows}=await db.query(`SELECT c.id FROM school_courses c
     LEFT JOIN school_course_publications p ON p.school_id=c.school_id AND p.course_id=c.id AND p.revision=c.published_revision
     WHERE c.school_id=$1 AND (c.archived_at IS NOT NULL)=$8 AND (
@@ -253,10 +258,19 @@ export async function handleSchoolCourses(context){
        SELECT 1 FROM school_course_publication_classes pc JOIN school_class_roster r ON r.school_id=pc.school_id AND r.class_id=pc.class_id
        WHERE pc.school_id=c.school_id AND pc.course_id=c.id AND pc.revision=c.published_revision AND r.identity_id=$4 AND EXISTS(SELECT 1 FROM school_classes active WHERE active.school_id=pc.school_id AND active.id=pc.class_id AND active.archived_at IS NULL))))
      AND ($5='' OR strpos(lower(CASE WHEN $2='student' THEN p.title||' '||p.description||' '||COALESCE(p.properties->'localizations','{}'::jsonb)::text ELSE c.title||' '||c.description||' '||COALESCE(c.properties->'localizations','{}'::jsonb)::text END),lower($5))>0)
-    ORDER BY c.created_at DESC,c.id LIMIT $6 OFFSET $7`,[schoolId,role,user.id,identityId,q,PAGE_SIZE+1,(page-1)*PAGE_SIZE,archived]);
+    ORDER BY c.created_at DESC,c.id LIMIT $6 OFFSET $7`,[schoolId,role,user.id,identityId,q,remaining+1,Math.max(0,offset-platform.length),archived]);
    const items=[];
-   for(const row of rows.slice(0,PAGE_SIZE))items.push(await shape(db,schoolId,await loadSchoolCourse(db,schoolId,row.id,user,role),{user}));
-   return reply({items,page,hasMore:rows.length>PAGE_SIZE});
+   for(const row of rows.slice(0,remaining))items.push(await shape(db,schoolId,await loadSchoolCourse(db,schoolId,row.id,user,role),{user}));
+   const result={items,page,hasMore:platform.length>offset+PAGE_SIZE||rows.length>remaining};
+   if(includePlatform){
+    result.platformCourses=[];
+    if(selectedPlatform.length){
+     await db.query("SELECT set_config('campus.account_id',$1,true)",[user.id]);
+     const { courseCatalogueEntries }=await import('./public-learning.mjs');
+     result.platformCourses=await courseCatalogueEntries(db,user,selectedPlatform,schoolId);
+    }
+   }
+   return reply(result);
   }
   if(!courseId&&method==='POST'){
    if(!['school_admin','teacher'].includes(role))fail(403,'FORBIDDEN','需要本校教职权限');

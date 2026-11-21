@@ -50,8 +50,14 @@ function safeHref(value: string | null | undefined, schoolId: string, kind: "acs
     result.set("section", kind === "acsl" ? "acsl" : "courses");
     if (params.has("schoolRole")) result.set("schoolRole", "student");
     if (kind === "course") {
-      if (!uuid.test(params.get("courseId") ?? "") || params.has("chapterId") && !uuid.test(params.get("chapterId") ?? "")) return null;
-      result.set("courseId", params.get("courseId")!);
+      const platformCourse = params.has("publicCourseId");
+      const courseKey = platformCourse ? "publicCourseId" : "courseId";
+      if (!uuid.test(params.get(courseKey) ?? "") || params.has("chapterId") && !uuid.test(params.get("chapterId") ?? "")) return null;
+      if (platformCourse) {
+        if (params.has("courseId") || params.get("scope") !== "school") return null;
+        result.set("scope", "school");
+      }
+      result.set(courseKey, params.get(courseKey)!);
       if (params.has("chapterId")) result.set("chapterId", params.get("chapterId")!);
     }
   } else {

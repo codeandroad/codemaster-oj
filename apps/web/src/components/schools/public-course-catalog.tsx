@@ -63,31 +63,39 @@ export function PublicCourseCatalog({ courseHref }: { courseHref: (id: string) =
   const [query, setQuery] = useCourseCatalogQuery();
   const courses = filterCourseCatalog((catalog.data?.courses ?? []).map(course => localizedCourse(course, language)), query);
   const detailHref = (id: string) => courseSearchHref(courseHref(id), query);
-  const { busy, openCourse, feedback, dialog } = useCourseAdmissionDialog(detailHref, catalog.reload);
+  const admission = useCourseAdmissionDialog(detailHref, catalog.reload);
 
   return <div className="space-y-3">
     <CourseCatalogSearch query={query} onSearch={setQuery}/>
-    {feedback}
+    {admission.feedback}
     <Loading resource={catalog}>
       <LearningCourseList empty={!courses.length ? (query
         ? text("No courses match this search.", "没有符合搜索条件的课程。")
         : text("No public courses yet.", "暂无公开课程。")) : undefined}>
-        {courses.map(course => {
-          const title = course.admission === "direct"
-            ? <AppLink href={detailHref(course.id)} className={learningCourseTitleClass}>{course.title}</AppLink>
-            : <button type="button" className={learningCourseTitleClass} disabled={busy}
-                onClick={event => void openCourse(event, course.id)}>{course.title}</button>;
-          const reading = course.admission === "direct" && course.completedChapters !== undefined
-            ? { value: course.completedChapters, total: course.chapterCount }
-            : undefined;
-          return <LearningCourseRow key={course.id} course={course} title={title} source={courseSourceName(course)}
-            status={courseAdmissionLabel(course.admission, text, reading ? undefined : course.chapterCount)} reading={reading}
-            practice={course.admission === "direct" && course.totalExercises !== undefined ? { value: course.completedExercises ?? 0, total: course.totalExercises } : undefined} />;
-        })}
+        {courses.map(course => <PublicCourseRow key={course.id} course={course} href={detailHref(course.id)} admission={admission}/>)}
       </LearningCourseList>
     </Loading>
-    {dialog}
+    {admission.dialog}
   </div>;
+}
+
+export function PublicCourseRow({course, href, admission}: {
+  course: PublicCourseEntry;
+  href: string;
+  admission: Pick<ReturnType<typeof useCourseAdmissionDialog>, "busy" | "openCourse">;
+}) {
+  const text = useSchoolText();
+  const title = course.admission === "direct"
+    ? <AppLink href={href} className={learningCourseTitleClass}>{course.title}</AppLink>
+    : <button type="button" className={learningCourseTitleClass} disabled={admission.busy}
+        onClick={event => void admission.openCourse(event, course.id)}>{course.title}</button>;
+  const reading = course.admission === "direct" && course.completedChapters !== undefined
+    ? { value: course.completedChapters, total: course.chapterCount }
+    : undefined;
+  return <LearningCourseRow course={course} title={title} source={courseSourceName(course)}
+    status={courseAdmissionLabel(course.admission, text, reading ? undefined : course.chapterCount)} reading={reading}
+    practice={course.admission === "direct" && course.totalExercises !== undefined
+      ? { value: course.completedExercises ?? 0, total: course.totalExercises } : undefined}/>;
 }
 
 export function PublicCoursePage({ id, homeHref, workspaceSchoolId }: { id: string; homeHref: string; workspaceSchoolId?: string | null }) {
@@ -128,7 +136,7 @@ function CourseReader({ id, courseQuery, workspaceSchoolId, platformOwned }: { p
       objective: chapter.objective, checkpoint: chapter.checkpoint, checkpointAnswer: chapter.checkpointAnswer,
       localizations: chapter.localizations, completed: chapter.read,
       problems: chapter.problems.map(problem => ({ id: problem.problemId, title: problem.title, completed: problem.solved,
-        href: `${pathname === "/schools" ? "/schools" : "/practice/problems"}?${new URLSearchParams({ ...(pathname === "/schools" && schoolId && {schoolId,section:"problems",scope:"public"}), problemId: problem.problemId, versionId: problem.versionId,
+        href: `${pathname === "/schools" ? "/schools" : "/practice/problems"}?${new URLSearchParams({ ...(pathname === "/schools" && schoolId && {schoolId,section:"problems",scope:"public", ...(location.get("scope") === "school" && {courseScope:"school"})}), problemId: problem.problemId, versionId: problem.versionId,
           publicCourseId: id, publicChapterId: chapter.id, ...(workspaceSchoolId && { workspaceSchoolId }), ...(courseQuery && { courseQ: courseQuery }) })}`,
       })),
     }))}
@@ -140,7 +148,9 @@ function CourseReader({ id, courseQuery, workspaceSchoolId, platformOwned }: { p
       if (course.data?.ownerScope !== "platform") return null;
       const links = course.data.chapters.find(chapter => chapter.id === chapterId)?.acslLinks ?? [];
       return schoolId && links.length ? <CourseAcslPractice links={links} schoolId={schoolId}
-        courseHref={courseLanguageHref(`/practice/courses/${encodeURIComponent(id)}?${new URLSearchParams({ schoolId, chapterId })}`, language)}/> : null;
+        courseHref={courseLanguageHref(pathname === "/schools" && location.get("scope") === "school"
+          ? `/schools?${new URLSearchParams({schoolId, section:"courses", scope:"school", publicCourseId:id, chapterId})}`
+          : `/practice/courses/${encodeURIComponent(id)}?${new URLSearchParams({ schoolId, chapterId })}`, language)}/> : null;
     }}
     canTrackProgress={course.data.canTrackProgress}
     onRead={async chapterId => {

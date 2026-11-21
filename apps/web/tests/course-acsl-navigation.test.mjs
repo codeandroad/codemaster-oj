@@ -84,6 +84,10 @@ test("school-scoped routes keep their school and chapter when both directions ar
   assert.equal(returned.get("section"), "courses");
   assert.equal(returned.get("chapterId"), chapterId);
   assert.equal(acslLearningHref(`${course}?schoolId=${school}`, schoolPaper, otherSchool), null);
+  const assignedCourse = `/schools?schoolId=${otherSchool}&section=courses&scope=school&publicCourseId=${courseId}&chapterId=${chapterId}`;
+  const attached = acslPracticeHref(schoolPaper, assignedCourse, otherSchool);
+  assert.equal(courseReturnHref(url(attached).searchParams, otherSchool), assignedCourse);
+  assert.equal(safeCourseHref(assignedCourse, school), null);
 });
 
 test("catalog → platform course → practice and return keep school, filters and language", () => {

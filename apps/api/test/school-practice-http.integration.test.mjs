@@ -477,6 +477,34 @@ test('school and public practice Nest transport requires scoped membership, CSRF
   });
   await pool.query(`INSERT INTO school_identities(school_id,kind,number,name,account_id)
    VALUES($1,'student','exchange','Exchange student',$2) ON CONFLICT DO NOTHING`,[school.id,users.student.id]);
+  await t.test('the school course catalog includes platform courses addressed to that school', async () => {
+   const target={scope:'custom',schoolRules:[{schoolId:school.id,admissionMode:'application'}]};
+   const create=async(title,audiencePolicy)=>{
+    const created=(await request('/platform/courses',{auth:auth.platform,method:'POST',status:201,
+     body:{requestId:randomUUID(),title,audiencePolicy,chapters:[{title:'Lesson',content:'Private lesson body'}]}})).data;
+    return (await request('/platform/courses/'+created.id+'/publish',{auth:auth.platform,method:'POST',
+     body:{expectedRevision:created.revision,sourceVersion:created.sourceVersion}})).data;
+   };
+   const assigned=await create('Catalog check · School',target);
+   const global=await create('Catalog check · Global',{scope:'all'});
+   const path=prefix+'/courses?includePlatform=true';
+   const list=async suffix=>(await request(path+suffix,{auth:auth.student})).data;
+   const combined=await list('');
+   assert.ok(combined.items.length);
+   assert.ok(!combined.platformCourses.some(course=>course.id===global.id));
+   const row=combined.platformCourses.find(course=>course.id===assigned.id);
+   assert.equal(row.admission,'apply');
+   assert.equal(row.ownerScope,'platform');
+   assert.ok(!JSON.stringify(row).includes('Private lesson body'));
+   assert.deepEqual((await list('&q=Catalog%20check')).platformCourses.map(course=>course.id),[assigned.id]);
+   assert.deepEqual((await list('&page=2')).platformCourses,[]);
+   await request(path,{auth:auth.personal,status:404});
+   await request('/practice/courses/'+assigned.id,{auth:auth.personal,status:404});
+   const updated=(await request('/platform/courses/'+assigned.id,{auth:auth.platform,method:'PATCH',
+    body:{expectedRevision:assigned.revision,sourceVersion:assigned.sourceVersion,audiencePolicy:{scope:'all'}}})).data;
+   assert.ok(!(await list('')).platformCourses.some(course=>course.id===assigned.id));
+   await request('/practice/courses/'+updated.id,{auth:auth.student});
+  });
   await t.test('school leaderboard preserves the default and saved avatars', async () => {
    const path=prefix+'/leaderboard';
    const read=async()=>(await request(path,{auth:auth.student})).data.items.find(item=>item.isOwn);

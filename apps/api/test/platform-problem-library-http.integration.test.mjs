@@ -105,7 +105,71 @@ test('platform catalog categories and bulk actions preserve stable source identi
    assert.ok(a.archivedAt); assert.ok(!(await get(banks)).items.some(item => item.id === a.id));
    await post(source, { ...draft('Archived category'), bankId: a.id }, { status: 409 });
    a = await post(`${banks}/${a.id}/restore`, { revision: a.revision }); assert.equal(a.archivedAt, null);
-   for (const table of ['platform_problem_banks', 'platform_problem_imports', 'platform_content_editors']) await assert.rejects(worker.query(`SELECT * FROM ${table}`), error => error.code === '42501');
+   for (const table of ['platform_problem_banks', 'platform_problem_imports', 'platform_content_editors', 'platform_problem_audiences']) await assert.rejects(worker.query(`SELECT * FROM ${table}`), error => error.code === '42501');
+  });
+  await t.test('course and directed audiences share one searchable row and enforce live access at submission', async () => {
+   const learner = async username => {
+    const identity = (await pool.query("INSERT INTO identities(kind,number,name) VALUES('student',$1,$1) RETURNING id", [username])).rows[0];
+    const account = (await pool.query('INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,$2,$3) RETURNING id',
+     [identity.id, username, await hashPassword(password)])).rows[0];
+    await pool.query("INSERT INTO account_roles(account_id,role) VALUES($1,'student')", [account.id]);
+    const login = await request('/auth/login', { method: 'POST', actor: username, body: { username, password } });
+    sessions[username] = { cookie: login.cookie, csrfToken: login.data.csrfToken };
+    return { accountId: account.id, identityId: identity.id };
+   };
+   const pupil = await learner('pupil'), independent = await learner('independent');
+   const school = (await pool.query("INSERT INTO schools(slug,name) VALUES('access-school','Access School') RETURNING id")).rows[0];
+   const problem = (await pool.query("INSERT INTO problems(owner_account_id,owner_scope) VALUES($1,'platform') RETURNING id", [admin.id])).rows[0];
+   const version = (await pool.query(`INSERT INTO problem_versions(problem_id,title,statement,mode,comparator,reference_code,samples,
+    time_limit_ms,memory_limit_mb,validation_status,course_only_published)
+    VALUES($1,'Audience exercise','Print the input.','stdio','tokens','print(input())',$2,1000,128,'AC',true) RETURNING id`,
+   [problem.id, JSON.stringify([{input:'7',expected:'7'}])])).rows[0];
+   await pool.query("INSERT INTO test_cases(version_id,position,input,expected,weight) VALUES($1,0,'hidden','hidden',100)", [version.id]);
+   await pool.query('UPDATE problem_versions SET published_at=now() WHERE id=$1', [version.id]);
+   await pool.query('UPDATE problems SET current_version_id=$2 WHERE id=$1', [problem.id, version.id]);
+   const course = (await pool.query(`INSERT INTO learning_paths(owner_account_id,title,owner_scope,platform_audience_scope,published_at,required_language)
+    VALUES($1,'My course','platform','custom',now(),'python') RETURNING id`, [admin.id])).rows[0];
+   await pool.query("INSERT INTO platform_course_rules(course_id,rule_key,target_kind,identity_id) VALUES($1,'pupil','account',$2)", [course.id, pupil.identityId]);
+   const chapter = (await pool.query("INSERT INTO learning_chapters(path_id,title,content,position) VALUES($1,'Practice','Lesson',0) RETURNING id", [course.id])).rows[0];
+   await pool.query('INSERT INTO chapter_problems(chapter_id,problem_id,version_id,position) VALUES($1,$2,$3,0)', [chapter.id, problem.id, version.id]);
+   const endpoint = '/platform/problem-audiences', path = '/practice/problems/' + problem.id;
+   const context = { courseId: course.id, chapterId: chapter.id };
+   const listed = async (actor, courseOnly = false) => (await get(`/practice/problems?page=1&q=${problem.id}${courseOnly ? '&fromCourse=1' : ''}`, { actor })).items;
+   const submit = (actor, status, options = {}) => post(path + '/submissions', {
+    requestId: randomUUID(), kind:'submit', code:'print(input())', versionId:version.id, ...options,
+   }, { actor, status });
+   const provision = { operation:'grant', problemIds:[problem.id], targets:[
+    {kind:'school', id:school.id}, {kind:'account', id:independent.accountId},
+   ] };
+   assert.equal((await listed('pupil'))[0].courses[0].title, 'My course');
+   assert.deepEqual((await listed('pupil'))[0].courseContext, context);
+   assert.deepEqual(await listed('independent'), []);
+   await submit('pupil', 404);
+   await submit('pupil', 202, context);
+   await get('/platform/problem-audience-targets?kind=school', { actor:'teacher', status:403 });
+   assert.equal((await get('/platform/problem-audience-targets?kind=account&q=independent')).items[0].id, independent.accountId);
+   await post(endpoint, provision, { actor:'teacher', status:403 });
+   await post(endpoint, { ...provision, problemIds:[problem.id, first.id] }, { status:409 });
+   assert.deepEqual(await listed('independent'), []);
+   await post(endpoint, provision);
+   assert.equal((await get(endpoint + '?problemIds=' + problem.id)).items.length, 2);
+   await pool.query("INSERT INTO school_memberships(school_id,account_id,role) VALUES($1,$2,'student')", [school.id, pupil.accountId]);
+   assert.equal((await listed('pupil')).length, 1);
+   assert.equal((await listed('pupil'))[0].courseContext, undefined);
+   assert.deepEqual((await listed('pupil', true))[0].courseContext, context);
+   assert.equal((await listed('independent')).length, 1);
+   assert.deepEqual(await listed('teacher'), []);
+   assert.equal((await get(path, { actor:'independent' })).definition.referenceCode, undefined);
+   const job = await submit('independent', 202);
+   await post(endpoint, { ...provision, operation:'revoke' });
+   assert.deepEqual(await listed('independent'), []);
+   await get(path, { actor:'independent', status:404 });
+   await submit('independent', 404);
+   assert.ok((await get('/practice/submissions', { actor:'independent' })).items.some(item => item.id === job.id));
+   assert.deepEqual((await listed('pupil'))[0].courseContext, context);
+   await pool.query('UPDATE platform_course_rules SET active=false WHERE course_id=$1', [course.id]);
+   assert.deepEqual(await listed('pupil'), []);
+   await submit('pupil', 404, context);
   });
  } finally { if (app) await app.close(); if (worker) await worker.end(); await pool.end(); await manager.query(`DROP SCHEMA ${schema} CASCADE`); await manager.end(); }
 });

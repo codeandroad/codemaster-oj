@@ -8,6 +8,8 @@ try {
     GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO campus_app;
     GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO campus_app;
     REVOKE ALL ON platform_problem_banks,platform_problem_imports FROM PUBLIC,campus_worker;
+    REVOKE ALL ON platform_problem_audiences FROM PUBLIC,campus_worker,campus_app;
+    GRANT SELECT,INSERT,DELETE ON platform_problem_audiences TO campus_app;
     REVOKE DELETE ON platform_problem_banks FROM campus_app;
     REVOKE UPDATE,DELETE ON platform_problem_imports FROM campus_app;
     REVOKE ALL ON luq_problem_solutions FROM PUBLIC,campus_worker,campus_app;

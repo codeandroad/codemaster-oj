@@ -4,7 +4,7 @@ import { useLocale } from "@/components/locale-context";
 import { input } from "./data-state";
 import styles from "./problems-page.module.css";
 
-type CourseOption = { id: string; title: string; localizations?: Partial<Record<"en" | "zh", { title: string }>> };
+export type CourseOption = { id: string; title: string; localizations?: Partial<Record<"en" | "zh", { title: string }>> };
 
 export type ProblemCatalogResult<T> = {
   items: T[];

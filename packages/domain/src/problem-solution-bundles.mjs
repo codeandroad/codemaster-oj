@@ -44,7 +44,6 @@ export function editableAssistanceContent(row) {
 
 export function readAssistanceDraft(input, {subjectKey, kind, previous, requireNonBlank = false}) {
  if (input.solutions === undefined) {
-  if (previous?.pending_solution) fail(409, 'CONTENT_CHANGED', '此题解有待审核的修改，请重新载入后再保存');
   const body = field(input.body, '辅助正文', {max: maxBodyLength, trim: false});
   if (requireNonBlank && !body.trim()) fail(400, 'VALIDATION', '辅助正文不能为空');
   return {body, details: previous?.solution_details ?? {}};

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, CheckCircle2, ChevronDown } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUp, CheckCircle2, ChevronDown } from "lucide-react";
 import { useLocale } from "@/components/locale-context";
 import { LearningProgressSummary } from "@/components/learning-course";
 import { AppLink } from "@/components/navigation";
@@ -125,10 +125,15 @@ function ReaderLesson({ chapter, language, nextHref, onRead, canTrackProgress, e
   const text = (zh: string, en: string) => locale === "en" ? en : zh;
   const router = useRouter(), action = useMutation(), pending = useRef(false);
   const saveScroll = () => { try { sessionStorage.setItem(`learning-scroll:${scrollKey}:${chapter.id}`, String(window.scrollY)); } catch {} };
+  const hasPractice = chapter.problems.length > 0 || Boolean(extraPractice);
   return <article className="space-y-5" data-od-id="learning-chapter-content">
-    <LearningChapterContent chapter={chapter} language={language}/>
-    {(chapter.problems.length > 0 || Boolean(extraPractice)) && <section className={`${panel} p-5 sm:p-7`}>
-      <h2 className="text-lg font-bold">{text("配套练习", "Practice problems")}</h2>
+    <LearningChapterContent chapter={chapter} language={language} practiceJump={hasPractice} titleId="chapter-tutorial-top"/>
+    {hasPractice && <section id="chapter-practice" className={`${panel} p-5 sm:p-7`}>
+      <div className="flex flex-wrap items-start justify-between gap-3"><h2 className="text-lg font-bold">{text("配套练习", "Practice problems")}</h2>
+        <Button type="button" variant="ghost" size="sm" className="shrink-0"
+          onClick={() => document.getElementById("chapter-tutorial-top")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+          {text("返回教程", "Back to tutorial")}<ArrowUp size={15} aria-hidden="true"/>
+        </Button></div>
       {chapter.problems.map(problem => <div key={problem.id} className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
         <div><h3 className="font-semibold">{problem.available === false ? problem.title : <AppLink href={problem.href} className="text-primary hover:underline focus-visible:underline" onClick={saveScroll}>{problem.title}</AppLink>}</h3>
           {problem.completed ? <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-success/25 bg-success-soft px-2.5 py-1 text-sm font-semibold text-success"><CheckCircle2 size={15} aria-hidden="true"/>{text("已通过正式判题", "Accepted in formal judging")}</p>
@@ -159,10 +164,14 @@ function ReaderLesson({ chapter, language, nextHref, onRead, canTrackProgress, e
 }
 
 /** Shared lesson and checkpoint presentation for the reader and teacher previews. */
-export function LearningChapterContent({ chapter, language }: { language?: "en" | "zh"; chapter: Pick<ReaderChapter, "title" | "content" | "objective" | "checkpoint" | "checkpointAnswer"> }) {
+export function LearningChapterContent({ chapter, language, practiceJump = false, titleId }: { language?: "en" | "zh"; practiceJump?: boolean; titleId?: string; chapter: Pick<ReaderChapter, "title" | "content" | "objective" | "checkpoint" | "checkpointAnswer"> }) {
   const { locale } = useLocale(), text = (zh: string, en: string) => locale === "en" ? en : zh;
   return <div className="relative isolate space-y-5" data-od-id="learning-lesson-presentation">
-    <section className={`${panel} p-5 sm:p-7`}><h1 className="text-2xl font-bold">{chapter.title}</h1>
+    <section className={`${panel} p-5 sm:p-7`}><div className="flex flex-wrap items-start justify-between gap-3"><h1 id={titleId} className="text-2xl font-bold">{chapter.title}</h1>
+      {practiceJump && <Button type="button" variant="ghost" size="sm" className="shrink-0"
+        onClick={() => document.getElementById("chapter-practice")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+        {text("跳到练习", "Skip to practice")}<ArrowDown size={15} aria-hidden="true"/>
+      </Button>}</div>
       {chapter.objective && <div className="mt-4 border-b border-border pb-5"><h2 className="text-sm font-semibold">{text("学习目标", "Learning objective")}</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{chapter.objective}</p></div>}
       <div className="mt-6"><LessonContent language={language} content={chapter.content}/></div>
     </section>

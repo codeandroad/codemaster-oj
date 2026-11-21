@@ -9,3 +9,4 @@
 - Keep `docs/campus-judge-design-summary.md` topic anchors and decision timeline stable so superseded prototype and production choices remain traceable.
 - Keep credentials in ignored private files; do not add test passwords or deployment secrets to source or documentation.
 - Run meaningful transport, authorization, grading and sandbox checks after changes to those boundaries. Clearly distinguish earlier validation from checks rerun on the current implementation.
+- After validating each requested code change, commit the task's changes and deploy that revision to the local pilot at http://localhost:3004 before handing it back for verification.

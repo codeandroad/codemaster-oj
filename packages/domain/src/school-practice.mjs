@@ -2,6 +2,7 @@ import { problemProgress } from './problem-progress.mjs';
 import { assertLiveProblemVersion, assertPublishedRevision } from './live-problem-version.mjs';
 import { problemCatalogCourseRequest } from './problem-catalog-courses.mjs';
 import { platformCourseProblem } from './platform-course-problems.mjs';
+import { handlePlatformProblemAudiences, matchingProblemAudienceSql } from './platform-problem-audiences.mjs';
 import {publicScholarshipOperation,recordPublicPracticeStaffExposure} from './public-scholarship.mjs';
 import { schoolActivityJobVisibleSql, schoolActivityProblemAccess, schoolJobFeedback } from './school-activities.mjs';
 import { randomUUID } from 'node:crypto';
@@ -22,6 +23,7 @@ import { LANGUAGES, starterCodesFor } from './languages.mjs';
 import {
  decideLegacyPublicProblem, handleLegacyPublicProblemRequest,
  listLegacyPublicProblemReviews, previewLegacyPublicProblem, prepareLegacyPublicProblem, legacyPublicProblemCatalogRows,
+ platformProblemCatalogRows, preparePlatformCourseProblem,
 } from './legacy-public-problems.mjs';
 
 const reply=(body,status=200)=>({status,body});
@@ -151,23 +153,45 @@ async function projectJob(db,job){
   runtimeMs,memoryKb,
   message:r?.publicMessage??'',...feedback};
 }
-async function publicLoaded(db,user,id,courseContext={}){
- if(courseContext.courseId&&(await db.query(`SELECT 1 FROM learning_paths p LEFT JOIN public_course_listings l ON l.course_id=p.id
- WHERE p.owner_scope='platform' AND (p.id=$1 OR l.id=$1)`,[uuid(courseContext.courseId)])).rowCount){const scoped=await platformCourseProblem(db,user,id,courseContext);if(scoped)return scoped;}
- await activeAccount(db,user.id);
- let publication=(await db.query('SELECT * FROM school_problem_publications WHERE problem_id=$1 AND withdrawn_at IS NULL',[uuid(id)])).rows[0];
- if(!publication){const scoped=await platformCourseProblem(db,user,id,courseContext);if(scoped)return scoped;fail(404,'NOT_FOUND','Problem is unavailable.');}
- await lockSchoolTeaching(db,publication.school_id,{shared:true});
- publication=(await db.query('SELECT * FROM school_problem_publications WHERE problem_id=$1 AND withdrawn_at IS NULL',[uuid(id)])).rows[0];
- if(!publication)fail(404,'NOT_FOUND','Problem is unavailable.');
- await scope(db,publication.school_id);
- if(publication.school_id===LEGACY_SCHOOL_ID){
-  const p=await prepareLegacyPublicProblem(db,id);
-  if(!p)fail(404,'NOT_FOUND','Problem is unavailable.');
-  return p;
+async function loadScopedPublicProblem(db,user,id,courseContext,requireCourseContext){
+ await lockSchoolTeaching(db,LEGACY_SCHOOL_ID,{shared:true});
+ const grant=await db.query(`SELECT 1 FROM platform_problem_audiences audience
+  WHERE audience.problem_id=$1 AND ${matchingProblemAudienceSql('$2')} LIMIT 1`,[id,user.id]);
+ if(grant.rowCount){
+  await scope(db,LEGACY_SCHOOL_ID);
+  const directed=await preparePlatformCourseProblem(db,id);
+  if(directed)return directed;
  }
- const p=await loadProblem(db,publication.school_id,id,user,null,{publicOnly:true});
- return p;
+ if(!requireCourseContext||courseContext.courseId){
+  const scoped=await platformCourseProblem(db,user,id,courseContext);
+  if(scoped)return scoped;
+ }
+ fail(404,'NOT_FOUND','Problem is unavailable.');
+}
+
+async function publicLoaded(db,user,id,courseContext={},requireCourseContext=false){
+ if(courseContext.courseId&&(await db.query(`SELECT 1 FROM learning_paths p LEFT JOIN public_course_listings l ON l.course_id=p.id
+ WHERE p.owner_scope='platform' AND (p.id=$1 OR l.id=$1)`,[uuid(courseContext.courseId)])).rowCount){
+  const scoped=await platformCourseProblem(db,user,id,courseContext);
+  if(scoped)return scoped;
+ }
+ await activeAccount(db,user.id);
+ const publication=(await db.query('SELECT school_id FROM school_problem_publications WHERE problem_id=$1 AND withdrawn_at IS NULL',[uuid(id)])).rows[0];
+ if(!publication)return loadScopedPublicProblem(db,user,id,courseContext,requireCourseContext);
+ const schoolId=publication.school_id;
+ await lockSchoolTeaching(db,schoolId,{shared:true});
+ const current=await db.query('SELECT 1 FROM school_problem_publications WHERE problem_id=$1 AND school_id=$2 AND withdrawn_at IS NULL',[id,schoolId]);
+ if(schoolId===LEGACY_SCHOOL_ID){
+  if(current.rowCount){
+   await scope(db,schoolId);
+   const problem=await prepareLegacyPublicProblem(db,id);
+   if(problem)return problem;
+  }
+  return loadScopedPublicProblem(db,user,id,courseContext,requireCourseContext);
+ }
+ if(!current.rowCount)fail(404,'NOT_FOUND','Problem is unavailable.');
+ await scope(db,schoolId);
+ return loadProblem(db,schoolId,id,user,null,{publicOnly:true});
 }
 
 const rowsBySchool=rows=>{
@@ -203,6 +227,7 @@ async function publicCatalogRows(db,publications,lockedSchools) {
 
 export async function listPublicProblems(pool,user,url){
  const { courseId, includeCourses } = problemCatalogCourseRequest(url);
+ const courseOnly=url?.searchParams.get('fromCourse')==='1';
  const filters={
   topic:field(url?.searchParams?.get('topic')??'','Topic',{min:0,max:200}),
   status:enumValue(url?.searchParams?.get('status')??'',['','Not started','AC','WA','CE','RE','TLE','MLE','OLE','Waiting','Judging','Executed','System Error'],'Status'),
@@ -218,38 +243,63 @@ export async function listPublicProblems(pool,user,url){
  let skip=page==null?0:(page-1)*pageSize;
  return transaction(pool,async db=>{
   await activeAccount(db,user.id);
-  const courseFilter = includeCourses ? await publicProblemCatalogCourses(db, user, courseId) : null;
-  const versions = courseId ? courseFilter.versions : null;
-  const problemIds = versions ? [...versions.keys()] : null;
+  await lockSchoolTeaching(db,LEGACY_SCHOOL_ID,{shared:true});
+  const courseFilter=await publicProblemCatalogCourses(db,user,courseId,{platformOnly:!includeCourses&&!courseOnly});
+  const versions=courseId?courseFilter.versions:null;
+  const problemIds=versions?[...versions.keys()]:courseOnly?[...courseFilter.byProblem.keys()]:null;
+  const linkedPlatformIds=[...courseFilter.byProblem].filter(([,contexts])=>[...contexts.values()].some(context=>context.platform)).map(([id])=>id);
   const favorites=filters.savedOnly?new Set((await db.query('SELECT problem_id FROM problem_favorites WHERE identity_id=$1',[user.identityId])).rows.map(row=>row.problem_id)):null;
-  const items=[],lockedSchools=new Set(),topics=new Set(),progress=new Map();
+  const items=[],lockedSchools=new Set([LEGACY_SCHOOL_ID]),topics=new Set(),progress=new Map();
   const loadProgress=async rows=>{
    for(const [schoolId,schoolRows] of rowsBySchool(rows)){
     await scope(db,schoolId);
     for(const [id,state] of await problemProgress(db,user,schoolRows.map(row=>row.id)))progress.set(id,state);
    }
   };
+  const directedIds=(await db.query(`SELECT DISTINCT audience.problem_id FROM platform_problem_audiences audience
+   WHERE ${matchingProblemAudienceSql('$1')}`,[user.id])).rows.map(row=>row.problem_id);
+  const directed=new Set(directedIds), scopedIds=new Set([...linkedPlatformIds,...directedIds]);
   let cursor=null;
   while(true){
    // Filter after rechecking the current published version and its scope.
    // Seek across publication batches so search also reaches older releases.
-   const {rows}=await db.query(`SELECT problem_id,school_id,version_id,approved_at::text AS approved_at
-    FROM school_problem_publications WHERE withdrawn_at IS NULL AND (
-      $1::timestamptz IS NULL OR approved_at<$1 OR (approved_at=$1 AND problem_id>$2::uuid)
-    ) AND ($3::uuid[] IS NULL OR problem_id=ANY($3))
-    ORDER BY approved_at DESC,problem_id LIMIT 100`,[cursor?.approved_at??null,cursor?.problem_id??null, problemIds]);
+   const {rows}=await db.query(`WITH candidates AS (
+    SELECT problem_id,school_id,approved_at FROM school_problem_publications
+    WHERE withdrawn_at IS NULL AND ($3::uuid[] IS NULL OR problem_id=ANY($3))
+    UNION ALL
+    SELECT problem_id,$5::uuid,'-infinity'::timestamptz FROM unnest($4::uuid[]) AS scoped(problem_id)
+    WHERE ($3::uuid[] IS NULL OR problem_id=ANY($3)) AND NOT EXISTS (
+     SELECT 1 FROM school_problem_publications publication WHERE publication.problem_id=scoped.problem_id AND publication.withdrawn_at IS NULL
+    )
+   )
+   SELECT problem_id,school_id,approved_at::text AS approved_at FROM candidates
+   WHERE $1::timestamptz IS NULL OR approved_at<$1 OR (approved_at=$1 AND problem_id>$2::uuid)
+   ORDER BY candidates.approved_at DESC,problem_id LIMIT 100`,
+   [cursor?.approved_at??null,cursor?.problem_id??null,problemIds,[...scopedIds],LEGACY_SCHOOL_ID]);
    const current=await publicCatalogRows(db,rows,lockedSchools);
+   const supplemental=rows.filter(row=>!current.has(row.problem_id)&&scopedIds.has(row.problem_id)).map(row=>row.problem_id);
+   if(supplemental.length){
+    await scope(db,LEGACY_SCHOOL_ID);
+    for(const item of await platformProblemCatalogRows(db,supplemental)){
+     const tags=Array.isArray(item.tags)?item.tags.filter(tag=>typeof tag==='string'&&tag.trim()):[];
+     current.set(item.id,{...item,tags,courseRequired:!directed.has(item.id)});
+    }
+   }
    const candidates=[];
    for(const row of rows){
      const item=current.get(row.problem_id);
      if(!item||versions&&!versions.get(item.id)?.has(item.versionId))continue;
+     const contexts=[...(courseFilter.byProblem.get(item.id)?.values()??[])].filter(context=>context.versionId===item.versionId);
+     const course=courseId?contexts.find(context=>context.id===courseId):contexts[0];
+     if((courseOnly||item.courseRequired)&&!course)continue;
      // Topic choices describe the entire accessible course/catalogue, even
      // when another filter or the current page contains no matching problems.
      for(const tag of item.tags)topics.add(tag);
      if(items.length>limit)continue;
-     if(catalogQuery&&!`${item.id} ${item.title} ${item.bankName} ${item.tags.join(' ')}`.toLowerCase().includes(catalogQuery))continue;
+     if(catalogQuery&&!`${item.id} ${item.title} ${item.bankName} ${item.tags.join(' ')} ${contexts.map(context=>context.title).join(' ')}`.toLowerCase().includes(catalogQuery))continue;
      if(filters.topic&&!item.tags.includes(filters.topic)||filters.mode&&item.mode!==filters.mode||favorites&&!favorites.has(item.id))continue;
-     candidates.push(item);
+     candidates.push({...item,courses:contexts.map(({id,title,localizations})=>({id,title,localizations})),
+      ...((courseOnly||courseId||item.courseRequired)&&course&&{courseContext:{courseId:course.id,chapterId:course.chapterId}})});
    }
    // Only status filters need progress before pagination. The default route
    // still aggregates achievements for the displayed page alone.
@@ -270,9 +320,11 @@ export async function listPublicProblems(pool,user,url){
     status:progress.get(item.id)?.status??'Not started',tags:item.tags,mode:item.mode,difficulty:item.difficulty,
     hasDraftChanges:item.hasDraftChanges,id:item.id,schoolId:item.schoolId,bankId:item.bankId,bankName:item.bankName,
     title:item.title,revision:item.revision,published:item.published,versionId:item.versionId,
+    ...(item.courses.length&&{courses:item.courses}),...(item.courseContext&&{courseContext:item.courseContext}),
     canManage:false,canManageTutorial:false,validation:null})),
    topics:[...topics].sort((a,b)=>a.localeCompare(b)),filters,
-   ...(courseFilter && { courseId, courses: courseFilter.courses }),
+   ...(includeCourses && { courseId, courses: courseFilter.courses }),
+   ...(courseOnly && { fromCourse:true }),
    ...(page != null && { page, query, hasMore: items.length > limit }),
   };
  });
@@ -307,8 +359,12 @@ async function decideProblemPublication(db, user, {schoolId, problemId, versionI
 
 export async function schoolPracticeOperation({pool,user,route,url,method,body={}}){
  route??=url.pathname.replace(/^\/api\/v1/,'');
- const courseContext={courseId:body.courseId??url?.searchParams.get('courseId'),chapterId:body.chapterId??url?.searchParams.get('chapterId'),versionId:body.versionId??url?.searchParams.get('versionId')};
- const loadPublic=(db,user,id)=>publicLoaded(db,user,id,courseContext);
+ const isSubmission=method==='POST'&&/^\/practice\/problems\/[^/]+\/submissions$/.test(route);
+ const courseContext=isSubmission?{courseId:body.courseId,chapterId:body.chapterId,versionId:body.versionId}
+  :{courseId:body.courseId??url?.searchParams.get('courseId'),chapterId:body.chapterId??url?.searchParams.get('chapterId'),versionId:body.versionId??url?.searchParams.get('versionId')};
+ const loadPublic=(db,user,id)=>publicLoaded(db,user,id,courseContext,isSubmission);
+ const audience=await handlePlatformProblemAudiences({pool,user,route,url,method,body});
+ if(audience)return audience;
  const scholarship=await publicScholarshipOperation({pool,user,route,url,method,body},loadPublic);
  if(scholarship)return scholarship;
  if(route==='/practice/leaderboard'&&method==='GET')return publicPracticeLeaderboard({pool,user,url});

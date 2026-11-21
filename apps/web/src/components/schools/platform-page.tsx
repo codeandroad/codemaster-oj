@@ -9,12 +9,10 @@ import {
   Building2,
   BookOpen,
   BookOpenCheck,
-  Flag,
   RefreshCw,
 } from "lucide-react";
 import { WorkspaceFrame } from "@/components/workspace-frame";
 import { AccountMenu } from "@/components/account-menu";
-import { MessageReports } from "@/components/admin/message-reports";
 import { NotificationDropdown } from "@/components/student/notification-dropdown";
 import { useSearchParams, useRouter } from "next/navigation";
 import { PersonalWorkspaceSettings } from "./personal-workspace-settings";
@@ -45,9 +43,8 @@ import {
 const platformSections = {
   schools: { icon: Building2, en: "Schools", zh: "学校" },
   courses: { icon: BookOpen, en: "Platform courses", zh: "平台课程" },
-  "course-review": { icon: BookOpenCheck, en: "Course review", zh: "课程公开审核" },
   problems: { icon: BookOpenCheck, en: "Public problems", zh: "公开题库" },
-  "message-reports": { icon: Flag, en: "Message reports", zh: "留言举报" },
+  "course-review": { icon: BookOpenCheck, en: "Course review", zh: "课程公开审核" },
 } as const;
 type PlatformSection = keyof typeof platformSections;
 
@@ -230,8 +227,6 @@ function PlatformAdminPage({
                       <PlatformCourses />
                     ) : section === "course-review" ? (
                       <PublicCourseReview />
-                    ) : section === "message-reports" ? (
-                      <MessageReports practice />
                     ) : (
                       <PublicProblemReview user={user} />
                     )}

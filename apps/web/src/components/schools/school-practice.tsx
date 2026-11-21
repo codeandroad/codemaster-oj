@@ -456,8 +456,9 @@ function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation
 const publicFilterKeys = {
   topic: "publicProblemTopic", status: "publicProblemStatus", mode: "publicProblemMode", savedOnly: "publicProblemSavedOnly",
 };
-const publicCatalogKeys = ["publicProblemQuery", publicProblemCourseFilterKey, "publicProblemPage", ...Object.values(publicFilterKeys)];
+const publicCatalogKeys = ["publicProblemQuery", publicProblemCourseFilterKey, "publicProblemPage", "publicProblemsFromCourse", ...Object.values(publicFilterKeys)];
 type PublicProblemCatalog = ProblemCatalogResult<Problem> & {
+  fromCourse?: boolean;
   page: number; query: string; hasMore: boolean; topics: string[];
   filters: { topic: string; status: string; mode: string; savedOnly: boolean };
 };
@@ -476,6 +477,7 @@ function PublicPracticeContents({ accountId, problemId }: { accountId: string; p
   const selected = search.get("problemId") ?? problemId ?? null;
   const urlQuery = (search.get("publicProblemQuery") ?? "").slice(0, 100);
   const courseId = search.get(publicProblemCourseFilterKey)?.toLowerCase() ?? "";
+  const fromCourse = search.get("publicProblemsFromCourse") === "1";
   const topic = (search.get(publicFilterKeys.topic) ?? "").trim();
   const status = search.get(publicFilterKeys.status) ?? "";
   const mode = search.get(publicFilterKeys.mode) ?? "";
@@ -525,15 +527,23 @@ function PublicPracticeContents({ accountId, problemId }: { accountId: string; p
   const list = useData<PublicProblemCatalog>(
     ready ? `practice/problems?${new URLSearchParams({
       q: urlQuery.trim(), page: String(page), includeCourseFilters: "1", ...(courseId && { courseId }),
+      ...(fromCourse && { fromCourse: "1" }),
       ...(topic && { topic }), ...(status && { status }), ...(mode && { mode }), ...(savedOnly && { savedOnly: "1" }),
     })}` : "",
   );
   const matchesFilters = list.data?.query === query.trim() && list.data?.page === page && (list.data?.courseId ?? "") === courseId
+    && Boolean(list.data?.fromCourse) === fromCourse
     && list.data?.filters?.topic === topic && list.data?.filters?.status === status
     && list.data?.filters?.mode === mode && list.data?.filters?.savedOnly === savedOnly;
   const rows = matchesFilters ? list.data?.items ?? [] : [];
   const pending = !list.error && (!ready || list.loading || !matchesFilters);
-  const selectProblem = (id: string | null) => changeUrlFilters({ problemId: id, publicProblemQuery: query }, true);
+  const selectProblem = (id: string | null) => {
+    const course = rows.find(row => row.id === id)?.courseContext;
+    changeUrlFilters({
+      problemId: id, publicProblemQuery: query, publicCourseId: course?.courseId ?? null,
+      publicChapterId: course?.chapterId ?? null, fromProblemCatalog: id ? "1" : null,
+    }, true);
+  };
   function changeCourse(value: string) {
     clearTimeout(timer.current);
     changeUrlFilters({ [publicProblemCourseFilterKey]: value, publicProblemQuery: query, publicProblemPage: null });
@@ -552,14 +562,21 @@ function PublicPracticeContents({ accountId, problemId }: { accountId: string; p
         onCompositionStart={() => { composing.current = true; clearTimeout(timer.current); }}
         onCompositionEnd={value => { composing.current = false; changeQuery(value); }} />
       <ProblemCatalogCourseFilter courses={list.data?.courses} value={courseId} onChange={changeCourse}/>
+      <label className="inline-flex min-h-9 items-center gap-2 whitespace-nowrap text-sm">
+        <input type="checkbox" className="accent-primary" checked={fromCourse} onChange={event => {
+          clearTimeout(timer.current);
+          changeUrlFilters({ publicProblemsFromCourse: event.currentTarget.checked ? "1" : null, publicProblemQuery: query, publicProblemPage: null });
+        }}/>
+        {tx("来自我的课程", "From my courses")}
+      </label>
       <StudentProblemFilter topics={list.data?.topics ?? []} topic={topic} status={status} mode={mode} savedOnly={savedOnly}
         onTopic={value => changeFilter("topic", value)} onStatus={value => changeFilter("status", value)}
         onMode={value => changeFilter("mode", value)} onSaved={value => changeFilter("savedOnly", value ? "1" : "")}/>
     </div>
     <State data={{ ...list, loading: pending, data: pending ? null : list.data }}>
-      <LearnerProblemTable rows={rows} onOpen={selectProblem} empty={query.trim() || courseId || topic || status || mode || savedOnly
+      <LearnerProblemTable rows={rows} onOpen={selectProblem} empty={query.trim() || courseId || fromCourse || topic || status || mode || savedOnly
         ? tx("没有匹配的题目，请调整搜索或筛选条件。", "No matching problems. Try another search or filter.")
-        : tx("暂时没有可显示的公开题目。", "There are no public problems to show.")} />
+        : tx("暂时没有可练习的平台题目。", "There are no platform problems available to practice.")} />
       {(page > 1 || list.data?.hasMore) && <nav className="flex flex-wrap items-center justify-end gap-2" aria-label={tx("题目分页", "Problem pages")}>
         <Button size="sm" variant="secondary" disabled={page === 1} onClick={() => changePage(page - 1)}>{tx("上一页", "Previous")}</Button>
         <span className={problemStyles.count}>{tx(`第 ${page} 页`, `Page ${page}`)}</span>

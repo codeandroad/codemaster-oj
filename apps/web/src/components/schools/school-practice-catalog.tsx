@@ -131,7 +131,8 @@ export function LearnerProblemTable({ rows, onOpen, empty }: {
   const { locale } = useLocale();
   const tx = (zh: string, en: string) => locale === "zh" ? zh : en;
   return <SharedLearnerProblemTable rows={rows.map(problem => ({
-    id: problem.id, title: problem.title, bankName: problem.bankName, tags: problem.tags, difficulty: problem.difficulty,
+    id: problem.id, title: problem.title, bankName: [problem.bankName, ...(problem.courses ?? []).map(course =>
+      course.localizations?.[locale]?.title ?? course.title)].filter(Boolean).join(" · "), tags: problem.tags, difficulty: problem.difficulty,
     status: problem.solved ? "AC" : problem.status ?? ((problem.attempts ?? 0) > 0 ? tx("已尝试", "Attempted") : tx("未开始", "Not started")),
   }))} onOpen={onOpen} empty={empty}/>;
 }

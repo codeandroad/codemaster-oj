@@ -15,18 +15,18 @@ export function publicWorkspaceProblem(problem: Problem): ProductionProblem {
     timeLimitMs: definition.timeLimitMs, memoryLimitMb: definition.memoryLimitMb };
 }
 
-export function publicPracticeHref(problem: {problemId: string; versionId?: string}, search: string) {
+export function publicPracticeHref(problem: {problemId: string; versionId?: string}, search: string, pathname = "/practice/problems") {
   const params = new URLSearchParams(search);
   params.set("problemId", problem.problemId);
   params.delete("versionId");
-  return `/practice/problems?${params}`;
+  return `${pathname}?${params}`;
 }
-export function publicPracticeReturnHref(search: string) {
+export function publicPracticeReturnHref(search: string, pathname = "/practice/problems") {
   const params = new URLSearchParams(search);
   const course = params.get("publicCourseId"), chapter = params.get("publicChapterId");
-  if (course && chapter) return `/practice/courses/${encodeURIComponent(course)}?${new URLSearchParams({chapterId: chapter, ...(params.get("courseQ") ? {courseQ: params.get("courseQ")!} : {})})}`;
-  for (const key of ["problemId", "versionId", "publicCourseId", "publicChapterId", "courseQ"]) params.delete(key);
-  return `/practice/problems${params.size ? `?${params}` : ""}`;
+  if (course && chapter && params.get("fromProblemCatalog") !== "1") return `/practice/courses/${encodeURIComponent(course)}?${new URLSearchParams({chapterId: chapter, ...(params.get("courseQ") ? {courseQ: params.get("courseQ")!} : {})})}`;
+  for (const key of ["problemId", "versionId", "publicCourseId", "publicChapterId", "courseQ", "fromProblemCatalog"]) params.delete(key);
+  return `${pathname}${params.size ? `?${params}` : ""}`;
 }
 export function publicDraftStorage(userId: string, problem: Problem, storage: Pick<Storage,"getItem"|"setItem"> & Partial<Pick<Storage,"key"|"length">>) {
   const prefix = `codemaster:public-workspace:${userId}:${problem.id}:`;

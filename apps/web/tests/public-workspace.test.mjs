@@ -21,6 +21,8 @@ test('chapter navigation follows the current problem and returns to the same cha
 test('catalog return keeps search/page and removes problem state', () => {
   assert.equal(publicPracticeReturnHref('problemId=p1&versionId=v1&publicProblemQuery=sum&publicProblemPage=2'),'/practice/problems?publicProblemQuery=sum&publicProblemPage=2');
   assert.equal(new URL(publicPracticeHref({problemId:'p2'},'versionId=stale'),'https://example.test').searchParams.has('versionId'),false);
+  const courseEntry='scope=public&publicProblemsFromCourse=1&problemId=p1&publicCourseId=c1&publicChapterId=ch1&fromProblemCatalog=1';
+  assert.equal(publicPracticeReturnHref(courseEntry,'/student/problems'),'/student/problems?scope=public&publicProblemsFromCourse=1');
 });
 test('old Python drafts survive migration without claiming they were submitted', () => {
   const storage=memory();const legacy='codemaster:school-practice:u1:s1:p1:v1';storage.setItem(legacy,'print(42)');

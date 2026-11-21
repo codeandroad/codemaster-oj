@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import { AccountMenu } from "@/components/account-menu";
 import { useLocale } from "@/components/locale-context";
 import { NotificationDropdown } from "@/components/student/notification-dropdown";
@@ -29,6 +29,9 @@ export function PublicProblemWorkspace({ id, catalog }: { id:string; catalog:{da
 }
 function PublicWorkspace({user, problem, catalog, reloadProblem}:{user:CampusUser;problem:Problem;catalog:{data:{items:Problem[]}|null;loading:boolean;error:string;reload:()=>void};reloadProblem:()=>void}) {
   const params = useSearchParams(), search = params.toString(), router = useRouter(), {locale} = useLocale();
+  const pathname = usePathname();
+  const fromCatalog = params.get("fromProblemCatalog") === "1";
+  const workspacePath = fromCatalog ? pathname : "/practice/problems";
   const courseId = params.get("publicCourseId"), chapterId = params.get("publicChapterId");
   const course = useData<PublicCourse>(courseId && chapterId ? `practice/courses/${encodeURIComponent(courseId)}` : "");
   const reloadCourse = course.reload;
@@ -46,13 +49,23 @@ function PublicWorkspace({user, problem, catalog, reloadProblem}:{user:CampusUse
       languageScope: "course",
       reloadLanguagePolicy: inCourse ? reloadCourse : undefined,
       onSubmissionCompleted: inCourse ? result => { if (result.kind === "submit") reloadCourse(); } : undefined,
-      returnTo: publicPracticeReturnHref(search), returnLabel: inCourse ? (locale==="en"?"Back to chapter":"返回章节") : (locale==="en"?"Back to Problems":"返回题目"), homeHref:"/practice",
+      returnTo: publicPracticeReturnHref(search, workspacePath), returnLabel: inCourse && !fromCatalog ? (locale==="en"?"Back to chapter":"返回章节") : (locale==="en"?"Back to Problems":"返回题目"), homeHref:"/practice",
       navigation: {
         items: inCourse ? validChapter ? chapter!.problems : [] : (catalog.data?.items??[]).map(item=>({problemId:item.id,versionId:item.versionId??undefined,title:item.title})),
         loading: inCourse ? course.loading : catalog.loading,
         error: inCourse ? course.error || (!course.loading&&!validChapter ? (locale==="en"?"This version is not available in this course chapter.":"此版本不在本章可访问的练习中。") : "") : catalog.error,
         reload: inCourse ? reloadCourse : catalog.reload,
-        href: target=>publicPracticeHref(target,search), title: inCourse ? (locale==="en"?"Chapter practice":"本章练习") : (locale==="en"?"Problem list":"题目列表"),
+        href: target => {
+          const query = new URLSearchParams(search);
+          if (fromCatalog && !inCourse) {
+            const context = catalog.data?.items.find(item => item.id === target.problemId)?.courseContext;
+            if (context) {
+              query.set("publicCourseId", context.courseId);
+              query.set("publicChapterId", context.chapterId);
+            }
+          }
+          return publicPracticeHref(target, query.toString(), workspacePath);
+        }, title: inCourse ? (locale==="en"?"Chapter practice":"本章练习") : (locale==="en"?"Problem list":"题目列表"),
         description: validChapter ? `${course.data?.title} › ${chapter?.title}` : undefined,
       },
       chapter: validChapter ? {courseTitle:course.data!.title,title:chapter!.title,position:chapter!.position??course.data!.chapters.indexOf(chapter!),completed:chapter!.problems.find(item=>item.problemId===problem.id)!.solved} : undefined,
@@ -71,7 +84,7 @@ function PublicWorkspace({user, problem, catalog, reloadProblem}:{user:CampusUse
         clearProductionSession();router.replace("/login");
       });}}/></>,
     };
-  },[user,problem,search,courseId,chapterId,chapter,validChapter,catalog,course.data,course.loading,course.error,reloadCourse,locale,logout,router]);
+  },[user,problem,search,courseId,chapterId,chapter,validChapter,catalog,course.data,course.loading,course.error,reloadCourse,locale,logout,router,fromCatalog,workspacePath]);
   if ((courseId || chapterId) && (!validChapter || course.error)) {
     const error = course.error || (!course.loading ? (locale === "en" ? "This version is not available in this course chapter." : "此版本不在本章可访问的练习中。") : "");
     return <div className="p-5">

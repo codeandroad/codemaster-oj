@@ -82,13 +82,13 @@ async function admissionFor(db, listing, course, accountId, options) {
 
 // Use the same edition and admission checks as the course reader. The filter
 // returns only links that also exist in the published problem catalogue.
-export async function publicProblemCatalogCourses(db, user, courseId) {
+export async function publicProblemCatalogCourses(db, user, courseId, {platformOnly=false}={}) {
   await context(db, user);
-  const { rows: schoolListings } = await db.query(`SELECT l.* FROM public_course_listings l
+  const schoolListings = platformOnly ? [] : (await db.query(`SELECT l.* FROM public_course_listings l
     WHERE l.withdrawn_at IS NULL
-      AND NOT EXISTS (SELECT 1 FROM learning_paths p WHERE p.id=l.course_id AND p.owner_scope='platform')`);
+      AND NOT EXISTS (SELECT 1 FROM learning_paths p WHERE p.id=l.course_id AND p.owner_scope='platform')`)).rows;
   const listings = [...await platformCourseListings(db), ...schoolListings];
-  const courses = [], admissionState = {};
+  const courses = [], byProblem = new Map(), admissionState = {};
   let versions = new Map();
   for (const listing of listings) {
     const course = await edition(db, listing, { detail: !listing.platform_owned, progress: listing.platform_owned });
@@ -96,10 +96,20 @@ export async function publicProblemCatalogCourses(db, user, courseId) {
     const available = await publicChapterProblems(db,listing,course,user.id);
     const links = chapterProblemVersions([{problems:[...available.values()]}]);
     if (!links.size) continue;
-    courses.push(problemCatalogCourseOption(listing.id, course));
+    const option=problemCatalogCourseOption(listing.id,course);
+    courses.push(option);
+    for(const chapter of course.chapters){
+      for(const link of chapter.problems??[]){
+        const problem=available.get(`${link.problemId}:${link.versionId}`);
+        if(!problem)continue;
+        const contexts=byProblem.get(problem.problemId)??new Map();
+        if(!contexts.has(listing.id))contexts.set(listing.id,{...option,chapterId:chapter.id,versionId:problem.versionId,platform:listing.platform_owned===true});
+        byProblem.set(problem.problemId,contexts);
+      }
+    }
     if (courseId === listing.id) versions = links;
   }
-  return { courses, versions };
+  return { courses, versions, byProblem };
 }
 
 async function catalogue(pool, user, url) {

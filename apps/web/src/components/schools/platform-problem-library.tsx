@@ -1,6 +1,5 @@
 "use client";
 import { useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import { useLocale } from "@/components/locale-context";
 import { Button } from "@/components/ui/button";
@@ -9,6 +8,7 @@ import { adjacentProblemRows } from "@/components/teacher/problem-editor-navigat
 import type { PlatformSourceProblem } from "@/components/teacher/platform-problem-source";
 import { productionApi, type CampusUser } from "@/lib/production-api";
 import { PlatformContentEditors } from "./platform-content-editors";
+import { PlatformProblemAudiences } from "./platform-problem-audiences";
 import { PlatformProblemEditor } from "./platform-problems";
 import { PlatformProblemFiltersBar } from "./platform-problem-filters";
 import { PlatformProblemTable } from "./platform-problem-table";
@@ -20,15 +20,23 @@ import { PlatformDraftBatchPublish } from "./platform-draft-batch-publish";
 import { PlatformProblemReviewDialog } from "./platform-problem-review-dialog";
 import { matchesPlatformProblem, mergePlatformLibrary, platformDraftPublicationTarget, platformProblemFilterKeys, platformProblemFilters, problemReviewTarget, type PlatformProblemBank, type PlatformProblemFilters, type PlatformProblemRow } from "./platform-problem-model";
 import type { Problem } from "./school-practice-types";
+import { useCatalogFilterUrl } from "@/components/use-catalog-filter-preferences";
+
+const platformProblemUrlKeys = [...Object.values(platformProblemFilterKeys), "problemPage"] as const;
 
 export function PublicProblemReview({ user, reviewSchoolId }: { user: CampusUser; reviewSchoolId?: string }) {
   const { locale } = useLocale(), tx = (zh: string, en: string) => locale === "en" ? en : zh;
-  const search = useSearchParams(), filters = platformProblemFilters(search), scope = JSON.stringify(filters);
   const delegated = Boolean(reviewSchoolId);
-  const sources = useData<{ items: PlatformSourceProblem[] }>(`platform/source-problems?view=summary${reviewSchoolId ? `&reviewQueue=1&schoolId=${encodeURIComponent(reviewSchoolId)}` : "&includeArchived=1"}`);
-  const publications = useData<{ items: Problem[] }>(delegated ? null : "platform/problem-publications"), banks = useData<{ items: PlatformProblemBank[] }>(delegated ? null : "platform/problem-banks?includeArchived=1");
+  const { search, changeUrlFilters, ready: filtersReady } = useCatalogFilterUrl(
+    `campus-judge:platform-problems:v1:${user.id}:${reviewSchoolId ?? "library"}`, platformProblemUrlKeys,
+    !delegated);
+  const ready = delegated || filtersReady;
+  const filters = platformProblemFilters(search), scope = JSON.stringify(filters);
+  const sources = useData<{ items: PlatformSourceProblem[] }>(ready ? `platform/source-problems?view=summary${reviewSchoolId ? `&reviewQueue=1&schoolId=${encodeURIComponent(reviewSchoolId)}` : "&includeArchived=1"}` : null);
+  const publications = useData<{ items: Problem[] }>(delegated || !ready ? null : "platform/problem-publications"), banks = useData<{ items: PlatformProblemBank[] }>(delegated || !ready ? null : "platform/problem-banks?includeArchived=1");
   const action = useAction(), [editing, setEditing] = useState<string | null>(null), [preview, setPreview] = useState<Problem | null>(null), [grant, setGrant] = useState<PlatformProblemRow[] | null>(null);
   const [reviewTab, setReviewTab] = useState<"publication" | "solutions">();
+  const [audienceIds, setAudienceIds] = useState<string[] | null>(null);
   const [batchReview, setBatchReview] = useState<PlatformProblemRow[] | null>(null), [reviewMessage, setReviewMessage] = useState("");
   const [draftPublish, setDraftPublish] = useState<{ pageScope: string; targets: NonNullable<ReturnType<typeof platformDraftPublicationTarget>>[]; skipped: number } | null>(null);
   const [manageBanks, setManageBanks] = useState(false), [upload, setUpload] = useState(false), [operation, setOperation] = useState<ProblemBatchOperation | null>(null), [selection, setSelection] = useState<{ scope: string; ids: string[] }>({ scope: "", ids: [] });
@@ -41,19 +49,20 @@ export function PublicProblemReview({ user, reviewSchoolId }: { user: CampusUser
   const pendingOnPage = selectedRows.filter(row => row.source?.draftReviewStatus === "pending");
   const draftTargets = pendingOnPage.map(platformDraftPublicationTarget).filter(target => target !== null);
   const platformOnly = selectedRows.every(row => !!row.source);
-  const busy = action.busy || sources.loading || publications.loading || banks.loading;
+  const busy = action.busy || sources.loading || publications.loading || banks.loading || !ready;
   function clearSelection() { setSelection({ scope: "", ids: [] }); }
   function reload() { sources.reload(); publications.reload(); banks.reload(); clearSelection(); setReviewMessage(""); }
   function updateFilters(patch: Partial<PlatformProblemFilters>) {
     clearSelection();
-    const params = new URLSearchParams(window.location.search), next = { ...platformProblemFilters(params), ...patch };
+    const next = { ...platformProblemFilters(new URLSearchParams(window.location.search)), ...patch };
+    const fields: Record<string, string | null> = { problemPage: null };
     for (const [key, param] of Object.entries(platformProblemFilterKeys)) {
       const value = next[key as keyof PlatformProblemFilters];
-      if (value) params.set(param, value === true ? "1" : String(value)); else params.delete(param);
+      fields[param] = value ? (value === true ? "1" : String(value)) : null;
     }
-    params.delete("problemPage"); window.history.replaceState(null, "", `${window.location.pathname}?${params}`);
+    changeUrlFilters(fields);
   }
-  function changePage(next: number) { clearSelection(); const params = new URLSearchParams(window.location.search); params.set("problemPage", String(next)); window.history.replaceState(null, "", `${window.location.pathname}?${params}`); }
+  function changePage(next: number) { clearSelection(); changeUrlFilters({ problemPage: String(next) }); }
   function openEditor(id: string, tab?: "publication" | "solutions") { setReviewTab(tab); setEditing(id); }
   function review(row: PlatformProblemRow) {
     const schoolId = row.publication?.schoolId ?? row.source?.schoolId;
@@ -89,7 +98,8 @@ export function PublicProblemReview({ user, reviewSchoolId }: { user: CampusUser
       {!delegated && !filters.deleted && <Button type="button" size="sm" variant="secondary" disabled={busy || !selectedRows.some(problemReviewTarget)} onClick={() => { setReviewMessage(""); setBatchReview(selectedRows); }}>{tx("批量管理全平台公开", "Manage platform-wide access in bulk")}</Button>}
       {!delegated && platformOnly && <>
         <Button type="button" size="sm" variant="secondary" disabled={busy || !!banks.error} onClick={() => setOperation({ action: "move", rows: selectedRows })}>{tx("更改分类", "Change category")}</Button>
-        {!filters.deleted && <Button type="button" size="sm" variant="secondary" disabled={busy} onClick={() => setGrant(selectedRows)}>{tx("批量授权", "Authorize selected")}</Button>}
+        {user.platformAdmin && <Button type="button" size="sm" variant="secondary" disabled={busy} onClick={() => setAudienceIds(selectedRows.map(row => row.id))}>{tx("管理开放范围", "Manage practice access")}</Button>}
+        {!filters.deleted && <Button type="button" size="sm" variant="secondary" disabled={busy} onClick={() => setGrant(selectedRows)}>{tx("授权编辑", "Authorize editing")}</Button>}
         <Button type="button" size="sm" variant="secondary" disabled={busy} onClick={() => setOperation({ action: filters.deleted ? "restore" : "archive", rows: selectedRows })}>{filters.deleted ? tx("恢复所选", "Restore selected") : tx("删除所选", "Delete selected")}</Button>
       </>}
       <Button type="button" size="sm" variant="ghost" onClick={clearSelection}>{tx("取消选择", "Clear selection")}</Button>
@@ -110,6 +120,7 @@ export function PublicProblemReview({ user, reviewSchoolId }: { user: CampusUser
     {batchReview && <PlatformProblemBatchReview rows={batchReview} onClose={() => setBatchReview(null)} onSaved={count => {
       setBatchReview(null); reload(); setReviewMessage(tx(`已审核 ${count} 道题目。`, `Reviewed ${count} problems.`));
     }} />}
+    {audienceIds && <PlatformProblemAudiences problemIds={audienceIds} onClose={() => setAudienceIds(null)} />}
     {grant && <PlatformContentEditors kind="problem" resourceIds={grant.map(row => row.id)} title={grant.length === 1 ? grant[0].title : tx(`${grant.length} 道题目`, `${grant.length} problems`)} onClose={() => setGrant(null)} />}
     {preview && <PlatformProblemReviewDialog problem={preview} onClose={() => setPreview(null)} onSaved={reload} />}
   </div>;

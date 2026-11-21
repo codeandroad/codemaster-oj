@@ -13,6 +13,9 @@ const sourceColumns = `p.id AS problem_id,p.bank_id,p.owner_account_id,b.name AS
 const sourceTables = `problems p
  JOIN problem_banks b ON b.id=p.bank_id
  JOIN problem_versions v ON v.id=${liveProblemVersionIdSql('p')} AND v.problem_id=p.id`;
+export const readyProblemPresentationSql = (p='p',v='v') => `(EXISTS(SELECT 1 FROM problem_public_statements current WHERE current.version_id=${v}.id)
+ OR NOT EXISTS(SELECT 1 FROM problem_public_statements configured
+  JOIN problem_versions original ON original.id=configured.version_id WHERE original.problem_id=${p}.id))`;
 // A problem reused by a timed practice remains outside public practice, even
 // if the author creates another edition with the same exercise.
 const sourceAccess = `p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school'
@@ -20,9 +23,7 @@ const sourceAccess = `p.archived_at IS NULL AND b.archived_at IS NULL AND b.visi
  AND (v.school_visible_at IS NOT NULL AND v.rank_review_status='approved'
   OR p.owner_scope='platform' AND v.course_only_published AND v.rank_review_status='pending')
  AND NOT EXISTS(SELECT 1 FROM timed_practice_problems t WHERE t.problem_id=p.id)
- AND (EXISTS(SELECT 1 FROM problem_public_statements current WHERE current.version_id=v.id)
-   OR NOT EXISTS(SELECT 1 FROM problem_public_statements configured
-     JOIN problem_versions original ON original.id=configured.version_id WHERE original.problem_id=p.id))`;
+ AND ${readyProblemPresentationSql()}`;
 
 async function findSource(db, problemId, versionId, { lock = false } = {}) {
  const { rows } = await db.query(`SELECT ${sourceColumns} FROM ${sourceTables}
@@ -95,7 +96,7 @@ export async function currentLegacyPublicProblems(db, problemIds) {
 // existing snapshot metadata when present, including the revision a later
 // detail request would assign, while keeping prose and private cases in the DB.
 // The caller holds the school's shared teaching lock and its RLS scope.
-export async function legacyPublicProblemCatalogRows(db,problemIds) {
+async function catalogRows(db,problemIds,access) {
  return (await db.query(`SELECT p.id,$1::uuid AS "schoolId",
   COALESCE(projected.bank_id,$3::uuid) AS "bankId",b.name AS "bankName",
   v.title,COALESCE(snapshot.draft_revision,1) revision,
@@ -106,13 +107,21 @@ export async function legacyPublicProblemCatalogRows(db,problemIds) {
    FROM school_problem_versions history WHERE history.school_id=$1 AND history.problem_id=p.id))
    <>COALESCE(projected.revision,1) AS "hasDraftChanges"
   FROM ${sourceTables}
-  JOIN school_problem_publications publication ON publication.school_id=$1 AND publication.problem_id=p.id
-   AND publication.withdrawn_at IS NULL
   LEFT JOIN school_problems projected ON projected.school_id=$1 AND projected.id=p.id
   LEFT JOIN school_problem_versions snapshot ON snapshot.school_id=$1 AND snapshot.problem_id=p.id AND snapshot.id=v.id
   LEFT JOIN problem_public_statements presentation ON presentation.version_id=v.id
-  WHERE p.id=ANY($2::uuid[]) AND ${sourceAccess}
+  WHERE p.id=ANY($2::uuid[]) AND ${access}
   FOR SHARE OF p,b,v`,[LEGACY_SCHOOL_ID,problemIds,snapshotBankId])).rows;
+}
+
+export function legacyPublicProblemCatalogRows(db,problemIds) {
+ return catalogRows(db,problemIds,`${sourceAccess} AND EXISTS (SELECT 1 FROM school_problem_publications publication
+  WHERE publication.school_id=$1 AND publication.problem_id=p.id AND publication.withdrawn_at IS NULL)`);
+}
+
+export async function platformProblemCatalogRows(db,problemIds) {
+ const {platformProblemReadySql}=await import('./platform-course-problems.mjs');
+ return catalogRows(db,problemIds,platformProblemReadySql());
 }
 
 export async function prepareLegacyPublicProblem(db, problemId) {

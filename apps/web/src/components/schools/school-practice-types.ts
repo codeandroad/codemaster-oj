@@ -19,6 +19,8 @@ export type Definition = {
 };
 
 export type Problem = {
+  courses?: import("@/components/student/problem-catalog-course-filter").CourseOption[];
+  courseContext?: { courseId: string; chapterId: string };
   ownerScope?: "platform" | "school";
   activity?: {id:string;title:string;kind:"assignment"|"timed";phase:string;endsAt?:string|null;canSubmit:boolean;attempt:{id:string;startedAt:string;deadlineAt:string|null;finishedAt:string|null}|null;resultsPublishedAt:string|null;preview?:boolean;revision?:number};
   staffPractice?: boolean;

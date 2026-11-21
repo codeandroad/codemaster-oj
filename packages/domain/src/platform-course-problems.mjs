@@ -2,13 +2,14 @@ import { fail, uuid } from './security.mjs';
 import { LEGACY_SCHOOL_ID, activeAccount, lockSchoolTeaching } from './schools.mjs';
 import { legacyCourseIsLive } from './legacy-public-course.mjs';
 import { platformCourseAdmission } from './platform-course-access.mjs';
-import { preparePlatformCourseProblem } from './legacy-public-problems.mjs';
+import { preparePlatformCourseProblem, readyProblemPresentationSql } from './legacy-public-problems.mjs';
 import { liveProblemVersionIdSql } from './live-problem-version.mjs';
 import { problemSolvedSql } from './problem-progress.mjs';
 
 export const platformProblemReadySql=(p='p',v='v',b='b')=>`${p}.owner_scope='platform' AND ${p}.archived_at IS NULL
  AND ${b}.archived_at IS NULL AND ${v}.published_at IS NOT NULL AND ${v}.validation_status='AC'
  AND (${v}.rank_review_status='approved' OR ${v}.course_only_published AND ${v}.rank_review_status='pending')
+ AND ${readyProblemPresentationSql(p,v)}
  AND NOT EXISTS(SELECT 1 FROM timed_practice_problems t WHERE t.problem_id=${p}.id)`;
 
 // Admission grants only this linked exercise, never the source school's bank.

@@ -10,8 +10,11 @@ export type ProblemSubmissionMetadata = {
   runtimeMs: number | null;
   memoryKb: number | null;
   isOwn: boolean;
+
 };
+type OwnDetail = {scope:"school"|"public";schoolId:string};
 export type ProblemSubmissionPage = {
+  ownDetails?: Record<string,OwnDetail>;
   platformSchoolId?: string;
   items: ProblemSubmissionMetadata[];
   page: number;
@@ -41,7 +44,16 @@ export function submissionMeasurement(value: number | null | undefined, sourceUn
   return mib > 0 && mib < 0.01 ? `<${format.format(0.01)} MiB` : `${format.format(mib)} MiB`;
 }
 
-export function submissionOwnDetailHref(row: ProblemSubmissionMetadata, allowLegacyDetails: boolean, platformSchoolId?: string) {
+export function submissionOwnDetailHref(row: ProblemSubmissionMetadata, allowLegacyDetails: boolean, platformSchoolId?: string, workspaceSchoolId?: string | null, detail?: OwnDetail) {
+  if (row.isOwn && detail) {
+    const {scope,schoolId} = detail;
+    const query = new URLSearchParams({submissionId:row.id});
+    if (scope === "public") query.set("submissionSchoolId",schoolId);
+    if (scope === "public" && !workspaceSchoolId) return `/practice/submissions?${query}`;
+    query.set("schoolId",scope === "school" ? schoolId : workspaceSchoolId!);
+    query.set("section","submissions"); query.set("scope",scope);
+    return `/schools?${query}`;
+  }
   if (allowLegacyDetails && row.isOwn && platformSchoolId && !row.id.startsWith("SUB")) {
     return `/practice/submissions?${new URLSearchParams({ submissionSchoolId: platformSchoolId, submissionId: row.id })}`;
   }

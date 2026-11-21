@@ -28,7 +28,7 @@ export function SchoolSubmissionDetail({ schoolId, submissionId, backHref, backL
     {job.reviews?.map((entry,index)=><p key={index} className="whitespace-pre-wrap break-words">{entry.note}</p>)}
     <CorrectionNote key={job.noteUpdatedAt??"new"} path={path} job={job} onSaved={reload}/>
   </>}
-    problemHref={job => `/schools?schoolId=${encodeURIComponent(schoolId)}&section=problems&scope=school&problemId=${encodeURIComponent(job.problemId)}`} />;
+    problemHref={job => `/student/problems/${encodeURIComponent(job.problemId)}?schoolId=${encodeURIComponent(schoolId)}`} />;
 }
 
 export function StudySubmissionDetail<T extends JobDetail>({ path, backHref, backLabel, problemHref, renderExtra }: {

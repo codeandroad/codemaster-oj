@@ -14,7 +14,7 @@ export function submissionListOptions(url) {
   order:enumValue(get('order')??'desc',['asc','desc'],'Order')};
 }
 
-export async function metadataPage(db, source, params, url, { schoolProgress = false } = {}) {
+export async function metadataPage(db, source, params, url, { schoolProgress = false, ownDetails = false } = {}) {
  const {page,pageSize,sort,order}=submissionListOptions(url);
  const columns={createdAt:'created_at',language:'language',status:'status',runtimeMs:'runtime_ms',memoryKb:'memory_kb'};
  // Filter visibility before choosing a person's latest formal submission. Keep
@@ -22,17 +22,18 @@ export async function metadataPage(db, source, params, url, { schoolProgress = f
  const base=`WITH visible AS (${source}), latest AS (
   SELECT DISTINCT ON (actor_key) * FROM visible ORDER BY actor_key,created_at DESC,received_id DESC
  ), measured AS (
-  SELECT id,received_id,created_at,language,status,is_own,display_name,
+  SELECT id,received_id,created_at,language,status,is_own,display_name,${ownDetails ? 'detail_scope,detail_school,' : ''}
    CASE WHEN status NOT IN ('Waiting','Judging','System Error') THEN m.runtime_ms END runtime_ms,
    CASE WHEN status NOT IN ('Waiting','Judging','System Error') THEN m.memory_kb END memory_kb
   FROM latest r CROSS JOIN LATERAL (${submissionMeasurementsSql}) m)`;
  const summary=(await db.query(`${base} SELECT (SELECT count(*)::int FROM latest) total,
   EXISTS(SELECT 1 FROM visible WHERE ${schoolProgress?'is_current_student':'is_own'} AND status='AC') solved`,params)).rows[0];
- const rows=(await db.query(`${base} SELECT id,created_at,language,status,is_own,display_name,runtime_ms,memory_kb FROM measured
+ const rows=(await db.query(`${base} SELECT * FROM measured
   ORDER BY ${columns[sort]} ${order.toUpperCase()} NULLS LAST,created_at DESC,received_id DESC
   LIMIT $${params.length+1} OFFSET $${params.length+2}`,[...params,pageSize,(page-1)*pageSize])).rows;
  return {items:rows.map(r=>({id:String(r.id),createdAt:r.created_at,language:r.language,status:r.status,isOwn:r.is_own,displayName:r.display_name,
   ...submissionMeasurements(r)})),
+  ...(ownDetails && {ownDetails:Object.fromEntries(rows.filter(r=>r.is_own && r.detail_scope).map(r=>[r.id,{scope:r.detail_scope,schoolId:r.detail_school}]))}),
   page,pageSize,total:summary.total,hasMore:page*pageSize<summary.total,solved:summary.solved};
 }
 
@@ -48,7 +49,8 @@ const ordinarySchoolReceipts = `SELECT 'SUB'||s.id::text id,lpad(s.id::text,20,'
  'person:'||s.identity_id::text actor_key,s.created_at,s.language,s.status,
  s.identity_id=$4 is_own,s.identity_id=$4 is_current_student,r.private_results,
  COALESCE(CASE WHEN profile.leaderboard_use_nickname THEN NULLIF(btrim(profile.nickname),'') END,
- NULLIF(btrim(person.name),''),'Student') display_name
+ NULLIF(btrim(person.name),''),'Student') display_name,
+ CASE WHEN s.account_id=$6 AND s.identity_id=$4 THEN 'school' END detail_scope,s.school_id detail_school
  FROM submissions s
  JOIN identities person ON person.id=s.identity_id
  LEFT JOIN accounts profile ON profile.identity_id=person.id AND profile.binding_released_at IS NULL
@@ -104,13 +106,14 @@ export async function schoolProblemSubmissions(db,p,user,url,accessContext,{work
   CASE WHEN $5='public' THEN a.identity_id=$4 WHEN $5='staff_practice' THEN j.account_id=$6 WHEN $7::uuid IS NOT NULL THEN j.identity_id=$7 ELSE j.identity_id IS NULL AND j.account_id=$6 END is_current_student,
   CASE WHEN j.state='completed' THEN j.result->'privateResults' END private_results,
   CASE WHEN j.access_context='public' OR person.id IS NULL THEN COALESCE(NULLIF(btrim(a.nickname),''),a.username)
-   ELSE COALESCE(CASE WHEN profile.leaderboard_use_nickname THEN NULLIF(btrim(profile.nickname),'') END,NULLIF(btrim(person.name),''),'Student') END display_name
+   ELSE COALESCE(CASE WHEN profile.leaderboard_use_nickname THEN NULLIF(btrim(profile.nickname),'') END,NULLIF(btrim(person.name),''),'Student') END display_name,
+  CASE WHEN j.account_id=$6 AND j.access_context IN ('school','public') THEN j.access_context END detail_scope,j.school_id detail_school
   FROM school_judge_jobs j JOIN accounts a ON a.id=j.account_id
   LEFT JOIN school_identities person ON person.school_id=j.school_id AND person.id=j.identity_id
   LEFT JOIN accounts profile ON profile.id=person.account_id
   WHERE j.school_id=$1 AND j.problem_id=$2 AND $3::uuid IS NOT NULL AND j.kind='submit'
    AND (j.access_context=$5 OR $5='staff_practice' AND j.access_context='school' AND j.activity_id IS NULL ${schoolJobs})
    AND ($5<>'staff_practice' OR j.account_id=$6) AND ${schoolActivityJobVisibleSql('j')}
-   ${schoolHistory}`,values,url,{schoolProgress:true});
+   ${schoolHistory}`,values,url,{schoolProgress:true,ownDetails:true});
  return {...page,solved:(await problemProgress(db,user,[p.id],{includeStaff:accessContext==='staff_practice'})).get(p.id)?.solved??false};
 }

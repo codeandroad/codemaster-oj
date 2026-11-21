@@ -38,6 +38,12 @@ test('missing performance measurements are not presented as measured zero', () =
 test('metadata belonging to someone else never links to private submission details', () => {
   const row = { id: 's1', displayName: 'Student', createdAt: '2026-11-07T00:00:00Z', language: 'python', status: 'AC', runtimeMs: null, memoryKb: null, isOwn: false };
   assert.equal(submissionOwnDetailHref(row, true), null);
+  const detail={scope:'public',schoolId:'source'};
+  assert.equal(submissionOwnDetailHref(row,false,undefined,'workspace',detail),null);
+  const href=submissionOwnDetailHref({...row,isOwn:true},false,undefined,'workspace',detail);
+  const url=new URL(href,'http://localhost');
+  assert.equal(url.pathname,'/schools');
+  assert.deepEqual(Object.fromEntries(url.searchParams),{submissionId:'s1',submissionSchoolId:'source',schoolId:'workspace',section:'submissions',scope:'public'});
   assert.equal(submissionOwnDetailHref({ ...row, isOwn: true }, false), null);
   assert.equal(submissionOwnDetailHref({ ...row, isOwn: true }, true), '/student/submissions/s1');
 });

@@ -129,6 +129,11 @@ test('school and public practice Nest transport requires scoped membership, CSRF
    assert.deepEqual(data.caseFeedback,detail.data.caseFeedback);
   }
   await request(`/practice/submissions/${school.id}/${formal.id}`,{auth:auth.student,status:404});
+  const mixed=(await request(`/practice/problems/${problem.id}/submissions?workspaceSchoolId=${school.id}`,{auth:auth.student})).data;
+  assert.deepEqual(mixed.ownDetails,{[formal.id]:{scope:'school',schoolId:school.id}});
+  assert.ok(mixed.items.some(row=>!row.isOwn && row.id===publicRun.id));
+  const publicFeed=(await request(`/practice/problems/${problem.id}/submissions`,{auth:auth.personal})).data;
+  assert.deepEqual(publicFeed.ownDetails,{[publicRun.id]:{scope:'public',schoolId:school.id}});
   await request(publicDetail,{auth:auth.student,status:404});
   await request(`${publicDetail}/note`,{auth:auth.student,method:'PATCH',body:{note:'Unauthorized'},status:404});
   await request(`${publicDetail}/note`,{auth:auth.personal,method:'PATCH',body:{note:'Check the return type'},csrf:false,status:403});

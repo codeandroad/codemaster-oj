@@ -4,6 +4,7 @@ import { randomBytes,randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createApiApplication } from '../dist/application.js';
 import { createPool } from '../../../packages/domain/src/db.mjs';
+import { defaultAvatarPath } from '../../../packages/domain/src/avatars.mjs';
 import { migrate } from '../../../packages/domain/src/migrate.mjs';
 import { provisionSchool } from '../../../packages/domain/src/schools.mjs';
 import { hashPassword } from '../../../packages/domain/src/security.mjs';
@@ -474,9 +475,22 @@ test('school and public practice Nest transport requires scoped membership, CSRF
    await processSchoolOne({pool:worker,judge});
    assert.equal((await request(`${prefix}/judge-jobs/${previewJob.id}`,{auth:auth.teacher})).data.status,'AC');
   });
+  await pool.query(`INSERT INTO school_identities(school_id,kind,number,name,account_id)
+   VALUES($1,'student','exchange','Exchange student',$2) ON CONFLICT DO NOTHING`,[school.id,users.student.id]);
+  await t.test('school leaderboard preserves the default and saved avatars', async () => {
+   const path=prefix+'/leaderboard';
+   const read=async()=>(await request(path,{auth:auth.student})).data.items.find(item=>item.isOwn);
+   const initial=await read();
+   assert.ok(initial);
+   assert.equal(initial.avatar,defaultAvatarPath(initial.identityId));
+   const preset='/avatars/oj-15.webp';
+   await pool.query('UPDATE accounts SET avatar=$2 WHERE id=$1',[users.student.id,preset]);
+   assert.equal((await read()).avatar,preset);
+   const upload='data:image/png;base64,iVBORw0KGgo=';
+   await pool.query('UPDATE accounts SET avatar=$2 WHERE id=$1',[users.student.id,upload]);
+   assert.equal((await read()).avatar,upload);
+  });
   await t.test('wallet exchange is atomic, scoped to the student, and safe to retry', async () => {
-   await pool.query(`INSERT INTO school_identities(school_id,kind,number,name,account_id)
-    VALUES($1,'student','exchange','Exchange student',$2) ON CONFLICT DO NOTHING`,[school.id,users.student.id]);
    const exchange=(body,options={})=>request(prefix+'/scholarship/exchange',{auth:auth.student,method:'POST',body,...options});
    const wallet=async path=>(await request(path+'/scholarship/me',{auth:auth.student})).data;
    const schoolBefore=await wallet(prefix),platformBefore=await wallet('/practice');

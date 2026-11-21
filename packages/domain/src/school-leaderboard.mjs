@@ -1,3 +1,4 @@
+import { avatarForIdentity } from './avatars.mjs';
 import { transaction } from './db.mjs';
 import { lockSchoolTeaching, schoolRole } from './schools.mjs';
 import { fail, field, integer, uuid } from './security.mjs';
@@ -32,7 +33,7 @@ export async function handleSchoolLeaderboard({pool,user,route,method,url}){
    WHERE i.school_id=$1 AND i.kind='student' AND ($2::uuid IS NULL OR EXISTS(SELECT 1 FROM school_class_roster cr WHERE cr.school_id=i.school_id AND cr.identity_id=i.id AND cr.class_id=$2))
   ), ranked AS (SELECT *,rank() OVER(ORDER BY points DESC,ac_rate DESC,balance DESC)::integer rank FROM members)
   SELECT *,count(*) OVER()::integer total FROM ranked WHERE $3='' OR strpos(lower(display_name),lower($3))>0 ORDER BY rank,display_name,id LIMIT 51 OFFSET $4`,[s,classId,q,(page-1)*50])).rows;
-  const visible={...settings.displayFields,...selectedClass?.leaderboard_fields},items=rows.slice(0,50).map(r=>({rank:r.rank,identityId:r.id,accountId:r.account_id,name:r.display_name,avatar:r.avatar,isOwn:r.account_id===user.id,points:r.points,...(visible.solved?{solved:r.solved}:{}),...(visible.attempts?{attempts:r.attempts}:{}),...(visible.acRate?{acRate:r.assessed?Number(r.ac_rate):null}:{}),...(visible.scholarship?{scholarship:r.balance}:{})}));
+  const visible={...settings.displayFields,...selectedClass?.leaderboard_fields},items=rows.slice(0,50).map(r=>({rank:r.rank,identityId:r.id,accountId:r.account_id,name:r.display_name,avatar:avatarForIdentity(r.avatar,r.id),isOwn:r.account_id===user.id,points:r.points,...(visible.solved?{solved:r.solved}:{}),...(visible.attempts?{attempts:r.attempts}:{}),...(visible.acRate?{acRate:r.assessed?Number(r.ac_rate):null}:{}),...(visible.scholarship?{scholarship:r.balance}:{})}));
   return {status:200,body:{items,page,pageSize:50,hasMore:rows.length>50,total:rows[0]?.total??0,displayFields:visible,classes:(await db.query('SELECT id,name FROM school_classes WHERE school_id=$1 AND archived_at IS NULL ORDER BY name,id',[s])).rows}};
  });
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { inputClass, useData } from "@/components/admin/common";
 import { Button } from "@/components/ui/button";
 import { useSchoolText } from "./school-ui";
@@ -99,12 +99,22 @@ function AudiencePicker({ kind, selected, onSelected, disabled }: {
   kind: "schools" | "students"; selected: AudienceMember[]; onSelected: (items: AudienceMember[]) => void; disabled: boolean;
 }) {
   const text = useSchoolText(), [query, setQuery] = useState("");
+  const schoolHintId = useId();
+  const showSchoolHint = kind === "schools" && selected.length === 0;
   const resource = useData<{ items: AudienceMember[] }>(`platform/courses/audience?${new URLSearchParams({ kind, q: query })}`);
   const toggle = (item: AudienceMember) => onSelected(selected.some(value => value.id === item.id) ? selected.filter(value => value.id !== item.id) : [...selected, item]);
   return <div className="space-y-2 rounded-md border border-border p-3">
     <p className="text-xs text-muted-foreground">{text(`${selected.length} selected`, `已选择 ${selected.length} 项`)}</p>
+    {showSchoolHint && (
+      <p id={schoolHintId} className="text-sm text-muted-foreground">
+        {text(
+          "Select a school below to configure its admission method and learning requirements.",
+          "请先勾选下方的学校，再设置该校的准入方式和学习门槛。",
+        )}
+      </p>
+    )}
     {selected.length > 0 && <ul className="flex max-h-32 flex-wrap gap-1 overflow-y-auto">{selected.map(item => <li key={item.id} className="min-w-0 max-w-full"><Button type="button" size="sm" variant="secondary" className="h-auto min-h-8 max-w-full py-1 text-left" disabled={disabled} aria-label={text(`Remove ${item.name}`, `移除 ${item.name}`)} onClick={() => toggle(item)}><span className="min-w-0 break-words">{item.name}</span><span aria-hidden="true">×</span></Button></li>)}</ul>}
-    <label className="grid gap-1 text-sm">{kind === "schools" ? text("Search schools", "搜索学校") : text("Search personal or school accounts", "搜索个人或学校账号")}<input type="search" className={inputClass} maxLength={100} disabled={disabled} value={query} onChange={event => setQuery(event.target.value)}/></label>
+    <label className="grid gap-1 text-sm">{kind === "schools" ? text("Search schools", "搜索学校") : text("Search personal or school accounts", "搜索个人或学校账号")}<input type="search" className={inputClass} maxLength={100} disabled={disabled} value={query} aria-describedby={showSchoolHint ? schoolHintId : undefined} onChange={event => setQuery(event.target.value)}/></label>
     {resource.pending ? <p role="status" className="text-xs text-muted-foreground">{text("Loading…", "正在加载…")}</p> : resource.error ? <div role="alert" className="space-y-2 text-sm text-destructive"><p>{resource.error}</p><Button type="button" variant="secondary" size="sm" disabled={disabled} onClick={resource.reload}>{text("Retry search", "重新搜索")}</Button></div> : <>
       <div className="max-h-40 overflow-y-auto">{resource.data?.items.map(item => <label key={item.id} className="flex min-h-11 cursor-pointer items-center gap-2 border-b border-border py-2 text-sm last:border-0"><input type="checkbox" className="size-4 shrink-0 accent-primary" disabled={disabled} checked={selected.some(value => value.id === item.id)} onChange={() => toggle(item)}/><span className="min-w-0 break-words">{item.name}{item.username && <span className="ml-1 text-muted-foreground">@{item.username}</span>}</span></label>)}</div>
       {!resource.data?.items.length && <p className="text-xs text-muted-foreground">{kind === "students" && query.length < 2 ? text("Enter at least two characters to find accounts.", "输入至少两个字符查找账号。") : text("No matches.", "没有找到匹配项。")}</p>}

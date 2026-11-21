@@ -474,5 +474,29 @@ test('school and public practice Nest transport requires scoped membership, CSRF
    await processSchoolOne({pool:worker,judge});
    assert.equal((await request(`${prefix}/judge-jobs/${previewJob.id}`,{auth:auth.teacher})).data.status,'AC');
   });
+  await t.test('wallet exchange is atomic, scoped to the student, and safe to retry', async () => {
+   await pool.query(`INSERT INTO school_identities(school_id,kind,number,name,account_id)
+    VALUES($1,'student','exchange','Exchange student',$2) ON CONFLICT DO NOTHING`,[school.id,users.student.id]);
+   const exchange=(body,options={})=>request(prefix+'/scholarship/exchange',{auth:auth.student,method:'POST',body,...options});
+   const wallet=async path=>(await request(path+'/scholarship/me',{auth:auth.student})).data;
+   const schoolBefore=await wallet(prefix),platformBefore=await wallet('/practice');
+   const out={direction:'to_platform',amount:3,requestId:randomUUID()};
+   await exchange(out,{csrf:false,status:403});
+   await exchange(out,{auth:auth.personal,status:404});
+   await exchange(out,{auth:auth.teacher,status:403});
+   await exchange({...out,amount:0},{status:400});
+   await Promise.all([exchange(out),exchange(out)]);
+   await exchange({...out,amount:4},{status:409});
+   const local=await wallet(prefix),platform=await wallet('/practice');
+   assert.equal(local.balance,schoolBefore.balance-3);
+   assert.equal(platform.balance,platformBefore.balance+3);
+   assert.equal(local.total,schoolBefore.total+1);
+   assert.equal(platform.total,platformBefore.total+1);
+   await exchange({...out,amount:local.balance+1,requestId:randomUUID()},{status:409});
+   assert.equal((await wallet('/practice')).total,platform.total);
+   await exchange({direction:'to_school',amount:3,requestId:randomUUID()});
+   assert.equal((await wallet(prefix)).balance,schoolBefore.balance);
+   assert.equal((await wallet('/practice')).balance,platformBefore.balance);
+  });
  }finally{await server?.close();await worker?.end();await pool.end();await owner.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);await owner.end();}
 });

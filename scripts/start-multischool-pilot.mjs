@@ -371,10 +371,26 @@ async function main() {
     await saveJson(beforePath,baseline);
     before=tables;plan=currentPlan;
   }
+  const verifiedTables = () => {
+    const all = fingerprints(plan);
+    return baseline.reconstruction ? reconstructionFingerprints(targetQuery,all,legacyId,baseline.reconstruction,true) : all;
+  };
+  if (!baseline.walletCutover && targetQuery("SELECT to_regclass('scholarship_receipt_ownership') IS NULL") === 't') {
+    await run('docker', [...compose,'run','--rm','--no-deps','migrate','node','--input-type=module','-e',
+      "import {createPool} from './src/db.mjs';import {migrate} from './src/migrate.mjs';const db=createPool();try {await migrate(db,{through:'143_school_review_notes.sql'});} finally {await db.end();}"], {env:values});
+    verifyPrecedingMigrations(before,verifiedTables(),plan);
+    baseline.walletCutover = true;
+    await saveJson(beforePath,baseline);
+  }
   await run('docker', [...compose,'run','--rm','--no-deps','migrate'],{env:values});
-  let after=fingerprints(plan);
-  if(baseline.reconstruction)after=reconstructionFingerprints(targetQuery,after,legacyId,baseline.reconstruction,true);
-  verifyPrecedingMigrations(before,after,plan);
+  const after=verifiedTables();
+  // Migration 144 reconciles these four tables per individual wallet in its
+  // transaction. All other pre-existing data still uses the original hashes.
+  const unaffected={...before};
+  if (baseline.walletCutover) {
+    for (const name of ['luq_accounts','luq_ledger','school_scholarship_accounts','school_scholarship_ledger']) delete unaffected[name];
+  }
+  verifyPrecedingMigrations(unaffected,after,plan);
   assert.equal(targetQuery(`SELECT to_regclass('account_roles') IS NULL AND to_regclass('legacy_school_account_ownership') IS NULL
    AND to_regclass('legacy_school_identity_ownership') IS NULL AND to_regclass('legacy_course_publication_versions') IS NULL
    AND NOT EXISTS(SELECT 1 FROM pg_class WHERE relnamespace='public'::regnamespace AND relname LIKE 'legacy_%')

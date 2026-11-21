@@ -68,8 +68,8 @@ export async function handleScholarshipLedger(ctx) {
   if (!user.roles.includes('student')) fail(403, 'FORBIDDEN', '需要学生身份');
   const balance = (await pool.query('SELECT balance FROM luq_accounts WHERE identity_id=$1', [user.identityId])).rows[0]?.balance ?? 0;
   const page = integer(Number(url.searchParams.get('page') ?? 1), 1, 100000, '页码'), pageSize = 50;
-  const total = Number((await pool.query('SELECT count(*) FROM luq_ledger WHERE identity_id=$1', [user.identityId])).rows[0].count);
-  const items = (await pool.query('SELECT * FROM luq_ledger WHERE identity_id=$1 ORDER BY id DESC LIMIT $2 OFFSET $3', [user.identityId,pageSize,(page-1)*pageSize])).rows.map(scholarshipLedgerShape);
+  const total = Number((await pool.query('SELECT count(*) FROM platform_scholarship_statement WHERE identity_id=$1', [user.identityId])).rows[0].count);
+  const items = (await pool.query('SELECT * FROM platform_scholarship_statement WHERE identity_id=$1 ORDER BY id DESC LIMIT $2 OFFSET $3', [user.identityId,pageSize,(page-1)*pageSize])).rows.map(scholarshipLedgerShape);
   return response({ balance, items, total, page, pageSize });
  }
  if (route === '/scholarship/reviews' && method === 'GET') {
@@ -81,10 +81,10 @@ export async function handleScholarshipLedger(ctx) {
   admin(user);
   const identityId = url.searchParams.get('identityId') ? uuid(url.searchParams.get('identityId')) : null;
   const page = integer(Number(url.searchParams.get('page') ?? 1), 1, 100000, '页码'), pageSize = 50;
-  const total = Number((await pool.query("SELECT count(*) FROM luq_ledger l JOIN identities i ON i.id=l.identity_id WHERE i.kind='student' AND ($1::uuid IS NULL OR l.identity_id=$1)", [identityId])).rows[0].count);
+  const total = Number((await pool.query("SELECT count(*) FROM platform_scholarship_statement l JOIN identities i ON i.id=l.identity_id WHERE i.kind='student' AND ($1::uuid IS NULL OR l.identity_id=$1)", [identityId])).rows[0].count);
   const rows = (await pool.query(`SELECT l.*,i.name student_name,i.number student_number,
    EXISTS(SELECT 1 FROM luq_ledger refund WHERE refund.refund_of=l.id) refunded
-   FROM luq_ledger l JOIN identities i ON i.id=l.identity_id
+   FROM platform_scholarship_statement l JOIN identities i ON i.id=l.identity_id
    WHERE i.kind='student' AND ($1::uuid IS NULL OR l.identity_id=$1) ORDER BY l.id DESC LIMIT $2 OFFSET $3`, [identityId, pageSize, (page - 1) * pageSize])).rows;
   return response({ items: rows.map(scholarshipLedgerShape), total, page, pageSize });
  }
@@ -113,7 +113,7 @@ export async function handleScholarshipLedger(ctx) {
   if (!/^[1-9][0-9]{0,18}$/.test(ledgerId)) fail(400, 'VALIDATION', '消费流水编号无效');
   const reason = field(body.reason, '退款原因', { max: 2000 });
   return transaction(pool, async db => {
-   const original = (await db.query("SELECT l.* FROM luq_ledger l JOIN identities i ON i.id=l.identity_id WHERE l.id=$1 AND l.kind='purchase' AND i.kind='student'", [ledgerId])).rows[0];
+   const original = (await db.query("SELECT l.* FROM platform_scholarship_statement l JOIN identities i ON i.id=l.identity_id WHERE l.id=$1 AND l.kind='purchase' AND i.kind='student'", [ledgerId])).rows[0];
    if (!original) fail(404, 'NOT_FOUND', '原消费不存在');
    return response(await postScholarshipEntry(db, { identityId: original.identity_id, delta: -original.delta, kind: 'refund',
     sourceKey: `refund:${ledgerId}`, requestKey: `refund:${user.id}:${requestId}`, actorAccountId: user.id, reason,

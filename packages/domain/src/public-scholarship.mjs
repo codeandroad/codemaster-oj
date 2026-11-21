@@ -48,8 +48,8 @@ export async function publicScholarshipOperation(ctx,loadPublicProblem){
   await activeAccount(db,user.id);
   const page=integer(Number(url.searchParams.get('page')??1),1,100000,'Page'),pageSize=50;
   const balance=(await db.query('SELECT balance FROM luq_accounts WHERE identity_id=$1',[user.identityId])).rows[0]?.balance??0;
-  const total=Number((await db.query('SELECT count(*) FROM luq_ledger WHERE identity_id=$1',[user.identityId])).rows[0].count);
-  const items=(await db.query('SELECT * FROM luq_ledger WHERE identity_id=$1 ORDER BY id DESC LIMIT $2 OFFSET $3',[user.identityId,pageSize,(page-1)*pageSize])).rows.map(scholarshipLedgerShape);
+  const total=Number((await db.query('SELECT count(*) FROM platform_scholarship_statement WHERE identity_id=$1',[user.identityId])).rows[0].count);
+  const items=(await db.query('SELECT * FROM platform_scholarship_statement WHERE identity_id=$1 ORDER BY id DESC LIMIT $2 OFFSET $3',[user.identityId,pageSize,(page-1)*pageSize])).rows.map(scholarshipLedgerShape);
   return {status:200,body:{balance,items,total,page,pageSize}};
  });
  const action=route.match(/^\/practice\/scholarship\/assistance\/(quote|unlock|provide)$/);

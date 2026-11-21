@@ -1,6 +1,7 @@
 import { receiptActivityJoin, receiptVisible } from './school-submission-history.mjs';
+import { postScholarshipEntry } from './scholarship-ledger.mjs';
 import { transaction } from './db.mjs';
-import { auditSchool, lockSchoolTeaching, schoolRole } from './schools.mjs';
+import { auditSchool, lockSchoolTeaching, lockWorkspaceMembership, schoolRole } from './schools.mjs';
 import { lockScholarshipAssistance } from './scholarship-access.mjs';
 import { schoolActivityJobVisibleSql } from './school-activities.mjs';
 import { canonicalHash, enumValue, fail, field, integer, uuid } from './security.mjs';
@@ -18,7 +19,7 @@ export async function schoolScholarshipSettings(db,s){
  const c=(await db.query('SELECT * FROM school_scholarship_settings WHERE school_id=$1',[s])).rows[0];
  return {initialGrant:c.initial_grant,firstAcReward:c.first_ac_reward,translationPrice:c.translation_price,solutionPrice:c.solution_price,activityRewardCap:c.activity_reward_cap,firstAcPoints:c.first_ac_points,revision:c.revision,displayFields:c.display_fields};
 }
-async function studentIdentity(db,s,user){const i=(await db.query("SELECT id,name FROM school_identities WHERE school_id=$1 AND account_id=$2 AND kind='student'",[s,user.id])).rows[0];if(!i)fail(403,'STUDENT_IDENTITY_REQUIRED','A linked school student identity is required.');return i;}
+async function studentIdentity(db,s,user){const i=(await db.query("SELECT id,name FROM school_identities WHERE school_id=$1 AND account_id=$2 AND kind='student' AND archived_at IS NULL",[s,user.id])).rows[0];if(!i)fail(403,'STUDENT_IDENTITY_REQUIRED','A linked school student identity is required.');return i;}
 async function walletLock(db,s,i){await db.query("SELECT pg_advisory_xact_lock(hashtextextended('school-scholarship:'||$1||':'||$2,0))",[s,i]);}
 async function balance(db,s,i){return (await db.query('SELECT balance FROM school_scholarship_accounts WHERE school_id=$1 AND identity_id=$2',[s,i])).rows[0]?.balance??0;}
 export async function schoolScholarshipWallet(db, schoolId, user, { lock = false } = {}) {
@@ -28,7 +29,7 @@ export async function schoolScholarshipWallet(db, schoolId, user, { lock = false
 }
 export async function postSchoolScholarshipEntry(db,{schoolId,identityId,delta,kind,sourceKey,actor=null,reason,metadata={},refundOf=null,requestHash=null}){
  try{return(await db.query('SELECT * FROM school_scholarship_entry($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',[schoolId,identityId,delta,kind,sourceKey,actor,reason,JSON.stringify(metadata),refundOf,requestHash])).rows[0];}
- catch(e){const text=String(e.message);if(text.includes('SCHOLARSHIP_INSUFFICIENT'))fail(409,'INSUFFICIENT_BALANCE','Insufficient scholarship balance.');if(text.includes('SCHOLARSHIP_REQUEST_CONFLICT'))fail(409,'REQUEST_CONFLICT','This request has already been used.');if(text.includes('SCHOLARSHIP_CREDIT_USED'))fail(409,'TRANSLATION_CREDIT_USED','This translation payment was used toward a solution and cannot be refunded independently.');throw e;}
+ catch(e){const text=String(e.message);if(text.includes('SCHOLARSHIP_ALREADY_REFUNDED'))fail(409,'ALREADY_REFUNDED','Purchase already refunded.');if(text.includes('SCHOLARSHIP_BALANCE_LIMIT'))fail(409,'BALANCE_LIMIT','Wallet balance exceeds the limit.');if(text.includes('SCHOLARSHIP_INSUFFICIENT'))fail(409,'INSUFFICIENT_BALANCE','Insufficient scholarship balance.');if(text.includes('SCHOLARSHIP_REQUEST_CONFLICT'))fail(409,'REQUEST_CONFLICT','This request has already been used.');if(text.includes('SCHOLARSHIP_CREDIT_USED'))fail(409,'TRANSLATION_CREDIT_USED','This translation payment was used toward a solution and cannot be refunded independently.');throw e;}
 }
 async function target(db,s,u,role,b,{management=false}={}){
  const type=b.type==='paper4'?'paper4':'problem';let p,v,subject,activityId=null,activityType='activity';
@@ -101,6 +102,7 @@ async function currentAssistance(db,s,u,role,b){
    JOIN luq_ledger l ON l.id=e.ledger_id AND l.identity_id=e.identity_id AND l.kind='purchase'
    WHERE imported.school_id=$1 AND imported.identity_id=$2 AND imported.subject_key=$3
     AND e.kind='FULL_TRANSLATION' AND e.language='zh-CN'
+    AND NOT EXISTS(SELECT 1 FROM scholarship_receipt_ownership r WHERE r.platform_entry=l.id AND r.refunded)
     AND NOT EXISTS(SELECT 1 FROM luq_ledger r WHERE r.refund_of=l.id)
     AND NOT EXISTS(SELECT 1 FROM luq_assistance_entitlements used WHERE used.translation_credit_ledger_id=l.id)
     AND NOT EXISTS(SELECT 1 FROM transferred_translation_credits used WHERE used.ledger_id=l.id)`,[s,i.id,t.subject])).rows[0];
@@ -158,10 +160,37 @@ export async function handleSchoolScholarship({pool,user,route,method,body={},ur
    const fields={};for(const key of ['solved','attempts','acRate','scholarship'])fields[key]=body.displayFields?.[key]!==false;
    await db.query('UPDATE school_scholarship_settings SET initial_grant=$2,first_ac_reward=$3,translation_price=$4,solution_price=$5,activity_reward_cap=$6,first_ac_points=$7,display_fields=$8,revision=revision+1 WHERE school_id=$1',[s,c.initialGrant,c.firstAcReward,c.translationPrice,c.solutionPrice,c.activityRewardCap,c.firstAcPoints,JSON.stringify(fields)]);await auditSchool(db,s,user.id,'scholarship.settings',s);return reply(await schoolScholarshipSettings(db,s));
   }
+  if(path==='exchange' && method==='POST'){
+   if(!await lockWorkspaceMembership(db,s,user.id,{studentOnly:true}))fail(403,'FORBIDDEN','An active student membership is required.');
+   const student=await studentIdentity(db,s,user);
+   const direction=enumValue(body.direction,['to_school','to_platform'],'Exchange direction');
+   const amount=integer(body.amount,1,2147483647,'Amount');
+   return reply(await idempotent(db,s,user,body.requestId,{operation:'exchange',direction,amount},async hash=>{
+    const schoolDelta=direction==='to_school'?amount:-amount;
+    const key=`exchange:${s}:${user.id}:${body.requestId}`;
+    const metadata={schoolId:s,direction,requestId:body.requestId,amount,rate:1};
+    const {rows:[school]}=await db.query('SELECT name FROM schools WHERE id=$1',[s]);
+    const reason=direction==='to_school'?`平台 → ${school.name}`:`${school.name} → 平台`;
+    await lockScholarshipAssistance(db,user.identityId);
+    const platform=await postScholarshipEntry(db,{identityId:user.identityId,delta:-schoolDelta,kind:'exchange',
+     sourceKey:key,actorAccountId:user.id,reason,metadata,requestHash:hash});
+    const schoolEntry=await postSchoolScholarshipEntry(db,{schoolId:s,identityId:student.id,delta:schoolDelta,kind:'exchange',
+     sourceKey:key,actor:user.id,reason,metadata,requestHash:hash});
+    return {platformBalance:platform.balanceAfter,schoolBalance:schoolEntry.balance_after};
+   }));
+  }
   if(path==='wallet'&&method==='GET'){const i=await studentIdentity(db,s,user);return reply({balance:await balance(db,s,i.id),...cfg});}
   if((path==='ledger'||path==='me')&&method==='GET'){
    const i=path==='ledger'&&role==='school_admin'?(url.searchParams.get('identityId')?uuid(url.searchParams.get('identityId')):null):(await studentIdentity(db,s,user)).id,page=integer(Number(url.searchParams.get('page')??1),1,100000,'Page');
-   const rows=(await db.query(`SELECT l.*,i.name,EXISTS(SELECT 1 FROM school_scholarship_ledger r WHERE r.school_id=l.school_id AND r.refund_of=l.id) AS refunded,EXISTS(SELECT 1 FROM school_scholarship_entitlements e WHERE e.school_id=l.school_id AND e.credit_ledger_id=l.id) AS credited FROM school_scholarship_ledger l JOIN school_identities i ON i.school_id=l.school_id AND i.id=l.identity_id WHERE l.school_id=$1 AND ($2::uuid IS NULL OR l.identity_id=$2) ORDER BY l.created_at DESC,l.id DESC LIMIT 51 OFFSET $3`,[s,i,(page-1)*50])).rows;
+   const rows=(await db.query(`SELECT l.*,i.name,
+    coalesce(o.refunded,false) OR EXISTS(SELECT 1 FROM school_scholarship_ledger r WHERE r.school_id=l.school_id AND r.refund_of=l.id) AS refunded,
+    EXISTS(SELECT 1 FROM school_scholarship_entitlements e WHERE e.school_id=l.school_id AND e.credit_ledger_id=l.id)
+     OR EXISTS(SELECT 1 FROM transferred_translation_credits c WHERE c.ledger_id=o.platform_entry)
+     OR EXISTS(SELECT 1 FROM luq_assistance_entitlements e WHERE e.translation_credit_ledger_id=o.platform_entry) AS credited
+    FROM school_scholarship_ledger l JOIN school_identities i ON i.school_id=l.school_id AND i.id=l.identity_id
+    LEFT JOIN scholarship_receipt_ownership o ON (o.school_id,o.school_entry)=(l.school_id,l.id)
+    WHERE l.school_id=$1 AND ($2::uuid IS NULL OR l.identity_id=$2)
+    ORDER BY l.created_at DESC,l.id DESC LIMIT 51 OFFSET $3`,[s,i,(page-1)*50])).rows;
    return reply({items:rows.slice(0,50).map(r=>({id:r.id,identityId:r.identity_id,name:role==='school_admin'?r.name:undefined,delta:r.delta,balanceAfter:r.balance_after,kind:r.kind,reason:r.reason,createdAt:r.created_at,refunded:r.refunded,credited:r.credited,refundOf:r.refund_of})),page,hasMore:rows.length>50,...(path==='me'?{balance:await balance(db,s,i),pageSize:50,total:Number((await db.query('SELECT count(*) FROM school_scholarship_ledger WHERE school_id=$1 AND identity_id=$2',[s,i])).rows[0].count)}:{}),...(path==='ledger'&&role==='school_admin'?{reviewCases:(await db.query('SELECT id,source_key AS source,reason,created_at AS "createdAt" FROM school_scholarship_review_cases WHERE school_id=$1 ORDER BY created_at DESC LIMIT 50',[s])).rows}:{})});
   }
   if(path==='recipients'&&method==='GET'){requireAdmin(role);return reply({items:(await db.query("SELECT i.id,i.name,i.number,coalesce(a.balance,0) AS balance FROM school_identities i LEFT JOIN school_scholarship_accounts a ON a.school_id=i.school_id AND a.identity_id=i.id WHERE i.school_id=$1 AND i.kind='student' AND i.archived_at IS NULL ORDER BY i.name,i.id",[s])).rows,classes:(await db.query('SELECT id,name FROM school_classes WHERE school_id=$1 AND archived_at IS NULL ORDER BY name,id',[s])).rows});}
@@ -175,7 +204,7 @@ export async function handleSchoolScholarship({pool,user,route,method,body={},ur
     for(const id of ids)await postSchoolScholarshipEntry(db,{schoolId:s,identityId:id,delta:amount,kind,sourceKey:`admin:${user.id}:${body.requestId}:${id}`,actor:user.id,reason,requestHash:hash});await auditSchool(db,s,user.id,'scholarship.grant',s);return {count:ids.length,amount};
    }));
   }
-  if(path==='refund'&&method==='POST'){requireAdmin(role);const ledgerId=uuid(body.ledgerId),reason=field(body.reason,'Reason',{max:2000});return reply(await idempotent(db,s,user,body.requestId,{ledgerId,reason},async()=>{const l=(await db.query("SELECT * FROM school_scholarship_ledger WHERE school_id=$1 AND id=$2 AND kind='purchase'",[s,ledgerId])).rows[0];if(!l)fail(404,'NOT_FOUND','Purchase not found.');const refunded=await postSchoolScholarshipEntry(db,{schoolId:s,identityId:l.identity_id,delta:-l.delta,kind:'refund',sourceKey:`refund:${ledgerId}`,actor:user.id,reason,refundOf:ledgerId});return {id:refunded.id,balance:refunded.balance_after};}));}
+  if(path==='refund'&&method==='POST'){requireAdmin(role);const ledgerId=uuid(body.ledgerId),reason=field(body.reason,'Reason',{max:2000});return reply(await idempotent(db,s,user,body.requestId,{ledgerId,reason},async()=>{const l=(await db.query("SELECT * FROM school_scholarship_ledger WHERE school_id=$1 AND id=$2 AND kind='purchase'",[s,ledgerId])).rows[0];if(!l)fail(404,'NOT_FOUND','Purchase not found.');await lockScholarshipAssistance(db,l.identity_id);const refunded=await postSchoolScholarshipEntry(db,{schoolId:s,identityId:l.identity_id,delta:-l.delta,kind:'refund',sourceKey:`refund:${ledgerId}`,actor:user.id,reason,refundOf:ledgerId});return {id:refunded.id,balance:refunded.balance_after};}));}
   if(path.startsWith('assistance/')&&method==='POST'){
    const i=await studentIdentity(db,s,user);await lockScholarshipAssistance(db,user.identityId);await walletLock(db,s,i.id);
    if(path==='assistance/unlock')await db.query("SELECT pg_advisory_xact_lock(hashtextextended('luq-account:'||$1::text,0))",[i.id]);

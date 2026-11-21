@@ -108,7 +108,8 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
         : <LearnerRecords notebook={section === "review-notebook"}/>;
       break;
     case "scholarship":
-      content = <StudentScholarshipPage key={wallet} endpoint={wallet} scopeName={scopeName}/>;
+      content = <StudentScholarshipPage key={wallet} endpoint={wallet} scopeName={scopeName}
+        exchangeSchools={(school ? [school] : schools).map(s => ({id:s.id, name:schoolDisplayName(s,locale)}))}/>;
       break;
     case "classes":
       content = school && (classId ? <StudentClass id={classId} schoolId={school.id}/> : <StudentClasses schoolId={school.id}/>);

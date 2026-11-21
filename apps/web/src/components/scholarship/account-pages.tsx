@@ -77,6 +77,7 @@ function Ledger({
     initial_grant: tx("学生初始发放", "Initial student allowance"),
     admin_grant: tx("管理员发放", "Administrator grant"),
     admin_adjustment: tx("管理员调整", "Administrator adjustment"),
+    exchange: tx("钱包兑换", "Wallet exchange"),
     purchase: tx("辅助内容解锁", "Assistance unlock"),
     refund: tx("消费退款", "Purchase refund"),
     first_ac: tx("首次 AC 奖励", "First-AC reward"),
@@ -181,7 +182,64 @@ function LedgerPager({
   );
 }
 
-export function StudentScholarshipPage({ endpoint = "scholarship/me", scopeName }: { scopeName?: string; endpoint?: "scholarship/me" | "practice/scholarship/me" | `schools/${string}/scholarship/me` } = {}) {
+type WalletSchool = { id: string; name: string };
+
+function ExchangeForm({ school, fromSchool, onComplete }: { school: WalletSchool; fromSchool: boolean; onComplete: () => void }) {
+  const tx = useText();
+  const action = useAction();
+  const [toSchool, setToSchool] = useState(!fromSchool);
+  const [amount, setAmount] = useState("");
+  const request = useRef<string | null>(null);
+  const platform = useData<ScholarshipAccount>("practice/scholarship/me");
+  const local = useData<ScholarshipAccount>(`schools/${school.id}/scholarship/me`);
+  const source = toSchool ? platform : local;
+  const publicName = tx("平台钱包", "Platform wallet");
+  return <form method="post" className="grid max-w-lg gap-3" onSubmit={event => {
+    event.preventDefault();
+    void action.run(async () => {
+      request.current ??= productionId();
+      await productionApi(`schools/${school.id}/scholarship/exchange`, { method: "POST", body: {
+        requestId: request.current, direction: toSchool ? "to_school" : "to_platform", amount: Number(amount),
+      } });
+      request.current = null;
+      setAmount("");
+      local.reload();
+      platform.reload();
+      onComplete();
+      window.dispatchEvent(new Event("campus-judge:scholarship-changed"));
+      return tx("兑换成功，两边的钱包均已记账。", "Exchange complete. Both wallets have been updated.");
+    });
+  }}>
+    <p className="text-sm">{publicName} · {platform.data?.balance ?? "—"}　{school.name} · {local.data?.balance ?? "—"}</p>
+    <Field label={tx("兑换方向", "Transfer direction")}><select name="direction" className={input} disabled={action.busy}
+      value={toSchool ? "in" : "out"} onChange={e => {setToSchool(e.target.value === "in"); request.current = null; action.clear();}}>
+      <option value="in">{publicName} → {school.name}</option>
+      <option value="out">{school.name} → {publicName}</option>
+    </select></Field>
+    <Field label={tx("兑换数量（1:1）", "Amount (1:1)")}><input name="amount" className={input} type="number" inputMode="numeric"
+      required min={1} step={1} max={source.data?.balance} value={amount} disabled={action.busy}
+      onChange={e => {setAmount(e.target.value); request.current = null; action.clear();}}/></Field>
+    <Button type="submit" disabled={action.busy || !source.data}>{tx("确认兑换", "Confirm exchange")} {amount}</Button>
+    <State resource={source}/><Feedback action={action}/>
+  </form>;
+}
+
+function WalletExchange({ schools, fromSchool, onComplete }: { schools: WalletSchool[]; fromSchool: boolean; onComplete: () => void }) {
+  const tx = useText();
+  const [opened, setOpened] = useState(false);
+  const [selected, setSelected] = useState(schools[0]?.id);
+  const school = schools.find(item => item.id === selected) ?? schools[0];
+  return <details className={`${panel} p-4`} onToggle={e => setOpened(e.currentTarget.open)}>
+    <summary className="cursor-pointer font-semibold">{tx("钱包兑换", "Wallet exchange")}</summary>
+    {opened && school && <div className="mt-3 grid max-w-lg gap-3">
+      {schools.length > 1 && <Field label={tx("学校", "School")}><select name="school" className={input} value={school.id} onChange={e => setSelected(e.target.value)}>
+        {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>}
+      <ExchangeForm key={school.id} school={school} fromSchool={fromSchool} onComplete={onComplete}/>
+    </div>}
+  </details>;
+}
+
+export function StudentScholarshipPage({ endpoint = "scholarship/me", scopeName, exchangeSchools = [] }: { exchangeSchools?: WalletSchool[]; scopeName?: string; endpoint?: "scholarship/me" | "practice/scholarship/me" | `schools/${string}/scholarship/me` } = {}) {
   const tx = useText(),
     [page, setPage] = useState(1),
     resource = useData<ScholarshipAccount>(`${endpoint}?page=${page}`);
@@ -210,6 +268,7 @@ export function StudentScholarshipPage({ endpoint = "scholarship/me", scopeName 
           </Button>
         </div>
       </section>
+      {exchangeSchools.length > 0 && <WalletExchange schools={exchangeSchools} fromSchool={!publicPractice} onComplete={() => {setPage(1); resource.reload();}}/>}
       <State resource={resource} />
       <section className={`${panel} overflow-hidden`}>
         <h2 className="border-b border-border px-4 py-3 font-semibold">

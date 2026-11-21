@@ -456,6 +456,7 @@ function ScholarshipLedger({
     }
   }
   const labels: Record<string, string> = {
+    exchange: tx("钱包兑换", "Wallet exchange"),
     initial_grant: tx("初始额度", "Initial allowance"),
     first_ac: tx("首次 AC", "First AC"),
     activity: tx("活动奖励", "Activity reward"),

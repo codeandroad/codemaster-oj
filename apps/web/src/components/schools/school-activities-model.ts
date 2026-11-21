@@ -6,6 +6,7 @@ export type ActivityAttempt = { id: string; startedAt: string; deadlineAt: strin
 export type SchoolActivity = {
   id: string; schoolId: string; kind: ActivityKind; title: string; description: string;
   state: "Draft" | "Published" | "Archived"; phase: string; revision: number;
+  courseTitle?: string|null; classNames?: string[];
   courseId?:string|null; courseScope?:"school"|"platform"|null;
   cancelledAt?: string | null;
   startsAt: string | null; endsAt: string | null; durationMinutes: number | null;

@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
+import { schoolBookmarkQuery } from "./schools/school-workspace-location";
 import { type School } from "./schools/school-ui";
 import { resolveLoginDestination } from "./auth/login-destination";
 import { readSchoolPreference, writeSchoolPreference } from "./schools/school-selection";
@@ -25,7 +26,7 @@ const PlatformPage = dynamic(() => import("./schools/platform-page").then(module
 const SchoolsPage = dynamic(() => import("./schools/schools-page").then(module => module.SchoolsPage), { loading: PageLoading });
 
 const PersonalRegisterPage = dynamic(() => import("./auth/personal-register-page").then(module => module.PersonalRegisterPage), { loading: PageLoading });
-const PracticePage = dynamic(() => import("./schools/practice-page").then(module => module.PracticePage), { loading: PageLoading });
+const LearnerWorkspace = dynamic(() => import("./schools/learner-workspace").then(module => module.LearnerWorkspace), { loading: PageLoading });
 
 const ProductionLoginPage = dynamic(() => import("@/components/auth/login-page").then(module => module.ProductionLoginPage), { loading: PageLoading });
 const ProductionRegisterPage = dynamic(() => import("@/components/auth/register-page").then(module => module.ProductionRegisterPage), { loading: PageLoading });
@@ -170,20 +171,13 @@ function AuthenticatedWorkspace({user,pathname,search,onUserSaved,onLogout}: {
 }) {
   if (pathname === "/platform") return <PlatformPage user={user} onUserSaved={onUserSaved} onLogout={onLogout} />;
   if (pathname === "/schools") return <SchoolsPage user={user} onUserSaved={onUserSaved} onLogout={onLogout} />;
-  if (pathname.startsWith("/practice")) return <PracticePage user={user} pathname={pathname} onUserSaved={onUserSaved} onLogout={onLogout}/>;
+  if (pathname.startsWith("/practice")) return <LearnerWorkspace user={user} pathname={pathname} onUserSaved={onUserSaved} onLogout={onLogout}/>;
   {
     const publicBookmark = resolvePublicLearningBookmark(pathname, search);
-    const schoolId = search.get("schoolId") ?? user.teachingSchoolId;
-    const [, scope, section, resourceId, child, chapterId] = pathname.split("/");
-    const sections: Record<string,string> = { "learning-paths": "courses", "timed-practice": "timed", settings: "personal-settings" };
-    const target = sections[section] ?? section ?? "home";
-    const query = new URLSearchParams(search);
-    query.set("section",target);
-    if (schoolId) query.set("schoolId", schoolId);
-    if (scope === "teacher" || scope === "student") query.set("schoolRole", scope);
-    const resourceKey: Record<string,string> = { courses: "courseId", problems: "problemId", assignments: "activityId", paper4: "paperId" };
-    if (resourceId && resourceKey[target]) query.set(resourceKey[target], resourceId);
-    if (child === "chapters" && chapterId) query.set("chapterId", chapterId);
+    const schoolId = search.get("schoolId") ?? user.defaultSchoolId ?? user.teachingSchoolId;
+    const [, scope, , resourceId] = pathname.split("/");
+    const query = schoolBookmarkQuery(pathname,search,schoolId);
+    const target = query.get("section")!;
     if (schoolId && resourceId && scope === "student" && (target === "problems" || target === "courses")) {
       return <ResourceBookmark schoolId={schoolId} id={resourceId} section={target} query={query.toString()}/>;
     }
@@ -211,19 +205,20 @@ function ResourceBookmark({ schoolId,id,section,query }: {schoolId:string;id:str
           params.set("courseId",resource.id);
           if(resource.chapterId&&!params.has("chapterId"))params.set("chapterId",resource.chapterId);
           if(resource.scope==="platform"){
-            params.set("workspaceSchoolId",schoolId);
-            router.replace(`/practice/courses/${encodeURIComponent(resource.id)}?${params}`);
+            params.set("scope","public"); params.set("publicCourseId",resource.id); params.delete("courseId");
+            router.replace(`/schools?${params}`);
             return;
           }
         }
+        if (section === "problems") params.set("scope","school");
         router.replace(`/schools?${params}`);
       })
       .catch(error=>{
         if(controller.signal.aborted)return;
         if(!(error instanceof ApiError && error.status===404)){router.replace(`/schools?${params}`);return;}
-        params.set("workspaceSchoolId",schoolId);
-        const path=section==="courses"?`/practice/courses/${encodeURIComponent(id)}`:"/practice/problems";
-        router.replace(`${path}?${params}`);
+        params.set("scope","public");
+        if (section==="courses") {params.set("publicCourseId",id); params.delete("courseId");}
+        router.replace(`/schools?${params}`);
       });
     return ()=>controller.abort();
   },[schoolId,id,section,query,router]);

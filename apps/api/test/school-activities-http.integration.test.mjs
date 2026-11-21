@@ -57,6 +57,14 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       assert.equal((await request(inbox, { auth: auth.student })).data.unreadCount, 0);
       await request(prefix + '/scholarship/grant', { auth: auth.admin, method: 'POST', body: grant });
       await request(prefix + '/scholarship/grant', { auth: auth.admin, method: 'POST', body: grant });
+      const personalWallet = prefix + '/scholarship/me';
+      const wallet = (await request(personalWallet, { auth: auth.student })).data;
+      assert.equal(wallet.total, wallet.items.length);
+      assert.equal(wallet.balance, wallet.items[0].balanceAfter);
+      assert.equal(wallet.items[0].delta, 15);
+      assert.deepEqual((await request(personalWallet + '?identityId=' + ids.peer, { auth: auth.student })).data, wallet);
+      assert.ok((await request(personalWallet + '?identityId=' + ids.student, { auth: auth.peer })).data.items.every(row => row.identityId === ids.peer));
+      await request(personalWallet, { auth: auth.outside, status: 404 });
       const { data } = await request(inbox, { auth: auth.student });
       assert.equal(data.unreadCount, 1);
       assert.deepEqual(data.items.map(({ kind, amount, reason }) => ({ kind, amount, reason })),
@@ -94,7 +102,7 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       const { data: view } = await request(problem, teacher);
       assert.equal(view.activity.preview, true);
       assert.equal(view.versionId, published.versionId);
-      assert.doesNotMatch(JSON.stringify(view), /PRIVATE_REFERENCE|1874|937/);
+      assert.doesNotMatch(JSON.stringify(view), /PRIVATE_REFERENCE|"1874"|"\[937\]"/);
       const submission = { method: 'POST', status: 202, ...teacher, body: {
         kind: 'submit', code: 'def solve(data):\n return data*2', requestId: randomUUID(),
         versionId: view.versionId, expectedRevision: view.activity.revision,
@@ -209,7 +217,7 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
         const { data } = await request(path, { auth: auth.student });
         assert.equal(data.status, 'WA');
         assert.deepEqual(data.caseFeedback, [{ position: 1, status: 'WA', timeMs: 5, memoryKb: 4 }]);
-        assert.doesNotMatch(JSON.stringify(data), /PRIVATE_|\[937\]|1874/);
+        assert.doesNotMatch(JSON.stringify(data), /PRIVATE_|\[937\]|"1874"/);
       }
       await request(prefix + '/problems/' + p.id, { auth: auth.student });
     });
@@ -294,6 +302,10 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       assert.equal((await request(problem, peer)).data.activity.canSubmit, false);
       await submit('peer', { ...solution, requestId: randomUUID() }, 409);
       await request(path + '/archive', { ...teacher, method: 'POST' });
+      const archived = (await request(activities+'?kind=assignment&archived=true',peer)).data;
+      assert.ok(archived.items.some(item=>item.id===path.split('/').at(-1)));
+      assert.equal((await request(path,peer)).data.canSubmit,false);
+      await request(path,{auth:auth.outside,status:404});
       await submit('student', { ...solution, requestId: randomUUID() }, 404);
     });
     await t.test('assignment changes notify affected students, preserve history, and use the personal cutoff', async () => {

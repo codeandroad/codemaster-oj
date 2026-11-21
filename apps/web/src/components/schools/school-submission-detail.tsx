@@ -20,15 +20,15 @@ export type JobDetail = DetailedSubmission & {
 
 // This endpoint returns only the current account's record in the current school.
 // Never use the problem-wide metadata feed to fetch another student's code.
-export function SchoolSubmissionDetail({ schoolId, submissionId, backHref }: {
-  schoolId: string; submissionId: string; backHref: string;
+export function SchoolSubmissionDetail({ schoolId, submissionId, backHref, backLabel }: {
+  schoolId: string; submissionId: string; backHref: string; backLabel?:string;
 }) {
   const path=`schools/${schoolId}/judge-jobs/${encodeURIComponent(submissionId)}`;
-  return <StudySubmissionDetail path={path} backHref={backHref} renderExtra={(job,reload)=>job.state==="completed"&&job.resultsVisible!==false&&<>
+  return <StudySubmissionDetail path={path} backHref={backHref} backLabel={backLabel} renderExtra={(job,reload)=>job.state==="completed"&&job.resultsVisible!==false&&<>
     {job.reviews?.map((entry,index)=><p key={index} className="whitespace-pre-wrap break-words">{entry.note}</p>)}
     <CorrectionNote key={job.noteUpdatedAt??"new"} path={path} job={job} onSaved={reload}/>
   </>}
-    problemHref={job => `/schools?schoolId=${encodeURIComponent(schoolId)}&section=problems&problemId=${encodeURIComponent(job.problemId)}`} />;
+    problemHref={job => `/schools?schoolId=${encodeURIComponent(schoolId)}&section=problems&scope=school&problemId=${encodeURIComponent(job.problemId)}`} />;
 }
 
 export function StudySubmissionDetail<T extends JobDetail>({ path, backHref, backLabel, problemHref, renderExtra }: {

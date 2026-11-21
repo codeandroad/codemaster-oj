@@ -478,7 +478,7 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
    return reply({ok:true});
   }return null;
  });
- const m=route.match(/^\/schools\/([^/]+)\/(problem-banks|problems|judge-status|judge-jobs|submissions)(?:\/([^/]+)(?:\/(validate|publish|unpublish|submissions|public-request|tutorial|note))?)?$/);
+ const m=route.match(/^\/schools\/([^/]+)\/(problem-banks|problems|judge-status|judge-jobs|submissions|review-notebook)(?:\/([^/]+)(?:\/(validate|publish|unpublish|submissions|public-request|tutorial|note))?)?$/);
  if(!m)return null;const schoolId=uuid(m[1]);
  return transaction(pool,async db=>{
   await lockSchoolTeaching(db,schoolId,{shared:method==='GET'});const role=await schoolRole(db,schoolId,user.id);await scope(db,schoolId);
@@ -504,21 +504,49 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
    return reply({...record,...saved});
   }
   const id=m[3]?uuid(m[3]):null;
+  if(m[2]==='review-notebook'&&method==='GET'&&id){
+   await db.query("SELECT set_config('campus.account_id',$1,true)",[user.id]);
+   const record=(await db.query(`SELECT 'SUB'||s.id AS "submissionId" FROM review_entries r JOIN submissions s ON s.id=r.submission_id
+    ${receiptActivityJoin} WHERE r.id=$3 AND s.school_id=$1 AND s.account_id=$2 AND ${receiptVisible}`,[schoolId,user.id,id])).rows[0];
+   if(!record)fail(404,'NOT_FOUND','Review entry not found.');
+   return reply(record);
+  }
   if(m[2]==='submissions'&&method==='GET'&&!id){
    await db.query("SELECT set_config('campus.account_id',$1,true)",[user.id]);
    const page=integer(Number(url.searchParams.get('page')??1),1,100000,'Page');
-   const rows=(await db.query(`SELECT * FROM (SELECT id::text,problem_id,payload->'version'->>'title' AS title,payload->>'language' AS language,state,created_at,result->>'status' AS status,result->>'score' AS score
-    FROM school_judge_jobs j WHERE ${schoolActivityJobVisibleSql('j')} AND school_id=$1 AND account_id=$2 AND access_context IN ('school','staff_practice') AND kind='submit'
-    AND (NOT $4 OR result->>'status' IN ('WA','CE','RE','TLE','MLE','OLE') OR EXISTS(SELECT 1 FROM school_submission_notes n WHERE n.job_id=j.id AND n.note<>''))
+   const notebook=url.searchParams.get('view')==='review';
+   const verdict=url.searchParams.get('status'),context=url.searchParams.get('context'),review=url.searchParams.get('reviewState');
+   const rows=(await db.query(`WITH records AS (
+    SELECT j.id::text,j.problem_id,j.payload->'version'->>'title' AS title,j.payload->>'language' AS language,j.state,j.created_at,
+     coalesce(j.result->>'status',CASE j.state WHEN 'failed' THEN 'System Error' WHEN 'leased' THEN 'Judging' ELSE 'Waiting' END) status,
+     j.result->>'score' score,coalesce(a.kind,'practice') context,n.updated_at note_at,NULL::text feedback,NULL::text correction,
+     (j.result->>'status' IN ('WA','CE','RE','TLE','MLE','OLE') OR n.note<>'') in_notebook
+    FROM school_judge_jobs j LEFT JOIN school_activities a ON (a.school_id,a.id)=(j.school_id,j.activity_id)
+    LEFT JOIN school_submission_notes n ON (n.school_id,n.job_id,n.account_id)=(j.school_id,j.id,j.account_id)
+    WHERE ${schoolActivityJobVisibleSql('j')} AND j.school_id=$1 AND j.account_id=$2 AND j.access_context IN ('school','staff_practice') AND j.kind='submit'
     UNION ALL SELECT 'SUB'||s.id,s.problem_id,v.title,s.language,
-     CASE WHEN s.status='Waiting' THEN 'queued' WHEN s.status='Judging' THEN 'leased' ELSE 'completed' END,s.created_at,
-     CASE WHEN ${receiptVisible} THEN s.status ELSE 'Submitted' END,CASE WHEN ${receiptVisible} THEN s.score::text END
+     CASE s.status WHEN 'Waiting' THEN 'queued' WHEN 'Judging' THEN 'leased' ELSE 'completed' END,s.created_at,
+     CASE WHEN ${receiptVisible} THEN s.status ELSE 'Submitted' END,CASE WHEN ${receiptVisible} THEN s.score::text END,
+     CASE WHEN s.kind='correction' THEN 'correction' WHEN s.assignment_id IS NOT NULL THEN 'assignment' WHEN ta.id IS NOT NULL THEN 'timed' ELSE 'practice' END,
+     greatest(note.updated_at,feedback.created_at,correction.created_at),
+     CASE WHEN ${receiptVisible} THEN feedback.note END,CASE WHEN ${receiptVisible} THEN correction.status END,
+     ${receiptVisible} AND s.kind='submit' AND (s.status IN ('WA','CE','RE','TLE','MLE','OLE') OR note.note<>'' OR EXISTS(SELECT 1 FROM review_entries r WHERE r.submission_id=s.id))
      FROM submissions s JOIN problem_versions v ON v.id=s.version_id ${receiptActivityJoin}
-     WHERE s.school_id=$1 AND s.account_id=$2 AND (NOT $4 OR ${receiptVisible} AND (EXISTS(SELECT 1 FROM review_entries r WHERE r.submission_id=s.id)
-      OR EXISTS(SELECT 1 FROM school_submission_notes n WHERE n.submission_id=s.id AND n.note<>'')
-      OR s.kind='submit' AND s.status IN ('WA','CE','RE','TLE','MLE','OLE')))) records
-    ORDER BY created_at DESC,id LIMIT 26 OFFSET $3`,[schoolId,user.id,(page-1)*25,url.searchParams.get('view')==='review'])).rows;
-   return reply({page,hasMore:rows.length>25,items:rows.slice(0,25).map(j=>({id:j.id,problemId:j.problem_id,problemTitle:j.title,language:j.language,state:j.state,createdAt:j.created_at,status:j.status??(j.state==='failed'?'System Error':j.state==='leased'?'Judging':'Waiting'),score:j.score===null?null:Number(j.score)}))});
+     LEFT JOIN school_submission_notes note ON (note.school_id,note.submission_id,note.account_id)=(s.school_id,s.id,s.account_id)
+     LEFT JOIN LATERAL (SELECT r.note,r.created_at FROM review_entries r WHERE $4 AND r.submission_id=s.id AND r.author_account_id<>s.account_id
+       ORDER BY r.created_at DESC,r.id DESC LIMIT 1) feedback ON true
+     LEFT JOIN LATERAL (SELECT c.status,c.created_at FROM submissions c WHERE $4 AND c.original_submission_id=s.id AND c.kind='correction'
+       AND (c.school_id,c.account_id)=(s.school_id,s.account_id) AND c.timed_attempt_id IS NULL ORDER BY c.created_at DESC,c.id DESC LIMIT 1) correction ON true
+     WHERE s.school_id=$1 AND s.account_id=$2 AND s.kind IN ('submit','correction')
+   ) SELECT * FROM records WHERE (NOT $4 OR in_notebook)
+    AND ($5::text IS NULL OR status=$5) AND ($6::text IS NULL OR context=$6)
+    AND ($7::text IS NULL OR CASE WHEN status='AC' AND feedback IS NOT NULL THEN 'feedback'
+      WHEN status='AC' OR correction='AC' THEN 'resolved' WHEN correction IS NOT NULL THEN 'retried' ELSE 'needs-review' END=$7)
+    ORDER BY CASE WHEN $4 THEN greatest(note_at,created_at) ELSE created_at END DESC,id LIMIT 26 OFFSET $3`,
+    [schoolId,user.id,(page-1)*25,notebook,verdict,context,review])).rows;
+   return reply({page,hasMore:rows.length>25,items:rows.slice(0,25).map(j=>({id:j.id,problemId:j.problem_id,problemTitle:j.title,
+    language:j.language,state:j.state,createdAt:j.created_at,status:j.status,score:j.score===null?null:Number(j.score),context:j.context,
+    ...(notebook?{feedback:j.feedback,correctionStatus:j.correction,noteUpdatedAt:j.note_at}:{})}))});
   }
   if(m[2]==='judge-status'&&method==='GET'){
    if(role!=='school_admin')fail(403,'FORBIDDEN','School administrator required.');

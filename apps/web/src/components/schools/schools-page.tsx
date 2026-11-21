@@ -1,9 +1,11 @@
 "use client";
 
+import { LearnerWorkspace } from "./learner-workspace";
+import { PageHeadingProvider, useCurrentPageHeading } from "../page-heading-context";
 import { StudentPublicProfile } from "../student/public-profile";
 import { useEffect, useRef, useState } from "react";
 import { useWorkspaceData } from "@/components/workspace-data";
-import { AcslPage, useAcslEnabled } from "@/components/acsl/acsl-page";
+import { useAcslEnabled } from "@/components/acsl/use-acsl-enabled";
 import { AcslTeacherPage } from "@/components/acsl/teacher-page";
 import { Eye, EyeOff } from "lucide-react";
 import { WorkspaceFrame } from "@/components/workspace-frame";
@@ -13,12 +15,11 @@ import { AppLink } from "@/components/navigation";
 import { PreparationRouter } from "@/components/written-papers/preparation-router";
 import { resolvePublicLearningBookmark } from "@/lib/campus-routes";
 import { useRouter, useSearchParams } from "next/navigation";
-import { LearnerResourceScope } from "./learner-resource-scope";
 
 import { SchoolExitAdministration } from "./school-exit-administration";
 import { SchoolActivities } from "./school-activities";
 import { SchoolPaper4 } from "./school-paper4";
-import { SchoolScholarship, SchoolLeaderboard, SchoolScholarshipBalance } from "./school-scholarship";
+import { SchoolScholarship, SchoolLeaderboard } from "./school-scholarship";
 import { WorkspaceNavigation, useWorkspaceNavigationLabel, workspaceNavigation } from "@/components/workspace-navigation";
 import { AdminDashboard } from "@/components/admin/dashboard";
 import { TeacherDashboard } from "@/components/teacher/dashboard-classes";
@@ -28,7 +29,6 @@ import { schoolWorkspaceHref, schoolWorkspaceRole } from "./school-workspace-loc
 import { PublicProblemReview, SchoolPractice, SchoolJudgeStatus } from "./school-practice";
 import { PersonalWorkspaceProfile } from "./personal-workspace-profile";
 import { SchoolClasses } from "./school-classes";
-import { SchoolStudentDashboard, SchoolSubmissions } from "./school-dashboard";
 import { PersonalWorkspaceSettings } from "./personal-workspace-settings";
 import { useLocale } from "@/components/locale-context";
 import {
@@ -127,15 +127,15 @@ export function SchoolsPage({
   const teaching = workspaceRole !== "student";
   const role = selected?.roles.includes("school_admin") ? "school_admin" : workspaceRole === "teacher" ? "teacher" : "student";
   const acslEnabled = useAcslEnabled(selected?.id, teaching);
-  const sections = workspaceNavigation[workspaceRole].filter(item => item.section !== "timed" && true);
+  const sections = workspaceNavigation[workspaceRole].filter(item => item.section !== "timed");
   const active = requestedSection === "acsl" ? (teaching
     ? {section: "acsl", label: "ACSL 题库", shortEnglish: "ACSL papers"} as const
     : {section: "acsl", label: "ACSL 真题练习", shortEnglish: "ACSL practice"} as const)
-    : requestedSection === "paper4" && !admin ? (teaching
+    : requestedSection === "paper4" ? (teaching
       ? {section: "paper4", label: "Paper 4 试卷", shortEnglish: "Paper 4 papers"} as const
       : {section: "paper4", label: "Paper 4 真题练习", shortEnglish: "Paper 4 past papers"} as const)
     : requestedSection === "leaderboard" ? {section: "leaderboard", label: "积分排行榜", shortEnglish: "Leaderboard"} as const
-    : workspaceNavigation[workspaceRole].find(item => item.section === requestedSection && item.section !== "timed") ?? sections[0];
+    : workspaceNavigation[workspaceRole].find(item => item.section === requestedSection) ?? sections[0];
   const preparationResource = active.section === "paper4" || active.section === "acsl";
   const preparationPage = preparationResource || active.section === "exam-preparation";
   const navigationSection = preparationResource ? "exam-preparation" : active.section;
@@ -192,6 +192,7 @@ export function SchoolsPage({
       </main>
     );
   if (!selected) return null;
+  if (!teaching) return <LearnerWorkspace key={selected.id} school={selected} pathname="/schools" user={user} onUserSaved={onUserSaved} onLogout={onLogout} onSchoolsChanged={refresh}/>;
   const members = (
     <SchoolMembers
       school={selected}
@@ -213,7 +214,6 @@ export function SchoolsPage({
     refreshRevision={refreshRevision}
     onRefresh={refresh}
   />;
-  if (!teaching && active.section === "acsl" && search.get("coding") === "1") return <AcslPage key={selected.id} schoolId={selected.id} user={user} baseHref={href("acsl")} />;
   const platformReviews = admin && search.get("reviewScope") === "platform";
   const schoolProblems = <SchoolPractice
     key={search.get("problemId") ?? "list"}
@@ -230,7 +230,7 @@ export function SchoolsPage({
     {platformReviews ? <PublicProblemReview user={user} reviewSchoolId={selected.id} /> : schoolProblems}
   </div> : schoolProblems;
   return (
-    <WorkspaceThemeProvider theme={resolvedPageTheme}>
+    <PageHeadingProvider pathname={search.toString()}><WorkspaceThemeProvider theme={resolvedPageTheme}>
       <PersonalAppearanceProvider
         pageTheme={settings.pageTheme}
         updatePageTheme={(pageTheme) => update({ pageTheme })}
@@ -276,18 +276,13 @@ export function SchoolsPage({
                     <span aria-hidden="true" className="hidden sm:block">›</span>
                   </>
                 )}
-                <h1 className="truncate font-semibold">
-                  {personalSettings
-                    ? text("Settings", "设置")
-                    : personalProfile
-                      ? text("Profile", "个人资料")
-                      : navigationLabel(active)}
-                </h1>
+                <SchoolPageTitle label={personalSettings ? text("Settings","设置") : personalProfile ? text("Profile","个人资料") : navigationLabel(active)}
+                  parentHref={active.section === "classes" && search.has("classId") ? href("classes") : undefined}/>
+
               </div>
             }
             account={
               <div className="flex items-center gap-2">
-              {!teaching && <SchoolScholarshipBalance key={`${user.id}:${selected.id}`} schoolId={selected.id} href={href("scholarship")}/>}
               <NotificationDropdown key={`${user.id}:${selected.id}:${workspaceRole}`} schoolId={selected.id}
                 workspace={teaching ? "staff" : "student"} scholarshipHref={href("scholarship")}/>
               <AccountMenu
@@ -329,35 +324,26 @@ export function SchoolsPage({
                 aria-label={schoolName}
               >
                 {active.section === "home" ? (
-                  admin ? <AdminDashboard schoolId={selected.id}/> :
-                  teaching ? <TeacherDashboard schoolId={selected.id}/> :
-                  <SchoolStudentDashboard school={selected} user={user}/>
+                  admin ? <AdminDashboard schoolId={selected.id}/> : <TeacherDashboard schoolId={selected.id}/>
                 ) : active.section === "assignments" || active.section === "timed" ? (
                   <SchoolActivities school={selected} kind={active.section === "timed" ? "timed" : "assignment"} />
                 ) : active.section === "exam-preparation" ? (
                   <PreparationRouter schoolId={selected.id} rootHref={href("exam-preparation")} staff={teaching} paper4Href={!admin ? href("paper4") : undefined} acslHref={acslEnabled ? href("acsl") : undefined} />
                 ) : active.section === "acsl" ? (
-                  teaching ? <AcslTeacherPage schoolId={selected.id} user={user} baseHref={href("acsl")} />
-                    : <AcslPage schoolId={selected.id} user={user} baseHref={href("acsl")} />
+                  <AcslTeacherPage schoolId={selected.id} user={user} baseHref={href("acsl")} />
                 ) : active.section === "paper4" ? (
                   <SchoolPaper4 schoolId={selected.id} role={role} user={user} />
                 ) : active.section === "scholarship" ? (
                   <SchoolScholarship schoolId={selected.id} role={role} />
                 ) : active.section === "leaderboard" ? (
                   search.get("profileId") ? <StudentPublicProfile profileId={search.get("profileId")!} schoolId={selected.id} viewer={user} workspace={admin?"admin":teaching?"teacher":"student"} /> : <SchoolLeaderboard schoolId={selected.id} />
-                ) : active.section === "submissions" ? (
-                  <LearnerResourceScope section="submissions" schoolHref={href("submissions")}>
-                    <SchoolSubmissions schoolId={selected.id}/>
-                  </LearnerResourceScope>
-                ) : active.section === "review-notebook" ? (
-                  <LearnerResourceScope section="review-notebook" schoolHref={href("review-notebook")}><SchoolSubmissions schoolId={selected.id} notebook/></LearnerResourceScope>
                 ) : active.section === "classes" ? (
                   <SchoolClasses
                     school={selected}
                     refreshRevision={refreshRevision}
                   />
                 ) : active.section === "problems" ? (
-                  teaching ? problems : <LearnerResourceScope workspaceSchoolId={selected.id} section="problems" schoolHref={href("problems")} accountId={user.id}>{problems}</LearnerResourceScope>
+                  problems
                 ) : active.section === "course-admissions" ? (
                   <SchoolCourseAdmissions schoolId={selected.id} href={href("course-admissions")}
                     coursesHref={schoolWorkspaceHref(selected.id, "courses", "teacher")}/>
@@ -379,15 +365,21 @@ export function SchoolsPage({
                     members={members}
                   />
                 ) : (
-                  teaching ? courses : <LearnerResourceScope workspaceSchoolId={selected.id} section="courses" schoolHref={href("courses")}>{courses}</LearnerResourceScope>
+                  courses
                 )}
               </section>
             )}
           </WorkspaceFrame>
         </div>
       </PersonalAppearanceProvider>
-    </WorkspaceThemeProvider>
+    </WorkspaceThemeProvider></PageHeadingProvider>
   );
+}
+
+function SchoolPageTitle({ label, parentHref }: { label: string; parentHref?: string }) {
+  const heading = useCurrentPageHeading();
+  return <>{parentHref && <><AppLink className="shrink-0 text-muted-foreground hover:text-primary" href={parentHref}>{label}</AppLink><span aria-hidden="true">›</span></>}
+    <h1 className="truncate font-semibold">{heading || label}</h1></>;
 }
 
 function SchoolMembers({

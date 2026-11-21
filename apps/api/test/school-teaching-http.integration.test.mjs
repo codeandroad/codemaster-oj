@@ -10,7 +10,6 @@ import { bootstrap } from '../../../packages/domain/src/bootstrap.mjs';
 import { loadConfig } from '../../../packages/domain/src/application.mjs';
 import { hashPassword } from '../../../packages/domain/src/security.mjs';
 import { handleSchools, provisionSchool } from '../../../packages/domain/src/schools.mjs';
-import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 
 test('school directories and class rosters enforce tenant, role, and account boundaries',
   { skip: !process.env.TEST_DATABASE_URL, timeout: 60000 }, async () => {
@@ -35,7 +34,7 @@ test('school directories and class rosters enforce tenant, role, and account bou
       await pool.query(grantsSql.replaceAll('SCHEMA public', `SCHEMA ${schema}`));
       const appUrl = new URL(url.href);
       appUrl.searchParams.set('options', `-crole=campus_app -csearch_path=${schema}`);
-      await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji', name: 'Legacy administrator', number: 'ADM', username: 'legacy-admin', password });
+      await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji', name: 'Campus administrator', number: 'ADM', username: 'campus-admin', password });
       const passwordHash = await hashPassword(password);
       // Membership-only login accounts use the shared authentication layer.
       // Their role in a school must never grant privileges on legacy routes.
@@ -82,7 +81,8 @@ test('school directories and class rosters enforce tenant, role, and account bou
         const { data, cookie } = await request('/auth/login', { method: 'POST', body: { username, password } });
         return { id: data.user.id, roles: data.user.roles, csrfToken: data.csrfToken, cookie };
       };
-      const legacy = await login('legacy-admin');
+      const campusAdmin = await login('campus-admin');
+      const originalCampus = (await pool.query("SELECT id FROM schools WHERE slug='tianxing-chuangshiji'")).rows[0];
       const alphaAdmin = await login('alpha-admin');
       const betaAdmin = await login('beta-admin');
       const teacher = await login('pilot-teacher');
@@ -111,8 +111,8 @@ test('school directories and class rosters enforce tenant, role, and account bou
       await join(beta, betaAdmin, teacher, 'student');
 
       await request(identities(alpha), { status: 401 });
-      await request(identities(alpha), { auth: legacy, status: 404 });
-      await request(identities({ id: LEGACY_SCHOOL_ID }), { auth: legacy, status: 404 });
+      await request(identities(alpha), { auth: campusAdmin, status: 404 });
+      await request(identities(originalCampus), { auth: campusAdmin });
       await request(identities(beta), { auth: alphaAdmin, status: 404 });
       await request(identities(alpha), { auth: teacher, status: 403 });
       await request(identities(alpha), { auth: student, status: 403 });
@@ -190,6 +190,14 @@ test('school directories and class rosters enforce tenant, role, and account bou
       assert.equal(studentClassItems[0].canManage, false);
       assert.equal(studentClassItems[0].studentCount, 1);
       assert.deepEqual(studentClassItems[0].teachers, [{ id: alphaTeacher.id, name: alphaTeacher.name }]);
+      const classDetail = classes(alpha) + '/' + taughtClass.id;
+      const classroom = (await request(classDetail,{auth:student})).data;
+      assert.equal(classroom.memberCount,1);
+      assert.deepEqual(classroom.members.map(r=>r.id),[alphaStudent.id]);
+      assert.deepEqual(Object.keys(classroom.members[0]).sort(),['avatar','displayName','id']);
+      assert.deepEqual((await request(classDetail+'/members',{auth:student})).data.items,classroom.members);
+      await request(classes(alpha)+'/'+otherClass.id,{auth:student,status:404});
+      await request(classes(beta)+'/'+taughtClass.id+'/members',{auth:student,status:404});
       const studentRoster = (await request(roster(alpha, taughtClass), { auth: student })).data.items;
       assert.deepEqual(studentRoster, [{ id: alphaStudent.id, kind: 'student', name: alphaStudent.name }]);
       assert.deepEqual((await request(`${roster(alpha, taughtClass)}?kind=teacher`, { auth: student })).data.items, studentRoster);
@@ -402,9 +410,9 @@ test('school directories and class rosters enforce tenant, role, and account bou
 
       assert.deepEqual((await request('/auth/me', { auth: alphaAdmin })).data.user.roles, []);
       assert.deepEqual((await request('/auth/me', { auth: teacher })).data.user.roles, []);
-      await request('/accounts', { auth: alphaAdmin, status: 403 });
-      await post('/classes', alphaAdmin, { name: 'Legacy escalation' }, 403);
-      assert.deepEqual((await request('/classes', { auth: legacy })).data.items, []);
+      await request('/accounts', { auth: alphaAdmin, status: 410 });
+      await post('/classes', alphaAdmin, { name: 'Unscoped class creation' }, 410);
+      assert.deepEqual((await request('/classes', { auth: campusAdmin })).data.items, []);
       assert.equal((await pool.query('SELECT count(*)::int count FROM identities')).rows[0].count, 5);
       assert.equal((await pool.query("SELECT count(*)::int count FROM audit_events WHERE action LIKE 'school.%'")).rows[0].count, 0);
       const { rows: audit } = await pool.query(`

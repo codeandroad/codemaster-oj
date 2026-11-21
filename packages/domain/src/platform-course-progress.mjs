@@ -97,8 +97,7 @@ export async function publicChapterProblems(db, listing, course, accountId) {
   const catalogIds=rows.filter(row=>row.resource_kind==='publication').map(row=>row.problemId);
   const sources=new Map((catalogIds.length?await currentCatalogPublicProblems(db,catalogIds):[]).map(row=>[row.problem_id,row]));
   for (const {resource_kind,linkedVersionId,...row} of rows) {
-    const schoolProblems=context&&schoolIds.includes(context)?await schoolChapterProblems(db,context,course,user,chapters.map(c=>c.id)):new Map();
-   const current=sources.get(row.problemId);
+    const current=sources.get(row.problemId);
     if (resource_kind==='publication'&&!current) continue;
     const key=`${row.problemId}:${linkedVersionId}`;
     problems.set(key, {...row,...(current?{versionId:current.id,title:current.title}:{}),solved:row.solved||problems.get(key)?.solved||false});

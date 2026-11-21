@@ -4,8 +4,8 @@ import { useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { StudentPresenceCard } from "./student-presence-card";
 
-export function ClassStudentPopover({ anchor, id, identityId, label, onClose, onDismiss }: {
-  anchor: HTMLButtonElement; id: string; identityId: string; label: string;
+export function ClassStudentPopover({ schoolId, anchor, id, identityId, label, onClose, onDismiss }: {
+  schoolId?: string; anchor: HTMLButtonElement; id: string; identityId: string; label: string;
   onClose: () => void; onDismiss: () => void;
 }) {
   const panel = useRef<HTMLDivElement>(null);
@@ -45,6 +45,6 @@ export function ClassStudentPopover({ anchor, id, identityId, label, onClose, on
   return createPortal(<div ref={panel} id={id} role="dialog" aria-label={label} className="fixed z-50 flex flex-col overflow-hidden rounded-md border border-border bg-surface p-1 text-xs text-foreground shadow-lg" onKeyDown={event => {
     if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); onClose(); }
   }}>
-    <StudentPresenceCard identityId={identityId} variant="disclosure" onBack={onClose} profileHref={`/student/people/${encodeURIComponent(identityId)}`}/>
+    <StudentPresenceCard schoolId={schoolId} identityId={identityId} variant="disclosure" onBack={onClose} profileHref={schoolId ? `/schools?schoolId=${schoolId}&section=leaderboard&profileId=${encodeURIComponent(identityId)}` : `/student/people/${encodeURIComponent(identityId)}`}/>
   </div>, document.body);
 }

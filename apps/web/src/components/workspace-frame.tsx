@@ -14,7 +14,7 @@ import {
 
 /** The same compact navigation and page frame for every school and personal workspace. */
 export function WorkspaceFrame({
-  schoolName,
+  schoolName, workspaceSelector,
   navigation,
   breadcrumb,
   account,
@@ -22,7 +22,7 @@ export function WorkspaceFrame({
   footer,
   student = false,
 }: {
-  schoolName: string;
+  schoolName: string; workspaceSelector?: ReactNode;
   navigation: ReactNode;
   breadcrumb: ReactNode;
   account: ReactNode;
@@ -38,12 +38,12 @@ export function WorkspaceFrame({
   const brand = (
     <div className="flex min-h-[76px] shrink-0 flex-col justify-center gap-1 border-b border-border px-4 py-2">
       <BrandLogo className="h-auto w-[160px] max-w-full shrink-0" />
-      <p
+      {workspaceSelector ?? <p
         className="break-words text-xs leading-4 text-muted-foreground [overflow-wrap:anywhere]"
         title={schoolName}
       >
         {schoolName}
-      </p>
+      </p>}
     </div>
   );
   return (
@@ -89,7 +89,7 @@ export function WorkspaceFrame({
           <DialogDescription className="sr-only">
             {schoolName}
           </DialogDescription>
-          {brand}
+          <div onChange={() => setOpen(false)}>{brand}</div>
           <div onClick={closeNavigation}>{navigation}</div>
         </DialogContent>
       </Dialog>

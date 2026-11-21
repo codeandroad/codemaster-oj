@@ -1,18 +1,16 @@
 "use client";
 
 import { useMemo } from "react";
-import { usePathname, useSearchParams, useRouter } from "next/navigation";
-import { AccountMenu } from "@/components/account-menu";
+import { usePathname, useSearchParams } from "next/navigation";
+import { ProblemWorkspaceAccount } from "./problem-workspace-account";
 import { useLocale } from "@/components/locale-context";
-import { NotificationDropdown } from "@/components/student/notification-dropdown";
 import { AppLink } from "@/components/navigation";
 import { OnlineStudents, StudentPresenceHeartbeat } from "@/components/student/student-presence";
 import { ScholarshipAssistance } from "@/components/scholarship/assistance";
-import { ScholarshipBalance } from "@/components/scholarship/account-pages";
 import { ProblemWorkspace, type ProblemWorkspaceAdapter } from "@/components/student/workspace";
-import { State, useData, useMutation, type DetailedSubmission } from "@/components/student/shared";
+import { State, useData, type DetailedSubmission } from "@/components/student/shared";
 import type { ResultCase } from "@/components/student/result-feedback";
-import { ApiError, clearProductionSession, productionApi, type CampusUser, type SubmissionLanguage } from "@/lib/production-api";
+import { productionApi, type CampusUser, type SubmissionLanguage } from "@/lib/production-api";
 import type { Problem } from "./school-practice-types";
 import { publicDraftStorage, publicPracticeHref, publicPracticeReturnHref, publicWorkspaceProblem } from "./public-workspace-model";
 
@@ -28,16 +26,15 @@ export function PublicProblemWorkspace({ id, catalog, workspaceSchoolId }: { id:
   return <State data={user}><State data={problem}>{user.data?.user && problem.data?.definition && <PublicWorkspace key={`${user.data.user.id}:${problem.data.id}:${problem.data.versionId}:${params.get("publicCourseId")??""}:${params.get("publicChapterId")??""}`} workspaceSchoolId={workspaceSchoolId} user={user.data.user} problem={problem.data} catalog={catalog} reloadProblem={problem.reload}/>}</State></State>;
 }
 function PublicWorkspace({user, problem, catalog, reloadProblem, workspaceSchoolId}:{workspaceSchoolId?:string|null; user:CampusUser;problem:Problem;catalog:{data:{items:Problem[]}|null;loading:boolean;error:string;reload:()=>void};reloadProblem:()=>void}) {
-  const params = useSearchParams(), search = params.toString(), router = useRouter(), {locale} = useLocale();
+  const params = useSearchParams(), search = params.toString(), {locale} = useLocale();
   const pathname = usePathname();
   const fromCatalog = params.get("fromProblemCatalog") === "1";
-  const workspacePath = fromCatalog ? pathname : "/practice/problems";
+  const workspacePath = pathname === "/schools" || fromCatalog ? pathname : "/practice/problems";
   const courseId = params.get("publicCourseId"), chapterId = params.get("publicChapterId");
   const course = useData<PublicCourse>(courseId && chapterId ? `practice/courses/${encodeURIComponent(courseId)}` : "");
   const reloadCourse = course.reload;
   const chapter = course.data?.chapters.find(item=>item.id===chapterId);
   const validChapter = chapter?.problems.some(item=>item.problemId===problem.id && item.versionId===problem.versionId);
-  const logout = useMutation();
   const adapter = useMemo<ProblemWorkspaceAdapter>(()=> {
     const path = `practice/problems/${encodeURIComponent(problem.id)}`;
     let storage: Pick<Storage,"getItem"|"setItem"> = unavailableStorage;
@@ -49,7 +46,7 @@ function PublicWorkspace({user, problem, catalog, reloadProblem, workspaceSchool
       languageScope: "course",
       reloadLanguagePolicy: inCourse ? reloadCourse : undefined,
       onSubmissionCompleted: inCourse ? result => { if (result.kind === "submit") reloadCourse(); } : undefined,
-      returnTo: publicPracticeReturnHref(search, workspacePath), returnLabel: inCourse && !fromCatalog ? (locale==="en"?"Back to chapter":"返回章节") : (locale==="en"?"Back to Problems":"返回题目"), homeHref:"/practice",
+      returnTo: publicPracticeReturnHref(search, workspacePath), returnLabel: inCourse && !fromCatalog ? (locale==="en"?"Back to chapter":"返回章节") : (locale==="en"?"Back to Problems":"返回题目"), homeHref:workspaceSchoolId ? `/schools?schoolId=${workspaceSchoolId}` : "/practice",
       navigation: {
         items: inCourse ? validChapter ? chapter!.problems : [] : (catalog.data?.items??[]).map(item=>({problemId:item.id,versionId:item.versionId??undefined,title:item.title})),
         loading: inCourse ? course.loading : catalog.loading,
@@ -84,14 +81,9 @@ function PublicWorkspace({user, problem, catalog, reloadProblem, workspaceSchool
       ...publicDraftStorage(user.id,problem,storage), draftVersion:"current",
       assistance: (kind, language)=><ScholarshipAssistance preferredLanguage={language} key={`${problem.id}:${problem.versionId}:${kind}`} target={{problemId:problem.id,versionId:problem.versionId!}} kind={kind} endpoint="practice/scholarship/assistance"/>,
       presence:<><StudentPresenceHeartbeat identityId={user.id} endpoint="practice/presence"/><OnlineStudents identityId={user.id} endpoint="practice/presence"/></>,
-      account:hasUnsavedChanges=><><ScholarshipBalance identityId={user.id} endpoint="practice/scholarship/me" href="/practice/scholarship"/><NotificationDropdown key={user.id} workspace="public"/><AccountMenu user={user} busy={logout.busy} leaderboardHref="/practice/leaderboard" onLogout={()=>{
-        if(hasUnsavedChanges&&!window.confirm(locale==="en"?"Your code has not been submitted. The draft remains in this browser. Sign out?":"代码尚未提交，草稿保留在本机。确认退出登录？"))return;
-        void logout.run(async()=>{
-        try { await productionApi("auth/logout",{method:"POST"}); } catch(error) { if(!(error instanceof ApiError&&error.status===401))throw error; }
-        clearProductionSession();router.replace("/login");
-      });}}/></>,
+      account:dirty=><ProblemWorkspaceAccount user={user} dirty={dirty} schoolId={workspaceSchoolId} publicWallet/>,
     };
-  },[user,problem,search,courseId,chapterId,chapter,validChapter,catalog,course.data,course.loading,course.error,reloadCourse,locale,logout,router,fromCatalog,workspacePath,workspaceSchoolId]);
+  },[user,problem,search,courseId,chapterId,chapter,validChapter,catalog,course.data,course.loading,course.error,reloadCourse,locale,fromCatalog,workspacePath,workspaceSchoolId]);
   if ((courseId || chapterId) && (!validChapter || course.error)) {
     const error = course.error || (!course.loading ? (locale === "en" ? "This version is not available in this course chapter." : "此版本不在本章可访问的练习中。") : "");
     return <div className="p-5">

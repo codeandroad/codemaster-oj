@@ -1,3 +1,4 @@
+import { studentClassroom } from './student-classroom.mjs';
 import { transaction } from './db.mjs';
 import { auditSchool, lockSchoolTeaching, requireSchoolAdmin, schoolRole } from './schools.mjs';
 import { enumValue, fail, field, integer, uuid } from './security.mjs';
@@ -96,7 +97,7 @@ const assignedStudent = `EXISTS (
   WHERE r.school_id = c.school_id AND r.class_id = c.id
     AND i.kind = 'student' AND i.account_id = $2
 )`;
-const classProjection = `c.id, c.name, c.type, c.created_at AS "createdAt",
+const classProjection = `c.id, c.name, c.description, c.type, c.created_at AS "createdAt",
   c.archived_at IS NOT NULL AS archived, c.revision`;
 
 async function teacherIdentity(db, schoolId, accountId) {
@@ -271,7 +272,7 @@ export async function handleSchoolTeaching({ pool, user, route, method, body, ur
     });
   }
 
-  const classes = route.match(/^\/schools\/([^/]+)\/classes(?:\/([^/]+)(?:\/(roster|candidates|archive|restore)(?:\/([^/]+))?)?)?$/);
+  const classes = route.match(/^\/schools\/([^/]+)\/classes(?:\/([^/]+)(?:\/(roster|members|candidates|archive|restore)(?:\/([^/]+))?)?)?$/);
   if (!classes) return null;
   const schoolId = uuid(classes[1], '学校 ID');
   const classId = classes[2] ? uuid(classes[2], '班级 ID') : null;
@@ -284,6 +285,10 @@ export async function handleSchoolTeaching({ pool, user, route, method, body, ur
     const role = await schoolRole(db, schoolId, user.id);
     if (method === 'GET' && !rosterIdentity) {
       if (!classId) return listClasses(db, schoolId, user.id, role, url);
+      if ((!action || action === 'members') && role === 'student') {
+        await db.query("SELECT set_config('campus.school_id',$1,true)", [schoolId]);
+        return {status:200, body:await studentClassroom(db,schoolId,classId,user,action === 'members')};
+      }
       if (action === 'roster') return listRoster(db, schoolId, user.id, role, classId, url);
       if (action === 'candidates') return listCandidates(db, schoolId, user.id, role, classId, url);
     }

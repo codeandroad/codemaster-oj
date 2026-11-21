@@ -127,6 +127,23 @@ export async function loadSchoolCourse(db,schoolId,id,user,role,{publishedOnly=f
  }
  return {course,view:await currentCourseProblems(db,schoolId,view),canManage:false,identityId};
 }
+export async function readableClassCourse(db, schoolId, user, courseId, scope, chapters = false) {
+  if (!courseId) return null;
+  let view;
+  if (scope === 'platform') {
+    if (!await platformCourseEligible(db, courseId, user.id)) return null;
+    view = await platformCourseEdition(db, { course_id: courseId }, { detail: chapters });
+  } else {
+    try {
+      ({ view } = await loadSchoolCourse(db, schoolId, courseId, user, 'student', { publishedOnly: true }));
+    } catch (error) {
+      if (error.status === 404) return null;
+      throw error;
+    }
+  }
+  return view && { id: courseId, scope, title: view.title, description: view.description, chapters: view.chapters };
+}
+
 export async function schoolProblemCatalogCourses(db, schoolId, user, role, courseId) {
  const { rows } = await db.query(`SELECT c.id FROM school_courses c
   JOIN school_course_publications p ON p.school_id=c.school_id AND p.course_id=c.id AND p.revision=c.published_revision

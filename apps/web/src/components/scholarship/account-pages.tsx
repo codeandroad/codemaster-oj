@@ -181,7 +181,7 @@ function LedgerPager({
   );
 }
 
-export function StudentScholarshipPage({ endpoint = "scholarship/me" }: { endpoint?: "scholarship/me" | "practice/scholarship/me" } = {}) {
+export function StudentScholarshipPage({ endpoint = "scholarship/me", scopeName }: { scopeName?: string; endpoint?: "scholarship/me" | "practice/scholarship/me" | `schools/${string}/scholarship/me` } = {}) {
   const tx = useText(),
     [page, setPage] = useState(1),
     resource = useData<ScholarshipAccount>(`${endpoint}?page=${page}`);
@@ -192,7 +192,7 @@ export function StudentScholarshipPage({ endpoint = "scholarship/me" }: { endpoi
         className={`${panel} flex flex-wrap items-center justify-between gap-3 p-4`}
       >
         <div>
-          <h1 className="text-lg font-bold">{tx("我的奖学金", "My scholarship")}</h1>
+          <h1 className="text-lg font-bold">{tx("我的奖学金", "My scholarship")}{scopeName && <span className="ml-2 text-sm font-normal text-muted-foreground">{scopeName}</span>}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {tx(
               "奖学金可用于解锁中文题面和题解，与成绩、个人积分分别记账。",

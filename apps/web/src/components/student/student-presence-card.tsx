@@ -15,9 +15,18 @@ type PresencePreview = {
   activity: { id: string; problemTitle: string; createdAt: string }[];
 };
 
+async function schoolStudentPreview(schoolId: string, identityId: string, signal: AbortSignal): Promise<PresencePreview> {
+  const path = `schools/${schoolId}/profiles/${encodeURIComponent(identityId)}`;
+  const [{profile},{items}] = await Promise.all([
+    productionApi<{profile:{id:string; nickname:string; avatar:string; isSelf:boolean} & PresencePreview["stats"]}>(path,{signal}),
+    productionApi<{items:PresencePreview["activity"]}>(`${path}/activity?pageSize=5`,{signal})
+  ]);
+  return {student:{identityId:profile.id,displayName:profile.nickname,avatar:profile.avatar,isSelf:profile.isSelf},stats:profile,activity:items};
+}
+
 /** Fetch only the server-filtered preview; never prefetch full profiles or submissions. */
-export function StudentPresenceCard({ identityId, onBack, onMinimize, endpoint = "presence", backLabel, profileHref, variant = "panel" }: {
-  identityId: string;
+export function StudentPresenceCard({ schoolId, identityId, onBack, onMinimize, endpoint = "presence", backLabel, profileHref, variant = "panel" }: {
+  schoolId?: string; identityId: string;
   onBack: () => void;
   onMinimize?: () => void;
   endpoint?: "presence" | "practice/presence";
@@ -39,7 +48,7 @@ export function StudentPresenceCard({ identityId, onBack, onMinimize, endpoint =
       if (pending || document.visibilityState !== "visible") return;
       pending = true;
       try {
-        const next = await productionApi<PresencePreview>(`${endpoint}/students/${encodeURIComponent(identityId)}`, { signal: controller.signal });
+        const next = schoolId ? await schoolStudentPreview(schoolId,identityId,controller.signal) : await productionApi<PresencePreview>(`${endpoint}/students/${encodeURIComponent(identityId)}`, { signal: controller.signal });
         if (!controller.signal.aborted) { setResult(next); setError(null); }
       } catch (caught) {
         if (!controller.signal.aborted) {
@@ -53,7 +62,7 @@ export function StudentPresenceCard({ identityId, onBack, onMinimize, endpoint =
     const visible = () => void refresh();
     document.addEventListener("visibilitychange", visible);
     return () => { controller.abort(); window.clearInterval(timer); document.removeEventListener("visibilitychange", visible); };
-  }, [identityId, retry, endpoint]);
+  }, [identityId, schoolId, retry, endpoint]);
   const formatDate = (date: string, compact: boolean) => new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en", {
     month: "short", day: "numeric", ...(compact ? {} : { year: "numeric", hour: "2-digit", minute: "2-digit" } as const),
   }).format(new Date(date));

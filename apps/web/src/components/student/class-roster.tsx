@@ -10,7 +10,7 @@ import { ClassStudentPopover } from "./class-student-popover";
 
 export interface ClassMember { id: string; displayName: string; avatar: string; isOnline?: boolean; }
 
-export function ClassRoster({ classId, members: initialMembers }: { classId: string; members: ClassMember[] }) {
+export function ClassRoster({ schoolId, classId, members: initialMembers }: { schoolId?: string; classId: string; members: ClassMember[] }) {
   const { locale } = useLocale();
   const tx = (zh: string, en: string) => locale === "en" ? en : zh;
   const panelId = useId();
@@ -34,7 +34,7 @@ export function ClassRoster({ classId, members: initialMembers }: { classId: str
       if (pending) { queued = true; return; }
       pending = true;
       try {
-        const result = await productionApi<{ items: ClassMember[] }>(`classes/${encodeURIComponent(classId)}/members`, { signal: controller.signal });
+        const result = await productionApi<{ items: ClassMember[] }>(`${schoolId ? "schools/"+schoolId+"/" : ""}classes/${encodeURIComponent(classId)}/members`, { signal: controller.signal });
         if (!controller.signal.aborted) {
           setMembers(result.items); setError(false); setUnavailable(false);
           setSelectedId(current => result.items.some(member => member.id === current) ? current : null);
@@ -61,7 +61,7 @@ export function ClassRoster({ classId, members: initialMembers }: { classId: str
       document.removeEventListener("visibilitychange", refreshVisible);
       window.removeEventListener(presenceChanged, refreshVisible);
     };
-  }, [classId, retry]);
+  }, [classId, schoolId, retry]);
 
   const query = search.trim().toLocaleLowerCase(locale);
   const visible = query ? members.filter(member => member.displayName.toLocaleLowerCase(locale).includes(query)) : members;
@@ -99,7 +99,7 @@ export function ClassRoster({ classId, members: initialMembers }: { classId: str
             <span id={`${detailsId}-status`} className={`flex shrink-0 items-center gap-1 text-xs ${online ? "font-medium text-success" : "text-muted-foreground"}`}><span aria-hidden="true" className={`size-1.5 rounded-full ${online ? "bg-success" : "bg-muted-foreground"}`}/>{status}</span>
             <ChevronDown size={15} aria-hidden="true" className={`shrink-0 text-muted-foreground ${expanded ? "rotate-180" : ""}`}/>
           </button>
-          {expanded && anchor && <ClassStudentPopover anchor={anchor} id={detailsId} identityId={member.id} label={tx(`${member.displayName} 的学习近况`, `Recent activity for ${member.displayName}`)} onClose={collapse} onDismiss={dismiss}/>}
+          {expanded && anchor && <ClassStudentPopover schoolId={schoolId} anchor={anchor} id={detailsId} identityId={member.id} label={tx(`${member.displayName} 的学习近况`, `Recent activity for ${member.displayName}`)} onClose={collapse} onDismiss={dismiss}/>}
         </li>;
       })}
     </ul> : !unavailable && <p className="px-3 py-4 text-sm text-muted-foreground">{members.length ? tx("没有匹配的同学", "No matching students") : tx("暂无已激活的学生主页", "No student profiles available yet")}</p>}

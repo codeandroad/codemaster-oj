@@ -20,7 +20,7 @@ function useText() {
 
 type BalanceProps = {
   identityId: string;
-  endpoint?: "scholarship/me" | "practice/scholarship/me";
+  endpoint?: "scholarship/me" | "practice/scholarship/me" | `schools/${string}/scholarship/me`;
   href?: string;
 };
 
@@ -70,10 +70,12 @@ function ScholarshipBalanceContent({ endpoint = "scholarship/me", href = "/stude
     const timer = setInterval(refreshEvent, 15000);
     window.addEventListener("focus", refreshEvent);
     window.addEventListener("campus-judge:scholarship-changed", refreshEvent);
+    window.addEventListener("codemaster:school-scholarship-changed", refreshEvent);
     return () => {
       controller?.abort();
       clearInterval(timer);
       window.removeEventListener("focus", refreshEvent);
+      window.removeEventListener("codemaster:school-scholarship-changed", refreshEvent);
       window.removeEventListener("campus-judge:scholarship-changed", refreshEvent);
     };
   }, [endpoint]);

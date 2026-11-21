@@ -65,6 +65,12 @@ export const publicStudyNavigation = workspaceNavigation.student
   .filter(item => Object.hasOwn(publicStudyPaths, item.section))
   .map(item => ({ ...item, path: publicStudyPaths[item.section] }));
 
+export function learnerNavigation(schoolId?: string) {
+  return schoolId ? workspaceNavigation.student.filter(item => item.section !== "timed").map(item =>
+    ({...item,href:`/schools?${new URLSearchParams({schoolId,section:item.section})}`}))
+    : publicStudyNavigation.map(item=>({...item,href:item.path}));
+}
+
 export function useWorkspaceNavigationLabel() {
   const { locale, t } = useLocale();
   return (item: Pick<WorkspaceNavigationItem, "label" | "shortEnglish">) =>

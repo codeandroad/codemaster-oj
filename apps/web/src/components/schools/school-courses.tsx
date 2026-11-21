@@ -76,7 +76,7 @@ export function SchoolCourses({
         window.location.search,
         {
           courseId: id,
-          coursePreview: preview ? "1" : null,
+          coursePreview: preview ? "1" : null, courseEdit:null,
           chapterId: null,
           problemId: null,
         },
@@ -115,6 +115,11 @@ export function SchoolCourses({
     setRevision((v) => v + 1);
     requestAnimationFrame(() => listHeading.current?.focus());
   }
+  const editBookmark = !!selected && canAuthor && location.get("courseEdit") === "1";
+  const grants = useData<{items:{id:string}[]}>(editBookmark ? `platform/courses?schoolId=${school.id}&view=catalog` : "");
+  if (editBookmark && selected) return <Loading resource={grants}>{grants.data?.items?.some(row=>row.id===selected.id)
+    ? <PlatformCourseEditorLoader id={selected.id} onClose={()=>selectCourse(null)} onSaved={()=>{onRefresh?.();}}/>
+    : <CourseEditorLoader base={base} id={selected.id} school={school} onClose={()=>selectCourse(null)} onSaved={()=>{selectCourse(null);onRefresh?.();}}/>}</Loading>;
   if(edit?.startsWith("platform:"))return <PlatformCourseEditorLoader id={edit.slice(9)} onClose={()=>setEdit(null)} onSaved={()=>{setRevision(value=>value+1);onRefresh?.();}}/>;
   if (selected)
     return (

@@ -1,3 +1,4 @@
+import { readableClassCourse } from './school-courses.mjs';
 import { assignmentChange, notifySchoolAssignmentChange } from './assignment-changes.mjs';
 import { schoolAssignmentReceiptGrades } from './assignment-grades.mjs';
 import { assertRequiredLanguage } from './course-language-policy.mjs';
@@ -73,14 +74,15 @@ export async function schoolActivityProblemAccess(db, { schoolId, problemId, use
 async function identity(db, schoolId, accountId) {
   return (await db.query("SELECT id,name,number FROM school_identities WHERE school_id=$1 AND account_id=$2 AND kind='student'", [schoolId, accountId])).rows[0];
 }
-async function load(db, schoolId, activityId, user, role, { management = false, ownJob = false } = {}) {
+async function load(db, schoolId, activityId, user, role, { management = false, ownJob = false, archiveRead = false } = {}) {
   const a = (await db.query('SELECT * FROM school_activities WHERE school_id=$1 AND id=$2 FOR UPDATE', [schoolId, activityId])).rows[0];
   if (!a) fail(404, 'NOT_FOUND', 'Activity not found.');
   const canManage = manages(a, user, role);
   const student = role === 'student' ? await identity(db, schoolId, user.id) : null;
   const participation = student && await assignmentParticipant(db, a, student.id);
   const canViewOwnJob = ownJob && participation && a.published_at;
-  if (management ? !canManage : !canManage && !canViewOwnJob && (!participation || participation.exempt || a.state !== 'Published')) fail(404, 'NOT_FOUND', 'Activity not found.');
+  const readableArchive = archiveRead && a.kind === 'assignment' && a.published_at && a.state === 'Archived';
+  if (management ? !canManage : !canManage && !canViewOwnJob && (!participation || participation.exempt || (a.state !== 'Published' && !readableArchive))) fail(404, 'NOT_FOUND', 'Activity not found.');
   return { a, canManage, student, participation };
 }
 async function assignmentParticipant(db, a, studentId) {
@@ -175,9 +177,16 @@ async function detail(db, loaded, user) {
   const participantCount = (await db.query('SELECT count(*)::int AS n FROM school_activity_participants WHERE school_id=$1 AND activity_id=$2', [a.school_id, a.id])).rows[0].n;
   const personalActivity = student && a.kind === 'assignment' && participation ? { ...a, ends_at: participation.due_at } : a;
   const now = Date.now(), attemptView = publicAttempt(ownAttempt);
+  const courseId = a.school_course_id ?? a.platform_course_id;
+  const courseScope = a.school_course_id ? 'school' : 'platform';
+  const course = student ? await readableClassCourse(db,a.school_id,user,courseId,courseScope)
+    : courseId && {id:courseId,scope:courseScope};
+  const classNames = student && a.kind === 'assignment' ? (await db.query(`SELECT c.name FROM school_activity_classes ac
+    JOIN school_classes c ON (c.school_id,c.id)=(ac.school_id,ac.class_id)
+    WHERE ac.school_id=$1 AND ac.activity_id=$2 ORDER BY c.name,c.id`, [a.school_id,a.id])).rows.map(c=>c.name) : [];
   return { id: a.id, schoolId: a.school_id, kind: a.kind, title: a.title, description: a.description,
     state: a.state, phase: phase(personalActivity, now), cancelledAt: a.cancelled_at, revision: a.revision, startsAt: a.starts_at, endsAt: effectiveEnd(personalActivity), durationMinutes: a.duration_minutes,
-    courseId:a.school_course_id??a.platform_course_id??null,courseScope:a.school_course_id?'school':a.platform_course_id?'platform':null,
+    courseId:course?.id??null,courseScope:course?.scope??null,courseTitle:course?.title??null,classNames,
     publishedAt: a.published_at, resultsPublishedAt: a.results_published_at, canManage,
     canPreview: canManage && canPreview(a) && items.length > 0, participantCount, problems: items,
     attempt: attemptView, canSubmit: Boolean(student) && canSubmitActivityWork(personalActivity, attemptView, now), grade, progress,
@@ -394,14 +403,14 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
     if (!match[2] && method === 'GET') {
       const kind = enumValue(url.searchParams.get('kind') ?? 'assignment', ['assignment', 'timed'], 'Activity type');
       const page = integer(Number(url.searchParams.get('page') ?? 1), 1, 100000, 'Page');
-      const archived = url.searchParams.get('archived') === 'true' && staff;
+      const archived = url.searchParams.get('archived') === 'true' && (staff || kind === 'assignment');
       const student = role === 'student' ? await identity(db, schoolId, user.id) : null;
       const requestedCategory = url.searchParams.get('timingCategory');
       const category = role === 'student' && kind === 'timed' && requestedCategory !== null
         ? enumValue(requestedCategory, ['upcoming', 'available', 'completed'], 'Timed practice category')
         : null;
       const rows = (await db.query(`SELECT a.* FROM school_activities a WHERE a.school_id=$1 AND a.kind=$2 AND
-        ($3='school_admin' OR $3='teacher' AND a.owner_account_id=$4 OR $3='student' AND a.state='Published' AND EXISTS(
+        ($3='school_admin' OR $3='teacher' AND a.owner_account_id=$4 OR $3='student' AND (a.state='Published' OR $6 AND a.kind='assignment' AND a.published_at IS NOT NULL) AND EXISTS(
           SELECT 1 FROM school_activity_participants p WHERE p.school_id=a.school_id AND p.activity_id=a.id AND p.identity_id=$5 AND NOT p.exempt))
         AND (a.state='Archived')=$6 AND ($8::text IS NULL OR CASE
           WHEN a.results_published_at IS NOT NULL OR least(a.ends_at,a.forced_ended_at)<=statement_timestamp() OR EXISTS (
@@ -435,6 +444,7 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
     const activityId = uuid(match[2]), action = match[3];
     const loaded = await load(db, schoolId, activityId, user, role, {
       management: ['publish', 'archive', 'cancel', 'participants', 'end', 'publish-results', 'report'].includes(action) || method === 'PATCH',
+      archiveRead: method === 'GET' && (!action || action === 'problems'),
       ownJob: action === 'jobs' && method === 'GET' && Boolean(match[4]),
     });
     const { a, canManage, student, participation } = loaded;

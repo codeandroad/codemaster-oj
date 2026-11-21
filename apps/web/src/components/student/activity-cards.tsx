@@ -1,8 +1,8 @@
-import { ArrowRight, CalendarClock, Check, ClipboardList, Clock3 } from "lucide-react";
+import { ArrowRight, CalendarClock, CheckCircle2, Check, ClipboardList, Clock3 } from "lucide-react";
 import { useLocale, type AppLocale } from "@/components/locale-context";
 import { AppLink } from "@/components/navigation";
 import { StatusPill } from "@/components/page-chrome";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Progress } from "./dashboard-view";
 import { date, Tabs } from "./shared";
 
@@ -136,5 +136,22 @@ export function StudentTimedPracticeCard({
       <p className="text-xs text-muted-foreground">Asia/Shanghai · {durationMinutes} {text("分钟", "min")} · {problemCount} {text("题", "problems")}</p>
     </div>
     <AppLink href={href} className={buttonVariants({ variant: active ? "primary" : "secondary" })}>{text("查看", "View")} <ArrowRight size={15} /></AppLink>
+  </section>;
+}
+
+export function AssignmentArchiveTabs({ archived, onChange }: { archived: boolean; onChange: (value: boolean) => void }) {
+  const {locale} = useLocale();
+  return <div className="mt-5 flex gap-2" role="group" aria-label={locale === "zh" ? "作业状态" : "Assignment status"}>
+    <Button variant={archived ? "secondary" : "primary"} aria-pressed={!archived} onClick={() => onChange(false)}>{locale === "zh" ? "当前作业" : "Current"}</Button>
+    <Button variant={archived ? "primary" : "secondary"} aria-pressed={archived} onClick={() => onChange(true)}>{locale === "zh" ? "历史归档" : "Archived"}</Button>
+  </div>;
+}
+
+export function AssignmentScoreRule() {
+  const {locale} = useLocale();
+  return <section className="mt-6 flex items-start gap-3 rounded-lg border border-border bg-surface p-5">
+    <CheckCircle2 className="mt-0.5 text-success" size={18}/>
+    <div><h2 className="font-bold">{locale === "zh" ? "成绩计算规则" : "Score display rule"}</h2>
+      <p className="mt-1 text-sm leading-6 text-muted-foreground">{locale === "zh" ? "订正提交单独显示，不会覆盖原作业成绩。" : "Correction submissions are displayed separately. Later corrections do not overwrite the original assignment score."}</p></div>
   </section>;
 }

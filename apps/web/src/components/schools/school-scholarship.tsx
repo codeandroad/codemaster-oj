@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Check } from "lucide-react";
 import { useLocale } from "@/components/locale-context";
 import { inputClass } from "@/components/admin/common";
@@ -10,8 +10,6 @@ import { ScholarshipAssistance, type SchoolAssistanceTarget } from "@/components
 import { MathContent } from "@/components/math-content";
 import { ApiError, apiMessage, productionApi, productionId, type SubmissionLanguage } from "@/lib/production-api";
 import { ScholarshipIcon } from "@/components/scholarship/scholarship-icon";
-import { ScholarshipPopover } from "@/components/scholarship/scholarship-popover";
-import { useData as useStudentData } from "@/components/student/shared";
 import {
   sameSolutionDraft,
   referenceSolutionDraft,
@@ -363,14 +361,12 @@ export function SchoolScholarship({
   role: string;
 }) {
   const tx = useText(),
-    [tab, setTab] = useState(role === "student" ? "ledger" : "content");
+    [tab, setTab] = useState("content");
   const admin = role === "school_admin";
   return (
     <div className="space-y-4">
       <nav className="flex flex-wrap gap-2 border-b border-border pb-2">
-        {(role === "student"
-          ? [["ledger", tx("收支明细", "Transactions")]]
-          : [
+        {([
               ["content", tx("内容审核与价格", "Content and prices")],
               ...(admin
                 ? [
@@ -922,28 +918,6 @@ function ScholarshipGrant({ schoolId }: { schoolId: string }) {
       </Button>
     </div>
   );
-}
-export function SchoolScholarshipBalance({
-  schoolId,
-  href,
-}: {
-  schoolId: string;
-  href: string;
-}) {
-  const { data, reload } = useStudentData<{ balance: number }>(`${prefix(schoolId)}/wallet`);
-  useEffect(() => {
-    const refresh = () => { if (document.visibilityState === "visible") reload(); };
-    window.addEventListener("codemaster:school-scholarship-changed", refresh);
-    const timer = window.setInterval(refresh, 45000);
-    return () => {
-      window.removeEventListener(
-        "codemaster:school-scholarship-changed",
-        refresh,
-      );
-      clearInterval(timer);
-    };
-  }, [reload]);
-  return <ScholarshipPopover balance={data?.balance} ledgerPath={`${prefix(schoolId)}/ledger`} href={href} onRefresh={reload}/>;
 }
 function ScholarshipContents({
   schoolId,

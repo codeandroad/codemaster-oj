@@ -101,19 +101,19 @@ export function PublicCoursePage({ id, homeHref, workspaceSchoolId }: { id: stri
   const catalogHref = courseSearchHref(homeHref, query);
   return <>
     <Loading resource={entry}>
-      {course?.admission === "direct" ? <CourseReader key={`${id}:${schoolId ?? "platform"}`} id={id} courseQuery={query} workspaceSchoolId={workspaceSchoolId}/>
+      {course?.admission === "direct" ? <CourseReader key={`${id}:${schoolId ?? "platform"}`} id={id} platformOwned={course.ownerScope === "platform"} courseQuery={query} workspaceSchoolId={workspaceSchoolId}/>
         : course && <CourseAdmissionDialog entry={course} onUpdated={setUpdated} onClose={() => router.replace(catalogHref)}/>}
     </Loading>
   </>;
 }
 
-function CourseReader({ id, courseQuery, workspaceSchoolId }: { id: string; courseQuery: string; workspaceSchoolId?: string | null }) {
+function CourseReader({ id, courseQuery, workspaceSchoolId, platformOwned }: { platformOwned: boolean; id: string; courseQuery: string; workspaceSchoolId?: string | null }) {
   const text = useSchoolText();
   const localError = useSchoolError();
   const location = useSearchParams(), pathname = usePathname();
   const { language } = useCourseLanguage();
   const schoolId = location.get("schoolId") ?? workspaceSchoolId;
-  const schoolQuery = schoolId ? `?${new URLSearchParams({ schoolId })}` : "";
+  const schoolQuery = schoolId && platformOwned ? `?${new URLSearchParams({ schoolId })}` : "";
   const course = useData<CourseDetail>(`practice/courses/${encodeURIComponent(id)}${schoolQuery}`);
   useCourseProgressRefresh(course);
   const chapterHref = (chapterId: string) => {
@@ -129,7 +129,7 @@ function CourseReader({ id, courseQuery, workspaceSchoolId }: { id: string; cour
       objective: chapter.objective, checkpoint: chapter.checkpoint, checkpointAnswer: chapter.checkpointAnswer,
       localizations: chapter.localizations, completed: chapter.read,
       problems: chapter.problems.map(problem => ({ id: problem.problemId, title: problem.title, completed: problem.solved,
-        href: `/practice/problems?${new URLSearchParams({ problemId: problem.problemId, versionId: problem.versionId,
+        href: `${pathname === "/schools" ? "/schools" : "/practice/problems"}?${new URLSearchParams({ ...(pathname === "/schools" && schoolId && {schoolId,section:"problems",scope:"public"}), problemId: problem.problemId, versionId: problem.versionId,
           publicCourseId: id, publicChapterId: chapter.id, ...(workspaceSchoolId && { workspaceSchoolId }), ...(courseQuery && { courseQ: courseQuery }) })}`,
       })),
     }))}

@@ -27,7 +27,7 @@ import { StudentLearningDetail, StudentLearningList, type LearningPath } from ".
 import { StudentTimedDetail, StudentTimedList } from "./timed";
 import { StudentWorkspace } from "./workspace";
 import { Progress, StudentDashboardView } from "./dashboard-view";
-import { AssignmentCompletedStatus, StudentAssignmentCard } from "./activity-cards";
+import { AssignmentArchiveTabs, AssignmentScoreRule, AssignmentCompletedStatus, StudentAssignmentCard } from "./activity-cards";
 import { AssignmentCompletionDialog } from "./assignment-completion";
 export { Progress } from "./dashboard-view";
 const StudentPaper4List = dynamic(() => import("@/components/paper4/student-paper4").then(module => module.StudentPaper4List));
@@ -141,10 +141,7 @@ export function StudentAssignments({ user }: { user: CampusUser }) {
     (!a.grades || a.grades.some(g => g.identityId === user.identityId))) ?? [];
   return <>
     <PageHeader title={ui(locale, "作业", "Assignments")} />
-    <div className="mt-5 flex gap-2" role="group" aria-label={ui(locale, "作业状态", "Assignment status")}>
-      <Button variant={showArchived ? "secondary" : "primary"} aria-pressed={!showArchived} onClick={() => setShowArchived(false)}>{ui(locale, "当前作业", "Current")}</Button>
-      <Button variant={showArchived ? "primary" : "secondary"} aria-pressed={showArchived} onClick={() => setShowArchived(true)}>{ui(locale, "历史归档", "Archived")}</Button>
-    </div>
+    <AssignmentArchiveTabs archived={showArchived} onChange={setShowArchived}/>
     <State data={assignments} empty={assignments.data && !assignments.data.items.length ? ui(locale, "暂无作业", "No assignments yet") : undefined}>
       <div className="mt-5 grid gap-4">
         {visible.map(assignment => {
@@ -178,15 +175,8 @@ export function StudentAssignments({ user }: { user: CampusUser }) {
         })}
       </div>
     </State>
-    <section className={`${panel} mt-6`}>
-      <div className="flex items-start gap-3">
-        <CheckCircle2 className="mt-0.5 text-success" size={18} />
-        <div>
-          <h2 className="font-bold">{ui(locale, "成绩计算规则", "Score display rule")}</h2>
-          <p className="mt-1 text-sm leading-6 text-muted-foreground">{ui(locale, "订正提交单独显示，不会覆盖原作业成绩。", "Correction submissions are displayed separately. Later corrections do not overwrite the original assignment score.")}</p>
-        </div>
-      </div>
-    </section>
+    <AssignmentScoreRule/>
+
   </>;
 }
 export function StudentAssignment({ id, user }: { id: string; user: CampusUser }) {

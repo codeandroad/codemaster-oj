@@ -73,6 +73,10 @@ export type ProblemWorkspaceAdapter = {
   navigation: { items: NavigationProblem[]; loading: boolean; error: string; reload: () => void; href: (problem: NavigationProblem) => string; title: string; description?: string };
   chapter?: { courseTitle: string; title: string; position: number; completed: boolean };
   tutorial?: ProblemTutorialContent;
+  tutorialEndpoint?: string;
+  submissionClosed?: boolean;
+  readSelectedLanguage?: () => SubmissionLanguage | null;
+  saveSelectedLanguage?: (language: SubmissionLanguage) => void;
   submissionsPath: string;
   resumeSubmission?: boolean;
   submissionsTitle?: string;
@@ -162,7 +166,7 @@ function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProb
   const tutorialEndpoint = !adapter && problem.versionId ? `problems/${encodeURIComponent(problem.id)}/tutorial?${new URLSearchParams({
     versionId: problem.versionId, ...(learningPathId && chapterId ? { courseId: learningPathId, chapterId } : {}),
   })}` : "";
-  const tutorial = useProblemTutorial(tutorialEndpoint, adapter?.tutorial);
+  const tutorial = useProblemTutorial(adapter?.tutorialEndpoint ?? tutorialEndpoint, adapter?.tutorial);
   const statementId = useId();
   const courseValid=!!courseChapter?.problems.some(p=>p.problemId===problem.id&&p.versionId===problem.versionId);
   const returnTo = adapter?.returnTo ?? (learningPathId&&chapterId?`/student/learning-paths/${encodeURIComponent(learningPathId)}/chapters/${encodeURIComponent(chapterId)}`:safeReturn(params.get("returnTo"))) ?? (timedPracticeId ? `/student/timed-practice/${timedPracticeId}` : assignmentId ? `/student/assignments/${assignmentId}` : originalId ? `/student/submissions/${originalId}` : "/student/problems");
@@ -177,7 +181,7 @@ function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProb
   const readWorkspaceDraft = useCallback((selected: SubmissionLanguage) => adapter ? adapter.readDraft(selected) : original ? readDraft(draftKey(user.id, problem.id, draftVersion, context, selected)) : readCurrentDraft(user.id, problem.id, context, selected), [adapter, original, user.id, problem.id, draftVersion, context]);
   const saveWorkspaceDraft = useCallback((selected: SubmissionLanguage, draft: NonNullable<ReturnType<typeof readDraft>>) => adapter ? adapter.saveDraft(selected, draft) : saveDraft(draftKey(user.id, problem.id, draftVersion, context, selected), draft), [adapter, user.id, problem.id, draftVersion, context]);
   const [language, setLanguage] = useState(() => initialWorkspaceLanguage(
-    draftVersion === "current" ? readCurrentDraftLanguage(user.id, problem.id, context) : readDraftLanguage(user.id, problem.id, draftVersion, context), latest, originalLanguage, readWorkspaceDraft, requiredLanguage,
+    adapter?.readSelectedLanguage?.() ?? (draftVersion === "current" ? readCurrentDraftLanguage(user.id, problem.id, context) : readDraftLanguage(user.id, problem.id, draftVersion, context)), latest, originalLanguage, readWorkspaceDraft, requiredLanguage,
   ));
   const storageKey = draftKey(user.id, problem.id, draftVersion, context, language);
   const [initialCode] = useState(() => workspaceEditorCode(language, readWorkspaceDraft(language), latest,
@@ -235,7 +239,7 @@ function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProb
     || Boolean(assignment.data?.problems.some(item => item.problemId === problem.id && item.versionId !== problem.versionId))
     || Boolean(courseChapter?.problems.some(item => item.problemId === problem.id && item.versionId !== problem.versionId))
     || Boolean(timedSession.data?.problems.some(item => item.problemId === problem.id && item.versionId !== problem.versionId)));
-  const unavailable = Boolean(timedPracticeId && !timedSession.active) || changedDefinition || Boolean(course.error || assignment.error);
+  const unavailable = Boolean(adapter?.submissionClosed) || Boolean(timedPracticeId && !timedSession.active) || changedDefinition || Boolean(course.error || assignment.error);
   useEffect(() => { setDraftSaved(saveWorkspaceDraft(language, { code, receivedCode, updatedAt: new Date().toISOString() })); }, [language, code, receivedCode, saveWorkspaceDraft]);
   useEffect(() => { if (!layoutMessage) return; const timeout = window.setTimeout(() => setLayoutMessage(""), 4000); return () => window.clearTimeout(timeout); }, [layoutMessage]);
   useEffect(() => { if (!anyDirty) return; const beforeUnload = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; }; window.addEventListener("beforeunload", beforeUnload); return () => window.removeEventListener("beforeunload", beforeUnload); }, [anyDirty]);
@@ -243,6 +247,7 @@ function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProb
     if (requiredLanguage || next === language || pending || formatting) return;
     saveWorkspaceDraft(language, { code, receivedCode, updatedAt: new Date().toISOString() });
     saveDraftLanguage(user.id, problem.id, draftVersion, context, next);
+    adapter?.saveSelectedLanguage?.(next);
     const nextDraft = readWorkspaceDraft(next);
     const starter = original && next === originalLanguage ? original.code : starterFor(problem, next);
     const nextCode = workspaceEditorCode(next, nextDraft, restoredSubmission.current && nextDraft ? null : latest, starter);

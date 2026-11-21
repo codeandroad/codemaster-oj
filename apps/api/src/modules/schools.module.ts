@@ -20,6 +20,8 @@ export class SchoolsController {
     'schools/:schoolId/student-exits',
     'schools/:schoolId/identities',
     'schools/:schoolId/classes',
+    'schools/:schoolId/classes/:classId',
+    'schools/:schoolId/classes/:classId/members',
     'schools/:schoolId/classes/:classId/roster',
     'schools/:schoolId/classes/:classId/candidates',
     'schools/:schoolId/courses',

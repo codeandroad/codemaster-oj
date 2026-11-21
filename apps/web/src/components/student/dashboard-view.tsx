@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { ArrowRight, CalendarClock, Check, CheckCircle2, ChevronRight, CircleAlert } from "lucide-react";
 import { useLocale } from "@/components/locale-context";
 import { AppLink } from "@/components/navigation";
@@ -45,12 +46,14 @@ export function Progress({ percent, label, complete = false }: { percent: number
 
 export function StudentDashboardView({
   heading, assignmentState, assignment, courseState, course, coursesHref,
-  submissionsState, submissions, submissionsHref,
+  submissionsState, submissions, submissionsHref, featured, courseCatalog,
 }: {
   heading: string;
-  assignmentState: DashboardState;
+  featured?: ReactNode;
+  courseCatalog?: ReactNode;
+  assignmentState?: DashboardState;
   assignment?: DashboardAssignment;
-  courseState: DashboardState;
+  courseState?: DashboardState;
   course?: DashboardCourse;
   coursesHref: string;
   submissionsState: DashboardState;
@@ -84,7 +87,8 @@ export function StudentDashboardView({
     <PageHeader title={heading} />
     <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
       <div className="space-y-6">
-        <State data={assignmentState}>
+        {featured}
+        {assignmentState && <State data={assignmentState}>
           {assignment ? <section className="border border-border bg-surface panel-shadow">
             <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
               <div className="min-w-0">
@@ -124,7 +128,7 @@ export function StudentDashboardView({
               </div>
             </div>
           </section> : <Empty title={text("暂无进行中的作业", "No current assignments")} description={text("老师发布的作业会显示在这里，可先从题库开始练习。", "Assignments from your teacher appear here. You can start with the problem library.")} />}
-        </State>
+        </State>}
         <section>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-bold">{text("需要订正", "Needs review")}</h2>
@@ -163,7 +167,8 @@ export function StudentDashboardView({
         </section>
       </div>
       <aside className="space-y-5">
-        <State data={courseState}>
+        {courseCatalog}
+        {courseState && <State data={courseState}>
           {course ? <section className={panel}>
             <p className="text-xs font-semibold uppercase text-muted-foreground">{text("当前课程", "Current path")}</p>
             <h2 className="mt-2 font-bold"><AppLink href={course.href} className="hover:text-primary hover:underline focus-visible:underline">{course.title}</AppLink></h2>
@@ -180,7 +185,7 @@ export function StudentDashboardView({
             <p className="mt-3 text-sm text-muted-foreground">{text("老师发布的章节会显示在这里。", "Published chapters from your teacher appear here.")}</p>
             <AppLink href={coursesHref} className="mt-4 block text-sm font-semibold text-primary">{text("查看课程", "View paths")}</AppLink>
           </section>}
-        </State>
+        </State>}
       </aside>
     </div>
   </>;

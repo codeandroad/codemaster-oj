@@ -1,18 +1,11 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
-import { AppLink as Link } from "@/components/navigation";
-import { Button } from "@/components/ui/button";
-import { StatusPill } from "@/components/page-chrome";
-import { useLocale } from "@/components/locale-context";
-import { date, State, useData } from "@/components/student/shared";
+import { useData } from "@/components/student/shared";
 import { StudentDashboardView } from "@/components/student/dashboard-view";
 import type { CampusUser } from "@/lib/production-api";
 import { useSchoolText, type School } from "./school-ui";
 import type { CourseDetail, CoursePage, SchoolCourse } from "./school-courses-model";
 import type { SchoolActivity } from "./school-activities-model";
-import { schoolWorkspaceHref } from "./school-workspace-location";
-import { SchoolSubmissionDetail } from "./school-submission-detail";
 
 export type SchoolSubmission = {
   id: string;
@@ -29,7 +22,6 @@ type SubmissionPage = {
   page: number;
   hasMore: boolean;
 };
-const panel = "overflow-hidden rounded-lg border border-border bg-surface";
 
 export function SchoolStudentDashboard({ school, user }: { school: School; user: CampusUser }) {
   const text = useSchoolText();
@@ -88,118 +80,4 @@ export function SchoolStudentDashboard({ school, user }: { school: School; user:
       score: submission.score,
     }))}
   />;
-}
-
-function SubmissionRows({
-  schoolId,
-  rows,
-}: {
-  schoolId: string;
-  rows: SchoolSubmission[];
-}) {
-  const text = useSchoolText(),
-    { locale } = useLocale();
-  const searchParams = useSearchParams();
-  const detailHref = (id: string) => {
-    const params = new URLSearchParams({ schoolId, section: searchParams.get("section")==="review-notebook"?"review-notebook":"submissions", submissionId: id });
-    if (searchParams.get("section") === "submissions" && searchParams.has("submissionPage")) {
-      params.set("submissionPage", searchParams.get("submissionPage")!);
-    }
-    return `/schools?${params}`;
-  };
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
-        <thead className="border-b border-border bg-surface-subtle text-muted-foreground">
-          <tr>
-            <th className="px-4 py-2">ID</th>
-            <th className="px-4 py-2">{text("Problem", "题目")}</th>
-            <th className="px-4 py-2">{text("Status", "状态")}</th>
-            <th className="px-4 py-2">{text("Score", "得分")}</th>
-            <th className="px-4 py-2">{text("Submitted", "提交时间")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((job) => (
-            <tr key={job.id} className="border-b border-border last:border-0">
-              <td className="px-4 py-3 font-mono text-xs">
-                <Link href={detailHref(job.id)} className="font-semibold text-primary hover:underline" title={job.id}>{job.id.slice(0, 8)}</Link>
-              </td>
-              <td className="px-4 py-3">
-                <Link
-                  className="font-semibold text-primary hover:underline"
-                  href={detailHref(job.id)}
-                >
-                  {job.problemTitle}
-                </Link>
-              </td>
-              <td className="px-4 py-3">
-                <StatusPill status={job.status} />
-              </td>
-              <td className="px-4 py-3">
-                {job.score === null ? "—" : `${job.score}/100`}
-              </td>
-              <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
-                {date(job.createdAt, locale)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {!rows.length && (
-        <p className="p-5 text-sm text-muted-foreground">
-          {text("No formal submissions yet.", "暂无正式提交。")}
-        </p>
-      )}
-    </div>
-  );
-}
-
-export function SchoolSubmissions({ schoolId,notebook=false }: { schoolId: string;notebook?:boolean }) {
-  const searchParams = useSearchParams();
-  const rawPage = Number(searchParams.get("submissionPage") ?? 1);
-  const page = Number.isInteger(rawPage) && rawPage >= 1 && rawPage <= 100000 ? rawPage : 1;
-  const submissionId = searchParams.get("submissionId");
-  if (submissionId) return <SchoolSubmissionDetail key={`${schoolId}:${submissionId}`} schoolId={schoolId} submissionId={submissionId} backHref={`${schoolWorkspaceHref(schoolId, notebook?"review-notebook":"submissions")}&submissionPage=${page}`} />;
-  return <SchoolSubmissionList key={`${schoolId}:${page}`} schoolId={schoolId} page={page} notebook={notebook} />;
-}
-
-function SchoolSubmissionList({ schoolId, page,notebook }: { schoolId: string; page: number;notebook:boolean }) {
-  const text = useSchoolText();
-  const router = useRouter();
-  const data = useData<SubmissionPage>(
-      `schools/${schoolId}/submissions?page=${page}${notebook?"&view=review":""}`,
-    );
-  const setPage = (value: number) => router.push(`${schoolWorkspaceHref(schoolId, notebook?"review-notebook":"submissions")}&submissionPage=${value}`, { scroll: false });
-  return (
-    <section className={panel}>
-      <State data={data}>
-        <SubmissionRows schoolId={schoolId} rows={data.data?.items ?? []} />
-        <div className="flex items-center justify-between border-t border-border px-4 py-3 text-sm">
-          <span>
-            {text("Page", "第")} {page}
-            {text("", " 页")}
-          </span>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={data.loading || page === 1}
-              onClick={() => setPage(page - 1)}
-            >
-              {text("Previous", "上一页")}
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={data.loading || !data.data?.hasMore}
-              onClick={() => setPage(page + 1)}
-            >
-              {text("Next", "下一页")}
-            </Button>
-          </div>
-        </div>
-      </State>
-    </section>
-  );
 }

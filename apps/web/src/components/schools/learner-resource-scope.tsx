@@ -36,7 +36,7 @@ export function LearnerResourceScope({ section, schoolHref, workspaceSchoolId, c
   const courseId = search.get("publicCourseId");
 
   return <div className="space-y-4">
-    <nav aria-label={text("Learning scope", "学习范围")} className="flex flex-wrap gap-1 border-b border-border">
+    {!search.has("problemId") && <nav aria-label={text("Learning scope", "学习范围")} className="flex flex-wrap gap-1 border-b border-border">
       {[
         { href: section === "problems" ? scopeHref + "school" : schoolHref, active: !showPublic, label: text("My school", "本校") },
         { href: publicHref, active: showPublic, label: section === "problems" ? text("Platform problems", "平台题目") : text("Platform public", "平台公开") },
@@ -44,7 +44,7 @@ export function LearnerResourceScope({ section, schoolHref, workspaceSchoolId, c
         className={`border-b-2 px-4 py-2 text-sm font-semibold ${tab.active ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
         {tab.label}
       </AppLink>)}
-    </nav>
+    </nav>}
     {!ready ? <p role="status" className="text-sm text-muted-foreground">{text("Loading problems…", "正在加载题目…")}</p> : showPublic ? (
       section === "problems" ? <PublicPractice accountId={accountId} workspaceSchoolId={workspaceSchoolId}/>
         : section === "submissions" ? <PublicSubmissions/>

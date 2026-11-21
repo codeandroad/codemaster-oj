@@ -2,12 +2,12 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "@/components/locale-context";
-import { useData } from "@/components/student/shared";
+import { State, useData } from "@/components/student/shared";
 import { publicSubmissionContext, submissionVerdicts } from "@/components/student/submission-filter";
 import { ReviewNotebookView, SubmissionHistory, studyRecordScore, studyRecordVerdict } from "@/components/student/study-record-views";
 import { reviewNotebookState, type ReviewNotebookFilter } from "@/components/student/review-notebook-state";
 import { CorrectionNote } from "./correction-note";
-import { StudySubmissionDetail, type JobDetail } from "./school-submission-detail";
+import { SchoolSubmissionDetail, StudySubmissionDetail, type JobDetail } from "./school-submission-detail";
 import { useSchoolText } from "./school-ui";
 
 type PublicRecord = {
@@ -18,31 +18,36 @@ type PublicRecord = {
   createdAt: string;
   status: string;
   score: number | null;
+  context?: string; correctionStatus?:string|null; feedback?:string|null; reviewState?:ReviewNotebookFilter;
   noteUpdatedAt?: string | null;
 };
 type RecordPage = { items: PublicRecord[]; page: number; hasMore: boolean };
 type PublicJob = JobDetail & { state: string; note: string | null; noteUpdatedAt: string | null };
 
 export function PublicSubmissions() {
-  return <PublicStudyRecords notebook={false} />;
+  return <LearnerRecords notebook={false} />;
 }
 
 export function PublicReviewNotebook() {
-  return <PublicStudyRecords notebook />;
+  return <LearnerRecords notebook />;
 }
 
-function PublicStudyRecords({ notebook }: { notebook: boolean }) {
+export function LearnerRecords({ notebook, schoolId: workspace }: { notebook: boolean; schoolId?:string }) {
   const text = useSchoolText();
   const pathname = usePathname();
   const search = useSearchParams();
-  const id = search.get("submissionId");
+  const entry = search.get("reviewEntryId");
+  const review = useData<{submissionId:string}>(workspace && notebook && entry ? `schools/${workspace}/review-notebook/${encodeURIComponent(entry)}` : "");
+  const id = search.get("submissionId") ?? review.data?.submissionId;
   const schoolId = search.get("submissionSchoolId");
-  const selectedVerdict = search.get("publicVerdict") ?? "";
+  const pageKey=workspace ? "submissionPage" : "publicPage";
+  const selectedVerdict = search.get(workspace ? "verdict" : "publicVerdict") ?? "";
   const verdict = !notebook && submissionVerdicts.includes(selectedVerdict) ? selectedVerdict : "";
-  const context = search.get("publicContext") === publicSubmissionContext ? publicSubmissionContext : "";
-  const review = search.get("publicReview");
-  const reviewState = notebook && (review === "resolved" || review === "needs-review") ? review : "";
-  const candidate = Number(search.get("publicPage") ?? 1);
+  const requestedContext=search.get(workspace ? "context":"publicContext") ?? "";
+  const context=(workspace ? ["assignment","timed","correction","practice"] : [publicSubmissionContext]).includes(requestedContext) ? requestedContext : "";
+  const requestedReview=search.get(workspace ? "reviewState":"publicReview") ?? "";
+  const reviewState=notebook && ["resolved","needs-review",...(workspace ? ["retried","feedback"] : [])].includes(requestedReview) ? requestedReview : "";
+  const candidate = Number(search.get(pageKey) ?? 1);
   const page = Number.isInteger(candidate) && candidate > 0 && candidate <= 100000 ? candidate : 1;
   function href(changes: Record<string, string | null>) {
     const params = new URLSearchParams(search.toString());
@@ -52,61 +57,69 @@ function PublicStudyRecords({ notebook }: { notebook: boolean }) {
     }
     return params.size ? `${pathname}?${params}` : pathname;
   }
+  if (entry && workspace && notebook && !id) return <State data={review}>{null}</State>;
+  if (id && workspace) return <SchoolSubmissionDetail key={workspace+id} schoolId={workspace} submissionId={id} backHref={href({submissionId:null,reviewEntryId:null})} backLabel={notebook ? text("Back to review notebook","返回订正本") : undefined}/>;
   if (id && schoolId) {
     const path = `practice/submissions/${encodeURIComponent(schoolId)}/${encodeURIComponent(id)}`;
     return <StudySubmissionDetail<PublicJob> key={path} path={path}
       backHref={href({ submissionId: null, submissionSchoolId: null })}
       backLabel={notebook ? text("Back to review notebook", "返回订正本") : undefined}
-      problemHref={job => `/practice/problems?problemId=${encodeURIComponent(job.problemId)}`}
+      problemHref={job => pathname === "/schools" ? `/schools?${new URLSearchParams({schoolId:search.get("schoolId")!,section:"problems",scope:"public",problemId:job.problemId})}`
+        : `/practice/problems?problemId=${encodeURIComponent(job.problemId)}`}
       renderExtra={(job, reload) => job.state === "completed" &&
         <CorrectionNote key={job.noteUpdatedAt ?? "new"} path={path} job={job} onSaved={reload} />}
     />;
   }
-  return <PublicRecordsList key={`${notebook}:${page}:${verdict}:${reviewState}`} notebook={notebook} page={page}
+  return <PublicRecordsList schoolId={workspace} key={`${workspace}:${notebook}:${page}:${verdict}:${context}:${reviewState}`} notebook={notebook} page={page}
     verdict={verdict} context={context} reviewState={reviewState} href={href} />;
 }
 
-function PublicRecordsList({ notebook, page, verdict, context, reviewState, href }: {
+function PublicRecordsList({ schoolId, notebook, page, verdict, context, reviewState, href }: {
+  schoolId?: string;
   notebook: boolean;
   page: number;
   verdict: string;
   context: string;
-  reviewState: "" | "resolved" | "needs-review";
+  reviewState: string;
   href: (changes: Record<string, string | null>) => string;
 }) {
   const text = useSchoolText();
   const { locale } = useLocale();
   const router = useRouter();
-  // This endpoint already restricts submissions to public practice.
-  const query = new URLSearchParams({ page: String(page), ...(verdict ? { status: verdict } : {}), ...(reviewState ? { reviewState } : {}) });
-  const resource = useData<RecordPage>(`practice/${notebook ? "review-notebook" : "submissions"}?${query}`);
+  const pageKey=schoolId ? "submissionPage" : "publicPage";
+  const path=schoolId ? `schools/${schoolId}/submissions` : `practice/${notebook ? "review-notebook" : "submissions"}`;
+  const query = new URLSearchParams({ page:String(page), ...(verdict && {status:verdict}), ...(reviewState && {reviewState}),
+    ...(schoolId && notebook && {view:"review"}), ...(schoolId && context && {context}) });
+  const resource = useData<RecordPage>(`${path}?${query}`);
+  const contexts: Record<string,string>={assignment:text("Assignment","作业"),timed:text("Timed practice","限时训练"),correction:text("Correction","订正"),practice:text("Practice library","题库练习")};
   const rows = (resource.data?.items ?? []).map(row => ({
     ...row,
     key: `${row.schoolId}:${row.id}`,
     displayId: row.id.slice(0, 8),
-    href: href({ submissionId: row.id, submissionSchoolId: row.schoolId }),
+    href: href({ submissionId: row.id, submissionSchoolId: schoolId ? null : row.schoolId }),
     title: row.problemTitle,
-    context: text("Public practice", "公开练习"),
+    context: schoolId ? contexts[row.context ?? "practice"] : text("Public practice", "公开练习"),
   }));
   const pagination = {
     page,
     hasMore: Boolean(resource.data?.hasMore),
-    previous: () => router.push(href({ publicPage: page > 2 ? String(page - 1) : null })),
-    next: () => router.push(href({ publicPage: String(page + 1) })),
+    previous: () => router.push(href({ [pageKey]: page > 2 ? String(page - 1) : null })),
+    next: () => router.push(href({ [pageKey]: String(page + 1) })),
   };
-  const reviewFilter: ReviewNotebookFilter = reviewState === "resolved" ? "Resolved" : reviewState === "needs-review" ? "Needs review" : "All";
-  if (notebook) return <ReviewNotebookView resource={resource} pagination={pagination} filter={reviewFilter}
-    onFilter={value => router.push(href({ publicReview: value === "Resolved" ? "resolved" : value === "Needs review" ? "needs-review" : null, publicPage: null }))}
+  const states:Record<string,ReviewNotebookFilter>={"resolved":"Resolved","needs-review":"Needs review","retried":"Retried","feedback":"Feedback received"};
+  if (notebook) return <ReviewNotebookView resource={resource} school={!!schoolId} pagination={pagination} filter={states[reviewState] ?? "All"}
+    onFilter={value=>router.push(href({[schoolId ? "reviewState":"publicReview"]:Object.keys(states).find(k=>states[k]===value) ?? null,[pageKey]:null}))}
     rows={rows.map(row => {
       const score = studyRecordScore(row);
       const status = studyRecordVerdict(locale, row.status);
       return { ...row, originalResult: score === "—" ? status : `${status} · ${score}`,
-        state: reviewNotebookState(row.status, undefined, false), lastPracticedAt: row.noteUpdatedAt ?? row.createdAt };
+        feedback:row.feedback ?? undefined, correction:row.correctionStatus ?? undefined,
+        state: reviewNotebookState(row.status,row.correctionStatus ?? undefined,Boolean(row.feedback)), lastPracticedAt: row.noteUpdatedAt ?? row.createdAt };
     })}/>;
   return <SubmissionHistory resource={resource} rows={rows} pagination={pagination}
     filters={{
-      verdict, context, scope: "public",
-      onVerdict: value => router.push(href({ publicVerdict: value || null, publicPage: null })),
-      onContext: value => router.push(href({ publicContext: value || null, publicPage: null })),
+      verdict, context, scope: schoolId ? "school" : "public",
+      onVerdict: value => router.push(href({ [schoolId ? "verdict":"publicVerdict"]: value || null, [pageKey]: null })),
+      onContext: value => router.push(href({ [schoolId ? "context":"publicContext"]: value || null, [pageKey]: null })),
     }}/>;
 }

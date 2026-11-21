@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { StatusPill } from "@/components/page-chrome";
 import { useLocale } from "@/components/locale-context";
-import { AssignmentCompletedStatus, StudentAssignmentCard, StudentTimedPracticeCard, StudentTimedPracticeTabs, timedPracticeCategoryLabel } from "@/components/student/activity-cards";
+import { AssignmentArchiveTabs, AssignmentScoreRule, AssignmentCompletedStatus, StudentAssignmentCard, StudentTimedPracticeCard, StudentTimedPracticeTabs, timedPracticeCategoryLabel } from "@/components/student/activity-cards";
 import { Progress } from "@/components/student/dashboard-view";
 import { date, Empty, Feedback, State, useData, useMutation } from "@/components/student/shared";
 import { AssignmentParticipantForm, CancelAssignment } from "@/components/teacher/assignment-changes";
@@ -71,14 +71,17 @@ export function SchoolActivities({ school, kind }: { school: School; kind: Activ
     {kind === "timed" && <StudentTimedPracticeTabs categories={timingCategories} value={timing} onChange={value => {
       go({ activityTiming: value.toLowerCase(), activityPage: null, activityEdit: null });
     }} />}
+    {kind === "assignment" && <AssignmentArchiveTabs archived={archived} onChange={value => go({ activityArchived:value ? "1" : null, activityPage:null })}/>}
     <SchoolStudentActivityCards
-      key={`${school.id}:${kind}:${timing}:${page}`}
+      archived={archived}
+      key={`${school.id}:${kind}:${timing}:${page}:${archived}`}
       schoolId={school.id}
       kind={kind}
       page={page}
       timing={timing}
       onPageChange={next => go({ activityPage: String(next), activityEdit: null })}
     />
+    {kind === "assignment" && <AssignmentScoreRule/>}
   </>;
   return <div className="space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex gap-1">{teaching && <>{[false, true].map(value => <Button key={String(value)} size="sm" variant={archived === value ? "default" : "secondary"} onClick={() => go({ activityArchived: value ? "1" : null, activityPage: null })}>{value ? text("Archived", "已归档") : text("Active", "使用中")}</Button>)}</>}</div><div className="flex gap-2"><Button size="sm" variant="ghost" disabled={list.loading} onClick={list.reload} aria-label={text("Refresh activities", "刷新活动")}><RefreshCw size={15}/></Button>{teaching && <Button size="sm" onClick={() => go({ activityEdit: "new" })}><Plus size={16}/>{text(kind === "timed" ? "New timed practice" : "New assignment", kind === "timed" ? "新建限时训练" : "新建作业")}</Button>}</div></div>
@@ -87,9 +90,10 @@ export function SchoolActivities({ school, kind }: { school: School; kind: Activ
 }
 
 function SchoolStudentActivityCards({
-  schoolId, kind, timing, page, onPageChange,
+  schoolId, kind, timing, page, archived, onPageChange,
 }: {
   schoolId: string;
+  archived: boolean;
   kind: ActivityKind;
   timing: SchoolTimingCategory;
   page: number;
@@ -98,12 +102,14 @@ function SchoolStudentActivityCards({
   const { locale } = useLocale();
   const text = useSchoolText();
   const params = new URLSearchParams({ kind, page: String(page) });
+  if (archived) params.set("archived", "true");
   if (kind === "timed") params.set("timingCategory", timing.toLowerCase());
   const list = useData<{ items: SchoolActivity[]; hasMore: boolean }>(`schools/${schoolId}/activities?${params}`);
   const items = list.data?.items ?? [];
   const href = (id: string) => {
     const params = new URLSearchParams({ schoolId, section: kind === "timed" ? "timed" : "assignments", activityId: id });
     if (kind === "timed") params.set("activityTiming", timing.toLowerCase());
+    if (archived) params.set("activityArchived","1");
     if (page > 1) params.set("activityPage", String(page));
     return `/schools?${params}`;
   };
@@ -125,6 +131,8 @@ function SchoolStudentActivityCards({
         href={href(activity.id)}
         status={text(...(labels[activity.phase] ?? [activity.phase, activity.phase]))}
         overdue={activity.phase === "Ended" && activity.endsAt ? { canSubmit: activity.canSubmit === true } : undefined}
+        audience={activity.classNames?.join(" / ") || text("Direct assignment","按学生名单布置")}
+        course={activity.courseId && activity.courseTitle ? {title:activity.courseTitle, href:activityCourseHref(activity)} : undefined}
         dueAt={activity.endsAt}
         archived={activity.phase === "Archived"}
         problemCount={activity.problems.length}
@@ -150,6 +158,11 @@ function SchoolStudentActivityCards({
   </State>;
 }
 
+function activityCourseHref(a: SchoolActivity) {
+  return a.courseScope === "platform" ? `/schools?section=courses&schoolId=${a.schoolId}&scope=public&publicCourseId=${a.courseId}`
+    : `/schools?section=courses&schoolId=${a.schoolId}&courseId=${a.courseId}`;
+}
+
 function SchoolActivityDetails({ activity: a, base, onBack, onEdit, onReport, onPreview, onProblem, reload }: {
   activity: SchoolActivity; base: string; onBack: () => void; onEdit: () => void; onReport: () => void; onPreview: () => void; onProblem: (id: string) => void; reload: () => void;
 }) {
@@ -162,7 +175,7 @@ function SchoolActivityDetails({ activity: a, base, onBack, onEdit, onReport, on
   const problemCount = a.problems.length;
   const progress = a.progress ?? a.grade;
   const complete = a.kind === "assignment" && problemCount > 0 && progress?.solved === problemCount;
-  const courseHref=a.courseScope==="platform"?`/practice/courses/${a.courseId}?workspaceSchoolId=${a.schoolId}`:`/schools?section=courses&schoolId=${a.schoolId}&courseId=${a.courseId}`;
+  const courseHref=activityCourseHref(a);
   return <div className="space-y-4">{a.courseId&&<AppLink href={courseHref} className="text-sm font-semibold text-primary">{text("Open linked course","打开关联课程")}</AppLink>}<div className="flex flex-wrap items-center justify-between gap-2"><Button size="sm" variant="ghost" onClick={onBack}><ArrowLeft size={15}/>{a.preview ? text("Back to assignment", "返回作业管理") : text(kindLabel(a.kind), a.kind === "timed" ? "限时训练" : "作业")}</Button><div className="flex flex-wrap gap-2">{a.canManage && <>{a.canPreview && <Button size="sm" variant="secondary" onClick={onPreview}>{text("Try as a student", "以学生视角试做")}</Button>}<Button size="sm" variant="secondary" onClick={onReport}>{text(a.kind === "assignment" ? "Report / student adjustments" : "Report", a.kind === "assignment" ? "报告 / 学生调整" : "报告")}</Button>{a.kind === "assignment" && a.state === "Published" && <CancelAssignment path={`${base}/${a.id}`} title={a.title} onSaved={reload}/>} {a.state === "Draft" && <><Button size="sm" variant="secondary" onClick={onEdit}>{text("Edit draft", "编辑草稿")}</Button><Button size="sm" onClick={() => setConfirmation("publish")}>{text("Publish", "发布")}</Button></>}{a.kind === "timed" && a.state === "Published" && !a.resultsPublishedAt && <><Button size="sm" variant="secondary" disabled={a.phase !== "Open"} onClick={() => setConfirmation("end")}>{text("End activity", "结束活动")}</Button><Button size="sm" disabled={a.phase !== "Ended"} onClick={() => setConfirmation("publish-results")}>{text("Publish results", "公布成绩")}</Button></>}{a.state !== "Archived" && <Button size="sm" variant="ghost" disabled={a.kind === "timed" && a.state === "Published" && !a.resultsPublishedAt} onClick={() => setConfirmation("archive")}>{text("Archive", "归档")}</Button>}</>}<Button size="sm" variant="ghost" onClick={reload} aria-label={text("Refresh activity", "刷新活动")}><RefreshCw size={15}/></Button></div></div><Feedback action={action}/>
     <section className={`${panel} p-5`}>
       <div className="flex flex-wrap items-start justify-between gap-4">

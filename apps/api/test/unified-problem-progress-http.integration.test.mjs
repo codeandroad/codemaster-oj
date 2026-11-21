@@ -106,6 +106,9 @@ test('ordinary problem versions and personal progress agree across school, platf
       }
       assert.deepEqual((await get(path, 'public-solver')).items.map(row => row.id), [publishedJob.id]);
       await get(`${path}?workspaceSchoolId=${randomUUID()}`, 'public-solver', 404);
+      const receipt=(await owner.query('SELECT school_id FROM submissions WHERE id=$1',[historical.id])).rows[0];
+      assert.equal(receipt.school_id,LEGACY_SCHOOL_ID);
+      await assert.rejects(owner.query('UPDATE submissions SET school_id=NULL WHERE id=$1',[historical.id]),{code:'23514'});
     });
     await legacyResult('unstarted', { kind: 'samples' });
     await legacyResult('school-solver', { status: 'WA' });

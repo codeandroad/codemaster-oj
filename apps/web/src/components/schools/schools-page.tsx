@@ -370,7 +370,7 @@ export function SchoolsPage({
                     refreshRevision={refreshRevision}
                   />
                 ) : active.section === "problems" ? (
-                  teaching ? problems : <LearnerResourceScope section="problems" schoolHref={href("problems")} accountId={user.id}>{problems}</LearnerResourceScope>
+                  teaching ? problems : <LearnerResourceScope workspaceSchoolId={selected.id} section="problems" schoolHref={href("problems")} accountId={user.id}>{problems}</LearnerResourceScope>
                 ) : active.section === "course-admissions" ? (
                   <SchoolCourseAdmissions schoolId={selected.id} href={href("course-admissions")}
                     coursesHref={schoolWorkspaceHref(selected.id, "courses", "teacher")}/>
@@ -392,7 +392,7 @@ export function SchoolsPage({
                     members={members}
                   />
                 ) : (
-                  teaching ? courses : <LearnerResourceScope section="courses" schoolHref={href("courses")}>{courses}</LearnerResourceScope>
+                  teaching ? courses : <LearnerResourceScope workspaceSchoolId={selected.id} section="courses" schoolHref={href("courses")}>{courses}</LearnerResourceScope>
                 )}
               </section>
             )}

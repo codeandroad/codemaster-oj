@@ -1,5 +1,5 @@
 import { problemProgress } from './problem-progress.mjs';
-import { LEGACY_SCHOOL_ID } from './schools.mjs';
+import { LEGACY_SCHOOL_ID, lockWorkspaceMembership } from './schools.mjs';
 import { schoolActivityJobVisibleSql } from './school-activities.mjs';
 import { assertLiveProblemVersion, resolveLiveProblemVersion } from './live-problem-version.mjs';
 import { enumValue, integer, uuid, fail } from './security.mjs';
@@ -38,12 +38,10 @@ export async function metadataPage(db, source, params, url, { schoolProgress = f
 }
 
 const legacySubmissionScope=`FROM submissions s
- JOIN legacy_school_identity_ownership own_scope ON own_scope.identity_id=s.identity_id
  LEFT JOIN timed_attempts ta ON ta.id=s.timed_attempt_id
  LEFT JOIN timed_practices tp ON tp.id=ta.practice_id
- WHERE s.problem_id=$1 AND s.kind='submit'
+ WHERE s.problem_id=$1 AND s.school_id=$6 AND s.kind='submit'
  AND (s.timed_attempt_id IS NULL OR tp.results_published_at IS NOT NULL)`;
-export const legacyVisibleSubmissions=legacySubmissionScope;
 
 const confirmedMeasurementsJoin = `LEFT JOIN LATERAL (
  SELECT r.private_results FROM judge_runs r JOIN judge_tasks t ON t.id=r.task_id
@@ -59,7 +57,6 @@ const ordinarySchoolReceipts = `SELECT 'SUB'||s.id::text id,lpad(s.id::text,20,'
  COALESCE(CASE WHEN profile.leaderboard_use_nickname THEN NULLIF(btrim(profile.nickname),'') END,
  NULLIF(btrim(person.name),''),'Student') display_name
  FROM submissions s
- JOIN legacy_school_identity_ownership owner ON owner.identity_id=s.identity_id AND owner.school_id=$8
  JOIN identities person ON person.id=s.identity_id
  LEFT JOIN accounts profile ON profile.identity_id=person.id AND profile.binding_released_at IS NULL
  JOIN problems source ON source.id=s.problem_id AND source.archived_at IS NULL
@@ -67,7 +64,7 @@ const ordinarySchoolReceipts = `SELECT 'SUB'||s.id::text id,lpad(s.id::text,20,'
  JOIN problem_versions receipt ON receipt.id=s.version_id AND receipt.published_at IS NOT NULL AND receipt.school_visible_at IS NOT NULL
  JOIN problem_versions live ON live.id=$3 AND live.problem_id=source.id AND live.school_visible_at IS NOT NULL AND live.published_at IS NOT NULL
  ${confirmedMeasurementsJoin}
- WHERE s.problem_id=$2 AND s.kind='submit' AND s.assignment_id IS NULL AND s.timed_attempt_id IS NULL
+ WHERE s.school_id=$8 AND s.problem_id=$2 AND s.kind='submit' AND s.assignment_id IS NULL AND s.timed_attempt_id IS NULL
  AND s.original_submission_id IS NULL`;
 
 export async function legacyProblemSolved(db,user,problemId,versionId) {
@@ -107,18 +104,18 @@ export async function legacyProblemSubmissions(db,user,problemId,url,helpers,pla
  // The editor reads private source separately from the paginated metadata.
  if(url.searchParams.get('view')==='resume'){
   const {rows}=await db.query(`SELECT s.code,COALESCE(s.language,'python') language
-   FROM submissions s JOIN legacy_school_identity_ownership own_scope ON own_scope.identity_id=s.identity_id
+   FROM submissions s
    LEFT JOIN timed_attempts ta ON ta.id=s.timed_attempt_id
    LEFT JOIN timed_practices tp ON tp.id=ta.practice_id
-   WHERE s.problem_id=$1 AND s.identity_id=$2 AND s.kind='submit'
+   WHERE s.problem_id=$1 AND s.identity_id=$2 AND s.school_id=$4 AND s.kind='submit'
     AND CASE WHEN $3::uuid IS NOT NULL THEN tp.id=$3
      ELSE s.timed_attempt_id IS NULL OR tp.results_published_at IS NOT NULL END
-   ORDER BY s.created_at DESC,s.id DESC LIMIT 1`,[p.id,user.identityId,practiceId]);
+   ORDER BY s.created_at DESC,s.id DESC LIMIT 1`,[p.id,user.identityId,practiceId,user.teachingSchoolId]);
   return {submission:rows[0]??null};
  }
  const bank=(await db.query('SELECT visibility,archived_at FROM problem_banks WHERE id=$1',[p.bank_id])).rows[0];
  const schoolVisible=!!v.published_at&&!!v.school_visible_at&&bank?.visibility==='school'&&!bank.archived_at&&!p.archived_at;
- const values=[problemId,user.identityId,permissions.canEdit,user.id,schoolVisible];
+ const values=[problemId,user.identityId,permissions.canEdit,user.id,schoolVisible,user.teachingSchoolId];
  let platformHistory='';
  if(platformSchoolId) {
   values.push(platformSchoolId);
@@ -126,7 +123,7 @@ export async function legacyProblemSubmissions(db,user,problemId,url,helpers,pla
    ${jobVerdict},j.account_id=$4,CASE WHEN j.state='completed' THEN j.result->'privateResults' END,
    COALESCE(NULLIF(btrim(a.nickname),''),a.username)
    FROM school_judge_jobs j JOIN accounts a ON a.id=j.account_id
-   WHERE j.school_id=$6 AND j.problem_id=$1 AND j.access_context='public' AND j.kind='submit' AND j.activity_id IS NULL`;
+   WHERE j.school_id=$7 AND j.problem_id=$1 AND j.access_context='public' AND j.kind='submit' AND j.activity_id IS NULL`;
  }
  const page=await metadataPage(db,`SELECT 'SUB'||s.id::text id,lpad(s.id::text,20,'0') received_id,s.identity_id actor_key,s.created_at,COALESCE(s.language,'python') language,s.status,s.identity_id=$2 is_own,r.private_results,
   COALESCE(CASE WHEN profile.leaderboard_use_nickname THEN NULLIF(btrim(profile.nickname),'') END,NULLIF(btrim(person.name),''),'Student') display_name
@@ -171,8 +168,7 @@ export async function schoolProblemSubmissions(db,p,user,url,accessContext,{work
  let schoolJobs=includePlatform?"OR (j.access_context='public' AND j.activity_id IS NULL)":'';
  if(workspaceSchoolId) {
   const schoolId=uuid(workspaceSchoolId,'School ID');
-  const membership=await db.query('SELECT 1 FROM school_workspace_roles WHERE school_id=$1 AND account_id=$2 AND role=$3',[schoolId,user.id,'student']);
-  if(!membership.rowCount)fail(404,'NOT_FOUND','School practice history is unavailable.');
+  if(!await lockWorkspaceMembership(db,schoolId,user.id,{studentOnly:true}))fail(404,'NOT_FOUND','School practice history is unavailable.');
   values.push(schoolId);
   schoolHistory=`UNION ALL ${ordinarySchoolReceipts}`;
   schoolJobs=`OR (j.school_id=$8 AND j.access_context='school' AND j.activity_id IS NULL)`;

@@ -46,13 +46,13 @@ export function StudentPages({ pathname, user }: { pathname: string; user: Campu
   if (pathname === "/") return <StudentDashboard user={user}/>;
   if (pathname === "/student/acsl") return <LegacyAcslPage user={user}/>;
   if (pathname === "/student/profile" || pathname === "/teacher/profile") return <AlignedProfile user={user} teacher={pathname.startsWith("/teacher")}/>;
-  if (parts[1] === "problems") return parts[2] ? <StudentWorkspace id={parts[2]} user={user}/> : <LearnerResourceScope section="problems" schoolHref="/student/problems" accountId={user.id}><StudentProblems accountId={user.id}/></LearnerResourceScope>;
+  if (parts[1] === "problems") return parts[2] ? <StudentWorkspace id={parts[2]} user={user}/> : <LearnerResourceScope workspaceSchoolId={user.teachingSchoolId} section="problems" schoolHref="/student/problems" accountId={user.id}><StudentProblems accountId={user.id}/></LearnerResourceScope>;
   if (parts[1] === "paper4") return parts[2] ? <StudentPaper4Detail paperId={parts[2]} user={user}/> : <StudentPaper4List/>;
   if (parts[1] === "classes") return parts[2] ? <StudentClass id={parts[2]}/> : <StudentClasses/>;
   if (parts[1] === "assignments") return parts[2] ? <StudentAssignment id={parts[2]} user={user}/> : <StudentAssignments user={user}/>;
   if (parts[1] === "submissions") return parts[2] ? <StudentSubmission id={parts[2]} user={user}/> : <LearnerResourceScope section="submissions" schoolHref="/student/submissions"><StudentSubmissions user={user}/></LearnerResourceScope>;
   if (parts[1] === "review-notebook") return parts[2] ? <StudentReview id={parts[2]} user={user}/> : <LearnerResourceScope section="review-notebook" schoolHref="/student/review-notebook"><StudentNotebook user={user}/></LearnerResourceScope>;
-  if (parts[1] === "learning-paths") return parts[2] ? <StudentLearningDetail id={parts[2]} chapterId={parts[4]}/> : <LearnerResourceScope section="courses" schoolHref="/student/learning-paths"><StudentLearningList/></LearnerResourceScope>;
+  if (parts[1] === "learning-paths") return parts[2] ? <StudentLearningDetail id={parts[2]} chapterId={parts[4]}/> : <LearnerResourceScope workspaceSchoolId={user.teachingSchoolId} section="courses" schoolHref="/student/learning-paths"><StudentLearningList/></LearnerResourceScope>;
   if (parts[1] === "timed-practice") return parts[2] ? <StudentTimedDetail id={parts[2]} user={user}/> : <StudentTimedList/>;
   return <Empty title={ui(locale, "页面不存在", "Page not found")} description={ui(locale, "请使用左侧导航返回学习页面。", "Use the navigation to return to a learning page.")}/>;
 }

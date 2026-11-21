@@ -91,7 +91,7 @@ export function PublicCourseCatalog({ courseHref, showSearch = true }: { courseH
   </div>;
 }
 
-export function PublicCoursePage({ id, homeHref }: { id: string; homeHref: string }) {
+export function PublicCoursePage({ id, homeHref, workspaceSchoolId }: { id: string; homeHref: string; workspaceSchoolId?: string | null }) {
   const router = useRouter();
   const schoolId = useSearchParams().get("schoolId");
   const entry = useData<PublicCourseEntry>(`practice/courses/${encodeURIComponent(id)}/entry`);
@@ -101,13 +101,13 @@ export function PublicCoursePage({ id, homeHref }: { id: string; homeHref: strin
   const catalogHref = courseSearchHref(homeHref, query);
   return <>
     <Loading resource={entry}>
-      {course?.admission === "direct" ? <CourseReader key={`${id}:${schoolId ?? "legacy"}`} id={id} courseQuery={query}/>
+      {course?.admission === "direct" ? <CourseReader key={`${id}:${schoolId ?? "legacy"}`} id={id} courseQuery={query} workspaceSchoolId={workspaceSchoolId}/>
         : course && <CourseAdmissionDialog entry={course} onUpdated={setUpdated} onClose={() => router.replace(catalogHref)}/>}
     </Loading>
   </>;
 }
 
-function CourseReader({ id, courseQuery }: { id: string; courseQuery: string }) {
+function CourseReader({ id, courseQuery, workspaceSchoolId }: { id: string; courseQuery: string; workspaceSchoolId?: string | null }) {
   const text = useSchoolText();
   const localError = useSchoolError();
   const location = useSearchParams(), pathname = usePathname();
@@ -130,7 +130,7 @@ function CourseReader({ id, courseQuery }: { id: string; courseQuery: string }) 
       localizations: chapter.localizations, completed: chapter.read,
       problems: chapter.problems.map(problem => ({ id: problem.problemId, title: problem.title, completed: problem.solved,
         href: `/practice/problems?${new URLSearchParams({ problemId: problem.problemId, versionId: problem.versionId,
-          publicCourseId: id, publicChapterId: chapter.id, ...(courseQuery && { courseQ: courseQuery }) })}`,
+          publicCourseId: id, publicChapterId: chapter.id, ...(workspaceSchoolId && { workspaceSchoolId }), ...(courseQuery && { courseQ: courseQuery }) })}`,
       })),
     }))}
     selectedChapterId={location.get("chapterId")} chapterHref={chapterHref} scrollKey={`public:${id}`}

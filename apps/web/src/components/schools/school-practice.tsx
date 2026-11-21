@@ -463,10 +463,12 @@ type PublicProblemCatalog = ProblemCatalogResult<Problem> & {
   filters: { topic: string; status: string; mode: string; savedOnly: boolean };
 };
 
-export function PublicPractice(props: { accountId: string; problemId?: string }) {
+type PublicPracticeProps = { accountId: string; problemId?: string; workspaceSchoolId?: string | null };
+
+export function PublicPractice(props: PublicPracticeProps) {
   return <PublicPracticeContents key={props.problemId ?? "list"} {...props} />;
 }
-function PublicPracticeContents({ accountId, problemId }: { accountId: string; problemId?: string }) {
+function PublicPracticeContents({ accountId, problemId, workspaceSchoolId }: PublicPracticeProps) {
   const { locale } = useLocale();
   const tx = (zh: string, en: string) => locale === "zh" ? zh : en;
   const params = useSearchParams();
@@ -553,7 +555,7 @@ function PublicPracticeContents({ accountId, problemId }: { accountId: string; p
     changeUrlFilters({ [publicFilterKeys[key]]: value, publicProblemQuery: query, publicProblemPage: null });
   }
   const changePage = (next: number) => changeUrlFilters({ publicProblemPage: next === 1 ? null : String(next) }, true);
-  if (selected) return <PublicProblemWorkspace key={`${selected}:${search.get("versionId") ?? ""}`} id={selected} catalog={{ ...list, data: pending ? null : { items: rows }, loading: pending }} />;
+  if (selected) return <PublicProblemWorkspace key={`${selected}:${search.get("versionId") ?? ""}`} id={selected} workspaceSchoolId={workspaceSchoolId} catalog={{ ...list, data: pending ? null : { items: rows }, loading: pending }} />;
 
   return <div className={problemStyles.page}>
     <div className={`${problemStyles.toolbar} flex-wrap`}>

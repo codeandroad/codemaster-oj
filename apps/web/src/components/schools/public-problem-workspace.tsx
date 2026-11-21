@@ -21,17 +21,15 @@ type PublicCourse = {title:string;requiredLanguage?:SubmissionLanguage|null;chap
 const normalizeJob = (result: DetailedSubmission) => ({...result, testResults: (result as DetailedSubmission & {caseFeedback?:ResultCase[]}).caseFeedback ?? []});
 const unavailableStorage = {getItem: () => null, setItem: () => { throw new Error("Storage unavailable"); }};
 
-export function PublicProblemWorkspace({ id, catalog }: { id:string; catalog:{data:{items:Problem[]}|null;loading:boolean;error:string;reload:()=>void} }) {
+export function PublicProblemWorkspace({ id, catalog, workspaceSchoolId }: { id:string; workspaceSchoolId?:string|null; catalog:{data:{items:Problem[]}|null;loading:boolean;error:string;reload:()=>void} }) {
   const params = useSearchParams();
   const user = useData<{user:CampusUser}>("auth/me");
   const problem = useData<Problem>(`practice/problems/${encodeURIComponent(id)}?${new URLSearchParams({view:"practice", ...(params.get("publicCourseId") ? {courseId:params.get("publicCourseId")!,chapterId:params.get("publicChapterId")!} : {})})}`);
-  return <State data={user}><State data={problem}>{user.data?.user && problem.data?.definition && <PublicWorkspace key={`${user.data.user.id}:${problem.data.id}:${problem.data.versionId}:${params.get("publicCourseId")??""}:${params.get("publicChapterId")??""}`} user={user.data.user} problem={problem.data} catalog={catalog} reloadProblem={problem.reload}/>}</State></State>;
+  return <State data={user}><State data={problem}>{user.data?.user && problem.data?.definition && <PublicWorkspace key={`${user.data.user.id}:${problem.data.id}:${problem.data.versionId}:${params.get("publicCourseId")??""}:${params.get("publicChapterId")??""}`} workspaceSchoolId={workspaceSchoolId} user={user.data.user} problem={problem.data} catalog={catalog} reloadProblem={problem.reload}/>}</State></State>;
 }
-function PublicWorkspace({user, problem, catalog, reloadProblem}:{user:CampusUser;problem:Problem;catalog:{data:{items:Problem[]}|null;loading:boolean;error:string;reload:()=>void};reloadProblem:()=>void}) {
+function PublicWorkspace({user, problem, catalog, reloadProblem, workspaceSchoolId}:{workspaceSchoolId?:string|null; user:CampusUser;problem:Problem;catalog:{data:{items:Problem[]}|null;loading:boolean;error:string;reload:()=>void};reloadProblem:()=>void}) {
   const params = useSearchParams(), search = params.toString(), router = useRouter(), {locale} = useLocale();
   const pathname = usePathname();
-  const workspaceSchoolId = pathname === "/student/problems" ? user.teachingSchoolId
-    : pathname === "/schools" ? params.get("schoolId") : null;
   const fromCatalog = params.get("fromProblemCatalog") === "1";
   const workspacePath = fromCatalog ? pathname : "/practice/problems";
   const courseId = params.get("publicCourseId"), chapterId = params.get("publicChapterId");

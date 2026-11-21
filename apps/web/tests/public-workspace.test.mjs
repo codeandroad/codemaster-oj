@@ -17,6 +17,12 @@ test('chapter navigation follows the current problem and returns to the same cha
   assert.equal(next.pathname,'/practice/problems');assert.equal(next.searchParams.has('versionId'),false);
   assert.equal(next.searchParams.get('publicChapterId'),'ch1');assert.equal(next.searchParams.get('publicCourseId'),'c1');
   assert.equal(publicPracticeReturnHref(search),'/practice/courses/c1?chapterId=ch1&courseQ=Python');
+  const scoped=search+'&workspaceSchoolId=school-a';
+  const nextScoped=new URL(publicPracticeHref({problemId:'p2'},scoped),'https://example.test');
+  assert.equal(nextScoped.searchParams.get('workspaceSchoolId'),'school-a');
+  const back=new URL(publicPracticeReturnHref(scoped),'https://example.test');
+  assert.equal(back.searchParams.get('workspaceSchoolId'),'school-a');
+  assert.equal(back.searchParams.get('chapterId'),'ch1');
 });
 test('catalog return keeps search/page and removes problem state', () => {
   assert.equal(publicPracticeReturnHref('problemId=p1&versionId=v1&publicProblemQuery=sum&publicProblemPage=2'),'/practice/problems?publicProblemQuery=sum&publicProblemPage=2');

@@ -1,3 +1,4 @@
+import { lockWorkspaceMembership } from './schools.mjs';
 import { transaction } from './db.mjs';
 import { fail, uuid } from './security.mjs';
 
@@ -29,13 +30,8 @@ export async function handleDefaultWorkspace({ pool, user, route, method, body }
    WHERE a.id=$1 AND a.disabled_at IS NULL AND a.binding_released_at IS NULL AND i.archived_at IS NULL
    FOR UPDATE OF a FOR SHARE OF i`,[user.id]);
   if(!rowCount)fail(401,'UNAUTHENTICATED','请重新登录');
-  if(schoolId){
-   const member=await db.query(`SELECT m.account_id FROM school_memberships m
-    WHERE m.account_id=$1 AND m.school_id=$2 AND m.revoked_at IS NULL FOR SHARE OF m`,[user.id,schoolId]);
-   if(!member.rowCount && !(await db.query(`SELECT r.account_id FROM account_roles r
-    JOIN legacy_school_account_ownership o USING(account_id)
-    WHERE r.account_id=$1 AND o.school_id=$2 FOR SHARE OF r`,[user.id,schoolId])).rowCount)
-    fail(404,'NOT_FOUND','学校不存在或尚未加入');
+  if(schoolId && !await lockWorkspaceMembership(db,schoolId,user.id)) {
+   fail(404,'NOT_FOUND','学校不存在或尚未加入');
   }
   await db.query('UPDATE accounts SET default_school_id=$2 WHERE id=$1 AND default_school_id IS DISTINCT FROM $2::uuid',[user.id,schoolId]);
   return {status:200,body:{defaultSchoolId:schoolId}};

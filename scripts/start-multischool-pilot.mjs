@@ -37,6 +37,7 @@ function fingerprintSql(plan) {
     ? `(CASE WHEN t.id='${legacyId}' AND t.slug='legacy-school' THEN jsonb_set(${schoolFields},'{slug}',to_jsonb('tianxing-chuangshiji'::text)) ELSE ${schoolFields} END)`
     : schoolFields;
   const expression = `CASE
+    ${plan.addSubmissionSchool ? "WHEN tablename='submissions' THEN 'to_jsonb(t) - ''school_id'''" : ''}
     ${plan.addPublicPresence ? "WHEN tablename='sessions' THEN 'to_jsonb(t) - ''public_presence_seen_at'''" : ''}
     ${plan.addCourseAdmissions ? "WHEN tablename='public_course_listings' THEN 'to_jsonb(t) - ''access_mode'' - ''access_generation'' - ''school_revision'' - ''legacy_revision'''" : ''}
     ${plan.addSchoolExitArchive ? "WHEN tablename='school_identities' THEN 'to_jsonb(t) - ''archived_at'''" : ''}
@@ -278,6 +279,7 @@ async function main() {
       : [];
     const plan = { addActivityContext, renameLegacySchool, addedOwnershipColumns, addSchoolSettings, addDefaultSchool, addClassLifecycle, addScholarshipVisibility, addCourseParity, addCourseAdmissions, addSchoolExitArchive, addCompletionRewardMode, addPublicPresence, addPublicScholarship, publicHistoricalClaims };
     plan.updateDirectorySlug = targetQuery("SELECT NOT EXISTS(SELECT 1 FROM schema_migrations WHERE name='127_school_directory_slug.sql');") === 't';
+    plan.addSubmissionSchool = targetQuery("SELECT NOT EXISTS(SELECT 1 FROM schema_migrations WHERE name='128_submission_school.sql');") === 't';
     const upgradeBackup = resolve(privateDir, `before-upgrade-${Date.now()}.dump`);
     const dump = await open(upgradeBackup, 'wx', 0o600);
     try { await run('docker', ['exec', targetContainer, 'pg_dump', '-Fc', '-U', 'campus_migrator', '-d', 'campus_demo'], { stdout: dump.fd }); }
@@ -293,6 +295,9 @@ async function main() {
   for (const [table, fingerprint] of Object.entries(before)) {
     assert.deepEqual(after[table], fingerprint, `Migration changed pre-existing business data in ${table}; pilot services remain stopped.`);
   }
+  if (plan.addSubmissionSchool) assert.equal(targetQuery(`SELECT count(*) FROM submissions s
+    LEFT JOIN legacy_school_identity_ownership d ON d.identity_id=s.identity_id
+    WHERE s.school_id IS DISTINCT FROM d.school_id;`), '0', 'Every submission must retain its original school audience.');
   if (plan.addActivityContext) assert.equal(targetQuery('SELECT count(*) FROM school_judge_jobs WHERE activity_id IS NOT NULL OR activity_attempt_id IS NOT NULL OR activity_deadline_at IS NOT NULL;'), '0', 'Existing submissions must retain their original context.');
   if (plan.addPublicPresence) assert.equal(targetQuery('SELECT count(*) FROM sessions WHERE public_presence_seen_at IS NOT NULL;'), '0', 'Existing school sessions must not be backfilled into public presence.');
   if (plan.publicHistoricalClaims?.length) {

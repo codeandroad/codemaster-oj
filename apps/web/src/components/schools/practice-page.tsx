@@ -64,10 +64,10 @@ export function PracticePage({ user, pathname, onLogout, onUserSaved }: {
       content = <StudentPublicProfile key={courseId} profileId={courseId} viewer={user} workspace="practice"/>;
       break;
     case "problems":
-      content = <PublicPractice accountId={user.id}/>;
+      content = <PublicPractice accountId={user.id} workspaceSchoolId={search.get("workspaceSchoolId")}/>;
       break;
     case "courses":
-      content = courseId ? <PublicCoursePage key={courseId} id={courseId} homeHref="/practice/courses"/> : <PublicCourseCatalog courseHref={publicCourseHref}/>;
+      content = courseId ? <PublicCoursePage key={courseId} id={courseId} workspaceSchoolId={search.get("workspaceSchoolId")} homeHref="/practice/courses"/> : <PublicCourseCatalog courseHref={publicCourseHref}/>;
       break;
     case "submissions":
       content = <PublicSubmissions/>;

@@ -19,12 +19,12 @@ function ScopeLoading() {
 type ResourceSection = "problems" | "courses" | "submissions" | "review-notebook";
 const scopeKeys = ["scope"];
 
-type LearnerResourceScopeProps = { schoolHref: string; children: ReactNode } & (
+type LearnerResourceScopeProps = { schoolHref: string; workspaceSchoolId?: string | null; children: ReactNode } & (
   { section: "problems"; accountId: string } |
   { section: Exclude<ResourceSection, "problems">; accountId?: never }
 );
 
-export function LearnerResourceScope({ section, schoolHref, children, accountId }: LearnerResourceScopeProps) {
+export function LearnerResourceScope({ section, schoolHref, workspaceSchoolId, children, accountId }: LearnerResourceScopeProps) {
   const text = useSchoolText();
   const { search, ready } = useCatalogFilterUrl(
     `campus-judge:problem-scope:v1:${accountId}:${schoolHref}`, scopeKeys, section === "problems",
@@ -46,10 +46,10 @@ export function LearnerResourceScope({ section, schoolHref, children, accountId 
       </AppLink>)}
     </nav>
     {!ready ? <p role="status" className="text-sm text-muted-foreground">{text("Loading problems…", "正在加载题目…")}</p> : showPublic ? (
-      section === "problems" ? <PublicPractice accountId={accountId}/>
+      section === "problems" ? <PublicPractice accountId={accountId} workspaceSchoolId={workspaceSchoolId}/>
         : section === "submissions" ? <PublicSubmissions/>
           : section === "review-notebook" ? <PublicReviewNotebook/>
-            : courseId ? <PublicCoursePage key={courseId} id={courseId} homeHref={publicHref}/>
+            : courseId ? <PublicCoursePage key={courseId} id={courseId} workspaceSchoolId={workspaceSchoolId} homeHref={publicHref}/>
               : <PublicCourseCatalog courseHref={id => `${publicHref}&publicCourseId=${encodeURIComponent(id)}`}/>
     ) : children}
   </div>;

@@ -317,8 +317,8 @@ function ProductionView({pathname,role,user,profileVersion,onProfileSaved}:{path
   if(pathname==="/student/profile")return <><ProfileEditor user={user} onSaved={onProfileSaved}/><StudentPublicProfile key={profileVersion} profileId={user.identityId} viewer={user} embedded/></>;
   if(pathname.endsWith("/profile"))return <ProfileEditor user={user} onSaved={onProfileSaved}/>;
   if(pathname==="/student/settings"||pathname==="/teacher/settings"||pathname==="/admin/personal-settings")return <><AlignedProfile user={user} teacher={role==="teacher"} admin={role==="admin"}/><PersonalAppearanceSettings/><JoinedSchoolSettings user={user}/></>;
-  if (role === "student" && pathname === "/student/problems") return <LearnerResourceScope section="problems" schoolHref="/student/problems" accountId={user.id}><StudentProblems accountId={user.id}/></LearnerResourceScope>;
-  if (role === "student" && pathname === "/student/learning-paths") return <LearnerResourceScope section="courses" schoolHref="/student/learning-paths"><StudentLearningList/></LearnerResourceScope>;
+  if (role === "student" && pathname === "/student/problems") return <LearnerResourceScope workspaceSchoolId={user.teachingSchoolId} section="problems" schoolHref="/student/problems" accountId={user.id}><StudentProblems accountId={user.id}/></LearnerResourceScope>;
+  if (role === "student" && pathname === "/student/learning-paths") return <LearnerResourceScope workspaceSchoolId={user.teachingSchoolId} section="courses" schoolHref="/student/learning-paths"><StudentLearningList/></LearnerResourceScope>;
   if (role==="student") return <StudentPages pathname={pathname} user={user}/>;
   if (pathname==="/teacher/profile") return <AlignedProfile user={user} teacher/>;
   if (role==="teacher") return <TeacherPages pathname={pathname} user={user}/>;

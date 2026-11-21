@@ -31,7 +31,7 @@ export async function getLegacySchoolOwnershipSummary(db) {
       (SELECT count(*)::int FROM timed_practices WHERE school_id=$1) AS "timedPractices",
       (SELECT count(*)::int FROM paper4_papers WHERE school_id=$1) AS papers,
       (SELECT count(*)::int FROM learning_resources WHERE school_id=$1) AS resources,
-      (SELECT count(*)::int FROM submissions s JOIN legacy_school_identity_ownership o ON o.identity_id=s.identity_id WHERE o.school_id=$1) AS submissions,
+      (SELECT count(*)::int FROM submissions WHERE school_id=$1) AS submissions,
       (SELECT count(*)::int FROM luq_ledger l JOIN legacy_school_identity_ownership o ON o.identity_id=l.identity_id WHERE o.school_id=$1) AS "luqEntries"
   `, [LEGACY_SCHOOL_ID]);
   return { schoolId: LEGACY_SCHOOL_ID, ...summary };

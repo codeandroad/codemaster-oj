@@ -44,6 +44,20 @@ export async function schoolRole(db, schoolId, userId) {
   return rows[0].role;
 }
 
+// Hold the grant that authorized the read until the enclosing transaction ends.
+export async function lockWorkspaceMembership(db, schoolId, accountId, { studentOnly = false } = {}) {
+  const params = [schoolId, accountId, studentOnly];
+  const member = await db.query(`SELECT m.account_id FROM school_memberships m
+    WHERE m.school_id=$1 AND m.account_id=$2 AND m.revoked_at IS NULL
+      AND (NOT $3::boolean OR m.role='student') FOR SHARE OF m`, params);
+  if (member.rowCount) return true;
+  const credential = await db.query(`
+    SELECT r.account_id FROM account_roles r JOIN legacy_school_account_ownership o USING (account_id)
+    WHERE o.school_id=$1 AND r.account_id=$2 AND (NOT $3::boolean OR r.role='student')
+    FOR SHARE OF r`, params);
+  return credential.rowCount > 0;
+}
+
 export async function requireSchoolAdmin(db, schoolId, userId) {
   if (await schoolRole(db, schoolId, userId) !== 'school_admin') {
     fail(403, 'FORBIDDEN', '需要本校管理员权限');

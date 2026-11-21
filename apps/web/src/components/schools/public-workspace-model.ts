@@ -24,7 +24,7 @@ export function publicPracticeHref(problem: {problemId: string; versionId?: stri
 export function publicPracticeReturnHref(search: string, pathname = "/practice/problems") {
   const params = new URLSearchParams(search);
   const course = params.get("publicCourseId"), chapter = params.get("publicChapterId");
-  if (course && chapter && params.get("fromProblemCatalog") !== "1") return `/practice/courses/${encodeURIComponent(course)}?${new URLSearchParams({chapterId: chapter, ...(params.get("courseQ") ? {courseQ: params.get("courseQ")!} : {})})}`;
+  if (course && chapter && params.get("fromProblemCatalog") !== "1") return `/practice/courses/${encodeURIComponent(course)}?${new URLSearchParams({chapterId: chapter, ...(params.get("workspaceSchoolId") ? {workspaceSchoolId: params.get("workspaceSchoolId")!} : {}), ...(params.get("courseQ") ? {courseQ: params.get("courseQ")!} : {})})}`;
   for (const key of ["problemId", "versionId", "publicCourseId", "publicChapterId", "courseQ", "fromProblemCatalog"]) params.delete(key);
   return `${pathname}${params.size ? `?${params}` : ""}`;
 }

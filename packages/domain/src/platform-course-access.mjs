@@ -11,7 +11,7 @@ const legacyAudienceSql=(alias,account)=>`(${alias}.platform_access_scope='all'
 // Candidate audience only. Every content reader must also evaluate admission.
 export function platformCourseAudienceSql(alias,account) {
  return `(EXISTS(SELECT 1 FROM platform_course_rules r WHERE r.course_id=${alias}.id AND r.active
-  AND ((${alias}.platform_audience_scope='all' AND r.target_kind='all') OR (${alias}.platform_audience_scope='custom' AND r.target_kind<>'all'))
+  AND ((${alias}.platform_audience_scope='all' AND r.target_kind IN ('all','school')) OR (${alias}.platform_audience_scope='custom' AND r.target_kind<>'all'))
   AND (r.target_kind='all' OR r.target_kind='account' AND EXISTS(SELECT 1 FROM accounts a WHERE a.id=${account} AND a.identity_id=r.identity_id)
    OR r.target_kind='independent' AND NOT EXISTS(SELECT 1 FROM school_memberships m WHERE m.account_id=${account} AND m.revoked_at IS NULL)
    OR r.target_kind='school' AND EXISTS(SELECT 1 FROM school_memberships m
@@ -87,17 +87,26 @@ export async function platformCourseAudience(db,body,old={}) {
   }
  }
  if(!value||typeof value!=='object'||Array.isArray(value))fail(400,'INVALID_AUDIENCE_POLICY','公开范围规则无效');
- const scope=enumValue(value.scope,['all','custom'],'公开范围'),rules=[];
+ const scope=enumValue(value.scope,['all','custom'],'公开范围');
+ let rules=[];
  if(scope==='all')rules.push(normalizeRule(value.allRule??direct(),{kind:'all'},oldRules));
- else{
-  if(value.independentRule)rules.push(normalizeRule(value.independentRule,{kind:'independent'},oldRules));
-  for(const [name,kind,idField,max] of [['schoolRules','school','schoolId',500],['accountRules','account','identityId',5000]]){
-   const selected=value[name]??[];
-   if(!Array.isArray(selected)||selected.length>max)fail(400,'INVALID_AUDIENCE_POLICY','目标人群数量无效');
-   for(const rule of selected)rules.push(normalizeRule(rule,{kind,id:uuid(rule?.[idField],idField).toLowerCase()},oldRules));
-  }
-  if(!rules.length)fail(400,'COURSE_AUDIENCE_REQUIRED','请选择至少一种目标人群');
+ if(scope==='custom' && value.independentRule)rules.push(normalizeRule(value.independentRule,{kind:'independent'},oldRules));
+ for(const [name,kind,idField,max] of [['schoolRules','school','schoolId',500],['accountRules','account','identityId',5000]]){
+  if(scope==='all' && kind==='account')continue;
+  const selected=value[name]??[];
+  if(!Array.isArray(selected)||selected.length>max)fail(400,'INVALID_AUDIENCE_POLICY','目标人群数量无效');
+  for(const rule of selected)rules.push(normalizeRule(rule,{kind,id:uuid(rule?.[idField],idField).toLowerCase()},oldRules));
  }
+ if(scope==='all' && rules.some(rule=>rule.kind==='school')){
+  const catalog=body.catalogSchoolIds===undefined
+   ? (await db.query('SELECT school_id FROM school_platform_course_adoptions WHERE course_id=$1',[courseId])).rows.map(row=>row.school_id)
+   : ids(body.catalogSchoolIds,500,'校内展示学校');
+  if(body.audiencePolicy && rules.some(rule=>rule.kind==='school' && !catalog.includes(rule.targetId)))
+   fail(400,'INVALID_AUDIENCE_POLICY','请先选择校内展示学校，再设置该校的额外准入规则');
+  // A catalog-only edit also revokes admission rules for removed schools.
+  rules=rules.filter(rule=>rule.kind!=='school'||catalog.includes(rule.targetId));
+ }
+ if(!rules.length)fail(400,'COURSE_AUDIENCE_REQUIRED','请选择至少一种目标人群');
  if(new Set(rules.map(r=>r.key)).size!==rules.length)fail(400,'INVALID_AUDIENCE_POLICY','目标人群不能重复');
  const schoolIds=rules.filter(r=>r.kind==='school').map(r=>r.targetId).sort(),studentIds=rules.filter(r=>r.kind==='account').map(r=>r.targetId).sort();
  if(schoolIds.length&&(await db.query('SELECT id FROM schools WHERE id=ANY($1::uuid[])',[schoolIds])).rowCount!==schoolIds.length)fail(400,'VALIDATION','所选学校不存在');

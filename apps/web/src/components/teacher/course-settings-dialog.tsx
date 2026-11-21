@@ -85,7 +85,7 @@ export function CourseSettingsDialog({ course, onClose, onSaved, platformCourse,
       COVER_LIMIT: tx("压缩后的封面不能超过 512 KB，请选择较简单的图片。", "The compressed cover must be at most 512 KB. Choose a simpler image."),
     };
     try {
-      const audiencePolicy=platformCourse?.canManage&&policy?courseAudiencePolicyForSave(policy):undefined;
+      const audiencePolicy=platformCourse?.canManage&&policy?courseAudiencePolicyForSave(policy, catalogSchools.map(school => school.id)):undefined;
       if(audiencePolicy&&!activeAdmissionRules(audiencePolicy).length){setTab("access");throw new Error(tx("请至少选择一项课程开放范围。", "Choose at least one course audience."));}
       if(audiencePolicy&&activeAdmissionRules(audiencePolicy).some(rule=>!Number.isSafeInteger(rule.minimumPoints)||rule.minimumPoints<0)){setTab("access");throw new Error(tx("最低积分须为不小于 0 的整数。", "Minimum points must be a non-negative integer."));}
       setBusy(true);

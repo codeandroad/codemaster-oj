@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { productionApi } from "@/lib/production-api";
 import { PlatformCourseAdmissionGate } from "./platform-course-admission-gate";
+import type { SchoolGate } from "./school-courses-model";
 import type { LearnerAdmissionRule } from "./platform-course-admission-model";
 import { useSchoolText } from "./school-ui";
 
@@ -32,7 +33,14 @@ export type PublicCourseEntry = {
   accessScope?: "school" | "classes";
   admission: "direct" | "apply" | "pending" | "rejected" | "invite" | "requirements" | "denied";
   admissionRules?: LearnerAdmissionRule[];
+  requirements?: SchoolGate;
 };
+
+export function schoolGateMessage(gate: SchoolGate, text: ReturnType<typeof useSchoolText>) {
+  const missing=gate.prerequisites.filter(course=>!course.completed).map(course=>course.title ?? text("Unavailable prerequisite", "前置课程暂不可用"));
+  if(gate.points < gate.minimumPoints)missing.push(text(`Platform points ${gate.points}/${gate.minimumPoints}`, `平台积分 ${gate.points}/${gate.minimumPoints}`));
+  return [text("Requirements not yet met", "尚未达到学习门槛"),...missing].join(" · ");
+}
 
 export function courseAdmissionLabel(admission: PublicCourseEntry["admission"], text: ReturnType<typeof useSchoolText>, chapterCount?: number) {
   const labels: Record<PublicCourseEntry["admission"], [string, string]> = {
@@ -92,13 +100,11 @@ function SchoolCourseAdmissionDialog({ entry, onUpdated, onClose, returnFocus }:
   const action = useMutation();
   const submitting = useRef(false);
   const source = courseSourceName(entry);
-  const description = entry.admission === "pending"
+  const description = entry.admission === "requirements" && entry.requirements ? schoolGateMessage(entry.requirements,text) : entry.admission === "pending"
     ? text("The school is reviewing your application.", "学校正在审核你的申请。")
     : entry.admission === "rejected"
       ? text("The school declined your application for this course.", "学校未批准你加入这门课程。")
-      : entry.accessScope === "classes"
-        ? text("Students in the eligible classes can enter directly. You can apply to study this course.", "指定班级的学生可以直接进入。你可以申请加入这门课程。")
-        : text("Students with school access can enter directly. You can apply to study this course.", "具备校内权限的学生可以直接进入。你可以申请加入这门课程。");
+      : text("You can apply to the school to study this course.", "你可以向学校申请学习这门课程。");
 
   async function apply() {
     if (submitting.current) return;

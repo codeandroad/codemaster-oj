@@ -34,7 +34,15 @@ export type CourseProperties = {
   authorName: string;
   authoredAt: string | null;
 };
+export type SchoolGate = { met: boolean; minimumPoints: number; points: number; prerequisites: {id?: string; title?: string; completed: boolean}[] };
+export type SchoolAccessSettings = {
+  accessScope: "school" | "classes";
+  classIds: string[];
+  minimumPoints?: number;
+  prerequisiteCourseIds?: string[];
+};
 export type SchoolCourse = CourseProperties & {
+  requirements?: SchoolGate;
   sections?: CourseSection[];
   id: string;
   title: string;
@@ -52,14 +60,14 @@ export type SchoolCourse = CourseProperties & {
   completedExercises: number;
   totalExercises: number;
 };
-export type CourseDetail = SchoolCourse & {
+export type CourseDetail = SchoolCourse & SchoolAccessSettings & {
   chapters: CourseChapter[];
   accessScope: "school" | "classes";
   classIds: string[];
   canTrackProgress: boolean;
   isPreview?: boolean;
 };
-export type CourseInput = CourseProperties &
+export type CourseInput = CourseProperties & SchoolAccessSettings &
   Pick<
     CourseDetail,
     "title" | "description" | "localizations" | "sections" | "accessScope" | "classIds" | "chapters"
@@ -70,6 +78,8 @@ export function useCourseError(editing = false) {
   const text = useSchoolText();
   return (error: unknown) => {
     if (error instanceof ApiError) {
+      if (error.code === "COURSE_PREREQUISITE_CYCLE") return new Error(text("Prerequisites cannot form a cycle.", "前置课程不能形成循环。"));
+      if (error.code === "INVALID_COURSE_PREREQUISITE") return new Error(text("Choose published prerequisites from this school.", "请选择本校已发布的前置课程。"));
       if (error.code === "COURSE_PROBLEM_UNAVAILABLE")
         return new Error(
           text(

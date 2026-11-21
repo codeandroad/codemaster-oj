@@ -27,8 +27,9 @@ import { PageHeader, StatusPill } from "@/components/page-chrome";
 import { panel } from "@/components/teacher/shared";
 import { CourseCatalogRow, CourseCatalogTable } from "@/components/teacher/course-catalog-table";
 import { courseSearchHref } from "@/components/student/learning-course-search-model";
-import { useCourseAdmissionDialog, type PublicCourseEntry } from "./course-admission";
+import { schoolGateMessage, useCourseAdmissionDialog, type PublicCourseEntry } from "./course-admission";
 import { PublicCourseRow } from "./public-course-catalog";
+import { SchoolAdmissionSettings } from "./school-admission-settings";
 import { CourseAdmissionsDialog } from "./course-admissions-dialog";
 import { SchoolCourseImport } from "./school-course-import";
 import { SchoolChapterResources } from "./school-learning-resources";
@@ -105,6 +106,7 @@ export function SchoolCourses({
       publish: boolean;
     } | null>(null),
     [archiveTarget, setArchiveTarget] = useState<SchoolCourse | null>(null),
+    [settingsTarget, setSettingsTarget] = useState<string | null>(null),
     [admissionsTarget, setAdmissionsTarget] = useState<SchoolCourse | null>(null),
     [message, setMessage] = useState("");
   const mutation = useMutation(),
@@ -206,6 +208,7 @@ export function SchoolCourses({
         onEdit={setEdit}
         onPublication={setPublication}
         onArchive={setArchiveTarget}
+        onSettings={setSettingsTarget}
         onAdmissions={canReviewAdmissions ? setAdmissionsTarget : undefined}
       />
       {importing && (
@@ -243,6 +246,8 @@ export function SchoolCourses({
             }
           />
         ))}
+      {settingsTarget && <SchoolAdmissionSettings schoolId={school.id} courseId={settingsTarget}
+        onClose={()=>setSettingsTarget(null)} onSaved={()=>{setSettingsTarget(null);saved(text("Access settings saved to draft.", "准入设置已保存到草稿。"));}}/>}
       {publication && (
         <PublicationDialog
           base={base}
@@ -352,6 +357,7 @@ function CourseList({
   onPublication,
   onArchive,
   onAdmissions,
+  onSettings,
 }: {
   path: string;
   schoolId: string;
@@ -363,6 +369,7 @@ function CourseList({
   onEdit: (id: string) => void;
   onPublication: (action: { course: SchoolCourse; publish: boolean }) => void;
   onArchive: (course: SchoolCourse) => void;
+  onSettings: (id: string) => void;
   onAdmissions?: (course: SchoolCourse) => void;
 }) {
   const text = useSchoolText();
@@ -391,13 +398,14 @@ function CourseList({
             actions={<>
               <RowActionButton onClick={() => course.canManage && !course.archived ? onEdit(course.id) : onOpen(course.id)}>{course.canManage && !course.archived ? text("Edit", "编辑") : text("View", "查看")}</RowActionButton>
               {course.canManage && <>
+                {!course.archived && <RowActionButton onClick={() => onSettings(course.id)}>{text("Course access","课程准入")}</RowActionButton>}
                 {!course.archived && <RowActionButton onClick={() => onOpen(course.id, true)}>{text("Preview", "预览")}</RowActionButton>}
                 <RowActionButton onClick={() => onArchive(course)}>{course.archived ? text("Restore", "恢复") : text("Archive", "归档")}</RowActionButton>
                 {!course.archived && (course.status !== "published" || course.hasUnpublishedChanges) && <RowActionButton onClick={() => onPublication({ course, publish: true })}>{text("Publish", "发布")}</RowActionButton>}
                 {!course.archived && course.status === "published" && <RowActionButton onClick={() => onPublication({ course, publish: false })}>{text("Unpublish", "下架")}</RowActionButton>}
                 {onAdmissions && course.status === "published" && !course.archived && (
                   <RowActionButton onClick={() => onAdmissions(course)}>
-                    {text("Admissions", "准入与申请")}
+                    {text("External applications", "校外申请")}
                   </RowActionButton>
                 )}
               </>}
@@ -417,8 +425,8 @@ function CourseList({
         {resource.data?.platformCourses?.map(item => localizedCourse(item, language)).map(course =>
           <PublicCourseRow key={`platform:${course.id}`} course={course} href={platformHref(course.id)} admission={admission}/>)}
         {resource.data?.items.map(item => localizedCourse(item, language)).map(course => <LearningCourseRow key={course.id} course={course}
-          title={<button type="button" className={learningCourseTitleClass} onClick={() => onOpen(course.id)}>{course.title}</button>}
-          status={course.accessScope === "school" ? text("School-wide", "本校学生") : text("Selected classes", "指定班级")}
+          title={course.requirements?.met === false ? <span>{course.title}</span> : <button type="button" className={learningCourseTitleClass} onClick={() => onOpen(course.id)}>{course.title}</button>}
+          status={course.requirements?.met === false ? schoolGateMessage(course.requirements,text) : course.accessScope === "school" ? text("School-wide", "本校学生") : text("Selected classes", "指定班级")}
           reading={{ value: course.completedChapters, total: course.chapterCount }}
           practice={{ value: course.completedExercises, total: course.totalExercises }} />)}
       </LearningCourseList>

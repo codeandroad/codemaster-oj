@@ -1,3 +1,4 @@
+import { platformPoints } from './platform-points.mjs';
 import { platformCourseEligible } from './platform-course-access.mjs';
 import { platformCourseEdition, platformCourseListings } from './platform-public-course.mjs';
 import { chapterProblemVersions, problemCatalogCourseOption } from './problem-catalog-courses.mjs';
@@ -17,6 +18,30 @@ const reply = (body, status = 200) => ({ status, body });
 const contentHash = chapter => canonicalHash({title:chapter.title,body:chapter.body});
 const manages = (course, user, role) => role === 'school_admin' || role === 'teacher' && course.owner_account_id === user.id;
 
+function schoolRequirements(body, previous = {}) {
+ const raw=body.prerequisiteCourseIds ?? previous.prerequisiteCourseIds ?? [];
+ if(!Array.isArray(raw)||raw.length>20)fail(400,'VALIDATION','最多选择 20 门前置课程');
+ const prerequisiteCourseIds=[...new Set(raw.map(id=>uuid(id,'前置课程 ID').toLowerCase()))].sort();
+ const minimumPoints=integer(body.minimumPoints ?? previous.minimumPoints ?? 0,0,1000000000,'最低平台积分');
+ return {prerequisiteCourseIds,minimumPoints};
+}
+
+async function validatePrerequisites(db,schoolId,courseId,ids) {
+ if(!ids.length)return;
+ if(ids.includes(courseId))fail(400,'COURSE_PREREQUISITE_CYCLE','课程不能以自身为前置');
+ const available=await db.query('SELECT id FROM school_courses WHERE school_id=$1 AND id=ANY($2::uuid[]) AND published AND archived_at IS NULL',[schoolId,ids]);
+ if(available.rowCount!==ids.length)fail(400,'INVALID_COURSE_PREREQUISITE','请选择本校已发布的前置课程');
+ // School course writes share the school teaching lock. Recheck against the
+ // live publication graph at publish time, since drafts can be saved in any order.
+ if(courseId && (await db.query(`WITH RECURSIVE dependencies(id) AS (
+  SELECT unnest($2::uuid[]) UNION
+  SELECT next.id::uuid FROM dependencies d JOIN school_courses c ON c.school_id=$1 AND c.id=d.id
+  JOIN school_course_publications p ON p.school_id=c.school_id AND p.course_id=c.id AND p.revision=c.published_revision
+  CROSS JOIN LATERAL jsonb_array_elements_text(p.properties->'prerequisiteCourseIds') next(id)
+ ) SELECT 1 FROM dependencies WHERE id=$3`,[schoolId,ids,courseId])).rowCount)
+  fail(400,'COURSE_PREREQUISITE_CYCLE','前置课程不能形成循环');
+}
+
 function courseInput(body, previous={}) {
  const old=previous.properties??{};
  const sections=courseSections(body.sections===undefined?old.sections??[]:body.sections);
@@ -27,6 +52,9 @@ function courseInput(body, previous={}) {
  authorName:field(body.authorName??old.authorName??'','作者',{min:0,max:200}),
  coverImage:body.coverImage===undefined?old.coverImage??null:validateCoverImage(body.coverImage),
  authoredAt:body.authoredAt===undefined?old.authoredAt??null:body.authoredAt};
+ // Omit empty settings on old create payloads to preserve their idempotency hashes.
+ if(body.minimumPoints!==undefined || body.prerequisiteCourseIds!==undefined)
+  Object.assign(properties,schoolRequirements(body,old));
  if(properties.authoredAt!==null){
   if(typeof properties.authoredAt!=='string'||!/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(properties.authoredAt)||!Number.isFinite(Date.parse(properties.authoredAt)))fail(400,'VALIDATION','创建时间须为带时区的有效时间');
   properties.authoredAt=new Date(properties.authoredAt).toISOString();
@@ -107,7 +135,7 @@ async function saveClasses(db,schoolId,courseId,ids){
 async function studentIdentity(db,schoolId,userId){
  return (await db.query("SELECT id FROM school_identities WHERE school_id=$1 AND account_id=$2 AND kind='student'",[schoolId,userId])).rows[0]?.id??null;
 }
-export async function loadSchoolCourse(db,schoolId,id,user,role,{publishedOnly=false}={}){
+export async function loadSchoolCourse(db,schoolId,id,user,role,{publishedOnly=false,catalog=false,completion=new Map()}={}){
  const course=(await db.query('SELECT * FROM school_courses WHERE school_id=$1 AND id=$2',[schoolId,id])).rows[0];
  if(!course)fail(404,'NOT_FOUND','课程不存在或不可访问');
  const canManage=manages(course,user,role);
@@ -125,8 +153,46 @@ export async function loadSchoolCourse(db,schoolId,id,user,role,{publishedOnly=f
    WHERE pc.school_id=$1 AND pc.course_id=$2 AND pc.revision=$3 AND r.identity_id=$4 AND EXISTS(SELECT 1 FROM school_classes active WHERE active.school_id=pc.school_id AND active.id=pc.class_id AND active.archived_at IS NULL) LIMIT 1`,[schoolId,id,course.published_revision,identityId]);
   if(!rowCount)fail(404,'NOT_FOUND','课程不存在或不可访问');
  }
- return {course,view:await currentCourseProblems(db,schoolId,view),canManage:false,identityId};
+ const requirements=await schoolCourseGate(db,schoolId,user,view.properties,completion);
+ if(requirements && !requirements.met && !catalog)fail(404,'COURSE_REQUIREMENTS_NOT_MET','尚未达到本校课程的学习门槛');
+ return {course,view:await currentCourseProblems(db,schoolId,view),canManage:false,identityId,requirements};
 }
+async function publicReadHashes(db,schoolId,courseId,accountId) {
+ const prior=(await db.query("SELECT current_setting('campus.account_id',true) account")).rows[0].account ?? '';
+ await db.query("SELECT set_config('campus.account_id',$1,true)",[accountId]);
+ const {rows}=await db.query(`SELECT pr.chapter_id,pr.content_hash FROM public_course_progress pr
+  JOIN public_course_listings l ON l.id=pr.listing_id
+  WHERE l.school_id=$1 AND l.course_id=$2 AND pr.account_id=$3 AND pr.read`,[schoolId,courseId,accountId]);
+ await db.query("SELECT set_config('campus.account_id',$1,true)",[prior]);
+ return new Set(rows.map(row=>row.chapter_id+':'+row.content_hash));
+}
+
+// Called for eligible school students in either catalog. Only published
+// editions and learner-visible titles participate in the result.
+export async function schoolCourseGate(db,schoolId,user,properties,completion=new Map()) {
+ const {minimumPoints,prerequisiteCourseIds}=schoolRequirements({},properties ?? {});
+ if(!minimumPoints && !prerequisiteCourseIds.length)return null;
+ const points=minimumPoints ? await platformPoints(db,user.id) : 0;
+ const prerequisites=[];
+ for(const id of prerequisiteCourseIds){
+  if(!completion.has(id)){
+   completion.set(id,{completed:false});
+   try {
+    const loaded=await loadSchoolCourse(db,schoolId,id,user,'student',{publishedOnly:true,completion});
+    const result=await shape(db,schoolId,loaded,{detail:true,user});
+    const chapters=result.chapters;
+    const read=chapters.every(ch=>ch.read) ? new Set() : await publicReadHashes(db,schoolId,id,user.id);
+    const completed=chapters.length>0 && chapters.every(ch=>
+     (ch.read||read.has(ch.id+':'+contentHash(ch))) && ch.problems.every(item=>item.available&&item.solved)
+     && (ch.acslLinks??[]).every(item=>item.available&&item.completed));
+    completion.set(id,{id,title:result.title,completed});
+   } catch(error){if(error.status!==404)throw error;}
+  }
+  prerequisites.push(completion.get(id));
+ }
+ return {minimumPoints,points,prerequisites,met:points>=minimumPoints&&prerequisites.every(item=>item.completed)};
+}
+
 export async function readableClassCourse(db, schoolId, user, courseId, scope, chapters = false) {
   if (!courseId) return null;
   let view;
@@ -198,7 +264,9 @@ async function shape(db,schoolId,loaded,{detail=false,user}={}){
   revision:canManage?course.revision:course.published_revision,publishedRevision:course.published_revision,
   hasUnpublishedChanges:canManage&&course.published&&course.revision!==course.published_revision,
   totalExercises:practice.totalExercises,completedExercises:practice.completedExercises,chapterCount:view.chapters.length,completedChapters:readIds.size,canManage,canTrackProgress:!canManage&&!!identityId};
+ if(loaded.requirements)body.requirements=loaded.requirements;
  if(detail){
+  if(canManage)Object.assign(body,schoolRequirements({},properties));
   body.accessScope=view.access_scope;
   body.classIds=canManage?(await db.query('SELECT class_id FROM school_course_classes WHERE school_id=$1 AND course_id=$2 ORDER BY class_id',[schoolId,course.id])).rows.map(r=>r.class_id):[];
   body.chapters=practice.chapters.map(ch=>({...ch,read:readIds.has(ch.id)}));
@@ -213,7 +281,7 @@ function expectedRevision(body,course){
 export async function handleSchoolCourses(context){
  const resource=await handleSchoolLearningResources(context,loadSchoolCourse);if(resource)return resource;
  const {pool,user,route,method,body={},url}=context;
- const match=route.match(/^\/schools\/([^/]+)\/courses(?:\/([^/]+)(?:\/(publish|unpublish|archive|restore|preview|bookmark)|\/chapters\/([^/]+)\/read)?)?$/);
+ const match=route.match(/^\/schools\/([^/]+)\/courses(?:\/([^/]+)(?:\/(publish|unpublish|archive|restore|preview|bookmark|admission-settings)|\/chapters\/([^/]+)\/read)?)?$/);
  if(!match)return null;
  const schoolId=uuid(match[1],'学校 ID');
  const courseId=match[2]?uuid(match[2],'课程 ID'):null;
@@ -237,6 +305,13 @@ export async function handleSchoolCourses(context){
    await loadSchoolCourse(db,schoolId,courseId,user,role);
    return reply({scope:'school',id:courseId});
   }
+  if(!courseId&&method==='GET'&&url.searchParams.get('view')==='prerequisites'){
+   if(!['school_admin','teacher'].includes(role))fail(403,'FORBIDDEN','需要本校教职权限');
+   const {rows}=await db.query(`SELECT c.id,p.title FROM school_courses c JOIN school_course_publications p
+    ON p.school_id=c.school_id AND p.course_id=c.id AND p.revision=c.published_revision
+    WHERE c.school_id=$1 AND c.published AND c.archived_at IS NULL ORDER BY p.title,c.id`,[schoolId]);
+   return reply({items:rows});
+  }
   if(!courseId&&method==='GET'){
    const page=integer(Number(url.searchParams.get('page')??'1'),1,100000,'页码');
    const archived=url.searchParams.get('archived')==='true';
@@ -259,8 +334,8 @@ export async function handleSchoolCourses(context){
        WHERE pc.school_id=c.school_id AND pc.course_id=c.id AND pc.revision=c.published_revision AND r.identity_id=$4 AND EXISTS(SELECT 1 FROM school_classes active WHERE active.school_id=pc.school_id AND active.id=pc.class_id AND active.archived_at IS NULL))))
      AND ($5='' OR strpos(lower(CASE WHEN $2='student' THEN p.title||' '||p.description||' '||COALESCE(p.properties->'localizations','{}'::jsonb)::text ELSE c.title||' '||c.description||' '||COALESCE(c.properties->'localizations','{}'::jsonb)::text END),lower($5))>0)
     ORDER BY c.created_at DESC,c.id LIMIT $6 OFFSET $7`,[schoolId,role,user.id,identityId,q,remaining+1,Math.max(0,offset-platform.length),archived]);
-   const items=[];
-   for(const row of rows.slice(0,remaining))items.push(await shape(db,schoolId,await loadSchoolCourse(db,schoolId,row.id,user,role),{user}));
+   const items=[],completion=new Map();
+   for(const row of rows.slice(0,remaining))items.push(await shape(db,schoolId,await loadSchoolCourse(db,schoolId,row.id,user,role,{catalog:true,completion}),{user}));
    const result={items,page,hasMore:platform.length>offset+PAGE_SIZE||rows.length>remaining};
    if(includePlatform){
     result.platformCourses=[];
@@ -278,6 +353,7 @@ export async function handleSchoolCourses(context){
    const old=(await db.query('SELECT * FROM school_courses WHERE school_id=$1 AND owner_account_id=$2 AND create_request_id=$3',[schoolId,user.id,requestId])).rows[0];
    if(old){if(old.create_request_hash!==hash)fail(409,'IDEMPOTENCY_CONFLICT','相同请求 ID 的课程内容不同');return reply(await shape(db,schoolId,{course:old,view:old,canManage:true,identityId:null},{detail:true,user}));}
    await validateClasses(db,schoolId,user,role,input.classIds);
+   await validatePrerequisites(db,schoolId,courseId,input.properties.prerequisiteCourseIds??[]);
    await validateProblems(db,schoolId,input.chapters);
    for(const chapter of input.chapters)if(chapter.acslLinks!==undefined)chapter.acslLinks=await resolveCourseAcslLinks(db,schoolId,user,chapter.acslLinks,[]);
    const course=(await db.query(`INSERT INTO school_courses(school_id,owner_account_id,title,description,access_scope,chapters,create_request_id,create_request_hash,properties,required_language)
@@ -310,10 +386,24 @@ export async function handleSchoolCourses(context){
   }
   if(!loaded.canManage)fail(403,'FORBIDDEN','无权管理此课程');
   expectedRevision(body,loaded.course);
-  if(method==='PATCH'&&!match[3]&&!match[4]){
+  if(method==='PATCH'&&match[3]==='admission-settings'){
+   if(loaded.course.archived_at)fail(409,'COURSE_ARCHIVED','请先恢复已归档课程');
+   const scope=enumValue(body.accessScope,['school','classes'],'开放范围');
+   if(!Array.isArray(body.classIds)||body.classIds.length>50)fail(400,'VALIDATION','请选择有效的班级范围');
+   const classes=[...new Set(body.classIds.map(id=>uuid(id,'班级 ID').toLowerCase()))];
+   if((scope==='classes')!==Boolean(classes.length))fail(400,'VALIDATION','指定班级时须选择班级，全校范围无需指定班级');
+   const requirements=schoolRequirements(body,loaded.course.properties);
+   await validateClasses(db,schoolId,user,role,classes);
+   await validatePrerequisites(db,schoolId,courseId,requirements.prerequisiteCourseIds);
+   await db.query(`UPDATE school_courses SET access_scope=$3,properties=properties||$4::jsonb,
+    revision=revision+1,updated_at=clock_timestamp() WHERE school_id=$1 AND id=$2`,[schoolId,courseId,scope,requirements]);
+   await saveClasses(db,schoolId,courseId,classes);
+   await auditSchool(db,schoolId,user.id,'school.course.admission.update',courseId);
+  }else if(method==='PATCH'&&!match[3]&&!match[4]){
    if(loaded.course.archived_at)fail(409,'COURSE_ARCHIVED','请先恢复已归档课程');
    const input=courseInput(body,loaded.course);
    await validateClasses(db,schoolId,user,role,input.classIds);
+   await validatePrerequisites(db,schoolId,courseId,input.properties.prerequisiteCourseIds??[]);
    await validateProblems(db,schoolId,input.chapters);
    for(const chapter of input.chapters)if(chapter.acslLinks!==undefined)chapter.acslLinks=await resolveCourseAcslLinks(db,schoolId,user,chapter.acslLinks,loaded.course.chapters.find(old=>old.id===chapter.id)?.acslLinks??[]);
    await db.query(`UPDATE school_courses SET title=$3,description=$4,access_scope=$5,chapters=$6,properties=$7,required_language=$8,revision=revision+1,updated_at=clock_timestamp()
@@ -327,6 +417,7 @@ export async function handleSchoolCourses(context){
    const ids=(await db.query('SELECT class_id FROM school_course_classes WHERE school_id=$1 AND course_id=$2 ORDER BY class_id',[schoolId,courseId])).rows.map(row=>row.class_id);
    if(c.access_scope==='classes'&&!ids.length)fail(409,'COURSE_CLASSES_REQUIRED','发布前请至少选择一个班级');
    await validateClasses(db,schoolId,user,role,ids);
+   await validatePrerequisites(db,schoolId,courseId,c.properties.prerequisiteCourseIds??[]);
    await validateProblems(db,schoolId,c.chapters);
    for(const chapter of c.chapters){const links=await projectCourseAcslLinks(db,schoolId,user,chapter.acslLinks??[]);if(links.some(link=>!link.available))fail(409,'UNAVAILABLE_ACSL_LINK','请修复不可用的 ACSL 引用后发布课程。');}
    const revision=c.revision+1;

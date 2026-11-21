@@ -13,6 +13,7 @@ test('audience mode changes preserve draft choices while sending only active rul
  const rule={admissionMode:'invite',minimumPoints:25,prerequisiteCourseIds:[school],ruleId:identity,generation:school,invitation:{active:true,expiresAt:'2030-01-01T00:00:00Z'}};
  const draft={scope:'all',allRule:{admissionMode:'application',minimumPoints:0,prerequisiteCourseIds:[]},independentRule:rule,schoolRules:[{...rule,schoolId:school}],accountRules:[{...rule,identityId:identity}]};
  const before=structuredClone(draft),all=courseAudiencePolicyForSave(draft);assert.equal(all.independentRule,null);assert.deepEqual(all.schoolRules,[]);assert.deepEqual(all.accountRules,[]);assert.deepEqual(draft,before);
+ const supplemental=courseAudiencePolicyForSave(draft,[school]);assert.deepEqual(supplemental.schoolRules,draft.schoolRules);assert.equal(activeAdmissionRules(supplemental).length,2);
  const custom=courseAudiencePolicyForSave({...draft,scope:'custom'});assert.equal(custom.allRule,null);assert.deepEqual(custom.independentRule,rule);assert.equal(custom.accountRules[0].generation,school);assert.equal(custom.schoolRules[0].ruleId,identity);
 });
 test('existing policies retain rule identity and school-specific thresholds',()=>{

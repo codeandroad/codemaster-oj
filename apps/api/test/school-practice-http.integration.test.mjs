@@ -558,6 +558,70 @@ test('school and public practice Nest transport requires scoped membership, CSRF
    assert.equal((await list(school.id))[0]?.id,course.id);
    assert.deepEqual(await list(beta.id),[]);
   });
+  await t.test('supplemental school admission is an alternative to the public rule in both catalogs', async () => {
+   const rules={scope:'all',allRule:{minimumPoints:1000000},schoolRules:[{schoolId:school.id,admissionMode:'direct'}]};
+   const created=(await request('/platform/courses',{auth:auth.platform,method:'POST',status:201,
+    body:{requestId:randomUUID(),title:'Alternative access',audiencePolicy:rules,catalogSchoolIds:[school.id],chapters:[{title:'Lesson',content:'Alternative lesson'}]}})).data;
+   const path='/platform/courses/'+created.id;
+   const published=(await request(path+'/publish',{auth:auth.platform,method:'POST',body:{expectedRevision:created.revision,sourceVersion:created.sourceVersion}})).data;
+   const entry='/practice/courses/'+created.id;
+   const schoolList=async()=>(await request(prefix+'/courses?includePlatform=true',{auth:auth.student})).data.platformCourses.find(c=>c.id===created.id);
+   assert.equal((await schoolList()).admission,'direct');
+   assert.equal((await request(entry+'/entry',{auth:auth.student})).data.admissionRules.length,2);
+   for(const suffix of ['', '?schoolId='+school.id])assert.equal((await request(entry+suffix,{auth:auth.student})).data.chapters[0].body,'Alternative lesson');
+   assert.equal((await request(entry+'/entry',{auth:auth.personal})).data.admission,'requirements');
+   await request(entry,{auth:auth.personal,status:403});
+   const changed=(await request(path,{auth:auth.platform,method:'PATCH',body:{expectedRevision:published.revision,sourceVersion:published.sourceVersion,
+    catalogSchoolIds:[school.id],audiencePolicy:{scope:'all',allRule:{},schoolRules:[{schoolId:school.id,minimumPoints:1000000}]}}})).data;
+   assert.equal((await schoolList()).admission,'direct');
+   const alternatives=(await request(entry+'/entry',{auth:auth.student})).data.admissionRules;
+   assert.deepEqual(alternatives.map(r=>[r.targetKind,r.granted]),[['all',true],['school',false]]);
+   const removed=(await request(path,{auth:auth.platform,method:'PATCH',body:{expectedRevision:changed.revision,sourceVersion:changed.sourceVersion,catalogSchoolIds:[]}})).data;
+   assert.equal(removed.audiencePolicy.schoolRules.length,0);
+   assert.equal(await schoolList(),undefined);
+   assert.equal((await request(entry+'/entry',{auth:auth.student})).data.admission,'direct');
+  });
+  await t.test('school course requirements follow the published edition, class audience and actual learner progress', async () => {
+   const base=prefix+'/courses';
+   const create=async(title,who)=> (await request(base,{auth:auth[who],method:'POST',status:201,body:{
+    title,requestId:randomUUID(),chapters:[{id:randomUUID(),title:'Lesson',body:'Published lesson'}]}})).data;
+   const publish=async(c)=> (await request(base+'/'+c.id+'/publish',{auth:auth.admin,method:'POST',body:{expectedRevision:c.revision}})).data;
+   const save=(c,who,changes,status=200)=>request(base+'/'+c.id+'/admission-settings',{auth:auth[who],method:'PATCH',status,body:{
+    expectedRevision:c.revision,accessScope:'school',classIds:[],...changes}});
+   const first=await publish(await create('Prerequisite','admin'));
+   const target=await publish(await create('Follow-up','teacher'));
+   const options=(await request(base+'?view=prerequisites',{auth:auth.teacher})).data.items;
+   assert.ok(options.some(c=>c.id===first.id));
+   await request(base+'?view=prerequisites',{auth:auth.student,status:403});
+   await save(first,'teacher',{},404);
+   await save(target,'student',{},403);
+   await save(target,'teacher',{prerequisiteCourseIds:[target.id]},400);
+   await save(target,'teacher',{prerequisiteCourseIds:[randomUUID()]},400);
+   const draft=(await save(target,'teacher',{minimumPoints:1000000,prerequisiteCourseIds:[first.id]})).data;
+   await save(target,'admin',{},409);
+   const targetPath=base+'/'+target.id;
+   await request(targetPath,{auth:auth.student});
+   let current=await publish(draft);
+   const listing=(await request(prefix+'/course-admissions/'+target.id,{auth:auth.admin,method:'POST',status:201,body:{expectedRevision:current.revision}})).data;
+   const publicPath='/practice/courses/'+listing.id;
+   assert.equal((await request(publicPath+'/entry',{auth:auth.student})).data.admission,'requirements');
+   await request(publicPath,{auth:auth.student,status:403});
+   assert.equal((await request(publicPath+'/entry',{auth:auth.personal})).data.admission,'apply');
+   const listed=async()=>(await request(base+'?q=Follow-up',{auth:auth.student})).data.items[0];
+   assert.equal((await listed()).requirements.met,false);
+   assert.equal((await listed()).chapters,undefined);
+   await request(targetPath,{auth:auth.student,status:404});
+   await request(targetPath+'/chapters/'+target.chapters[0].id+'/read',{auth:auth.student,method:'POST',body:{expectedRevision:current.revision,read:true},status:404});
+   await save(first,'admin',{prerequisiteCourseIds:[target.id]},400);
+   await request(base+'/'+first.id+'/chapters/'+first.chapters[0].id+'/read',{auth:auth.student,method:'POST',body:{expectedRevision:first.revision,read:true}});
+   assert.equal((await listed()).requirements.prerequisites[0].completed,true);
+   await request(targetPath,{auth:auth.student,status:404});
+   current=await publish((await save(current,'admin',{minimumPoints:0})).data);
+   assert.equal((await request(targetPath,{auth:auth.student})).data.chapters[0].body,'Published lesson');
+   const cl=(await request(prefix+'/classes',{auth:auth.admin,method:'POST',status:201,body:{requestId:randomUUID(),name:'Restricted course class',type:'administrative'}})).data;
+   await publish((await save(current,'admin',{accessScope:'classes',classIds:[cl.id]})).data);
+   await request(targetPath,{auth:auth.student,status:404});
+  });
   await t.test('school leaderboard preserves the default and saved avatars', async () => {
    const path=prefix+'/leaderboard';
    const read=async()=>(await request(path,{auth:auth.student})).data.items.find(item=>item.isOwn);

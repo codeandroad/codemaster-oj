@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { inputClass, useData } from "@/components/admin/common";
 import { Button } from "@/components/ui/button";
 import { useSchoolText } from "./school-ui";
@@ -17,6 +17,7 @@ export function PlatformCourseAudience({ courseId, policy, onChange, schools, ac
   const text = useSchoolText(), courses = useData<{ items: PlatformCourse[] }>("platform/courses?view=summary");
   const [schoolPicker, setSchoolPicker] = useState(policy.schoolRules.length > 0), [accountPicker, setAccountPicker] = useState(policy.accountRules.length > 0);
   const [savedSchools, setSavedSchools] = useState(policy.schoolRules), [savedAccounts, setSavedAccounts] = useState(policy.accountRules), [savedIndependent, setSavedIndependent] = useState(policy.independentRule);
+  const otherScopeSchools = useRef<AudiencePolicy["schoolRules"]>([]);
   const prerequisites = (courses.data?.items ?? []).filter(course => course.id !== courseId);
   const schoolName = (id: string) => schools.find(item => item.id === id)?.name ?? text("Selected school", "指定学校");
   const accountName = (id: string) => {
@@ -41,7 +42,12 @@ export function PlatformCourseAudience({ courseId, policy, onChange, schools, ac
   };
   return <section className="min-w-0 space-y-4" data-od-id="platform-course-policy">
     <h3 className="text-sm font-semibold">{text("Audience and admission", "开放范围与准入")}</h3>
-    <label className="grid gap-2 text-sm font-medium">{text("Audience", "开放范围")}<select className={inputClass} disabled={disabled} value={policy.scope} onChange={event => onChange({ ...policy, scope: event.target.value as AudiencePolicy["scope"], allRule: policy.allRule ?? directAdmissionRule() })}>
+    <label className="grid gap-2 text-sm font-medium">{text("Audience", "开放范围")}<select className={inputClass} disabled={disabled} value={policy.scope} onChange={event => {
+      const schoolRules = otherScopeSchools.current;
+      otherScopeSchools.current = policy.schoolRules;
+      if (event.target.value === "custom") setSchoolPicker(schoolRules.length > 0);
+      onChange({ ...policy, scope: event.target.value as AudiencePolicy["scope"], schoolRules, allRule: policy.allRule ?? directAdmissionRule() });
+    }}>
       <option value="all">{text("All registered users", "所有注册用户")}</option><option value="custom">{text("Custom audience", "自定义范围")}</option>
     </select></label>
     {courses.error && <div role="alert" className="space-y-2 text-sm text-destructive"><p>{courses.error}</p><Button type="button" variant="secondary" size="sm" onClick={courses.reload}>{text("Reload prerequisite courses", "重新加载前置课程")}</Button></div>}
@@ -50,10 +56,26 @@ export function PlatformCourseAudience({ courseId, policy, onChange, schools, ac
       <section aria-label={text("School catalog visibility", "校内展示")} className="space-y-2 border-t border-border pt-4">
         <h4 className="text-sm font-semibold">{text("School catalog visibility", "校内展示")}</h4>
         <p className="text-sm text-muted-foreground">{text(
-          "Selected schools show this course in their school catalog. Students follow the public admission rule above.",
-          "所选学校会在「本校」课程列表展示这门课，学生按上面的公开准入规则学习。",
+          "Selected schools show this course in their school catalog. By default the public rule applies. Members may also qualify through an additional school rule in either catalog.",
+          "所选学校会在「本校」课程列表展示这门课，默认沿用公开规则。添加学校规则后，该校成员满足公开或本校任一条完整规则，即可从两个页签学习。",
         )}</p>
-        <AudiencePicker kind="schools" selected={catalogSchools} onSelected={onCatalogSchools} disabled={disabled}/>
+        <AudiencePicker kind="schools" selected={catalogSchools} onSelected={items => {
+          onCatalogSchools(items);
+          onChange({ ...policy, schoolRules: policy.schoolRules.filter(rule => items.some(item => item.id === rule.schoolId)) });
+        }} disabled={disabled}/>
+        {catalogSchools.map(school => {
+          const rule = policy.schoolRules.find(item => item.schoolId === school.id);
+          const update = (value?: AdmissionRule) => onChange({ ...policy, schoolRules: [
+            ...policy.schoolRules.filter(item => item.schoolId !== school.id), ...(value ? [{ ...value, schoolId: school.id }] : []),
+          ] });
+          return <fieldset key={school.id} className="space-y-2 border-t border-border pt-2" disabled={disabled}>
+            <legend className="text-sm font-semibold">{school.name}</legend>
+            <label className="flex min-h-10 items-center gap-2 text-sm"><input type="checkbox" checked={!!rule}
+              onChange={event => update(event.target.checked ? directAdmissionRule() : undefined)}/>
+              {text("Add an admission rule for this school", "为该校增加准入规则")}</label>
+            {rule && ruleView(`school:${school.id}`, school.name, rule, update)}
+          </fieldset>;
+        })}
       </section>
     </> : <div className="space-y-4">
       <p className="text-xs leading-5 text-muted-foreground">{text("Meeting one complete rule is enough. School membership is checked across your schools, regardless of the current workspace.", "满足任意一条完整规则即可。学校资格按账号的有效成员身份匹配，不受当前工作区影响。")}</p>
@@ -95,7 +117,7 @@ export function PlatformCourseAudience({ courseId, policy, onChange, schools, ac
     </div>}
     <div className="space-y-2 rounded-md border border-border bg-surface-subtle p-3 text-xs leading-5" data-od-id="platform-admission-summary">
       <p className="font-semibold">{text("Effective rules after saving", "保存后生效的规则")}</p>
-      {policy.scope === "all" ? <p>{text("All registered users", "所有注册用户")}：{summary(policy.allRule ?? directAdmissionRule())}</p> : <>
+      {policy.scope === "all" ? <><p>{text("All registered users", "所有注册用户")}：{summary(policy.allRule ?? directAdmissionRule())}</p>{policy.schoolRules.map(rule => <p key={rule.schoolId}>{catalogSchools.find(school => school.id === rule.schoolId)?.name}：{summary(rule)}</p>)}</> : <>
         {policy.independentRule && <p>{text("Personal users without a school", "未加入学校的个人用户")}：{summary(policy.independentRule)}</p>}
         {policy.schoolRules.map(rule => <p key={rule.schoolId}>{schoolName(rule.schoolId)}：{summary(rule)}</p>)}
         {policy.accountRules.map(rule => <p key={rule.identityId}>{accountName(rule.identityId)}：{summary(rule)}</p>)}

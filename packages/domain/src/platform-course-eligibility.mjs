@@ -56,7 +56,7 @@ export async function resolvePlatformCourseAdmission(db,courseId,accountId,{stat
   state.stack.add(courseId);
   const course=state.courses?.has(courseId)?state.courses.get(courseId):(await db.query(`SELECT ${courseColumns} FROM learning_paths p WHERE p.id=$1 AND ${eligibleCourseSql('$2')}`,[courseId,accountId])).rows[0];
   if(!course)return denied();
-  const rules=(state.rules?.has(courseId)?state.rules.get(courseId).filter(rule=>rule.active):await platformCourseRules(db,courseId)).filter(rule=>(course.platform_audience_scope==='all')===(rule.target_kind==='all')
+  const rules=(state.rules?.has(courseId)?state.rules.get(courseId).filter(rule=>rule.active):await platformCourseRules(db,courseId)).filter(rule=>(rule.target_kind==='school'||(course.platform_audience_scope==='all')===(rule.target_kind==='all'))
    &&(rule.target_kind==='all'||rule.target_kind==='independent'&&state.schools.size===0
     ||rule.target_kind==='school'&&state.schools.has(rule.school_id)||rule.target_kind==='account'&&rule.identity_id===state.user.identityId));
   if(!rules.length){

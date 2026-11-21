@@ -7,8 +7,8 @@ import { ArrowDown, ArrowUp, Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import {
   Feedback,
   inputClass,
-  Loading,
-  useData,
+
+
   useMutation,
 } from "@/components/admin/common";
 import {
@@ -33,7 +33,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useRangeSelection } from "@/components/ui/use-range-selection";
+import { SchoolAdmissionFields } from "./school-admission-settings";
 import { productionApi } from "@/lib/production-api";
 import { useSchoolText, type School } from "./school-ui";
 import {
@@ -41,7 +41,7 @@ import {
   type CourseChapter,
   type CourseDetail,
   type CourseInput,
-  type CoursePage,
+
 } from "./school-courses-model";
 
 function inputFor(course?: CourseDetail): CourseInput {
@@ -60,6 +60,8 @@ function inputFor(course?: CourseDetail): CourseInput {
         localizations: course.localizations,
         sections: course.sections,
         accessScope: course.accessScope,
+        minimumPoints: course.minimumPoints,
+        prerequisiteCourseIds: course.prerequisiteCourseIds,
         classIds: [...course.classIds],
         chapters: course.chapters.map(({ id, title, body, problems, localizations, acslLinks, sectionKey }) => ({
           id,
@@ -199,6 +201,11 @@ export function SchoolCourseEditor({
       classSection.current?.focus();
       return;
     }
+    if (!Number.isInteger(form.minimumPoints ?? 0) || (form.minimumPoints ?? 0) < 0 || (form.minimumPoints ?? 0) > 1000000000) {
+      setValidation(text("Enter a whole number from 0 to 1,000,000,000.", "最低平台积分须为 0 至 10 亿之间的整数。"));
+      classSection.current?.focus();
+      return;
+    }
     try {
       parseCourseSections(form.sections ?? []);
       validateChapterSections(form.sections, form.chapters);
@@ -299,27 +306,7 @@ export function SchoolCourseEditor({
                     }
                   />
                 </label>
-                <label className="min-w-0 text-sm font-medium">
-                  {text("Audience", "学习对象")}
-                  <select
-                    className={`${inputClass} mt-1 h-9`}
-                    value={form.accessScope}
-                    onChange={(event) =>
-                      setForm((previous) => ({
-                        ...previous,
-                        accessScope: event.target
-                          .value as CourseInput["accessScope"],
-                      }))
-                    }
-                  >
-                    <option value="school">
-                      {text("All students in this school", "本校所有学生")}
-                    </option>
-                    <option value="classes">
-                      {text("Selected classes", "指定班级")}
-                    </option>
-                  </select>
-                </label>
+
               </div>
               <label className="block text-sm font-medium">
                 {text("Description", "课程简介")}
@@ -503,24 +490,10 @@ export function SchoolCourseEditor({
               </div>
               <CourseSectionsEditor sections={form.sections ?? []} chapters={form.chapters} onChange={sections => setForm(previous => ({ ...previous, sections }))} disabled={mutation.busy}/>
               <CourseTranslationFields value={form.localizations} onChange={localizations => setForm(previous => ({ ...previous, localizations }))} disabled={mutation.busy}/>
-              {form.accessScope === "classes" && (
-                <div
-                  ref={classSection}
-                  tabIndex={-1}
-                  className="rounded-md border border-border p-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  aria-describedby={
-                    invalidField === "classes" ? "course-validation" : undefined
-                  }
-                >
-                  <ClassPicker
-                    schoolId={school.id}
-                    selected={form.classIds}
-                    onChange={(classIds) =>
-                      setForm((previous) => ({ ...previous, classIds }))
-                    }
-                  />
-                </div>
-              )}
+              <div ref={classSection} tabIndex={-1}>
+                <SchoolAdmissionFields schoolId={school.id} courseId={initial?.id} value={form}
+                  onChange={change => setForm(previous => ({ ...previous, ...change }))}/>
+              </div>
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
                 <h3 className="text-sm font-semibold">
                   {text(
@@ -815,136 +788,5 @@ export function SchoolCourseEditor({
         </Dialog>
       )}
     </>
-  );
-}
-
-function ClassPicker({
-  schoolId,
-  selected,
-  onChange,
-}: {
-  schoolId: string;
-  selected: string[];
-  onChange: (classIds: string[]) => void;
-}) {
-  const text = useSchoolText();
-  const [page, setPage] = useState(1);
-  return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-        <span>
-          {text(
-            `Selected classes: ${selected.length}/50`,
-            `已选班级：${selected.length}/50`,
-          )}
-        </span>
-        {selected.length > 0 && (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={() => onChange([])}
-          >
-            {text("Clear selection", "清空选择")}
-          </Button>
-        )}
-      </div>
-      <ClassPickerPage
-        key={`${schoolId}:${page}`}
-        schoolId={schoolId}
-        page={page}
-        selected={selected}
-        onChange={onChange}
-        onPage={setPage}
-      />
-    </div>
-  );
-}
-
-function ClassPickerPage({
-  schoolId,
-  page,
-  selected,
-  onChange,
-  onPage,
-}: {
-  schoolId: string;
-  page: number;
-  selected: string[];
-  onChange: (classIds: string[]) => void;
-  onPage: (page: number) => void;
-}) {
-  const text = useSchoolText();
-  const resource = useData<CoursePage<{ id: string; name: string }>>(
-    `schools/${schoolId}/classes?page=${page}`,
-  );
-  const range = useRangeSelection(
-    resource.data?.items ?? [],
-    `${schoolId}:${page}`,
-  );
-  const [limitReached, setLimitReached] = useState(false);
-  return (
-    <Loading resource={resource}>
-      <div className="max-h-40 overflow-y-auto rounded-md border border-border">
-        {(resource.data?.items ?? []).map((item) => (
-          <label
-            key={item.id}
-            className="flex cursor-pointer items-center gap-2 border-b border-border px-3 py-2 text-sm last:border-b-0 hover:bg-muted"
-          >
-            <input
-              type="checkbox"
-              checked={selected.includes(item.id)}
-              onChange={(event) => {
-                const ids = range.getRange(item.id, event) ?? [item.id];
-                const next = event.currentTarget.checked
-                  ? [...new Set([...selected, ...ids])]
-                  : selected.filter((id) => !ids.includes(id));
-                if (next.length > 50) {
-                  setLimitReached(true);
-                  return;
-                }
-                setLimitReached(false);
-                onChange(next);
-              }}
-            />
-            <span className="min-w-0 break-words">{item.name}</span>
-          </label>
-        ))}
-        {!resource.data?.items.length && (
-          <p className="px-3 py-4 text-sm text-muted-foreground">
-            {text(
-              "No classes are available on this page.",
-              "本页没有可选班级。",
-            )}
-          </p>
-        )}
-      </div>
-      {limitReached && (
-        <p role="alert" className="text-xs text-destructive">
-          {text("Select up to 50 classes.", "最多选择 50 个班级。")}
-        </p>
-      )}
-      <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          disabled={page <= 1}
-          onClick={() => onPage(page - 1)}
-        >
-          {text("Previous", "上一页")}
-        </Button>
-        <span>{text(`Page ${page}`, `第 ${page} 页`)}</span>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          disabled={!resource.data?.hasMore}
-          onClick={() => onPage(page + 1)}
-        >
-          {text("Next", "下一页")}
-        </Button>
-      </div>
-    </Loading>
   );
 }

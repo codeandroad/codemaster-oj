@@ -18,6 +18,7 @@ export function courseEntry(listing, course, admission) {
     requiredLanguage: course.required_language ?? null,
     accessScope: course.access_scope,
     admission,
+    ...(course.requirements && {requirements:course.requirements}),
     ...(listing.platform_owned?{admissionRules:course.admissionRules??[]}:{}),
   };
 }

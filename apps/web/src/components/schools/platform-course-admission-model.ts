@@ -48,12 +48,12 @@ export function admissionRuleSettings(rule: AdmissionRule) {
   return { admissionMode: rule.admissionMode, prerequisiteCourseIds: rule.prerequisiteCourseIds, minimumPoints: rule.minimumPoints, requirementMode: rule.requirementMode ?? "all" };
 }
 export function activeAdmissionRules(policy: AudiencePolicy): AdmissionRule[] {
-  return policy.scope === "all" ? policy.allRule ? [policy.allRule] : []
+  return policy.scope === "all" ? [...(policy.allRule ? [policy.allRule] : []), ...policy.schoolRules]
     : [...(policy.independentRule ? [policy.independentRule] : []), ...policy.schoolRules, ...policy.accountRules];
 }
-export function courseAudiencePolicyForSave(policy: AudiencePolicy): AudiencePolicy {
+export function courseAudiencePolicyForSave(policy: AudiencePolicy, catalogSchoolIds: string[] = []): AudiencePolicy {
   return policy.scope === "all"
-    ? { scope: "all", allRule: policy.allRule ?? directAdmissionRule(), independentRule: null, schoolRules: [], accountRules: [] }
+    ? { scope: "all", allRule: policy.allRule ?? directAdmissionRule(), independentRule: null, schoolRules: policy.schoolRules.filter(rule => catalogSchoolIds.includes(rule.schoolId)), accountRules: [] }
     : { ...policy, allRule: null };
 }
 export function validCourseInvitation(value: string) {

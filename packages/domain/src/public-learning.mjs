@@ -10,6 +10,7 @@ import { isPlatformAdministrator } from './platform-governance.mjs';
 import { publicChapterProblems } from './platform-course-progress.mjs';
 import { canonicalHash, enumValue, fail, integer, uuid } from './security.mjs';
 import { handlePlatformCourses } from './platform-courses.mjs';
+import { schoolCourseGate } from './school-courses.mjs';
 import { platformCourseAdmission } from './platform-course-access.mjs';
 import { handlePlatformCourseAdmissions } from './platform-course-admissions.mjs';
 import { platformCourseListings, platformCourseEdition, platformCourseProgressEdition, platformReadProgress } from './platform-public-course.mjs';
@@ -31,7 +32,7 @@ async function edition(db, listing, { detail = false, lock = false, progress = f
   await setSchool(db, listing.school_id);
   if(listing.platform_owned&&progress)return platformCourseProgressEdition(db,listing,{contentHashChapterIds});
   if(listing.platform_owned)return platformCourseEdition(db,listing,{detail,lock});
-  return (await db.query(`SELECT p.title, p.description, p.revision, p.access_scope, p.properties->'localizations' AS localizations,p.properties->'sections' AS sections,
+  return (await db.query(`SELECT p.title, p.description, p.revision, p.access_scope,p.properties->'prerequisiteCourseIds' AS "prerequisiteCourseIds",p.properties->'minimumPoints' AS "minimumPoints", p.properties->'localizations' AS localizations,p.properties->'sections' AS sections,
       p.required_language,p.language_credit_cutoffs,s.name school_name,
       p.properties->>'category' category, p.properties->>'difficulty' difficulty, p.properties->>'coverKey' cover_key,
       p.properties->>'coverImage' cover_image, p.properties->>'authorName' author_name,
@@ -55,6 +56,11 @@ async function activeListing(db, id, { includeWithdrawn = false } = {}) {
 
 async function admissionFor(db, listing, course, accountId, options) {
   if(listing.platform_owned){const access=await platformCourseAdmission(db,listing.course_id,accountId,options);course.admissionRules=access.admissionRules;return access.admission;}
+  if ((course.minimumPoints || course.prerequisiteCourseIds?.length) && (await db.query(`SELECT 1 FROM school_memberships
+    WHERE school_id=$1 AND account_id=$2 AND role='student' AND revoked_at IS NULL`,[listing.school_id,accountId])).rowCount) {
+    course.requirements=await schoolCourseGate(db,listing.school_id,{id:accountId},course);
+    if(!course.requirements.met)return 'requirements';
+  }
   if (listing.access_mode === 'direct') return 'direct';
   const eligible = (await db.query(`SELECT 1 FROM school_memberships m
     WHERE m.school_id=$1 AND m.account_id=$2 AND m.revoked_at IS NULL

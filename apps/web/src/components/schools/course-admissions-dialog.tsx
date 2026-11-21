@@ -84,8 +84,8 @@ export function CourseAdmissionsDialog({ schoolId, course, applicationId, onChan
             <div className="space-y-4 text-sm">
               <p className="text-muted-foreground">
                 {admission.accessScope === "classes"
-                  ? text("Students in the selected classes can enter directly.", "指定班级的学生可以直接进入。")
-                  : text("Members of this school can enter directly.", "本校成员可以直接进入。")}
+                  ? text("Students in the selected classes follow the school course requirements.", "指定班级的学生按本校课程准入设置学习。")
+                  : text("School students follow the school course requirements.", "本校学生按校内课程准入设置学习。")}
               </p>
               {applicationId && admission.mode !== "application" ? (
                 <p>{text("This application is no longer available for review.", "这份申请已无法审核。")}</p>

@@ -47,7 +47,7 @@ const visibleSystemNotification = `n.school_id=$1 AND COALESCE(n.legacy_identity
     OR EXISTS(SELECT 1 FROM timed_practices timed
       WHERE timed.id::text=n.data->>'timedPracticeId' AND timed.results_published_at IS NOT NULL))`;
 
-const unreadReminderNotification = `n.kind='assignment_reminder' AND n.read_at IS NULL`;
+const unreadReminderNotification = `n.school_id=$1 AND COALESCE(n.legacy_identity_id,n.school_identity_id)=$2 AND n.kind='assignment_reminder' AND n.read_at IS NULL`;
 
 export async function listStudentNotifications(ctx, { page, pageSize }) {
   return transaction(ctx.pool, async db => {

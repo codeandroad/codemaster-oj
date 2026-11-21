@@ -6,7 +6,6 @@ import { schoolPaper4Input,schoolPaper4Title,validateStageCoverage } from './sch
 import { parsePaper4BatchImport,exportPaper4Collection } from './paper4-collection.mjs';
 import { configureSchoolActivityScholarshipRule,settleSchoolActivityRewards } from './school-scholarship.mjs';
 
-const LEGACY='00000000-0000-4000-8000-000000000052';
 const reply=body=>({status:200,body});
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const managed=(p,user,role)=>role==='school_admin'||role==='teacher'&&p.owner_account_id===user.id;
@@ -96,7 +95,7 @@ function questionPayload(content,files,{questionKey,stageId,validation=false,pub
 async function publishResults(db,a){if(a.state!=='submitted')fail(409,'NOT_SUBMITTED','The attempt has not been submitted.');const j=(await db.query("SELECT state FROM school_paper4_jobs WHERE school_id=$1 AND attempt_id=$2 AND kind='submit'",[a.school_id,a.id])).rows[0];if(j?.state!=='completed')fail(409,'GRADING_PENDING','Wait for automatic judging before publishing results.');const marks=await marksView(db,a,'school_admin');if(marks.some(m=>m.marks===null))fail(409,'REVIEW_REQUIRED','Review all manual and evidence stages before publishing results.');}
 export async function handleSchoolPaper4({pool,user,route,method,body={},url}){
  const match=route.match(/^\/schools\/([^/]+)\/paper4(?:\/(.*))?$/);if(!match)return null;
- const s=uuid(match[1]);if(s===LEGACY)fail(404,'NOT_FOUND','Use the existing school workspace.');const parts=(match[2]??'').split('/').filter(Boolean);
+ const s=uuid(match[1]);const parts=(match[2]??'').split('/').filter(Boolean);
  return transaction(pool,async db=>{
   await lockSchoolTeaching(db,s,{shared:method==='GET'});const role=await schoolRole(db,s,user.id);await db.query("SELECT set_config('campus.school_id',$1,true)",[s]);
   const [resource,key,action,subkey]=parts;

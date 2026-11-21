@@ -1,5 +1,5 @@
 import { transaction } from './db.mjs';
-import { auditSchool, LEGACY_SCHOOL_ID, lockSchoolTeaching, schoolRole } from './schools.mjs';
+import { auditSchool, lockSchoolTeaching, schoolRole } from './schools.mjs';
 import { canonicalHash, enumValue, fail, field, integer, uuid } from './security.mjs';
 
 const reply=(body,status=200)=>({status,body});
@@ -12,7 +12,7 @@ function input(body){
 }
 export async function handleSchoolLearningResources({pool,user,route,method,body={},url},loadCourse){
  const m=route.match(/^\/schools\/([^/]+)\/learning-resources(?:\/([^/]+))?$/);if(!m)return null;
- const schoolId=uuid(m[1]);if(schoolId===LEGACY_SCHOOL_ID)fail(404,'NOT_FOUND','请使用原学校入口');
+ const schoolId=uuid(m[1]);
  const id=m[2]?uuid(m[2]):null;
  return transaction(pool,async db=>{
   await lockSchoolTeaching(db,schoolId,{shared:method==='GET'});const role=await schoolRole(db,schoolId,user.id);

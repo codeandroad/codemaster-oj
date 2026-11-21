@@ -1,5 +1,5 @@
 import { transaction } from './db.mjs';
-import { auditSchool, LEGACY_SCHOOL_ID, lockSchoolTeaching, schoolRole } from './schools.mjs';
+import { auditSchool, lockSchoolTeaching, schoolRole } from './schools.mjs';
 import { lockScholarshipAssistance } from './scholarship-access.mjs';
 import { schoolActivityJobVisibleSql } from './school-activities.mjs';
 import { canonicalHash, enumValue, fail, field, integer, uuid } from './security.mjs';
@@ -33,7 +33,7 @@ async function target(db,s,u,role,b,{management=false}={}){
  const type=b.type==='paper4'?'paper4':'problem';let p,v,subject,activityId=null,activityType='activity';
  if(type==='problem'){
   const id=uuid(b.problemId),versionId=uuid(b.versionId);
-  p=(await db.query('SELECT p.*,b.archived FROM school_problems p JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id WHERE p.school_id=$1 AND p.id=$2',[s,id])).rows[0];
+  p=(await db.query(`SELECT p.*,b.archived FROM school_problems p JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id WHERE b.resource_kind='ordinary' AND p.school_id=$1 AND p.id=$2`,[s,id])).rows[0];
   v=(await db.query('SELECT id,definition FROM school_problem_versions WHERE school_id=$1 AND problem_id=$2 AND id=$3',[s,id,versionId])).rows[0];subject=`problem:${id}`;
   if(b.activityId){activityId=uuid(b.activityId);const a=(await db.query(`SELECT a.* FROM school_activities a JOIN school_activity_problems ap ON ap.school_id=a.school_id AND ap.activity_id=a.id WHERE a.school_id=$1 AND a.id=$2 AND ap.problem_id=$3 AND ap.version_id=$4`,[s,activityId,id,versionId])).rows[0];
    if(!a||!management&&(a.state==='Draft'||a.cancelled_at||a.starts_at&&+new Date(a.starts_at)>Date.now()||!(await db.query(`SELECT 1 FROM school_activity_participants ap JOIN school_identities i ON i.school_id=ap.school_id AND i.id=ap.identity_id WHERE ap.school_id=$1 AND ap.activity_id=$2 AND i.account_id=$3 AND NOT ap.exempt`,[s,activityId,u.id])).rowCount))fail(404,'NOT_FOUND','Activity content is unavailable.');
@@ -51,7 +51,6 @@ async function target(db,s,u,role,b,{management=false}={}){
 // A public mirror must honor the source school's restrictions too. No school
 // content or financial data is exposed: only activity policy restrictions are returned.
 export async function publicSchoolAssistanceRestriction(db,s,u,problemId,kind){
- if(s===LEGACY_SCHOOL_ID)return null;
  const assigned=(await db.query(`SELECT a.id,a.kind,a.results_published_at FROM school_activities a
   JOIN school_activity_problems ap ON ap.school_id=a.school_id AND ap.activity_id=a.id
   JOIN school_activity_participants pp ON pp.school_id=a.school_id AND pp.activity_id=a.id
@@ -130,7 +129,7 @@ export async function configureSchoolActivityScholarshipRule(db,schoolId,user,ro
 }
 export async function settleSchoolActivityRewards(db,schoolId,activityId,type='activity'){await db.query('SELECT school_scholarship_settle_activity($1,$2,$3)',[schoolId,type,activityId]);}
 export async function handleSchoolScholarship({pool,user,route,method,body={},url}){
- const match=route.match(/^\/schools\/([^/]+)\/scholarship(?:\/(.*))?$/);if(!match)return null;const s=uuid(match[1]),path=match[2]??'';if(s===LEGACY_SCHOOL_ID)fail(404,'NOT_FOUND','Use the existing school scholarship service.');
+ const match=route.match(/^\/schools\/([^/]+)\/scholarship(?:\/(.*))?$/);if(!match)return null;const s=uuid(match[1]),path=match[2]??'';
  return transaction(pool,async db=>{
   await lockSchoolTeaching(db,s,{shared:method==='GET'});const role=await schoolRole(db,s,user.id);await scope(db,s);
   const cfg=await schoolScholarshipSettings(db,s);
@@ -176,7 +175,7 @@ export async function handleSchoolScholarship({pool,user,route,method,body={},ur
   }
   if(path==='targets'&&method==='GET'){
    if(!['teacher','school_admin'].includes(role))fail(403,'FORBIDDEN','Teaching permission required.');const items=[];
-   const problems=(await db.query(`SELECT p.id,p.published_version_id AS version_id,v.definition->>'title' AS title FROM school_problems p JOIN school_problem_versions v ON v.school_id=p.school_id AND v.id=p.published_version_id WHERE p.school_id=$1 AND ($2='school_admin' OR p.owner_account_id=$3) ORDER BY p.created_at DESC,p.id`,[s,role,user.id])).rows;
+   const problems=(await db.query(`SELECT p.id,p.published_version_id AS version_id,v.definition->>'title' AS title FROM school_problems p JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id AND b.resource_kind='ordinary' JOIN school_problem_versions v ON v.school_id=p.school_id AND v.id=p.published_version_id WHERE p.school_id=$1 AND ($2='school_admin' OR p.owner_account_id=$3) ORDER BY p.created_at DESC,p.id`,[s,role,user.id])).rows;
    for(const p of problems)items.push({type:'problem',problemId:p.id,versionId:p.version_id,title:p.title,subjectKey:`problem:${p.id}`});
    const papers=(await db.query(`SELECT p.id,p.published_version_id AS version_id,v.content FROM school_paper4_papers p JOIN school_paper4_versions v ON v.school_id=p.school_id AND v.id=p.published_version_id WHERE p.school_id=$1 AND ($2='school_admin' OR p.owner_account_id=$3) ORDER BY p.created_at DESC,p.id`,[s,role,user.id])).rows;
    for(const p of papers)for(const q of p.content.definition?.questions??[])items.push({type:'paper4',paperId:p.id,questionKey:q.key,versionId:p.version_id,title:`${p.content.shortTitle||p.content.title} · ${q.title}`,subjectKey:`paper4:${p.id}:${q.key}`});

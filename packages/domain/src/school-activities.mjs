@@ -1,6 +1,8 @@
 import { assignmentChange, notifySchoolAssignmentChange } from './assignment-changes.mjs';
+import { schoolAssignmentReceiptGrades } from './assignment-grades.mjs';
+import { assertRequiredLanguage } from './course-language-policy.mjs';
 import { transaction } from './db.mjs';
-import { auditSchool, LEGACY_SCHOOL_ID, lockSchoolTeaching, schoolRole } from './schools.mjs';
+import { auditSchool, lockSchoolTeaching, schoolRole } from './schools.mjs';
 import { bytes, canonicalHash, enumValue, fail, field, integer, uuid } from './security.mjs';
 import { validateTask } from '../judge.mjs';
 import { submissionCaseFeedback } from './submission-feedback.mjs';
@@ -131,7 +133,21 @@ export async function calculateSchoolActivityGrade(db, a, studentId, { includeLa
     LEFT JOIN school_activity_participants part ON part.school_id=a.school_id AND part.activity_id=a.id AND part.identity_id=$3
     LEFT JOIN school_judge_jobs j ON j.school_id=p.school_id AND j.problem_id=p.problem_id AND j.version_id=p.version_id
       AND j.identity_id=$3 AND j.access_context='school' AND j.kind='submit'
+      AND (a.required_language IS NULL OR coalesce(j.payload->>'language','python')=a.required_language)
     WHERE a.school_id=$1 AND a.id=$2 GROUP BY p.problem_id`, [a.school_id, a.id, studentId, includeLate && a.kind === 'assignment'])).rows;
+  if (a.kind === 'assignment') {
+    const receipts = await schoolAssignmentReceiptGrades(db, a, studentId, includeLate);
+    const byProblem = new Map(receipts.map(receipt => [receipt.problem_id, receipt]));
+    for (const row of rows) {
+      const prior = byProblem.get(row.problem_id);
+      if (!prior) continue;
+      row.activity_attempts += prior.eligible_attempts;
+      row.all_attempts += prior.eligible_attempts;
+      row.best = Math.max(Number(row.best ?? 0), Number(prior.score ?? 0));
+      row.accepted ||= prior.status === 'AC' && !prior.credited_ac;
+      row.inherited ||= prior.credited_ac;
+    }
+  }
   return activityGrade(entries, rows, a.kind);
 }
 function activityGrade(entries, rows, kind) {
@@ -180,7 +196,7 @@ function normalize(body, kind) {
 async function validateSelections(db, schoolId, data) {
   for (const p of data.problems) {
     const valid = (await db.query(`SELECT 1 FROM school_problems p JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id
-      WHERE p.school_id=$1 AND p.id=$2 AND p.published_version_id=$3 AND p.published AND NOT b.archived`, [schoolId, p.problemId, p.versionId])).rowCount;
+      WHERE p.school_id=$1 AND p.id=$2 AND p.published_version_id=$3 AND b.resource_kind='ordinary' AND p.published AND NOT b.archived`, [schoolId, p.problemId, p.versionId])).rowCount;
     if (!valid) fail(404, 'PROBLEM_UNAVAILABLE', 'A selected problem version is unavailable. Refresh the problem list.');
   }
   if (data.classIds.length) {
@@ -235,6 +251,7 @@ async function enqueueActivity(db, loaded, problemId, user, body, { preview = fa
   }
   const kind = enumValue(body.kind, ['submit', 'samples', 'custom'], 'Run type');
   const requestId = uuid(body.requestId), language = enumValue(body.language ?? 'python', ['python', 'cpp', 'javascript'], 'Language');
+  assertRequiredLanguage(language, a.required_language);
   const code = bytes(body.code, 'Code'), customInput = kind === 'custom' ? bytes(body.input ?? '', 'Input', 262144) : null;
   const hash = canonicalHash({ activityId: a.id, problemId, versionId: p.version_id, identityId: student?.id ?? null, kind, language, code, customInput,
     ...(preview && { previewRevision: a.revision }) });
@@ -330,7 +347,7 @@ async function options(db, schoolId) {
   const items = (await db.query(`SELECT p.id AS "problemId",p.published_version_id AS "versionId",v.definition->>'title' AS title,b.name AS "bankName",b.id AS "bankId"
     FROM school_problems p JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id
     JOIN school_problem_versions v ON v.school_id=p.school_id AND v.id=p.published_version_id
-    WHERE p.school_id=$1 AND p.published AND NOT b.archived ORDER BY b.name,v.definition->>'title',p.id LIMIT 2000`, [schoolId])).rows;
+    WHERE p.school_id=$1 AND b.resource_kind='ordinary' AND p.published AND NOT b.archived ORDER BY b.name,v.definition->>'title',p.id LIMIT 2000`, [schoolId])).rows;
   const students = (await db.query(`SELECT i.id,i.name,i.number,i.account_id IS NOT NULL AS activated,
     coalesce((SELECT jsonb_agg(r.class_id ORDER BY r.class_id) FROM school_class_roster r JOIN school_classes c ON c.school_id=r.school_id AND c.id=r.class_id
       WHERE r.school_id=i.school_id AND r.identity_id=i.id AND c.archived_at IS NULL),'[]') AS "classIds"
@@ -358,7 +375,6 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
   const match = preview ?? route.match(/^\/schools\/([^/]+)\/activities(?:\/(options|[^/]+)(?:\/(publish|archive|cancel|participants|start|finish|end|publish-results|report|problems|jobs)(?:\/([^/]+)(?:\/(submissions))?)?)?)?$/);
   if (!match) return null;
   const schoolId = uuid(match[1]);
-  if (schoolId === LEGACY_SCHOOL_ID) fail(404, 'NOT_FOUND', 'Use the existing school workspace.');
   return transaction(pool, async db => {
     // Match membership/roster mutation lock ordering; a revoke cannot race publication or submit.
     await lockSchoolTeaching(db, schoolId, { shared: method === 'GET' });

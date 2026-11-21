@@ -1,4 +1,5 @@
 import { assignmentPassingProgressSubmission } from './assignment-grades.mjs';
+import { schoolActivityJobVisibleSql } from './school-activities.mjs';
 import { LEGACY_SCHOOL_ID } from './schools.mjs';
 import { fail, field } from './security.mjs';
 
@@ -64,19 +65,20 @@ export async function insertLegacyAssignmentReminders(db, identityId) {
 
 export async function insertSchoolAssignmentReminders(db, schoolId, identityId) {
   await db.query(`INSERT INTO student_system_notifications(school_id,school_identity_id,kind,source_key,data)
-    SELECT a.school_id,p.identity_id,'assignment_reminder',concat('reminder:',a.id),
-      jsonb_build_object('assignmentId',a.id,'activityTitle',a.title,'dueAt',greatest(a.ends_at,p.extended_due_at))
-    FROM school_activities a JOIN school_activity_participants p ON p.school_id=a.school_id AND p.activity_id=a.id
-      AND p.identity_id=$2 AND NOT p.exempt
-    WHERE a.school_id=$1 AND a.kind='assignment' AND a.state='Published' AND a.cancelled_at IS NULL
-      AND greatest(a.ends_at,p.extended_due_at)>clock_timestamp()
-      AND greatest(a.ends_at,p.extended_due_at)<=clock_timestamp()+${reminderHorizon}
-      AND EXISTS(SELECT 1 FROM school_activity_problems ap WHERE ap.school_id=a.school_id AND ap.activity_id=a.id
+    SELECT assignment.school_id,part.identity_id,'assignment_reminder',concat('reminder:',assignment.id),
+      jsonb_build_object('assignmentId',assignment.id,'activityTitle',assignment.title,'dueAt',greatest(assignment.ends_at,part.extended_due_at))
+    FROM school_activities assignment JOIN school_activity_participants part
+      ON part.school_id=assignment.school_id AND part.activity_id=assignment.id AND part.identity_id=$2 AND NOT part.exempt
+    WHERE assignment.school_id=$1 AND assignment.kind='assignment' AND assignment.state='Published' AND assignment.cancelled_at IS NULL
+      AND greatest(assignment.ends_at,part.extended_due_at)>clock_timestamp()
+      AND greatest(assignment.ends_at,part.extended_due_at)<=clock_timestamp()+${reminderHorizon}
+      AND EXISTS(SELECT 1 FROM school_activity_problems ap WHERE ap.school_id=assignment.school_id AND ap.activity_id=assignment.id
+        AND NOT EXISTS(SELECT 1 FROM submissions previous WHERE previous.school_id=assignment.school_id
+          AND ${assignmentPassingProgressSubmission})
         AND NOT EXISTS(SELECT 1 FROM school_judge_jobs j
-          WHERE j.school_id=a.school_id AND j.identity_id=p.identity_id AND j.problem_id=ap.problem_id
+          WHERE j.school_id=assignment.school_id AND j.identity_id=part.identity_id AND j.problem_id=ap.problem_id AND j.version_id=ap.version_id
             AND j.access_context='school' AND j.kind='submit' AND j.state='completed' AND j.result->>'status'='AC'
-            AND (j.activity_id=a.id AND j.version_id=ap.version_id
-              OR j.activity_id IS DISTINCT FROM a.id AND j.created_at<=greatest(a.ends_at,p.extended_due_at))))
+            AND (assignment.required_language IS NULL OR coalesce(j.payload->>'language','python')=assignment.required_language)
+            AND ${schoolActivityJobVisibleSql('j')}))
     ON CONFLICT DO NOTHING`, [schoolId, identityId]);
 }
-

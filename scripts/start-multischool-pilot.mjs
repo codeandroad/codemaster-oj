@@ -37,6 +37,7 @@ function fingerprintSql(plan) {
     ? `(CASE WHEN t.id='${legacyId}' AND t.slug='legacy-school' THEN jsonb_set(${schoolFields},'{slug}',to_jsonb('tianxing-chuangshiji'::text)) ELSE ${schoolFields} END)`
     : schoolFields;
   const expression = `CASE
+    ${plan.addGradingContext ? "WHEN tablename='school_activities' THEN 'to_jsonb(t) - ''required_language''' WHEN tablename='school_activity_problems' THEN 'to_jsonb(t) - ''prior_version_id'' - ''original_problem_version_id'' - ''original_prior_problem_version_id'''" : ''}
     ${plan.classifySnapshotBank ? `WHEN tablename='school_problem_banks' THEN 'CASE WHEN t.school_id=''${legacyId}'' AND t.id=''00000000-0000-4000-8000-000000000074'' AND t.request_id=t.id THEN to_jsonb(t) || jsonb_build_object(''resource_kind'',''publication''::text) ELSE to_jsonb(t) END'` : ''}
     ${plan.addSubmissionSchool ? "WHEN tablename='submissions' THEN 'to_jsonb(t) - ''school_id'''" : ''}
     ${plan.addPublicPresence ? "WHEN tablename='sessions' THEN 'to_jsonb(t) - ''public_presence_seen_at'''" : ''}
@@ -298,6 +299,7 @@ async function main() {
     plan.addSubmissionSchool = targetQuery("SELECT NOT EXISTS(SELECT 1 FROM schema_migrations WHERE name='128_submission_school.sql');") === 't';
     plan.classifySnapshotBank = targetQuery("SELECT NOT EXISTS(SELECT 1 FROM schema_migrations WHERE name='129_problem_bank_scope.sql');") === 't';
     plan.mergeProblemRequests = targetQuery("SELECT NOT EXISTS(SELECT 1 FROM schema_migrations WHERE name='130_problem_publication_requests.sql');") === 't';
+    plan.addGradingContext = targetQuery("SELECT NOT EXISTS(SELECT 1 FROM schema_migrations WHERE name='132_school_activity_grading_context.sql');") === 't';
     const upgradeBackup = resolve(privateDir, `before-upgrade-${Date.now()}.dump`);
     const dump = await open(upgradeBackup, 'wx', 0o600);
     try { await run('docker', ['exec', targetContainer, 'pg_dump', '-Fc', '-U', 'campus_migrator', '-d', 'campus_demo'], { stdout: dump.fd }); }
@@ -309,6 +311,8 @@ async function main() {
   const { tables: before, plan } = baseline;
   await run('docker', [...compose, 'run', '--rm', '--no-deps', 'migrate'], { env: values });
   const after = fingerprints(plan);
+  if (plan.addGradingContext) assert.equal(targetQuery(`SELECT (SELECT count(*) FROM school_activities WHERE required_language IS NOT NULL)
+    + (SELECT count(*) FROM school_activity_problems WHERE num_nonnulls(prior_version_id,original_problem_version_id,original_prior_problem_version_id)>0)`),'0','Existing school activity rules must retain their original settings.');
   if (plan.classifySnapshotBank) assert.equal(targetQuery(`SELECT count(*) FROM school_problem_banks WHERE school_id='${legacyId}'
     AND id='00000000-0000-4000-8000-000000000074' AND request_id=id AND resource_kind<>'publication'`),'0','Catalog snapshots must be service-managed.');
   if (plan.updateDirectorySlug) assert.equal(targetQuery(`SELECT count(*) FROM schools WHERE id='${legacyId}' AND slug='legacy-school'`),'0','School directory migration did not finish.');

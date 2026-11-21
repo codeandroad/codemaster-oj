@@ -1,9 +1,9 @@
 import { transaction } from './db.mjs';
-import { LEGACY_SCHOOL_ID, lockSchoolTeaching, schoolRole } from './schools.mjs';
+import { lockSchoolTeaching, schoolRole } from './schools.mjs';
 import { fail, field, integer, uuid } from './security.mjs';
 import { schoolScholarshipSettings } from './school-scholarship.mjs';
 export async function handleSchoolLeaderboard({pool,user,route,method,url}){
- const m=route.match(/^\/schools\/([^/]+)\/leaderboard$/);if(!m)return null;if(method!=='GET')return null;const s=uuid(m[1]);if(s===LEGACY_SCHOOL_ID)fail(404,'NOT_FOUND','Use the existing school leaderboard.');
+ const m=route.match(/^\/schools\/([^/]+)\/leaderboard$/);if(!m)return null;if(method!=='GET')return null;const s=uuid(m[1]);
  return transaction(pool,async db=>{
   await lockSchoolTeaching(db,s,{shared:true});await schoolRole(db,s,user.id);await db.query("SELECT set_config('campus.school_id',$1,true)",[s]);
   const settings=await schoolScholarshipSettings(db,s),page=integer(Number(url.searchParams.get('page')??1),1,100000,'Page'),q=field(url.searchParams.get('q')??'','Search',{min:0,max:100}),classId=url.searchParams.get('classId')?uuid(url.searchParams.get('classId')):null;

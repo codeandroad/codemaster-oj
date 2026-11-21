@@ -23,7 +23,7 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
     const grantSql = (await readFile(new URL('../../../packages/domain/grants.mjs', import.meta.url), 'utf8')).match(/await pool\.query\(`([\s\S]*?)`\);/)?.[1];
     await pool.query(grantSql.replaceAll('SCHEMA public', 'SCHEMA ' + schema));
     const password = randomBytes(24).toString('base64url'), hash = await hashPassword(password), users = {}, ids = {};
-    for (const name of ['admin', 'teacher', 'student', 'peer', 'outside']) {
+    for (const name of ['admin', 'teacher', 'student', 'peer', 'fresh', 'outside']) {
       const identity = randomUUID();
       await pool.query("INSERT INTO identities(id,kind,number,name) VALUES($1,'personal',$2,$2)", [identity, name]);
       users[name] = (await pool.query('INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,$2,$3) RETURNING id', [identity, name, hash])).rows[0];
@@ -31,10 +31,10 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
     const school = await provisionSchool(pool, { slug: 'activity-http-school', name: 'HTTP school', adminUsername: 'admin' });
     const beta = await provisionSchool(pool, { slug: 'activity-http-beta', name: 'Beta', adminUsername: 'outside' });
     await pool.query('INSERT INTO platform_admins(account_id) VALUES($1)', [users.admin.id]);
-    for (const name of ['teacher', 'student', 'peer']) {
+    for (const name of ['teacher', 'student', 'peer', 'fresh']) {
       const role = name === 'teacher' ? 'teacher' : 'student';
       await pool.query('INSERT INTO school_memberships(school_id,account_id,role) VALUES($1,$2,$3)', [school.id, users[name].id, role]);
-      ids[name] = (await pool.query('INSERT INTO school_identities(school_id,kind,number,name,account_id) VALUES($1,$2,$3,$3,$4) RETURNING id', [school.id, role, name, users[name].id])).rows[0].id;
+      ids[name] = (await pool.query('INSERT INTO school_identities(id,school_id,kind,number,name,account_id) SELECT identity_id,$1,$2,$3,$3,id FROM accounts WHERE id=$4 RETURNING id', [school.id, role, name, users[name].id])).rows[0].id;
     }
     const runtime = new URL(scoped); runtime.searchParams.set('options', '-crole=campus_app -csearch_path=' + schema);
     const wu = new URL(scoped); wu.searchParams.set('options', '-crole=campus_worker -csearch_path=' + schema); worker = createPool(wu.href);
@@ -353,9 +353,9 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
     });
 
     await t.test('publishes an assigned notice and a readable deadline reminder', async () => {
-      const teacher = { auth: auth.teacher }, student = { auth: auth.student };
+      const teacher = { auth: auth.teacher }, student = { auth: auth.fresh };
       const { data: a } = await request(activities, { ...teacher, method: 'POST', status: 201, body: {
-        ...config, kind: 'assignment', title: 'Reminder homework', requestId: randomUUID(),
+        ...config, kind: 'assignment', title: 'Reminder homework', identityIds: [ids.student,ids.fresh], requestId: randomUUID(),
         endsAt: new Date(Date.now() + 24 * 3600000).toISOString(),
       } });
       const path = activities + '/' + a.id;
@@ -368,11 +368,24 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       assert.equal((await reminderNotices(student)).length, 1);
       assert.equal((await reminderNotices(student))[0].activityTitle, 'Reminder homework');
       assert.ok((await reminderNotices(student))[0].dueAt);
-      const { data: inboxData } = await request(inbox, { auth: student });
+      const { data: inboxData } = await request(inbox, student);
       const reminder = inboxData.items.find(item => item.kind === 'assignment_reminder' && item.assignmentId === a.id);
       assert.ok(reminder && !reminder.readAt);
       assert.equal((await request(inbox + '/' + reminder.id + '/read', { ...student, method: 'POST' })).data.ok, true);
-      assert.equal((await reminderNotices(student))[0].readAt !== null, true);
+      assert.deepEqual(await reminderNotices(student), []);
+      assert.deepEqual(await reminderNotices({ auth: auth.student }), [], 'a previously solved exercise needs no reminder');
+      // Historical receipts retain their original identity, school, and language.
+      await pool.query("INSERT INTO problems(id,owner_account_id) VALUES($1,$2)", [p.id,users.teacher.id]);
+      await pool.query(`INSERT INTO problem_versions(id,problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code)
+        VALUES($1,$2,'Double','stdio','Double',500,64,'print(2)')`, [published.versionId,p.id]);
+      await pool.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,code,idempotency_key,request_hash,status,score,language)
+        VALUES($1,$2,$3,$4,'submit','print(2)',$5,'receipt','AC',100,'python')`,
+        [users.fresh.id,ids.fresh,p.id,published.versionId,randomUUID()]);
+      const grade = async () => (await request(path, student)).data.grade;
+      assert.equal((await grade()).score, config.problems[0].points);
+      assert.equal((await grade()).items[0].inherited,true);
+      await pool.query("UPDATE school_activities SET required_language='cpp' WHERE school_id=$1 AND id=$2",[school.id,a.id]);
+      assert.equal((await grade()).score,0);
     });
   } finally {
     await server?.close(); await worker?.end(); await pool.end(); await owner.query('DROP SCHEMA IF EXISTS ' + schema + ' CASCADE'); await owner.end();

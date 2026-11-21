@@ -7,7 +7,7 @@ import { validateCoverImage } from './course-access.mjs';
 import { normalizeRequiredLanguage } from './course-language-policy.mjs';
 import { handleSchoolLearningResources } from './school-learning-resources.mjs';
 import { transaction } from './db.mjs';
-import { auditSchool, LEGACY_SCHOOL_ID, lockSchoolTeaching, schoolRole } from './schools.mjs';
+import { auditSchool, lockSchoolTeaching, schoolRole } from './schools.mjs';
 import { canonicalHash, enumValue, fail, field, integer, uuid } from './security.mjs';
 
 const PAGE_SIZE = 50;
@@ -61,14 +61,14 @@ async function validateProblems(db,schoolId,chapters){
  const {rows:[result]}=await db.query(`SELECT count(*)::int AS invalid FROM jsonb_to_recordset($2::jsonb) AS l("problemId" uuid,"versionId" uuid)
   LEFT JOIN school_problems p ON p.school_id=$1 AND p.id=l."problemId" AND p.published_version_id=l."versionId"
   LEFT JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id
-  WHERE p.id IS NULL OR NOT p.published OR b.archived`,[schoolId,JSON.stringify(links)]);
+  WHERE p.id IS NULL OR NOT p.published OR b.archived OR b.resource_kind<>'ordinary'`,[schoolId,JSON.stringify(links)]);
  if(result.invalid)fail(409,'COURSE_PROBLEM_UNAVAILABLE','配套练习必须为本校当前已审核发布版本');
 }
 async function currentCourseProblems(db,schoolId,view){
  const ids=[...new Set(view.chapters.flatMap(chapter=>(chapter.problems??[]).map(link=>link.problemId)))];
  if(!ids.length)return view;
  const {rows}=await db.query(`SELECT p.id,p.published_version_id FROM school_problems p
-  JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id
+  JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id AND b.resource_kind='ordinary'
   WHERE p.school_id=$1 AND p.id=ANY($2::uuid[]) AND p.published AND NOT b.archived AND p.published_version_id IS NOT NULL`,[schoolId,ids]);
  const versions=new Map(rows.map(row=>[row.id,row.published_version_id]));
  return {...view,chapters:view.chapters.map(chapter=>({...chapter,problems:(chapter.problems??[]).map(link=>({...link,versionId:versions.get(link.problemId)??link.versionId}))}))};
@@ -83,7 +83,7 @@ async function chapterPractice(db,schoolId,view,user){
     ${problemSolvedSql({problemId:'p.id',accountId:'$3',requiredLanguage:'$4',languageCreditCutoffs:'$5'})} AS solved
    FROM links l JOIN school_problems p ON p.school_id=$1 AND p.id=l."problemId"
    JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id
-   JOIN school_problem_versions v ON v.school_id=p.school_id AND v.problem_id=p.id AND v.id=l."versionId"`,[schoolId,JSON.stringify(links),user.id,required_language,language_credit_cutoffs??{}])).rows;
+   JOIN school_problem_versions v ON b.resource_kind='ordinary' AND v.school_id=p.school_id AND v.problem_id=p.id AND v.id=l."versionId"`,[schoolId,JSON.stringify(links),user.id,required_language,language_credit_cutoffs??{}])).rows;
   for(const row of rows)indexed.set(row.problemId+':'+row.versionId,row);
  }
  let completed=0,total=0;
@@ -195,7 +195,6 @@ export async function handleSchoolCourses(context){
  const match=route.match(/^\/schools\/([^/]+)\/courses(?:\/([^/]+)(?:\/(publish|unpublish|archive|restore|preview)|\/chapters\/([^/]+)\/read)?)?$/);
  if(!match)return null;
  const schoolId=uuid(match[1],'学校 ID');
- if(schoolId===LEGACY_SCHOOL_ID)fail(404,'NOT_FOUND','请从原学校课程入口访问');
  const courseId=match[2]?uuid(match[2],'课程 ID'):null;
  return transaction(pool,async db=>{
   // The school lock also serializes identity linkage, membership changes and

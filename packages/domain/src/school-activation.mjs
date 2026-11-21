@@ -16,11 +16,12 @@ export async function activationSchools(db) {
 export function activationSchoolSlug(body) {
   // Compatibility is limited to the original school's existing clients and
   // tokens. Never search all schools when the client omits the school scope.
-  return body.schoolSlug === undefined ? 'legacy-school' : field(body.schoolSlug, '学校', { max: 50 }).toLowerCase();
+  return body.schoolSlug === undefined ? null : field(body.schoolSlug, '学校', { max: 50 }).toLowerCase();
 }
 
 export async function verifySchoolIdentity(db, { schoolSlug, kind, number, name, code }) {
-  const school = (await db.query('SELECT id,slug,name,name_zh AS "nameZh",name_en AS "nameEn" FROM schools WHERE slug=$1', [schoolSlug])).rows[0];
+  const school = (await db.query(`SELECT id,slug,name,name_zh AS "nameZh",name_en AS "nameEn" FROM schools
+    WHERE slug=$1 OR ($1::text IS NULL AND id=$2)`, [schoolSlug,LEGACY_SCHOOL_ID])).rows[0];
   if (!school) claimFailed();
   await lockSchoolTeaching(db, school.id);
   const legacy = school.id === LEGACY_SCHOOL_ID;

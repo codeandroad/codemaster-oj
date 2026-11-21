@@ -45,11 +45,36 @@ const legacySubmissionScope=`FROM submissions s
  AND (s.timed_attempt_id IS NULL OR tp.results_published_at IS NOT NULL)`;
 export const legacyVisibleSubmissions=legacySubmissionScope;
 
+const confirmedMeasurementsJoin = `LEFT JOIN LATERAL (
+ SELECT r.private_results FROM judge_runs r JOIN judge_tasks t ON t.id=r.task_id
+ WHERE r.submission_id=s.id AND r.id IS DISTINCT FROM s.pending_judge_run_id
+  AND r.status=s.status AND r.score IS NOT DISTINCT FROM s.score
+  AND (NOT t.rejudge OR EXISTS(SELECT 1 FROM audit_events e WHERE e.action='submission.rejudge_confirm'
+   AND e.resource_id=s.id::text AND e.metadata->>'runId'=r.id::text))
+ ORDER BY r.created_at DESC,r.id DESC LIMIT 1) r ON true`;
+
+const ordinarySchoolReceipts = `SELECT 'SUB'||s.id::text id,lpad(s.id::text,20,'0') received_id,
+ 'person:'||s.identity_id::text actor_key,s.created_at,s.language,s.status,
+ s.identity_id=$4 is_own,s.identity_id=$4 is_current_student,r.private_results,
+ COALESCE(CASE WHEN profile.leaderboard_use_nickname THEN NULLIF(btrim(profile.nickname),'') END,
+ NULLIF(btrim(person.name),''),'Student') display_name
+ FROM submissions s
+ JOIN legacy_school_identity_ownership owner ON owner.identity_id=s.identity_id AND owner.school_id=$8
+ JOIN identities person ON person.id=s.identity_id
+ LEFT JOIN accounts profile ON profile.identity_id=person.id AND profile.binding_released_at IS NULL
+ JOIN problems source ON source.id=s.problem_id AND source.archived_at IS NULL
+ JOIN problem_banks bank ON bank.id=source.bank_id AND bank.school_id=$8 AND bank.visibility='school' AND bank.archived_at IS NULL
+ JOIN problem_versions receipt ON receipt.id=s.version_id AND receipt.published_at IS NOT NULL AND receipt.school_visible_at IS NOT NULL
+ JOIN problem_versions live ON live.id=$3 AND live.problem_id=source.id AND live.school_visible_at IS NOT NULL AND live.published_at IS NOT NULL
+ ${confirmedMeasurementsJoin}
+ WHERE s.problem_id=$2 AND s.kind='submit' AND s.assignment_id IS NULL AND s.timed_attempt_id IS NULL
+ AND s.original_submission_id IS NULL`;
+
 export async function legacyProblemSolved(db,user,problemId,versionId) {
  return (await problemProgress(db,user,[problemId],{schoolId:LEGACY_SCHOOL_ID})).get(problemId)?.solved??false;
 }
 
-export async function legacyProblemSubmissions(db,user,problemId,url,helpers) {
+export async function legacyProblemSubmissions(db,user,problemId,url,helpers,platformSchoolId=null) {
  const assignmentId=url.searchParams.get('assignmentId'),practiceId=url.searchParams.get('timedPracticeId');
  if(assignmentId&&practiceId)fail(400,'VALIDATION','Choose one activity context.');
  let versionId=url.searchParams.get('versionId');
@@ -93,7 +118,17 @@ export async function legacyProblemSubmissions(db,user,problemId,url,helpers) {
  }
  const bank=(await db.query('SELECT visibility,archived_at FROM problem_banks WHERE id=$1',[p.bank_id])).rows[0];
  const schoolVisible=!!v.published_at&&!!v.school_visible_at&&bank?.visibility==='school'&&!bank.archived_at&&!p.archived_at;
- const page=await metadataPage(db,`SELECT 'SUB'||s.id::text id,s.id received_id,s.identity_id actor_key,s.created_at,COALESCE(s.language,'python') language,s.status,s.identity_id=$2 is_own,r.private_results,
+ const values=[problemId,user.identityId,permissions.canEdit,user.id,schoolVisible];
+ let platformHistory='';
+ if(platformSchoolId) {
+  values.push(platformSchoolId);
+  platformHistory=`UNION ALL SELECT j.id::text,j.id::text,a.identity_id,j.created_at,COALESCE(j.payload->>'language','python'),
+   ${jobVerdict},j.account_id=$4,CASE WHEN j.state='completed' THEN j.result->'privateResults' END,
+   COALESCE(NULLIF(btrim(a.nickname),''),a.username)
+   FROM school_judge_jobs j JOIN accounts a ON a.id=j.account_id
+   WHERE j.school_id=$6 AND j.problem_id=$1 AND j.access_context='public' AND j.kind='submit' AND j.activity_id IS NULL`;
+ }
+ const page=await metadataPage(db,`SELECT 'SUB'||s.id::text id,lpad(s.id::text,20,'0') received_id,s.identity_id actor_key,s.created_at,COALESCE(s.language,'python') language,s.status,s.identity_id=$2 is_own,r.private_results,
   COALESCE(CASE WHEN profile.leaderboard_use_nickname THEN NULLIF(btrim(profile.nickname),'') END,NULLIF(btrim(person.name),''),'Student') display_name
   FROM (SELECT s.* ${legacySubmissionScope}
    AND ($3::boolean OR ($5::boolean AND EXISTS(SELECT 1 FROM problem_versions public_version
@@ -103,14 +138,13 @@ export async function legacyProblemSubmissions(db,user,problemId,url,helpers) {
    tp.results_published_at IS NOT NULL AND EXISTS(SELECT 1 FROM timed_practice_participants part WHERE part.practice_id=tp.id AND part.identity_id=$2 AND NOT part.exempt))) s
   JOIN identities person ON person.id=s.identity_id
   LEFT JOIN accounts profile ON profile.identity_id=person.id AND profile.binding_released_at IS NULL
-  LEFT JOIN LATERAL (SELECT r.private_results FROM judge_runs r JOIN judge_tasks t ON t.id=r.task_id
-   WHERE r.submission_id=s.id AND r.id IS DISTINCT FROM s.pending_judge_run_id AND r.status=s.status AND r.score IS NOT DISTINCT FROM s.score
-    AND (NOT t.rejudge OR EXISTS(SELECT 1 FROM audit_events e WHERE e.action='submission.rejudge_confirm' AND e.resource_id=s.id::text AND e.metadata->>'runId'=r.id::text))
-   ORDER BY r.created_at DESC,r.id DESC LIMIT 1) r ON true`,[problemId,user.identityId,permissions.canEdit,user.id,schoolVisible],url);
- return {...page,solved:await legacyProblemSolved(db,user,problemId)};
+  ${confirmedMeasurementsJoin} ${platformHistory}`,values,url);
+ return {...page,...(platformSchoolId && {platformSchoolId}),solved:await legacyProblemSolved(db,user,problemId)};
 }
 
-export async function schoolProblemSubmissions(db,p,user,url,accessContext) {
+const jobVerdict=`CASE WHEN j.state='completed' THEN COALESCE(j.result->>'status','System Error') WHEN j.state='failed' THEN 'System Error' WHEN j.state='leased' THEN 'Judging' ELSE 'Waiting' END`;
+
+export async function schoolProblemSubmissions(db,p,user,url,accessContext,{workspaceSchoolId=null,includePlatform=false}={}) {
  const requested=url.searchParams.get('versionId');
  if(requested&&uuid(requested)!==p.published_version_id&&!(await db.query(`SELECT 1
   FROM school_problem_versions requested JOIN school_problem_versions current ON current.school_id=requested.school_id
@@ -132,22 +166,35 @@ export async function schoolProblemSubmissions(db,p,user,url,accessContext) {
  // The job's identity is a receipt-time snapshot. Never infer historical
  // ownership from a later school-account binding. Unlinked history remains an
  // account bucket; owning that history does not transfer its AC to a new pupil.
- const page=await metadataPage(db,`SELECT j.id::text,j.id received_id,
-  CASE WHEN $5='public' THEN 'person:'||a.identity_id::text WHEN $5<>'staff_practice' AND j.identity_id IS NOT NULL THEN 'school:'||j.identity_id::text ELSE 'account:'||j.account_id::text END actor_key,
+ const values=[p.school_id,p.id,p.published_version_id,user.identityId,accessContext,user.id,identityId];
+ let schoolHistory='';
+ let schoolJobs=includePlatform?"OR (j.access_context='public' AND j.activity_id IS NULL)":'';
+ if(workspaceSchoolId) {
+  const schoolId=uuid(workspaceSchoolId,'School ID');
+  const membership=await db.query('SELECT 1 FROM school_workspace_roles WHERE school_id=$1 AND account_id=$2 AND role=$3',[schoolId,user.id,'student']);
+  if(!membership.rowCount)fail(404,'NOT_FOUND','School practice history is unavailable.');
+  values.push(schoolId);
+  schoolHistory=`UNION ALL ${ordinarySchoolReceipts}`;
+  schoolJobs=`OR (j.school_id=$8 AND j.access_context='school' AND j.activity_id IS NULL)`;
+ }
+ const page=await metadataPage(db,`SELECT j.id::text,j.id::text received_id,
+  CASE WHEN j.access_context='public' THEN 'person:'||a.identity_id::text
+   WHEN (${includePlatform ? 'true' : "$5='public'"}) AND person.account_id=j.account_id THEN 'person:'||a.identity_id::text
+   WHEN $5<>'staff_practice' AND j.identity_id IS NOT NULL THEN 'school:'||j.identity_id::text ELSE 'account:'||j.account_id::text END actor_key,
   j.created_at,COALESCE(j.payload->>'language','python') language,
-  CASE WHEN j.state='completed' THEN COALESCE(j.result->>'status','System Error') WHEN j.state='failed' THEN 'System Error' WHEN j.state='leased' THEN 'Judging' ELSE 'Waiting' END status,
+  ${jobVerdict} status,
   (j.account_id=$6 OR j.identity_id=$7::uuid) IS TRUE is_own,
   CASE WHEN $5='public' THEN a.identity_id=$4 WHEN $5='staff_practice' THEN j.account_id=$6 WHEN $7::uuid IS NOT NULL THEN j.identity_id=$7 ELSE j.identity_id IS NULL AND j.account_id=$6 END is_current_student,
   CASE WHEN j.state='completed' THEN j.result->'privateResults' END private_results,
-  CASE WHEN $5='public' OR person.id IS NULL THEN COALESCE(NULLIF(btrim(a.nickname),''),a.username)
+  CASE WHEN j.access_context='public' OR person.id IS NULL THEN COALESCE(NULLIF(btrim(a.nickname),''),a.username)
    ELSE COALESCE(CASE WHEN profile.leaderboard_use_nickname THEN NULLIF(btrim(profile.nickname),'') END,NULLIF(btrim(person.name),''),'Student') END display_name
   FROM school_judge_jobs j JOIN accounts a ON a.id=j.account_id
   LEFT JOIN school_identities person ON person.school_id=j.school_id AND person.id=j.identity_id
   LEFT JOIN accounts profile ON profile.id=person.account_id
   WHERE j.school_id=$1 AND j.problem_id=$2 AND $3::uuid IS NOT NULL AND j.kind='submit'
-   AND (j.access_context=$5 OR $5='staff_practice' AND j.access_context='school' AND j.activity_id IS NULL)
-   AND ($5<>'staff_practice' OR j.account_id=$6) AND ${schoolActivityJobVisibleSql('j')}`,
- [p.school_id,p.id,p.published_version_id,user.identityId,accessContext,user.id,identityId],url,{schoolProgress:true});
+   AND (j.access_context=$5 OR $5='staff_practice' AND j.access_context='school' AND j.activity_id IS NULL ${schoolJobs})
+   AND ($5<>'staff_practice' OR j.account_id=$6) AND ${schoolActivityJobVisibleSql('j')}
+   ${schoolHistory}`,values,url,{schoolProgress:true});
  return {...page,solved:(await problemProgress(db,user,[p.id],{includeStaff:accessContext==='staff_practice'})).get(p.id)?.solved??false};
 }
 

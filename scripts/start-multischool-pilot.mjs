@@ -32,7 +32,10 @@ const ownershipRoots = ['classes', 'problem_banks', 'learning_paths', 'assignmen
 // transformation separately. This does not exempt subsequent migrations.
 function fingerprintSql(plan) {
   const roots = plan.addedOwnershipColumns.map(name => `'${name}'`).join(',') || "''";
-  const schoolJson = plan.addSchoolSettings ? "to_jsonb(t) - 'name_zh' - 'name_en' - 'settings_revision'" : 'to_jsonb(t)';
+  const schoolFields = plan.addSchoolSettings ? "to_jsonb(t) - 'name_zh' - 'name_en' - 'settings_revision'" : 'to_jsonb(t)';
+  const schoolJson = plan.updateDirectorySlug
+    ? `(CASE WHEN t.id='${legacyId}' AND t.slug='legacy-school' THEN jsonb_set(${schoolFields},'{slug}',to_jsonb('tianxing-chuangshiji'::text)) ELSE ${schoolFields} END)`
+    : schoolFields;
   const expression = `CASE
     ${plan.addPublicPresence ? "WHEN tablename='sessions' THEN 'to_jsonb(t) - ''public_presence_seen_at'''" : ''}
     ${plan.addCourseAdmissions ? "WHEN tablename='public_course_listings' THEN 'to_jsonb(t) - ''access_mode'' - ''access_generation'' - ''school_revision'' - ''legacy_revision'''" : ''}
@@ -274,6 +277,7 @@ async function main() {
         FROM successes s WHERE NOT EXISTS(SELECT 1 FROM luq_first_ac_claims c WHERE c.identity_id=s.identity_id AND c.subject_key=s.subject_key);`))
       : [];
     const plan = { addActivityContext, renameLegacySchool, addedOwnershipColumns, addSchoolSettings, addDefaultSchool, addClassLifecycle, addScholarshipVisibility, addCourseParity, addCourseAdmissions, addSchoolExitArchive, addCompletionRewardMode, addPublicPresence, addPublicScholarship, publicHistoricalClaims };
+    plan.updateDirectorySlug = targetQuery("SELECT NOT EXISTS(SELECT 1 FROM schema_migrations WHERE name='127_school_directory_slug.sql');") === 't';
     const upgradeBackup = resolve(privateDir, `before-upgrade-${Date.now()}.dump`);
     const dump = await open(upgradeBackup, 'wx', 0o600);
     try { await run('docker', ['exec', targetContainer, 'pg_dump', '-Fc', '-U', 'campus_migrator', '-d', 'campus_demo'], { stdout: dump.fd }); }
@@ -285,6 +289,7 @@ async function main() {
   const { tables: before, plan } = baseline;
   await run('docker', [...compose, 'run', '--rm', '--no-deps', 'migrate'], { env: values });
   const after = fingerprints(plan);
+  if (plan.updateDirectorySlug) assert.equal(targetQuery(`SELECT count(*) FROM schools WHERE id='${legacyId}' AND slug='legacy-school'`),'0','School directory migration did not finish.');
   for (const [table, fingerprint] of Object.entries(before)) {
     assert.deepEqual(after[table], fingerprint, `Migration changed pre-existing business data in ${table}; pilot services remain stopped.`);
   }

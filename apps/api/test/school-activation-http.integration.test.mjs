@@ -55,7 +55,7 @@ test('school activation isolates same-name and same-number identities and consum
         const before = (await owner.query('SELECT (SELECT count(*) FROM accounts)::int accounts,(SELECT count(*) FROM school_memberships)::int memberships,(SELECT count(*) FROM school_activation_tokens WHERE consumed_at IS NOT NULL)::int consumed')).rows[0];
         const items = (await request('/auth/activation-schools')).data.items;
         assert.equal(items.length, 3);
-        assert.ok(items.some(item => item.slug === 'legacy-school'));
+        assert.ok(items.some(item => item.slug === 'tianxing-chuangshiji'));
         assert.ok(items.some(item => item.slug === beta.slug));
         assert.deepEqual(items.find(item => item.id === alpha.id), { id: alpha.id, slug: alpha.slug, name: '甲学校', nameZh: '甲学校', nameEn: 'Alpha School' });
         for (const item of items) assert.deepEqual(Object.keys(item).sort(), ['id', 'name', 'nameEn', 'nameZh', 'slug']);
@@ -142,13 +142,13 @@ test('school activation isolates same-name and same-number identities and consum
       await t.test('original school activation stays scoped and retains its stable identity and roles', async () => {
         const legacy = await request('/auth/login', { method: 'POST', body: { username: 'legacy-admin', password } });
         const p = (await request('/people', { auth: legacy, method: 'POST', status: 201, body: { kind: 'student', number: '001', name: 'Same Name' } })).data;
-        const body = claim({ slug: 'legacy-school' }, p.person, p.activationCode);
+        const body = claim(p.school, p.person, p.activationCode);
         await verify({ ...body, schoolSlug: alpha.slug }, 400);
-        assert.equal((await verify(body)).data.school.slug, 'legacy-school');
+        assert.equal((await verify(body)).data.school.slug, 'tianxing-chuangshiji');
         const registered = await register(body, 'legacy-student');
         assert.equal(registered.data.user.identityId, p.person.id); assert.deepEqual(registered.data.user.roles, ['student']);
         const q = (await request('/people', { auth: legacy, method: 'POST', status: 201, body: { kind: 'teacher', number: 'T-OLD', name: 'Teacher' } })).data;
-        const compatibility = claim({ slug: 'legacy-school' }, q.person, q.activationCode); delete compatibility.schoolSlug;
+        const compatibility = claim(q.school, q.person, q.activationCode); delete compatibility.schoolSlug;
         await register(compatibility, 'old-client-teacher');
       });
     } finally { await app?.close(); await owner.end(); await manager.query(`DROP SCHEMA ${schema} CASCADE`); await manager.end(); }

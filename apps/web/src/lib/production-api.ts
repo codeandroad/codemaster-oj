@@ -10,6 +10,7 @@ export interface CampusUser {
   roles: CampusRole[];
   platformAdmin?: boolean;
   defaultSchoolId?: string | null;
+  teachingSchoolId?: string | null;
   number: string;
   email?: string | null;
 }

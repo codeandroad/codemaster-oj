@@ -1,6 +1,6 @@
 "use client";
 
-import { LegacyActivationSchoolHint } from "@/components/auth/activation-school-hint";
+import { ActivationSchoolHint, type ActivationSchool } from "@/components/auth/activation-school-hint";
 
 import { AppLink as Link } from "@/components/navigation";
 import { useEffect, useState } from "react";
@@ -258,7 +258,7 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
   const selectedAttempted = selectedGrade?.problems.filter((problem) => (Boolean(problem.submissionId) || problem.completionSource === "other_entry")).length ?? 0;
   const selectedSolved = selectedGrade?.problems.filter((problem) => problem.status === "AC").length ?? 0;
   const action = useAction(),
-    [code, setCode] = useState<{ name: string; activationCode: string } | null>(
+    [code, setCode] = useState<{ name: string; school: ActivationSchool; activationCode: string } | null>(
       null,
     );
   return (
@@ -393,6 +393,7 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
                             onClick={() =>
                               action.run(async () => {
                                 const result = await productionApi<{
+                                  school: ActivationSchool;
                                   activationCode: string;
                                 }>(`people/${id}/activation`, {
                                   method: "POST",
@@ -400,6 +401,7 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
                                 });
                                 setCode({
                                   name: student?.name ?? tx("学生", "Student"),
+                                  school: result.school,
                                   activationCode: result.activationCode,
                                 });
                                 return tx("新激活码已生成。旧码即刻失效。", "A new activation code was issued. The old code is now invalid.");
@@ -507,7 +509,7 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
       )}
       {code && (
         <Modal title={`${code.name} · ${tx("激活码", "Activation code")}`} onClose={() => setCode(null)}>
-          <LegacyActivationSchoolHint/>
+          <ActivationSchoolHint school={code.school}/>
           <p className="text-sm text-muted-foreground">
             {tx("请将学号和此激活码交给本人，激活后账号自动建立。", "Give the student their ID and activation code privately. They create an account when claiming it.")}
           </p>
@@ -518,7 +520,7 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
             className="mt-4"
             onClick={() =>
               action.run(async () => {
-                await navigator.clipboard.writeText(`legacy-school\t${code.name}\t${code.activationCode}`);
+                await navigator.clipboard.writeText(`${code.school.slug}\t${code.name}\t${code.activationCode}`);
                 return tx("激活码已复制。", "Activation code copied.");
               })
             }

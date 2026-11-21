@@ -11,7 +11,7 @@ import { handleSchoolPaper4 } from './school-paper4.mjs';
 import { schoolActivitiesOperation } from './school-activities.mjs';
 import { DEFAULT_SCHOOL_EXPRESSION, handleDefaultWorkspace } from './default-workspace.mjs';
 import { handleSchoolSettings } from './school-settings.mjs';
-import { schoolPracticeOperation } from './school-practice.mjs';
+import { readablePlatformHistory, schoolPracticeOperation } from './school-practice.mjs';
 import { handlePublicLearning } from './public-learning.mjs';
 import { randomUUID } from 'node:crypto';
 import {courseMetadataForUser, resolveLegacyCourseProblem} from './course-access.mjs';
@@ -64,7 +64,7 @@ const admin=user=>{if(!rolesInclude(user,'admin')) fail(403,'FORBIDDEN','需要�
 const staff=user=>{if(!isStaff(user)) fail(403,'FORBIDDEN','需要教师权限');};
 const row=(result,message='资源不存在')=>{if(!result.rowCount) fail(404,'NOT_FOUND',message);return result.rows[0];};
 const identityIds=(value,name,max=500)=>{if(value===undefined)return [];if(!Array.isArray(value)||value.length>max)fail(400,'VALIDATION',`${name}须为最多 ${max} 项的 ID 数组`);return [...new Set(value.map(id=>uuid(id,name)))];};
-const userShape=r=>({id:r.id,identityId:r.identity_id,name:r.name,number:r.number,gender:r.gender??null,username:r.username,email:r.email||null,nickname:r.nickname,showNicknameOnLeaderboard:!!r.leaderboard_use_nickname,bio:r.bio,avatar:avatarForIdentity(r.avatar,r.identity_id),roles:r.roles,platformAdmin:!!r.platform_admin,defaultSchoolId:r.default_school_id??null,activatedAt:r.created_at});
+const userShape=r=>({id:r.id,identityId:r.identity_id,name:r.name,number:r.number,gender:r.gender??null,username:r.username,email:r.email||null,nickname:r.nickname,showNicknameOnLeaderboard:!!r.leaderboard_use_nickname,bio:r.bio,avatar:avatarForIdentity(r.avatar,r.identity_id),roles:r.roles,platformAdmin:!!r.platform_admin,defaultSchoolId:r.default_school_id??null,teachingSchoolId:r.teaching_school_id??null,activatedAt:r.created_at});
 const personShape=r=>({id:r.id,kind:r.kind,number:r.number,name:r.name,gender:r.gender??null,classes:r.classes||[],activated:!!r.activated});
 const problemShape=(r,{includeDisabledSamples=false}={})=>({...publicProblemMetadata(r.metadata),id:r.problem_id,title:r.title,mode:r.mode,statement:legacyProblemStatement(r),statementLanguage:r.statement_language,publicStatementPending:r.public_statement_pending,functionName:r.function_name,starterCode:r.starter_code,starterCodes:starterCodesFor(r),supportedLanguages:LANGUAGES,languageLimits:languageLimitsFor(r),referenceLanguage:r.reference_language||'python',samples:(r.samples||[]).filter(sample=>includeDisabledSamples||sample.enabled!==false),timeLimitMs:r.time_limit_ms,memoryLimitMb:r.memory_limit_mb,comparator:r.comparator,tags:r.tags||[],source:r.source||'',versionId:r.id,publishedVersionId:r.published_version_id||(r.published_at?r.id:null),publishedTitle:r.published_title||(r.published_at?r.title:null),published:!!r.published_at,schoolVisibleAt:r.school_visible_at??null,rankReviewStatus:r.rank_review_status??'pending',rankApprovedAt:r.rank_approved_at??null,bankVisibility:r.bank_visibility,validationStatus:r.validation_status,validationMessage:r.validation_message||null,formalTestCount:r.formal_test_count===undefined?undefined:Number(r.formal_test_count),canPublish:r.validation_status==='AC'&&!r.published_at});
 const submissionShape=r=>({id:`SUB${r.id}`,identityId:r.identity_id,problemId:r.problem_id,problemTitle:r.problem_title,versionId:r.version_id,kind:r.kind,language:r.language||'python',requiredLanguage:r.required_language??null,status:r.status,score:r.score===null?null:Number(r.score),passed:r.passed,total:r.total,createdAt:r.created_at,code:r.code,publicOutput:r.public_output||null,message:r.public_message||null,assignmentId:r.assignment_id||null,timedPracticeId:r.timed_practice_id||null,timedAttemptId:r.timed_attempt_id||null,resultsVisible:r.results_visible!==false,originalSubmissionId:r.original_submission_id?`SUB${r.original_submission_id}`:null,studentName:r.student_name});
@@ -115,7 +115,7 @@ export async function createDomainServices(pool,config) {
  const timed=createTimedService(pool);
  async function audit(db,actor,action,type,id,metadata={}) { await db.query('INSERT INTO audit_events(actor_account_id,action,resource_type,resource_id,metadata) VALUES($1,$2,$3,$4,$5)',[actor,action,type,String(id),metadata]); }
  async function findUser(db,accountId) {
-  const r=await db.query(`SELECT a.id,a.identity_id,a.username,a.email,a.nickname,a.leaderboard_use_nickname,a.bio,a.avatar,a.created_at,i.name,i.number,i.gender,${DEFAULT_SCHOOL_EXPRESSION} default_school_id,EXISTS(SELECT 1 FROM platform_admins pa WHERE pa.account_id=a.id AND pa.revoked_at IS NULL) platform_admin,ARRAY(SELECT role FROM account_roles WHERE account_id=a.id ORDER BY role) roles FROM accounts a JOIN identities i ON i.id=a.identity_id WHERE a.id=$1 AND a.disabled_at IS NULL AND a.binding_released_at IS NULL AND i.archived_at IS NULL`,[accountId]);return r.rowCount?userShape(r.rows[0]):null;
+  const r=await db.query(`SELECT a.id,a.identity_id,(SELECT school_id FROM legacy_school_account_ownership WHERE account_id=a.id) teaching_school_id,a.username,a.email,a.nickname,a.leaderboard_use_nickname,a.bio,a.avatar,a.created_at,i.name,i.number,i.gender,${DEFAULT_SCHOOL_EXPRESSION} default_school_id,EXISTS(SELECT 1 FROM platform_admins pa WHERE pa.account_id=a.id AND pa.revoked_at IS NULL) platform_admin,ARRAY(SELECT role FROM account_roles WHERE account_id=a.id ORDER BY role) roles FROM accounts a JOIN identities i ON i.id=a.identity_id WHERE a.id=$1 AND a.disabled_at IS NULL AND a.binding_released_at IS NULL AND i.archived_at IS NULL`,[accountId]);return r.rowCount?userShape(r.rows[0]):null;
  }
  async function session(db,accountId) {
   const token=randomToken(),csrfToken=randomToken();
@@ -290,10 +290,11 @@ export async function createDomainServices(pool,config) {
   if(!input.incomplete)await db.query("INSERT INTO judge_tasks(version_id,purpose) VALUES($1,'validation')",[v.id]);await audit(db,user.id,'problem.version_create','problem_version',v.id);return v;
  }
  async function issueActivation(db,user,identityId) {
+  const school=row(await db.query('SELECT id,slug,name,name_zh AS "nameZh",name_en AS "nameEn" FROM schools WHERE id=$1',[user.teachingSchoolId]));
   const person=row(await db.query('SELECT * FROM identities WHERE id=$1 AND archived_at IS NULL FOR UPDATE',[identityId]));
   await protectPlatformAccount(db,user,{identityId});
   if((await db.query('SELECT 1 FROM accounts WHERE identity_id=$1 AND binding_released_at IS NULL',[identityId])).rowCount)fail(409,'ACTIVATED','该身份已认领');
-  const activationCode=randomToken();await db.query("INSERT INTO activation_tokens(identity_id,token_hash,expires_at) VALUES($1,$2,now()+interval '7 days') ON CONFLICT(identity_id) DO UPDATE SET token_hash=EXCLUDED.token_hash,expires_at=EXCLUDED.expires_at,consumed_at=NULL",[identityId,tokenHash(activationCode)]);await audit(db,user.id,'identity.activation_issue','identity',identityId);return {person:personShape(person),activationCode};
+  const activationCode=randomToken();await db.query("INSERT INTO activation_tokens(identity_id,token_hash,expires_at) VALUES($1,$2,now()+interval '7 days') ON CONFLICT(identity_id) DO UPDATE SET token_hash=EXCLUDED.token_hash,expires_at=EXCLUDED.expires_at,consumed_at=NULL",[identityId,tokenHash(activationCode)]);await audit(db,user.id,'identity.activation_issue','identity',identityId);return {person:personShape(person),school,activationCode};
  }
 
  async function authOperation(context) {
@@ -498,7 +499,12 @@ export async function createDomainServices(pool,config) {
   const {route,method,body,url,user,sess,ip}=context;
   let m;
   const historyMatch=route.match(/^\/problems\/([^/]+)\/submissions$/);
-  if(historyMatch&&method==='GET')return respond(200,await transaction(pool,db=>legacyProblemSubmissions(db,user,historyMatch[1],url,{versionAccess,assignmentAccess})));
+  if(historyMatch&&method==='GET')return respond(200,await transaction(pool,async db=>{
+   const freePractice=url.searchParams.get('includePlatform')==='1' && user.roles.includes('student')
+    && !['assignmentId','timedPracticeId','view'].some(key=>url.searchParams.has(key));
+   const platformSchoolId=freePractice?await readablePlatformHistory(db,user,uuid(historyMatch[1])):null;
+   return legacyProblemSubmissions(db,user,historyMatch[1],url,{versionAccess,assignmentAccess},platformSchoolId);
+  }));
   for (const handler of [handleFavorites,handleLibrary]) { const result=await handler(context); if(result)return result; }
    if(route==='/problems'&&method==='GET'){
     const staffSummary=url.searchParams.get('view')==='summary';

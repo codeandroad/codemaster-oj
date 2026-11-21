@@ -286,7 +286,7 @@ function PracticeEditor({problem,userId,path,jobPath,onBack,backLabel,navigation
    if (tab === "tutorial" && statementScrollRef.current) statementScrollRef.current.scrollTop = 0;
    setLeftTab(tab);
  }
- const submissions=useProblemSubmissions(`${path}/submissions`,`${jobId??""}:${job?.state??""}:${job?.status??""}`);
+ const submissions=useProblemSubmissions(`${path}/submissions?includePlatform=1`,`${jobId??""}:${job?.state??""}:${job?.status??""}`);
  useEffect(()=>{
    try { localStorage.setItem(key, code); setDraftSaved(true); }
    catch { setDraftSaved(false); }

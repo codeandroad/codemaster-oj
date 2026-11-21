@@ -1,19 +1,12 @@
 import { transaction } from './db.mjs';
 import { fail, uuid } from './security.mjs';
-import { LEGACY_SCHOOL_ID } from './schools.mjs';
 
 // Used only with the accounts alias `a`. Read-time validation makes revoked
 // memberships immediately ineligible, including in existing login sessions.
 // A platform administrator still needs a school membership to prefer a school.
 export const DEFAULT_SCHOOL_EXPRESSION = `CASE WHEN EXISTS (
- SELECT 1 FROM schools ds WHERE ds.id=a.default_school_id AND (
-  EXISTS (SELECT 1 FROM school_memberships dm
-   WHERE dm.school_id=ds.id AND dm.account_id=a.id AND dm.revoked_at IS NULL)
-  OR ds.id='${LEGACY_SCHOOL_ID}'::uuid AND EXISTS (
-   SELECT 1 FROM legacy_school_account_ownership lo JOIN account_roles lr ON lr.account_id=lo.account_id
-   WHERE lo.account_id=a.id AND lo.school_id=ds.id
-  )
- )
+ SELECT 1 FROM school_workspace_roles member
+ WHERE member.school_id=a.default_school_id AND member.account_id=a.id
 ) THEN a.default_school_id ELSE NULL END`;
 
 export async function handleDefaultWorkspace({ pool, user, route, method, body }) {
@@ -37,14 +30,12 @@ export async function handleDefaultWorkspace({ pool, user, route, method, body }
    FOR UPDATE OF a FOR SHARE OF i`,[user.id]);
   if(!rowCount)fail(401,'UNAUTHENTICATED','请重新登录');
   if(schoolId){
-   const access=schoolId===LEGACY_SCHOOL_ID
-    ? await db.query(`SELECT r.account_id FROM account_roles r
-       JOIN legacy_school_account_ownership o ON o.account_id=r.account_id
-       JOIN schools s ON s.id=o.school_id
-       WHERE r.account_id=$1 AND o.school_id=$2 FOR SHARE OF r`,[user.id,schoolId])
-    : await db.query(`SELECT m.account_id FROM school_memberships m JOIN schools s ON s.id=m.school_id
-       WHERE m.account_id=$1 AND m.school_id=$2 AND m.revoked_at IS NULL FOR SHARE OF m`,[user.id,schoolId]);
-   if(!access.rowCount)fail(404,'NOT_FOUND','学校不存在或尚未加入');
+   const member=await db.query(`SELECT m.account_id FROM school_memberships m
+    WHERE m.account_id=$1 AND m.school_id=$2 AND m.revoked_at IS NULL FOR SHARE OF m`,[user.id,schoolId]);
+   if(!member.rowCount && !(await db.query(`SELECT r.account_id FROM account_roles r
+    JOIN legacy_school_account_ownership o USING(account_id)
+    WHERE r.account_id=$1 AND o.school_id=$2 FOR SHARE OF r`,[user.id,schoolId])).rowCount)
+    fail(404,'NOT_FOUND','学校不存在或尚未加入');
   }
   await db.query('UPDATE accounts SET default_school_id=$2 WHERE id=$1 AND default_school_id IS DISTINCT FROM $2::uuid',[user.id,schoolId]);
   return {status:200,body:{defaultSchoolId:schoolId}};

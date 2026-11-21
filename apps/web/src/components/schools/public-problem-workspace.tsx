@@ -30,6 +30,8 @@ export function PublicProblemWorkspace({ id, catalog }: { id:string; catalog:{da
 function PublicWorkspace({user, problem, catalog, reloadProblem}:{user:CampusUser;problem:Problem;catalog:{data:{items:Problem[]}|null;loading:boolean;error:string;reload:()=>void};reloadProblem:()=>void}) {
   const params = useSearchParams(), search = params.toString(), router = useRouter(), {locale} = useLocale();
   const pathname = usePathname();
+  const workspaceSchoolId = pathname === "/student/problems" ? user.teachingSchoolId
+    : pathname === "/schools" ? params.get("schoolId") : null;
   const fromCatalog = params.get("fromProblemCatalog") === "1";
   const workspacePath = fromCatalog ? pathname : "/practice/problems";
   const courseId = params.get("publicCourseId"), chapterId = params.get("publicChapterId");
@@ -70,7 +72,14 @@ function PublicWorkspace({user, problem, catalog, reloadProblem}:{user:CampusUse
       },
       chapter: validChapter ? {courseTitle:course.data!.title,title:chapter!.title,position:chapter!.position??course.data!.chapters.indexOf(chapter!),completed:chapter!.problems.find(item=>item.problemId===problem.id)!.solved} : undefined,
       tutorial: validChapter && chapter?.body.trim() ? {source:"course",courseTitle:course.data!.title,title:chapter.title,body:chapter.body} : undefined,
-      submissionsPath: `${path}/submissions?${new URLSearchParams({versionId:problem.versionId!})}`,
+      submissionsPath: `${path}/submissions?${new URLSearchParams({
+        versionId:problem.versionId!,
+        ...(workspaceSchoolId ? {workspaceSchoolId} : {}),
+        ...(inCourse ? {courseId:courseId!,chapterId:chapterId!} : {}),
+      })}`,
+      submissionsTitle: workspaceSchoolId
+        ? (locale === "en" ? "Latest school and platform practice submissions" : "校内与平台练习 · 每人最新提交")
+        : (locale === "en" ? "Latest platform practice submissions" : "平台练习 · 每人最新提交"),
       resumeSubmission: true,
       submit: ({kind,code,language,customInput,requestId})=>productionApi(`${path}/submissions`, {method:"POST",body:{kind,code,language,input:customInput,requestId,versionId:problem.versionId,publishedRevision:problem.publishedRevision,...(inCourse ? {courseId,chapterId} : {})}}),
       submissionPath: id=>`${path}/submissions/${encodeURIComponent(id)}`, normalizeSubmission:normalizeJob,
@@ -84,7 +93,7 @@ function PublicWorkspace({user, problem, catalog, reloadProblem}:{user:CampusUse
         clearProductionSession();router.replace("/login");
       });}}/></>,
     };
-  },[user,problem,search,courseId,chapterId,chapter,validChapter,catalog,course.data,course.loading,course.error,reloadCourse,locale,logout,router,fromCatalog,workspacePath]);
+  },[user,problem,search,courseId,chapterId,chapter,validChapter,catalog,course.data,course.loading,course.error,reloadCourse,locale,logout,router,fromCatalog,workspacePath,workspaceSchoolId]);
   if ((courseId || chapterId) && (!validChapter || course.error)) {
     const error = course.error || (!course.loading ? (locale === "en" ? "This version is not available in this course chapter." : "此版本不在本章可访问的练习中。") : "");
     return <div className="p-5">

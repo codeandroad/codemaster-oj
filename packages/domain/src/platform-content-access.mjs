@@ -1,13 +1,10 @@
-import { activeAccount, LEGACY_SCHOOL_ID } from './schools.mjs';
+import { activeAccount } from './schools.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
 import { fail } from './security.mjs';
 
-export const staffSchoolSql=(account,school)=>`(EXISTS(SELECT 1 FROM school_memberships m
- WHERE m.account_id=${account} AND m.school_id=${school} AND m.revoked_at IS NULL
- AND (m.role IN ('teacher','school_admin') OR EXISTS(SELECT 1 FROM school_administrators a
- WHERE a.school_id=m.school_id AND a.account_id=m.account_id AND a.revoked_at IS NULL)))
- OR (${school}='${LEGACY_SCHOOL_ID}'::uuid AND EXISTS(SELECT 1 FROM legacy_school_account_ownership o
- JOIN account_roles r ON r.account_id=o.account_id WHERE o.account_id=${account} AND o.school_id=${school} AND r.role IN ('teacher','admin'))))`;
+export const staffSchoolSql=(account,school)=>`EXISTS(SELECT 1 FROM school_workspace_roles authorized_staff
+ WHERE authorized_staff.account_id=${account} AND authorized_staff.school_id=${school}
+ AND authorized_staff.role IN ('teacher','school_admin'))`;
 
 // Course permissions are evaluated against current links, never copied into problem grants.
 // Removing a link, ending the school role, or revoking the course grant takes effect immediately.

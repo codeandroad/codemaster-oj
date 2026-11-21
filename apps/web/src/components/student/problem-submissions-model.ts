@@ -12,6 +12,7 @@ export type ProblemSubmissionMetadata = {
   isOwn: boolean;
 };
 export type ProblemSubmissionPage = {
+  platformSchoolId?: string;
   items: ProblemSubmissionMetadata[];
   page: number;
   pageSize: number;
@@ -40,6 +41,9 @@ export function submissionMeasurement(value: number | null | undefined, sourceUn
   return mib > 0 && mib < 0.01 ? `<${format.format(0.01)} MiB` : `${format.format(mib)} MiB`;
 }
 
-export function submissionOwnDetailHref(row: ProblemSubmissionMetadata, allowLegacyDetails: boolean) {
+export function submissionOwnDetailHref(row: ProblemSubmissionMetadata, allowLegacyDetails: boolean, platformSchoolId?: string) {
+  if (allowLegacyDetails && row.isOwn && platformSchoolId && !row.id.startsWith("SUB")) {
+    return `/practice/submissions?${new URLSearchParams({ submissionSchoolId: platformSchoolId, submissionId: row.id })}`;
+  }
   return allowLegacyDetails && row.isOwn ? `/student/submissions/${encodeURIComponent(row.id)}` : null;
 }

@@ -194,6 +194,17 @@ async function publicLoaded(db,user,id,courseContext={},requireCourseContext=fal
  return loadProblem(db,schoolId,id,user,null,{publicOnly:true});
 }
 
+export async function readablePlatformHistory(db,user,problemId) {
+ try {
+  const problem=await publicLoaded(db,user,problemId);
+  await schoolActivityProblemAccess(db,{schoolId:problem.school_id,problemId,user});
+  return problem.school_id;
+ } catch(error) {
+  if(error instanceof HttpError && [403,404].includes(error.status))return null;
+  throw error;
+ }
+}
+
 const rowsBySchool=rows=>{
  const schools=new Map();
  for(const row of rows){const id=row.school_id??row.schoolId;if(!schools.has(id))schools.set(id,[]);schools.get(id).push(row);}
@@ -392,7 +403,9 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
   }
   await schoolActivityProblemAccess(db,{schoolId:p.school_id,problemId:p.id,user});
   if(method==='GET'&&!route.includes('/submissions'))return reply(await shapeProblem(db,p,user,null,{detail:true,publicOnly:true,accessContext:'public'}));
-  if(method==='GET'&&route.endsWith('/submissions'))return reply(await schoolProblemSubmissions(db,p,user,url,'public'));
+  if(method==='GET'&&route.endsWith('/submissions'))return reply(await schoolProblemSubmissions(db,p,user,url,'public',{
+   workspaceSchoolId:url.searchParams.get('workspaceSchoolId'),
+  }));
   if(method==='GET'&&pub[2]){const job=(await db.query("SELECT * FROM school_judge_jobs WHERE school_id=$1 AND id=$2 AND account_id=$3 AND problem_id=$4 AND access_context='public'",[p.school_id,uuid(pub[2]),user.id,p.id])).rows[0];if(!job)fail(404,'NOT_FOUND','Submission not found.');return reply(await projectJob(db,job));}
   if(method==='POST'&&route.endsWith('/submissions')){const version=(await db.query('SELECT * FROM school_problem_versions WHERE school_id=$1 AND id=$2',[p.school_id,p.published_version_id])).rows[0];return reply(await enqueue(db,{schoolId:p.school_id,p,version,user,kind:enumValue(body.kind,['samples','custom','submit'],'Run type'),body,accessContext:'public'}),202);}
   return null;
@@ -515,7 +528,11 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
    return reply({platformPublished:false,publicRequestStatus:'pending'});
   }
   if(method==='GET'||m[4]==='submissions')await schoolActivityProblemAccess(db,{schoolId,problemId:p.id,user});
-  if(method==='GET'&&m[4]==='submissions')return reply(await schoolProblemSubmissions(db,p,user,url,practiceContext(role)));
+  if(method==='GET'&&m[4]==='submissions'){
+   const includePlatform=role==='student' && url.searchParams.get('includePlatform')==='1'
+    && (await db.query('SELECT 1 FROM school_problem_publications WHERE school_id=$1 AND problem_id=$2 AND withdrawn_at IS NULL',[schoolId,p.id])).rowCount>0;
+   return reply(await schoolProblemSubmissions(db,p,user,url,practiceContext(role),{includePlatform}));
+  }
   if(method==='GET'){const practice=url.searchParams.get('view')==='practice';if(practice&&(!p.published||p.archived))fail(404,'NOT_FOUND','Problem unavailable.');return reply(await shapeProblem(db,p,user,role,{detail:true,publicOnly:practice}));}
   if(m[4]==='submissions'&&method==='POST'){
    if(body.versionId!=null)assertLiveProblemVersion(uuid(body.versionId).toLowerCase(),p.published_version_id);

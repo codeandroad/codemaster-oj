@@ -313,11 +313,6 @@ function SchoolList({
                   <p className="mt-0.5 text-xs break-all text-muted-foreground">
                     {school.slug}
                   </p>
-                  {school.legacy && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {text("Existing school", "原系统学校")}
-                    </p>
-                  )}
                 </div>
                 <div className="space-y-1 text-xs text-muted-foreground">
                   <p>
@@ -369,14 +364,6 @@ function SchoolList({
                     <span className="text-muted-foreground">
                       {text("No active administrator", "暂无有效管理员")}
                     </span>
-                  )}
-                  {school.legacy && (
-                    <p className="mt-1 text-muted-foreground">
-                      {text(
-                        "Existing administrator roles retained.",
-                        "保留原有管理员角色。",
-                      )}
-                    </p>
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-1 lg:flex-nowrap lg:justify-end">

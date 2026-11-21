@@ -93,6 +93,20 @@ test('ordinary problem versions and personal progress agree across school, platf
     const publishedJob = await post(`/practice/problems/${problem.id}/submissions`, { requestId: randomUUID(), kind: 'submit', code: 'print(input())', language: 'python', versionId: v1.id }, 'public-solver', 202);
     const accepted = { judge: async () => ({ status: 'AC', score: 100, passed: 1, total: 1, publicMessage: '', privateResults: [] }) };
     assert.equal(await processSchoolOne({ pool: worker, judge: accepted }), true);
+    await t.test('a school workspace joins authorized peer receipts while the public view stays public', async () => {
+      const path = `/practice/problems/${problem.id}/submissions`;
+      const expected = [`SUB${historical.id}`, publishedJob.id].sort();
+      const school = await get(`/problems/${problem.id}/submissions?includePlatform=1`, 'public-solver');
+      const platform = await get(`${path}?workspaceSchoolId=${LEGACY_SCHOOL_ID}`, 'public-solver');
+      for (const page of [school, platform]) {
+        assert.equal(page.total, 2);
+        assert.deepEqual(page.items.map(row => row.id).sort(), expected);
+        assert.equal(page.items.find(row => row.isOwn)?.id, publishedJob.id);
+        assert.doesNotMatch(JSON.stringify(page), /PRIVATE_SAVED_CODE|privateResults/);
+      }
+      assert.deepEqual((await get(path, 'public-solver')).items.map(row => row.id), [publishedJob.id]);
+      await get(`${path}?workspaceSchoolId=${randomUUID()}`, 'public-solver', 404);
+    });
     await legacyResult('unstarted', { kind: 'samples' });
     await legacyResult('school-solver', { status: 'WA' });
     const v2 = await createVersion('Current function exercise', { mode: 'function' });

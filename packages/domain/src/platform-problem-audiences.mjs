@@ -6,11 +6,7 @@ import { enumValue, fail, field, uuid } from './security.mjs';
 
 export const matchingProblemAudienceSql = account => `(
  audience.account_id=${account} OR audience.school_id IN (
-  SELECT school_id FROM school_memberships WHERE account_id=${account} AND role='student' AND revoked_at IS NULL
-  UNION
-  SELECT ownership.school_id FROM legacy_school_account_ownership ownership
-  JOIN account_roles role ON role.account_id=ownership.account_id AND role.role='student'
-  WHERE ownership.account_id=${account}
+  SELECT school_id FROM school_workspace_roles WHERE account_id=${account} AND role='student'
  ))`;
 
 const active = 'a.disabled_at IS NULL AND a.binding_released_at IS NULL AND i.archived_at IS NULL';

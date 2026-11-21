@@ -102,6 +102,7 @@ export function ProblemWorkspace(props: ProblemWorkspaceProps) {
       const value = params.get(key);
       if (value) query.set(key, value);
     }
+    if (!query.has("assignmentId") && !query.has("timedPracticeId")) query.set("includePlatform", "1");
   }
   const submissionsPath = adapter?.submissionsPath ?? `problems/${encodeURIComponent(problem.id)}/submissions?${query}`;
   const resumePath = !original && (!adapter || adapter.resumeSubmission)

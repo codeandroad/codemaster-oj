@@ -6,6 +6,8 @@ try {
   await pool.query(`
     GRANT USAGE ON SCHEMA public TO campus_app, campus_worker;
     GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO campus_app;
+    REVOKE ALL ON school_workspace_roles FROM campus_worker, PUBLIC, campus_app;
+    GRANT SELECT ON school_workspace_roles TO campus_app;
     GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO campus_app;
     REVOKE ALL ON platform_problem_banks,platform_problem_imports FROM PUBLIC,campus_worker;
     REVOKE ALL ON platform_problem_audiences FROM PUBLIC,campus_worker,campus_app;

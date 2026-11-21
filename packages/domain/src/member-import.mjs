@@ -50,7 +50,7 @@ export async function handleMemberImport({pool,user,route,method,body,config,hel
     const status=created?'created':added?'added':'skipped';
     if(created)issued=await helpers.issueActivation(db,user,person.id);
     const classes=(await db.query('SELECT c.id,c.name FROM class_members cm JOIN classes c ON c.id=cm.class_id WHERE cm.identity_id=$1 AND c.archived_at IS NULL ORDER BY c.name',[person.id])).rows;
-    items.push({line:index+1,status,person:helpers.personShape({...person,classes}),...(issued?{activationCode:issued.activationCode}:{})});summary[status]++;
+    items.push({line:index+1,status,person:helpers.personShape({...person,classes}),...(issued?{activationCode:issued.activationCode,school:issued.school}:{})});summary[status]++;
     await db.query('RELEASE SAVEPOINT member_import_row');
    }catch(error){
     await db.query('ROLLBACK TO SAVEPOINT member_import_row');await db.query('RELEASE SAVEPOINT member_import_row');

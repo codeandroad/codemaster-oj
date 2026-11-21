@@ -86,18 +86,10 @@ export async function provisionSchool(pool, { slug, name, adminUsername }) {
 async function listSchools(pool, user) {
   const { rows } = await pool.query(`
     SELECT s.id, s.slug, s.name, s.name_zh AS "nameZh", s.name_en AS "nameEn",
-      CASE WHEN m.role <> 'school_admin' AND g.account_id IS NOT NULL
-        THEN ARRAY['school_admin',m.role] ELSE ARRAY[m.role] END roles
-    FROM school_memberships m JOIN schools s ON s.id = m.school_id
-    LEFT JOIN school_administrators g ON g.school_id=m.school_id AND g.account_id=m.account_id
-      AND g.revoked_at IS NULL
-    WHERE m.account_id = $1 AND m.revoked_at IS NULL
-    ORDER BY s.name, s.id`, [user.id]);
-  const legacyRoles = user.roles.map(role => role === 'admin' ? 'school_admin' : role);
-  if (legacyRoles.length) {
-    const { rows: [legacy] } = await pool.query('SELECT id,slug,name,name_zh AS "nameZh",name_en AS "nameEn" FROM schools WHERE id=$1', [LEGACY_SCHOOL_ID]);
-    if (legacy) rows.unshift({ ...legacy, roles: legacyRoles });
-  }
+      array_agg(m.role ORDER BY m.role) roles
+    FROM school_workspace_roles m JOIN schools s ON s.id = m.school_id
+    WHERE m.account_id = $1
+    GROUP BY s.id ORDER BY (s.id=$2) DESC, s.name, s.id`, [user.id,LEGACY_SCHOOL_ID]);
   return rows.map(school => ({ ...school, legacy: school.id === LEGACY_SCHOOL_ID }));
 }
 

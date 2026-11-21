@@ -130,3 +130,17 @@ export async function savePlatformCourseAudience(db,courseId,audience) {
  }
  await db.query('UPDATE platform_course_rules SET active=false,updated_at=clock_timestamp() WHERE course_id=$1 AND active AND NOT(rule_key=ANY($2::text[]))',[courseId,audience.rules.map(r=>r.key)]);
 }
+
+export async function savePlatformCourseCatalogSchools(db, courseId, scope, schoolIds) {
+ if (scope === 'all' && schoolIds === undefined) return;
+ const selected = ids(schoolIds === undefined ? [] : schoolIds, 500, '校内展示学校');
+ if (scope !== 'all' && selected.length)
+  fail(400, 'VALIDATION', '自定义范围的校内展示由指定学校规则决定');
+ if (selected.length && (await db.query('SELECT id FROM schools WHERE id=ANY($1::uuid[])', [selected])).rowCount !== selected.length)
+  fail(400, 'VALIDATION', '所选学校不存在');
+
+ await db.query(`DELETE FROM school_platform_course_adoptions
+  WHERE course_id=$1 AND NOT(school_id=ANY($2::uuid[]))`, [courseId, selected]);
+ if (selected.length) await db.query(`INSERT INTO school_platform_course_adoptions(school_id,course_id)
+  SELECT school_id,$1 FROM unnest($2::uuid[]) AS selected(school_id) ON CONFLICT DO NOTHING`, [courseId, selected]);
+}

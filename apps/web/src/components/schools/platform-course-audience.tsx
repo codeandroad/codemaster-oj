@@ -8,9 +8,10 @@ import type { AudienceMember, PlatformCourse } from "./platform-course-model";
 import { directAdmissionRule, type AdmissionRule, type AudiencePolicy } from "./platform-course-admission-model";
 import { PlatformCourseInvitation, PlatformCourseRuleEditor } from "./platform-course-rule-editor";
 
-export function PlatformCourseAudience({ courseId, policy, onChange, schools, accounts, onSchools, onAccounts, disabled, dirty }: {
+export function PlatformCourseAudience({ courseId, policy, onChange, schools, accounts, onSchools, onAccounts, catalogSchools, onCatalogSchools, disabled, dirty }: {
   courseId: string; policy: AudiencePolicy; onChange: (policy: AudiencePolicy) => void;
   schools: AudienceMember[]; accounts: AudienceMember[]; onSchools: (items: AudienceMember[]) => void; onAccounts: (items: AudienceMember[]) => void;
+  catalogSchools: AudienceMember[]; onCatalogSchools: (items: AudienceMember[]) => void;
   disabled: boolean; dirty: boolean;
 }) {
   const text = useSchoolText(), courses = useData<{ items: PlatformCourse[] }>("platform/courses?view=summary");
@@ -44,7 +45,17 @@ export function PlatformCourseAudience({ courseId, policy, onChange, schools, ac
       <option value="all">{text("All registered users", "所有注册用户")}</option><option value="custom">{text("Custom audience", "自定义范围")}</option>
     </select></label>
     {courses.error && <div role="alert" className="space-y-2 text-sm text-destructive"><p>{courses.error}</p><Button type="button" variant="secondary" size="sm" onClick={courses.reload}>{text("Reload prerequisite courses", "重新加载前置课程")}</Button></div>}
-    {policy.scope === "all" ? ruleView("all", text("All registered users", "所有注册用户"), policy.allRule ?? directAdmissionRule(), allRule => onChange({ ...policy, allRule })) : <div className="space-y-4">
+    {policy.scope === "all" ? <>
+      {ruleView("all", text("All registered users", "所有注册用户"), policy.allRule ?? directAdmissionRule(), allRule => onChange({ ...policy, allRule }))}
+      <section aria-label={text("School catalog visibility", "校内展示")} className="space-y-2 border-t border-border pt-4">
+        <h4 className="text-sm font-semibold">{text("School catalog visibility", "校内展示")}</h4>
+        <p className="text-sm text-muted-foreground">{text(
+          "Selected schools show this course in their school catalog. Students follow the public admission rule above.",
+          "所选学校会在「本校」课程列表展示这门课，学生按上面的公开准入规则学习。",
+        )}</p>
+        <AudiencePicker kind="schools" selected={catalogSchools} onSelected={onCatalogSchools} disabled={disabled}/>
+      </section>
+    </> : <div className="space-y-4">
       <p className="text-xs leading-5 text-muted-foreground">{text("Meeting one complete rule is enough. School membership is checked across your schools, regardless of the current workspace.", "满足任意一条完整规则即可。学校资格按账号的有效成员身份匹配，不受当前工作区影响。")}</p>
       <div className="space-y-3 border-t border-border pt-3">
         <label className="flex min-h-10 items-center gap-2 text-sm font-medium"><input type="checkbox" className="size-4 shrink-0 accent-primary" disabled={disabled} checked={Boolean(policy.independentRule)} onChange={event => {
@@ -59,7 +70,7 @@ export function PlatformCourseAudience({ courseId, policy, onChange, schools, ac
           onChange({ ...policy, schoolRules: event.target.checked ? savedSchools : [] });
         }}/>{text("Selected schools", "指定学校")}</label>
         {schoolPicker && <>
-          <AudiencePicker kind="schools" selected={policy.schoolRules.map(rule => schools.find(school => school.id === rule.schoolId) ?? { id: rule.schoolId, name: schoolName(rule.schoolId) })} disabled={disabled} onSelected={items => {
+          <AudiencePicker kind="schools" showAdmissionHint selected={policy.schoolRules.map(rule => schools.find(school => school.id === rule.schoolId) ?? { id: rule.schoolId, name: schoolName(rule.schoolId) })} disabled={disabled} onSelected={items => {
             onSchools(items); onChange({ ...policy, schoolRules: items.map(item => policy.schoolRules.find(rule => rule.schoolId === item.id) ?? { schoolId: item.id, ...directAdmissionRule() }) });
           }}/>
           {policy.schoolRules.map(rule => <div key={rule.schoolId} className="space-y-3 border-t border-border pt-3"><h4 className="break-words text-sm font-semibold">{schoolName(rule.schoolId)}</h4>
@@ -95,12 +106,12 @@ export function PlatformCourseAudience({ courseId, policy, onChange, schools, ac
   </section>;
 }
 
-function AudiencePicker({ kind, selected, onSelected, disabled }: {
-  kind: "schools" | "students"; selected: AudienceMember[]; onSelected: (items: AudienceMember[]) => void; disabled: boolean;
+function AudiencePicker({ kind, selected, onSelected, disabled, showAdmissionHint = false }: {
+  kind: "schools" | "students"; selected: AudienceMember[]; onSelected: (items: AudienceMember[]) => void; disabled: boolean; showAdmissionHint?: boolean;
 }) {
   const text = useSchoolText(), [query, setQuery] = useState("");
   const schoolHintId = useId();
-  const showSchoolHint = kind === "schools" && selected.length === 0;
+  const showSchoolHint = showAdmissionHint && selected.length === 0;
   const resource = useData<{ items: AudienceMember[] }>(`platform/courses/audience?${new URLSearchParams({ kind, q: query })}`);
   const toggle = (item: AudienceMember) => onSelected(selected.some(value => value.id === item.id) ? selected.filter(value => value.id !== item.id) : [...selected, item]);
   return <div className="space-y-2 rounded-md border border-border p-3">

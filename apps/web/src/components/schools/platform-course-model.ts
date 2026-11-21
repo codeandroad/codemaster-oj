@@ -16,6 +16,7 @@ export type PlatformChapter = {
 export type PlatformCourse = {
   canManage?: boolean;
   audiencePolicy?: AudiencePolicy;
+  catalogSchools?: AudienceMember[];
   pendingApplications?: number;
   sections?: CourseSection[];
   localizations?: CourseLocalizations;

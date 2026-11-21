@@ -505,7 +505,7 @@ test('school and public practice Nest transport requires scoped membership, CSRF
    assert.ok(!(await list('')).platformCourses.some(course=>course.id===assigned.id));
    await request('/practice/courses/'+updated.id,{auth:auth.student});
   });
-  await t.test('school adoption adds a public course to that school without changing admission', async () => {
+  await t.test('platform administrators can manage school catalog visibility independently of public admission', async () => {
    const created=(await request('/platform/courses',{auth:auth.platform,method:'POST',status:201,
     body:{requestId:randomUUID(),title:'Adopted course',audiencePolicy:{scope:'all'},
      chapters:[{title:'Lesson',content:'Shared lesson body'}]}})).data;
@@ -513,12 +513,22 @@ test('school and public practice Nest transport requires scoped membership, CSRF
     body:{expectedRevision:created.revision,sourceVersion:created.sourceVersion}})).data;
    const list=async schoolId=>(await request('/schools/'+schoolId+'/courses?includePlatform=true&q=Adopted%20course',
     {auth:auth.student})).data.platformCourses;
+   const path='/platform/courses/'+course.id;
+   const update=(state,body,options={})=>request(path,{auth:auth.platform,method:'PATCH',
+    body:{expectedRevision:state.revision,sourceVersion:state.sourceVersion,...body},...options});
    assert.deepEqual(await list(school.id),[]);
-   const app=createPool(runtime.href);
-   try {
-    await assert.rejects(app.query('INSERT INTO school_platform_course_adoptions VALUES($1,$2)',[school.id,course.id]),{code:'42501'});
-   } finally { await app.end(); }
+   // Simulate a school already selected by the earlier data migration.
    await pool.query('INSERT INTO school_platform_course_adoptions VALUES($1,$2)',[school.id,course.id]);
+   assert.deepEqual((await request(path,{auth:auth.platform})).data.catalogSchools,[{id:school.id,name:school.name}]);
+   const appPool=createPool(runtime.href),app=await appPool.connect();
+   try {
+    await app.query("SELECT set_config('campus.account_id',$1,false)",[users.teacher.id]);
+    await assert.rejects(app.query('INSERT INTO school_platform_course_adoptions VALUES($1,$2)',[beta.id,course.id]),{code:'42501'});
+    assert.equal((await app.query('DELETE FROM school_platform_course_adoptions WHERE course_id=$1',[course.id])).rowCount,0);
+   } finally { app.release(); await appPool.end(); }
+   await update(course,{catalogSchoolIds:[]},{auth:auth.student,status:403});
+   await update(course,{catalogSchoolIds:[]},{csrf:false,status:403});
+   await update(course,{catalogSchoolIds:[randomUUID()]},{status:400});
    const [adopted]=await list(school.id);
    assert.equal(adopted.id,course.id);
    assert.equal(adopted.admission,'direct');
@@ -528,9 +538,25 @@ test('school and public practice Nest transport requires scoped membership, CSRF
    assert.equal((await read('student','?schoolId='+school.id)).chapters[0].body,'Shared lesson body');
    assert.equal((await read('personal')).chapters[0].body,'Shared lesson body');
    assert.deepEqual(await list(beta.id),[]);
-   await pool.query('DELETE FROM school_platform_course_adoptions WHERE school_id=$1 AND course_id=$2',[school.id,course.id]);
+   const moved=(await update(course,{catalogSchoolIds:[beta.id]})).data;
+   assert.deepEqual(moved.catalogSchools,[{id:beta.id,name:beta.name}]);
+   assert.deepEqual(moved.audiencePolicy,course.audiencePolicy);
    assert.deepEqual(await list(school.id),[]);
+   assert.equal((await list(beta.id))[0]?.id,course.id);
+   await update(course,{catalogSchoolIds:[]},{status:409});
+   const revoked=(await update(moved,{catalogSchoolIds:[]})).data;
+   assert.deepEqual(revoked.catalogSchools,[]);
+   assert.deepEqual(await list(beta.id),[]);
    assert.equal((await read('personal')).chapters[0].body,'Shared lesson body');
+   const restored=(await update(revoked,{catalogSchoolIds:[beta.id]})).data;
+   const custom={scope:'custom',schoolRules:[{schoolId:school.id,admissionMode:'direct'}],
+    independentRule:{admissionMode:'direct'}};
+   await update(restored,{audiencePolicy:custom,catalogSchoolIds:[beta.id]},{status:400});
+   assert.equal((await list(beta.id))[0]?.id,course.id);
+   const narrowed=(await update(restored,{audiencePolicy:custom})).data;
+   assert.deepEqual(narrowed.catalogSchools,[]);
+   assert.equal((await list(school.id))[0]?.id,course.id);
+   assert.deepEqual(await list(beta.id),[]);
   });
   await t.test('school leaderboard preserves the default and saved avatars', async () => {
    const path=prefix+'/leaderboard';

@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { transaction } from './db.mjs';
 import { activeAccount } from './schools.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
-import { platformAudiencePolicy, platformAudiencePolicyFromRows, platformCourseAudience, savePlatformCourseAudience } from './platform-course-access.mjs';
+import { platformAudiencePolicy, platformAudiencePolicyFromRows, platformCourseAudience, savePlatformCourseAudience, savePlatformCourseCatalogSchools } from './platform-course-access.mjs';
 import { courseDisplayProperties } from './course-access.mjs';
 import { courseLocalizations } from './course-localizations.mjs';
 import { assertCoursePaper4Ready, loadCoursePaper4, chapterPaper4Links, setChapterPaper4Links } from './course-paper4.mjs';
@@ -104,7 +104,10 @@ async function shape(db,p,{detail=false,admin=true}={}) {
  const pendingApplications=Number((await db.query(`SELECT count(*) n FROM platform_course_admissions a
   JOIN platform_course_rules r ON r.id=a.rule_id AND r.active AND r.generation=a.generation
   WHERE a.course_id=$1 AND a.status='pending'`,[p.id])).rows[0].n);
- return {...courseMetadata(p,{audiencePolicy,schools,students,pendingApplications,chapterCount:chapters.length,admin}),...(detail?{chapters}:{})};
+ const catalogSchools = admin ? (await db.query(`SELECT s.id,s.name FROM school_platform_course_adoptions a
+  JOIN schools s ON s.id=a.school_id WHERE a.course_id=$1 ORDER BY s.name,s.id`, [p.id])).rows : undefined;
+ return {...courseMetadata(p,{audiencePolicy,schools,students,pendingApplications,chapterCount:chapters.length,admin}),
+  ...(catalogSchools && {catalogSchools}),...(detail?{chapters}:{})};
 }
 async function audit(db,user,action,p) {
  await db.query(`INSERT INTO platform_audit_events(actor_account_id,action,detail) VALUES($1,$2,$3)`,
@@ -158,6 +161,7 @@ async function save(db,user,body,old,{admin}) {
  [id,title,description,category,minutes,difficulty,cover,display.authorName,display.authoredAt,display.coverImage,display.requiredLanguage,localizations,audience.scope,audience.schoolIds,audience.studentIds,!!old]);
  await db.query('UPDATE learning_paths SET sections=$2 WHERE id=$1',[id,JSON.stringify(sections)]);
  await savePlatformCourseAudience(db,id,audience);
+ if (admin) await savePlatformCourseCatalogSchools(db, id, audience.policyScope, body.catalogSchoolIds);
  if(body.chapters===undefined)assertChapterSections(sections,(await db.query('SELECT section_key FROM learning_chapters WHERE path_id=$1 AND archived_at IS NULL',[id])).rows);
  if(body.chapters!==undefined){
   if(!Array.isArray(body.chapters)||body.chapters.length>100||Buffer.byteLength(JSON.stringify(body.chapters))>1500000)
@@ -277,6 +281,7 @@ export async function handlePlatformCourses({pool,user,route,method,body,url}) {
   if(old&&(body.expectedRevision!==old.platform_revision||body.sourceVersion!==old.source_version))
    fail(409,'REVISION_CONFLICT','课程已更新，请重新载入后保存');
   if(!admin&&old){
+   if(body.catalogSchoolIds!==undefined)fail(403,'PLATFORM_ADMIN_REQUIRED','需要平台管理员权限才能修改校内展示');
    for(const key of ['audiencePolicy','audienceScope','schoolIds','studentIds'])if(body[key]!==undefined){
     const shaped=await shape(db,old,{admin});
     if(!isDeepStrictEqual(body[key],shaped[key]))fail(403,'PLATFORM_ADMIN_REQUIRED','编辑授权不包含更改开放范围和准入规则');

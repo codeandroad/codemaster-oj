@@ -344,6 +344,7 @@ test('the complete platform problem editor uses scoped grants without publicatio
       assert.equal((await get(`${source}/${problem.id}`, 'other-teacher')).canEdit, true);
       const edit = { expectedRevision: course.revision, sourceVersion: course.sourceVersion };
       await patch(`/platform/courses/${course.id}`, { ...edit, audienceScope: 'students', studentIds: [actors.student.identityId] }, 'teacher', 403);
+      await patch(`/platform/courses/${course.id}`, { ...edit, catalogSchoolIds: [alpha.id] }, 'teacher', 403);
       await post(`/platform/courses/${course.id}/publish`, edit, 'teacher', 403);
       await post(`/platform/content-editors/course/${course.id}`, grant('teacher', beta.id));
       await pool.query('UPDATE school_memberships SET revoked_at=now() WHERE school_id=$1 AND account_id=$2', [alpha.id, actors.teacher.id]);

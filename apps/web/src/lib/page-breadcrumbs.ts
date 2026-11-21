@@ -6,7 +6,7 @@ const sections: Record<string, Label> = {
   "/student/acsl": ["ACSL 真题练习", "ACSL practice"],
   "/teacher/acsl": ["ACSL 题库", "ACSL papers"],
   "/admin/acsl": ["ACSL 题库", "ACSL papers"],
-  "/practice": ["公开学习", "Public learning"],
+  "/practice": ["开放平台", "Open Platform"],
   "/practice/courses": ["课程", "Courses"],
   "/practice/problems": ["题目", "Problems"],
   "/practice/submissions": ["提交记录", "Submissions"],

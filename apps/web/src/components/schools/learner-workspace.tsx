@@ -60,7 +60,7 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
   const navigation = learnerNavigation(school?.id);
   const href = (key:string) => school ? schoolWorkspaceHref(school.id,key === "settings" ? "personal-settings" : key)
     : key === "home" ? "/practice" : `/practice/${key}`;
-  const scopeName = school ? schoolDisplayName(school,locale) : text("Public learning","公开学习");
+  const scopeName = school ? schoolDisplayName(school,locale) : text("Open Platform","开放平台");
   const prep = ["paper4","acsl"].includes(section);
   const item = navigation.find(item=>item.section === section);
   const otherLabels:Record<string,string> = {profile:text("Profile","个人资料"),people:text("Profile","个人主页"),
@@ -140,7 +140,7 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
           {fullscreen ? content : <WorkspaceFrame student schoolName={scopeName}
             workspaceSelector={schools.length > 0 ? <select aria-label={text("Learning workspace","学习工作区")} value={school?.id ?? ""}
               onChange={event=>switchWorkspace(event.target.value)} className="max-w-full rounded-sm bg-transparent text-xs text-muted-foreground focus-visible:outline-2 focus-visible:outline-primary">
-              <option value="">{text("Public learning","公开学习")}</option>
+              <option value="">{text("Open Platform","开放平台")}</option>
               {schools.map(s=><option key={s.id} value={s.id}>{schoolDisplayName(s,locale)}</option>)}</select> : undefined}
             breadcrumb={<LearnerBreadcrumb home={href("home")} homeLabel={text("Home","首页")} section={section} label={label}
               parent={section==="classes" && classId ? {href:href("classes"),label} : prep ? {href:href("exam-preparation"),label:text("Exam preparation","备考中心")} : undefined}/>}

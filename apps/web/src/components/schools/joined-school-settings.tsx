@@ -109,7 +109,7 @@ export function JoinedSchoolSettings({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {staff && <AppLink href="/practice/courses" className="inline-flex min-h-9 items-center rounded-md px-2 text-sm font-medium text-primary hover:bg-muted">{text("Public learning", "公开学习")}</AppLink>}
+          {staff && <AppLink href="/practice/courses" className="inline-flex min-h-9 items-center rounded-md px-2 text-sm font-medium text-primary hover:bg-muted">{text("Open Platform", "开放平台")}</AppLink>}
           {user.platformAdmin && <AppLink href="/platform" className="inline-flex min-h-9 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-primary hover:bg-muted"><ShieldCheck size={15} aria-hidden="true" />{text("Platform administration", "平台管理")}</AppLink>}
         <Button
           size="sm"

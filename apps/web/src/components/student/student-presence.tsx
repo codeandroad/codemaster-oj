@@ -41,7 +41,7 @@ export function StudentPresenceHeartbeat({ identityId, endpoint = "presence" }: 
 export function OnlineStudents({ identityId, endpoint = "presence" }: { identityId: string; endpoint?: PresenceEndpoint }) {
   const { locale } = useLocale();
   const tx = (zh: string, en: string) => locale === "zh" ? zh : en;
-  const audienceLabel = endpoint === "practice/presence" ? tx("公开学习区在线人员", "Public learners online") : tx("全站当前在线学生", "Students currently online across the site");
+  const audienceLabel = endpoint === "practice/presence" ? tx("开放平台在线人员", "Learners online on the Open Platform") : tx("全站当前在线学生", "Students currently online across the site");
   const panelId = useId();
   const [open, setOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);

@@ -46,21 +46,21 @@ export function Progress({ percent, label, complete = false }: { percent: number
 
 export function StudentDashboardView({
   heading, assignmentState, assignment, courseState, course, coursesHref,
-  submissionsState, submissions, submissionsHref, featured, courseCatalog,
+  submissionsState, submissions, submissionsHref, featured,
 }: {
   heading: string;
   featured?: ReactNode;
-  courseCatalog?: ReactNode;
   assignmentState?: DashboardState;
   assignment?: DashboardAssignment;
   courseState?: DashboardState;
   course?: DashboardCourse;
-  coursesHref: string;
+  coursesHref?: string;
   submissionsState: DashboardState;
   submissions: DashboardSubmission[];
   submissionsHref: string;
 }) {
   const { locale } = useLocale();
+  const hasCourseSidebar = courseState !== undefined && coursesHref !== undefined;
   const text = (zh: string, en: string) => locale === "en" ? en : zh;
   const displayDate = (value: string | null) => value ? new Intl.DateTimeFormat(text("zh-CN", "en-US"), {
     dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Shanghai",
@@ -85,8 +85,8 @@ export function StudentDashboardView({
     : status;
   return <>
     <PageHeader title={heading} />
-    <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="space-y-6">
+    <div className={hasCourseSidebar ? "mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]" : "mt-6"}>
+      <div className="min-w-0 space-y-6">
         {featured}
         {assignmentState && <State data={assignmentState}>
           {assignment ? <section className="border border-border bg-surface panel-shadow">
@@ -166,9 +166,8 @@ export function StudentDashboardView({
           </State>
         </section>
       </div>
-      <aside className="space-y-5">
-        {courseCatalog}
-        {courseState && <State data={courseState}>
+      {hasCourseSidebar && <aside className="space-y-5">
+        <State data={courseState}>
           {course ? <section className={panel}>
             <p className="text-xs font-semibold uppercase text-muted-foreground">{text("当前课程", "Current path")}</p>
             <h2 className="mt-2 font-bold"><AppLink href={course.href} className="hover:text-primary hover:underline focus-visible:underline">{course.title}</AppLink></h2>
@@ -185,8 +184,8 @@ export function StudentDashboardView({
             <p className="mt-3 text-sm text-muted-foreground">{text("老师发布的章节会显示在这里。", "Published chapters from your teacher appear here.")}</p>
             <AppLink href={coursesHref} className="mt-4 block text-sm font-semibold text-primary">{text("查看课程", "View paths")}</AppLink>
           </section>}
-        </State>}
-      </aside>
+        </State>
+      </aside>}
     </div>
   </>;
 }

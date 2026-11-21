@@ -55,19 +55,18 @@ type CourseDetail = {
   canTrackProgress: boolean;
 };
 
-export function PublicCourseCatalog({ courseHref, showSearch = true }: { courseHref: (id: string) => string; showSearch?: boolean }) {
+export function PublicCourseCatalog({ courseHref }: { courseHref: (id: string) => string }) {
   const text = useSchoolText();
   const { language } = useCourseLanguage();
   const catalog = useData<{ courses: PublicCourseEntry[] }>("practice/courses");
   useCourseProgressRefresh(catalog);
-  const [catalogQuery, setQuery] = useCourseCatalogQuery();
-  const query = showSearch ? catalogQuery : "";
+  const [query, setQuery] = useCourseCatalogQuery();
   const courses = filterCourseCatalog((catalog.data?.courses ?? []).map(course => localizedCourse(course, language)), query);
   const detailHref = (id: string) => courseSearchHref(courseHref(id), query);
   const { busy, openCourse, feedback, dialog } = useCourseAdmissionDialog(detailHref, catalog.reload);
 
   return <div className="space-y-3">
-    {showSearch && <CourseCatalogSearch query={query} onSearch={setQuery}/>}
+    <CourseCatalogSearch query={query} onSearch={setQuery}/>
     {feedback}
     <Loading resource={catalog}>
       <LearningCourseList empty={!courses.length ? (query

@@ -178,9 +178,6 @@ function PublicStudyHome({ user }: { user: CampusUser }) {
     submissionsState={submissions} submissionsHref="/practice/submissions"
     submissions={(submissions.data?.items ?? []).map(item => ({...item,title:item.problemTitle,
       href:`/practice/submissions?${new URLSearchParams({submissionId:item.id,submissionSchoolId:item.schoolId})}`}))}
-    coursesHref="/practice/courses" courseCatalog={<section className="space-y-3">
-      <h2 className="text-lg font-bold">{text("Public courses","公开课程")}</h2><PublicCourseCatalog courseHref={publicCourseHref} showSearch={false}/>
-    </section>}
     featured={<>
       {schoolAccessChanged && <p role="status" className={panelClass}>{text("Your school workspace is no longer available.", "你的账号已无法进入原学校工作区。")}</p>}
       <div className={`${panelClass} flex flex-wrap items-center justify-between gap-3 p-4`}>

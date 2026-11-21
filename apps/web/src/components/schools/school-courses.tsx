@@ -24,11 +24,11 @@ import { useCourseProgressRefresh } from "@/components/student/course-progress-r
 import { LearningCourseList, LearningCourseRow, learningCourseTitleClass } from "@/components/student/learning-course-list";
 import { CourseCatalogSearch } from "@/components/student/learning-course-search";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
-import { Tabs, panel } from "@/components/teacher/shared";
+import { panel } from "@/components/teacher/shared";
 import { CourseCatalogRow, CourseCatalogTable } from "@/components/teacher/course-catalog-table";
 import { CourseAdmissionsDialog } from "./course-admissions-dialog";
 import { SchoolCourseImport } from "./school-course-import";
-import { SchoolLearningResources } from "./school-learning-resources";
+import { SchoolChapterResources } from "./school-learning-resources";
 import { PracticeProblem } from "./school-practice";
 import { Button } from "@/components/ui/button";
 import {
@@ -88,15 +88,13 @@ export function SchoolCourses({
     (r) => r === "school_admin" || r === "teacher",
   );
   const canReviewAdmissions = school.roles.includes("school_admin");
-  const [tab, setTab] = useState("courses"),
-    [archived, setArchived] = useState(false),
+  const [archived, setArchived] = useState(false),
     [query, setQuery] = useState(""),
     [page, setPage] = useState(1),
     [revision, setRevision] = useState(0);
   const [edit, setEdit] = useState<string | null>(null),
     [draft, setDraft] = useState<CourseInput | undefined>(),
-    [importing, setImporting] = useState(false),
-    [creatingResource, setCreatingResource] = useState(false);
+    [importing, setImporting] = useState(false);
   const [publication, setPublication] = useState<{
       course: SchoolCourse;
       publish: boolean;
@@ -137,106 +135,67 @@ export function SchoolCourses({
   return (
     <div ref={listHeading} tabIndex={-1} className="space-y-3 outline-none">
       <PageHeader
-        eyebrow={text("Courses", "课程")}
         title={text("Courses", "课程")}
         action={
           canAuthor ? (
             <div className="flex flex-wrap gap-2">
-              {tab === "courses" && (
-                <Button variant="secondary" onClick={() => setImporting(true)}>
-                  {text("Import course Markdown", "导入课程 Markdown")}
-                </Button>
-              )}
-              <Button
-                onClick={() =>
-                  tab === "courses" ? setEdit("new") : setCreatingResource(true)
-                }
-              >
+              <Button variant="secondary" onClick={() => setImporting(true)}>
+                {text("Import course Markdown", "导入课程 Markdown")}
+              </Button>
+              <Button onClick={() => setEdit("new")}>
                 <Plus size={15} />
-                {tab === "courses"
-                  ? text("New course", "新建课程")
-                  : text("Add resource", "添加资料")}
+                {text("New course", "新建课程")}
               </Button>
             </div>
           ) : undefined
         }
       />
-      <Tabs
-        items={[
-          text("Courses", "课程"),
-          text("Learning resources", "学习资料"),
-        ]}
-        value={
-          tab === "courses"
-            ? text("Courses", "课程")
-            : text("Learning resources", "学习资料")
-        }
-        onChange={(value) =>
-          setTab(value === text("Courses", "课程") ? "courses" : "resources")
-        }
-      />
       <Feedback action={{ error: "", message }} />
-      {tab === "courses" ? (
-        <>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            {canAuthor && (
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant={archived ? "secondary" : "primary"}
-                  aria-pressed={!archived}
-                  onClick={() => {
-                    setArchived(false);
-                    setPage(1);
-                  }}
-                >
-                  {text("Active", "使用中")}
-                </Button>
-                <Button
-                  size="sm"
-                  variant={archived ? "primary" : "secondary"}
-                  aria-pressed={archived}
-                  onClick={() => {
-                    setArchived(true);
-                    setPage(1);
-                  }}
-                >
-                  {text("Archived", "已归档")}
-                </Button>
-              </div>
-            )}
-            <CourseCatalogSearch query={query} onSearch={value => {
-              setQuery(value);
-              setPage(1);
-            }} onRefresh={onRefresh}/>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {canAuthor && (
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant={archived ? "secondary" : "primary"}
+              aria-pressed={!archived}
+              onClick={() => {
+                setArchived(false);
+                setPage(1);
+              }}
+            >
+              {text("Active", "使用中")}
+            </Button>
+            <Button
+              size="sm"
+              variant={archived ? "primary" : "secondary"}
+              aria-pressed={archived}
+              onClick={() => {
+                setArchived(true);
+                setPage(1);
+              }}
+            >
+              {text("Archived", "已归档")}
+            </Button>
           </div>
-          {canAuthor && <section className="rounded-lg border border-border bg-surface px-5 py-4">
-            <h2 className="font-semibold">{text("Organize courses by chapter", "按章节编排课程")}</h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{text("Add lessons and linked practice, then choose the eligible classes in course properties. Publishing opens the course to those students; it does not create classes or activities.", "新建课程后添加讲解与配套练习，在课程属性中设置准入班级，发布后向符合条件的学生开放。课程不会自动创建班级、作业或训练。")}</p>
-          </section>}
-          <CourseList
-            key={`${school.id}:${query}:${page}:${archived}:${revision}:${refreshRevision}`}
-            path={`${base}?page=${page}&q=${encodeURIComponent(query)}&archived=${archived}`}
-            page={page}
-            onPage={setPage}
-            canAuthor={canAuthor}
-            query={query}
-            onOpen={selectCourse}
-            onEdit={setEdit}
-            onPublication={setPublication}
-            onArchive={setArchiveTarget}
-            onAdmissions={canReviewAdmissions ? setAdmissionsTarget : undefined}
-          />
-        </>
-      ) : (
-        <SchoolLearningResources
-          key={`${school.id}:${refreshRevision}`}
-          schoolId={school.id}
-          canAuthor={canAuthor}
-          creating={creatingResource}
-          onCreated={() => setCreatingResource(false)}
-        />
-      )}
+        )}
+        <CourseCatalogSearch query={query} onSearch={value => {
+          setQuery(value);
+          setPage(1);
+        }} onRefresh={onRefresh}/>
+      </div>
+      <CourseList
+        key={`${school.id}:${query}:${page}:${archived}:${revision}:${refreshRevision}`}
+        path={`${base}?page=${page}&q=${encodeURIComponent(query)}&archived=${archived}`}
+        page={page}
+        onPage={setPage}
+        canAuthor={canAuthor}
+        query={query}
+        onOpen={selectCourse}
+        onEdit={setEdit}
+        onPublication={setPublication}
+        onArchive={setArchiveTarget}
+        onAdmissions={canReviewAdmissions ? setAdmissionsTarget : undefined}
+      />
       {importing && (
         <SchoolCourseImport
           onClose={() => setImporting(false)}
@@ -725,7 +684,7 @@ function CourseReader({ school, base, id, preview = false, onBack }: {
       relatedActivities={<CoursePracticeReturn schoolId={school.id}/>}
       extraPractice={chapterId => { const links = course.chapters.find(item => item.id === chapterId)?.acslLinks ?? []; return links.length ? <CourseAcslPractice links={links} schoolId={school.id} courseHref={courseLanguageHref(readerHref(chapterId), language)}/> : null; }}
       canTrackProgress={!preview && course.canTrackProgress}
-      chapterResources={chapterId => !preview ? <SchoolLearningResources schoolId={school.id} canAuthor={false} courseId={id} chapterId={chapterId} hideEmpty/> : null}
+      chapterResources={chapterId => !preview ? <SchoolChapterResources schoolId={school.id} courseId={id} chapterId={chapterId}/> : null}
       onRead={async chapterId => {
         try {
           await productionApi(`${base}/${id}/chapters/${chapterId}/read`, { method: "POST", body: { read: true, expectedRevision: course.revision } });

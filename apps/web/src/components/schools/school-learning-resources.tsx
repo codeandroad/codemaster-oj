@@ -38,28 +38,14 @@ type Resource = {
   canManage: boolean;
   content?: string;
 };
-export function SchoolLearningResources({
-  schoolId,
-  canAuthor,
-  creating = false,
-  onCreated,
-  courseId,
-  chapterId,
-  hideEmpty = false,
-}: {
+export function SchoolChapterResources({schoolId, courseId, chapterId}: {
   schoolId: string;
-  canAuthor: boolean;
-  creating?: boolean;
-  onCreated?: () => void;
-  courseId?: string;
-  chapterId?: string;
-  hideEmpty?: boolean;
+  courseId: string;
+  chapterId: string;
 }) {
   const text = useSchoolText();
   const base = `schools/${schoolId}/learning-resources`;
-  const list = useData<{ items: Resource[] }>(
-    `${base}${courseId ? `?courseId=${courseId}` : ""}`,
-  );
+  const list = useData<{items: Resource[]}>(`${base}?courseId=${courseId}`);
   const [selected, setSelected] = useState<Resource | null>(null);
   const [removing, setRemoving] = useState<Resource | null>(null);
   const mutation = useMutation();
@@ -70,9 +56,9 @@ export function SchoolLearningResources({
     reference: text("Reference", "参考资料"),
   };
   const items = (list.data?.items ?? []).filter(
-    (r) => !chapterId || !r.chapterId || r.chapterId === chapterId,
+    (r) => !r.chapterId || r.chapterId === chapterId,
   );
-  if (hideEmpty && !list.loading && !list.error && !items.length) return null;
+  if (!list.loading && !list.error && !items.length) return null;
   return (
     <>
       <Feedback action={mutation} />
@@ -139,34 +125,21 @@ export function SchoolLearningResources({
                   </td>
                 </tr>
               ))}
-              {!items.length && (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="px-4 py-8 text-center text-muted-foreground"
-                  >
-                    {text("No learning resources yet.", "暂无学习资料。")}
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
       </Loading>
-      {(selected || creating) && (
+      {selected && (
         <ResourceLoader
-          key={selected?.id ?? "new"}
+          key={selected.id}
           base={base}
           schoolId={schoolId}
-          id={selected?.id}
-          canAuthor={canAuthor}
+          id={selected.id}
           onClose={() => {
             setSelected(null);
-            onCreated?.();
           }}
           onSaved={() => {
             setSelected(null);
-            onCreated?.();
             list.reload();
           }}
         />
@@ -230,19 +203,17 @@ function ResourceLoader({
   base,
   schoolId,
   id,
-  canAuthor,
   onClose,
   onSaved,
 }: {
   base: string;
   schoolId: string;
-  id?: string;
-  canAuthor: boolean;
+  id: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const text = useSchoolText();
-  const resource = useOptionalData<Resource>(id ? `${base}/${id}` : "");
+  const resource = useOptionalData<Resource>(`${base}/${id}`);
   const closeGuardRef = useRef<() => boolean>(() => true);
   function requestClose() {
     if (closeGuardRef.current()) onClose();
@@ -255,41 +226,25 @@ function ResourceLoader({
       }}
     >
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-        <DialogTitle>
-          {id
-            ? text("Learning resource", "学习资料")
-            : text("Add learning resource", "添加学习资料")}
-        </DialogTitle>
+        <DialogTitle>{text("Learning resource", "学习资料")}</DialogTitle>
         <DialogDescription>
           {text(
             "Markdown notes, code snippets and reference materials.",
             "Markdown 说明、代码片段与参考资料。",
           )}
         </DialogDescription>
-        {id ? (
-          <Loading resource={resource}>
-            {resource.data && (
-              <ResourceForm
-                base={base}
-                schoolId={schoolId}
-                initial={resource.data}
-                onClose={requestClose}
-                onSaved={onSaved}
-                closeGuardRef={closeGuardRef}
-              />
-            )}
-          </Loading>
-        ) : (
-          canAuthor && (
+        <Loading resource={resource}>
+          {resource.data && (
             <ResourceForm
               base={base}
               schoolId={schoolId}
+              initial={resource.data}
               onClose={requestClose}
               onSaved={onSaved}
               closeGuardRef={closeGuardRef}
             />
-          )
-        )}
+          )}
+        </Loading>
       </DialogContent>
     </Dialog>
   );
@@ -304,7 +259,7 @@ function ResourceForm({
 }: {
   base: string;
   schoolId: string;
-  initial?: Resource;
+  initial: Resource;
   onClose: () => void;
   onSaved: () => void;
   closeGuardRef: MutableRefObject<() => boolean>;
@@ -312,14 +267,13 @@ function ResourceForm({
   const text = useSchoolText(),
     mutation = useMutation(),
     pending = useRef(false);
-  const [requestId] = useState(() => crypto.randomUUID());
   const [form, setForm] = useState({
-    title: initial?.title ?? "",
-    type: initial?.type ?? "note",
-    scope: initial?.scope ?? "private",
-    content: initial?.content ?? "",
-    courseId: initial?.courseId ?? "",
-    chapterId: initial?.chapterId ?? "",
+    title: initial.title,
+    type: initial.type,
+    scope: initial.scope,
+    content: initial.content ?? "",
+    courseId: initial.courseId ?? "",
+    chapterId: initial.chapterId ?? "",
   });
   const [baseline] = useState(() => JSON.stringify(form));
   const dirty = JSON.stringify(form) !== baseline;
@@ -337,7 +291,7 @@ function ResourceForm({
   const [courses, setCourses] = useState<SchoolCourse[]>([]);
   const [courseError, setCourseError] = useState("");
   const [preview, setPreview] = useState(false);
-  const editable = !initial || initial.canManage;
+  const editable = initial.canManage;
   const detail = useOptionalData<CourseDetail>(
     form.courseId ? `schools/${schoolId}/courses/${form.courseId}` : "",
   );
@@ -372,7 +326,7 @@ function ResourceForm({
   if (!editable)
     return (
       <>
-        <MathContent content={initial?.content ?? ""} preserveHeadingLevels />
+        <MathContent content={initial.content ?? ""} preserveHeadingLevels />
         <div className="flex justify-end">
           <Button variant="secondary" onClick={onClose}>
             {text("Close", "关闭")}
@@ -389,15 +343,13 @@ function ResourceForm({
         pending.current = true;
         try {
           await mutation.run(async () => {
-            await productionApi(initial ? `${base}/${initial.id}` : base, {
-              method: initial ? "PATCH" : "POST",
+            await productionApi(`${base}/${initial.id}`, {
+              method: "PATCH",
               body: {
                 ...form,
                 courseId: form.courseId || null,
                 chapterId: form.chapterId || null,
-                ...(initial
-                  ? { expectedRevision: initial.revision }
-                  : { requestId }),
+                expectedRevision: initial.revision,
               },
             });
             onSaved();

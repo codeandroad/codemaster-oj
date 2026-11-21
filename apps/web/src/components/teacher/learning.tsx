@@ -27,7 +27,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { courseProblemEditorEntries, courseProblemEditorEntryId, type CourseProblemEditorEntry } from "./problem-editor-navigation";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "@/components/locale-context";
-import { ArrowDown, ArrowUp, Eye, FilePlus2, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Eye, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRangeSelection } from "@/components/ui/use-range-selection";
 import { PageHeader, StatusPill } from "@/components/page-chrome";
@@ -35,7 +35,6 @@ import { useWorkspaceData } from "@/components/workspace-data";
 import { productionApi, type ProductionProblem } from "@/lib/production-api";
 import {
   area,
-  Empty,
   Feedback,
   Field,
   input,
@@ -44,8 +43,6 @@ import {
   move,
   panel,
   State,
-  Table,
-  Tabs,
   useAction,
   useData,
   useDirty,
@@ -139,18 +136,6 @@ export function platformLearningPath(course: PlatformCourse): LearningEditorPath
  return {...course,ownerScope:"platform",platformAudience:course.audienceScope,canEdit:true,platformData:course,chapters:course.chapters.map((chapter,position)=>({...chapter,id:chapter.id!,position,problems:(chapter.problems??[]).map(problem=>({...problem,title:problem.title??problem.problemId,published:problem.published,schoolVisibleAt:problem.schoolVisibleAt,rankReviewStatus:problem.rankReviewStatus,readyForCourse:problem.readyForCourse}))}))};
 }
 
-interface Resource {
-  id: string;
-  type: string;
-  title: string;
-  content: string;
-  pathId?: string | null;
-  chapterId?: string | null;
-  scope: string;
-  canEdit?: boolean;
-}
-
-
 export function TeacherLearning({ canManageAdmissions = false }: { canManageAdmissions?: boolean }) {
   const {t,locale} = useLocale();
   const tx=(zh:string,en:string)=>locale==="en"?en:zh;
@@ -159,14 +144,11 @@ export function TeacherLearning({ canManageAdmissions = false }: { canManageAdmi
   const [archiveTarget,setArchiveTarget]=useState<Path|null>(null);
   const schoolId = useSearchParams().get("schoolId");
   const [admissionTarget, setAdmissionTarget] = useState<Path | null>(null);
-  const [tab, setTab] = useState("课程");
   const router = useRouter(),
     paths = useWorkspaceData<{ items: Path[] }>(`learning-paths?view=summary${showArchived ? "&archived=true" : ""}`),
     platformPaths = useWorkspaceData<{items:PlatformCourse[]}>(`platform/courses?view=catalog${schoolId ? "&schoolId=" + encodeURIComponent(schoolId) : ""}`),
-    resources = useData<{ items: Resource[] }>(tab === "学习资料" ? "learning-resources" : null),
     [create, setCreate] = useState(false),
     [importing,setImporting]=useState(false),
-    [editing, setEditing] = useState<Resource | null>(null),
     action = useAction();
   const courseRows=[...(paths.data?.items??[]),...(platformPaths.data?.items??[]).filter(course=>course.archived===showArchived).map(course=>platformLearningPath({...course,chapters:course.chapters??[]}))];
   const categories=[...new Set([...courseRows.map(course=>course.category),...(categoryFilter?[categoryFilter]:[])])].sort((a,b)=>a.localeCompare(b,locale));
@@ -181,22 +163,18 @@ export function TeacherLearning({ canManageAdmissions = false }: { canManageAdmi
   return (
     <>
       <PageHeader
-        eyebrow={t("课程")}
         title={t("课程")}
-        description={t("课程组织章节、讲解与练习；班级维护学生名单，作业和限时训练另行发布。")}
         action={
-          <div className="flex flex-wrap gap-2">{tab==="课程"&&<Button variant="secondary" onClick={()=>setImporting(true)}>{t("导入课程 Markdown")}</Button>}
-          <Button onClick={() => setCreate(true)}>
-            {tab === "课程" ? <Plus size={15} /> : <FilePlus2 size={15} />}{" "}
-            {tab === "课程" ? t("新建课程") : t("添加资料")}
-          </Button></div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => setImporting(true)}>{t("导入课程 Markdown")}</Button>
+            <Button onClick={() => setCreate(true)}><Plus size={15} />{t("新建课程")}</Button>
+          </div>
         }
       />
       {importing&&<LearningImport onClose={()=>setImporting(false)} onImported={id=>{setImporting(false);router.push(`/teacher/courses/${id}`);}}/>}
-      <Tabs items={[t("课程"), t("学习资料")]} value={t(tab)} onChange={label=>{const next=label===t("课程")?"课程":"学习资料";setTab(next);if(next!=="课程")setShowArchived(false);}} />
       <Feedback action={action} />
-      {tab==="课程"&&<div className="mt-4 flex gap-2"><Button variant={showArchived?"secondary":"default"} aria-pressed={!showArchived} onClick={()=>setShowArchived(false)}>{tx("使用中","Active")}</Button><Button variant={showArchived?"default":"secondary"} aria-pressed={showArchived} onClick={()=>setShowArchived(true)}>{tx("已归档","Archived")}</Button></div>}
-      {tab==="课程"&&<div className="mt-4 space-y-3 rounded-lg border border-border bg-surface px-4 py-3">
+      <div className="mt-4 flex gap-2"><Button variant={showArchived?"secondary":"default"} aria-pressed={!showArchived} onClick={()=>setShowArchived(false)}>{tx("使用中","Active")}</Button><Button variant={showArchived?"default":"secondary"} aria-pressed={showArchived} onClick={()=>setShowArchived(true)}>{tx("已归档","Archived")}</Button></div>
+      <div className="mt-4 space-y-3 rounded-lg border border-border bg-surface px-4 py-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <CourseCatalogSearch query={courseQuery} onSearch={setCourseQuery} onRefresh={()=>{paths.reload();platformPaths.reload();}}/>
           <div className="flex min-w-0 flex-wrap items-end gap-3">
@@ -206,124 +184,35 @@ export function TeacherLearning({ canManageAdmissions = false }: { canManageAdmi
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground"><span role="status">{tx(`显示 ${filteredCourses.length} / ${courseRows.length} 门课程`,`Showing ${filteredCourses.length} of ${courseRows.length} courses`)}</span>{hasCourseFilters&&<Button type="button" size="sm" variant="ghost" onClick={clearCourseFilters}>{tx("清除筛选","Clear filters")}</Button>}</div>
-      </div>}
+      </div>
       <section className={`${panel} mt-4`}>
-        {tab === "课程" ? (
-          <>
-            <State resource={paths} /><State resource={platformPaths}/>
-            <CourseCatalogTable fitActions empty={!paths.loading && !platformPaths.loading && !filteredCourses.length ? (hasCourseFilters ? tx("没有符合条件的课程。请调整搜索或筛选。", "No courses match. Adjust your search or filters.") : showArchived ? tx("暂无已归档课程。", "No archived courses.") : t("暂无课程。点击“新建课程”组织章节内容。")) : undefined}>
-              {filteredCourses.map(path => (
-                <CourseCatalogRow key={path.id} course={path}
-                  title={<Link className={link} href={courseHref(path)} title={path.title}>{path.title}</Link>}
-                  access={<CourseAccessSummary course={path} showSource={false}/>}
-                  status={<StatusPill status={courseStatus(path, locale)}/>}
-                  actions={<>
-                    <Link className={rowActionClassName} href={path.mergedIntoCourseId?`/teacher/courses/${path.mergedIntoCourseId}`:courseHref(path)}>{path.mergedIntoCourseId ? tx("打开合并课程", "Open combined course") : path.archived ? tx("查看", "View") : path.canEdit ? t("编辑") : t("查看")}</Link>
-                    {!path.archived && <Link className={rowActionClassName} href={`${courseHref(path)}${path.ownerScope==="platform"?"&":"?"}preview=1`}>{tx("预览", "Preview")}</Link>}
-                    {canManageAdmissions && path.ownerScope!=="platform" && path.published && !path.archived &&
-                      <RowActionButton onClick={() => setAdmissionTarget(path)}>{tx("课程准入", "Course admissions")}</RowActionButton>}
-                    {path.canEdit && path.ownerScope!=="platform" && !path.mergedIntoCourseId && <RowActionButton disabled={action.busy} onClick={() => setArchiveTarget(path)}>{path.archived ? tx("恢复", "Restore") : tx("归档", "Archive")}</RowActionButton>}
-                  </>}
-                />
-              ))}
-            </CourseCatalogTable>
-          </>
-        ) : (
-          <>
-            <State resource={resources} />
-            <Table
-              headers={[
-                t("类型"),
-                t("标题"),
-                t("关联课程 / 章节"),
-                t("可见范围"),
-                t("内容 / 操作"),
-              ]}
-              min={760}
-            >
-              {resources.data?.items.map((r) => (
-                <tr key={r.id}>
-                  <td>{t(({note:"说明",article:"代码片段",reference:"参考资料"} as Record<string,string>)[r.type]??r.type)}</td>
-                  <td><button type="button" className="font-semibold text-primary hover:underline focus-visible:underline" onClick={() => setEditing(r)}>{r.title}</button></td>
-                  <td>
-                    {paths.data?.items.find((x) => x.id === r.pathId)?.title ??
-                      t("独立资料")}
-                  </td>
-                  <td>{r.scope === "school" ? t("本校学生") : t("维护教师")}</td>
-                  <td>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setEditing(r)}
-                    >
-                      {t("查看 / 编辑")}
-                    </Button>
-                    {r.canEdit !== false && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={action.busy}
-                        onClick={() => {
-                          if (
-                            window.confirm(t("删除此资料？课程和题目保留。"))
-                          )
-                            void action.run(async () => {
-                              await productionApi(
-                                `learning-resources/${r.id}`,
-                                { method: "DELETE" },
-                              );
-                              resources.reload();
-                              return t("资料已删除。");
-                            });
-                        }}
-                      >
-                        {t("删除")}
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {!resources.loading && !resources.data?.items.length && (
-                <Empty columns={5}>
-                  {t("暂无资料。添加说明或代码片段帮助学生复习。")}
-                </Empty>
-              )}
-            </Table>
-          </>
-        )}
+        <State resource={paths} /><State resource={platformPaths}/>
+        <CourseCatalogTable fitActions empty={!paths.loading && !platformPaths.loading && !filteredCourses.length ? (hasCourseFilters ? tx("没有符合条件的课程。请调整搜索或筛选。", "No courses match. Adjust your search or filters.") : showArchived ? tx("暂无已归档课程。", "No archived courses.") : t("暂无课程。点击“新建课程”组织章节内容。")) : undefined}>
+          {filteredCourses.map(path => (
+            <CourseCatalogRow key={path.id} course={path}
+              title={<Link className={link} href={courseHref(path)} title={path.title}>{path.title}</Link>}
+              access={<CourseAccessSummary course={path} showSource={false}/>}
+              status={<StatusPill status={courseStatus(path, locale)}/>}
+              actions={<>
+                <Link className={rowActionClassName} href={path.mergedIntoCourseId?`/teacher/courses/${path.mergedIntoCourseId}`:courseHref(path)}>{path.mergedIntoCourseId ? tx("打开合并课程", "Open combined course") : path.archived ? tx("查看", "View") : path.canEdit ? t("编辑") : t("查看")}</Link>
+                {!path.archived && <Link className={rowActionClassName} href={`${courseHref(path)}${path.ownerScope==="platform"?"&":"?"}preview=1`}>{tx("预览", "Preview")}</Link>}
+                {canManageAdmissions && path.ownerScope!=="platform" && path.published && !path.archived &&
+                  <RowActionButton onClick={() => setAdmissionTarget(path)}>{tx("课程准入", "Course admissions")}</RowActionButton>}
+                {path.canEdit && path.ownerScope!=="platform" && !path.mergedIntoCourseId && <RowActionButton disabled={action.busy} onClick={() => setArchiveTarget(path)}>{path.archived ? tx("恢复", "Restore") : tx("归档", "Archive")}</RowActionButton>}
+              </>}
+            />
+          ))}
+        </CourseCatalogTable>
       </section>
       {admissionTarget && schoolId && <CourseAdmissionsDialog schoolId={schoolId} course={admissionTarget} onClose={() => setAdmissionTarget(null)} />}
       {archiveTarget&&<Modal title={archiveTarget.archived?tx("恢复课程","Restore course"):tx("归档课程","Archive course")} onClose={()=>setArchiveTarget(null)}>
         <p className="text-sm text-muted-foreground">{archiveTarget.archived?tx("恢复后课程回到使用中列表。普通题目须保持审核通过；若 Paper 4 引用已不可用，课程会保持下架，修复后可重新公开。","Linked problems must remain approved. If Paper 4 references are unavailable, the restored course stays withdrawn until repaired and republished."):tx("归档后课程从学生课程列表移除。章节与学习进度保留；已发布作业仍可独立查看。","Archiving removes the course from the student catalog. Lessons and progress remain recorded; published assignments remain available independently.")}</p>
         <div className="mt-5 flex justify-end gap-2"><Button variant="secondary" onClick={()=>setArchiveTarget(null)}>{tx("取消","Cancel")}</Button><Button disabled={action.busy} onClick={()=>void action.run(async()=>{const restored = await productionApi<Path>(`learning-paths/${archiveTarget.id}${archiveTarget.archived?"/restore":""}`,archiveTarget.archived?{method:"POST",body:{}}:{method:"PATCH",body:{archived:true}});setArchiveTarget(null);paths.reload();return archiveTarget.archived?(archiveTarget.published && !restored.published && restored.withdrawnAt ? tx("课程已恢复为下架状态：请修复不可用的 Paper 4 引用后重新公开。","Course restored and kept withdrawn. Repair unavailable Paper 4 references before republishing.") : tx("课程已恢复。","Course restored.")):tx("课程已归档。","Course archived.");})}>{archiveTarget.archived?tx("恢复","Restore"):tx("归档","Archive")}</Button></div>
       </Modal>}
-      {create &&
-        (tab === "课程" ? (
-          <CreatePath
-            onClose={() => setCreate(false)}
-            onCreated={(id) => router.push(`/teacher/courses/${id}`)}
-          />
-        ) : (
-          <ResourceEditor
-            paths={paths.data?.items ?? []}
-            onClose={() => setCreate(false)}
-            onSaved={() => {
-              setCreate(false);
-              resources.reload();
-            }}
-          />
-        ))}
-      {editing && (
-        <ResourceEditor
-          initial={editing}
-          paths={paths.data?.items ?? []}
-          onClose={() => setEditing(null)}
-          onSaved={() => {
-            setEditing(null);
-            resources.reload();
-          }}
-        />
-      )}
+      {create && <CreatePath
+        onClose={() => setCreate(false)}
+        onCreated={(id) => router.push(`/teacher/courses/${id}`)}
+      />}
     </>
   );
 }
@@ -422,120 +311,6 @@ export function CreatePath({
     </Modal>
   );
 }
-function ResourceEditor({
-  initial,
-  paths,
-  onClose,
-  onSaved,
-}: {
-  initial?: Resource | undefined;
-  paths: Path[];
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const action = useAction();
-  const {t} = useLocale();
-  return (
-    <Modal title={initial ? t("编辑学习资料") : t("添加学习资料")} onClose={onClose}>
-      <form
-        className="space-y-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const d = new FormData(e.currentTarget);
-          void action.run(async () => {
-            await productionApi(
-              initial
-                ? `learning-resources/${initial.id}`
-                : "learning-resources",
-              {
-                method: initial ? "PATCH" : "POST",
-                body: {
-                  type: d.get("type"),
-                  title: d.get("title"),
-                  content: d.get("content"),
-                  pathId: d.get("pathId") || null,
-                  scope: d.get("scope"),
-                },
-              },
-            );
-            onSaved();
-          });
-        }}
-      >
-        <Field label={t("名称")}>
-          <input
-            name="title"
-            required
-            defaultValue={initial?.title}
-            className={input}
-          />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={t("类型")}>
-            <select
-              name="type"
-              defaultValue={initial?.type ?? "note"}
-              className={input}
-            >
-              {[
-                ["note", "说明"],
-                ["article", "代码片段"],
-                ["reference", "参考资料"],
-              ].map(([value, label]) => (
-                <option key={value} value={value}>
-                  {t(label)}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label={t("可见范围")}>
-            <select
-              name="scope"
-              defaultValue={initial?.scope ?? "private"}
-              className={input}
-            >
-              <option value="private">{t("维护教师")}</option>
-              <option value="school">{t("本校学生")}</option>
-            </select>
-          </Field>
-        </div>
-        <Field label={t("关联课程")}>
-          <select
-            name="pathId"
-            defaultValue={initial?.pathId ?? ""}
-            className={input}
-          >
-            <option value="">{t("独立资料")}</option>
-            {paths.map((x) => (
-              <option key={x.id} value={x.id}>
-                {x.title}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label={t("内容")}>
-          <textarea
-            name="content"
-            required
-            rows={8}
-            defaultValue={initial?.content}
-            className={area}
-          />
-        </Field>
-        <Feedback action={action} />
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            {t("取消")}
-          </Button>
-          <Button disabled={action.busy || initial?.canEdit === false}>
-            {t("保存资料")}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
 export function TeacherLearningEditor({ id }: { id: string }) {
   const query = useSearchParams(), platform = query.get("source") === "platform";
   const resource = useData<Path | PlatformCourse>(`${platform ? "platform/courses" : "learning-paths"}/${id}`);

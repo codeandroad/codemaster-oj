@@ -43,7 +43,7 @@ import {
 const platformSections = {
   schools: { icon: Building2, en: "Schools", zh: "学校" },
   courses: { icon: BookOpen, en: "Platform courses", zh: "平台课程" },
-  problems: { icon: BookOpenCheck, en: "Public problems", zh: "公开题库" },
+  problems: { icon: BookOpenCheck, en: "Platform problem bank", zh: "平台题库" },
   "course-review": { icon: BookOpenCheck, en: "Course review", zh: "课程公开审核" },
 } as const;
 type PlatformSection = keyof typeof platformSections;

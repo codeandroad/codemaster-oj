@@ -22,7 +22,7 @@ test('school and public practice Nest transport requires scoped membership, CSRF
   for(const role of ['teacher','student'])await pool.query('INSERT INTO school_memberships(school_id,account_id,role) VALUES($1,$2,$3)',[school.id,users[role].id,role]);
   await pool.query('INSERT INTO platform_admins(account_id) VALUES($1)',[users.platform.id]);
   const runtime=new URL(scoped);runtime.searchParams.set('options',`-crole=campus_app -csearch_path=${schema}`);const workerUrl=new URL(scoped);workerUrl.searchParams.set('options',`-crole=campus_worker -csearch_path=${schema}`);worker=createPool(workerUrl.href);
-  for (const table of ['student_guestbook_likes','student_guestbook_mentions']) {
+  for (const table of ['student_guestbook_likes','student_guestbook_mentions','school_platform_course_adoptions']) {
    await assert.rejects(worker.query(`SELECT 1 FROM ${table} LIMIT 1`),{code:'42501'});
   }
   const origin='http://practice.test';server=await createApiApplication({databaseUrl:runtime.href,logger:false,config:loadConfig({SESSION_SECRET:randomBytes(32).toString('base64url'),APP_ORIGIN:origin,COOKIE_SECURE:'false'})});await server.listen(0,'127.0.0.1');const base=await server.getUrl();
@@ -504,6 +504,33 @@ test('school and public practice Nest transport requires scoped membership, CSRF
     body:{expectedRevision:assigned.revision,sourceVersion:assigned.sourceVersion,audiencePolicy:{scope:'all'}}})).data;
    assert.ok(!(await list('')).platformCourses.some(course=>course.id===assigned.id));
    await request('/practice/courses/'+updated.id,{auth:auth.student});
+  });
+  await t.test('school adoption adds a public course to that school without changing admission', async () => {
+   const created=(await request('/platform/courses',{auth:auth.platform,method:'POST',status:201,
+    body:{requestId:randomUUID(),title:'Adopted course',audiencePolicy:{scope:'all'},
+     chapters:[{title:'Lesson',content:'Shared lesson body'}]}})).data;
+   const course=(await request('/platform/courses/'+created.id+'/publish',{auth:auth.platform,method:'POST',
+    body:{expectedRevision:created.revision,sourceVersion:created.sourceVersion}})).data;
+   const list=async schoolId=>(await request('/schools/'+schoolId+'/courses?includePlatform=true&q=Adopted%20course',
+    {auth:auth.student})).data.platformCourses;
+   assert.deepEqual(await list(school.id),[]);
+   const app=createPool(runtime.href);
+   try {
+    await assert.rejects(app.query('INSERT INTO school_platform_course_adoptions VALUES($1,$2)',[school.id,course.id]),{code:'42501'});
+   } finally { await app.end(); }
+   await pool.query('INSERT INTO school_platform_course_adoptions VALUES($1,$2)',[school.id,course.id]);
+   const [adopted]=await list(school.id);
+   assert.equal(adopted.id,course.id);
+   assert.equal(adopted.admission,'direct');
+   const publicList=(await request('/practice/courses',{auth:auth.personal})).data.courses;
+   assert.equal(publicList.find(item=>item.id===course.id).admission,'direct');
+   const read=async(account,query='')=>(await request('/practice/courses/'+course.id+query,{auth:auth[account]})).data;
+   assert.equal((await read('student','?schoolId='+school.id)).chapters[0].body,'Shared lesson body');
+   assert.equal((await read('personal')).chapters[0].body,'Shared lesson body');
+   assert.deepEqual(await list(beta.id),[]);
+   await pool.query('DELETE FROM school_platform_course_adoptions WHERE school_id=$1 AND course_id=$2',[school.id,course.id]);
+   assert.deepEqual(await list(school.id),[]);
+   assert.equal((await read('personal')).chapters[0].body,'Shared lesson body');
   });
   await t.test('school leaderboard preserves the default and saved avatars', async () => {
    const path=prefix+'/leaderboard';

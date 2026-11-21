@@ -1,3 +1,4 @@
+import { receiptActivityJoin, receiptVisible } from './school-submission-history.mjs';
 import { transaction } from './db.mjs';
 import { auditSchool, lockSchoolTeaching, schoolRole } from './schools.mjs';
 import { lockScholarshipAssistance } from './scholarship-access.mjs';
@@ -71,7 +72,7 @@ async function currentAssistance(db,s,u,role,b){
  const exam= t.type==='problem'?(await db.query(`SELECT 1 FROM school_activities a JOIN school_activity_problems ap ON ap.school_id=a.school_id AND ap.activity_id=a.id JOIN school_activity_participants pp ON pp.school_id=a.school_id AND pp.activity_id=a.id
   WHERE a.school_id=$1 AND ap.problem_id=$2 AND pp.identity_id=$3 AND a.kind='timed' AND a.state<>'Draft' AND a.starts_at<=clock_timestamp() AND a.results_published_at IS NULL LIMIT 1`,[s,t.p.id,i.id])).rowCount:
   (await db.query(`SELECT 1 FROM school_paper4_activities a JOIN school_paper4_participants pp ON pp.school_id=a.school_id AND pp.activity_id=a.id WHERE a.school_id=$1 AND a.paper_id=$2 AND pp.identity_id=$3 AND a.kind='exam' AND a.starts_at<=clock_timestamp() AND a.results_published_at IS NULL LIMIT 1`,[s,t.p.id,i.id])).rowCount;
- const restrictions=t.type==='problem'?(await db.query(`SELECT a.id FROM school_activities a JOIN school_activity_problems ap ON ap.school_id=a.school_id AND ap.activity_id=a.id JOIN school_activity_participants pp ON pp.school_id=a.school_id AND pp.activity_id=a.id WHERE a.school_id=$1 AND ap.problem_id=$2 AND pp.identity_id=$3 AND a.state='Published' AND NOT pp.exempt AND (a.starts_at IS NULL OR a.starts_at<=clock_timestamp()) AND (a.ends_at IS NULL OR greatest(a.ends_at,pp.extended_due_at)>=clock_timestamp() OR a.kind='timed' AND a.results_published_at IS NULL)`,[s,t.p.id,i.id])).rows:(await db.query(`SELECT a.id FROM school_paper4_activities a JOIN school_paper4_participants pp ON pp.school_id=a.school_id AND pp.activity_id=a.id WHERE a.school_id=$1 AND a.paper_id=$2 AND pp.identity_id=$3 AND (a.starts_at IS NULL OR a.starts_at<=clock_timestamp()) AND (a.ends_at IS NULL OR greatest(a.ends_at,pp.extended_due_at)>=clock_timestamp() OR a.kind='exam' AND a.results_published_at IS NULL)`,[s,t.p.id,i.id])).rows;
+ const restrictions=t.type==='problem'?(await db.query(`SELECT a.id FROM school_activities a JOIN school_activity_problems ap ON ap.school_id=a.school_id AND ap.activity_id=a.id JOIN school_activity_participants pp ON pp.school_id=a.school_id AND pp.activity_id=a.id WHERE a.school_id=$1 AND ap.problem_id=$2 AND pp.identity_id=$3 AND a.state='Published' AND NOT pp.exempt AND (a.starts_at IS NULL OR a.starts_at<=clock_timestamp()) AND (a.ends_at IS NULL OR greatest(a.ends_at,pp.extended_due_at)>=clock_timestamp() OR a.kind='timed' AND a.results_published_at IS NULL)`,[s,t.p.id,i.id])).rows:(await db.query(`SELECT a.id FROM school_paper4_activities a JOIN school_paper4_participants pp ON pp.school_id=a.school_id AND pp.activity_id=a.id WHERE a.school_id=$1 AND a.paper_id=$2 AND pp.identity_id=$3 AND (a.starts_at IS NULL OR a.starts_at<=clock_timestamp()) AND (a.ends_at IS NULL OR a.ends_at>=clock_timestamp() OR a.kind='exam' AND a.results_published_at IS NULL)`,[s,t.p.id,i.id])).rows;
  const restrictedIds=restrictions.map(a=>a.id);
  const policies=(await db.query(`SELECT * FROM school_scholarship_policies WHERE school_id=$1 AND kind=$2 AND (target_type='subject' AND target_key=$3 OR target_type=$4 AND (target_key=$5 OR target_key=ANY($6::text[]))) ORDER BY CASE target_type WHEN 'subject' THEN 0 ELSE 1 END`,[s,k,t.subject,t.activityType,t.activityId??'',restrictedIds])).rows;
  let mode='paid',price=k==='FULL_TRANSLATION'?cfg.translationPrice:cfg.solutionPrice,reason='';
@@ -83,14 +84,31 @@ async function currentAssistance(db,s,u,role,b){
   &&(await db.query(`SELECT EXISTS(SELECT 1 FROM school_judge_jobs j
    WHERE j.school_id=$1 AND j.identity_id=$2 AND j.problem_id=$3
     AND j.access_context='school' AND j.kind='submit' AND j.state='completed' AND j.result->>'status'='AC'
-    AND ${schoolActivityJobVisibleSql('j')}) accepted`,[s,i.id,t.p.id])).rows[0].accepted;
+    AND ${schoolActivityJobVisibleSql('j')}
+   UNION ALL SELECT 1 FROM submissions s ${receiptActivityJoin}
+   WHERE s.school_id=$1 AND s.identity_id=$2 AND s.account_id=$4 AND s.problem_id=$3
+    AND s.kind='submit' AND s.status='AC' AND ${receiptVisible}) accepted`,[s,i.id,t.p.id,u.id])).rows[0].accepted;
  if(freeAfterAc)mode='free';
  const entitlement=(await db.query('SELECT * FROM school_scholarship_entitlements WHERE school_id=$1 AND identity_id=$2 AND subject_key=$3 AND kind=$4 AND language=$5',[s,i.id,t.subject,k,language])).rows[0];
- let translationCredit=0,creditLedger=null;
- if(k==='FULL_SOLUTION'&&mode==='paid'&&!entitlement){const paid=(await db.query(`SELECT l.id,-l.delta AS amount FROM school_scholarship_entitlements e JOIN school_scholarship_ledger l ON l.school_id=e.school_id AND l.id=e.ledger_id WHERE e.school_id=$1 AND e.identity_id=$2 AND e.subject_key=$3 AND e.kind='FULL_TRANSLATION' AND e.language='zh-CN' AND NOT EXISTS(SELECT 1 FROM school_scholarship_ledger r WHERE r.school_id=l.school_id AND r.refund_of=l.id)`,[s,i.id,t.subject])).rows[0];if(paid){translationCredit=Math.min(price,paid.amount);creditLedger=paid.id;}}
+ let translationCredit=0,creditLedger=null,platformCredit=null;
+ if(k==='FULL_SOLUTION'&&mode==='paid'&&!entitlement){
+  const paid=(await db.query(`SELECT l.id AS local_id,NULL::bigint platform_id,-l.delta AS amount
+   FROM school_scholarship_entitlements e JOIN school_scholarship_ledger l ON (l.school_id,l.id)=(e.school_id,e.ledger_id)
+   WHERE e.school_id=$1 AND e.identity_id=$2 AND e.subject_key=$3 AND e.kind='FULL_TRANSLATION' AND e.language='zh-CN'
+   AND NOT EXISTS(SELECT 1 FROM school_scholarship_ledger r WHERE r.school_id=l.school_id AND r.refund_of=l.id)
+   UNION ALL SELECT NULL::uuid,l.id,-l.delta FROM school_scholarship_entitlements imported
+   JOIN luq_assistance_entitlements e ON e.id=imported.platform_entitlement_id
+   JOIN luq_ledger l ON l.id=e.ledger_id AND l.identity_id=e.identity_id AND l.kind='purchase'
+   WHERE imported.school_id=$1 AND imported.identity_id=$2 AND imported.subject_key=$3
+    AND e.kind='FULL_TRANSLATION' AND e.language='zh-CN'
+    AND NOT EXISTS(SELECT 1 FROM luq_ledger r WHERE r.refund_of=l.id)
+    AND NOT EXISTS(SELECT 1 FROM luq_assistance_entitlements used WHERE used.translation_credit_ledger_id=l.id)
+    AND NOT EXISTS(SELECT 1 FROM transferred_translation_credits used WHERE used.ledger_id=l.id)`,[s,i.id,t.subject])).rows[0];
+  if(paid){translationCredit=Math.min(price,paid.amount);creditLedger=paid.local_id;platformCredit=paid.platform_id;}
+ }
  const basePrice=price;price=entitlement||mode!=='paid'?0:Math.max(0,price-translationCredit);const currentBalance=await balance(db,s,i.id),available=!!content&&mode!=='disabled';
  const affectsFirstAcScholarship=k==='FULL_SOLUTION';
- return {t,i,k,language,content,entitlement,creditLedger,quote:{available,mode,unlocked:!!entitlement,price,basePrice,translationCredit,balance:currentBalance,balanceAfter:currentBalance-price,contentId:content?.id,contentRevision:content?.revision,requiresConfirmation:available&&mode==='paid'&&!entitlement,affectsFirstAcScholarship,affectsFirstAcLuq:affectsFirstAcScholarship,reason:reason||(!content?'No reviewed content has been published for this version.':'')}};
+ return {t,i,k,language,content,entitlement,creditLedger,platformCredit,quote:{available,mode,unlocked:!!entitlement,price,basePrice,translationCredit,balance:currentBalance,balanceAfter:currentBalance-price,contentId:content?.id,contentRevision:content?.revision,requiresConfirmation:available&&mode==='paid'&&!entitlement,affectsFirstAcScholarship,affectsFirstAcLuq:affectsFirstAcScholarship,reason:reason||(!content?'No reviewed content has been published for this version.':'')}};
 }
 async function idempotent(db,s,u,requestId,input,work){
  const id=uuid(requestId),hash=canonicalHash(input);await db.query("SELECT pg_advisory_xact_lock(hashtextextended('school-scholarship-request:'||$1||':'||$2||':'||$3,0))",[s,u.id,id]);
@@ -159,13 +177,15 @@ export async function handleSchoolScholarship({pool,user,route,method,body={},ur
   }
   if(path==='refund'&&method==='POST'){requireAdmin(role);const ledgerId=uuid(body.ledgerId),reason=field(body.reason,'Reason',{max:2000});return reply(await idempotent(db,s,user,body.requestId,{ledgerId,reason},async()=>{const l=(await db.query("SELECT * FROM school_scholarship_ledger WHERE school_id=$1 AND id=$2 AND kind='purchase'",[s,ledgerId])).rows[0];if(!l)fail(404,'NOT_FOUND','Purchase not found.');const refunded=await postSchoolScholarshipEntry(db,{schoolId:s,identityId:l.identity_id,delta:-l.delta,kind:'refund',sourceKey:`refund:${ledgerId}`,actor:user.id,reason,refundOf:ledgerId});return {id:refunded.id,balance:refunded.balance_after};}));}
   if(path.startsWith('assistance/')&&method==='POST'){
-   const i=await studentIdentity(db,s,user);await lockScholarshipAssistance(db,user.identityId);await walletLock(db,s,i.id);const st=await currentAssistance(db,s,user,role,body);if(path==='assistance/quote')return reply(st.quote);
+   const i=await studentIdentity(db,s,user);await lockScholarshipAssistance(db,user.identityId);await walletLock(db,s,i.id);
+   if(path==='assistance/unlock')await db.query("SELECT pg_advisory_xact_lock(hashtextextended('luq-account:'||$1::text,0))",[i.id]);
+   const st=await currentAssistance(db,s,user,role,body);if(path==='assistance/quote')return reply(st.quote);
    if(!st.quote.available)fail(403,'ASSISTANCE_UNAVAILABLE',st.quote.reason);
    if(path==='assistance/unlock')return reply(await idempotent(db,s,user,body.requestId??body.requestKey,{subject:st.t.subject,kind:st.k,language:st.language},async()=>{
     if(st.entitlement||st.quote.mode==='free')return {balance:st.quote.balance,unlocked:!!st.entitlement};
     if(body.confirmedContentId!==st.content.id||body.confirmedRevision!==st.content.revision||body.confirmedPrice!==st.quote.price)fail(409,'QUOTE_CHANGED','Content or price changed. Review the new quote.');
     let entry=null;if(st.quote.price>0)entry=await postSchoolScholarshipEntry(db,{schoolId:s,identityId:i.id,delta:-st.quote.price,kind:'purchase',sourceKey:`purchase:${i.id}:${st.t.subject}:${st.k}:${st.language}`,actor:user.id,reason:st.k==='FULL_TRANSLATION'?'Unlock Chinese translation':'Unlock solution',metadata:{subjectKey:st.t.subject,versionId:st.t.v.id,translationCredit:st.quote.translationCredit}});
-    await db.query('INSERT INTO school_scholarship_entitlements(school_id,identity_id,subject_key,kind,language,ledger_id,credit_ledger_id) VALUES($1,$2,$3,$4,$5,$6,$7)',[s,i.id,st.t.subject,st.k,st.language,entry?.id??null,st.quote.translationCredit?st.creditLedger:null]);return {balance:await balance(db,s,i.id),unlocked:true};
+    await db.query('INSERT INTO school_scholarship_entitlements(school_id,identity_id,subject_key,kind,language,ledger_id,credit_ledger_id,platform_credit_ledger_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[s,i.id,st.t.subject,st.k,st.language,entry?.id??null,st.quote.translationCredit?st.creditLedger:null,st.quote.translationCredit?st.platformCredit:null]);return {balance:await balance(db,s,i.id),unlocked:true};
    }));
    if(path==='assistance/provide'){
     if(st.quote.mode!=='free'&&!st.entitlement)fail(403,'PAYMENT_REQUIRED','Unlock this content first.');

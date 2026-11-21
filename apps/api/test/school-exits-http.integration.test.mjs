@@ -7,7 +7,8 @@ import { createPool } from '../../../packages/domain/src/db.mjs';
 import { migrate } from '../../../packages/domain/src/migrate.mjs';
 import { bootstrap } from '../../../packages/domain/src/bootstrap.mjs';
 import { loadConfig } from '../../../packages/domain/src/application.mjs';
-import { LEGACY_SCHOOL_ID, provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 
 test('school exits require approval, archive the original dossier and retain the personal login', {
   skip: !process.env.TEST_DATABASE_URL, timeout: 120000,
@@ -25,7 +26,7 @@ test('school exits require approval, archive the original dossier and retain the
   let app;
   try {
     await migrate(owner);
-    await bootstrap(owner, { name: 'Legacy administrator', number: 'ADM', username: 'legacy-admin', password });
+    await bootstrap(owner,{schoolSlug:'tianxing-chuangshiji', name: 'Legacy administrator', number: 'ADM', username: 'legacy-admin', password });
     const grants = (await readFile(new URL('../../../packages/domain/grants.mjs', import.meta.url), 'utf8')).match(/await pool\.query\(`([\s\S]*?)`\);/)[1];
     await owner.query(grants.replaceAll('SCHEMA public', `SCHEMA ${schema}`));
     const runtime = new URL(url);

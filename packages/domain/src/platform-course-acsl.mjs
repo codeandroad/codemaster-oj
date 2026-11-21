@@ -1,6 +1,6 @@
 import { canEditPlatformContent } from './platform-content-access.mjs';
 import { transaction } from './db.mjs';
-import { activeAccount, LEGACY_SCHOOL_ID, lockSchoolTeaching } from './schools.mjs';
+import { activeAccount } from './schools.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
 import { normalizeCourseAcslLinks } from './course-acsl.mjs';
 import { fail } from './security.mjs';
@@ -11,29 +11,14 @@ async function sourceContext(db, user, fn, courseId=null) {
  const run=async client=>{
   await activeAccount(client,user.id);
   if(!await isPlatformAdministrator(client,user.id)&&!(courseId&&await canEditPlatformContent(client,user.id,'course',courseId)))fail(403,'PLATFORM_ADMIN_REQUIRED','需要平台管理员权限');
-  await lockSchoolTeaching(client,LEGACY_SCHOOL_ID,{shared:true});
-  const previous=(await client.query("SELECT current_setting('campus.school_id',true) AS school")).rows[0].school??'';
-  let failed=false;
-  try {
-   await client.query("SELECT set_config('campus.school_id',$1,true)",[LEGACY_SCHOOL_ID]);
-   return await fn(client);
-  } catch(error) { failed=true;throw error; }
-  finally {
-   // A failed SQL statement has already aborted the transaction; preserve its
-   // original error instead of masking it with the context-reset failure.
-   try { await client.query("SELECT set_config('campus.school_id',$1,true)",[previous]); }
-   catch(error) { if(!failed)throw error; }
-  }
+  return fn(client);
  };
  return typeof db.release==='function'?run(db):transaction(db,run);
 }
 
 async function papers(db,slugs=null) {
- return (await db.query(`SELECT id,slug,version_id,enabled,programming_problem_id,
-  definition->'title' AS title,definition->>'division' AS division,definition->>'season' AS season,
-  (definition->>'round')::integer AS round,COALESCE((SELECT jsonb_agg(jsonb_build_object(
-   'id',q->>'id','number',q->'number','topic',q->'topic')) FROM jsonb_array_elements(definition->'questions') q),'[]'::jsonb) AS questions
-  FROM acsl_papers WHERE school_id=$1 AND ($2::text[] IS NULL OR slug=ANY($2)) ORDER BY slug`,[LEGACY_SCHOOL_ID,slugs])).rows;
+ return (await db.query(`SELECT * FROM platform_course_acsl_editions
+  WHERE ($1::text[] IS NULL OR slug=ANY($1)) ORDER BY slug`,[slugs])).rows;
 }
 const same=(a,b)=>a.paperSlug===b.paperSlug&&a.kind===b.kind&&a.questionId===b.questionId;
 const available=(paper,link,versionId)=>paper?.enabled&&(!versionId||paper.version_id===versionId)

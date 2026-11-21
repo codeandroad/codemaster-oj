@@ -1,5 +1,6 @@
 "use client";
 
+import { StudentPublicProfile } from "../student/public-profile";
 import { useEffect, useRef, useState } from "react";
 import { useWorkspaceData } from "@/components/workspace-data";
 import { AcslPage, useAcslEnabled } from "@/components/acsl/acsl-page";
@@ -13,7 +14,7 @@ import { PreparationRouter } from "@/components/written-papers/preparation-route
 import { resolvePublicLearningBookmark } from "@/lib/campus-routes";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LearnerResourceScope } from "./learner-resource-scope";
-import { PublicReviewNotebook } from "./public-study-records";
+
 import { SchoolExitAdministration } from "./school-exit-administration";
 import { SchoolActivities } from "./school-activities";
 import { SchoolPaper4 } from "./school-paper4";
@@ -48,7 +49,7 @@ import {
   useData,
   useMutation,
 } from "@/components/admin/common";
-import { productionApi, roleHome, type CampusUser } from "@/lib/production-api";
+import { productionApi, type CampusUser } from "@/lib/production-api";
 import {
   RoleLabel,
   schoolDisplayName,
@@ -125,7 +126,7 @@ export function SchoolsPage({
   const admin = workspaceRole === "admin";
   const teaching = workspaceRole !== "student";
   const role = selected?.roles.includes("school_admin") ? "school_admin" : workspaceRole === "teacher" ? "teacher" : "student";
-  const acslEnabled = useAcslEnabled(!selected?.legacy ? selected?.id : undefined, teaching);
+  const acslEnabled = useAcslEnabled(selected?.id, teaching);
   const sections = workspaceNavigation[workspaceRole].filter(item => item.section !== "timed" && true);
   const active = requestedSection === "acsl" ? (teaching
     ? {section: "acsl", label: "ACSL 题库", shortEnglish: "ACSL papers"} as const
@@ -144,21 +145,7 @@ export function SchoolsPage({
     loaded && publicBookmark ? publicBookmark
     : loaded && user.platformAdmin && search.get("join") === "1"
       ? "/platform?section=settings#schools"
-      : loaded && selected?.legacy
-        ? personalSettings
-          ? user.roles.includes("admin")
-            ? "/admin/personal-settings#schools"
-            : user.roles.includes("teacher")
-              ? "/teacher/settings#schools"
-              : "/student/settings#schools"
-          : personalProfile
-            ? user.roles.includes("admin")
-              ? "/admin/profile"
-              : user.roles.includes("teacher")
-                ? "/teacher/profile"
-                : "/student/profile"
-            : roleHome(user)
-        : loaded && !selected
+      : loaded && !selected
           ? user.platformAdmin
             ? personalSettings
               ? "/platform?section=settings#schools"
@@ -357,13 +344,13 @@ export function SchoolsPage({
                 ) : active.section === "scholarship" ? (
                   <SchoolScholarship schoolId={selected.id} role={role} />
                 ) : active.section === "leaderboard" ? (
-                  <SchoolLeaderboard schoolId={selected.id} />
+                  search.get("profileId") ? <StudentPublicProfile profileId={search.get("profileId")!} schoolId={selected.id} viewer={user} workspace={admin?"admin":teaching?"teacher":"student"} /> : <SchoolLeaderboard schoolId={selected.id} />
                 ) : active.section === "submissions" ? (
                   <LearnerResourceScope section="submissions" schoolHref={href("submissions")}>
                     <SchoolSubmissions schoolId={selected.id}/>
                   </LearnerResourceScope>
                 ) : active.section === "review-notebook" ? (
-                  <PublicReviewNotebook/>
+                  <LearnerResourceScope section="review-notebook" schoolHref={href("review-notebook")}><SchoolSubmissions schoolId={selected.id} notebook/></LearnerResourceScope>
                 ) : active.section === "classes" ? (
                   <SchoolClasses
                     school={selected}

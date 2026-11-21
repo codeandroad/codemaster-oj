@@ -101,7 +101,7 @@ function SubmissionRows({
     { locale } = useLocale();
   const searchParams = useSearchParams();
   const detailHref = (id: string) => {
-    const params = new URLSearchParams({ schoolId, section: "submissions", submissionId: id });
+    const params = new URLSearchParams({ schoolId, section: searchParams.get("section")==="review-notebook"?"review-notebook":"submissions", submissionId: id });
     if (searchParams.get("section") === "submissions" && searchParams.has("submissionPage")) {
       params.set("submissionPage", searchParams.get("submissionPage")!);
     }
@@ -155,22 +155,22 @@ function SubmissionRows({
   );
 }
 
-export function SchoolSubmissions({ schoolId }: { schoolId: string }) {
+export function SchoolSubmissions({ schoolId,notebook=false }: { schoolId: string;notebook?:boolean }) {
   const searchParams = useSearchParams();
   const rawPage = Number(searchParams.get("submissionPage") ?? 1);
   const page = Number.isInteger(rawPage) && rawPage >= 1 && rawPage <= 100000 ? rawPage : 1;
   const submissionId = searchParams.get("submissionId");
-  if (submissionId) return <SchoolSubmissionDetail key={`${schoolId}:${submissionId}`} schoolId={schoolId} submissionId={submissionId} backHref={`${schoolWorkspaceHref(schoolId, "submissions")}&submissionPage=${page}`} />;
-  return <SchoolSubmissionList key={`${schoolId}:${page}`} schoolId={schoolId} page={page} />;
+  if (submissionId) return <SchoolSubmissionDetail key={`${schoolId}:${submissionId}`} schoolId={schoolId} submissionId={submissionId} backHref={`${schoolWorkspaceHref(schoolId, notebook?"review-notebook":"submissions")}&submissionPage=${page}`} />;
+  return <SchoolSubmissionList key={`${schoolId}:${page}`} schoolId={schoolId} page={page} notebook={notebook} />;
 }
 
-function SchoolSubmissionList({ schoolId, page }: { schoolId: string; page: number }) {
+function SchoolSubmissionList({ schoolId, page,notebook }: { schoolId: string; page: number;notebook:boolean }) {
   const text = useSchoolText();
   const router = useRouter();
   const data = useData<SubmissionPage>(
-      `schools/${schoolId}/submissions?page=${page}`,
+      `schools/${schoolId}/submissions?page=${page}${notebook?"&view=review":""}`,
     );
-  const setPage = (value: number) => router.push(`${schoolWorkspaceHref(schoolId, "submissions")}&submissionPage=${value}`, { scroll: false });
+  const setPage = (value: number) => router.push(`${schoolWorkspaceHref(schoolId, notebook?"review-notebook":"submissions")}&submissionPage=${value}`, { scroll: false });
   return (
     <section className={panel}>
       <State data={data}>

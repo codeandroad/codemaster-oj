@@ -1,4 +1,3 @@
-import {canonicalMergedCourseId} from './course-merge.mjs';
 import {fail,field,uuid,enumValue} from './security.mjs';
 import {normalizeRequiredLanguage} from './course-language-policy.mjs';
 import {resolveLiveProblemVersion} from './live-problem-version.mjs';
@@ -122,4 +121,10 @@ export async function requireLinkedCourse(db,user,value){
  const course=(await db.query('SELECT id,published_at,archived_at FROM learning_paths WHERE id=$1 FOR SHARE',[id])).rows[0];
  if(!course?.published_at||course.archived_at||user&&!(await readableCourseIds(db,user,[id])).has(id))fail(409,'COURSE_UNAVAILABLE','只能关联当前有权访问的已发布课程');
  return id;
+}
+
+export async function canonicalMergedCourseId(db, value) {
+ const id=uuid(value);
+ const row=(await db.query('SELECT merged_into_id FROM learning_paths WHERE id=$1',[id])).rows[0];
+ return row?.merged_into_id??id;
 }

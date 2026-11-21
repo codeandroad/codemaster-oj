@@ -269,7 +269,7 @@ export async function productionApi<T>(
       }
       // A missing school resource may mean that the membership was revoked.
       // Confirm with the school list before switching workspaces.
-      if (typeof window !== "undefined" && (code === "LEGACY_WORKSPACE_REQUIRED"
+      if (typeof window !== "undefined" && (code === "SCHOOL_WORKSPACE_REQUIRED"
         || response.status === 404 && /^\/?schools\/[^/]+\//.test(path))) {
         window.dispatchEvent(new Event("codemaster:school-access-check"));
       }

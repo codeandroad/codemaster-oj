@@ -4,7 +4,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { createPool } from '../src/db.mjs';
 import { migrate } from '../src/migrate.mjs';
-import { handlePaper4 } from '../src/paper4.mjs';
+import { handlePaper4 } from './fixtures/pre-workspace/paper4.mjs';
 import { parsePaper4BatchImport } from '../src/paper4-collection.mjs';
 const source=new URL('../../../content/paper4-pastpapers/',import.meta.url);
 test('Paper 4 bulk import is atomic and private exports roundtrip all 32 papers without publishing or overwriting',

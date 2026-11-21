@@ -1,5 +1,7 @@
+import { lockCatalogProblemSchools } from './catalog-problem-publication.mjs';
+import { lockPlatformContent } from './platform-content-access.mjs';
 import { transaction } from './db.mjs';
-import { activeAccount, LEGACY_SCHOOL_ID, lockSchoolTeaching } from './schools.mjs';
+import { activeAccount } from './schools.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
 import { canonicalHash, enumValue, fail, field, integer, uuid } from './security.mjs';
 
@@ -9,7 +11,7 @@ const bankShape = row => ({ id: row.id, name: row.name, description: row.descrip
 
 export async function platformStorageBank(db, accountId) {
  await db.query("SELECT pg_advisory_xact_lock(hashtextextended('platform-source-bank',0))");
- let bank = (await db.query("SELECT id FROM problem_banks WHERE name='CodeMaster' AND description='Platform source problems' AND archived_at IS NULL ORDER BY created_at,id LIMIT 1")).rows[0];
+ let bank = (await db.query("SELECT id FROM problem_banks WHERE school_id IS NULL AND name='CodeMaster' AND description='Platform source problems' AND archived_at IS NULL ORDER BY created_at,id LIMIT 1")).rows[0];
  if (!bank) bank = (await db.query("INSERT INTO problem_banks(name,description,visibility,owner_account_id) VALUES('CodeMaster','Platform source problems','school',$1) RETURNING id", [accountId])).rows[0];
  return bank.id;
 }
@@ -28,10 +30,9 @@ export async function handlePlatformProblemLibrary({ pool, user, route, method, 
  const batch = route === '/platform/source-problems/batch';
  if (!banks && !importing && !batch) return null;
  return transaction(pool, async db => {
-  await lockSchoolTeaching(db, LEGACY_SCHOOL_ID, { shared: method === 'GET' });
+  await lockPlatformContent(db, { shared: method === 'GET' });
   await activeAccount(db, user.id);
   if (!await isPlatformAdministrator(db, user.id)) fail(403, 'PLATFORM_ADMIN_REQUIRED', '需要平台管理员权限');
-  await db.query("SELECT set_config('campus.school_id',$1,true)", [LEGACY_SCHOOL_ID]);
   const audit = (action, detail) => db.query('INSERT INTO platform_audit_events(actor_account_id,action,detail) VALUES($1,$2,$3)', [user.id, action, detail]);
   if (banks) {
    if (!banks[1] && method === 'GET') {
@@ -102,7 +103,10 @@ export async function handlePlatformProblemLibrary({ pool, user, route, method, 
     OR EXISTS(SELECT 1 FROM assignment_problems ap JOIN assignments a ON a.id=ap.assignment_id WHERE ap.problem_id=p.id AND a.archived_at IS NULL)
     OR EXISTS(SELECT 1 FROM timed_practice_problems tp JOIN timed_practices t ON t.id=tp.practice_id WHERE tp.problem_id=p.id AND t.archived_at IS NULL))`, [ids])).rows;
    if (referenced.length) fail(409, 'PROBLEM_REFERENCED', `${referenced.length} 道题目仍被课程、作业或训练引用，请先解除关联；本批未删除任何题目`);
-   await db.query('UPDATE school_problem_publications SET withdrawn_at=clock_timestamp() WHERE school_id=$1 AND problem_id=ANY($2::uuid[]) AND withdrawn_at IS NULL', [LEGACY_SCHOOL_ID, ids]);
+   for (const schoolId of await lockCatalogProblemSchools(db, ids)) {
+    await db.query("SELECT set_config('campus.school_id',$1,true)", [schoolId]);
+    await db.query('UPDATE school_problem_publications SET withdrawn_at=clock_timestamp() WHERE school_id=$1 AND problem_id=ANY($2::uuid[]) AND withdrawn_at IS NULL', [schoolId, ids]);
+   }
    await db.query('UPDATE problems SET archived_at=COALESCE(archived_at,clock_timestamp()) WHERE id=ANY($1::uuid[])', [ids]);
   } else {
    if ((await db.query(`SELECT 1 FROM problems p JOIN problem_banks b ON b.id=p.bank_id

@@ -9,7 +9,7 @@ import { DomainService } from '../domain.service.js';
 export class PlatformController {
   constructor(private readonly domain: DomainService) {}
 
-  @Get(['schools', 'school-admin-candidates'])
+  @Get(['problem-groups','problem-groups/:id','schools', 'school-admin-candidates'])
   async read(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
     return applyResponse(response, await this.domain.execute('platform', request.domainContext));
   }
@@ -19,7 +19,7 @@ export class PlatformController {
     return applyResponse(response, await this.domain.execute('platform', request.domainContext));
   }
 
-  @Patch('schools/:schoolId')
+  @Patch(['schools/:schoolId', 'problem-groups/:id'])
   async update(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
     return applyResponse(response, await this.domain.execute('platform', request.domainContext));
   }

@@ -8,7 +8,7 @@ import type { CampusRole } from "@/lib/production-api";
 
 export function LegacyExamPreparation({ role }: { role: CampusRole }) {
   const schools = useWorkspaceData<{ items: School[] }>("schools");
-  const school = schools.data?.items.find(item => item.legacy);
+  const school = schools.data?.items[0];
   const availability = useWorkspaceData<{ enabled: boolean }>(
     school ? `schools/${school.id}/acsl${role === "student" ? "" : "/manage"}?view=availability` : "",
   );

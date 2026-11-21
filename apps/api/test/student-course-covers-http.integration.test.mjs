@@ -8,7 +8,7 @@ import {migrate} from '../../../packages/domain/src/migrate.mjs';
 import {bootstrap} from '../../../packages/domain/src/bootstrap.mjs';
 import {loadConfig} from '../../../packages/domain/src/application.mjs';
 import {hashPassword} from '../../../packages/domain/src/security.mjs';
-import {LEGACY_SCHOOL_ID} from '../../../packages/domain/src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 
 test('student course cover URLs retain catalog admission and authorize every binary revalidation', {skip:!process.env.TEST_DATABASE_URL,timeout:120000}, async t=>{
  const base=new URL(process.env.TEST_DATABASE_URL);
@@ -21,7 +21,7 @@ test('student course cover URLs retain catalog admission and authorize every bin
  try{
   await migrate(owner);
   const password=randomBytes(24).toString('base64url'),origin='http://student-course-covers.test';
-  await bootstrap(owner,{username:'cover-admin',password,number:'ADMIN',name:'Cover admin'});
+  await bootstrap(owner,{schoolSlug:'tianxing-chuangshiji',username:'cover-admin',password,number:'ADMIN',name:'Cover admin'});
   const actors={admin:(await owner.query("SELECT id,identity_id AS \"identityId\" FROM accounts WHERE username='cover-admin'")).rows[0]};
   const hash=await hashPassword(password);
   for(const [name,kind] of [['learner','student'],['peer','student'],['teacher','teacher'],['outsider','personal']]){

@@ -21,7 +21,7 @@ test('actual NestJS HTTP entry preserves sessions, CSRF, role checks, body limit
   let app;
   try {
     await migrate(pool);
-    const adminId=await bootstrap(pool,{name:'Nest管理员',number:'ADMIN',username:'nest-admin',password:adminPassword});
+    const adminId=await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji',name:'Nest管理员',number:'ADMIN',username:'nest-admin',password:adminPassword});
     const sessionSecret=randomBytes(32).toString('base64url');
     app=await createApiApplication({databaseUrl:connection.toString(),logger:false,
       config:loadConfig({SESSION_SECRET:sessionSecret,APP_ORIGIN:'http://school.test',COOKIE_SECURE:'false'})});

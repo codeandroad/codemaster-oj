@@ -25,7 +25,7 @@ test('legacy course language governs judge admission and credit for newly publis
     await pool.query(grants.replaceAll('SCHEMA public', `SCHEMA ${schema}`));
     const password = randomBytes(24).toString('base64url');
     const origin = 'http://legacy-course-language.test';
-    await bootstrap(pool, { name: 'Administrator', number: 'LANG-ADMIN', username: 'lang-admin', password });
+    await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji', name: 'Administrator', number: 'LANG-ADMIN', username: 'lang-admin', password });
     const runtime = new URL(database);
     runtime.searchParams.set('options', `-crole=campus_app -csearch_path=${schema}`);
     app = await createApiApplication({ databaseUrl: runtime.href, logger: false, config: loadConfig({

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createPool } from '../src/db.mjs';
 import { migrate } from '../src/migrate.mjs';
-import { handleEducation } from '../src/education.mjs';
+import { handleEducation } from './fixtures/pre-workspace/education.mjs';
 
 function leaderboard(pool, user, query = '') {
  const url = new URL(`http://localhost/api/v1/points/leaderboard${query}`);

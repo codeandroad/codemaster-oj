@@ -1156,7 +1156,6 @@ function ProblemTranslationActions({
   const [reviewed, setReviewed] = useState(false);
   const { contents, content, value, dirty, reset } = translation;
   const base = endpoint ?? "scholarship/contents";
-  const awaitingReview = Boolean(content?.hasPendingSolutions) || content?.status === "draft";
   const status = content?.hasPendingSolutions
     ? tx("已发布 · 更新待审核", "Published · updates awaiting review")
     : content?.status === "published"

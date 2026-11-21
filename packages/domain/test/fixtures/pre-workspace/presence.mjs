@@ -1,8 +1,8 @@
-import { leaderboardOrdinaryAttempts, leaderboardPaperAttempts } from './leaderboard-attempts.mjs';
-import { avatarForIdentity } from './avatars.mjs';
-import { transaction } from './db.mjs';
+import { leaderboardOrdinaryAttempts, leaderboardPaperAttempts } from '../../../src/leaderboard-attempts.mjs';
+import { avatarForIdentity } from '../../../src/avatars.mjs';
+import { transaction } from '../../../src/db.mjs';
 import { LEGACY_SCHOOL_ID } from './legacy-school.mjs';
-import { fail, field, integer, uuid } from './security.mjs';
+import { fail, field, integer, uuid } from '../../../src/security.mjs';
 
 export const PRESENCE_TTL_SECONDS = 90;
 export const PRESENCE_HEARTBEAT_SECONDS = 30;

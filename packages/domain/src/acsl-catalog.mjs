@@ -40,13 +40,10 @@ export async function acslCatalog(db, schoolId, accountId) {
     GROUP BY p.id
   ), programming_awards AS (
     SELECT award.paper_id,award.version_id,award.points FROM acsl_point_awards award
-    JOIN accounts actor ON actor.identity_id=award.identity_id AND actor.id=$2
-    JOIN identities person ON person.id=actor.identity_id AND person.kind='student' AND person.archived_at IS NULL
-    JOIN legacy_school_account_ownership membership ON membership.account_id=actor.id AND membership.school_id=award.school_id
-    JOIN legacy_school_identity_ownership ownership ON ownership.identity_id=person.id AND ownership.school_id=award.school_id
-    WHERE award.school_id=$1 AND award.section='programming'
-      AND actor.disabled_at IS NULL AND actor.binding_released_at IS NULL
-      AND EXISTS(SELECT 1 FROM account_roles role WHERE role.account_id=actor.id AND role.role='student')
+    JOIN school_identities person ON (person.school_id,person.id)=(award.school_id,award.identity_id)
+      JOIN school_memberships member ON (member.school_id,member.account_id)=(person.school_id,person.account_id)
+       AND member.role='student' AND member.revoked_at IS NULL
+      WHERE person.account_id=$2 AND person.archived_at IS NULL AND award.school_id=$1 AND award.section='programming'
   ) SELECT p.id,p."versionId",p.slug,p.title,p.division,p.season,p.round,p."roundLabel",p."hasProgramming",p."questionCount",
     coalesce(grade.question_count,drafts.answered_count,0) AS "answeredCount",
     grade.id IS NOT NULL AS graded,grade.id AS "gradeId",grade.created_at AS "gradedAt",

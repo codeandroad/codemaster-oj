@@ -10,19 +10,18 @@ export function schoolSelectionStorageKey(accountId: string): string {
   return `codemaster:current-school:v1:${accountId.toLowerCase()}`;
 }
 
-export function resolveSchoolSelection<T extends { id: string; legacy: boolean }>(
+export function resolveSchoolSelection<T extends { id: string }>(
   items: readonly T[],
   preferredId: string,
 ): T | undefined {
   return (
     items.find((school) => school.id === preferredId) ??
-    items.find((school) => !school.legacy) ??
     items[0]
   );
 }
 
 /** Current navigation takes precedence over the default for the next sign-in. */
-export function resolveCurrentSchoolSelection<T extends { id: string; legacy: boolean }>(
+export function resolveCurrentSchoolSelection<T extends { id: string }>(
   items: readonly T[],
   {
     activeSchoolId,

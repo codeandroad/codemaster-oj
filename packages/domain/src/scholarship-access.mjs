@@ -1,9 +1,8 @@
 import { problemSolvedSql, withProblemProgressScope } from './problem-progress.mjs';
 import {fail,uuid,field,enumValue} from './security.mjs';
-import {problemPermissions} from './library.mjs';
+import {canEditPlatformContent} from './platform-content-access.mjs';
 import {scholarshipActivityAccess} from './scholarship-rules.mjs';
 import {resolveLiveProblemVersion,assertLiveProblemVersion} from './live-problem-version.mjs';
-import {LEGACY_SCHOOL_ID} from './schools.mjs';
 
 const one=result=>{if(!result.rowCount)fail(404,'NOT_FOUND','题目或活动不存在');return result.rows[0];};
 export const isScholarshipStaff=user=>user.roles.includes('admin')||user.roles.includes('teacher');
@@ -26,7 +25,7 @@ export async function hasPublicPracticeAc(db,accountId,schoolId,problemId){
 }
 
 export async function hasLegacyPracticeAc(db,user,{problemId}){
- return hasPublicPracticeAc(db,user.id,LEGACY_SCHOOL_ID,problemId);
+ return hasPublicPracticeAc(db,user.id,user.teachingSchoolId,problemId);
 }
 
 // Read only public statement/version identifiers here; never reference code or judge data.
@@ -43,7 +42,8 @@ export async function resolveAssistanceTarget(db,user,input,{manage=false,helper
   else{
    p=one(await db.query('SELECT * FROM problems WHERE id=$1',[problemId]));
    v=one(await db.query('SELECT * FROM problem_versions WHERE id=$1 AND problem_id=$2',[versionId,problemId]));
-   permissions=await problemPermissions(db,user,p,v);
+   const canEdit=p.owner_scope==='platform'&&!p.archived_at&&await canEditPlatformContent(db,user.id,'problem',p.id);
+   permissions={canRead:canEdit,canEdit};
    if(!permissions.canRead)fail(404,'NOT_FOUND','题目不存在');
   }
   if(manage&&(!permissions.canEdit||(p.owner_scope!=='platform'&&!isScholarshipStaff(user))))fail(403,'FORBIDDEN','无权管理此题辅助内容');

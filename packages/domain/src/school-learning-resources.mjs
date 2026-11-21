@@ -1,3 +1,5 @@
+import { platformCourseEligible } from './platform-course-access.mjs';
+import { platformCourseEdition } from './platform-public-course.mjs';
 import { transaction } from './db.mjs';
 import { auditSchool, lockSchoolTeaching, schoolRole } from './schools.mjs';
 import { canonicalHash, enumValue, fail, field, integer, uuid } from './security.mjs';
@@ -7,7 +9,7 @@ const manages=(r,user,role)=>role==='school_admin'||role==='teacher'&&r.owner_ac
 function input(body){
  const courseId=body.courseId?uuid(body.courseId):null,chapterId=body.chapterId?uuid(body.chapterId):null;
  if(chapterId&&!courseId)fail(400,'VALIDATION','请选择章节所属课程');
- return {title:field(body.title,'资料名称',{max:200}),type:enumValue(body.type??'note',['note','article','reference'],'资料类型'),
+ return {title:field(body.title,'资料名称',{max:200}),type:enumValue(body.type??'note',['reading','video','reference','note','article','link'],'资料类型'),
  scope:enumValue(body.scope??'private',['school','private'],'资料范围'),content:field(body.content??'','资料正文',{min:0,max:100000,trim:false}),courseId,chapterId};
 }
 export async function handleSchoolLearningResources({pool,user,route,method,body={},url},loadCourse){
@@ -18,6 +20,13 @@ export async function handleSchoolLearningResources({pool,user,route,method,body
   await lockSchoolTeaching(db,schoolId,{shared:method==='GET'});const role=await schoolRole(db,schoolId,user.id);
   await db.query("SELECT set_config('campus.school_id',$1,true)",[schoolId]);
   async function linked(resource,{editing=false}={}){
+   if(resource.platform_course_id){
+    const id=resource.platform_course_id;
+    if(!await platformCourseEligible(db,id,user.id))fail(404,'NOT_FOUND','关联课程不可访问');
+    const view=await platformCourseEdition(db,{course_id:id},{detail:true});
+    if(!view||resource.chapter_id&&!view.chapters.some(chapter=>chapter.id===resource.chapter_id))fail(404,'NOT_FOUND','关联课程不可访问');
+    return {view};
+   }
    if(!resource.course_id)return null;
    const loaded=await loadCourse(db,schoolId,resource.course_id,user,role);
    if(editing&&(!loaded.canManage||loaded.course.archived_at))fail(404,'NOT_FOUND','课程不可编辑');
@@ -26,7 +35,7 @@ export async function handleSchoolLearningResources({pool,user,route,method,body
   }
   async function shape(r,{detail=false}={}){
    const course=await linked(r),canManage=manages(r,user,role);
-   return {id:r.id,title:r.title,type:r.type,scope:r.scope,courseId:r.course_id,chapterId:r.chapter_id,
+   return {id:r.id,title:r.title,type:r.type,scope:r.scope,courseId:r.course_id??r.platform_course_id,courseScope:r.platform_course_id?'platform':'school',chapterId:r.chapter_id,
     courseTitle:course?.view.title??null,chapterTitle:course?.view.chapters.find(ch=>ch.id===r.chapter_id)?.title??null,
     revision:r.revision,canManage,...(detail?{content:r.content}:{})};
   }
@@ -35,7 +44,7 @@ export async function handleSchoolLearningResources({pool,user,route,method,body
    const q=field(url.searchParams.get('q')??'','搜索',{min:0,max:100});
    const rows=(await db.query(`SELECT * FROM school_learning_resources WHERE school_id=$1 AND deleted_at IS NULL
     AND ($2='school_admin' OR owner_account_id=$3 AND $2='teacher' OR scope='school')
-    AND ($4::uuid IS NULL OR course_id=$4) AND ($5='' OR strpos(lower(title),lower($5))>0) ORDER BY created_at DESC,id`,[schoolId,role,user.id,courseId,q])).rows;
+    AND ($4::uuid IS NULL OR coalesce(course_id,platform_course_id)=$4) AND ($5='' OR strpos(lower(title),lower($5))>0) ORDER BY created_at DESC,id`,[schoolId,role,user.id,courseId,q])).rows;
    const items=[];for(const r of rows){try{items.push(await shape(r));}catch(e){if(e.status!==404)throw e;}}
    return reply({items});
   }
@@ -60,8 +69,9 @@ export async function handleSchoolLearningResources({pool,user,route,method,body
    await auditSchool(db,schoolId,user.id,'school.resource.delete',id);return reply({ok:true});
   }
   if(method==='PATCH'){
-   const data=input(body);await linked({course_id:data.courseId,chapter_id:data.chapterId},{editing:true});
-   const updated=(await db.query(`UPDATE school_learning_resources SET title=$3,type=$4,scope=$5,content=$6,course_id=$7,chapter_id=$8,revision=revision+1,updated_at=clock_timestamp() WHERE school_id=$1 AND id=$2 RETURNING *`,[schoolId,id,data.title,data.type,data.scope,data.content,data.courseId,data.chapterId])).rows[0];
+   const data=input(body);const platformId=row.platform_course_id===data.courseId?row.platform_course_id:null;
+   await linked({course_id:platformId?null:data.courseId,platform_course_id:platformId,chapter_id:data.chapterId},{editing:true});
+   const updated=(await db.query(`UPDATE school_learning_resources SET title=$3,type=$4,scope=$5,content=$6,course_id=$7,chapter_id=$8,platform_course_id=$9,revision=revision+1,updated_at=clock_timestamp() WHERE school_id=$1 AND id=$2 RETURNING *`,[schoolId,id,data.title,data.type,data.scope,data.content,platformId?null:data.courseId,data.chapterId,platformId])).rows[0];
    await auditSchool(db,schoolId,user.id,'school.resource.update',id);return reply(await shape(updated,{detail:true}));
   }
   return null;

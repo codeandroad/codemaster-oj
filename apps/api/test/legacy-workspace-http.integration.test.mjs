@@ -22,7 +22,7 @@ test('legacy business endpoints require original-school ownership on the real Ne
     let app;
     try {
       await migrate(pool);
-      const legacyAccountId = await bootstrap(pool, { name: 'Original administrator', number: 'ADM', username: 'original-admin', password });
+      const legacyAccountId = await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji', name: 'Original administrator', number: 'ADM', username: 'original-admin', password });
       const hash = await hashPassword(password);
       async function credential(login, { legacyRole } = {}) {
         return transaction(pool, async db => {

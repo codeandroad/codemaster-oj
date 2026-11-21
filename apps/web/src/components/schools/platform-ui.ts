@@ -7,7 +7,6 @@ export type PlatformSchool = {
   id: string;
   slug: string;
   name: string;
-  legacy: boolean;
   createdAt: string;
   counts: {
     members: number;
@@ -22,7 +21,7 @@ export type PlatformSchool = {
     accountId: string;
     name: string;
     username: string;
-    source: "membership" | "grant" | "legacy";
+    source: "membership" | "grant";
   }[];
 };
 
@@ -49,10 +48,6 @@ export function usePlatformError() {
       STALE_SCHOOL: text(
         "The school name changed while this form was open. Close this form and refresh before renaming it.",
         "学校名称已被其他操作修改，请关闭此窗口、刷新列表后再修改。",
-      ),
-      LEGACY_ADMIN_MANAGEMENT: text(
-        "This school's existing administrator roles are maintained in its original workspace.",
-        "这所学校的既有管理员角色在原工作区维护。",
       ),
       VALIDATION: text(
         "Check the fields and try again.",

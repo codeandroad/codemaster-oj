@@ -1,10 +1,10 @@
 import { transaction } from './db.mjs';
 import { fail, field, integer, username, uuid } from './security.mjs';
-import { activeAccount, auditSchool, LEGACY_SCHOOL_ID, lockSchoolTeaching } from './schools.mjs';
+import { activeAccount, auditSchool, lockSchoolTeaching } from './schools.mjs';
 
 const result = (body, status = 200) => ({ status, body });
 const schoolFields = 'id, slug, name, name_zh AS "nameZh", name_en AS "nameEn", settings_revision AS revision, created_at AS "createdAt"';
-const schoolShape = school => ({ ...school, legacy: school.id === LEGACY_SCHOOL_ID });
+
 
 export async function isPlatformAdministrator(db, accountId) {
   const { rowCount } = await db.query(`
@@ -85,28 +85,16 @@ async function listSchools(db, url) {
     await db.query("SELECT set_config('campus.school_id',$1,true)", [school.id]);
     const { rows: [counts] } = await db.query(`
       SELECT
-        ((SELECT count(*) FROM school_memberships m JOIN accounts a ON a.id=m.account_id
+        (SELECT count(*) FROM school_memberships m JOIN accounts a ON a.id=m.account_id
           JOIN identities i ON i.id=a.identity_id WHERE m.school_id=$1 AND m.revoked_at IS NULL
-            AND a.disabled_at IS NULL AND a.binding_released_at IS NULL AND i.archived_at IS NULL)
-          + (SELECT count(*) FROM legacy_school_account_ownership o JOIN accounts a ON a.id=o.account_id
-            JOIN identities i ON i.id=a.identity_id WHERE o.school_id=$1
-              AND a.disabled_at IS NULL AND a.binding_released_at IS NULL AND i.archived_at IS NULL))::int members,
-        ((SELECT count(*) FROM school_identities WHERE school_id=$1)
-          + (SELECT count(*) FROM legacy_school_identity_ownership WHERE school_id=$1))::int identities,
-        ((SELECT count(*) FROM school_classes WHERE school_id=$1)
-          + (SELECT count(*) FROM classes WHERE school_id=$1))::int classes,
-        (SELECT count(*)::int FROM problem_banks WHERE school_id=$1) banks,
-        ((SELECT count(*) FROM learning_paths WHERE school_id=$1 AND owner_scope='school')
-          + (SELECT count(*) FROM school_courses WHERE school_id=$1))::int courses,
-        (SELECT count(*)::int FROM assignments WHERE school_id=$1) assignments,
-        (SELECT count(*)::int FROM paper4_papers WHERE school_id=$1) papers`, [school.id]);
-    const { rows: administrators } = await db.query(school.id === LEGACY_SCHOOL_ID ? `
-      SELECT a.id AS "accountId", i.name, a.username, 'legacy' AS source
-      FROM accounts a JOIN identities i ON i.id=a.identity_id
-      JOIN account_roles r ON r.account_id=a.id AND r.role='admin'
-      JOIN legacy_school_account_ownership o ON o.account_id=a.id AND o.school_id=$1
-      WHERE a.disabled_at IS NULL AND a.binding_released_at IS NULL AND i.archived_at IS NULL
-      ORDER BY i.name,a.id` : `
+            AND a.disabled_at IS NULL AND a.binding_released_at IS NULL AND i.archived_at IS NULL)::int members,
+        (SELECT count(*)::int FROM school_identities WHERE school_id=$1) identities,
+        (SELECT count(*)::int FROM school_classes WHERE school_id=$1) classes,
+        (SELECT count(*)::int FROM school_problem_banks WHERE school_id=$1 AND resource_kind='ordinary') banks,
+        (SELECT count(*)::int FROM school_courses WHERE school_id=$1) courses,
+        (SELECT count(*)::int FROM school_activities WHERE school_id=$1 AND kind='assignment') assignments,
+        (SELECT count(*)::int FROM school_paper4_papers WHERE school_id=$1) papers`, [school.id]);
+    const { rows: administrators } = await db.query(`
       SELECT a.id AS "accountId", i.name, a.username,
         CASE WHEN g.account_id IS NOT NULL THEN 'grant' ELSE 'membership' END AS source
       FROM school_memberships m JOIN accounts a ON a.id=m.account_id JOIN identities i ON i.id=a.identity_id
@@ -114,7 +102,7 @@ async function listSchools(db, url) {
       WHERE m.school_id=$1 AND m.revoked_at IS NULL AND (m.role='school_admin' OR g.account_id IS NOT NULL)
         AND a.disabled_at IS NULL AND a.binding_released_at IS NULL AND i.archived_at IS NULL
       ORDER BY i.name,a.id`, [school.id]);
-    items.push({ ...schoolShape(school), counts, administrators });
+    items.push({ ...school, counts, administrators });
   }
   return result({ items, page, hasMore: rows.length > 50 });
 }
@@ -138,7 +126,7 @@ function validateSchool(body) {
   const slug = body.slug === undefined
     ? `school-${uuid(body.requestId, '请求 ID').toLowerCase()}`
     : field(body.slug, '学校标识', { min: 3, max: 50 });
-  if (!/^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/.test(slug) || slug === 'legacy-school') {
+  if (!/^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/.test(slug)) {
     fail(400, 'VALIDATION', '学校标识须使用 3–50 个小写字母、数字或短横线');
   }
   return { slug, name: field(body.name, '学校名称', { max: 100 }) };
@@ -156,13 +144,13 @@ async function createSchool(db, actorId, body) {
         AND (m.role='school_admin' OR EXISTS (SELECT 1 FROM school_administrators g
           WHERE g.school_id=m.school_id AND g.account_id=m.account_id AND g.revoked_at IS NULL))`, [existing.id, account.accountId]);
     if (existing.name !== name || !rowCount) fail(409, 'CONFLICT', '学校标识已存在');
-    return result(schoolShape(existing));
+    return result(existing);
   }
   const { rows: [school] } = await db.query(`INSERT INTO schools (slug,name) VALUES ($1,$2) RETURNING ${schoolFields}`, [slug,name]);
   await db.query(`INSERT INTO school_memberships (school_id,account_id,role) VALUES ($1,$2,'school_admin')`, [school.id,account.accountId]);
   await auditSchool(db, school.id, actorId, 'school.provision', account.accountId);
   await auditPlatform(db, actorId, 'platform.school.create', { schoolId: school.id, accountId: account.accountId });
-  return result(schoolShape(school), 201);
+  return result(school, 201);
 }
 
 async function renameSchool(db, actorId, schoolId, body) {
@@ -170,19 +158,14 @@ async function renameSchool(db, actorId, schoolId, body) {
   const expectedName = field(body.expectedName, '原学校名称', { max: 100 });
   const { rows: [school] } = await db.query(`SELECT ${schoolFields} FROM schools WHERE id=$1 FOR UPDATE`, [schoolId]);
   if (!school) fail(404, 'NOT_FOUND', '学校不存在');
-  if (school.name === name) return result(schoolShape(school));
+  if (school.name === name) return result(school);
   if (school.name !== expectedName) fail(409, 'STALE_SCHOOL', '学校名称已变更，请刷新后重试');
   const { rows: [updated] } = await db.query(`UPDATE schools SET name=$2 WHERE id=$1 RETURNING ${schoolFields}`, [schoolId,name]);
-  if (schoolId === LEGACY_SCHOOL_ID) {
-    await db.query(`UPDATE site_settings SET settings=jsonb_set(settings,'{schoolName}',to_jsonb($1::text)),
-      updated_at=now() WHERE id=true`, [name]);
-  }
   await auditPlatform(db, actorId, 'platform.school.rename', { schoolId, detail: { before: school.name, after: name } });
-  return result(schoolShape(updated));
+  return result(updated);
 }
 
 async function appointAdministrator(db, actorId, schoolId, body) {
-  if (schoolId === LEGACY_SCHOOL_ID) fail(409, 'LEGACY_ADMIN_MANAGEMENT', '原学校管理员仍按原角色管理，暂不支持平台任命');
   const { rowCount } = await db.query('SELECT id FROM schools WHERE id=$1 FOR SHARE', [schoolId]);
   if (!rowCount) fail(404, 'NOT_FOUND', '学校不存在');
   const account = await findActiveAccount(db, body.username);

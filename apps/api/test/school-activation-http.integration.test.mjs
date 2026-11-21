@@ -21,7 +21,7 @@ test('school activation isolates same-name and same-number identities and consum
     let app;
     try {
       await migrate(owner);
-      await bootstrap(owner, { name: 'Original admin', number: 'ADMIN', username: 'legacy-admin', password });
+      await bootstrap(owner,{schoolSlug:'tianxing-chuangshiji', name: 'Original admin', number: 'ADMIN', username: 'legacy-admin', password });
       const grants = (await readFile(new URL('../../../packages/domain/grants.mjs', import.meta.url), 'utf8')).match(/await pool\.query\(`([\s\S]*?)`\);/)[1];
       await owner.query(grants.replaceAll('SCHEMA public', `SCHEMA ${schema}`));
       const appUrl = new URL(url); appUrl.searchParams.set('options', `-crole=campus_app -csearch_path=${schema}`);

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createPool } from '../src/db.mjs';
 import { migrate } from '../src/migrate.mjs';
-import { handlePaper4 } from '../src/paper4.mjs';
-import { handleEducation } from '../src/education.mjs';
+import { handlePaper4 } from './fixtures/pre-workspace/paper4.mjs';
+import { handleEducation } from './fixtures/pre-workspace/education.mjs';
 import { completePaper4Task } from '../paper4-worker.mjs';
 const questions = [{ key: 'Q1', title: 'Preserve a queue', statement: 'Implement the queue in English.',
   starterCode: '# Start here\n', initialFiles: { 'Data.txt': 'original\r\n' }, outputFiles: ['Result.txt'],

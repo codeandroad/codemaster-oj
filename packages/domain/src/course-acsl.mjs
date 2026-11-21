@@ -1,9 +1,8 @@
 import { transaction } from './db.mjs';
-import { LEGACY_SCHOOL_ID, schoolRole } from './schools.mjs';
+import { schoolRole } from './schools.mjs';
 import { fail, field, uuid } from './security.mjs';
-import { readableCourseIds } from './course-access.mjs';
 import { platformCourseAudienceSql, platformCourseEligible } from './platform-course-access.mjs';
-import { legacyCourseIsLive } from './legacy-public-course.mjs';
+import { courseIsLive } from './course-live.mjs';
 
 export function normalizeCourseAcslLinks(value = []) {
   if (!Array.isArray(value) || value.length > 100) fail(400, 'INVALID_ACSL_LINK', '每章最多关联 100 项 ACSL 练习。');
@@ -61,12 +60,12 @@ export async function resolveCourseAcslLinks(db, schoolId, user, value, previous
 }
 
 export function acslPracticeHref(schoolId, paperId, link) {
-  const params = new URLSearchParams(schoolId === LEGACY_SCHOOL_ID ? {} : { schoolId, section: 'acsl' });
+  const params = new URLSearchParams({ schoolId, section: 'acsl' });
   params.set('paperId',paperId);
   if(link.versionId)params.set('paperVersionId',link.versionId);
   if (link.questionId) params.set('questionId',link.questionId);
   if (link.kind === 'programming') params.set('coding','1');
-  return `${schoolId === LEGACY_SCHOOL_ID ? '/student/acsl' : '/schools'}?${params}`;
+  return `/schools?${params}`;
 }
 
 export async function projectCourseAcslLinks(db, schoolId, user, value = []) {
@@ -110,7 +109,7 @@ export async function legacyCourseAcsl(db, pathIds, user) {
   if (!pathIds.length) return {chapters:new Map(),paths:new Map()};
   const rows = (await db.query('SELECT id,path_id,acsl_links FROM learning_chapters WHERE path_id=ANY($1::uuid[]) AND archived_at IS NULL', [pathIds])).rows;
   const chapters = new Map(), paths = new Map();
-  const projected = await projectCourseAcslLinks(db,LEGACY_SCHOOL_ID,user,rows.flatMap(row=>row.acsl_links??[]));
+  const projected = await projectCourseAcslLinks(db,user.teachingSchoolId,user,rows.flatMap(row=>row.acsl_links??[]));
   let offset = 0;
   for (const row of rows) {
     const links = projected.slice(offset,offset+(row.acsl_links?.length??0));offset+=row.acsl_links?.length??0;chapters.set(row.id,links);
@@ -121,13 +120,11 @@ export async function legacyCourseAcsl(db, pathIds, user) {
 }
 export const acslLinkCounts = links => ({ total: links.filter(link => link.available).length, completed: links.filter(link => link.available && link.completed).length });
 
-const courseHref=(schoolId,courseId,chapterId)=>schoolId===LEGACY_SCHOOL_ID
- ?`/student/learning-paths/${courseId}/chapters/${chapterId}`
- :`/practice/courses/${courseId}?${new URLSearchParams({chapterId,schoolId})}`;
+const courseHref=(schoolId,courseId,chapterId)=>`/practice/courses/${courseId}?${new URLSearchParams({chapterId,schoolId})}`;
 
 async function platformAcslCourses(db,user) {
  const courses=(await db.query(`SELECT p.id,p.title,p.description,p.localizations FROM learning_paths p
-  WHERE p.owner_scope='platform' AND (${legacyCourseIsLive}) AND ${platformCourseAudienceSql('p','$1')}
+  WHERE p.owner_scope='platform' AND (${courseIsLive}) AND ${platformCourseAudienceSql('p','$1')}
   AND EXISTS(SELECT 1 FROM learning_chapters c WHERE c.path_id=p.id AND c.archived_at IS NULL AND jsonb_array_length(c.acsl_links)>0)
   ORDER BY p.title,p.id`,[user.id])).rows;
  const allowed=[],state={};for(const course of courses)if(await platformCourseEligible(db,course.id,user.id,{state}))allowed.push(course);return allowed;
@@ -172,9 +169,7 @@ export async function acslLearningCourses(db,schoolId,user,catalog) {
 
 export async function courseAcslPicker(db, schoolId, user) {
   return context(db,schoolId,user,async client => {
-    if (schoolId === LEGACY_SCHOOL_ID) {
-      if (!(await client.query("SELECT 1 FROM account_roles WHERE account_id=$1 AND role IN ('teacher','admin')",[user.id])).rowCount) fail(403,'FORBIDDEN','需要本校教师权限。');
-    } else if (!['teacher','school_admin'].includes(await schoolRole(client,schoolId,user.id))) fail(403,'FORBIDDEN','需要本校教师权限。');
+    if (!['teacher','school_admin'].includes(await schoolRole(client,schoolId,user.id))) fail(403,'FORBIDDEN','需要本校教师权限。');
     const rows = (await client.query('SELECT id,version_id,slug,definition,programming_problem_id FROM acsl_papers WHERE school_id=$1 AND enabled ORDER BY slug',[schoolId])).rows;
     return { items: rows.map(p => ({ paperId:p.id,versionId:p.version_id,paperSlug:p.slug,title:p.definition.title,division:p.definition.division,season:p.definition.season,round:p.definition.round,
       hasProgramming:!!p.programming_problem_id,questions:p.definition.questions.map(q=>({id:q.id,number:q.number,topic:q.topic})) })) };
@@ -191,17 +186,8 @@ export async function acslLearningLinks(db, schoolId, paper, user) {
     output.push({courseId:course.id,chapterId:chapter.id,title,chapterTitle:chapter.title,
       questionIds:[...new Set(links.filter(link=>link.kind==='question').map(link=>link.questionId))],written:links.some(link=>link.kind==='written'),programming:links.some(link=>link.kind==='programming'),
       ...(courseLocale || chapterLocale ? {localizations:Object.fromEntries(['en','zh'].map(language=>[language,{title:courseLocale?.[language]?.title??title,chapterTitle:chapterLocale?.[language]?.title??chapter.title}]))}:{}),
-      href:schoolId===LEGACY_SCHOOL_ID?courseHref(schoolId,course.id,chapter.id):course.ownerScope==='platform'?courseHref(schoolId,course.id,chapter.id):`/schools?${params}`});
+      href:course.ownerScope==='platform'?courseHref(schoolId,course.id,chapter.id):`/schools?${params}`});
   };
-  if (schoolId === LEGACY_SCHOOL_ID) {
-    const courses = (await db.query(`SELECT p.* FROM learning_paths p WHERE p.published_at IS NOT NULL AND p.archived_at IS NULL
-      AND (p.owner_scope<>'platform' OR p.listed AND p.withdrawn_at IS NULL)
-      AND EXISTS(SELECT 1 FROM learning_chapters c WHERE c.path_id=p.id AND c.archived_at IS NULL AND c.acsl_links @> $1::jsonb)`,[JSON.stringify([{paperSlug:paper.slug,versionId:paper.version_id}])])).rows;
-    const allowed = await readableCourseIds(db,user,courses.map(c=>c.id));
-    for (const course of courses.filter(c=>allowed.has(c.id))) {
-      for (const chapter of (await db.query('SELECT * FROM learning_chapters WHERE path_id=$1 AND archived_at IS NULL ORDER BY position',[course.id])).rows) add(course,chapter,course.title);
-    }
-  } else {
     const role = await schoolRole(db,schoolId,user.id);
     const { loadSchoolCourse } = await import('./school-courses.mjs');
     const courses = (await db.query(`SELECT c.id FROM school_courses c JOIN school_course_publications p ON p.school_id=c.school_id AND p.course_id=c.id AND p.revision=c.published_revision
@@ -217,6 +203,5 @@ export async function acslLearningLinks(db, schoolId, paper, user) {
       [course.id,JSON.stringify([{paperSlug:paper.slug,versionId:paper.version_id}])])).rows;
       for(const chapter of chapters)add({...course,ownerScope:'platform'},chapter,course.title);
     }
-  }
   return output;
 }

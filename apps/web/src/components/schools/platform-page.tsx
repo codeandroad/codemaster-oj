@@ -1,4 +1,6 @@
 "use client";
+
+import { CatalogGroups } from "./catalog-groups";
 import { RowActionButton } from "@/components/ui/row-action";
 
 import { useEffect, useRef, useState } from "react";
@@ -228,7 +230,7 @@ function PlatformAdminPage({
                     ) : section === "course-review" ? (
                       <PublicCourseReview />
                     ) : (
-                      <PublicProblemReview user={user} />
+                      <><CatalogGroups base="platform"/><PublicProblemReview user={user} /></>
                     )}
                   </>
                 ) : (
@@ -378,7 +380,6 @@ function SchoolList({
                   >
                     {text("Rename", "修改名称")}
                   </RowActionButton>
-                  {!school.legacy && (
                     <RowActionButton
                       aria-label={text(
                         `Assign administrator for ${school.name}`,
@@ -393,7 +394,6 @@ function SchoolList({
                     >
                       {text("Assign admin", "指定管理员")}
                     </RowActionButton>
-                  )}
                 </div>
               </li>
             ))}
@@ -442,12 +442,12 @@ export function PlatformPage(props: { user: CampusUser; onLogout: () => void; on
 }
 function SchoolAuthoringRedirect() {
   const search = useSearchParams(), router = useRouter(), text = useSchoolText();
-  const schools = useData<{items: {id:string; legacy?:boolean; roles:string[]}[]}>("schools");
+  const schools = useData<{items: {id:string; roles:string[]}[]}>("schools");
   const section = search.get("section") === "source-problems" || search.get("section") === "problems" ? "problems" : "courses";
   useEffect(() => {
     if (!schools.data) return;
     const school = schools.data.items.find(item => item.roles.some(role => role === "teacher" || role === "school_admin"));
-    router.replace(school?.legacy ? `/teacher/${section}` : school ? `/schools?${new URLSearchParams({schoolId:school.id,section,schoolRole:"teacher"})}` : "/schools");
+    router.replace(school ? `/schools?${new URLSearchParams({schoolId:school.id,section,schoolRole:"teacher"})}` : "/schools");
   }, [schools.data, section, router]);
   return <main className="p-6"><Loading resource={schools}><p role="status">{text("Opening your school workspace…", "正在进入学校工作区…")}</p></Loading></main>;
 }

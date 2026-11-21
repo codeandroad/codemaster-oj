@@ -4,19 +4,32 @@ import { readFile } from 'node:fs/promises';
 import { randomBytes,randomUUID } from 'node:crypto';
 import { createPool } from '../src/db.mjs';
 import { migrate } from '../src/migrate.mjs';
-import { LEGACY_SCHOOL_ID,provisionSchool,lockSchoolTeaching } from '../src/schools.mjs';
+import { provisionSchool, lockSchoolTeaching } from '../src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from './fixtures/pre-workspace/legacy-school.mjs';
 import { schoolPracticeOperation } from '../src/school-practice.mjs';
-import { resourceArea } from '../src/application.mjs';
 import { claimSchoolTask,finishSchoolTask,processSchoolOne } from '../school-worker.mjs';
 import { GoJudge } from '../judge.mjs';
 
 test('isolated school and public practice lifecycle, authorization, queue and feedback',{skip:!process.env.TEST_DATABASE_URL,timeout:120000},async t=>{
  const base=new URL(process.env.TEST_DATABASE_URL);assert.match(base.pathname,/^\/campus_qa(?:_[a-z0-9_]+)?$/);const manager=createPool(base.href),schema=`school_practice_${randomBytes(5).toString('hex')}`;const scoped=new URL(base);scoped.searchParams.set('options',`-csearch_path=${schema}`);const pool=createPool(scoped.href);let app,worker;
  try{
-  await manager.query(`CREATE SCHEMA ${schema}`);await migrate(pool);
+  await manager.query(`CREATE SCHEMA ${schema}`);await migrate(pool,{through:'132_school_activity_grading_context.sql'});
+  const users={};for(const name of ['admin','teacher','student','outsider','platform']){const identity=randomUUID();await pool.query("INSERT INTO identities(id,kind,number,name) VALUES($1,'student',$2,$2)",[identity,name]);users[name]=(await pool.query('INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,$2,$3) RETURNING id',[identity,name,'unusable-test-hash'])).rows[0];}
+   await pool.query("INSERT INTO account_roles(account_id,role) VALUES($1,'admin')",[users.admin.id]);
+   const { rows: [{ id: problemId }] } = await pool.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id',[users.teacher.id]);
+   const { rows: [{ id: versionId }] } = await pool.query(`INSERT INTO problem_versions
+    (problem_id,title,mode,statement,reference_code,samples,metadata,time_limit_ms,memory_limit_mb,validation_status)
+    VALUES($1,'Original sum','stdio','Print the sum.','PRIVATE_REFERENCE',
+    '[{"input":"2 3","expected":"5","enabled":true},{"input":"PRIVATE_DISABLED_SAMPLE","expected":"5","enabled":false}]',
+    '{"teacherNote":"PRIVATE_NOTE","inputDescription":"Two integers on one line."}',1000,128,'AC') RETURNING id`,[problemId]);
+   await pool.query("INSERT INTO test_cases(version_id,position,input,expected,weight) VALUES($1,1,'PRIVATE_HIDDEN_INPUT','17',100)",[versionId]);
+   await pool.query(`UPDATE problem_versions SET published_at=now(),rank_review_status='approved',
+    school_visible_at=now(),rank_approved_at=now() WHERE id=$1`,[versionId]);
+   await pool.query('UPDATE problems SET current_version_id=$1 WHERE id=$2',[versionId,problemId]);
+
+  await migrate(pool);
   const grants=(await readFile(new URL('../grants.mjs',import.meta.url),'utf8')).match(/await pool\.query\(`([\s\S]*?)`\);/)?.[1];assert.ok(grants);await pool.query(grants.replaceAll('SCHEMA public',`SCHEMA ${schema}`));
   const asRole=role=>{const url=new URL(scoped);url.searchParams.set('options',`-crole=${role} -csearch_path=${schema}`);return createPool(url.href);};app=asRole('campus_app');worker=asRole('campus_worker');
-  const users={};for(const name of ['admin','teacher','student','outsider','platform']){const identity=randomUUID();await pool.query("INSERT INTO identities(id,kind,number,name) VALUES($1,'student',$2,$2)",[identity,name]);users[name]=(await pool.query('INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,$2,$3) RETURNING id',[identity,name,'unusable-test-hash'])).rows[0];}
   await pool.query('INSERT INTO platform_admins(account_id) VALUES($1)',[users.platform.id]);
   const alpha=await provisionSchool(pool,{slug:'practice-alpha',name:'Alpha',adminUsername:'admin'}),beta=await provisionSchool(pool,{slug:'practice-beta',name:'Beta',adminUsername:'outsider'});
   for(const role of ['teacher','student']){await pool.query('INSERT INTO school_memberships(school_id,account_id,role) VALUES($1,$2,$3)',[alpha.id,users[role].id,role]);await pool.query('INSERT INTO school_identities(school_id,kind,number,name,account_id) VALUES($1,$2,$2,$2,$3)',[alpha.id,role,users[role].id]);}
@@ -111,30 +124,18 @@ test('isolated school and public practice lifecycle, authorization, queue and fe
    await call('admin',`${prefix}/problems/${p.id}/publish`,'POST',{expectedRevision:p.revision});await call('platform',`/platform/problem-publications/${p.id}/withdraw`,'POST',{schoolId:alpha.id});assert.equal((await call('outsider','/practice/problems')).items.length,0);
   });
   await t.test('an original school version can enter public practice without exposing private content',async()=>{
-   await pool.query("INSERT INTO account_roles(account_id,role) VALUES($1,'admin')",[users.admin.id]);
-   const { rows: [{ id: problemId }] } = await pool.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id',[users.teacher.id]);
-   const { rows: [{ id: versionId }] } = await pool.query(`INSERT INTO problem_versions
-    (problem_id,title,mode,statement,reference_code,samples,metadata,time_limit_ms,memory_limit_mb,validation_status)
-    VALUES($1,'Original sum','stdio','Print the sum.','PRIVATE_REFERENCE',
-    '[{"input":"2 3","expected":"5","enabled":true},{"input":"PRIVATE_DISABLED_SAMPLE","expected":"5","enabled":false}]',
-    '{"teacherNote":"PRIVATE_NOTE","inputDescription":"Two integers on one line."}',1000,128,'AC') RETURNING id`,[problemId]);
-   await pool.query("INSERT INTO test_cases(version_id,position,input,expected,weight) VALUES($1,1,'PRIVATE_HIDDEN_INPUT','17',100)",[versionId]);
-   await pool.query(`UPDATE problem_versions SET published_at=now(),rank_review_status='approved',
-    school_visible_at=now(),rank_approved_at=now() WHERE id=$1`,[versionId]);
-   await pool.query('UPDATE problems SET current_version_id=$1 WHERE id=$2',[versionId,problemId]);
-
-   const requestRoute = `/admin/problems/${problemId}/publication-request`;
-   assert.equal(resourceArea(requestRoute),'schoolPractice');
+   const detailRoute=`/schools/${LEGACY_SCHOOL_ID}/problems/${problemId}`;
+   const requestRoute=detailRoute+'/public-request';
    const publicRoute = `/practice/problems/${problemId}`;
    const approval = {schoolId:LEGACY_SCHOOL_ID,problemId,versionId};
-   await assert.rejects(call('outsider',requestRoute,'POST',{versionId}),e=>e.status===403);
+   await assert.rejects(call('outsider',requestRoute,'POST',{versionId}),e=>e.status===404);
    await assert.rejects(call('outsider',publicRoute),e=>e.status===404);
    await assert.rejects(call('platform',`/platform/problem-publications/${problemId}/reject`,'POST',approval),e=>e.status===409);
    const unrequested = (await call('platform','/platform/problem-publications')).items.find(item=>item.id===problemId);
    assert.equal(unrequested.publicRequestStatus,null);
    const preview=await call('platform',`/platform/problem-publications/${problemId}?schoolId=${LEGACY_SCHOOL_ID}`);
    assert.deepEqual(preview.definition.samples,[{input:'2 3',expected:'5'}]);
-   assert.match(preview.definition.statement,/Two integers on one line/);
+   assert.equal(preview.definition.inputDescription,'Two integers on one line.');
    assert.doesNotMatch(JSON.stringify(preview),/PRIVATE_/);
    await call('platform','/platform/problem-publications','POST',approval);
    assert.equal((await call('outsider',publicRoute)).versionId,versionId);
@@ -143,7 +144,7 @@ test('isolated school and public practice lifecycle, authorization, queue and fe
    for(const request of await Promise.all([1,2].map(()=>call('admin',requestRoute,'POST',{versionId})))){
     assert.equal(request.publicRequestStatus,'pending');
    }
-   assert.equal((await call('admin',requestRoute+`?versionId=${versionId}`)).publicRequestStatus,'pending');
+   assert.equal((await call('admin',detailRoute)).publicRequestStatus,'pending');
    await assert.rejects(call('admin','/platform/problem-publications','POST',approval),e=>e.status===403);
    await call('platform','/platform/problem-publications','POST',approval);
    const published=await call('outsider',publicRoute);
@@ -160,11 +161,10 @@ test('isolated school and public practice lifecycle, authorization, queue and fe
    assert.doesNotMatch(JSON.stringify(await call('outsider',publicRoute+'/submissions/'+job.id)),/PRIVATE_|HIDDEN_/);
    await assert.rejects(worker.query('SELECT * FROM school_problem_publication_requests'),{code:'42501'});
 
-   const { rows: [{id: classId}] } = await pool.query("INSERT INTO classes(name,owner_account_id) VALUES('Protected class',$1) RETURNING id",[users.teacher.id]);
-   const { rows: [{id: practiceId}] } = await pool.query(`INSERT INTO timed_practices
-    (title,class_id,owner_account_id,starts_at,ends_at,duration_minutes)
-    VALUES('Protected task',$1,$2,now(),now()+interval '1 hour',60) RETURNING id`,[classId,users.teacher.id]);
-   await pool.query('INSERT INTO timed_practice_problems(practice_id,problem_id,version_id,points,position) VALUES($1,$2,$3,100,1)',[practiceId,problemId,versionId]);
+   const practiceId=randomUUID();
+   await pool.query(`INSERT INTO school_activities(school_id,id,owner_account_id,kind,title,request_id,request_hash)
+    VALUES($1,$2,$3,'timed','Protected task',$2,'test')`,[LEGACY_SCHOOL_ID,practiceId,users.admin.id]);
+   await pool.query('INSERT INTO school_activity_problems(school_id,activity_id,problem_id,version_id,points,position) VALUES($1,$2,$3,$4,100,1)',[LEGACY_SCHOOL_ID,practiceId,problemId,versionId]);
    await assert.rejects(call('outsider',publicRoute),e=>e.status===404);
    await assert.rejects(call('outsider',publicRoute+'/submissions','POST',{kind:'submit',code:'print(17)',requestId:randomUUID()}),e=>e.status===404);
    await call('platform',`/platform/problem-publications/${problemId}/withdraw`,'POST',approval);

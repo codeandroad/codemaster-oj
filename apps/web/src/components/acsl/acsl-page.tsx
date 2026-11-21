@@ -48,7 +48,7 @@ export { useAcslEnabled } from "./use-acsl-enabled";
 
 export function LegacyAcslPage({ user }: { user: CampusUser }) {
   const schools = useWorkspaceData<{ items: School[] }>("schools");
-  const school = schools.data?.items.find((item) => item.legacy);
+  const school = schools.data?.items[0];
   return (
     <Loading resource={schools}>
       {school && (
@@ -57,7 +57,6 @@ export function LegacyAcslPage({ user }: { user: CampusUser }) {
           schoolId={school.id}
           user={user}
           baseHref="/student/acsl"
-          legacySchool={school.legacy}
         />
       )}
     </Loading>
@@ -68,12 +67,10 @@ export function AcslPage({
   schoolId,
   user,
   baseHref,
-  legacySchool = false,
 }: {
   schoolId: string;
   user: CampusUser;
   baseHref: string;
-  legacySchool?: boolean;
 }) {
   const params = useSearchParams();
   const { locale } = useLocale();
@@ -93,7 +90,6 @@ export function AcslPage({
         user={user}
         baseHref={catalogHref}
         language={language}
-        legacySchool={legacySchool}
       />
     );
   const tx = (en: string, zh: string) => (locale === "en" ? en : zh);
@@ -124,14 +120,12 @@ function PaperLoader({
   user,
   baseHref,
   language,
-  legacySchool,
 }: {
   schoolId: string;
   paperId: string;
   user: CampusUser;
   baseHref: string;
   language: AcslLanguage;
-  legacySchool: boolean;
 }) {
   const params = useSearchParams(), { locale } = useLocale();
   const requestedVersion = params.get("paperVersionId");
@@ -152,7 +146,6 @@ function PaperLoader({
           user={user}
           baseHref={paperBaseHref}
           language={language}
-          legacySchool={legacySchool}
         />
       )}
     </Loading>
@@ -165,14 +158,12 @@ function PaperView({
   user,
   baseHref,
   language,
-  legacySchool,
 }: {
   schoolId: string;
   initialPaper: AcslPaper;
   user: CampusUser;
   baseHref: string;
   language: AcslLanguage;
-  legacySchool: boolean;
 }) {
   const [paper, setPaper] = useState(initialPaper);
   const [questionRevision, setQuestionRevision] = useState(0);
@@ -389,7 +380,6 @@ function PaperView({
     return (
       <>
         <AcslProgramming
-          legacySchool={legacySchool}
           schoolId={schoolId}
           paper={paper}
           user={user}

@@ -1,8 +1,9 @@
-import { readableCourseIds } from './course-access.mjs';
-import { LEGACY_SCHOOL_ID, lockSchoolTeaching } from './schools.mjs';
-import { platformContentEditorSql } from './platform-content-access.mjs';
-import { liveProblemVersionIdSql } from './live-problem-version.mjs';
-import { fail, uuid } from './security.mjs';
+import { readableCourseIds } from '../../../src/course-access.mjs';
+import { lockSchoolTeaching } from '../../../src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from './legacy-school.mjs';
+import { platformContentEditorSql } from '../../../src/platform-content-access.mjs';
+import { liveProblemVersionIdSql } from '../../../src/live-problem-version.mjs';
+import { fail, uuid } from '../../../src/security.mjs';
 
 // Editorial access in another school does not authorize use in this workspace.
 // Keep this separate from learner admission: linking a course grants no access

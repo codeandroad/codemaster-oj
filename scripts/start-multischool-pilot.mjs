@@ -7,6 +7,8 @@ import { access, chmod, cp, lstat, mkdir, open, readFile, realpath, writeFile } 
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { reconstructionKeys, reconstructionFingerprints } from './verify-school-reconstruction.mjs';
+
 const root = fileURLToPath(new URL('../', import.meta.url));
 const project = 'campus-judge-multischool-pilot';
 const volume = `${project}_database`;
@@ -156,6 +158,53 @@ async function copyOriginalAssets(sourceRoot) {
     assert(!(await lstat(path)).isSymbolicLink(), 'Paper 4 asset symlinks are not accepted.'); return true;
   } });
   console.log('Copied the supplied local Paper 4 assets into the pilot checkout.');
+}
+
+function verifyPrecedingMigrations(before,after,plan) {
+  if (plan.addGradingContext) assert.equal(targetQuery(`SELECT (SELECT count(*) FROM school_activities WHERE required_language IS NOT NULL)
+    + (SELECT count(*) FROM school_activity_problems WHERE num_nonnulls(prior_version_id,original_problem_version_id,original_prior_problem_version_id)>0)`),'0','Existing school activity rules must retain their original settings.');
+  if (plan.classifySnapshotBank) assert.equal(targetQuery(`SELECT count(*) FROM school_problem_banks WHERE school_id='${legacyId}'
+    AND id='00000000-0000-4000-8000-000000000074' AND request_id=id AND resource_kind<>'publication'`),'0','Catalog snapshots must be service-managed.');
+  if (plan.updateDirectorySlug) assert.equal(targetQuery(`SELECT count(*) FROM schools WHERE id='${legacyId}' AND slug='legacy-school'`),'0','School directory migration did not finish.');
+  for (const [table, fingerprint] of Object.entries(before)) {
+    assert.deepEqual(after[table], fingerprint, `Migration changed pre-existing business data in ${table}; pilot services remain stopped.`);
+  }
+  if (plan.addSubmissionSchool) assert.equal(targetQuery(`SELECT count(*) FROM submissions s
+    LEFT JOIN legacy_school_identity_ownership d ON d.identity_id=s.identity_id
+    WHERE s.school_id IS DISTINCT FROM d.school_id;`), '0', 'Every submission must retain its original school audience.');
+  if (plan.addActivityContext) assert.equal(targetQuery('SELECT count(*) FROM school_judge_jobs WHERE activity_id IS NOT NULL OR activity_attempt_id IS NOT NULL OR activity_deadline_at IS NOT NULL;'), '0', 'Existing submissions must retain their original context.');
+  if (plan.addPublicPresence) assert.equal(targetQuery('SELECT count(*) FROM sessions WHERE public_presence_seen_at IS NOT NULL;'), '0', 'Existing school sessions must not be backfilled into public presence.');
+  if (plan.publicHistoricalClaims?.length) {
+    const keys = plan.publicHistoricalClaims.map(key => `'${key.replaceAll("'", "''")}'`).join(',');
+    assert.equal(Number(targetQuery(`SELECT count(*) FROM luq_first_ac_claims
+      WHERE identity_id::text||'/'||subject_key = ANY(ARRAY[${keys}]::text[])
+        AND source_key='historical-public' AND reason='historical_public_ac' AND eligible=false AND ledger_id IS NULL;`)),
+      plan.publicHistoricalClaims.length, 'Historical public ACs must consume eligibility without awarding money.');
+  }
+  if (plan.addCourseAdmissions) assert.equal(targetQuery("SELECT count(*) FROM public_course_listings WHERE access_mode<>'direct' OR access_generation IS NULL OR school_revision IS DISTINCT FROM revision OR legacy_revision IS NOT NULL;"), '0', 'Existing public course listings must keep direct access.');
+  if (plan.addCompletionRewardMode) assert.equal(targetQuery(`SELECT
+    (SELECT count(*) FROM luq_activity_rules WHERE require_all IS DISTINCT FROM false)
+    +(SELECT count(*) FROM school_scholarship_activity_rules WHERE require_all IS DISTINCT FROM false);`),
+    '0', 'Existing scholarship rules must retain their original thresholds.');
+  if (plan.addSchoolExitArchive) assert.equal(targetQuery('SELECT count(*) FROM school_identities WHERE archived_at IS NOT NULL;'), '0', 'Existing school identities must remain active.');
+  if (plan.addDefaultSchool) assert.equal(targetQuery('SELECT count(*) FROM accounts WHERE default_school_id IS NOT NULL;'), '0', 'Default schools must start unset.');
+  if (plan.addClassLifecycle) assert.equal(targetQuery('SELECT count(*) FROM school_classes WHERE archived_at IS NOT NULL OR revision<>1;'), '0', 'Existing classes must remain active at revision 1.');
+  if (plan.addScholarshipVisibility) assert.equal(targetQuery('SELECT count(*) FROM leaderboard_settings WHERE show_luq_balance IS DISTINCT FROM true;'), '0', 'Scholarship visibility must default to enabled without changing prior settings.');
+  if (plan.addCourseParity) {
+    assert.equal(targetQuery("SELECT count(*) FROM school_courses WHERE properties<>'{}'::jsonb OR archived_at IS NOT NULL;"), '0', 'Existing courses must retain their content and default to active with no new metadata.');
+    assert.equal(targetQuery("SELECT count(*) FROM school_course_publications WHERE properties<>'{}'::jsonb;"), '0', 'Existing course editions must retain their content.');
+  }
+  if (plan.renameLegacySchool) {
+    assert.equal(targetQuery(`SELECT name FROM schools WHERE id='${legacyId}';`), '天行创世纪学校');
+    assert.equal(targetQuery("SELECT settings->>'schoolName' FROM site_settings WHERE id;"), '天行创世纪学校');
+    assert.equal(targetQuery(`SELECT count(*) FROM school_audit_events WHERE school_id='${legacyId}' AND action='school.legacy.attributed' AND target_id='${legacyId}' AND actor_account_id IS NULL;`), '1');
+  }
+  for (const table of plan.addedOwnershipColumns) {
+    assert.equal(targetQuery(`SELECT count(*) FROM ${table} WHERE school_id IS DISTINCT FROM '${legacyId}'::uuid;`), '0');
+  }
+  if(plan.addSchoolSettings) assert.equal(targetQuery(`SELECT bool_and(settings_revision=1 AND
+    ((name ~ '[㐀-鿿]' AND name_zh=name AND name_en='') OR (name !~ '[㐀-鿿]' AND name_en=name AND name_zh='')))
+    FROM schools;`), 't', 'School name backfill must preserve the existing name exactly.');
 }
 
 async function main() {
@@ -308,62 +357,38 @@ async function main() {
     await saveJson(beforePath, baseline);
     state = { ...state, phase: 'migrating', migrationStartedAt: now() }; await saveJson(statePath, state);
   }
-  const { tables: before, plan } = baseline;
-  await run('docker', [...compose, 'run', '--rm', '--no-deps', 'migrate'], { env: values });
-  const after = fingerprints(plan);
-  if (plan.addGradingContext) assert.equal(targetQuery(`SELECT (SELECT count(*) FROM school_activities WHERE required_language IS NOT NULL)
-    + (SELECT count(*) FROM school_activity_problems WHERE num_nonnulls(prior_version_id,original_problem_version_id,original_prior_problem_version_id)>0)`),'0','Existing school activity rules must retain their original settings.');
-  if (plan.classifySnapshotBank) assert.equal(targetQuery(`SELECT count(*) FROM school_problem_banks WHERE school_id='${legacyId}'
-    AND id='00000000-0000-4000-8000-000000000074' AND request_id=id AND resource_kind<>'publication'`),'0','Catalog snapshots must be service-managed.');
-  if (plan.updateDirectorySlug) assert.equal(targetQuery(`SELECT count(*) FROM schools WHERE id='${legacyId}' AND slug='legacy-school'`),'0','School directory migration did not finish.');
-  for (const [table, fingerprint] of Object.entries(before)) {
-    assert.deepEqual(after[table], fingerprint, `Migration changed pre-existing business data in ${table}; pilot services remain stopped.`);
+  let { tables: before, plan } = baseline;
+  const migrated = () => targetQuery("SELECT to_regclass('legacy_school_account_ownership') IS NULL AND EXISTS(SELECT 1 FROM schema_migrations WHERE name='134_school_membership_authority.sql')") === 't';
+  if (!baseline.reconstruction && !migrated()) {
+    // Verify the earlier upgrades at their original schema boundary.
+    await run('docker', [...compose,'run','--rm','--no-deps','migrate','node','--input-type=module','-e',
+      "import {createPool} from './src/db.mjs';import {migrate} from './src/migrate.mjs';const db=createPool();try {await migrate(db,{through:'132_school_activity_grading_context.sql'});} finally {await db.end();}"], {env:values});
+    verifyPrecedingMigrations(before,fingerprints(plan),plan);
+    const keys=reconstructionKeys(targetQuery,legacyId);
+    const currentPlan={addedOwnershipColumns:[]};
+    const tables=reconstructionFingerprints(targetQuery,fingerprints(currentPlan),legacyId,keys,false);
+    baseline={...baseline,priorPlan:plan,tables,plan:currentPlan,reconstruction:keys};
+    await saveJson(beforePath,baseline);
+    before=tables;plan=currentPlan;
   }
-  if (plan.addSubmissionSchool) assert.equal(targetQuery(`SELECT count(*) FROM submissions s
-    LEFT JOIN legacy_school_identity_ownership d ON d.identity_id=s.identity_id
-    WHERE s.school_id IS DISTINCT FROM d.school_id;`), '0', 'Every submission must retain its original school audience.');
-  if (plan.addActivityContext) assert.equal(targetQuery('SELECT count(*) FROM school_judge_jobs WHERE activity_id IS NOT NULL OR activity_attempt_id IS NOT NULL OR activity_deadline_at IS NOT NULL;'), '0', 'Existing submissions must retain their original context.');
-  if (plan.addPublicPresence) assert.equal(targetQuery('SELECT count(*) FROM sessions WHERE public_presence_seen_at IS NOT NULL;'), '0', 'Existing school sessions must not be backfilled into public presence.');
-  if (plan.publicHistoricalClaims?.length) {
-    const keys = plan.publicHistoricalClaims.map(key => `'${key.replaceAll("'", "''")}'`).join(',');
-    assert.equal(Number(targetQuery(`SELECT count(*) FROM luq_first_ac_claims
-      WHERE identity_id::text||'/'||subject_key = ANY(ARRAY[${keys}]::text[])
-        AND source_key='historical-public' AND reason='historical_public_ac' AND eligible=false AND ledger_id IS NULL;`)),
-      plan.publicHistoricalClaims.length, 'Historical public ACs must consume eligibility without awarding money.');
-  }
-  if (plan.addCourseAdmissions) assert.equal(targetQuery("SELECT count(*) FROM public_course_listings WHERE access_mode<>'direct' OR access_generation IS NULL OR school_revision IS DISTINCT FROM revision OR legacy_revision IS NOT NULL;"), '0', 'Existing public course listings must keep direct access.');
-  if (plan.addCompletionRewardMode) assert.equal(targetQuery(`SELECT
-    (SELECT count(*) FROM luq_activity_rules WHERE require_all IS DISTINCT FROM false)
-    +(SELECT count(*) FROM school_scholarship_activity_rules WHERE require_all IS DISTINCT FROM false);`),
-    '0', 'Existing scholarship rules must retain their original thresholds.');
-  if (plan.addSchoolExitArchive) assert.equal(targetQuery('SELECT count(*) FROM school_identities WHERE archived_at IS NOT NULL;'), '0', 'Existing school identities must remain active.');
-  if (plan.addDefaultSchool) assert.equal(targetQuery('SELECT count(*) FROM accounts WHERE default_school_id IS NOT NULL;'), '0', 'Default schools must start unset.');
-  if (plan.addClassLifecycle) assert.equal(targetQuery('SELECT count(*) FROM school_classes WHERE archived_at IS NOT NULL OR revision<>1;'), '0', 'Existing classes must remain active at revision 1.');
-  if (plan.addScholarshipVisibility) assert.equal(targetQuery('SELECT count(*) FROM leaderboard_settings WHERE show_luq_balance IS DISTINCT FROM true;'), '0', 'Scholarship visibility must default to enabled without changing prior settings.');
-  if (plan.addCourseParity) {
-    assert.equal(targetQuery("SELECT count(*) FROM school_courses WHERE properties<>'{}'::jsonb OR archived_at IS NOT NULL;"), '0', 'Existing courses must retain their content and default to active with no new metadata.');
-    assert.equal(targetQuery("SELECT count(*) FROM school_course_publications WHERE properties<>'{}'::jsonb;"), '0', 'Existing course editions must retain their content.');
-  }
-  if (plan.renameLegacySchool) {
-    assert.equal(targetQuery(`SELECT name FROM schools WHERE id='${legacyId}';`), '天行创世纪学校');
-    assert.equal(targetQuery("SELECT settings->>'schoolName' FROM site_settings WHERE id;"), '天行创世纪学校');
-    assert.equal(targetQuery(`SELECT count(*) FROM school_audit_events WHERE school_id='${legacyId}' AND action='school.legacy.attributed' AND target_id='${legacyId}' AND actor_account_id IS NULL;`), '1');
-  }
-  for (const table of plan.addedOwnershipColumns) {
-    assert.equal(targetQuery(`SELECT count(*) FROM ${table} WHERE school_id IS DISTINCT FROM '${legacyId}'::uuid;`), '0');
-  }
-  if(plan.addSchoolSettings) assert.equal(targetQuery(`SELECT bool_and(settings_revision=1 AND
-    ((name ~ '[㐀-鿿]' AND name_zh=name AND name_en='') OR (name !~ '[㐀-鿿]' AND name_en=name AND name_zh='')))
-    FROM schools;`), 't', 'School name backfill must preserve the existing name exactly.');
+  await run('docker', [...compose,'run','--rm','--no-deps','migrate'],{env:values});
+  let after=fingerprints(plan);
+  if(baseline.reconstruction)after=reconstructionFingerprints(targetQuery,after,legacyId,baseline.reconstruction,true);
+  verifyPrecedingMigrations(before,after,plan);
+  assert.equal(targetQuery(`SELECT to_regclass('account_roles') IS NULL AND to_regclass('legacy_school_account_ownership') IS NULL
+   AND to_regclass('legacy_school_identity_ownership') IS NULL AND to_regclass('legacy_course_publication_versions') IS NULL
+   AND NOT EXISTS(SELECT 1 FROM pg_class WHERE relnamespace='public'::regnamespace AND relname LIKE 'legacy_%')
+   AND NOT EXISTS(SELECT 1 FROM pg_constraint WHERE connamespace='public'::regnamespace AND pg_get_constraintdef(oid) LIKE '%00000000-0000-4000-8000-000000000052%')
+   AND NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND column_name IN ('legacy_identity_id','legacy_revision'))`),'t');
   const denied = targetQuery(`SELECT bool_and(
     NOT has_table_privilege('campus_worker', name, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     AND NOT has_any_column_privilege('campus_worker', name, 'SELECT,INSERT,UPDATE,REFERENCES'))
     FROM unnest(ARRAY['schools','school_memberships','school_invitations','school_audit_events',
       'school_identities','school_classes','school_class_roster','school_identity_imports','school_activation_tokens',
-      'legacy_school_identity_ownership','legacy_school_account_ownership','platform_admins','school_administrators','platform_audit_events',
+      'platform_course_acsl_editions','transferred_translation_credits','platform_admins','school_administrators','platform_audit_events',
       'school_courses','school_course_classes','school_course_publications','school_course_publication_classes','school_course_progress','school_learning_resources',
       'school_problem_banks','school_problems','school_problem_versions','school_problem_publications','public_course_listings','public_course_progress','public_luq_receipts','public_luq_results',
-      'public_course_applications','legacy_course_publication_versions','school_exit_requests','school_problem_publication_requests','public_practice_notes','student_system_notifications','staff_course_notification_reads','course_admission_notifications',
+      'public_course_applications','catalog_course_publication_history','school_exit_requests','school_problem_publication_requests','public_practice_notes','student_system_notifications','staff_course_notification_reads','course_admission_notifications',
       'school_activities','school_activity_problems','school_activity_participants','school_activity_classes','school_activity_attempts','school_activity_results',
       'school_paper4_papers','school_paper4_versions','school_paper4_activities','school_paper4_participants','school_paper4_attempts','school_paper4_files','school_paper4_reviews','school_paper4_requests',
       'school_scholarship_settings','school_scholarship_accounts','school_scholarship_ledger','school_scholarship_contents','school_scholarship_entitlements','school_scholarship_deliveries','school_rank_awards']) AS tables(name);`);

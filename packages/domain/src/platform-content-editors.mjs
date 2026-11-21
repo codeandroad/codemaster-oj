@@ -1,5 +1,6 @@
+import { lockPlatformContent } from './platform-content-access.mjs';
 import { transaction } from './db.mjs';
-import { activeAccount, LEGACY_SCHOOL_ID, lockSchoolTeaching } from './schools.mjs';
+import { activeAccount } from './schools.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
 import { staffSchoolSql } from './platform-content-access.mjs';
 import { fail, field, uuid } from './security.mjs';
@@ -37,7 +38,7 @@ export async function handlePlatformContentEditors({pool,user,route,method,body=
  const match=route.match(/^\/platform\/content-editors\/(course|problem)\/([^/]+)$/);
  if(!match&&!['/platform/content-editor-candidates','/platform/content-access'].includes(route))return null;
  return transaction(pool,async db=>{
-  await lockSchoolTeaching(db,LEGACY_SCHOOL_ID,{shared:method==='GET'});
+  await lockPlatformContent(db,{shared:method==='GET'});
   await activeAccount(db,user.id);
   if(route==='/platform/content-access'&&method==='GET')return {status:200,body:{canEdit:await isPlatformAdministrator(db,user.id)||(await db.query(`SELECT 1 FROM platform_content_editors e
    WHERE e.account_id=$1 AND e.revoked_at IS NULL AND ${staffSchoolSql('e.account_id','e.school_id')} LIMIT 1`,[user.id])).rowCount>0}};

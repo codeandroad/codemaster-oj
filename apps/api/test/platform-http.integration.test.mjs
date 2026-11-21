@@ -7,7 +7,7 @@ import { createPool } from '../../../packages/domain/src/db.mjs';
 import { migrate } from '../../../packages/domain/src/migrate.mjs';
 import { bootstrap } from '../../../packages/domain/src/bootstrap.mjs';
 import { loadConfig } from '../../../packages/domain/src/application.mjs';
-import { LEGACY_SCHOOL_ID } from '../../../packages/domain/src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 import { provisionPlatformAdministrator } from '../../../packages/domain/src/platform-governance.mjs';
 
 test('explicit platform governance preserves teaching roles and enforces authorization on the real Nest API',
@@ -22,7 +22,7 @@ test('explicit platform governance preserves teaching roles and enforces authori
     let app;
     try {
       await migrate(pool);
-      await bootstrap(pool, { name: 'Legacy operator', number: 'ADM', username: 'legacy-operator', password });
+      await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji', name: 'Legacy operator', number: 'ADM', username: 'legacy-operator', password });
       const grantScript = await readFile(new URL('../../../packages/domain/grants.mjs', import.meta.url), 'utf8');
       const grantSql = grantScript.match(/await pool\.query\(`([\s\S]*?)`\);/)[1];
       await pool.query(grantSql.replaceAll('SCHEMA public', `SCHEMA ${schema}`));

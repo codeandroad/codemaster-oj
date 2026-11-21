@@ -62,7 +62,7 @@ export function createWorkspaceResourceStore(
     }
   }
   function pruneSchools(data: unknown) {
-    const schools = data as { items?: { id: string; roles: string[]; legacy?: boolean }[] };
+    const schools = data as { items?: { id: string; roles: string[] }[] };
     if (!Array.isArray(schools?.items)) return;
     for (const [path, value] of entries) {
       const match = /^schools\/([^/]+)\/acsl(\/manage)?(?:\?view=availability)?$/.exec(path);

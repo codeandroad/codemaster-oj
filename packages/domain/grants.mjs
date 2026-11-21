@@ -6,6 +6,7 @@ try {
   await pool.query(`
     GRANT USAGE ON SCHEMA public TO campus_app, campus_worker;
     GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO campus_app;
+    REVOKE ALL ON catalog_course_publication_history FROM campus_app,campus_worker,PUBLIC;
     REVOKE ALL ON school_workspace_roles FROM campus_worker, PUBLIC, campus_app;
     GRANT SELECT ON school_workspace_roles TO campus_app;
     GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO campus_app;
@@ -45,9 +46,8 @@ try {
       FROM campus_app, campus_worker;
     GRANT SELECT, INSERT ON schools TO campus_app;
     GRANT UPDATE(name,name_zh,name_en) ON schools TO campus_app;
-    REVOKE ALL ON platform_admins, school_administrators, platform_audit_events,
-      legacy_school_identity_ownership, legacy_school_account_ownership FROM PUBLIC, campus_app, campus_worker;
-    GRANT SELECT ON platform_admins, legacy_school_identity_ownership, legacy_school_account_ownership TO campus_app;
+    REVOKE ALL ON platform_admins, school_administrators, platform_audit_events FROM PUBLIC, campus_app, campus_worker;
+    GRANT SELECT ON platform_admins TO campus_app;
     GRANT SELECT, INSERT, UPDATE ON school_administrators TO campus_app;
     GRANT SELECT, INSERT ON platform_audit_events TO campus_app;
     GRANT SELECT, INSERT, UPDATE ON school_memberships, school_invitations TO campus_app;
@@ -68,9 +68,9 @@ try {
     GRANT SELECT, INSERT, DELETE ON school_course_classes TO campus_app;
     GRANT SELECT, INSERT ON school_course_publications, school_course_publication_classes TO campus_app;
     GRANT SELECT, UPDATE ON judge_tasks TO campus_worker;
-    REVOKE ALL ON legacy_assignment_preview_submissions FROM PUBLIC, campus_app, campus_worker;
-    GRANT SELECT,INSERT ON legacy_assignment_preview_submissions TO campus_app;
-    GRANT SELECT(id,version_id,kind,code,language,custom_input) ON legacy_assignment_preview_submissions TO campus_worker;
+    REVOKE ALL ON assignment_preview_receipts FROM PUBLIC, campus_app, campus_worker;
+    GRANT SELECT ON assignment_preview_receipts TO campus_app;
+    GRANT SELECT(id,version_id,kind,code,language,custom_input) ON assignment_preview_receipts TO campus_worker;
     GRANT SELECT ON site_settings TO campus_worker;
     GRANT SELECT,INSERT,UPDATE ON judge_nodes TO campus_worker;
     GRANT SELECT ON submissions, problem_versions, test_cases TO campus_worker;
@@ -87,9 +87,9 @@ try {
 
 REVOKE ALL ON public_course_listings, public_course_progress FROM PUBLIC, campus_app, campus_worker;
 GRANT SELECT,INSERT,UPDATE ON public_course_listings, public_course_progress TO campus_app;
-REVOKE ALL ON public_course_applications, legacy_course_publication_versions, school_exit_requests, school_problem_publication_requests, public_practice_notes
+REVOKE ALL ON public_course_applications, school_exit_requests, school_problem_publication_requests, public_practice_notes
  FROM PUBLIC, campus_app, campus_worker;
-GRANT SELECT, INSERT ON public_course_applications, legacy_course_publication_versions, school_exit_requests, school_problem_publication_requests, public_practice_notes TO campus_app;
+GRANT SELECT, INSERT ON public_course_applications, school_exit_requests, school_problem_publication_requests, public_practice_notes TO campus_app;
 GRANT UPDATE(status,decided_by,decided_at) ON public_course_applications TO campus_app;
 REVOKE ALL ON platform_course_rules,platform_course_admissions,platform_course_invitations,platform_course_invitation_attempts FROM PUBLIC,campus_app,campus_worker;
 GRANT SELECT,INSERT,UPDATE ON platform_course_rules,platform_course_invitations,platform_course_invitation_attempts TO campus_app;
@@ -110,10 +110,18 @@ GRANT SELECT,INSERT ON school_paper4_papers,school_paper4_versions,school_paper4
 GRANT UPDATE ON school_paper4_papers,school_paper4_activities,school_paper4_attempts,school_paper4_files,school_paper4_reviews TO campus_app;
 GRANT SELECT ON school_paper4_jobs TO campus_worker;
 GRANT UPDATE(state,result,completed_at,lease_id,lease_expires_at,available_at,attempts,node_id) ON school_paper4_jobs TO campus_worker;
+REVOKE ALL ON platform_course_acsl_editions FROM PUBLIC,campus_worker,campus_app;
+REVOKE ALL ON practice_storage_scopes FROM PUBLIC,campus_worker,campus_app;
+GRANT SELECT ON practice_storage_scopes,platform_course_acsl_editions TO campus_app;
+REVOKE ALL ON school_activity_result_revisions FROM PUBLIC,campus_app,campus_worker;
+GRANT SELECT ON school_activity_result_revisions TO campus_app;
 REVOKE ALL ON school_scholarship_settings,school_scholarship_accounts,school_scholarship_ledger,school_scholarship_requests,school_scholarship_contents,school_scholarship_policies,school_scholarship_entitlements,school_scholarship_deliveries,school_scholarship_receipts,school_scholarship_results,school_scholarship_claims,school_rank_awards,school_scholarship_review_cases,school_scholarship_activity_rules,school_scholarship_activity_awards FROM PUBLIC,campus_app,campus_worker;
 GRANT SELECT ON school_scholarship_settings,school_scholarship_accounts,school_scholarship_ledger,school_scholarship_requests,school_scholarship_contents,school_scholarship_policies,school_scholarship_entitlements,school_scholarship_deliveries,school_scholarship_receipts,school_scholarship_results,school_scholarship_claims,school_rank_awards,school_scholarship_review_cases,school_scholarship_activity_rules,school_scholarship_activity_awards TO campus_app;
 GRANT INSERT,UPDATE ON school_scholarship_settings,school_scholarship_contents,school_scholarship_policies TO campus_app;
-GRANT INSERT ON school_scholarship_requests,school_scholarship_entitlements,school_scholarship_deliveries,school_scholarship_activity_rules TO campus_app;
+GRANT INSERT(school_id,identity_id,subject_key,kind,language,ledger_id,credit_ledger_id,platform_credit_ledger_id) ON school_scholarship_entitlements TO campus_app;
+REVOKE ALL ON transferred_translation_credits FROM PUBLIC,campus_app,campus_worker;
+GRANT SELECT(ledger_id) ON transferred_translation_credits TO campus_app;
+GRANT INSERT ON school_scholarship_requests,school_scholarship_deliveries,school_scholarship_activity_rules TO campus_app;
 GRANT EXECUTE ON FUNCTION school_scholarship_entry(uuid,uuid,integer,text,text,uuid,text,jsonb,uuid,text),school_scholarship_settle_activity(uuid,text,uuid) TO campus_app;
 REVOKE ALL ON school_activities,school_activity_problems,school_activity_participants,school_activity_classes,school_activity_attempts,school_activity_results FROM PUBLIC,campus_app,campus_worker;
 GRANT SELECT,INSERT,UPDATE ON school_activities,school_activity_attempts TO campus_app;
@@ -148,6 +156,17 @@ REVOKE ALL ON written_papers,written_paper_versions,written_assets,written_attem
 GRANT SELECT,INSERT ON written_papers,written_paper_versions,written_assets,written_attempts,written_attachments,written_events TO campus_app;
 GRANT UPDATE(draft_version_id,published_version_id) ON written_papers TO campus_app;
 GRANT UPDATE(answers,revision,save_request_id,save_hash,state,updated_at,submitted_at,released_at,score,marks,grading_revision,review_request_id,review_hash,self_marks,notes) ON written_attempts TO campus_app;
+
+REVOKE ALL ON practice_problem_groups,practice_problem_group_members,school_import_history FROM PUBLIC,campus_app,campus_worker;
+REVOKE ALL ON school_submission_notes FROM PUBLIC,campus_app,campus_worker;
+GRANT SELECT,INSERT,UPDATE(note,updated_at) ON school_submission_notes TO campus_app;
+GRANT UPDATE(name) ON practice_problem_groups TO campus_app;
+GRANT INSERT,DELETE ON practice_problem_group_members TO campus_app;
+GRANT SELECT ON practice_problem_groups,practice_problem_group_members,school_import_history TO campus_app;
+REVOKE INSERT,UPDATE,DELETE ON classes,class_members,teacher_classes,identity_teacher_classes,assignments,assignment_problems,
+ assignment_participants,timed_practices,timed_practice_problems,timed_practice_participants,timed_attempts,timed_result_snapshots,timed_result_revisions,
+ paper4_papers,paper4_versions,paper4_attempts,paper4_attempt_files,paper4_snapshots,paper4_reference_snapshots,
+ problem_groups,problem_group_members,identity_import_batches,member_import_batches,problem_import_batches,point_rewards,learning_resources FROM campus_app;
 
 `);
   console.log('Runtime role grants applied.');

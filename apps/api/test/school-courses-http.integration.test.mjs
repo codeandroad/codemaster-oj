@@ -8,7 +8,8 @@ import { bootstrap } from '../../../packages/domain/src/bootstrap.mjs';
 import { loadConfig } from '../../../packages/domain/src/application.mjs';
 import { hashPassword } from '../../../packages/domain/src/security.mjs';
 import { normalizeSchoolProblem } from '../../../packages/domain/src/school-practice.mjs';
-import { LEGACY_SCHOOL_ID, provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 
 test('school course HTTP lifecycle preserves published boundaries and stable learning progress',
  { skip: !process.env.TEST_DATABASE_URL, timeout: 90000 }, async t => {
@@ -27,7 +28,7 @@ test('school course HTTP lifecycle preserves published boundaries and stable lea
    await manager.query(`CREATE SCHEMA ${schema}`);
    schemaCreated = true;
    await migrate(pool);
-   await bootstrap(pool, { name: 'Legacy administrator', number: 'ADM', username: 'legacy-admin', password });
+   await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji', name: 'Legacy administrator', number: 'ADM', username: 'legacy-admin', password });
    const passwordHash = await hashPassword(password);
    for (const username of ['alpha-admin', 'beta-admin', 'teacher', 'other-teacher', 'student', 'new-login', 'unlinked-student']) {
     await transaction(pool, async db => {

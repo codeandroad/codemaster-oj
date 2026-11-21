@@ -20,7 +20,7 @@ test('Nest profile routes preserve authentication, class access and CSRF for gue
   try {
    await migrate(pool);
    const password=randomBytes(20).toString('base64url');
-   await bootstrap(pool,{name:'Admin',number:'ADMIN',username:'community-admin',password});
+   await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji',name:'Admin',number:'ADMIN',username:'community-admin',password});
    const hash=await hashPassword(password);
    async function student(number,nickname) {
     const identityId=(await pool.query('INSERT INTO identities(kind,number,name) VALUES($1,$2,$3) RETURNING id',

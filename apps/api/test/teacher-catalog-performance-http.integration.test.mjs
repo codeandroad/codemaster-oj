@@ -9,7 +9,7 @@ import {bootstrap} from '../../../packages/domain/src/bootstrap.mjs';
 import {createDomainServices,loadConfig} from '../../../packages/domain/src/application.mjs';
 import {hashPassword} from '../../../packages/domain/src/security.mjs';
 import {provisionPlatformAdministrator} from '../../../packages/domain/src/platform-governance.mjs';
-import {LEGACY_SCHOOL_ID} from '../../../packages/domain/src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 
 test('teacher catalogs stay compact and course reads do not fetch every exercise source', {skip:!process.env.TEST_DATABASE_URL,timeout:120000},async t=>{
  const base=new URL(process.env.TEST_DATABASE_URL);assert.match(base.pathname,/^\/campus_qa(?:_[a-z0-9_]+)?$/);assert.ok(['localhost','127.0.0.1'].includes(base.hostname));
@@ -18,7 +18,7 @@ test('teacher catalogs stay compact and course reads do not fetch every exercise
  const owner=createPool(scoped.href);let app,runtime;
  try{
   await migrate(owner);const password=randomBytes(24).toString('base64url');
-  await bootstrap(owner,{username:'catalog-admin',password,number:'ADMIN',name:'Catalog admin'});
+  await bootstrap(owner,{schoolSlug:'tianxing-chuangshiji',username:'catalog-admin',password,number:'ADMIN',name:'Catalog admin'});
   await provisionPlatformAdministrator(owner,{username:'catalog-admin'});
   const admin=(await owner.query("SELECT id FROM accounts WHERE username='catalog-admin'")).rows[0];
   const passwordHash=await hashPassword(password),users={};

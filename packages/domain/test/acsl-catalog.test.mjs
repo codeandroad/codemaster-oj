@@ -5,7 +5,8 @@ import { readFile } from 'node:fs/promises';
 import { createPool } from '../src/db.mjs';
 import { migrate } from '../src/migrate.mjs';
 import { hashPassword } from '../src/security.mjs';
-import { LEGACY_SCHOOL_ID, provisionSchool } from '../src/schools.mjs';
+import { provisionSchool } from '../src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from './fixtures/pre-workspace/legacy-school.mjs';
 import { importAcslPaper, importAcslPapers } from '../src/acsl-import.mjs';
 import { handleAcsl } from '../src/acsl.mjs';
 

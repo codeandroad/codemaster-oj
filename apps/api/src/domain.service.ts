@@ -2,7 +2,6 @@ import { Injectable, Inject, type OnModuleInit, type OnModuleDestroy } from '@ne
 import type { IncomingHttpHeaders } from 'node:http';
 import { createPool } from '../../../packages/domain/src/db.mjs';
 import { createDomainServices, loadConfig } from '../../../packages/domain/src/application.mjs';
-import { cleanupExpiredMemberImports } from '../../../packages/domain/src/member-import.mjs';
 import { paper4RequestBodyLimit } from '../../../packages/domain/src/paper4-request-limit.mjs';
 import { parseJsonBody } from '../../../packages/domain/src/http-contract.mjs';
 import type { DomainContext, DomainArea, DomainServices, DomainConfig } from '../../../packages/domain/src/application.mjs';
@@ -14,7 +13,6 @@ export interface RuntimeOptions { databaseUrl?: string; config?: DomainConfig; l
 export class DomainService implements OnModuleInit, OnModuleDestroy {
   private readonly pool;
   private services!: DomainServices;
-  private cleanup?: NodeJS.Timeout;
   readonly config: DomainConfig;
 
   constructor(@Inject(RUNTIME_OPTIONS) options: RuntimeOptions) {
@@ -24,16 +22,10 @@ export class DomainService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit(): Promise<void> {
     await this.pool.query('SELECT 1 FROM schema_migrations LIMIT 1');
-    await cleanupExpiredMemberImports(this.pool);
     this.services = await createDomainServices(this.pool, this.config);
-    this.cleanup = setInterval(() => {
-      void cleanupExpiredMemberImports(this.pool).catch((error: {code?: string; name?: string}) =>
-        console.error('Import credential cleanup failed', {code: error.code ?? error.name}));
-    }, 60_000).unref();
   }
 
   async onModuleDestroy(): Promise<void> {
-    if (this.cleanup) clearInterval(this.cleanup);
     await this.pool.end();
   }
 

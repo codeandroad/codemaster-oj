@@ -149,7 +149,7 @@ interface Resource {
   scope: string;
   canEdit?: boolean;
 }
-const LEGACY_SCHOOL_ID = "00000000-0000-4000-8000-000000000052";
+
 
 export function TeacherLearning({ canManageAdmissions = false }: { canManageAdmissions?: boolean }) {
   const {t,locale} = useLocale();
@@ -157,11 +157,12 @@ export function TeacherLearning({ canManageAdmissions = false }: { canManageAdmi
   const [showArchived,setShowArchived]=useState(false);
   const [courseQuery,setCourseQuery]=useState(""),[categoryFilter,setCategoryFilter]=useState(""),[publicationFilter,setPublicationFilter]=useState(""),[sourceFilter,setSourceFilter]=useState("");
   const [archiveTarget,setArchiveTarget]=useState<Path|null>(null);
+  const schoolId = useSearchParams().get("schoolId");
   const [admissionTarget, setAdmissionTarget] = useState<Path | null>(null);
   const [tab, setTab] = useState("课程");
   const router = useRouter(),
     paths = useWorkspaceData<{ items: Path[] }>(`learning-paths?view=summary${showArchived ? "&archived=true" : ""}`),
-    platformPaths = useWorkspaceData<{items:PlatformCourse[]}>(`platform/courses?schoolId=${LEGACY_SCHOOL_ID}&view=catalog`),
+    platformPaths = useWorkspaceData<{items:PlatformCourse[]}>(`platform/courses?view=catalog${schoolId ? "&schoolId=" + encodeURIComponent(schoolId) : ""}`),
     resources = useData<{ items: Resource[] }>(tab === "学习资料" ? "learning-resources" : null),
     [create, setCreate] = useState(false),
     [importing,setImporting]=useState(false),
@@ -291,7 +292,7 @@ export function TeacherLearning({ canManageAdmissions = false }: { canManageAdmi
           </>
         )}
       </section>
-      {admissionTarget && <CourseAdmissionsDialog schoolId={LEGACY_SCHOOL_ID} course={admissionTarget} onClose={() => setAdmissionTarget(null)} />}
+      {admissionTarget && schoolId && <CourseAdmissionsDialog schoolId={schoolId} course={admissionTarget} onClose={() => setAdmissionTarget(null)} />}
       {archiveTarget&&<Modal title={archiveTarget.archived?tx("恢复课程","Restore course"):tx("归档课程","Archive course")} onClose={()=>setArchiveTarget(null)}>
         <p className="text-sm text-muted-foreground">{archiveTarget.archived?tx("恢复后课程回到使用中列表。普通题目须保持审核通过；若 Paper 4 引用已不可用，课程会保持下架，修复后可重新公开。","Linked problems must remain approved. If Paper 4 references are unavailable, the restored course stays withdrawn until repaired and republished."):tx("归档后课程从学生课程列表移除。章节与学习进度保留；已发布作业仍可独立查看。","Archiving removes the course from the student catalog. Lessons and progress remain recorded; published assignments remain available independently.")}</p>
         <div className="mt-5 flex justify-end gap-2"><Button variant="secondary" onClick={()=>setArchiveTarget(null)}>{tx("取消","Cancel")}</Button><Button disabled={action.busy} onClick={()=>void action.run(async()=>{const restored = await productionApi<Path>(`learning-paths/${archiveTarget.id}${archiveTarget.archived?"/restore":""}`,archiveTarget.archived?{method:"POST",body:{}}:{method:"PATCH",body:{archived:true}});setArchiveTarget(null);paths.reload();return archiveTarget.archived?(archiveTarget.published && !restored.published && restored.withdrawnAt ? tx("课程已恢复为下架状态：请修复不可用的 Paper 4 引用后重新公开。","Course restored and kept withdrawn. Repair unavailable Paper 4 references before republishing.") : tx("课程已恢复。","Course restored.")):tx("课程已归档。","Course archived.");})}>{archiveTarget.archived?tx("恢复","Restore"):tx("归档","Archive")}</Button></div>
@@ -1134,7 +1135,7 @@ export function LearningEditorForm({
                   </span>
                 </div>)}
               </section>
-              <CourseAcslEditor platform={platform} courseId={platform?path.id:undefined} schoolId={LEGACY_SCHOOL_ID} links={chapter.acslLinks ?? []} onChange={links => update("acslLinks", links)} disabled={!canEditCourse || action.busy}/>
+              <CourseAcslEditor platform={platform} courseId={platform?path.id:undefined} schoolId={search.get("schoolId") ?? undefined} links={chapter.acslLinks ?? []} onChange={links => update("acslLinks", links)} disabled={!canEditCourse || action.busy}/>
             </div>
           </section>
         )}

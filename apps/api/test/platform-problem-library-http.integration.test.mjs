@@ -9,7 +9,7 @@ import { bootstrap } from '../../../packages/domain/src/bootstrap.mjs';
 import { loadConfig } from '../../../packages/domain/src/application.mjs';
 import { hashPassword } from '../../../packages/domain/src/security.mjs';
 import { provisionPlatformAdministrator } from '../../../packages/domain/src/platform-governance.mjs';
-import { LEGACY_SCHOOL_ID } from '../../../packages/domain/src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 
 test('platform catalog categories and bulk actions preserve stable source identities', { skip: !process.env.TEST_DATABASE_URL, timeout: 90000 }, async t => {
  const url = new URL(process.env.TEST_DATABASE_URL);
@@ -20,7 +20,7 @@ test('platform catalog categories and bulk actions preserve stable source identi
  try {
   await migrate(pool);
   const password = randomBytes(24).toString('base64url');
-  await bootstrap(pool, { username: 'platform', password, number: 'ADMIN', name: 'Platform' });
+  await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji', username: 'platform', password, number: 'ADMIN', name: 'Platform' });
   await provisionPlatformAdministrator(pool, { username: 'platform' });
   const admin = (await pool.query("SELECT id FROM accounts WHERE username='platform'")).rows[0];
   const identity = (await pool.query("INSERT INTO identities(kind,number,name) VALUES('teacher','STAFF','Teacher') RETURNING id")).rows[0];

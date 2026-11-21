@@ -1,6 +1,7 @@
-import { transaction } from './db.mjs';
-import { activeAccount, LEGACY_SCHOOL_ID, lockSchoolTeaching } from './schools.mjs';
-import { enumValue, fail, field, uuid } from './security.mjs';
+import { transaction } from '../../../src/db.mjs';
+import { activeAccount, lockSchoolTeaching } from '../../../src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from './legacy-school.mjs';
+import { enumValue, fail, field, uuid } from '../../../src/security.mjs';
 
 function selectedIds(value, max, label, min = 1) {
  if (!Array.isArray(value) || value.length < min || value.length > max) fail(400, 'VALIDATION', `${label}数量无效`);

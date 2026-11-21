@@ -62,11 +62,11 @@ export function ProfileMessagesPanel({ sharing, children }: { sharing?: ReactNod
 }
 
 /** Public information is always loaded from the public profile API, never from private CampusUser fields. */
-export function StudentPublicProfile({ profileId, viewer, embedded = false, workspace = "student" }: { profileId: string; viewer: CampusUser; embedded?: boolean; workspace?: CampusRole | "practice" }) {
+export function StudentPublicProfile({ profileId, viewer, embedded = false, workspace = "student", schoolId }: { schoolId?:string; profileId: string; viewer: CampusUser; embedded?: boolean; workspace?: CampusRole | "practice" }) {
   const { locale } = useLocale();
   const practice = workspace === "practice";
   const showActivity = !practice || embedded;
-  const base = `${practice ? "practice/" : ""}profiles/${encodeURIComponent(profileId)}`;
+  const base = `${practice ? "practice/" : schoolId ? `schools/${schoolId}/` : ""}profiles/${encodeURIComponent(profileId)}`;
   const { version, refresh } = useRefreshOnReturn();
   const profile = useData<{ profile: PublicProfile }>(base, version);
   const [activityPage, setActivityPage] = useState(1);
@@ -75,8 +75,8 @@ export function StudentPublicProfile({ profileId, viewer, embedded = false, work
   const own = person?.isSelf ?? profileId === (practice ? viewer.id : viewer.identityId);
   const showSharing = embedded && own;
   const schoolSharing = useData<PracticeProfileSharing>(showSharing && !practice ? `practice/profiles/${encodeURIComponent(viewer.id)}` : "", version);
-  const canWrite = practice || workspace === "student" && viewer.roles.includes("student");
-  const publicHref = `/${workspace}/people/${encodeURIComponent(profileId)}`;
+  const canWrite = practice || workspace === "student" && (Boolean(schoolId) || viewer.roles.includes("student"));
+  const publicHref = schoolId ? `/schools?schoolId=${schoolId}&section=leaderboard&profileId=${profileId}` : `/${workspace}/people/${encodeURIComponent(profileId)}`;
   const stats = person?.points !== undefined && <dl className={`mt-5 grid max-w-xl ${person.scholarship === undefined ? "grid-cols-2" : "grid-cols-3"} gap-3 border-t border-border pt-4 text-sm`}>
     <div><dt className="text-xs text-muted-foreground">{practice ? ui(locale, "排名积分", "Ranking points") : ui(locale, "积分", "Points")}</dt><dd className="mt-1 text-lg font-bold tabular-nums">{person.points}</dd></div>
     {person.scholarship !== undefined && <div><dt className="text-xs text-muted-foreground">{ui(locale, "奖学金", "Scholarship")}</dt><dd className="mt-1 text-lg font-bold tabular-nums">{person.scholarship}</dd></div>}
@@ -96,7 +96,7 @@ export function StudentPublicProfile({ profileId, viewer, embedded = false, work
 
     <State data={profile}>
       {embedded && stats}
-      {person && !embedded && <ProfileHero avatar={person.avatar} nickname={person.nickname} bio={person.bio} presenceIdentityId={workspace === "student" || workspace === "teacher" || workspace === "admin" ? profileId : undefined} showBio={!practice} self={person.isSelf} selfLabel={ui(locale, "我的资料", "My profile")} actions={person.isSelf ? <AppLink href={`/${workspace}/profile`} className={buttonVariants({ variant: "outline" })}>{ui(locale, "编辑个人资料", "Edit profile")}</AppLink> : undefined}>
+      {person && !embedded && <ProfileHero avatar={person.avatar} nickname={person.nickname} bio={person.bio} presenceIdentityId={!schoolId && !practice ? profileId : undefined} showBio={!practice} self={person.isSelf} selfLabel={ui(locale, "我的资料", "My profile")} actions={person.isSelf ? <AppLink href={schoolId ? `/schools?schoolId=${schoolId}&section=profile` : `/${workspace}/profile`} className={buttonVariants({ variant: "outline" })}>{ui(locale, "编辑个人资料", "Edit profile")}</AppLink> : undefined}>
         {!practice && stats}
       </ProfileHero>}
     </State>
@@ -104,7 +104,7 @@ export function StudentPublicProfile({ profileId, viewer, embedded = false, work
     {person && <div className={`grid items-start gap-5 ${showActivity ? "xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]" : ""}`}>
       <ProfileMessagesPanel sharing={showSharing &&
         <ProfileSharingControls accountId={viewer.id} resource={practice ? profile : schoolSharing}/>}>
-        <ProfileGuestbook key={base} base={base} peoplePath={`/${workspace}/people`} canPost={!own && canWrite} refreshVersion={version}/>
+        <ProfileGuestbook key={base} base={base} peoplePath={schoolId ? `/schools?schoolId=${schoolId}&section=leaderboard&profileId=` : `/${workspace}/people`} canPost={!own && canWrite} refreshVersion={version}/>
       </ProfileMessagesPanel>
 
       {showActivity && <section className={`${panel} min-w-0`} aria-labelledby="profile-activity-heading">

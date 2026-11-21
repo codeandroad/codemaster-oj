@@ -8,7 +8,8 @@ import { migrate } from '../../../packages/domain/src/migrate.mjs';
 import { bootstrap } from '../../../packages/domain/src/bootstrap.mjs';
 import { loadConfig } from '../../../packages/domain/src/application.mjs';
 import { hashPassword } from '../../../packages/domain/src/security.mjs';
-import { LEGACY_SCHOOL_ID, provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 import { provisionPlatformAdministrator } from '../../../packages/domain/src/platform-governance.mjs';
 import { processSchoolOne } from '../../../packages/domain/school-worker.mjs';
 import { GoJudge } from '../../../packages/domain/judge.mjs';
@@ -29,7 +30,7 @@ test('ordinary problem versions and personal progress agree across school, platf
   const password = randomBytes(24).toString('base64url'), origin = 'http://unified-problems.test';
   try {
     await migrate(owner);
-    await bootstrap(owner, { name: 'Fixture author', number: 'ADMIN', username: 'author', password });
+    await bootstrap(owner,{schoolSlug:'tianxing-chuangshiji', name: 'Fixture author', number: 'ADMIN', username: 'author', password });
     await provisionPlatformAdministrator(owner, { username: 'author' });
     const actors = { author: (await owner.query("SELECT id,identity_id AS \"identityId\" FROM accounts WHERE username='author'")).rows[0] };
     const hash = await hashPassword(password);

@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {transaction} from '../../src/db.mjs';
-import {LEGACY_SCHOOL_ID} from '../../src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from '../fixtures/pre-workspace/legacy-school.mjs';
 import {decideCatalogPublicProblem} from '../../src/catalog-problem-publication.mjs';
 
 /** Test-only published legacy source + exact public snapshot; never uses live data. */

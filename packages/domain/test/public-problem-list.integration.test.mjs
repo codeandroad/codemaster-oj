@@ -5,7 +5,8 @@ import { readFile } from 'node:fs/promises';
 import { createPool } from '../src/db.mjs';
 import { migrate } from '../src/migrate.mjs';
 import { bootstrap } from '../src/bootstrap.mjs';
-import { LEGACY_SCHOOL_ID, provisionSchool } from '../src/schools.mjs';
+import { provisionSchool } from '../src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from './fixtures/pre-workspace/legacy-school.mjs';
 import { listPublicProblems } from '../src/school-practice.mjs';
 
 test('public problem discovery batches current publications without writing judge snapshots',

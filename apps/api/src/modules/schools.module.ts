@@ -11,6 +11,9 @@ export class SchoolsController {
 
   @Get([
     'schools',
+    'schools/:schoolId/problem-groups',
+    'schools/:schoolId/problem-groups/:id',
+    'schools/:schoolId/import-history',
     'schools/:schoolId/members',
     'schools/:schoolId/exit-request',
     'schools/:schoolId/exit-requests',
@@ -22,6 +25,7 @@ export class SchoolsController {
     'schools/:schoolId/courses',
     'schools/:schoolId/courses/:courseId',
     'schools/:schoolId/courses/:courseId/preview',
+    'schools/:schoolId/courses/:courseId/bookmark',
     'schools/:schoolId/learning-resources',
     'schools/:schoolId/learning-resources/:resourceId',
   ])
@@ -55,7 +59,8 @@ export class SchoolsController {
     return applyResponse(response, await this.domain.execute('schools', request.domainContext));
   }
 
-  @Patch(['schools/:schoolId/learning-resources/:resourceId', 'schools/:schoolId/classes/:classId', 'schools/:schoolId/identities/:identityId/account', 'schools/:schoolId/courses/:courseId'])
+  @Patch([
+    'schools/:schoolId/problem-groups/:id','schools/:schoolId/learning-resources/:resourceId', 'schools/:schoolId/classes/:classId', 'schools/:schoolId/identities/:identityId/account', 'schools/:schoolId/courses/:courseId'])
   async update(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
     return applyResponse(response, await this.domain.execute('schools', request.domainContext));
   }

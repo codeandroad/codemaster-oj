@@ -1,11 +1,12 @@
 export type ActivityKind = "assignment" | "timed";
-export type ActivityProblem = { id: string; versionId: string; title: string; position: number; points: number };
+export type ActivityProblem = { id: string; versionId: string; title: string; position: number; rewardPoints?:number|null; points: number };
 export type ActivityGradeItem = ActivityProblem & { status: string; solved: boolean; score: number; attempts: number; activityAttempts: number; inherited: boolean };
 export type ActivityGrade = { items: ActivityGradeItem[]; score: number; total: number; solved: number; attempted: number };
 export type ActivityAttempt = { id: string; startedAt: string; deadlineAt: string | null; finishedAt: string | null };
 export type SchoolActivity = {
   id: string; schoolId: string; kind: ActivityKind; title: string; description: string;
   state: "Draft" | "Published" | "Archived"; phase: string; revision: number;
+  courseId?:string|null; courseScope?:"school"|"platform"|null;
   cancelledAt?: string | null;
   startsAt: string | null; endsAt: string | null; durationMinutes: number | null;
   publishedAt: string | null; resultsPublishedAt: string | null; canManage: boolean; participantCount: number;

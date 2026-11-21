@@ -4,7 +4,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { createPool, transaction } from '../src/db.mjs';
 import { migrate } from '../src/migrate.mjs';
 import { bootstrap } from '../src/bootstrap.mjs';
-import { problemPermissions } from '../src/library.mjs';
+import { problemPermissions } from './fixtures/pre-workspace/library.mjs';
 import { liveProblemVersionIdSql, resolveLiveProblemVersion, assertLiveProblemVersion } from '../src/live-problem-version.mjs';
 
 test('one live teaching definition preserves approval, activity authorization and publication locks', {

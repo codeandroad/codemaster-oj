@@ -1,5 +1,6 @@
 "use client";
 
+import { CorrectionNote } from "./correction-note";
 import { useEffect, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Code2 } from "lucide-react";
 import { AppLink } from "@/components/navigation";
@@ -13,6 +14,7 @@ import { useSchoolText } from "./school-ui";
 
 export type JobDetail = DetailedSubmission & {
   state: string;
+  note?:string; noteUpdatedAt?:string;
   caseFeedback: DetailedSubmission["testResults"];
 };
 
@@ -21,7 +23,11 @@ export type JobDetail = DetailedSubmission & {
 export function SchoolSubmissionDetail({ schoolId, submissionId, backHref }: {
   schoolId: string; submissionId: string; backHref: string;
 }) {
-  return <StudySubmissionDetail path={`schools/${schoolId}/judge-jobs/${encodeURIComponent(submissionId)}`} backHref={backHref}
+  const path=`schools/${schoolId}/judge-jobs/${encodeURIComponent(submissionId)}`;
+  return <StudySubmissionDetail path={path} backHref={backHref} renderExtra={(job,reload)=>job.state==="completed"&&job.resultsVisible!==false&&<>
+    {job.reviews?.map((entry,index)=><p key={index} className="whitespace-pre-wrap break-words">{entry.note}</p>)}
+    <CorrectionNote key={job.noteUpdatedAt??"new"} path={path} job={job} onSaved={reload}/>
+  </>}
     problemHref={job => `/schools?schoolId=${encodeURIComponent(schoolId)}&section=problems&problemId=${encodeURIComponent(job.problemId)}`} />;
 }
 

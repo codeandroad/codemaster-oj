@@ -9,7 +9,8 @@ import { migrate } from '../../../packages/domain/src/migrate.mjs';
 import { bootstrap } from '../../../packages/domain/src/bootstrap.mjs';
 import { loadConfig } from '../../../packages/domain/src/application.mjs';
 import { hashPassword } from '../../../packages/domain/src/security.mjs';
-import { LEGACY_SCHOOL_ID, provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 import { provisionPlatformAdministrator } from '../../../packages/domain/src/platform-governance.mjs';
 
 test('default school preferences persist per account without extending workspace authorization',
@@ -28,7 +29,7 @@ test('default school preferences persist per account without extending workspace
    await pool.query("INSERT INTO schema_migrations(name) VALUES('063_account_default_school.sql')");
    await migrate(pool);
    const password=randomBytes(24).toString('base64url'),hash=await hashPassword(password);
-   const legacyId=await bootstrap(pool,{name:'Legacy admin',number:'ADM',username:'legacy-admin',password});
+   const legacyId=await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji',name:'Legacy admin',number:'ADM',username:'legacy-admin',password});
    const accounts={};
    for(const login of ['alpha-admin','beta-admin','teacher','student','visitor','platform-user','invalid-account']) {
     accounts[login]=await transaction(pool,async db=>{

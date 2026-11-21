@@ -1,5 +1,4 @@
 import { problemProgress } from './problem-progress.mjs';
-import { LEGACY_SCHOOL_ID } from './schools.mjs';
 import {createHmac,timingSafeEqual} from 'node:crypto';
 import {canonicalHash,enumValue,fail,integer,submissionId,uuid} from './security.mjs';
 
@@ -57,7 +56,7 @@ export async function submissionHistory(ctx){
 }
 
 export async function problemOwnProgress(pool,user,problemIds){
- return problemProgress(pool,user,problemIds,{schoolId:LEGACY_SCHOOL_ID});
+ return problemProgress(pool,user,problemIds,{schoolId:user.teachingSchoolId});
 }
 
 export const emptyOwnProgress=()=>({status:'NotStarted',bestScore:null,formalCount:0,lastSubmissionId:null,lastSubmittedAt:null});

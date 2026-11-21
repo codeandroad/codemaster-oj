@@ -1,6 +1,7 @@
+import { lockPlatformContent } from './platform-content-access.mjs';
 import { transaction } from './db.mjs';
 import { problemListColumns, problemListSummary } from './problem-list-summary.mjs';
-import { activeAccount, LEGACY_SCHOOL_ID, lockSchoolTeaching } from './schools.mjs';
+import { activeAccount } from './schools.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
 import { requirePlatformContentEditor, platformContentEditorSql } from './platform-content-access.mjs';
 import { handlePlatformProblemLibrary, platformStorageBank, platformCategory } from './platform-problem-library.mjs';
@@ -94,7 +95,7 @@ export async function handlePlatformProblems(ctx) {
  const match=route.match(/^\/platform\/source-problems(?:\/([^/]+)(?:\/(versions|publish|request-review|validate|tutorial|contents|public-statement)(?:\/([^/]+)\/(publish))?)?)?$/);
  if(!match&&!batchReview&&!batchPublish)return null;
  return transaction(pool,async db=>{
-  await lockSchoolTeaching(db,LEGACY_SCHOOL_ID,{shared:method==='GET'});
+  await lockPlatformContent(db,{shared:method==='GET'});
   await activeAccount(db,user.id);
   const admin=await isPlatformAdministrator(db,user.id);
   const audit=(action,id,detail={})=>db.query('INSERT INTO platform_audit_events(actor_account_id,action,detail) VALUES($1,$2,$3)',
@@ -104,7 +105,7 @@ export async function handlePlatformProblems(ctx) {
   const detail=async(id,versionId)=>{
    const result=await helpers.problemResult(db,user,id,versionId,{editing:true});
    const category=(await db.query('SELECT p.platform_bank_id,b.name FROM problems p LEFT JOIN platform_problem_banks b ON b.id=p.platform_bank_id WHERE p.id=$1',[id])).rows[0];
-   return {...result,sourceBankId:result.bankId,bankId:category?.platform_bank_id??null,ownerScope:'platform',schoolId:LEGACY_SCHOOL_ID,bankName:category?.name??'',
+   return {...result,sourceBankId:result.bankId,bankId:category?.platform_bank_id??null,ownerScope:'platform',bankName:category?.name??'',
     canPublish:(admin&&result.canPublish)||(result.draftReviewStatus==='pending'&&result.validationStatus==='AC'&&await canReview(id)),
     canRequestReview:!admin&&result.canPublish&&result.editRevision>result.publishedRevision,canManage:admin};
   };
@@ -135,7 +136,7 @@ export async function handlePlatformProblems(ctx) {
      ${platformContentEditorSql('problem','p.id','$1::uuid','$3::uuid')})
      AND (NOT $6 OR v.draft_review_status='pending' AND ($2 OR g.problem_id IS NOT NULL))
     ORDER BY (v.draft_review_status IS NOT DISTINCT FROM 'pending') DESC,v.title,p.id`,[user.id,admin,schoolId,admin&&url.searchParams.get('includeArchived')==='1',bankId,reviewQueue])).rows;
-   return reply({items:rows.map(row=>({...(summary?problemListSummary(row):helpers.problemShape(row)),ownerScope:'platform',schoolId:LEGACY_SCHOOL_ID,bankName:row.category_name??'',
+   return reply({items:rows.map(row=>({...(summary?problemListSummary(row):helpers.problemShape(row)),ownerScope:'platform',bankName:row.category_name??'',
     ...(!row.archived_at&&Array.isArray(row.draft_tags)?{draftTags:row.draft_tags}:{}),
     ...(summary?{editRevision:row.edit_revision,draftValidationStatus:row.draft_validation_status,
      ...(row.can_review_draft&&row.draft_review_status==='pending'&&row.draft_title?{draftTitle:row.draft_title}:{}),

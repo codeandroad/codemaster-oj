@@ -7,7 +7,8 @@ import {createPool} from '../../../packages/domain/src/db.mjs';
 import {migrate} from '../../../packages/domain/src/migrate.mjs';
 import {loadConfig} from '../../../packages/domain/src/application.mjs';
 import {hashPassword} from '../../../packages/domain/src/security.mjs';
-import {LEGACY_SCHOOL_ID,provisionSchool} from '../../../packages/domain/src/schools.mjs';
+import { provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 
 const sections=[
  {key:'number-systems',title:'Number systems',groupKey:'contest-1',groupTitle:'Contest 1',localizations:{en:{title:'Number systems',groupTitle:'Contest 1'},zh:{title:'数制',groupTitle:'第一轮'}}},

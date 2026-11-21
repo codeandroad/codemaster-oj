@@ -1,7 +1,7 @@
 import type { ProductionProblem } from "@/lib/production-api";
 
 export const teacherProblemSummaries = "problems?view=summary";
-export const teacherPlatformProblemSummaries = "platform/source-problems?schoolId=00000000-0000-4000-8000-000000000052&view=summary";
+export const teacherPlatformProblemSummaries = "platform/source-problems?view=summary";
 
 export type PlatformSourceProblem = ProductionProblem & {
   ownerScope: "platform";

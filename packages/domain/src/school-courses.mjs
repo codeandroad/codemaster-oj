@@ -1,3 +1,5 @@
+import { platformCourseEligible } from './platform-course-access.mjs';
+import { platformCourseEdition, platformCourseListings } from './platform-public-course.mjs';
 import { chapterProblemVersions, problemCatalogCourseOption } from './problem-catalog-courses.mjs';
 import { courseSections, chapterSectionKey } from './course-sections.mjs';
 import { courseLocalizations, localizedFields } from './course-localizations.mjs';
@@ -18,7 +20,7 @@ const manages = (course, user, role) => role === 'school_admin' || role === 'tea
 function courseInput(body, previous={}) {
  const old=previous.properties??{};
  const sections=courseSections(body.sections===undefined?old.sections??[]:body.sections);
- const properties={sections,localizations:body.localizations===undefined?old.localizations??null:courseLocalizations(body.localizations),category:field(body.category??old.category??'Programming','课程分类',{min:1,max:100}),
+ const properties={...old,sections,localizations:body.localizations===undefined?old.localizations??null:courseLocalizations(body.localizations),category:field(body.category??old.category??'Programming','课程分类',{min:1,max:100}),
  difficulty:enumValue(body.difficulty??old.difficulty??'beginner',['beginner','intermediate','advanced'],'难度'),
  coverKey:enumValue(body.coverKey??old.coverKey??'general',['python','algorithms','general'],'课程封面'),
  estimatedMinutes:integer(body.estimatedMinutes??old.estimatedMinutes??60,1,10080,'预计学习时间'),
@@ -113,6 +115,8 @@ export async function loadSchoolCourse(db,schoolId,id,user,role,{publishedOnly=f
  if((!canManage&&role!=='student')||!course.published||course.archived_at)fail(404,'NOT_FOUND','课程不存在或不可访问');
  const view=(await db.query('SELECT * FROM school_course_publications WHERE school_id=$1 AND course_id=$2 AND revision=$3',[schoolId,id,course.published_revision])).rows[0];
  if(!view)fail(404,'NOT_FOUND','课程不存在或不可访问');
+ if(!canManage && (view.properties?.availableFrom && Date.parse(view.properties.availableFrom)>Date.now()
+  || view.properties?.availableUntil && Date.parse(view.properties.availableUntil)<=Date.now()))fail(404,'NOT_FOUND','课程不在开放时间内');
  if(canManage)return {course,view:await currentCourseProblems(db,schoolId,view),canManage,identityId:null};
  const identityId=await studentIdentity(db,schoolId,user.id);
  if(view.access_scope==='classes'){
@@ -192,7 +196,7 @@ function expectedRevision(body,course){
 export async function handleSchoolCourses(context){
  const resource=await handleSchoolLearningResources(context,loadSchoolCourse);if(resource)return resource;
  const {pool,user,route,method,body={},url}=context;
- const match=route.match(/^\/schools\/([^/]+)\/courses(?:\/([^/]+)(?:\/(publish|unpublish|archive|restore|preview)|\/chapters\/([^/]+)\/read)?)?$/);
+ const match=route.match(/^\/schools\/([^/]+)\/courses(?:\/([^/]+)(?:\/(publish|unpublish|archive|restore|preview|bookmark)|\/chapters\/([^/]+)\/read)?)?$/);
  if(!match)return null;
  const schoolId=uuid(match[1],'学校 ID');
  const courseId=match[2]?uuid(match[2],'课程 ID'):null;
@@ -202,6 +206,20 @@ export async function handleSchoolCourses(context){
   await lockSchoolTeaching(db,schoolId,{shared:method==='GET'});
   const role=await schoolRole(db,schoolId,user.id);
   await db.query("SELECT set_config('campus.school_id',$1,true)",[schoolId]);
+  if(match[3]==='bookmark'&&method==='GET'){
+   const original=(await db.query('SELECT properties FROM school_courses WHERE school_id=$1 AND id=$2',[schoolId,courseId])).rows[0];
+   const target=original?.properties?.mergedIntoId;
+   if(target){
+    const [listing]=await platformCourseListings(db,target);
+    if(listing&&await platformCourseEdition(db,listing)&&await platformCourseEligible(db,target,user.id)){
+     return reply({scope:'platform',id:listing.id,chapterId:original.properties.mergedFirstChapterId??null});
+    }
+    await loadSchoolCourse(db,schoolId,target,user,role);
+    return reply({scope:'school',id:target,chapterId:original.properties.mergedFirstChapterId??null});
+   }
+   await loadSchoolCourse(db,schoolId,courseId,user,role);
+   return reply({scope:'school',id:courseId});
+  }
   if(!courseId&&method==='GET'){
    const page=integer(Number(url.searchParams.get('page')??'1'),1,100000,'页码');
    const archived=url.searchParams.get('archived')==='true';
@@ -212,7 +230,9 @@ export async function handleSchoolCourses(context){
     LEFT JOIN school_course_publications p ON p.school_id=c.school_id AND p.course_id=c.id AND p.revision=c.published_revision
     WHERE c.school_id=$1 AND (c.archived_at IS NOT NULL)=$8 AND (
       $2='school_admin' OR $2='teacher' AND c.owner_account_id=$3
-      OR $2='student' AND c.published AND (p.access_scope='school' OR EXISTS(
+      OR $2='student' AND c.published AND COALESCE((p.properties->>'listed')::boolean,true)
+       AND COALESCE((p.properties->>'availableFrom')::timestamptz,'-infinity')<=now()
+       AND COALESCE((p.properties->>'availableUntil')::timestamptz,'infinity')>now() AND (p.access_scope='school' OR EXISTS(
        SELECT 1 FROM school_course_publication_classes pc JOIN school_class_roster r ON r.school_id=pc.school_id AND r.class_id=pc.class_id
        WHERE pc.school_id=c.school_id AND pc.course_id=c.id AND pc.revision=c.published_revision AND r.identity_id=$4 AND EXISTS(SELECT 1 FROM school_classes active WHERE active.school_id=pc.school_id AND active.id=pc.class_id AND active.archived_at IS NULL))))
      AND ($5='' OR strpos(lower(CASE WHEN $2='student' THEN p.title||' '||p.description||' '||COALESCE(p.properties->'localizations','{}'::jsonb)::text ELSE c.title||' '||c.description||' '||COALESCE(c.properties->'localizations','{}'::jsonb)::text END),lower($5))>0)

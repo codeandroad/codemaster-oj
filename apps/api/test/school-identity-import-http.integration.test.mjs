@@ -8,7 +8,8 @@ import { migrate } from '../../../packages/domain/src/migrate.mjs';
 import { bootstrap } from '../../../packages/domain/src/bootstrap.mjs';
 import { loadConfig } from '../../../packages/domain/src/application.mjs';
 import { hashPassword } from '../../../packages/domain/src/security.mjs';
-import { LEGACY_SCHOOL_ID, provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 
 test('school identity import previews and atomic commits enforce tenant, account, and retry boundaries',
   { skip: !process.env.TEST_DATABASE_URL, timeout: 90000 }, async t => {
@@ -30,7 +31,7 @@ test('school identity import previews and atomic commits enforce tenant, account
       await manager.query(`CREATE SCHEMA ${schema}`);
       schemaCreated = true;
       await migrate(pool);
-      await bootstrap(pool, { name: 'Legacy administrator', number: 'ADM', username: 'legacy-admin', password });
+      await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji', name: 'Legacy administrator', number: 'ADM', username: 'legacy-admin', password });
       const passwordHash = await hashPassword(password);
       await transaction(pool, async db => {
         for (const username of ['alpha-admin', 'alpha-colleague', 'beta-admin', 'pilot-teacher', 'pilot-student']) {

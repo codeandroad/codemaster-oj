@@ -58,7 +58,8 @@ async function aidState(db,user,input,helpers){
   translationPurchase=(await db.query(`SELECT l.id,-l.delta paid FROM luq_assistance_entitlements e
    JOIN luq_ledger l ON l.id=e.ledger_id AND l.identity_id=e.identity_id AND l.kind='purchase'
    WHERE e.identity_id=$1 AND e.subject_key=$2 AND e.kind='FULL_TRANSLATION' AND e.language='zh-CN'
-     AND NOT EXISTS (SELECT 1 FROM luq_ledger refund WHERE refund.refund_of=l.id)`,
+     AND NOT EXISTS (SELECT 1 FROM luq_ledger refund WHERE refund.refund_of=l.id)
+     AND NOT EXISTS (SELECT 1 FROM transferred_translation_credits credit WHERE credit.ledger_id=l.id)`,
   [user.identityId,target.subjectKey])).rows[0]??null;
  }
  const translationCredit=Math.min(basePrice,translationPurchase?.paid??0);

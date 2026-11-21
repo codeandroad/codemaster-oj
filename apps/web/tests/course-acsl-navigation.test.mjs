@@ -67,8 +67,8 @@ test("safe return addresses reject external, teacher, other-school and ambiguous
     assert.equal(safeAcslHref(unsafe, school), null, unsafe);
   }
   assert.equal(safeCourseHref(`/teacher/courses/${courseId}`, school), null);
-  assert.equal(safeCourseHref(course, otherSchool), null);
-  assert.equal(safeAcslHref(written, otherSchool), null);
+  assert.equal(safeCourseHref(`${course}?schoolId=${school}`, otherSchool), null);
+  assert.equal(safeAcslHref(`${written}&schoolId=${school}`, otherSchool), null);
   assert.equal(safeAcslHref(`/schools?schoolId=${otherSchool}&section=acsl`, school), null);
   assert.equal(safeAcslHref(`/schools?schoolId=${otherSchool}&section=acsl&schoolRole=teacher`, otherSchool), null);
   assert.equal(safeCourseHref(`/schools?schoolId=${otherSchool}&section=courses&courseId=bad`, otherSchool), null);
@@ -83,7 +83,7 @@ test("school-scoped routes keep their school and chapter when both directions ar
   assert.equal(returned.get("schoolId"), otherSchool);
   assert.equal(returned.get("section"), "courses");
   assert.equal(returned.get("chapterId"), chapterId);
-  assert.equal(acslLearningHref(course, schoolPaper, otherSchool), null);
+  assert.equal(acslLearningHref(`${course}?schoolId=${school}`, schoolPaper, otherSchool), null);
 });
 
 test("catalog → platform course → practice and return keep school, filters and language", () => {

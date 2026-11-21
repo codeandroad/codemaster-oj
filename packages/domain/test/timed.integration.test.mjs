@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createPool, transaction } from '../src/db.mjs';
 import { migrate } from '../src/migrate.mjs';
-import { createTimedService } from '../src/timed.mjs';
+import { createTimedService } from './fixtures/pre-workspace/timed.mjs';
 
 const url = process.env.TEST_DATABASE_URL ?? process.env.JUDGE_TEST_DATABASE_URL;
 let manager, pool, schema, timed, teacher, student, outsider, classId, problemId, version;

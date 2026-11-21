@@ -1,5 +1,5 @@
 import { transaction } from './db.mjs';
-import { activeAccount, auditSchool, LEGACY_SCHOOL_ID, lockSchoolTeaching, requireSchoolAdmin } from './schools.mjs';
+import { activeAccount, auditSchool, lockSchoolTeaching, requireSchoolAdmin } from './schools.mjs';
 import { enumValue, fail, field, integer, uuid } from './security.mjs';
 
 const PAGE_SIZE = 30;
@@ -10,25 +10,8 @@ const requestFields = `id,account_id AS "accountId",identity_id AS "identityId",
   reviewed_by AS "reviewedBy",reviewed_at AS "reviewedAt",review_note AS "reviewNote"`;
 const reply = (body, status = 200) => ({ status, body });
 
-async function authorizeAdmin(db, schoolId, actorId) {
-  if (schoolId !== LEGACY_SCHOOL_ID) return requireSchoolAdmin(db, schoolId, actorId);
-  await activeAccount(db, actorId);
-  const admin = await db.query(`SELECT 1 FROM account_roles r
-    JOIN legacy_school_account_ownership o ON o.account_id=r.account_id
-    WHERE o.school_id=$1 AND r.account_id=$2 AND r.role='admin' FOR SHARE OF r`, [schoolId, actorId]);
-  if (!admin.rowCount) fail(403, 'FORBIDDEN', '需要本校管理员权限');
-}
 
-function studentSelection(schoolId) {
-  if (schoolId === LEGACY_SCHOOL_ID) return `
-    SELECT a.id AS "accountId",i.id AS "identityId",i.name,i.number,a.created_at::text AS "membershipStartedAt"
-    FROM accounts a JOIN identities i ON i.id=a.identity_id
-    JOIN legacy_school_account_ownership o ON o.account_id=a.id
-    JOIN legacy_school_identity_ownership d ON d.identity_id=i.id AND d.school_id=o.school_id
-    WHERE o.school_id=$1 AND i.kind='student' AND i.archived_at IS NULL
-      AND a.binding_released_at IS NULL
-      AND EXISTS (SELECT 1 FROM account_roles WHERE account_id=a.id AND role='student')
-      AND NOT EXISTS (SELECT 1 FROM account_roles WHERE account_id=a.id AND role<>'student')`;
+function studentSelection() {
   return `
     SELECT a.id AS "accountId",s.id AS "identityId",COALESCE(s.name,i.name) AS name,s.number,
       m.joined_at::text AS "membershipStartedAt"
@@ -41,7 +24,7 @@ function studentSelection(schoolId) {
 }
 
 async function findStudent(db, schoolId, accountId) {
-  return (await db.query(`${studentSelection(schoolId)} AND a.id=$2`, [schoolId, accountId])).rows[0];
+  return (await db.query(`${studentSelection()} AND a.id=$2`, [schoolId, accountId])).rows[0];
 }
 
 function requireStudent(student) {
@@ -67,12 +50,6 @@ function sameMembership(student, record) {
 }
 
 async function archiveStudent(db, schoolId, student, actorId, requestId) {
-  if (schoolId === LEGACY_SCHOOL_ID) {
-    const { rows: [{ detached }] } = await db.query(
-      'SELECT detach_legacy_school_student($1,$2,$3,$4) AS detached', [actorId, student.accountId, student.identityId, requestId]);
-    if (!detached) fail(409, 'EXIT_STATE_CHANGED', '学生身份已变更，请刷新后重试');
-    return;
-  }
   // Lock the account before changing membership, matching default-school writes.
   await db.query('SELECT id FROM accounts WHERE id=$1 FOR UPDATE', [student.accountId]);
   const revoked = await db.query(`UPDATE school_memberships SET revoked_at=clock_timestamp()
@@ -155,7 +132,7 @@ async function adminRead(db, schoolId, resource, url) {
   const query = field(url.searchParams.get('q') ?? '', '搜索关键词', { min: 0, max: 100 });
   let rows;
   if (resource === 'student-exits') {
-    ({ rows } = await db.query(`SELECT * FROM (${studentSelection(schoolId)}) students
+    ({ rows } = await db.query(`SELECT * FROM (${studentSelection()}) students
       WHERE $2='' OR strpos(lower(name),lower($2))>0 OR strpos(lower(number),lower($2))>0
       ORDER BY name,"accountId" LIMIT $3 OFFSET $4`, [schoolId, query, PAGE_SIZE + 1, offset]));
   } else {
@@ -179,9 +156,8 @@ export async function handleSchoolExits({ pool, user, route, method, body, url }
   const schoolId = uuid(school, '学校 ID');
   return transaction(pool, async db => {
     await lockSchoolTeaching(db, schoolId, { shared: read });
-    if (write && schoolId === LEGACY_SCHOOL_ID) await db.query('SELECT pg_advisory_xact_lock(798944)');
     if (resource === 'exit-request') return studentRequest(db, schoolId, user, method, body);
-    await authorizeAdmin(db, schoolId, user.id);
+    await requireSchoolAdmin(db, schoolId, user.id);
     if (read) return adminRead(db, schoolId, resource, url);
     if (resource === 'student-exits') {
       const accountId = uuid(body.accountId, '学生账号 ID');

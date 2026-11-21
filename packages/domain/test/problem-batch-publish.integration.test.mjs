@@ -6,7 +6,7 @@ import { createPool } from '../src/db.mjs';
 import { migrate } from '../src/migrate.mjs';
 import { bootstrap } from '../src/bootstrap.mjs';
 import { createApp, loadConfig } from '../src/app.mjs';
-import { SCHOOL_BANK } from '../src/library.mjs';
+import { SCHOOL_BANK } from './fixtures/pre-workspace/library.mjs';
 
 test('batch publication is atomic, authorized, version-pinned and awaits administrator review',
   {skip:!process.env.TEST_DATABASE_URL,timeout:60000},async()=>{

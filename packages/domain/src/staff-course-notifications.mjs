@@ -1,20 +1,16 @@
 import { courseAdmissionNotificationRows, inboxItem, readCourseAdmissionNotification, setAccountNotificationRecipient } from './account-notifications.mjs';
 import { transaction } from './db.mjs';
-import { legacyCourseStaffRole } from './legacy-public-course.mjs';
 import { currentCourseAdmissionsJoin } from './public-learning.mjs';
-import { LEGACY_SCHOOL_ID, lockSchoolTeaching, schoolRole } from './schools.mjs';
+import { lockSchoolTeaching, schoolRole } from './schools.mjs';
 import { fail, uuid } from './security.mjs';
 import { guestbookNotificationRows, readGuestbookNotification } from './guestbook-notifications.mjs';
 
 const response = body => ({ status: 200, body });
 
 async function inboxRecipient(db, { user, notificationSchoolId: requestedSchool }) {
-  const schoolId = requestedSchool ? uuid(requestedSchool, '学校 ID') : LEGACY_SCHOOL_ID;
-  if (requestedSchool && schoolId === LEGACY_SCHOOL_ID) fail(404, 'NOT_FOUND', '通知入口不存在');
-  await lockSchoolTeaching(db, schoolId, { shared: true });
-  const role = requestedSchool
-    ? await schoolRole(db, schoolId, user.id)
-    : await legacyCourseStaffRole(db, user.id);
+  const schoolId = uuid(requestedSchool,'学校 ID');
+  await lockSchoolTeaching(db, schoolId, { shared:true });
+  const role = await schoolRole(db, schoolId, user.id);
   if (role !== 'school_admin' && role !== 'teacher') fail(403, 'FORBIDDEN', '需要教师或本校管理员权限');
   if (role === 'school_admin') {
     await db.query(`SELECT set_config('campus.school_id',$1,true),

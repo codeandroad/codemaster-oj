@@ -20,7 +20,7 @@ test('Nest school leaderboard routes enforce admin-only visibility, cross-class 
   try {
    await migrate(pool);
    const password=randomBytes(20).toString('base64url');
-   await bootstrap(pool,{name:'Admin',number:'ADMIN',username:'leaderboard-admin',password});
+   await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji',name:'Admin',number:'ADMIN',username:'leaderboard-admin',password});
    const identityId=(await pool.query("INSERT INTO identities(kind,number,name) VALUES('student',$1,'Student') RETURNING id",[randomUUID()])).rows[0].id;
    const studentId=(await pool.query(`INSERT INTO accounts(identity_id,username,password_hash,nickname)
     VALUES($1,'leaderboard-student',$2,'Coder') RETURNING id`,[identityId,await hashPassword(password)])).rows[0].id;

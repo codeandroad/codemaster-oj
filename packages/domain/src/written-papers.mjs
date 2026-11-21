@@ -1,17 +1,13 @@
 import { transaction } from './db.mjs';
-import { activeAccount, LEGACY_SCHOOL_ID, lockSchoolTeaching, schoolRole } from './schools.mjs';
+import { lockSchoolTeaching, schoolRole } from './schools.mjs';
 import { canonicalHash, fail, field, integer, uuid } from './security.mjs';
 import { answerFields, automaticSuggestions, pngBytes, publicDefinition, sha256, validateAnswers, validateMarks, validateWrittenPackage } from './written-paper-model.mjs';
 
 const reply=(body,status=200)=>({body,status});
 const missing=()=>fail(404,'NOT_FOUND','Written practice is unavailable.');
 async function scope(db,school,user){
- await lockSchoolTeaching(db,school,{shared:true});await activeAccount(db,user.id);
- let roles;
- if(school===LEGACY_SCHOOL_ID){
-  if(!(await db.query('SELECT 1 FROM legacy_school_account_ownership WHERE school_id=$1 AND account_id=$2',[school,user.id])).rowCount)missing();
-  roles=(await db.query('SELECT role FROM account_roles WHERE account_id=$1',[user.id])).rows.map(r=>r.role);
- }else roles=[await schoolRole(db,school,user.id)];
+ await lockSchoolTeaching(db,school,{shared:true});
+ const roles=[await schoolRole(db,school,user.id)];
  await db.query("SELECT set_config('campus.school_id',$1,true)",[school]);
  return {staff:roles.some(r=>['teacher','admin','school_admin'].includes(r)),student:roles.includes('student')};
 }

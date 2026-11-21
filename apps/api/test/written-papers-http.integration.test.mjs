@@ -7,7 +7,8 @@ import {createPool} from '../../../packages/domain/src/db.mjs';
 import {migrate} from '../../../packages/domain/src/migrate.mjs';
 import {hashPassword} from '../../../packages/domain/src/security.mjs';
 import {loadConfig} from '../../../packages/domain/src/application.mjs';
-import {LEGACY_SCHOOL_ID,provisionSchool} from '../../../packages/domain/src/schools.mjs';
+import { provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 import {validateAnswers} from '../../../packages/domain/src/written-paper-model.mjs';
 
 test('written-paper real Nest transport, school permissions, immutable versions and grading lifecycle',{skip:!process.env.TEST_DATABASE_URL,timeout:180000},async t=>{

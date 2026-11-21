@@ -1,4 +1,5 @@
 "use client";
+import { AppLink } from "@/components/navigation";
 import { useState } from "react";
 import { useLocale } from "@/components/locale-context";
 import { useData } from "@/components/teacher/shared";
@@ -123,7 +124,7 @@ export function SchoolLeaderboard({ schoolId }: { schoolId: string }) {
                 <td className="p-3">
                   <div className="flex items-center gap-2">
                     <ProfileAvatar avatar={i.avatar} nickname={i.name} />
-                    <span className="font-medium">{i.name}</span>
+                    <AppLink className="font-medium text-primary hover:underline" href={`/schools?schoolId=${schoolId}&section=leaderboard&profileId=${i.identityId}`}>{i.name}</AppLink>
                     {i.isOwn && (
                       <span className="text-xs text-muted-foreground">
                         {tx("你", "You")}

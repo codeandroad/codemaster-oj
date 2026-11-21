@@ -14,38 +14,38 @@ export class SystemController {
     return applyResponse(response, await this.domain.execute('system', request.domainContext));
   }
 
-  @Patch('system-settings')
+  @Patch('platform/system-settings')
   async updateSettings(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('system', request.domainContext));
   }
 
-  @Post('judge-maintenance')
+  @Post('platform/judge-maintenance')
   async maintenance(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('system', request.domainContext));
   }
 
-  @Get('judge-tasks/:id')
+  @Get('platform/judge-tasks/:id')
   async task(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('system', request.domainContext));
   }
 
-  @Post('judge-tasks/:id/retry')
+  @Post('platform/judge-tasks/:id/retry')
   async retry(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('system', request.domainContext));
   }
 
 
-  @Get('system-settings')
+  @Get('platform/system-settings')
   async settings(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('system', request.domainContext));
   }
 
-  @Get('audit-events')
+  @Get('platform/audit-events')
   async audit(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('system', request.domainContext));
   }
 
-  @Get('judge-status')
+  @Get('platform/judge-status')
   async judge(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('system', request.domainContext));
   }

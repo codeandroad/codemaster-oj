@@ -14,9 +14,9 @@ export async function protectPlatformAccount(db, actor, { accountId, identityId 
     fail(403, 'PLATFORM_ACCOUNT_PROTECTED', '学校管理员不能修改或重置平台管理员账号');
   }
   if ((await db.query(`SELECT 1 FROM accounts a WHERE a.id=ANY($1::uuid[])
-    AND NOT EXISTS(SELECT 1 FROM legacy_school_account_ownership o WHERE o.account_id=a.id)`,
-  [accounts.rows.map(row=>row.id)])).rowCount) {
-    fail(403, 'LEGACY_TARGET_REQUIRED', '此账号不属于本学校，不能通过学校身份维护修改个人或其他学校账号');
+    AND NOT EXISTS(SELECT 1 FROM school_memberships o WHERE o.account_id=a.id AND o.school_id=$2 AND o.revoked_at IS NULL)`,
+  [accounts.rows.map(row=>row.id),actor.teachingSchoolId])).rowCount) {
+    fail(403, 'SCHOOL_TARGET_REQUIRED', '此账号不属于本学校，不能通过学校身份维护修改个人或其他学校账号');
   }
 
 }

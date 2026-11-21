@@ -2,8 +2,6 @@ import { transaction } from './db.mjs';
 import { archiveRemovedStudent, handleSchoolExits } from './school-exits.mjs';
 import { enumValue, fail, field, integer, randomToken, tokenHash, username, uuid } from './security.mjs';
 
-export const LEGACY_SCHOOL_ID = '00000000-0000-4000-8000-000000000052';
-
 const result = (body, status = 200) => ({ status, body });
 
 export async function activeAccount(db, accountId) {
@@ -50,12 +48,7 @@ export async function lockWorkspaceMembership(db, schoolId, accountId, { student
   const member = await db.query(`SELECT m.account_id FROM school_memberships m
     WHERE m.school_id=$1 AND m.account_id=$2 AND m.revoked_at IS NULL
       AND (NOT $3::boolean OR m.role='student') FOR SHARE OF m`, params);
-  if (member.rowCount) return true;
-  const credential = await db.query(`
-    SELECT r.account_id FROM account_roles r JOIN legacy_school_account_ownership o USING (account_id)
-    WHERE o.school_id=$1 AND r.account_id=$2 AND (NOT $3::boolean OR r.role='student')
-    FOR SHARE OF r`, params);
-  return credential.rowCount > 0;
+  return member.rowCount > 0;
 }
 
 export async function requireSchoolAdmin(db, schoolId, userId) {
@@ -66,7 +59,7 @@ export async function requireSchoolAdmin(db, schoolId, userId) {
 
 export async function provisionSchool(pool, { slug, name, adminUsername }) {
   const schoolSlug = field(slug, '学校标识', { min: 3, max: 50 });
-  if (!/^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/.test(schoolSlug) || schoolSlug === 'legacy-school') {
+  if (!/^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/.test(schoolSlug)) {
     fail(400, 'VALIDATION', '学校标识须使用 3–50 个小写字母、数字或短横线');
   }
   const schoolName = field(name, '学校名称', { max: 100 });
@@ -103,8 +96,8 @@ async function listSchools(pool, user) {
       array_agg(m.role ORDER BY m.role) roles
     FROM school_workspace_roles m JOIN schools s ON s.id = m.school_id
     WHERE m.account_id = $1
-    GROUP BY s.id ORDER BY (s.id=$2) DESC, s.name, s.id`, [user.id,LEGACY_SCHOOL_ID]);
-  return rows.map(school => ({ ...school, legacy: school.id === LEGACY_SCHOOL_ID }));
+    GROUP BY s.id ORDER BY s.name, s.id`, [user.id]);
+  return rows;
 }
 
 async function issueInvitation(db, schoolId, actorId, role) {

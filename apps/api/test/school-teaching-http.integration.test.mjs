@@ -9,7 +9,8 @@ import { migrate } from '../../../packages/domain/src/migrate.mjs';
 import { bootstrap } from '../../../packages/domain/src/bootstrap.mjs';
 import { loadConfig } from '../../../packages/domain/src/application.mjs';
 import { hashPassword } from '../../../packages/domain/src/security.mjs';
-import { handleSchools, LEGACY_SCHOOL_ID, provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { handleSchools, provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 
 test('school directories and class rosters enforce tenant, role, and account boundaries',
   { skip: !process.env.TEST_DATABASE_URL, timeout: 60000 }, async () => {
@@ -34,7 +35,7 @@ test('school directories and class rosters enforce tenant, role, and account bou
       await pool.query(grantsSql.replaceAll('SCHEMA public', `SCHEMA ${schema}`));
       const appUrl = new URL(url.href);
       appUrl.searchParams.set('options', `-crole=campus_app -csearch_path=${schema}`);
-      await bootstrap(pool, { name: 'Legacy administrator', number: 'ADM', username: 'legacy-admin', password });
+      await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji', name: 'Legacy administrator', number: 'ADM', username: 'legacy-admin', password });
       const passwordHash = await hashPassword(password);
       // Membership-only login accounts use the shared authentication layer.
       // Their role in a school must never grant privileges on legacy routes.

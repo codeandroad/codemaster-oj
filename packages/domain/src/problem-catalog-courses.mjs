@@ -1,5 +1,5 @@
 import { readableCourseIds } from './course-access.mjs';
-import { legacyCourseIsLive } from './legacy-public-course.mjs';
+import { courseIsLive } from './course-live.mjs';
 import { uuid } from './security.mjs';
 
 export function problemCatalogCourseRequest(url) {
@@ -25,7 +25,7 @@ export async function legacyProblemCatalogCourses(db, user, courseId) {
   FROM learning_paths p
   JOIN learning_chapters chapter ON chapter.path_id=p.id AND chapter.archived_at IS NULL
   JOIN chapter_problems link ON link.chapter_id=chapter.id
-  WHERE ${legacyCourseIsLive}
+  WHERE ${courseIsLive}
   GROUP BY p.id ORDER BY p.title,p.id`, [courseId]);
  const readable = await readableCourseIds(db, user, rows.map(row => row.id), { listed: true });
  const courses = rows.filter(row => readable.has(row.id));

@@ -8,7 +8,8 @@ import { migrate } from '../../../packages/domain/src/migrate.mjs';
 import { bootstrap } from '../../../packages/domain/src/bootstrap.mjs';
 import { loadConfig } from '../../../packages/domain/src/application.mjs';
 import { hashPassword } from '../../../packages/domain/src/security.mjs';
-import { LEGACY_SCHOOL_ID, provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 import { provisionPlatformAdministrator } from '../../../packages/domain/src/platform-governance.mjs';
 import { importAcslPaper } from '../../../packages/domain/src/acsl-import.mjs';
 
@@ -41,7 +42,7 @@ test('ACSL platform course migration and directory enforce ownership without los
     await pool.query('INSERT INTO schema_migrations(name) VALUES($1)', [migration]);
     await migrate(pool);
     const password = randomBytes(24).toString('base64url'), passwordHash = await hashPassword(password);
-    await bootstrap(pool, { name: 'Fixture legacy administrator', number: 'ADMIN', username: 'legacy-admin', password });
+    await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji', name: 'Fixture legacy administrator', number: 'ADMIN', username: 'legacy-admin', password });
     const actors = {};
     actors['legacy-admin'] = (await pool.query("SELECT id,identity_id AS \"identityId\" FROM accounts WHERE username='legacy-admin'")).rows[0];
     for (const name of ['legacy-owner', 'legacy-teacher', 'legacy-student', 'legacy-peer', 'platform', 'alpha-admin', 'alpha-teacher', 'alpha-student', 'beta-admin', 'beta-student', 'outsider']) {

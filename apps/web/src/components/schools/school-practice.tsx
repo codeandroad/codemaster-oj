@@ -1,5 +1,6 @@
 "use client";
 
+import { CatalogGroups, SchoolImportHistory } from "./catalog-groups";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useCatalogFilterUrl } from "@/components/use-catalog-filter-preferences";
@@ -200,6 +201,7 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
   />;
   return <div className="space-y-3">
     <Feedback action={action} />
+    {staff && <><CatalogGroups base={base}/><SchoolImportHistory schoolId={schoolId}/></>}
     {staff && <State data={platformSources}>{null}</State>}
     <State data={banks}>{staff ? <State data={problems}>{catalogView}</State> : catalogView}</State>
     <Dialog open={bankEdit !== null} onOpenChange={open => { if (!open && !bankPending.current) setBankEdit(null); }}>

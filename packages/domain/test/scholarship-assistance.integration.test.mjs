@@ -5,7 +5,7 @@ import {createPool,transaction} from '../src/db.mjs';
 import {migrate} from '../src/migrate.mjs';
 import {handleScholarshipAssistance} from '../src/scholarship-assistance.mjs';
 import {postScholarshipEntry,handleScholarshipLedger} from '../src/scholarship-ledger.mjs';
-import {handleEducation} from '../src/education.mjs';
+import {handleEducation} from './fixtures/pre-workspace/education.mjs';
 
 const options={skip:!process.env.TEST_DATABASE_URL,timeout:60000};
 async function fixture(run){

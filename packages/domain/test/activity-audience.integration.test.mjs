@@ -6,7 +6,7 @@ import {createPool} from '../src/db.mjs';
 import {migrate} from '../src/migrate.mjs';
 import {bootstrap} from '../src/bootstrap.mjs';
 import {createApp,loadConfig} from '../src/app.mjs';
-import {canReviewActivitySubmission} from '../src/library.mjs';
+import {canReviewActivitySubmission} from './fixtures/pre-workspace/library.mjs';
 
 // HTTP-level authorization fixture. Candidate code is never executed here;
 // ordinary sandbox execution and grade-worker tests remain separate checks.

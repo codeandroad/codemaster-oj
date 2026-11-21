@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { transaction } from './db.mjs';
-import { auditSchool, LEGACY_SCHOOL_ID, lockSchoolTeaching, requireSchoolAdmin } from './schools.mjs';
+import { auditSchool, lockSchoolTeaching, requireSchoolAdmin } from './schools.mjs';
 import { fail, field, randomToken, safeEqual, tokenHash, uuid } from './security.mjs';
 
 const claimFailed = () => fail(400, 'CLAIM_FAILED', '学校、身份信息或激活码无效，请联系本校管理员');
@@ -14,47 +14,28 @@ export async function activationSchools(db) {
 }
 
 export function activationSchoolSlug(body) {
-  // Compatibility is limited to the original school's existing clients and
-  // tokens. Never search all schools when the client omits the school scope.
-  return body.schoolSlug === undefined ? null : field(body.schoolSlug, '学校', { max: 50 }).toLowerCase();
+  return field(body.schoolSlug, '学校', { max: 50 }).toLowerCase();
 }
 
 export async function verifySchoolIdentity(db, { schoolSlug, kind, number, name, code }) {
   const school = (await db.query(`SELECT id,slug,name,name_zh AS "nameZh",name_en AS "nameEn" FROM schools
-    WHERE slug=$1 OR ($1::text IS NULL AND id=$2)`, [schoolSlug,LEGACY_SCHOOL_ID])).rows[0];
+    WHERE slug=$1`, [schoolSlug])).rows[0];
   if (!school) claimFailed();
   await lockSchoolTeaching(db, school.id);
-  const legacy = school.id === LEGACY_SCHOOL_ID;
-  const identity = legacy
-    ? (await db.query(`SELECT i.* FROM identities i
-        JOIN legacy_school_identity_ownership o ON o.identity_id=i.id
-        WHERE o.school_id=$1 AND i.kind=$2 AND i.number=$3 AND i.archived_at IS NULL
-        FOR UPDATE OF i`, [school.id, kind, number])).rows[0]
-    : (await db.query(`SELECT * FROM school_identities
-        WHERE school_id=$1 AND kind=$2 AND number=$3 AND archived_at IS NULL FOR UPDATE`, [school.id, kind, number])).rows[0];
-  const token = !identity ? null : legacy
-    ? (await db.query(`SELECT * FROM activation_tokens WHERE identity_id=$1
-        AND consumed_at IS NULL AND expires_at>clock_timestamp() FOR UPDATE`, [identity.id])).rows[0]
-    : (await db.query(`SELECT * FROM school_activation_tokens WHERE school_id=$1 AND identity_id=$2
-        AND consumed_at IS NULL AND expires_at>clock_timestamp() FOR UPDATE`, [school.id, identity.id])).rows[0];
-  const claimed = !identity ? false : legacy
-    ? !!(await db.query('SELECT 1 FROM accounts WHERE identity_id=$1 AND binding_released_at IS NULL', [identity.id])).rowCount
-    : identity.account_id !== null;
+  const identity = (await db.query(`SELECT * FROM school_identities WHERE school_id=$1 AND kind=$2 AND number=$3
+    AND archived_at IS NULL FOR UPDATE`, [school.id, kind, number])).rows[0];
+  const token = identity && (await db.query(`SELECT * FROM school_activation_tokens WHERE school_id=$1 AND identity_id=$2
+    AND consumed_at IS NULL AND expires_at>clock_timestamp() FOR UPDATE`, [school.id, identity.id])).rows[0];
+  const claimed = identity?.account_id != null;
   if (!identity || identity.name !== name || !token || claimed || !safeEqual(tokenHash(code), token.token_hash)) claimFailed();
-  if (!legacy) {
-    try { await requireSchoolAdmin(db, school.id, token.issued_by); }
-    catch (error) { if ([401,403,404].includes(error.status)) claimFailed(); throw error; }
-  }
-  return { school, identity, legacy };
+  try { await requireSchoolAdmin(db, school.id, token.issued_by); }
+  catch (error) { if ([401,403,404].includes(error.status)) claimFailed(); throw error; }
+  return { school, identity };
 }
 
 export async function schoolClaimPreview(db, claim) {
-  const { school, identity, legacy } = claim;
-  const classes = legacy
-    ? (await db.query(`SELECT c.name FROM classes c WHERE c.archived_at IS NULL AND
-        (EXISTS(SELECT 1 FROM class_members cm WHERE cm.class_id=c.id AND cm.identity_id=$1)
-         OR EXISTS(SELECT 1 FROM identity_teacher_classes tc WHERE tc.class_id=c.id AND tc.identity_id=$1))`, [identity.id])).rows
-    : (await db.query(`SELECT c.name FROM school_class_roster r JOIN school_classes c
+  const { school, identity } = claim;
+  const classes = (await db.query(`SELECT c.name FROM school_class_roster r JOIN school_classes c
         ON c.school_id=r.school_id AND c.id=r.class_id
         WHERE r.school_id=$1 AND r.identity_id=$2 AND c.archived_at IS NULL ORDER BY c.name,c.id`, [school.id, identity.id])).rows;
   return { school, person: { kind: identity.kind, number: identity.number, name: identity.name, gender: identity.gender ?? null, classes } };

@@ -1,9 +1,10 @@
+import { lockPlatformContent } from './platform-content-access.mjs';
 import { requirePlatformContentEditor, platformContentEditorSql } from './platform-content-access.mjs';
 import { isDeepStrictEqual } from 'node:util';
 import { courseSections, chapterSectionKey, assertChapterSections } from './course-sections.mjs';
 import { randomUUID } from 'node:crypto';
 import { transaction } from './db.mjs';
-import { activeAccount, LEGACY_SCHOOL_ID, lockSchoolTeaching } from './schools.mjs';
+import { activeAccount } from './schools.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
 import { platformAudiencePolicy, platformAudiencePolicyFromRows, platformCourseAudience, savePlatformCourseAudience } from './platform-course-access.mjs';
 import { courseDisplayProperties } from './course-access.mjs';
@@ -20,7 +21,6 @@ async function authorize(db,user) {
  await activeAccount(db,user.id);
 
  await db.query("SELECT set_config('campus.account_id',$1,true)",[user.id]);
- await db.query("SELECT set_config('campus.school_id',$1,true)",[LEGACY_SCHOOL_ID]);
 }
 async function get(db,id,{lock=false}={}) {
  const p=(await db.query(`SELECT p.*,${sourceVersion} source_version FROM learning_paths p
@@ -220,7 +220,7 @@ export async function handlePlatformCourses({pool,user,route,method,body,url}) {
  const match=route.match(/^\/platform\/courses(?:\/([^/]+)(?:\/(publish|unpublish|archive|restore))?)?$/);
  if(!match)return null;
  return transaction(pool,async db=>{
-  await lockSchoolTeaching(db,LEGACY_SCHOOL_ID,{shared:method==='GET'});
+  await lockPlatformContent(db,{shared:method==='GET'});
   await authorize(db,user);
   const admin=await isPlatformAdministrator(db,user.id);
   const courseId=match[1]&& !['audience','acsl-links','problem-options','paper4-options'].includes(match[1])?uuid(match[1]):null;
@@ -263,7 +263,7 @@ export async function handlePlatformCourses({pool,user,route,method,body,url}) {
   }
   if(match[1]&&method==='GET'&&!match[2])return reply(await shape(db,await get(db,match[1]),{detail:true,admin}));
   if(!['POST','PATCH'].includes(method))return null;
-  await lockSchoolTeaching(db,LEGACY_SCHOOL_ID);
+  await lockPlatformContent(db);
   if(!match[1]&&method==='POST'){
    const requestId=uuid(body.requestId,'请求 ID');
    const previous=(await db.query('SELECT p.*,extract(epoch FROM p.updated_at)::text source_version FROM learning_paths p WHERE id=$1',[requestId])).rows[0];

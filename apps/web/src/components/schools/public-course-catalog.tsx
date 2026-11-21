@@ -101,7 +101,7 @@ export function PublicCoursePage({ id, homeHref, workspaceSchoolId }: { id: stri
   const catalogHref = courseSearchHref(homeHref, query);
   return <>
     <Loading resource={entry}>
-      {course?.admission === "direct" ? <CourseReader key={`${id}:${schoolId ?? "legacy"}`} id={id} courseQuery={query} workspaceSchoolId={workspaceSchoolId}/>
+      {course?.admission === "direct" ? <CourseReader key={`${id}:${schoolId ?? "platform"}`} id={id} courseQuery={query} workspaceSchoolId={workspaceSchoolId}/>
         : course && <CourseAdmissionDialog entry={course} onUpdated={setUpdated} onClose={() => router.replace(catalogHref)}/>}
     </Loading>
   </>;
@@ -112,8 +112,8 @@ function CourseReader({ id, courseQuery, workspaceSchoolId }: { id: string; cour
   const localError = useSchoolError();
   const location = useSearchParams(), pathname = usePathname();
   const { language } = useCourseLanguage();
-  const schoolId = location.get("schoolId") ?? "00000000-0000-4000-8000-000000000052";
-  const schoolQuery = location.has("schoolId") ? `?${new URLSearchParams({ schoolId })}` : "";
+  const schoolId = location.get("schoolId") ?? workspaceSchoolId;
+  const schoolQuery = schoolId ? `?${new URLSearchParams({ schoolId })}` : "";
   const course = useData<CourseDetail>(`practice/courses/${encodeURIComponent(id)}${schoolQuery}`);
   useCourseProgressRefresh(course);
   const chapterHref = (chapterId: string) => {
@@ -136,11 +136,11 @@ function CourseReader({ id, courseQuery, workspaceSchoolId }: { id: string; cour
     selectedChapterId={location.get("chapterId")} chapterHref={chapterHref} scrollKey={`public:${id}`}
     metadata={<CourseAccessSummary course={course.data} showAuthor
       accessLabel={[text("Public course", "公开课程"), courseSourceName(course.data)].filter(Boolean).join(" · ")}/>}
-    relatedActivities={course.data.ownerScope === "platform" ? <CoursePracticeReturn schoolId={schoolId}/> : undefined}
+    relatedActivities={schoolId && course.data.ownerScope === "platform" ? <CoursePracticeReturn schoolId={schoolId}/> : undefined}
     extraPractice={chapterId => {
       if (course.data?.ownerScope !== "platform") return null;
       const links = course.data.chapters.find(chapter => chapter.id === chapterId)?.acslLinks ?? [];
-      return links.length ? <CourseAcslPractice links={links} schoolId={schoolId} legacy={schoolId === "00000000-0000-4000-8000-000000000052"}
+      return schoolId && links.length ? <CourseAcslPractice links={links} schoolId={schoolId}
         courseHref={courseLanguageHref(`/practice/courses/${encodeURIComponent(id)}?${new URLSearchParams({ schoolId, chapterId })}`, language)}/> : null;
     }}
     canTrackProgress={course.data.canTrackProgress}

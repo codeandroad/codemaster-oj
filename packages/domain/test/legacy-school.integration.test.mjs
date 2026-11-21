@@ -4,7 +4,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { createPool, transaction } from '../src/db.mjs';
 import { migrate } from '../src/migrate.mjs';
-import { LEGACY_SCHOOL_ID, getLegacySchoolOwnershipSummary, reconcileLegacySchoolOwnership } from '../src/legacy-school.mjs';
+import { LEGACY_SCHOOL_ID, getLegacySchoolOwnershipSummary, reconcileLegacySchoolOwnership } from './fixtures/pre-workspace/legacy-school.mjs';
 
 const roots = ['classes', 'problem_banks', 'learning_paths', 'assignments', 'timed_practices', 'paper4_papers', 'learning_resources'];
 
@@ -80,7 +80,7 @@ test('legacy school ownership upgrades real PostgreSQL without rewriting history
     const originalSettings = (await pool.query('SELECT settings FROM site_settings')).rows[0].settings;
 
     await t.test('upgrade preserves every pre-existing business row and all old FK associations', async () => {
-      await migrate(pool);
+      await migrate(pool,{through:'132_school_activity_grading_context.sql'});
       for (const [table, fingerprint] of Object.entries(before)) {
         const columns=(await pool.query('SELECT column_name FROM information_schema.columns WHERE table_schema=$1 AND table_name=$2',[schema,table])).rows;
         const added=columns.map(row=>row.column_name).filter(column=>!originalColumns.get(table).has(column));
@@ -106,7 +106,7 @@ test('legacy school ownership upgrades real PostgreSQL without rewriting history
     await t.test('repeated migrations and reconciliation do not grant Luq or duplicate ownership', async () => {
       const ledger = await digest('luq_ledger'), balances = await digest('luq_accounts');
       const identities = await digest('legacy_school_identity_ownership'), accounts = await digest('legacy_school_account_ownership');
-      await migrate(pool); await reconcileLegacySchoolOwnership(pool); await reconcileLegacySchoolOwnership(pool);
+      await migrate(pool,{through:'132_school_activity_grading_context.sql'}); await reconcileLegacySchoolOwnership(pool); await reconcileLegacySchoolOwnership(pool);
       assert.deepEqual(await digest('luq_ledger'), ledger); assert.deepEqual(await digest('luq_accounts'), balances);
       assert.deepEqual(await digest('legacy_school_identity_ownership'), identities);
       assert.deepEqual(await digest('legacy_school_account_ownership'), accounts);

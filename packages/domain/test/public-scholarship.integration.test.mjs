@@ -5,7 +5,7 @@ import {randomBytes,randomUUID} from 'node:crypto';
 import {createPool} from '../src/db.mjs';
 import {migrate} from '../src/migrate.mjs';
 import {handleScholarshipLedger} from '../src/scholarship-ledger.mjs';
-import {LEGACY_SCHOOL_ID} from '../src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from './fixtures/pre-workspace/legacy-school.mjs';
 import {schoolPracticeOperation} from '../src/school-practice.mjs';
 import {claimSchoolTask,finishSchoolTask} from '../school-worker.mjs';
 import {seedPublicScholarshipProblem,seedPublicScholarshipLearner} from './helpers/public-scholarship.mjs';

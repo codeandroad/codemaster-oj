@@ -14,7 +14,7 @@ export function LegacyAcslTeacherPage({
   baseHref?: string;
 }) {
   const schools = useWorkspaceData<{ items: School[] }>("schools");
-  const school = schools.data?.items.find((item) => item.legacy);
+  const school = schools.data?.items[0];
   return (
     <Loading resource={schools}>
       {school && (

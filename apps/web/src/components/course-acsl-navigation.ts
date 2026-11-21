@@ -1,5 +1,4 @@
 /** Navigation context is a return address, never proof of course or paper access. */
-const legacySchoolId = "00000000-0000-4000-8000-000000000052";
 const localOrigin = "https://campus.invalid";
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const contextKeys = ["acslFrom", "courseFrom"] as const;
@@ -44,7 +43,7 @@ function safeHref(value: string | null | undefined, schoolId: string, kind: "acs
     result.set("schoolId", schoolId.toLowerCase());
     if (params.has("chapterId")) result.set("chapterId", params.get("chapterId")!);
   } else if (source.pathname === "/schools") {
-    if (schoolId === legacySchoolId || params.get("schoolId")?.toLowerCase() !== schoolId.toLowerCase() ||
+    if (params.get("schoolId")?.toLowerCase() !== schoolId.toLowerCase() ||
         params.get("section") !== (kind === "acsl" ? "acsl" : "courses") ||
         params.has("schoolRole") && params.get("schoolRole") !== "student") return null;
     result.set("schoolId", schoolId.toLowerCase());
@@ -56,7 +55,8 @@ function safeHref(value: string | null | undefined, schoolId: string, kind: "acs
       if (params.has("chapterId")) result.set("chapterId", params.get("chapterId")!);
     }
   } else {
-    if (schoolId.toLowerCase() !== legacySchoolId || params.has("schoolId") && params.get("schoolId")?.toLowerCase() !== legacySchoolId) return null;
+    if (params.has("schoolId") && params.get("schoolId")?.toLowerCase() !== schoolId.toLowerCase()) return null;
+    result.set("schoolId", schoolId.toLowerCase());
     if (kind === "acsl") {
       if (source.pathname !== "/student/acsl") return null;
     } else {

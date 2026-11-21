@@ -5,8 +5,8 @@ import { transaction } from './db.mjs';
 
 const legacyAudienceSql=(alias,account)=>`(${alias}.platform_access_scope='all'
  OR ${alias}.platform_access_scope='students' AND EXISTS(SELECT 1 FROM accounts a WHERE a.id=${account} AND a.identity_id=ANY(${alias}.platform_student_ids))
- OR ${alias}.platform_access_scope='schools' AND (EXISTS(SELECT 1 FROM school_memberships m WHERE m.account_id=${account} AND m.revoked_at IS NULL AND m.school_id=ANY(${alias}.platform_school_ids))
- OR EXISTS(SELECT 1 FROM legacy_school_account_ownership o WHERE o.account_id=${account} AND o.school_id=ANY(${alias}.platform_school_ids))))`;
+ OR ${alias}.platform_access_scope='schools' AND EXISTS(SELECT 1 FROM school_memberships m
+  WHERE m.account_id=${account} AND m.revoked_at IS NULL AND m.school_id=ANY(${alias}.platform_school_ids)))`;
 
 // Candidate audience only. Every content reader must also evaluate admission.
 export function platformCourseAudienceSql(alias,account) {
@@ -14,9 +14,8 @@ export function platformCourseAudienceSql(alias,account) {
   AND ((${alias}.platform_audience_scope='all' AND r.target_kind='all') OR (${alias}.platform_audience_scope='custom' AND r.target_kind<>'all'))
   AND (r.target_kind='all' OR r.target_kind='account' AND EXISTS(SELECT 1 FROM accounts a WHERE a.id=${account} AND a.identity_id=r.identity_id)
    OR r.target_kind='independent' AND NOT EXISTS(SELECT 1 FROM school_memberships m WHERE m.account_id=${account} AND m.revoked_at IS NULL)
-    AND NOT EXISTS(SELECT 1 FROM legacy_school_account_ownership o WHERE o.account_id=${account})
-   OR r.target_kind='school' AND (EXISTS(SELECT 1 FROM school_memberships m WHERE m.account_id=${account} AND m.school_id=r.school_id AND m.revoked_at IS NULL)
-    OR EXISTS(SELECT 1 FROM legacy_school_account_ownership o WHERE o.account_id=${account} AND o.school_id=r.school_id))))
+   OR r.target_kind='school' AND EXISTS(SELECT 1 FROM school_memberships m
+    WHERE m.account_id=${account} AND m.school_id=r.school_id AND m.revoked_at IS NULL)))
   OR NOT EXISTS(SELECT 1 FROM platform_course_rules r WHERE r.course_id=${alias}.id) AND ${legacyAudienceSql(alias,account)})`;
 }
 export async function platformCourseAdmission(db,id,accountId,options) {

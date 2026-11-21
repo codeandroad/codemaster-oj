@@ -195,13 +195,13 @@ function MessageBody({ item, peoplePath }: { item: Message; peoplePath: string }
     .sort((left, right) => left.start - right.start);
   const legacy = item.mentions.filter(mention => !mention.ranges);
   const parts = inline.map(({ id, start, end }, index) => (
-    <span key={start}>{item.body.slice(index > 0 ? inline[index - 1].end : 0, start)}<AppLink className="text-primary hover:underline" href={`${peoplePath}/${encodeURIComponent(id)}`}>
+    <span key={start}>{item.body.slice(index > 0 ? inline[index - 1].end : 0, start)}<AppLink className="text-primary hover:underline" href={`${peoplePath}${peoplePath.endsWith("=") ? "" : "/"}${encodeURIComponent(id)}`}>
       {item.body.slice(start, end)}
     </AppLink></span>
   ));
   return <>
     {!!legacy.length && <p className="mb-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-sm text-primary">
-      {legacy.map(mention => <AppLink key={mention.id} className="break-all hover:underline" href={`${peoplePath}/${encodeURIComponent(mention.id)}`}>@{mention.nickname}</AppLink>)}
+      {legacy.map(mention => <AppLink key={mention.id} className="break-all hover:underline" href={`${peoplePath}${peoplePath.endsWith("=") ? "" : "/"}${encodeURIComponent(mention.id)}`}>@{mention.nickname}</AppLink>)}
     </p>}
     <p className="whitespace-pre-wrap break-words text-sm leading-6">{parts}{item.body.slice(inline.at(-1)?.end ?? 0)}</p>
   </>;
@@ -218,7 +218,7 @@ function MessageRow({ item, base, peoplePath, onReply, onDelete, children }: {
   const like = useMutation();
   const [reaction, setReaction] = useState<{ source: Message; liked: boolean; likeCount: number }>();
   const { liked, likeCount } = reaction?.source === item ? reaction : item;
-  const authorPath = item.author.id ? `${peoplePath}/${encodeURIComponent(item.author.id)}` : null;
+  const authorPath = item.author.id ? `${peoplePath}${peoplePath.endsWith("=") ? "" : "/"}${encodeURIComponent(item.author.id)}` : null;
   const avatar = item.author.avatar
     ? <Image src={item.author.avatar} width={32} height={32} unoptimized alt="" className="size-8 shrink-0 rounded-full object-cover"/>
     : <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-sm font-semibold text-primary">{Array.from(item.author.nickname)[0]}</span>;

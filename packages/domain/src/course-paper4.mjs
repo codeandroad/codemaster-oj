@@ -21,7 +21,7 @@ export async function setChapterPaper4Links(db,chapterId,value){
   const versionId=link.versionId??previous?.version_id??null;
   const row=(await db.query(`SELECT p.id,p.delivery_kind,p.status,p.archived_at,v.id version_id,v.published_at,v.definition,v.runner_cases
    FROM paper4_papers p JOIN paper4_versions v ON v.paper_id=p.id AND v.id=COALESCE($2::uuid,p.current_version_id)
-   WHERE p.id=$1 FOR SHARE OF p,v`,[link.paperId,versionId])).rows[0];
+   WHERE p.id=$1`,[link.paperId,versionId])).rows[0];
   if(!row)fail(409,'UNAVAILABLE_PAPER4_LINK','Paper 4 试卷或已发布版本不存在');
   const pinned={...link,versionId:row.version_id},unchanged=old.some(item=>sameLink(item,pinned));
   const available=row.delivery_kind==='catalog'&&row.status==='published'&&!row.archived_at&&!!row.published_at;
@@ -38,7 +38,7 @@ export async function assertCoursePaper4Ready(db,pathId){
  const rows=(await db.query(`SELECT l.question_key,p.delivery_kind,p.status,p.archived_at,v.published_at,v.definition,v.runner_cases
   FROM chapter_paper4_links l JOIN learning_chapters c ON c.id=l.chapter_id
   JOIN paper4_papers p ON p.id=l.paper_id JOIN paper4_versions v ON v.id=l.version_id AND v.paper_id=p.id
-  WHERE c.path_id=$1 AND c.archived_at IS NULL FOR SHARE OF p,v`,[pathId])).rows;
+  WHERE c.path_id=$1 AND c.archived_at IS NULL`,[pathId])).rows;
  if(rows.some(row=>row.delivery_kind!=='catalog'||row.status!=='published'||row.archived_at||!row.published_at||!row.definition.questions.filter(q=>!row.question_key||q.key===row.question_key).length||!row.definition.questions.filter(q=>!row.question_key||q.key===row.question_key).every(q=>canJudge(q,row.runner_cases))))fail(409,'UNAVAILABLE_PAPER4_LINK','关联的 Paper 4 练习已不可用，请修复引用后发布课程');
 }
 export async function loadCoursePaper4(db,pathIds,identityIds=[]){

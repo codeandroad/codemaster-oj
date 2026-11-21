@@ -1,10 +1,10 @@
-import { notifyLegacyAssignmentAssigned, notifyLegacyAssignmentChange } from './assignment-changes.mjs';
-import { transaction } from './db.mjs';
-import { fail,field,uuid,enumValue,integer } from './security.mjs';
+import { notifyLegacyAssignmentAssigned, notifyLegacyAssignmentChange } from './assignment-notifications.mjs';
+import { transaction } from '../../../src/db.mjs';
+import { fail,field,uuid,enumValue,integer } from '../../../src/security.mjs';
 import {audienceClasses,audienceStudents,defaultClassStudents,replaceAudienceClasses} from './activity-audience.mjs';
-import {getScholarshipSettings} from './scholarship-ledger.mjs';
-import {checkScholarshipRuleVersion,readScholarshipRule,saveScholarshipRule} from './scholarship-rules.mjs';
-import {resolveLiveProblemVersion} from './live-problem-version.mjs';
+import {getScholarshipSettings} from '../../../src/scholarship-ledger.mjs';
+import {checkScholarshipRuleVersion,readScholarshipRule,saveScholarshipRule} from '../../../src/scholarship-rules.mjs';
+import {resolveLiveProblemVersion} from '../../../src/live-problem-version.mjs';
 import {requireAssignmentCourse} from './assignment-courses.mjs';
 const staff=u=>{if(!u.roles.some(r=>['teacher','admin'].includes(r)))fail(403,'FORBIDDEN','需要教师权限');};
 const row=r=>{if(!r.rowCount)fail(404,'NOT_FOUND','资源不存在');return r.rows[0];};

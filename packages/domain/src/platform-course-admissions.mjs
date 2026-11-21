@@ -1,6 +1,6 @@
 import { createHmac, randomInt } from 'node:crypto';
 import { transaction } from './db.mjs';
-import { activeAccount, LEGACY_SCHOOL_ID } from './schools.mjs';
+import { activeAccount } from './schools.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
 import { platformCourseAdmission } from './platform-course-access.mjs';
 import { courseEntry } from './public-course-entry.mjs';
@@ -15,7 +15,7 @@ const codeHash=(secret,courseId,ruleId,generation,code)=>createHmac('sha256',sec
 async function principal(db,user,{platform=false}={}) {
  await activeAccount(db,user.id);
  if(platform&&!await isPlatformAdministrator(db,user.id))fail(403,'PLATFORM_ADMIN_REQUIRED','需要平台管理员权限');
- await db.query("SELECT set_config('campus.account_id',$1,true),set_config('campus.school_id',$2,true)",[user.id,LEGACY_SCHOOL_ID]);
+ await db.query("SELECT set_config('campus.account_id',$1,true)",[user.id]);
 }
 async function course(db,id,{lock=false}={}) {
  const row=(await db.query(`SELECT * FROM learning_paths WHERE id=$1 AND owner_scope='platform' ${lock?'FOR UPDATE':''}`,[uuid(id)])).rows[0];

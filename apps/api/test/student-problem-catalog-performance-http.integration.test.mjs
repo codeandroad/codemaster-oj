@@ -8,7 +8,7 @@ import {migrate} from '../../../packages/domain/src/migrate.mjs';
 import {bootstrap} from '../../../packages/domain/src/bootstrap.mjs';
 import {createDomainServices,loadConfig} from '../../../packages/domain/src/application.mjs';
 import {hashPassword} from '../../../packages/domain/src/security.mjs';
-import {LEGACY_SCHOOL_ID} from '../../../packages/domain/src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 
 // Exercise the lightweight student contract through Nest with real restricted
 // database roles. The older full representation remains the parity reference.
@@ -17,7 +17,7 @@ test('student problem summaries preserve personal progress, publication and acti
  const manager=createPool(base.href),schema='student_problems_'+randomBytes(6).toString('hex');await manager.query(`CREATE SCHEMA ${schema}`);
  const scoped=new URL(base);scoped.searchParams.set('options',`-csearch_path=${schema}`);const owner=createPool(scoped.href);let app,runtime;
  try{
-  await migrate(owner);const password=randomBytes(24).toString('base64url');await bootstrap(owner,{username:'author',password,number:'AUTHOR',name:'Author'});
+  await migrate(owner);const password=randomBytes(24).toString('base64url');await bootstrap(owner,{schoolSlug:'tianxing-chuangshiji',username:'author',password,number:'AUTHOR',name:'Author'});
   const author=(await owner.query("SELECT id FROM accounts WHERE username='author'")).rows[0],users={};const hash=await hashPassword(password);
   for(const name of ['learner','other']){
    const identity=(await owner.query("INSERT INTO identities(kind,number,name) VALUES('student',$1,$1) RETURNING id",[name])).rows[0];

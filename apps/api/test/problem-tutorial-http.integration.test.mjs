@@ -22,7 +22,7 @@ test('problem tutorials allow school teachers to teach with approved shared prob
  try {
   await manager.query(`CREATE SCHEMA ${schema}`);
   await migrate(pool);
-  const adminId = await bootstrap(pool,{name:'Administrator',number:'A1',username:'tutorial-admin',password});
+  const adminId = await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji',name:'Administrator',number:'A1',username:'tutorial-admin',password});
   app = await createApiApplication({ databaseUrl:databaseUrl.href,logger:false,
    config:loadConfig({SESSION_SECRET:randomBytes(32).toString('base64url'),APP_ORIGIN:origin,COOKIE_SECURE:'false'}) });
   await app.listen(0,'127.0.0.1');

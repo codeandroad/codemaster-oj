@@ -1,9 +1,9 @@
-import {readableCourseIds} from './course-access.mjs';
-import {fail,uuid,field} from './security.mjs';
-import {avatarForIdentity} from './avatars.mjs';
+import {readableCourseIds} from '../../../src/course-access.mjs';
+import {fail,uuid,field} from '../../../src/security.mjs';
+import {avatarForIdentity} from '../../../src/avatars.mjs';
 import {PRESENCE_TTL_SECONDS} from './presence.mjs';
 import {LEGACY_SCHOOL_ID} from './legacy-school.mjs';
-import {assignmentProgressById} from './assignment-grades.mjs';
+import {assignmentProgressById} from '../../../src/assignment-grades.mjs';
 const admin=user=>user.roles.includes('admin');
 const staff=user=>user.roles.some(role=>['teacher','admin'].includes(role));
 export async function audienceClasses(db,user,body,old=null,kind='assignment'){

@@ -193,8 +193,7 @@ export function JoinedSchoolSettings({
                           ? text("Clear default", "取消默认")
                           : text("Set default", "设为默认")}
                       </Button>
-                      {school.legacy && [...new Set([...user.roles, ...(user.roles.includes("admin") ? ["teacher" as const] : [])])].length > 1 && <div className="flex flex-wrap items-center gap-1">{[...new Set([...user.roles, ...(user.roles.includes("admin") ? ["teacher" as const] : [])])].map(role => <AppLink key={role} href={role === "student" ? "/" : `/${role}`} onNavigate={() => writeSchoolPreference(user.id, school.id)} className="inline-flex min-h-9 items-center rounded-md px-2 text-xs font-medium text-primary hover:bg-muted">{role === "admin" ? text("Administration", "管理工作区") : role === "teacher" ? text("Teaching", "教学工作区") : text("Learning", "学生工作区")}</AppLink>)}</div>}
-                      {!school.legacy && school.roles.includes("school_admin") && (
+                      {school.roles.includes("school_admin") && (
                         <AppLink
                           href={schoolWorkspaceHref(school.id, "home", "teacher")}
                           className="inline-flex min-h-9 items-center rounded-md px-2 text-xs font-medium text-primary hover:bg-muted"

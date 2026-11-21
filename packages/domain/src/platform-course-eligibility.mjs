@@ -41,8 +41,7 @@ async function identityContext(db,accountId,state) {
   WHERE a.id=$1 AND a.disabled_at IS NULL AND a.binding_released_at IS NULL AND i.archived_at IS NULL`,[accountId])).rows[0];
  if(!state.user)return;
  state.schools=new Map((await db.query(`SELECT s.id,s.name FROM schools s WHERE EXISTS(
-  SELECT 1 FROM school_memberships m WHERE m.school_id=s.id AND m.account_id=$1 AND m.revoked_at IS NULL)
-  OR EXISTS(SELECT 1 FROM legacy_school_account_ownership o WHERE o.school_id=s.id AND o.account_id=$1) ORDER BY s.id`,[accountId])).rows.map(row=>[row.id,row.name]));
+  SELECT 1 FROM school_memberships m WHERE m.school_id=s.id AND m.account_id=$1 AND m.revoked_at IS NULL) ORDER BY s.id`,[accountId])).rows.map(row=>[row.id,row.name]));
  state.admissions=new Map();state.stack=new Set();state.progress=new Map();
 }
 

@@ -2,6 +2,11 @@ import { activeAccount } from './schools.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
 import { fail } from './security.mjs';
 
+export function lockPlatformContent(db, {shared = false} = {}) {
+ const lock = shared ? 'pg_advisory_xact_lock_shared' : 'pg_advisory_xact_lock';
+ return db.query(`SELECT ${lock}(hashtextextended('platform-content',0))`);
+}
+
 export const staffSchoolSql=(account,school)=>`EXISTS(SELECT 1 FROM school_workspace_roles authorized_staff
  WHERE authorized_staff.account_id=${account} AND authorized_staff.school_id=${school}
  AND authorized_staff.role IN ('teacher','school_admin'))`;

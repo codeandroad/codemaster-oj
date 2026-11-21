@@ -1,9 +1,9 @@
-import { paper4QuestionSubmissions } from './problem-submissions.mjs';
-import { transaction } from './db.mjs';
-import { HttpError, fail, field, bytes, uuid, integer } from './security.mjs';
-import { parsePaper4Import } from './paper4-import.mjs';
-import { parsePaper4BatchImport, exportPaper4Collection } from './paper4-collection.mjs';
-import { paper4ExamInput, paper4ShortTitle, paper4ShortTitleInput } from './paper4-catalog.mjs';
+import { paper4QuestionSubmissions } from './paper4-question-history.mjs';
+import { transaction } from '../../../src/db.mjs';
+import { HttpError, fail, field, bytes, uuid, integer } from '../../../src/security.mjs';
+import { parsePaper4Import } from '../../../src/paper4-import.mjs';
+import { parsePaper4BatchImport, exportPaper4Collection } from '../../../src/paper4-collection.mjs';
+import { paper4ExamInput, paper4ShortTitle, paper4ShortTitleInput } from '../../../src/paper4-catalog.mjs';
 import {audienceClasses,audienceStudents,defaultClassStudents,replaceAudienceClasses,activityClasses} from './activity-audience.mjs';
 
 const staff = user => user.roles.includes('teacher') || user.roles.includes('admin');

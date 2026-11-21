@@ -99,7 +99,7 @@ export async function loadTask(pool, task) {
   let submission;
   if (task.purpose !== 'validation') {
     const preview = task.purpose === 'assignment_preview';
-    const source = preview ? 'legacy_assignment_preview_submissions' : 'submissions';
+    const source = preview ? 'assignment_preview_receipts' : 'submissions';
     submission = (await pool.query(`SELECT kind,code,language,custom_input FROM ${source} WHERE id=$1 AND version_id=$2`,
       [preview ? task.preview_submission_id : task.submission_id, task.version_id])).rows[0];
     if (!submission) throw new InfrastructureError('Task submission is missing.');

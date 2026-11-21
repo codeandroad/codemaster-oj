@@ -6,7 +6,8 @@ import { createPool } from '../../../packages/domain/src/db.mjs';
 import { migrate } from '../../../packages/domain/src/migrate.mjs';
 import { bootstrap } from '../../../packages/domain/src/bootstrap.mjs';
 import { loadConfig } from '../../../packages/domain/src/application.mjs';
-import { LEGACY_SCHOOL_ID, provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 
 test('school invitations and management stay within each school on the real Nest API',
   { skip: !process.env.TEST_DATABASE_URL, timeout: 60000 }, async () => {
@@ -20,7 +21,7 @@ test('school invitations and management stay within each school on the real Nest
     let app;
     try {
       await migrate(pool);
-      await bootstrap(pool, { name: 'Legacy admin', number: 'ADM', username: 'legacy-admin', password });
+      await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji', name: 'Legacy admin', number: 'ADM', username: 'legacy-admin', password });
       app = await createApiApplication({
         databaseUrl: url.href, logger: false,
         config: loadConfig({ SESSION_SECRET: randomBytes(32).toString('base64url'), APP_ORIGIN: 'http://schools.test', COOKIE_SECURE: 'false' }),

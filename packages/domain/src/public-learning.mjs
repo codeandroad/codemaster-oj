@@ -5,9 +5,8 @@ import { courseEntry } from './public-course-entry.mjs';
 import { localizedFields, publicChapterLocalizations } from './course-localizations.mjs';
 import { projectCourseAcslLinks, acslLinkCounts, requireCourseAcslSchool } from './course-acsl.mjs';
 import { transaction } from './db.mjs';
-import { activeAccount, auditSchool, LEGACY_SCHOOL_ID, lockSchoolTeaching, requireSchoolAdmin } from './schools.mjs';
+import { activeAccount, auditSchool, lockSchoolTeaching, requireSchoolAdmin } from './schools.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
-import { legacyCourseCandidate, legacyCourseIsLive, legacyCourseReviewCandidates, legacyCourseSourceVersion, legacyDirectAccess, legacyEdition, requireLegacyCourseAdmin, snapshotLegacyCourse } from './legacy-public-course.mjs';
 import { publicChapterProblems } from './platform-course-progress.mjs';
 import { canonicalHash, enumValue, fail, integer, uuid } from './security.mjs';
 import { handlePlatformCourses } from './platform-courses.mjs';
@@ -32,7 +31,6 @@ async function edition(db, listing, { detail = false, lock = false, progress = f
   await setSchool(db, listing.school_id);
   if(listing.platform_owned&&progress)return platformCourseProgressEdition(db,listing,{contentHashChapterIds});
   if(listing.platform_owned)return platformCourseEdition(db,listing,{detail,lock});
-  if (listing.school_id === LEGACY_SCHOOL_ID) return legacyEdition(db, listing, { detail, lock });
   return (await db.query(`SELECT p.title, p.description, p.revision, p.access_scope, p.properties->'localizations' AS localizations,p.properties->'sections' AS sections,
       p.required_language,p.language_credit_cutoffs,s.name school_name,
       p.properties->>'category' category, p.properties->>'difficulty' difficulty, p.properties->>'coverKey' cover_key,
@@ -58,9 +56,7 @@ async function activeListing(db, id, { includeWithdrawn = false } = {}) {
 async function admissionFor(db, listing, course, accountId, options) {
   if(listing.platform_owned){const access=await platformCourseAdmission(db,listing.course_id,accountId,options);course.admissionRules=access.admissionRules;return access.admission;}
   if (listing.access_mode === 'direct') return 'direct';
-  const eligible = listing.school_id === LEGACY_SCHOOL_ID
-    ? await legacyDirectAccess(db, listing, course.access_scope, accountId)
-    : (await db.query(`SELECT 1 FROM school_memberships m
+  const eligible = (await db.query(`SELECT 1 FROM school_memberships m
     WHERE m.school_id=$1 AND m.account_id=$2 AND m.revoked_at IS NULL
       AND ($3='school' OR EXISTS (
         SELECT 1 FROM school_course_publication_classes pc
@@ -116,7 +112,7 @@ async function catalogue(pool, user, url) {
   return transaction(pool, async db => {
     await context(db, user);
     const acslSchoolId=url?.searchParams.has('schoolId')
-      ?await requireCourseAcslSchool(db,uuid(url.searchParams.get('schoolId'),'学校 ID'),user):LEGACY_SCHOOL_ID;
+      ?await requireCourseAcslSchool(db,uuid(url.searchParams.get('schoolId'),'学校 ID'),user):user.teachingSchoolId??null;
     const { rows } = await db.query(`SELECT l.* FROM public_course_listings l WHERE withdrawn_at IS NULL
       AND NOT EXISTS(SELECT 1 FROM learning_paths p WHERE p.id=l.course_id AND p.owner_scope='platform') ORDER BY approved_at DESC,id`);
     rows.unshift(...await platformCourseListings(db));
@@ -184,7 +180,7 @@ async function publicCourse({ pool, user, method, body, url }, match) {
     const course = listing && await edition(db, listing, { lock: true });
     if (!course) fail(404, 'NOT_FOUND', '公开课程不存在或已撤回');
 
-    let acslSchoolId=listing.platform_owned?LEGACY_SCHOOL_ID:listing.school_id;
+    let acslSchoolId=listing.platform_owned?(user.teachingSchoolId??null):listing.school_id;
     if(url?.searchParams.has('schoolId')){
       acslSchoolId=await requireCourseAcslSchool(db,uuid(url.searchParams.get('schoolId'),'学校 ID'),user);
       if(!listing.platform_owned&&acslSchoolId!==listing.school_id)
@@ -263,21 +259,15 @@ async function publishListing(db, schoolId, courseId, revision, actorId, mode) {
 
 // The admission queue and notification inbox only link to a live application edition.
 export const currentCourseAdmissionsJoin = `JOIN LATERAL (
-    SELECT v.title FROM legacy_course_publication_versions v
-    JOIN learning_paths p ON p.school_id=v.school_id AND p.id=v.course_id
-    WHERE v.school_id=l.school_id AND v.course_id=l.course_id AND v.revision=l.legacy_revision
-      AND p.owner_scope='school' AND (${legacyCourseIsLive}) AND v.source_version=${legacyCourseSourceVersion}
-    UNION ALL
     SELECT p.title FROM school_courses c
     JOIN school_course_publications p ON p.school_id=c.school_id AND p.course_id=c.id AND p.revision=c.published_revision
-    WHERE c.school_id=l.school_id AND c.id=l.course_id AND p.revision=l.school_revision
+    WHERE c.school_id=l.school_id AND c.id=l.course_id AND p.revision=l.revision
       AND c.published AND c.archived_at IS NULL
   ) course ON l.access_mode='application' AND l.withdrawn_at IS NULL`;
 
 async function requireCourseAdmissionsAdmin(db, schoolId, accountId, shared) {
   await lockSchoolTeaching(db, schoolId, { shared });
-  if (schoolId === LEGACY_SCHOOL_ID) await requireLegacyCourseAdmin(db, accountId);
-  else await requireSchoolAdmin(db, schoolId, accountId);
+  await requireSchoolAdmin(db, schoolId, accountId);
   await setSchool(db, schoolId);
   await db.query("SELECT set_config('campus.course_admission_school_id',$1,true)", [schoolId]);
 }
@@ -306,10 +296,7 @@ async function schoolAdmissions({ pool, user, method, body, url }, match) {
   const courseId = uuid(match[2], '课程 ID');
   return transaction(pool, async db => {
     await requireCourseAdmissionsAdmin(db, schoolId, user.id, method === 'GET');
-    const legacy = schoolId === LEGACY_SCHOOL_ID;
-    const course = legacy
-      ? await legacyCourseCandidate(db, courseId, { lock: true })
-      : (await db.query(`SELECT c.published_revision,c.archived_at,c.published,COALESCE(p.title,c.title) title,p.access_scope
+    const course = (await db.query(`SELECT c.published_revision,c.archived_at,c.published,COALESCE(p.title,c.title) title,p.access_scope
       FROM school_courses c LEFT JOIN school_course_publications p
         ON p.school_id=c.school_id AND p.course_id=c.id AND p.revision=c.published_revision
       WHERE c.school_id=$1 AND c.id=$2`, [schoolId, courseId])).rows[0];
@@ -335,7 +322,6 @@ async function schoolAdmissions({ pool, user, method, body, url }, match) {
       return respond({
         courseTitle: course.title,
         revision: live ? course.published_revision : null,
-        ...(legacy && { sourceVersion: course.source_version }),
         accessScope: course.access_scope ?? null,
         mode: current ? listing.access_mode : null,
         applications: rows.slice(0, reviewPageSize),
@@ -343,13 +329,11 @@ async function schoolAdmissions({ pool, user, method, body, url }, match) {
         hasMore: rows.length > reviewPageSize,
       });
     }
-    if (!live || body.expectedRevision !== course.published_revision
-      || (legacy && body.sourceVersion !== course.source_version)) {
+    if (!live || body.expectedRevision !== course.published_revision) {
       fail(409, 'REVISION_CONFLICT', '课程版本已更新，请刷新');
     }
     if (method === 'POST' && !match[3]) {
       if (current && listing.access_mode === 'direct') fail(409, 'ALREADY_PUBLIC', '此课程已由平台公开');
-      if (legacy) await snapshotLegacyCourse(db, course);
       const published = await publishListing(db, schoolId, courseId, course.published_revision, user.id, 'application');
       if (!current) await auditSchool(db, schoolId, user.id, 'school.course.admissions.open', courseId);
       return respond({ id: published.id, mode: 'application' }, 201);
@@ -391,9 +375,7 @@ async function platformPublications({ pool, user, method, body }) {
       const items = [];
       for (const school of schools) {
         await setSchool(db, school.id);
-        const rows = school.id === LEGACY_SCHOOL_ID
-          ? await legacyCourseReviewCandidates(db)
-          : (await db.query(`SELECT c.id,c.published_revision,p.title,p.description,p.required_language,p.properties->'sections' AS sections,
+        const rows = (await db.query(`SELECT c.id,c.published_revision,p.title,p.description,p.required_language,p.properties->'sections' AS sections,
             CASE WHEN p.access_scope='school' THEN p.chapters ELSE '[]'::jsonb END chapters,
             p.access_scope, jsonb_array_length(p.chapters) chapter_count,
             l.id listing_id,l.revision approved_revision,l.withdrawn_at,l.access_mode
@@ -427,20 +409,8 @@ async function platformPublications({ pool, user, method, body }) {
     const revision = integer(body.revision, 1, 2147483647, '版本');
     await lockSchoolTeaching(db, schoolId);
     await context(db, user, { platform: true });
-    if (schoolId === LEGACY_SCHOOL_ID) {
-      await setSchool(db, schoolId);
-      const source = await legacyCourseCandidate(db, courseId, { lock: true });
-      if (!source?.published || source.access_scope !== 'school') {
-        fail(409, 'NOT_PUBLISHED', '请先在学校发布这个版本的全校课程');
-      }
-      if (source.published_revision !== revision || source.source_version !== body.sourceVersion) {
-        fail(409, 'REVISION_CONFLICT', '课程版本已更新，请刷新');
-      }
-      await snapshotLegacyCourse(db, source);
-    } else {
       const source = await edition(db, { school_id: schoolId, course_id: courseId, revision, access_mode: 'direct' });
       if (!source) fail(409, 'NOT_PUBLISHED', '请先在学校发布这个版本的全校课程');
-    }
     const listing = await publishListing(db, schoolId, courseId, revision, user.id, 'direct');
     await db.query("INSERT INTO platform_audit_events(actor_account_id,action,school_id,detail) VALUES($1,'public.course.approved',$2,$3)",
       [user.id, schoolId, { courseId, revision, listingId: listing.id }]);

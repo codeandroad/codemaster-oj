@@ -9,7 +9,8 @@ import { migrate } from '../../../packages/domain/src/migrate.mjs';
 import { bootstrap } from '../../../packages/domain/src/bootstrap.mjs';
 import { loadConfig } from '../../../packages/domain/src/application.mjs';
 import { hashPassword } from '../../../packages/domain/src/security.mjs';
-import { LEGACY_SCHOOL_ID, provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 import { provisionPlatformAdministrator } from '../../../packages/domain/src/platform-governance.mjs';
 import { importAcslPaper } from '../../../packages/domain/src/acsl-import.mjs';
 
@@ -46,7 +47,7 @@ async function fixture() {
     await owner.query('CREATE TABLE schema_migrations(name text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');
     await owner.query('INSERT INTO schema_migrations(name) SELECT unnest($1::text[])', [migrations]);
     await migrate(owner);
-    await bootstrap(owner, { name: 'Fixture legacy admin', number: 'ADMIN', username: 'legacy-admin', password });
+    await bootstrap(owner,{schoolSlug:'tianxing-chuangshiji', name: 'Fixture legacy admin', number: 'ADMIN', username: 'legacy-admin', password });
     const actors = {};
     actors['legacy-admin'] = (await owner.query("SELECT id,identity_id AS \"identityId\" FROM accounts WHERE username='legacy-admin'")).rows[0];
     const hash = await hashPassword(password);

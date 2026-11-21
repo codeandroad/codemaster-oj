@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createPool } from '../src/db.mjs';
 import { migrate } from '../src/migrate.mjs';
-import { handlePaper4 } from '../src/paper4.mjs';
-import { handleEducation } from '../src/education.mjs';
+import { handlePaper4 } from './fixtures/pre-workspace/paper4.mjs';
+import { handleEducation } from './fixtures/pre-workspace/education.mjs';
 import { handleCommunity } from '../src/community.mjs';
 import { completePaper4Task } from '../paper4-worker.mjs';
 

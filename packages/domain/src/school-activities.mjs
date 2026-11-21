@@ -108,7 +108,7 @@ function canSubmitActivityWork(a, attempt, now = Date.now()) {
     Boolean(attempt && (!attempt.deadlineAt || now < +new Date(attempt.deadlineAt))));
 }
 async function problems(db, a) {
-  return (await db.query(`SELECT p.problem_id AS id,p.version_id AS "versionId",p.position,p.points,
+  return (await db.query(`SELECT p.problem_id AS id,p.version_id AS "versionId",p.position,p.points,p.reward_points AS "rewardPoints",
     v.definition->>'title' AS title FROM school_activity_problems p
     JOIN school_problem_versions v ON v.school_id=p.school_id AND v.problem_id=p.problem_id AND v.id=p.version_id
     WHERE p.school_id=$1 AND p.activity_id=$2 ORDER BY p.position,p.problem_id`, [a.school_id, a.id])).rows;
@@ -177,6 +177,7 @@ async function detail(db, loaded, user) {
   const now = Date.now(), attemptView = publicAttempt(ownAttempt);
   return { id: a.id, schoolId: a.school_id, kind: a.kind, title: a.title, description: a.description,
     state: a.state, phase: phase(personalActivity, now), cancelledAt: a.cancelled_at, revision: a.revision, startsAt: a.starts_at, endsAt: effectiveEnd(personalActivity), durationMinutes: a.duration_minutes,
+    courseId:a.school_course_id??a.platform_course_id??null,courseScope:a.school_course_id?'school':a.platform_course_id?'platform':null,
     publishedAt: a.published_at, resultsPublishedAt: a.results_published_at, canManage,
     canPreview: canManage && canPreview(a) && items.length > 0, participantCount, problems: items,
     attempt: attemptView, canSubmit: Boolean(student) && canSubmitActivityWork(personalActivity, attemptView, now), grade, progress,
@@ -320,7 +321,8 @@ async function assignmentPreview(db, { a, user, method, action, id, submissions,
   if (!action) return reply({
     id: a.id, schoolId: a.school_id, kind: a.kind, title: a.title, description: a.description,
     state: a.state, phase: 'Open', revision: a.revision, startsAt: a.starts_at, endsAt: a.ends_at,
-    durationMinutes: null, publishedAt: a.published_at, resultsPublishedAt: null, canManage: false,
+    durationMinutes: null, courseId:a.school_course_id??a.platform_course_id??null,courseScope:a.school_course_id?'school':a.platform_course_id?'platform':null,
+    publishedAt: a.published_at, resultsPublishedAt: null, canManage: false,
     participantCount: 0, problems: entries, attempt: null, grade, preview: true,
   });
   const solved = Boolean(grade.items.find(item => item.id === problemId)?.solved);
@@ -504,7 +506,8 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
         WHERE p.school_id=$1 AND p.activity_id=$2 ORDER BY i.name,i.number,i.id`, [schoolId, a.id, a.ends_at])).rows;
       const items = [];
       for (const row of rows) items.push({ ...row, attempt: publicAttempt(await attempt(db, a, row.id)), grade: a.results_published_at ? (await db.query('SELECT grade FROM school_activity_results WHERE school_id=$1 AND activity_id=$2 AND identity_id=$3', [schoolId, a.id, row.id])).rows[0]?.grade : await calculateSchoolActivityGrade(db, a, row.id) });
-      return reply({ activity: await detail(db, loaded, user), items });
+      const revisions=(await db.query('SELECT id,revision,reason,created_at AS "createdAt",grades FROM school_activity_result_revisions WHERE school_id=$1 AND activity_id=$2 ORDER BY revision DESC',[schoolId,a.id])).rows;
+      return reply({ activity: await detail(db, loaded, user), items,revisions });
     } else if (action === 'problems' && match[4]) {
       const problemId = uuid(match[4]);
       if (match[5] === 'submissions' && method === 'POST') return reply(await enqueueActivity(db, loaded, problemId, user, body), 202);

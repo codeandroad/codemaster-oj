@@ -1,4 +1,4 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import {handleEducation} from '../src/education.mjs';
+import {test} from 'node:test';import assert from 'node:assert/strict';import {handleEducation} from './fixtures/pre-workspace/education.mjs';
 const id='11111111-1111-4111-8111-111111111111';
 function context(roles,body={problemId:id,points:30}){const calls=[];const query=async(sql,args)=>{calls.push(sql);return {rowCount:1,rows:[{owner_account_id:id}]};};return {calls,ctx:{route:'/points/rewards',method:'POST',body,user:{id,identityId:id,roles},pool:{query,connect:async()=>({query,release(){}})},helpers:{versionAccess:async()=>({owner:true}),audit:async()=>{}},url:new URL('https://example.test')}};}
 test('students cannot configure point awards',async()=>{const {ctx,calls}=context(['student']);await assert.rejects(handleEducation(ctx),e=>e.status===403);assert.equal(calls.length,0);});

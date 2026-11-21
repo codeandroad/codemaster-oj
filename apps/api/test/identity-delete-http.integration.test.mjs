@@ -16,7 +16,7 @@ test('identity deletion is admin-only, recoverable, atomic and serialized with a
  try{
   await migrate(pool);
   const adminPassword=randomBytes(24).toString('base64url');
-  await bootstrap(pool,{name:'QA administrator',number:'ADMIN',username:'delete-admin',password:adminPassword});
+  await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji',name:'QA administrator',number:'ADMIN',username:'delete-admin',password:adminPassword});
   app=await createApiApplication({databaseUrl:connection.toString(),logger:false,
    config:loadConfig({SESSION_SECRET:randomBytes(32).toString('base64url'),APP_ORIGIN:'http://school.test',COOKIE_SECURE:'false'})});
   await app.listen(0,'127.0.0.1');const base=await app.getUrl();

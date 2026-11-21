@@ -1,5 +1,5 @@
 import { transaction } from './db.mjs';
-import { activeAccount, LEGACY_SCHOOL_ID, lockSchoolTeaching, schoolRole } from './schools.mjs';
+import { lockSchoolTeaching, schoolRole } from './schools.mjs';
 import { bytes, canonicalHash, enumValue, fail, integer, uuid } from './security.mjs';
 import { gradeAnswer, paperAssetPurposes, selectedOptions } from './acsl-grading.mjs';
 import { validateTask } from '../judge.mjs';
@@ -14,14 +14,7 @@ const reply = (body, status = 200) => ({ status, body });
 
 async function access(db, schoolId, user) {
   await lockSchoolTeaching(db, schoolId, { shared: true });
-  if (schoolId === LEGACY_SCHOOL_ID) {
-    await activeAccount(db, user.id);
-    if (!(await db.query('SELECT 1 FROM legacy_school_account_ownership WHERE account_id=$1', [user.id])).rowCount) {
-      fail(404, 'NOT_FOUND', 'School workspace is unavailable.');
-    }
-  } else {
-    await schoolRole(db, schoolId, user.id);
-  }
+  await schoolRole(db, schoolId, user.id);
   await db.query("SELECT set_config('campus.school_id',$1,true)", [schoolId]);
 }
 
@@ -85,13 +78,10 @@ async function codingProgress(db, paper, accountId) {
   if (!paper.programming_problem_id) return { attempts: 0, solved: false };
   return (await db.query(`SELECT count(*)::integer attempts, coalesce(bool_or(state='completed' AND result->>'status'='AC'),false) solved,
     (SELECT award.points FROM acsl_point_awards award
-      JOIN accounts actor ON actor.identity_id=award.identity_id AND actor.id=$4
-      JOIN identities person ON person.id=actor.identity_id AND person.kind='student' AND person.archived_at IS NULL
-      JOIN legacy_school_account_ownership membership ON membership.account_id=actor.id AND membership.school_id=award.school_id
-      JOIN legacy_school_identity_ownership ownership ON ownership.identity_id=person.id AND ownership.school_id=award.school_id
-      WHERE award.school_id=$1 AND award.paper_id=$5 AND award.version_id=$6 AND award.section='programming'
-        AND actor.disabled_at IS NULL AND actor.binding_released_at IS NULL
-        AND EXISTS(SELECT 1 FROM account_roles role WHERE role.account_id=actor.id AND role.role='student')) AS "pointsAwarded"
+      JOIN school_identities person ON (person.school_id,person.id)=(award.school_id,award.identity_id)
+      JOIN school_memberships member ON (member.school_id,member.account_id)=(person.school_id,person.account_id)
+       AND member.role='student' AND member.revoked_at IS NULL
+      WHERE person.account_id=$4 AND person.archived_at IS NULL AND award.school_id=$1 AND award.paper_id=$5 AND award.version_id=$6 AND award.section='programming') AS "pointsAwarded"
     FROM school_judge_jobs WHERE school_id=$1 AND problem_id=$2 AND version_id=ANY($3::uuid[]) AND account_id=$4 AND access_context='acsl' AND kind='submit'`,
     [paper.school_id, paper.programming_problem_id, await programmingVersions(db, paper), accountId, paper.id, paper.version_id])).rows[0];
 }

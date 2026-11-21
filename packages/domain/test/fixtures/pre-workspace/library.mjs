@@ -1,13 +1,13 @@
-import { canEditPlatformContent, platformContentEditorSql } from './platform-content-access.mjs';
-import { isPlatformAdministrator } from './platform-governance.mjs';
+import { canEditPlatformContent, platformContentEditorSql } from '../../../src/platform-content-access.mjs';
+import { isPlatformAdministrator } from '../../../src/platform-governance.mjs';
 import {changeGroupMembers} from './group-move.mjs';
-import { assertJudgeAdmission } from './system.mjs';
-import { transaction } from './db.mjs';
-import { fail, field, uuid, enumValue, canonicalHash } from './security.mjs';
-import { handleProblemTutorial } from './problem-tutorials.mjs';
-import { legacyProblemStatement } from './problem-statement-display.mjs';
-import { liveProblemVersionIdSql } from './live-problem-version.mjs';
-import { publishProblemDraft, requireDraftRevision } from './problem-editor-drafts.mjs';
+import { assertJudgeAdmission } from '../../../src/system.mjs';
+import { transaction } from '../../../src/db.mjs';
+import { fail, field, uuid, enumValue, canonicalHash } from '../../../src/security.mjs';
+import { handleProblemTutorial } from '../../../src/problem-tutorials.mjs';
+import { legacyProblemStatement } from '../../../src/problem-statement-display.mjs';
+import { liveProblemVersionIdSql } from '../../../src/live-problem-version.mjs';
+import { publishProblemDraft, requireDraftRevision } from '../../../src/problem-editor-drafts.mjs';
 
 export async function canReviewActivitySubmission(db,user,submission,{readOnly=false}={}){
  if(submission.original_submission_id&&!submission.assignment_id&&!submission.timed_attempt_id){

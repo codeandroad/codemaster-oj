@@ -26,7 +26,7 @@ async function paper(db,s,id,user,role,{manage=false}={}){
 }
 async function version(db,s,id){const v=(await db.query('SELECT * FROM school_paper4_versions WHERE school_id=$1 AND id=$2',[s,id])).rows[0];if(!v)fail(404,'NOT_FOUND','Paper version not found.');return v;}
 async function frozen(db,p){return(await db.query('INSERT INTO school_paper4_versions(school_id,paper_id,draft_revision,content) VALUES($1,$2,$3,$4) ON CONFLICT(school_id,paper_id,draft_revision) DO NOTHING RETURNING *',[p.school_id,p.id,p.revision,JSON.stringify(p.draft)])).rows[0]??(await db.query('SELECT * FROM school_paper4_versions WHERE school_id=$1 AND paper_id=$2 AND draft_revision=$3',[p.school_id,p.id,p.revision])).rows[0];}
-async function validation(db,s,v){if(!v)return null;const j=(await db.query("SELECT id,state,result->>'status' status FROM school_paper4_jobs WHERE school_id=$1 AND version_id=$2 AND kind='validation' ORDER BY created_at DESC,id DESC LIMIT 1",[s,v.id])).rows[0];return j??null;}
+async function validation(db,s,v){if(!v)return null;const j=(await db.query("SELECT id,state,result->>'status' status FROM school_paper4_jobs WHERE school_id=$1 AND version_id=$2 AND kind='validation' AND stage_key IS NULL ORDER BY created_at DESC,id DESC LIMIT 1",[s,v.id])).rows[0];return j??null;}
 async function paperView(db,p,user,role,detail=false){
  const manage=managed(p,user,role),v=p.published_version_id?await version(db,p.school_id,p.published_version_id):null;
  const c=manage?p.draft:v?.content;if(!c)fail(404,'NOT_FOUND','Paper is unavailable.');

@@ -1,7 +1,6 @@
 import { problemProgress } from './problem-progress.mjs';
-import { LEGACY_SCHOOL_ID, lockWorkspaceMembership } from './schools.mjs';
+import { lockWorkspaceMembership } from './schools.mjs';
 import { schoolActivityJobVisibleSql } from './school-activities.mjs';
-import { assertLiveProblemVersion, resolveLiveProblemVersion } from './live-problem-version.mjs';
 import { enumValue, integer, uuid, fail } from './security.mjs';
 import { submissionMeasurements, submissionMeasurementsSql } from './submission-feedback.mjs';
 
@@ -37,12 +36,6 @@ export async function metadataPage(db, source, params, url, { schoolProgress = f
   page,pageSize,total:summary.total,hasMore:page*pageSize<summary.total,solved:summary.solved};
 }
 
-const legacySubmissionScope=`FROM submissions s
- LEFT JOIN timed_attempts ta ON ta.id=s.timed_attempt_id
- LEFT JOIN timed_practices tp ON tp.id=ta.practice_id
- WHERE s.problem_id=$1 AND s.school_id=$6 AND s.kind='submit'
- AND (s.timed_attempt_id IS NULL OR tp.results_published_at IS NOT NULL)`;
-
 const confirmedMeasurementsJoin = `LEFT JOIN LATERAL (
  SELECT r.private_results FROM judge_runs r JOIN judge_tasks t ON t.id=r.task_id
  WHERE r.submission_id=s.id AND r.id IS DISTINCT FROM s.pending_judge_run_id
@@ -66,78 +59,6 @@ const ordinarySchoolReceipts = `SELECT 'SUB'||s.id::text id,lpad(s.id::text,20,'
  ${confirmedMeasurementsJoin}
  WHERE s.school_id=$8 AND s.problem_id=$2 AND s.kind='submit' AND s.assignment_id IS NULL AND s.timed_attempt_id IS NULL
  AND s.original_submission_id IS NULL`;
-
-export async function legacyProblemSolved(db,user,problemId,versionId) {
- return (await problemProgress(db,user,[problemId],{schoolId:LEGACY_SCHOOL_ID})).get(problemId)?.solved??false;
-}
-
-export async function legacyProblemSubmissions(db,user,problemId,url,helpers,platformSchoolId=null) {
- const assignmentId=url.searchParams.get('assignmentId'),practiceId=url.searchParams.get('timedPracticeId');
- if(assignmentId&&practiceId)fail(400,'VALIDATION','Choose one activity context.');
- let versionId=url.searchParams.get('versionId');
- if(assignmentId){
-  await db.query('SELECT id FROM assignments WHERE id=$1 FOR SHARE',[uuid(assignmentId)]);
-  await helpers.assignmentAccess(db,user,assignmentId);
-  const pin=(await db.query('SELECT version_id,prior_version_id FROM assignment_problems WHERE assignment_id=$1 AND problem_id=$2',[assignmentId,uuid(problemId)])).rows[0];
-  if(!pin)fail(404,'NOT_FOUND','Problem is not in this assignment.');
-  const live=await resolveLiveProblemVersion(db,problemId,{allowArchived:true});
-  assertLiveProblemVersion(versionId&&uuid(versionId),live.id);
-  versionId=live.id;
- }
- if(practiceId){
-  const practice=(await db.query(`SELECT p.* FROM timed_practices p WHERE p.id=$1 AND
-   ($3::boolean OR p.owner_account_id=$4 OR p.state IN ('Published','ResultsPublished','Archived') AND EXISTS(
-    SELECT 1 FROM timed_practice_participants part WHERE part.practice_id=p.id AND part.identity_id=$2 AND NOT part.exempt)) FOR SHARE`,
-  [uuid(practiceId),user.identityId,user.roles.includes('admin'),user.id])).rows[0];
-  if(!practice)fail(404,'NOT_FOUND','Practice is unavailable.');
-  const pin=(await db.query('SELECT version_id FROM timed_practice_problems WHERE practice_id=$1 AND problem_id=$2',[practiceId,uuid(problemId)])).rows[0];
-  if(!pin)fail(404,'NOT_FOUND','Problem is not in this practice.');
-  const live=await resolveLiveProblemVersion(db,problemId,{allowArchived:true});
-  assertLiveProblemVersion(versionId&&uuid(versionId),live.id);
-  versionId=live.id;
- }
- // Keep publication/archive visibility coherent while collecting metadata.
- await db.query('SELECT id FROM problems WHERE id=$1 FOR SHARE',[uuid(problemId)]);
- await db.query('SELECT b.id FROM problem_banks b JOIN problems p ON p.bank_id=b.id WHERE p.id=$1 FOR SHARE OF b',[problemId]);
- await db.query('SELECT id FROM problem_versions WHERE problem_id=$1 FOR SHARE',[problemId]);
- const {p,v,permissions}=await helpers.versionAccess(db,user,problemId,versionId);
- // The editor reads private source separately from the paginated metadata.
- if(url.searchParams.get('view')==='resume'){
-  const {rows}=await db.query(`SELECT s.code,COALESCE(s.language,'python') language
-   FROM submissions s
-   LEFT JOIN timed_attempts ta ON ta.id=s.timed_attempt_id
-   LEFT JOIN timed_practices tp ON tp.id=ta.practice_id
-   WHERE s.problem_id=$1 AND s.identity_id=$2 AND s.school_id=$4 AND s.kind='submit'
-    AND CASE WHEN $3::uuid IS NOT NULL THEN tp.id=$3
-     ELSE s.timed_attempt_id IS NULL OR tp.results_published_at IS NOT NULL END
-   ORDER BY s.created_at DESC,s.id DESC LIMIT 1`,[p.id,user.identityId,practiceId,user.teachingSchoolId]);
-  return {submission:rows[0]??null};
- }
- const bank=(await db.query('SELECT visibility,archived_at FROM problem_banks WHERE id=$1',[p.bank_id])).rows[0];
- const schoolVisible=!!v.published_at&&!!v.school_visible_at&&bank?.visibility==='school'&&!bank.archived_at&&!p.archived_at;
- const values=[problemId,user.identityId,permissions.canEdit,user.id,schoolVisible,user.teachingSchoolId];
- let platformHistory='';
- if(platformSchoolId) {
-  values.push(platformSchoolId);
-  platformHistory=`UNION ALL SELECT j.id::text,j.id::text,a.identity_id,j.created_at,COALESCE(j.payload->>'language','python'),
-   ${jobVerdict},j.account_id=$4,CASE WHEN j.state='completed' THEN j.result->'privateResults' END,
-   COALESCE(NULLIF(btrim(a.nickname),''),a.username)
-   FROM school_judge_jobs j JOIN accounts a ON a.id=j.account_id
-   WHERE j.school_id=$7 AND j.problem_id=$1 AND j.access_context='public' AND j.kind='submit' AND j.activity_id IS NULL`;
- }
- const page=await metadataPage(db,`SELECT 'SUB'||s.id::text id,lpad(s.id::text,20,'0') received_id,s.identity_id actor_key,s.created_at,COALESCE(s.language,'python') language,s.status,s.identity_id=$2 is_own,r.private_results,
-  COALESCE(CASE WHEN profile.leaderboard_use_nickname THEN NULLIF(btrim(profile.nickname),'') END,NULLIF(btrim(person.name),''),'Student') display_name
-  FROM (SELECT s.* ${legacySubmissionScope}
-   AND ($3::boolean OR ($5::boolean AND EXISTS(SELECT 1 FROM problem_versions public_version
-    WHERE public_version.id=s.version_id AND public_version.published_at IS NOT NULL AND public_version.school_visible_at IS NOT NULL)) OR s.identity_id=$2 OR
-   s.assignment_id IS NOT NULL AND EXISTS(SELECT 1 FROM assignments a WHERE a.id=s.assignment_id AND
-    (a.owner_account_id=$4 OR a.state='Published' AND EXISTS(SELECT 1 FROM assignment_participants ap WHERE ap.assignment_id=a.id AND ap.identity_id=$2 AND NOT ap.exempt))) OR
-   tp.results_published_at IS NOT NULL AND EXISTS(SELECT 1 FROM timed_practice_participants part WHERE part.practice_id=tp.id AND part.identity_id=$2 AND NOT part.exempt))) s
-  JOIN identities person ON person.id=s.identity_id
-  LEFT JOIN accounts profile ON profile.identity_id=person.id AND profile.binding_released_at IS NULL
-  ${confirmedMeasurementsJoin} ${platformHistory}`,values,url);
- return {...page,...(platformSchoolId && {platformSchoolId}),solved:await legacyProblemSolved(db,user,problemId)};
-}
 
 const jobVerdict=`CASE WHEN j.state='completed' THEN COALESCE(j.result->>'status','System Error') WHEN j.state='failed' THEN 'System Error' WHEN j.state='leased' THEN 'Judging' ELSE 'Waiting' END`;
 
@@ -166,16 +87,16 @@ export async function schoolProblemSubmissions(db,p,user,url,accessContext,{work
  const values=[p.school_id,p.id,p.published_version_id,user.identityId,accessContext,user.id,identityId];
  let schoolHistory='';
  let schoolJobs=includePlatform?"OR (j.access_context='public' AND j.activity_id IS NULL)":'';
- if(workspaceSchoolId) {
-  const schoolId=uuid(workspaceSchoolId,'School ID');
+ if(workspaceSchoolId || accessContext==='school') {
+  const schoolId=uuid(workspaceSchoolId??p.school_id,'School ID');
   if(!await lockWorkspaceMembership(db,schoolId,user.id,{studentOnly:true}))fail(404,'NOT_FOUND','School practice history is unavailable.');
   values.push(schoolId);
   schoolHistory=`UNION ALL ${ordinarySchoolReceipts}`;
-  schoolJobs=`OR (j.school_id=$8 AND j.access_context='school' AND j.activity_id IS NULL)`;
+  if(workspaceSchoolId)schoolJobs=`OR (j.school_id=$8 AND j.access_context='school' AND j.activity_id IS NULL)`;
  }
  const page=await metadataPage(db,`SELECT j.id::text,j.id::text received_id,
   CASE WHEN j.access_context='public' THEN 'person:'||a.identity_id::text
-   WHEN (${includePlatform ? 'true' : "$5='public'"}) AND person.account_id=j.account_id THEN 'person:'||a.identity_id::text
+   WHEN person.account_id=j.account_id THEN 'person:'||a.identity_id::text
    WHEN $5<>'staff_practice' AND j.identity_id IS NOT NULL THEN 'school:'||j.identity_id::text ELSE 'account:'||j.account_id::text END actor_key,
   j.created_at,COALESCE(j.payload->>'language','python') language,
   ${jobVerdict} status,
@@ -192,31 +113,4 @@ export async function schoolProblemSubmissions(db,p,user,url,accessContext,{work
    AND ($5<>'staff_practice' OR j.account_id=$6) AND ${schoolActivityJobVisibleSql('j')}
    ${schoolHistory}`,values,url,{schoolProgress:true});
  return {...page,solved:(await problemProgress(db,user,[p.id],{includeStaff:accessContext==='staff_practice'})).get(p.id)?.solved??false};
-}
-
-export async function paper4QuestionSubmissions(db,attempt,question,user,url) {
- const automatic=question.stages.filter(stage=>stage.judgeMode==='auto');
- const complete=automatic.length>0&&automatic.every(stage=>Array.isArray(attempt.runner_cases?.[stage.id])&&attempt.runner_cases[stage.id].length>0);
- const required=complete?automatic.flatMap(stage=>attempt.runner_cases[stage.id].map(c=>({stageId:stage.id,caseId:c.id}))):[];
- return metadataPage(db,`SELECT s.id::text,s.id received_id,a.identity_id actor_key,s.created_at,'python'::text language,a.identity_id=$4 is_own,
-  CASE WHEN t.id IS NULL THEN 'NeedsReview' WHEN t.state='failed' THEN 'System Error' WHEN t.state='leased' THEN 'Judging'
-   WHEN t.state='queued' THEN 'Waiting' WHEN r.id IS NULL THEN 'System Error'
-   WHEN jsonb_array_length($5::jsonb)=0 THEN 'NeedsReview'
-   WHEN r.status='AC' AND jsonb_typeof(r.private_results)='array' AND jsonb_array_length(CASE WHEN jsonb_typeof(r.private_results)='array' THEN r.private_results ELSE '[]'::jsonb END)=jsonb_array_length($5::jsonb)
-    AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements($5::jsonb) required WHERE
-     (SELECT count(*) FROM jsonb_array_elements(CASE WHEN jsonb_typeof(r.private_results)='array' THEN r.private_results ELSE '[]'::jsonb END) result WHERE result->>'stageId'=required->>'stageId'
-      AND result->>'caseId'=required->>'caseId' AND result->>'status'='AC')<>1) THEN 'AC'
-   ELSE 'NotPassed' END status,
-  r.private_results,
-  COALESCE(CASE WHEN profile.leaderboard_use_nickname THEN NULLIF(btrim(profile.nickname),'') END,NULLIF(btrim(person.name),''),'Student') display_name
-  FROM paper4_snapshots s JOIN paper4_attempts a ON a.id=s.attempt_id
-  JOIN paper4_papers paper ON paper.id=a.paper_id
-  JOIN identities person ON person.id=a.identity_id
-  LEFT JOIN accounts profile ON profile.identity_id=person.id AND profile.binding_released_at IS NULL
-  JOIN legacy_school_identity_ownership ownership ON ownership.identity_id=a.identity_id
-  LEFT JOIN LATERAL (SELECT * FROM paper4_run_tasks t WHERE t.snapshot_id=s.id AND t.reference_snapshot_id IS NULL ORDER BY t.created_at DESC,t.id DESC LIMIT 1) t ON true
-  LEFT JOIN LATERAL (SELECT id,status,private_results FROM paper4_runs r WHERE r.task_id=t.id AND r.snapshot_id=s.id AND r.lease_id=t.lease_id ORDER BY r.created_at DESC,r.id DESC LIMIT 1) r ON t.state='completed'
-  WHERE a.paper_id=$1 AND a.version_id=$2 AND s.question_key=$3 AND s.origin='formal' AND s.stage_key IS NULL AND a.state='submitted'
-   AND (paper.delivery_kind='catalog' OR paper.activity_kind='practice' OR a.released_at IS NOT NULL)`,
- [attempt.paper_id,attempt.version_id,question.key,user.identityId,JSON.stringify(required)],url);
 }

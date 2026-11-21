@@ -6,7 +6,8 @@ import { createPool, transaction } from '../src/db.mjs';
 import { migrate } from '../src/migrate.mjs';
 import { hashPassword } from '../src/security.mjs';
 import { handlePlatformGovernance, provisionPlatformAdministrator } from '../src/platform-governance.mjs';
-import { handleSchools, LEGACY_SCHOOL_ID } from '../src/schools.mjs';
+import { handleSchools } from '../src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from './fixtures/pre-workspace/legacy-school.mjs';
 
 test('platform operations work with the real application grants while grants, audits, and worker boundaries stay protected',
   { skip: !process.env.TEST_DATABASE_URL, timeout: 60000 }, async () => {
@@ -66,14 +67,15 @@ test('platform operations work with the real application grants while grants, au
       assert.equal((await governance(`/platform/schools/${LEGACY_SCHOOL_ID}`,'PATCH',{
         name:'Legacy app role name',expectedName:'天行创世纪学校',
       })).status,200);
-      assert.equal((await owner.query('SELECT settings FROM site_settings WHERE id=true')).rows[0].settings.schoolName,'Legacy app role name');
+      assert.equal((await owner.query('SELECT name FROM schools WHERE id=$1',[LEGACY_SCHOOL_ID])).rows[0].name,'Legacy app role name');
+      assert.equal((await owner.query('SELECT settings FROM site_settings WHERE id=true')).rows[0].settings.schoolName,undefined);
 
       await assert.rejects(app.query('UPDATE platform_admins SET revoked_at=NULL WHERE account_id=$1',[founder.id]),{code:'42501'});
       await assert.rejects(app.query('INSERT INTO platform_admins(account_id) VALUES($1)',[founder.id]),{code:'42501'});
       await assert.rejects(app.query('UPDATE platform_audit_events SET action=action'),{code:'42501'});
       await assert.rejects(app.query('DELETE FROM platform_audit_events'),{code:'42501'});
       await assert.rejects(app.query('DELETE FROM school_audit_events'),{code:'42501'});
-      for (const table of ['platform_admins','school_administrators','platform_audit_events','legacy_school_identity_ownership','legacy_school_account_ownership']) {
+      for (const table of ['platform_admins','school_administrators','platform_audit_events','school_identities','school_memberships']) {
         await assert.rejects(worker.query(`SELECT * FROM ${table} LIMIT 1`),{code:'42501'},table);
       }
       assert.equal((await owner.query('SELECT count(*)::int n FROM platform_audit_events')).rows[0].n,5);

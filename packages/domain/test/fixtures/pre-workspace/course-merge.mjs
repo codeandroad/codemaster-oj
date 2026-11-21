@@ -1,14 +1,10 @@
-import { transaction } from './db.mjs';
-import { fail, field, integer, uuid, canonicalHash } from './security.mjs';
-import { LEGACY_SCHOOL_ID } from './schools.mjs';
-import { courseLocalizations } from './course-localizations.mjs';
-import { courseSections } from './course-sections.mjs';
+import { transaction } from '../../../src/db.mjs';
+import { fail, field, integer, uuid, canonicalHash } from '../../../src/security.mjs';
+import { LEGACY_SCHOOL_ID } from './legacy-school.mjs';
+import { courseLocalizations } from '../../../src/course-localizations.mjs';
+import { courseSections } from '../../../src/course-sections.mjs';
 
-export async function canonicalMergedCourseId(db, value) {
- const id=uuid(value);
- const row=(await db.query('SELECT merged_into_id FROM learning_paths WHERE id=$1',[id])).rows[0];
- return row?.merged_into_id??id;
-}
+export { canonicalMergedCourseId } from '../../../src/course-access.mjs';
 const conflict=message=>fail(409,'COURSE_MERGE_CONFLICT',message);
 export function courseMergeInput(targetId, body) {
  if(!body||typeof body.dryRun!=='boolean')fail(400,'VALIDATION','请明确选择预览或执行合并。');

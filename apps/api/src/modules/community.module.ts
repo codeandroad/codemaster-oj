@@ -50,15 +50,15 @@ export class CommunityController {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
 
- @Get(['profile-message-reports','platform/profile-message-reports'])
+ @Get(['profile-message-reports','schools/:schoolId/profile-message-reports','platform/profile-message-reports'])
  async allReports(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
- @Post(['profile-message-reports/:reportId/dismiss','platform/profile-message-reports/:reportId/dismiss'])
+ @Post(['profile-message-reports/:reportId/dismiss','schools/:schoolId/profile-message-reports/:reportId/dismiss','platform/profile-message-reports/:reportId/dismiss'])
  async dismissReport(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
- @Get(['profiles/:identityId','practice/profiles/:accountId'])
+ @Get(['profiles/:identityId','schools/:schoolId/profiles/:identityId','practice/profiles/:accountId'])
  async profile(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
@@ -66,29 +66,29 @@ export class CommunityController {
  async updateProfile(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
- @Get(['profiles/:identityId/activity','practice/profiles/:accountId/activity'])
+ @Get(['profiles/:identityId/activity','schools/:schoolId/profiles/:identityId/activity','practice/profiles/:accountId/activity'])
  async activity(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
- @Get(['profiles/:identityId/messages','practice/profiles/:accountId/messages',
-  'profiles/:identityId/messages/:messageId/replies','practice/profiles/:accountId/messages/:messageId/replies',
-  'profiles/:identityId/mentions','practice/profiles/:accountId/mentions'])
+ @Get(['profiles/:identityId/messages','schools/:schoolId/profiles/:identityId/messages','practice/profiles/:accountId/messages',
+  'profiles/:identityId/messages/:messageId/replies','schools/:schoolId/profiles/:identityId/messages/:messageId/replies','practice/profiles/:accountId/messages/:messageId/replies',
+  'profiles/:identityId/mentions','schools/:schoolId/profiles/:identityId/mentions','practice/profiles/:accountId/mentions'])
  async messages(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
- @Post(['profiles/:identityId/messages','practice/profiles/:accountId/messages'])
+ @Post(['profiles/:identityId/messages','schools/:schoolId/profiles/:identityId/messages','practice/profiles/:accountId/messages'])
  async createMessage(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
- @Delete(['profiles/:identityId/messages/:messageId','practice/profiles/:accountId/messages/:messageId'])
+ @Delete(['profiles/:identityId/messages/:messageId','schools/:schoolId/profiles/:identityId/messages/:messageId','practice/profiles/:accountId/messages/:messageId'])
  async deleteMessage(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
- @Post(['profiles/:identityId/messages/:messageId/like','practice/profiles/:accountId/messages/:messageId/like'])
+ @Post(['profiles/:identityId/messages/:messageId/like','schools/:schoolId/profiles/:identityId/messages/:messageId/like','practice/profiles/:accountId/messages/:messageId/like'])
  async likeMessage(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }
- @Get('profiles/:identityId/message-reports')
+ @Get(['profiles/:identityId/message-reports','schools/:schoolId/profiles/:identityId/message-reports'])
  async reports(@Req() request:DomainRequest,@Res({passthrough:true}) response:Response) {
   return applyResponse(response,await this.domain.execute('community',request.domainContext));
  }

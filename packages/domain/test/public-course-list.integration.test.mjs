@@ -6,7 +6,7 @@ import { createPool } from '../src/db.mjs';
 import { migrate } from '../src/migrate.mjs';
 import { bootstrap } from '../src/bootstrap.mjs';
 import { canonicalHash } from '../src/security.mjs';
-import { LEGACY_SCHOOL_ID } from '../src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from './fixtures/pre-workspace/legacy-school.mjs';
 import { handlePublicLearning } from '../src/public-learning.mjs';
 
 test('course-only discovery reads shallow statistics without materializing a problem catalog',

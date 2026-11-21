@@ -1,8 +1,8 @@
-import {courseMetadataForUser} from './course-access.mjs';
+import {courseMetadataForUser} from '../../../src/course-access.mjs';
 import {audienceClasses,audienceStudents,defaultClassStudents,replaceAudienceClasses,activityClasses,linkedCourse} from './activity-audience.mjs';
-import { transaction } from './db.mjs';
-import { assertLiveProblemVersion, liveProblemVersionIdSql, resolveLiveProblemVersion } from './live-problem-version.mjs';
-import { fail, field, uuid, integer } from './security.mjs';
+import { transaction } from '../../../src/db.mjs';
+import { assertLiveProblemVersion, liveProblemVersionIdSql, resolveLiveProblemVersion } from '../../../src/live-problem-version.mjs';
+import { fail, field, uuid, integer } from '../../../src/security.mjs';
 
 const isAdmin = (user) => user.roles.includes('admin');
 const isStaff = (user) => isAdmin(user) || user.roles.includes('teacher');

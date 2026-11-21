@@ -1,7 +1,7 @@
 import { transaction } from './db.mjs';
 import { enumValue, fail, field, integer, uuid } from './security.mjs';
 import { avatarForIdentity, defaultAvatarPath } from './avatars.mjs';
-import { activeAccount } from './schools.mjs';
+import { activeAccount, schoolRole, lockSchoolTeaching } from './schools.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
 import { publicPracticeFirstAc, setPublicPracticeHistoryAccount } from './public-practice-records.mjs';
 import { POINTS_PER_SOLVED } from './public-practice-leaderboard.mjs';
@@ -15,6 +15,10 @@ const admin = user => user.roles.includes('admin');
 const publicAlias = (account='a') => `'Learner-'||upper(left(md5('public-practice:'||${account}.id::text),8))`;
 const publicName = (account='a') => `COALESCE(CASE WHEN ${account}.leaderboard_use_nickname THEN NULLIF(btrim(${account}.nickname),'') END,${publicAlias(account)})`;
 
+function withGuestbookTransaction(ctx,work) {
+ return ctx.inSchoolTransaction ? work(ctx.pool) : transaction(ctx.pool,work);
+}
+
 function paging(url) {
  const number = (key, fallback, max) => {
   const raw = url.searchParams.get(key) ?? String(fallback);
@@ -27,11 +31,10 @@ function paging(url) {
 async function activeStudent(db, identityId) {
  const row = (await db.query(`SELECT i.id, a.id account_id,
   COALESCE(NULLIF(btrim(a.nickname),''),'同学') nickname, a.avatar, a.bio
-  FROM identities i JOIN accounts a ON a.identity_id=i.id
-  JOIN legacy_school_account_ownership ownership ON ownership.account_id=a.id
-  WHERE i.id=$1 AND i.kind='student' AND i.archived_at IS NULL
-   AND a.disabled_at IS NULL AND a.binding_released_at IS NULL
-   AND EXISTS (SELECT 1 FROM account_roles r WHERE r.account_id=a.id AND r.role='student')`,
+  FROM school_identities i JOIN accounts a ON a.id=i.account_id
+  JOIN school_memberships m ON (m.school_id,m.account_id)=(i.school_id,a.id) AND m.role='student' AND m.revoked_at IS NULL
+  WHERE i.id=$1 AND i.kind='student' AND i.archived_at IS NULL AND i.school_id=NULLIF(current_setting('campus.school_id',true),'')::uuid
+   AND a.disabled_at IS NULL AND a.binding_released_at IS NULL`,
   [identityId])).rows[0];
  if (!row) fail(404, 'NOT_FOUND', '学生主页不存在');
  return row;
@@ -75,16 +78,16 @@ async function mentionCandidates(db, profile, practice, query, ids = null) {
  const nickname = publicNickname(practice);
  const audience = practice
   ? 'JOIN public_practice_preferences p ON p.account_id=a.id AND p.profile_enabled'
-  : `JOIN legacy_school_account_ownership o ON o.account_id=a.id
-     JOIN account_roles r ON r.account_id=a.id AND r.role='student'`;
+  : `JOIN school_identities pupil ON pupil.account_id=a.id AND pupil.kind='student' AND pupil.archived_at IS NULL
+     JOIN school_memberships m ON (m.school_id,m.account_id)=(pupil.school_id,a.id) AND m.role='student' AND m.revoked_at IS NULL
+     AND pupil.school_id=NULLIF(current_setting('campus.school_id',true),'')::uuid`;
  const {rows} = await db.query(`SELECT a.id AS account_id,
-    CASE WHEN $1::boolean THEN a.id ELSE i.id END id,${nickname} nickname
+    ${practice?'a.id':'pupil.id'} id,${nickname} nickname
   FROM accounts a JOIN identities i ON i.id=a.identity_id ${audience}
   WHERE a.disabled_at IS NULL AND a.binding_released_at IS NULL AND i.archived_at IS NULL
-    AND (${practice ? 'true' : "i.kind='student'"})
-    AND ($2::uuid[] IS NULL OR CASE WHEN $1 THEN a.id ELSE i.id END=ANY($2))
-    AND (strpos(lower(${nickname}),lower($3))>0 OR $3='')
-  ORDER BY (a.id=$4) DESC, nickname,a.id LIMIT 8`,[practice,ids,query,profile.account_id]);
+    AND ($1::uuid[] IS NULL OR ${practice?'a.id':'pupil.id'}=ANY($1))
+    AND (strpos(lower(${nickname}),lower($2))>0 OR $2='')
+  ORDER BY (a.id=$3) DESC, nickname,a.id LIMIT 8`,[ids,query,profile.account_id]);
  return rows;
 }
 
@@ -114,13 +117,13 @@ async function visibleMessage(db, params, messageId, { root = false, lock = fals
 async function profile(ctx, identityId) {
  const p = await visibleProfile(ctx.pool, ctx.user, identityId);
  const totals = (await ctx.pool.query(`SELECT
-  ((SELECT COALESCE(sum(points),0) FROM school_rank_ledger WHERE identity_id=$1)
+  ((SELECT COALESCE(sum(points),0) FROM school_rank_awards WHERE identity_id=$1)
    +(SELECT COALESCE(sum(points),0) FROM paper4_rank_ledger WHERE identity_id=$1)
    +(SELECT COALESCE(sum(points),0) FROM acsl_point_awards WHERE identity_id=$1))::int points,
   ((SELECT count(DISTINCT problem_id) FROM point_ledger WHERE identity_id=$1 AND reason='first_ac')
    +(SELECT count(*) FROM paper4_rank_ledger WHERE identity_id=$1))::int solved_problems,
-  CASE WHEN $2::boolean OR COALESCE((SELECT show_luq_balance FROM leaderboard_settings WHERE id=true),true)
-   THEN COALESCE((SELECT balance FROM luq_accounts WHERE identity_id=$1),0)::int END scholarship`,
+  CASE WHEN $2::boolean OR COALESCE((SELECT (display_fields->>'scholarship')::boolean FROM school_scholarship_settings WHERE school_id=NULLIF(current_setting('campus.school_id',true),'')::uuid),true)
+   THEN COALESCE((SELECT balance FROM school_scholarship_accounts WHERE identity_id=$1),0)::int END scholarship`,
  [identityId,ctx.user.identityId===p.id || ctx.user.roles.some(role=>role==='admin'||role==='teacher')])).rows[0];
  return response({profile:{id:p.id,nickname:p.nickname,avatar:avatarForIdentity(p.avatar,p.id),bio:p.bio,
   points:totals.points,rankPoints:totals.points,solvedProblems:totals.solved_problems,isSelf:ctx.user.identityId===p.id,
@@ -138,7 +141,7 @@ async function activity(ctx, identityId) {
   JOIN problems p ON p.id=l.problem_id
   JOIN problem_banks b ON b.id=p.bank_id
   JOIN problem_versions v ON v.id=s.version_id
-  WHERE l.identity_id=$1 AND l.reason='first_ac'
+  WHERE s.school_id=NULLIF(current_setting('campus.school_id',true),'')::uuid AND l.identity_id=$1 AND l.reason='first_ac'
    AND ($2::boolean OR (b.visibility='school' AND b.archived_at IS NULL
    AND p.archived_at IS NULL AND v.published_at IS NOT NULL
    AND v.school_visible_at IS NOT NULL))
@@ -172,7 +175,7 @@ async function practiceProfileOperation(ctx, accountId, section, messageId, acti
   if (!own) fail(403,'FORBIDDEN','You can only manage your own practice profile.');
   const enabled=ctx.body.profileEnabled;
   if (typeof enabled!=='boolean') fail(400,'VALIDATION','Choose whether to share your practice profile.');
-  return transaction(ctx.pool,async db=>{
+  return withGuestbookTransaction(ctx,async db=>{
    await activeAccount(db,user.id);
    await db.query(`INSERT INTO public_practice_preferences(account_id,profile_enabled) VALUES($1,$2)
     ON CONFLICT(account_id) DO UPDATE SET profile_enabled=EXCLUDED.profile_enabled`,[user.id,enabled]);
@@ -192,7 +195,7 @@ async function practiceProfileOperation(ctx, accountId, section, messageId, acti
  if (method!=='GET') return null;
  if (section==='activity' && !own) fail(404,'NOT_FOUND','This activity is private.');
  if (!own) return response({profile:{nickname:target.nickname,avatar:defaultAvatarPath(target.alias),isSelf:false}});
- return transaction(ctx.pool,async db=>{
+ return withGuestbookTransaction(ctx,async db=>{
   await activeAccount(db,user.id);
   await setPublicPracticeHistoryAccount(db,user.id);
   const {rows:[{total}]}=await db.query(`SELECT count(*)::int total FROM (${publicPracticeFirstAc}) first_ac`,[user.id]);
@@ -221,7 +224,7 @@ async function listMessages(ctx, identityId, practiceAccountId = null, threadId 
  if (threadId) await visibleMessage(ctx.pool,params,threadId,{root:true});
  const {rows}=await ctx.pool.query(`WITH visible AS MATERIALIZED (
    SELECT m.id,m.body,m.created_at,m.author_account_id,m.thread_id,m.quote_id,
-    i.id author_identity_id,a.avatar author_avatar,${publicAlias()} author_alias,${publicNickname(publicPractice)} author_nickname
+    ${publicPractice?'i.id':"(SELECT pupil.id FROM school_identities pupil WHERE pupil.school_id=m.school_id AND pupil.account_id=a.id AND pupil.archived_at IS NULL)"} author_identity_id,a.avatar author_avatar,${publicAlias()} author_alias,${publicNickname(publicPractice)} author_nickname
    ${visibleMessageSql}
  ), page AS (
    SELECT * FROM visible WHERE thread_id IS NOT DISTINCT FROM $5::uuid
@@ -236,12 +239,12 @@ async function listMessages(ctx, identityId, practiceAccountId = null, threadId 
   (SELECT count(*)::int FROM visible r WHERE r.thread_id=p.id) reply_count,
   (SELECT count(*)::int FROM student_guestbook_likes l WHERE l.message_id=p.id) like_count,
   EXISTS(SELECT 1 FROM student_guestbook_likes l WHERE l.message_id=p.id AND l.account_id=$2) liked,
-  (SELECT jsonb_agg(jsonb_build_object('id',${publicPractice ? 'tagged.id' : 'tagged_identity.id'},
+  (SELECT jsonb_agg(jsonb_build_object('id',${publicPractice ? 'tagged.id' : 'pupil.id'},
       'nickname',${publicNickname(publicPractice,'tagged')},'ranges',tag.text_ranges) ORDER BY tagged.id)
    FROM student_guestbook_mentions tag
    JOIN accounts tagged ON tagged.id=tag.account_id AND tagged.disabled_at IS NULL AND tagged.binding_released_at IS NULL
    JOIN identities tagged_identity ON tagged_identity.id=tagged.identity_id AND tagged_identity.archived_at IS NULL
-   ${publicPractice ? 'JOIN public_practice_preferences pref ON pref.account_id=tagged.id AND pref.profile_enabled' : ''}
+   ${publicPractice ? 'JOIN public_practice_preferences pref ON pref.account_id=tagged.id AND pref.profile_enabled' : "JOIN school_identities pupil ON pupil.account_id=tagged.id AND pupil.school_id=NULLIF(current_setting('campus.school_id',true),'')::uuid AND pupil.archived_at IS NULL"}
    WHERE tag.message_id=p.id) mentions
  FROM totals LEFT JOIN page p ON true LEFT JOIN visible q ON q.id=p.quote_id
  ORDER BY p.created_at DESC,p.id DESC`,[...params,threadId,pageSize,(page-1)*pageSize]);
@@ -271,7 +274,7 @@ async function createMessage(ctx, identityId, practiceAccountId = null) {
   fail(400,'VALIDATION','留言包含无效字符');
  if (/(?:https?:\/\/|www\.)/iu.test(body))
   fail(400,'VALIDATION','留言不支持外部链接');
- const created=await transaction(ctx.pool,async db=>{
+ const created=await withGuestbookTransaction(ctx,async db=>{
   const profile=await guestbookProfile(db,ctx,identityId,practiceAccountId);
   const params=[identityId,ctx.user.id,own,practiceAccountId];
   const quote=quoteId ? await visibleMessage(db,params,quoteId,{lock:true}) : null;
@@ -293,9 +296,9 @@ async function createMessage(ctx, identityId, practiceAccountId = null) {
    count(*) FILTER (WHERE created_at>clock_timestamp()-interval '1 day')::int daily
    FROM student_guestbook_messages WHERE author_account_id=$1`,[ctx.user.id])).rows[0];
   if(recent.recent || recent.daily>=20) fail(429,'RATE_LIMIT','留言过于频繁，请稍后再试');
-  const m=(await db.query(`INSERT INTO student_guestbook_messages(profile_identity_id,author_account_id,body,practice_profile_account_id,thread_id,quote_id)
-   VALUES($1,$2,$3,$4,$5,$6) RETURNING id,body,created_at,author_account_id,thread_id,quote_id`,
-   [identityId,ctx.user.id,body,practiceAccountId,threadId,quoteId])).rows[0];
+  const m=(await db.query(`INSERT INTO student_guestbook_messages(profile_identity_id,author_account_id,body,practice_profile_account_id,thread_id,quote_id,school_id)
+   VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id,body,created_at,author_account_id,thread_id,quote_id`,
+   [identityId,ctx.user.id,body,practiceAccountId,threadId,quoteId,ctx.schoolId??null])).rows[0];
   const recipients=new Map(mentions.map(tag=>[tag.account_id,'mention']));
   if (quote) recipients.set(quote.author_account_id,'reply');
   if (!recipients.has(profile.account_id)) recipients.set(profile.account_id,quote?'reply':'message');
@@ -324,7 +327,7 @@ async function createMessage(ctx, identityId, practiceAccountId = null) {
 async function reactToMessage(ctx, identityId, messageId, practiceAccountId = null) {
  const {liked}=ctx.body;
  if (typeof liked!=='boolean') fail(400,'VALIDATION','点赞状态无效');
- return transaction(ctx.pool,async db=>{
+ return withGuestbookTransaction(ctx,async db=>{
   await guestbookProfile(db,ctx,identityId,practiceAccountId);
   const own=practiceAccountId ? ctx.user.id===practiceAccountId : ctx.user.identityId===identityId;
   const params=[identityId,ctx.user.id,own,practiceAccountId];
@@ -340,7 +343,7 @@ async function reactToMessage(ctx, identityId, messageId, practiceAccountId = nu
 
 async function deleteMessage(ctx, identityId, messageId, practiceAccountId = null) {
  const publicPractice=practiceAccountId!==null;
- await transaction(ctx.pool,async db=>{
+ await withGuestbookTransaction(ctx,async db=>{
   // Administrators must be able to resolve historical reports even after
   // the target student account or identity was disabled, unbound or archived.
   // Students and class teachers still need the normal live-profile access.
@@ -414,14 +417,14 @@ async function allReports(ctx, publicPractice = false) {
    AND EXISTS (SELECT 1 FROM public_practice_preferences pref WHERE pref.account_id=pa.id AND pref.profile_enabled))`
    : `(pi.kind='student' AND pi.archived_at IS NULL AND pa.id IS NOT NULL
    AND pa.disabled_at IS NULL AND EXISTS (
-    SELECT 1 FROM account_roles ar WHERE ar.account_id=pa.id AND ar.role='student'
+    SELECT 1 FROM school_memberships ar WHERE ar.school_id=m.school_id AND ar.account_id=pa.id AND ar.role='student' AND ar.revoked_at IS NULL
    ))`} profile_available,
   aa.identity_id author_identity_id,
   ${publicPractice?publicName('aa'):"COALESCE(NULLIF(btrim(aa.nickname),''),'同学')"} author_nickname
   ${base}
-  JOIN identities pi ON pi.id=m.profile_identity_id
+  JOIN ${publicPractice?'identities':'school_identities'} pi ON pi.id=m.profile_identity_id
   JOIN accounts aa ON aa.id=m.author_account_id
-  LEFT JOIN accounts pa ON ${publicPractice?'pa.id=m.practice_profile_account_id':'pa.identity_id=m.profile_identity_id AND pa.binding_released_at IS NULL'}
+  LEFT JOIN accounts pa ON ${publicPractice?'pa.id=m.practice_profile_account_id':'pa.id=pi.account_id AND pa.binding_released_at IS NULL'}
   WHERE ${scope} AND ($1::text='all' OR ${reportStatusSql}=$1)
   ORDER BY CASE WHEN ${reportStatusSql}='pending' THEN 0 ELSE 1 END,
    r.created_at DESC,r.id DESC LIMIT $2 OFFSET $3`,
@@ -438,7 +441,7 @@ async function allReports(ctx, publicPractice = false) {
 
 async function dismissReport(ctx, reportId, publicPractice = false) {
  if (!(publicPractice ? await isPlatformAdministrator(ctx.pool,ctx.user.id) : admin(ctx.user))) fail(403,'FORBIDDEN','需要管理员权限');
- await transaction(ctx.pool,async db=>{
+ await withGuestbookTransaction(ctx,async db=>{
   // Lock the message before the report, matching deletion's lock order.
   const message=(await db.query(`SELECT m.id,m.profile_identity_id,m.deleted_at
    FROM student_guestbook_reports r JOIN student_guestbook_messages m ON m.id=r.message_id
@@ -459,6 +462,16 @@ async function dismissReport(ctx, reportId, publicPractice = false) {
 }
 
 export async function handleCommunity(ctx) {
+ const scoped=ctx.route.match(/^\/schools\/([^/]+)(\/(?:profiles|profile-message-reports)(?:\/.*)?)$/);
+ if(scoped)return transaction(ctx.pool,async db=>{
+  const schoolId=uuid(scoped[1]);
+  await lockSchoolTeaching(db,schoolId,{shared:true});
+  const role=await schoolRole(db,schoolId,ctx.user.id);
+  await db.query("SELECT set_config('campus.school_id',$1,true)",[schoolId]);
+  const person=(await db.query('SELECT id FROM school_identities WHERE school_id=$1 AND account_id=$2 AND archived_at IS NULL',[schoolId,ctx.user.id])).rows[0];
+  return handleCommunity({...ctx,route:scoped[2],pool:db,schoolId,inSchoolTransaction:true,
+   user:{...ctx.user,identityId:person?.id??null,roles:[role==='school_admin'?'admin':role]}});
+ });
  const practice=ctx.route.match(/^\/practice\/profiles\/([^/]+)(?:\/(activity|messages|mentions)(?:\/([^/]+)(?:\/(replies|like))?)?)?$/);
  if (practice) return practiceProfileOperation(ctx,uuid(practice[1],'Account ID'),practice[2],
   practice[3] && uuid(practice[3],'Message ID'),practice[4]);

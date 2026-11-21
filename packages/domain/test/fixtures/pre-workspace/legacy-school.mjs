@@ -1,4 +1,4 @@
-import { transaction } from './db.mjs';
+import { transaction } from '../../../src/db.mjs';
 
 export const LEGACY_SCHOOL_ID = '00000000-0000-4000-8000-000000000052';
 export const LEGACY_SCHOOL_NAME = '天行创世纪学校';

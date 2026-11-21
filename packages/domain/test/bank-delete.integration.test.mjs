@@ -6,7 +6,7 @@ import {createPool} from '../src/db.mjs';
 import {migrate} from '../src/migrate.mjs';
 import {bootstrap} from '../src/bootstrap.mjs';
 import {createApp,loadConfig} from '../src/app.mjs';
-import {SCHOOL_BANK} from '../src/library.mjs';
+import {SCHOOL_BANK} from './fixtures/pre-workspace/library.mjs';
 
 test('empty problem banks can be deleted by their owner or admin; referenced banks are protected',
  {skip:!process.env.TEST_DATABASE_URL,timeout:60000},async()=>{

@@ -6,7 +6,7 @@ import {createPool} from '../src/db.mjs';
 import {migrate} from '../src/migrate.mjs';
 import {bootstrap} from '../src/bootstrap.mjs';
 import {createApp,loadConfig} from '../src/app.mjs';
-import {handleClassHub} from '../src/activity-audience.mjs';
+import {handleClassHub} from './fixtures/pre-workspace/activity-audience.mjs';
 import {defaultAvatarPath} from '../src/avatars.mjs';
 
 test('class roster exposes only public active classmates and checks current membership over HTTP',

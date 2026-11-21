@@ -3,14 +3,17 @@ import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
 import { createPool, transaction } from './db.mjs';
 import { field, username, hashPassword } from './security.mjs';
-export async function bootstrap(pool,{name,number,username:login,password}) {
+export async function bootstrap(pool,{name,number,username:login,password,schoolSlug}) {
  const passwordHash=await hashPassword(password);
  return transaction(pool,async db=>{
   await db.query('SELECT pg_advisory_xact_lock(798944)');
-  if((await db.query("SELECT 1 FROM account_roles WHERE role='admin' LIMIT 1")).rowCount) throw new Error('An administrator already exists; use administrator invitation instead.');
+  const school=(await db.query('SELECT id FROM schools WHERE slug=$1 FOR UPDATE',[field(schoolSlug,'学校标识')])).rows[0];
+  if(!school) throw new Error('Choose an existing school for the initial administrator.');
+  if((await db.query("SELECT 1 FROM school_workspace_roles WHERE school_id=$1 AND role='school_admin' LIMIT 1",[school.id])).rowCount) throw new Error('This school already has an administrator.');
   const identity=(await db.query("INSERT INTO identities(kind,number,name) VALUES('admin',$1,$2) RETURNING id",[field(number,'工号'),field(name,'姓名')])).rows[0];
   const account=(await db.query('INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,$2,$3) RETURNING id',[identity.id,username(login),passwordHash])).rows[0];
-  await db.query("INSERT INTO account_roles(account_id,role) VALUES($1,'admin')",[account.id]);
+  await db.query("INSERT INTO school_memberships(school_id,account_id,role) VALUES($1,$2,'school_admin')",[school.id,account.id]);
+  await db.query("INSERT INTO school_identities(school_id,id,kind,name,number,account_id) VALUES($1,$2,'school_admin',$3,$4,$5)",[school.id,identity.id,name,number,account.id]);
   await db.query("INSERT INTO audit_events(actor_account_id,action,resource_type,resource_id) VALUES($1,'admin.bootstrap','account',$2)",[account.id,account.id]);return account.id;
  });
 }
@@ -29,8 +32,9 @@ if(process.argv[1]===fileURLToPath(import.meta.url)) {
   const name=process.env.BOOTSTRAP_NAME||await rl.question('Administrator name: ');
   const number=process.env.BOOTSTRAP_NUMBER||await rl.question('Staff number: ');
   const login=process.env.BOOTSTRAP_USERNAME||await rl.question('Username: ');
+  const schoolSlug=process.env.BOOTSTRAP_SCHOOL_SLUG||await rl.question('School slug: ');
   rl.close();
   const secret=process.env.BOOTSTRAP_PASSWORD||await hiddenPassword();
-  console.log(`Administrator created: ${await bootstrap(pool,{name,number,username:login,password:secret})}`);
+  console.log(`Administrator created: ${await bootstrap(pool,{name,number,username:login,password:secret,schoolSlug})}`);
  } finally { rl.close();await pool.end(); }
 }

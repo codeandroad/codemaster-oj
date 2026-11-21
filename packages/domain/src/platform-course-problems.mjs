@@ -1,6 +1,6 @@
 import { fail, uuid } from './security.mjs';
 import { activeAccount } from './schools.mjs';
-import { legacyCourseIsLive } from './legacy-public-course.mjs';
+import { courseIsLive } from './course-live.mjs';
 import { platformCourseAdmission } from './platform-course-access.mjs';
 import { lockCatalogProblemSchools, preparePlatformCourseProblem, readyProblemPresentationSql } from './catalog-problem-publication.mjs';
 import { liveProblemVersionIdSql } from './live-problem-version.mjs';
@@ -21,7 +21,7 @@ export async function platformCourseProblem(db,user,id,{courseId=null,chapterId=
  JOIN learning_chapters c ON c.path_id=p.id AND c.archived_at IS NULL
  JOIN chapter_problems cp ON cp.chapter_id=c.id
  LEFT JOIN public_course_listings listing ON listing.course_id=p.id
- WHERE p.owner_scope='platform' AND ${legacyCourseIsLive} AND cp.problem_id=$1
+ WHERE p.owner_scope='platform' AND ${courseIsLive} AND cp.problem_id=$1
  AND ($2::uuid IS NULL OR p.id=$2 OR listing.id=$2) AND ($3::uuid IS NULL OR c.id=$3)
  ORDER BY p.id,c.position`,[uuid(id),courseId,chapterId])).rows;
  for(const row of rows){

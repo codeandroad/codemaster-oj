@@ -7,7 +7,7 @@ import { liveProblemVersionIdSql } from './live-problem-version.mjs';
 
 const snapshotBankId = '00000000-0000-4000-8000-000000000074';
 const scope = (db,schoolId) => db.query("SELECT set_config('campus.school_id',$1,true)", [schoolId]);
-const sourceColumns = `p.id AS problem_id,p.bank_id,p.owner_account_id,b.school_id,b.name AS bank_name,
+const sourceColumns = `p.id AS problem_id,p.bank_id,p.owner_account_id,b.catalog_scope_id AS school_id,b.name AS bank_name,
  v.id,v.title,v.statement,v.metadata,v.tags,v.mode,v.function_name,v.comparator,v.starter_code,
  v.starter_codes,v.time_limit_ms,v.memory_limit_mb,v.samples`;
 const sourceTables = `problems p
@@ -18,7 +18,7 @@ export const readyProblemPresentationSql = (p='p',v='v') => `(EXISTS(SELECT 1 FR
   JOIN problem_versions original ON original.id=configured.version_id WHERE original.problem_id=${p}.id))`;
 // A problem reused by a timed practice remains outside public practice, even
 // if the author creates another edition with the same exercise.
-const sourceAccess = `p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school'
+const sourceAccess = `p.owner_scope='platform' AND p.archived_at IS NULL AND b.archived_at IS NULL AND b.visibility='school'
  AND v.published_at IS NOT NULL AND v.validation_status='AC'
  AND (v.school_visible_at IS NOT NULL AND v.rank_review_status='approved'
   OR p.owner_scope='platform' AND v.course_only_published AND v.rank_review_status='pending')
@@ -27,8 +27,8 @@ const sourceAccess = `p.archived_at IS NULL AND b.archived_at IS NULL AND b.visi
 
 // Serialize platform audience edits with readers of the same source banks.
 export async function lockCatalogProblemSchools(db, problemIds, {shared=false}={}) {
- const {rows}=await db.query(`SELECT DISTINCT b.school_id FROM problems p JOIN problem_banks b ON b.id=p.bank_id
-  WHERE ($1::uuid[] IS NULL AND p.owner_scope='platform') OR p.id=ANY($1::uuid[]) ORDER BY b.school_id`,[problemIds]);
+ const {rows}=await db.query(`SELECT DISTINCT b.catalog_scope_id AS school_id FROM problems p JOIN problem_banks b ON b.id=p.bank_id
+  WHERE ($1::uuid[] IS NULL AND p.owner_scope='platform') OR p.id=ANY($1::uuid[]) ORDER BY b.catalog_scope_id`,[problemIds]);
  for(const row of rows)await lockSchoolTeaching(db,row.school_id,{shared});
  return rows.map(row=>row.school_id);
 }
@@ -85,7 +85,7 @@ export async function availableCatalogPublicProblemVersions(db, versionIds) {
 // source version as the school catalogue.
 export async function currentCatalogPublicProblems(db, problemIds) {
  return (await db.query(`SELECT p.id AS problem_id,v.id,v.title FROM ${sourceTables}
-  JOIN school_problem_publications publication ON publication.school_id=b.school_id AND publication.problem_id=p.id
+  JOIN school_problem_publications publication ON publication.school_id=b.catalog_scope_id AND publication.problem_id=p.id
    AND publication.withdrawn_at IS NULL
   WHERE p.id=ANY($1::uuid[]) AND ${sourceAccess}`,[problemIds])).rows;
 }
@@ -95,26 +95,26 @@ export async function currentCatalogPublicProblems(db, problemIds) {
 // detail request would assign, while keeping prose and private cases in the DB.
 // The caller holds the school's shared teaching lock and its RLS scope.
 async function catalogRows(db,problemIds,access,schoolId=null) {
- return (await db.query(`SELECT p.id,b.school_id AS "schoolId",
+ return (await db.query(`SELECT p.id,b.catalog_scope_id AS "schoolId",
   COALESCE(projected.bank_id,$2::uuid) AS "bankId",b.name AS "bankName",
   v.title,COALESCE(snapshot.draft_revision,1) revision,
   true published,v.id AS "versionId",v.tags,v.mode,
   CASE WHEN jsonb_typeof(COALESCE(presentation.metadata,v.metadata)->'difficulty')='string'
    THEN COALESCE(presentation.metadata,v.metadata)->>'difficulty' END difficulty,
   COALESCE(snapshot.draft_revision,(SELECT COALESCE(max(history.draft_revision),0)+1
-   FROM school_problem_versions history WHERE history.school_id=b.school_id AND history.problem_id=p.id))
+   FROM school_problem_versions history WHERE history.school_id=b.catalog_scope_id AND history.problem_id=p.id))
    <>COALESCE(projected.revision,1) AS "hasDraftChanges"
   FROM ${sourceTables}
-  LEFT JOIN school_problems projected ON projected.school_id=b.school_id AND projected.id=p.id
-  LEFT JOIN school_problem_versions snapshot ON snapshot.school_id=b.school_id AND snapshot.problem_id=p.id AND snapshot.id=v.id
+  LEFT JOIN school_problems projected ON projected.school_id=b.catalog_scope_id AND projected.id=p.id
+  LEFT JOIN school_problem_versions snapshot ON snapshot.school_id=b.catalog_scope_id AND snapshot.problem_id=p.id AND snapshot.id=v.id
   LEFT JOIN problem_public_statements presentation ON presentation.version_id=v.id
-  WHERE p.id=ANY($1::uuid[]) AND ($3::uuid IS NULL OR b.school_id=$3) AND ${access}
+  WHERE p.id=ANY($1::uuid[]) AND ($3::uuid IS NULL OR b.catalog_scope_id=$3) AND ${access}
   FOR SHARE OF p,b,v`,[problemIds,snapshotBankId,schoolId])).rows;
 }
 
 export function publishedCatalogRows(db,schoolId,problemIds) {
  return catalogRows(db,problemIds,`${sourceAccess} AND EXISTS (SELECT 1 FROM school_problem_publications publication
-  WHERE publication.school_id=b.school_id AND publication.problem_id=p.id AND publication.withdrawn_at IS NULL)`,schoolId);
+  WHERE publication.school_id=b.catalog_scope_id AND publication.problem_id=p.id AND publication.withdrawn_at IS NULL)`,schoolId);
 }
 
 export async function platformProblemCatalogRows(db,problemIds) {
@@ -134,14 +134,13 @@ export async function prepareCatalogPublicProblem(db, problemId) {
 export async function listCatalogPublicProblemReviews(db,schoolId) {
  await scope(db,schoolId);
  const { rows } = await db.query(`
-  SELECT p.id AS problem_id,p.bank_id,b.school_id,b.name AS bank_name,v.id,v.title,CASE WHEN p.owner_scope='platform' THEN 'CodeMaster' ELSE s.name END AS school_name,
-   EXISTS(SELECT 1 FROM school_problem_publications publication WHERE publication.school_id=s.id
+  SELECT p.id AS problem_id,p.bank_id,b.catalog_scope_id AS school_id,b.name AS bank_name,v.id,v.title,'CodeMaster'::text AS school_name,
+   EXISTS(SELECT 1 FROM school_problem_publications publication WHERE publication.school_id=b.catalog_scope_id
     AND publication.problem_id=p.id AND publication.withdrawn_at IS NULL) AS "platformPublished",
    request.status AS "publicRequestStatus"
   FROM ${sourceTables}
-  LEFT JOIN school_problem_publication_requests request ON request.school_id=b.school_id AND request.problem_id=p.id AND request.catalog_version_id=v.id
-  JOIN schools s ON s.id=b.school_id
-  WHERE b.school_id=$1 AND ${sourceAccess}
+  LEFT JOIN school_problem_publication_requests request ON request.school_id=b.catalog_scope_id AND request.problem_id=p.id AND request.catalog_version_id=v.id
+  WHERE b.catalog_scope_id=$1 AND ${sourceAccess}
   ORDER BY (request.status='pending') DESC NULLS LAST,request.requested_at DESC NULLS LAST,v.title,p.id LIMIT 500`,[schoolId]);
  return rows.map(source => visibleProblem(source, {
    platformPublished: source.platformPublished,
@@ -246,7 +245,7 @@ export async function handleCatalogPublicProblemRequest({ pool, user, route, met
  const versionId = uuid(method === 'POST' ? body.versionId : url.searchParams.get('versionId'));
  return transaction(pool, async db => {
   await activeAccount(db, user.id);
-  const { rows: [bank] } = await db.query(`SELECT b.school_id FROM problems p JOIN problem_banks b ON b.id=p.bank_id
+  const { rows: [bank] } = await db.query(`SELECT b.catalog_scope_id AS school_id FROM problems p JOIN problem_banks b ON b.id=p.bank_id
    WHERE p.id=$1`, [problemId]);
   if (!bank) fail(403, 'FORBIDDEN', 'School administrator required.');
   const schoolId=bank.school_id;

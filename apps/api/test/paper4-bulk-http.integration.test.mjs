@@ -15,7 +15,7 @@ test('real Nest Paper 4 bulk transport accepts all 32 packages while preserving 
   const pool=createPool(connection.href);let app;
   try{
    await migrate(pool);const password=randomBytes(24).toString('base64url');
-   await bootstrap(pool,{name:'Bulk administrator',number:'BULK-ADMIN',username:'bulk-admin',password});
+   await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji',name:'Bulk administrator',number:'BULK-ADMIN',username:'bulk-admin',password});
    app=await createApiApplication({databaseUrl:connection.href,logger:false,config:loadConfig({SESSION_SECRET:randomBytes(48).toString('base64url'),APP_ORIGIN:'http://paper4.test',COOKIE_SECURE:'false'})});
    await app.listen(0,'127.0.0.1');const base=await app.getUrl();let cookie='',csrf='';
    async function request(path,body,{token=csrf}={}){

@@ -9,7 +9,7 @@ import {hashPassword} from '../../../packages/domain/src/security.mjs';
 import {createDomainServices,loadConfig} from '../../../packages/domain/src/application.mjs';
 import {platformCourseAdmission,platformCourseAdmissions} from '../../../packages/domain/src/platform-course-access.mjs';
 import {courseAccess} from '../../../packages/domain/src/course-access.mjs';
-import {LEGACY_SCHOOL_ID} from '../../../packages/domain/src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 import {createApiApplication} from '../dist/application.js';
 
 test('student course catalogs batch admission and learner history without widening access', {skip:!process.env.TEST_DATABASE_URL,timeout:120000},async t=>{
@@ -19,7 +19,7 @@ test('student course catalogs batch admission and learner history without wideni
  const owner=createPool(scoped.href);let runtime,app;
  try{
   await migrate(owner);const password=randomBytes(24).toString('base64url');
-  await bootstrap(owner,{username:'catalog-admin',password,number:'ADMIN',name:'Catalog admin'});
+  await bootstrap(owner,{schoolSlug:'tianxing-chuangshiji',username:'catalog-admin',password,number:'ADMIN',name:'Catalog admin'});
   const admin=(await owner.query("SELECT id FROM accounts WHERE username='catalog-admin'")).rows[0];
   const identity=(await owner.query("INSERT INTO identities(kind,number,name) VALUES('student','catalog-learner','Catalog learner') RETURNING id")).rows[0];
   const learner={...(await owner.query('INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,$2,$3) RETURNING id',[identity.id,'catalog-learner',await hashPassword(password)])).rows[0],identityId:identity.id,roles:['student']};

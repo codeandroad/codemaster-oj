@@ -5,7 +5,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { createPool, transaction } from './db.mjs';
 import { canonicalHash, uuid } from './security.mjs';
 import { normalizeSchoolProblem } from './school-practice.mjs';
-import { LEGACY_SCHOOL_ID, lockSchoolTeaching } from './schools.mjs';
+import { lockSchoolTeaching } from './schools.mjs';
 import { paperAssetPurposes, validatePaperDefinition } from './acsl-grading.mjs';
 
 const MAX_ASSET_BYTES = 8388608;
@@ -87,7 +87,7 @@ async function insertPaper(db, { schoolId, ownerAccountId }, { content, contentH
 
 export async function importAcslPapers(pool, { schoolId, ownerAccountId, packages, enablePoints = false }) {
   uuid(schoolId); uuid(ownerAccountId);
-  if (typeof enablePoints !== 'boolean' || enablePoints && schoolId !== LEGACY_SCHOOL_ID) throw new Error('ACSL points can be explicitly enabled only for the legacy school.');
+  if (typeof enablePoints !== 'boolean') throw new Error('enablePoints must be a boolean.');
   if (!Array.isArray(packages) || !packages.length || packages.length > 200) throw new Error('Import 1–200 ACSL editions at a time.');
   const prepared = packages.map(prepareAcslPackage);
   if (new Set(prepared.map(item => item.content.slug)).size !== prepared.length) throw new Error('Duplicate ACSL edition slugs in batch.');

@@ -1,15 +1,12 @@
 "use client";
 
-import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "@/components/locale-context";
-import { useNavigationBlocker } from "@/components/navigation";
-import { Button } from "@/components/ui/button";
-import { Feedback, textarea, useData, useMutation } from "@/components/student/shared";
+import { useData } from "@/components/student/shared";
 import { publicSubmissionContext, submissionVerdicts } from "@/components/student/submission-filter";
 import { ReviewNotebookView, SubmissionHistory, studyRecordScore, studyRecordVerdict } from "@/components/student/study-record-views";
 import { reviewNotebookState, type ReviewNotebookFilter } from "@/components/student/review-notebook-state";
-import { productionApi } from "@/lib/production-api";
+import { CorrectionNote } from "./correction-note";
 import { StudySubmissionDetail, type JobDetail } from "./school-submission-detail";
 import { useSchoolText } from "./school-ui";
 
@@ -62,7 +59,7 @@ function PublicStudyRecords({ notebook }: { notebook: boolean }) {
       backLabel={notebook ? text("Back to review notebook", "返回订正本") : undefined}
       problemHref={job => `/practice/problems?problemId=${encodeURIComponent(job.problemId)}`}
       renderExtra={(job, reload) => job.state === "completed" &&
-        <PublicCorrectionNote key={job.noteUpdatedAt ?? "new"} path={path} job={job} onSaved={reload} />}
+        <CorrectionNote key={job.noteUpdatedAt ?? "new"} path={path} job={job} onSaved={reload} />}
     />;
   }
   return <PublicRecordsList key={`${notebook}:${page}:${verdict}:${reviewState}`} notebook={notebook} page={page}
@@ -112,24 +109,4 @@ function PublicRecordsList({ notebook, page, verdict, context, reviewState, href
       onVerdict: value => router.push(href({ publicVerdict: value || null, publicPage: null })),
       onContext: value => router.push(href({ publicContext: value || null, publicPage: null })),
     }}/>;
-}
-
-function PublicCorrectionNote({ path, job, onSaved }: { path: string; job: PublicJob; onSaved: () => void }) {
-  const text = useSchoolText();
-  const [note, setNote] = useState(job.note ?? "");
-  const action = useMutation();
-  const dirty = note !== (job.note ?? "");
-  useNavigationBlocker(dirty);
-  return <form className="space-y-3 rounded-lg border border-border bg-surface p-4" onSubmit={event => {
-    event.preventDefault();
-    void action.run(async () => {
-      await productionApi(`${path}/note`, { method: "PATCH", body: { note } });
-      onSaved();
-    });
-  }}>
-    <label className="block font-semibold" htmlFor="public-correction-note">{text("Review note", "订正笔记")}</label>
-    <textarea id="public-correction-note" className={textarea} rows={4} required maxLength={8000} value={note} onChange={event => setNote(event.target.value)} />
-    <Feedback action={action} />
-    <Button type="submit" disabled={action.busy || !dirty || !note.trim()}>{text("Save note", "保存笔记")}</Button>
-  </form>;
 }

@@ -36,11 +36,11 @@ test('publication requests keep the source school, edition and decision through 
   const {rows}=await pool.query('SELECT * FROM school_problem_publication_requests ORDER BY requested_at,status');
   assert.deepEqual(rows.map(r=>[r.school_id,r.problem_id,r.version_id,r.catalog_version_id,r.school_version_id,r.status,r.requested_by,r.requested_at.toISOString().slice(0,10),r.decided_by,r.decided_at?.toISOString().slice(0,10)]),[
    [nativeSchool,nativeEdition,nativeEdition,null,nativeEdition,'pending',account,'2026-01-01',null,undefined],
-   [sourceSchool,sourceEditions[0],sourceEditions[0],sourceEditions[0],null,'pending',account,'2026-01-02',null,undefined],
-   [sourceSchool,sourceEditions[1],sourceEditions[1],sourceEditions[1],null,'rejected',account,'2026-01-02',account,'2026-01-03'],
+   [sourceSchool,sourceEditions[0],sourceEditions[0],null,sourceEditions[0],'pending',account,'2026-01-02',null,undefined],
+   [sourceSchool,sourceEditions[1],sourceEditions[1],null,sourceEditions[1],'rejected',account,'2026-01-02',account,'2026-01-03'],
   ]);
   assert.equal((await pool.query("SELECT to_regclass('legacy_public_problem_requests') old")).rows[0].old,null);
-  assert.equal((await pool.query('SELECT count(*) FROM school_problem_versions')).rows[0].count,'1');
+  assert.equal((await pool.query('SELECT count(*) FROM school_problem_versions')).rows[0].count,'3');
   await assert.rejects(pool.query('UPDATE school_problem_publication_requests SET school_id=$1 WHERE version_id=$2',[nativeSchool,sourceEditions[0]]),{code:'23503'});
   await assert.rejects(pool.query('UPDATE school_problem_publication_requests SET catalog_version_id=$1,version_id=$1 WHERE problem_id=$2',[sourceEditions[1],sourceEditions[0]]),{code:'23503'});
  } finally {

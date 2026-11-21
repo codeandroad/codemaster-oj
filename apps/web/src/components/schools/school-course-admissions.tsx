@@ -8,7 +8,6 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { CourseAdmissionsDialog } from "./course-admissions-dialog";
 import { useSchoolText } from "./school-ui";
 
-export { legacyCourseAdmissionsHref, legacyCourseAdmissionsSchoolId } from "./school-course-admission-routes";
 
 type Course = { id: string; title: string; pendingCount: number };
 type AdmissionsList = { items: Course[]; page: number; hasMore: boolean };

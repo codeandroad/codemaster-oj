@@ -1,3 +1,4 @@
+import { ownSchoolReceipt, receiptActivityJoin, receiptVisible } from './school-submission-history.mjs';
 import { problemProgress } from './problem-progress.mjs';
 import { assertLiveProblemVersion, assertPublishedRevision } from './live-problem-version.mjs';
 import { problemCatalogCourseRequest } from './problem-catalog-courses.mjs';
@@ -169,9 +170,13 @@ async function loadScopedPublicProblem(db,user,id,courseContext,requireCourseCon
 }
 
 async function hasCatalogSource(db,schoolId,problemId) {
- const {rowCount}=await db.query('SELECT 1 FROM problems p JOIN problem_banks b ON b.id=p.bank_id WHERE p.id=$1 AND b.school_id=$2',[problemId,schoolId]);
+ const {rowCount}=await db.query("SELECT 1 FROM problems p JOIN problem_banks b ON b.id=p.bank_id WHERE p.id=$1 AND b.catalog_scope_id=$2 AND p.owner_scope='platform'",[problemId,schoolId]);
  return rowCount>0;
 }
+
+const publicExerciseAvailable = `NOT EXISTS(SELECT 1 FROM school_activity_problems link
+ JOIN school_activities activity ON (activity.school_id,activity.id)=(link.school_id,link.activity_id)
+ WHERE (link.school_id,link.problem_id)=(p.school_id,p.id) AND activity.kind='timed')`;
 
 async function publicLoaded(db,user,id,courseContext={},requireCourseContext=false){
  if(courseContext.courseId&&(await db.query(`SELECT 1 FROM learning_paths p LEFT JOIN public_course_listings l ON l.course_id=p.id
@@ -195,6 +200,8 @@ async function publicLoaded(db,user,id,courseContext={},requireCourseContext=fal
  }
  if(!current.rowCount)fail(404,'NOT_FOUND','Problem is unavailable.');
  await scope(db,schoolId);
+ await schoolActivityProblemAccess(db,{schoolId,problemId:id,user});
+ if(!(await db.query(`SELECT 1 FROM school_problems p WHERE p.school_id=$1 AND p.id=$2 AND ${publicExerciseAvailable}`,[schoolId,id])).rowCount)fail(404,'NOT_FOUND','Problem is unavailable.');
  return loadProblem(db,schoolId,id,user,null,{publicOnly:true});
 }
 
@@ -232,7 +239,7 @@ async function publicCatalogRows(db,publications,lockedSchools) {
     JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id
     JOIN school_problem_versions v ON v.school_id=p.school_id AND v.problem_id=p.id AND v.id=p.published_version_id
     WHERE publication.school_id=$1 AND publication.problem_id=ANY($2::uuid[]) AND publication.withdrawn_at IS NULL
-     AND p.published AND NOT b.archived AND b.resource_kind='ordinary'`,[schoolId,ids])).rows;
+     AND p.published AND NOT b.archived AND b.resource_kind='ordinary' AND ${publicExerciseAvailable}`,[schoolId,ids])).rows;
   for(const row of [...current,...sources])output.set(row.id,{...row,
    tags:Array.isArray(row.tags)?row.tags.filter(tag=>typeof tag==='string'&&tag.trim()):[],
    mode:row.mode==='function'?'function':'stdio'});
@@ -282,7 +289,7 @@ export async function listPublicProblems(pool,user,url){
     SELECT problem_id,school_id,approved_at FROM school_problem_publications
     WHERE withdrawn_at IS NULL AND ($3::uuid[] IS NULL OR problem_id=ANY($3))
     UNION ALL
-    SELECT scoped.problem_id,b.school_id,'-infinity'::timestamptz FROM unnest($4::uuid[]) AS scoped(problem_id)
+    SELECT scoped.problem_id,b.catalog_scope_id AS school_id,'-infinity'::timestamptz FROM unnest($4::uuid[]) AS scoped(problem_id)
     JOIN problems source ON source.id=scoped.problem_id AND source.owner_scope='platform'
     JOIN problem_banks b ON b.id=source.bank_id
     WHERE ($3::uuid[] IS NULL OR scoped.problem_id=ANY($3)) AND NOT EXISTS (
@@ -365,6 +372,8 @@ async function decideProblemPublication(db, user, {schoolId, problemId, versionI
    WHERE school_id=$1 AND problem_id=$2 AND version_id=$3 AND status='pending'
   `, [schoolId,problemId,versionId,decision==='approve'?'approved':'rejected',user.id]);
   if (decision === 'reject' && !request.rowCount) fail(409,'NO_PENDING_REQUEST','No request is pending for this version.');
+  if(decision==='approve'&&!(await db.query(`SELECT 1 FROM school_problems p WHERE p.school_id=$1 AND p.id=$2 AND ${publicExerciseAvailable}`,[schoolId,problemId])).rowCount)
+   fail(409,'INELIGIBLE_FOR_PUBLIC_PRACTICE','Timed assessment problems cannot enter public practice.');
   if (decision === 'approve') await db.query(`
    INSERT INTO school_problem_publications(school_id,problem_id,version_id,approved_by) VALUES($1,$2,$3,$4)
    ON CONFLICT(problem_id) DO UPDATE SET version_id=EXCLUDED.version_id,approved_by=EXCLUDED.approved_by,
@@ -426,7 +435,7 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
   }
   if(method==='GET'){
    const items=[];
-   const {rows:schools}=await db.query('SELECT id,name FROM schools ORDER BY name,id');
+   const {rows:schools}=await db.query("SELECT storage.id,coalesce(s.name,'CodeMaster') name FROM practice_storage_scopes storage LEFT JOIN schools s ON s.id=storage.school_id ORDER BY name,storage.id");
    for(const school of schools){
     await scope(db,school.id);
     const {rows:problems}=await db.query(`SELECT p.*,b.name AS bank_name FROM school_problems p
@@ -469,15 +478,46 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
    return reply({ok:true});
   }return null;
  });
- const m=route.match(/^\/schools\/([^/]+)\/(problem-banks|problems|judge-status|judge-jobs|submissions)(?:\/([^/]+)(?:\/(validate|publish|unpublish|submissions|public-request|tutorial))?)?$/);
+ const m=route.match(/^\/schools\/([^/]+)\/(problem-banks|problems|judge-status|judge-jobs|submissions)(?:\/([^/]+)(?:\/(validate|publish|unpublish|submissions|public-request|tutorial|note))?)?$/);
  if(!m)return null;const schoolId=uuid(m[1]);
  return transaction(pool,async db=>{
-  await lockSchoolTeaching(db,schoolId,{shared:method==='GET'});const role=await schoolRole(db,schoolId,user.id);await scope(db,schoolId);const id=m[3]?uuid(m[3]):null;
+  await lockSchoolTeaching(db,schoolId,{shared:method==='GET'});const role=await schoolRole(db,schoolId,user.id);await scope(db,schoolId);
+  if(m[2]==='judge-jobs'&&m[3]&&(method==='GET'&&!m[4]||method==='PATCH'&&m[4]==='note')){
+   await db.query("SELECT set_config('campus.account_id',$1,true)",[user.id]);
+   const historical=/^SUB[1-9][0-9]{0,17}$/.test(m[3]),id=historical?m[3].slice(3):uuid(m[3]);
+   const column=historical?'submission_id':'job_id';
+   let record;
+   if(historical)record=await ownSchoolReceipt(db,schoolId,user.id,id);
+   else{
+    const job=(await db.query("SELECT * FROM school_judge_jobs WHERE school_id=$1 AND id=$2 AND account_id=$3 AND access_context NOT IN ('assignment_preview','acsl')",[schoolId,id,user.id])).rows[0];
+    if(!job)fail(404,'NOT_FOUND','Submission not found.');
+    record=await projectJob(db,job);
+   }
+   if(method==='PATCH'){
+    if(!record.resultsVisible||record.state!=='completed')fail(409,'UNAVAILABLE','成绩公布后可订正');
+    const note=field(body.note??'','订正笔记',{min:0,max:10000});
+    await db.query(`INSERT INTO school_submission_notes(school_id,account_id,${column},note) VALUES($1,$2,$3,$4)
+     ON CONFLICT(school_id,account_id,${column}) DO UPDATE SET note=EXCLUDED.note,updated_at=clock_timestamp()`,[schoolId,user.id,id,note]);
+    return reply({note});
+   }
+   const saved=record.resultsVisible?(await db.query(`SELECT note,updated_at AS "noteUpdatedAt" FROM school_submission_notes WHERE school_id=$1 AND account_id=$2 AND ${column}=$3`,[schoolId,user.id,id])).rows[0]:null;
+   return reply({...record,...saved});
+  }
+  const id=m[3]?uuid(m[3]):null;
   if(m[2]==='submissions'&&method==='GET'&&!id){
+   await db.query("SELECT set_config('campus.account_id',$1,true)",[user.id]);
    const page=integer(Number(url.searchParams.get('page')??1),1,100000,'Page');
-   const rows=(await db.query(`SELECT id,problem_id,payload->'version'->>'title' AS title,payload->>'language' AS language,state,created_at,result->>'status' AS status,result->>'score' AS score
+   const rows=(await db.query(`SELECT * FROM (SELECT id::text,problem_id,payload->'version'->>'title' AS title,payload->>'language' AS language,state,created_at,result->>'status' AS status,result->>'score' AS score
     FROM school_judge_jobs j WHERE ${schoolActivityJobVisibleSql('j')} AND school_id=$1 AND account_id=$2 AND access_context IN ('school','staff_practice') AND kind='submit'
-    ORDER BY created_at DESC,id LIMIT 26 OFFSET $3`,[schoolId,user.id,(page-1)*25])).rows;
+    AND (NOT $4 OR result->>'status' IN ('WA','CE','RE','TLE','MLE','OLE') OR EXISTS(SELECT 1 FROM school_submission_notes n WHERE n.job_id=j.id AND n.note<>''))
+    UNION ALL SELECT 'SUB'||s.id,s.problem_id,v.title,s.language,
+     CASE WHEN s.status='Waiting' THEN 'queued' WHEN s.status='Judging' THEN 'leased' ELSE 'completed' END,s.created_at,
+     CASE WHEN ${receiptVisible} THEN s.status ELSE 'Submitted' END,CASE WHEN ${receiptVisible} THEN s.score::text END
+     FROM submissions s JOIN problem_versions v ON v.id=s.version_id ${receiptActivityJoin}
+     WHERE s.school_id=$1 AND s.account_id=$2 AND (NOT $4 OR ${receiptVisible} AND (EXISTS(SELECT 1 FROM review_entries r WHERE r.submission_id=s.id)
+      OR EXISTS(SELECT 1 FROM school_submission_notes n WHERE n.submission_id=s.id AND n.note<>'')
+      OR s.kind='submit' AND s.status IN ('WA','CE','RE','TLE','MLE','OLE')))) records
+    ORDER BY created_at DESC,id LIMIT 26 OFFSET $3`,[schoolId,user.id,(page-1)*25,url.searchParams.get('view')==='review'])).rows;
    return reply({page,hasMore:rows.length>25,items:rows.slice(0,25).map(j=>({id:j.id,problemId:j.problem_id,problemTitle:j.title,language:j.language,state:j.state,createdAt:j.created_at,status:j.status??(j.state==='failed'?'System Error':j.state==='leased'?'Judging':'Waiting'),score:j.score===null?null:Number(j.score)}))});
   }
   if(m[2]==='judge-status'&&method==='GET'){
@@ -485,7 +525,6 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
    const counts=(await db.query("SELECT count(*) FILTER(WHERE state='queued')::integer AS queued,count(*) FILTER(WHERE state='leased')::integer AS running,count(*) FILTER(WHERE state='failed')::integer AS failed,count(*) FILTER(WHERE state='completed')::integer AS completed FROM school_judge_jobs WHERE school_id=$1",[schoolId])).rows[0];
    const ready=(await db.query("SELECT EXISTS(SELECT 1 FROM judge_nodes WHERE executor_ready AND heartbeat_at>now()-interval '45 seconds') AS ready")).rows[0].ready;return reply({...counts,ready});
   }
-  if(m[2]==='judge-jobs'&&method==='GET'&&id){const job=(await db.query("SELECT * FROM school_judge_jobs WHERE school_id=$1 AND id=$2 AND account_id=$3 AND access_context NOT IN ('assignment_preview','acsl')",[schoolId,id,user.id])).rows[0];if(!job)fail(404,'NOT_FOUND','Submission not found.');return reply(await projectJob(db,job));}
   if(m[2]==='problem-banks'){
    if(method==='GET'){return reply({items:(await db.query(`SELECT id,name,revision,archived,owner_account_id=$2 OR $3='school_admin' AS "canManage" FROM school_problem_banks WHERE resource_kind=\'ordinary\' AND school_id=$1 AND ($3='school_admin' OR owner_account_id=$2 OR NOT archived AND EXISTS(SELECT 1 FROM school_problems p WHERE p.school_id=$1 AND p.bank_id=school_problem_banks.id AND p.published)) ORDER BY name,id`,[schoolId,user.id,role])).rows});}
    if(!['teacher','school_admin'].includes(role))fail(403,'FORBIDDEN','Teaching role required.');

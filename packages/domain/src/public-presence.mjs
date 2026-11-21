@@ -1,7 +1,7 @@
 import { avatarForIdentity } from './avatars.mjs';
 import { transaction } from './db.mjs';
 import { availableCatalogPublicProblemVersions } from './catalog-problem-publication.mjs';
-import { PRESENCE_HEARTBEAT_SECONDS, PRESENCE_TTL_SECONDS } from './presence.mjs';
+const PRESENCE_HEARTBEAT_SECONDS=30, PRESENCE_TTL_SECONDS=90;
 import { fail, field, integer, uuid } from './security.mjs';
 
 const displayName = `COALESCE(CASE WHEN a.leaderboard_use_nickname THEN NULLIF(btrim(a.nickname),'') END,

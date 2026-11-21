@@ -9,7 +9,7 @@ import { loadConfig } from '../../../packages/domain/src/application.mjs';
 import { provisionPlatformAdministrator } from '../../../packages/domain/src/platform-governance.mjs';
 import { GoJudge } from '../../../packages/domain/judge.mjs';
 import { processOne } from '../../../packages/domain/worker.mjs';
-import { SCHOOL_BANK } from '../../../packages/domain/src/library.mjs';
+import { SCHOOL_BANK } from '../../../packages/domain/test/fixtures/pre-workspace/library.mjs';
 import { acceptDraftValidation, draftIdentity, reviewIdentity } from '../../../packages/domain/test/problem-draft-fixture.mjs';
 
 test('legacy teachers preview the current exercise with private, immutable judged results', {
@@ -25,7 +25,7 @@ test('legacy teachers preview the current exercise with private, immutable judge
   try {
     await migrate(pool);
     const password = randomBytes(24).toString('base64url');
-    await bootstrap(pool, { name: 'QA administrator', number: 'ADMIN', username: 'qa-admin', password });
+    await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji', name: 'QA administrator', number: 'ADMIN', username: 'qa-admin', password });
     const origin = 'http://legacy-preview.test';
     app = await createApiApplication({ databaseUrl: database.href, logger: false, config: loadConfig({
       SESSION_SECRET: randomBytes(32).toString('hex'), APP_ORIGIN: origin, COOKIE_SECURE: 'false',

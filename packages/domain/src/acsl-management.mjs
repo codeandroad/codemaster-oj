@@ -1,5 +1,5 @@
 import { transaction } from './db.mjs';
-import { activeAccount, LEGACY_SCHOOL_ID, lockSchoolTeaching, schoolRole } from './schools.mjs';
+import { lockSchoolTeaching, schoolRole } from './schools.mjs';
 import { enumValue, fail, field, uuid } from './security.mjs';
 import { validatePaperDefinition } from './acsl-grading.mjs';
 import { readAcslSolutionPrice, updateAcslSolutionPrice } from './acsl-pricing.mjs';
@@ -20,12 +20,7 @@ function assign(target, patch, keys) {
 
 async function staffAccess(db, schoolId, user, write) {
   await lockSchoolTeaching(db, schoolId, { shared: !write });
-  if (schoolId === LEGACY_SCHOOL_ID) {
-    await activeAccount(db, user.id);
-    const result = await db.query(`SELECT 1 FROM legacy_school_account_ownership o JOIN account_roles r ON r.account_id=o.account_id
-      WHERE o.account_id=$1 AND r.role IN ('teacher','admin')`, [user.id]);
-    if (!result.rowCount) fail(403, 'FORBIDDEN', 'Teaching access to this school is required.');
-  } else if (!['teacher', 'school_admin'].includes(await schoolRole(db, schoolId, user.id))) {
+  if (!['teacher', 'school_admin'].includes(await schoolRole(db, schoolId, user.id))) {
     fail(403, 'FORBIDDEN', 'Teaching access to this school is required.');
   }
   await db.query("SELECT set_config('campus.school_id',$1,true)", [schoolId]);

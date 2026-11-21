@@ -1,9 +1,7 @@
 import { platformChapterProblems } from './platform-course-problems.mjs';
-import { LEGACY_SCHOOL_ID } from './schools.mjs';
 import { currentCatalogPublicProblems } from './catalog-problem-publication.mjs';
 import { problemSolvedSql } from './problem-progress.mjs';
 import { loadCoursePaper4, paper4Progress } from './course-paper4.mjs';
-import { latestCourseProblemVersion } from './course-problem-version.mjs';
 
 async function schoolScope(db,schoolId,fn) {
  const previous=(await db.query("SELECT current_setting('campus.school_id',true) school")).rows[0].school??'';
@@ -15,21 +13,16 @@ async function schoolScope(db,schoolId,fn) {
 
 export const unavailablePrerequisite=courseId=>({courseId,available:false,completed:false,canOpen:false,requiresAdmission:false,readChapters:0,totalChapters:0,completedExercises:0,totalExercises:0});
 
-// Match the ordinary legacy learning page's current published exercise and
-// credit rules. This is used only in an actual legacy-school membership
-// context; a platform course never grants access to a school's private bank.
-async function legacyChapterProblems(db,course,user,chapterIds) {
- if(!chapterIds.length)return new Map();
- const rows=(await db.query(`SELECT cp.problem_id,cp.version_id,
-  ${problemSolvedSql({problemId:'cp.problem_id',accountId:'$2',requiredLanguage:'$3',languageCreditCutoffs:'$4'})} solved
-  FROM chapter_problems cp JOIN problems p ON p.id=cp.problem_id
-  JOIN problem_banks b ON b.id=p.bank_id
-  JOIN problem_versions linked ON linked.id=cp.version_id AND linked.problem_id=cp.problem_id
-  ${latestCourseProblemVersion} true JOIN problem_versions v ON v.id=COALESCE(latest.id,linked.id)
-  WHERE cp.chapter_id=ANY($1::uuid[]) AND p.archived_at IS NULL AND b.archived_at IS NULL
-   AND b.visibility='school' AND v.published_at IS NOT NULL AND v.school_visible_at IS NOT NULL
-   AND v.rank_review_status='approved'`,[chapterIds,user.id,course.required_language,course.language_credit_cutoffs])).rows;
- return new Map(rows.map(row=>[`${row.problem_id}:${row.version_id}`,row]));
+async function schoolChapterProblems(db,schoolId,course,user,chapterIds) {
+ return schoolScope(db,schoolId,async()=>{
+  const rows=(await db.query(`SELECT cp.problem_id,cp.version_id,
+   ${problemSolvedSql({problemId:'cp.problem_id',accountId:'$2',requiredLanguage:'$3',languageCreditCutoffs:'$4'})} solved
+   FROM chapter_problems cp JOIN school_problems p ON p.id=cp.problem_id AND p.school_id=$5 AND p.published
+   JOIN school_problem_banks b ON (b.school_id,b.id)=(p.school_id,p.bank_id) AND b.resource_kind='ordinary' AND NOT b.archived
+   JOIN school_problem_versions linked ON (linked.school_id,linked.problem_id,linked.id)=(p.school_id,p.id,cp.version_id)
+   WHERE cp.chapter_id=ANY($1::uuid[])`,[chapterIds,user.id,course.required_language,course.language_credit_cutoffs,schoolId])).rows;
+  return new Map(rows.map(row=>[`${row.problem_id}:${row.version_id}`,row]));
+ });
 }
 
 // No course admission calls here: the resolver checks the prerequisite's own
@@ -44,20 +37,19 @@ export async function platformPrerequisiteProgress(db,course,user,{schoolId=null
    readChapters:chapters.filter(c=>c.read).length,totalChapters:chapters.length,totalExercises:0,completedExercises:0};
   const configured=chapters.flatMap(c=>c.problems),problems=await publicChapterProblems(db,{school_id:course.school_id},{...course,chapters},user.id);
   const contexts=schoolId?[schoolId]:[null,...schoolIds];
-  const legacyAllowed=course.school_id===LEGACY_SCHOOL_ID&&schoolIds.includes(LEGACY_SCHOOL_ID)&&contexts.includes(LEGACY_SCHOOL_ID);
-  const legacy=legacyAllowed?await legacyChapterProblems(db,course,user,chapters.map(c=>c.id)):new Map();
   const acslLinks=chapters.flatMap(c=>c.acsl_links??[]);
   const {projectCourseAcslLinks}=acslLinks.length?await import('./course-acsl.mjs'):{};
   const paper4Count=Number((await db.query(`SELECT count(*) n FROM chapter_paper4_links l JOIN learning_chapters c ON c.id=l.chapter_id WHERE c.path_id=$1 AND c.archived_at IS NULL`,[course.id])).rows[0].n);
-  const paper4=paper4Count&&legacyAllowed?await loadCoursePaper4(db,[course.id],[user.identityId]):null;
+  const paper4=paper4Count&&schoolIds.includes(course.school_id)?await loadCoursePaper4(db,[course.id],[user.identityId]):null;
   let best=null;
   // Evaluate the whole prerequisite in one lawful school context, with public
   // practice credit usable in each. Never combine ordinary, ACSL or Paper 4
   // achievements from different school contexts into an artificial pass.
   for(const context of contexts){
+   const schoolProblems=context&&schoolIds.includes(context)?await schoolChapterProblems(db,context,course,user,chapters.map(c=>c.id)):new Map();
    const current={available:chapters.length>0,totalExercises:configured.length+acslLinks.length,completedExercises:0};
    for(const link of configured){
-    const key=`${link.problemId}:${link.versionId}`,publicProblem=problems.get(key),schoolProblem=context===LEGACY_SCHOOL_ID?legacy.get(key):null;
+    const key=`${link.problemId}:${link.versionId}`,publicProblem=problems.get(key),schoolProblem=schoolProblems.get(key);
     if(!publicProblem&&!schoolProblem)current.available=false;
     else if(publicProblem?.solved||schoolProblem?.solved)current.completedExercises++;
    }
@@ -67,7 +59,7 @@ export async function platformPrerequisiteProgress(db,course,user,{schoolId=null
     current.completedExercises+=projected.filter(link=>link.available&&link.completed).length;
    }
    if(paper4Count){
-    if(context!==LEGACY_SCHOOL_ID||!paper4){current.available=false;current.totalExercises+=paper4Count;}
+    if(context!==course.school_id||!paper4){current.available=false;current.totalExercises+=paper4Count;}
     else{
      const progress=paper4Progress(paper4,'path',course.id,user.identityId);
      const unavailable=paper4.rows.filter(row=>!row.available).length+(paper4Count-paper4.rows.length);
@@ -105,7 +97,8 @@ export async function publicChapterProblems(db, listing, course, accountId) {
   const catalogIds=rows.filter(row=>row.resource_kind==='publication').map(row=>row.problemId);
   const sources=new Map((catalogIds.length?await currentCatalogPublicProblems(db,catalogIds):[]).map(row=>[row.problem_id,row]));
   for (const {resource_kind,linkedVersionId,...row} of rows) {
-    const current=sources.get(row.problemId);
+    const schoolProblems=context&&schoolIds.includes(context)?await schoolChapterProblems(db,context,course,user,chapters.map(c=>c.id)):new Map();
+   const current=sources.get(row.problemId);
     if (resource_kind==='publication'&&!current) continue;
     const key=`${row.problemId}:${linkedVersionId}`;
     problems.set(key, {...row,...(current?{versionId:current.id,title:current.title}:{}),solved:row.solved||problems.get(key)?.solved||false});

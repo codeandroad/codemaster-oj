@@ -11,7 +11,8 @@ import { migrate } from '../../../packages/domain/src/migrate.mjs';
 import { bootstrap } from '../../../packages/domain/src/bootstrap.mjs';
 import { hashPassword } from '../../../packages/domain/src/security.mjs';
 import { loadConfig } from '../../../packages/domain/src/application.mjs';
-import { provisionSchool, LEGACY_SCHOOL_ID } from '../../../packages/domain/src/schools.mjs';
+import { provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 import { provisionPlatformAdministrator } from '../../../packages/domain/src/platform-governance.mjs';
 
 const migration='102_platform_courses.sql';
@@ -27,7 +28,7 @@ test('platform courses retain original data and enforce audiences through NestJS
  try{
   await pool.query('CREATE TABLE schema_migrations(name text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');
   await pool.query('INSERT INTO schema_migrations(name) SELECT unnest($1::text[])',[deferredMigrations]);await migrate(pool);
-  await bootstrap(pool,{name:'Original school administrator',number:'A',username:'school-admin',password});
+  await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji',name:'Original school administrator',number:'A',username:'school-admin',password});
   const admin=(await pool.query("SELECT id,identity_id FROM accounts WHERE username='school-admin'")).rows[0];
   const hash=await hashPassword(password),actors={};
   for(const name of ['platform','student-a','student-b','personal','school-teacher']){

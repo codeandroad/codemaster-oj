@@ -4,7 +4,7 @@ import {randomBytes, randomUUID} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {createPool, transaction} from '../src/db.mjs';
 import {migrate} from '../src/migrate.mjs';
-import {handlePresence, PRESENCE_TTL_SECONDS} from '../src/presence.mjs';
+import {handlePresence, PRESENCE_TTL_SECONDS} from './fixtures/pre-workspace/presence.mjs';
 import {defaultAvatarPath} from '../src/avatars.mjs';
 
 test('presence validates authentication, role, paging, search and rejects client-controlled identity/time', async () => {

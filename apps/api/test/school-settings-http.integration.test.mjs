@@ -8,7 +8,8 @@ import { migrate } from '../../../packages/domain/src/migrate.mjs';
 import { bootstrap } from '../../../packages/domain/src/bootstrap.mjs';
 import { loadConfig } from '../../../packages/domain/src/application.mjs';
 import { hashPassword } from '../../../packages/domain/src/security.mjs';
-import { LEGACY_SCHOOL_ID, provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 import { handleSchoolSettings } from '../../../packages/domain/src/school-settings.mjs';
 
 // Both HTTP middleware and deployment-role permissions are exercised against a
@@ -29,7 +30,7 @@ test('school names: own-school administration, revisions, legacy compatibility a
    await manager.query(`CREATE SCHEMA ${schema}`); created = true;
    await migrate(pool);
    const password = randomBytes(24).toString('base64url');
-   const legacyId = await bootstrap(pool, {name:'Legacy administrator',number:'ADM',username:'legacy-admin',password});
+   const legacyId = await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji',name:'Legacy administrator',number:'ADM',username:'legacy-admin',password});
    const passwordHash = await hashPassword(password);
    const accounts = {};
    for (const username of ['alpha-admin','beta-admin','teacher','student']) {

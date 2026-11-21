@@ -6,7 +6,7 @@ import { createPool } from '../src/db.mjs';
 import { migrate } from '../src/migrate.mjs';
 import { bootstrap } from '../src/bootstrap.mjs';
 import { createApp, loadConfig } from '../src/app.mjs';
-import { SCHOOL_BANK } from '../src/library.mjs';
+import { SCHOOL_BANK } from './fixtures/pre-workspace/library.mjs';
 
 test('batch school approval is admin-only, version-pinned, atomic and never publishes drafts',
   {skip:!process.env.TEST_DATABASE_URL,timeout:60000},async()=>{

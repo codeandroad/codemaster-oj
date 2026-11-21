@@ -158,7 +158,7 @@ test('isolated school and public practice lifecycle, authorization, queue and fe
     return approvedResult;
    }}});
    assert.doesNotMatch(JSON.stringify(await call('outsider',publicRoute+'/submissions/'+job.id)),/PRIVATE_|HIDDEN_/);
-   await assert.rejects(worker.query('SELECT * FROM legacy_public_problem_requests'),{code:'42501'});
+   await assert.rejects(worker.query('SELECT * FROM school_problem_publication_requests'),{code:'42501'});
 
    const { rows: [{id: classId}] } = await pool.query("INSERT INTO classes(name,owner_account_id) VALUES('Protected class',$1) RETURNING id",[users.teacher.id]);
    const { rows: [{id: practiceId}] } = await pool.query(`INSERT INTO timed_practices

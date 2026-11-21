@@ -1,7 +1,7 @@
 import { transaction } from './db.mjs';
-import { platformProblemCatalogRows } from './legacy-public-problems.mjs';
+import { lockCatalogProblemSchools, platformProblemCatalogRows } from './catalog-problem-publication.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
-import { activeAccount, LEGACY_SCHOOL_ID, lockSchoolTeaching } from './schools.mjs';
+import { activeAccount } from './schools.mjs';
 import { enumValue, fail, field, uuid } from './security.mjs';
 
 export const matchingProblemAudienceSql = account => `(
@@ -47,8 +47,7 @@ export async function handlePlatformProblemAudiences({pool,user,route,url,method
    const kind=enumValue(target?.kind,['school','account'],'开放对象'),id=normalId(target?.id);
    return [`${kind}:${id}`,{kind,id}];
   })).values()];
-  await lockSchoolTeaching(db,LEGACY_SCHOOL_ID);
-  await db.query("SELECT set_config('campus.school_id',$1,true)",[LEGACY_SCHOOL_ID]);
+  await lockCatalogProblemSchools(db,ids);
   if(operation==='grant'){
    if((await platformProblemCatalogRows(db,ids)).length!==ids.length)
     fail(409,'PROBLEM_UNAVAILABLE','请先发布并验证所选平台题目');

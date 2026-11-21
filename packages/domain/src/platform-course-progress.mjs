@@ -1,6 +1,6 @@
 import { platformChapterProblems } from './platform-course-problems.mjs';
 import { LEGACY_SCHOOL_ID } from './schools.mjs';
-import { currentLegacyPublicProblems } from './legacy-public-problems.mjs';
+import { currentCatalogPublicProblems } from './catalog-problem-publication.mjs';
 import { problemSolvedSql } from './problem-progress.mjs';
 import { loadCoursePaper4, paper4Progress } from './course-paper4.mjs';
 import { latestCourseProblemVersion } from './course-problem-version.mjs';
@@ -94,7 +94,7 @@ export async function publicChapterProblems(db, listing, course, accountId) {
     SELECT DISTINCT "problemId","versionId"
     FROM jsonb_to_recordset($2::jsonb) AS link("problemId" uuid,"versionId" uuid)
   )
-  SELECT links."problemId",links."versionId" AS "linkedVersionId",v.id AS "versionId",v.definition->>'title' AS title,
+  SELECT b.resource_kind,links."problemId",links."versionId" AS "linkedVersionId",v.id AS "versionId",v.definition->>'title' AS title,
    ${problemSolvedSql({problemId:'p.id',accountId:'$3',requiredLanguage:'$4',languageCreditCutoffs:'$5'})} solved
   FROM links
   JOIN school_problem_publications pub ON pub.school_id=$1 AND pub.problem_id=links."problemId" AND pub.withdrawn_at IS NULL
@@ -102,12 +102,11 @@ export async function publicChapterProblems(db, listing, course, accountId) {
   JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id AND NOT b.archived
   JOIN school_problem_versions v ON v.school_id=p.school_id AND v.problem_id=p.id AND v.id=p.published_version_id`,
   [listing.school_id, JSON.stringify(links), accountId, course.required_language, course.language_credit_cutoffs]);
-  const legacy = listing.school_id === LEGACY_SCHOOL_ID && rows.length
-    ? new Map((await currentLegacyPublicProblems(db,rows.map(row=>row.problemId))).map(source=>[source.problem_id,source]))
-    : null;
-  for (const {linkedVersionId,...row} of rows) {
-    const current=legacy?.get(row.problemId);
-    if (legacy&&!current) continue;
+  const catalogIds=rows.filter(row=>row.resource_kind==='publication').map(row=>row.problemId);
+  const sources=new Map((catalogIds.length?await currentCatalogPublicProblems(db,catalogIds):[]).map(row=>[row.problem_id,row]));
+  for (const {resource_kind,linkedVersionId,...row} of rows) {
+    const current=sources.get(row.problemId);
+    if (resource_kind==='publication'&&!current) continue;
     const key=`${row.problemId}:${linkedVersionId}`;
     problems.set(key, {...row,...(current?{versionId:current.id,title:current.title}:{}),solved:row.solved||problems.get(key)?.solved||false});
   }

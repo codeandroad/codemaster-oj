@@ -7,7 +7,7 @@ import {publicScholarshipOperation,recordPublicPracticeStaffExposure} from './pu
 import { schoolActivityJobVisibleSql, schoolActivityProblemAccess, schoolJobFeedback } from './school-activities.mjs';
 import { randomUUID } from 'node:crypto';
 import { transaction } from './db.mjs';
-import { activeAccount, auditSchool, LEGACY_SCHOOL_ID, lockSchoolTeaching, schoolRole } from './schools.mjs';
+import { activeAccount, auditSchool, lockSchoolTeaching, schoolRole } from './schools.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
 import { HttpError, bytes, canonicalHash, enumValue, fail, field, integer, uuid } from './security.mjs';
 import { validateTask } from '../judge.mjs';
@@ -21,10 +21,10 @@ import { publicCourseProblemLanguage, publicProblemCatalogCourses } from './publ
 import { assertRequiredLanguage } from './course-language-policy.mjs';
 import { LANGUAGES, starterCodesFor } from './languages.mjs';
 import {
- decideLegacyPublicProblem, handleLegacyPublicProblemRequest,
- listLegacyPublicProblemReviews, previewLegacyPublicProblem, prepareLegacyPublicProblem, legacyPublicProblemCatalogRows,
- platformProblemCatalogRows, preparePlatformCourseProblem,
-} from './legacy-public-problems.mjs';
+ decideCatalogPublicProblem, handleCatalogPublicProblemRequest,
+ listCatalogPublicProblemReviews, previewCatalogPublicProblem, prepareCatalogPublicProblem, publishedCatalogRows,
+ platformProblemCatalogRows, preparePlatformCourseProblem, lockCatalogProblemSchools,
+} from './catalog-problem-publication.mjs';
 
 const reply=(body,status=200)=>({status,body});
 const canManage=(p,u,role)=>!p.platform_owned&&(role==='school_admin'||role==='teacher'&&p.owner_account_id===u.id);
@@ -154,11 +154,10 @@ async function projectJob(db,job){
   message:r?.publicMessage??'',...feedback};
 }
 async function loadScopedPublicProblem(db,user,id,courseContext,requireCourseContext){
- await lockSchoolTeaching(db,LEGACY_SCHOOL_ID,{shared:true});
+ await lockCatalogProblemSchools(db,[id],{shared:true});
  const grant=await db.query(`SELECT 1 FROM platform_problem_audiences audience
   WHERE audience.problem_id=$1 AND ${matchingProblemAudienceSql('$2')} LIMIT 1`,[id,user.id]);
  if(grant.rowCount){
-  await scope(db,LEGACY_SCHOOL_ID);
   const directed=await preparePlatformCourseProblem(db,id);
   if(directed)return directed;
  }
@@ -167,6 +166,11 @@ async function loadScopedPublicProblem(db,user,id,courseContext,requireCourseCon
   if(scoped)return scoped;
  }
  fail(404,'NOT_FOUND','Problem is unavailable.');
+}
+
+async function hasCatalogSource(db,schoolId,problemId) {
+ const {rowCount}=await db.query('SELECT 1 FROM problems p JOIN problem_banks b ON b.id=p.bank_id WHERE p.id=$1 AND b.school_id=$2',[problemId,schoolId]);
+ return rowCount>0;
 }
 
 async function publicLoaded(db,user,id,courseContext={},requireCourseContext=false){
@@ -181,10 +185,10 @@ async function publicLoaded(db,user,id,courseContext={},requireCourseContext=fal
  const schoolId=publication.school_id;
  await lockSchoolTeaching(db,schoolId,{shared:true});
  const current=await db.query('SELECT 1 FROM school_problem_publications WHERE problem_id=$1 AND school_id=$2 AND withdrawn_at IS NULL',[id,schoolId]);
- if(schoolId===LEGACY_SCHOOL_ID){
+ if(await hasCatalogSource(db,schoolId,id)){
   if(current.rowCount){
    await scope(db,schoolId);
-   const problem=await prepareLegacyPublicProblem(db,id);
+   const problem=await prepareCatalogPublicProblem(db,id);
    if(problem)return problem;
   }
   return loadScopedPublicProblem(db,user,id,courseContext,requireCourseContext);
@@ -218,8 +222,8 @@ async function publicCatalogRows(db,publications,lockedSchools) {
   const ids=rows.map(row=>row.problem_id);
   // Recheck publication after acquiring the same withdrawal lock as detail
   // requests. School scopes stay sequential on this transaction's connection.
-  const current=schoolId===LEGACY_SCHOOL_ID?await legacyPublicProblemCatalogRows(db,ids)
-   :(await db.query(`SELECT p.id,p.school_id AS "schoolId",p.bank_id AS "bankId",b.name AS "bankName",
+  const sources=await publishedCatalogRows(db,schoolId,ids);
+  const current=(await db.query(`SELECT p.id,p.school_id AS "schoolId",p.bank_id AS "bankId",b.name AS "bankName",
     v.definition->>'title' title,v.definition->'tags' tags,v.definition->>'mode' mode,
     CASE WHEN jsonb_typeof(v.definition->'metadata'->'difficulty')='string' THEN v.definition->'metadata'->>'difficulty' END difficulty,
     p.revision,p.published,v.id AS "versionId",v.draft_revision<>p.revision AS "hasDraftChanges"
@@ -229,7 +233,7 @@ async function publicCatalogRows(db,publications,lockedSchools) {
     JOIN school_problem_versions v ON v.school_id=p.school_id AND v.problem_id=p.id AND v.id=p.published_version_id
     WHERE publication.school_id=$1 AND publication.problem_id=ANY($2::uuid[]) AND publication.withdrawn_at IS NULL
      AND p.published AND NOT b.archived AND b.resource_kind='ordinary'`,[schoolId,ids])).rows;
-  for(const row of current)output.set(row.id,{...row,
+  for(const row of [...current,...sources])output.set(row.id,{...row,
    tags:Array.isArray(row.tags)?row.tags.filter(tag=>typeof tag==='string'&&tag.trim()):[],
    mode:row.mode==='function'?'function':'stdio'});
  }
@@ -254,13 +258,13 @@ export async function listPublicProblems(pool,user,url){
  let skip=page==null?0:(page-1)*pageSize;
  return transaction(pool,async db=>{
   await activeAccount(db,user.id);
-  await lockSchoolTeaching(db,LEGACY_SCHOOL_ID,{shared:true});
+  const sourceSchools=await lockCatalogProblemSchools(db,null,{shared:true});
   const courseFilter=await publicProblemCatalogCourses(db,user,courseId,{platformOnly:!includeCourses&&!courseOnly});
   const versions=courseId?courseFilter.versions:null;
   const problemIds=versions?[...versions.keys()]:courseOnly?[...courseFilter.byProblem.keys()]:null;
   const linkedPlatformIds=[...courseFilter.byProblem].filter(([,contexts])=>[...contexts.values()].some(context=>context.platform)).map(([id])=>id);
   const favorites=filters.savedOnly?new Set((await db.query('SELECT problem_id FROM problem_favorites WHERE identity_id=$1',[user.identityId])).rows.map(row=>row.problem_id)):null;
-  const items=[],lockedSchools=new Set([LEGACY_SCHOOL_ID]),topics=new Set(),progress=new Map();
+  const items=[],lockedSchools=new Set(sourceSchools),topics=new Set(),progress=new Map();
   const loadProgress=async rows=>{
    for(const [schoolId,schoolRows] of rowsBySchool(rows)){
     await scope(db,schoolId);
@@ -278,20 +282,22 @@ export async function listPublicProblems(pool,user,url){
     SELECT problem_id,school_id,approved_at FROM school_problem_publications
     WHERE withdrawn_at IS NULL AND ($3::uuid[] IS NULL OR problem_id=ANY($3))
     UNION ALL
-    SELECT problem_id,$5::uuid,'-infinity'::timestamptz FROM unnest($4::uuid[]) AS scoped(problem_id)
-    WHERE ($3::uuid[] IS NULL OR problem_id=ANY($3)) AND NOT EXISTS (
+    SELECT scoped.problem_id,b.school_id,'-infinity'::timestamptz FROM unnest($4::uuid[]) AS scoped(problem_id)
+    JOIN problems source ON source.id=scoped.problem_id AND source.owner_scope='platform'
+    JOIN problem_banks b ON b.id=source.bank_id
+    WHERE ($3::uuid[] IS NULL OR scoped.problem_id=ANY($3)) AND NOT EXISTS (
      SELECT 1 FROM school_problem_publications publication WHERE publication.problem_id=scoped.problem_id AND publication.withdrawn_at IS NULL
     )
    )
    SELECT problem_id,school_id,approved_at::text AS approved_at FROM candidates
    WHERE $1::timestamptz IS NULL OR approved_at<$1 OR (approved_at=$1 AND problem_id>$2::uuid)
    ORDER BY candidates.approved_at DESC,problem_id LIMIT 100`,
-   [cursor?.approved_at??null,cursor?.problem_id??null,problemIds,[...scopedIds],LEGACY_SCHOOL_ID]);
+   [cursor?.approved_at??null,cursor?.problem_id??null,problemIds,[...scopedIds]]);
    const current=await publicCatalogRows(db,rows,lockedSchools);
-   const supplemental=rows.filter(row=>!current.has(row.problem_id)&&scopedIds.has(row.problem_id)).map(row=>row.problem_id);
-   if(supplemental.length){
-    await scope(db,LEGACY_SCHOOL_ID);
-    for(const item of await platformProblemCatalogRows(db,supplemental)){
+   const supplemental=rows.filter(row=>!current.has(row.problem_id)&&scopedIds.has(row.problem_id));
+   for(const [schoolId,missing] of rowsBySchool(supplemental)){
+    await scope(db,schoolId);
+    for(const item of await platformProblemCatalogRows(db,missing.map(row=>row.problem_id))){
      const tags=Array.isArray(item.tags)?item.tags.filter(tag=>typeof tag==='string'&&tag.trim()):[];
      current.set(item.id,{...item,tags,courseRequired:!directed.has(item.id)});
     }
@@ -343,8 +349,8 @@ export async function listPublicProblems(pool,user,url){
 
 async function decideProblemPublication(db, user, {schoolId, problemId, versionId: expectedVersion}, decision) {
  await scope(db,schoolId);
- if (schoolId === LEGACY_SCHOOL_ID) {
-  await decideLegacyPublicProblem(db,{problemId,versionId:expectedVersion,decision,actorId:user.id});
+ if (await hasCatalogSource(db,schoolId,problemId)) {
+  await decideCatalogPublicProblem(db,{schoolId,problemId,versionId:expectedVersion,decision,actorId:user.id});
   return;
  }
  const p=await loadProblem(db,schoolId,problemId,user,null,{publicOnly:true});
@@ -381,8 +387,8 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
  if(route==='/practice/leaderboard'&&method==='GET')return publicPracticeLeaderboard({pool,user,url});
  const personalRecords = await handlePublicPracticeRecords({pool,user,route,url,method,body}, projectJob);
  if (personalRecords) return personalRecords;
- const legacyRequest = await handleLegacyPublicProblemRequest({pool,user,route,url,method,body});
- if (legacyRequest) return legacyRequest;
+ const catalogRequest = await handleCatalogPublicProblemRequest({pool,user,route,url,method,body});
+ if (catalogRequest) return catalogRequest;
  if(route==='/practice/problems'&&method==='GET')return reply(await listPublicProblems(pool,user,url));
  const pub=route.match(/^\/practice\/problems\/([^/]+)(?:\/submissions(?:\/([^/]+))?)?$/);
  if(pub)return transaction(pool,async db=>{
@@ -390,10 +396,10 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
   const expectedVersion=method==='POST'?body.versionId:url?.searchParams.get('versionId');
   if(expectedVersion!=null){
    const requested=uuid(expectedVersion).toLowerCase();
-   if(requested!==p.published_version_id&&p.school_id===LEGACY_SCHOOL_ID&&!(await db.query(
+   if(requested!==p.published_version_id&&p.catalog_source&&!(await db.query(
     'SELECT 1 FROM problem_versions WHERE id=$1 AND problem_id=$2 AND published_at IS NOT NULL',[requested,p.id])).rowCount)
     fail(404,'NOT_FOUND','This version is not available.');
-   if(requested!==p.published_version_id&&p.school_id!==LEGACY_SCHOOL_ID&&!(await db.query(`SELECT 1
+   if(requested!==p.published_version_id&&!p.catalog_source&&!(await db.query(`SELECT 1
     FROM school_problem_versions requested JOIN school_problem_versions current ON current.school_id=requested.school_id
      AND current.problem_id=requested.problem_id AND current.id=$4
     WHERE requested.school_id=$1 AND requested.problem_id=$2 AND requested.id=$3
@@ -414,13 +420,24 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
   await activeAccount(db,user.id);if(!await isPlatformAdministrator(db,user.id))fail(403,'FORBIDDEN','Platform administrator required.');
   if(method==='GET'&&route!=='/platform/problem-publications'){
    const schoolId=uuid(url.searchParams.get('schoolId')),problemId=uuid(route.split('/')[3]);await scope(db,schoolId);
-   if (schoolId === LEGACY_SCHOOL_ID) return reply(await previewLegacyPublicProblem(db,problemId));
+   if (await hasCatalogSource(db,schoolId,problemId)) return reply(await previewCatalogPublicProblem(db,problemId));
    const p=await loadProblem(db,schoolId,problemId,user,null,{publicOnly:true});
    return reply({...await shapeProblem(db,p,user,null,{detail:true,publicOnly:true,accessContext:'public'}),...await publicProblemStatus(db,p,p.published_version_id)});
   }
   if(method==='GET'){
-   const items=[];for(const s of(await db.query('SELECT id,name FROM schools WHERE id<>$1 ORDER BY name',[LEGACY_SCHOOL_ID])).rows){await scope(db,s.id);for(const p of(await db.query(`SELECT p.*,b.name AS bank_name FROM school_problems p JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id WHERE b.resource_kind=\'ordinary\' AND p.school_id=$1 AND p.published AND NOT b.archived`,[s.id])).rows){const item=await shapeProblem(db,p,user,null,{publicOnly:true,accessContext:'public'});items.push({...item,schoolName:s.name,...await publicProblemStatus(db,p,p.published_version_id)});}}
-   items.push(...await listLegacyPublicProblemReviews(db));
+   const items=[];
+   const {rows:schools}=await db.query('SELECT id,name FROM schools ORDER BY name,id');
+   for(const school of schools){
+    await scope(db,school.id);
+    const {rows:problems}=await db.query(`SELECT p.*,b.name AS bank_name FROM school_problems p
+     JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id
+     WHERE b.resource_kind='ordinary' AND p.school_id=$1 AND p.published AND NOT b.archived`,[school.id]);
+    for(const p of problems){
+     const item=await shapeProblem(db,p,user,null,{publicOnly:true,accessContext:'public'});
+     items.push({...item,schoolName:school.name,...await publicProblemStatus(db,p,p.published_version_id)});
+    }
+    items.push(...await listCatalogPublicProblemReviews(db,school.id));
+   }
    return reply({items});
   }
   if(method==='POST'&&route==='/platform/problem-publications/batch'){
@@ -453,7 +470,7 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
   }return null;
  });
  const m=route.match(/^\/schools\/([^/]+)\/(problem-banks|problems|judge-status|judge-jobs|submissions)(?:\/([^/]+)(?:\/(validate|publish|unpublish|submissions|public-request|tutorial))?)?$/);
- if(!m)return null;const schoolId=uuid(m[1]);if(schoolId===LEGACY_SCHOOL_ID)fail(404,'NOT_FOUND','Use the existing school workspace.');
+ if(!m)return null;const schoolId=uuid(m[1]);
  return transaction(pool,async db=>{
   await lockSchoolTeaching(db,schoolId,{shared:method==='GET'});const role=await schoolRole(db,schoolId,user.id);await scope(db,schoolId);const id=m[3]?uuid(m[3]):null;
   if(m[2]==='submissions'&&method==='GET'&&!id){

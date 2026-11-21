@@ -1,7 +1,6 @@
 import { avatarForIdentity } from './avatars.mjs';
 import { transaction } from './db.mjs';
-import { availableLegacyPublicProblemVersions } from './legacy-public-problems.mjs';
-import { LEGACY_SCHOOL_ID } from './legacy-school.mjs';
+import { availableCatalogPublicProblemVersions } from './catalog-problem-publication.mjs';
 import { PRESENCE_HEARTBEAT_SECONDS, PRESENCE_TTL_SECONDS } from './presence.mjs';
 import { fail, field, integer, uuid } from './security.mjs';
 
@@ -39,7 +38,7 @@ async function preview(db, accountId, targetId) {
  const activity = [];
  for (const item of recent) {
   await db.query("SELECT set_config('campus.school_id',$1,true)", [item.schoolId]);
-  const {rows:[problem]} = await db.query(`SELECT v.definition->>'title' title
+  const {rows:[problem]} = await db.query(`SELECT v.definition->>'title' title,b.resource_kind
    FROM school_problem_publications pub
    JOIN school_problems p ON p.school_id=pub.school_id AND p.id=pub.problem_id
    JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id
@@ -48,8 +47,8 @@ async function preview(db, accountId, targetId) {
     AND p.published AND p.published_version_id=pub.version_id AND NOT b.archived`,
   [item.schoolId,item.problemId,item.versionId]);
   if (!problem?.title) continue;
-  if (item.schoolId === LEGACY_SCHOOL_ID &&
-   !(await availableLegacyPublicProblemVersions(db, [item.versionId])).has(item.versionId)) continue;
+  if (problem.resource_kind === 'publication' &&
+   !(await availableCatalogPublicProblemVersions(db, [item.versionId])).has(item.versionId)) continue;
   activity.push({id:item.id,problemTitle:problem.title,createdAt:item.createdAt});
   if (activity.length === 3) break;
  }

@@ -183,7 +183,7 @@ test('public scholarship migration consumes old AC without touching money or stu
  try{
   await manager.query(`CREATE SCHEMA ${schema}`);
   await owner.query('CREATE TABLE schema_migrations(name text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');
-  await owner.query("INSERT INTO schema_migrations(name) VALUES('080_public_scholarship.sql'),('085_public_practice_preferences.sql'),('107_public_practice_profiles.sql')");await migrate(owner);
+  await owner.query("INSERT INTO schema_migrations(name) VALUES('080_public_scholarship.sql'),('085_public_practice_preferences.sql'),('107_public_practice_profiles.sql'),('131_public_problem_subjects.sql')");await migrate(owner);
   const learner=await seedPublicScholarshipLearner(owner),question=await seedPublicScholarshipProblem(owner),pendingQuestion=await seedPublicScholarshipProblem(owner);
   const enqueue=async(p,completed)=>(await owner.query(`INSERT INTO school_judge_jobs(school_id,problem_id,version_id,account_id,request_id,request_hash,kind,access_context,payload,state,result,completed_at)
    VALUES($1,$2,$3,$4,$5,'historical-fixture','submit','public','{}',$6,$7,CASE WHEN $6='completed' THEN clock_timestamp() ELSE NULL END) RETURNING *`,[LEGACY_SCHOOL_ID,p.problemId,p.versionId,learner.id,randomUUID(),completed?'completed':'queued',completed?{status:'AC',score:100}:null])).rows[0];
@@ -206,7 +206,7 @@ test('public scholarship migration consumes old AC without touching money or stu
   const snapshots=async()=>Promise.all(['luq_accounts','luq_ledger','luq_initial_grants','luq_assistance_entitlements','school_judge_jobs']
    .map(async table=>(await owner.query(`SELECT to_jsonb(t) AS row FROM ${table} t ORDER BY to_jsonb(t)::text`)).rows));
   const before=await snapshots();
-  await owner.query("DELETE FROM schema_migrations WHERE name IN ('085_public_practice_preferences.sql','107_public_practice_profiles.sql')");await migrate(owner);
+  await owner.query("DELETE FROM schema_migrations WHERE name IN ('085_public_practice_preferences.sql','107_public_practice_profiles.sql','131_public_problem_subjects.sql')");await migrate(owner);
   assert.deepEqual(await snapshots(),before);
   assert.equal((await owner.query('SELECT balance FROM luq_accounts WHERE identity_id=$1',[learner.identityId])).rows[0].balance,97);
   assert.equal((await owner.query('SELECT count(*)::int n FROM public_practice_preferences')).rows[0].n,0);

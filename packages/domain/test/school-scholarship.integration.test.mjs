@@ -245,17 +245,15 @@ test('scholarship migration preserves historical AC and grants only the configur
  const manager=createPool(base.href),schema='scholarship_history_'+randomBytes(5).toString('hex'),url=new URL(base);url.searchParams.set('options',`-csearch_path=${schema}`);const db=createPool(url.href);
  try{
   await manager.query(`CREATE SCHEMA ${schema}`);
-  // This disposable schema defers scholarship tables and dependent migrations.
-  const deferred=['070_school_scholarship.sql','076_student_system_notifications.sql','077_assignment_completion_scholarship.sql','080_public_scholarship.sql','082_activity_bonus_scholarship.sql','085_public_practice_preferences.sql','096_problem_solution_bundles.sql','107_public_practice_profiles.sql','122_assignment_changes.sql'];
-  await db.query('CREATE TABLE schema_migrations(name text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');await db.query('INSERT INTO schema_migrations(name) SELECT unnest($1::text[])',[deferred]);await migrate(db);
+  await migrate(db,{through:'069_school_paper4.sql'});
   const person=(await db.query("INSERT INTO identities(kind,number,name) VALUES('personal','history','History') RETURNING id")).rows[0],user=(await db.query("INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,'history','unusable-qa') RETURNING id",[person.id])).rows[0];
   const school=await provisionSchool(db,{slug:'history-alpha',name:'History',adminUsername:'history'});await db.query("UPDATE school_memberships SET role='student' WHERE school_id=$1 AND account_id=$2",[school.id,user.id]);
   const identity=(await db.query("INSERT INTO school_identities(school_id,kind,number,name,account_id) VALUES($1,'student','history','History',$2) RETURNING id",[school.id,user.id])).rows[0],bank=(await db.query("INSERT INTO school_problem_banks(school_id,owner_account_id,name,request_id) VALUES($1,$2,'Old bank',$3) RETURNING id",[school.id,user.id,randomUUID()])).rows[0];
   const problemId=randomUUID(),versionId=randomUUID();await db.query("INSERT INTO school_problems(school_id,id,bank_id,owner_account_id,draft,request_id) VALUES($1,$2,$3,$4,'{}',$5)",[school.id,problemId,bank.id,user.id,randomUUID()]);await db.query("INSERT INTO school_problem_versions(school_id,id,problem_id,draft_revision,definition) VALUES($1,$2,$3,1,'{}')",[school.id,versionId,problemId]);
   const enqueue=async completed=>(await db.query("INSERT INTO school_judge_jobs(school_id,problem_id,version_id,account_id,identity_id,request_id,request_hash,kind,access_context,payload,state,result,completed_at) VALUES($1,$2,$3,$4,$5,$6,'history','submit','school','{}',$7,$8,CASE WHEN $7='completed' THEN clock_timestamp() ELSE NULL END) RETURNING *",[school.id,problemId,versionId,user.id,identity.id,randomUUID(),completed?'completed':'queued',completed?{status:'AC',score:100}:null])).rows[0];
   const old=await enqueue(true);await db.query('UPDATE luq_settings SET initial_grant=37,rule_version=rule_version+1 WHERE singleton');const legacy=(await db.query('SELECT count(*)::int n FROM luq_ledger')).rows[0];
-  await db.query('DELETE FROM schema_migrations WHERE name=ANY($1::text[])',[deferred]);await migrate(db);
-  assert.deepEqual((await db.query('SELECT * FROM school_judge_jobs WHERE school_id=$1 AND id=$2',[school.id,old.id])).rows[0],old);
+  await migrate(db);
+  assert.deepEqual((await db.query('SELECT * FROM school_judge_jobs WHERE school_id=$1 AND id=$2',[school.id,old.id])).rows[0],{...old,preview_activity_id:null,preview_revision:null,validation_revision:null});
   assert.equal((await db.query('SELECT balance FROM school_scholarship_accounts WHERE school_id=$1 AND identity_id=$2',[school.id,identity.id])).rows[0].balance,37);
   assert.equal((await db.query('SELECT reason FROM school_scholarship_claims WHERE school_id=$1 AND identity_id=$2',[school.id,identity.id])).rows[0].reason,'historical_ac');
   const later=await enqueue(false);await db.query("UPDATE school_judge_jobs SET state='completed',completed_at=clock_timestamp(),result='{"+'"status":"AC","score":100'+"}' WHERE school_id=$1 AND id=$2",[school.id,later.id]);

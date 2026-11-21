@@ -1,8 +1,8 @@
 import {transaction} from './db.mjs';
 import {fail,integer,uuid} from './security.mjs';
-import {activeAccount,LEGACY_SCHOOL_ID} from './schools.mjs';
+import {activeAccount} from './schools.mjs';
 import {scholarshipLedgerShape} from './scholarship-ledger.mjs';
-import {hasLegacyPracticeAc,hasPublicPracticeAc,lockScholarshipAssistance} from './scholarship-access.mjs';
+import {hasPublicPracticeAc,lockScholarshipAssistance} from './scholarship-access.mjs';
 import {studentAssistanceOperation} from './scholarship-assistance.mjs';
 import {publicSchoolAssistanceRestriction} from './school-scholarship.mjs';
 import {schoolActivityProblemAccess} from './school-activities.mjs';
@@ -62,14 +62,14 @@ export async function publicScholarshipOperation(ctx,loadPublicProblem){
   if(body.assignmentId||body.timedAttemptId||body.paperId||body.paper4AttemptId)fail(400,'VALIDATION','Public practice does not accept a school activity context.');
   await schoolActivityProblemAccess(db,{schoolId:p.school_id,problemId:p.id,user});
   await lockScholarshipAssistance(db,user.identityId);
-  const legacy=p.school_id===LEGACY_SCHOOL_ID;
-  const target={subjectKey:legacy?`problem:${p.id}`:`public-school:${p.school_id}:problem:${p.id}`,versionId:p.published_version_id,
+  const catalogSource=p.catalog_source===true;
+  const target={subjectKey:catalogSource?`problem:${p.id}`:`public-school:${p.school_id}:problem:${p.id}`,versionId:p.published_version_id,
    problemId:p.id,title:p.public_metadata?.title??'',baseType:'problem',baseId:p.id,contextType:'public',contextId:null};
   // Only independently reviewed global assistance is sold. New-school private
   // drafts/reference code are deliberately not copied into this public path.
   const result=await studentAssistanceOperation(db,user,action[1],body,{assistanceTarget:async()=>target,
    assistanceRestriction:async(db,u,t,kind)=>publicSchoolAssistanceRestriction(db,p.school_id,u,p.id,kind),
-   hasPracticeAc:legacy?hasLegacyPracticeAc:(db,u,t)=>hasPublicPracticeAc(db,u.id,p.school_id,t.problemId)});
+   hasPracticeAc:(db,u,t)=>hasPublicPracticeAc(db,u.id,p.school_id,t.problemId)});
   return {status:200,body:result};
  });
 }

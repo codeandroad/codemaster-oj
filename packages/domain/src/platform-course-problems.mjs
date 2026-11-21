@@ -1,8 +1,8 @@
 import { fail, uuid } from './security.mjs';
-import { LEGACY_SCHOOL_ID, activeAccount, lockSchoolTeaching } from './schools.mjs';
+import { activeAccount } from './schools.mjs';
 import { legacyCourseIsLive } from './legacy-public-course.mjs';
 import { platformCourseAdmission } from './platform-course-access.mjs';
-import { preparePlatformCourseProblem, readyProblemPresentationSql } from './legacy-public-problems.mjs';
+import { lockCatalogProblemSchools, preparePlatformCourseProblem, readyProblemPresentationSql } from './catalog-problem-publication.mjs';
 import { liveProblemVersionIdSql } from './live-problem-version.mjs';
 import { problemSolvedSql } from './problem-progress.mjs';
 
@@ -14,8 +14,8 @@ export const platformProblemReadySql=(p='p',v='v',b='b')=>`${p}.owner_scope='pla
 
 // Admission grants only this linked exercise, never the source school's bank.
 export async function platformCourseProblem(db,user,id,{courseId=null,chapterId=null,versionId=null}={}) {
- await lockSchoolTeaching(db,LEGACY_SCHOOL_ID,{shared:true});
  await activeAccount(db,user.id);
+ await lockCatalogProblemSchools(db,[uuid(id)],{shared:true});
  if(courseId)uuid(courseId);if(chapterId)uuid(chapterId);if(versionId)uuid(versionId);
  const rows=(await db.query(`SELECT p.id course_id FROM learning_paths p
  JOIN learning_chapters c ON c.path_id=p.id AND c.archived_at IS NULL
@@ -27,7 +27,6 @@ export async function platformCourseProblem(db,user,id,{courseId=null,chapterId=
  for(const row of rows){
   const access=await platformCourseAdmission(db,row.course_id,user.id);
   if(access.admission!=='direct'){if(courseId&&access.admission!=='denied')fail(403,'COURSE_APPLICATION_REQUIRED','请先申请加入课程');continue;}
-  await db.query("SELECT set_config('campus.school_id',$1,true)",[LEGACY_SCHOOL_ID]);
   const p=await preparePlatformCourseProblem(db,id);
   if(p)return p;
   if(courseId&&(await db.query("SELECT 1 FROM problems WHERE id=$1 AND owner_scope='school'",[id])).rowCount)return null;

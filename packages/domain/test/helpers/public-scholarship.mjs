@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {transaction} from '../../src/db.mjs';
 import {LEGACY_SCHOOL_ID} from '../../src/schools.mjs';
-import {decideLegacyPublicProblem} from '../../src/legacy-public-problems.mjs';
+import {decideCatalogPublicProblem} from '../../src/catalog-problem-publication.mjs';
 
 /** Test-only published legacy source + exact public snapshot; never uses live data. */
 export async function seedPublicScholarshipProblem(owner,{authorId,title='Reviewed public aid',publishContent=true}={}) {
@@ -18,7 +18,7 @@ export async function seedPublicScholarshipProblem(owner,{authorId,title='Review
  await owner.query('UPDATE problems SET current_version_id=$2 WHERE id=$1',[problemId,versionId]);
  await transaction(owner,async db=>{
   await db.query("SELECT set_config('campus.school_id',$1,true)",[LEGACY_SCHOOL_ID]);
-  await decideLegacyPublicProblem(db,{problemId,versionId,decision:'approve',actorId:authorId});
+  await decideCatalogPublicProblem(db,{schoolId:LEGACY_SCHOOL_ID,problemId,versionId,decision:'approve',actorId:authorId});
  });
  const contentIds={};
  for(const [kind,language,body]of [['FULL_TRANSLATION','zh-CN','输出数字五。'],['FULL_SOLUTION','','Return the required constant.\n```python\nprint(5)\n```']]) {

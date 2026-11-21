@@ -33,8 +33,8 @@ test('public problem discovery batches current publications without writing judg
   await owner.query("SELECT set_config('campus.school_id',$1,false)", [LEGACY_SCHOOL_ID]);
   const bank = (await owner.query("INSERT INTO problem_banks(owner_account_id,name,visibility) VALUES($1,'Searchable source bank','school') RETURNING id", [author.id])).rows[0];
   const archivedBank = (await owner.query("INSERT INTO problem_banks(owner_account_id,name,visibility,archived_at) VALUES($1,'Archived source','school',now()) RETURNING id", [author.id])).rows[0];
-  const snapshotBank = (await owner.query(`INSERT INTO school_problem_banks(school_id,id,owner_account_id,name,request_id)
-   VALUES($1,$3,$2,'Public practice',$3) RETURNING id`, [LEGACY_SCHOOL_ID, author.id, '00000000-0000-4000-8000-000000000074'])).rows[0];
+  const snapshotBank = (await owner.query(`INSERT INTO school_problem_banks(school_id,id,owner_account_id,name,request_id,resource_kind)
+   VALUES($1,$3,$2,'Public practice',$3,'publication') RETURNING id`, [LEGACY_SCHOOL_ID, author.id, '00000000-0000-4000-8000-000000000074'])).rows[0];
   const problems = [];
   async function addProblem(index, { hidden = null } = {}) {
    const problem = (await owner.query(`INSERT INTO problems(bank_id,owner_account_id,owner_scope)

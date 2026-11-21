@@ -37,6 +37,7 @@ function fingerprintSql(plan) {
     ? `(CASE WHEN t.id='${legacyId}' AND t.slug='legacy-school' THEN jsonb_set(${schoolFields},'{slug}',to_jsonb('tianxing-chuangshiji'::text)) ELSE ${schoolFields} END)`
     : schoolFields;
   const expression = `CASE
+    ${plan.classifySnapshotBank ? `WHEN tablename='school_problem_banks' THEN 'CASE WHEN t.school_id=''${legacyId}'' AND t.id=''00000000-0000-4000-8000-000000000074'' AND t.request_id=t.id THEN to_jsonb(t) || jsonb_build_object(''resource_kind'',''publication''::text) ELSE to_jsonb(t) END'` : ''}
     ${plan.addSubmissionSchool ? "WHEN tablename='submissions' THEN 'to_jsonb(t) - ''school_id'''" : ''}
     ${plan.addPublicPresence ? "WHEN tablename='sessions' THEN 'to_jsonb(t) - ''public_presence_seen_at'''" : ''}
     ${plan.addCourseAdmissions ? "WHEN tablename='public_course_listings' THEN 'to_jsonb(t) - ''access_mode'' - ''access_generation'' - ''school_revision'' - ''legacy_revision'''" : ''}
@@ -97,9 +98,24 @@ function targetQuery(sql) {
 }
 function fingerprints(plan) {
   const result = targetQuery(fingerprintSql(plan));
-  return Object.fromEntries(result ? result.split('\n').map(line => {
+  const tables = Object.fromEntries(result ? result.split('\n').map(line => {
     const row = JSON.parse(line); return [row.table, row];
   }) : []);
+  if (plan.mergeProblemRequests && tables.school_problem_publication_requests) {
+    const nativeColumns = 'school_id,problem_id,version_id,requested_by,requested_at,status,decided_by,decided_at';
+    const unified = targetQuery("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='school_problem_publication_requests' AND column_name='catalog_version_id')") === 't';
+    let requests = `SELECT ${nativeColumns},${unified?'catalog_version_id':'NULL::uuid catalog_version_id'} FROM school_problem_publication_requests`;
+    if (tables.legacy_public_problem_requests) requests += ` UNION ALL
+      SELECT b.school_id,r.problem_id,r.version_id,r.requested_by,r.requested_at,r.status,r.decided_by,r.decided_at,r.version_id
+      FROM legacy_public_problem_requests r JOIN problems p ON p.id=r.problem_id JOIN problem_banks b ON b.id=p.bank_id`;
+    const merged = JSON.parse(targetQuery(`SELECT jsonb_build_object('table','school_problem_publication_requests','count',count(*),
+      'hash',encode(sha256(convert_to(coalesce(string_agg(to_jsonb(r)::text,chr(10) ORDER BY to_jsonb(r)::text),''),'UTF8')),'hex'))
+      FROM (${requests}) r`));
+    assert.equal(merged.count,tables.school_problem_publication_requests.count+(tables.legacy_public_problem_requests?.count??0));
+    tables.school_problem_publication_requests=merged;
+    delete tables.legacy_public_problem_requests;
+  }
+  return tables;
 }
 function verifyConfig(config) {
   assert.equal(config.name, project, 'Unexpected Compose project.');
@@ -280,6 +296,8 @@ async function main() {
     const plan = { addActivityContext, renameLegacySchool, addedOwnershipColumns, addSchoolSettings, addDefaultSchool, addClassLifecycle, addScholarshipVisibility, addCourseParity, addCourseAdmissions, addSchoolExitArchive, addCompletionRewardMode, addPublicPresence, addPublicScholarship, publicHistoricalClaims };
     plan.updateDirectorySlug = targetQuery("SELECT NOT EXISTS(SELECT 1 FROM schema_migrations WHERE name='127_school_directory_slug.sql');") === 't';
     plan.addSubmissionSchool = targetQuery("SELECT NOT EXISTS(SELECT 1 FROM schema_migrations WHERE name='128_submission_school.sql');") === 't';
+    plan.classifySnapshotBank = targetQuery("SELECT NOT EXISTS(SELECT 1 FROM schema_migrations WHERE name='129_problem_bank_scope.sql');") === 't';
+    plan.mergeProblemRequests = targetQuery("SELECT NOT EXISTS(SELECT 1 FROM schema_migrations WHERE name='130_problem_publication_requests.sql');") === 't';
     const upgradeBackup = resolve(privateDir, `before-upgrade-${Date.now()}.dump`);
     const dump = await open(upgradeBackup, 'wx', 0o600);
     try { await run('docker', ['exec', targetContainer, 'pg_dump', '-Fc', '-U', 'campus_migrator', '-d', 'campus_demo'], { stdout: dump.fd }); }
@@ -291,6 +309,8 @@ async function main() {
   const { tables: before, plan } = baseline;
   await run('docker', [...compose, 'run', '--rm', '--no-deps', 'migrate'], { env: values });
   const after = fingerprints(plan);
+  if (plan.classifySnapshotBank) assert.equal(targetQuery(`SELECT count(*) FROM school_problem_banks WHERE school_id='${legacyId}'
+    AND id='00000000-0000-4000-8000-000000000074' AND request_id=id AND resource_kind<>'publication'`),'0','Catalog snapshots must be service-managed.');
   if (plan.updateDirectorySlug) assert.equal(targetQuery(`SELECT count(*) FROM schools WHERE id='${legacyId}' AND slug='legacy-school'`),'0','School directory migration did not finish.');
   for (const [table, fingerprint] of Object.entries(before)) {
     assert.deepEqual(after[table], fingerprint, `Migration changed pre-existing business data in ${table}; pilot services remain stopped.`);
@@ -339,7 +359,7 @@ async function main() {
       'legacy_school_identity_ownership','legacy_school_account_ownership','platform_admins','school_administrators','platform_audit_events',
       'school_courses','school_course_classes','school_course_publications','school_course_publication_classes','school_course_progress','school_learning_resources',
       'school_problem_banks','school_problems','school_problem_versions','school_problem_publications','public_course_listings','public_course_progress','public_luq_receipts','public_luq_results',
-      'public_course_applications','legacy_course_publication_versions','school_exit_requests','school_problem_publication_requests','public_practice_notes','legacy_public_problem_requests','student_system_notifications','staff_course_notification_reads','course_admission_notifications',
+      'public_course_applications','legacy_course_publication_versions','school_exit_requests','school_problem_publication_requests','public_practice_notes','student_system_notifications','staff_course_notification_reads','course_admission_notifications',
       'school_activities','school_activity_problems','school_activity_participants','school_activity_classes','school_activity_attempts','school_activity_results',
       'school_paper4_papers','school_paper4_versions','school_paper4_activities','school_paper4_participants','school_paper4_attempts','school_paper4_files','school_paper4_reviews','school_paper4_requests',
       'school_scholarship_settings','school_scholarship_accounts','school_scholarship_ledger','school_scholarship_contents','school_scholarship_entitlements','school_scholarship_deliveries','school_rank_awards']) AS tables(name);`);

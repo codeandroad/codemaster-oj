@@ -87,9 +87,9 @@ try {
 
 REVOKE ALL ON public_course_listings, public_course_progress FROM PUBLIC, campus_app, campus_worker;
 GRANT SELECT,INSERT,UPDATE ON public_course_listings, public_course_progress TO campus_app;
-REVOKE ALL ON public_course_applications, legacy_course_publication_versions, school_exit_requests, school_problem_publication_requests, legacy_public_problem_requests, public_practice_notes
+REVOKE ALL ON public_course_applications, legacy_course_publication_versions, school_exit_requests, school_problem_publication_requests, public_practice_notes
  FROM PUBLIC, campus_app, campus_worker;
-GRANT SELECT, INSERT ON public_course_applications, legacy_course_publication_versions, school_exit_requests, school_problem_publication_requests, legacy_public_problem_requests, public_practice_notes TO campus_app;
+GRANT SELECT, INSERT ON public_course_applications, legacy_course_publication_versions, school_exit_requests, school_problem_publication_requests, public_practice_notes TO campus_app;
 GRANT UPDATE(status,decided_by,decided_at) ON public_course_applications TO campus_app;
 REVOKE ALL ON platform_course_rules,platform_course_admissions,platform_course_invitations,platform_course_invitation_attempts FROM PUBLIC,campus_app,campus_worker;
 GRANT SELECT,INSERT,UPDATE ON platform_course_rules,platform_course_invitations,platform_course_invitation_attempts TO campus_app;
@@ -101,7 +101,7 @@ REVOKE ALL ON course_admission_notifications FROM PUBLIC, campus_app, campus_wor
 GRANT SELECT, INSERT(application_id,recipient_account_id,listing_id,outcome,course_title,created_at) ON course_admission_notifications TO campus_app;
 GRANT UPDATE(read_at) ON course_admission_notifications TO campus_app;
 GRANT UPDATE(status,reviewed_at,reviewed_by,review_note) ON school_exit_requests TO campus_app;
-GRANT UPDATE(status,requested_by,requested_at,decided_by,decided_at) ON school_problem_publication_requests, legacy_public_problem_requests TO campus_app;
+GRANT UPDATE(status,requested_by,requested_at,decided_by,decided_at) ON school_problem_publication_requests TO campus_app;
 GRANT UPDATE(note,updated_at) ON public_practice_notes TO campus_app;
 
 REVOKE ALL ON school_problem_banks,school_problems,school_problem_versions,school_problem_publications,school_judge_jobs FROM PUBLIC,campus_app,campus_worker;

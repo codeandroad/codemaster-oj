@@ -12,13 +12,16 @@ export async function studentClassroom(db, schoolId, classId, user, membersOnly)
       AND i.kind='student' AND i.archived_at IS NULL`, params);
   if (!group) fail(404, 'NOT_FOUND', '班级不存在或不可访问');
   const { rows } = await db.query(`SELECT i.id,i.kind,i.name,coalesce(nullif(trim(a.nickname),''),i.name) AS nickname,a.avatar,
-    a.id IS NOT NULL AND m.account_id IS NOT NULL AS activated
+    a.id IS NOT NULL AND m.account_id IS NOT NULL AS activated,
+    EXISTS(SELECT 1 FROM sessions s WHERE s.account_id=a.id AND s.expires_at>statement_timestamp()
+     AND (s.presence_seen_at>statement_timestamp()-interval '90 seconds'
+       OR s.public_presence_seen_at>statement_timestamp()-interval '90 seconds')) AS online
     FROM school_class_roster r JOIN school_identities i ON (i.school_id,i.id)=(r.school_id,r.identity_id)
     LEFT JOIN accounts a ON a.id=i.account_id AND a.disabled_at IS NULL AND a.binding_released_at IS NULL
     LEFT JOIN school_memberships m ON (m.school_id,m.account_id)=(i.school_id,a.id) AND m.role=i.kind AND m.revoked_at IS NULL
     WHERE r.school_id=$1 AND r.class_id=$2 AND i.archived_at IS NULL ORDER BY i.name,i.id`, [schoolId,classId]);
   const students = rows.filter(r => r.kind === 'student');
-  const members = students.filter(r => r.activated).map(r => ({ id:r.id, displayName:r.nickname, avatar:avatarForIdentity(r.avatar,r.id) }));
+  const members = students.filter(r => r.activated).map(r => ({ id:r.id, displayName:r.nickname, avatar:avatarForIdentity(r.avatar,r.id), isOnline:r.online }));
   if (membersOnly) return { items:members };
   const { rows: tasks } = await db.query(`SELECT a.*,greatest(a.ends_at,p.extended_due_at) AS due
     FROM school_activity_classes ac JOIN school_activities a ON (a.school_id,a.id)=(ac.school_id,ac.activity_id)

@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Feedback, useMutation } from "@/components/admin/common";
 import { LeaderboardStandings, rankNumber, type VisibleFields } from "@/components/leaderboard-view";
 import styles from "@/components/points-page.module.css";
 import { AppLink } from "@/components/navigation";
 import { useData, useRefreshOnReturn } from "@/components/student/shared";
-import { presenceChanged } from "@/components/student/student-presence";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { productionApi } from "@/lib/production-api";
 import { useSchoolText } from "./school-ui";
@@ -34,18 +33,13 @@ type PublicRanking = {
   pointsPerSolved: number;
 };
 
-const visibleFields: VisibleFields = { solvedProblems: true, attempts: true, acRate: true, scholarshipBalance: false };
+const visibleFields: VisibleFields = { online: true, solvedProblems: true, attempts: true, acRate: true, scholarshipBalance: false };
 
 export function PublicPracticeLeaderboard() {
   const text = useSchoolText();
   const [page, setPage] = useState(1);
   const { version, refresh } = useRefreshOnReturn();
   const ranking = useData<PublicRanking>(`practice/leaderboard?page=${page}`, version);
-  useEffect(() => {
-    const reload = () => ranking.reload();
-    window.addEventListener(presenceChanged, reload);
-    return () => window.removeEventListener(presenceChanged, reload);
-  }, [ranking]);
   const data = ranking.data?.page === page ? ranking.data : null;
   const own = ranking.data?.own;
   const progress = ranking.data?.progress;

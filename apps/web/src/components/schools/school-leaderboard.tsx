@@ -7,7 +7,6 @@ import { useData } from "@/components/teacher/shared";
 import { inputClass } from "@/components/admin/common";
 import { Button } from "@/components/ui/button";
 import { Search, SlidersHorizontal } from "lucide-react";
-import { presenceChanged } from "@/components/student/student-presence";
 type Entry = {
   rank: number;
   identityId: string;
@@ -40,11 +39,6 @@ export function SchoolLeaderboard({ schoolId }: { schoolId: string }) {
     }>(
       `schools/${schoolId}/leaderboard?${new URLSearchParams({ q, page: String(page), ...(classId ? { classId } : {}) })}`,
     );
-  useEffect(() => {
-    const reload = () => data.reload();
-    window.addEventListener(presenceChanged, reload);
-    return () => window.removeEventListener(presenceChanged, reload);
-  }, [data]);
   const fields = data.data?.displayFields ?? {},
     items = (data.data?.items ?? []).map(person => ({...person,id:person.identityId,online:person.isOnline,solvedProblems:person.solved,
       acRate:person.acRate == null ? null : person.acRate*100,scholarshipBalance:person.scholarship}));
@@ -110,7 +104,7 @@ export function SchoolLeaderboard({ schoolId }: { schoolId: string }) {
         )}
       </div>
       <LeaderboardStandings ranking={ranking} leaders={page === 1 && !q ? {...ranking,data:data.data ? {items:items.slice(0,3)} : null} : undefined}
-        visibleFields={{solvedProblems:!!fields.solved,attempts:!!fields.attempts,acRate:!!fields.acRate,scholarshipBalance:!!fields.scholarship}}
+        visibleFields={{online:true,solvedProblems:!!fields.solved,attempts:!!fields.attempts,acRate:!!fields.acRate,scholarshipBalance:!!fields.scholarship}}
         isCurrent={person=>items.some(row=>row.id===person.id && row.isOwn)} profileHref={person=>`/schools?schoolId=${schoolId}&section=leaderboard&profileId=${person.id}`}
         page={page} pageSize={50} onPageChange={setPage} refresh={data.reload}/>
     </section>

@@ -40,7 +40,7 @@ interface LeaderboardResponse {
   visibleFields: VisibleFields;
 }
 
-const allFieldsVisible: VisibleFields = { solvedProblems: true, attempts: true, acRate: true, scholarshipBalance: true };
+const allFieldsVisible: VisibleFields = { online: false, solvedProblems: true, attempts: true, acRate: true, scholarshipBalance: true };
 const fieldLabels: { field: OptionalField; label: string }[] = [
   { field: "solvedProblems", label: "解题数" },
   { field: "attempts", label: "提交次数" },

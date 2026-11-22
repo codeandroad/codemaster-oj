@@ -23,7 +23,7 @@ export interface RankedStudent {
   scholarshipBalance?: number;
 }
 
-export type OptionalField = "solvedProblems" | "attempts" | "acRate" | "scholarshipBalance";
+export type OptionalField = "solvedProblems" | "attempts" | "acRate" | "scholarshipBalance" | "online";
 export type VisibleFields = Record<OptionalField, boolean>;
 
 export const rankNumber = new Intl.NumberFormat("zh-CN");
@@ -34,6 +34,7 @@ export const fieldName = (locale: AppLocale, field: OptionalField) => {
     attempts: ["提交次数", "Attempts"],
     acRate: ["首解 AC 率", "First-solve AC rate"],
     scholarshipBalance: ["奖学金", "Scholarship"],
+    online: ["状态", "Status"],
   };
   return ui(locale, ...names[field]);
 };
@@ -122,6 +123,7 @@ function LeaderboardRow({ person, current, pinned = false, visibleFields, href }
       <td className={styles.studentCell}>
         {href ? <Link href={href} className={styles.studentLink}>{student}</Link> : <span className={styles.studentLink}>{student}</span>}
       </td>
+      {visibleFields.online && <td className={styles.numberCell}><PresenceDot online={person.online} locale={locale}/></td>}
       <td className={styles.pointsCell}>{rankNumber.format(person.points)}</td>
       {visibleFields.solvedProblems && <td className={styles.numberCell}>{person.solvedProblems == null ? "—" : rankNumber.format(person.solvedProblems)}</td>}
       {visibleFields.attempts && <td className={styles.numberCell}>{person.attempts == null ? "—" : rankNumber.format(person.attempts)}</td>}
@@ -153,7 +155,7 @@ export function LeaderboardStandings({ ranking, leaders, visibleFields, leaderFi
   const end = Math.min(page * pageSize, total);
   const showMe = pinned && !ranking.data?.items.some(person => person.id === pinned.id) ? pinned : null;
   const optionalCount = Object.values(visibleFields).filter(Boolean).length;
-  const tableWidth = ["min-w-[420px]", "min-w-[500px]", "min-w-[580px]", "min-w-[700px]", "min-w-[820px]"][optionalCount];
+  const tableWidth = ["min-w-[420px]", "min-w-[480px]", "min-w-[540px]", "min-w-[620px]", "min-w-[700px]", "min-w-[820px]"][optionalCount];
 
   return (<>
       {leaders && <div className={styles.podiumArea} aria-busy={leaders.loading} hidden={!leaders.loading && !leaders.error && !leaders.data?.items.length}>
@@ -184,6 +186,7 @@ export function LeaderboardStandings({ ranking, leaders, visibleFields, leaderFi
                     <tr>
                       <th scope="col" className={styles.rankCell}>{ui(locale, "排名", "Rank")}</th>
                       <th scope="col" className={styles.studentCell}>{publicPractice ? ui(locale, "学习者", "Learner") : ui(locale, "学生", "Student")}</th>
+                      {visibleFields.online && <th scope="col" className={styles.numberCell}>{fieldName(locale, "online")}</th>}
                       <th scope="col" className={styles.numberCell}>{ui(locale, "积分", "Points")}</th>
                       {visibleFields.solvedProblems && <th scope="col" className={styles.numberCell}><abbr title={publicPractice ? ui(locale, "仅统计计入公开排名的首次通过。", "Counts first solves included in public ranking.") : ui(locale, "仅统计所选时间范围内计入排行榜的解题记录。", "Counts only solves that earned leaderboard credit in the selected period.")}>{fieldName(locale, "solvedProblems")}<CircleHelp size={12} aria-hidden="true" /></abbr></th>}
                       {visibleFields.attempts && <th scope="col" className={styles.numberCell}>{publicPractice ? ui(locale, "计分提交", "Scored attempts") : fieldName(locale, "attempts")}</th>}

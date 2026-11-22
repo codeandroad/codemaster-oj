@@ -53,9 +53,9 @@ function PresenceDot({ online, locale }: { online?: boolean; locale: AppLocale }
 function StudentName({ person, current, podium = false, locale }: { person: RankedStudent; current: boolean; podium?: boolean; locale: AppLocale }) {
   return (
     <span className={podium ? styles.podiumName : styles.studentName}>
-      <PresenceDot online={person.online} locale={locale}/>
       {person.name}
       {current && <span className={podium ? styles.podiumMe : styles.meTag}>{ui(locale, "我", "You")}</span>}
+      <PresenceDot online={person.online} locale={locale}/>
     </span>
   );
 }

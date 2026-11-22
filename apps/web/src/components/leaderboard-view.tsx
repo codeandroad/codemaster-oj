@@ -56,7 +56,7 @@ function StudentName({ person, current, podium = false, locale }: { person: Rank
     <span className={podium ? styles.podiumName : styles.studentName}>
       {person.name}
       {current && <span className={podium ? styles.podiumMe : styles.meTag}>{ui(locale, "我", "You")}</span>}
-      <PresenceDot online={person.online} locale={locale}/>
+      {podium && <PresenceDot online={person.online} locale={locale}/>}
     </span>
   );
 }

@@ -136,7 +136,7 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
     <WorkspaceThemeProvider theme={resolvedPageTheme}>
       <PersonalAppearanceProvider pageTheme={settings.pageTheme} updatePageTheme={pageTheme=>update({pageTheme})}>
         <div className={resolvedPageTheme==="dark" ? "dark" : ""} style={{colorScheme:resolvedPageTheme}}>
-          {!school && !fullscreen && <StudentPresenceHeartbeat identityId={user.id} endpoint="practice/presence"/>}
+          {!fullscreen && <StudentPresenceHeartbeat identityId={user.id} endpoint={school ? "presence" : "practice/presence"}/>}
           {fullscreen ? content : <WorkspaceFrame student schoolName={scopeName}
             workspaceSelector={schools.length > 0 ? <select aria-label={text("Learning workspace","学习工作区")} value={school?.id ?? ""}
               onChange={event=>switchWorkspace(event.target.value)} className="max-w-full rounded-sm bg-transparent text-xs text-muted-foreground focus-visible:outline-2 focus-visible:outline-primary">

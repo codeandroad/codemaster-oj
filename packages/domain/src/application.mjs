@@ -6,6 +6,7 @@ import { canEditPlatformContent } from './platform-content-access.mjs';
 import { handleAcsl } from './acsl.mjs';
 import { recordPublicPracticeStaffExposure } from './public-scholarship.mjs';
 import { handlePublicPresence } from './public-presence.mjs';
+import { handlePresence } from './presence.mjs';
 import { handleSchoolScholarship } from './school-scholarship.mjs';
 import { handleSchoolLeaderboard } from './school-leaderboard.mjs';
 import { handleSchoolPaper4 } from './school-paper4.mjs';
@@ -192,6 +193,7 @@ export async function createDomainServices(pool,config) {
   schoolScholarship:handleSchoolScholarship,schoolLeaderboard:handleSchoolLeaderboard,schoolPaper4:handleSchoolPaper4,
   schoolActivities:schoolActivitiesOperation,schoolPractice:schoolPracticeOperation,publicLearning:handlePublicLearning,
   auth:authOperation,community:handleCommunity,education:handleOwnPoints,system:handleSystem,schools:schoolsOperation,
+  presence:handlePresence,
   platform:async ctx=>await handleWorkspaceCatalog(ctx)??await handlePublicLearning(ctx)??await schoolPracticeOperation(ctx)??await handlePlatformGovernance(ctx),
  };
  const helpers={problemShape,audit,problemResult,problemInput,insertVersion};

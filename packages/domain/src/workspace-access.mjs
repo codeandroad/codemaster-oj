@@ -23,6 +23,7 @@ export async function requireWorkspaceRoute(user, route, method) {
     || (method === 'POST' && /^\/account-notifications\/(read-all|[^/]+\/read)$/.test(route))
     || /^\/schools(?:\/|$)/.test(route)
     || /^\/practice(?:\/|$)/.test(route)
+    || /^\/presence(?:\/|$)/.test(route)
     || /^\/platform(?:\/|$)/.test(route)) return;
   if (!user) fail(401, 'UNAUTHENTICATED', '请先登录');
   fail(410, 'SCHOOL_WORKSPACE_REQUIRED', '请从已加入的学校工作区打开此功能');

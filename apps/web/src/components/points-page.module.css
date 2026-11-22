@@ -317,6 +317,9 @@ a.podiumCard:hover {
   font-weight: 650;
   overflow-wrap: anywhere;
   line-height: 1.4;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 .podiumMe {
   display: inline-flex;
@@ -481,6 +484,9 @@ a.studentLink:hover {
 .studentName {
   font-weight: 550;
   overflow-wrap: anywhere;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 .meTag {
   display: inline-block;

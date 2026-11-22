@@ -14,6 +14,7 @@ export interface RankedStudent {
   id: string;
   name: string;
   avatar?: string;
+  online?: boolean;
   points: number;
   rank: number;
   solvedProblems?: number;
@@ -36,6 +37,28 @@ export const fieldName = (locale: AppLocale, field: OptionalField) => {
   };
   return ui(locale, ...names[field]);
 };
+
+function PresenceDot({ online, locale }: { online?: boolean; locale: AppLocale }) {
+  if (online === undefined) return null;
+  const label = ui(locale, "在线", "Online");
+  const offline = ui(locale, "离线", "Offline");
+  return (
+    <span className={`inline-flex shrink-0 items-center gap-1 text-xs font-medium ${online ? "text-success" : "text-muted-foreground"}`}>
+      <span role="img" aria-label={online ? label : offline} className={`size-1.5 rounded-full ${online ? "bg-success" : "bg-muted-foreground"}`}/>
+      {online ? label : offline}
+    </span>
+  );
+}
+
+function StudentName({ person, current, podium = false, locale }: { person: RankedStudent; current: boolean; podium?: boolean; locale: AppLocale }) {
+  return (
+    <span className={podium ? styles.podiumName : styles.studentName}>
+      <PresenceDot online={person.online} locale={locale}/>
+      {person.name}
+      {current && <span className={podium ? styles.podiumMe : styles.meTag}>{ui(locale, "我", "You")}</span>}
+    </span>
+  );
+}
 
 function pageNumbers(current: number, last: number): (number | "…")[] {
   const visible = [...new Set([1, last, current - 1, current, current + 1])]
@@ -69,7 +92,7 @@ function LeaderboardPodium({ people, visibleFields, isCurrent, profileHref, publ
           <Trophy className={styles.podiumWatermark} aria-hidden="true" strokeWidth={1} />
           <span className={styles.podiumRank}><Trophy size={14} aria-hidden="true" />{ui(locale, `第 ${person.rank} 名`, `RANK ${person.rank}`)}</span>
           <StudentAvatar person={person} podium />
-          <span className={styles.podiumName}>{person.name}{isCurrent(person) && <span className={styles.podiumMe}>{ui(locale, "我", "You")}</span>}</span>
+          <StudentName person={person} current={isCurrent(person)} podium locale={locale}/>
           <span className={styles.podiumPoints}>{rankNumber.format(person.points)}<span>{ui(locale, "积分", "points")}</span></span>
           {visibleFields.scholarshipBalance && person.scholarshipBalance != null && <span className="mt-1 inline-flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground" title={ui(locale, "当前奖学金余额", "Current Scholarship balance")}><ScholarshipIcon size={14} aria-hidden="true" /><span>{rankNumber.format(person.scholarshipBalance)}</span><span className="sr-only">{ui(locale, "奖学金", "Scholarship")}</span></span>}
         </>;
@@ -86,7 +109,7 @@ function LeaderboardRow({ person, current, pinned = false, visibleFields, href }
   const { locale } = useLocale();
   const student = <>
     <StudentAvatar person={person} />
-    <span className={styles.studentName}>{person.name}{current && <span className={styles.meTag}>{ui(locale, "我", "You")}</span>}</span>
+    <StudentName person={person} current={current} locale={locale}/>
   </>;
   return (
     <tr className={`${styles.row} ${current ? styles.currentRow : ""} ${pinned ? styles.pinnedRow : ""}`}>

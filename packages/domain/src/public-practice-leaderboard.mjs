@@ -23,6 +23,7 @@ export async function publicPracticeLeaderboard({ pool, user, url }) {
     rank: row.rank, name: row.display_name, avatar: defaultAvatarPath(row.avatar_key),
     isOwn: row.is_own, points: row.solved * POINTS_PER_SOLVED, solved: row.solved,
     attempts: row.attempts, acRate: row.ac_rate === null ? null : Number(row.ac_rate),
+    online: row.online,
    };
   }
   return {

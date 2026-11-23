@@ -72,6 +72,7 @@ export type ProblemWorkspaceAdapter = {
   homeHref: string;
   navigation: { items: NavigationProblem[]; loading: boolean; error: string; reload: () => void; href: (problem: NavigationProblem) => string; title: string; description?: string };
   chapter?: { courseTitle: string; title: string; position: number; completed: boolean };
+  assignmentNavigation?: boolean;
   tutorial?: ProblemTutorialContent;
   tutorialEndpoint?: string;
   submissionClosed?: boolean;
@@ -441,13 +442,13 @@ function WorkspaceEditor({ problem, user, original = null, adapter, onReloadProb
     </header>
     {adapter?.statusBanner}
     {chapterContext&&<div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-surface px-4 py-2" data-od-id="course-practice-context"><span className="text-xs">{chapterContext.courseTitle} › {locale==="en"?`Chapter ${chapterContext.position+1}`:`第 ${chapterContext.position+1} 章`} · {chapterContext.title}</span>{chapterContext.completed&&<><span className="text-sm text-success">{tx("本题已完成","Problem completed")}</span>{navigation.next&&<Button size="sm" onClick={()=>switchProblem(navigation.next)}>{tx("下一题","Next problem")}</Button>}</>}<Button size="sm" variant="secondary" onClick={()=>navigateWorkspace(returnTo)}>{tx("返回章节","Back to chapter")}</Button></div>}
-    {assignmentId&&assignment.data&&assignmentValid&&<div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border bg-surface px-4 py-1" data-od-id="assignment-practice-context">
-      <div className="min-w-0 flex-1 basis-52 text-xs leading-5 [overflow-wrap:anywhere]">
+    {(adapter?.assignmentNavigation || assignmentId && assignment.data && assignmentValid) && <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border bg-surface px-4 py-1" data-od-id="assignment-practice-context">
+      {assignmentId && assignment.data && <div className="min-w-0 flex-1 basis-52 text-xs leading-5 [overflow-wrap:anywhere]">
         <StudentScholarshipRule activityType="assignment" activityId={assignmentId} assignmentContext={assignment.data}/>
         {!assignment.data.archived && <p className="text-muted-foreground">{t("截止后补交会更新题目状态和完成进度。作业成绩与奖励以截止前收到的提交为准。")}</p>}
-      </div>
-      <span className="shrink-0 text-xs text-muted-foreground">{navigationItems.findIndex(p=>p.problemId===problem.id)+1} / {navigationItems.length}</span>
-      {assignmentGrade?.status==="AC"&&<span role="status" className="shrink-0 text-xs text-success">{assignmentGrade.completionSource==="other_entry"?tx("已在其他入口通过","Passed elsewhere"):tx("本题已完成","Completed")}</span>}
+      </div>}
+      <span className="ml-auto shrink-0 text-xs text-muted-foreground">{navigationItems.findIndex(p=>p.problemId===problem.id)+1} / {navigationItems.length}</span>
+      {(adapter?.assignmentNavigation ? solved : assignmentGrade?.status==="AC") && <span role="status" className="shrink-0 text-xs text-success">{assignmentGrade?.completionSource==="other_entry"?tx("已在其他入口通过","Passed elsewhere"):tx("本题已完成","Completed")}</span>}
       {navigation.next?<Button size="sm" variant="secondary" className="shrink-0 max-[760px]:min-h-11" disabled={pending||navigationLoading||Boolean(navigationError)} onClick={()=>switchProblem(navigation.next)} data-od-id="assignment-next-problem">{tx("下一题","Next problem")}<ChevronRight size={15}/></Button>:<span className="shrink-0 text-xs text-muted-foreground">{tx("最后一题","Last problem")}</span>}
     </div>}
     {changedDefinition && <div role="alert" className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-info-soft px-4 py-3 text-sm">

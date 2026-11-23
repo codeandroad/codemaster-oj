@@ -19,6 +19,7 @@ export type Definition = {
 };
 
 export type Problem = {
+  tutorial?: import("@/components/student/problem-tutorial").ProblemTutorialContent;
   courses?: import("@/components/student/problem-catalog-course-filter").CourseOption[];
   courseContext?: { courseId: string; chapterId: string };
   ownerScope?: "platform" | "school";

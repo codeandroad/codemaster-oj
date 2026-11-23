@@ -58,6 +58,7 @@ export function SchoolActivities({ school, kind }: { school: School; kind: Activ
     </div>}
     <State data={{ ...detail, data: view }}>{view && (problemId ?
       <PracticeProblem key={`${activityPath}:${problemId}`} path={`${activityPath}/problems/${problemId}`}
+        onAssignmentSubmitted={kind === "assignment" && !preview ? detail.reload : undefined}
         jobPath={id => `${activityPath}/jobs/${id}`} onBack={() => { go({ problemId: null }); detail.reload(); }}
         backLabel={preview ? text("Back to preview", "返回试做") : text(kind === "timed" ? "Back to timed practice" : "Back to assignment", kind === "timed" ? "返回限时训练" : "返回作业")}
         navigation={{ currentId: problemId, items: view.problems, onSelect: id => go({ problemId: id }) }}/> :

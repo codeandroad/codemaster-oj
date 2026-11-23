@@ -399,6 +399,41 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       await pool.query("UPDATE school_activities SET required_language='cpp' WHERE school_id=$1 AND id=$2",[school.id,a.id]);
       assert.equal((await grade()).score,0);
     });
+    await t.test('migrated assignment pins show only the admitted platform chapter for their exact version', async () => {
+      const { rows: [course] } = await pool.query(`INSERT INTO learning_paths(owner_account_id,title,owner_scope,platform_audience_scope,published_at)
+        VALUES($1,'Platform Python','platform','custom',now()) RETURNING id`, [users.admin.id]);
+      await pool.query("INSERT INTO platform_course_rules(course_id,rule_key,target_kind,identity_id) VALUES($1,'pupil','account',$2)", [course.id, ids.student]);
+      const { rows: [chapter] } = await pool.query(`INSERT INTO learning_chapters(path_id,title,content,checkpoint_answer,position)
+        VALUES($1,'Loops','The loop lesson','PRIVATE_CHECKPOINT',0) RETURNING id`, [course.id]);
+      const { rows: [source] } = await pool.query("INSERT INTO problems(owner_account_id,owner_scope) VALUES($1,'platform') RETURNING id", [users.admin.id]);
+      const addVersion = async () => (await pool.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,reference_code,time_limit_ms,memory_limit_mb)
+        VALUES($1,'Loops','stdio','Use a loop','PRIVATE_REFERENCE',500,64) RETURNING id`, [source.id])).rows[0].id;
+      const pin = await addVersion(), other = await addVersion();
+      await pool.query('INSERT INTO chapter_problems(chapter_id,problem_id,version_id,position) VALUES($1,$2,$3,0)', [chapter.id, source.id, pin]);
+      const { rows: [bank] } = await pool.query(`INSERT INTO school_problem_banks(school_id,name,owner_account_id,request_id,resource_kind)
+        VALUES($1,'Execution snapshots',$2,$3,'publication') RETURNING id`, [school.id, users.admin.id, randomUUID()]);
+      await pool.query(`INSERT INTO school_problems(school_id,id,bank_id,owner_account_id,draft,request_id)
+        VALUES($1,$2,$3,$4,'{}',$2)`, [school.id,source.id,bank.id,users.admin.id]);
+      await pool.query(`INSERT INTO school_problem_versions(school_id,id,problem_id,draft_revision,definition)
+        SELECT school_id,$2,$3,1,definition FROM school_problem_versions WHERE school_id=$1 AND id=$4`, [school.id,pin,source.id,published.versionId]);
+      const { rows: [hw] } = await pool.query(`INSERT INTO school_activities(school_id,owner_account_id,kind,title,state,published_at,request_id,request_hash,platform_course_id)
+        VALUES($1,$2,'assignment','HW2','Published',now(),$3,'fixture',$4) RETURNING id`, [school.id,users.teacher.id,randomUUID(),course.id]);
+      await pool.query('INSERT INTO school_activity_problems(school_id,activity_id,problem_id,version_id,position,points) VALUES($1,$2,$3,$4,1,100)', [school.id,hw.id,source.id,pin]);
+      await pool.query('INSERT INTO school_activity_participants(school_id,activity_id,identity_id) VALUES($1,$2,$3),($1,$2,$4)', [school.id,hw.id,ids.student,ids.peer]);
+      const path = activities + '/' + hw.id + '/problems/' + source.id;
+      const get = async (who, query = '') => (await request(path + query, { auth:auth[who] })).data;
+      await request(prefix + '/problems/' + source.id + '/tutorial', { auth:auth.student, status:404 });
+      const view = await get('student');
+      assert.deepEqual(view.tutorial, {source:'course',courseTitle:'Platform Python',title:'Loops',body:'The loop lesson'});
+      assert.doesNotMatch(JSON.stringify(view), /PRIVATE_/);
+      assert.equal((await get('peer', '?courseId=' + course.id)).tutorial, undefined);
+      await request(path, { auth:auth.fresh, status:404 });
+      await pool.query("UPDATE problems SET tutorial_mode='none' WHERE id=$1", [source.id]);
+      assert.equal((await get('student')).tutorial, undefined);
+      await pool.query("UPDATE problems SET tutorial_mode='course' WHERE id=$1", [source.id]);
+      await pool.query('UPDATE chapter_problems SET version_id=$2 WHERE chapter_id=$1', [chapter.id,other]);
+      assert.equal((await get('student', '?versionId=' + other)).tutorial, undefined);
+    });
   } finally {
     await server?.close(); await worker?.end(); await pool.end(); await owner.query('DROP SCHEMA IF EXISTS ' + schema + ' CASCADE'); await owner.end();
   }

@@ -252,6 +252,19 @@ async function activityProblem(db, a, problemId) {
   if (!p) fail(404, 'NOT_FOUND', 'Problem not assigned.');
   return p;
 }
+// The activity detail has already checked this student's admission to the linked course.
+// Read only the chapter attached to the assigned edition, including migrated platform pins.
+async function assignmentCourseTutorial(db, detail, pin) {
+  if (!detail.courseId || detail.courseScope !== 'platform') return null;
+  const { rows: [chapter] } = await db.query(`SELECT c.title,c.content AS body
+    FROM chapter_problems link JOIN learning_chapters c ON c.id=link.chapter_id
+    JOIN problems p ON p.id=link.problem_id
+    WHERE c.path_id=$1 AND link.problem_id=$2 AND link.version_id=$3
+      AND c.archived_at IS NULL AND btrim(c.content)<>'' AND p.owner_scope='platform'
+      AND p.archived_at IS NULL AND p.tutorial_mode='course'
+    ORDER BY c.position,c.id LIMIT 1`, [detail.courseId, pin.problem_id, pin.version_id]);
+  return chapter && chapter.body.trim() ? { source:'course', courseTitle:detail.courseTitle, ...chapter } : null;
+}
 async function enqueueActivity(db, loaded, problemId, user, body, { preview = false } = {}) {
   const { a, student, participation } = loaded;
   if (!preview && !student) fail(403, 'STUDENT_REQUIRED', 'Only assigned students can submit.');
@@ -548,7 +561,9 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
         await schoolActivityProblemAccess(db, { schoolId, problemId, user, activityId: a.id });
         const p = await activityProblem(db, a, problemId);
         const d = await detail(db, loaded, user);
+        const tutorial = student && a.kind === 'assignment' ? await assignmentCourseTutorial(db, d, p) : null;
         return reply({ id: problemId, schoolId, versionId: p.version_id, publishedRevision:p.draft_revision, title: p.definition.title, published: true, canManage: false, definition: safeDefinition(p.definition),
+          ...(tutorial && { tutorial }),
           solved: (d.progress ?? d.grade)?.items.find(item => item.id === problemId)?.solved ?? false, activity: { id: a.id, title: a.title, kind: a.kind, phase: d.phase, endsAt: d.endsAt, attempt: d.attempt, resultsPublishedAt: a.results_published_at, canSubmit: d.canSubmit } });
       }
       return null;

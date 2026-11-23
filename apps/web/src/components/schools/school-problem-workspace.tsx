@@ -18,7 +18,7 @@ import { PracticeToolbar, type PracticeNavigation } from "./school-practice-tool
 import { schoolWorkspaceHref } from "./school-workspace-location";
 
 type CoursePracticeContext = { courseId: string; chapterId: string; requiredLanguage?: SubmissionLanguage | null; solved: boolean; preview: boolean; reload: () => void };
-type Props = { path: string; jobPath: (id: string) => string; onBack: () => void; backLabel?: string; navigation?: PracticeNavigation; expectedVersionId?: string; course?: CoursePracticeContext };
+type Props = { path: string; jobPath: (id: string) => string; onBack: () => void; backLabel?: string; navigation?: PracticeNavigation; expectedVersionId?: string; course?: CoursePracticeContext; onAssignmentSubmitted?: () => void };
 
 export function PracticeProblem(props: Props) {
   const { path, course, expectedVersionId } = props;
@@ -62,7 +62,7 @@ const normalizeJob = (result: DetailedSubmission) => ({
   ...result, testResults: (result as DetailedSubmission & {caseFeedback?: ResultCase[]}).caseFeedback ?? [],
 });
 
-function SchoolProblemWorkspace({ path, jobPath, backLabel, navigation, course, problem, user, reload }: Props & { problem: Problem; user: CampusUser; reload: () => void }) {
+function SchoolProblemWorkspace({ path, jobPath, backLabel, navigation, course, onAssignmentSubmitted, problem, user, reload }: Props & { problem: Problem; user: CampusUser; reload: () => void }) {
   const { locale } = useLocale(), pathname = usePathname(), query = useSearchParams();
   const tx = (zh: string, en: string) => locale === "zh" ? zh : en;
   const a = problem.activity, staff = Boolean(a?.preview || problem.staffPractice || course?.preview);
@@ -84,12 +84,15 @@ function SchoolProblemWorkspace({ path, jobPath, backLabel, navigation, course, 
     languageScope: a ? "assignment" : "course", reloadLanguagePolicy:course?.reload, submissionClosed: closed,
     returnTo:href(null), returnLabel:backLabel ?? tx("返回题目","Back to problems"), homeHref:schoolWorkspaceHref(problem.schoolId),
     navigation:{items:(navigation?.items ?? []).map(i => ({problemId:i.id,title:i.title})),loading:false,error:"",reload,href:i=>href(i.problemId),title:a?.title ?? tx("题目列表","Problem list")},
-    tutorialEndpoint: !a?.preview && (a?.kind !== "timed" || a.resultsPublishedAt) ? `schools/${problem.schoolId}/problems/${problem.id}/tutorial?${tutorialQuery}` : undefined,
+    assignmentNavigation: a?.kind === "assignment" && !a.preview,
+    tutorial: problem.tutorial,
+    tutorialEndpoint: !problem.tutorial && !a?.preview && (a?.kind !== "timed" || a.resultsPublishedAt) ? `schools/${problem.schoolId}/problems/${problem.id}/tutorial?${tutorialQuery}` : undefined,
     submissionsPath:`${path}/submissions?includePlatform=1`, submissionPath:jobPath, normalizeSubmission:normalizeJob,
     submit:({kind,code,language,customInput,requestId})=>productionApi(`${path}/submissions`,{method:"POST",body:{kind,code,language,input:customInput,requestId,
       versionId:problem.versionId,publishedRevision:problem.publishedRevision,...courseContext,...(course?.preview && {coursePreview:true}),...(a?.preview && {expectedRevision:a.revision})}}),
     onSubmissionCompleted: result => {
       if(result.kind !== "submit") return;
+      onAssignmentSubmitted?.();
       course?.reload();
       if (!staff) window.dispatchEvent(new Event("codemaster:school-scholarship-changed"));
     },

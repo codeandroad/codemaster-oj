@@ -35,6 +35,8 @@ const caret = (text: string, at: number) => {
 const wordClass = (char: string | undefined) => !char || /\s/u.test(char) ? 0 : /[\p{L}\p{N}_]/u.test(char) ? 1 : 2;
 const isWordMotion = (key: string): key is WordDirection | Uppercase<WordDirection> =>
   key.length === 1 && "wbeWBE".includes(key);
+const isFindMotion = (key: string): key is "f" | "F" | "t" | "T" =>
+  key.length === 1 && "fFtT".includes(key);
 const emptyLineAt = (text: string, at: number) => text[at] === "\n" && (at === 0 || text[at - 1] === "\n");
 
 function wordClassAt(text: string, at: number, wide: boolean) {
@@ -84,14 +86,28 @@ export function vimKey(snapshot: EditSnapshot, previous: VimState, event: Key, o
   const reset = () => { state.count = ""; state.operator = ""; state.operatorCount = 1; state.pending = ""; };
   const result = (value = text, start = at, end = start): VimResult => ({ state, snapshot: { value, start, end } });
   const normal = (value = text, position = at) => { state.mode = "normal"; reset(); state.column = null; at = caret(value, position); state.head = at; return result(value, at); };
-  const escape = event.key === "Escape" || (event.ctrlKey && !event.metaKey && ["[", "c"].includes(event.key));
+  const escape = event.key === "Escape" || (event.ctrlKey && !event.metaKey && event.key === "[");
   if (escape) {
     state.query = null;
     return normal(text, state.mode === "insert" ? Math.max(lineStart(text, at), previousChar(text, at)) : at);
   }
-  if (state.mode === "insert") return null;
+  if (state.mode === "insert") {
+    if (state.query !== null) state.query = null;
+    // Ctrl+W deletes back one word; Alt+Backspace reaches the component so the
+    // keymap keeps working on platforms where the OS shortcut is unavailable.
+    if ((event.ctrlKey && event.key.toLowerCase() === "w" && !event.metaKey && !event.altKey) ||
+        (event.altKey && !event.ctrlKey && !event.metaKey && event.key === "Backspace")) {
+      const start = word(text, at, "b", false);
+      if (start === at) return result();
+      return result(text.slice(0, start) + text.slice(at), start);
+    }
+    return null;
+  }
   if (event.metaKey || event.altKey) return null;
   if (event.ctrlKey) {
+    // Ctrl+C still cancels a pending / search; in insert mode it now reaches
+    // the browser so students can copy code.
+    if (state.query !== null && event.key.toLowerCase() === "c") { state.query = null; return result(); }
     if (event.key.toLowerCase() === "r") { const next = normal(); return { ...next, history: "redo" }; }
     if (["d", "u"].includes(event.key.toLowerCase())) { at = vertical(text, at, event.key.toLowerCase() === "d" ? 10 : -10, at - lineStart(text, at)); return normal(); }
     return null;
@@ -149,18 +165,23 @@ export function vimKey(snapshot: EditSnapshot, previous: VimState, event: Key, o
   if (state.operator && (key === "i" || key === "a")) { state.pending = key === "i" ? "iw" : "aw"; return result(); }
   let target: number | null = null, inclusive = false, linewise = false;
   const pending = state.pending;
-  if (pending === "f" || pending === "F") {
+  if (isFindMotion(pending)) {
+    const backward = pending === "F" || pending === "T";
     target = at;
     for (let n = 0; n < count; n++) {
-      const found: number = pending === "f" ? text.indexOf(key, target! + 1) : target! > 0 ? text.lastIndexOf(key, target! - 1) : -1;
+    const found: number = backward ? text.lastIndexOf(key, target! - 1) : text.indexOf(key, target! + 1);
       if (key.length !== 1 || found < lineStart(text, at) || found >= lineEnd(text, at)) { reset(); return result(snapshot.value, snapshot.start, snapshot.end); }
       target = found;
     }
-    inclusive = true;
+    // t/T land beside the match; f/F land on it. Backward motions exclude the
+    // matched character, matching Vim's till/FIND semantics.
+    if (pending === "t") target = previousChar(text, target);
+    else if (pending === "T") target = nextChar(text, target);
+    inclusive = pending === "f" || pending === "t";
   } else if (pending === "g") {
     if (key !== "g") return normal();
     target = vertical(text, 0, count - 1, 0); linewise = true;
-  } else if (["g", "f", "F"].includes(key)) { state.pending = key; return result(snapshot.value, snapshot.start, snapshot.end); }
+  } else if (key === "g" || isFindMotion(key)) { state.pending = key; return result(snapshot.value, snapshot.start, snapshot.end); }
   else if (["d", "c", "y"].includes(key)) {
     if (state.operator === key) { const end = vertical(text, at, count - 1, 0); return change(...lineRange(text, at, end), true); }
     state.operator = key as VimState["operator"]; state.operatorCount = count; state.count = ""; return result();

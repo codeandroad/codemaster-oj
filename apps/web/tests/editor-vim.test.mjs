@@ -80,4 +80,27 @@ test('cw keeps following whitespace and normal-mode EOF clamps to the final char
  const e=editor('alpha beta');e.keys(['c','w']);assert.equal(e.snapshot.value,' beta');assert.equal(e.state.mode,'insert');
  const f=editor('abc',3);f.key('x');assert.equal(f.snapshot.value,'ab');assert.equal(f.snapshot.start,1);
 });
+test('t and T move till the target and pair with d and c',()=>{
+ const e=editor('foo(bar) baz');e.keys(['d','t','(']);assert.equal(e.snapshot.value,'(bar) baz');assert.equal(e.state.mode,'normal');
+ const c=editor('foo(bar) baz');c.keys(['c','t','(']);assert.equal(c.snapshot.value,'(bar) baz');assert.equal(c.state.mode,'insert');
+ const x=editor('foo(bar) baz');x.keys(['f','(','d','t',')']);assert.equal(x.snapshot.value,'foo) baz');
+ const b=editor('foo(bar) baz',11);b.keys(['d','T','(']);assert.equal(b.snapshot.value,'foo(z');
+ const b2=editor('foo(bar) baz',9);b2.keys(['d','T','(']);assert.equal(b2.snapshot.value,'foo(baz');
+ const bf=editor('foo(bar) baz',11);bf.keys(['d','F','(']);assert.equal(bf.snapshot.value,'fooz');
+ const bf2=editor('foo(bar) baz');bf2.keys(['f','(','d','F','(']);assert.equal(bf2.snapshot.value,'foo(bar) baz');
+ const p=editor('a.b.c',4);p.keys(['F','.']);assert.equal(p.snapshot.start,3);p.keys(['T','.']);assert.equal(p.snapshot.start,2);p.keys(['0','t','.']);assert.equal(p.snapshot.start,0);p.keys(['2','t','.']);assert.equal(p.snapshot.start,2);
+ const y=editor('foo(bar)',3);y.keys(['v','t',')','d']);assert.equal(y.snapshot.value,'foo)');
+});
+test('Ctrl+C reaches the browser in insert mode while Ctrl+W and Alt+Backspace delete a word',()=>{
+ const e=editor('alpha beta');e.key('i');e.insert('alpha beta');assert.equal(e.state.mode,'insert');
+ assert.equal(e.key('c',{ctrlKey:true}),null);assert.equal(e.state.mode,'insert');
+ const w=editor('alpha beta');w.key('A');w.key('w',{ctrlKey:true});
+ assert.equal(w.snapshot.value,'alpha ');assert.equal(w.snapshot.start,6);assert.equal(w.state.mode,'insert');
+ const a=editor('alpha beta');a.key('A');a.key('Backspace',{altKey:true});
+ assert.equal(a.snapshot.value,'alpha ');assert.equal(a.snapshot.start,6);
+ const t=editor('');t.key('i');t.insert('alpha');t.key('w',{ctrlKey:true});assert.equal(t.snapshot.value,'');assert.equal(t.snapshot.start,0);
+ const dot=editor('foo.bar');dot.key('A');dot.key('w',{ctrlKey:true});assert.equal(dot.snapshot.value,'foo.');assert.equal(dot.snapshot.start,4);
+ const z=editor('alpha');z.key('i');z.key('w',{ctrlKey:true});assert.equal(z.snapshot.value,'alpha');assert.equal(z.snapshot.start,0);
+ const line=editor('one\ntwo');line.keys(['G','A']);line.key('Backspace',{altKey:true});assert.equal(line.snapshot.value,'one\n');assert.equal(line.snapshot.start,4);
+});
 test('a new literal search wraps from the last line and missing text keeps the caret',()=>{const e=editor('alpha\nbeta\ngamma',14);e.keys(['/','b','e','t','a','Enter']);assert.equal(e.snapshot.start,6);e.keys(['/','z','z','z','Enter']);assert.equal(e.snapshot.start,6);});

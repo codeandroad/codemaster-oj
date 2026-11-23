@@ -2,7 +2,7 @@
 import katex from 'katex';
 import {Fragment,createElement,type ReactNode} from 'react';
 import {useLocale} from './locale-context';
-import {contentBlocks,inlineTokens} from './content-parser';
+import {contentBlocks,inlineTokens,type InlineToken} from './content-parser';
 import {AcslSourceImage} from './acsl/source-images';
 import {acslSourceImageBlock} from './acsl/source-asset';
 import {parseContentDiagram} from './content-diagram';
@@ -20,8 +20,16 @@ function Formula({text,display=false}:{text:string;display?:boolean}){
   if(result.error)return <code className={styles.mathError} title={`${locale==='en'?'Formula error: ':'公式错误：'}${result.error==='公式语法有误'&&locale==='en'?'Invalid formula syntax':result.error}`}>{display?'$$':'$'}{text}{display?'$$':'$'}</code>;
   return <span className={display?styles.displayMath:styles.inlineMath} data-math-display={display} dangerouslySetInnerHTML={{__html:result.html}}/>;
 }
-function Inline({text}:{text:string}){
-  return <>{inlineTokens(text).map((token,index)=>token.kind==='math'?<Formula key={index} text={token.text} display={token.display}/>:token.kind==='code'?<code key={index} className={styles.inlineCode}>{token.text}</code>:token.kind==='strong'?<strong key={index}><Inline text={token.text}/></strong>:token.text)}</>;
+function Inline({text,tokens=inlineTokens(text)}:{text:string;tokens?:InlineToken[]}){
+  return <>{tokens.map((token,index)=>{
+    switch(token.kind){
+      case 'math': return <Formula key={index} text={token.text} display={token.display}/>;
+      case 'code': return <code key={index} className={styles.inlineCode}>{token.text}</code>;
+      case 'strong': return <strong key={index}><Inline text={token.text} tokens={token.children}/></strong>;
+      case 'emphasis': return <em key={index}><Inline text={token.text} tokens={token.children}/></em>;
+      default: return token.text;
+    }
+  })}</>;
 }
 export function MathContent({content,renderCode,preserveHeadingLevels=true,compact=false,language}:{content:string;renderCode?:(text:string,language?:string)=>ReactNode;preserveHeadingLevels?:boolean;compact?:boolean;language?:'en'|'zh'}){
   const {locale}=useLocale();

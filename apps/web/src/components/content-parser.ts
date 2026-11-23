@@ -1,6 +1,6 @@
 export type TableAlignment = 'left'|'center'|'right';
 export interface ContentBlock {kind:'paragraph'|'heading'|'code'|'math'|'list'|'table'|'blank';text:string;level?:number;language?:string;ordered?:boolean;items?:string[];numbers?:number[];headers?:string[];rows?:string[][];alignments?:TableAlignment[]}
-export interface InlineToken {kind:'text'|'code'|'math'|'strong';text:string;display?:boolean}
+export interface InlineToken {kind:'text'|'code'|'math'|'strong'|'emphasis';text:string;display?:boolean;children?:InlineToken[]}
 function escaped(text:string,index:number){let count=0;for(let i=index-1;i>=0&&text[i]==='\\';i--)count++;return count%2===1;}
 function closeAt(text:string,delimiter:string,start:number,dollar=false){
   for(let at=text.indexOf(delimiter,start);at>=0;at=text.indexOf(delimiter,at+delimiter.length)){
@@ -48,10 +48,47 @@ function tableAt(lines:string[],index:number):{block:ContentBlock;end:number}|nu
   }
   return {block:{kind:'table',text:'',headers:header.cells,rows,alignments},end};
 }
+interface EmphasisDelimiter {
+  kind:'delimiter';text:string;marker:string;canOpen:boolean;canClose:boolean;start:number;end:number;
+}
+type InlinePart = InlineToken | EmphasisDelimiter;
+function inlineContent(parts:InlinePart[]):InlineToken[]{
+  const tokens:InlineToken[]=[];
+  for(const part of parts){
+    const token:InlineToken=part.kind==='delimiter'?{kind:'text',text:part.text}:part;
+    const previous=tokens[tokens.length-1];
+    if(token.kind==='text'&&previous?.kind==='text')previous.text+=token.text;
+    else tokens.push(token);
+  }
+  return tokens;
+}
+function resolveEmphasis(parts:InlinePart[],source:string):InlineToken[]{
+  for(let close=0;close<parts.length;close++){
+    const closer=parts[close];
+    if(closer.kind!=='delimiter'||!closer.canClose)continue;
+    for(let open=close-1;open>=0;open--){
+      const opener=parts[open];
+      if(opener.kind!=='delimiter'||!opener.canOpen||opener.marker!==closer.marker)continue;
+      // Ambiguous runs follow Markdown's rule of three, preserving literal stars.
+      if((opener.canClose||closer.canOpen)&&(opener.text.length+closer.text.length)%3===0&&
+        (opener.text.length%3!==0||closer.text.length%3!==0))continue;
+      const size=opener.text.length>=2&&closer.text.length>=2?2:1;
+      const token:InlineToken={kind:size===2?'strong':'emphasis',text:source.slice(opener.end,closer.start),children:inlineContent(parts.slice(open+1,close))};
+      const replacement:InlinePart[]=[];
+      if(opener.text.length>size)replacement.push({...opener,text:opener.text.slice(size),end:opener.end-size});
+      replacement.push(token);
+      if(closer.text.length>size)replacement.push({...closer,text:closer.text.slice(size),start:closer.start+size});
+      parts.splice(open,close-open+1,...replacement);
+      close=open+replacement.length-2;
+      break;
+    }
+  }
+  return inlineContent(parts);
+}
 export function inlineTokens(text:string):InlineToken[]{
-  const tokens:InlineToken[]=[];let buffer='';const flush=()=>{if(buffer){tokens.push({kind:'text',text:buffer});buffer='';}};
+  const tokens:InlinePart[]=[];let buffer='';const flush=()=>{if(buffer){tokens.push({kind:'text',text:buffer});buffer='';}};
   for(let i=0;i<text.length;){
-    if(text[i]==='\\'&&['$','`','*','|','\\'].includes(text[i+1]??'')){buffer+=text[i+1];i+=2;continue;}
+    if(text[i]==='\\'&&['$','`','*','_','|','\\'].includes(text[i+1]??'')){buffer+=text[i+1];i+=2;continue;}
     if(text[i]==='`'){
       const fence=text.slice(i).match(/^`+/)![0],end=codeSpanEnd(text,i+fence.length,fence);
       if(end>=0){flush();tokens.push({kind:'code',text:text.slice(i+fence.length,end)});i=end+fence.length;continue;}
@@ -64,11 +101,21 @@ export function inlineTokens(text:string):InlineToken[]{
         flush();tokens.push({kind:'math',text:text.slice(i+left.length,end),display:left==='$$'||left==='\\['});i=end+right.length;continue;
       }
     }
-    if(text.startsWith('**',i)){
-      const end=text.indexOf('**',i+2);if(end>i+2){flush();tokens.push({kind:'strong',text:text.slice(i+2,end)});i=end+2;continue;}
+    if(text[i]==='*'||text[i]==='_'){
+      const marker=text[i],run=text.slice(i).match(marker==='*'?/^\*+/:/^_+/)![0];
+      const before=text.slice(Math.max(0,i-2),i).match(/.$/u)?.[0]??'';
+      const after=String.fromCodePoint(text.codePointAt(i+run.length)??32);
+      const beforeSpace=!before||/\s/u.test(before),afterSpace=!after||/\s/u.test(after);
+      const beforePunctuation=/[\p{P}\p{S}]/u.test(before),afterPunctuation=/[\p{P}\p{S}]/u.test(after);
+      const left=!afterSpace&&(!afterPunctuation||beforeSpace||beforePunctuation);
+      const right=!beforeSpace&&(!beforePunctuation||afterSpace||afterPunctuation);
+      flush();tokens.push({kind:'delimiter',text:run,marker,start:i,end:i+run.length,
+        canOpen:left&&(marker==='*'||!right||beforePunctuation),
+        canClose:right&&(marker==='*'||!left||afterPunctuation)});
+      i+=run.length;continue;
     }
     buffer+=text[i++];
-  }flush();return tokens;
+  }flush();return resolveEmphasis(tokens,text);
 }
 export function contentBlocks(content:string):ContentBlock[]{
   const lines=content.replace(/\r\n/g,'\n').split('\n'),out:ContentBlock[]=[];let paragraph:string[]=[];

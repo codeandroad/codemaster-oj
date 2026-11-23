@@ -156,3 +156,9 @@ test('public bookmarks survive a lost school workspace without carrying private 
   assert.equal(resolvePublicLearningBookmark('/schools', new URLSearchParams({ section: 'courses' })), null);
   assert.equal(resolvePublicLearningBookmark('/schools', new URLSearchParams({ section: 'constructor', scope: 'public' })), null);
 });
+
+test('open platform poker route is registered as a campus route with bilingual breadcrumbs', () => {
+  assert.equal(isCampusRoute('/practice/poker'), true);
+  assert.equal(pageBreadcrumbs('/practice/poker', 'student', 'zh').at(-1).label, '德州扑克');
+  assert.equal(pageBreadcrumbs('/practice/poker', 'student', 'en').at(-1).label, "Texas Hold'em");
+});

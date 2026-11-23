@@ -8,6 +8,7 @@ export type PracticeNavigation = {
   items: { id: string; title: string }[];
   currentId: string;
   onSelect: (id: string) => void;
+  href?: (id: string) => string;
 };
 
 export function PracticeToolbar({ title, onBack, backLabel, navigation }: {

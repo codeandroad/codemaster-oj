@@ -58,3 +58,9 @@ export function practiceLocation(pathname: string, search: string, patch: Record
   const query = params.toString();
   return `${pathname}${query ? `?${query}` : ""}${hash}`;
 }
+
+/** Keep linked platform exercises in their course when opened from the school catalog. */
+export function schoolCatalogProblemLocation(problemId: string, context?: Problem["courseContext"]) {
+  return { problemId, publicCourseId: context?.courseId ?? null, publicChapterId: context?.chapterId ?? null,
+    fromProblemCatalog: context ? "1" : null };
+}

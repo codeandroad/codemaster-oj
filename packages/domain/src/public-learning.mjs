@@ -84,12 +84,12 @@ async function admissionFor(db, listing, course, accountId, options) {
 
 // Use the same edition and admission checks as the course reader. The filter
 // returns only links that also exist in the published problem catalogue.
-export async function publicProblemCatalogCourses(db, user, courseId, {platformOnly=false}={}) {
+export async function publicProblemCatalogCourses(db, user, courseId, {platformOnly=false, schoolId=null}={}) {
   await context(db, user);
-  const schoolListings = platformOnly ? [] : (await db.query(`SELECT l.* FROM public_course_listings l
+  const schoolListings = platformOnly || schoolId ? [] : (await db.query(`SELECT l.* FROM public_course_listings l
     WHERE l.withdrawn_at IS NULL
       AND NOT EXISTS (SELECT 1 FROM learning_paths p WHERE p.id=l.course_id AND p.owner_scope='platform')`)).rows;
-  const listings = [...await platformCourseListings(db), ...schoolListings];
+  const listings = [...await platformCourseListings(db,null,{schoolId}), ...schoolListings];
   const courses = [], byProblem = new Map(), admissionState = {};
   let versions = new Map();
   for (const listing of listings) {

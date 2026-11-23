@@ -78,7 +78,9 @@ export function SchoolPracticeCatalog({
   if (!staff) return <div className={problemStyles.page}>
     {toolbar}
     <State data={learnerResource ?? { data: null, loading: false, error: "", reload: onRefresh }}><LearnerProblemTable rows={rows} onOpen={onOpen}
-      empty={problems.length || courseFilter?.value
+      empty={bankId && courseFilter?.value && !problems.length && allProblems.length
+        ? tx("该题库中没有这门课的题目。选择「全部题库」可查看随课练习。", "This bank has no problems from this course. Select All banks to see its exercises.")
+        : problems.length || courseFilter?.value
         ? tx("没有匹配的题目，请调整搜索或筛选。", "No matching problems. Try another search or filter.")
         : tx("学校尚未发布可练习题目。", "Your school has not published any problems yet.")} />
     <p className={problemStyles.count}>{countLabel}</p></State>

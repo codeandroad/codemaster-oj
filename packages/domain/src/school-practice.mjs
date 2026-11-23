@@ -257,16 +257,21 @@ export async function listPublicProblems(pool,user,url){
   savedOnly:url?.searchParams?.get('savedOnly')==='1',
  };
  const query=(url?.searchParams?.get('q')??'').slice(0,100).trim();
- const catalogQuery=query.toLowerCase();
  const rawPage=url?.searchParams?.get('page');
  const page=rawPage==null?null:integer(Number(rawPage),1,100000,'Page');
- const pageSize=50;
- const limit=page==null?500:pageSize;
- let skip=page==null?0:(page-1)*pageSize;
  return transaction(pool,async db=>{
   await activeAccount(db,user.id);
   const sourceSchools=await lockCatalogProblemSchools(db,null,{shared:true});
   const courseFilter=await publicProblemCatalogCourses(db,user,courseId,{platformOnly:!includeCourses&&!courseOnly});
+  return readPracticeCatalog(db,user,courseFilter,sourceSchools,{courseId,includeCourses,courseOnly,filters,query,page});
+ });
+}
+
+async function readPracticeCatalog(db,user,courseFilter,sourceSchools,{
+ courseId,includeCourses=false,courseOnly=false,filters={},query='',page=null,limit=page==null?500:50,
+}) {
+  const catalogQuery=query.toLowerCase();
+  let skip=page==null?0:(page-1)*limit;
   const versions=courseId?courseFilter.versions:null;
   const problemIds=versions?[...versions.keys()]:courseOnly?[...courseFilter.byProblem.keys()]:null;
   const linkedPlatformIds=[...courseFilter.byProblem].filter(([,contexts])=>[...contexts.values()].some(context=>context.platform)).map(([id])=>id);
@@ -278,7 +283,7 @@ export async function listPublicProblems(pool,user,url){
     for(const [id,state] of await problemProgress(db,user,schoolRows.map(row=>row.id)))progress.set(id,state);
    }
   };
-  const directedIds=(await db.query(`SELECT DISTINCT audience.problem_id FROM platform_problem_audiences audience
+  const directedIds=courseOnly?[]:(await db.query(`SELECT DISTINCT audience.problem_id FROM platform_problem_audiences audience
    WHERE ${matchingProblemAudienceSql('$1')}`,[user.id])).rows.map(row=>row.problem_id);
   const directed=new Set(directedIds), scopedIds=new Set([...linkedPlatformIds,...directedIds]);
   let cursor=null;
@@ -351,7 +356,6 @@ export async function listPublicProblems(pool,user,url){
    ...(courseOnly && { fromCourse:true }),
    ...(page != null && { page, query, hasMore: items.length > limit }),
   };
- });
 }
 
 async function decideProblemPublication(db, user, {schoolId, problemId, versionId: expectedVersion}, decision) {
@@ -566,8 +570,15 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
    const { courseId, includeCourses } = problemCatalogCourseRequest(url);
    const courseFilter = role === 'student' && includeCourses
     ? await schoolProblemCatalogCourses(db, schoolId, user, role, courseId) : null;
+   const includePlatform = role === 'student' && (!bankId || includeCourses);
+   const sourceSchools = includePlatform ? await lockCatalogProblemSchools(db,null,{shared:true}) : [];
+   const platform = includePlatform
+    ? await publicProblemCatalogCourses(db,user,courseId,{schoolId}) : null;
+   // Course admission checks can switch the connection to the course's source school.
+   if (platform) await scope(db,schoolId);
    const links = courseId && courseFilter
-    ? [...courseFilter.versions].flatMap(([problemId, versions]) => [...versions].map(versionId => ({ problemId, versionId }))) : null;
+    ? [...courseFilter.versions, ...platform.versions].flatMap(([problemId, versions]) =>
+        [...versions].map(versionId => ({ problemId, versionId }))) : null;
    const { rows } = await db.query(`SELECT p.*,b.name AS bank_name,b.archived,
       EXISTS(SELECT 1 FROM problems original WHERE original.id=p.id AND original.owner_scope='platform') platform_owned
     FROM school_problems p JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id
@@ -579,8 +590,21 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
       ))
     ORDER BY p.created_at,p.id LIMIT 500`, [schoolId, user.id, role, bankId, links && JSON.stringify(links)]);
    const items = [];
-   for (const p of rows) items.push(await shapeProblem(db, p, user, role));
-   return reply({ ...(courseFilter && { courseId, courses: courseFilter.courses }), items });
+   for (const p of rows) {
+    const item = await shapeProblem(db,p,user,role);
+    const selected = platform?.byProblem.get(item.id)?.get(courseId);
+    if (selected && selected.versionId === item.versionId) {
+     item.courseContext = {courseId,chapterId:selected.chapterId};
+    }
+    items.push(item);
+   }
+   if (platform?.byProblem.size && !bankId && (!courseId || platform.versions.size)) {
+    const linked = await readPracticeCatalog(db,user,platform,sourceSchools,{courseId,courseOnly:true,limit:Infinity});
+    const localIds = new Set(items.map(item => item.id));
+    items.push(...linked.items.filter(item => !localIds.has(item.id)));
+   }
+   const courses = courseFilter && [...new Map([...courseFilter.courses,...platform.courses].map(course=>[course.id,course])).values()];
+   return reply({ ...(courses && {courseId,courses}), items });
   }
   if(method==='POST'&&!id){if(!['teacher','school_admin'].includes(role))fail(403,'FORBIDDEN','Teaching role required.');const bankId=uuid(body.bankId),bank=(await db.query('SELECT * FROM school_problem_banks WHERE resource_kind=\'ordinary\' AND school_id=$1 AND id=$2',[schoolId,bankId])).rows[0];if(!bank||bank.archived||!canManage(bank,user,role))fail(404,'NOT_FOUND','Bank unavailable.');const requestId=uuid(body.requestId),old=(await db.query('SELECT * FROM school_problems WHERE school_id=$1 AND owner_account_id=$2 AND request_id=$3',[schoolId,user.id,requestId])).rows[0];const definition=normalizeSchoolProblem(body);if(old){if(old.bank_id!==bankId||canonicalHash(draftDefinition(old.draft))!==canonicalHash(draftDefinition(definition)))fail(409,'REQUEST_CONFLICT','Request ID already used.');return reply(await shapeProblem(db,await loadProblem(db,schoolId,old.id,user,role),user,role,{detail:true}));}const p=(await db.query('INSERT INTO school_problems(school_id,bank_id,owner_account_id,draft,request_id) VALUES($1,$2,$3,$4,$5) RETURNING id',[schoolId,bankId,user.id,JSON.stringify(definition),requestId])).rows[0];await auditSchool(db,schoolId,user.id,'school.problem.create',p.id);return reply(await shapeProblem(db,await loadProblem(db,schoolId,p.id,user,role),user,role,{detail:true}),201);}
   if(!id)return null;const p=await loadProblem(db,schoolId,id,user,role);

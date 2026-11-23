@@ -2,7 +2,7 @@
 
 import { CatalogGroups, SchoolImportHistory } from "./catalog-groups";
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useCatalogFilterUrl } from "@/components/use-catalog-filter-preferences";
 import { RefreshCw } from "lucide-react";
 import { useLocale } from "@/components/locale-context";
@@ -21,7 +21,7 @@ import type { Bank, Problem } from "./school-practice-types";
 import { PlatformProblemEditor } from "./platform-problems";
 import type { PlatformSourceProblem } from "@/components/teacher/platform-problem-source";
 import { SchoolProblemEditor } from "./school-problem-editor";
-import { practiceCatalogFilters, practiceFilterKeys, practiceLocation, practiceNavigationItems, practiceProblemMatches, type PracticeCatalogFilters } from "./school-practice-navigation";
+import { practiceCatalogFilters, practiceFilterKeys, practiceLocation, practiceNavigationItems, practiceProblemMatches, schoolCatalogProblemLocation, type PracticeCatalogFilters } from "./school-practice-navigation";
 import { PublicProblemWorkspace } from "./public-problem-workspace";
 import { PracticeProblem } from "./school-problem-workspace";
 
@@ -45,6 +45,7 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
   const tx = (zh: string, en: string) => locale === "zh" ? zh : en;
   const base = `schools/${schoolId}`;
   const params = useSearchParams();
+  const pathname = usePathname();
   const selected = params.get("problemId") ?? initialProblemId ?? null;
   const { search, changeUrlFilters, ready } = useCatalogFilterUrl(
     `campus-judge:school-problems:v1:${accountId}:${schoolId}:${role}`, schoolCatalogKeys,
@@ -89,7 +90,11 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
   const action = useMutation();
   function refresh() { banks.reload(); allProblems.reload(); bankProblems.reload(); platformSources.reload(); }
   function closeProblemEditor() { setEditing(null); refresh(); }
-  function selectProblem(problemId: string | null) { updatePracticeLocation({ problemId }); }
+  function problemLocation(id: string) {
+    const row = navigationProblems.find(problem => problem.id === id) ?? catalogProblems.find(problem => problem.id === id);
+    return schoolCatalogProblemLocation(id, row?.courseContext);
+  }
+  function selectProblem(problemId: string | null) { updatePracticeLocation(problemId ? problemLocation(problemId) : { problemId }); }
   function changeFilters(patch: Partial<PracticeCatalogFilters>) {
     const fields = Object.fromEntries(Object.entries(patch).map(([key, value]) => [practiceFilterKeys[key as keyof PracticeCatalogFilters], typeof value === "boolean" ? value ? "1" : null : value]));
     changeUrlFilters(fields);
@@ -140,7 +145,10 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
           bankId={bookmarked.data.bankId} close={closeBookmark} saved={closeBookmark}/>
       : <p role="status">{tx("此题目前不可编辑。","This problem is currently read-only.")}</p>)}</State></State>;
   }
-  if (selected) return <PracticeProblem key={`${schoolId}:${selected}`} path={`${base}/problems/${encodeURIComponent(selected)}`} jobPath={id => `${base}/judge-jobs/${id}`} onBack={() => { selectProblem(null); refresh(); }} navigation={{ currentId: selected, items: practiceNavigationItems(navigationProblems, filters, staff, selected, banks.data?.items.filter(bank => bank.archived).map(bank => bank.id)), onSelect: selectProblem }} />;
+  if (!staff && selected && params.has("publicCourseId")) {
+    return <PublicProblemWorkspace id={selected} workspaceSchoolId={schoolId} catalog={catalog}/>;
+  }
+  if (selected) return <PracticeProblem key={`${schoolId}:${selected}`} path={`${base}/problems/${encodeURIComponent(selected)}`} jobPath={id => `${base}/judge-jobs/${id}`} onBack={() => { selectProblem(null); refresh(); }} navigation={{ currentId: selected, items: practiceNavigationItems(navigationProblems, filters, staff, selected, banks.data?.items.filter(bank => bank.archived).map(bank => bank.id)), onSelect: selectProblem, href: id => practiceLocation(pathname, params.toString(), problemLocation(id)) }} />;
 
   const catalogView = <SchoolPracticeCatalog
     banks={catalogBanks}

@@ -581,6 +581,40 @@ test('school and public practice Nest transport requires scoped membership, CSRF
    assert.equal(await schoolList(),undefined);
    assert.equal((await request(entry+'/entry',{auth:auth.student})).data.admission,'direct');
   });
+  await t.test('school problem discovery follows school catalog visibility and current course admission', async () => {
+   const {rows:[source]}=await pool.query("INSERT INTO problems(owner_account_id,owner_scope) VALUES($1,'platform') RETURNING id",[users.platform.id]);
+   const {rows:[version]}=await pool.query(`INSERT INTO problem_versions(problem_id,title,statement,mode,comparator,
+    reference_code,samples,time_limit_ms,memory_limit_mb,validation_status,course_only_published)
+    VALUES($1,'Linked exercise','Print seven','stdio','tokens','print(7)','[{"input":"","expected":"7"}]',1000,128,'AC',true) RETURNING id`,[source.id]);
+   await pool.query("INSERT INTO test_cases(version_id,position,input,expected,weight) VALUES($1,0,'','7',100)",[version.id]);
+   await pool.query('UPDATE problem_versions SET published_at=now() WHERE id=$1',[version.id]);
+   await pool.query('UPDATE problems SET current_version_id=$2 WHERE id=$1',[source.id,version.id]);
+   const created=(await request('/platform/courses',{auth:auth.platform,method:'POST',status:201,body:{
+    requestId:randomUUID(),title:'Scoped exercise',audiencePolicy:{scope:'all'},
+    chapters:[{title:'Linked chapter',content:'Lesson',problems:[{problemId:source.id,versionId:version.id}]}],
+   }})).data;
+   const path='/platform/courses/'+created.id;
+   let course=(await request(path+'/publish',{auth:auth.platform,method:'POST',body:{expectedRevision:created.revision,sourceVersion:created.sourceVersion}})).data;
+   const change=async patch=>{course=(await request(path,{auth:auth.platform,method:'PATCH',body:{...patch,expectedRevision:course.revision,sourceVersion:course.sourceVersion}})).data;};
+   const catalog=async(query='')=>(await request(prefix+'/problems?includeCourseFilters=1'+query,{auth:auth.student})).data;
+   const byCourse='&courseId='+course.id;
+   const context={courseId:course.id,chapterId:course.chapters[0].id};
+   assert.ok(!(await catalog()).courses.some(c=>c.id===course.id));
+   assert.deepEqual((await catalog(byCourse)).items,[]);
+   await change({catalogSchoolIds:[school.id]});
+   assert.ok((await catalog()).courses.some(c=>c.id===course.id));
+   assert.deepEqual((await catalog()).items.find(p=>p.id===source.id)?.courseContext,context);
+   assert.deepEqual((await catalog(byCourse)).items.map(p=>[p.id,p.versionId,p.courseContext]),[[source.id,version.id,context]]);
+   const inBank=await catalog(byCourse+'&bankId='+bank.id);
+   assert.ok(inBank.courses.some(c=>c.id===course.id));
+   assert.deepEqual(inBank.items,[]);
+   const practice='/practice/problems/'+source.id+'?'+new URLSearchParams(context);
+   assert.equal((await request(practice,{auth:auth.student})).data.definition.statement,'Print seven');
+   await change({audiencePolicy:{scope:'custom',schoolRules:[{schoolId:school.id,minimumPoints:1000000}]}});
+   assert.ok(!(await catalog()).courses.some(c=>c.id===course.id));
+   assert.deepEqual((await catalog(byCourse)).items,[]);
+   await request(practice,{auth:auth.student,status:403});
+  });
   await t.test('school course requirements follow the published edition, class audience and actual learner progress', async () => {
    const base=prefix+'/courses';
    const create=async(title,who)=> (await request(base,{auth:auth[who],method:'POST',status:201,body:{

@@ -9,7 +9,6 @@ import { loadConfig } from '../../../packages/domain/src/application.mjs';
 import { hashPassword } from '../../../packages/domain/src/security.mjs';
 import { normalizeSchoolProblem } from '../../../packages/domain/src/school-practice.mjs';
 import { provisionSchool } from '../../../packages/domain/src/schools.mjs';
-import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 
 test('school course HTTP lifecycle preserves published boundaries and stable learning progress',
  { skip: !process.env.TEST_DATABASE_URL, timeout: 90000 }, async t => {
@@ -107,7 +106,9 @@ test('school course HTTP lifecycle preserves published boundaries and stable lea
     await request(courses,{status:401});
     await request(courses,{auth:legacy,status:404});
     await request(courses,{auth:betaAdmin,status:404});
-    await request(school(LEGACY_SCHOOL_ID,'courses'),{auth:legacy,status:404});
+    const homeSchool=(await pool.query("SELECT id FROM schools WHERE slug='tianxing-chuangshiji'")).rows[0];
+    await request(school(homeSchool.id,'courses'),{auth:legacy,status:200});
+    await request(school(homeSchool.id,'courses'),{auth:student,status:404});
     await post(courses,student,input,403);
     await request(courses,{method:'POST',auth:teacher,body:input,csrf:false,status:403});
     const retries = await Promise.all([post(courses,teacher,input,[200,201]),post(courses,teacher,input,[200,201])]);

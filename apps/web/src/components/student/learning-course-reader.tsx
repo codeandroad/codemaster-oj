@@ -92,8 +92,11 @@ export function LearningCourseReader({
     selectedId={chapter?.id} chapterHref={chapterHref}/>;
 
   return <>
-    <PageHeader className="course-detail-header" title={chapter?.title ?? course.title} description={course.description}/>
-    <div className="mt-3"><CourseLanguageControl language={language} onChange={setLanguage} missing={Boolean(chapter && !chapter.localizations?.[language])}/></div>
+    <PageHeader title={course.title}/>
+    <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <h1 className="min-w-0 break-words text-2xl font-bold">{course.title}</h1>
+      <CourseLanguageControl language={language} onChange={setLanguage}/>
+    </header>
     {metadata && <div className="mt-2">{metadata}</div>}
     <div className="mt-4"><LearningProgressSummary read={course.completedChapters} totalChapters={course.chapterCount} done={course.completedTasks} totalTasks={course.taskCount}/></div>
     {relatedActivities}
@@ -167,12 +170,12 @@ function ReaderLesson({ chapter, language, nextHref, onRead, canTrackProgress, e
 export function LearningChapterContent({ chapter, language, practiceJump = false, titleId }: { language?: "en" | "zh"; practiceJump?: boolean; titleId?: string; chapter: Pick<ReaderChapter, "title" | "content" | "objective" | "checkpoint" | "checkpointAnswer"> }) {
   const { locale } = useLocale(), text = (zh: string, en: string) => locale === "en" ? en : zh;
   return <div className="relative isolate space-y-5" data-od-id="learning-lesson-presentation">
-    <section className={`${panel} p-5 sm:p-7`}><div className="flex flex-wrap items-start justify-between gap-3"><h1 id={titleId} className="text-2xl font-bold">{chapter.title}</h1>
+    <section className={`${panel} p-5 sm:p-7`}><div className="flex flex-wrap items-start justify-between gap-3"><h2 id={titleId} className="text-2xl font-bold">{chapter.title}</h2>
       {practiceJump && <Button type="button" variant="ghost" size="sm" className="shrink-0"
         onClick={() => document.getElementById("chapter-practice")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
         {text("跳到练习", "Skip to practice")}<ArrowDown size={15} aria-hidden="true"/>
       </Button>}</div>
-      {chapter.objective && <div className="mt-4 border-b border-border pb-5"><h2 className="text-sm font-semibold">{text("学习目标", "Learning objective")}</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{chapter.objective}</p></div>}
+      {chapter.objective && <div className="mt-4 border-b border-border pb-5"><h3 className="text-sm font-semibold">{text("学习目标", "Learning objective")}</h3><p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{chapter.objective}</p></div>}
       <div className="mt-6"><LessonContent language={language} content={chapter.content}/></div>
     </section>
     {chapter.checkpoint?.trim() && <section className={`${panel} p-5 sm:p-7`} data-od-id="learning-checkpoint">

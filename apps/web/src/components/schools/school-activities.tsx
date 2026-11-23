@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { StatusPill } from "@/components/page-chrome";
 import { useLocale } from "@/components/locale-context";
-import { AssignmentArchiveTabs, AssignmentScoreRule, AssignmentCompletedStatus, StudentAssignmentCard, StudentTimedPracticeCard, StudentTimedPracticeTabs, timedPracticeCategoryLabel } from "@/components/student/activity-cards";
+import { AssignmentArchiveTabs, AssignmentCompletedStatus, StudentAssignmentCard, StudentTimedPracticeCard, StudentTimedPracticeTabs, timedPracticeCategoryLabel } from "@/components/student/activity-cards";
 import { Progress } from "@/components/student/dashboard-view";
 import { date, Empty, Feedback, State, useData, useMutation } from "@/components/student/shared";
 import { AssignmentParticipantForm, CancelAssignment } from "@/components/teacher/assignment-changes";
@@ -82,7 +82,6 @@ export function SchoolActivities({ school, kind }: { school: School; kind: Activ
       timing={timing}
       onPageChange={next => go({ activityPage: String(next), activityEdit: null })}
     />
-    {kind === "assignment" && <AssignmentScoreRule/>}
   </>;
   return <div className="space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex gap-1">{teaching && <>{[false, true].map(value => <Button key={String(value)} size="sm" variant={archived === value ? "default" : "secondary"} onClick={() => go({ activityArchived: value ? "1" : null, activityPage: null })}>{value ? text("Archived", "已归档") : text("Active", "使用中")}</Button>)}</>}</div><div className="flex gap-2"><Button size="sm" variant="ghost" disabled={list.loading} onClick={list.reload} aria-label={text("Refresh activities", "刷新活动")}><RefreshCw size={15}/></Button>{teaching && <Button size="sm" onClick={() => go({ activityEdit: "new" })}><Plus size={16}/>{text(kind === "timed" ? "New timed practice" : "New assignment", kind === "timed" ? "新建限时训练" : "新建作业")}</Button>}</div></div>

@@ -27,7 +27,7 @@ import { StudentLearningDetail, StudentLearningList, type LearningPath } from ".
 import { StudentTimedDetail, StudentTimedList } from "./timed";
 import { StudentWorkspace } from "./workspace";
 import { Progress, StudentDashboardView } from "./dashboard-view";
-import { AssignmentArchiveTabs, AssignmentScoreRule, AssignmentCompletedStatus, StudentAssignmentCard } from "./activity-cards";
+import { AssignmentArchiveTabs, AssignmentCompletedStatus, StudentAssignmentCard } from "./activity-cards";
 import { AssignmentCompletionDialog } from "./assignment-completion";
 export { Progress } from "./dashboard-view";
 const StudentPaper4List = dynamic(() => import("@/components/paper4/student-paper4").then(module => module.StudentPaper4List));
@@ -175,8 +175,6 @@ export function StudentAssignments({ user }: { user: CampusUser }) {
         })}
       </div>
     </State>
-    <AssignmentScoreRule/>
-
   </>;
 }
 export function StudentAssignment({ id, user }: { id: string; user: CampusUser }) {

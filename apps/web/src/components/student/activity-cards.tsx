@@ -1,4 +1,4 @@
-import { ArrowRight, CalendarClock, CheckCircle2, Check, ClipboardList, Clock3 } from "lucide-react";
+import { ArrowRight, CalendarClock, Check, ClipboardList, Clock3 } from "lucide-react";
 import { useLocale, type AppLocale } from "@/components/locale-context";
 import { AppLink } from "@/components/navigation";
 import { StatusPill } from "@/components/page-chrome";
@@ -147,11 +147,3 @@ export function AssignmentArchiveTabs({ archived, onChange }: { archived: boolea
   </div>;
 }
 
-export function AssignmentScoreRule() {
-  const {locale} = useLocale();
-  return <section className="mt-6 flex items-start gap-3 rounded-lg border border-border bg-surface p-5">
-    <CheckCircle2 className="mt-0.5 text-success" size={18}/>
-    <div><h2 className="font-bold">{locale === "zh" ? "成绩计算规则" : "Score display rule"}</h2>
-      <p className="mt-1 text-sm leading-6 text-muted-foreground">{locale === "zh" ? "订正提交单独显示，不会覆盖原作业成绩。" : "Correction submissions are displayed separately. Later corrections do not overwrite the original assignment score."}</p></div>
-  </section>;
-}

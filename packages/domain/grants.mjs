@@ -170,6 +170,13 @@ REVOKE INSERT,UPDATE,DELETE ON classes,class_members,teacher_classes,identity_te
  assignment_participants,timed_practices,timed_practice_problems,timed_practice_participants,timed_attempts,timed_result_snapshots,timed_result_revisions,
  paper4_papers,paper4_versions,paper4_attempts,paper4_attempt_files,paper4_snapshots,paper4_reference_snapshots,
  problem_groups,problem_group_members,identity_import_batches,member_import_batches,problem_import_batches,point_rewards,learning_resources FROM campus_app;
+REVOKE ALL ON poker_settings,poker_wallets,poker_wallet_ledger,poker_daily_stats,poker_tables,poker_seats,poker_hands FROM PUBLIC,campus_app,campus_worker;
+GRANT SELECT,INSERT,UPDATE ON poker_settings,poker_wallets,poker_daily_stats,poker_tables,poker_hands TO campus_app;
+GRANT SELECT,INSERT,UPDATE,DELETE ON poker_seats TO campus_app;
+GRANT SELECT,INSERT ON poker_wallet_ledger TO campus_app;
+GRANT USAGE,SELECT ON SEQUENCE poker_wallet_ledger_id_seq TO campus_app;
+REVOKE ALL ON FUNCTION poker_account_ac_count(uuid) FROM PUBLIC,campus_worker;
+GRANT EXECUTE ON FUNCTION poker_account_ac_count(uuid) TO campus_app;
 
 `);
   console.log('Runtime role grants applied.');

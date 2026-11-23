@@ -1,4 +1,5 @@
 import { handleWorkspaceCatalog } from './workspace-catalog.mjs';
+import { handlePoker } from './poker.mjs';
 import { handleWrittenPapers } from './written-papers.mjs';
 import { handleOwnPoints } from './platform-points.mjs';
 import { problemProgress } from './problem-progress.mjs';
@@ -193,8 +194,8 @@ export async function createDomainServices(pool,config) {
   schoolScholarship:handleSchoolScholarship,schoolLeaderboard:handleSchoolLeaderboard,schoolPaper4:handleSchoolPaper4,
   schoolActivities:schoolActivitiesOperation,schoolPractice:schoolPracticeOperation,publicLearning:handlePublicLearning,
   auth:authOperation,community:handleCommunity,education:handleOwnPoints,system:handleSystem,schools:schoolsOperation,
-  presence:handlePresence,
-  platform:async ctx=>await handleWorkspaceCatalog(ctx)??await handlePublicLearning(ctx)??await schoolPracticeOperation(ctx)??await handlePlatformGovernance(ctx),
+  presence:handlePresence,poker:handlePoker,
+  platform:async ctx=>await handleWorkspaceCatalog(ctx)??await handlePoker(ctx)??await handlePublicLearning(ctx)??await schoolPracticeOperation(ctx)??await handlePlatformGovernance(ctx),
  };
  const helpers={problemShape,audit,problemResult,problemInput,insertVersion};
  async function prepareRequest({url:rawUrl,method,headers={},body={},ip='unknown'}) {
@@ -234,6 +235,7 @@ export function resourceArea(route) {
  if(/^\/schools\/[^/]+\/activities(?:\/|$)/.test(route))return 'schoolActivities';
  if(/^\/schools\/[^/]+\/course-admissions(?:\/|$)/.test(route))return 'publicLearning';
  if(/^\/practice\/presence(?:\/|$)/.test(route))return 'publicPresence';
+ if(/^\/(practice|platform)\/poker(?:\/|$)/.test(route))return 'poker';
  if(/^\/(practice\/profiles|platform\/profile-message-reports)(?:\/|$)/.test(route))return 'community';
  if(/^\/practice(?:\/|$)/.test(route))return /^\/practice\/(catalog|courses)(?:\/|$)/.test(route)?'publicLearning':'schoolPractice';
  if(/^\/schools\/[^/]+\/(problem-banks|problems|judge-jobs|judge-status|submissions)(?:\/|$)/.test(route))return 'schoolPractice';

@@ -2,10 +2,10 @@
 
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useState, type ReactNode } from "react";
 
-type HeadingEntry = { id: string; pathname: string; title: string };
+type HeadingEntry = { id: string; pathname: string; title: string; inContent: boolean };
 type HeadingContextValue = {
   pathname: string;
-  title: string;
+  heading?: HeadingEntry;
   register: (entry: HeadingEntry) => () => void;
 };
 const PageHeadingContext = createContext<HeadingContextValue | null>(null);
@@ -17,23 +17,23 @@ export function PageHeadingProvider({ pathname, children }: { pathname: string; 
     setHeadings(current => [...current.filter(item => item.id !== entry.id), entry]);
     return () => setHeadings(current => current.filter(item => item.id !== entry.id));
   }, []);
-  const title = headings.findLast(entry => entry.pathname === pathname)?.title ?? "";
-  const value = useMemo(() => ({ pathname, title, register }), [pathname, title, register]);
+  const heading = headings.findLast(entry => entry.pathname === pathname);
+  const value = useMemo(() => ({ pathname, heading, register }), [pathname, heading, register]);
   return <PageHeadingContext.Provider value={value}>{children}</PageHeadingContext.Provider>;
 }
 
 /** Also safe in standalone workspaces, which do not use the campus shell. */
-export function usePageHeading(title: string) {
+export function usePageHeading(title: string, { inContent = false } = {}) {
   const context = useContext(PageHeadingContext);
   const id = useId();
   const register = context?.register;
   const pathname = context?.pathname;
   useEffect(() => {
     if (!register || pathname === undefined || !title.trim()) return;
-    return register({ id, pathname, title: title.trim() });
-  }, [id, pathname, register, title]);
+    return register({ id, pathname, title: title.trim(), inContent });
+  }, [id, pathname, register, title, inContent]);
 }
 
 export function useCurrentPageHeading() {
-  return useContext(PageHeadingContext)?.title ?? "";
+  return useContext(PageHeadingContext)?.heading;
 }

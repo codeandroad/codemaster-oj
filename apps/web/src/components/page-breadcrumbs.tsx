@@ -9,7 +9,7 @@ import { pageBreadcrumbs, type BreadcrumbRole } from "@/lib/page-breadcrumbs";
 
 export function PageBreadcrumbs({ pathname, role }: { pathname: string; role: BreadcrumbRole }) {
   const { locale } = useLocale();
-  const title = useCurrentPageHeading();
+  const title = useCurrentPageHeading()?.title ?? "";
   const search = useSearchParams();
   const items = pageBreadcrumbs(pathname, role, locale, title, search);
   return <nav aria-label={locale === "en" ? "Breadcrumb" : "当前位置"} data-od-id="page-breadcrumbs" className="min-w-0 flex-1 text-sm">
@@ -28,5 +28,6 @@ export function ShellPageHeading({ pathname, role }: { pathname: string; role: B
   const { locale } = useLocale();
   const heading = useCurrentPageHeading();
   const items = pageBreadcrumbs(pathname, role, locale);
-  return <h1 className="sr-only">{heading || items[items.length - 1].label}</h1>;
+  if (heading?.inContent) return null;
+  return <h1 className="sr-only">{heading?.title || items[items.length - 1].label}</h1>;
 }

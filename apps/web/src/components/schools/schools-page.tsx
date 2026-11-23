@@ -378,8 +378,9 @@ export function SchoolsPage({
 
 function SchoolPageTitle({ label, parentHref }: { label: string; parentHref?: string }) {
   const heading = useCurrentPageHeading();
+  const Label = heading?.inContent ? "span" : "h1";
   return <>{parentHref && <><AppLink className="shrink-0 text-muted-foreground hover:text-primary" href={parentHref}>{label}</AppLink><span aria-hidden="true">›</span></>}
-    <h1 className="truncate font-semibold">{heading || label}</h1></>;
+    <Label className="truncate font-semibold">{heading?.title || label}</Label></>;
 }
 
 function SchoolMembers({

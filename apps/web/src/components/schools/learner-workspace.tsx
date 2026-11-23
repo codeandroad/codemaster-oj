@@ -160,10 +160,11 @@ export function LearnerWorkspace({ user, pathname, school, onLogout, onUserSaved
 
 function LearnerBreadcrumb({home,homeLabel,section,label,parent}:{home:string; homeLabel:string; section:string; label:string; parent?:{href:string;label:string}}) {
   const heading=useCurrentPageHeading();
+  const Label = heading?.inContent ? "span" : "h1";
   const text = useSchoolText();
   return <nav aria-label={text("Breadcrumb","面包屑导航")} className="flex min-w-0 items-center gap-2 text-sm">{section!=="home" && <><AppLink href={home} className="text-muted-foreground hover:text-primary">{homeLabel}</AppLink><span aria-hidden="true">›</span></>}
     {parent && <><AppLink className="shrink-0 text-muted-foreground hover:text-primary" href={parent.href}>{parent.label}</AppLink><span aria-hidden="true">›</span></>}
-    <h1 aria-current="page" className="truncate font-semibold">{heading || label}</h1></nav>;
+    <Label aria-current="page" className="truncate font-semibold">{heading?.title || label}</Label></nav>;
 }
 
 function publicCourseHref(id: string) {

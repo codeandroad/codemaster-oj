@@ -6,7 +6,7 @@ import { ArrowDown, ArrowRight, ArrowUp, CheckCircle2, ChevronDown } from "lucid
 import { useLocale } from "@/components/locale-context";
 import { LearningProgressSummary } from "@/components/learning-course";
 import { AppLink } from "@/components/navigation";
-import { PageHeader } from "@/components/page-chrome";
+import { usePageHeading } from "@/components/page-heading-context";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { CourseDirectory } from "@/components/course-directory";
 import { orderCourseChapters, type CourseSection } from "@/components/course-sections";
@@ -56,6 +56,7 @@ export function LearningCourseReader({
   const text = (zh: string, en: string) => locale === "en" ? en : zh;
   const { language, setLanguage } = useCourseLanguage();
   const course = localizedCourse(sourceCourse, language);
+  usePageHeading(course.title, { inContent: true });
   const chapters = orderCourseChapters(sourceCourse.sections, sourceChapters).map(item => localizedChapter(item, language));
   const directoryRef = useRef<HTMLDivElement>(null);
   const chapter = selectedChapterId
@@ -92,7 +93,6 @@ export function LearningCourseReader({
     selectedId={chapter?.id} chapterHref={chapterHref}/>;
 
   return <>
-    <PageHeader title={course.title}/>
     <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
       <h1 className="min-w-0 break-words text-2xl font-bold">{course.title}</h1>
       <CourseLanguageControl language={language} onChange={setLanguage}/>

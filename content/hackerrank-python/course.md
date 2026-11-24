@@ -303,19 +303,41 @@ pairs = list(zip(["north", "south"], [12, 18], strict=True))
 assert pairs == [("north", 12), ("south", 18)]
 ```
 
-#### 列表推导式：筛选、转换与多层遍历
+#### 列表推导式与其他推导式
 
-基本形式是 `[表达式 for 变量 in 可迭代对象 if 条件]`。逐项取值，通过末尾的条件后才计算表达式，计算结果会立即收集到新列表。末尾的 `if` 可以省略，也可连续写多个筛选条件。若要每项都保留，只改变输出值，将 `a if 条件 else b` 放在 `for` 前。空输入或全部被过滤会得到 `[]`。
+推导式把遍历、筛选和计算写在一个表达式里。列表推导式会立即把结果收集成一个新列表。
+
+##### 1. 基本形式
+
+`[表达式 for 变量 in 可迭代对象]` 对每项计算一次表达式。
+
+```python
+squares = [x ** 2 for x in range(5)]
+assert squares == [0, 1, 4, 9, 16]
+```
+
+##### 2. 带条件筛选
+
+把 `if` 放在 `for` 后面，只保留满足条件的元素。可以连续写多个筛选条件。若每项都被过滤，结果是空列表。
 
 ```python
 values = [-3, 0, 2, 5, 8]
-nonnegative_squares = [x * x for x in values if x >= 0]
-labels = ["even" if x % 2 == 0 else "odd" for x in values]
+nonnegative_squares = [x ** 2 for x in values if x >= 0]
 even_nonnegative = [x for x in values if x >= 0 if x % 2 == 0]
 assert nonnegative_squares == [0, 4, 25, 64]
-assert labels == ["odd", "even", "even", "odd", "even"]
 assert even_nonnegative == [0, 2, 8]
 ```
+
+##### 3. 带条件表达式
+
+把 `a if 条件 else b` 放在 `for` 前面。每个输入元素都产生一个结果，条件决定选择哪个值。
+
+```python
+labels = ["偶" if x % 2 == 0 else "奇" for x in range(5)]
+assert labels == ["偶", "奇", "偶", "奇", "偶"]
+```
+
+##### 4. 嵌套循环
 
 多个 `for` 从左到右对应外层到内层循环。外层变量可用于决定内层范围或条件。单层方括号加多个 `for` 通常产生扁平列表；表达式自身又是一个推导式时，会保留每个外层元素对应的一组结果。若可读性下降，先写普通循环并确认执行顺序，再缩写成推导式。推导式适合构造值，输出日志、修改原数据或提前 `break` 时，普通循环更清楚。
 
@@ -340,6 +362,31 @@ for row in batches:
         if n >= 0:
             flat.append(n * 2)
 assert flat == [6, 0, 8]
+```
+
+##### 5. 字典推导式
+
+用 `{键: 值 for ...}` 为每项生成一对键值。如果同一个键出现多次，最后得到的值会覆盖前面的值。
+
+```python
+square_by_number = {x: x ** 2 for x in range(5)}
+assert square_by_number == {0: 0, 1: 1, 2: 4, 3: 9, 4: 16}
+```
+
+##### 6. 集合推导式
+
+用 `{表达式 for ...}` 生成集合，自动去重。集合的迭代顺序没有保证。
+
+```python
+unique_lengths = {len(word) for word in ["hi", "hello", "hey", "ok"]}
+assert unique_lengths == {2, 3, 5}
+```
+
+**试一试：奇数的立方。** 用列表推导式生成 1 到 20 中所有奇数的立方。注意 `range()` 的结束值不包含在内。写完后可以对照下面的结果。
+
+```python
+cubes = [x ** 3 for x in range(1, 21) if x % 2 != 0]
+assert cubes == [1, 27, 125, 343, 729, 1331, 2197, 3375, 4913, 6859]
 ```
 
 #### 生成器表达式：惰性计算与一次性消费

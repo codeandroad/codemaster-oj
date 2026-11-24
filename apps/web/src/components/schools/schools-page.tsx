@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { useWorkspaceData } from "@/components/workspace-data";
 import { useAcslEnabled } from "@/components/acsl/use-acsl-enabled";
 import { AcslTeacherPage } from "@/components/acsl/teacher-page";
-import { Eye, EyeOff } from "lucide-react";
+import { ArrowLeftRight, Eye, EyeOff } from "lucide-react";
 import { WorkspaceFrame } from "@/components/workspace-frame";
 import { AccountMenu } from "@/components/account-menu";
 import { NotificationDropdown } from "@/components/student/notification-dropdown";
@@ -285,6 +285,16 @@ export function SchoolsPage({
             }
             account={
               <div className="flex items-center gap-2">
+              {selected.roles.includes("school_admin") && !issuingInvitation && (
+                <AppLink
+                  href={schoolWorkspaceHref(selected.id, "home", admin ? "teacher" : "admin")}
+                  className={buttonVariants({ variant: "secondary", size: "sm" })}
+                  aria-label={admin ? text("Switch to teaching workspace", "切换到教学工作区") : text("Switch to admin workspace", "切换到管理工作区")}
+                >
+                  <ArrowLeftRight size={14} aria-hidden="true" />
+                  {admin ? text("Teaching workspace", "教学工作区") : text("Admin workspace", "管理工作区")}
+                </AppLink>
+              )}
               <NotificationDropdown key={`${user.id}:${selected.id}:${workspaceRole}`} schoolId={selected.id}
                 workspace={teaching ? "staff" : "student"} scholarshipHref={href("scholarship")}/>
               <AccountMenu

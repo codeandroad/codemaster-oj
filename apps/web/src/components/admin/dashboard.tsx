@@ -2,7 +2,6 @@
 
 import { AppLink } from "@/components/navigation";
 import { PageHeader } from "@/components/page-chrome";
-import { buttonVariants } from "@/components/ui/button";
 import { useLocale } from "@/components/locale-context";
 import { workspaceNavigation } from "@/components/workspace-navigation";
 import { schoolWorkspaceHref } from "@/components/schools/school-workspace-location";
@@ -19,7 +18,6 @@ export function AdminDashboard({ schoolId }: { schoolId?: string }) {
   const people = useData<{ items: Pick<Person, "id" | "name" | "number">[] }>(schoolId ? `schools/${schoolId}/identities` : "people");
   const classes = useData<{ items: DashboardClass[] }>(schoolId ? `schools/${schoolId}/classes` : "classes");
   const peopleHref = schoolId ? schoolWorkspaceHref(schoolId, "identities") : "/admin/people";
-  const teacherHref = schoolId ? schoolWorkspaceHref(schoolId, "home", "teacher") : null;
   const personHref = (id: string) => schoolId
     ? `${peopleHref}&identityId=${encodeURIComponent(id)}`
     : `${peopleHref}?personId=${encodeURIComponent(id)}`;
@@ -32,9 +30,6 @@ export function AdminDashboard({ schoolId }: { schoolId?: string }) {
         eyebrow={t("管理员首页")}
         title={t("管理工作台")}
         description={t("维护学校身份与账号，查看导入、判题服务和系统设置。")}
-        action={teacherHref && <AppLink href={teacherHref} className={buttonVariants({ variant: "secondary" })}>
-          {locale === "en" ? "Teaching workspace" : "教学工作区"}
-        </AppLink>}
       />
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
         {workspaceNavigation.admin.slice(1, 4).map(item => (

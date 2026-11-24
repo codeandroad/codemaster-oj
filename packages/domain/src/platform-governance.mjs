@@ -168,8 +168,8 @@ async function renameSchool(db, actorId, schoolId, body) {
 async function appointAdministrator(db, actorId, schoolId, body) {
   const { rowCount } = await db.query('SELECT id FROM schools WHERE id=$1 FOR SHARE', [schoolId]);
   if (!rowCount) fail(404, 'NOT_FOUND', '学校不存在');
-  const account = await findActiveAccount(db, body.username);
   await lockSchoolTeaching(db, schoolId);
+  const account = await findActiveAccount(db, body.username);
   await db.query(`
     INSERT INTO school_memberships (school_id,account_id,role) VALUES ($1,$2,'school_admin')
     ON CONFLICT (school_id,account_id) DO UPDATE SET revoked_at=NULL, joined_at=clock_timestamp()
@@ -177,8 +177,8 @@ async function appointAdministrator(db, actorId, schoolId, body) {
   const { rowCount: granted } = await db.query(`
     INSERT INTO school_administrators (school_id,account_id,granted_by) VALUES ($1,$2,$3)
     ON CONFLICT (school_id,account_id) DO UPDATE SET granted_by=EXCLUDED.granted_by,
-      granted_at=clock_timestamp(), revoked_at=NULL
-    WHERE school_administrators.revoked_at IS NOT NULL`, [schoolId,account.accountId,actorId]);
+      granted_at=clock_timestamp(), revoked_at=NULL, delegated_by_school=false
+    WHERE school_administrators.revoked_at IS NOT NULL OR school_administrators.delegated_by_school`, [schoolId,account.accountId,actorId]);
   if (granted) {
     await auditSchool(db, schoolId, actorId, 'school.administrator.grant', account.accountId);
     await auditPlatform(db, actorId, 'platform.school.administrator.grant', { schoolId, accountId: account.accountId });

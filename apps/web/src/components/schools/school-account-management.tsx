@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Drawer, Loading, inputClass, useData, useAdminText } from "@/components/admin/common";
+import { Drawer, Feedback, Loading, Modal, inputClass, useData, useAdminText, useMutation } from "@/components/admin/common";
 import { AppLink } from "@/components/navigation";
 import { Button } from "@/components/ui/button";
+import { productionApi, ApiError } from "@/lib/production-api";
 import { genderLabel } from "@/lib/gender";
 import type { CampusGender } from "@/lib/production-api";
 import { RoleLabel, useSchoolText, type School, type SchoolRole } from "./school-ui";
@@ -13,7 +14,7 @@ export type Member = {
   accountId: string; username: string; name: string; number: string | null;
   role: SchoolRole; administrator: boolean; classes: string[];
   disabled: boolean; joinedAt: string; lastLoginAt: string | null;
-  canResetPassword: boolean; identityId: string | null; gender: CampusGender | null;
+  canEditRoles: boolean; canResetPassword: boolean; identityId: string | null; gender: CampusGender | null;
 };
 
 export type AccountFilters = { q: string; className: string; role: string; status: string };
@@ -63,10 +64,42 @@ export function SchoolAccountDetails({ school, accountId, onClose }: { school: S
         {text("Open school identity", "查看校内身份档案")}</AppLink>}
       <section><h3 className="mb-2 text-sm font-semibold">{text("Recent account changes", "近期账号管理记录")}</h3>
         <ul className="space-y-1 text-sm">{member.events.map((event, index) => <li key={index}>
-          {new Date(event.createdAt).toLocaleString()} · {event.action === "account.reset_issue" ? text("Password reset code issued","已签发密码重置码") : event.action}
+          {new Date(event.createdAt).toLocaleString()} · {event.action === "account.reset_issue" ? text("Password reset code issued","已签发密码重置码") : event.action === "school.account.roles" ? text("School roles updated","已修改校内角色") : event.action}
         </li>)}</ul>
         {!member.events.length && <p className="text-sm text-muted-foreground">{text("No recent changes.", "暂无管理记录。")}</p>}
       </section>
     </div>}</Loading>
   </Drawer>;
+}
+
+export function SchoolRoleEditor({ school, member, onClose, onSaved }: {school: School; member: Member; onClose: () => void; onSaved: () => void}) {
+  const text = useSchoolText(), action = useMutation();
+  const [role, setRole] = useState(member.role);
+  const [administrator, setAdministrator] = useState(member.administrator);
+  return <Modal title={text("Edit school roles", "编辑校内角色")} description={school.name + " · " + member.name + " · " + member.username} onClose={() => { if (!action.busy) onClose(); }}>
+    <label className="grid gap-1 text-sm">{text("School membership role", "校内基础角色")}
+      <select className={inputClass} value={role} disabled={Boolean(member.identityId) || action.busy} onChange={e => setRole(e.target.value as SchoolRole)}>
+        <option value="student">{text("Student","学生")}</option><option value="teacher">{text("Teacher","教师")}</option>
+      </select>
+    </label>
+    {member.identityId && <p className="text-sm text-muted-foreground">{text(
+      "The base role follows the linked identity. To change it, unlink the current record, change the role and link the corresponding identity.",
+      "基础角色与校内身份档案关联。如需切换学生或教师身份，请先解除原档案关联，更改角色后再关联对应档案。"
+    )} <AppLink className="text-primary underline" href={schoolWorkspaceHref(school.id,"identities")+"&identityId="+member.identityId}>{text("Identity record", "查看身份档案")}</AppLink></p>}
+    <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={administrator} disabled={action.busy}
+      onChange={e=>setAdministrator(e.target.checked)}/>{text("School administrator (includes teaching access)", "授予本校管理员权限（含教学工作区）")}</label>
+    <Feedback action={action}/>
+    <div className="flex justify-end gap-2"><Button variant="secondary" onClick={onClose} disabled={action.busy}>{text("Cancel", "取消")}</Button>
+      <Button disabled={action.busy || (role===member.role && administrator===member.administrator)} onClick={()=>void action.run(async()=>{
+        try {
+          await productionApi(`schools/${school.id}/accounts/${member.accountId}/roles`,{method:"PATCH",body:{
+            role,administrator,expectedRole:member.role,expectedAdministrator:member.administrator,
+          }});
+        } catch(error) {
+          if (error instanceof ApiError && error.status===409) throw new Error(text("The role or identity has changed. Close and refresh before editing.", "角色或身份已变化，请关闭并刷新后重试。"));
+          throw error;
+        }
+        onSaved();
+      })}>{text("Save roles", "保存角色")}</Button></div>
+  </Modal>;
 }

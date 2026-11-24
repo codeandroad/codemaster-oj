@@ -58,7 +58,7 @@ import {
   type School,
   type SchoolRole,
 } from "./school-ui";
-import { SchoolAccountDetails, SchoolAccountFilters, type AccountFilters, type Member } from "./school-account-management";
+import { SchoolAccountDetails, SchoolAccountFilters, SchoolRoleEditor, type AccountFilters, type Member } from "./school-account-management";
 import { SchoolActivationBatch } from "./school-activation-batch";
 import { SchoolAdministration } from "./school-administration";
 import { SchoolCourses } from "./school-courses";
@@ -479,12 +479,15 @@ function MemberList({
   const [resetTarget, setResetTarget] = useState<Member | null>(null);
   const [credential, setCredential] = useState<{ username: string; resetCode: string; resetUrl: string } | null>(null);
   const [detail, setDetail] = useState<Member | null>(null);
+  const [editingRoles, setEditingRoles] = useState<Member | null>(null);
   const [filters, setFilters] = useState<AccountFilters>({ q:"", className:"", role:"all", status:"all" });
   const params = new URLSearchParams({ ...filters, page: String(page) });
   const members = useData<{ items: Member[]; page: number; hasMore: boolean }>(`schools/${school.id}/accounts?${params}`);
   return (
     <div className="min-h-48">
       <SchoolAccountFilters filters={filters} onChange={next => { onPage(1); setFilters(next); }}/>
+      {editingRoles && <SchoolRoleEditor school={school} member={editingRoles} onClose={() => setEditingRoles(null)}
+        onSaved={() => { setEditingRoles(null); members.reload(); }}/>}
       {detail && <SchoolAccountDetails school={school} accountId={detail.accountId} onClose={() => setDetail(null)} />}
       <Loading resource={{ ...members, loading: members.pending || members.loading }}>
         <div className="overflow-x-auto">
@@ -527,9 +530,10 @@ function MemberList({
                   </td>
                   <td className="py-2 text-right">
                     <div className="flex flex-wrap justify-end gap-1">
+                      {member.canEditRoles && <Button variant="secondary" size="sm" onClick={() => setEditingRoles(member)}>{text("Edit roles", "编辑角色")}</Button>}
                       {member.canResetPassword && (
                         <Button
-                          variant="ghost"
+                          variant="secondary"
                           size="sm"
                           onClick={() => setResetTarget(member)}
                         >
@@ -539,7 +543,7 @@ function MemberList({
                       {member.role !== "school_admin" &&
                         member.role !== "student" && !member.administrator && (
                           <Button
-                            variant="ghost"
+                            variant="secondary"
                             size="sm"
                             onClick={() => onRemove(member)}
                           >

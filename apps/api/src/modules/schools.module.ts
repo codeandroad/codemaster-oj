@@ -66,6 +66,7 @@ export class SchoolsController {
   }
 
   @Patch([
+    'schools/:schoolId/accounts/:accountId/roles',
     'schools/:schoolId/problem-groups/:id','schools/:schoolId/learning-resources/:resourceId', 'schools/:schoolId/classes/:classId', 'schools/:schoolId/identities/:identityId/account', 'schools/:schoolId/courses/:courseId', 'schools/:schoolId/courses/:courseId/admission-settings'])
   async update(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
     return applyResponse(response, await this.domain.execute('schools', request.domainContext));

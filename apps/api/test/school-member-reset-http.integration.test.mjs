@@ -100,6 +100,25 @@ test('school administrators issue one-time password reset credentials for member
         assert.equal((await request(directory+'?role=teacher&q=S01',{auth:admin})).data.items.length,0);
         assert.equal((await request(directory+'/'+personal.data.user.id,{auth:admin})).data.lastLoginAt,null);
       });
+      await t.test('only local delegates and unlinked base roles are editable, preserving roster identities', async () => {
+        const path = `/schools/${schoolId}/accounts/`;
+        const edit = (id,auth, role,administrator,expectedRole,expectedAdministrator) => request(path+id+'/roles',{
+          method:'PATCH',auth,body:{role,administrator,expectedRole,expectedAdministrator},
+        });
+        assert.equal((await edit(memberId,student,'student',true,'student',false)).status,403);
+        assert.equal((await edit(admin.data.user.id,admin,'student',false,'student',false)).status,403);
+        assert.equal((await edit(memberId,admin,'teacher',false,'student',false)).status,409);
+        const id=personal.data.user.id;
+        assert.equal((await edit(id,admin,'teacher',false,'student',false)).status,200);
+        assert.equal((await edit(id,admin,'teacher',true,'teacher',false)).status,200);
+        assert.deepEqual(new Set((await request('/schools',{auth:personal})).data.items[0].roles),new Set(['teacher','school_admin']));
+        assert.equal((await edit(id,admin,'teacher',false,'teacher',true)).status,200);
+        assert.equal((await request(path+memberId,{auth:personal})).status,403);
+        assert.equal((await edit(id,admin,'student',false,'teacher',false)).status,200);
+        await pool.query('UPDATE school_administrators SET revoked_at=NULL,delegated_by_school=false WHERE account_id=$1',[id]);
+        assert.equal((await edit(id,admin,'student',false,'student',true)).status,403);
+        await pool.query('UPDATE school_administrators SET revoked_at=now() WHERE account_id=$1',[id]);
+      });
       const tokenRow = (await pool.query('SELECT token_hash, consumed_at FROM reset_tokens WHERE account_id=$1', [memberId])).rows[0];
       assert.ok(tokenRow && /^[0-9a-f]{64}$/.test(tokenRow.token_hash) && !tokenRow.consumed_at, 'stores only the code hash');
 

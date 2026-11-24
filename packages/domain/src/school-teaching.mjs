@@ -43,12 +43,14 @@ async function requireMatchingMember(db, schoolId, accountId, kind) {
 async function listIdentities(db, schoolId, url) {
   const page = requestedPage(url);
   const kind = requestedKind(url);
+  const pendingActivation = enumValue(url.searchParams.get('pendingActivation') ?? 'false', ['true', 'false'], '仅显示待激活身份') === 'true';
   const query = field(url.searchParams.get('q') ?? '', '搜索关键词', { min: 0, max: 100 });
   const { rows } = await db.query(`
     SELECT ${identityFields} FROM school_identities
     WHERE school_id = $1 AND archived_at IS NULL AND ($2::text IS NULL OR kind = $2)
       AND ($3 = '' OR strpos(lower(name), lower($3)) > 0 OR strpos(lower(number), lower($3)) > 0)
-    ORDER BY name, id LIMIT $4 OFFSET $5`, [schoolId, kind, query, PAGE_SIZE + 1, (page - 1) * PAGE_SIZE]);
+      AND (NOT $6::boolean OR (account_id IS NULL AND kind IN ('student','teacher')))
+    ORDER BY name, id LIMIT $4 OFFSET $5`, [schoolId, kind, query, PAGE_SIZE + 1, (page - 1) * PAGE_SIZE, pendingActivation]);
   return pageResult(page, rows);
 }
 

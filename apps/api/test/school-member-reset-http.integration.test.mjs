@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { createApiApplication } from '../dist/application.js';
 import { createPool } from '../../../packages/domain/src/db.mjs';
 import { migrate } from '../../../packages/domain/src/migrate.mjs';
@@ -9,7 +10,7 @@ import { loadConfig } from '../../../packages/domain/src/application.mjs';
 import { provisionSchool } from '../../../packages/domain/src/schools.mjs';
 
 test('school administrators issue one-time password reset credentials for members',
-  { skip: !process.env.TEST_DATABASE_URL, timeout: 60000 }, async () => {
+  { skip: !process.env.TEST_DATABASE_URL, timeout: 60000 }, async t => {
     const manager = createPool(process.env.TEST_DATABASE_URL);
     const schema = 'reset_' + randomBytes(6).toString('hex');
     await manager.query(`CREATE SCHEMA ${schema}`);
@@ -21,8 +22,12 @@ test('school administrators issue one-time password reset credentials for member
     try {
       await migrate(pool);
       await bootstrap(pool, { schoolSlug: 'tianxing-chuangshiji', name: 'Legacy admin', number: 'ADM', username: 'legacy-admin', password });
+      const grants = (await readFile(new URL('../../../packages/domain/grants.mjs', import.meta.url), 'utf8')).match(/await pool\.query\(`([\s\S]*?)`\);/)[1];
+      await pool.query(grants.replaceAll('SCHEMA public', `SCHEMA ${schema}`));
+      const appUrl = new URL(url);
+      appUrl.searchParams.set('options', `-crole=campus_app -csearch_path=${schema}`);
       app = await createApiApplication({
-        databaseUrl: url.href, logger: false,
+        databaseUrl: appUrl.href, logger: false,
         config: loadConfig({ SESSION_SECRET: randomBytes(32).toString('base64url'), APP_ORIGIN: 'http://reset.test', COOKIE_SECURE: 'false' }),
       });
       await app.listen(0, '127.0.0.1');
@@ -97,6 +102,58 @@ test('school administrators issue one-time password reset credentials for member
       await provisionSchool(pool, {slug:'second-school',name:'Second School',adminUsername:'reset-member'});
       assert.equal((await redeem(prior.data.resetCode)).status, 400);
       assert.equal((await reset(memberId, admin)).status, 403);
+
+      await t.test('batch activation uses the school roster, rejects mixed batches atomically and issues usable codes', async () => {
+        const path = `/schools/${schoolId}/identities`;
+        const create = async (kind, number) => {
+          const response = await request(path, { method: 'POST', auth: admin, body: { kind, number, name: 'Batch ' + number } });
+          assert.equal(response.status, 201);
+          return response.data;
+        };
+        const a = await create('student', 'B01');
+        const b = await create('teacher', 'B02');
+        const batch = (ids, auth = admin) => request(path + '/activation-batch', { method: 'POST', auth, body: { identityIds: ids } });
+        const verify = (person, code) => request('/auth/verify-identity', { method: 'POST',
+          body: { schoolSlug: 'tianxing-chuangshiji', kind: person.kind, name: person.name, number: person.number, activationCode: code } });
+        const candidates = await request(path + '?pendingActivation=true&kind=teacher&q=B02', { auth: admin });
+        assert.deepEqual(candidates.data.items.map(item => item.id), [b.id]);
+        const protectedIdentity = (await pool.query("INSERT INTO school_identities(school_id,kind,number,name) VALUES($1,'school_admin','ADMIN-B','School admin') RETURNING id", [schoolId])).rows[0];
+        const unlinked = await request(path + '?pendingActivation=true', { auth: admin });
+        assert.ok(!unlinked.data.items.some(item => item.id === created.data.id));
+        assert.ok(!unlinked.data.items.some(item => item.id === protectedIdentity.id));
+        assert.equal((await batch([protectedIdentity.id])).status, 404);
+        assert.equal((await batch([a.id], personal)).status, 403);
+        for (const ids of [[], [a.id, a.id], Array(501).fill(a.id)]) assert.equal((await batch(ids)).status, 400);
+        const first = await batch([a.id, b.id]);
+        assert.equal(first.status, 201);
+        assert.equal(first.data.school.id, schoolId);
+        assert.equal(first.data.items.length, 2);
+        const codes = new Map(first.data.items.map(item => [item.person.number, item.activationCode]));
+        assert.notEqual(codes.get(a.number), codes.get(b.number));
+
+        const foreignSchool = (await pool.query("SELECT id FROM schools WHERE slug='second-school'")).rows[0].id;
+        const foreign = await request(`/schools/${foreignSchool}/identities`, { method: 'POST',
+          auth: await request('/auth/login', { method:'POST', body:{username:'reset-member',password:newPassword} }),
+          body:{kind:'teacher',number:'B02',name:'Batch B02'} });
+        assert.equal(foreign.status, 201);
+        assert.equal((await batch([a.id, foreign.data.id])).status, 404);
+        assert.equal((await batch([a.id, created.data.id])).status, 409);
+        assert.equal((await verify(a, codes.get(a.number))).status, 200);
+        assert.equal((await verify(b, codes.get(b.number))).status, 200);
+        const replaced = await batch([a.id]);
+        assert.equal(replaced.status, 201);
+        assert.equal((await verify(a, codes.get(a.number))).status, 400);
+        assert.equal((await verify(b, codes.get(b.number))).status, 200);
+
+        const code = replaced.data.items[0].activationCode;
+        const register = await request('/auth/register', { method: 'POST', body: { ...a, schoolSlug: 'tianxing-chuangshiji',
+          activationCode: code, username: 'batch-student', password } });
+        assert.equal(register.status, 201);
+        assert.equal((await verify(a, code)).status, 400);
+        assert.equal((await batch([a.id])).status, 409);
+        const audit = await pool.query("SELECT count(*)::int n FROM school_audit_events WHERE school_id=$1 AND action='school.identity.activation_issue' AND target_id=ANY($2::uuid[])", [schoolId,[a.id,b.id]]);
+        assert.equal(audit.rows[0].n, 3);
+      });
     } finally {
       await app?.close();
       await pool.end();

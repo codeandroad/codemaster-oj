@@ -58,6 +58,7 @@ import {
   type School,
   type SchoolRole,
 } from "./school-ui";
+import { SchoolActivationBatch } from "./school-activation-batch";
 import { SchoolAdministration } from "./school-administration";
 import { SchoolCourses } from "./school-courses";
 import { SchoolCourseAdmissions } from "./school-course-admissions";
@@ -403,12 +404,16 @@ function SchoolMembers({
   const [remove, setRemove] = useState<Member | null>(null);
   const [revision, setRevision] = useState(0);
   const [removed, setRemoved] = useState(false);
+  const [activating, setActivating] = useState(false);
   return (
     <div className="mt-3 space-y-4">
-      <SchoolExitAdministration schoolId={school.id} onChanged={() => {
-        setPage(1);
-        setRevision(value => value + 1);
-      }}/>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Button onClick={() => setActivating(true)}>{text("Generate activation codes", "批量生成激活码")}</Button>
+        <AppLink href={schoolWorkspaceHref(school.id, "identities")} className={buttonVariants({ variant: "secondary", size: "sm" })}>
+          {text("Manage identity records", "管理身份档案")}
+        </AppLink>
+      </div>
+      {activating && <SchoolActivationBatch school={school} onClose={() => setActivating(false)} />}
       <IssueInvitation
         school={school}
         invitation={invitation}
@@ -420,6 +425,10 @@ function SchoolMembers({
           {text("School membership removed.", "已移除本校成员关系。")}
         </p>
       )}
+      <p className="text-sm text-muted-foreground">
+        {text("Password resets are available for student and teacher accounts managed exclusively by this school.",
+          "本校独立管理的学生、教师账号，可在下方成员名单中重置密码。")}
+      </p>
       <MemberList
         key={`${page}-${revision}-${refreshRevision}`}
         school={school}
@@ -427,6 +436,10 @@ function SchoolMembers({
         onPage={setPage}
         onRemove={setRemove}
       />
+      <SchoolExitAdministration schoolId={school.id} onChanged={() => {
+        setPage(1);
+        setRevision(value => value + 1);
+      }}/>
       {remove && (
         <RemoveMember
           member={remove}

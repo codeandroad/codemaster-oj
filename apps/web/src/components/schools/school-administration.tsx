@@ -227,7 +227,7 @@ function SchoolDirectory({
                     : text("Link account", "关联账号")}
                 </Button>
 
-                {!item.accountId && (
+                {!item.accountId && (item.kind === "student" || item.kind === "teacher") && (
                   <SchoolActivationButton school={school} identity={item} />
                 )}
               </div>
@@ -304,7 +304,7 @@ function identityColumns<T extends Identity>(
   ];
 }
 
-function IdentityFilter({
+export function IdentityFilter({
   onQuery,
   kind,
   onKind,

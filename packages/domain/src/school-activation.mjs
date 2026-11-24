@@ -56,23 +56,40 @@ export async function registerSchoolIdentity(db, claim, { login, hash, email }) 
   return account;
 }
 
-export async function handleSchoolActivation({ pool, user, route, method }) {
-  const match = route.match(/^\/schools\/([^/]+)\/identities\/([^/]+)\/activation-code$/);
+export async function handleSchoolActivation({ pool, user, route, method, body }) {
+  const match = route.match(/^\/schools\/([^/]+)\/identities\/(?:(?:([^/]+)\/activation-code)|activation-batch)$/);
   if (!match || method !== 'POST') return null;
-  const schoolId = uuid(match[1], '学校 ID'), identityId = uuid(match[2], '身份档案 ID');
+  const schoolId = uuid(match[1], '学校 ID');
+  const single = Boolean(match[2]);
   return transaction(pool, async db => {
-    await requireSchoolAdmin(db, schoolId, user.id);
     await lockSchoolTeaching(db, schoolId);
-    const identity = (await db.query('SELECT id,kind,number,name,account_id FROM school_identities WHERE school_id=$1 AND id=$2 AND archived_at IS NULL FOR UPDATE', [schoolId, identityId])).rows[0];
-    if (!identity) fail(404, 'NOT_FOUND', '本校身份档案不存在');
-    if (identity.account_id !== null) fail(409, 'ACTIVATED', '该身份已认领');
-    const activationCode = randomToken();
+    await requireSchoolAdmin(db, schoolId, user.id);
+    const requested = single ? [match[2]] : body.identityIds;
+    if (!Array.isArray(requested) || !requested.length || requested.length > 500) {
+      fail(400, 'VALIDATION', '每次请选择 1 至 500 个身份档案');
+    }
+    const ids = requested.map(id => uuid(id, '身份档案 ID').toLowerCase());
+    if (new Set(ids).size !== ids.length) fail(400, 'VALIDATION', '身份档案重复');
+
+    const { rows: identities } = await db.query(`SELECT id,kind,number,name,account_id FROM school_identities
+      WHERE school_id=$1 AND id=ANY($2::uuid[]) AND archived_at IS NULL
+        AND kind IN ('student','teacher') ORDER BY name,id FOR UPDATE`, [schoolId, ids]);
+    if (identities.length !== ids.length) fail(404, 'NOT_FOUND', '本校身份档案不存在');
+    if (identities.some(identity => identity.account_id !== null)) fail(409, 'ACTIVATED', '所选身份中有档案已认领');
+
+    const codes = identities.map(() => randomToken());
+    const issuedIds = identities.map(identity => identity.id);
     const { rows: [token] } = await db.query(`INSERT INTO school_activation_tokens(school_id,identity_id,token_hash,issued_by,expires_at)
-      VALUES($1,$2,$3,$4,clock_timestamp()+interval '7 days')
+      SELECT $1, id, digest, $4, now()+interval '7 days' FROM unnest($2::uuid[], $3::text[]) AS selected(id,digest)
       ON CONFLICT(school_id,identity_id) DO UPDATE SET token_hash=EXCLUDED.token_hash,issued_by=EXCLUDED.issued_by,
-        expires_at=EXCLUDED.expires_at,consumed_at=NULL RETURNING expires_at`, [schoolId, identityId, tokenHash(activationCode), user.id]);
-    const school = (await db.query('SELECT id,slug,name FROM schools WHERE id=$1', [schoolId])).rows[0];
-    await auditSchool(db, schoolId, user.id, 'school.identity.activation_issue', identityId);
-    return { status: 201, body: { school, person: { kind: identity.kind, number: identity.number, name: identity.name }, activationCode, expiresAt: token.expires_at } };
+        expires_at=EXCLUDED.expires_at,consumed_at=NULL RETURNING expires_at`, [schoolId, issuedIds, codes.map(tokenHash), user.id]);
+    await db.query(`INSERT INTO school_audit_events(school_id,actor_account_id,action,target_id)
+      SELECT $1,$2,'school.identity.activation_issue',id FROM unnest($3::uuid[]) AS selected(id)`, [schoolId, user.id, issuedIds]);
+    const { rows: [school] } = await db.query('SELECT id,slug,name FROM schools WHERE id=$1', [schoolId]);
+    const items = identities.map(({ kind, number, name }, index) => ({
+      person: { kind, number, name }, activationCode: codes[index],
+    }));
+    const common = { school, expiresAt: token.expires_at };
+    return { status: 201, body: single ? { ...common, ...items[0] } : { ...common, items } };
   });
 }

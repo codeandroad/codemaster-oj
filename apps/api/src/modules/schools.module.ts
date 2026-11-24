@@ -43,6 +43,7 @@ export class SchoolsController {
     'school-invitations/accept',
     'schools/:schoolId/identities',
     'schools/:schoolId/identities/:identityId/activation-code',
+    'schools/:schoolId/identities/activation-batch',
     'schools/:schoolId/identity-imports/preview',
     'schools/:schoolId/identity-imports/commit',
     'schools/:schoolId/classes',

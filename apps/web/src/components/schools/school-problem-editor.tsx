@@ -15,7 +15,8 @@ import { ProblemTutorialEditor } from "@/components/teacher/problem-tutorial-edi
 import { MathEditor } from "@/components/teacher/math-editor";
 import { ProblemEditorSteps, SaveAndEditNext } from "@/components/teacher/problem-editor-steps";
 import type { ProblemEditorNavigation, ProblemEditorTarget } from "@/components/teacher/problem-editor-navigation";
-import { productionApi } from "@/lib/production-api";
+import { languageInfo } from "@/components/student/languages";
+import { productionApi, type SubmissionLanguage } from "@/lib/production-api";
 import type { Bank, Definition, Problem } from "./school-practice-types";
 import { equalSchoolTestWeights, schoolProblemDefaults, schoolProblemDraftIssue, schoolProblemMode, type ProblemEditorSection } from "./school-problem-draft";
 
@@ -135,7 +136,10 @@ export function SchoolProblemEditor({ problem, banks, bankId, base, close, saved
             </div>
             <div id={`${id}-panel-reference`} role="tabpanel" aria-labelledby={`${id}-tab-reference`} hidden={section !== "reference"} className="space-y-3">
               <p className="text-sm text-muted-foreground">{tx("Private teaching material. The reference program is used for isolated validation and is not included in the student's problem statement.", "教师私有资料。参考程序用于隔离验证，不会包含在学生题面中。")}</p>
-              <ProgramField label={tx("Reference program · Python 3", "参考程序 · Python 3")} name="reference" code={draft.referenceCode ?? ""} onChange={referenceCode => change({ referenceCode })} disabled={action.busy || !canEdit} />
+              <Field label={tx("Reference language","参考程序语言")}><select className={input} disabled={action.busy || !canEdit} value={draft.referenceLanguage??"python"} onChange={event=>change({referenceLanguage:event.target.value as SubmissionLanguage})}>
+                {(["python","cpp","javascript"] as const).map(lang=><option key={lang} value={lang}>{languageInfo[lang].name}</option>)}
+              </select></Field>
+              <ProgramField language={draft.referenceLanguage} label={tx("Reference program","参考程序")+" · "+languageInfo[draft.referenceLanguage??"python"].name} name="reference" code={draft.referenceCode ?? ""} onChange={referenceCode => change({ referenceCode })} disabled={action.busy || !canEdit} />
             </div>
           </fieldset>
         </div>
@@ -153,11 +157,11 @@ export function SchoolProblemEditor({ problem, banks, bankId, base, close, saved
   </Dialog>;
 }
 
-function ProgramField({ label, name, code, onChange, disabled }: { label: string; name: string; code: string; onChange: (code: string) => void; disabled: boolean }) {
+function ProgramField({ label, name, code, onChange, disabled, language="python" }: { language?:SubmissionLanguage; label: string; name: string; code: string; onChange: (code: string) => void; disabled: boolean }) {
   const theme = useWorkspaceTheme();
   return <section className="min-w-0 space-y-2">
     <div className="flex items-center justify-between gap-2"><h3 className="text-sm font-semibold">{label}</h3><CopyCodeButton code={code} /></div>
-    <div className="h-72 overflow-hidden rounded-md border border-border"><CodeEditor idPrefix={`school-problem-${name}`} inputLabel={label} language="python" code={code} onChange={onChange} readOnly={disabled} settings={{ ...defaultWorkspaceSettings, theme: theme === "dark" ? "vs_dark" : "vs", fontSize: 13 }} /></div>
+    <div className="h-72 overflow-hidden rounded-md border border-border"><CodeEditor idPrefix={`school-problem-${name}`} inputLabel={label} language={language} code={code} onChange={onChange} readOnly={disabled} settings={{ ...defaultWorkspaceSettings, theme: theme === "dark" ? "vs_dark" : "vs", fontSize: 13 }} /></div>
   </section>;
 }
 

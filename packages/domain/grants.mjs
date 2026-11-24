@@ -166,6 +166,7 @@ GRANT SELECT,INSERT,UPDATE(note,updated_at) ON school_submission_notes TO campus
 GRANT UPDATE(name) ON practice_problem_groups TO campus_app;
 GRANT INSERT,DELETE ON practice_problem_group_members TO campus_app;
 GRANT SELECT ON practice_problem_groups,practice_problem_group_members,school_import_history TO campus_app;
+GRANT INSERT ON school_import_history TO campus_app;
 REVOKE INSERT,UPDATE,DELETE ON classes,class_members,teacher_classes,identity_teacher_classes,assignments,assignment_problems,
  assignment_participants,timed_practices,timed_practice_problems,timed_practice_participants,timed_attempts,timed_result_snapshots,timed_result_revisions,
  paper4_papers,paper4_versions,paper4_attempts,paper4_attempt_files,paper4_snapshots,paper4_reference_snapshots,

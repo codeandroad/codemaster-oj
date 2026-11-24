@@ -515,6 +515,30 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       await request(path+'/archive',{...post,body:{}}); assert.equal((await request(path+'/restore',{...post,body:{}})).data.state,'Published');
       await request(path+'/cancel',{...post,body:{}}); await request(path+'/restore',{...post,body:{},status:409});
     });
+    await t.test('assignment problem import atomically creates only school drafts and preserves the package language', async () => {
+      const path=prefix+'/problems/import';
+      const post={auth:auth.teacher,method:'POST'};
+      const definition={title:'Imported JavaScript',statement:'Read a line and echo it.',mode:'stdio',referenceLanguage:'javascript',
+        referenceCode:"console.log(require('node:fs').readFileSync(0,'utf8').trim())",starterCode:'',samples:[{input:'7',expected:'7'}],tests:[{input:'8',expected:'8',weight:100}]};
+      const body={bankName:'Import destination',idempotencyKey:randomUUID(),problems:[definition]};
+      await request(path,{...post,auth:auth.student,body,status:403});
+      await request(path,{...post,auth:auth.outside,body,status:404});
+      await request(path,{...post,body:{...body,problems:[definition,{...definition,tests:[]}]},status:400});
+      assert.equal((await pool.query('SELECT id FROM school_problem_banks WHERE school_id=$1 AND name=$2',[school.id,body.bankName])).rowCount,0);
+      await request(path,{...post,body,status:201});
+      assert.equal((await request(path,{...post,body})).data.importedCount,1);
+      await request(path,{...post,body:{...body,bankName:'Conflicting'},status:409});
+      const {rows} = await pool.query("SELECT id,draft,published FROM school_problems WHERE school_id=$1 AND draft->>'title'=$2",[school.id,definition.title]);
+      assert.equal(rows.length,1); assert.equal(rows[0].published,false); assert.equal(rows[0].draft.reference_language,'javascript');
+      const created=prefix+'/problems/'+rows[0].id;
+      await request(created,{auth:auth.student,status:404});
+      await request(created+'/validate',{...post,body:{expectedRevision:1,requestId:randomUUID()},status:202});
+      const queued=(await pool.query('SELECT payload FROM school_judge_jobs WHERE school_id=$1 AND problem_id=$2',[school.id,rows[0].id])).rows[0];
+      assert.equal(queued.payload.language,'javascript');
+      const judge=process.env.GO_JUDGE_TEST_URL ? new GoJudge({url:process.env.GO_JUDGE_TEST_URL,token:process.env.GO_JUDGE_TEST_TOKEN,environmentVersion:'assignment-import-qa'}) : {judge:async()=>completed};
+      await processSchoolOne({pool:worker,judge});
+      assert.equal((await request(created,{auth:auth.teacher})).data.validation.status,'AC');
+    });
     await t.test('bank controls and scholarship review track the exact bank, problem and published version', async () => {
       const staff = { auth: auth.teacher }, targets = prefix + '/scholarship/targets';
       const listed = async () => (await request(targets, staff)).data.items;

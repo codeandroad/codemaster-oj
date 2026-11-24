@@ -40,6 +40,7 @@ import { ActivityAssistanceFields, defaultActivityAssistance, type ActivityRule 
 import { TeacherAssignment } from "./dashboard-classes";
 import { ProblemPicker } from "./problem-banks";
 import { AssignmentParticipantForm, CancelAssignment } from "./assignment-changes";
+import { SchoolAssignmentProblemImport } from "../schools/platform-problem-import";
 import { SchoolAssignmentSubmissions } from "./school-assignment-submissions";
 import { AssignmentPreviewLink } from "./assignment-preview";
 import {
@@ -302,6 +303,7 @@ function AssignmentEditorForm({
         [],
     ),
     [picker, setPicker] = useState(false),
+    [importing, setImporting] = useState(false),
     [publish, setPublish] = useState(false),
     [confirmUpdate, setConfirmUpdate] = useState(false),
     [stale, setStale] = useState(false),
@@ -884,13 +886,9 @@ function AssignmentEditorForm({
                     <Plus size={15} />
                     从题库与分组选择
                   </Button>
-                  <Link
-                    href={schoolId ? schoolWorkspaceHref(schoolId,"imports","teacher") : "/teacher/imports"}
-                    className={buttonVariants({ variant: "secondary" })}
-                  >
-                    <Upload size={15} />
-                    导入题目
-                  </Link>
+                  {schoolId
+                    ? <Button type="button" variant="secondary" disabled={!canEditProblems || action.busy} onClick={()=>setImporting(true)}><Upload size={15}/>{ui(locale,"导入题目","Import problems")}</Button>
+                    : <Link href="/teacher/imports" className={buttonVariants({variant:"secondary"})}><Upload size={15}/>导入题目</Link>}
                 </div>
               </div>
               <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-y border-border py-2 text-sm">
@@ -1133,6 +1131,7 @@ function AssignmentEditorForm({
           )}
         </fieldset>
       </section>
+      {importing && schoolId && <SchoolAssignmentProblemImport schoolId={schoolId} onClose={()=>setImporting(false)}/>}
       {picker && courseOrderReady && (
         <ProblemPicker
           forAssignment schoolId={schoolId} schoolProblems={schoolId ? options.data?.problems.map(p=>({
@@ -1439,7 +1438,7 @@ export function TeacherAssignmentProgress({ id, schoolId }: { id: string; school
       )}
       {manage && assignment && (
         <Modal title={ui(locale, "作业延期与适用名单", "Assignment deadlines and exemptions")} onClose={() => setManage(false)} wide>
-          <h3 className="mb-3 text-sm font-semibold">{ui(locale, "整份作业延期", "Extend assignment for everyone")}</h3>
+          {(!schoolId || assignment.dueAt) && <><h3 className="mb-3 text-sm font-semibold">{ui(locale, "整份作业延期", "Extend assignment for everyone")}</h3>
           <form
             className="grid grid-cols-2 gap-3 max-sm:grid-cols-1"
             onSubmit={(e) => {
@@ -1473,7 +1472,7 @@ export function TeacherAssignmentProgress({ id, schoolId }: { id: string; school
             <Button variant="secondary" disabled={action.busy}>
               {ui(locale, "延期并通知学生", "Extend and notify students")}
             </Button>
-          </form>
+          </form></>}
           <Feedback action={action} />
           <div className="mt-5 border-t border-border pt-4">
             <h3 className="mb-3 text-sm font-semibold">{ui(locale, "个人延期或豁免", "Individual deadline or exemption")}</h3>

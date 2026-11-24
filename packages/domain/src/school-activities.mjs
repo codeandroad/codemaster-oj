@@ -511,6 +511,8 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
     if (authoringView && (!canManage || a.kind!=='assignment')) fail(404,'NOT_FOUND','Assignment not found.');
     if (!action && method==='GET' && authoringView) {
       const info = await detail(db,loaded,user);
+      const {firstAcPoints}=await schoolScholarshipSettings(db,schoolId);
+      info.problems=info.problems.map(problem=>({...problem,firstAcPoints}));
       const participants=(await db.query(`SELECT p.identity_id AS "identityId",i.name,p.exempt,greatest(p.extended_due_at,$3::timestamptz) AS "dueAt"
         FROM school_activity_participants p JOIN school_identities i ON (i.school_id,i.id)=(p.school_id,p.identity_id)
         WHERE p.school_id=$1 AND p.activity_id=$2`,[schoolId,a.id,a.ends_at])).rows;

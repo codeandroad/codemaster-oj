@@ -54,17 +54,21 @@ async function schoolCourseTutorial(db,problem,user,role,url) {
 
 export function normalizeSchoolProblem(body){
  const mode=enumValue(body.mode??'stdio',['stdio','function'],'Mode');
- const definition={title:field(body.title,'Title',{max:200}),statement:field(body.statement,'Statement',{max:100000,trim:false}),mode,
+ const referenceLanguage=enumValue(body.referenceLanguage??'python',LANGUAGES,'Reference language');
+ const definition={reference_language:referenceLanguage,title:field(body.title,'Title',{max:200}),statement:field(body.statement,'Statement',{max:100000,trim:false}),mode,
   function_name:mode==='function'?field(body.functionName??'solve','Function name',{max:80}):null,
   comparator:mode==='function'?'json':enumValue(body.comparator??'tokens',['tokens','exact','json'],'Comparator'),
   time_limit_ms:integer(body.timeLimitMs??1000,100,5000,'Time limit'),memory_limit_mb:integer(body.memoryLimitMb??128,32,256,'Memory limit'),
   reference_code:bytes(body.referenceCode,'Reference code'),starter_code:bytes(body.starterCode??(mode==='function'?'def solve(data):\n    pass\n':'# Read input and print the result.\n'),'Starter code'),samples:[],tests:[]};
+ definition.metadata=publicProblemMetadata(body);
+ if (Array.isArray(body.tags)) definition.tags=body.tags.map(tag=>field(tag,'标签',{max:100}));
+ if (body.starterCodes) definition.starter_codes=Object.fromEntries(LANGUAGES.filter(lang=>typeof body.starterCodes[lang]==='string').map(lang=>[lang,bytes(lang==='python'?definition.starter_code:body.starterCodes[lang],'Starter code')]));
  for(const key of ['samples','tests']){
   if(!Array.isArray(body[key])||body[key].length<1||body[key].length>(key==='samples'?20:100))fail(400,'VALIDATION',`${key} must contain 1–${key==='samples'?20:100} cases.`);
   definition[key]=body[key].map((t,i)=>({id:randomUUID(),position:i+1,input:bytes(t?.input,`${key} input`,262144),expected:bytes(t?.expected,`${key} expected`,262144),...(key==='tests'?{weight:Number(t.weight)}:{enabled:true})}));
  }
  if(Buffer.byteLength(JSON.stringify(definition))>2000000)fail(413,'TOO_LARGE','Problem package exceeds 2 MB.');
- try{validateTask({kind:'validation',version:definition,language:'python',code:definition.reference_code,tests:definition.tests});validateTask({kind:'samples',version:definition,language:'python',code:definition.reference_code,tests:definition.samples});}
+ try{validateTask({kind:'validation',version:definition,language:referenceLanguage,code:definition.reference_code,tests:definition.tests});validateTask({kind:'samples',version:definition,language:'python',code:definition.reference_code,tests:definition.samples});}
  catch{fail(400,'INVALID_CASES','Check function name, JSON cases and positive formal test weights totaling 100.');}
  return definition;
 }
@@ -73,7 +77,7 @@ const publicDefinition=v=>({title:v.title,statement:v.statement,mode:v.mode,func
  timeLimitMs:v.time_limit_ms,memoryLimitMb:v.memory_limit_mb,starterCode:v.starter_code,
  starterCodes:starterCodesFor(v),
  samples:v.samples.map(t=>({input:t.input,expected:t.expected}))});
-const draftDefinition=v=>({...publicDefinition(v),referenceCode:v.reference_code,tests:v.tests.map(t=>({input:t.input,expected:t.expected,weight:t.weight}))});
+const draftDefinition=v=>({...publicDefinition(v),referenceLanguage:v.reference_language??'python',referenceCode:v.reference_code,tests:v.tests.map(t=>({input:t.input,expected:t.expected,weight:t.weight}))});
 async function loadProblem(db,schoolId,id,user,role,{publicOnly=false}={}){
  const p=(await db.query(`SELECT p.*,b.name AS bank_name,b.archived,EXISTS(SELECT 1 FROM problems original WHERE original.id=p.id AND original.owner_scope='platform') platform_owned FROM school_problems p JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id WHERE b.resource_kind=\'ordinary\' AND p.school_id=$1 AND p.id=$2`,[schoolId,id])).rows[0];
  if(!p||(!publicOnly&&!canManage(p,user,role)&&(!p.published||p.archived))||publicOnly&&(!p.published||p.archived))fail(404,'NOT_FOUND','Problem is unavailable.');
@@ -387,6 +391,37 @@ async function decideProblemPublication(db, user, {schoolId, problemId, versionI
  await db.query('INSERT INTO platform_audit_events(actor_account_id,action,school_id,detail) VALUES($1,$2,$3,$4)',[user.id,'problem.'+decision,schoolId,JSON.stringify({problemId,versionId})]);
 }
 
+async function importSchoolProblems(db, schoolId, user, role, body) {
+ if (!['teacher','school_admin'].includes(role)) fail(403,'FORBIDDEN','需要本校教师权限');
+ const key=uuid(body.idempotencyKey), bankId=body.bankId?uuid(body.bankId):null;
+ const bankName=bankId?null:field(body.bankName,'题库名称',{max:120});
+ if (!Array.isArray(body.problems) || !body.problems.length || body.problems.length>100 || Buffer.byteLength(JSON.stringify(body.problems))>2*1024*1024)
+  fail(400,'VALIDATION','每批可导入 1–100 道题目，合计不超过 2 MB');
+ const hash=canonicalHash({bankId,bankName,problems:body.problems});
+ const old=(await db.query("SELECT actor_account_id,result FROM school_import_history WHERE school_id=$1 AND kind='problem_bank' AND id=$2",[schoolId,key])).rows[0];
+ if (old) {
+  if(old.actor_account_id!==user.id || old.result.requestHash!==hash) fail(409,'REQUEST_CONFLICT','导入请求已用于其他内容');
+  return reply({importedCount:old.result.importedCount});
+ }
+ if (bankId) {
+  const bank=(await db.query("SELECT * FROM school_problem_banks WHERE school_id=$1 AND id=$2 AND resource_kind='ordinary' AND NOT archived",[schoolId,bankId])).rows[0];
+  if(!bank || !canManage(bank,user,role)) fail(404,'NOT_FOUND','目标题库不可用');
+ }
+ const definitions=body.problems.map((row,index)=>{
+  if (!row || typeof row!=='object' || Array.isArray(row)) fail(400,'VALIDATION',`第 ${index+1} 行题目格式无效`);
+  return normalizeSchoolProblem(row);
+ });
+ const destination=bankId??(await db.query('INSERT INTO school_problem_banks(school_id,owner_account_id,name,request_id) VALUES($1,$2,$3,$4) RETURNING id',[schoolId,user.id,bankName,randomUUID()])).rows[0].id;
+ for (const definition of definitions) await db.query('INSERT INTO school_problems(school_id,bank_id,owner_account_id,draft,request_id) VALUES($1,$2,$3,$4,$5)',
+  [schoolId,destination,user.id,JSON.stringify(definition),randomUUID()]);
+ const result={importedCount:definitions.length};
+ await db.query("SELECT set_config('campus.account_id',$1,true)",[user.id]);
+ await db.query(`INSERT INTO school_import_history(school_id,id,kind,actor_account_id,created_at,result,bank_id,filename)
+  VALUES($1,$2,'problem_bank',$3,now(),$4,$5,$6)`,[schoolId,key,user.id,JSON.stringify({...result,requestHash:hash}),destination,field(body.filename??'','文件名',{min:0,max:1000})]);
+ await auditSchool(db,schoolId,user.id,'school.problem.import',key);
+ return reply(result,201);
+}
+
 export async function schoolPracticeOperation({pool,user,route,url,method,body={}}){
  route??=url.pathname.replace(/^\/api\/v1/,'');
  const isSubmission=method==='POST'&&/^\/practice\/problems\/[^/]+\/submissions$/.test(route);
@@ -486,6 +521,7 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
  if(!m)return null;const schoolId=uuid(m[1]);
  return transaction(pool,async db=>{
   await lockSchoolTeaching(db,schoolId,{shared:method==='GET'});const role=await schoolRole(db,schoolId,user.id);await scope(db,schoolId);
+  if (m[2]==='problems' && m[3]==='import' && !m[4] && method==='POST') return importSchoolProblems(db,schoolId,user,role,body);
   if(m[2]==='judge-jobs'&&m[3]&&(method==='GET'&&!m[4]||method==='PATCH'&&m[4]==='note')){
    await db.query("SELECT set_config('campus.account_id',$1,true)",[user.id]);
    const historical=/^SUB[1-9][0-9]{0,17}$/.test(m[3]),id=historical?m[3].slice(3):uuid(m[3]);
@@ -655,7 +691,7 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
   if(method==='POST'&&m[4]==='validate'){
    const previous=(await db.query('SELECT id FROM school_problem_versions WHERE school_id=$1 AND problem_id=$2 ORDER BY (id=$3) DESC NULLS LAST,draft_revision DESC LIMIT 1',[schoolId,id,p.published_version_id])).rows[0];
    const version=previous??(await db.query('INSERT INTO school_problem_versions(school_id,problem_id,draft_revision,definition) VALUES($1,$2,$3,$4) RETURNING id',[schoolId,id,p.revision,JSON.stringify(p.draft)])).rows[0];
-   return reply(await enqueue(db,{schoolId,p,version:{...version,definition:p.draft},user,kind:'validation',body:{...body,language:'python'},accessContext:'school'}),202);
+   return reply(await enqueue(db,{schoolId,p,version:{...version,definition:p.draft},user,kind:'validation',body:{...body,language:p.draft.reference_language??'python'},accessContext:'school'}),202);
   }
   if(method==='POST'&&m[4]==='publish'){
    if(role!=='school_admin')fail(403,'FORBIDDEN','School administrator review is required.');

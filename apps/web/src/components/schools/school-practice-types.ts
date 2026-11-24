@@ -12,6 +12,7 @@ export type Definition = {
   returnType?: string;
   tags?: string[];
   referenceCode?: string;
+  referenceLanguage?: "python" | "cpp" | "javascript";
   samples: { input: string; expected: string }[];
   tests?: { input: string; expected: string; weight: number }[];
   timeLimitMs: number;

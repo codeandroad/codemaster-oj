@@ -166,7 +166,9 @@ export async function courseCatalogueEntries(db, user, rows, acslSchoolId) {
 export async function publicCourseProblemLanguage(db, user, { courseId, chapterId, schoolId, problemId, versionId }) {
   await context(db, user);
   const listing = await activeListing(db, courseId);
-  const course = listing?.school_id === schoolId && await edition(db, listing, { detail: true, lock: true });
+  // Platform courses may pin a problem stored outside the course's original school.
+  const course = listing && (listing.platform_owned || listing.school_id === schoolId)
+    && await edition(db, listing, { detail: true, lock: true });
   if (!course) fail(404, 'COURSE_PROBLEM_UNAVAILABLE', '公开课程不存在或已撤回');
   if (await admissionFor(db, listing, course, user.id) !== 'direct') {
     fail(403, 'COURSE_APPLICATION_REQUIRED', '请先申请加入课程');
@@ -176,6 +178,8 @@ export async function publicCourseProblemLanguage(db, user, { courseId, chapterI
   if (!chapter?.problems?.some(link => {const current=available.get(`${link.problemId}:${link.versionId}`);return current?.problemId===problemId&&current.versionId===versionId;})) {
     fail(404, 'COURSE_PROBLEM_UNAVAILABLE', '此题不在可访问的公开课程章节中');
   }
+  // Reading the course switches RLS to its owner. Enqueue under the resolved problem's storage scope.
+  await setSchool(db, schoolId);
   return course.required_language;
 }
 

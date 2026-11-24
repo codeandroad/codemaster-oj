@@ -63,6 +63,8 @@ export async function handleSchoolLearningResources({pool,user,route,method,body
   if(!row||!manages(row,user,role)&&row.scope!=='school')fail(404,'NOT_FOUND','资料不存在或不可访问');
   if(method==='GET')return reply(await shape(row,{detail:true}));
   if(!manages(row,user,role))fail(403,'FORBIDDEN','无权编辑资料');
+  // A write may remove the link, so authorize against the stored course first.
+  if(row.platform_course_id)await linked(row);
   if(integer(body.expectedRevision,1,2147483646,'版本')!==row.revision)fail(409,'REVISION_CONFLICT','资料已更新，请刷新');
   if(method==='DELETE'){
    await db.query('UPDATE school_learning_resources SET deleted_at=clock_timestamp(),revision=revision+1 WHERE school_id=$1 AND id=$2',[schoolId,id]);

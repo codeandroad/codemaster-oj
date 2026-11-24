@@ -6,6 +6,7 @@ import { dirname, resolve } from 'node:path';
 import { createApiApplication } from '../dist/application.js';
 import { createPool } from '../../../packages/domain/src/db.mjs';
 import { migrate } from '../../../packages/domain/src/migrate.mjs';
+import { applicationDatabaseUrl, enrollWithClaim } from './support/workspace-accounts.mjs';
 import { bootstrap } from '../../../packages/domain/src/bootstrap.mjs';
 import { loadConfig } from '../../../packages/domain/src/application.mjs';
 import { hashPassword } from '../../../packages/domain/src/security.mjs';
@@ -14,8 +15,8 @@ import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-wor
 import { provisionPlatformAdministrator } from '../../../packages/domain/src/platform-governance.mjs';
 import { importAcslPaper } from '../../../packages/domain/src/acsl-import.mjs';
 
-const migrations = ['106_platform_course_admissions.sql', '108_platform_points_and_requirement_modes.sql'];
 const bodySentinel = 'LOCKED_LESSON_CONTENT_NOT_FOR_APPLICANTS';
+const examSentinel = 'FORMAL_EXAM_EXPLANATION_NEVER_IN_COURSE_ENTRY';
 const policy = ({ all, independent, schools = [], accounts = [] } = {}) => ({
   scope: all ? 'all' : 'custom', allRule: all ?? null, independentRule: independent ?? null,
   schoolRules: schools, accountRules: accounts,
@@ -31,6 +32,17 @@ function noCode(value, code) {
   } }; inspect(value);
 }
 
+async function seedCatalogEdition(db, ownerId, scope) {
+  const bank = (await db.query("INSERT INTO problem_banks(owner_account_id,name,visibility) VALUES($1,$2,'school') RETURNING id", [ownerId, `${scope} fixture bank`])).rows[0];
+  const {id: problemId} = (await db.query('INSERT INTO problems(owner_account_id,bank_id,owner_scope) VALUES($1,$2,$3) RETURNING id', [ownerId,bank.id,scope])).rows[0];
+  const {id: versionId} = (await db.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,reference_code,samples,time_limit_ms,memory_limit_mb,validation_status)
+    VALUES($1,'Teaching exercise','stdio','Print the input.','print(input())','[{"input":"2","expected":"2","enabled":true}]',1000,128,'AC') RETURNING id`, [problemId])).rows[0];
+  await db.query("INSERT INTO test_cases(version_id,position,input,expected,weight) VALUES($1,1,'3','3',100)", [versionId]);
+  await db.query("UPDATE problem_versions SET published_at=now(),rank_review_status='approved',school_visible_at=now(),rank_approved_at=now() WHERE id=$1", [versionId]);
+  await db.query('UPDATE problems SET current_version_id=$1 WHERE id=$2', [versionId,problemId]);
+  return {problemId,versionId};
+}
+
 // These fixtures are intentionally new, randomly named schemas. No production
 // accounts, courses, historical answers or balances are reused or reset.
 async function fixture() {
@@ -42,53 +54,50 @@ async function fixture() {
   await manager.query(`CREATE SCHEMA ${schema}`);
   const scoped = new URL(base); scoped.searchParams.set('options', `-csearch_path=${schema}`);
   const owner = createPool(scoped.href), servers = [];
+  let worker;
   const password = randomBytes(24).toString('base64url'), origin = 'http://platform-admissions.test';
   try {
-    await owner.query('CREATE TABLE schema_migrations(name text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');
-    await owner.query('INSERT INTO schema_migrations(name) SELECT unnest($1::text[])', [migrations]);
-    await migrate(owner);
-    await bootstrap(owner,{schoolSlug:'tianxing-chuangshiji', name: 'Fixture legacy admin', number: 'ADMIN', username: 'legacy-admin', password });
+    // The historical audience and reading records must exist before the admission migration runs.
+    await migrate(owner, { through: '105_acsl_platform_course.sql' });
     const actors = {};
-    actors['legacy-admin'] = (await owner.query("SELECT id,identity_id AS \"identityId\" FROM accounts WHERE username='legacy-admin'")).rows[0];
     const hash = await hashPassword(password);
-    for (const name of ['platform', 'free', 'free-peer', 'free-third', 'alpha-admin', 'alpha-teacher', 'alpha-student', 'alpha-peer', 'beta-admin', 'beta-student', 'multi-student', 'legacy-student', 'legacy-peer']) {
-      const kind = name.startsWith('legacy-') ? 'student' : 'personal';
+    for (const [name, kind] of [['platform','personal'], ['free','personal'], ['legacy-student','student'], ['legacy-teacher','teacher']]) {
       const identityId = randomUUID();
-      await owner.query('INSERT INTO identities(id,kind,number,name) VALUES($1,$2,$3,$3)', [identityId, kind, name]);
-      actors[name] = { ...(await owner.query('INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,$2,$3) RETURNING id', [identityId, name, hash])).rows[0], identityId };
-      if (name.startsWith('legacy-')) {
-        await owner.query("INSERT INTO account_roles(account_id,role) VALUES($1,'student')", [actors[name].id]);
-        await owner.query('INSERT INTO legacy_school_account_ownership(account_id) VALUES($1) ON CONFLICT DO NOTHING', [actors[name].id]);
-      } else await owner.query('DELETE FROM legacy_school_account_ownership WHERE account_id=$1', [actors[name].id]);
-    }
-    await provisionPlatformAdministrator(owner, { username: 'platform' });
-    const alpha = await provisionSchool(owner, { slug: 'admission-alpha', name: 'Fixture Alpha', adminUsername: 'alpha-admin' });
-    const beta = await provisionSchool(owner, { slug: 'admission-beta', name: 'Fixture Beta', adminUsername: 'beta-admin' });
-    for (const [name, schoolId, role] of [
-      ['alpha-teacher', alpha.id, 'teacher'], ['alpha-student', alpha.id, 'student'], ['alpha-peer', alpha.id, 'student'],
-      ['beta-student', beta.id, 'student'], ['multi-student', alpha.id, 'student'], ['multi-student', beta.id, 'student'],
-    ]) {
-      await owner.query('INSERT INTO school_memberships(school_id,account_id,role) VALUES($1,$2,$3)', [schoolId, actors[name].id, role]);
-      const schoolIdentity = (await owner.query('INSERT INTO school_identities(school_id,kind,number,name,account_id) VALUES($1,$2,$3,$3,$4) RETURNING id', [schoolId, role, name, actors[name].id])).rows[0];
-      actors[name].schoolIdentities ??= {}; actors[name].schoolIdentities[schoolId] = schoolIdentity.id;
+      await owner.query('INSERT INTO identities(id,kind,number,name) VALUES($1,$2,$3,$3)', [identityId,kind,name]);
+      const account = (await owner.query('INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,$2,$3) RETURNING id', [identityId,name,hash])).rows[0];
+      actors[name] = {...account, identityId};
+      if (kind !== 'personal') await owner.query('INSERT INTO account_roles(account_id,role) VALUES($1,$2)',[account.id,kind]);
     }
     const oldCourses = [];
     for (const scope of ['all', 'schools', 'students']) {
       const path = (await owner.query(`INSERT INTO learning_paths(owner_account_id,title,owner_scope,published_at,
         platform_access_scope,platform_school_ids,platform_student_ids) VALUES($1,$2,'platform',now(),$3,$4,$5) RETURNING *`,
-      [actors.platform.id, `Existing ${scope} course`, scope, scope === 'schools' ? [alpha.id] : [], scope === 'students' ? [actors.free.identityId] : []])).rows[0];
+      [actors.platform.id, `Existing ${scope} course`, scope, scope === 'schools' ? [LEGACY_SCHOOL_ID] : [], scope === 'students' ? [actors.free.identityId] : []])).rows[0];
       const chapter = (await owner.query("INSERT INTO learning_chapters(path_id,title,content,position) VALUES($1,'Historical chapter','Historical bilingual lesson',0) RETURNING *", [path.id])).rows[0];
       await owner.query('INSERT INTO learning_progress(identity_id,chapter_id,completed) VALUES($1,$2,true)', [actors['legacy-student'].identityId, chapter.id]);
       oldCourses.push({ path, chapter });
     }
-    const alias = (await owner.query("INSERT INTO learning_paths(owner_account_id,title,archived_at,merged_into_id,merged_first_chapter_id) VALUES($1,'Historical alias',now(),$2,$3) RETURNING *", [actors['legacy-admin'].id, oldCourses[0].path.id, oldCourses[0].chapter.id])).rows[0];
+    const alias = (await owner.query("INSERT INTO learning_paths(owner_account_id,title,archived_at,merged_into_id,merged_first_chapter_id) VALUES($1,'Historical alias',now(),$2,$3) RETURNING *", [actors['legacy-teacher'].id, oldCourses[0].path.id, oldCourses[0].chapter.id])).rows[0];
+    const resourceId = (await owner.query(`INSERT INTO learning_resources(owner_account_id,type,title,content,path_id,chapter_id,scope)
+      VALUES($1,'note','Historical reference',$2,$3,$4,'school') RETURNING id`,
+    [actors['legacy-teacher'].id, bodySentinel, oldCourses[0].path.id, oldCourses[0].chapter.id])).rows[0].id;
     const oldProgress = (await owner.query('SELECT * FROM learning_progress ORDER BY chapter_id')).rows;
-    await owner.query('DELETE FROM schema_migrations WHERE name=ANY($1::text[])', [migrations]); await migrate(owner);
-    const grants = (await readFile(new URL('../../../packages/domain/grants.mjs', import.meta.url), 'utf8')).match(/await pool\.query\(`([\s\S]*?)`\);/)[1];
-    await owner.query(grants.replaceAll('SCHEMA public', `SCHEMA ${schema}`));
-    const runtime = new URL(scoped); runtime.searchParams.set('options', `-crole=campus_app -csearch_path=${schema}`);
+    await migrate(owner, { through: '110_platform_content_ownership.sql' });
+    // This school edition is pinned by a historical platform course and copied into the school's practice storage on upgrade.
+    const schoolProblem = await seedCatalogEdition(owner, actors['legacy-teacher'].id, 'school');
+    await owner.query('INSERT INTO chapter_problems(chapter_id,problem_id,version_id,position) VALUES($1,$2,$3,0)',
+      [oldCourses[1].chapter.id, schoolProblem.problemId, schoolProblem.versionId]);
+    await migrate(owner, { through: '135_school_notifications_and_publications.sql' });
+    const sample = JSON.parse(await readFile(new URL('../../../packages/domain/content/acsl/sample.json', import.meta.url), 'utf8'));
+    for (const question of sample.questions) question.explanation = { en: examSentinel, zh: examSentinel };
+    const paper = await importAcslPaper(owner, { schoolId: LEGACY_SCHOOL_ID, ownerAccountId: actors['legacy-teacher'].id, content: sample, enablePoints: true });
+    await migrate(owner);
+    await bootstrap(owner, {schoolSlug:'tianxing-chuangshiji', name:'Original school administrator', number:'ADMIN', username:'legacy-admin', password});
+    actors['legacy-admin'] = (await owner.query('SELECT id,identity_id AS "identityId" FROM accounts WHERE username=$1',['legacy-admin'])).rows[0];
+    await provisionPlatformAdministrator(owner, {username:'platform'});
+    const runtime = new URL(await applicationDatabaseUrl(owner,scoped,schema));
     const workerUrl = new URL(scoped); workerUrl.searchParams.set('options', `-crole=campus_worker -csearch_path=${schema}`);
-    const worker = createPool(workerUrl.href);
+    worker = createPool(workerUrl.href);
     const config = loadConfig({ SESSION_SECRET: randomBytes(32).toString('base64url'), APP_ORIGIN: origin, COOKIE_SECURE: 'false' });
     const startServer = async () => {
       const app = await createApiApplication({ databaseUrl: runtime.href, logger: false, config });
@@ -110,6 +119,27 @@ async function fixture() {
     for (const name of Object.keys(actors)) {
       const login = await request('/auth/login', { session: false, method: 'POST', body: { username: name, password } });
       auth[name] = { cookie: login.cookie, csrf: login.data.csrfToken };
+    }
+    for (const username of ['free-peer','free-third','applicant','alpha-admin','alpha-teacher','alpha-student','alpha-peer','beta-admin','beta-student','multi-student','legacy-peer']) {
+      const signup = await request('/auth/register-personal', {session:false, method:'POST', status:201, body:{username,displayName:username,password}});
+      const {id,identityId} = signup.data.user;
+      actors[username] = {id,identityId};
+      auth[username] = {cookie:signup.cookie,csrf:signup.data.csrfToken};
+    }
+    const alpha = await provisionSchool(owner, {slug:'admission-alpha',name:'Fixture Alpha',adminUsername:'alpha-admin'});
+    const beta = await provisionSchool(owner, {slug:'admission-beta',name:'Fixture Beta',adminUsername:'beta-admin'});
+    const original = {id:LEGACY_SCHOOL_ID,slug:'tianxing-chuangshiji'};
+    const claimPost = (path,name,body,status) => request(path,{name,method:'POST',body,status});
+    for (const [school, admin, name, kind] of [
+      [alpha,'alpha-admin','alpha-teacher','teacher'], [alpha,'alpha-admin','alpha-student','student'],
+      [alpha,'alpha-admin','alpha-peer','student'], [beta,'beta-admin','beta-student','student'],
+      [alpha,'alpha-admin','multi-student','student'], [beta,'beta-admin','multi-student','student'],
+      [original,'legacy-admin','legacy-peer','student'],
+    ]) {
+      const identity = await enrollWithClaim(claimPost,school,admin,name,{kind,name,number:name});
+      actors[name].schoolIdentities ??= {};
+      actors[name].schoolIdentities[school.id] = identity.id;
+      assert.notEqual(identity.id,actors[name].identityId);
     }
     const get = async (path, name = 'platform', status = 200) => (await request(path, { name, status })).data;
     const post = async (path, body, name = 'platform', status = 200) => (await request(path, { name, method: 'POST', body, status })).data;
@@ -136,10 +166,10 @@ async function fixture() {
       await worker.end(); await owner.end();
       if (!retained) await manager.query(`DROP SCHEMA ${schema} CASCADE`); await manager.end();
     };
-    return { owner, worker, actors, alpha, beta, schema, request, get, post, patch, snapshot, startServer, close, retain, oldCourses, oldProgress, alias };
+    return { owner, worker, actors, alpha, beta, schema, request, get, post, patch, snapshot, startServer, close, retain, oldCourses, oldProgress, alias, resourceId, schoolProblem, sample, paper };
   } catch (error) {
     for (const app of servers) await app.close();
-    await owner.end(); await manager.query(`DROP SCHEMA ${schema} CASCADE`); await manager.end(); throw error;
+    await worker?.end(); await owner.end(); await manager.query(`DROP SCHEMA ${schema} CASCADE`); await manager.end(); throw error;
   }
 }
 
@@ -147,8 +177,11 @@ test('platform course admission combines audience, requirements and grants acros
   skip: !process.env.TEST_DATABASE_URL, timeout: 240000,
 }, async t => {
   const f = await fixture();
-  let passedCases = 0;
-  const run = (name, check) => t.test(name, async () => { await check(); passedCases++; });
+  let cases = 0, passedCases = 0;
+  const run = (name, check) => {
+    cases++;
+    return t.test(name, async () => { await check(); passedCases++; });
+  };
   const { owner, actors, alpha, beta, get, post, patch, request } = f;
   const create = async (audiencePolicy, title = 'Admission fixture', chapters = [{ title: 'Lesson', content: bodySentinel }]) => {
     let course = await post('/platform/courses', { requestId: randomUUID(), title, audiencePolicy, chapters }, 'platform', 201);
@@ -165,25 +198,26 @@ test('platform course admission combines audience, requirements and grants acros
   const redeem = (course, r, code, name, status = 200, at) => request(`/practice/courses/${course.id}/invitations/redeem`, { method: 'POST', name, status, at, body: { ruleId: r.ruleId, generation: r.generation, code } });
   const admissions = course => get(`/platform/courses/${course.id}/admissions`);
   const decision = (course, application, action, name = 'platform', status = 200) => post(`/platform/courses/${course.id}/admissions/${application.id}/decision`, { action, expectedStatus: application.status, generation: application.generation }, name, status);
-  const publicProblem = async ({ approved = true } = {}) => {
-    const bankId = (await owner.query("INSERT INTO school_problem_banks(school_id,owner_account_id,name,request_id) VALUES($1,$2,'Fixture bank',$3) RETURNING id", [alpha.id, actors['alpha-admin'].id, randomUUID()])).rows[0].id;
+  const publicProblem = async ({ approved = true, schoolId = alpha.id, admin = 'alpha-admin' } = {}) => {
+    const bankId = (await owner.query("INSERT INTO school_problem_banks(school_id,owner_account_id,name,request_id) VALUES($1,$2,'Fixture bank',$3) RETURNING id", [schoolId, actors[admin].id, randomUUID()])).rows[0].id;
     const definition = { title: 'Fixture public input', mode: 'stdio', statement: 'Return the input.', reference_code: 'print(input())', samples: [{ input: '2', expected: '2', enabled: true }], tests: [{ position: 1, input: '3', expected: '3' }], time_limit_ms: 1000, memory_limit_mb: 128, languages: ['python'] };
-    const problemId = (await owner.query('INSERT INTO school_problems(school_id,bank_id,owner_account_id,draft,request_id) VALUES($1,$2,$3,$4,$5) RETURNING id', [alpha.id, bankId, actors['alpha-admin'].id, definition, randomUUID()])).rows[0].id;
-    const versionId = (await owner.query('INSERT INTO school_problem_versions(school_id,problem_id,draft_revision,definition) VALUES($1,$2,1,$3) RETURNING id', [alpha.id, problemId, definition])).rows[0].id;
-    await owner.query('UPDATE school_problems SET published=true,published_version_id=$3 WHERE school_id=$1 AND id=$2', [alpha.id, problemId, versionId]);
-    if (approved) await owner.query('INSERT INTO school_problem_publications(school_id,problem_id,version_id,approved_by) VALUES($1,$2,$3,$4)', [alpha.id, problemId, versionId, actors.platform.id]);
-    return { schoolId: alpha.id, problemId, versionId };
+    const problemId = (await owner.query('INSERT INTO school_problems(school_id,bank_id,owner_account_id,draft,request_id) VALUES($1,$2,$3,$4,$5) RETURNING id', [schoolId, bankId, actors[admin].id, definition, randomUUID()])).rows[0].id;
+    const versionId = (await owner.query('INSERT INTO school_problem_versions(school_id,problem_id,draft_revision,definition) VALUES($1,$2,1,$3) RETURNING id', [schoolId, problemId, definition])).rows[0].id;
+    await owner.query('UPDATE school_problems SET published=true,published_version_id=$3 WHERE school_id=$1 AND id=$2', [schoolId, problemId, versionId]);
+    if (approved) await owner.query('INSERT INTO school_problem_publications(school_id,problem_id,version_id,approved_by) VALUES($1,$2,$3,$4)', [schoolId, problemId, versionId, actors.platform.id]);
+    return { schoolId, problemId, versionId };
   };
-  const seedJob = async (problem, name, { context = 'public', kind = 'submit', status = 'AC', state = 'completed' } = {}) => {
-    // Trusted fixture result, never execution of user code. Only transport and
-    // eligibility projection are under test in this suite.
-    const deferSchoolResult = context === 'school' && state === 'completed';
-    const id = (await owner.query(`INSERT INTO school_judge_jobs(school_id,problem_id,version_id,account_id,request_id,request_hash,kind,access_context,payload,state,result,completed_at,identity_id)
-      VALUES($1,$2,$3,$4,$5,'fixture',$6,$7,$8,$9,$10,now(),$11) RETURNING id`, [problem.schoolId, problem.problemId, problem.versionId, actors[name].id, randomUUID(), kind, context,
-      { language: 'python', code: '# fixture result' }, deferSchoolResult ? 'queued' : state, deferSchoolResult ? null : { status },
-      context === 'school' ? actors[name].schoolIdentities?.[problem.schoolId] : null])).rows[0].id;
-    if (deferSchoolResult) await owner.query("UPDATE school_judge_jobs SET state='completed',result=$3,completed_at=now() WHERE school_id=$1 AND id=$2", [problem.schoolId, id, { status }]);
-    return id;
+  const seedJob = async (problem, name, { context = 'public', kind = 'submit', language = 'python', status = 'AC' } = {}) => {
+    // Use the same account and school dossier as an actual queued job. The sandbox has its own execution tests.
+    const actor = actors[name];
+    const identityId = context === 'school' ? actor.schoolIdentities[problem.schoolId] : null;
+    if (context === 'school') assert.ok(identityId);
+    const { rows: [job] } = await owner.query(`INSERT INTO school_judge_jobs
+      (school_id,problem_id,version_id,account_id,request_id,request_hash,kind,access_context,payload,state,identity_id)
+      VALUES($1,$2,$3,$4,$5,'fixture',$6,$7,$8,'queued',$9) RETURNING id`,
+    [problem.schoolId, problem.problemId, problem.versionId, actor.id, randomUUID(), kind, context, {language,code:'# fixture result'}, identityId]);
+    await owner.query("UPDATE school_judge_jobs SET state='completed',result=$3,completed_at=now() WHERE school_id=$1 AND id=$2", [problem.schoolId, job.id, {status}]);
+    return job.id;
   };
   try {
     await run('migration preserves existing scopes, stable chapters, aliases and reading history', async () => {
@@ -194,7 +228,7 @@ test('platform course admission combines audience, requirements and grants acros
         const course = await get(`/platform/courses/${path.id}`);
         assert.ok(rulesOf(course).every(r => r.admissionMode === 'direct' && r.minimumPoints === 0 && r.prerequisiteCourseIds.length === 0));
         if (path.platform_access_scope === 'all') await read(course, 'free');
-        if (path.platform_access_scope === 'schools') { await read(course, 'alpha-student'); await read(course, 'beta-student', 404); }
+        if (path.platform_access_scope === 'schools') { await read(course, 'legacy-student'); await read(course, 'beta-student', 404); }
         if (path.platform_access_scope === 'students') { await read(course, 'free'); await read(course, 'free-peer', 404); }
       }
       assert.deepEqual((await owner.query('SELECT * FROM learning_progress ORDER BY chapter_id')).rows, f.oldProgress);
@@ -220,67 +254,90 @@ test('platform course admission combines audience, requirements and grants acros
       await owner.query('UPDATE school_memberships SET revoked_at=NULL WHERE account_id=$1', [actors['multi-student'].id]);
     });
 
+    await run('school approval links the existing dossier and exposes only the course entry until separately admitted', async () => {
+      const name = 'applicant', school = `/schools/${alpha.id}`;
+      const facts = {kind:'student', number:'QA-applicant', name:'School applicant'};
+      const identity = await post(school + '/identities',facts,'alpha-admin',201);
+      const course = await create(policy({schools:[{schoolId:alpha.id,...rule('application')}]}));
+      const r = course.audiencePolicy.schoolRules[0];
+      const application = await post(school + '/join-requests',facts,name,201);
+      await get(school + '/courses?includePlatform=true',name,404);
+      await entry(course,name,404); await read(course,name,404);
+      await post(school + '/join-requests/' + application.id + '/decision',{decision:'approved',identityId:identity.id},'alpha-admin');
+      const dossiers = (await owner.query('SELECT id FROM school_identities WHERE school_id=$1 AND account_id=$2',[alpha.id,actors[name].id])).rows;
+      assert.deepEqual(dossiers,[{id:identity.id}]);
+      actors[name].schoolIdentities = {[alpha.id]:identity.id};
+      assert.notEqual(identity.id,actors[name].identityId);
+      const listed = (await get(school + '/courses?includePlatform=true',name)).platformCourses.find(item=>item.id===course.id);
+      assert.equal(listed.admission,'apply'); noLesson(listed); await read(course,name,403);
+      await apply(course,r,name); await read(course,name,403);
+      await decision(course,(await admissions(course)).items[0],'approve');
+      assert.equal((await read(course,name)).id,course.id);
+    });
+
     await run('a platform course targeting the legacy school appears in both course tabs before admission', async () => {
       const schoolRule = { schoolId: LEGACY_SCHOOL_ID, ...rule('direct', { minimumPoints: 300 }) };
       const independent = rule('invite'), name = 'legacy-student';
       let course = await create(policy({ independent, schools: [schoolRule] }), 'ACSL discovery fixture');
       const issued = await invite(course, course.audiencePolicy.independentRule);
-      const schoolList = () => get('/learning-paths?includeAdmission=true', name);
-      const publicList = async actor => (await get('/practice/catalog', actor)).courses.find(item => item.id === course.id);
-      const summary = (await schoolList()).items.find(item => item.id === course.id);
-      assert.ok(summary);
-      assert.equal(summary.title, course.title);
-      assert.equal(summary.admission, 'requirements');
-      assert.equal(summary.chapterCount, 1);
-      for (const key of ['chapters', 'completedChapters', 'taskCount', 'admissionRules']) assert.ok(!(key in summary));
-      noLesson(summary); noCode(summary, issued.code);
-      assert.equal((await publicList(name)).admission, 'requirements');
-      const schoolEntry = await entry(course, name);
-      assert.equal(schoolEntry.admissionRules.length, 1);
-      assert.equal(schoolEntry.admissionRules[0].points.required, 300);
-      assert.equal((await publicList('free')).admission, 'invite');
-      assert.equal(await publicList('beta-student'), undefined);
-      await get('/learning-paths?includeAdmission=true', 'beta-student', 403);
-      assert.ok(!(await get('/learning-paths', name)).items.some(item => item.id === course.id));
-      await get(`/learning-paths/${course.id}`, name, 404); await read(course, name, 403);
-
+      const schoolPath = `/schools/${LEGACY_SCHOOL_ID}/courses`;
+      const schoolListing = async () => (await get(schoolPath + '?includePlatform=true', name)).platformCourses.find(item => item.id === course.id);
+      const publicListing = async actor => (await get('/practice/catalog', actor)).courses.find(item => item.id === course.id);
+      for (const summary of [await schoolListing(), await publicListing(name)]) {
+        assert.equal(summary.title, course.title);
+        assert.equal(summary.admission, 'requirements');
+        assert.equal(summary.chapterCount, 1);
+        for (const key of ['chapters', 'completedChapters', 'totalExercises']) assert.ok(!(key in summary));
+        assert.equal(summary.admissionRules.length, 1);
+        assert.equal(summary.admissionRules[0].points.required, 300);
+        noLesson(summary); noCode(summary, issued.code);
+      }
+      assert.equal((await publicListing('free')).admission, 'invite');
+      assert.equal(await publicListing('beta-student'), undefined);
+      await get(schoolPath + '?includePlatform=true', 'beta-student', 404);
+      assert.ok(!(await get(schoolPath, name)).items.some(item => item.id === course.id));
+      await get(`${schoolPath}/${course.id}`, name, 404); await read(course, name, 403);
       course = await change(course, { audiencePolicy: policy({ independent, schools: [{ ...schoolRule, minimumPoints: 0 }] }) });
-      const admitted = (await schoolList()).items.find(item => item.id === course.id);
-      assert.equal(admitted.completedChapters, 0);
-      assert.ok(!('admission' in admitted));
-      assert.equal((await get(`/learning-paths/${course.id}`, name)).id, course.id);
+      for (const summary of [await schoolListing(), await publicListing(name)]) {
+        assert.equal(summary.admission, 'direct');
+        assert.equal(summary.completedChapters, 0);
+      }
+      assert.equal((await read(course, name)).id, course.id);
     });
 
-    await run('the school catalog keeps all-user and individually targeted courses visible behind admission gates', async () => {
-      const name = 'legacy-student';
-      const gated = rule('direct', { minimumPoints: 300 });
-      const catalog = actor => get('/learning-paths?view=student-summary&includeAdmission=true', actor);
+    await run('school adoption, personal targeting and publication control discovery independently of admission', async () => {
+      const name = 'legacy-peer', gated = rule('direct', { minimumPoints: 300 });
       const coverImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jF2kAAAAASUVORK5CYII=';
-      const policies = [
-        policy({ all: gated }),
-        policy({ accounts: [{ identityId: actors[name].identityId, ...gated }] }),
-      ];
-      for (const audiencePolicy of policies) {
-        const course = await create(audiencePolicy);
-        await owner.query('UPDATE learning_paths SET cover_image=$2 WHERE id=$1', [course.id, coverImage]);
-        const summary = (await catalog(name)).items.find(item => item.id === course.id);
-        assert.equal(summary?.admission, 'requirements');
-        assert.equal(summary.coverImage, `/api/v1/learning-paths/${course.id}/cover`);
-        for (const key of ['chapters', 'completedChapters', 'taskCount', 'admissionRules']) assert.ok(!(key in summary));
-        const publicCourse = (await get('/practice/catalog', name)).courses.find(item => item.id === course.id);
-        assert.equal(publicCourse?.admission, 'requirements');
-        const coverPath = summary.coverImage.slice('/api/v1'.length);
-        const cover = await get(coverPath, name);
-        assert.deepEqual(Buffer.from(cover), Buffer.from(coverImage.split(',')[1], 'base64'));
-        await get(`/learning-paths/${course.id}`, name, 404);
-        await read(course, name, 403);
-        if (audiencePolicy.scope !== 'all') {
-          assert.ok(!(await catalog('legacy-peer')).items.some(item => item.id === course.id));
-          await get(coverPath, 'legacy-peer', 404);
+      const schoolListings = async actor => (await get(`/schools/${LEGACY_SCHOOL_ID}/courses?includePlatform=true`, actor)).platformCourses;
+      const publicListings = async actor => (await get('/practice/catalog', actor)).courses;
+      for (const audience of [policy({all:gated}), policy({accounts:[{identityId:actors[name].identityId,...gated}]})]) {
+        let course = await create(audience);
+        course = await change(course, {coverImage});
+        const find = items => items.find(item => item.id === course.id);
+        assert.equal(find(await schoolListings(name)), undefined);
+        if (audience.scope === 'all') {
+          course = await change(course, {catalogSchoolIds:[LEGACY_SCHOOL_ID]});
+          assert.equal(find(await schoolListings(name)).admission, 'requirements');
+          assert.equal(find(await schoolListings('legacy-student')).coverImage, coverImage);
+        } else {
+          assert.equal(find(await publicListings('legacy-student')), undefined);
+          await entry(course,'legacy-student',404);
         }
-        await owner.query('UPDATE learning_paths SET listed=false WHERE id=$1', [course.id]);
-        assert.ok(!(await catalog(name)).items.some(item => item.id === course.id));
-        await get(coverPath, name, 404);
+        const summary = find(await publicListings(name));
+        assert.equal(summary.admission, 'requirements'); assert.equal(summary.coverImage, coverImage);
+        for (const key of ['chapters','completedChapters','totalExercises']) assert.ok(!(key in summary));
+        assert.equal((await entry(course,name)).coverImage, coverImage);
+        await read(course,name,403);
+        // Migrated courses can be published but unlisted.
+        await owner.query('UPDATE learning_paths SET listed=false WHERE id=$1',[course.id]);
+        assert.equal(find(await schoolListings(name)), undefined);
+        assert.equal(find(await publicListings(name)), undefined);
+        await entry(course,name,404); await read(course,name,404);
+        await owner.query('UPDATE learning_paths SET listed=true WHERE id=$1',[course.id]);
+        await post(`/platform/courses/${course.id}/unpublish`,cas(await get(`/platform/courses/${course.id}`)));
+        assert.equal(find(await schoolListings(name)), undefined);
+        assert.equal(find(await publicListings(name)), undefined);
+        await entry(course,name,404); await read(course,name,404);
       }
     });
 
@@ -320,6 +377,7 @@ test('platform course admission combines audience, requirements and grants acros
       const audits = (await owner.query('SELECT detail FROM platform_audit_events ORDER BY id')).rows;
       noCode(audits, first.code);
       await redeem(course, r, first.code, 'free'); await redeem(course, r, first.code, 'free'); await read(course, 'free');
+      assert.deepEqual((await get('/schools','free')).items, [], 'course invitation does not create a school membership');
       assert.equal((await admissions(course)).items.length, 1, 'redeeming twice cannot create duplicate approvals');
       const second = await invite(course, r); assert.match(second.code, /^[2-9A-HJKMNP-Z]{6}$/); assert.notEqual(second.code, first.code);
       assert.equal((await redeem(course, r, first.code, 'free-peer', 400)).data.error.code, 'INVALID_COURSE_INVITATION');
@@ -467,10 +525,11 @@ test('platform course admission combines audience, requirements and grants acros
     });
 
     await run('platform points count formal public solves independent of ranking and exclude private or duplicated AC', async () => {
-      const name = 'free-third';
+      const name = 'applicant';
       await owner.query('INSERT INTO public_practice_preferences(account_id,ranking_enabled,scholarship_enabled) VALUES($1,true,false) ON CONFLICT(account_id) DO UPDATE SET ranking_enabled=true,scholarship_enabled=false', [actors[name].id]);
       const ranked = await publicProblem(); await seedJob(ranked, name); await seedJob(ranked, name);
       const sample = await publicProblem(); await seedJob(sample, name, { kind: 'samples' });
+      await seedJob(sample, name, { kind: 'custom' }); await seedJob(sample, name, { status: 'WA' });
       const privatePractice = await publicProblem({ approved: false }); await seedJob(privatePractice, name, { context: 'school' });
       await owner.query('UPDATE public_practice_preferences SET ranking_enabled=false WHERE account_id=$1', [actors[name].id]);
       const unranked = await publicProblem(); await seedJob(unranked, name);
@@ -488,10 +547,7 @@ test('platform course admission combines audience, requirements and grants acros
     });
 
     await run('prerequisites require all reading and formal ACSL results; unavailable references cannot become zero-task passes', async () => {
-      const sample = JSON.parse(await readFile(new URL('../../../packages/domain/content/acsl/sample.json', import.meta.url), 'utf8'));
-      const examSentinel = 'FORMAL_EXAM_EXPLANATION_NEVER_IN_COURSE_ENTRY';
-      for (const question of sample.questions) question.explanation = { en: examSentinel, zh: examSentinel };
-      const paper = await importAcslPaper(owner, { schoolId: LEGACY_SCHOOL_ID, ownerAccountId: actors['legacy-admin'].id, content: sample, enablePoints: true });
+      const { sample, paper } = f;
       const ref = { paperSlug: sample.slug, versionId: paper.versionId, kind: 'question', questionId: 'q1' };
       const prerequisite = await create(policy({ schools: [{ schoolId: LEGACY_SCHOOL_ID, ...rule() }] }), 'Required formal ACSL', [
         { title: 'First', content: 'First original lesson', acslLinks: [ref] }, { title: 'Second', content: 'Second original lesson' },
@@ -528,67 +584,83 @@ test('platform course admission combines audience, requirements and grants acros
     });
 
     await run('legacy aliases, resources, tutorials, progress and course-context judge admission cannot bypass a pending gate', async () => {
-      const course = await create(policy({ schools: [{ schoolId: LEGACY_SCHOOL_ID, ...rule('application') }] })), chapter = course.chapters[0], r = course.audiencePolicy.schoolRules[0];
-      const aliasId = (await owner.query("INSERT INTO learning_paths(owner_account_id,title,archived_at,merged_into_id,merged_first_chapter_id) VALUES($1,'Old alias with a locked target',now(),$2,$3) RETURNING id", [actors['legacy-admin'].id, course.id, chapter.id])).rows[0].id;
-      const resourceId = (await owner.query("INSERT INTO learning_resources(owner_account_id,type,title,content,path_id,chapter_id,scope) VALUES($1,'note','Locked resource',$2,$3,$4,'school') RETURNING id", [actors['legacy-admin'].id, bodySentinel, course.id, chapter.id])).rows[0].id;
-      const problemId = (await owner.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id', [actors['legacy-admin'].id])).rows[0].id;
-      const versionId = (await owner.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,reference_code,samples,time_limit_ms,memory_limit_mb,validation_status)
-        VALUES($1,'Public teaching fixture','stdio','Print the input.','print(input())','[{"input":"2","expected":"2","enabled":true}]',1000,128,'AC') RETURNING id`, [problemId])).rows[0].id;
-      await owner.query("INSERT INTO test_cases(version_id,position,input,expected,weight) VALUES($1,1,'3','3',100)", [versionId]);
-      await owner.query("UPDATE problem_versions SET published_at=now(),rank_review_status='approved',school_visible_at=now(),rank_approved_at=now() WHERE id=$1", [versionId]);
-      await owner.query('UPDATE problems SET current_version_id=$1 WHERE id=$2', [versionId, problemId]);
-      await owner.query('INSERT INTO chapter_problems(chapter_id,problem_id,version_id,position) VALUES($1,$2,$3,0)', [chapter.id, problemId, versionId]);
-      await post('/platform/problem-publications', { schoolId: LEGACY_SCHOOL_ID, problemId, versionId });
+      const name = 'legacy-peer', root = `/schools/${LEGACY_SCHOOL_ID}`;
+      const historical = await get(`/platform/courses/${f.oldCourses[0].path.id}`);
+      const course = await change(historical, {
+        requiredLanguage:'python',
+        audiencePolicy: policy({schools:[{schoolId:LEGACY_SCHOOL_ID,...rule('application')}]}),
+        chapters: [{...historical.chapters[0],content:bodySentinel}],
+      });
+      const chapter = course.chapters[0], r = course.audiencePolicy.schoolRules[0];
+      const resourcePath = `${root}/learning-resources`, resource = `${resourcePath}/${f.resourceId}`;
+      const bookmark = `${root}/courses/${f.alias.id}/bookmark`;
+      const {problemId,versionId} = await seedCatalogEdition(owner, actors.platform.id, 'platform');
+      await owner.query('INSERT INTO chapter_problems(chapter_id,problem_id,version_id,position) VALUES($1,$2,$3,0)', [chapter.id,problemId,versionId]);
+      const problem = `/practice/problems/${problemId}`;
+      const context = {courseId:course.id,chapterId:chapter.id,versionId};
       const before = await f.snapshot(), jobCount = (await owner.query('SELECT count(*)::int n FROM school_judge_jobs')).rows[0].n;
-      const problemCatalogues = ['/problems', '/practice/problems'];
-      const catalogueQuery = `?includeCourseFilters=1&courseId=${course.id}`;
-      await get(`/learning-resources/${resourceId}`, 'legacy-admin', 404);
-      assert.ok(!(await get('/learning-resources', 'legacy-admin')).items.some(item => item.id === resourceId), 'former resource owner and school administrator cannot bypass a platform gate');
-      await patch(`/learning-resources/${resourceId}`, { content: 'Unauthorized update', pathId: null, chapterId: null }, 'legacy-admin', 403);
-      await request(`/learning-resources/${resourceId}`, { name: 'legacy-admin', method: 'DELETE', status: 403 });
-      const preservedResource = (await owner.query('SELECT content,path_id,archived_at FROM learning_resources WHERE id=$1', [resourceId])).rows[0];
-      assert.equal(preservedResource.content, bodySentinel); assert.equal(preservedResource.path_id, course.id); assert.equal(preservedResource.archived_at, null);
+      const catalogues = [root + '/problems', '/practice/problems'];
+      const filter = `?includeCourseFilters=1&courseId=${course.id}`;
+      const markRead = status => post(`/practice/courses/${course.id}/chapters/${chapter.id}/read`, {read:true,expectedRevision:course.revision}, name, status);
+      const submit = (kind,status,extra={}) => post(problem + '/submissions', {...context,requestId:randomUUID(),kind,code:'print(input())',input:'2',language:'python',...extra}, name, status);
+      for (const staff of ['legacy-teacher','legacy-admin']) {
+        await get(resource,staff,404);
+        assert.ok(!(await get(resourcePath,staff)).items.some(item => item.id === f.resourceId));
+        await patch(resource,{title:'Historical reference',scope:'school',content:'changed',courseId:null,expectedRevision:1},staff,404);
+        await request(resource,{name:staff,method:'DELETE',body:{expectedRevision:1},status:404});
+      }
       const blocked = async () => {
-        await read(course, 'legacy-peer', 403);
-        for (const path of problemCatalogues) {
-          const result = await get(path + catalogueQuery, 'legacy-peer');
+        await read(course,name,403); await get(bookmark,name,404);
+        for (const path of catalogues) {
+          const result = await get(path + filter,name);
           assert.deepEqual(result.items, []);
           assert.ok(!result.courses.some(item => item.id === course.id));
         }
-        await get(`/learning-paths/${course.id}`, 'legacy-peer', [403, 404]); await get(`/learning-paths/${aliasId}`, 'legacy-peer', [403, 404]);
-        assert.ok(!(await get('/learning-paths', 'legacy-peer')).items.some(item => item.id === course.id));
-        await get(`/learning-resources/${resourceId}`, 'legacy-peer', 404);
-        assert.ok(!(await get('/learning-resources', 'legacy-peer')).items.some(item => item.id === resourceId));
-        await post(`/chapters/${chapter.id}/progress`, { completed: true }, 'legacy-peer', [403, 404]);
-        await post(`/practice/courses/${course.id}/chapters/${chapter.id}/read`, { read: true, expectedRevision: course.revision }, 'legacy-peer', 403);
-        const tutorial = await get(`/problems/${problemId}/tutorial?courseId=${course.id}&chapterId=${chapter.id}`, 'legacy-peer');
-        assert.equal(tutorial.tutorial, null); noLesson(tutorial);
-        for (const kind of ['samples', 'custom', 'submit']) await post(`/practice/problems/${problemId}/submissions`, {
-          requestId: randomUUID(), kind, code: 'print(input())', input: '2', language: 'python', versionId, courseId: course.id, chapterId: chapter.id,
-        }, 'legacy-peer', [403, 404]);
+        await get(resource,name,404);
+        assert.ok(!(await get(resourcePath,name)).items.some(item => item.id === f.resourceId));
+        noLesson(await entry(course,name));
+        await get(problem + '?' + new URLSearchParams(context),name,403);
+        await markRead(403);
+        for (const kind of ['samples','custom','submit']) await submit(kind,403);
       };
-      await blocked(); await apply(course, r, 'legacy-peer'); await blocked();
-      assert.equal((await owner.query('SELECT count(*)::int n FROM school_judge_jobs')).rows[0].n, jobCount);
-      assert.deepEqual(await f.snapshot(), before);
-      let application = (await admissions(course)).items[0]; await decision(course, application, 'approve');
-      for (const path of problemCatalogues) {
-        const result = await get(path + catalogueQuery, 'legacy-peer');
-        assert.equal(result.courseId, course.id);
-        assert.deepEqual(result.items.map(item => [item.id, item.versionId]), [[problemId, versionId]]);
+      await get(`/problems/${problemId}/tutorial?courseId=${course.id}&chapterId=${chapter.id}`,name,410);
+      await get(`/learning-resources/${f.resourceId}`,name,410);
+      await post(`/chapters/${chapter.id}/progress`,{completed:true},name,410);
+      await blocked(); await apply(course,r,name); await blocked();
+      assert.equal((await owner.query('SELECT count(*)::int n FROM school_judge_jobs')).rows[0].n,jobCount);
+      assert.deepEqual(await f.snapshot(),before);
+      await decision(course,(await admissions(course)).items[0],'approve');
+      for (const path of catalogues) {
+        const result = await get(path + filter,name);
+        assert.equal(result.courseId,course.id);
+        assert.deepEqual(result.items.map(item => [item.id,item.versionId]),[[problemId,versionId]]);
         assert.ok(result.courses.some(item => item.id === course.id));
-        assert.doesNotMatch(JSON.stringify(result), /referenceCode|reference_code|checkpoint/);
+        assert.doesNotMatch(JSON.stringify(result),/referenceCode|reference_code|checkpoint/);
       }
-      assert.equal((await get(`/learning-paths/${course.id}`, 'legacy-peer')).id, course.id);
-      assert.equal((await get(`/learning-paths/${aliasId}`, 'legacy-peer')).id, course.id);
-      assert.ok((await get('/learning-paths', 'legacy-peer')).items.some(item => item.id === course.id));
-      assert.equal((await get(`/learning-resources/${resourceId}`, 'legacy-peer')).content, bodySentinel);
-      assert.ok((await get('/learning-resources', 'legacy-peer')).items.some(item => item.id === resourceId));
-      assert.equal((await get(`/problems/${problemId}/tutorial?courseId=${course.id}&chapterId=${chapter.id}`, 'legacy-peer')).tutorial.body, bodySentinel);
-      await post(`/chapters/${chapter.id}/progress`, { completed: true }, 'legacy-peer');
-      await post(`/practice/problems/${problemId}/submissions`, { requestId: randomUUID(), kind: 'samples', code: 'print(input())', language: 'python', versionId, courseId: course.id, chapterId: chapter.id }, 'legacy-peer', 202);
+      assert.deepEqual(await get(bookmark,name),{scope:'platform',id:course.id,chapterId:chapter.id});
+      assert.equal((await get(resource,name)).content,bodySentinel);
+      assert.ok((await get(resourcePath,name)).items.some(item => item.id === f.resourceId));
+      assert.equal((await read(course,name)).chapters.find(item=>item.id===chapter.id).body,bodySentinel);
+      assert.equal((await get(problem + '?' + new URLSearchParams(context),name)).versionId,versionId);
+      await markRead(200);
+      await submit('samples',404,{chapterId:randomUUID()});
+      assert.equal((await submit('submit',400,{language:'cpp'})).error.code,'COURSE_LANGUAGE_REQUIRED');
+      const job = await submit('samples',202);
+      const stored = (await owner.query(`SELECT j.account_id,j.access_context,s.school_id FROM school_judge_jobs j
+        JOIN practice_storage_scopes s ON s.id=j.school_id WHERE j.id=$1`,[job.id])).rows;
+      assert.deepEqual(stored,[{account_id:actors[name].id,access_context:'public',school_id:null}]);
       const existingProgress = await f.snapshot();
-      application = (await admissions(course)).items[0]; await decision(course, application, 'revoke');
-      await blocked(); assert.deepEqual(await f.snapshot(), existingProgress, 'revoking access preserves existing reading and grades');
+      await decision(course,(await admissions(course)).items[0],'revoke');
+      await blocked(); assert.deepEqual(await f.snapshot(),existingProgress);
+      await apply(course,r,'legacy-teacher');
+      const teacherApplication = (await admissions(course)).items.find(item=>item.accountId===actors['legacy-teacher'].id);
+      await decision(course,teacherApplication,'approve');
+      const editable = await get(resource,'legacy-teacher');
+      assert.equal(editable.revision,1); assert.equal(editable.content,bodySentinel);
+      const edited = await patch(resource,{expectedRevision:editable.revision,title:editable.title,scope:editable.scope,
+        content:'Revised teaching reference',courseId:course.id,chapterId:chapter.id},'legacy-teacher');
+      assert.equal(edited.revision,2); assert.equal(edited.content,'Revised teaching reference');
+      await get(resource,name,404);
     });
 
     await run('rule removal and restoration invalidate old grants while unrelated edits preserve matching generations', async () => {
@@ -613,27 +685,19 @@ test('platform course admission combines audience, requirements and grants acros
     });
 
     await run('ordinary prerequisite progress accepts existing school and public formal AC with language cutoffs intact', async () => {
-      let prerequisite = await create(policy({ all: rule() }), 'Ordinary formal prerequisite');
-      prerequisite = await change(prerequisite, { requiredLanguage: 'python' });
+      let prerequisite = await get(`/platform/courses/${f.oldCourses[1].path.id}`);
+      prerequisite = await change(prerequisite,{audiencePolicy:policy({all:rule()}),requiredLanguage:'python'});
       const chapter = prerequisite.chapters[0];
-      const problemId = (await owner.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id', [actors['legacy-admin'].id])).rows[0].id;
-      const versionId = (await owner.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,reference_code,samples,time_limit_ms,memory_limit_mb,validation_status)
-        VALUES($1,'Prerequisite public fixture','stdio','Print the input.','print(input())','[{"input":"2","expected":"2","enabled":true}]',1000,128,'AC') RETURNING id`, [problemId])).rows[0].id;
-      await owner.query("INSERT INTO test_cases(version_id,position,input,expected,weight) VALUES($1,1,'3','3',100)", [versionId]);
-      await owner.query("UPDATE problem_versions SET published_at=now(),rank_review_status='approved',school_visible_at=now(),rank_approved_at=now() WHERE id=$1", [versionId]);
-      await owner.query('UPDATE problems SET current_version_id=$1 WHERE id=$2', [versionId, problemId]);
-      await owner.query('INSERT INTO chapter_problems(chapter_id,problem_id,version_id,position) VALUES($1,$2,$3,0)', [chapter.id, problemId, versionId]);
-      await post('/platform/problem-publications', { schoolId: LEGACY_SCHOOL_ID, problemId, versionId });
+      const publicRef = {schoolId:LEGACY_SCHOOL_ID,...f.schoolProblem};
+      await post('/platform/problem-publications', publicRef);
       const course = await create(policy({ all: rule('direct', { prerequisiteCourseIds: [prerequisite.id] }) }));
       for (const name of ['legacy-peer', 'free-peer', 'free-third']) await post(`/practice/courses/${prerequisite.id}/chapters/${chapter.id}/read`, { read: true, expectedRevision: prerequisite.revision }, name);
-      const legacyResult = async (kind, language) => owner.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,language,code,idempotency_key,request_hash,status,score,passed,total)
-        VALUES($1,$2,$3,$4,$5,$6,'fixture',$7,'fixture','AC',100,1,1)`, [actors['legacy-peer'].id, actors['legacy-peer'].identityId, problemId, versionId, kind, language, randomUUID()]);
-      await legacyResult('samples', 'python'); await legacyResult('submit', 'cpp');
-      assert.equal((await entry(course, 'legacy-peer')).admissionRules[0].prerequisites[0].completed, false);
-      await legacyResult('submit', 'python');
-      assert.equal((await get(`/learning-paths/${prerequisite.id}`, 'legacy-peer')).completedTasks, 1);
-      assert.equal((await entry(course, 'legacy-peer')).admissionRules[0].prerequisites[0].completed, true); await read(course, 'legacy-peer');
-      const publicRef = { schoolId: LEGACY_SCHOOL_ID, problemId, versionId };
+      const schoolResult = (kind,language) => seedJob(publicRef,'legacy-peer',{context:'school',kind,language});
+      await schoolResult('samples','python'); await schoolResult('submit','cpp');
+      assert.equal((await entry(course,'legacy-peer')).admissionRules[0].prerequisites[0].completed,false);
+      await schoolResult('submit','python');
+      assert.equal((await entry(course,'legacy-peer')).admissionRules[0].prerequisites[0].completed,true);
+      await read(course,'legacy-peer');
       await seedJob(publicRef, 'free-peer');
       assert.equal((await read(prerequisite, 'free-peer')).completedExercises, 1);
       assert.equal((await entry(course, 'free-peer')).admissionRules[0].prerequisites[0].completed, true); await read(course, 'free-peer');
@@ -664,17 +728,11 @@ test('platform course admission combines audience, requirements and grants acros
       await read(course, 'alpha-peer');
     });
 
-    await run('earned legacy points follow the same login through a real school exit', async () => {
+    await run('earned school practice points follow the same platform login through a real school exit', async () => {
       const name = 'legacy-peer';
-      const problem = (await owner.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id', [actors['legacy-admin'].id])).rows[0];
-      const version = (await owner.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,reference_code,time_limit_ms,memory_limit_mb,validation_status,
-        published_at,school_visible_at,rank_review_status,rank_approved_at)
-        VALUES($1,'Legacy earned points','stdio','Print the input.','print(input())',1000,128,'AC',now(),now(),'approved',now()) RETURNING id`, [problem.id])).rows[0];
-      const bank = (await owner.query("INSERT INTO problem_banks(owner_account_id,name,visibility) VALUES($1,'Legacy points bank','school') RETURNING id", [actors['legacy-admin'].id])).rows[0];
-      await owner.query('UPDATE problems SET bank_id=$2,current_version_id=$3 WHERE id=$1', [problem.id, bank.id, version.id]);
+      const problem = await publicProblem({schoolId:LEGACY_SCHOOL_ID,admin:'legacy-admin'});
       const pointsBefore = (await get('/points/me', name)).points;
-      await owner.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,language,code,idempotency_key,request_hash,status,score,passed,total)
-        VALUES($1,$2,$3,$4,'submit','python','fixture',$5,'fixture','AC',100,1,1)`, [actors[name].id, actors[name].identityId, problem.id, version.id, randomUUID()]);
+      await seedJob(problem,name,{context:'school'});
       const earned = (await get('/points/me', name)).points;
       assert.equal(earned, pointsBefore + 10);
       const exit = await post(`/schools/${LEGACY_SCHOOL_ID}/exit-request`, {}, name, 201);
@@ -696,7 +754,7 @@ test('platform course admission combines audience, requirements and grants acros
       assert.equal(paths.filter(course => course.audiencePolicy.allRule.prerequisiteCourseIds.length === 1).length, 1);
     });
 
-    if (process.env.TEST_KEEP_PLATFORM_ADMISSION_FIXTURE && passedCases === 18) {
+    if (process.env.TEST_KEEP_PLATFORM_ADMISSION_FIXTURE && passedCases === cases) {
       const browserCourse = await create(policy({ independent: rule('application'), schools: [{ schoolId: alpha.id, ...rule() }, { schoolId: beta.id, ...rule('invite') }] }), 'QA platform admission: three routes', [
         { title: 'An original bilingual lesson', content: 'Read the explanation before completing the checkpoint.', objective: 'Understand the admission flow', checkpoint: 'Explain one rule in your own words.', checkpointAnswer: 'Rules combine an audience with requirements and an admission method.', localizations: { en: { title: 'An original bilingual lesson', content: 'Read the explanation before completing the checkpoint.', objective: 'Understand the admission flow', checkpoint: 'Explain one rule in your own words.', checkpointAnswer: 'Rules combine an audience with requirements and an admission method.' }, zh: { title: '原创双语课时', content: '阅读讲解，再完成检查点。', objective: '理解课程准入流程', checkpoint: '用自己的话解释一条规则。', checkpointAnswer: '规则由目标人群、前置条件和准入方式组成。' } } },
       ]);

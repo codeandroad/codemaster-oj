@@ -22,7 +22,7 @@ import { parseFunctionInput, parseJsonValue } from './function-input.mjs';
 import { handleCommunity } from './community.mjs';
 import { handlePlatformGovernance } from './platform-governance.mjs';
 import { requireWorkspaceRoute, schoolBookmark } from './workspace-access.mjs';
-import { handleSchools } from './schools.mjs';
+import { handleSchools, redeemSchoolPasswordReset } from './schools.mjs';
 import { handleSchoolTeaching } from './school-teaching.mjs';
 import { handleSchoolCourses } from './school-courses.mjs';
 import { handleSchoolIdentityImports } from './school-identity-imports.mjs';
@@ -169,7 +169,10 @@ export async function createDomainServices(pool,config) {
     // Reset codes use base64url. Ignore spacing and invisible marks introduced by copying rich text.
     const code=field(body.resetCode,'重置凭据',{max:100}).replace(/[\s\u200b-\u200f\u2060]/gu,'');
     authLimiter.check(`reset:${login}`);const hash=await hashPassword(body.password);
-    await transaction(pool,async db=>{const a=(await db.query('SELECT * FROM accounts WHERE username=$1 AND disabled_at IS NULL AND binding_released_at IS NULL FOR UPDATE',[login])).rows[0];const t=a?(await db.query('SELECT * FROM reset_tokens WHERE account_id=$1 AND consumed_at IS NULL AND expires_at>now() FOR UPDATE',[a.id])).rows[0]:null;if(!a||!t||!safeEqual(tokenHash(code),t.token_hash))fail(400,'RESET_FAILED','重置凭据无效或已过期');await db.query('UPDATE accounts SET password_hash=$1 WHERE id=$2',[hash,a.id]);await db.query('UPDATE reset_tokens SET consumed_at=now() WHERE account_id=$1',[a.id]);await db.query('DELETE FROM sessions WHERE account_id=$1',[a.id]);await audit(db,a.id,'auth.password_reset','account',a.id);});return respond(200,{ok:true},sessionCookie('',{...config,maxAge:0}));
+    await transaction(pool,async db=>{
+     const accountId=await redeemSchoolPasswordReset(db,login,code,hash);
+     await audit(db,accountId,'auth.password_reset','account',accountId);
+    });return respond(200,{ok:true},sessionCookie('',{...config,maxAge:0}));
    }
    if(route==='/auth/logout'&&method==='POST'){await pool.query('DELETE FROM sessions WHERE token_hash=$1',[sess.token_hash]);return respond(200,{ok:true},sessionCookie('',{...config,maxAge:0}));}
    if(route==='/auth/profile'&&method==='PATCH') {

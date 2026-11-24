@@ -1,9 +1,51 @@
 import { transaction } from './db.mjs';
 import { archiveRemovedStudent, handleSchoolExits } from './school-exits.mjs';
-import { protectPlatformAccount } from './platform-account-protection.mjs';
 import { enumValue, fail, field, integer, randomToken, tokenHash, username, uuid } from './security.mjs';
 
 const result = (body, status = 200) => ({ status, body });
+
+const schoolResetEligible = `m.revoked_at IS NULL AND m.role IN ('student','teacher')
+  AND EXISTS (SELECT 1 FROM school_identities si
+    WHERE si.school_id=m.school_id AND si.account_id=a.id AND si.kind=m.role AND si.archived_at IS NULL
+      AND (si.id=a.identity_id OR (m.joined_at=a.created_at AND EXISTS (
+        SELECT 1 FROM school_activation_tokens activation
+        WHERE activation.school_id=si.school_id AND activation.identity_id=si.id AND activation.consumed_at IS NOT NULL))))
+  AND NOT EXISTS (SELECT 1 FROM school_workspace_roles other
+    WHERE other.account_id=a.id AND (other.school_id<>m.school_id OR other.role='school_admin'))
+  AND NOT EXISTS (SELECT 1 FROM platform_admins p WHERE p.account_id=a.id AND p.revoked_at IS NULL)`;
+
+export async function redeemSchoolPasswordReset(db, login, code, passwordHash) {
+  const digest = tokenHash(code);
+  const invalid = () => fail(400, 'RESET_FAILED', '重置凭据无效或已过期');
+  const { rows: [scope] } = await db.query(`
+    SELECT a.id, issue.actor_account_id AS issuer, issue.metadata->>'schoolId' AS school
+    FROM accounts a JOIN reset_tokens t ON t.account_id=a.id
+    JOIN LATERAL (SELECT actor_account_id,metadata FROM audit_events
+      WHERE action='account.reset_issue' AND resource_type='account' AND resource_id=a.id::text
+      ORDER BY id DESC LIMIT 1) issue ON true
+    WHERE a.username=$1 AND t.token_hash=$2 AND t.consumed_at IS NULL AND t.expires_at>clock_timestamp()`, [login, digest]);
+  if (!scope?.school) invalid();
+  await lockSchoolTeaching(db, scope.school);
+  try {
+    await requireSchoolAdmin(db, scope.school, scope.issuer);
+  } catch (error) {
+    if ([401,403,404].includes(error.status)) invalid();
+    throw error;
+  }
+  const target = await db.query(`SELECT a.id FROM accounts a JOIN identities i ON i.id=a.identity_id
+    WHERE a.id=$1 AND a.disabled_at IS NULL AND a.binding_released_at IS NULL AND i.archived_at IS NULL
+    FOR UPDATE OF a`, [scope.id]);
+  if (!target.rowCount) invalid();
+  const consumed = await db.query(`UPDATE reset_tokens SET consumed_at=clock_timestamp()
+    FROM accounts a JOIN school_memberships m ON m.account_id=a.id
+    WHERE reset_tokens.account_id=a.id AND a.id=$1 AND m.school_id=$2 AND ${schoolResetEligible}
+      AND reset_tokens.token_hash=$3 AND reset_tokens.consumed_at IS NULL AND reset_tokens.expires_at>clock_timestamp()
+    RETURNING a.id`, [scope.id, scope.school, digest]);
+  if (!consumed.rowCount) invalid();
+  await db.query('UPDATE accounts SET password_hash=$2 WHERE id=$1', [scope.id, passwordHash]);
+  await db.query('DELETE FROM sessions WHERE account_id=$1', [scope.id]);
+  return scope.id;
+}
 
 export async function activeAccount(db, accountId) {
   const { rowCount } = await db.query(`
@@ -165,7 +207,7 @@ export async function handleSchools({ pool, user, route, method, body, url }) {
       await requireSchoolAdmin(db, schoolId, user.id);
       const { rows } = await db.query(`
         SELECT m.account_id AS "accountId", i.name, m.role, m.joined_at AS "joinedAt",
-          g.account_id IS NOT NULL AS has_admin_grant
+          g.account_id IS NOT NULL AS has_admin_grant, (${schoolResetEligible}) AS "canResetPassword"
           ${unlinked ? ', a.username' : ''}
         FROM school_memberships m JOIN accounts a ON a.id = m.account_id
         JOIN identities i ON i.id = a.identity_id
@@ -196,7 +238,7 @@ export async function handleSchools({ pool, user, route, method, body, url }) {
       return result(await issueInvitation(db, schoolId, user.id, role), 201);
     });
   }
-  if (resource === 'members' && memberId && method === 'DELETE') {
+  if (resource === 'members' && memberId && !action && method === 'DELETE') {
     const target = uuid(memberId, '账号 ID');
     return transaction(pool, async db => {
       await lockSchoolTeaching(db, schoolId);
@@ -233,14 +275,16 @@ export async function handleSchools({ pool, user, route, method, body, url }) {
           AND i.archived_at IS NULL
         FOR UPDATE OF a`, [schoolId, target]);
       if (!member) fail(404, 'NOT_FOUND', '本校成员不存在或账号不可用');
-      await protectPlatformAccount(db, user, { accountId: target });
+      const eligible = await db.query(`SELECT 1 FROM school_memberships m JOIN accounts a ON a.id=m.account_id
+        WHERE m.school_id=$1 AND m.account_id=$2 AND ${schoolResetEligible}`, [schoolId, target]);
+      if (!eligible.rowCount) fail(403, 'FORBIDDEN', '只能重置本校独立管理的普通成员账号');
       const resetCode = randomToken();
       await db.query(
         "INSERT INTO reset_tokens(account_id,token_hash,expires_at) VALUES($1,$2,now()+interval '30 minutes') ON CONFLICT(account_id) DO UPDATE SET token_hash=EXCLUDED.token_hash,expires_at=EXCLUDED.expires_at,consumed_at=NULL",
         [target, tokenHash(resetCode)]);
       await db.query(
-        'INSERT INTO audit_events(actor_account_id,action,resource_type,resource_id) VALUES($1,$2,$3,$4)',
-        [user.id, 'account.reset_issue', 'account', target]);
+        'INSERT INTO audit_events(actor_account_id,action,resource_type,resource_id,metadata) VALUES($1,$2,$3,$4,$5)',
+        [user.id, 'account.reset_issue', 'account', target, {schoolId}]);
       await auditSchool(db, schoolId, user.id, 'school.account_reset', target);
       return result({ username: member.username, resetCode });
     });

@@ -68,6 +68,7 @@ import {
 } from "./school-selection";
 
 type Member = {
+  canResetPassword: boolean;
   accountId: string;
   name: string;
   role: SchoolRole;
@@ -502,7 +503,7 @@ function MemberList({
                   </td>
                   <td className="py-2 text-right">
                     <div className="flex flex-wrap justify-end gap-1">
-                      {member.role !== "school_admin" && !member.administrator && (
+                      {member.canResetPassword && (
                         <Button
                           variant="ghost"
                           size="sm"

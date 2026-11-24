@@ -48,16 +48,28 @@ test('school administrators issue one-time password reset credentials for member
       const members = `/schools/${schoolId}/members`;
       const reset = (accountId, auth) => request(`${members}/${accountId}/reset`, { method: 'POST', auth });
 
-      const student = await request('/auth/register-personal', {
-        method: 'POST', body: { username: 'reset-member', displayName: 'Reset member', password },
+      const personal = await request('/auth/register-personal', {
+        method: 'POST', body: { username: 'personal-member', displayName: 'Personal member', password },
       });
-      assert.equal(student.status, 201);
-      const memberId = student.data.user.id;
-      assert.equal((await reset(memberId, admin)).status, 404, 'non-members cannot be reset');
+      assert.equal(personal.status, 201);
+      assert.equal((await reset(personal.data.user.id, admin)).status, 404);
 
       const invite = await request(`/schools/${schoolId}/invitations`, { method: 'POST', auth: admin, body: { role: 'student' } });
       assert.equal(invite.status, 201);
-      assert.equal((await request('/school-invitations/accept', { method: 'POST', auth: student, body: { token: invite.data.token } })).status, 200);
+      assert.equal((await request('/school-invitations/accept', { method: 'POST', auth: personal, body: { token: invite.data.token } })).status, 200);
+      assert.equal((await reset(personal.data.user.id, admin)).status, 403);
+      assert.equal((await reset(admin.data.user.id, admin)).status, 403);
+      const identity = { kind: 'student', name: 'Reset member', number: 'S01' };
+      const created = await request(`/schools/${schoolId}/identities`, { method: 'POST', auth: admin, body: identity });
+      assert.equal(created.status, 201);
+      const activation = await request(`/schools/${schoolId}/identities/${created.data.id}/activation-code`, { method: 'POST', auth: admin });
+      const student = await request('/auth/register', { method: 'POST', body: {
+        ...identity, schoolSlug: 'tianxing-chuangshiji', activationCode: activation.data.activationCode, username: 'reset-member', password,
+      } });
+      assert.equal(student.status, 201);
+      const memberId = student.data.user.id;
+      const list = (await request(members, { auth: admin })).data.items;
+      assert.deepEqual(list.filter(member => member.canResetPassword).map(member => member.accountId), [memberId]);
 
       assert.equal((await reset(memberId, student)).status, 403, 'members cannot issue reset credentials');
       const issued = await reset(memberId, admin);
@@ -68,14 +80,23 @@ test('school administrators issue one-time password reset credentials for member
       const tokenRow = (await pool.query('SELECT token_hash, consumed_at FROM reset_tokens WHERE account_id=$1', [memberId])).rows[0];
       assert.ok(tokenRow && /^[0-9a-f]{64}$/.test(tokenRow.token_hash) && !tokenRow.consumed_at, 'stores only the code hash');
 
-      const newPassword = 'ResetMember-8f6b7c2d1e!';
-      const settled = await request('/auth/reset', { method: 'POST', body: { username: 'reset-member', resetCode: issued.data.resetCode, password: newPassword } });
-      assert.equal(settled.status, 200);
-      assert.equal((await request('/auth/login', { method: 'POST', body: { username: 'reset-member', password: newPassword } })).status, 200);
-
+      const newPassword = randomBytes(24).toString('base64url');
+      const redeem = resetCode => request('/auth/reset', {method:'POST', body:{username:'reset-member',resetCode,password:newPassword}});
       const reissued = await reset(memberId, admin);
       assert.equal(reissued.status, 200);
-      assert.equal((await request('/auth/reset', { method: 'POST', body: { username: 'reset-member', resetCode: issued.data.resetCode, password: 'StaleCode-9z8y7x6w5v!' } })).status, 400, 'reissuing invalidates the previous code');
+      assert.equal((await redeem(issued.data.resetCode)).status, 400);
+      assert.equal((await redeem(reissued.data.resetCode)).status, 200);
+      assert.equal((await request('/auth/me', {auth:student})).status, 401);
+      assert.equal((await redeem(reissued.data.resetCode)).status, 400);
+      assert.equal((await request('/auth/login', { method:'POST', body:{username:'reset-member',password:newPassword} })).status, 200);
+      const prior = await reset(memberId, admin);
+      await pool.query('INSERT INTO school_administrators(school_id,account_id,granted_by) VALUES($1,$2,$3)', [schoolId,memberId,admin.data.user.id]);
+      assert.equal((await redeem(prior.data.resetCode)).status, 400);
+      assert.equal((await reset(memberId, admin)).status, 403);
+      await pool.query('DELETE FROM school_administrators WHERE school_id=$1 AND account_id=$2', [schoolId,memberId]);
+      await provisionSchool(pool, {slug:'second-school',name:'Second School',adminUsername:'reset-member'});
+      assert.equal((await redeem(prior.data.resetCode)).status, 400);
+      assert.equal((await reset(memberId, admin)).status, 403);
     } finally {
       await app?.close();
       await pool.end();

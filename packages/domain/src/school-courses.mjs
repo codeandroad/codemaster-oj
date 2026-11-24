@@ -5,7 +5,7 @@ import { chapterProblemVersions, problemCatalogCourseOption } from './problem-ca
 import { courseSections, chapterSectionKey } from './course-sections.mjs';
 import { courseLocalizations, localizedFields } from './course-localizations.mjs';
 import { normalizeCourseAcslLinks, resolveCourseAcslLinks, projectCourseAcslLinks, acslLinkCounts } from './course-acsl.mjs';
-import { problemSolvedSql } from './problem-progress.mjs';
+import { problemProgressRowsSql } from './problem-progress.mjs';
 import { validateCoverImage } from './course-access.mjs';
 import { normalizeRequiredLanguage } from './course-language-policy.mjs';
 import { handleSchoolLearningResources } from './school-learning-resources.mjs';
@@ -107,13 +107,19 @@ async function chapterPractice(db,schoolId,view,user){
  const {chapters,required_language,language_credit_cutoffs}=view;
  const links=chapters.flatMap(ch=>ch.problems??[]);const indexed=new Map();
  if(links.length){
-  const rows=(await db.query(`WITH links AS (SELECT DISTINCT "problemId","versionId" FROM jsonb_to_recordset($2::jsonb) AS l("problemId" uuid,"versionId" uuid))
+  const rows=(await db.query(`WITH links AS (SELECT DISTINCT "problemId","versionId" FROM jsonb_to_recordset($2::jsonb) AS l("problemId" uuid,"versionId" uuid)),
+   solved AS MATERIALIZED (
+    SELECT DISTINCT progress.problem_id FROM (
+     ${problemProgressRowsSql({problemIds:'ARRAY(SELECT "problemId" FROM links)',accountId:'$3'})}
+    ) progress WHERE progress.status='AC' AND course_language_allows_credit($4,$5,progress.language,progress.created_at)
+   )
    SELECT l."problemId",l."versionId",v.definition->>'title' AS title,
     p.published AND NOT b.archived AND p.published_version_id=l."versionId" AS available,
-    ${problemSolvedSql({problemId:'p.id',accountId:'$3',requiredLanguage:'$4',languageCreditCutoffs:'$5'})} AS solved
+    solved.problem_id IS NOT NULL AS solved
    FROM links l JOIN school_problems p ON p.school_id=$1 AND p.id=l."problemId"
    JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id
-   JOIN school_problem_versions v ON b.resource_kind='ordinary' AND v.school_id=p.school_id AND v.problem_id=p.id AND v.id=l."versionId"`,[schoolId,JSON.stringify(links),user.id,required_language,language_credit_cutoffs??{}])).rows;
+   JOIN school_problem_versions v ON b.resource_kind='ordinary' AND v.school_id=p.school_id AND v.problem_id=p.id AND v.id=l."versionId"
+   LEFT JOIN solved ON solved.problem_id=p.id`,[schoolId,JSON.stringify(links),user.id,required_language,language_credit_cutoffs??{}])).rows;
   for(const row of rows)indexed.set(row.problemId+':'+row.versionId,row);
  }
  let completed=0,total=0;

@@ -1,13 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { applicationDatabaseUrl, registerPersonal } from './support/workspace-accounts.mjs';
 import { createApiApplication } from '../dist/application.js';
 import { createPool } from '../../../packages/domain/src/db.mjs';
 import { migrate } from '../../../packages/domain/src/migrate.mjs';
 import { bootstrap } from '../../../packages/domain/src/bootstrap.mjs';
 import { loadConfig } from '../../../packages/domain/src/application.mjs';
-import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 import { provisionPlatformAdministrator } from '../../../packages/domain/src/platform-governance.mjs';
 
 test('explicit platform governance preserves teaching roles and enforces authorization on the real Nest API',
@@ -23,13 +22,8 @@ test('explicit platform governance preserves teaching roles and enforces authori
     try {
       await migrate(pool);
       await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji', name: 'Legacy operator', number: 'ADM', username: 'legacy-operator', password });
-      const grantScript = await readFile(new URL('../../../packages/domain/grants.mjs', import.meta.url), 'utf8');
-      const grantSql = grantScript.match(/await pool\.query\(`([\s\S]*?)`\);/)[1];
-      await pool.query(grantSql.replaceAll('SCHEMA public', `SCHEMA ${schema}`));
-      const appUrl = new URL(url);
-      appUrl.searchParams.set('options', `-crole=campus_app -csearch_path=${schema}`);
       app = await createApiApplication({
-        databaseUrl: appUrl.href, logger: false,
+        databaseUrl: await applicationDatabaseUrl(pool,url,schema), logger: false,
         config: loadConfig({ SESSION_SECRET: randomBytes(32).toString('base64url'), APP_ORIGIN: 'http://platform.test', COOKIE_SECURE: 'false' }),
       });
       await app.listen(0, '127.0.0.1');
@@ -48,21 +42,19 @@ test('explicit platform governance preserves teaching roles and enforces authori
       }
       const legacy = await request('/auth/login', { method: 'POST', body: { username: 'legacy-operator', password } });
       assert.equal(legacy.status, 200);
-      async function register(login, number) {
-        const name = 'QA ' + login;
-        const issue = await request('/people', { method: 'POST', auth: legacy, body: { kind: 'student', number, name } });
-        assert.equal(issue.status, 201);
-        const registered = await request('/auth/register', {
-          method: 'POST', body: { kind: 'student', number, name, username: login, password, activationCode: issue.data.activationCode },
-        });
-        assert.equal(registered.status, 201);
-        return registered;
-      }
-      const platform = await register('platform-operator', 'PLAT');
-      const firstAdmin = await register('school-founder', 'FOUND');
-      const teacher = await register('school-teacher', 'TEACH');
-      const learner = await register('school-learner', 'LEARN');
-      const disabled = await register('disabled-target', 'DISABLE');
+      const originalSchool = (await request('/schools',{auth:legacy})).data.items.find(s=>s.slug==='tianxing-chuangshiji');
+      const platform = await registerPersonal(request,'platform-operator',password);
+      const firstAdmin = await registerPersonal(request,'school-founder',password);
+      const teacher = await registerPersonal(request,'school-teacher',password);
+      const learner = await registerPersonal(request,'school-learner',password);
+      const disabled = await registerPersonal(request,'disabled-target',password);
+      const studentInvite = await request(`/schools/${originalSchool.id}/invitations`, {
+        method:'POST',auth:legacy,body:{role:'student'},
+      });
+      assert.equal(studentInvite.status,201);
+      assert.equal((await request('/school-invitations/accept',{
+        method:'POST',auth:platform,body:{token:studentInvite.data.token},
+      })).status,200);
 
       assert.equal((await request('/platform/schools')).status, 401);
       assert.equal((await request('/platform/schools', { auth: legacy })).status, 403, 'legacy admin is not a platform admin');
@@ -73,20 +65,18 @@ test('explicit platform governance preserves teaching roles and enforces authori
       ]);
       assert.deepEqual(grants.map(g => g.created).sort(), [false,true]);
       assert.equal((await pool.query("SELECT count(*)::int n FROM platform_audit_events WHERE action='platform.administrator.provision'")).rows[0].n, 1);
-      assert.deepEqual((await request('/auth/me', { auth: platform })).data.user.roles, ['student']);
+      assert.deepEqual((await request('/auth/me', { auth: platform })).data.user.roles, []);
       assert.equal((await request('/auth/me', { auth: platform })).data.user.platformAdmin, true);
-      assert.equal((await request('/accounts', { auth: platform })).status, 403, 'platform capability does not grant legacy account access');
-      const protectedMutations = [
-        [`/accounts/${platform.data.user.id}`, 'PATCH', { disabled: true }],
-        [`/accounts/${platform.data.user.id}`, 'PATCH', { roles: ['admin'] }],
-        [`/people/${platform.data.user.identityId}`, 'PATCH', { name: 'Changed by school admin' }],
-        [`/people/${platform.data.user.identityId}/reset`, 'POST', {}],
-        [`/people/${platform.data.user.identityId}/unbind`, 'POST', {}],
-      ];
-      for (const [path,method,body] of protectedMutations) {
-        const denied = await request(path, { method,body,auth:legacy });
-        assert.equal(denied.status, 403, path);
-        assert.equal(denied.data.error?.code ?? denied.data.code, 'PLATFORM_ACCOUNT_PROTECTED', path);
+      assert.deepEqual((await request('/schools',{auth:platform})).data.items[0].roles,['student']);
+      assert.equal((await request('/platform/accounts', { auth: platform })).status, 200);
+      const protectedId=platform.data.user.id, prefix=`/schools/${originalSchool.id}`;
+      for (const [path,method,body] of [
+        [`/platform/accounts/${protectedId}/login`, 'PATCH', {disabled:true}],
+        [`${prefix}/accounts/${protectedId}/roles`, 'PATCH', {role:'teacher',expectedRole:'student',administrator:false,expectedAdministrator:false}],
+        [`${prefix}/accounts/${protectedId}/access`, 'PATCH', {suspended:true}],
+        [`${prefix}/members/${protectedId}/reset`, 'POST', {}],
+      ]) {
+        assert.equal((await request(path,{method,body,auth:legacy})).status,403,path);
       }
 
       const createBody = { slug: 'platform-school', name: 'Platform School', adminUsername: 'school-founder' };
@@ -96,11 +86,11 @@ test('explicit platform governance preserves teaching roles and enforces authori
       assert.deepEqual(created.map(r => r.status).sort(), [200,201]);
       assert.equal(created[0].data.id, created[1].data.id);
       const school = created[0].data;
-      assert.equal(school.legacy, false);
+      assert.equal(school.slug, createBody.slug);
       assert.equal((await request('/platform/schools', { auth: firstAdmin })).status, 403, 'school admin cannot manage the platform');
       assert.equal((await request('/platform/schools', { method: 'POST', auth: platform, body: { ...createBody, adminUsername: 'school-teacher' } })).status, 409);
       assert.equal((await request('/platform/schools', { method: 'POST', auth: platform, body: { ...createBody, slug: 'missing-admin', adminUsername: 'missing-person' } })).status, 404);
-      assert.equal((await request('/platform/schools', { method: 'POST', auth: platform, body: { ...createBody, slug: 'legacy-school' } })).status, 400);
+      assert.equal((await request('/platform/schools', { method: 'POST', auth: platform, body: { ...createBody, slug: 'invalid slug' } })).status, 400);
       const memberPath = `/schools/${school.id}/members`;
       assert.equal((await request(memberPath, { auth: platform })).status, 404, 'governance does not grant a school directory');
       assert.equal((await request(memberPath, { auth: firstAdmin })).status, 200);
@@ -111,17 +101,14 @@ test('explicit platform governance preserves teaching roles and enforces authori
       assert.equal((await request(`/platform/schools/${school.id}`, { method: 'PATCH', auth: platform, body: { name: 'Conflicting name', expectedName: school.name } })).status, 409);
       assert.equal((await request(`/platform/schools/${school.id}`, { method: 'PATCH', auth: platform, body: { name: 'Renamed School', expectedName: school.name } })).status, 200, 'exact rename retry is harmless');
 
-      const originalSettings = (await pool.query('SELECT settings FROM site_settings WHERE id=true')).rows[0].settings;
-      assert.equal((await request(`/platform/schools/${LEGACY_SCHOOL_ID}`, {
-        method:'PATCH', auth:platform, body:{ name:'Legacy school renamed in QA',expectedName:'天行创世纪学校' },
-      })).status, 200);
-      assert.deepEqual((await pool.query('SELECT settings FROM site_settings WHERE id=true')).rows[0].settings,
-        { ...originalSettings,schoolName:'Legacy school renamed in QA' }, 'legacy rename only updates the old school name in site settings');
-      assert.equal((await request('/site-info')).data.schoolName, 'Legacy school renamed in QA');
-      assert.equal((await request('/system-settings', {
-        method:'PATCH', auth:legacy, body:{ schoolName:'天行创世纪学校' },
-      })).status, 200);
-      assert.equal((await pool.query('SELECT name FROM schools WHERE id=$1', [LEGACY_SCHOOL_ID])).rows[0].name, '天行创世纪学校');
+      const site = (await request('/site-info')).data;
+      const renameOriginal = name => request(`/platform/schools/${originalSchool.id}`, {
+        method:'PATCH',auth:platform,body:{name,expectedName:originalSchool.name},
+      });
+      const renamed = await renameOriginal('Original school renamed in QA');
+      assert.equal(renamed.status,200);
+      assert.equal((await request(`/schools/${originalSchool.id}/settings`,{auth:legacy})).data.name,renamed.data.name);
+      assert.deepEqual((await request('/site-info')).data,site,'renaming one school keeps platform branding independent');
 
       const invitation = await request(`/schools/${school.id}/invitations`, { method: 'POST', auth: firstAdmin, body: { role: 'teacher' } });
       assert.equal(invitation.status, 201);
@@ -151,7 +138,7 @@ test('explicit platform governance preserves teaching roles and enforces authori
       assert.equal(appointedMember.administrator, true);
       assert.ok((await request(memberPath+'?role=school_admin', { auth:firstAdmin })).data.items.some(m => m.accountId === teacher.data.user.id));
       assert.equal((await request(`${memberPath}/${teacher.data.user.id}`, { method: 'DELETE', auth: firstAdmin })).status, 404, 'school member removal cannot revoke a platform-appointed administrator');
-      assert.equal((await request(`/platform/schools/${LEGACY_SCHOOL_ID}/administrators`, { method: 'POST', auth: platform, body: { username: 'school-teacher' } })).status, 409);
+      assert.equal((await request(`/schools/${originalSchool.id}/members`, {auth:teacher})).status,404,'appointment applies only to the selected school');
 
       // Additional administrator capabilities authorize invitations, and their
       // revocation invalidates outstanding invitations without touching teaching.
@@ -164,7 +151,7 @@ test('explicit platform governance preserves teaching roles and enforces authori
       assert.equal((await request(memberPath, { auth: teacher })).status, 403);
       assert.deepEqual((await request('/schools', { auth: teacher })).data.items.find(s => s.id === school.id).roles, ['teacher']);
 
-      await pool.query('UPDATE accounts SET disabled_at=clock_timestamp() WHERE id=$1', [disabled.data.user.id]);
+      assert.equal((await request(`/platform/accounts/${disabled.data.user.id}/login`, {auth:platform,method:'PATCH',body:{disabled:true}})).status,200);
       assert.equal((await request(appointPath, { method: 'POST', auth: platform, body: { username: 'disabled-target' } })).status, 404);
       const list = await request('/platform/schools', { auth: platform });
       assert.equal(list.status, 200);
@@ -172,7 +159,7 @@ test('explicit platform governance preserves teaching roles and enforces authori
       assert.deepEqual(listed.counts, { members:3,identities:1,classes:1,banks:0,courses:0,assignments:0,papers:0 });
       assert.equal(listed.administrators.length, 1);
       assert.equal(listed.administrators[0].accountId, firstAdmin.data.user.id);
-      assert.equal(list.data.items.find(s => s.legacy).name, '天行创世纪学校');
+      assert.equal(list.data.items.find(s => s.id===originalSchool.id).name, renamed.data.name);
       assert.equal((await pool.query("SELECT count(*)::int n FROM platform_audit_events WHERE action='platform.school.create'")).rows[0].n, 1);
       assert.equal((await pool.query("SELECT count(*)::int n FROM platform_audit_events WHERE action='platform.school.administrator.grant'")).rows[0].n, 1);
       assert.equal((await pool.query("SELECT count(*)::int n FROM audit_events WHERE action LIKE 'platform.%'")).rows[0].n, 0);
@@ -216,8 +203,8 @@ test('explicit platform governance preserves teaching roles and enforces authori
         const prefix = `/schools/${fresh.data.id}`;
         const memberships = await request('/schools', { auth: founder });
         assert.equal(memberships.status, 200);
-        assert.deepEqual(memberships.data.items.map(({ id, roles, legacy }) => ({ id, roles, legacy })), [
-          { id: fresh.data.id, roles: ['school_admin'], legacy: false },
+        assert.deepEqual(memberships.data.items.map(({ id, roles }) => ({ id, roles })), [
+          { id: fresh.data.id, roles: ['school_admin'] },
         ]);
 
         const commonLists = ['classes', 'courses', 'problems', 'activities?kind=assignment', 'activities?kind=timed', 'paper4/papers', 'paper4/activities', 'leaderboard'];
@@ -235,7 +222,7 @@ test('explicit platform governance preserves teaching roles and enforces authori
         assert.equal((await request(`${prefix}/judge-status`, { auth: founder })).status, 200);
         assert.equal((await request(`${prefix}/settings`, { auth: founder })).data.id, fresh.data.id);
         assert.equal((await request(`${prefix}/settings`, { auth: platform })).status, 404);
-        assert.equal((await request('/accounts', { auth: founder })).status, 403);
+        assert.equal((await request('/platform/accounts', { auth: founder })).status, 403);
 
         for (const [role, auth] of [['teacher', teacher], ['student', learner]]) {
           const invite = await request(`${prefix}/invitations`, { method: 'POST', auth: founder, body: { role } });

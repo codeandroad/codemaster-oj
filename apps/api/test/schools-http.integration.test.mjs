@@ -7,7 +7,8 @@ import { migrate } from '../../../packages/domain/src/migrate.mjs';
 import { bootstrap } from '../../../packages/domain/src/bootstrap.mjs';
 import { loadConfig } from '../../../packages/domain/src/application.mjs';
 import { provisionSchool } from '../../../packages/domain/src/schools.mjs';
-import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
+import { applicationDatabaseUrl, registerPersonal } from './support/workspace-accounts.mjs';
+import { provisionPlatformAdministrator } from '../../../packages/domain/src/platform-governance.mjs';
 
 test('school invitations and management stay within each school on the real Nest API',
   { skip: !process.env.TEST_DATABASE_URL, timeout: 60000 }, async () => {
@@ -23,7 +24,7 @@ test('school invitations and management stay within each school on the real Nest
       await migrate(pool);
       await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji', name: 'Legacy admin', number: 'ADM', username: 'legacy-admin', password });
       app = await createApiApplication({
-        databaseUrl: url.href, logger: false,
+        databaseUrl: await applicationDatabaseUrl(pool,url,schema), logger: false,
         config: loadConfig({ SESSION_SECRET: randomBytes(32).toString('base64url'), APP_ORIGIN: 'http://schools.test', COOKIE_SECURE: 'false' }),
       });
       await app.listen(0, '127.0.0.1');
@@ -45,26 +46,18 @@ test('school invitations and management stay within each school on the real Nest
       }
       const legacy = await request('/auth/login', { method: 'POST', body: { username: 'legacy-admin', password } });
       assert.equal(legacy.status, 200);
-      async function register(username, number) {
-        const name = 'QA ' + username;
-        const issue = await request('/people', { method: 'POST', auth: legacy, body: { kind: 'student', number, name } });
-        assert.equal(issue.status, 201);
-        const account = await request('/auth/register', {
-          method: 'POST', body: { kind: 'student', number, name, username, password, activationCode: issue.data.activationCode },
-        });
-        assert.equal(account.status, 201);
-        return account;
-      }
-      const alphaAdmin = await register('alpha-admin', 'A');
-      const betaAdmin = await register('beta-admin', 'B');
-      const learner = await register('test-learner', 'C');
-      const another = await register('test-another', 'D');
+      const alphaAdmin = await registerPersonal(request,'alpha-admin',password);
+      const betaAdmin = await registerPersonal(request,'beta-admin',password);
+      const learner = await registerPersonal(request,'test-learner',password);
+      const another = await registerPersonal(request,'test-another',password);
+      const platform = await registerPersonal(request,'platform-admin',password);
+      await provisionPlatformAdministrator(pool,{username:'platform-admin'});
       const alpha = await provisionSchool(pool, { slug: 'school-alpha', name: 'Alpha School', adminUsername: 'alpha-admin' });
       const beta = await provisionSchool(pool, { slug: 'school-beta', name: 'Beta School', adminUsername: 'beta-admin' });
       const retry = await provisionSchool(pool, { slug: 'school-alpha', name: 'Alpha School', adminUsername: 'alpha-admin' });
       assert.equal(retry.id, alpha.id);
       await assert.rejects(provisionSchool(pool, { slug: 'school-alpha', name: 'Alpha School', adminUsername: 'beta-admin' }), { status: 409 });
-      await assert.rejects(provisionSchool(pool, { slug: 'legacy-school', name: 'Legacy', adminUsername: 'alpha-admin' }), { status: 400 });
+      await assert.rejects(provisionSchool(pool, { slug: 'invalid slug', name: 'Invalid', adminUsername: 'alpha-admin' }), { status: 400 });
 
       const members = school => `/schools/${school.id}/members`;
       const issue = (school, auth, role = 'student', csrf = true) => request(`/schools/${school.id}/invitations`, {
@@ -73,8 +66,8 @@ test('school invitations and management stay within each school on the real Nest
       const accept = (auth, token) => request('/school-invitations/accept', { method: 'POST', auth, body: { token } });
       const revoke = (school, account, auth) => request(`${members(school)}/${account.data.user.id}`, { method: 'DELETE', auth });
       assert.equal((await request('/schools')).status, 401);
-      assert.deepEqual((await request('/schools', { auth: alphaAdmin })).data.items.map(s => s.id), [LEGACY_SCHOOL_ID, alpha.id]);
-      assert.equal((await request('/accounts', { auth: alphaAdmin })).status, 403, 'school admin grant cannot elevate legacy privileges');
+      assert.deepEqual((await request('/schools', { auth: alphaAdmin })).data.items.map(s => s.id), [alpha.id]);
+      assert.equal((await request('/platform/accounts', { auth: alphaAdmin })).status, 403, 'school admin grant cannot manage platform accounts');
       assert.equal((await request(members(beta), { auth: alphaAdmin })).status, 404);
       assert.equal((await request(members(alpha), { auth: legacy })).status, 404, 'legacy admin cannot browse a pilot school');
       assert.equal((await issue(beta, alphaAdmin)).status, 404);
@@ -93,9 +86,9 @@ test('school invitations and management stay within each school on the real Nest
       assert.equal((await accept(member, bInvite.data.token)).status, 200);
       const mySchools = (await request('/schools', { auth: member })).data.items;
       assert.deepEqual(mySchools.map(s => [s.id, s.roles]), [
-        [LEGACY_SCHOOL_ID, ['student']], [alpha.id, ['teacher']], [beta.id, ['student']],
+        [alpha.id, ['teacher']], [beta.id, ['student']],
       ]);
-      assert.deepEqual((await request('/auth/me', { auth: member })).data.user.roles, ['student']);
+      assert.deepEqual((await request('/auth/me', { auth: member })).data.user.roles, []);
       assert.equal((await request(members(alpha), { auth: member })).status, 403);
       assert.equal((await issue(alpha, member)).status, 403);
       assert.equal((await issue(alpha,member,'school_admin')).status,403,'teachers cannot grant administrator access');
@@ -103,10 +96,10 @@ test('school invitations and management stay within each school on the real Nest
       const betaList = (await request(members(beta), { auth: betaAdmin })).data.items;
       assert.deepEqual(new Set(alphaList.map(m => m.accountId)), new Set([alphaAdmin.data.user.id, memberId]));
       assert.deepEqual(new Set(betaList.map(m => m.accountId)), new Set([betaAdmin.data.user.id, memberId]));
-      assert.deepEqual(Object.keys(alphaList[0]).sort(), ['accountId', 'joinedAt', 'name', 'role']);
+      assert.deepEqual(Object.keys(alphaList[0]).sort(), ['accountId', 'canResetPassword', 'joinedAt', 'name', 'role']);
       assert.equal((await revoke(beta, member, alphaAdmin)).status, 404);
       assert.equal((await revoke(alpha, member, alphaAdmin)).status, 200);
-      assert.deepEqual((await request('/schools', { auth: member })).data.items.map(s => s.id), [LEGACY_SCHOOL_ID, beta.id]);
+      assert.deepEqual((await request('/schools', { auth: member })).data.items.map(s => s.id), [beta.id]);
       assert.equal((await accept(member, aInvite.data.token)).status, 400);
       const reinvite = await issue(alpha, alphaAdmin);
       assert.equal((await accept(member, reinvite.data.token)).status, 200);
@@ -125,13 +118,12 @@ test('school invitations and management stay within each school on the real Nest
       assert.equal((await issue(alpha,candidate,'teacher')).status,201);
       assert.deepEqual((await request('/auth/me',{auth:candidate})).data.user.roles,[]);
       assert.equal((await request('/platform/schools',{auth:candidate})).status,403);
-      assert.equal((await request('/accounts',{auth:candidate})).status,403);
-      assert.equal((await pool.query('SELECT count(*)::int n FROM account_roles WHERE account_id=$1',[candidate.data.user.id])).rows[0].n,0);
+      assert.equal((await request('/platform/accounts',{auth:candidate})).status,403);
       assert.equal((await pool.query('SELECT count(*)::int n FROM platform_admins WHERE account_id=$1',[candidate.data.user.id])).rows[0].n,0);
       assert.equal((await revoke(alpha,candidate,alphaAdmin)).status,404,'membership removal cannot accidentally remove a school administrator');
 
       const unclaimed = await issue(alpha, alphaAdmin);
-      await pool.query('UPDATE accounts SET disabled_at = clock_timestamp() WHERE id = $1', [alphaAdmin.data.user.id]);
+      assert.equal((await request(`/platform/accounts/${alphaAdmin.data.user.id}/login`, {auth:platform,method:'PATCH',body:{disabled:true}})).status,200);
       assert.equal((await accept(another, unclaimed.data.token)).status, 400, 'disabling issuer invalidates unused invitations');
       assert.equal((await request('/schools', { auth: alphaAdmin })).status, 401);
       const { rows } = await pool.query('SELECT token_hash FROM school_invitations');

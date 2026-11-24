@@ -22,6 +22,7 @@ import { parseFunctionInput, parseJsonValue } from './function-input.mjs';
 import { handleCommunity } from './community.mjs';
 import { handlePlatformGovernance } from './platform-governance.mjs';
 import { requireWorkspaceRoute, schoolBookmark } from './workspace-access.mjs';
+import { handleSchoolAccounts } from './school-accounts.mjs';
 import { handleSchools, redeemSchoolPasswordReset } from './schools.mjs';
 import { handleSchoolTeaching } from './school-teaching.mjs';
 import { handleSchoolCourses } from './school-courses.mjs';
@@ -189,7 +190,7 @@ export async function createDomainServices(pool,config) {
  }
 
  async function schoolsOperation(context) {
-  return await handleWorkspaceCatalog(context) ?? await handleSchoolSettings(context) ?? await handleSchools(context) ?? await handleSchoolActivation(context) ?? await handleSchoolTeaching(context) ?? await handleSchoolIdentityImports(context) ?? await handleSchoolCourses(context);
+  return await handleWorkspaceCatalog(context) ?? await handleSchoolSettings(context) ?? await handleSchoolAccounts(context) ?? await handleSchools(context) ?? await handleSchoolActivation(context) ?? await handleSchoolTeaching(context) ?? await handleSchoolIdentityImports(context) ?? await handleSchoolCourses(context);
  }
 
  const operations={

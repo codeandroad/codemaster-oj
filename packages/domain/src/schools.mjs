@@ -4,7 +4,7 @@ import { enumValue, fail, field, integer, randomToken, tokenHash, username, uuid
 
 const result = (body, status = 200) => ({ status, body });
 
-const schoolResetEligible = `m.revoked_at IS NULL AND m.role IN ('student','teacher')
+export const schoolCredentialCustodySql = `m.revoked_at IS NULL AND m.role IN ('student','teacher')
   AND EXISTS (SELECT 1 FROM school_identities si
     WHERE si.school_id=m.school_id AND si.account_id=a.id AND si.kind=m.role AND si.archived_at IS NULL
       AND (si.id=a.identity_id OR (m.joined_at=a.created_at AND EXISTS (
@@ -38,7 +38,7 @@ export async function redeemSchoolPasswordReset(db, login, code, passwordHash) {
   if (!target.rowCount) invalid();
   const consumed = await db.query(`UPDATE reset_tokens SET consumed_at=clock_timestamp()
     FROM accounts a JOIN school_memberships m ON m.account_id=a.id
-    WHERE reset_tokens.account_id=a.id AND a.id=$1 AND m.school_id=$2 AND ${schoolResetEligible}
+    WHERE reset_tokens.account_id=a.id AND a.id=$1 AND m.school_id=$2 AND ${schoolCredentialCustodySql}
       AND reset_tokens.token_hash=$3 AND reset_tokens.consumed_at IS NULL AND reset_tokens.expires_at>clock_timestamp()
     RETURNING a.id`, [scope.id, scope.school, digest]);
   if (!consumed.rowCount) invalid();
@@ -207,7 +207,7 @@ export async function handleSchools({ pool, user, route, method, body, url }) {
       await requireSchoolAdmin(db, schoolId, user.id);
       const { rows } = await db.query(`
         SELECT m.account_id AS "accountId", i.name, m.role, m.joined_at AS "joinedAt",
-          g.account_id IS NOT NULL AS has_admin_grant, (${schoolResetEligible}) AS "canResetPassword"
+          g.account_id IS NOT NULL AS has_admin_grant, (${schoolCredentialCustodySql}) AS "canResetPassword"
           ${unlinked ? ', a.username' : ''}
         FROM school_memberships m JOIN accounts a ON a.id = m.account_id
         JOIN identities i ON i.id = a.identity_id
@@ -276,7 +276,7 @@ export async function handleSchools({ pool, user, route, method, body, url }) {
         FOR UPDATE OF a`, [schoolId, target]);
       if (!member) fail(404, 'NOT_FOUND', '本校成员不存在或账号不可用');
       const eligible = await db.query(`SELECT 1 FROM school_memberships m JOIN accounts a ON a.id=m.account_id
-        WHERE m.school_id=$1 AND m.account_id=$2 AND ${schoolResetEligible}`, [schoolId, target]);
+        WHERE m.school_id=$1 AND m.account_id=$2 AND ${schoolCredentialCustodySql}`, [schoolId, target]);
       if (!eligible.rowCount) fail(403, 'FORBIDDEN', '只能重置本校独立管理的普通成员账号');
       const resetCode = randomToken();
       await db.query(

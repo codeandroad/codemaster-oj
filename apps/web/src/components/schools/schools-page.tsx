@@ -58,6 +58,7 @@ import {
   type School,
   type SchoolRole,
 } from "./school-ui";
+import { SchoolAccountDetails, SchoolAccountFilters, type AccountFilters, type Member } from "./school-account-management";
 import { SchoolActivationBatch } from "./school-activation-batch";
 import { SchoolAdministration } from "./school-administration";
 import { SchoolCourses } from "./school-courses";
@@ -68,14 +69,6 @@ import {
   writeSchoolPreference,
 } from "./school-selection";
 
-type Member = {
-  canResetPassword: boolean;
-  accountId: string;
-  name: string;
-  role: SchoolRole;
-  administrator?: boolean;
-  joinedAt: string;
-};
 type Invitation = { token: string; role: SchoolRole; expiresAt: string };
 const teacherOnly = new Set<string>(workspaceNavigation.teacher
   .filter(item => !workspaceNavigation.admin.some(admin => admin.section === item.section))
@@ -440,7 +433,7 @@ function SchoolMembers({
           "本校独立管理的学生、教师账号，可在下方成员名单中重置密码。")}
       </p>
       <MemberList
-        key={`${page}-${revision}-${refreshRevision}`}
+        key={`${revision}-${refreshRevision}`}
         school={school}
         page={page}
         onPage={setPage}
@@ -485,12 +478,15 @@ function MemberList({
   const localError = useSchoolError();
   const [resetTarget, setResetTarget] = useState<Member | null>(null);
   const [credential, setCredential] = useState<{ username: string; resetCode: string; resetUrl: string } | null>(null);
-  const members = useData<{ items: Member[]; page: number; hasMore: boolean }>(
-    `schools/${school.id}/members?page=${page}`,
-  );
+  const [detail, setDetail] = useState<Member | null>(null);
+  const [filters, setFilters] = useState<AccountFilters>({ q:"", className:"", role:"all", status:"all" });
+  const params = new URLSearchParams({ ...filters, page: String(page) });
+  const members = useData<{ items: Member[]; page: number; hasMore: boolean }>(`schools/${school.id}/accounts?${params}`);
   return (
     <div className="min-h-48">
-      <Loading resource={members}>
+      <SchoolAccountFilters filters={filters} onChange={next => { onPage(1); setFilters(next); }}/>
+      {detail && <SchoolAccountDetails school={school} accountId={detail.accountId} onClose={() => setDetail(null)} />}
+      <Loading resource={{ ...members, loading: members.pending || members.loading }}>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <caption className="sr-only">
@@ -500,7 +496,9 @@ function MemberList({
               <tr>
                 <th className="py-2 pr-3">{text("Name", "姓名")}</th>
                 <th className="py-2 pr-3">{text("Role", "角色")}</th>
-                <th className="py-2 pr-3">{text("Joined", "加入日期")}</th>
+                <th className="py-2 pr-3">{text("Classes", "关联班级")}</th>
+                <th className="py-2 pr-3">{text("Status", "账号状态")}</th>
+                <th className="py-2 pr-3">{text("Last sign-in", "最后登录")}</th>
                 <th className="py-2 text-right">{text("Actions", "操作")}</th>
               </tr>
             </thead>
@@ -510,7 +508,10 @@ function MemberList({
                   key={member.accountId}
                   className="border-b border-border last:border-0"
                 >
-                  <td className="py-2 pr-3 break-words">{member.name}</td>
+                  <td className="py-2 pr-3 break-words">
+                    <button type="button" className="font-semibold text-primary hover:underline" onClick={() => setDetail(member)}>{member.name}</button>
+                    <span className="block text-xs text-muted-foreground">{member.username} {member.number && `· ${member.number}`}</span>
+                  </td>
                   <td className="py-2 pr-3">
                     <RoleLabel role={member.role} />
                     {member.administrator && member.role !== "school_admin" && (
@@ -519,10 +520,10 @@ function MemberList({
                       </span>
                     )}
                   </td>
+                  <td className="py-2 pr-3">{member.classes.join("、") || "—"}</td>
+                  <td className="whitespace-nowrap py-2 pr-3">{member.disabled ? text("Disabled", "已禁用") : text("Enabled", "已启用")}</td>
                   <td className="whitespace-nowrap py-2 pr-3 text-muted-foreground">
-                    {new Date(member.joinedAt).toLocaleDateString(
-                      locale === "en" ? "en-GB" : "zh-CN",
-                    )}
+                    {member.lastLoginAt ? new Date(member.lastLoginAt).toLocaleString(locale === "en" ? "en-GB" : "zh-CN") : "—"}
                   </td>
                   <td className="py-2 text-right">
                     <div className="flex flex-wrap justify-end gap-1">
@@ -552,7 +553,7 @@ function MemberList({
               {!members.data?.items.length && (
                 <tr>
                   <td
-                    colSpan={4}
+                    colSpan={6}
                     className="py-6 text-center text-muted-foreground"
                   >
                     {text("No members on this page.", "本页没有成员。")}

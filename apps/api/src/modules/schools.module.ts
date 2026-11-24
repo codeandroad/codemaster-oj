@@ -15,6 +15,8 @@ export class SchoolsController {
     'schools/:schoolId/problem-groups/:id',
     'schools/:schoolId/import-history',
     'schools/:schoolId/members',
+    'schools/:schoolId/accounts',
+    'schools/:schoolId/accounts/:accountId',
     'schools/:schoolId/exit-request',
     'schools/:schoolId/exit-requests',
     'schools/:schoolId/student-exits',

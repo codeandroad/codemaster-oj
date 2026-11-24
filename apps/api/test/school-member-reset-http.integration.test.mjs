@@ -82,6 +82,24 @@ test('school administrators issue one-time password reset credentials for member
       assert.equal(issued.data.username, 'reset-member');
       assert.match(issued.data.resetCode, /^[A-Za-z0-9_-]{32}$/);
 
+      await t.test('school account directory and detail restrict membership, filter real records and scope account history', async () => {
+        const directory = `/schools/${schoolId}/accounts`;
+        assert.equal((await request(directory, {auth:student})).status, 403);
+        const cls = await request(`/schools/${schoolId}/classes`, {auth:admin, method:'POST', body:{name:'Reset class', type:'training'}});
+        assert.equal(cls.status, 201);
+        const roster = await request(`/schools/${schoolId}/classes/${cls.data.id}/roster`, {auth:admin, method:'POST', body:{identityId:created.data.id}});
+        assert.equal(roster.status, 201);
+        const filtered = await request(directory+'?q=S01&role=student&className=Reset&status=enabled', {auth:admin});
+        assert.equal(filtered.status, 200);
+        assert.deepEqual(filtered.data.items.map(item => item.accountId), [memberId]);
+        const detail = await request(directory+'/'+memberId, {auth:admin});
+        assert.equal(detail.status, 200);
+        assert.equal(detail.data.username,'reset-member');
+        assert.deepEqual(detail.data.classes,['Reset class']);
+        assert.equal(detail.data.events[0].action,'account.reset_issue');
+        assert.equal((await request(directory+'?role=teacher&q=S01',{auth:admin})).data.items.length,0);
+        assert.equal((await request(directory+'/'+personal.data.user.id,{auth:admin})).data.lastLoginAt,null);
+      });
       const tokenRow = (await pool.query('SELECT token_hash, consumed_at FROM reset_tokens WHERE account_id=$1', [memberId])).rows[0];
       assert.ok(tokenRow && /^[0-9a-f]{64}$/.test(tokenRow.token_hash) && !tokenRow.consumed_at, 'stores only the code hash');
 

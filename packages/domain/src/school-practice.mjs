@@ -53,7 +53,7 @@ async function schoolCourseTutorial(db,problem,user,role,url) {
  return null;
 }
 
-export function normalizeSchoolProblem(body){
+export function normalizeSchoolProblem(body,previous={}){
  const mode=enumValue(body.mode??'stdio',['stdio','function'],'Mode');
  const referenceLanguage=enumValue(body.referenceLanguage??'python',LANGUAGES,'Reference language');
  const definition={reference_language:referenceLanguage,title:field(body.title,'Title',{max:200}),statement:field(body.statement,'Statement',{max:100000,trim:false}),mode,
@@ -61,7 +61,18 @@ export function normalizeSchoolProblem(body){
   comparator:mode==='function'?'json':enumValue(body.comparator??'tokens',['tokens','exact','json'],'Comparator'),
   time_limit_ms:integer(body.timeLimitMs??1000,100,5000,'Time limit'),memory_limit_mb:integer(body.memoryLimitMb??128,32,256,'Memory limit'),
   reference_code:bytes(body.referenceCode,'Reference code'),starter_code:bytes(body.starterCode??(mode==='function'?'def solve(data):\n    pass\n':'# Read input and print the result.\n'),'Starter code'),samples:[],tests:[]};
- definition.metadata=publicProblemMetadata(body);
+ definition.metadata={...previous.metadata,...publicProblemMetadata(body)};
+ // Teacher-only material is stored with the draft, outside the student metadata allowlist.
+ const editorial=body.editorial??previous.editorial;
+ if(editorial!=null)definition.metadata.editorial=field(editorial,'Teacher solution notes',{min:0,max:100000,trim:false});
+ if(body.hints!==undefined){
+  if(!Array.isArray(body.hints)||body.hints.length>30)fail(400,'VALIDATION','Expected at most 30 hints.');
+  definition.metadata.hints=body.hints.map(h=>typeof h==='string'?field(h,'Hint',{min:0,max:4000}):{
+   name:field(h?.name??'','Hint name',{min:0,max:200}),type:field(h?.type??'','Hint type',{min:0,max:200}),
+   description:field(h?.description??'','Hint description',{min:0,max:4000})});
+ }
+ if(body.hintPolicy!==undefined)definition.metadata.hintPolicy=enumValue(body.hintPolicy,['always','afterAC','never'],'Hint policy');
+ if(body.source!==undefined||previous.source!==undefined)definition.source=field(body.source??previous.source,'Source',{min:0,max:4000});
  if (Array.isArray(body.tags)) definition.tags=body.tags.map(tag=>field(tag,'标签',{max:100}));
  if (body.starterCodes) definition.starter_codes=Object.fromEntries(LANGUAGES.filter(lang=>typeof body.starterCodes[lang]==='string').map(lang=>[lang,bytes(lang==='python'?definition.starter_code:body.starterCodes[lang],'Starter code')]));
  for(const key of ['samples','tests']){
@@ -78,7 +89,10 @@ const publicDefinition=v=>({title:v.title,statement:v.statement,mode:v.mode,func
  timeLimitMs:v.time_limit_ms,memoryLimitMb:v.memory_limit_mb,starterCode:v.starter_code,
  starterCodes:starterCodesFor(v),
  samples:v.samples.map(t=>({input:t.input,expected:t.expected}))});
-const draftDefinition=v=>({...publicDefinition(v),referenceLanguage:v.reference_language??'python',referenceCode:v.reference_code,tests:v.tests.map(t=>({input:t.input,expected:t.expected,weight:t.weight}))});
+const draftDefinition=v=>({...publicDefinition(v),
+ ...(v.source!=null&&{source:v.source}),...((v.editorial??v.metadata?.editorial)!=null&&{editorial:v.editorial??v.metadata.editorial}),
+ ...(v.metadata?.hints!=null&&{hints:v.metadata.hints}),...(v.metadata?.hintPolicy!=null&&{hintPolicy:v.metadata.hintPolicy}),
+ referenceLanguage:v.reference_language??'python',referenceCode:v.reference_code,tests:v.tests.map(t=>({input:t.input,expected:t.expected,weight:t.weight}))});
 async function loadProblem(db,schoolId,id,user,role,{publicOnly=false}={}){
  const p=(await db.query(`SELECT p.*,b.name AS bank_name,b.archived,EXISTS(SELECT 1 FROM problems original WHERE original.id=p.id AND original.owner_scope='platform') platform_owned FROM school_problems p JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id WHERE b.resource_kind=\'ordinary\' AND p.school_id=$1 AND p.id=$2`,[schoolId,id])).rows[0];
  if(!p||(!publicOnly&&!canManage(p,user,role)&&(!p.published||p.archived))||publicOnly&&(!p.published||p.archived))fail(404,'NOT_FOUND','Problem is unavailable.');
@@ -711,7 +725,7 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
    return reply({id,archived:archive});
   }
   if(p.archived_at)fail(409,'PROBLEM_ARCHIVED','请先恢复已归档题目');
-  if(method==='PATCH'&&!m[4]){const definition=normalizeSchoolProblem(body);await db.query('UPDATE school_problems SET draft=$3,revision=revision+1,updated_at=clock_timestamp() WHERE school_id=$1 AND id=$2',[schoolId,id,JSON.stringify(definition)]);await auditSchool(db,schoolId,user.id,'school.problem.update',id);return reply(await shapeProblem(db,await loadProblem(db,schoolId,id,user,role),user,role,{detail:true}));}
+  if(method==='PATCH'&&!m[4]){const definition=normalizeSchoolProblem(body,p.draft);await db.query('UPDATE school_problems SET draft=$3,revision=revision+1,updated_at=clock_timestamp() WHERE school_id=$1 AND id=$2',[schoolId,id,JSON.stringify(definition)]);await auditSchool(db,schoolId,user.id,'school.problem.update',id);return reply(await shapeProblem(db,await loadProblem(db,schoolId,id,user,role),user,role,{detail:true}));}
   if(method==='POST'&&m[4]==='validate'){
    const previous=(await db.query('SELECT id FROM school_problem_versions WHERE school_id=$1 AND problem_id=$2 ORDER BY (id=$3) DESC NULLS LAST,draft_revision DESC LIMIT 1',[schoolId,id,p.published_version_id])).rows[0];
    const version=previous??(await db.query('INSERT INTO school_problem_versions(school_id,problem_id,draft_revision,definition) VALUES($1,$2,$3,$4) RETURNING id',[schoolId,id,p.revision,JSON.stringify(p.draft)])).rows[0];

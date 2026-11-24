@@ -3,11 +3,17 @@ export type Definition = {
   statement: string;
   mode: "stdio" | "function";
   functionName?: string;
-  comparator: string;
+  comparator: "tokens" | "exact" | "json";
   starterCode: string;
   starterCodes?: Partial<Record<"python" | "cpp" | "javascript", string>>;
   difficulty?: string;
   objective?: string;
+  inputDescription?: string;
+  outputDescription?: string;
+  source?: string;
+  editorial?: string;
+  hints?: (string | {name: string; type?: string; description?: string})[];
+  hintPolicy?: string;
   parameters?: (string | { name: string; type?: string; description?: string })[];
   returnType?: string;
   tags?: string[];

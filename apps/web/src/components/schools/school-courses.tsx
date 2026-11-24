@@ -1,4 +1,5 @@
 "use client";
+import { CourseChapterWorkspace } from "./platform-course-editor";
 import { RowActionButton } from "@/components/ui/row-action";
 
 import { useMemo, useRef, useState } from "react";
@@ -45,7 +46,6 @@ import { productionApi } from "@/lib/production-api";
 import { useSchoolText, type School } from "./school-ui";
 import { PlatformCourseEditorLoader } from "./platform-course-editor";
 import type { PlatformCourse } from "./platform-course-model";
-import { LearningEditorForm } from "@/components/teacher/learning";
 import { schoolLearningPath } from "./school-learning-path";
 import { CreateSchoolCourseDialog } from "./school-courses-editor";
 import {
@@ -553,12 +553,12 @@ function ExistingCourseEditor({
   const text = useSchoolText();
   const resource = useData<CourseDetail>(`${base}/${id}`);
   const course = useMemo(() => resource.data?.canManage ? schoolLearningPath(school.id, resource.data) : null, [resource.data, school.id]);
-  if (!course || resource.loading || resource.error) return <div className="space-y-4">
+  if (!course || resource.error) return <div className="space-y-4">
     <Button variant="ghost" onClick={onClose}>← {text("Back to courses", "返回课程")}</Button>
     <Loading resource={resource}>{resource.data && !course && <p role="alert">{text("You cannot edit this course.", "你无法编辑此课程。")}</p>}</Loading>
   </div>;
   return <div className="space-y-4">
-    <LearningEditorForm initial={course} onBack={onClose} onSaved={onSaved} showTopicEditor={showTopicEditor}/>
+    <CourseChapterWorkspace key={course.id} initial={course} onBack={onClose} onSaved={onSaved} refresh={resource.reload} schoolAdmin={school.roles.includes("school_admin")} showTopicEditor={showTopicEditor}/>
   </div>;
 }
 

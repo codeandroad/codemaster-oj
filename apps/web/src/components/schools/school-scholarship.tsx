@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
 import { useLocale } from "@/components/locale-context";
 import { inputClass } from "@/components/admin/common";
@@ -1334,18 +1334,26 @@ function ScholarshipContents({
     </div>
   );
 }
+export function SchoolProblemContent({schoolId,problemId,versionId,kind,onPendingChange}: {
+  schoolId:string; problemId:string; versionId:string; kind:Kind; onPendingChange:(pending:boolean)=>void;
+}) {
+  return <ContentEditor key={`${problemId}:${versionId}:${kind}`} schoolId={schoolId}
+    target={{type:"problem",problemId,versionId}} kind={kind} onPendingChange={onPendingChange}/>;
+}
 function ContentEditor({
   schoolId,
   target,
   kind,
   onClose,
   onSaved,
+  onPendingChange,
 }: {
   schoolId: string;
-  target: Target;
+  target: SchoolAssistanceTarget & {title?:string};
   kind: Kind;
-  onClose: () => void;
-  onSaved: () => void;
+  onClose?: () => void;
+  onSaved?: () => void;
+  onPendingChange?: (pending:boolean)=>void;
 }) {
   const tx = useText(),
     query = new URLSearchParams(
@@ -1378,6 +1386,10 @@ function ContentEditor({
   const disabled = busy || data.loading || Boolean(data.error) || !data.data;
   const canSave = !disabled && dirty && !conflict && !solutionDraftError(value);
   useSolutionDraftNavigation(unsavedEdits || busy);
+  useEffect(() => {
+    onPendingChange?.(unsavedEdits || busy);
+    return () => onPendingChange?.(false);
+  }, [onPendingChange,unsavedEdits,busy]);
   const records = useData<{
     items: { id: string; name: string; kind: string; providedAt: string }[];
   }>(usage ? `${prefix(schoolId)}/usage?${query}` : null);
@@ -1406,7 +1418,7 @@ function ContentEditor({
       setDraft(null);
       setMessage(tx("草稿已保存，等待审核。", "Draft saved for review."));
       data.reload();
-      onSaved();
+      onSaved?.();
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) setConflict(true);
       setError(apiMessage(e));
@@ -1418,11 +1430,11 @@ function ContentEditor({
   function close() {
     if (inFlight.current) return;
     if (unsavedEdits) setDiscard("close");
-    else onClose();
+    else onClose?.();
   }
   function confirmDiscard() {
     if (discard === "close") {
-      onClose();
+      onClose?.();
       return;
     }
     setDiscard(null);
@@ -1431,8 +1443,8 @@ function ContentEditor({
     setError("");
     data.reload();
   }
-  return (
-    <Modal wide title={target.title} onClose={close}>
+  const content = (
+    <>
       <div className="space-y-3">
         <Feedback error={error || data.error} />
         {message && <p role="status" className="text-sm text-success">{message}</p>}
@@ -1518,11 +1530,14 @@ function ContentEditor({
             >
               {tx("保存待审核草稿", "Save review draft")}
             </Button>
+            {!onClose && unsavedEdits && !conflict && <Button type="button" variant="secondary"
+              disabled={busy} onClick={() => setDiscard("reload")}>{tx("放弃修改", "Discard changes")}</Button>}
           </>
         )}
       </div>
       {discard && <SolutionDiscardDialog reload={discard === "reload"} onCancel={() => setDiscard(null)} onDiscard={confirmDiscard} />}
-    </Modal>
+    </>
   );
+  return onClose ? <Modal wide title={target.title ?? ""} onClose={close}>{content}</Modal> : content;
 }
 export { SchoolLeaderboard } from "./school-leaderboard";

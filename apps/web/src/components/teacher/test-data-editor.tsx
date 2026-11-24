@@ -11,12 +11,14 @@ export function TestDrawer({
   mode,
   kind,
   initial,
+  fixedCases = false,
   onClose,
   onSave,
 }: {
   mode: string;
   kind: string;
   initial: EditorCase | null;
+  fixedCases?: boolean;
   onClose: () => void;
   onSave: (value: EditorCase) => void;
 }) {
@@ -38,13 +40,13 @@ export function TestDrawer({
       onClose={onClose}
     >
       <div className="space-y-5">
-        <Field label={tr("用例名称", "Case name")}>
+        {!fixedCases && <Field label={tr("用例名称", "Case name")}>
           <input
             className={input}
             value={value.name ?? ""}
             onChange={(e) => setValue((x) => ({ ...x, name: e.target.value }))}
           />
-        </Field>
+        </Field>}
         {mode === "stdio" && (
           <div className="flex gap-2">
             {["文本输入", "使用文件"].map((x) => (
@@ -101,7 +103,7 @@ export function TestDrawer({
             </Field>
           ))}
         </div>
-        <label className="flex items-center gap-2 text-sm">
+        {!fixedCases && <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
             checked={value.enabled !== false}
@@ -110,7 +112,7 @@ export function TestDrawer({
             }
           />
           {tr("启用此测试", "Enable this test")}
-        </label>
+        </label>}
         <Feedback action={action} />
         <div className="flex justify-end gap-2 border-t border-border pt-4">
           <Button variant="secondary" onClick={onClose}>

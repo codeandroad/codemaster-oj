@@ -33,13 +33,30 @@ test('school and public practice Nest transport requires scoped membership, CSRF
   await request(`${prefix}/problems`,{status:401});await request(`${prefix}/problems`,{auth:auth.personal,status:404});
   await request(`${prefix}/problem-banks`,{auth:auth.teacher,method:'POST',body:{name:'Python',requestId:randomUUID()},csrf:false,status:403});
   const bank=(await request(`${prefix}/problem-banks`,{auth:auth.teacher,method:'POST',body:{name:'Python',requestId:randomUUID()},status:201})).data;
-  const problem=(await request(`${prefix}/problems`,{auth:auth.teacher,method:'POST',status:201,body:{bankId:bank.id,requestId:randomUUID(),title:'Double',statement:'Return twice the integer.',mode:'function',functionName:'solve',referenceCode:'def solve(data):\n return data*2',starterCode:'def solve(data):\n pass',samples:[{input:'[2]',expected:'4'}],tests:[{input:'[937]',expected:'1874',weight:100}]}})).data;
+  const problem=(await request(`${prefix}/problems`,{auth:auth.teacher,method:'POST',status:201,body:{bankId:bank.id,requestId:randomUUID(),title:'Double',statement:'Return twice the integer.',editorial:'Private author notes',hints:['Private hint'],hintPolicy:'never',source:'Teaching worksheet',mode:'function',functionName:'solve',referenceCode:'def solve(data):\n return data*2',starterCode:'def solve(data):\n pass',samples:[{input:'[2]',expected:'4'}],tests:[{input:'[937]',expected:'1874',weight:100}]}})).data;
   await request(`${prefix}/problems/${problem.id}`,{auth:auth.student,status:404});
   const validation=(await request(`${prefix}/problems/${problem.id}/validate`,{auth:auth.teacher,method:'POST',body:{expectedRevision:1,requestId:randomUUID()},status:202})).data;
   await processSchoolOne({pool:worker,judge:{judge:async()=>({status:'AC',score:100,passed:1,total:1,publicMessage:'',privateResults:[]})}});
   assert.equal((await request(`${prefix}/judge-jobs/${validation.id}`,{auth:auth.teacher})).data.status,'AC');
   const published=(await request(`${prefix}/problems/${problem.id}/publish`,{auth:auth.admin,method:'POST',body:{expectedRevision:1}})).data;
   const visible=await request(`${prefix}/problems/${problem.id}`,{auth:auth.student});assert.ok(!JSON.stringify(visible.data).includes('[937]'));assert.equal(visible.data.definition.tests,undefined);assert.equal(visible.data.definition.referenceCode,undefined);assert.match(visible.headers.get('cache-control')??'',/no-store/);
+  assert.equal(problem.definition.editorial,'Private author notes');
+  assert.deepEqual(problem.definition.hints,['Private hint']);
+  assert.equal(problem.definition.hintPolicy,'never');
+  assert.equal(problem.definition.source,'Teaching worksheet');
+  assert.doesNotMatch(JSON.stringify(visible.data),/Private author notes|Private hint/);
+  await t.test('editing a school draft preserves its published edition and checks revision and role',async()=>{
+   const path=`${prefix}/problems/${problem.id}`;
+   const {editorial,hints,hintPolicy,source,...previousFields}=problem.definition;
+   const body={...previousFields,title:'Double · revised draft',expectedRevision:published.revision};
+   const edited=(await request(path,{auth:auth.teacher,method:'PATCH',body})).data;
+   assert.equal(edited.revision,published.revision+1);
+   assert.equal(edited.versionId,published.versionId);
+   assert.deepEqual(edited.definition,{...problem.definition,title:body.title});
+   await request(path,{auth:auth.teacher,method:'PATCH',body,status:409});
+   await request(path+'/publish',{auth:auth.teacher,method:'POST',body:{expectedRevision:edited.revision},status:403});
+   assert.equal((await request(path,{auth:auth.student})).data.definition.title,problem.definition.title);
+  });
   await request('/practice/problems?page=1&q=Double',{status:401});
   assert.deepEqual((await request('/practice/problems?page=1&q=Double',{auth:auth.personal})).data,
    {items:[],topics:[],filters:{topic:'',status:'',mode:'',savedOnly:false},page:1,query:'Double',hasMore:false});

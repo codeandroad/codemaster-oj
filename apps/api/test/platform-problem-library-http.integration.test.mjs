@@ -25,8 +25,8 @@ test('platform catalog categories and bulk actions preserve stable source identi
   const admin = (await pool.query("SELECT id FROM accounts WHERE username='platform'")).rows[0];
   const identity = (await pool.query("INSERT INTO identities(kind,number,name) VALUES('teacher','STAFF','Teacher') RETURNING id")).rows[0];
   const teacher = (await pool.query("INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,'teacher',$2) RETURNING id", [identity.id, await hashPassword(password)])).rows[0];
-  await pool.query("INSERT INTO account_roles(account_id,role) VALUES($1,'teacher')", [teacher.id]);
-  await pool.query('INSERT INTO legacy_school_account_ownership(account_id) VALUES($1) ON CONFLICT DO NOTHING', [teacher.id]);
+  await pool.query("INSERT INTO school_memberships(school_id,account_id,role) VALUES($1,$2,'teacher')", [LEGACY_SCHOOL_ID,teacher.id]);
+  await pool.query("INSERT INTO school_identities(school_id,id,kind,name,number,account_id) VALUES($1,$2,'teacher','Teacher','STAFF',$3)", [LEGACY_SCHOOL_ID,identity.id,teacher.id]);
   const grants = (await readFile(new URL('../../../packages/domain/grants.mjs', import.meta.url), 'utf8')).match(/await pool\.query\(`([\s\S]*?)`\);/)[1];
   await pool.query(grants.replaceAll('SCHEMA public', `SCHEMA ${schema}`));
   const runtime = new URL(url); runtime.searchParams.set('options', `-crole=campus_app -csearch_path=${schema}`);
@@ -109,10 +109,9 @@ test('platform catalog categories and bulk actions preserve stable source identi
   });
   await t.test('course and directed audiences share one searchable row and enforce live access at submission', async () => {
    const learner = async username => {
-    const identity = (await pool.query("INSERT INTO identities(kind,number,name) VALUES('student',$1,$1) RETURNING id", [username])).rows[0];
+    const identity = (await pool.query("INSERT INTO identities(kind,number,name) VALUES('personal',$1,$1) RETURNING id", [username])).rows[0];
     const account = (await pool.query('INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,$2,$3) RETURNING id',
      [identity.id, username, await hashPassword(password)])).rows[0];
-    await pool.query("INSERT INTO account_roles(account_id,role) VALUES($1,'student')", [account.id]);
     const login = await request('/auth/login', { method: 'POST', actor: username, body: { username, password } });
     sessions[username] = { cookie: login.cookie, csrfToken: login.data.csrfToken };
     return { accountId: account.id, identityId: identity.id };

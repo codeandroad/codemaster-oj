@@ -17,7 +17,7 @@ export function adjacentProblemRows<T extends { id: string }>(rows: readonly T[]
   return { previous: index > 0 ? rows[index - 1] : undefined, next: rows[index + 1] };
 }
 
-export type CourseProblemEditorEntry = { id: string; chapterId: string; problemId: string; title: string };
+export type CourseProblemEditorEntry = { id: string; chapterId: string; problemId: string; title: string; ownerScope?: "school" | "platform" };
 
 export function courseProblemEditorEntryId(chapterId: string, problemId: string) {
   return `${chapterId}:${problemId}`;
@@ -25,7 +25,7 @@ export function courseProblemEditorEntryId(chapterId: string, problemId: string)
 
 export function courseProblemEditorEntries(chapters: readonly {
   id: string;
-  problems: readonly { problemId: string; title: string; canEdit?: boolean }[];
+  problems: readonly { problemId: string; title: string; canEdit?: boolean; ownerScope?: "school" | "platform" }[];
 }[]): CourseProblemEditorEntry[] {
   return chapters.flatMap(chapter => chapter.problems
     .filter(problem => problem.canEdit === true)
@@ -34,5 +34,6 @@ export function courseProblemEditorEntries(chapters: readonly {
       chapterId: chapter.id,
       problemId: problem.problemId,
       title: problem.title,
+      ownerScope: problem.ownerScope,
     })));
 }

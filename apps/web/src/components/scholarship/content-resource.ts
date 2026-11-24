@@ -5,12 +5,13 @@ import { apiMessage, productionApi } from "@/lib/production-api";
 import type { ContentResponse } from "./content-model";
 
 /** Keep the form mounted during refresh, and never apply recommendations from an older request. */
-export function useContentResource(path: string) {
+export function useContentResource(path: string, enabled = true) {
   const [resource, setResource] = useState<{ path: string; data: ContentResponse } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
   useEffect(() => {
+    if (!enabled) return;
     const controller = new AbortController();
     setLoading(true);
     setError("");
@@ -19,10 +20,10 @@ export function useContentResource(path: string) {
       .catch(cause => { if (!controller.signal.aborted) setError(apiMessage(cause)); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [path, revision]);
+  }, [path, revision, enabled]);
   return {
-    data: resource?.data ?? null,
-    loading: loading || (resource?.path !== path && !error),
+    data: enabled && resource?.path === path ? resource.data : null,
+    loading: enabled && (loading || (resource?.path !== path && !error)),
     error,
     reload: () => setRevision(value => value + 1),
     setData: (update: (previous: ContentResponse | null) => ContentResponse) => setResource(previous => ({

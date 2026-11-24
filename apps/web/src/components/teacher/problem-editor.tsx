@@ -8,7 +8,11 @@ import { ProblemEditorSteps, SaveAndEditNext } from "./problem-editor-steps";
 import type { ProblemEditorNavigation, ProblemEditorTab, ProblemEditorTarget } from "./problem-editor-navigation";
 import { teacherPlatformProblemSummaries, teacherProblemSummaries } from "./platform-problem-source";
 
-import { useEffect, useId, useState, useTransition } from "react";
+import { schoolEditorDefinition, schoolEditorProblem } from "../schools/school-problem-source";
+import { schoolProblemDefaults, schoolProblemDraftIssue, schoolProblemMode } from "../schools/school-problem-draft";
+import { SchoolProblemContent } from "../schools/school-scholarship";
+import type { Problem as SchoolProblem } from "../schools/school-practice-types";
+import { useCallback, useEffect, useId, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useNavigationBlocker } from "@/components/navigation";
 import { useRefreshWorkspaceData } from "@/components/workspace-data";
@@ -61,9 +65,10 @@ import {
   useData,
 } from "./shared";
 
+type SchoolEditorScope = {id: string; admin: boolean; bankId?: string; onCreated?: (id: string, tab?: ProblemEditorTab) => void};
 type MetadataLine =
-  string | { name: string; type: string; description: string };
-interface EditorProblem extends ProductionProblem {
+  string | { name: string; type?: string; description?: string };
+export interface EditorProblem extends ProductionProblem {
   ownerScope?: "platform" | "school";
   bankName?: string;
   referenceLanguage?: "python" | "cpp" | "javascript";
@@ -71,7 +76,7 @@ interface EditorProblem extends ProductionProblem {
   comparator?: "tokens" | "exact" | "json";
   inputDescription?: string;
   outputDescription?: string;
-  parameters?: MetadataLine[];
+  parameters?: ProductionProblem["parameters"];
   returnType?: string;
   editorial?: string;
   hints?: MetadataLine[];
@@ -118,12 +123,13 @@ const metadataText = (values: MetadataLine[] | undefined) =>
     .map((value) =>
       typeof value === "string"
         ? value
-        : `${value.name}: ${value.type}${value.description ? ` — ${value.description}` : ""}`,
+        : `${value.name}: ${value.type ?? ""}${value.description ? ` — ${value.description}` : ""}`,
     )
     .join("\n");
 const editableSnapshot = (p: EditorProblem) =>
   JSON.stringify({
     title: p.title,
+    objective:p.objective ?? "",
     mode: p.mode,
     comparator: p.comparator ?? "tokens",
     statement: p.statement,
@@ -225,14 +231,15 @@ function ProblemEditorResource({ id, user, platform, versionId, onClose, closeLa
     </>
   );
 }
-function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, closeLabel, navigation, initialTab }: {
-  initial: EditorProblem | null; user: CampusUser; platform: boolean; delegatedReview?: boolean;
+export function ProblemEditorForm({ initial, user, platform, school, delegatedReview, onClose, closeLabel, navigation, initialTab }: {
+  initial: EditorProblem | null; user: CampusUser; platform: boolean; school?: SchoolEditorScope; delegatedReview?: boolean;
   onClose?: () => void; closeLabel?: string; navigation?: ProblemEditorNavigation; initialTab: string | null;
 }) {
-  const endpoint = platform ? "platform/source-problems" : "problems";
-  const summaryPath = platform ? teacherPlatformProblemSummaries : teacherProblemSummaries;
+  const schoolBase = school ? `schools/${school.id}` : null;
+  const endpoint = schoolBase ? `${schoolBase}/problems` : platform ? "platform/source-problems" : "problems";
+  const summaryPath = schoolBase ? `${schoolBase}/problems?view=management` : platform ? teacherPlatformProblemSummaries : teacherProblemSummaries;
   const refreshWorkspaceData = useRefreshWorkspaceData();
-  const canPublish = !platform || user.platformAdmin === true;
+  const canPublish = school ? school.admin : !platform || user.platformAdmin === true;
   const requestsPlatformReview = platform && !canPublish && !delegatedReview;
   const { locale } = useLocale();
   const tr = (zh:string,en:string) => locale === "zh" ? zh : en;
@@ -240,16 +247,19 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
   const [tagsText, setTagsText] = useState<string | null>(null);
   const search = useSearchParams(),
     router = useRouter(),
-    banks = useData<{ items: Bank[] }>(platform ? user.platformAdmin ? "platform/problem-banks" : null : "problem-banks"),
-    groups = useData<{ items: Group[] }>(platform ? null : "problem-groups"),
+    banks = useData<{ items: (Bank & {canManage?: boolean; archived?: boolean})[] }>(schoolBase ? `${schoolBase}/problem-banks` : platform ? user.platformAdmin ? "platform/problem-banks" : null : "problem-banks"),
+    groups = useData<{ items: Group[] }>(platform || school ? null : "problem-groups"),
+    defaultBankId = school?.bankId ?? search.get("bankId") ?? "",
+    emptyProblem: EditorProblem = { ...blank, ...(school && schoolProblemDefaults), bankId:defaultBankId },
     [problem, setProblem] = useState<EditorProblem>(
-      initial ?? { ...blank, bankId: search.get("bankId") ?? "" },
+      initial ?? emptyProblem,
     ),
     [saved, setSaved] = useState<EditorProblem | null>(initial),
     [requestedTab, setTab] = useState(() => tabs.find(item => editorTabs[item].id === initialTab) ?? "题面"),
     [statementLang, setStatementLang] = useState<"en" | "zh">("en"),
     [solutionsVisited, setSolutionsVisited] = useState(initialTab === "solutions"),
-    [solutionPending, setSolutionPending] = useState(false),
+    [pendingSolution, setSolutionPending] = useState(false),
+    [pendingSchoolTranslation,setPendingSchoolTranslation] = useState(false),
     [tutorialVisited, setTutorialVisited] = useState(initialTab === "tutorial"),
     [tutorialState, setTutorialState] = useState({ dirty: false, busy: false }),
     [switching, startSwitch] = useTransition(),
@@ -265,13 +275,14 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
     [publish, setPublish] = useState(false),
     [impact, setImpact] = useState(false),
     action = useAction();
+  const solutionPending = pendingSolution || pendingSchoolTranslation;
   const showTutorial = !saved || saved.canManageTutorial === true;
   const visibleTabs = showTutorial ? tabs : tabs.filter(item => item !== "教程");
   const tab = visibleTabs.includes(requestedTab) ? requestedTab : "题面";
   const dirty =
       editableSnapshot(problem) !==
       editableSnapshot(
-        saved ?? { ...blank, bankId: search.get("bankId") ?? "" },
+        saved ?? emptyProblem,
       ),
     editable = !initial || initial.canEdit !== false,
     back =
@@ -280,25 +291,26 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
         ? `/teacher/problems/banks/${problem.bankId}`
         : "/teacher/problems");
   const translation = useProblemTranslation({
-    problemId: saved?.versionId && editable ? saved.id : undefined,
-    versionId: saved?.versionId && editable ? saved.versionId : undefined,
+    problemId: !school && saved?.versionId && editable ? saved.id : undefined,
+    versionId: !school && saved?.versionId && editable ? saved.versionId : undefined,
     endpoint: platform && saved ? `${endpoint}/${saved.id}/contents` : undefined,
     onPendingChange: setSolutionPending,
   });
   const bankVisibility = banks.data?.items.find((bank) => bank.id === problem.bankId)?.visibility ?? saved?.bankVisibility;
-  const publicationLabel = requestsPlatformReview ? tr("提交平台审核", "Request platform review")
+  const publicationLabel = school ? tr("审核发布", "Review and publish") : requestsPlatformReview ? tr("提交平台审核", "Request platform review")
     : platform ? saved?.published || saved?.draftReviewStatus === "pending" ? tr("发布题目修改", "Publish draft changes") : tr("发布题目", "Publish problem")
     : bankVisibility === "school" ? tr("提交公开审核", "Request public review") : tr("启用教学版本", "Release for teaching");
-  const draft=useTeacherDraft({storageKey:teacherDraftKey(user.id,saved?.id??"new",search.get("versionId")??"current",platform ? "platform" : search.get("bankId")??""),baseline:editableSnapshot(initial??{...blank,bankId:search.get("bankId")??""}),snapshot:editableSnapshot(problem),baseVersion:initial?.versionId??"new",dirty,editable,onRestore:snapshot=>{const recovered=JSON.parse(snapshot);setTagsText(null);setProblem(current=>({...current,...recovered}));}});
+  const draft=useTeacherDraft({storageKey:teacherDraftKey(school ? `${user.id}:${school.id}` : user.id,saved?.id??"new",search.get("versionId")??"current",platform ? "platform" : defaultBankId),baseline:editableSnapshot(initial??emptyProblem),snapshot:editableSnapshot(problem),baseVersion:(school ? initial?.editRevision?.toString() : initial?.versionId)??"new",dirty,editable,onRestore:snapshot=>{const recovered=JSON.parse(snapshot);setTagsText(null);setProblem(current=>({...current,...recovered}));}});
   const draftMessage = draft.status === "failed" ? tr("自动保存失败，请手动保存草稿。", "Local autosave failed. Save the draft manually.")
     : draft.savedLocally ? tr("本机草稿已自动保存 · 待保存到服务器", "Autosaved locally · Server save pending")
     : draft.status === "restored" ? tr("本机草稿已恢复 · 待保存到服务器", "Local draft restored · Server save pending")
     : dirty ? tr("有未保存修改", "Unsaved changes")
     : draft.status === "discarded" ? tr("已忽略本机草稿。", "Local draft discarded.") : "";
+  const createKey = useRef({body:"",id:""});
   const steps = initial && editable ? navigation : undefined;
   const nextStep = steps?.next;
   const stepDisabled = action.busy || switching || solutionPending || tutorialState.busy;
-  const hasUnsavedEdits = dirty || tutorialState.dirty;
+  const hasUnsavedEdits = dirty || tutorialState.dirty || solutionPending;
   function switchProblem(target: ProblemEditorTarget, afterSave = false) {
     setSwitchError("");
     startSwitch(async () => {
@@ -320,14 +332,20 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty]);
+  const schoolAdmin = school?.admin;
+  const fetchSaved = useCallback(async (current: EditorProblem, signal?: AbortSignal) => {
+    if (schoolAdmin === undefined) return productionApi<EditorProblem>(
+      `${endpoint}/${current.id}?versionId=${current.versionId}`, {signal});
+    const record = await productionApi<SchoolProblem>(`${endpoint}/${current.id}`, {signal});
+    if (record.revision !== current.editRevision) throw new Error(locale === "zh"
+      ? "这道题已被更新。请重新打开编辑页后核对草稿。" : "The problem has changed. Reopen the editor to review the latest draft.");
+    return schoolEditorProblem(record, schoolAdmin);
+  }, [endpoint,schoolAdmin,locale]);
   useEffect(() => {
     if (!saved?.id || !isPending(saved.validationStatus ?? "")) return;
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      productionApi<EditorProblem>(
-        `${endpoint}/${saved.id}?versionId=${saved.versionId}`,
-        { signal: controller.signal },
-      )
+      fetchSaved(saved,controller.signal)
         .then(result => {
           if (!controller.signal.aborted) setSaved(current => current?.versionId === result.versionId && current?.editRevision === result.editRevision ? result : current);
         })
@@ -337,7 +355,7 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
       controller.abort();
       clearTimeout(timer);
     };
-  }, [saved, endpoint]);
+  }, [saved, fetchSaved]);
   const update = <K extends keyof EditorProblem>(
     key: K,
     value: EditorProblem[K],
@@ -348,36 +366,62 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
     if(!Number.isInteger(problem.timeLimitMs)||problem.timeLimitMs<100||problem.timeLimitMs>5000)throw new Error("时间限制须为 100–5000 ms 的整数。");
     if(!Number.isInteger(problem.memoryLimitMb)||problem.memoryLimitMb<32||problem.memoryLimitMb>256)throw new Error("内存限制须为 32–256 MB 的整数。");
     if(problem.mode==="function"&&problem.functionName&&!/^[A-Za-z_][A-Za-z0-9_]*$/.test(problem.functionName))throw new Error("函数名只能包含字母、数字与下划线，且不能以数字开头。");
-    const tests = problem.tests ?? [];
-    const body = {
-      ...problem,
-      saveDraft: true,
-      ...(saved ? { expectedVersionId: saved.versionId, expectedRevision: saved.editRevision } : {}),
-      comparator: problem.mode === "function" ? "json" : problem.comparator === "exact" ? "exact" : "tokens",
-      tests: equalCaseWeights(tests),
-      functionName: problem.mode === "function" ? problem.functionName : "",
-      // Python uses the legacy starterCode field. Sending a stale generated
-      // starterCodes.python would otherwise override the teacher's edit.
-      starterCodes: {
-        cpp: problem.starterCodes?.cpp ?? "",
-        javascript: problem.starterCodes?.javascript ?? "",
-      },
-    };
-    const result = await productionApi<EditorProblem>(
-      saved ? `${endpoint}/${saved.id}/versions` : endpoint,
-      { method: "POST", body },
-    );
+    let result: EditorProblem;
+    if (school) {
+      const definition = schoolEditorDefinition(problem);
+      const issue = schoolProblemDraftIssue(definition, locale);
+      if (issue) {
+        setTab(({statement:"题面",interface:"接口与模板",tests:"测试数据",reference:"解答与提示"} as const)[issue.section]);
+        if (issue.section === "reference") setSolutionsVisited(true);
+        throw new Error(issue.message);
+      }
+      if (!problem.bankId) throw new Error(tr("请选择题库。","Choose a problem bank."));
+      const payload = {...definition, bankId:problem.bankId,expectedRevision:saved?.editRevision};
+      const serialized = JSON.stringify(payload);
+      if (createKey.current.body !== serialized) createKey.current = {body:serialized,id:crypto.randomUUID()};
+      result = schoolEditorProblem(await productionApi<SchoolProblem>(saved ? `${endpoint}/${saved.id}` : endpoint,
+        {method:saved ? "PATCH" : "POST",body:{...payload,requestId:createKey.current.id}}),school.admin);
+    } else {
+      const tests = problem.tests ?? [];
+      const body = {
+        ...problem,
+        saveDraft: true,
+        ...(saved ? { expectedVersionId: saved.versionId, expectedRevision: saved.editRevision } : {}),
+        comparator: problem.mode === "function" ? "json" : problem.comparator === "exact" ? "exact" : "tokens",
+        tests: equalCaseWeights(tests),
+        functionName: problem.mode === "function" ? problem.functionName : "",
+        // Python uses the legacy starterCode field. Sending a stale generated
+        // starterCodes.python would otherwise override the teacher's edit.
+        starterCodes: {
+          cpp: problem.starterCodes?.cpp ?? "",
+          javascript: problem.starterCodes?.javascript ?? "",
+        },
+      };
+      result = await productionApi<EditorProblem>(saved ? `${endpoint}/${saved.id}/versions` : endpoint, {method:"POST",body});
+    }
     void refreshWorkspaceData?.(summaryPath);
     draft.clear();
     setSaved(result);
     setProblem(result);
     setTagsText(null);
+    if (school && !initial && navigate) school.onCreated?.(result.id);
     if (!initial && navigate && !onClose)
       router.replace(
         `/teacher/problems/${result.id}/edit?${platform ? "source=platform&" : ""}returnTo=${encodeURIComponent(back)}${tab === "教程" ? "&tab=tutorial" : tab === "解答与提示" ? "&tab=solutions" : ""}`,
       );
     return result;
   };
+  async function validateReference() {
+    if (!school) { await save(); }
+    else {
+      const current = dirty || !saved ? await save(false) : saved;
+      await productionApi(`${endpoint}/${current.id}/validate`, {method:"POST",body:{expectedRevision:current.editRevision,requestId:crypto.randomUUID()}});
+      setSaved({...current, validationStatus:"Waiting", canPublish:false});
+      if (!initial) school.onCreated?.(current.id,"publication");
+    }
+    setTab("版本与发布");
+    return tr("参考解验证任务已提交。", "Reference validation job submitted.");
+  }
   const list = (kind: "samples" | "tests") => problem[kind] ?? [];
   return (
     <div className={styles.editor} data-od-id="teacher-problem-editor">
@@ -403,7 +447,7 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
                 onClick={() =>
                   void action.run(async () => {
                     await save();
-                    return tr("草稿已保存，参考解验证结果在版本与发布页查看。", "Draft saved. Check reference validation under Versions and publication.");
+                    return school ? tr("题目草稿已保存。","Problem draft saved.") : tr("草稿已保存，参考解验证结果在版本与发布页查看。", "Draft saved. Check reference validation under Versions and publication.");
                   })
                 }
               >
@@ -418,7 +462,7 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
                   return tr("草稿已保存。", "Draft saved.");
                 });
               }} />}
-              {editable && <Button
+              {editable && (!school || canPublish) && <Button
                 variant="secondary"
                 disabled={action.busy || switching || solutionPending || dirty || !(requestsPlatformReview ? saved?.canRequestReview : saved?.canPublish)}
                 onClick={() => setPublish(true)}
@@ -441,11 +485,11 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
         : tr("草稿待学校审核。继续保存修改后，需要重新提交审核。", "Awaiting school review. Submit again after further edits.")}</p>}
       {requestsPlatformReview && editable && saved && !saved.draftReviewStatus && <p className="mt-2 text-sm text-muted-foreground">{tr("这道题由平台管理。保存后等待参考解验证通过，即可提交平台管理员审核。学生题解需在「解答与提示」单独保存，由平台管理员发布。", "This is a platform problem. After saving, wait for reference validation to pass, then request platform review. Save student solutions separately under Solutions and hints for a platform administrator to publish.")}</p>}
       {saved?.draftReviewStatus === "rejected" && <p role="status" className="mt-2 text-sm text-destructive">{tr("草稿未通过审核", "Draft rejected")}{saved.draftReviewReason ? `：${saved.draftReviewReason}` : ""}</p>}
-      {draft.recovery&&<section className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface-subtle px-3 py-2 text-sm" data-od-id="teacher-draft-recovery"><p>{tr("发现本机未保存草稿", "Unsaved local draft found")} · {new Date(draft.recovery.updatedAt).toLocaleString(locale === "zh" ? "zh-CN" : "en-US")} {draft.recovery.baseVersion!==(initial?.versionId??"new")&&tr("（服务器版本已变化，请核对后保存）", "(The server version changed; review before saving)")}</p><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={!editable || action.busy || switching} onClick={draft.restore}>{tr("恢复草稿", "Restore draft")}</Button><Button size="sm" variant="ghost" disabled={action.busy || switching} onClick={draft.discard}>{tr("忽略草稿", "Discard draft")}</Button></div></section>}
+      {draft.recovery&&<section className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface-subtle px-3 py-2 text-sm" data-od-id="teacher-draft-recovery"><p>{tr("发现本机未保存草稿", "Unsaved local draft found")} · {new Date(draft.recovery.updatedAt).toLocaleString(locale === "zh" ? "zh-CN" : "en-US")} {draft.recovery.baseVersion!==((school ? initial?.editRevision?.toString() : initial?.versionId)??"new")&&tr("（服务器版本已变化，请核对后保存）", "(The server version changed; review before saving)")}</p><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={!editable || action.busy || switching} onClick={draft.restore}>{tr("恢复草稿", "Restore draft")}</Button><Button size="sm" variant="ghost" disabled={action.busy || switching} onClick={draft.discard}>{tr("忽略草稿", "Discard draft")}</Button></div></section>}
       {editable && <p className={`${styles.draftStatus} text-xs ${draft.status === "failed" || dirty && !draft.savedLocally ? "text-warning" : "text-muted-foreground"}`} role="status" data-od-id="teacher-autosave-status">{draftMessage}</p>}
 
       <div className={styles.toolbar}>
-        {!platform && <><span className="text-muted-foreground">{tr("分组", "Groups")}</span>
+        {!school && !platform && <><span className="text-muted-foreground">{tr("分组", "Groups")}</span>
         <GroupTags
           onClick={saved?.id && editable && !stepDisabled ? () => setManage(true) : undefined}
           groups={
@@ -462,10 +506,10 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
         >
           {tr("整理分组", "Organize groups")}
         </Button></>}
-        {saved && !platform ? <ProblemPublicationStatus problem={saved} bankVisibility={bankVisibility}/> : <StatusPill status={saved?.published ? tr("已发布", "Published") : tr("草稿", "Draft")}/>}
-        {saved && !platform && <span className="text-xs text-muted-foreground">{reviewVisibilityLabel(saved, bankVisibility, locale)}</span>}
+        {saved && !school && !platform ? <ProblemPublicationStatus problem={saved} bankVisibility={bankVisibility}/> : <StatusPill status={saved?.published ? tr("已发布", "Published") : tr("草稿", "Draft")}/>}
+        {saved && !school && !platform && <span className="text-xs text-muted-foreground">{reviewVisibilityLabel(saved, bankVisibility, locale)}</span>}
       </div>
-      {!platform && !saved?.id&&<p className="text-xs text-muted-foreground">{tr("整理分组时先保存题目草稿；没有分组可在弹窗中直接新建。", "Save the problem draft before organizing groups. You can create a group in the dialog.")}</p>}
+      {!school && !platform && !saved?.id&&<p className="text-xs text-muted-foreground">{tr("整理分组时先保存题目草稿；没有分组可在弹窗中直接新建。", "Save the problem draft before organizing groups. You can create a group in the dialog.")}</p>}
       <State resource={groups}/>
       <Tabs value={tr(tab, editorTabs[tab].en)} onChange={value => {
         const next = visibleTabs.find(item => tr(item, editorTabs[item].en) === value) ?? "题面";
@@ -474,8 +518,8 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
         setTab(next);
       }} items={visibleTabs.map(item => tr(item, editorTabs[item].en))} />
       <section className={`${panel} ${styles.body}`} hidden={tab === "教程" || tab === "解答与提示"} data-od-id="teacher-editor-tab-content"><fieldset disabled={!editable || action.busy || switching}>
-        {tab === "题面" && (
-          <div className="grid grid-cols-[minmax(0,1fr)_260px] gap-5 max-lg:grid-cols-1">
+        {(tab === "题面" || (school && statementLang === "zh")) && (
+          <div className="grid grid-cols-[minmax(0,1fr)_260px] gap-5 max-lg:grid-cols-1" hidden={tab !== "题面"}>
             <div className="space-y-4">
               <Field label={tr("题目标题", "Problem title")}>
                 <input
@@ -486,10 +530,11 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
                   className={input}
                 />
               </Field>
-              <MathEditor
+              {school && saved?.versionId && editable && <Field label={tr("题面语言","Statement language")}><select className={`${input} max-w-56`} value={statementLang} disabled={solutionPending} onChange={e=>setStatementLang(e.target.value === "zh" ? "zh" : "en")}><option value="en">{tr("原题面","Original statement")}</option><option value="zh">{tr("中文题面（译文）","Chinese statement (translation)")}</option></select></Field>}
+              {school && statementLang === "zh" && saved?.versionId ? <SchoolProblemContent schoolId={school.id} problemId={saved.id} versionId={saved.versionId} kind="FULL_TRANSLATION" onPendingChange={setPendingSchoolTranslation}/> : <MathEditor
                 fieldName="statement"
                 label={tr("题面 / Markdown 与 LaTeX", "Statement / Markdown and LaTeX")}
-                labelControl={saved?.versionId && editable ? (
+                labelControl={!school && saved?.versionId && editable ? (
                   <select
                     aria-label={tr("题面语言", "Statement language")}
                     className={`${input} max-w-56`}
@@ -505,8 +550,8 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
                 onChange={statementLang === "zh" ? (value) => translation.setText(value) : (value) => update("statement", value)}
                 rows={10}
                 initialPreview
-              />
-              {statementLang === "zh" && saved?.versionId && editable && (
+              />}
+              {!school && statementLang === "zh" && saved?.versionId && editable && (
                 <ProblemTranslationActions
                   target={{ problemId: saved.id, versionId: saved.versionId }}
                   endpoint={platform ? `${endpoint}/${saved.id}/contents` : undefined}
@@ -530,7 +575,7 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
                   {banks.data?.items
                     .filter(
                       (x) =>
-                        x.canContribute ||
+                        x.canManage && !x.archived || x.canContribute ||
                         x.canEdit ||
                         ["owner", "edit"].includes(x.permission) ||
                         x.id === problem.bankId,
@@ -568,6 +613,7 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
                   onChange={(e) => update("difficulty", e.target.value)}
                   className={input}
                 >
+                  {problem.difficulty && !["基础", "中等", "进阶"].includes(problem.difficulty) && <option value={problem.difficulty}>{problem.difficulty}</option>}
                   {["基础", "中等", "进阶"].map((x) => (
                     <option key={x} value={x}>{tr(x, ({"基础":"Basic","中等":"Intermediate","进阶":"Advanced"} as Record<string,string>)[x] ?? x)}</option>
                   ))}
@@ -598,7 +644,7 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
                     key={mode}
                     variant={problem.mode === mode ? "primary" : "secondary"}
                     disabled={!editable}
-                    onClick={() => update("mode", mode)}
+                    onClick={() => school ? setProblem(p => ({...p,...schoolProblemMode(schoolEditorDefinition(p),mode)})) : update("mode", mode)}
                   >
                     {mode === "stdio" ? tr("标准输入输出", "Standard I/O") : tr("函数题", "Function")}
                   </Button>
@@ -692,6 +738,7 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
                     </p>
                   </div>
                   <div className="flex gap-2">
+                    {school && kind === "tests" && <Button type="button" variant="secondary" size="sm" onClick={()=>update("tests",equalCaseWeights(problem.tests ?? []))}>{tr("均分权重","Equal weights")}</Button>}
                     {kind === "tests" && (
                       <Button
                         variant="secondary"
@@ -718,7 +765,7 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
                     tr("编号 / 名称", "ID / name"),
                     problem.mode === "function" ? tr("参数", "Parameters") : tr("输入", "Input"),
                     problem.mode === "function" ? tr("期望返回值", "Expected return") : tr("期望输出", "Expected output"),
-                    tr("启用", "Enabled"),
+                    school ? tr("权重","Weight") : tr("启用", "Enabled"),
                     tr("操作", "Actions"),
                   ]}
                   min={760}
@@ -731,7 +778,7 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
                           {i + 1}
                         </span>
                         <p className="font-semibold">
-                          {item.name ??
+                          {(school ? undefined : item.name) ??
                             `${kind === "samples" ? tr("样例", "Sample") : tr("测试", "Test")} ${i + 1}`}
                         </p>
                       </td>
@@ -746,7 +793,8 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
                         </pre>
                       </td>
                       <td>
-                        <button
+                        {school ? kind === "tests" ? <input type="number" aria-label={tr(`测试 ${i+1} 权重`,`Test ${i+1} weight`)} className={`${input} w-24`} min={0.0001} max={100} step={0.0001}
+                          value={Number.isFinite(item.weight) ? item.weight : ""} onChange={e=>update(kind,list(kind).map((row,index)=>index===i?{...row,weight:e.target.valueAsNumber}:row))}/> : "—" : <button
                           disabled={!editable}
                           className={`rounded-full px-2 py-1 text-xs font-semibold ${item.enabled !== false ? "bg-success-soft text-success" : "bg-muted text-muted-foreground"}`}
                           onClick={() =>
@@ -761,7 +809,7 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
                           }
                         >
                           {item.enabled !== false ? tr("启用", "Enabled") : tr("停用", "Disabled")}
-                        </button>
+                        </button>}
                       </td>
                       <td>
                         <div className="flex gap-1">
@@ -833,9 +881,9 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
               <Field label={tr("参考解验证语言","Reference validation language")}><select className={input} value={problem.referenceLanguage??"python"} onChange={e=>update("referenceLanguage",e.target.value as SubmissionLanguage)}><option value="python">Python</option><option value="cpp">C++</option><option value="javascript">JavaScript</option></select></Field>
               <Field label={tr("时间限制（ms）","Time limit (ms)")}><input type="number" step={1} min={100} max={5000} value={problem.timeLimitMs} onChange={e=>update("timeLimitMs",Number(e.target.value))} className={input}/><p className="mt-1 text-xs text-muted-foreground">{tr("100–5000 ms，亦受运行环境上限约束。","100–5000 ms, subject to runtime limits.")}</p></Field>
               <Field label={tr("内存限制（MB）","Memory limit (MB)")}><input type="number" step={1} min={32} max={256} value={problem.memoryLimitMb} onChange={e=>update("memoryLimitMb",Number(e.target.value))} className={input}/><p className="mt-1 text-xs text-muted-foreground">{tr("32–256 MB；JavaScript 最低按 128 MB 执行。","32–256 MB; JavaScript uses at least 128 MB.")}</p></Field>
-              <Field label={tr("输出比较方式","Output comparison")}><select aria-label={tr("输出比较方式","Output comparison")} disabled={problem.mode==="function"} className={input} value={problem.mode==="function"?"json":problem.comparator==="exact"?"exact":"tokens"} onChange={e=>update("comparator",e.target.value as EditorProblem["comparator"])}>{problem.mode==="function"?<option value="json">{tr("JSON 返回值比较","JSON return-value comparison")}</option>:<><option value="tokens">{tr("按 token 比较（忽略空白差异）","Token comparison (ignore whitespace)")}</option><option value="exact">{tr("精确文本比较","Exact text comparison")}</option></>}</select><p className="mt-1 text-xs text-muted-foreground">{tr("函数题由系统固定使用 JSON 比较。","Function problems always use JSON comparison.")}</p></Field>
-              <Field label={tr("测试计分","Test scoring")}><div className="rounded-md border border-border px-3 py-2 text-sm">{tr("启用的正式测试点等权计分","Enabled formal test cases have equal weight")}</div><p className="mt-1 text-xs text-muted-foreground">{tr("公开样例不计分，活动得分按作业或训练规则计算。","Public samples do not score. Activity points follow assignment or practice rules.")}</p></Field>
-              <div className="flex flex-wrap items-start gap-2"><Button variant="secondary" onClick={()=>setTab("测试数据")}>{tr("管理测试数据","Manage test data")}</Button><Button variant="secondary" disabled={!editable||action.busy||solutionPending} onClick={()=>void action.run(async()=>{await save();setTab("版本与发布");return tr("草稿已保存，请查看参考解验证结果。","Draft saved. Check reference validation results.");})}>{tr("验证参考解","Validate reference solution")}</Button></div>
+              <Field label={tr("输出比较方式","Output comparison")}><select aria-label={tr("输出比较方式","Output comparison")} disabled={problem.mode==="function"} className={input} value={problem.mode==="function"?"json":school ? problem.comparator ?? "tokens" : problem.comparator==="exact"?"exact":"tokens"} onChange={e=>update("comparator",e.target.value as EditorProblem["comparator"])}>{problem.mode==="function"?<option value="json">{tr("JSON 返回值比较","JSON return-value comparison")}</option>:<><option value="tokens">{tr("按 token 比较（忽略空白差异）","Token comparison (ignore whitespace)")}</option><option value="exact">{tr("精确文本比较","Exact text comparison")}</option>{school && <option value="json">{tr("JSON 值","JSON value")}</option>}</>}</select><p className="mt-1 text-xs text-muted-foreground">{tr("函数题由系统固定使用 JSON 比较。","Function problems always use JSON comparison.")}</p></Field>
+              <Field label={tr("测试计分","Test scoring")}><div className="rounded-md border border-border px-3 py-2 text-sm">{school ? tr("正式测试按权重计分，总和为 100。","Formal test weights must total 100.") : tr("启用的正式测试点等权计分","Enabled formal test cases have equal weight")}</div><p className="mt-1 text-xs text-muted-foreground">{tr("公开样例不计分，活动得分按作业或训练规则计算。","Public samples do not score. Activity points follow assignment or practice rules.")}</p></Field>
+              <div className="flex flex-wrap items-start gap-2"><Button variant="secondary" onClick={()=>setTab("测试数据")}>{tr("管理测试数据","Manage test data")}</Button><Button variant="secondary" disabled={!editable||action.busy||solutionPending} onClick={()=>void action.run(async()=>{return validateReference();})}>{tr("验证参考解","Validate reference solution")}</Button></div>
             </div>
           </div>
         )}
@@ -847,8 +895,8 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
                 <p className="mt-2 text-sm text-muted-foreground">
                   {tr("草稿保存在同一道题中。发布后，学生看到更新后的内容；已有提交、成绩和进度保留。", "Drafts are saved to the same problem. On publication, students see the updated content and keep their submissions, grades, and progress.")}
                 </p>
-                <p className="mt-2 text-sm text-muted-foreground">{platform ? tr("授权编辑者可以保存草稿，由平台管理员发布。", "Authorized editors can save drafts. A platform administrator publishes them.") : bankVisibility === "school" ? tr("提交草稿后，由学校管理员审核。通过前，学生仍看到上次发布的内容。", "A school administrator reviews submitted drafts. Students keep seeing the last published content until approval.") : tr("这是教师私有题库。发布后，更新可用于指定作业或训练。", "This bank is teacher-private. Published updates can be used in assigned activities.")}</p>
-                {saved && !platform && <p className="mt-2 text-sm font-medium">{tr("当前状态", "Current status")}: {reviewVisibilityLabel(saved, bankVisibility, locale)}</p>}
+                <p className="mt-2 text-sm text-muted-foreground">{school ? tr("校内草稿通过参考解验证后，由学校管理员发布。","A school administrator can publish the draft after reference validation passes.") : platform ? tr("授权编辑者可以保存草稿，由平台管理员发布。", "Authorized editors can save drafts. A platform administrator publishes them.") : bankVisibility === "school" ? tr("提交草稿后，由学校管理员审核。通过前，学生仍看到上次发布的内容。", "A school administrator reviews submitted drafts. Students keep seeing the last published content until approval.") : tr("这是教师私有题库。发布后，更新可用于指定作业或训练。", "This bank is teacher-private. Published updates can be used in assigned activities.")}</p>
+                {saved && !school && !platform && <p className="mt-2 text-sm font-medium">{tr("当前状态", "Current status")}: {reviewVisibilityLabel(saved, bankVisibility, locale)}</p>}
                 <p className="mt-3 font-mono text-xs">
                   {saved?.id ?? tr("尚未保存", "Not saved")}
                 </p>
@@ -885,7 +933,7 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
                   {saved.validationMessage}
                 </p>
               )}
-              {saved?.versionId && (saved.editRevision ?? 0) > (saved.publishedRevision ?? 0) && editable && saved.draftReviewStatus !== "pending" &&
+              {!school && saved?.versionId && (saved.editRevision ?? 0) > (saved.publishedRevision ?? 0) && editable && saved.draftReviewStatus !== "pending" &&
                 <ProblemDraftPresentation key={`${saved.id}:${saved.editRevision}`} problem={saved} locale={locale} platform={platform} />}
             </section>
             <aside className="space-y-3">
@@ -898,9 +946,8 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
                 disabled={!saved || action.busy}
                 onClick={() =>
                   void action.run(async () => {
-                    const result = await productionApi<EditorProblem>(
-                      `${endpoint}/${saved?.id}?versionId=${saved?.versionId}`,
-                    );
+                    if (!saved) return "";
+                    const result = await fetchSaved(saved);
                     setSaved(result);
                     return tr("验证结果已刷新。", "Validation result refreshed.");
                   })
@@ -908,7 +955,7 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
               >
                 {tr("刷新验证结果", "Refresh validation")}
               </Button>
-              {editable && <Button
+              {editable && (!school || canPublish) && <Button
                 variant="secondary"
                 disabled={!(requestsPlatformReview ? saved?.canRequestReview : saved?.canPublish) || dirty || action.busy || solutionPending}
                 onClick={() => setPublish(true)}
@@ -920,15 +967,15 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
         )}
       </fieldset></section>
       {solutionsVisited && <section className="space-y-4" role="tabpanel" aria-label={tr("解答与提示", "Solutions and hints")} hidden={tab !== "解答与提示"}>
-        {saved?.versionId && editable ? <ProblemAssistanceEditor key={saved.id}
+        {school && saved?.versionId && editable ? <SchoolProblemContent schoolId={school.id} problemId={saved.id} versionId={saved.versionId} kind="FULL_SOLUTION" onPendingChange={setSolutionPending}/> : saved?.versionId && editable ? <ProblemAssistanceEditor key={saved.id}
           problemId={saved.id} versionId={saved.versionId}
           endpoint={platform ? `${endpoint}/${saved.id}/contents` : undefined} canPublish={canPublish}
           initialVersionId={search.get("solutionVersionId") ?? undefined}
           initialKind={search.get("kind") === "FULL_TRANSLATION" ? "FULL_TRANSLATION" : "FULL_SOLUTION"}
           externalBusy={action.busy || switching} hasUnsavedProblemChanges={dirty} onPendingChange={setSolutionPending} />
           : <p className={`${panel} p-4 text-sm text-muted-foreground`}>{saved
-            ? tr("你对此题只有查看权限，无法编辑或发布学生题解。", "You have read-only access to this problem and cannot edit or publish student solutions.")
-            : tr("先保存题目草稿，即可在这里修改学生题解、添加多种解法并审核发布。", "Save the problem draft first, then edit student solutions, add approaches and review them for publication here.")}</p>}
+            && !editable ? tr("你对此题只有查看权限，无法编辑或发布学生题解。", "You have read-only access to this problem and cannot edit or publish student solutions.")
+            : school ? tr("发布教学版本后，可为该版本编辑学生题解。","Publish a teaching version to edit its student solutions.") : tr("先保存题目草稿，即可在这里修改学生题解、添加多种解法并审核发布。", "Save the problem draft first, then edit student solutions, add approaches and review them for publication here.")}</p>}
         {steps?.repeatAfterSolutions && (steps.previous || steps.next) && <div className="flex justify-end">
           <ProblemEditorSteps navigation={steps} dirty={hasUnsavedEdits} disabled={stepDisabled}
             label={tr("从题解切换题目", "Switch problem from solutions")} onSelect={switchProblem} />
@@ -975,9 +1022,7 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
                 disabled={action.busy || solutionPending || !editable}
                 onClick={() =>
                   void action.run(async () => {
-                    await save();
-                    setTab("版本与发布");
-                    return tr("参考解验证任务已提交。", "Reference validation job submitted.");
+                    return validateReference();
                   })
                 }
               >
@@ -996,7 +1041,7 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
           <p className="text-sm text-muted-foreground">{tr("先保存题目草稿，即可在这里设置教程。", "Save the problem draft to set up its tutorial here.")}</p>}
       </section>}
       {test && (
-        <TestDrawer
+        <TestDrawer fixedCases={!!school}
           key={`${test.kind}-${test.index}`}
           mode={problem.mode}
           kind={test.kind}
@@ -1005,6 +1050,7 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
           }
           onClose={() => setTest(null)}
           onSave={(value) => {
+            if (school && test.kind === "tests") value = {...value,weight:value.weight ?? 1};
             update(
               test.kind,
               test.index === null
@@ -1021,6 +1067,7 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
           currentCount={problem.tests?.length ?? 0}
           onClose={() => setBatch(false)}
           onApply={(rows, replace) => {
+            if (school) rows = replace ? equalCaseWeights(rows) : rows.map(row => ({...row,weight:1}));
             update(
               "tests",
               replace ? rows : [...(problem.tests ?? []), ...rows],
@@ -1055,7 +1102,7 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
               ? tr(`提交“${saved.title}”供平台管理员或获授权的学校管理员审核。`, `Send “${saved.title}” to a platform administrator or an authorized school administrator for review.`)
               : platform && saved.draftReviewStatus === "pending"
               ? tr(`发布“${saved.title}”的已验证修改。已有访问权限的学生可看到更新内容。`, `Publish the validated changes to “${saved.title}” for students with existing access.`)
-              : platform || bankVisibility !== "school"
+              : school || platform || bankVisibility !== "school"
               ? tr(`发布“${saved.title}”的已验证修改。已有提交、成绩和进度会保留。`, `Publish the validated changes to “${saved.title}”. Existing submissions, grades, and progress will be kept.`)
               : tr(`提交“${saved.title}”供学校管理员审核。通过前，学生继续看到已发布内容。`, `Send “${saved.title}” to a school administrator for review. Students keep seeing the published content until approval.`)}
           </p>
@@ -1068,7 +1115,8 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
               disabled={action.busy}
               onClick={() =>
                 void action.run(async () => {
-                  const result = await productionApi<EditorProblem>(
+                  const result = school ? schoolEditorProblem(await productionApi<SchoolProblem>(`${endpoint}/${saved.id}/publish`,
+                    {method:"POST",body:{expectedRevision:saved.editRevision}}),school.admin) : await productionApi<EditorProblem>(
                     `${endpoint}/${saved.id}/${requestsPlatformReview ? "request-review" : "publish"}`,
                     { method: "POST", body: { ...(platform ? { expectedVersionId: saved.versionId } : { versionId: saved.versionId }), expectedRevision: saved.editRevision } },
                   );
@@ -1078,11 +1126,11 @@ function ProblemEditorForm({ initial, user, platform, delegatedReview, onClose, 
                   setTagsText(null);
                   setPublish(false);
                   if (requestsPlatformReview) return tr("已提交平台管理员审核。", "Sent to a platform administrator for review.");
-                  return !platform && bankVisibility === "school" ? tr("已提交学校管理员审核。", "Sent to a school administrator for review.") : tr("题目已发布。", "Problem published.");
+                  return !school && !platform && bankVisibility === "school" ? tr("已提交学校管理员审核。", "Sent to a school administrator for review.") : tr("题目已发布。", "Problem published.");
                 })
               }
             >
-              {requestsPlatformReview || !platform && bankVisibility === "school" ? tr("提交审核", "Request review") : tr("发布题目", "Publish problem")}
+              {requestsPlatformReview || !school && !platform && bankVisibility === "school" ? tr("提交审核", "Request review") : tr("发布题目", "Publish problem")}
             </Button>
           </div>
         </Modal>
@@ -1123,7 +1171,7 @@ function useProblemTranslation({
     problemId: problemId ?? "00000000-0000-0000-0000-000000000000",
     versionId: versionId ?? "00000000-0000-0000-0000-000000000000",
   })}`;
-  const contents = useContentResource(path);
+  const contents = useContentResource(path, Boolean(problemId && versionId));
   const content = contents.data?.items.find(
     (item) => item.kind === "FULL_TRANSLATION" && item.language === "zh-CN",
   );

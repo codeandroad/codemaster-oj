@@ -14,8 +14,7 @@ import problemStyles from "@/components/student/problems-page.module.css";
 import { ProblemCatalogSearch } from "@/components/student/problem-catalog-search";
 import { StudentProblemFilter } from "@/components/student/problem-filter";
 import { ProblemCatalogCourseFilter, problemCourseFilterKey, publicProblemCourseFilterKey, type ProblemCatalogResult } from "@/components/student/problem-catalog-course-filter";
-import { ProblemTutorialEditor } from "@/components/teacher/problem-tutorial-editor";
-import { adjacentProblemRows, type ProblemEditorNavigation } from "@/components/teacher/problem-editor-navigation";
+import { adjacentProblemRows, type ProblemEditorTab } from "@/components/teacher/problem-editor-navigation";
 import { Feedback, State, input, useData, useMutation } from "@/components/student/shared";
 import { LearnerProblemTable, SchoolPracticeCatalog } from "./school-practice-catalog";
 import type { Bank, Problem } from "./school-practice-types";
@@ -25,8 +24,6 @@ import { SchoolProblemEditor } from "./school-problem-editor";
 import { practiceCatalogFilters, practiceFilterKeys, practiceLocation, practiceNavigationItems, practiceProblemMatches, schoolCatalogProblemLocation, type PracticeCatalogFilters } from "./school-practice-navigation";
 import { PublicProblemWorkspace } from "./public-problem-workspace";
 import { PracticeProblem } from "./school-problem-workspace";
-
-type EditableProblem = { scope: "school"; problem: Problem } | { scope: "platform"; id: string };
 
 function updatePracticeLocation(patch: Record<string, string | null>) {
   const current = window.location;
@@ -87,7 +84,6 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
     ? inventory.filter(p => p.bankId === bankId && (filters.groupId === "ungrouped" ? !groupedIds.has(p.id) : groupedIds.has(p.id)))
     : inventory;
   const navigationProblems = (allProblems.data?.courseId ?? "") === courseId ? allProblems.data?.items ?? [] : [];
-  const [editing, setEditing] = useState<EditableProblem | "new" | null>(null);
   const [bankEdit, setBankEdit] = useState<Bank | "new" | null>(null);
   const [archiveProblem,setArchiveProblem] = useState<Problem | null>(null);
   const [archiveBank, setArchiveBank] = useState<Bank | null>(null);
@@ -95,12 +91,10 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
   const bankRequest = useRef("");
   const bankPending = useRef(false);
   const editBookmark = staff && params.get("problemEdit") === "1" ? selected : null;
-  const sourceBookmark = !!editBookmark && (params.get("source") === "platform" || sourceProblems.some(p=>p.id===editBookmark));
-  const bookmarked = useData<Problem>(editBookmark && !sourceBookmark && platformSources.data ? `${base}/problems/${encodeURIComponent(editBookmark)}` : "");
-  const closeBookmark = () => updatePracticeLocation({problemId:null,problemEdit:null,source:null});
+  const sourceBookmark = !!editBookmark && (params.get("source") === "platform" || !params.has("source") && sourceProblems.some(p=>p.id===editBookmark));
+  const closeBookmark = () => { updatePracticeLocation({problemId:null,problemEdit:null,source:null,tab:null}); refresh(); };
   const action = useMutation();
   function refresh() { groups.reload(); banks.reload(); allProblems.reload(); bankProblems.reload(); platformSources.reload(); }
-  function closeProblemEditor() { setEditing(null); refresh(); }
   function problemLocation(id: string) {
     const row = navigationProblems.find(problem => problem.id === id) ?? catalogProblems.find(problem => problem.id === id);
     return schoolCatalogProblemLocation(id, row?.courseContext);
@@ -111,17 +105,8 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
     const fields = Object.fromEntries(Object.entries(patch).map(([key, value]) => [practiceFilterKeys[key as keyof PracticeCatalogFilters], typeof value === "boolean" ? value ? "1" : null : value]));
     changeUrlFilters(fields);
   }
-  async function openProblemEditor(problem: Problem) {
-    if (problem.ownerScope === "platform") {
-      setEditing({ scope: "platform", id: problem.id });
-      return;
-    }
-    const detail = await productionApi<Problem>(`${base}/problems/${encodeURIComponent(problem.id)}`);
-    if (!detail.canManage) throw new Error(tx("此题目前不可编辑。", "This problem is currently read-only."));
-    setEditing({ scope: "school", problem: detail });
-  }
-  function editProblem(problem: Problem) {
-    void action.run(() => openProblemEditor(problem));
+  function editProblem(problem: Problem, tab?: ProblemEditorTab) {
+    updatePracticeLocation({problemId:problem.id, problemEdit:"1", source:problem.ownerScope === "platform" ? "platform" : "school",tab:tab ?? null});
   }
   function editBank(bank: Bank | "new") {
     action.reset();
@@ -135,27 +120,18 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
     return () => clearInterval(timer);
   }, [problems.data, problems.reload]);
 
-  let editorNavigation: ProblemEditorNavigation | undefined;
-  if (editing && editing !== "new") {
-    const currentId = editing.scope === "platform" ? editing.id : editing.problem.id;
-    const rows = catalogProblems.filter(problem => problem.canManage && !problem.archived
-      && (problem.id === currentId || practiceProblemMatches(problem, filters, staff)));
-    const { previous, next } = adjacentProblemRows(rows, currentId);
-    const target = (problem?: Problem) => problem && ({
-      title: problem.title,
-      select: () => openProblemEditor(problem),
-    });
-    editorNavigation = { previous: target(previous), next: target(next) };
-    if (editing.scope === "platform") return <PlatformProblemEditor id={editing.id} navigation={editorNavigation}
-      onClose={closeProblemEditor} />;
-  }
-
   if (editBookmark) {
-    if (sourceBookmark) return <PlatformProblemEditor id={editBookmark} onClose={closeBookmark}/>;
-    return <State data={platformSources}><State data={bookmarked}>{bookmarked.data && (bookmarked.data.canManage
-      ? <SchoolProblemEditor problem={bookmarked.data} base={base} banks={catalogBanks.filter(bank=>bank.canManage && !bank.archived)}
-          bankId={bookmarked.data.bankId} close={closeBookmark} saved={closeBookmark}/>
-      : <p role="status">{tx("此题目前不可编辑。","This problem is currently read-only.")}</p>)}</State></State>;
+    const rows = catalogProblems.filter(problem => problem.canManage && !problem.archived
+      && (problem.id === editBookmark || practiceProblemMatches(problem, filters, staff)));
+    const { previous, next } = adjacentProblemRows(rows, editBookmark);
+    const target = (problem?: Problem) => problem && ({title:problem.title,select:(tab?: ProblemEditorTab)=>editProblem(problem,tab)});
+    const navigation = {previous:target(previous), next:target(next)};
+    if (sourceBookmark) return <PlatformProblemEditor id={editBookmark} navigation={navigation} onClose={closeBookmark}/>;
+    if (editBookmark === "new" && !banks.data) return <State data={banks}>{null}</State>;
+    if (editBookmark !== "new" && !params.has("source") && !platformSources.data) return <State data={platformSources}>{null}</State>;
+    return <SchoolProblemEditor key={editBookmark} id={editBookmark} schoolId={schoolId} admin={role==="school_admin"} bankId={banks.data?.items.find(b=>b.id===bankId && b.canManage && !b.archived)?.id ?? banks.data?.items.find(b=>b.canManage && !b.archived)?.id}
+      initialTab={params.get("tab")} navigation={navigation} close={closeBookmark}
+      onCreated={(id,tab)=>window.history.replaceState(null,"",practiceLocation(pathname,params.toString(),{problemId:id,source:"school",tab:tab ?? null}))}/>;
   }
   if (!staff && selected && params.has("publicCourseId")) {
     return <PublicProblemWorkspace id={selected} workspaceSchoolId={schoolId} catalog={catalog}/>;
@@ -181,7 +157,7 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
     onRefresh={refresh}
     onEditBank={editBank}
     onArchiveBank={bank => { action.reset(); setArchiveBank(bank); }}
-    onNewProblem={() => setEditing("new")}
+    onNewProblem={() => updatePracticeLocation({problemId:"new",problemEdit:"1",source:"school",tab:null})}
     onOpen={id => {
       const problem = catalogProblems.find(item => item.id === id);
       if (staff && problem?.canManage) editProblem(problem);
@@ -189,13 +165,8 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
     }}
     renderActions={problem => <>
       {problem.canManage && <Button size="sm" variant="ghost" disabled={action.busy} onClick={() => editProblem(problem)}>{tx("编辑", "Edit")}</Button>}
-      {problem.ownerScope !== "platform" && problem.canManageTutorial && <ProblemTutorialEditor
-        endpoint={`${base}/problems/${encodeURIComponent(problem.id)}/tutorial`}
-        problemTitle={problem.title}
-        size="sm"
-        variant="ghost"
-        disabled={action.busy}
-      />}
+      {problem.ownerScope !== "platform" && problem.canManageTutorial && <Button type="button" size="sm" variant="ghost"
+        onClick={()=>editProblem(problem,"tutorial")}>{tx("编辑教程","Edit tutorial")}</Button>}
       {problem.ownerScope !== "platform" && problem.canManage && <>
         <Button size="sm" variant="secondary" title={tx("验证参考程序", "Validate reference program")} disabled={action.busy || ["queued", "leased"].includes(problem.validation?.state ?? "")} onClick={() => void action.run(async () => {
           await productionApi(`${base}/problems/${problem.id}/validate`, { method: "POST", body: { expectedRevision: problem.revision, requestId: crypto.randomUUID() } }); refresh();
@@ -283,10 +254,6 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
         </form>
       </DialogContent>
     </Dialog>
-    {editing && <SchoolProblemEditor key={editing === "new" ? "new" : editing.problem.id} problem={editing === "new" ? null : editing.problem}
-      banks={banks.data?.items.filter(bank => bank.canManage && !bank.archived) ?? []}
-      bankId={banks.data?.items.find(bank => bank.id === bankId && bank.canManage && !bank.archived)?.id ?? ""}
-      base={base} navigation={editorNavigation} close={closeProblemEditor} saved={closeProblemEditor} />}
   </div>;
 }
 

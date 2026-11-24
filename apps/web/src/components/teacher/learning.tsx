@@ -356,14 +356,14 @@ export function LearningEditorForm({
   initial,
   onSaved,
   onBack,
-  onEditPlatformProblem,
+  onEditProblem,
   showTopicEditor = false,
 }: {
   initial: Path;
   showTopicEditor?: boolean;
   onSaved: () => void;
   onBack?: () => void;
-  onEditPlatformProblem?: (selection: CourseProblemEditorSelection) => void;
+  onEditProblem?: (selection: CourseProblemEditorSelection) => void;
 }) {
   const {t, locale} = useLocale();
   const { language, setLanguage } = useCourseLanguage();
@@ -412,6 +412,20 @@ export function LearningEditorForm({
   const platform = path.ownerScope === "platform";
   const school = path.schoolData;
   const legacy = !platform && !school;
+  const scopedProblems = useData<{items:{id:string;canManage:boolean;archived?:boolean}[]}>(
+    school && canEditCourse ? `schools/${school.schoolId}/problems?view=management` : null);
+  const localProblems = new Map(scopedProblems.data?.items.map(problem => [problem.id, problem]));
+  const hasExternalLinks = scopedProblems.data && chapters.some(ch => ch.problems.some(p => !localProblems.has(p.problemId)));
+  const platformSources = useData<{items: Pick<ProductionProblem,"id" | "canEdit">[]}>(
+    school && canEditCourse && hasExternalLinks ? `platform/source-problems?schoolId=${school.schoolId}&view=summary` : null);
+  const grantedSources = new Set(platformSources.data?.items.filter(p => p.canEdit).map(p => p.id));
+  function editorScope(problem: ChapterProblem) {
+    if (!school) return platform && problem.canEdit ? "platform" : undefined;
+    const local = localProblems.get(problem.problemId);
+    if (local?.canManage && !local.archived) return "school";
+    if (grantedSources.has(problem.problemId)) return "platform";
+  }
+
   const canPublish = canEditCourse && (legacy || path.platformData?.canManage === true);
   async function saveSchoolDraft(nextChapters: Chapter[], nextSections: CourseSection[], settings?: Record<string, unknown>) {
     if (!school) throw new Error("School course required");
@@ -438,11 +452,17 @@ export function LearningEditorForm({
   }, [path.archived]);
   const chapter = chapters.find((x) => x.id === current) ?? chapters[0],
     selectedIndex = chapters.findIndex((x) => x.id === chapter?.id);
-  function openPlatformExercise(chapterId: string, problemId: string) {
-    const exercises = courseProblemEditorEntries(orderCourseChapters(sections, chapters));
+  function openExercise(chapterId: string, problemId: string) {
+    const ordered = orderCourseChapters(sections, chapters);
+    const exercises = courseProblemEditorEntries(ordered.map(ch => ({
+      ...ch, problems: ch.problems.map(p => {
+        const ownerScope = editorScope(p);
+        return {...p, canEdit: !!ownerScope, ownerScope};
+      }),
+    })));
     const exercise = exercises.find(item => item.id === courseProblemEditorEntryId(chapterId, problemId));
     if (!exercise) return;
-    onEditPlatformProblem?.({ exercise, exercises, returnToExercise: entry => {
+    onEditProblem?.({ exercise, exercises, returnToExercise: entry => {
       setCurrent(entry.chapterId);
       requestAnimationFrame(() => document.getElementById(`${exerciseListId}-${entry.id}`)?.focus());
     } });
@@ -865,12 +885,12 @@ export function LearningEditorForm({
                     className="flex flex-wrap items-center justify-between gap-2 border-t border-border p-3 text-sm"
                   >
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      {platform && p.canEdit && onEditPlatformProblem ? <button
+                      {editorScope(p) && onEditProblem ? <button
                         type="button"
                         id={`${exerciseListId}-${courseProblemEditorEntryId(chapter.id, p.problemId)}`}
                         className={`${link} min-h-6 text-left disabled:opacity-50`}
                         disabled={action.busy}
-                        onClick={() => openPlatformExercise(chapter.id, p.problemId)}
+                        onClick={() => openExercise(chapter.id, p.problemId)}
                       >
                         {p.title}
                       </button> : (legacy || p.canEdit) ? <Link

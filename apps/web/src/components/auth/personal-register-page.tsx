@@ -257,11 +257,9 @@ export function PersonalRegisterPage({
           ) : (
             <UserPlus size={17} />
           )}
-          <span role="status">
-            {busy
-              ? text("Creating account…", "正在创建…")
-              : text("Create account", "创建账号")}
-          </span>
+          {busy
+            ? text("Creating account…", "正在创建…")
+            : text("Create account", "创建账号")}
         </Button>
       </form>
       <div className="mt-5 flex flex-wrap justify-center gap-x-5 gap-y-2 border-t border-border pt-4 text-sm">

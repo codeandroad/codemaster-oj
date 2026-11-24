@@ -86,6 +86,13 @@ function chapterProblems(value=[]){
  if(new Set(items.map(p=>p.problemId)).size!==items.length)fail(400,'VALIDATION','章节题目不能重复');
  return items;
 }
+export async function schoolPublishedProblemOptions(db, schoolId) {
+  return (await db.query(`SELECT p.id AS "problemId",p.published_version_id AS "versionId",v.definition->>'title' AS title,v.definition->>'mode' AS mode,v.definition#>>'{metadata,difficulty}' AS difficulty,b.name AS "bankName",b.id AS "bankId"
+    FROM school_problems p JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id
+    JOIN school_problem_versions v ON v.school_id=p.school_id AND v.id=p.published_version_id
+    WHERE p.school_id=$1 AND b.resource_kind='ordinary' AND p.published AND NOT b.archived ORDER BY b.name,v.definition->>'title',p.id LIMIT 2000`, [schoolId])).rows;
+}
+
 async function validateProblems(db,schoolId,chapters){
  const links=chapters.flatMap(ch=>ch.problems??[]);if(!links.length)return;
  const {rows:[result]}=await db.query(`SELECT count(*)::int AS invalid FROM jsonb_to_recordset($2::jsonb) AS l("problemId" uuid,"versionId" uuid)
@@ -310,6 +317,10 @@ export async function handleSchoolCourses(context){
    }
    await loadSchoolCourse(db,schoolId,courseId,user,role);
    return reply({scope:'school',id:courseId});
+  }
+  if(!courseId&&method==='GET'&&url.searchParams.get('view')==='problem-options'){
+   if(!['school_admin','teacher'].includes(role))fail(403,'FORBIDDEN','需要本校教职权限');
+   return reply({items:await schoolPublishedProblemOptions(db,schoolId)});
   }
   if(!courseId&&method==='GET'&&url.searchParams.get('view')==='prerequisites'){
    if(!['school_admin','teacher'].includes(role))fail(403,'FORBIDDEN','需要本校教职权限');

@@ -309,6 +309,11 @@ test('school course HTTP lifecycle preserves published boundaries and stable lea
      await db.query('INSERT INTO school_problem_versions(school_id,id,problem_id,draft_revision,definition) VALUES($1,$2,$3,1,$4)',[alpha.id,version,problem,definition]);
      await db.query('UPDATE school_problems SET published=true,published_version_id=$3 WHERE school_id=$1 AND id=$2',[alpha.id,problem,version]);
     });
+    const optionsPath=courses+'?view=problem-options';
+    const choices=(await request(optionsPath,{auth:teacher})).data.items;
+    assert.deepEqual(choices.map(p=>[p.problemId,p.versionId,p.bankId]),[[problem,version,bank]]);
+    await request(optionsPath,{auth:student,status:403});
+    assert.deepEqual((await request(school(beta.id,'courses?view=problem-options'),{auth:betaAdmin})).data.items,[]);
     const ci={...input,requestId:randomUUID(),title:'Practice course',chapters:[{...chapterA,problems:[{problemId:problem,versionId:version}]}]};
     await post(courses,teacher,{...ci,requestId:randomUUID(),chapters:[{...chapterA,problems:[{problemId:randomUUID(),versionId:version}]}]},409);
     let c=(await post(courses,teacher,ci)).data;const cp=courses+'/'+c.id;

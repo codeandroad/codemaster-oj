@@ -1,7 +1,7 @@
 "use client";
 import { RowActionButton } from "@/components/ui/row-action";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { practiceLocation } from "./school-practice-navigation";
 import {
@@ -45,7 +45,9 @@ import { productionApi } from "@/lib/production-api";
 import { useSchoolText, type School } from "./school-ui";
 import { PlatformCourseEditorLoader } from "./platform-course-editor";
 import type { PlatformCourse } from "./platform-course-model";
-import { SchoolCourseEditor } from "./school-courses-editor";
+import { LearningEditorForm } from "@/components/teacher/learning";
+import { schoolLearningPath } from "./school-learning-path";
+import { CreateSchoolCourseDialog } from "./school-courses-editor";
 import {
   useCourseError,
   type CourseInput,
@@ -73,16 +75,16 @@ export function SchoolCourses({
   const selected = selectedId
     ? { id: selectedId, preview: location.get("coursePreview") === "1" }
     : null;
-  function selectCourse(id: string | null, preview = false) {
+  function selectCourse(id: string | null, preview = false, editSource?: "school" | "platform") {
     window.history.pushState(
-      null,
+      editSource ? { courseCatalogSchoolId: school.id } : null,
       "",
       practiceLocation(
         window.location.pathname,
         window.location.search,
         {
           courseId: id,
-          coursePreview: preview ? "1" : null, courseEdit:null,
+          coursePreview: preview ? "1" : null, courseEdit: editSource ? "1" : null, courseSource: editSource ?? null,
           chapterId: null,
           problemId: null,
         },
@@ -100,7 +102,7 @@ export function SchoolCourses({
     [page, setPage] = useState(1),
     [revision, setRevision] = useState(0);
   const query = canAuthor ? staffQuery : learnerQuery;
-  const [edit, setEdit] = useState<string | null>(null),
+  const [creating, setCreating] = useState(false),
     [draft, setDraft] = useState<CourseInput | undefined>(),
     [importing, setImporting] = useState(false);
   const [publication, setPublication] = useState<{
@@ -116,7 +118,7 @@ export function SchoolCourses({
   const listHeading = useRef<HTMLDivElement>(null);
   const base = `schools/${school.id}/courses`;
   function saved(notice: string) {
-    setEdit(null);
+    setCreating(false);
     setDraft(undefined);
     setPublication(null);
     setArchiveTarget(null);
@@ -125,11 +127,22 @@ export function SchoolCourses({
     requestAnimationFrame(() => listHeading.current?.focus());
   }
   const editBookmark = !!selected && canAuthor && location.get("courseEdit") === "1";
-  const grants = useData<{items:{id:string}[]}>(editBookmark ? `platform/courses?schoolId=${school.id}&view=catalog` : null);
-  if (editBookmark && selected) return <Loading resource={grants}>{grants.data?.items?.some(row=>row.id===selected.id)
-    ? <PlatformCourseEditorLoader showTopicEditor={showTopicEditor} id={selected.id} onClose={()=>selectCourse(null)} onSaved={()=>{onRefresh?.();}}/>
-    : <CourseEditorLoader showTopicEditor={showTopicEditor} base={base} id={selected.id} school={school} onClose={()=>selectCourse(null)} onSaved={()=>{selectCourse(null);onRefresh?.();}}/>}</Loading>;
-  if(edit?.startsWith("platform:"))return <PlatformCourseEditorLoader showTopicEditor={showTopicEditor} id={edit.slice(9)} onClose={()=>setEdit(null)} onSaved={()=>{setRevision(value=>value+1);onRefresh?.();}}/>;
+  const source = location.get("courseSource");
+  const knownSource = source === "school" || source === "platform";
+  const grants = useData<{items:{id:string}[]}>(editBookmark && !knownSource ? `platform/courses?schoolId=${school.id}&view=catalog` : null);
+  if (editBookmark && selected) {
+    const back = () => {
+      if (window.history.state?.courseCatalogSchoolId === school.id) window.history.back();
+      else window.history.replaceState(null, "", practiceLocation(window.location.pathname, window.location.search,
+        {courseId:null, courseEdit:null, courseSource:null, coursePreview:null, chapterId:null}, window.location.hash));
+    };
+    const closeButton = <Button variant="ghost" onClick={back}>← {text("Back to courses", "返回课程")}</Button>;
+    if (!knownSource && !grants.data) return <>{closeButton}<Loading resource={grants}>{null}</Loading></>;
+    const isPlatform = source === "platform" || (!knownSource && grants.data?.items.some(row => row.id === selected.id));
+    const props = {id:selected.id, showTopicEditor, onClose:back, onSaved:() => { setRevision(value => value+1); if (selected.id === "new") back(); }};
+    return isPlatform ? <PlatformCourseEditorLoader key={selected.id} {...props}/> :
+      <CourseEditorLoader key={selected.id} {...props} school={school} base={base}/>;
+  }
   if (selected)
     return (
       <div className="mt-3 space-y-3">
@@ -156,7 +169,7 @@ export function SchoolCourses({
               <Button variant="secondary" onClick={() => setImporting(true)}>
                 {text("Import course Markdown", "导入课程 Markdown")}
               </Button>
-              <Button onClick={() => setEdit("new")}>
+              <Button onClick={() => setCreating(true)}>
                 <Plus size={15} />
                 {text("New course", "新建课程")}
               </Button>
@@ -207,7 +220,7 @@ export function SchoolCourses({
         canAuthor={canAuthor}
         query={query}
         onOpen={selectCourse}
-        onEdit={setEdit}
+        onEdit={(id, source) => selectCourse(id, false, source)}
         onPublication={setPublication}
         onArchive={setArchiveTarget}
         onSettings={setSettingsTarget}
@@ -219,37 +232,25 @@ export function SchoolCourses({
           onPrepared={(value) => {
             setImporting(false);
             setDraft(value);
-            setEdit("new");
+            setCreating(true);
           }}
         />
       )}
-      {edit &&
-        (edit === "new" ? (
-          <SchoolCourseEditor
-            showTopicEditor={showTopicEditor}
-            base={base}
-            school={school}
-            initialDraft={draft}
-            onClose={() => {
-              setEdit(null);
-              setDraft(undefined);
-            }}
-            onSaved={() =>
-              saved(text("Course draft saved.", "课程草稿已保存。"))
-            }
-          />
-        ) : (
-          <CourseEditorLoader
-            showTopicEditor={showTopicEditor}
-            base={base}
-            id={edit}
-            school={school}
-            onClose={() => setEdit(null)}
-            onSaved={() =>
-              saved(text("Course draft saved.", "课程草稿已保存。"))
-            }
-          />
-        ))}
+      {creating && (
+        <CreateSchoolCourseDialog
+          showTopicEditor={showTopicEditor}
+          base={base}
+          school={school}
+          initialDraft={draft}
+          onClose={() => {
+            setCreating(false);
+            setDraft(undefined);
+          }}
+          onSaved={() =>
+            saved(text("Course draft saved.", "课程草稿已保存。"))
+          }
+        />
+      )}
       {settingsTarget && <SchoolAdmissionSettings schoolId={school.id} courseId={settingsTarget}
         onClose={()=>setSettingsTarget(null)} onSaved={()=>{setSettingsTarget(null);saved(text("Access settings saved to draft.", "准入设置已保存到草稿。"));}}/>}
       {publication && (
@@ -370,7 +371,7 @@ function CourseList({
   canAuthor: boolean;
   query: string;
   onOpen: (id: string, preview?: boolean) => void;
-  onEdit: (id: string) => void;
+  onEdit: (id: string, source: "school" | "platform") => void;
   onPublication: (action: { course: SchoolCourse; publish: boolean }) => void;
   onArchive: (course: SchoolCourse) => void;
   onSettings: (id: string) => void;
@@ -391,16 +392,16 @@ function CourseList({
       {platform.error&&<p role="alert" className="text-sm text-destructive">{platform.error}</p>}
       <section className={panel}>
         <CourseCatalogTable empty={!resource.data?.items.length && !platformCourses.length ? (query ? text("No courses match this search.", "没有符合搜索条件的课程。") : text("No courses in this view.", "当前列表暂无课程。")) : undefined}>
-          {platformCourses.map(course=><CourseCatalogRow key={course.id} course={{...course,ownerScope:"platform"}} title={<button type="button" className="text-left font-semibold text-primary hover:underline" onClick={()=>onEdit(`platform:${course.id}`)}>{course.title}</button>} access={<CourseAccessSummary course={{...course,ownerScope:"platform",platformAudience:course.audienceScope}} showSource={false}/>} status={<StatusPill status={course.archived?text("Archived","已归档"):course.published?text("Published","已发布"):text("Draft","草稿")}/>} actions={<RowActionButton type="button" onClick={()=>onEdit(`platform:${course.id}`)}>{course.archived?text("View","查看"):text("Edit","编辑")}</RowActionButton>}/>)}
+          {platformCourses.map(course=><CourseCatalogRow key={course.id} course={{...course,ownerScope:"platform"}} title={<button type="button" className="text-left font-semibold text-primary hover:underline" onClick={()=>onEdit(course.id, "platform")}>{course.title}</button>} access={<CourseAccessSummary course={{...course,ownerScope:"platform",platformAudience:course.audienceScope}} showSource={false}/>} status={<StatusPill status={course.archived?text("Archived","已归档"):course.published?text("Published","已发布"):text("Draft","草稿")}/>} actions={<RowActionButton type="button" onClick={()=>onEdit(course.id, "platform")}>{course.archived?text("View","查看"):text("Edit","编辑")}</RowActionButton>}/>)}
           {resource.data?.items.map(course => <CourseCatalogRow key={course.id} course={course}
-            title={<button type="button" className="text-left font-semibold text-primary hover:underline" onClick={() => course.canManage && !course.archived ? onEdit(course.id) : onOpen(course.id)}>{course.title}</button>}
+            title={<button type="button" className="text-left font-semibold text-primary hover:underline" onClick={() => course.canManage && !course.archived ? onEdit(course.id, "school") : onOpen(course.id)}>{course.title}</button>}
             access={<span className="text-xs text-muted-foreground">{course.accessScope === "school" ? text("School-wide", "全校可学") : text("Selected classes", "指定班级")}</span>}
             status={<>
               <CourseStatus course={course}/>
               {course.hasUnpublishedChanges && <p className="mt-1 text-xs text-muted-foreground">{text("Unpublished edits", "有未发布修改")}</p>}
             </>}
             actions={<>
-              <RowActionButton onClick={() => course.canManage && !course.archived ? onEdit(course.id) : onOpen(course.id)}>{course.canManage && !course.archived ? text("Edit", "编辑") : text("View", "查看")}</RowActionButton>
+              <RowActionButton onClick={() => course.canManage && !course.archived ? onEdit(course.id, "school") : onOpen(course.id)}>{course.canManage && !course.archived ? text("Edit", "编辑") : text("View", "查看")}</RowActionButton>
               {course.canManage && <>
                 {!course.archived && <RowActionButton onClick={() => onSettings(course.id)}>{text("Course access","课程准入")}</RowActionButton>}
                 {!course.archived && <RowActionButton onClick={() => onOpen(course.id, true)}>{text("Preview", "预览")}</RowActionButton>}
@@ -514,7 +515,7 @@ function CourseEditorLoader({
 }) {
   if (id === "new")
     return (
-      <SchoolCourseEditor
+      <CreateSchoolCourseDialog
         showTopicEditor={showTopicEditor}
         base={base}
         school={school}
@@ -551,42 +552,14 @@ function ExistingCourseEditor({
 }) {
   const text = useSchoolText();
   const resource = useData<CourseDetail>(`${base}/${id}`);
-  if (
-    resource.data &&
-    !resource.error &&
-    !resource.loading &&
-    resource.data.canManage
-  )
-    return (
-      <SchoolCourseEditor
-        showTopicEditor={showTopicEditor}
-        base={base}
-        school={school}
-        initial={resource.data}
-        onClose={onClose}
-        onSaved={onSaved}
-      />
-    );
-  return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-    >
-      <DialogContent>
-        <DialogTitle>{text("Edit course", "编辑课程")}</DialogTitle>
-        <DialogDescription>
-          {text("Load the current course draft.", "读取当前课程草稿。")}
-        </DialogDescription>
-        <Loading resource={resource}>
-          <p role="alert" className="text-sm">
-            {text("You cannot edit this course.", "你无法编辑此课程。")}
-          </p>
-        </Loading>
-      </DialogContent>
-    </Dialog>
-  );
+  const course = useMemo(() => resource.data?.canManage ? schoolLearningPath(school.id, resource.data) : null, [resource.data, school.id]);
+  if (!course || resource.loading || resource.error) return <div className="space-y-4">
+    <Button variant="ghost" onClick={onClose}>← {text("Back to courses", "返回课程")}</Button>
+    <Loading resource={resource}>{resource.data && !course && <p role="alert">{text("You cannot edit this course.", "你无法编辑此课程。")}</p>}</Loading>
+  </div>;
+  return <div className="space-y-4">
+    <LearningEditorForm initial={course} onBack={onClose} onSaved={onSaved} showTopicEditor={showTopicEditor}/>
+  </div>;
 }
 
 function PublicationDialog({

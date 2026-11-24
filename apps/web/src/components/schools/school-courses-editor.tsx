@@ -39,61 +39,31 @@ import { useSchoolText, type School } from "./school-ui";
 import {
   useCourseError,
   type CourseChapter,
-  type CourseDetail,
   type CourseInput,
 
 } from "./school-courses-model";
 
-function inputFor(course?: CourseDetail): CourseInput {
-  return course
-    ? {
-        requiredLanguage: course.requiredLanguage ?? null,
-        category: course.category,
-        difficulty: course.difficulty,
-        coverKey: course.coverKey,
-        coverImage: course.coverImage,
-        estimatedMinutes: course.estimatedMinutes,
-        authorName: course.authorName,
-        authoredAt: course.authoredAt,
-        title: course.title,
-        description: course.description,
-        localizations: course.localizations,
-        sections: course.sections,
-        accessScope: course.accessScope,
-        minimumPoints: course.minimumPoints,
-        prerequisiteCourseIds: course.prerequisiteCourseIds,
-        classIds: [...course.classIds],
-        chapters: course.chapters.map(({ id, title, body, problems, localizations, acslLinks, sectionKey }) => ({
-          id,
-          title,
-          body, localizations, acslLinks, sectionKey,
-          problems: (problems ?? []).map(({ problemId, versionId }) => ({
-            problemId,
-            versionId,
-          })),
-        })),
-      }
-    : {
-        requiredLanguage: null,
-        category: "Programming",
-        difficulty: "beginner",
-        coverKey: "general",
-        coverImage: null,
-        estimatedMinutes: 60,
-        authorName: "",
-        authoredAt: null,
-        title: "",
-        description: "",
-        accessScope: "school",
-        classIds: [],
-        chapters: [],
-      };
+function newCourseInput(): CourseInput {
+  return {
+    requiredLanguage: null,
+    category: "Programming",
+    difficulty: "beginner",
+    coverKey: "general",
+    coverImage: null,
+    estimatedMinutes: 60,
+    authorName: "",
+    authoredAt: null,
+    title: "",
+    description: "",
+    accessScope: "school",
+    classIds: [],
+    chapters: [],
+  };
 }
 
-export function SchoolCourseEditor({
+export function CreateSchoolCourseDialog({
   base,
   school,
-  initial,
   initialDraft,
   showTopicEditor,
   onClose,
@@ -101,7 +71,6 @@ export function SchoolCourseEditor({
 }: {
   base: string;
   school: School;
-  initial?: CourseDetail;
   initialDraft?: CourseInput;
   showTopicEditor: boolean;
   onClose: () => void;
@@ -114,11 +83,11 @@ export function SchoolCourseEditor({
   const pending = useRef(false);
   const [requestId] = useState(() => crypto.randomUUID());
   const [form, setForm] = useState<CourseInput>(
-    () => initialDraft ?? inputFor(initial),
+    () => initialDraft ?? newCourseInput(),
   );
   const [baseline] = useState(form);
   const [chapterId, setChapterId] = useState(
-    (initialDraft ?? initial)?.chapters[0]?.id ?? "",
+    initialDraft?.chapters[0]?.id ?? "",
   );
   const [preview, setPreview] = useState(false);
   const [discard, setDiscard] = useState(false);
@@ -228,13 +197,11 @@ export function SchoolCourseEditor({
     try {
       await mutation.run(async () => {
         try {
-          await productionApi(initial ? `${base}/${initial.id}` : base, {
-            method: initial ? "PATCH" : "POST",
+          await productionApi(base, {
+            method: "POST",
             body: {
               ...payload,
-              ...(initial
-                ? { expectedRevision: initial.revision }
-                : { requestId }),
+              requestId,
             },
           });
           onSaved();
@@ -270,9 +237,7 @@ export function SchoolCourseEditor({
         >
           <div className="pr-7">
             <DialogTitle>
-              {initial
-                ? text("Edit course", "编辑课程")
-                : text("Create course", "创建课程")}
+              {text("Create course", "创建课程")}
             </DialogTitle>
             <DialogDescription className="mt-1">
               {text(
@@ -493,7 +458,7 @@ export function SchoolCourseEditor({
               {showTopicEditor && <CourseSectionsEditor sections={form.sections ?? []} chapters={form.chapters} onChange={sections => setForm(previous => ({ ...previous, sections }))} disabled={mutation.busy}/>}
               <CourseTranslationFields value={form.localizations} onChange={localizations => setForm(previous => ({ ...previous, localizations }))} disabled={mutation.busy}/>
               <div ref={classSection} tabIndex={-1}>
-                <SchoolAdmissionFields schoolId={school.id} courseId={initial?.id} value={form}
+                <SchoolAdmissionFields schoolId={school.id} value={form}
                   onChange={change => setForm(previous => ({ ...previous, ...change }))}/>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
@@ -681,11 +646,7 @@ export function SchoolCourseEditor({
                 {dirty
                   ? text("Unsaved changes", "有未保存修改")
                   : text("Draft", "草稿")}
-                {initial?.status === "published" &&
-                  text(
-                    " · Changes appear after republishing",
-                    " · 重新发布后修改才对学生生效",
-                  )}
+
               </p>
               <div className="flex gap-2">
                 <Button
@@ -696,7 +657,7 @@ export function SchoolCourseEditor({
                 >
                   {text("Cancel", "取消")}
                 </Button>
-                <Button type="submit" disabled={mutation.busy || (Boolean(initial) && !dirty)}>
+                <Button type="submit" disabled={mutation.busy}>
                   {text("Save draft", "保存草稿")}
                 </Button>
               </div>

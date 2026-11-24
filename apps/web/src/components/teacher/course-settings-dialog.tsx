@@ -12,6 +12,8 @@ import { apiMessage, productionApi, type SchoolClass } from "@/lib/production-ap
 import { CourseProgrammingLanguageField } from "./course-programming-language-field";
 import { useData } from "./shared";
 import type { PlatformCourse } from "@/components/schools/platform-course-model";
+import { SchoolAdmissionFields } from "@/components/schools/school-admission-settings";
+import type { SchoolAccessSettings } from "@/components/schools/school-courses-model";
 import { PlatformCourseAudience } from "@/components/schools/platform-course-audience";
 import { activeAdmissionRules, courseAudiencePolicy, courseAudiencePolicyForSave } from "@/components/schools/platform-course-admission-model";
 import { CourseTranslationFields } from "./course-translation-editor";
@@ -26,10 +28,14 @@ export interface CourseSettings extends CourseAccessMetadata {
 const input = "min-h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-60";
 function localTime(value?: string | null) { return value ? new Date(new Date(value).getTime() + 8 * 3600000).toISOString().slice(0, 16) : ""; }
 
-export function CourseSettingsDialog({ course, onClose, onSaved, platformCourse, saveCourse, accessOnly = false }: { course: CourseSettings; onClose: () => void; onSaved: (course: CourseSettings) => void; platformCourse?: PlatformCourse; saveCourse?: (body: Record<string, unknown>) => Promise<CourseSettings>; accessOnly?: boolean }) {
+export function CourseSettingsDialog({ course, onClose, onSaved, platformCourse, schoolData, saveCourse, accessOnly = false }: { course: CourseSettings; onClose: () => void; onSaved: (course: CourseSettings) => void; platformCourse?: PlatformCourse; schoolData?: { schoolId: string; course: SchoolAccessSettings }; saveCourse?: (body: Record<string, unknown>) => Promise<CourseSettings>; accessOnly?: boolean }) {
   const { locale } = useLocale(), tx = (zh: string, en: string) => locale === "en" ? en : zh;
   const admissionOnly = accessOnly && platformCourse?.canManage === true;
-  const classes = useData<{ items: SchoolClass[] }>(platformCourse ? null : "classes");
+  const classes = useData<{ items: SchoolClass[] }>(platformCourse || schoolData ? null : "classes");
+  const [schoolAccess,setSchoolAccess] = useState<SchoolAccessSettings | undefined>(() => schoolData && ({
+    accessScope: schoolData.course.accessScope, classIds: schoolData.course.classIds,
+    minimumPoints: schoolData.course.minimumPoints, prerequisiteCourseIds: schoolData.course.prerequisiteCourseIds,
+  }));
   const [policy,setPolicy]=useState(()=>platformCourse?courseAudiencePolicy(platformCourse):null),[schools,setSchools]=useState(platformCourse?.schools??[]),[accounts,setAccounts]=useState(platformCourse?.students??[]);
   const [catalogSchools, setCatalogSchools] = useState(platformCourse?.catalogSchools ?? []);
   const [tab, setTab] = useState<"details" | "access">(admissionOnly ? "access" : "details");
@@ -93,8 +99,13 @@ export function CourseSettingsDialog({ course, onClose, onSaved, platformCourse,
         ...(audiencePolicy && { audiencePolicy }),
         ...(audiencePolicy?.scope === "all" && { catalogSchoolIds: catalogSchools.map(school => school.id) }),
       };
+      if (schoolAccess && (!Number.isSafeInteger(schoolAccess.minimumPoints ?? 0) || (schoolAccess.minimumPoints ?? 0) < 0 || (schoolAccess.minimumPoints ?? 0) > 1000000000)) {
+        setTab("access"); throw new Error(tx("最低平台积分须为 0 至 10 亿之间的整数。", "Enter minimum points as an integer from 0 to 1,000,000,000."));
+      }
       const payload = admissionOnly ? accessSettings : {
-        ...courseSettingsInput({ title, description, category, estimatedMinutes: minutes, difficulty, coverKey, coverImage, authorName, authoredAt, accessScope: scope, classIds, availableFrom: from, availableUntil: until, listed }),
+        ...courseSettingsInput({ title, description, category, estimatedMinutes: minutes, difficulty, coverKey, coverImage, authorName, authoredAt, accessScope: schoolAccess?.accessScope ?? scope, classIds: schoolAccess?.classIds ?? classIds, availableFrom: from, availableUntil: until, listed }),
+        ...(schoolAccess && authoredAt === localTime(course.authoredAt) && {authoredAt:course.authoredAt}),
+        ...(schoolAccess && {minimumPoints: schoolAccess.minimumPoints, prerequisiteCourseIds: schoolAccess.prerequisiteCourseIds}),
         requiredLanguage, localizations: localizations ? parseCourseLocalizations(localizations) : undefined, ...accessSettings,
       };
       const saved = saveCourse ? await saveCourse(payload) : await productionApi<CourseSettings>(`learning-paths/${course.id}`, { method: "PATCH", body: payload });
@@ -124,6 +135,9 @@ export function CourseSettingsDialog({ course, onClose, onSaved, platformCourse,
           schools={schools} accounts={accounts} onSchools={setSchools} onAccounts={setAccounts}
           catalogSchools={catalogSchools} onCatalogSchools={setCatalogSchools}
           disabled={busy || imageBusy} dirty={JSON.stringify(policy)!==JSON.stringify(courseAudiencePolicy(platformCourse))}/>
+      </fieldset> : schoolData && schoolAccess ? <fieldset disabled={busy || imageBusy}>
+        <SchoolAdmissionFields schoolId={schoolData.schoolId} courseId={course.id} value={schoolAccess}
+          onChange={change => setSchoolAccess({...schoolAccess, ...change})}/>
       </fieldset> : <fieldset disabled={busy || imageBusy} className="space-y-4">
         <label className="grid gap-1 text-sm font-semibold">{tx("准入范围", "Eligible students")}<select className={input} value={scope} onChange={event => setScope(event.target.value as typeof scope)}><option value="school">{tx("全校学生（含未分班）", "All school students (including no class)")}</option><option value="classes">{tx("指定班级（可多选）", "Selected classes (multiple allowed)")}</option></select></label>
         {scope === "classes" && <section className="rounded-md border border-border" aria-label={tx("课程班级", "Course classes")}><div className="border-b border-border bg-surface-subtle px-3 py-2 text-sm font-semibold">{tx(`已选择 ${classIds.length} 个班级`, `${classIds.length} classes selected`)}</div>{classes.loading && <p role="status" className="p-3 text-sm text-muted-foreground">{tx("正在加载班级…", "Loading classes…")}</p>}{classes.error && <p role="alert" className="p-3 text-sm text-destructive">{classes.error}<Button type="button" variant="ghost" size="sm" onClick={classes.reload}>{tx("重试", "Retry")}</Button></p>}<div className="max-h-56 overflow-y-auto">{options.map(item => <label key={item.id} className="flex min-h-11 cursor-pointer items-center gap-3 border-b border-border px-3 py-2 text-sm last:border-0"><input className="size-4 accent-primary" type="checkbox" checked={classIds.includes(item.id)} onChange={event => {

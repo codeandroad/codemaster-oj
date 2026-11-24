@@ -970,6 +970,8 @@ export function ManageGroups({
     </Modal>
   );
 }
+type SchoolProblemOption = import("../schools/school-activities-model").ActivityOptions["problems"][number];
+
 type PickerProblem = Pick<ProductionProblem,
   "id" | "title" | "mode" | "published" | "publishedTitle" | "versionId" | "publishedVersionId" |
   "publishedDifficulty" | "difficulty" | "firstAcPoints" | "bankId" | "bankName" | "tags" |
@@ -1003,7 +1005,13 @@ export function ProblemPicker({
     [group, setGroup] = useState(""),
     [query, setQuery] = useState(""),
     [picked, setPicked] = useState<string[]>([]);
-  const orderedProblems = courseProblemOrder(schoolProblems ?? problems.data?.items ?? [], orderedProblemIds ?? [], problem => problem.id);
+  const courseOptions = useData<{items: SchoolProblemOption[]}>(schoolId && !forAssignment ? `schools/${schoolId}/courses?view=problem-options` : null);
+  const publishedOptions = courseOptions.data?.items.map(p => ({
+    id: p.problemId, title: p.title, versionId: p.versionId, published: true, mode: p.mode,
+    bankId: p.bankId, bankName: p.bankName, publishedDifficulty: p.difficulty,
+  } satisfies PickerProblem));
+  const options: PickerProblem[] = schoolProblems ?? publishedOptions ?? problems.data?.items ?? [];
+  const orderedProblems = courseProblemOrder(options, orderedProblemIds ?? [], problem => problem.id);
   const rows =
     orderedProblems.filter(
       (p) =>
@@ -1079,7 +1087,7 @@ export function ProblemPicker({
           placeholder={tr("搜索题目", "Search problems")}
         />
       </div>
-      <State resource={banks} /><State resource={groups} /><State resource={problems} />
+      <State resource={banks} /><State resource={groups} /><State resource={problems} /><State resource={courseOptions} />
       <div className="mt-4 divide-y divide-border border border-border">
         {rows.map(({ problem: p, exists, courseReady, available, disabled }) => {
           return (
@@ -1128,7 +1136,7 @@ export function ProblemPicker({
             </label>
           );
         })}
-        {!problems.loading && !rows.length && (
+        {!problems.loading && !courseOptions.loading && !rows.length && (
           <p className="p-4 text-sm text-muted-foreground">
             {courseMode === "draft"
               ? tr("当前范围暂无可编辑的校内题库题目。", "No editable school-bank problems in this scope.")
@@ -1159,7 +1167,7 @@ export function ProblemPicker({
             {tr("取消", "Cancel")}
           </Button>
           <Button
-            disabled={!picked.length || problems.loading || !!problems.error}
+            disabled={!picked.length || problems.loading || !!problems.error || courseOptions.loading || !!courseOptions.error}
             onClick={() =>
               onAdd(
                 orderedProblems.filter((x) =>

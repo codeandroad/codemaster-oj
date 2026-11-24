@@ -1,5 +1,6 @@
 import { transaction } from './db.mjs';
 import { archiveRemovedStudent, handleSchoolExits } from './school-exits.mjs';
+import { protectPlatformAccount } from './platform-account-protection.mjs';
 import { enumValue, fail, field, integer, randomToken, tokenHash, username, uuid } from './security.mjs';
 
 const result = (body, status = 200) => ({ status, body });
@@ -150,9 +151,9 @@ export async function handleSchools({ pool, user, route, method, body, url }) {
     const token = field(body.token, '邀请码', { min: 32, max: 32 });
     return result(await acceptInvitation(pool, user, token));
   }
-  const match = route.match(/^\/schools\/([^/]+)\/(members|invitations)(?:\/([^/]+))?$/);
+  const match = route.match(/^\/schools\/([^/]+)\/(members|invitations)(?:\/([^/]+))?(?:\/(reset))?$/);
   if (!match) return null;
-  const [, id, resource, memberId] = match;
+  const [, id, resource, memberId, action] = match;
   const schoolId = uuid(id, '学校 ID');
   if (resource === 'members' && !memberId && method === 'GET') {
     const page = integer(Number(url.searchParams.get('page') ?? '1'), 1, 100000, '页码');
@@ -216,6 +217,32 @@ export async function handleSchools({ pool, user, route, method, body, url }) {
       if (identity) await auditSchool(db, schoolId, user.id, 'school.identity.unlink', identity.id);
       await auditSchool(db, schoolId, user.id, 'school.revoke_membership', target);
       return result({ ok: true });
+    });
+  }
+  if (resource === 'members' && memberId && action === 'reset' && method === 'POST') {
+    const target = uuid(memberId, '账号 ID');
+    return transaction(pool, async db => {
+      await lockSchoolTeaching(db, schoolId);
+      await requireSchoolAdmin(db, schoolId, user.id);
+      const { rows: [member] } = await db.query(`
+        SELECT m.account_id AS id, a.username
+        FROM school_memberships m JOIN accounts a ON a.id = m.account_id
+        JOIN identities i ON i.id = a.identity_id
+        WHERE m.school_id = $1 AND m.account_id = $2 AND m.revoked_at IS NULL
+          AND a.disabled_at IS NULL AND a.binding_released_at IS NULL
+          AND i.archived_at IS NULL
+        FOR UPDATE OF a`, [schoolId, target]);
+      if (!member) fail(404, 'NOT_FOUND', '本校成员不存在或账号不可用');
+      await protectPlatformAccount(db, user, { accountId: target });
+      const resetCode = randomToken();
+      await db.query(
+        "INSERT INTO reset_tokens(account_id,token_hash,expires_at) VALUES($1,$2,now()+interval '30 minutes') ON CONFLICT(account_id) DO UPDATE SET token_hash=EXCLUDED.token_hash,expires_at=EXCLUDED.expires_at,consumed_at=NULL",
+        [target, tokenHash(resetCode)]);
+      await db.query(
+        'INSERT INTO audit_events(actor_account_id,action,resource_type,resource_id) VALUES($1,$2,$3,$4)',
+        [user.id, 'account.reset_issue', 'account', target]);
+      await auditSchool(db, schoolId, user.id, 'school.account_reset', target);
+      return result({ username: member.username, resetCode });
     });
   }
   return null;

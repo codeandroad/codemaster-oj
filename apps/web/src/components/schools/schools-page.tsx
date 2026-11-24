@@ -458,6 +458,9 @@ function MemberList({
 }) {
   const text = useSchoolText();
   const { locale } = useLocale();
+  const localError = useSchoolError();
+  const [resetTarget, setResetTarget] = useState<Member | null>(null);
+  const [credential, setCredential] = useState<{ username: string; resetCode: string; resetUrl: string } | null>(null);
   const members = useData<{ items: Member[]; page: number; hasMore: boolean }>(
     `schools/${school.id}/members?page=${page}`,
   );
@@ -498,16 +501,27 @@ function MemberList({
                     )}
                   </td>
                   <td className="py-2 text-right">
-                    {member.role !== "school_admin" &&
-                      member.role !== "student" && !member.administrator && (
+                    <div className="flex flex-wrap justify-end gap-1">
+                      {member.role !== "school_admin" && !member.administrator && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => onRemove(member)}
+                          onClick={() => setResetTarget(member)}
                         >
-                          {text("Remove", "移除")}
+                          {text("Reset password", "重置密码")}
                         </Button>
                       )}
+                      {member.role !== "school_admin" &&
+                        member.role !== "student" && !member.administrator && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onRemove(member)}
+                          >
+                            {text("Remove", "移除")}
+                          </Button>
+                        )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -551,7 +565,135 @@ function MemberList({
           </div>
         </div>
       </Loading>
+      {resetTarget && (
+        <ResetMemberCredential
+          member={resetTarget}
+          school={school}
+          onClose={() => setResetTarget(null)}
+          onIssued={(issued) => {
+            setResetTarget(null);
+            setCredential({
+              ...issued,
+              resetUrl: `${window.location.origin}/login?reset=1`,
+            });
+          }}
+          text={text}
+          localError={localError}
+        />
+      )}
+      {credential && (
+        <Dialog open onOpenChange={(open) => { if (!open) setCredential(null); }}>
+          <DialogContent>
+            <DialogTitle>{text("One-time reset credential", "一次性密码重置凭据")}</DialogTitle>
+            <DialogDescription>
+              {text(
+                "Valid for 30 minutes and shown only here. Give it to the account holder privately.",
+                "凭据有效期 30 分钟，仅在此处展示，请私下交给本人。",
+              )}
+            </DialogDescription>
+            <div className="space-y-3 text-sm">
+              <p>
+                {text("Username: ", "用户名：")}
+                <code>{credential.username}</code>
+              </p>
+              <div className="border border-dashed border-border-strong bg-surface-subtle p-3">
+                <code className="select-all break-all">{credential.resetCode}</code>
+                <CopyCode text={credential.resetCode} />
+              </div>
+              <p className="text-muted-foreground">
+                {text(
+                  "Share the reset entry below with the newest code privately. The code works on the issuing site, and issuing a new code immediately invalidates the previous one.",
+                  "请把下方重置入口和最新凭据私下交给本人。凭据只能在签发站点使用，重新签发后旧凭据立即失效。",
+                )}
+              </p>
+              <div className="space-y-1">
+                <a href={credential.resetUrl} className="break-all text-primary underline">
+                  {credential.resetUrl}
+                </a>
+                <CopyCode text={credential.resetUrl} label={text("Copy reset link", "复制重置入口")} />
+              </div>
+              <Button onClick={() => setCredential(null)}>
+                {text("Done — close", "已记录，关闭")}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
+  );
+}
+
+function ResetMemberCredential({
+  member,
+  school,
+  onClose,
+  onIssued,
+  text,
+  localError,
+}: {
+  member: Member;
+  school: School;
+  onClose: () => void;
+  onIssued: (issued: { username: string; resetCode: string }) => void;
+  text: (en: string, zh: string) => string;
+  localError: (error: unknown) => Error;
+}) {
+  const action = useMutation();
+  const cancel = useRef<HTMLButtonElement>(null);
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open && !action.busy) onClose();
+      }}
+    >
+      <DialogContent
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          cancel.current?.focus();
+        }}
+      >
+        <DialogTitle>
+          {text(`Reset ${member.name}'s password?`, `重置 ${member.name} 的密码？`)}
+        </DialogTitle>
+        <DialogDescription>
+          {text(
+            `Generate a one-time reset code for ${member.name} at ${school.name} and hand it to them privately. Their old password is never shown; they set a new one on the sign-in page.`,
+            `为 ${school.name} 的 ${member.name} 生成一次性重置凭据，当面交付本人。旧密码不会显示；本人通过登录页设置新密码。`,
+          )}
+        </DialogDescription>
+        <Feedback action={action} />
+        <div className="flex justify-end gap-2">
+          <Button
+            ref={cancel}
+            variant="secondary"
+            disabled={action.busy}
+            onClick={onClose}
+          >
+            {text("Cancel", "取消")}
+          </Button>
+          <Button
+            disabled={action.busy}
+            aria-busy={action.busy}
+            onClick={() =>
+              void action.run(async () => {
+                try {
+                  const issued = await productionApi<{ username: string; resetCode: string }>(
+                    `schools/${school.id}/members/${member.accountId}/reset`,
+                    { method: "POST" },
+                  );
+                  onIssued(issued);
+                } catch (error) {
+                  throw localError(error);
+                }
+              })
+            }
+          >
+            {text("Issue reset code", "签发重置凭据")}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

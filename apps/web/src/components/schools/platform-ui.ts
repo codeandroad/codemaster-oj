@@ -41,6 +41,7 @@ export function usePlatformError() {
         "This account is no longer available or the username does not match an active account. Choose or check the account and try again.",
         "该账号已不可用，或用户名未匹配到有效账号。请重新选择或核对后重试。",
       ),
+      SCHOOL_ACCESS_SUSPENDED: text("A school administrator must restore this member's school access first.", "请先由学校管理员恢复此成员的本校访问。"),
       CONFLICT: text(
         "This create request conflicts with an existing school. Check the school list before starting a new request.",
         "此次建校请求与已有学校冲突，请先检查学校列表，再重新发起。",

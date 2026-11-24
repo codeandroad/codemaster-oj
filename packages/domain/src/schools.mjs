@@ -12,6 +12,8 @@ export const schoolCredentialCustodySql = `m.revoked_at IS NULL AND m.role IN ('
         WHERE activation.school_id=si.school_id AND activation.identity_id=si.id AND activation.consumed_at IS NOT NULL))))
   AND NOT EXISTS (SELECT 1 FROM school_workspace_roles other
     WHERE other.account_id=a.id AND (other.school_id<>m.school_id OR other.role='school_admin'))
+  AND NOT EXISTS (SELECT 1 FROM school_memberships other
+    WHERE other.account_id=a.id AND other.school_id<>m.school_id AND other.suspended)
   AND NOT EXISTS (SELECT 1 FROM platform_admins p WHERE p.account_id=a.id AND p.revoked_at IS NULL)`;
 
 export async function redeemSchoolPasswordReset(db, login, code, passwordHash) {
@@ -173,9 +175,13 @@ async function acceptInvitation(pool, user, token) {
       VALUES ($1, $2, $3)
       ON CONFLICT (school_id, account_id) DO UPDATE
       SET role = EXCLUDED.role, revoked_at = NULL, joined_at = clock_timestamp()
-      WHERE school_memberships.revoked_at IS NOT NULL
+      WHERE school_memberships.revoked_at IS NOT NULL AND NOT school_memberships.suspended
       RETURNING account_id`, [invitation.school_id, user.id, invitation.role]);
-    if (!member.rowCount) fail(409, 'ALREADY_MEMBER', '已加入该学校');
+    if (!member.rowCount) {
+      const {rows:[existing]} = await db.query('SELECT suspended FROM school_memberships WHERE school_id=$1 AND account_id=$2',[invitation.school_id,user.id]);
+      if (existing?.suspended) fail(409, 'SCHOOL_ACCESS_SUSPENDED', '本校访问已暂停，请联系学校管理员');
+      fail(409, 'ALREADY_MEMBER', '已加入该学校');
+    }
     const accepted = await db.query(`
       UPDATE school_invitations SET accepted_at = clock_timestamp(), accepted_by = $2
       WHERE id = $1 AND expires_at > clock_timestamp()`, [invitation.id, user.id]);

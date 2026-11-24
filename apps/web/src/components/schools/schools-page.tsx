@@ -1,5 +1,7 @@
 "use client";
 
+import { AccountAccessAction } from "./account-access-action";
+
 import { LearnerWorkspace } from "./learner-workspace";
 import { PageHeadingProvider, useCurrentPageHeading } from "../page-heading-context";
 import { StudentPublicProfile } from "../student/public-profile";
@@ -480,7 +482,7 @@ function MemberList({
   const [credential, setCredential] = useState<{ username: string; resetCode: string; resetUrl: string } | null>(null);
   const [detail, setDetail] = useState<Member | null>(null);
   const [editingRoles, setEditingRoles] = useState<Member | null>(null);
-  const [filters, setFilters] = useState<AccountFilters>({ q:"", className:"", role:"all", status:"all" });
+  const [filters, setFilters] = useState<AccountFilters>({ q:"", className:"", role:"all", status:"all", access:"all" });
   const params = new URLSearchParams({ ...filters, page: String(page) });
   const members = useData<{ items: Member[]; page: number; hasMore: boolean }>(`schools/${school.id}/accounts?${params}`);
   return (
@@ -500,7 +502,8 @@ function MemberList({
                 <th className="py-2 pr-3">{text("Name", "姓名")}</th>
                 <th className="py-2 pr-3">{text("Role", "角色")}</th>
                 <th className="py-2 pr-3">{text("Classes", "关联班级")}</th>
-                <th className="py-2 pr-3">{text("Status", "账号状态")}</th>
+                <th className="py-2 pr-3">{text("Platform login", "平台登录")}</th>
+                <th className="py-2 pr-3">{text("School access", "本校访问")}</th>
                 <th className="py-2 pr-3">{text("Last sign-in", "最后登录")}</th>
                 <th className="py-2 text-right">{text("Actions", "操作")}</th>
               </tr>
@@ -525,6 +528,7 @@ function MemberList({
                   </td>
                   <td className="py-2 pr-3">{member.classes.join("、") || "—"}</td>
                   <td className="whitespace-nowrap py-2 pr-3">{member.disabled ? text("Disabled", "已禁用") : text("Enabled", "已启用")}</td>
+                  <td className="whitespace-nowrap py-2 pr-3">{member.suspended ? text("Suspended", "已暂停") : text("Active", "已开放")}</td>
                   <td className="whitespace-nowrap py-2 pr-3 text-muted-foreground">
                     {member.lastLoginAt ? new Date(member.lastLoginAt).toLocaleString(locale === "en" ? "en-GB" : "zh-CN") : "—"}
                   </td>
@@ -540,7 +544,8 @@ function MemberList({
                           {text("Reset password", "重置密码")}
                         </Button>
                       )}
-                      {member.role !== "school_admin" &&
+                      {member.canManageAccess && <AccountAccessAction account={member} access={{scope:"school", school, suspended:member.suspended}} onSaved={members.reload}/>}
+                      {!member.suspended && member.role !== "school_admin" &&
                         member.role !== "student" && !member.administrator && (
                           <Button
                             variant="secondary"
@@ -557,7 +562,7 @@ function MemberList({
               {!members.data?.items.length && (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="py-6 text-center text-muted-foreground"
                   >
                     {text("No members on this page.", "本页没有成员。")}

@@ -37,6 +37,7 @@ export function useSchoolError() {
           "This invitation is invalid, expired, or already used. Ask the school administrator for a new code.",
           "邀请无效、已过期或已使用，请向学校管理员获取新的邀请码。",
         ),
+        SCHOOL_ACCESS_SUSPENDED: text("School access is suspended. Contact a school administrator.", "本校访问已暂停，请联系学校管理员。"),
         ALREADY_MEMBER: text(
           "You already belong to this school.",
           "你已加入这所学校。",

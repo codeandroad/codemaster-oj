@@ -13,6 +13,7 @@ import {
   BookOpenCheck,
   RefreshCw,
   Spade,
+  Users,
 } from "lucide-react";
 import { WorkspaceFrame } from "@/components/workspace-frame";
 import { AccountMenu } from "@/components/account-menu";
@@ -35,6 +36,7 @@ import { productionApi, type CampusUser } from "@/lib/production-api";
 import { useSchoolText } from "./school-ui";
 import { PlatformSchoolDialog } from "./platform-school-dialog";
 import { PlatformCourses } from "./platform-courses";
+import { PlatformAccounts } from "./platform-accounts";
 import { PublicCourseReview } from "./public-course-review";
 import { PublicProblemReview } from "./school-practice";
 import { PlatformPokerAdmin } from "./platform-poker-admin";
@@ -46,6 +48,7 @@ import {
 
 const platformSections = {
   schools: { icon: Building2, en: "Schools", zh: "学校" },
+  accounts: { icon: Users, en: "Accounts", zh: "账号管理" },
   courses: { icon: BookOpen, en: "Platform courses", zh: "平台课程" },
   problems: { icon: BookOpenCheck, en: "Platform problem bank", zh: "平台题库" },
   "course-review": { icon: BookOpenCheck, en: "Course review", zh: "课程公开审核" },
@@ -228,6 +231,8 @@ function PlatformAdminPage({
                           onAction={openAction}
                         />
                       </>
+                    ) : section === "accounts" ? (
+                      <PlatformAccounts />
                     ) : section === "courses" ? (
                       <PlatformCourses />
                     ) : section === "course-review" ? (

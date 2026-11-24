@@ -13,7 +13,7 @@ export function platformCourseAudienceSql(alias,account) {
  return `(EXISTS(SELECT 1 FROM platform_course_rules r WHERE r.course_id=${alias}.id AND r.active
   AND ((${alias}.platform_audience_scope='all' AND r.target_kind IN ('all','school')) OR (${alias}.platform_audience_scope='custom' AND r.target_kind<>'all'))
   AND (r.target_kind='all' OR r.target_kind='account' AND EXISTS(SELECT 1 FROM accounts a WHERE a.id=${account} AND a.identity_id=r.identity_id)
-   OR r.target_kind='independent' AND NOT EXISTS(SELECT 1 FROM school_memberships m WHERE m.account_id=${account} AND m.revoked_at IS NULL)
+   OR r.target_kind='independent' AND NOT EXISTS(SELECT 1 FROM school_memberships m WHERE m.account_id=${account} AND (m.revoked_at IS NULL OR m.suspended))
    OR r.target_kind='school' AND EXISTS(SELECT 1 FROM school_memberships m
     WHERE m.account_id=${account} AND m.school_id=r.school_id AND m.revoked_at IS NULL)))
   OR NOT EXISTS(SELECT 1 FROM platform_course_rules r WHERE r.course_id=${alias}.id) AND ${legacyAudienceSql(alias,account)})`;

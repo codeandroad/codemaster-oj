@@ -1,5 +1,5 @@
 import { transaction } from './db.mjs';
-import { fail, field, integer, username, uuid } from './security.mjs';
+import { enumValue, fail, field, integer, username, uuid } from './security.mjs';
 import { activeAccount, auditSchool, lockSchoolTeaching } from './schools.mjs';
 
 const result = (body, status = 200) => ({ status, body });
@@ -120,6 +120,46 @@ async function searchSchoolAdminCandidates(db, url) {
   return result({ items: rows });
 }
 
+const loginAccount = `FROM accounts a JOIN identities i ON i.id=a.identity_id
+  WHERE a.binding_released_at IS NULL AND i.archived_at IS NULL`;
+const platformGrant = 'EXISTS (SELECT 1 FROM platform_admins p WHERE p.account_id=a.id AND p.revoked_at IS NULL)';
+
+async function listLoginAccounts(db, url) {
+  const page = integer(Number(url.searchParams.get('page') ?? 1),1,100000,'页码');
+  const term = field(url.searchParams.get('q') ?? '', '关键词', {min:0,max:100}).toLowerCase();
+  const status = enumValue(url.searchParams.get('status') ?? 'all', ['all','enabled','disabled'], '平台登录状态');
+  const {rows} = await db.query(`SELECT a.id AS "accountId",a.username,i.name,a.disabled_at IS NOT NULL AS disabled,
+    ${platformGrant} AS "platformAdmin" ${loginAccount}
+    AND ($1='' OR strpos(lower(a.username),$1)>0 OR strpos(lower(i.name),$1)>0)
+    AND ($2='all' OR (a.disabled_at IS NOT NULL)=($2='disabled'))
+    ORDER BY a.username,a.id LIMIT 51 OFFSET $3`, [term,status,(page-1)*50]);
+  return result({items:rows.slice(0,50),page,hasMore:rows.length>50});
+}
+
+async function setPlatformLogin(db, actorId, accountId, disabled) {
+  if (typeof disabled !== 'boolean') fail(400,'VALIDATION','请指定平台登录状态');
+  const protectedAccount = () => fail(403,'PROTECTED_ACCOUNT','平台管理员账号受保护');
+  if (actorId===accountId) protectedAccount();
+  // Don't queue a write lock on a peer administrator's credential. Re-check
+  // after the lock to account for concurrent provisioning of a new admin.
+  const {rows:[candidate]} = await db.query(`SELECT ${platformGrant} AS protected ${loginAccount} AND a.id=$1`, [accountId]);
+  if (!candidate) fail(404,'NOT_FOUND','账号不存在');
+  if (candidate.protected) protectedAccount();
+  const {rows:[target]} = await db.query(`SELECT a.disabled_at IS NOT NULL AS disabled ${loginAccount}
+    AND a.id=$1 FOR UPDATE OF a FOR SHARE OF i`,[accountId]);
+  if (!target) fail(404,'NOT_FOUND','账号不存在');
+  if ((await db.query('SELECT 1 FROM platform_admins WHERE account_id=$1 AND revoked_at IS NULL',[accountId])).rowCount) protectedAccount();
+  if (disabled!==target.disabled) {
+    await db.query('UPDATE accounts SET disabled_at=CASE WHEN $2::boolean THEN clock_timestamp() END WHERE id=$1',[accountId,disabled]);
+    // Purge sessions on restoration as well: older disabled accounts may have
+    // retained dormant sessions or reset credentials from before migration.
+    await db.query('DELETE FROM sessions WHERE account_id=$1',[accountId]);
+    await db.query('UPDATE reset_tokens SET consumed_at=clock_timestamp() WHERE account_id=$1 AND consumed_at IS NULL',[accountId]);
+    await auditPlatform(db,actorId,disabled ? 'platform.login.disable' : 'platform.login.restore',{accountId});
+  }
+  return result({disabled});
+}
+
 function validateSchool(body) {
   // The form sends a stable request ID so a lost response can be retried
   // against the same generated code. Existing clients can still supply a slug.
@@ -170,6 +210,9 @@ async function appointAdministrator(db, actorId, schoolId, body) {
   if (!rowCount) fail(404, 'NOT_FOUND', '学校不存在');
   await lockSchoolTeaching(db, schoolId);
   const account = await findActiveAccount(db, body.username);
+  if ((await db.query('SELECT 1 FROM school_memberships WHERE school_id=$1 AND account_id=$2 AND suspended',[schoolId,account.accountId])).rowCount) {
+    fail(409,'SCHOOL_ACCESS_SUSPENDED','请先由学校管理员恢复此成员的本校访问');
+  }
   await db.query(`
     INSERT INTO school_memberships (school_id,account_id,role) VALUES ($1,$2,'school_admin')
     ON CONFLICT (school_id,account_id) DO UPDATE SET revoked_at=NULL, joined_at=clock_timestamp()
@@ -188,11 +231,15 @@ async function appointAdministrator(db, actorId, schoolId, body) {
 
 export async function handlePlatformGovernance({ pool,user,route,method,body,url }) {
   const searching = route === '/platform/school-admin-candidates' && method === 'GET';
+  const accounts = route === '/platform/accounts' && method === 'GET';
+  const login = method === 'PATCH' && route.match(/^\/platform\/accounts\/([^/]+)\/login$/);
   const match = route.match(/^\/platform\/schools(?:\/([^/]+)(?:\/(administrators))?)?$/);
-  if (!searching && !match) return null;
+  if (!searching && !match && !accounts && !login) return null;
   const schoolId = match?.[1] ? uuid(match[1], '学校 ID') : null;
   return transaction(pool, async db => {
     await requirePlatformAdministrator(db, user.id);
+    if (accounts) return listLoginAccounts(db,url);
+    if (login) return setPlatformLogin(db,user.id,uuid(login[1],'账号 ID'),body.disabled);
     if (searching) return searchSchoolAdminCandidates(db,url);
     if (!schoolId && method === 'GET') return listSchools(db,url);
     if (!schoolId && method === 'POST') return createSchool(db,user.id,body);

@@ -8,9 +8,11 @@ const accountDirectory = `FROM school_memberships m
   LEFT JOIN school_identities si ON si.school_id=m.school_id AND si.account_id=a.id AND si.archived_at IS NULL
   LEFT JOIN school_administrators g ON g.school_id=m.school_id AND g.account_id=a.id AND g.revoked_at IS NULL`;
 
-const editableRoles = `m.role <> 'school_admin' AND a.disabled_at IS NULL
+const unprotectedMember = `m.role <> 'school_admin'
   AND (g.account_id IS NULL OR g.delegated_by_school)
   AND NOT EXISTS (SELECT 1 FROM platform_admins p WHERE p.account_id=a.id AND p.revoked_at IS NULL)`;
+const editableRoles = `NOT m.suspended AND a.disabled_at IS NULL AND ${unprotectedMember}`;
+const presentMembership = '(m.revoked_at IS NULL OR m.suspended)';
 
 async function readAccounts(db, schoolId, accountId, url, actorId) {
   const params = url.searchParams;
@@ -18,25 +20,28 @@ async function readAccounts(db, schoolId, accountId, url, actorId) {
   const q = field(params.get('q') ?? '', '关键词', { min: 0, max: 100 });
   const role = enumValue(params.get('role') ?? 'all', ['all','student','teacher','school_admin'], '角色');
   const status = enumValue(params.get('status') ?? 'all', ['all','enabled','disabled'], '状态');
+  const access = enumValue(params.get('access') ?? 'all', ['all','active','suspended'], '本校访问');
   const className = field(params.get('className') ?? '', '班级名称', { min:0, max:100 });
   const {rows} = await db.query(`SELECT a.id AS "accountId", a.username, coalesce(si.name,i.name) AS name, si.number,
     si.id AS "identityId", si.gender, m.role, m.joined_at AS "joinedAt",
     (m.role='school_admin' OR g.account_id IS NOT NULL) AS administrator, a.disabled_at IS NOT NULL AS disabled,
     custody.managed AND a.disabled_at IS NULL AS "canResetPassword",
     (a.id<>$8 AND ${editableRoles}) AS "canEditRoles",
+    m.suspended, (a.id<>$8 AND (m.suspended OR (${unprotectedMember}))) AS "canManageAccess",
     CASE WHEN custody.managed THEN a.last_login_at END AS "lastLoginAt",
     ARRAY(SELECT c.name FROM school_class_roster r JOIN school_classes c ON c.school_id=r.school_id AND c.id=r.class_id
       WHERE r.school_id=m.school_id AND r.identity_id=si.id AND c.archived_at IS NULL ORDER BY c.name,c.id) AS classes
     ${accountDirectory}
     CROSS JOIN LATERAL (SELECT (${schoolCredentialCustodySql}) AS managed) custody
-    WHERE m.school_id=$1 AND m.revoked_at IS NULL AND ($2::uuid IS NULL OR a.id=$2)
+    WHERE m.school_id=$1 AND ${presentMembership} AND ($2::uuid IS NULL OR a.id=$2)
+      AND ($9='all' OR m.suspended=($9='suspended'))
       AND ($3='' OR strpos(lower(coalesce(si.name,i.name)),lower($3))>0 OR strpos(a.username,lower($3))>0 OR strpos(lower(si.number),lower($3))>0)
       AND ($4='all' OR m.role=$4 OR ($4 IN ('school_admin','teacher') AND (m.role='school_admin' OR g.account_id IS NOT NULL)))
       AND ($5='all' OR (a.disabled_at IS NOT NULL)=($5='disabled'))
       AND ($6='' OR EXISTS (SELECT 1 FROM school_class_roster r JOIN school_classes c
         ON c.school_id=r.school_id AND c.id=r.class_id WHERE r.school_id=m.school_id AND r.identity_id=si.id
         AND c.archived_at IS NULL AND strpos(lower(c.name),lower($6))>0))
-    ORDER BY coalesce(si.name,i.name),a.id LIMIT 51 OFFSET $7`, [schoolId,accountId,q,role,status,className,(page-1)*50,actorId]);
+    ORDER BY coalesce(si.name,i.name),a.id LIMIT 51 OFFSET $7`, [schoolId,accountId,q,role,status,className,(page-1)*50,actorId,access]);
   if (!accountId) return { items:rows.slice(0,50), page, hasMore:rows.length>50 };
   if (!rows.length) fail(404,'NOT_FOUND','本校账号不存在');
   const { rows: events } = await db.query(`SELECT action,created_at AS "createdAt" FROM audit_events
@@ -81,8 +86,29 @@ async function editRoles(db, schoolId, accountId, actorId, body) {
     VALUES($1,'school.account.roles','account',$2,$3)`,[actorId,accountId,{schoolId,role,administrator:body.administrator,previousRole:target.role,previousAdministrator:target.administrator}]);
 }
 
+async function setSchoolAccess(db, schoolId, accountId, actorId, suspended) {
+  if (typeof suspended !== 'boolean') fail(400,'VALIDATION','请指定本校访问状态');
+  if (accountId===actorId) fail(403,'FORBIDDEN','不能更改自己的本校访问权限');
+  // Serialize with changes to the target credential, platform appointments and
+  // invitations. Read the target's grants after acquiring the account lock.
+  const locked = await db.query(`SELECT a.id FROM accounts a JOIN school_memberships m ON m.account_id=a.id
+    WHERE a.id=$2 AND m.school_id=$1 AND ${presentMembership} FOR UPDATE OF a`, [schoolId,accountId]);
+  if (!locked.rowCount) fail(404,'NOT_FOUND','本校成员不存在');
+  const {rows:[target]} = await db.query(`SELECT m.suspended, (${unprotectedMember}) AS manageable ${accountDirectory}
+    WHERE m.school_id=$1 AND a.id=$2 AND ${presentMembership} FOR UPDATE OF m`, [schoolId,accountId]);
+  if (!target) fail(404,'NOT_FOUND','本校成员不存在');
+  if (!target.manageable && !target.suspended) fail(403,'FORBIDDEN','此成员的校内权限受保护');
+  if (target.suspended===suspended) return;
+  await db.query(`UPDATE school_memberships SET suspended=$3, revoked_at=CASE WHEN $3 THEN clock_timestamp() END
+    WHERE school_id=$1 AND account_id=$2`, [schoolId,accountId,suspended]);
+  const action = suspended ? 'school.account.suspend' : 'school.account.restore';
+  await auditSchool(db,schoolId,actorId,action,accountId);
+  await db.query(`INSERT INTO audit_events(actor_account_id,action,resource_type,resource_id,metadata)
+    VALUES($1,$2,'account',$3,$4)`, [actorId,action,accountId,{schoolId}]);
+}
+
 export async function handleSchoolAccounts({ pool, user, route, method, url, body }) {
-  const match = route.match(/^\/schools\/([^/]+)\/accounts(?:\/([^/]+)(?:\/(roles))?)?$/);
+  const match = route.match(/^\/schools\/([^/]+)\/accounts(?:\/([^/]+)(?:\/(roles|access))?)?$/);
   if (!match) return null;
   const schoolId = uuid(match[1], '学校 ID');
   const accountId = match[2] ? uuid(match[2], '账号 ID') : null;
@@ -90,6 +116,10 @@ export async function handleSchoolAccounts({ pool, user, route, method, url, bod
     await lockSchoolTeaching(db, schoolId, {shared:method==='GET'});
     await requireSchoolAdmin(db, schoolId, user.id);
     if (!match[3] && method==='GET') return { status:200, body:await readAccounts(db,schoolId,accountId,url,user.id) };
+    if (match[3]==='access' && method==='PATCH') {
+      await setSchoolAccess(db,schoolId,accountId,user.id,body.suspended);
+      return {status:200,body:{ok:true}};
+    }
     if (match[3]==='roles' && method==='PATCH') {
       await editRoles(db,schoolId,accountId,user.id,body);
       return {status:200,body:{ok:true}};

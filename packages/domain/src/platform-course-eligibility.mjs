@@ -40,8 +40,10 @@ async function identityContext(db,accountId,state) {
  state.user=(await db.query(`SELECT a.id,a.identity_id AS "identityId",i.name FROM accounts a JOIN identities i ON i.id=a.identity_id
   WHERE a.id=$1 AND a.disabled_at IS NULL AND a.binding_released_at IS NULL AND i.archived_at IS NULL`,[accountId])).rows[0];
  if(!state.user)return;
- state.schools=new Map((await db.query(`SELECT s.id,s.name FROM schools s WHERE EXISTS(
-  SELECT 1 FROM school_memberships m WHERE m.school_id=s.id AND m.account_id=$1 AND m.revoked_at IS NULL) ORDER BY s.id`,[accountId])).rows.map(row=>[row.id,row.name]));
+ const affiliations=(await db.query(`SELECT s.id,s.name,m.suspended FROM school_memberships m JOIN schools s ON s.id=m.school_id
+  WHERE m.account_id=$1 AND (m.revoked_at IS NULL OR m.suspended) ORDER BY s.id`,[accountId])).rows;
+ state.independent=affiliations.length===0;
+ state.schools=new Map(affiliations.filter(row=>!row.suspended).map(row=>[row.id,row.name]));
  state.admissions=new Map();state.stack=new Set();state.progress=new Map();
 }
 
@@ -57,7 +59,7 @@ export async function resolvePlatformCourseAdmission(db,courseId,accountId,{stat
   const course=state.courses?.has(courseId)?state.courses.get(courseId):(await db.query(`SELECT ${courseColumns} FROM learning_paths p WHERE p.id=$1 AND ${eligibleCourseSql('$2')}`,[courseId,accountId])).rows[0];
   if(!course)return denied();
   const rules=(state.rules?.has(courseId)?state.rules.get(courseId).filter(rule=>rule.active):await platformCourseRules(db,courseId)).filter(rule=>(rule.target_kind==='school'||(course.platform_audience_scope==='all')===(rule.target_kind==='all'))
-   &&(rule.target_kind==='all'||rule.target_kind==='independent'&&state.schools.size===0
+   &&(rule.target_kind==='all'||rule.target_kind==='independent'&&state.independent
     ||rule.target_kind==='school'&&state.schools.has(rule.school_id)||rule.target_kind==='account'&&rule.identity_id===state.user.identityId));
   if(!rules.length){
    const any=state.rules?.has(courseId)?state.rules.get(courseId).length:(await db.query('SELECT 1 FROM platform_course_rules WHERE course_id=$1 LIMIT 1',[courseId])).rowCount;

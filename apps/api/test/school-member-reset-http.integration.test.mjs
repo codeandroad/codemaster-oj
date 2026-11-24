@@ -8,6 +8,7 @@ import { migrate } from '../../../packages/domain/src/migrate.mjs';
 import { bootstrap } from '../../../packages/domain/src/bootstrap.mjs';
 import { loadConfig } from '../../../packages/domain/src/application.mjs';
 import { provisionSchool } from '../../../packages/domain/src/schools.mjs';
+import { provisionPlatformAdministrator } from '../../../packages/domain/src/platform-governance.mjs';
 
 test('school administrators issue one-time password reset credentials for members',
   { skip: !process.env.TEST_DATABASE_URL, timeout: 60000 }, async t => {
@@ -190,6 +191,100 @@ test('school administrators issue one-time password reset credentials for member
         assert.equal((await batch([a.id])).status, 409);
         const audit = await pool.query("SELECT count(*)::int n FROM school_audit_events WHERE school_id=$1 AND action='school.identity.activation_issue' AND target_id=ANY($2::uuid[])", [schoolId,[a.id,b.id]]);
         assert.equal(audit.rows[0].n, 3);
+      });
+      await t.test('platform login and school suspension are independently authorized and reversible', async () => {
+        const personalAccount = username => request('/auth/register-personal', {
+          method:'POST',body:{username,displayName:username,password},
+        });
+        const platform = await personalAccount('login-manager');
+        await provisionPlatformAdministrator(pool,{username:'login-manager'});
+        const secondAdmin = await personalAccount('other-admin');
+        const second = await provisionSchool(pool,{slug:'access-school',name:'Access School',adminUsername:'other-admin'});
+        const person = {kind:'student',name:'Access member',number:'ACCESS'};
+        const record = await request(`/schools/${schoolId}/identities`,{auth:admin,method:'POST',body:person});
+        const code = await request(`/schools/${schoolId}/identities/${record.data.id}/activation-code`,{auth:admin,method:'POST'});
+        const member = await request('/auth/register',{method:'POST',body:{...person,username:'access-member',
+          schoolSlug:'tianxing-chuangshiji',activationCode:code.data.activationCode,password}});
+        assert.equal(member.status,201);
+        const id = member.data.user.id;
+        const detailPath = `/schools/${schoolId}/accounts/${id}`;
+        const setAccess = (school, auth, suspended, target=id) => request(`/schools/${school}/accounts/${target}/access`,{method:'PATCH',auth,body:{suspended}});
+        const setLogin = (auth, disabled, target=id) => request(`/platform/accounts/${target}/login`,{method:'PATCH',auth,body:{disabled}});
+        const login = () => request('/auth/login',{method:'POST',body:{username:'access-member',password}});
+        const inviteTo = async (school,auth) => (await request(`/schools/${school}/invitations`,{auth,method:'POST',body:{role:'student'}})).data.token;
+        const accept = token => request('/school-invitations/accept',{auth:member,method:'POST',body:{token}});
+        const read = (path,auth) => request(path,{auth});
+        const cls = await request(`/schools/${schoolId}/classes`,{auth:admin,method:'POST',body:{name:'Access class',type:'training'}});
+        assert.equal((await request(`/schools/${schoolId}/classes/${cls.data.id}/roster`,{auth:admin,method:'POST',body:{identityId:record.data.id}})).status,201);
+        const before = (await read(detailPath,admin)).data;
+        assert.equal(before.canResetPassword,true);
+        assert.equal((await reset(id,admin)).status,200);
+        assert.equal((await accept(await inviteTo(second.id,secondAdmin))).status,200);
+        assert.equal((await setAccess(second.id,admin,true)).status,404);
+        assert.equal((await setAccess(schoolId,member,true)).status,403);
+        assert.equal((await setAccess(schoolId,platform,true)).status,404);
+        assert.equal((await setAccess(schoolId,admin,true,admin.data.user.id)).status,403);
+        assert.equal((await setLogin(admin,true)).status,403);
+        assert.equal((await setLogin(platform,true,platform.data.user.id)).status,403);
+        assert.equal((await read('/platform/accounts')).status,401);
+        assert.equal((await read('/platform/accounts',admin)).status,403);
+        const peer = await personalAccount('peer-manager');
+        await provisionPlatformAdministrator(pool,{username:'peer-manager'});
+        assert.equal((await setLogin(platform,true,peer.data.user.id)).status,403);
+        // A paused second affiliation must not transfer global credential custody to the first school.
+        assert.equal((await setAccess(second.id,secondAdmin,true)).status,200);
+        assert.equal((await reset(id,admin)).status,403);
+        assert.equal((await setAccess(second.id,secondAdmin,false)).status,200);
+
+        assert.equal((await setAccess(schoolId,admin,true)).status,200);
+        assert.equal((await setAccess(schoolId,admin,true)).status,200);
+        assert.deepEqual((await read('/schools',member)).data.items.map(item=>item.id),[second.id]);
+        assert.equal((await read(`/schools/${schoolId}/courses`,member)).status,404);
+        assert.equal((await read(`/schools/${second.id}/courses`,member)).status,200);
+        assert.equal((await read('/practice/courses',member)).status,200);
+        assert.equal((await setAccess(second.id,secondAdmin,true)).status,200);
+        const {rows:[independent]} = await pool.query(`INSERT INTO learning_paths(owner_account_id,title,owner_scope,published_at,platform_audience_scope)
+          VALUES($1,'Independent learners','platform',now(),'custom') RETURNING id`,[platform.data.user.id]);
+        await pool.query(`INSERT INTO platform_course_rules(course_id,rule_key,target_kind,admission_mode)
+          VALUES($1,'independent','independent','direct')`,[independent.id]);
+        assert.equal((await read('/schools',member)).data.items.length,0);
+        assert.equal((await read('/practice/courses/'+independent.id+'/entry',member)).status,404);
+        const independentUser=await personalAccount('independent-user');
+        assert.equal((await read('/practice/courses/'+independent.id+'/entry',independentUser)).status,200);
+        assert.equal((await setAccess(second.id,secondAdmin,false)).status,200);
+        assert.equal((await accept(await inviteTo(schoolId,admin))).data.error.code,'SCHOOL_ACCESS_SUSPENDED');
+        assert.equal((await request(`/platform/schools/${schoolId}/administrators`,{
+          auth:platform,method:'POST',body:{username:'access-member'},
+        })).status,409);
+        const filtered = await read(`/schools/${schoolId}/accounts?access=suspended&q=access-member`,admin);
+        assert.deepEqual(filtered.data.items.map(item=>item.accountId),[id]);
+        const secondSession = await login();
+        assert.equal(secondSession.status,200);
+
+        assert.equal((await setLogin(platform,true)).status,200);
+        assert.equal((await setLogin(platform,true)).status,200);
+        for (const session of [member,secondSession]) assert.equal((await read('/auth/me',session)).status,401);
+        assert.equal((await login()).status,403);
+        const disabled = await read('/platform/accounts?status=disabled&q=access-member',platform);
+        assert.deepEqual(disabled.data.items.map(item=>item.accountId),[id]);
+        assert.equal((await read(detailPath,admin)).data.disabled,true);
+        assert.equal((await setAccess(schoolId,admin,false)).status,200);
+        assert.equal((await login()).status,403);
+        assert.equal((await setAccess(schoolId,admin,true)).status,200);
+        assert.equal((await setLogin(platform,false)).status,200);
+        assert.equal((await read('/auth/me',member)).status,401);
+        const restored = await login();
+        assert.equal(restored.status,200);
+        assert.equal((await read(`/schools/${schoolId}/courses`,restored)).status,404);
+        assert.equal((await setAccess(schoolId,admin,false)).status,200);
+        assert.equal((await read(`/schools/${schoolId}/courses`,restored)).status,200);
+        const after = (await read(detailPath,admin)).data;
+        for (const key of ['identityId','classes','role','joinedAt']) assert.deepEqual(after[key],before[key],key);
+        assert.equal(after.suspended,false);
+        assert.equal(after.events.filter(e=>e.action==='school.account.suspend').length,2);
+        const audit = await pool.query('SELECT action FROM platform_audit_events WHERE target_account_id=$1 ORDER BY created_at',[id]);
+        assert.deepEqual(audit.rows.map(row=>row.action),['platform.login.disable','platform.login.restore']);
+        assert.equal((await pool.query('SELECT count(*)::int n FROM reset_tokens WHERE account_id=$1 AND consumed_at IS NULL',[id])).rows[0].n,0);
       });
     } finally {
       await app?.close();

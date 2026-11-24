@@ -10,6 +10,7 @@ import type { CampusGender } from "@/lib/production-api";
 import { RoleLabel, useSchoolText, type School, type SchoolRole } from "./school-ui";
 import { schoolWorkspaceHref } from "./school-workspace-location";
 import { SchoolIdentityClasses } from "./school-identity-classes";
+import { SchoolIdentityProfile } from "./school-identity-profile";
 
 export type Member = {
   accountId: string; username: string; name: string; number: string | null;
@@ -52,17 +53,17 @@ export function SchoolAccountFilters({ filters, onChange }: { filters: AccountFi
   </form>;
 }
 
-export function SchoolAccountDetails({ school, accountId, onClose, onClassesSaved }: {
-  school: School; accountId: string; onClose: () => void; onClassesSaved: () => void;
+export function SchoolAccountDetails({ school, accountId, onClose, onIdentitySaved }: {
+  school: School; accountId: string; onClose: () => void; onIdentitySaved: () => void;
 }) {
   const text = useSchoolText(), t = useAdminText();
   const resource = useData<Member & { events: { createdAt: string; action: string }[] }>(`schools/${school.id}/accounts/${accountId}`);
   const member = resource.data;
-  const [editingClasses, setEditingClasses] = useState(false);
-  if (editingClasses && member?.identityId) {
-    return <SchoolIdentityClasses school={school} identityId={member.identityId}
-      onClose={() => setEditingClasses(false)}
-      onSaved={() => { setEditingClasses(false); resource.reload(); onClassesSaved(); }}/>;
+  const [editing, setEditing] = useState<"classes" | "profile" | null>(null);
+  if (editing && member?.identityId) {
+    const Editor = editing === "profile" ? SchoolIdentityProfile : SchoolIdentityClasses;
+    return <Editor school={school} identityId={member.identityId} onClose={() => setEditing(null)}
+      onSaved={() => { setEditing(null); resource.reload(); onIdentitySaved(); }}/>;
   }
   return <Drawer title={member?.name ?? text("Account details", "账号详情")} eyebrow={member?.username} onClose={onClose}>
     <Loading resource={resource}>{member && <div className="space-y-5">
@@ -73,14 +74,17 @@ export function SchoolAccountDetails({ school, accountId, onClose, onClassesSave
         <dt>{text("Classes", "关联班级")}</dt>
         <dd className="flex flex-wrap items-center gap-2">{member.classes.join("、") || "—"}
           {member.identityId && (member.role === "student" || member.role === "teacher") &&
-            <Button size="sm" variant="secondary" onClick={() => setEditingClasses(true)}>{text("Adjust classes", "调整班级")}</Button>}
+            <Button size="sm" variant="secondary" onClick={() => setEditing("classes")}>{text("Adjust classes", "调整班级")}</Button>}
         </dd>
         <dt>{text("Joined", "加入日期")}</dt><dd>{new Date(member.joinedAt).toLocaleDateString()}</dd>
         <dt>{text("Platform login", "平台登录")}</dt><dd>{member.disabled ? text("Disabled","已禁用") : text("Enabled","已启用")}</dd>
         <dt>{text("School access", "本校访问")}</dt><dd>{member.suspended ? text("Suspended","已暂停") : text("Active","已开放")}</dd>
       </dl>
-      {member.identityId && <AppLink className="text-sm font-semibold text-primary" href={schoolWorkspaceHref(school.id,"identities")+"&identityId="+member.identityId}>
-        {text("Open school identity", "查看校内身份档案")}</AppLink>}
+      {member.identityId && <div className="flex flex-wrap items-center gap-3">
+        <Button size="sm" variant="secondary" onClick={() => setEditing("profile")}>{text("Edit profile", "编辑资料")}</Button>
+        <AppLink className="text-sm font-semibold text-primary" href={schoolWorkspaceHref(school.id,"identities")+"&identityId="+member.identityId}>
+          {text("Open school identity", "查看校内身份档案")}</AppLink>
+      </div>}
       <section><h3 className="mb-2 text-sm font-semibold">{text("Recent account changes", "近期账号管理记录")}</h3>
         <ul className="space-y-1 text-sm">{member.events.map((event, index) => <li key={index}>
           {new Date(event.createdAt).toLocaleString()} · {({

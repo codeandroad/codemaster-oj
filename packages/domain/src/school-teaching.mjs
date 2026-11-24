@@ -1,7 +1,7 @@
 import { studentClassroom } from './student-classroom.mjs';
 import { transaction } from './db.mjs';
 import { auditSchool, lockSchoolTeaching, requireSchoolAdmin, schoolRole } from './schools.mjs';
-import { enumValue, fail, field, integer, uuid } from './security.mjs';
+import { canonicalHash, enumValue, fail, field, genderValue, integer, uuid } from './security.mjs';
 
 const PAGE_SIZE = 50;
 const IDENTITY_KINDS = ['student', 'teacher'];
@@ -75,17 +75,45 @@ async function createIdentity(db, schoolId, actorId, body) {
   const kind = enumValue(body.kind, IDENTITY_KINDS, '身份类型');
   const number = field(body.number, '编号', { max: 64 });
   const name = field(body.name, '姓名', { max: 100 });
+  const gender = genderValue(body.gender ?? null);
+  const notes = identityNotes(body.notes ?? null);
   const accountId = body.accountId == null ? null : uuid(body.accountId, '账号 ID');
   const { classIds = [] } = body;
   const classes = readClassIds(classIds);
   await requireMatchingMember(db, schoolId, accountId, kind);
   await requireActiveClasses(db, schoolId, classes);
   const { rows: [identity] } = await db.query(`
-    INSERT INTO school_identities (school_id, kind, number, name, account_id)
-    VALUES ($1, $2, $3, $4, $5) RETURNING ${identityFields}`, [schoolId, kind, number, name, accountId]);
+    INSERT INTO school_identities (school_id, kind, number, name, account_id, gender, notes)
+    VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ${identityFields}`, [schoolId, kind, number, name, accountId, gender, notes]);
   await auditSchool(db, schoolId, actorId, 'school.identity.create', identity.id);
   if (classes.length) await addToClassRosters(db, schoolId, actorId, identity.id, classes);
   return { status: 201, body: identity };
+}
+
+function identityNotes(value) {
+  return value === null ? null : field(value, '备注', { min: 0, max: 2000 }) || null;
+}
+
+async function manageIdentityProfile(db, schoolId, actorId, identityId, method, body) {
+  const { rows: [profile] } = await db.query(`SELECT kind, name, number, gender, notes FROM school_identities
+    WHERE school_id=$1 AND id=$2 AND archived_at IS NULL`, [schoolId, identityId]);
+  if (!profile) fail(404, 'NOT_FOUND', '本校身份档案不存在');
+  const version = canonicalHash([profile.name, profile.number, profile.gender, profile.notes]);
+  if (method === 'GET') return { status: 200, body: { ...profile, version } };
+
+  const expectedVersion = field(body.expectedVersion, '档案版本', { min: 64, max: 64 });
+  const name = body.name === undefined ? profile.name : field(body.name, '姓名', { max: 100 });
+  const number = body.number === undefined ? profile.number : field(body.number, '编号', { max: 64 });
+  const gender = body.gender === undefined ? profile.gender : genderValue(body.gender);
+  const notes = body.notes === undefined ? profile.notes : identityNotes(body.notes);
+  if (name === profile.name && number === profile.number && gender === profile.gender && notes === profile.notes) {
+    return { status: 200, body: { ok: true } };
+  }
+  if (expectedVersion !== version) fail(409, 'PROFILE_CHANGED', '档案资料已变更，请重新加载后确认');
+  await db.query(`UPDATE school_identities SET name=$3, number=$4, gender=$5, notes=$6
+    WHERE school_id=$1 AND id=$2`, [schoolId, identityId, name, number, gender, notes]);
+  await auditSchool(db, schoolId, actorId, 'school.identity.update', identityId);
+  return { status: 200, body: { ok: true } };
 }
 
 async function manageIdentityClasses(db, schoolId, actorId, identityId, method, body) {
@@ -318,7 +346,7 @@ async function removeFromClassRosters(db, schoolId, actorId, identityId, classId
 }
 
 export async function handleSchoolTeaching({ pool, user, route, method, body, url }) {
-  const directory = route.match(/^\/schools\/([^/]+)\/identities(?:\/([^/]+)\/(account|classes))?$/);
+  const directory = route.match(/^\/schools\/([^/]+)\/identities(?:\/([^/]+)\/(account|classes|profile))?$/);
   if (directory) {
     const schoolId = uuid(directory[1], '学校 ID');
     const identityId = directory[2];
@@ -327,6 +355,9 @@ export async function handleSchoolTeaching({ pool, user, route, method, body, ur
       await requireSchoolAdmin(db, schoolId, user.id);
       if (!identityId && method === 'GET') return listIdentities(db, schoolId, url);
       if (!identityId && method === 'POST') return createIdentity(db, schoolId, user.id, body);
+      if (directory[3] === 'profile' && ['GET', 'PATCH'].includes(method)) {
+        return manageIdentityProfile(db, schoolId, user.id, uuid(identityId, '身份档案 ID'), method, body);
+      }
       if (directory[3] === 'classes' && ['GET', 'PATCH'].includes(method)) {
         return manageIdentityClasses(db, schoolId, user.id, uuid(identityId, '身份档案 ID'), method, body);
       }

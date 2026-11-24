@@ -56,7 +56,7 @@ try {
     REVOKE ALL ON school_identities, school_classes, school_class_roster
       FROM PUBLIC, campus_app, campus_worker;
     GRANT SELECT, INSERT ON school_identities, school_classes TO campus_app;
-    GRANT UPDATE(account_id,archived_at) ON school_identities TO campus_app;
+    GRANT UPDATE(account_id,archived_at,name,number,gender,notes) ON school_identities TO campus_app;
     GRANT UPDATE(name,type,archived_at,revision) ON school_classes TO campus_app;
     GRANT SELECT, INSERT, DELETE ON school_class_roster TO campus_app;
     REVOKE ALL ON school_identity_imports FROM PUBLIC, campus_app, campus_worker;

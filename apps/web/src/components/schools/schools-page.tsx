@@ -491,7 +491,7 @@ function MemberList({
       <SchoolAccountFilters filters={filters} onChange={next => { onPage(1); setFilters(next); }}/>
       {editingRoles && <SchoolRoleEditor school={school} member={editingRoles} onClose={() => setEditingRoles(null)}
         onSaved={() => { setEditingRoles(null); members.reload(); }}/>}
-      {detail && <SchoolAccountDetails school={school} accountId={detail.accountId} onClose={() => setDetail(null)} onClassesSaved={members.reload} />}
+      {detail && <SchoolAccountDetails school={school} accountId={detail.accountId} onClose={() => setDetail(null)} onIdentitySaved={members.reload} />}
       <Loading resource={{ ...members, loading: members.pending || members.loading }}>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">

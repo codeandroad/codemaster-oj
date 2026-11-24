@@ -18,10 +18,11 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { productionApi } from "@/lib/production-api";
+import { productionApi, type CampusGender } from "@/lib/production-api";
 import { cn } from "@/lib/utils";
 import { SchoolIdentityImport } from "./school-identity-import";
 import { SchoolIdentityClasses, type IdentityClass } from "./school-identity-classes";
+import { OptionalIdentityFields, SchoolIdentityProfile } from "./school-identity-profile";
 import { SchoolCourses } from "./school-courses";
 import { SchoolClassPicker } from "./school-class-picker";
 import { SchoolClasses } from "./school-classes";
@@ -142,6 +143,7 @@ function SchoolDirectory({
   const [kind, setKind] = useState<IdentityKind | "">("");
   const [edit, setEdit] = useState(false);
   const [editingClasses, setEditingClasses] = useState<string | null>(null);
+  const [editingProfile, setEditingProfile] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [link, setLink] = useState<DirectoryIdentity | null>(null);
   const [unlink, setUnlink] = useState<DirectoryIdentity | null>(null);
@@ -151,6 +153,7 @@ function SchoolDirectory({
   function saved(nextMessage: string) {
     setEdit(false);
     setEditingClasses(null);
+    setEditingProfile(null);
     setImporting(false);
     setLink(null);
     setUnlink(null);
@@ -213,6 +216,9 @@ function SchoolDirectory({
             title: text("Actions", "操作"),
             cell: (item) => (
               <div className="flex flex-wrap gap-1">
+                <Button size="sm" variant="ghost" onClick={() => setEditingProfile(item.id)}>
+                  {text("Edit profile", "编辑资料")}
+                </Button>
                 {(item.kind === "student" || item.kind === "teacher") && (
                   <Button size="sm" variant="ghost" onClick={() => setEditingClasses(item.id)}>
                     {text("Adjust classes", "调整班级")}
@@ -252,6 +258,9 @@ function SchoolDirectory({
       {editingClasses && <SchoolIdentityClasses key={editingClasses} school={school} identityId={editingClasses}
         onClose={() => setEditingClasses(null)}
         onSaved={() => saved(text("Class assignments saved.", "已保存班级调整。"))}/>}
+      {editingProfile && <SchoolIdentityProfile key={editingProfile} school={school} identityId={editingProfile}
+        onClose={() => setEditingProfile(null)}
+        onSaved={() => saved(text("Identity profile saved.", "已保存身份资料。"))}/>}
       {importing && (
         <SchoolIdentityImport
           school={school}
@@ -527,6 +536,7 @@ function CreateSchoolRecord({
   const [number, setNumber] = useState("");
   const [kind, setKind] = useState<IdentityKind>("student");
   const [classIds, setClassIds] = useState<string[]>([]);
+  const [optionalFields, setOptionalFields] = useState<{ gender: CampusGender | null; notes: string }>({ gender: null, notes: "" });
   const [classType, setClassType] = useState<ClassType>("administrative");
   const [invalid, setInvalid] = useState<"name" | "number" | null>(null);
   const nameInput = useRef<HTMLInputElement>(null);
@@ -550,7 +560,7 @@ function CreateSchoolRecord({
     void action.run(async () => {
       try {
         const body = isIdentity
-          ? { name: name.trim(), number: number.trim(), kind, classIds }
+          ? { name: name.trim(), number: number.trim(), kind, classIds, ...optionalFields }
           : { name: name.trim(), type: classType };
         await productionApi(endpoint, { method: "POST", body });
         onSaved();
@@ -660,6 +670,10 @@ function CreateSchoolRecord({
                 <option value="teacher">{text("Teacher", "教师")}</option>
               </select>
             </label>
+            <fieldset disabled={action.busy} className="space-y-3">
+              <legend className="sr-only">{text("Additional details", "补充资料")}</legend>
+              <OptionalIdentityFields {...optionalFields} onChange={value => setOptionalFields(previous => ({ ...previous, ...value }))}/>
+            </fieldset>
             <fieldset disabled={action.busy} className="space-y-2">
               <legend className="text-sm font-semibold">
                 {kind === "student"

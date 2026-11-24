@@ -361,11 +361,59 @@ test('school directories and class rosters enforce tenant, role, and account bou
         }
       }
       const { data: unassigned } = await post(identities(alpha), alphaAdmin, {
-        kind: 'student', number: 'NO-CLASS', name: 'Unassigned student', classIds: [],
+        kind: 'student', number: 'NO-CLASS', name: 'Unassigned student', classIds: [], gender: 'undisclosed', notes: 'Admission note',
       });
       assert.equal((await pool.query('SELECT 1 FROM school_class_roster WHERE identity_id=$1', [unassigned.id])).rowCount, 0);
 
       const classPath = person => `${identities(alpha)}/${person.id}/classes`;
+      await t.test('profile edits stay school-scoped and preserve the linked account and roster', async () => {
+        const created = (await request(`${identities(alpha)}/${unassigned.id}/profile`, { auth: alphaAdmin })).data;
+        assert.equal(created.gender, 'undisclosed');
+        assert.equal(created.notes, 'Admission note');
+        const privileges = (await pool.query(`SELECT
+          has_column_privilege('campus_app',$1,'kind','UPDATE') AS role,
+          has_column_privilege('campus_app',$1,'school_id','UPDATE') AS school,
+          has_column_privilege('campus_worker',$1,'name','UPDATE') AS worker`, [schema + '.school_identities'])).rows[0];
+        assert.deepEqual(privileges, { role: false, school: false, worker: false });
+        const path = `${identities(alpha)}/${alphaStudent.id}/profile`;
+        const original = (await request(path, { auth: alphaAdmin })).data;
+        const beforeClasses = (await request(classPath(alphaStudent), { auth: alphaAdmin })).data.classes;
+        const changes = { expectedVersion: original.version, name: 'Updated student', number: 'UPDATED-01', gender: 'female', notes: 'School note' };
+        for (const [auth, status] of [[teacher, 403], [student, 403], [betaAdmin, 404]]) {
+          await request(path, { auth, status });
+          await patch(path, auth, changes, status);
+        }
+        await request(path, { auth: alphaAdmin, method: 'PATCH', body: changes, csrf: false, status: 403 });
+        await patch(path, alphaAdmin, { ...changes, number: enrolled.number }, 409);
+        for (const invalid of [{ name: ' ' }, { number: 'x'.repeat(65) }, { gender: 'invalid' }, { notes: 'x'.repeat(2001) }]) {
+          await patch(path, alphaAdmin, { ...changes, ...invalid }, 400);
+        }
+        assert.deepEqual((await request(path, { auth: alphaAdmin })).data, original);
+        await patch(path, alphaAdmin, changes);
+        await patch(path, alphaAdmin, changes);
+        const stale = await patch(path, alphaAdmin, { ...changes, name: 'Stale edit' }, 409);
+        assert.equal(stale.data.error.code, 'PROFILE_CHANGED');
+        const profile = (await request(path, { auth: alphaAdmin })).data;
+        assert.equal(profile.gender, 'female');
+        assert.equal(profile.notes, 'School note');
+        const found = (await request(`${identities(alpha)}?q=UPDATED-01`, { auth: alphaAdmin })).data.items;
+        assert.equal(found.length, 1);
+        assert.equal(found[0].id, alphaStudent.id);
+        assert.equal(found[0].accountId, student.id);
+        assert.equal(found[0].name, changes.name);
+        assert.deepEqual(found[0].classes, beforeClasses);
+        const member = (await request(schoolPath(alpha, 'accounts/' + student.id), { auth: alphaAdmin })).data;
+        assert.equal(member.username, 'pilot-student');
+        assert.equal(member.name, changes.name);
+        assert.equal(member.number, changes.number);
+        assert.equal((await request(roster(alpha, taughtClass), { auth: teacher })).data.items.find(i => i.id === alphaStudent.id).name, changes.name);
+        const events = await pool.query("SELECT id FROM school_audit_events WHERE action='school.identity.update' AND target_id=$1", [alphaStudent.id]);
+        assert.equal(events.rowCount, 1);
+        await patch(path, alphaAdmin, { expectedVersion: profile.version, notes: null });
+        const cleared = (await request(path, { auth: alphaAdmin })).data;
+        assert.equal(cleared.notes, null);
+        assert.equal(cleared.gender, 'female');
+      });
       await t.test('school admins can move, clear, and retry existing class assignments atomically', async () => {
         const path = classPath(enrolled);
         const edit = { expectedClassIds: chosenClasses, classIds: [otherClass.id, locatedId] };

@@ -95,6 +95,18 @@ test('school activation isolates same-name and same-number identities and consum
         assert.equal(preview.person.id, undefined); assert.equal(preview.person.accountId, undefined);
       });
       let registeredA;
+      await t.test('a pending identity can claim its existing code using the corrected name and number', async () => {
+        const pending = await identity(alpha, adminA, 'T-EDIT', 'teacher');
+        const { activationCode } = await issue(alpha, adminA, pending);
+        const path = `/schools/${alpha.id}/identities/${pending.id}/profile`;
+        const profile = (await request(path, { auth: adminA })).data;
+        const corrected = { ...pending, name: 'Corrected teacher', number: 'T-EDIT-2' };
+        await request(path, { auth: adminA, method: 'PATCH', body: { name: corrected.name, number: corrected.number, expectedVersion: profile.version } });
+        await verify(claim(alpha, pending, activationCode), 400);
+        await verify(claim(alpha, corrected, activationCode));
+        const activated = await register(claim(alpha, corrected, activationCode), 'corrected-teacher');
+        assert.equal((await owner.query('SELECT account_id FROM school_identities WHERE id=$1', [pending.id])).rows[0].account_id, activated.data.user.id);
+      });
       await t.test('concurrent registration creates exactly one account and preserves the school identity and roster', async () => {
         const preview = (await verify(claim(alpha, a, ca.activationCode))).data;
         assert.deepEqual(preview.person.classes, [{ name: 'Existing class' }]);

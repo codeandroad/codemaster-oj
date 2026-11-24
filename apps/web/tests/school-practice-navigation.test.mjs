@@ -55,6 +55,11 @@ test('practice navigation excludes draft and archived-bank rows even when addres
 
 test('staff search uses the same publication status as the displayed catalog', () => {
   assert.equal(practicePublicationState(problem('published')), 'published');
+  const archived = problem('archived', {archived: true, published: false});
+  const archivedFilter = practiceCatalogFilters(new URLSearchParams('problemStatus=archived'), true);
+  assert.equal(archivedFilter.status, 'archived');
+  assert.equal(practiceProblemMatches(archived, archivedFilter, true), true);
+  assert.equal(practiceProblemMatches(problem('draft', {published: false}), archivedFilter, true), false);
   const revised = problem('revised', {hasDraftChanges: true, validation: {id: 'j1', state: 'done', status: 'AC'}});
   assert.equal(practicePublicationState(revised), 'review');
   const filters = practiceCatalogFilters(new URLSearchParams('problemStatus=review&problemQuery=PYTHON'), true);

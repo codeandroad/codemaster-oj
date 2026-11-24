@@ -16,7 +16,7 @@ export const practiceFilterKeys = {
 } as const;
 
 export function practiceCatalogFilters(search: Pick<URLSearchParams, "get">, staff: boolean): PracticeCatalogFilters {
-  const statuses = staff ? ["published", "review", "validating", "failed", "draft"] : ["accepted", "attempted", "not-started"];
+  const statuses = staff ? ["published", "review", "validating", "failed", "draft", "archived"] : ["accepted", "attempted", "not-started"];
   const status = search.get(practiceFilterKeys.status) ?? "";
   return {
     bankId: search.get(practiceFilterKeys.bankId) ?? "",
@@ -30,6 +30,7 @@ export function practiceCatalogFilters(search: Pick<URLSearchParams, "get">, sta
 }
 
 export function practicePublicationState(problem: Problem) {
+  if (problem.archived) return "archived";
   if (problem.published && !problem.hasDraftChanges) return "published";
   if (["queued", "leased"].includes(problem.validation?.state ?? "")) return "validating";
   if (problem.validation?.status === "AC") return "review";

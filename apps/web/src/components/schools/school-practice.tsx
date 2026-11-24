@@ -57,9 +57,7 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
 
   const courseId = staff ? "" : search.get(problemCourseFilterKey)?.toLowerCase() ?? "";
   const banks = useData<{ items: Bank[] }>(`${base}/problem-banks`);
-  const bankId = role === "school_admin" && filters.tab === "banks"
-    ? (banks.data?.items.find(bank => bank.id === filters.bankId)?.id ?? banks.data?.items.find(bank => !bank.archived)?.id ?? banks.data?.items[0]?.id ?? "")
-    : filters.bankId;
+  const { bankId } = filters;
   const groups = useData<{items: SchoolGroup[]}>(staff ? base + "/problem-groups" : "");
   const bankGroups = (groups.data?.items ?? []).filter(group => group.bankId === bankId);
   const [groupBank,setGroupBank] = useState<Bank | null>(null);
@@ -140,8 +138,8 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
   let editorNavigation: ProblemEditorNavigation | undefined;
   if (editing && editing !== "new") {
     const currentId = editing.scope === "platform" ? editing.id : editing.problem.id;
-    const rows = catalogProblems.filter(problem => problem.canManage
-      && (problem.id === currentId || practiceProblemMatches(problem, {...filters,bankId}, staff)));
+    const rows = catalogProblems.filter(problem => problem.canManage && !problem.archived
+      && (problem.id === currentId || practiceProblemMatches(problem, filters, staff)));
     const { previous, next } = adjacentProblemRows(rows, currentId);
     const target = (problem?: Problem) => problem && ({
       title: problem.title,
@@ -162,7 +160,7 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
   if (!staff && selected && params.has("publicCourseId")) {
     return <PublicProblemWorkspace id={selected} workspaceSchoolId={schoolId} catalog={catalog}/>;
   }
-  if (selected) return <PracticeProblem key={`${schoolId}:${selected}`} path={`${base}/problems/${encodeURIComponent(selected)}`} jobPath={id => `${base}/judge-jobs/${id}`} onBack={() => { selectProblem(null); refresh(); }} navigation={{ currentId: selected, items: practiceNavigationItems(staff ? catalogProblems : navigationProblems, {...filters,bankId}, staff, selected, banks.data?.items.filter(bank => bank.archived).map(bank => bank.id)), onSelect: selectProblem, href: id => practiceLocation(pathname, params.toString(), problemLocation(id)) }} />;
+  if (selected) return <PracticeProblem key={`${schoolId}:${selected}`} path={`${base}/problems/${encodeURIComponent(selected)}`} jobPath={id => `${base}/judge-jobs/${id}`} onBack={() => { selectProblem(null); refresh(); }} navigation={{ currentId: selected, items: practiceNavigationItems(staff ? catalogProblems : navigationProblems, filters, staff, selected, banks.data?.items.filter(bank => bank.archived).map(bank => bank.id)), onSelect: selectProblem, href: id => practiceLocation(pathname, params.toString(), problemLocation(id)) }} />;
 
   const catalogView = <SchoolPracticeCatalog
     banks={catalogBanks}
@@ -174,7 +172,7 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
     }}
     allProblems={staff ? withSources(allProblems.data?.items ?? []) : allProblems.data?.items ?? []}
     role={role}
-    filters={{...filters,bankId}}
+    filters={filters}
     groups={groups.data?.items ?? []}
     onManageGroups={setGroupBank}
     onArchiveProblem={p => {action.reset(); setArchiveProblem(p);}}
@@ -189,7 +187,7 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
       if (staff && problem?.canManage) editProblem(problem);
       else selectProblem(id);
     }}
-    renderActions={problem => problem.archived ? <span className="text-sm">{tx("已归档","Archived")}</span> : <>
+    renderActions={problem => <>
       {problem.canManage && <Button size="sm" variant="ghost" disabled={action.busy} onClick={() => editProblem(problem)}>{tx("编辑", "Edit")}</Button>}
       {problem.ownerScope !== "platform" && problem.canManageTutorial && <ProblemTutorialEditor
         endpoint={`${base}/problems/${encodeURIComponent(problem.id)}/tutorial`}

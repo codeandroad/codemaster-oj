@@ -59,11 +59,21 @@ async function createIdentity(db, schoolId, actorId, body) {
   const number = field(body.number, '编号', { max: 64 });
   const name = field(body.name, '姓名', { max: 100 });
   const accountId = body.accountId == null ? null : uuid(body.accountId, '账号 ID');
+  const { classIds = [] } = body;
+  if (!Array.isArray(classIds)) fail(400, 'VALIDATION', '班级须为列表');
+  const classes = [...new Set(classIds.map(id => uuid(id, '班级 ID').toLowerCase()))];
   await requireMatchingMember(db, schoolId, accountId, kind);
+  if (classes.length) {
+    const { rows } = await db.query(`SELECT archived_at FROM school_classes
+      WHERE school_id = $1 AND id = ANY($2::uuid[])`, [schoolId, classes]);
+    if (rows.length !== classes.length) fail(404, 'NOT_FOUND', '班级不存在或不可访问');
+    if (rows.some(row => row.archived_at)) fail(409, 'CLASS_ARCHIVED', '请选择使用中的班级');
+  }
   const { rows: [identity] } = await db.query(`
     INSERT INTO school_identities (school_id, kind, number, name, account_id)
     VALUES ($1, $2, $3, $4, $5) RETURNING ${identityFields}`, [schoolId, kind, number, name, accountId]);
   await auditSchool(db, schoolId, actorId, 'school.identity.create', identity.id);
+  if (classes.length) await addToClassRosters(db, schoolId, actorId, identity.id, classes);
   return { status: 201, body: identity };
 }
 
@@ -236,13 +246,21 @@ async function requireRosterIdentity(db, schoolId, role, identityId) {
   if (role === 'teacher' && identity.kind !== 'student') fail(403, 'FORBIDDEN', '教师只能管理学生名单');
 }
 
+async function addToClassRosters(db, schoolId, actorId, identityId, classIds) {
+  await db.query(`WITH added AS (
+    INSERT INTO school_class_roster (school_id, class_id, identity_id)
+    SELECT $1, class_id, $3 FROM unnest($4::uuid[]) AS classes(class_id)
+    ON CONFLICT (school_id, class_id, identity_id) DO NOTHING
+    RETURNING school_id, identity_id
+  )
+  INSERT INTO school_audit_events (school_id, actor_account_id, action, target_id)
+  SELECT school_id, $2, 'school.roster.add', identity_id FROM added`, [schoolId, actorId, identityId, classIds]);
+}
+
 async function addRosterIdentity(db, schoolId, actorId, role, classId, identityId) {
   await requireSchoolClassManagement(db, schoolId, actorId, role, classId);
   await requireRosterIdentity(db, schoolId, role, identityId);
-  const { rowCount } = await db.query(`
-    INSERT INTO school_class_roster (school_id, class_id, identity_id) VALUES ($1, $2, $3)
-    ON CONFLICT (school_id, class_id, identity_id) DO NOTHING`, [schoolId, classId, identityId]);
-  if (rowCount) await auditSchool(db, schoolId, actorId, 'school.roster.add', identityId);
+  await addToClassRosters(db, schoolId, actorId, identityId, [classId]);
   return { status: 201, body: { ok: true } };
 }
 

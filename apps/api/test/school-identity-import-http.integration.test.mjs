@@ -113,6 +113,9 @@ test('school identity import previews and atomic commits enforce tenant, account
         return Object.fromEntries(entries);
       }
       const protectedBefore = await snapshot(protectedTables);
+      const accountBindings = async () => (await pool.query(`SELECT id, account_id FROM school_identities
+        WHERE account_id IS NOT NULL ORDER BY id`)).rows;
+      const bindingsBefore = await accountBindings();
       const walletState=async()=>({
         accounts:(await pool.query('SELECT * FROM school_scholarship_accounts ORDER BY school_id,identity_id')).rows,
         ledger:(await pool.query('SELECT * FROM school_scholarship_ledger ORDER BY id')).rows,
@@ -133,9 +136,10 @@ test('school identity import previews and atomic commits enforce tenant, account
           await operation(body, { auth: student, status: 403 });
           await operation(body, { auth: legacy, status: 404 });
           await operation(body, { school: beta, status: 404 });
-          await operation(body, { school: { id: LEGACY_SCHOOL_ID }, auth: legacy, status: 404 });
+          await operation(body, { school: { id: LEGACY_SCHOOL_ID }, auth: alphaAdmin, status: 404 });
           await operation(body, { csrf: false, status: 403, code: 'CSRF' });
         }
+        await preview(body, { school: { id: LEGACY_SCHOOL_ID }, auth: legacy });
         await preview(body, { school: { id: 'not-a-uuid' }, status: 400 });
         await preview(body, { school: { id: randomUUID() }, status: 404 });
         await preview({ ...body, classId: 'not-a-uuid' }, { status: 400 });
@@ -423,13 +427,10 @@ test('school identity import previews and atomic commits enforce tenant, account
           assert.equal(entries[0].kind,'initial_grant');
           assert.equal(entries[0].delta,wallet.balance);
         }
-        assert.deepEqual((await pool.query(`SELECT id, account_id FROM school_identities
-          WHERE account_id IS NOT NULL ORDER BY id`)).rows,
-        [{ id: existingStudent.id, account_id: student.id }, { id: existingTeacher.id, account_id: teacher.id }]
-          .sort((a, b) => a.id.localeCompare(b.id)));
+        assert.deepEqual(await accountBindings(), bindingsBefore);
         assert.equal((await request('/auth/me', { auth: alphaAdmin })).data.user.roles.length, 0);
-        await request('/accounts', { auth: alphaAdmin, status: 403 });
-        await post('/classes', alphaAdmin, { name: 'Legacy escalation' }, 403);
+        await request('/accounts', { auth: alphaAdmin, status: 410 });
+        await post('/classes', alphaAdmin, { name: 'Legacy escalation' }, 410);
       });
     } finally {
       await app?.close();

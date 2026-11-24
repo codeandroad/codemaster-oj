@@ -194,7 +194,8 @@ test('school directories and class rosters enforce tenant, role, and account bou
       const classroom = (await request(classDetail,{auth:student})).data;
       assert.equal(classroom.memberCount,1);
       assert.deepEqual(classroom.members.map(r=>r.id),[alphaStudent.id]);
-      assert.deepEqual(Object.keys(classroom.members[0]).sort(),['avatar','displayName','id']);
+      assert.deepEqual(Object.keys(classroom.members[0]).sort(),['avatar','displayName','id','isOnline']);
+      assert.equal(typeof classroom.members[0].isOnline, 'boolean');
       assert.deepEqual((await request(classDetail+'/members',{auth:student})).data.items,classroom.members);
       await request(classes(alpha)+'/'+otherClass.id,{auth:student,status:404});
       await request(classes(beta)+'/'+taughtClass.id+'/members',{auth:student,status:404});
@@ -333,6 +334,37 @@ test('school directories and class rosters enforce tenant, role, and account bou
       assert.equal(locatedArchived.page, 1);
       assert.ok(locatedArchived.items.some(cls => cls.id === archivedTarget.id));
       await request(`${classes(alpha)}?classId=${archivedTarget.id}`, { auth: student, status: 404 });
+
+      const newStudent = { kind: 'student', number: 'MULTI-S', name: 'New student' };
+      const chosenClasses = [taughtClass.id, otherClass.id];
+      for (const [classIds, status] of [
+        [[taughtClass.id, betaClass.id], 404],
+        [[taughtClass.id, archivedTarget.id], 409],
+        [[taughtClass.id, randomUUID()], 404],
+        [[taughtClass.id, 'invalid'], 400],
+        [taughtClass.id, 400],
+      ]) {
+        await post(identities(alpha), alphaAdmin, { ...newStudent, classIds }, status);
+      }
+      await post(identities(alpha), teacher, { ...newStudent, classIds: chosenClasses }, 403);
+      assert.deepEqual((await request(`${identities(alpha)}?q=MULTI-S`, { auth: alphaAdmin })).data.items, []);
+      const { data: enrolled } = await post(identities(alpha), alphaAdmin, {
+        ...newStudent, classIds: [...chosenClasses, taughtClass.id.toUpperCase()],
+      });
+      const { data: assigned } = await post(identities(alpha), alphaAdmin, {
+        kind: 'teacher', number: 'MULTI-T', name: 'New teacher', classIds: chosenClasses,
+      });
+      for (const cls of [taughtClass, otherClass]) {
+        for (const person of [enrolled, assigned]) {
+          const { data } = await request(`${roster(alpha, cls)}?kind=${person.kind}`, { auth: alphaAdmin });
+          assert.equal(data.items.filter(member => member.id === person.id).length, 1);
+        }
+      }
+      const { data: unassigned } = await post(identities(alpha), alphaAdmin, {
+        kind: 'student', number: 'NO-CLASS', name: 'Unassigned student', classIds: [],
+      });
+      assert.equal((await pool.query('SELECT 1 FROM school_class_roster WHERE identity_id=$1', [unassigned.id])).rowCount, 0);
+
       // Deterministically pause a real revocation after its school lock. A
       // simultaneous teacher read must wait before taking a membership SHARE
       // lock, otherwise the revoker and the read form a database deadlock.

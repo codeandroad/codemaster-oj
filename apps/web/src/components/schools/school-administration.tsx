@@ -22,6 +22,7 @@ import { productionApi } from "@/lib/production-api";
 import { cn } from "@/lib/utils";
 import { SchoolIdentityImport } from "./school-identity-import";
 import { SchoolCourses } from "./school-courses";
+import { SchoolClassPicker } from "./school-class-picker";
 import { SchoolClasses } from "./school-classes";
 import { SchoolActivationButton } from "./school-activation-button";
 import {
@@ -246,7 +247,7 @@ function SchoolDirectory({
         <CreateSchoolRecord
           endpoint={`${base}/identities`}
           type="identity"
-          schoolName={school.name}
+          school={school}
           onClose={() => setEdit(false)}
           onSaved={() => saved(text("Identity created.", "已创建身份档案。"))}
         />
@@ -492,13 +493,13 @@ function SchoolTablePage<T>({
 function CreateSchoolRecord({
   endpoint,
   type,
-  schoolName,
+  school,
   onClose,
   onSaved,
 }: {
   endpoint: string;
   type: "identity" | "class";
-  schoolName: string;
+  school: School;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -508,6 +509,7 @@ function CreateSchoolRecord({
   const [name, setName] = useState("");
   const [number, setNumber] = useState("");
   const [kind, setKind] = useState<IdentityKind>("student");
+  const [classIds, setClassIds] = useState<string[]>([]);
   const [classType, setClassType] = useState<ClassType>("administrative");
   const [invalid, setInvalid] = useState<"name" | "number" | null>(null);
   const nameInput = useRef<HTMLInputElement>(null);
@@ -531,7 +533,7 @@ function CreateSchoolRecord({
     void action.run(async () => {
       try {
         const body = isIdentity
-          ? { name: name.trim(), number: number.trim(), kind }
+          ? { name: name.trim(), number: number.trim(), kind, classIds }
           : { name: name.trim(), type: classType };
         await productionApi(endpoint, { method: "POST", body });
         onSaved();
@@ -550,12 +552,12 @@ function CreateSchoolRecord({
       description={
         isIdentity
           ? text(
-              `Create a student or teacher identity at ${schoolName}. Link it to a school member after saving.`,
-              `在 ${schoolName} 创建学生或教师身份，保存后可关联本校成员账号。`,
+              `Create a student or teacher identity at ${school.name}. Link it to a school member after saving.`,
+              `在 ${school.name} 创建学生或教师身份，保存后可关联本校成员账号。`,
             )
           : text(
-              `Create a class at ${schoolName}. Add students and teachers from the school directory after saving.`,
-              `在 ${schoolName} 创建班级，保存后可从身份档案中添加学生和教师。`,
+              `Create a class at ${school.name}. Add students and teachers from the school directory after saving.`,
+              `在 ${school.name} 创建班级，保存后可从身份档案中添加学生和教师。`,
             )
       }
       onClose={() => {
@@ -641,6 +643,14 @@ function CreateSchoolRecord({
                 <option value="teacher">{text("Teacher", "教师")}</option>
               </select>
             </label>
+            <fieldset disabled={action.busy} className="space-y-2">
+              <legend className="text-sm font-semibold">
+                {kind === "student"
+                  ? text("Student classes (optional)", "所在班级（可选）")
+                  : text("Teaching classes (optional)", "任教班级（可选）")}
+              </legend>
+              <SchoolClassPicker schoolId={school.id} selected={classIds} onChange={setClassIds} />
+            </fieldset>
           </>
         ) : (
           <label className="block space-y-1 text-sm font-semibold">

@@ -33,10 +33,6 @@ export function useSchoolError() {
   return (error: unknown) => {
     if (error instanceof ApiError) {
       const messages: Record<string, string> = {
-        INVALID_INVITATION: text(
-          "This invitation is invalid, expired, or already used. Ask the school administrator for a new code.",
-          "邀请无效、已过期或已使用，请向学校管理员获取新的邀请码。",
-        ),
         SCHOOL_ACCESS_SUSPENDED: text("School access is suspended. Contact a school administrator.", "本校访问已暂停，请联系学校管理员。"),
         ALREADY_MEMBER: text(
           "You already belong to this school.",
@@ -69,10 +65,6 @@ export function useSchoolError() {
         NOT_FOUND: text(
           "This school or record is no longer available. Refresh the list.",
           "学校或记录已不可用，请刷新列表。",
-        ),
-        INVITATION_LIMIT: text(
-          "This school has reached its pending invitation limit. Use an existing invitation or wait for it to expire.",
-          "这所学校的待领取邀请已达上限，请使用现有邀请或等待过期。",
         ),
         UNAUTHENTICATED: text(
           "Your session has expired. Sign in again.",

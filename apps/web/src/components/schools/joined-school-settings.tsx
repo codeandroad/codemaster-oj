@@ -19,7 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { productionApi, type CampusUser } from "@/lib/production-api";
-import { JoinSchoolForm } from "./join-school-form";
+import { JoinSchoolForm, MySchoolRequests } from "./join-school-form";
 import { schoolWorkspaceHref } from "./school-workspace-location";
 import { writeSchoolPreference } from "./school-selection";
 import { SchoolSettingsDialog } from "./school-settings";
@@ -49,6 +49,7 @@ export function JoinedSchoolSettings({
     null,
   );
   const [selected, setSelected] = useState<School | null>(null);
+  const [requestRevision,setRequestRevision] = useState(0);
   const [joining, setJoining] = useState(false);
   const action = useMutation();
   const pending = useRef(false);
@@ -121,7 +122,7 @@ export function JoinedSchoolSettings({
           }}
         >
           <UserPlus size={15} aria-hidden="true" />
-          {text("Join with an invitation", "使用邀请码加入")}
+          {text("Join a school", "加入学校")}
         </Button>
         </div>
       </div>
@@ -229,6 +230,7 @@ export function JoinedSchoolSettings({
             )}
           </Loading>
         </Loading>
+        <MySchoolRequests key={requestRevision} onRefresh={changed}/>
         <Feedback action={action} />
       </div>
       {selected && (
@@ -249,10 +251,11 @@ export function JoinedSchoolSettings({
             setJoining(false);
             requestAnimationFrame(() => returnFocus.current?.focus());
           }}
-          onJoined={() => {
+          onComplete={(_schoolId,pending) => {
             setJoining(false);
-            changed();
-            action.success(text("School joined.", "已加入学校。"));
+            setRequestRevision(value=>value+1);
+            if (!pending) changed();
+            action.success(pending ? text("Application submitted.","已提交入校申请。") : text("Identity linked. You have joined the school.","身份已关联，可进入学校工作区。"));
             requestAnimationFrame(() => returnFocus.current?.focus());
           }}
         />
@@ -263,10 +266,10 @@ export function JoinedSchoolSettings({
 
 export function JoinSchoolDialog({
   onClose,
-  onJoined,
+  onComplete,
 }: {
   onClose: () => void;
-  onJoined: (schoolId: string) => void;
+  onComplete: (schoolId: string, pending: boolean) => void;
 }) {
   const text = useSchoolText();
   const action = useMutation();
@@ -284,14 +287,14 @@ export function JoinSchoolDialog({
         <DialogTitle>{text("Join a school", "加入学校")}</DialogTitle>
         <DialogDescription>
           {text(
-            "Enter the invitation code from your school administrator.",
-            "填写学校管理员提供的邀请码。",
+            "Use your school identity claim code or apply for administrator review.",
+            "有身份认领码可直接关联档案，没有码可提交申请，由学校管理员审核。",
           )}
         </DialogDescription>
         <JoinSchoolForm
           action={action}
           onCancel={onClose}
-          onJoined={onJoined}
+          onComplete={onComplete}
         />
       </DialogContent>
     </Dialog>

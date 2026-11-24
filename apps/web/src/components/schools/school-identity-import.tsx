@@ -357,8 +357,8 @@ export function SchoolIdentityImport({
                   `将学生导入 ${initialClass?.name ?? school.name}，保留已有身份和账号关联。`,
                 )
               : text(
-                  `Import student or teacher identity records into ${school.name}. Accounts are linked separately; this import creates no login accounts, passwords, or activation codes.`,
-                  `将学生或教师身份档案导入 ${school.name}。账号须另行关联；本次导入不创建登录账号、密码或激活码。`,
+                  `Import student or teacher identity records into ${school.name}. Accounts are linked separately; this import creates no login accounts, passwords, or identity claim codes.`,
+                  `将学生或教师身份档案导入 ${school.name}。账号须另行关联；本次导入不创建登录账号、密码或认领码。`,
                 )}
           </DialogDescription>
         </div>

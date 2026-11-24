@@ -8,5 +8,5 @@ export type { ActivationSchool };
 export function ActivationSchoolHint({ school }: { school?: ActivationSchool }) {
   const { locale } = useLocale();
   if (!school) return null;
-  return <p className="text-sm text-muted-foreground">{activationSchoolName(school, locale)} · {locale === "en" ? "Select this school when activating your identity." : "激活身份时请选择本学校。"}</p>;
+  return <p className="text-sm text-muted-foreground">{activationSchoolName(school, locale)} · {locale === "en" ? "Select this school when claiming your identity." : "认领身份时请选择这所学校。"}</p>;
 }

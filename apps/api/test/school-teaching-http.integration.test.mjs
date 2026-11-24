@@ -1,3 +1,4 @@
+import { seedUnlinkedMembership } from './support/workspace-accounts.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -102,13 +103,9 @@ test('school directories and class rosters enforce tenant, role, and account bou
       const post = (path, auth, body, status = 201) => request(path, { method: 'POST', auth, body, status });
       const patch = (path, auth, body, status = 200) => request(path, { method: 'PATCH', auth, body, status });
       const remove = (path, auth, status = 200) => request(path, { method: 'DELETE', auth, status });
-      const join = async (school, admin, member, role) => {
-        const { data: invite } = await post(schoolPath(school, 'invitations'), admin, { role });
-        await post('/school-invitations/accept', member, { token: invite.token }, 200);
-      };
-      await join(alpha, alphaAdmin, teacher, 'teacher');
-      await join(alpha, alphaAdmin, student, 'student');
-      await join(beta, betaAdmin, teacher, 'student');
+      await seedUnlinkedMembership(pool,alpha.id,teacher.id,'teacher');
+      await seedUnlinkedMembership(pool,alpha.id,student.id,'student');
+      await seedUnlinkedMembership(pool,beta.id,teacher.id,'student');
 
       await request(identities(alpha), { status: 401 });
       await request(identities(alpha), { auth: campusAdmin, status: 404 });
@@ -557,7 +554,7 @@ test('school directories and class rosters enforce tenant, role, and account bou
       assert.ok(retainedRoster.some(person => person.id === alphaTeacher.id));
       const betaDirectory = (await request(identities(beta), { auth: betaAdmin })).data.items;
       assert.equal(betaDirectory.find(person => person.id === betaStudent.id)?.accountId, teacher.id);
-      await join(alpha, alphaAdmin, teacher, 'student');
+      await seedUnlinkedMembership(pool,alpha.id,teacher.id,'student');
       await request(roster(alpha, taughtClass), { auth: teacher, status: 404 });
       await patch(bind(alpha, alphaTeacher), alphaAdmin, { accountId: teacher.id }, 400);
 

@@ -1,3 +1,4 @@
+import { enrollWithClaim } from './support/workspace-accounts.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -57,18 +58,12 @@ test('school exits require approval, archive the original dossier and retain the
     const alpha = await provisionSchool(owner, { slug: 'exit-alpha', name: 'Exit Alpha', adminUsername: 'exit-alpha-admin' });
     const beta = await provisionSchool(owner, { slug: 'exit-beta', name: 'Exit Beta', adminUsername: 'exit-beta-admin' });
     const prefix = `/schools/${alpha.id}`;
-    const invite = async (school, admin, target, role = 'student') => {
-      const { data } = await post(`/schools/${school.id}/invitations`, admin, { role }, 201);
-      await post('/school-invitations/accept', target, { token: data.token });
-    };
     const student = await personal('exit-student');
     const teacher = await personal('exit-teacher');
     const studentId = student.data.user.id;
-    await invite(alpha, alphaAdmin, student);
-    await invite(beta, betaAdmin, student);
-    await invite(alpha, alphaAdmin, teacher, 'teacher');
-    const identity = (await post(prefix + '/identities', alphaAdmin,
-      { kind: 'student', number: 'ALPHA-1', name: 'Alpha learner', accountId: studentId }, 201)).data;
+    const identity = await enrollWithClaim(post,alpha,alphaAdmin,student,{kind:'student',number:'ALPHA-1',name:'Alpha learner'});
+    await enrollWithClaim(post,beta,betaAdmin,student,{kind:'student',number:'B1',name:'Beta learner'});
+    await enrollWithClaim(post,alpha,alphaAdmin,teacher,{kind:'teacher',number:'T1',name:'Alpha teacher'});
     const schoolClass = (await post(prefix + '/classes', alphaAdmin, { name: 'QA class', type: 'training' }, 201)).data;
     const roster = `${prefix}/classes/${schoolClass.id}/roster`;
     await post(roster, alphaAdmin, { identityId: identity.id }, 201);
@@ -133,19 +128,19 @@ test('school exits require approval, archive the original dossier and retain the
         WHERE i.id=$1`, [identity.id, pending.id]);
       assert.ok(snapshot.archived_at);
       assert.deepEqual({ ...snapshot, archived_at: true }, { account_id: null, archived_at: true, balance: schoolBalance, roster: 1, ledger: 1, decisions: 1 });
-      await invite(alpha, alphaAdmin, student);
-      const candidates = (await request(direct + '?q=exit-student', { auth: alphaAdmin })).data.items;
+      const newIdentity = await enrollWithClaim(post,alpha,alphaAdmin,student,{kind:'student',name:'Rejoined learner',number:'ALPHA-2'});
+      const candidates = (await request(direct + '?q=Rejoined+learner', { auth: alphaAdmin })).data.items;
       assert.equal(candidates.length, 1);
-      assert.equal(candidates[0].identityId, null, 'rejoining does not reclaim an archived dossier');
+      assert.equal(candidates[0].identityId, newIdentity.id, 'rejoining does not reclaim an archived dossier');
       await post(direct, alphaAdmin, { accountId: studentId, membershipStartedAt: previousCandidate.membershipStartedAt, identityId: previousCandidate.identityId }, 409);
-      await post(direct, alphaAdmin, { accountId: studentId, membershipStartedAt: candidates[0].membershipStartedAt }, 201);
+      await post(direct, alphaAdmin, { accountId: studentId, membershipStartedAt: candidates[0].membershipStartedAt, identityId:newIdentity.id }, 201);
       assert.deepEqual(await schoolList(student), [beta.id]);
     });
 
     await t.test('an elevated student cannot drop an administrator membership through a student exit', async () => {
       const elevated = await personal('exit-elevated');
       const id = elevated.data.user.id;
-      await invite(alpha, alphaAdmin, elevated);
+      await enrollWithClaim(post,alpha,alphaAdmin,elevated,{kind:'student',number:'S3',name:'Elevated learner'});
       await owner.query('INSERT INTO school_administrators(school_id,account_id,granted_by) VALUES($1,$2,$3)', [alpha.id, id, alphaAdmin.data.user.id]);
       await post(apply, elevated, {}, 404);
       await post(direct, alphaAdmin, { accountId: id }, 404);
@@ -154,61 +149,58 @@ test('school exits require approval, archive the original dossier and retain the
     });
 
     await t.test('legacy administrator detaches the school dossier while preserving the same credentials', async () => {
-      const person = (await post('/people', legacy, { kind: 'student', number: 'OLD-1', name: 'Legacy learner' }, 201)).data;
-      const account = await post('/auth/register', undefined, {
-        kind: 'student', number: 'OLD-1', name: 'Legacy learner', activationCode: person.activationCode, username: 'exit-legacy-student', password,
-      }, 201);
-      const id = account.data.user.id;
-      const dossier = account.data.user.identityId;
-      await invite(beta, betaAdmin, account);
-      const oldClass = (await owner.query("INSERT INTO classes(name,type,owner_account_id) VALUES('Legacy class','training',$1) RETURNING id", [legacy.data.user.id])).rows[0].id;
-      await owner.query('INSERT INTO class_members(class_id,identity_id) VALUES($1,$2)', [oldClass, dossier]);
-      const administratorId = legacy.data.user.id;
-      const assignment = (await owner.query("INSERT INTO assignments(title,class_id,owner_account_id,due_at) VALUES('Legacy assignment',$1,$2,now()+interval '1 day') RETURNING id", [oldClass, administratorId])).rows[0].id;
-      const problem = (await owner.query('INSERT INTO problems(owner_account_id) VALUES($1) RETURNING id', [administratorId])).rows[0].id;
-      const version = (await owner.query(`INSERT INTO problem_versions(problem_id,title,mode,statement,time_limit_ms,memory_limit_mb,reference_code)
-        VALUES($1,'Legacy problem','stdio','Legacy prompt',1000,128,'print(1)') RETURNING id`, [problem])).rows[0].id;
-      await owner.query('INSERT INTO assignment_problems(assignment_id,problem_id,version_id,points,position) VALUES($1,$2,$3,100,0)', [assignment, problem, version]);
-      await owner.query('INSERT INTO assignment_participants(assignment_id,identity_id) VALUES($1,$2)', [assignment, dossier]);
-      const submission = (await owner.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,assignment_id,kind,code,idempotency_key,request_hash,status,score)
-        VALUES($1,$2,$3,$4,$5,'submit','print(1)',$6,'qa:exit:submission','AC',100) RETURNING id`, [id, dossier, problem, version, assignment, randomUUID()])).rows[0].id;
-      await owner.query('SELECT luq_post_entry($1, $2, $3, $4, $5, $6)', [dossier, 17, 'admin_grant', 'qa:legacy-exit', legacy.data.user.id, 'QA history']);
-      const legacyBalance = (await owner.query('SELECT balance FROM luq_accounts WHERE identity_id=$1', [dossier])).rows[0].balance;
-      await request('/auth/default-workspace', { method: 'PATCH', auth: account, body: { defaultSchoolId: LEGACY_SCHOOL_ID } });
-      const legacyPath = `/schools/${LEGACY_SCHOOL_ID}`;
+      const account = await personal('exit-legacy-student');
+      const school = (await request('/schools',{auth:legacy})).data.items.find(s=>s.id===LEGACY_SCHOOL_ID);
+      const schoolRecord = await enrollWithClaim(post,school,legacy,account,{kind:'student',number:'OLD-1',name:'Legacy learner'});
+      const id = account.data.user.id, dossier = account.data.user.identityId;
+      await enrollWithClaim(post,beta,betaAdmin,account,{kind:'student',number:'B2',name:'Legacy learner'});
+      const legacyPath = '/schools/' + LEGACY_SCHOOL_ID;
+      const schoolClass = (await post(legacyPath + '/classes', legacy, {name:'Legacy class',type:'training'}, 201)).data;
+      await post(legacyPath + '/classes/' + schoolClass.id + '/roster', legacy, {identityId:schoolRecord.id}, 201);
+      await post(legacyPath + '/scholarship/grant', legacy, {
+        identityIds:[schoolRecord.id], amount:17, reason:'QA history', requestId:randomUUID(),
+      });
+      const balance = (await request(legacyPath + '/scholarship/wallet', {auth:account})).data.balance;
+      const assignment = (await owner.query(`INSERT INTO school_activities(school_id,owner_account_id,kind,title,state,request_id,request_hash)
+        VALUES($1,$2,'assignment','Legacy assignment','Published',gen_random_uuid(),'exit-history') RETURNING id`,
+        [school.id,legacy.data.user.id])).rows[0].id;
+      const participant = [school.id,assignment,schoolRecord.id];
+      await owner.query('INSERT INTO school_activity_participants(school_id,activity_id,identity_id) VALUES($1,$2,$3)',participant);
+      await owner.query('INSERT INTO school_activity_attempts(school_id,activity_id,identity_id,account_id) VALUES($1,$2,$3,$4)',[...participant,id]);
+      await owner.query('INSERT INTO school_activity_results(school_id,activity_id,identity_id,grade) VALUES($1,$2,$3,$4)',[...participant,{score:100}]);
+      await request('/auth/default-workspace', { method: 'PATCH', auth: account, body: { defaultSchoolId: school.id } });
       const pending = (await post(legacyPath + '/exit-request', account, {}, 201)).data.request;
-      await post(`${legacyPath}/exit-requests/${pending.id}/decision`, betaAdmin, { decision: 'approve' }, 403);
+      await post(`${legacyPath}/exit-requests/${pending.id}/decision`, betaAdmin, { decision: 'approve' }, 404);
       await post(`${legacyPath}/exit-requests/${pending.id}/decision`, legacy, { decision: 'approve' });
       assert.deepEqual(await schoolList(account), [beta.id]);
       const me = (await request('/auth/me', { auth: account })).data.user;
       assert.equal(me.id, id);
-      assert.notEqual(me.identityId, dossier);
+      assert.equal(me.identityId, dossier);
       assert.deepEqual(me.roles, []);
       assert.equal(me.defaultSchoolId, null);
       assert.equal((await login('exit-legacy-student')).data.user.id, id);
-      await request('/classes', { auth: account, expected: 403 });
-      await request(`/accounts/${id}`, { method: 'PATCH', auth: legacy, body: { disabled: true }, expected: 403 });
-      await post(`/people/${dossier}/restore`, legacy, {}, 409);
-      await post(`/people/${dossier}/activation`, legacy, {}, 404);
-      const archived = (await request('/people?deleted=true', { auth: legacy })).data.items.find(item => item.id === dossier);
+      await request(legacyPath+'/classes', { auth: account, expected: 404 });
+      await post(legacyPath+'/identities/'+schoolRecord.id+'/restore', legacy, {}, 409);
+      await post(legacyPath+'/identities/'+schoolRecord.id+'/activation-code', legacy, {}, 404);
+      const archived = (await request(legacyPath+'/identities/'+schoolRecord.id+'/details', { auth: legacy })).data;
       assert.equal(archived.archivedByExit, true);
-      assert.equal(archived.canDelete, false);
-      await request(`/classes/${oldClass}`, { method: 'PATCH', auth: legacy, body: { studentIds: [] } });
-      assert.equal((await owner.query('SELECT count(*)::int n FROM class_members WHERE identity_id=$1', [dossier])).rows[0].n, 1);
-      assert.equal((await owner.query('SELECT balance FROM luq_accounts WHERE identity_id=$1', [dossier])).rows[0].balance, legacyBalance);
-      const { rows: [retained] } = await owner.query(`SELECT s.account_id,s.identity_id,s.assignment_id,s.status,s.score::int,
-        EXISTS (SELECT 1 FROM assignment_participants p WHERE p.assignment_id=s.assignment_id AND p.identity_id=s.identity_id) AS assigned
-        FROM submissions s WHERE s.id=$1`, [submission]);
-      assert.deepEqual(retained, { account_id: id, identity_id: dossier, assignment_id: assignment, status: 'AC', score: 100, assigned: true });
+      assert.equal(archived.canArchive, false);
+      assert.equal((await owner.query('SELECT count(*)::int n FROM school_class_roster WHERE identity_id=$1', [schoolRecord.id])).rows[0].n, 1);
+      assert.equal((await owner.query('SELECT balance FROM school_scholarship_accounts WHERE identity_id=$1', [schoolRecord.id])).rows[0].balance, balance);
+      const {rows:[retained]} = await owner.query(`SELECT a.account_id,r.grade FROM school_activity_attempts a
+        JOIN school_activity_results r USING(school_id,activity_id,identity_id)
+        JOIN school_activity_participants p USING(school_id,activity_id,identity_id)
+        WHERE a.school_id=$1 AND a.activity_id=$2 AND a.identity_id=$3`,participant);
+      assert.deepEqual(retained,{account_id:id,grade:{score:100}});
     });
 
     const { rows: [grantsAfter] } = await owner.query(`SELECT
       has_table_privilege('campus_worker', $1, 'SELECT') AS worker_reads,
       has_table_privilege('campus_app', $1, 'DELETE') AS app_deletes,
       has_column_privilege('campus_app', $1, 'account_id', 'UPDATE') AS app_reassigns,
-      has_function_privilege('campus_worker', $2, 'EXECUTE') AS worker_detaches`,
+      to_regprocedure($2) IS NOT NULL AS obsolete_detach_exists`,
     [`${schema}.school_exit_requests`, `${schema}.detach_legacy_school_student(uuid,uuid,uuid,uuid)`]);
-    assert.deepEqual(grantsAfter, { worker_reads: false, app_deletes: false, app_reassigns: false, worker_detaches: false });
+    assert.deepEqual(grantsAfter, { worker_reads: false, app_deletes: false, app_reassigns: false, obsolete_detach_exists: false });
   } finally {
     await app?.close();
     await owner.end();

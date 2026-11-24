@@ -1,3 +1,4 @@
+import { closePendingSchoolRequests } from './school-join-requests.mjs';
 import { studentClassroom } from './student-classroom.mjs';
 import { transaction } from './db.mjs';
 import { auditSchool, lockSchoolTeaching, requireSchoolAdmin, schoolRole } from './schools.mjs';
@@ -128,6 +129,7 @@ async function createIdentity(db, schoolId, actorId, body) {
   const { rows: [identity] } = await db.query(`
     INSERT INTO school_identities (school_id, kind, number, name, account_id, gender, notes)
     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ${identityFields}`, [schoolId, kind, number, name, accountId, gender, notes]);
+  if (accountId) await closePendingSchoolRequests(db, schoolId, accountId, actorId);
   await auditSchool(db, schoolId, actorId, 'school.identity.create', identity.id);
   if (classes.length) await addToClassRosters(db, schoolId, actorId, identity.id, classes);
   return { status: 201, body: identity };
@@ -205,6 +207,10 @@ async function setIdentityAccount(db, schoolId, actorId, identityId, body) {
   const { rows: [updated] } = await db.query(`
     UPDATE school_identities SET account_id = $3 WHERE school_id = $1 AND id = $2
     RETURNING ${identityFields}`, [schoolId, identityId, accountId]);
+  // A later unlink must not revive a claim code issued before this binding.
+  await db.query(`UPDATE school_activation_tokens SET consumed_at=clock_timestamp()
+    WHERE school_id=$1 AND identity_id=$2 AND consumed_at IS NULL`, [schoolId, identityId]);
+  if (accountId) await closePendingSchoolRequests(db, schoolId, accountId, actorId);
   await auditSchool(db, schoolId, actorId, accountId === null ? 'school.identity.unlink' : 'school.identity.link', identityId);
   return { status: 200, body: updated };
 }

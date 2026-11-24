@@ -46,8 +46,15 @@ test('school activation isolates same-name and same-number identities and consum
       const issuePath = (school, person) => `/schools/${school.id}/identities/${person.id}/activation-code`;
       const issue = async (school, auth, person) => (await request(issuePath(school, person), { method: 'POST', body: {}, auth, status: 201 })).data;
       const claim = (school, person, code) => ({ schoolSlug: school.slug, kind: person.kind, number: person.number, name: person.name, activationCode: code });
-      const verify = (body, status = 200) => request('/auth/verify-identity', { method: 'POST', body, status });
-      const register = (body, username, status = 201) => request('/auth/register', { method: 'POST', body: { ...body, username, password, email: '' }, status });
+      const previewer = await personal('preview-account');
+      const verify = (body, status = 200) => request('/auth/verify-identity', { method: 'POST', auth:previewer, body, status });
+      const claimAs = async (body, username, status = 200) => {
+        const account = await personal(username);
+        const response = await request('/auth/claim-identity', { method:'POST', auth:account, body, status });
+        if (response.status !== 200) return response;
+        assert.equal((await request('/auth/me',{auth:account})).data.user.id,account.data.user.id);
+        return {...account,status:response.status};
+      };
       const cls = (await request(`/schools/${alpha.id}/classes`, { method: 'POST', auth: adminA, status: 201, body: { name: 'Existing class', type: 'training' } })).data;
       const a = await identity(alpha, adminA, '001', 'student', [cls.id]), b = await identity(beta, adminB);
       const ca = await issue(alpha, adminA, a), cb = await issue(beta, adminB, b);
@@ -85,9 +92,9 @@ test('school activation isolates same-name and same-number identities and consum
         const wrongName = await verify({ ...claim(alpha, a, ca.activationCode), name: 'Other Name' }, 400);
         assert.deepEqual(wrongSchool.data.error, unknownSchool.data.error);
         assert.deepEqual(wrongSchool.data.error, wrongName.data.error);
-        const wrongRegistration = await register(claim(beta, b, ca.activationCode), 'wrong-school-student', 400);
+        const wrongRegistration = await claimAs(claim(beta, b, ca.activationCode), 'wrong-school-student', 400);
         assert.deepEqual(wrongRegistration.data.error, wrongSchool.data.error);
-        assert.equal((await owner.query("SELECT count(*)::int n FROM accounts WHERE username='wrong-school-student'")).rows[0].n, 0);
+        assert.equal((await owner.query("SELECT count(*)::int n FROM accounts WHERE username='wrong-school-student'")).rows[0].n, 1);
         const ac = claim(alpha, a, ca.activationCode); delete ac.schoolSlug;
         await verify(ac, 400); // Legacy fallback never searches pilot identities.
         const preview = (await verify(claim(alpha, a, ca.activationCode))).data;
@@ -104,28 +111,28 @@ test('school activation isolates same-name and same-number identities and consum
         await request(path, { auth: adminA, method: 'PATCH', body: { name: corrected.name, number: corrected.number, expectedVersion: profile.version } });
         await verify(claim(alpha, pending, activationCode), 400);
         await verify(claim(alpha, corrected, activationCode));
-        const activated = await register(claim(alpha, corrected, activationCode), 'corrected-teacher');
+        const activated = await claimAs(claim(alpha, corrected, activationCode), 'corrected-teacher');
         assert.equal((await owner.query('SELECT account_id FROM school_identities WHERE id=$1', [pending.id])).rows[0].account_id, activated.data.user.id);
       });
-      await t.test('concurrent registration creates exactly one account and preserves the school identity and roster', async () => {
+      await t.test('concurrent claims link exactly one existing account and preserves the school identity and roster', async () => {
         const preview = (await verify(claim(alpha, a, ca.activationCode))).data;
         assert.deepEqual(preview.person.classes, [{ name: 'Existing class' }]);
-        const attempts = await Promise.all(['candidate-one', 'candidate-two'].map(login => register(claim(alpha, a, ca.activationCode), login, [201,400])));
-        assert.deepEqual(attempts.map(item => item.status).sort(), [201,400]);
-        registeredA = attempts.find(item => item.status === 201);
-        assert.deepEqual(registeredA.data.user.roles, []); assert.equal(registeredA.data.user.defaultSchoolId, alpha.id);
+        const attempts = await Promise.all(['candidate-one', 'candidate-two'].map(login => claimAs(claim(alpha, a, ca.activationCode), login, [200,400])));
+        assert.deepEqual(attempts.map(item => item.status).sort(), [200,400]);
+        registeredA = attempts.find(item => item.status === 200);
+        assert.deepEqual(registeredA.data.user.roles, []); assert.equal(registeredA.data.user.defaultSchoolId, null);
         const retained = (await owner.query('SELECT account_id FROM school_identities WHERE school_id=$1 AND id=$2', [alpha.id, a.id])).rows[0];
         assert.equal(retained.account_id, registeredA.data.user.id);
         assert.equal((await owner.query('SELECT count(*)::int n FROM school_class_roster WHERE identity_id=$1', [a.id])).rows[0].n, 1);
         assert.deepEqual((await owner.query('SELECT school_id,role FROM school_memberships WHERE account_id=$1 AND revoked_at IS NULL', [retained.account_id])).rows,
           [{ school_id: alpha.id, role: 'student' }]);
         assert.equal((await owner.query("SELECT count(*)::int n FROM school_audit_events WHERE action='school.identity.claim' AND target_id=$1", [a.id])).rows[0].n, 1);
-        await register(claim(alpha, a, ca.activationCode), 'candidate-repeat', 400);
+        await claimAs(claim(alpha, a, ca.activationCode), 'candidate-repeat', 400);
         await request(issuePath(alpha, a), { method: 'POST', body: {}, auth: adminA, status: 409 });
         await request('/accounts', { auth: registeredA, status: 410 });
       });
       await t.test('the same identity number and name at another school remain independently claimable', async () => {
-        const registeredB = await register(claim(beta, b, cb.activationCode), 'beta-student');
+        const registeredB = await claimAs(claim(beta, b, cb.activationCode), 'beta-student');
         assert.notEqual(registeredA.data.user.identityId, registeredB.data.user.identityId);
         const schoolList = (await request('/schools', { auth: registeredB })).data.items;
         assert.deepEqual(schoolList.map(school => school.id), [beta.id]);
@@ -140,14 +147,14 @@ test('school activation isolates same-name and same-number identities and consum
         await verify(claim(beta, otherTeacher, second.activationCode), 400);
         await verify(claim(alpha, person, first.activationCode), 400);
         await owner.query("UPDATE school_activation_tokens SET expires_at=now()-interval '1 second' WHERE identity_id=$1", [person.id]);
-        await register(claim(alpha, person, second.activationCode), 'expired-teacher', 400);
+        await claimAs(claim(alpha, person, second.activationCode), 'expired-teacher', 400);
         const third = await issue(alpha, adminA, person);
         await owner.query('UPDATE accounts SET disabled_at=now() WHERE id=$1', [adminA.data.user.id]);
         await verify(claim(alpha, person, third.activationCode), 400);
         await owner.query('UPDATE accounts SET disabled_at=NULL WHERE id=$1', [adminA.data.user.id]);
-        const registered = await register(claim(alpha, person, third.activationCode), 'active-teacher');
+        const registered = await claimAs(claim(alpha, person, third.activationCode), 'active-teacher');
         assert.deepEqual((await request('/schools', { auth: registered })).data.items[0].roles, ['teacher']);
-        const betaRegistered = await register(claim(beta, otherTeacher, betaCode.activationCode), 'beta-teacher');
+        const betaRegistered = await claimAs(claim(beta, otherTeacher, betaCode.activationCode), 'beta-teacher');
         assert.notEqual(betaRegistered.data.user.identityId, registered.data.user.identityId);
         assert.deepEqual((await request('/schools', { auth: betaRegistered })).data.items[0].roles, ['teacher']);
       });
@@ -159,7 +166,7 @@ test('school activation isolates same-name and same-number identities and consum
         const body = claim(school, person, code.activationCode);
         await verify({ ...body, schoolSlug: alpha.slug }, 400);
         assert.equal((await verify(body)).data.school.slug, 'tianxing-chuangshiji');
-        const registered = await register(body, 'legacy-student');
+        const registered = await claimAs(body, 'legacy-student');
         assert.deepEqual(registered.data.user.roles, []);
         assert.deepEqual((await request('/schools', { auth: registered })).data.items.map(item => [item.id, item.roles]), [[school.id, ['student']]]);
         const linked = (await owner.query('SELECT id FROM school_identities WHERE school_id=$1 AND account_id=$2', [school.id, registered.data.user.id])).rows;
@@ -167,7 +174,7 @@ test('school activation isolates same-name and same-number identities and consum
         const teacher = await identity(school, legacy, 'T-OLD', 'teacher');
         const teacherCode = await issue(school, legacy, teacher);
         const unscoped = claim(school, teacher, teacherCode.activationCode); delete unscoped.schoolSlug;
-        await register(unscoped, 'old-client-teacher', 400);
+        await claimAs(unscoped, 'old-client-teacher', 400);
       });
     } finally { await app?.close(); await owner.end(); await manager.query(`DROP SCHEMA ${schema} CASCADE`); await manager.end(); }
   });

@@ -35,8 +35,8 @@ export class AuthController {
     return applyResponse(response, await this.domain.execute('auth', request.domainContext));
   }
 
-  @Post('auth/register')
-  async register(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
+  @Post('auth/claim-identity')
+  async claimIdentity(@Req() request: DomainRequest, @Res({passthrough: true}) response: Response): Promise<unknown> {
     return applyResponse(response, await this.domain.execute('auth', request.domainContext));
   }
 

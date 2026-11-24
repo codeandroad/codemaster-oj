@@ -190,7 +190,7 @@ function PublicStudyHome({ user }: { user: CampusUser }) {
       <div className={`${panelClass} flex flex-wrap items-center justify-between gap-3 p-4`}>
         <AppLink href="/practice/problems" className="font-semibold text-primary">{text("Browse problems","浏览题目")} →</AppLink>
         {schools.data && <AppLink className="text-sm font-semibold text-primary" href={user.platformAdmin ? "/platform" : schools.data.items.length ? "/schools" : "/practice/settings#schools"}>
-          {user.platformAdmin ? text("Platform administration","平台管理") : schools.data.items.length ? text("Return to school workspace","返回学校工作区") : text("Join a school with an invitation","通过邀请码加入学校")} →
+          {user.platformAdmin ? text("Platform administration","平台管理") : schools.data.items.length ? text("Return to school workspace","返回学校工作区") : text("Join a school","加入学校")} →
         </AppLink>}
       </div>
     </>}/>;

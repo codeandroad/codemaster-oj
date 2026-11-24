@@ -145,65 +145,15 @@ async function listSchools(pool, user) {
   return rows;
 }
 
-async function issueInvitation(db, schoolId, actorId, role) {
-  const token = randomToken();
-  const { rows: [invitation] } = await db.query(`
-    INSERT INTO school_invitations (school_id, issued_by, role, token_hash, expires_at)
-    VALUES ($1, $2, $3, $4, clock_timestamp() + interval '7 days')
-    RETURNING id, expires_at`, [schoolId, actorId, role, tokenHash(token)]);
-  await auditSchool(db, schoolId, actorId, 'school.invite', invitation.id);
-  return { token, role, expiresAt: invitation.expires_at };
-}
-
-async function acceptInvitation(pool, user, token) {
-  return transaction(pool, async db => {
-    await activeAccount(db, user.id);
-    const { rows: [invitation] } = await db.query(`
-      SELECT id, school_id, issued_by, role FROM school_invitations
-      WHERE token_hash = $1 AND accepted_at IS NULL AND expires_at > clock_timestamp()
-      FOR UPDATE`, [tokenHash(token)]);
-    if (!invitation) fail(400, 'INVALID_INVITATION', '邀请无效、已过期或已使用');
-    // Lock the issuing grant and account, so concurrent disable/revoke is serialized.
-    try {
-      await requireSchoolAdmin(db, invitation.school_id, invitation.issued_by);
-    } catch (error) {
-      if ([401,403,404].includes(error.status)) fail(400, 'INVALID_INVITATION', '邀请无效、已过期或已使用');
-      throw error;
-    }
-    const member = await db.query(`
-      INSERT INTO school_memberships (school_id, account_id, role)
-      VALUES ($1, $2, $3)
-      ON CONFLICT (school_id, account_id) DO UPDATE
-      SET role = EXCLUDED.role, revoked_at = NULL, joined_at = clock_timestamp()
-      WHERE school_memberships.revoked_at IS NOT NULL AND NOT school_memberships.suspended
-      RETURNING account_id`, [invitation.school_id, user.id, invitation.role]);
-    if (!member.rowCount) {
-      const {rows:[existing]} = await db.query('SELECT suspended FROM school_memberships WHERE school_id=$1 AND account_id=$2',[invitation.school_id,user.id]);
-      if (existing?.suspended) fail(409, 'SCHOOL_ACCESS_SUSPENDED', '本校访问已暂停，请联系学校管理员');
-      fail(409, 'ALREADY_MEMBER', '已加入该学校');
-    }
-    const accepted = await db.query(`
-      UPDATE school_invitations SET accepted_at = clock_timestamp(), accepted_by = $2
-      WHERE id = $1 AND expires_at > clock_timestamp()`, [invitation.id, user.id]);
-    if (!accepted.rowCount) fail(400, 'INVALID_INVITATION', '邀请无效、已过期或已使用');
-    await auditSchool(db, invitation.school_id, user.id, 'school.join', invitation.id);
-    return { schoolId: invitation.school_id, role: invitation.role };
-  });
-}
-
 export async function handleSchools({ pool, user, route, method, body, url }) {
   const exit = await handleSchoolExits({ pool, user, route, method, body, url });
   if (exit) return exit;
   if (route === '/schools' && method === 'GET') return result({ items: await listSchools(pool, user) });
-  if (route === '/school-invitations/accept' && method === 'POST') {
-    const token = field(body.token, '邀请码', { min: 32, max: 32 });
-    return result(await acceptInvitation(pool, user, token));
-  }
-  const match = route.match(/^\/schools\/([^/]+)\/(members|invitations)(?:\/([^/]+))?(?:\/(reset))?$/);
+  const match = route.match(/^\/schools\/([^/]+)\/members(?:\/([^/]+))?(?:\/(reset))?$/);
   if (!match) return null;
-  const [, id, resource, memberId, action] = match;
+  const [, id, memberId, action] = match;
   const schoolId = uuid(id, '学校 ID');
-  if (resource === 'members' && !memberId && method === 'GET') {
+  if (!memberId && method === 'GET') {
     const page = integer(Number(url.searchParams.get('page') ?? '1'), 1, 100000, '页码');
     const role = url.searchParams.has('role')
       ? enumValue(url.searchParams.get('role'), ['teacher', 'student', 'school_admin'], '成员角色')
@@ -231,20 +181,7 @@ export async function handleSchools({ pool, user, route, method, body, url }) {
       return result({ items, page, hasMore: rows.length > 50 });
     });
   }
-  if (resource === 'invitations' && !memberId && method === 'POST') {
-    const role = enumValue(body.role, ['teacher', 'student', 'school_admin'], '邀请角色');
-    return transaction(pool, async db => {
-      await requireSchoolAdmin(db, schoolId, user.id);
-      // Serialize the outstanding invitation cap across school administrators.
-      await db.query("SELECT pg_advisory_xact_lock(hashtextextended('school-invitations:' || $1::uuid::text, 0))", [schoolId]);
-      const { rows: [{ count }] } = await db.query(`
-        SELECT count(*)::int AS count FROM school_invitations
-        WHERE school_id = $1 AND accepted_at IS NULL AND expires_at > clock_timestamp()`, [schoolId]);
-      if (count >= 100) fail(429, 'INVITATION_LIMIT', '该校未使用的邀请已达到上限');
-      return result(await issueInvitation(db, schoolId, user.id, role), 201);
-    });
-  }
-  if (resource === 'members' && memberId && !action && method === 'DELETE') {
+  if (memberId && !action && method === 'DELETE') {
     const target = uuid(memberId, '账号 ID');
     return transaction(pool, async db => {
       await lockSchoolTeaching(db, schoolId);
@@ -267,7 +204,7 @@ export async function handleSchools({ pool, user, route, method, body, url }) {
       return result({ ok: true });
     });
   }
-  if (resource === 'members' && memberId && action === 'reset' && method === 'POST') {
+  if (memberId && action === 'reset' && method === 'POST') {
     const target = uuid(memberId, '账号 ID');
     return transaction(pool, async db => {
       await lockSchoolTeaching(db, schoolId);

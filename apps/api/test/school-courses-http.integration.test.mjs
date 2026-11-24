@@ -1,3 +1,4 @@
+import { seedUnlinkedMembership } from './support/workspace-accounts.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -69,8 +70,7 @@ test('school course HTTP lifecycle preserves published boundaries and stable lea
    const patch = (path,auth,body,status=200) => request(path,{method:'PATCH',auth,body,status});
    const remove = (path,auth,status=200) => request(path,{method:'DELETE',auth,status});
    for (const [member,role] of [[teacher,'teacher'],[otherTeacher,'teacher'],[student,'student'],[newLogin,'student'],[unlinked,'student']]) {
-    const invitation = (await post(school(alpha.id,'invitations'),admin,{role})).data;
-    await post('/school-invitations/accept',member,{token:invitation.token},200);
+    await seedUnlinkedMembership(pool,alpha.id,member.id,role);
    }
    const teacherIdentity = (await post(school(alpha.id,'identities'),admin,{kind:'teacher',number:'T1',name:'Teacher',accountId:teacher.id})).data;
    let studentIdentity = (await post(school(alpha.id,'identities'),admin,{kind:'student',number:'S1',name:'Learner',accountId:student.id})).data;
@@ -216,8 +216,7 @@ test('school course HTTP lifecycle preserves published boundaries and stable lea
     await remove(school(alpha.id,`members/${student.id}`),admin);
     await request(coursePath,{auth:student,status:404});
     await post(readPath(chapterA.id),student,{read:true,expectedRevision:revision},404);
-    const invitation=(await post(school(alpha.id,'invitations'),admin,{role:'student'})).data;
-    await post('/school-invitations/accept',student,{token:invitation.token},200);
+    await seedUnlinkedMembership(pool,alpha.id,student.id,'student');
     await patch(school(alpha.id,`identities/${studentIdentity.id}/account`),admin,{accountId:student.id},404);
     const archived=(await pool.query('SELECT archived_at,account_id FROM school_identities WHERE id=$1',[studentIdentity.id])).rows[0];
     assert.ok(archived.archived_at);

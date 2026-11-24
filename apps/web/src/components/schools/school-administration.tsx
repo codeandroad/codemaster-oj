@@ -198,9 +198,9 @@ function SchoolDirectory({
       </div>
       <div className="flex flex-wrap items-center gap-2"><div className="min-w-48 flex-1">
         <IdentityFilter onQuery={setQuery} kind="" onKind={()=>{}} fixedKind searchAccount/></div>
-        {!archived && <select aria-label={text("Activation status","激活状态")} className={inputClass+" !w-auto"} value={status} onChange={e=>setStatus(e.target.value)}>
-          <option value="all">{text("All statuses","全部状态")}</option><option value="active">{text("Activated","已激活")}</option>
-          <option value="pending">{text("Pending activation","待激活")}</option></select>}
+        {!archived && <select aria-label={text("Claim status","认领状态")} className={inputClass+" !w-auto"} value={status} onChange={e=>setStatus(e.target.value)}>
+          <option value="all">{text("All statuses","全部状态")}</option><option value="active">{text("Claimed","已认领")}</option>
+          <option value="pending">{text("Awaiting claim","待认领")}</option></select>}
         <SchoolClassFilter classes={options.data?.classes ?? []} value={classId} onChange={setClassId}/>
       </div>
       <Feedback action={{ error: options.error, message }} />
@@ -213,7 +213,7 @@ function SchoolDirectory({
           {title:text("Gender","性别"),cell:item=>t(genderLabel(item.gender))},
           {title:text("Classes","关联班级"),cell:item=>item.classes.filter(c=>!c.archived).map(c=>c.name).join("、")||"—"},
           {title:text("Linked account","关联账号"),cell:item=>item.username ?? "—"},
-          {title:text("Status","状态"),cell:item=>item.archivedByExit ? text("Left school","已退校") : archived ? text("Deleted","已删除") : item.accountId ? text("Activated","已激活") : text("Pending activation","待激活")},
+          {title:text("Status","状态"),cell:item=>item.archivedByExit ? text("Left school","已退校") : archived ? text("Deleted","已删除") : item.accountId ? text("Claimed","已认领") : text("Awaiting claim","待认领")},
           {title:text("Actions","操作"),cell:item=><div className="flex gap-2">
             <Button size="sm" variant="secondary" onClick={()=>setViewId(item.id)}>{text("View","查看")}</Button>
             {item.canArchive && <Button size="sm" variant="secondary" onClick={()=>setArchiving(item)}>{archived?text("Restore","恢复"):text("Delete","删除")}</Button>}
@@ -231,7 +231,7 @@ function SchoolDirectory({
             {!person.archivedAt && person.kind!=="school_admin" && <Button size="sm" variant="secondary" onClick={()=>setEditingClasses(person.id)}>{text("Adjust classes","调整班级")}</Button>}
           </section>
           <section className="space-y-3 rounded-md border border-border p-4"><h3 className="font-semibold">{text("Login account","登录账号")}</h3>
-            <p>{person.username || (person.archivedAt ? "—" : text("Pending activation","待激活"))}</p>
+            <p>{person.username || (person.archivedAt ? "—" : text("Awaiting claim","待认领"))}</p>
             <div className="flex flex-wrap items-center gap-2">
               {person.accountId && <AppLink className="text-primary underline" href={schoolWorkspaceHref(school.id,"members")+"&accountId="+person.accountId}>{text("View in accounts","在账号与角色中查看")}</AppLink>}
               {!person.archivedAt && person.kind!=="school_admin" && <>

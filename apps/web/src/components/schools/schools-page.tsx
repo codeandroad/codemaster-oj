@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { useWorkspaceData } from "@/components/workspace-data";
 import { useAcslEnabled } from "@/components/acsl/use-acsl-enabled";
 import { AcslTeacherPage } from "@/components/acsl/teacher-page";
-import { ArrowLeftRight, Eye, EyeOff } from "lucide-react";
+import { ArrowLeftRight } from "lucide-react";
 import { WorkspaceFrame } from "@/components/workspace-frame";
 import { AccountMenu } from "@/components/account-menu";
 import { NotificationDropdown } from "@/components/student/notification-dropdown";
@@ -46,7 +46,6 @@ import { useWorkspaceSettings } from "@/components/student/workspace-settings";
 import {
   CopyCode,
   Feedback,
-  inputClass,
   Loading,
   useData,
   useMutation,
@@ -58,9 +57,9 @@ import {
   useSchoolError,
   useSchoolText,
   type School,
-  type SchoolRole,
 } from "./school-ui";
 import { SchoolAccountDetails, SchoolAccountFilters, SchoolRoleEditor, type AccountFilters, type Member } from "./school-account-management";
+import { SchoolJoinReview } from "./school-join-review";
 import { SchoolActivationBatch } from "./school-activation-batch";
 import { SchoolAdministration } from "./school-administration";
 import { SchoolCourses } from "./school-courses";
@@ -71,7 +70,6 @@ import {
   writeSchoolPreference,
 } from "./school-selection";
 
-type Invitation = { token: string; role: SchoolRole; expiresAt: string };
 const teacherOnly = new Set<string>(workspaceNavigation.teacher
   .filter(item => !workspaceNavigation.admin.some(admin => admin.section === item.section))
   .map(item => item.section));
@@ -96,10 +94,6 @@ export function SchoolsPage({
   const logout = useMutation();
   const { settings, update, resolvedPageTheme } = useWorkspaceSettings(user.id);
   const [refreshRevision, setRefreshRevision] = useState(0);
-  const [invitations, setInvitations] = useState<
-    Record<string, Invitation | null>
-  >({});
-  const [issuingInvitation, setIssuingInvitation] = useState(false);
   const items = schools.data?.items ?? [];
   const loaded = !schools.loading && !schools.error && schools.data !== null;
   const requestedSchoolId = search.get("schoolId");
@@ -194,14 +188,6 @@ export function SchoolsPage({
     <SchoolMembers
       school={selected}
       refreshRevision={refreshRevision}
-      invitation={invitations[selected.id] ?? null}
-      onInvitation={(invitation) =>
-        setInvitations((previous) => ({
-          ...previous,
-          [selected.id]: invitation,
-        }))
-      }
-      onIssuing={setIssuingInvitation}
     />
   );
   const href = (section: string) => schoolWorkspaceHref(selected.id, section, workspaceRole);
@@ -243,7 +229,6 @@ export function SchoolsPage({
             navigation={
               <WorkspaceNavigation
                 items={sections.map(item => ({...item, href: href(item.section), active: !personalPage && navigationSection === item.section}))}
-                disabled={issuingInvitation}
               />
             }
             breadcrumb={
@@ -281,7 +266,7 @@ export function SchoolsPage({
             }
             account={
               <div className="flex items-center gap-2">
-              {selected.roles.includes("school_admin") && !issuingInvitation && (
+              {selected.roles.includes("school_admin") && (
                 <AppLink
                   href={schoolWorkspaceHref(selected.id, "home", admin ? "teacher" : "admin")}
                   className={buttonVariants({ variant: "secondary", size: "sm" })}
@@ -298,7 +283,7 @@ export function SchoolsPage({
                 profileHref={href("profile")}
                 settingsHref={href("personal-settings")}
                 leaderboardHref={href("leaderboard")}
-                busy={logout.busy || issuingInvitation}
+                busy={logout.busy}
                 onLogout={() =>
                   void logout.run(async () => {
                     try {
@@ -368,7 +353,6 @@ export function SchoolsPage({
                     school={selected}
                     currentSection={active.section}
                     refreshRevision={refreshRevision}
-                    navigationDisabled={issuingInvitation}
                     actions={null}
                     members={members}
                   />
@@ -394,15 +378,9 @@ function SchoolPageTitle({ label, parentHref }: { label: string; parentHref?: st
 function SchoolMembers({
   school,
   refreshRevision,
-  invitation,
-  onInvitation,
-  onIssuing,
 }: {
   school: School;
   refreshRevision: number;
-  invitation: Invitation | null;
-  onInvitation: (value: Invitation | null) => void;
-  onIssuing: (busy: boolean) => void;
 }) {
   const text = useSchoolText();
   const localError = useSchoolError();
@@ -414,19 +392,13 @@ function SchoolMembers({
   return (
     <div className="mt-3 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button onClick={() => setActivating(true)}>{text("Generate activation codes", "批量生成激活码")}</Button>
+        <Button onClick={() => setActivating(true)}>{text("Generate claim codes", "批量生成认领码")}</Button>
         <AppLink href={schoolWorkspaceHref(school.id, "identities")} className={buttonVariants({ variant: "secondary", size: "sm" })}>
           {text("Manage identity records", "管理身份档案")}
         </AppLink>
       </div>
       {activating && <SchoolActivationBatch school={school} onClose={() => setActivating(false)} />}
-      <details className="rounded-md border border-border p-3"><summary className="cursor-pointer text-sm font-semibold">{text("Invite a member","邀请成员")}</summary>
-      <IssueInvitation
-        school={school}
-        invitation={invitation}
-        onInvitation={onInvitation}
-        onIssuing={onIssuing}
-      /></details>
+      <SchoolJoinReview schoolId={school.id} onChanged={()=>setRevision(value=>value+1)}/>
       {removed && (
         <p role="status" className="text-sm text-success">
           {text("School membership removed.", "已移除本校成员关系。")}
@@ -697,7 +669,7 @@ function ResetMemberCredential({
         </DialogTitle>
         <DialogDescription>
           {text(
-            `Generate a one-time reset code for ${member.name} at ${school.name} and hand it to them privately. Their old password is never shown; they set a new one on the sign-in page.`,
+            `Generate a one-time reset code for ${member.name} at ${school.name} and hand it to them privately. Their old password is never shown; they set a new one after signing in.`,
             `为 ${school.name} 的 ${member.name} 生成一次性重置凭据，当面交付本人。旧密码不会显示；本人通过登录页设置新密码。`,
           )}
         </DialogDescription>
@@ -733,138 +705,6 @@ function ResetMemberCredential({
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function IssueInvitation({
-  school,
-  invitation,
-  onInvitation,
-  onIssuing,
-}: {
-  school: School;
-  invitation: Invitation | null;
-  onInvitation: (value: Invitation | null) => void;
-  onIssuing: (busy: boolean) => void;
-}) {
-  const text = useSchoolText();
-  const localError = useSchoolError();
-  const { locale } = useLocale();
-  const action = useMutation();
-  const [role, setRole] = useState<SchoolRole>("student");
-  const [visible, setVisible] = useState(false);
-  return (
-    <div className="rounded-md border border-border bg-muted/30 p-3">
-      <form
-        noValidate
-        className="flex flex-wrap items-end gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (action.busy || invitation) return;
-          onIssuing(true);
-          void action.run(async () => {
-            try {
-              const next = await productionApi<Invitation>(
-                `schools/${school.id}/invitations`,
-                { method: "POST", body: { role } },
-              );
-              onInvitation(next);
-              setVisible(false);
-            } catch (error) {
-              throw localError(error);
-            } finally {
-              onIssuing(false);
-            }
-          });
-        }}
-      >
-        <label htmlFor="invitation-role" className="text-sm font-semibold">
-          {text("Invite as", "邀请角色")}
-          <select
-            id="invitation-role"
-            className={`${inputClass} mt-1 min-w-36`}
-            value={role}
-            disabled={action.busy}
-            onChange={(event) => setRole(event.target.value as SchoolRole)}
-          >
-            <option value="student">{text("Student", "学生")}</option>
-            <option value="teacher">{text("Teacher", "教师")}</option>
-            <option value="school_admin">
-              {text("School administrator", "学校管理员")}
-            </option>
-          </select>
-        </label>
-        <Button
-          type="submit"
-          variant="secondary"
-          className="min-w-40"
-          disabled={action.busy || !!invitation}
-          aria-busy={action.busy}
-        >
-          {text("Create invitation", "创建邀请")}
-        </Button>
-      </form>
-      {role === "school_admin" && (
-        <p className="mt-2 text-xs text-muted-foreground">
-          {text(
-            "This invitation grants permission to manage this school, including its members and settings.",
-            "此邀请授予管理本学校成员、设置等业务的权限。",
-          )}
-        </p>
-      )}
-
-      <Feedback action={action} />
-      {invitation && (
-        <div className="mt-3 space-y-2">
-          <label htmlFor="issued-invitation" className="block text-sm">
-            {text("One-time invitation code", "一次性邀请码")}
-          </label>
-          <div className="flex flex-wrap items-center gap-1">
-            <input
-              id="issued-invitation"
-              className={`${inputClass} max-w-sm font-mono`}
-              type={visible ? "text" : "password"}
-              value={invitation.token}
-              readOnly
-              autoComplete="off"
-            />
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={text(
-                visible ? "Hide invitation code" : "Show invitation code",
-                visible ? "隐藏邀请码" : "显示邀请码",
-              )}
-              aria-pressed={visible}
-              onClick={() => setVisible(!visible)}
-            >
-              {visible ? <EyeOff size={17} /> : <Eye size={17} />}
-            </Button>
-            <CopyCode text={invitation.token} />
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {text(
-              "Give this code privately to one person. Expires",
-              "请私下交给一位受邀者。有效期至",
-            )}{" "}
-            {new Date(invitation.expiresAt).toLocaleString(
-              locale === "en" ? "en-GB" : "zh-CN",
-            )}{" "}
-            · <RoleLabel role={invitation.role} />
-          </p>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              onInvitation(null);
-              setVisible(false);
-            }}
-          >
-            {text("Done, clear code", "已记录，清除显示")}
-          </Button>
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -909,8 +749,8 @@ function RemoveMember({
         </DialogTitle>
         <DialogDescription>
           {text(
-            `Remove ${member.name} from ${school.name}. This revokes their membership and unlinks their identity at this school. Their login and class records are retained. They will need a new invitation to rejoin.`,
-            `将 ${member.name} 从 ${school.name} 移除。此操作撤销本校成员资格并解除本校身份关联，登录账号与班级档案保留。重新加入需要新的邀请。`,
+            `Remove ${member.name} from ${school.name}. This revokes their membership and unlinks their identity at this school. Their login and class records are retained. They can rejoin through a claim code or an approved application.`,
+            `将 ${member.name} 从 ${school.name} 移除。此操作撤销本校成员资格并解除本校身份关联，登录账号与班级档案保留。重新加入时可以认领身份或提交入校申请。`,
           )}
         </DialogDescription>
         <Feedback action={action} />

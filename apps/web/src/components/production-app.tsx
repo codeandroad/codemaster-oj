@@ -7,7 +7,7 @@ import { CourseLanguageProvider } from "./course-language";
 import { isCampusAuthRoute, isCampusRoute, loginReturnTo, resolvePublicLearningBookmark } from "@/lib/campus-routes";
 
 import { useEffect, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { redirect, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 import { schoolBookmarkQuery } from "./schools/school-workspace-location";
@@ -29,7 +29,6 @@ const PersonalRegisterPage = dynamic(() => import("./auth/personal-register-page
 const LearnerWorkspace = dynamic(() => import("./schools/learner-workspace").then(module => module.LearnerWorkspace), { loading: PageLoading });
 
 const ProductionLoginPage = dynamic(() => import("@/components/auth/login-page").then(module => module.ProductionLoginPage), { loading: PageLoading });
-const ProductionRegisterPage = dynamic(() => import("@/components/auth/register-page").then(module => module.ProductionRegisterPage), { loading: PageLoading });
 
 function PageLoading() {
   const { locale } = useLocale();
@@ -148,7 +147,7 @@ export function ProductionApp() {
         </div>
       </main>
     );
-  if (pathname === "/activate") return <ProductionRegisterPage />;
+  if (pathname === "/activate") redirect(user ? "/schools?join=1" : "/login?join=1");
   if (pathname === "/register") return <PersonalRegisterPage onRegistered={loggedIn} joinIntent={joinIntent}/>;
   if (!user || pathname === "/login") {
     const login = <ProductionLoginPage key={resetIntent ? "reset" : "login"} onLogin={loggedIn} joinIntent={joinIntent} resetIntent={resetIntent} />;

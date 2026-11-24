@@ -405,11 +405,11 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
                                   school: result.school,
                                   activationCode: result.activationCode,
                                 });
-                                return tx("新激活码已生成。旧码即刻失效。", "A new activation code was issued. The old code is now invalid.");
+                                return tx("新认领码已生成。旧码即刻失效。", "A new claim code was issued. The old code is now invalid.");
                               })
                             }
                           >
-                            {tx("生成激活码", "Issue activation code")}
+                            {tx("生成认领码", "Issue claim code")}
                           </button>
                         </>
                       )}
@@ -441,7 +441,7 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
               })}
               {!current.studentIds.length && (
                 <Empty columns={7}>
-                  {tx("该班级暂无学生。可通过“导入名单”建档入班；学生本人使用激活码认领后创建账号。", "This class has no students. Import a roster to create identities; students create accounts when they claim an activation code.")}
+                  {tx("该班级暂无学生。可通过“导入名单”建档入班，学生登录后即可认领本校身份。", "This class has no students. Import a roster to create school identities. Students can then sign in and claim their record.")}
                 </Empty>
               )}
             </Table>
@@ -509,10 +509,10 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
         />
       )}
       {code && (
-        <Modal title={`${code.name} · ${tx("激活码", "Activation code")}`} onClose={() => setCode(null)}>
+        <Modal title={`${code.name} · ${tx("认领码", "Claim code")}`} onClose={() => setCode(null)}>
           <ActivationSchoolHint school={code.school}/>
           <p className="text-sm text-muted-foreground">
-            {tx("请将学号和此激活码交给本人，激活后账号自动建立。", "Give the student their ID and activation code privately. They create an account when claiming it.")}
+            {tx("请将学号和认领码私下交给学生，由本人登录后关联校内档案。", "Give the student their ID and claim code privately. They can sign in to link their school record.")}
           </p>
           <p className="mt-4 break-all rounded border border-border bg-surface-subtle p-4 font-mono font-semibold">
             {code.activationCode}
@@ -522,11 +522,11 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
             onClick={() =>
               action.run(async () => {
                 await navigator.clipboard.writeText(`${code.school.slug}\t${code.name}\t${code.activationCode}`);
-                return tx("激活码已复制。", "Activation code copied.");
+                return tx("认领码已复制。", "Claim code copied.");
               })
             }
           >
-            {tx("复制激活码", "Copy activation code")}
+            {tx("复制认领码", "Copy claim code")}
           </Button>
           <Feedback action={action} />
         </Modal>

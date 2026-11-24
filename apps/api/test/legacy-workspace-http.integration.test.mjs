@@ -1,3 +1,4 @@
+import { enrollWithClaim } from './support/workspace-accounts.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -49,11 +50,8 @@ test('old bookmarks resolve through the current school membership and role on th
       const school = await provisionSchool(pool,{slug:'boundary-school',name:'Boundary School',adminUsername:'new-school-admin'});
       await provisionPlatformAdministrator(pool,{username:'platform-only'});
       for (const [auth,role] of [[student,'student'],[teacher,'teacher']]) {
-        const invite = await request(`/schools/${original.id}/invitations`,{auth:admin,method:'POST',body:{role}});
-        assert.equal(invite.status,201);
-        assert.equal((await request('/school-invitations/accept',{auth,method:'POST',body:{token:invite.data.token}})).status,200);
-        assert.equal((await request(`/schools/${original.id}/identities`,{auth:admin,method:'POST',
-          body:{kind:role,name:'Original '+role,number:role,accountId:auth.data.user.id}})).status,201);
+        await enrollWithClaim((path,auth,body)=>request(path,{auth,body,method:'POST'}),original,admin,auth,
+          {kind:role,name:'Original '+role,number:role});
       }
       const prefix = `/schools/${original.id}`;
       const {bankId,links} = await publishedSchoolProblems(pool, original.id, teacher.data.user.id, 104);

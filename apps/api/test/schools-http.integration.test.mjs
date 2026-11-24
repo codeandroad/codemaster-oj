@@ -7,10 +7,10 @@ import { migrate } from '../../../packages/domain/src/migrate.mjs';
 import { bootstrap } from '../../../packages/domain/src/bootstrap.mjs';
 import { loadConfig } from '../../../packages/domain/src/application.mjs';
 import { provisionSchool } from '../../../packages/domain/src/schools.mjs';
-import { applicationDatabaseUrl, registerPersonal } from './support/workspace-accounts.mjs';
+import { applicationDatabaseUrl, registerPersonal, seedUnlinkedMembership } from './support/workspace-accounts.mjs';
 import { provisionPlatformAdministrator } from '../../../packages/domain/src/platform-governance.mjs';
 
-test('school invitations and management stay within each school on the real Nest API',
+test('school claims and reviewed applications stay within each school on the real Nest API',
   { skip: !process.env.TEST_DATABASE_URL, timeout: 60000 }, async () => {
     const manager = createPool(process.env.TEST_DATABASE_URL);
     const schema = 'schools_' + randomBytes(6).toString('hex');
@@ -60,76 +60,83 @@ test('school invitations and management stay within each school on the real Nest
       await assert.rejects(provisionSchool(pool, { slug: 'invalid slug', name: 'Invalid', adminUsername: 'alpha-admin' }), { status: 400 });
 
       const members = school => `/schools/${school.id}/members`;
-      const issue = (school, auth, role = 'student', csrf = true) => request(`/schools/${school.id}/invitations`, {
-        method: 'POST', auth, csrf, body: { role },
-      });
-      const accept = (auth, token) => request('/school-invitations/accept', { method: 'POST', auth, body: { token } });
-      const revoke = (school, account, auth) => request(`${members(school)}/${account.data.user.id}`, { method: 'DELETE', auth });
       assert.equal((await request('/schools')).status, 401);
       assert.deepEqual((await request('/schools', { auth: alphaAdmin })).data.items.map(s => s.id), [alpha.id]);
       assert.equal((await request('/platform/accounts', { auth: alphaAdmin })).status, 403, 'school admin grant cannot manage platform accounts');
       assert.equal((await request(members(beta), { auth: alphaAdmin })).status, 404);
       assert.equal((await request(members(alpha), { auth: legacy })).status, 404, 'legacy admin cannot browse a pilot school');
-      assert.equal((await issue(beta, alphaAdmin)).status, 404);
-      assert.equal((await issue(alpha, alphaAdmin, 'platform_admin')).status, 400);
-      assert.equal((await issue(alpha, alphaAdmin, 'student', false)).status, 403);
-      assert.equal((await revoke(alpha, alphaAdmin, alphaAdmin)).status, 404);
+      const post = (path, auth, body, csrf=true) => request(path,{method:'POST',auth,body,csrf});
+      const path = school => `/schools/${school.id}/join-requests`;
+      const facts = {kind:'student',number:'S001',name:'Alpha Learner'};
+      const decide = (school,id,auth,decision,identityId) => post(path(school)+'/'+id+'/decision',auth,{decision,identityId});
+      assert.equal((await post('/school-invitations/accept',learner,{token:'unused'})).status,404);
+      assert.equal((await post('/schools/'+alpha.id+'/invitations',alphaAdmin,{role:'school_admin'})).status,404);
+      assert.equal((await post('/auth/register',undefined,{})).status,404);
+      assert.equal((await post('/auth/claim-identity',undefined,{})).status,401);
+      assert.equal((await post('/auth/verify-identity',undefined,{})).status,401);
+      assert.equal((await post(path(alpha),undefined,facts)).status,401);
+      assert.equal((await post(path(alpha),learner,facts,false)).status,403);
+      assert.equal((await post(path(alpha),learner,{...facts,kind:'school_admin'})).status,400);
+      const submissions=await Promise.all([1,2].map(()=>post(path(alpha),learner,facts)));
+      assert.deepEqual(submissions.map(r=>r.status).sort(),[200,201]);
+      const id=submissions[0].data.id;
+      assert.equal(id,submissions[1].data.id);
+      assert.equal((await post(path(alpha),learner,{...facts,name:'Different'})).status,409);
+      assert.deepEqual((await request('/schools',{auth:learner})).data.items,[]);
+      assert.deepEqual((await request('/schools/join-requests',{auth:another})).data.items,[]);
+      assert.equal((await request('/schools/join-requests',{auth:learner})).data.items[0].status,'pending');
+      const list = async () => (await request(path(alpha),{auth:alphaAdmin})).data.items;
+      assert.equal((await list())[0].identityId,null);
+      const make = async (school,auth,body) => (await post('/schools/'+school.id+'/identities',auth,body)).data;
+      const local=await make(alpha,alphaAdmin,facts),foreign=await make(beta,betaAdmin,facts);
+      const different=await make(alpha,alphaAdmin,{...facts,number:'S002'});
+      assert.equal((await list())[0].identityId,local.id);
+      assert.equal((await request(path(alpha),{auth:learner})).status,404);
+      assert.equal((await decide(beta,id,betaAdmin,'approved',foreign.id)).status,404);
+      assert.equal((await decide(alpha,id,betaAdmin,'approved',local.id)).status,404);
+      for (const wrong of [foreign,different]) assert.equal((await decide(alpha,id,alphaAdmin,'approved',wrong.id)).status,409);
+      const collision=await post(path(alpha),another,facts);
+      const sourceCode=(await post('/schools/'+alpha.id+'/identities/'+local.id+'/activation-code',alphaAdmin,{})).data.activationCode;
+      const approvals=await Promise.all([1,2].map(()=>decide(alpha,id,alphaAdmin,'approved',local.id)));
+      assert.deepEqual(approvals.map(r=>r.status),[200,200]);
+      assert.equal((await decide(alpha,collision.data.id,alphaAdmin,'approved',local.id)).status,409);
+      assert.equal((await decide(alpha,collision.data.id,alphaAdmin,'rejected')).status,200);
+      assert.deepEqual((await request('/schools',{auth:another})).data.items,[]);
+      assert.equal((await request('/schools/join-requests',{auth:another})).data.items[0].status,'rejected');
+      assert.equal((await request(members(alpha),{auth:learner})).status,403);
+      assert.equal((await pool.query('SELECT account_id FROM school_identities WHERE id=$1',[local.id])).rows[0].account_id,learner.data.user.id);
+      assert.equal((await post('/auth/claim-identity',another,{...facts,schoolSlug:alpha.slug,activationCode:sourceCode})).status,400);
+      assert.equal((await post(path(alpha),learner,facts)).status,409);
+      const pending=await post(path(beta),learner,facts);
+      const issue=await post('/schools/'+beta.id+'/identities/'+foreign.id+'/activation-code',betaAdmin,{});
+      const claim={...facts,schoolSlug:beta.slug,activationCode:issue.data.activationCode};
+      assert.equal((await post('/auth/claim-identity',learner,claim,false)).status,403);
+      assert.equal((await post('/auth/claim-identity',learner,claim)).status,200);
+      assert.deepEqual(new Set((await request('/schools',{auth:learner})).data.items.map(s=>s.id)),new Set([alpha.id,beta.id]));
+      assert.equal((await decide(beta,pending.data.id,betaAdmin,'approved',foreign.id)).status,409);
+      assert.equal((await request('/schools/join-requests',{auth:learner})).data.items.find(r=>r.id===pending.data.id).status,'superseded');
+      assert.equal((await request('/auth/me',{auth:learner})).data.user.id,learner.data.user.id);
+      assert.equal((await post('/auth/claim-identity',another,claim)).status,400);
+      assert.equal((await request('/platform/accounts',{auth:learner})).status,403);
 
-      const aInvite = await issue(alpha, alphaAdmin, 'teacher');
-      const bInvite = await issue(beta, betaAdmin);
-      assert.equal(aInvite.status, 201);
-      assert.equal(bInvite.status, 201);
-      const claimed = await Promise.all([accept(learner, aInvite.data.token), accept(another, aInvite.data.token)]);
-      assert.deepEqual(claimed.map(r => r.status).sort(), [200, 400]);
-      const member = claimed[0].status === 200 ? learner : another;
-      const memberId = member.data.user.id;
-      assert.equal((await accept(member, bInvite.data.token)).status, 200);
-      const mySchools = (await request('/schools', { auth: member })).data.items;
-      assert.deepEqual(mySchools.map(s => [s.id, s.roles]), [
-        [alpha.id, ['teacher']], [beta.id, ['student']],
-      ]);
-      assert.deepEqual((await request('/auth/me', { auth: member })).data.user.roles, []);
-      assert.equal((await request(members(alpha), { auth: member })).status, 403);
-      assert.equal((await issue(alpha, member)).status, 403);
-      assert.equal((await issue(alpha,member,'school_admin')).status,403,'teachers cannot grant administrator access');
-      const alphaList = (await request(members(alpha), { auth: alphaAdmin })).data.items;
-      const betaList = (await request(members(beta), { auth: betaAdmin })).data.items;
-      assert.deepEqual(new Set(alphaList.map(m => m.accountId)), new Set([alphaAdmin.data.user.id, memberId]));
-      assert.deepEqual(new Set(betaList.map(m => m.accountId)), new Set([betaAdmin.data.user.id, memberId]));
-      assert.deepEqual(Object.keys(alphaList[0]).sort(), ['accountId', 'canResetPassword', 'joinedAt', 'name', 'role']);
-      assert.equal((await revoke(beta, member, alphaAdmin)).status, 404);
-      assert.equal((await revoke(alpha, member, alphaAdmin)).status, 200);
-      assert.deepEqual((await request('/schools', { auth: member })).data.items.map(s => s.id), [beta.id]);
-      assert.equal((await accept(member, aInvite.data.token)).status, 400);
-      const reinvite = await issue(alpha, alphaAdmin);
-      assert.equal((await accept(member, reinvite.data.token)).status, 200);
-
-      // School administrators can delegate only their school's administration.
-      const candidate = await request('/auth/register-personal', {method:'POST',body:{username:'new-school-admin',displayName:'New school administrator',password}});
-      assert.equal(candidate.status,201);
-      const adminInvite = await issue(alpha, alphaAdmin, 'school_admin');
-      assert.equal(adminInvite.status,201);
-      assert.equal((await accept(member,adminInvite.data.token)).status,409,'an invitation cannot override an active membership');
-      assert.equal((await issue(alpha,member,'school_admin')).status,403,'students cannot grant administrator access');
-      assert.equal((await accept(candidate,adminInvite.data.token)).status,200);
-      assert.equal((await accept(candidate,adminInvite.data.token)).status,400,'one invitation can be consumed only once');
-      assert.equal((await request(members(alpha),{auth:candidate})).status,200);
-      assert.equal((await request(members(beta),{auth:candidate})).status,404);
-      assert.equal((await issue(alpha,candidate,'teacher')).status,201);
-      assert.deepEqual((await request('/auth/me',{auth:candidate})).data.user.roles,[]);
-      assert.equal((await request('/platform/schools',{auth:candidate})).status,403);
-      assert.equal((await request('/platform/accounts',{auth:candidate})).status,403);
-      assert.equal((await pool.query('SELECT count(*)::int n FROM platform_admins WHERE account_id=$1',[candidate.data.user.id])).rows[0].n,0);
-      assert.equal((await revoke(alpha,candidate,alphaAdmin)).status,404,'membership removal cannot accidentally remove a school administrator');
-
-      const unclaimed = await issue(alpha, alphaAdmin);
-      assert.equal((await request(`/platform/accounts/${alphaAdmin.data.user.id}/login`, {auth:platform,method:'PATCH',body:{disabled:true}})).status,200);
-      assert.equal((await accept(another, unclaimed.data.token)).status, 400, 'disabling issuer invalidates unused invitations');
-      assert.equal((await request('/schools', { auth: alphaAdmin })).status, 401);
-      const { rows } = await pool.query('SELECT token_hash FROM school_invitations');
-      assert.ok(rows.every(row => /^[0-9a-f]{64}$/.test(row.token_hash)));
-      assert.ok(rows.every(row => row.token_hash !== aInvite.data.token));
-      assert.equal((await pool.query("SELECT count(*)::int count FROM audit_events WHERE action LIKE 'school.%'")).rows[0].count, 0);
+      // Members who previously used a general invitation can finish linking their original dossier.
+      await seedUnlinkedMembership(pool,beta.id,another.data.user.id,'student');
+      const memberFacts={kind:'student',name:'Previous member',number:'S003'};
+      const oldMemberRequest=await post(path(beta),another,memberFacts);
+      assert.equal(oldMemberRequest.status,201);
+      const existing=await make(beta,betaAdmin,memberFacts);
+      const bind=await request('/schools/'+beta.id+'/identities/'+existing.id+'/account',{
+        method:'PATCH',auth:betaAdmin,body:{accountId:another.data.user.id},
+      });
+      assert.equal(bind.status,200);
+      assert.equal((await request('/schools/join-requests',{auth:another})).data.items.find(r=>r.id===oldMemberRequest.data.id).status,'superseded');
+      assert.equal((await decide(beta,oldMemberRequest.data.id,betaAdmin,'approved',existing.id)).status,409);
+      assert.equal((await post(path(beta),another,memberFacts)).status,409);
+      const attempts=await request('/schools/'+beta.id+'/accounts/'+another.data.user.id+'/access',{
+        method:'PATCH',auth:betaAdmin,body:{suspended:true},
+      });
+      assert.equal(attempts.status,200);
+      assert.equal((await post(path(beta),another,memberFacts)).data.error.code,'SCHOOL_ACCESS_SUSPENDED');
     } finally {
       await app?.close();
       await pool.end();

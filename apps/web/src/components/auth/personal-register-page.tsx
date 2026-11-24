@@ -12,6 +12,7 @@ import {
   type AuthResponse,
   type CampusUser,
 } from "@/lib/production-api";
+import { invalidAccountField } from "./registration-fields";
 import { AuthShell } from "./auth-shell";
 import styles from "./auth-shell.module.css";
 
@@ -41,44 +42,17 @@ export function PersonalRegisterPage({
     const displayName = String(values.get("displayName") ?? "").trim();
     const email = String(values.get("email") ?? "").trim();
     const password = String(values.get("password") ?? "");
-    const invalid = !displayName
-      ? {
-          field: "displayName",
-          message: text("Enter your name.", "请输入姓名。"),
-        }
-      : !/^[A-Za-z0-9][A-Za-z0-9_.-]{2,39}$/.test(username)
-        ? {
-            field: "username",
-            message: text(
-              "Use 3–40 letters, numbers, underscores, dots or hyphens; start with a letter or number.",
-              "用户名使用3–40位字母、数字、下划线、点或连字符，首位为字母或数字。",
-            ),
-          }
-        : password.length < 8 || password.length > 128
-          ? {
-              field: "password",
-              message: text(
-                "Use 8–128 characters for your password.",
-                "密码需为 8–128 位。",
-              ),
-            }
-          : password !== values.get("confirmation")
-            ? {
-                field: "confirmation",
-                message: text(
-                  "Passwords do not match.",
-                  "两次输入的密码不一致。",
-                ),
-              }
-            : email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-              ? {
-                  field: "email",
-                  message: text(
-                    "Enter a valid email, or leave it blank.",
-                    "请输入有效邮箱，或留空。",
-                  ),
-                }
-              : null;
+    const invalidField = displayName
+      ? invalidAccountField({username, password, confirmation:String(values.get("confirmation") ?? ""), email})
+      : "displayName";
+    const messages = {
+      displayName: text("Enter your name.", "请输入姓名。"),
+      username: text("Use 3–40 letters, numbers, underscores, dots or hyphens. Start with a letter or number.", "用户名使用 3–40 位字母、数字、下划线、点或连字符，首位为字母或数字。"),
+      password: text("Use 8–128 characters for your password.", "密码需为 8–128 位。"),
+      confirmation: text("Passwords do not match.", "两次输入的密码不一致。"),
+      email: text("Enter a valid email, or leave it blank.", "请输入有效邮箱，或留空。"),
+    };
+    const invalid = invalidField ? {field: invalidField, message: messages[invalidField]} : null;
     setIssue(invalid);
     if (invalid) {
       (
@@ -130,12 +104,12 @@ export function PersonalRegisterPage({
         <p className={styles.description}>
           {joinIntent
             ? text(
-                "Create your account, then use an invitation to join a school.",
-                "先创建账号，再使用邀请码加入学校。",
+                "Create your account, then claim your identity or apply to join a school.",
+                "先创建个人账号，再认领校内身份或申请入校。",
               )
             : text(
-                "Practice independently. Join a school whenever you have an invitation.",
-                "可独立学习公开课程与题目，也可通过邀请码加入学校。",
+                "Practice independently. You can also claim a school identity or apply to join.",
+                "可独立学习公开课程与题目，也可认领校内身份或申请入校。",
               )}
         </p>
       </header>
@@ -301,7 +275,7 @@ export function PersonalRegisterPage({
           href="/activate"
           className="text-muted-foreground hover:text-primary hover:underline"
         >
-          {text("Have a school activation code?", "已有学校身份激活码？")}
+          {text("Already have a school claim code?", "已有学校身份认领码？")}
         </Link>
       </div>
     </AuthShell>

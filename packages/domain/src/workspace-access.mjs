@@ -7,14 +7,13 @@ const SHARED_ENDPOINTS = new Set([
   'GET /auth/activation-schools',
   'POST /auth/login',
   'POST /auth/logout',
-  'POST /auth/register',
+  'POST /auth/claim-identity',
   'POST /auth/register-personal',
   'POST /auth/reset',
   'POST /auth/verify-identity',
   'PATCH /auth/profile',
   'GET /auth/default-workspace',
   'PATCH /auth/default-workspace',
-  'POST /school-invitations/accept',
 ]);
 
 export async function requireWorkspaceRoute(user, route, method) {

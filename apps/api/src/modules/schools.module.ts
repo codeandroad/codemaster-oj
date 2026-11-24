@@ -11,6 +11,8 @@ export class SchoolsController {
 
   @Get([
     'schools',
+    'schools/join-requests',
+    'schools/:schoolId/join-requests',
     'schools/:schoolId/problem-groups',
     'schools/:schoolId/problem-groups/:id',
     'schools/:schoolId/import-history',
@@ -43,11 +45,11 @@ export class SchoolsController {
   @Post([
     'schools/:schoolId/problem-groups',
     'schools/:schoolId/problem-groups/:id/move',
-    'schools/:schoolId/invitations',
+    'schools/:schoolId/join-requests',
+    'schools/:schoolId/join-requests/:requestId/decision',
     'schools/:schoolId/exit-request',
     'schools/:schoolId/exit-requests/:requestId/decision',
     'schools/:schoolId/student-exits',
-    'school-invitations/accept',
     'schools/:schoolId/identities',
     'schools/:schoolId/identities/:identityId/archive',
     'schools/:schoolId/identities/:identityId/restore',

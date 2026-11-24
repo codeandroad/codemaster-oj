@@ -1,3 +1,4 @@
+import { enrollWithClaim } from './support/workspace-accounts.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -48,13 +49,8 @@ test('explicit platform governance preserves teaching roles and enforces authori
       const teacher = await registerPersonal(request,'school-teacher',password);
       const learner = await registerPersonal(request,'school-learner',password);
       const disabled = await registerPersonal(request,'disabled-target',password);
-      const studentInvite = await request(`/schools/${originalSchool.id}/invitations`, {
-        method:'POST',auth:legacy,body:{role:'student'},
-      });
-      assert.equal(studentInvite.status,201);
-      assert.equal((await request('/school-invitations/accept',{
-        method:'POST',auth:platform,body:{token:studentInvite.data.token},
-      })).status,200);
+      const post = (path,auth,body) => request(path,{method:'POST',auth,body});
+      await enrollWithClaim(post,originalSchool,legacy,platform,{kind:'student',name:'Platform user',number:'P1'});
 
       assert.equal((await request('/platform/schools')).status, 401);
       assert.equal((await request('/platform/schools', { auth: legacy })).status, 403, 'legacy admin is not a platform admin');
@@ -110,27 +106,21 @@ test('explicit platform governance preserves teaching roles and enforces authori
       assert.equal((await request(`/schools/${originalSchool.id}/settings`,{auth:legacy})).data.name,renamed.data.name);
       assert.deepEqual((await request('/site-info')).data,site,'renaming one school keeps platform branding independent');
 
-      const invitation = await request(`/schools/${school.id}/invitations`, { method: 'POST', auth: firstAdmin, body: { role: 'teacher' } });
-      assert.equal(invitation.status, 201);
-      assert.equal((await request('/school-invitations/accept', { method: 'POST', auth: teacher, body: { token: invitation.data.token } })).status, 200);
-      const identity = await request(`/schools/${school.id}/identities`, {
-        method: 'POST', auth: firstAdmin, body: { kind: 'teacher', name: 'School teacher', number: 'T-01', accountId: teacher.data.user.id },
-      });
-      assert.equal(identity.status, 201);
+      const teacherRecord = await enrollWithClaim(post,school,firstAdmin,teacher,{kind:'teacher',name:'School teacher',number:'T-01'});
       const classResponse = await request(`/schools/${school.id}/classes`, { method: 'POST', auth: firstAdmin, body: { name: 'Teaching class', type: 'training' } });
       assert.equal(classResponse.status, 201);
       assert.equal((await request(`/schools/${school.id}/classes/${classResponse.data.id}/roster`, {
-        method: 'POST', auth: firstAdmin, body: { identityId: identity.data.id },
+        method: 'POST', auth: firstAdmin, body: { identityId: teacherRecord.id },
       })).status, 201);
-      const originalIdentity = (await pool.query('SELECT * FROM school_identities WHERE id=$1', [identity.data.id])).rows[0];
+      const originalIdentity = (await pool.query('SELECT * FROM school_identities WHERE id=$1', [teacherRecord.id])).rows[0];
       const appointPath = `/platform/schools/${school.id}/administrators`;
       assert.equal((await request(appointPath, { method: 'POST', auth: firstAdmin, body: { username: 'school-teacher' } })).status, 403);
       const appointments = await Promise.all([1,2].map(() => request(appointPath, { method: 'POST', auth: platform, body: { username: 'school-teacher' } })));
       assert.ok(appointments.every(r => r.status === 200));
       assert.deepEqual(appointments.map(r => r.data.created).sort(), [false,true]);
       assert.equal((await pool.query('SELECT role FROM school_memberships WHERE school_id=$1 AND account_id=$2', [school.id, teacher.data.user.id])).rows[0].role, 'teacher');
-      assert.deepEqual((await pool.query('SELECT * FROM school_identities WHERE id=$1', [identity.data.id])).rows[0], originalIdentity, 'administrator grant preserves the bound teaching identity');
-      assert.equal((await pool.query('SELECT count(*)::int n FROM school_class_roster WHERE identity_id=$1', [identity.data.id])).rows[0].n, 1);
+      assert.deepEqual((await pool.query('SELECT * FROM school_identities WHERE id=$1', [teacherRecord.id])).rows[0], originalIdentity, 'administrator grant preserves the bound teaching identity');
+      assert.equal((await pool.query('SELECT count(*)::int n FROM school_class_roster WHERE identity_id=$1', [teacherRecord.id])).rows[0].n, 1);
       assert.deepEqual((await request('/schools', { auth: teacher })).data.items.find(s => s.id === school.id).roles, ['school_admin','teacher']);
       assert.equal((await request(memberPath, { auth: teacher })).status, 200);
       const appointedMember = (await request(memberPath, { auth:firstAdmin })).data.items.find(m => m.accountId === teacher.data.user.id);
@@ -140,14 +130,13 @@ test('explicit platform governance preserves teaching roles and enforces authori
       assert.equal((await request(`${memberPath}/${teacher.data.user.id}`, { method: 'DELETE', auth: firstAdmin })).status, 404, 'school member removal cannot revoke a platform-appointed administrator');
       assert.equal((await request(`/schools/${originalSchool.id}/members`, {auth:teacher})).status,404,'appointment applies only to the selected school');
 
-      // Additional administrator capabilities authorize invitations, and their
-      // revocation invalidates outstanding invitations without touching teaching.
-      const allowed = await request(`/schools/${school.id}/invitations`, { method: 'POST', auth: teacher, body: { role: 'student' } });
-      assert.equal(allowed.status, 201);
-      assert.equal((await request('/school-invitations/accept', { method: 'POST', auth: learner, body: { token: allowed.data.token } })).status, 200);
-      const unused = await request(`/schools/${school.id}/invitations`, { method: 'POST', auth: teacher, body: { role: 'student' } });
-      await pool.query('UPDATE school_administrators SET revoked_at=clock_timestamp() WHERE school_id=$1 AND account_id=$2', [school.id,teacher.data.user.id]);
-      assert.equal((await request('/school-invitations/accept', { method: 'POST', auth: disabled, body: { token: unused.data.token } })).status, 400);
+      // A delegated administrator can admit a student; revocation invalidates unused claim codes.
+      await enrollWithClaim(post,school,teacher,learner,{kind:'student',name:'Learner',number:'S01'});
+      const facts={kind:'student',name:'Candidate',number:'S02'};
+      const person=await post(`/schools/${school.id}/identities`,teacher,facts);
+      const unused=await post(`/schools/${school.id}/identities/${person.data.id}/activation-code`,teacher,{});
+      await pool.query('UPDATE school_administrators SET revoked_at=clock_timestamp() WHERE school_id=$1 AND account_id=$2',[school.id,teacher.data.user.id]);
+      assert.equal((await post('/auth/claim-identity',disabled,{...facts,schoolSlug:school.slug,activationCode:unused.data.activationCode})).status,400);
       assert.equal((await request(memberPath, { auth: teacher })).status, 403);
       assert.deepEqual((await request('/schools', { auth: teacher })).data.items.find(s => s.id === school.id).roles, ['teacher']);
 
@@ -156,7 +145,7 @@ test('explicit platform governance preserves teaching roles and enforces authori
       const list = await request('/platform/schools', { auth: platform });
       assert.equal(list.status, 200);
       const listed = list.data.items.find(s => s.id === school.id);
-      assert.deepEqual(listed.counts, { members:3,identities:1,classes:1,banks:0,courses:0,assignments:0,papers:0 });
+      assert.deepEqual(listed.counts, { members:3,identities:3,classes:1,banks:0,courses:0,assignments:0,papers:0 });
       assert.equal(listed.administrators.length, 1);
       assert.equal(listed.administrators[0].accountId, firstAdmin.data.user.id);
       assert.equal(list.data.items.find(s => s.id===originalSchool.id).name, renamed.data.name);
@@ -225,13 +214,7 @@ test('explicit platform governance preserves teaching roles and enforces authori
         assert.equal((await request('/platform/accounts', { auth: founder })).status, 403);
 
         for (const [role, auth] of [['teacher', teacher], ['student', learner]]) {
-          const invite = await request(`${prefix}/invitations`, { method: 'POST', auth: founder, body: { role } });
-          assert.equal(invite.status, 201);
-          assert.equal((await request('/school-invitations/accept', { method: 'POST', auth, body: { token: invite.data.token } })).status, 200);
-          const linked = await request(`${prefix}/identities`, {
-            method: 'POST', auth: founder, body: { kind: role, name: `New school ${role}`, number: role, accountId: auth.data.user.id },
-          });
-          assert.equal(linked.status, 201);
+          await enrollWithClaim(post,fresh.data,founder,auth,{kind:role,name:'New school '+role,number:role});
           for (const module of commonLists) {
             const response = await request(`${prefix}/${module}`, { auth });
             assert.equal(response.status, 200, `${role} can open ${module}`);

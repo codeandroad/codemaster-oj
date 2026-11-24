@@ -9,7 +9,7 @@ test('shared classroom IP permits 180 login, claim or reset attempts per route i
   const services = await createDomainServices(pool, config);
   for (const [route, lastRoute] of [
     ['/auth/login', '/auth/login'],
-    ['/auth/verify-identity', '/auth/register'],
+    ['/auth/verify-identity', '/auth/claim-identity'],
     ['/auth/reset', '/auth/reset'],
   ]) {
     const context = { route, method: 'POST', body: {}, ip: '198.51.100.50' };

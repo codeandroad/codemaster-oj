@@ -51,7 +51,9 @@ try {
     GRANT SELECT ON platform_admins TO campus_app;
     GRANT SELECT, INSERT, UPDATE ON school_administrators TO campus_app;
     GRANT SELECT, INSERT ON platform_audit_events TO campus_app;
-    GRANT SELECT, INSERT, UPDATE ON school_memberships, school_invitations TO campus_app;
+    GRANT SELECT, INSERT, UPDATE ON school_memberships TO campus_app;
+    REVOKE ALL ON school_join_requests FROM PUBLIC, campus_app, campus_worker;
+    GRANT SELECT, INSERT, UPDATE(status,decided_at,decided_by,identity_id) ON school_join_requests TO campus_app;
     GRANT INSERT ON school_audit_events TO campus_app;
     REVOKE ALL ON school_identities, school_classes, school_class_roster
       FROM PUBLIC, campus_app, campus_worker;

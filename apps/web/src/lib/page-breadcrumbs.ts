@@ -16,7 +16,7 @@ const sections: Record<string, Label> = {
   "/practice/poker": ["德州扑克", "Texas Hold'em"],
   "/practice/settings": ["个人设置", "Personal settings"],
   "/practice/profile": ["个人资料", "Profile"],
-  "/activate": ["激活学校身份", "Activate school identity"],
+  "/activate": ["加入学校", "Join a school"],
   "/platform": ["平台管理", "Platform administration"],
   "/schools": ["学校工作区", "School workspaces"],
   "/student/scholarship": ["我的奖学金", "Scholarship"],

@@ -1,3 +1,4 @@
+import { seedUnlinkedMembership, registerPersonal } from './support/workspace-accounts.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
@@ -60,20 +61,22 @@ test('school administrators issue one-time password reset credentials for member
       assert.equal(personal.status, 201);
       assert.equal((await reset(personal.data.user.id, admin)).status, 404);
 
-      const invite = await request(`/schools/${schoolId}/invitations`, { method: 'POST', auth: admin, body: { role: 'student' } });
-      assert.equal(invite.status, 201);
-      assert.equal((await request('/school-invitations/accept', { method: 'POST', auth: personal, body: { token: invite.data.token } })).status, 200);
+      await seedUnlinkedMembership(pool,schoolId,personal.data.user.id,'student');
       assert.equal((await reset(personal.data.user.id, admin)).status, 403);
       assert.equal((await reset(admin.data.user.id, admin)).status, 403);
       const identity = { kind: 'student', name: 'Reset member', number: 'S01' };
       const created = await request(`/schools/${schoolId}/identities`, { method: 'POST', auth: admin, body: identity });
       assert.equal(created.status, 201);
       const activation = await request(`/schools/${schoolId}/identities/${created.data.id}/activation-code`, { method: 'POST', auth: admin });
-      const student = await request('/auth/register', { method: 'POST', body: {
-        ...identity, schoolSlug: 'tianxing-chuangshiji', activationCode: activation.data.activationCode, username: 'reset-member', password,
-      } });
-      assert.equal(student.status, 201);
+      const student = await registerPersonal(request,'reset-member',password);
+      const claim = (auth,facts,code,schoolSlug='tianxing-chuangshiji') => request('/auth/claim-identity',{
+        method:'POST',auth,body:{...facts,schoolSlug,activationCode:code}});
+      assert.equal((await claim(student,identity,activation.data.activationCode)).status,200);
       const memberId = student.data.user.id;
+      assert.equal((await reset(memberId,admin)).status,403,'claiming a dossier does not give the school custody of a personal login');
+      // Before personal-first enrollment, school-created logins shared the original membership timestamp.
+      const legacyCustody = id => pool.query('UPDATE school_memberships m SET joined_at=a.created_at FROM accounts a WHERE m.account_id=a.id AND m.school_id=$1 AND a.id=$2',[schoolId,id]);
+      await legacyCustody(memberId);
       const list = (await request(members, { auth: admin })).data.items;
       assert.deepEqual(list.filter(member => member.canResetPassword).map(member => member.accountId), [memberId]);
 
@@ -151,7 +154,7 @@ test('school administrators issue one-time password reset credentials for member
         const a = await create('student', 'B01');
         const b = await create('teacher', 'B02');
         const batch = (ids, auth = admin) => request(path + '/activation-batch', { method: 'POST', auth, body: { identityIds: ids } });
-        const verify = (person, code) => request('/auth/verify-identity', { method: 'POST',
+        const verify = (person, code) => request('/auth/verify-identity', { method: 'POST', auth:personal,
           body: { schoolSlug: 'tianxing-chuangshiji', kind: person.kind, name: person.name, number: person.number, activationCode: code } });
         const candidates = await request(path + '?pendingActivation=true&kind=teacher&q=B02', { auth: admin });
         assert.deepEqual(candidates.data.items.map(item => item.id), [b.id]);
@@ -184,9 +187,8 @@ test('school administrators issue one-time password reset credentials for member
         assert.equal((await verify(b, codes.get(b.number))).status, 200);
 
         const code = replaced.data.items[0].activationCode;
-        const register = await request('/auth/register', { method: 'POST', body: { ...a, schoolSlug: 'tianxing-chuangshiji',
-          activationCode: code, username: 'batch-student', password } });
-        assert.equal(register.status, 201);
+        const batchStudent = await registerPersonal(request,'batch-student',password);
+        assert.equal((await claim(batchStudent,a,code)).status,200);
         assert.equal((await verify(a, code)).status, 400);
         assert.equal((await batch([a.id])).status, 409);
         const audit = await pool.query("SELECT count(*)::int n FROM school_audit_events WHERE school_id=$1 AND action='school.identity.activation_issue' AND target_id=ANY($2::uuid[])", [schoolId,[a.id,b.id]]);
@@ -203,23 +205,28 @@ test('school administrators issue one-time password reset credentials for member
         const person = {kind:'student',name:'Access member',number:'ACCESS'};
         const record = await request(`/schools/${schoolId}/identities`,{auth:admin,method:'POST',body:person});
         const code = await request(`/schools/${schoolId}/identities/${record.data.id}/activation-code`,{auth:admin,method:'POST'});
-        const member = await request('/auth/register',{method:'POST',body:{...person,username:'access-member',
-          schoolSlug:'tianxing-chuangshiji',activationCode:code.data.activationCode,password}});
-        assert.equal(member.status,201);
+        const member = await personalAccount('access-member');
+        assert.equal((await claim(member,person,code.data.activationCode)).status,200);
         const id = member.data.user.id;
+        await legacyCustody(id);
         const detailPath = `/schools/${schoolId}/accounts/${id}`;
         const setAccess = (school, auth, suspended, target=id) => request(`/schools/${school}/accounts/${target}/access`,{method:'PATCH',auth,body:{suspended}});
         const setLogin = (auth, disabled, target=id) => request(`/platform/accounts/${target}/login`,{method:'PATCH',auth,body:{disabled}});
         const login = () => request('/auth/login',{method:'POST',body:{username:'access-member',password}});
-        const inviteTo = async (school,auth) => (await request(`/schools/${school}/invitations`,{auth,method:'POST',body:{role:'student'}})).data.token;
-        const accept = token => request('/school-invitations/accept',{auth:member,method:'POST',body:{token}});
+        const issueClaim = async (school,auth) => {
+          const student = {kind:'student',name:'Applicant',number:'APPLY'};
+          const dir = `/schools/${school.id}/identities`;
+          const identity = await request(dir,{auth,method:'POST',body:student});
+          const code = await request(dir+'/'+identity.data.id+'/activation-code',{auth,method:'POST'});
+          return claim(member,student,code.data.activationCode,school.slug);
+        };
         const read = (path,auth) => request(path,{auth});
         const cls = await request(`/schools/${schoolId}/classes`,{auth:admin,method:'POST',body:{name:'Access class',type:'training'}});
         assert.equal((await request(`/schools/${schoolId}/classes/${cls.data.id}/roster`,{auth:admin,method:'POST',body:{identityId:record.data.id}})).status,201);
         const before = (await read(detailPath,admin)).data;
         assert.equal(before.canResetPassword,true);
         assert.equal((await reset(id,admin)).status,200);
-        assert.equal((await accept(await inviteTo(second.id,secondAdmin))).status,200);
+        assert.equal((await issueClaim(second,secondAdmin)).status,200);
         assert.equal((await setAccess(second.id,admin,true)).status,404);
         assert.equal((await setAccess(schoolId,member,true)).status,403);
         assert.equal((await setAccess(schoolId,platform,true)).status,404);
@@ -252,7 +259,7 @@ test('school administrators issue one-time password reset credentials for member
         const independentUser=await personalAccount('independent-user');
         assert.equal((await read('/practice/courses/'+independent.id+'/entry',independentUser)).status,200);
         assert.equal((await setAccess(second.id,secondAdmin,false)).status,200);
-        assert.equal((await accept(await inviteTo(schoolId,admin))).data.error.code,'SCHOOL_ACCESS_SUSPENDED');
+        assert.equal((await issueClaim({id:schoolId,slug:'tianxing-chuangshiji'},admin)).data.error.code,'SCHOOL_ACCESS_SUSPENDED');
         assert.equal((await request(`/platform/schools/${schoolId}/administrators`,{
           auth:platform,method:'POST',body:{username:'access-member'},
         })).status,409);

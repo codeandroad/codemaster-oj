@@ -1,11 +1,10 @@
-import { randomUUID } from 'node:crypto';
 import { transaction } from './db.mjs';
 import { auditSchool, lockSchoolTeaching, requireSchoolAdmin } from './schools.mjs';
 import { fail, field, randomToken, safeEqual, tokenHash, uuid } from './security.mjs';
 
-const claimFailed = () => fail(400, 'CLAIM_FAILED', '学校、身份信息或激活码无效，请联系本校管理员');
+const claimFailed = () => fail(400, 'CLAIM_FAILED', '学校、身份信息或认领码无效，请联系本校管理员');
 
-// The activation selector is public; identity directories and invitation data
+// The activation selector is public; identity directories and claim codes
 // remain authenticated. Return an explicit display-only projection.
 export async function activationSchools(db) {
   const { rows } = await db.query(`SELECT id,slug,name,name_zh AS "nameZh",name_en AS "nameEn"
@@ -39,21 +38,6 @@ export async function schoolClaimPreview(db, claim) {
         ON c.school_id=r.school_id AND c.id=r.class_id
         WHERE r.school_id=$1 AND r.identity_id=$2 AND c.archived_at IS NULL ORDER BY c.name,c.id`, [school.id, identity.id])).rows;
   return { school, person: { kind: identity.kind, number: identity.number, name: identity.name, gender: identity.gender ?? null, classes } };
-}
-
-export async function registerSchoolIdentity(db, claim, { login, hash, email }) {
-  const { school, identity } = claim;
-  const globalIdentity = randomUUID();
-  await db.query("INSERT INTO identities(id,kind,number,name) VALUES($1::uuid,'personal',$1::text,$2)", [globalIdentity, identity.name]);
-  const { rows: [account] } = await db.query(`INSERT INTO accounts(identity_id,username,password_hash,email,last_login_at,default_school_id)
-    VALUES($1,$2,$3,$4,now(),$5) RETURNING id`, [globalIdentity, login, hash, email, school.id]);
-  await db.query('INSERT INTO school_memberships(school_id,account_id,role) VALUES($1,$2,$3)', [school.id, account.id, identity.kind]);
-  await db.query('UPDATE school_identities SET account_id=$3 WHERE school_id=$1 AND id=$2', [school.id, identity.id, account.id]);
-  const consumed = await db.query(`UPDATE school_activation_tokens SET consumed_at=clock_timestamp()
-    WHERE school_id=$1 AND identity_id=$2 AND consumed_at IS NULL AND expires_at>clock_timestamp()`, [school.id, identity.id]);
-  if (!consumed.rowCount) claimFailed();
-  await auditSchool(db, school.id, account.id, 'school.identity.claim', identity.id);
-  return account;
 }
 
 export async function handleSchoolActivation({ pool, user, route, method, body }) {

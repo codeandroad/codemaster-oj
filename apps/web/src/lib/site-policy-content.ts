@@ -129,7 +129,7 @@ export const sitePolicyContent: Record<AppLocale, Record<SitePolicySlug, SitePol
         {
           heading: "School accounts and records",
           paragraphs: [
-            "Contact your school administrator for invitations, identity activation, class membership, record corrections or a one-time password reset code. Use your school’s existing private support channel and share only the information needed to identify your account.",
+            "Contact your school administrator for school applications, identity claim codes, class membership, record corrections or a one-time password reset code. Use your school’s existing private support channel and share only the information needed to identify your account.",
           ],
         },
         {
@@ -263,7 +263,7 @@ export const sitePolicyContent: Record<AppLocale, Record<SitePolicySlug, SitePol
         {
           heading: "校内账号和身份档案",
           paragraphs: [
-            "邀请码、身份激活、班级归属、档案更正或一次性密码重置凭据，请通过学校已有的私下沟通渠道联系学校管理员。仅提供用于确认本人账号所需的信息。",
+            "入校申请、身份认领码、班级归属、档案更正或一次性密码重置凭据，请通过学校已有的私下沟通渠道联系学校管理员。仅提供用于确认本人账号所需的信息。",
           ],
         },
         {

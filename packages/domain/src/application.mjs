@@ -1,3 +1,4 @@
+import { bindSchoolIdentity, handleSchoolJoinRequests } from './school-join-requests.mjs';
 import { handleWorkspaceCatalog } from './workspace-catalog.mjs';
 import { handlePoker } from './poker.mjs';
 import { handleWrittenPapers } from './written-papers.mjs';
@@ -23,11 +24,11 @@ import { handleCommunity } from './community.mjs';
 import { handlePlatformGovernance } from './platform-governance.mjs';
 import { requireWorkspaceRoute, schoolBookmark } from './workspace-access.mjs';
 import { handleSchoolAccounts } from './school-accounts.mjs';
-import { handleSchools, redeemSchoolPasswordReset } from './schools.mjs';
+import { auditSchool, handleSchools, redeemSchoolPasswordReset } from './schools.mjs';
 import { handleSchoolTeaching } from './school-teaching.mjs';
 import { handleSchoolCourses } from './school-courses.mjs';
 import { handleSchoolIdentityImports } from './school-identity-imports.mjs';
-import { activationSchools, activationSchoolSlug, handleSchoolActivation, registerSchoolIdentity, schoolClaimPreview, verifySchoolIdentity } from './school-activation.mjs';
+import { activationSchools, activationSchoolSlug, handleSchoolActivation, schoolClaimPreview, verifySchoolIdentity } from './school-activation.mjs';
 import { publicProblemMetadata } from './problem-public-statements.mjs';
 import { legacyProblemStatement } from './problem-statement-display.mjs';
 import { handleSystem, assertJudgeAdmission, getSettings } from './system.mjs';
@@ -133,10 +134,15 @@ export async function createDomainServices(pool,config) {
     const valid=await verifyPassword(a?.password_hash||dummyHash,secret);if(!a||!valid)fail(401,'LOGIN_FAILED','用户名或密码不正确');
     const result=await transaction(pool,async db=>{const locked=(await db.query('SELECT * FROM accounts WHERE id=$1 AND binding_released_at IS NULL FOR UPDATE',[a.id])).rows[0];if(!locked||!safeEqual(locked.password_hash,a.password_hash))fail(401,'LOGIN_FAILED','用户名或密码不正确');if(locked.disabled_at)fail(403,'ACCOUNT_DISABLED','账号已禁用');if(!await findUser(db,a.id))fail(401,'LOGIN_FAILED','用户名或密码不正确');if(sess)await db.query('DELETE FROM sessions WHERE token_hash=$1',[sess.token_hash]);await db.query('UPDATE accounts SET last_login_at=now() WHERE id=$1',[a.id]);await audit(db,a.id,'auth.login','account',a.id);return session(db,a.id);});return respond(200,result.body,result.cookie);
    }
-   if(route==='/auth/verify-identity'&&method==='POST') {
-    ipLimiter.check(`claim:${ip}`);const kind=enumValue(body.kind,['student','teacher'],'身份类型'),number=field(body.number,'编号'),name=field(body.name,'姓名'),code=field(body.activationCode,'激活码',{max:100}),schoolSlug=activationSchoolSlug(body);authLimiter.check(`claim:${schoolSlug}:${kind}:${number}`);
-    const preview=await transaction(pool,async db=>schoolClaimPreview(db,await verifySchoolIdentity(db,{schoolSlug,kind,number,name,code})));
-    return respond(200,preview);
+   if((route==='/auth/verify-identity'||route==='/auth/claim-identity')&&method==='POST') {
+    ipLimiter.check(`claim:${ip}`);const kind=enumValue(body.kind,['student','teacher'],'身份类型'),number=field(body.number,'编号'),name=field(body.name,'姓名'),code=field(body.activationCode,'身份认领码',{max:100}),schoolSlug=activationSchoolSlug(body);authLimiter.check(`claim:${schoolSlug}:${kind}:${number}`);
+    return transaction(pool,async db=>{
+     const claim=await verifySchoolIdentity(db,{schoolSlug,kind,number,name,code});
+     if(route==='/auth/verify-identity')return respond(200,await schoolClaimPreview(db,claim));
+     await bindSchoolIdentity(db,claim.school.id,user.id,claim.identity,user.id);
+     await auditSchool(db,claim.school.id,user.id,'school.identity.claim',claim.identity.id);
+     return respond(200,{schoolId:claim.school.id,identityId:claim.identity.id});
+    });
    }
    if(route==='/auth/register-personal'&&method==='POST') {
     ipLimiter.check(`personal-register:${ip}`);
@@ -155,14 +161,6 @@ export async function createDomainServices(pool,config) {
      if(sess)await db.query('DELETE FROM sessions WHERE token_hash=$1',[sess.token_hash]);
      await audit(db,a.id,'auth.personal_register','account',a.id);
      return session(db,a.id);
-    });return respond(201,result.body,result.cookie);
-   }
-   if(route==='/auth/register'&&method==='POST') {
-    ipLimiter.check(`claim:${ip}`);const kind=enumValue(body.kind,['student','teacher','admin'],'身份类型'),number=field(body.number,'编号'),name=field(body.name,'姓名'),code=field(body.activationCode,'激活码',{max:100}),login=username(body.username),schoolSlug=activationSchoolSlug(body);authLimiter.check(`claim:${schoolSlug}:${kind}:${number}`);const hash=await hashPassword(body.password);
-    const email=body.email==null||(typeof body.email==='string'&&!body.email.trim())?null:field(body.email,'邮箱',{max:254});if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))fail(400,'VALIDATION','邮箱格式无效');
-    const result=await transaction(pool,async db=>{
-     const claim=await verifySchoolIdentity(db,{schoolSlug,kind,number,name,code});
-     const account=await registerSchoolIdentity(db,claim,{login,hash,email});if(sess)await db.query('DELETE FROM sessions WHERE token_hash=$1',[sess.token_hash]);return session(db,account.id);
     });return respond(201,result.body,result.cookie);
    }
    if(route==='/auth/reset'&&method==='POST') {
@@ -190,7 +188,7 @@ export async function createDomainServices(pool,config) {
  }
 
  async function schoolsOperation(context) {
-  return await handleWorkspaceCatalog(context) ?? await handleSchoolSettings(context) ?? await handleSchoolAccounts(context) ?? await handleSchools(context) ?? await handleSchoolActivation(context) ?? await handleSchoolTeaching(context) ?? await handleSchoolIdentityImports(context) ?? await handleSchoolCourses(context);
+  return await handleWorkspaceCatalog(context) ?? await handleSchoolSettings(context) ?? await handleSchoolAccounts(context) ?? await handleSchoolJoinRequests(context) ?? await handleSchools(context) ?? await handleSchoolActivation(context) ?? await handleSchoolTeaching(context) ?? await handleSchoolIdentityImports(context) ?? await handleSchoolCourses(context);
  }
 
  const operations={
@@ -211,7 +209,7 @@ export async function createDomainServices(pool,config) {
   const sess=rawToken?(await pool.query('SELECT s.* FROM sessions s JOIN accounts a ON a.id=s.account_id JOIN identities i ON i.id=a.identity_id WHERE s.token_hash=$1 AND s.expires_at>now() AND a.disabled_at IS NULL AND a.binding_released_at IS NULL AND i.archived_at IS NULL',[sessionHash(rawToken,config.secret)])).rows[0]:null;
   const user=sess?await findUser(pool,sess.account_id):null;
   if(!['GET','HEAD','OPTIONS'].includes(method))checkMutation({headers},sess,config.origins);
-  if(!user&&!['/auth/login','/auth/register','/auth/register-personal','/auth/reset','/auth/verify-identity','/site-info'].includes(route)&&!(route==='/auth/activation-schools'&&method==='GET'))fail(401,'UNAUTHENTICATED','请先登录');
+  if(!user&&!['/auth/login','/auth/register-personal','/auth/reset','/site-info'].includes(route)&&!(route==='/auth/activation-schools'&&method==='GET'))fail(401,'UNAUTHENTICATED','请先登录');
   const bookmark=await schoolBookmark(pool,user,route,method,url);
   await requireWorkspaceRoute(user,bookmark??route,method);
   const renewedCookie=route==='/auth/me'&&method==='GET'&&user?sessionCookie(rawToken,config):undefined;
@@ -245,7 +243,7 @@ export function resourceArea(route) {
  if(/^\/schools\/[^/]+\/(problem-banks|problems|judge-jobs|judge-status|submissions)(?:\/|$)/.test(route))return 'schoolPractice';
  if(/^\/platform\/(system-settings|audit-events|judge-status|judge-maintenance|judge-tasks)(?:\/|$)/.test(route))return 'system';
  if(/^\/platform(?:\/|$)/.test(route))return 'platform';
- if(/^\/(schools|school-invitations)(?:\/|$)/.test(route))return 'schools';
+ if(/^\/schools(?:\/|$)/.test(route))return 'schools';
  if(/^\/presence(?:\/|$)/.test(route))return 'presence';
  if(/^\/scholarship(?:\/|$)/.test(route))return 'scholarship';
  if(/^\/paper4(?:\/|$)/.test(route))return 'paper4';

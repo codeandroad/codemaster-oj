@@ -6,7 +6,7 @@ import { createPool, transaction } from '../src/db.mjs';
 import { migrate } from '../src/migrate.mjs';
 import { hashPassword } from '../src/security.mjs';
 import { handlePlatformGovernance, provisionPlatformAdministrator } from '../src/platform-governance.mjs';
-import { handleSchools } from '../src/schools.mjs';
+import { handleSchoolJoinRequests } from '../src/school-join-requests.mjs';
 import { LEGACY_SCHOOL_ID } from './fixtures/pre-workspace/legacy-school.mjs';
 
 test('platform operations work with the real application grants while grants, audits, and worker boundaries stay protected',
@@ -62,8 +62,11 @@ test('platform operations work with the real application grants while grants, au
       })).status, 200);
       assert.equal((await governance(`/platform/schools/${school.body.id}/administrators`,'POST',{ username:'qa-another' })).status, 200);
       assert.equal((await governance('/platform/schools')).body.items.find(s=>s.id===school.body.id).administrators.length,2);
-      const invitation = await handleSchools({ pool:app,user:{id:another.id,roles:[]},route:`/schools/${school.body.id}/invitations`,method:'POST',body:{role:'student'} });
-      assert.equal(invitation.status,201,'an additionally appointed admin can issue an invitation with runtime grants');
+      const queue = await handleSchoolJoinRequests({pool:app,user:{id:another.id},route:`/schools/${school.body.id}/join-requests`,method:'GET'});
+      assert.deepEqual(queue.body.items,[]);
+      await assert.rejects(app.query('SELECT * FROM school_invitations LIMIT 1'),{code:'42501'});
+      await assert.rejects(app.query('DELETE FROM school_join_requests'),{code:'42501'});
+      await assert.rejects(app.query('UPDATE school_join_requests SET account_id=account_id'),{code:'42501'});
       assert.equal((await governance(`/platform/schools/${LEGACY_SCHOOL_ID}`,'PATCH',{
         name:'Legacy app role name',expectedName:'天行创世纪学校',
       })).status,200);
@@ -75,7 +78,7 @@ test('platform operations work with the real application grants while grants, au
       await assert.rejects(app.query('UPDATE platform_audit_events SET action=action'),{code:'42501'});
       await assert.rejects(app.query('DELETE FROM platform_audit_events'),{code:'42501'});
       await assert.rejects(app.query('DELETE FROM school_audit_events'),{code:'42501'});
-      for (const table of ['platform_admins','school_administrators','platform_audit_events','school_identities','school_memberships']) {
+      for (const table of ['platform_admins','school_administrators','platform_audit_events','school_identities','school_memberships','school_join_requests']) {
         await assert.rejects(worker.query(`SELECT * FROM ${table} LIMIT 1`),{code:'42501'},table);
       }
       assert.equal((await owner.query('SELECT count(*)::int n FROM platform_audit_events')).rows[0].n,5);

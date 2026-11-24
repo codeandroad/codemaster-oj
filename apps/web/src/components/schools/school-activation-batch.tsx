@@ -82,21 +82,21 @@ export function SchoolActivationBatch({ school, onClose }: { school: School; onC
     text("School code", "学校标识") + " " + result.school.slug,
     person.kind === "student" ? text("Student ID", "学号") + " " + person.number : text("Staff ID", "工号") + " " + person.number,
     text("Name", "姓名") + " " + person.name,
-    text("Activation code", "激活码") + " " + activationCode,
+    text("Identity claim code", "认领码") + " " + activationCode,
   ].join("\n")) : [];
   const close = () => { if (!issuing.current) onClose(); };
 
-  return <Modal wide title={text("Generate activation codes", "批量生成激活码")} onClose={close}
+  return <Modal wide title={text("Generate claim codes", "批量生成认领码")} onClose={close}
     description={result
-      ? text("Give each person their own code privately. Use Activate school identity on the sign-in page. Copy the codes before closing.", "请将激活信息分别私下交给本人，从登录页进入“激活学校身份”。关闭前请复制留存。")
+      ? text("Give each person their own code privately. Use Claim an identity or apply to join after signing in. Copy the codes before closing.", "请将认领信息分别私下交给本人，登录后进入“设置 → 学校”，选择“加入学校”。关闭前请复制留存。")
       : text(`Select unlinked identities at ${school.name}. Each code works once for seven days. Issuing a new code replaces the previous one.`,
-          `请选择${school.name}待激活的身份。每人一码，有效期七天。重新签发后，该身份的旧码立即失效。`)}>
+          `请选择${school.name}待认领的身份。每人一码，有效期七天。重新签发后，该身份的旧码立即失效。`)}>
     {result ? <>
       <div className="max-h-[48vh] divide-y divide-border overflow-auto">
         {result.items.map(({ person, activationCode }, index) => <div key={activationCode} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
           <div><span className="font-semibold">{person.name}</span> · <RoleLabel role={person.kind} /> · {person.number}
             <code className="block select-all break-all">{activationCode}</code></div>
-          <CopyCode text={details[index]} label={text("Copy details", "复制激活信息")} />
+          <CopyCode text={details[index]} label={text("Copy details", "复制认领信息")} />
         </div>)}
       </div>
       <div className="flex items-center justify-end gap-2">
@@ -126,7 +126,7 @@ export function SchoolActivationBatch({ school, onClose }: { school: School; onC
                 <td className="p-2"><RoleLabel role={row.kind}/></td><td className="p-2">{row.classes.filter(c=>!c.archived).map(c=>c.name).join("、")||"—"}</td>
               </tr>)}</tbody>
             </table>
-            {!rows.length && <p className="py-4 text-sm text-muted-foreground">{text("No unlinked identities match.", "没有符合条件的待激活身份。")}</p>}
+            {!rows.length && <p className="py-4 text-sm text-muted-foreground">{text("No unlinked identities match.", "没有符合条件的待认领身份。")}</p>}
           </div>
           <div className="flex items-center justify-end gap-2 py-1 text-sm">
             <Button size="sm" variant="secondary" disabled={page === 1} onClick={() => setPage(page - 1)}>{text("Previous", "上一页")}</Button>
@@ -139,7 +139,7 @@ export function SchoolActivationBatch({ school, onClose }: { school: School; onC
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span role="status" className="text-sm">{text(`${selection.size} selected`, `已选 ${selection.size} 人`)}</span>
         <Button disabled={busy || !selection.size || resource.pending || Boolean(resource.error)} onClick={() => void issue()}>
-          {text(busy ? "Generating…" : "Generate codes", busy ? "正在生成…" : "生成激活码")}
+          {text(busy ? "Generating…" : "Generate codes", busy ? "正在生成…" : "生成认领码")}
         </Button>
       </div>
     </>}

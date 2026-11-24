@@ -12,7 +12,7 @@ import { hashPassword } from '../../../packages/domain/src/security.mjs';
 import { handleSchools, provisionSchool } from '../../../packages/domain/src/schools.mjs';
 
 test('school directories and class rosters enforce tenant, role, and account boundaries',
-  { skip: !process.env.TEST_DATABASE_URL, timeout: 60000 }, async () => {
+  { skip: !process.env.TEST_DATABASE_URL, timeout: 60000 }, async t => {
     const baseUrl = new URL(process.env.TEST_DATABASE_URL);
     assert.ok(['127.0.0.1', 'localhost'].includes(baseUrl.hostname) && /^\/campus_(?:qa|test)(?:_[A-Za-z0-9_]+)?$/.test(baseUrl.pathname), 'Use an isolated local QA database.');
     const manager = createPool(baseUrl.href);
@@ -365,6 +365,52 @@ test('school directories and class rosters enforce tenant, role, and account bou
       });
       assert.equal((await pool.query('SELECT 1 FROM school_class_roster WHERE identity_id=$1', [unassigned.id])).rowCount, 0);
 
+      const classPath = person => `${identities(alpha)}/${person.id}/classes`;
+      await t.test('school admins can move, clear, and retry existing class assignments atomically', async () => {
+        const path = classPath(enrolled);
+        const edit = { expectedClassIds: chosenClasses, classIds: [otherClass.id, locatedId] };
+        await request(path, { status: 401 });
+        for (const auth of [teacher, student, betaAdmin]) {
+          const status = auth === betaAdmin ? 404 : 403;
+          await request(path, { auth, status });
+          await patch(path, auth, edit, status);
+        }
+        await request(path, { auth: alphaAdmin, method: 'PATCH', csrf: false, body: edit, status: 403 });
+        await patch(classPath(betaStudent), alphaAdmin, edit, 404);
+        await patch(path, alphaAdmin, { classIds: [] }, 400);
+        await patch(path, alphaAdmin, { expectedClassIds: chosenClasses }, 400);
+        for (const [id, status] of [[betaClass.id, 404], [archivedTarget.id, 409], ['invalid', 400]]) {
+          await patch(path, alphaAdmin, { ...edit, classIds: [locatedId, id] }, status);
+        }
+        const getClasses = async () => (await request(path, { auth: alphaAdmin })).data.classes.map(c => c.id).sort();
+        assert.deepEqual(await getClasses(), [...chosenClasses].sort());
+        await patch(path, alphaAdmin, edit);
+        await patch(path, alphaAdmin, edit);
+        assert.deepEqual(await getClasses(), [...edit.classIds].sort());
+        const directory = (await request(`${identities(alpha)}?q=MULTI-S`, { auth: alphaAdmin })).data.items[0];
+        assert.deepEqual(directory.classes.map(c => c.id).sort(), [...edit.classIds].sort());
+        const competing = await Promise.all([[], [taughtClass.id]].map(classIds =>
+          patch(path, alphaAdmin, { expectedClassIds: edit.classIds, classIds }, [200, 409])));
+        assert.equal(competing.filter(r => r.data.error?.code === 'ROSTER_CHANGED').length, 1);
+        await patch(path, alphaAdmin, { expectedClassIds: await getClasses(), classIds: [] });
+        assert.deepEqual(await getClasses(), []);
+      });
+
+      await t.test('class changes take effect for linked students and teachers and preserve archived rosters', async () => {
+        for (const [person, auth] of [[alphaTeacher, teacher], [alphaStudent, student]]) {
+          const path = classPath(person);
+          const current = (await request(path, { auth: alphaAdmin })).data.classes;
+          assert.ok(current.some(c => c.id === archivedTarget.id && c.archived));
+          const original = current.filter(c => !c.archived).map(c => c.id);
+          const extended = [...original, otherClass.id];
+          await patch(path, alphaAdmin, { expectedClassIds: original, classIds: extended });
+          await request(roster(alpha, otherClass), { auth });
+          await patch(path, alphaAdmin, { expectedClassIds: extended, classIds: original });
+          await request(roster(alpha, otherClass), { auth, status: 404 });
+          assert.deepEqual((await request(path, { auth: alphaAdmin })).data.classes, current);
+        }
+      });
+
       // Deterministically pause a real revocation after its school lock. A
       // simultaneous teacher read must wait before taking a membership SHARE
       // lock, otherwise the revoker and the read form a database deadlock.
@@ -454,13 +500,13 @@ test('school directories and class rosters enforce tenant, role, and account bou
         'school.identity.create': 1,
         'school.identity.link': 2,
         'school.identity.unlink': 2,
-        'school.roster.add': 3,
-        'school.roster.remove': 2,
+        'school.roster.add': 4,
+        'school.roster.remove': 3,
       });
       const { rows: [studentAudit] } = await pool.query(`
         SELECT count(*)::int count FROM school_audit_events
         WHERE school_id = $1 AND target_id = $2 AND action = 'school.roster.add'`, [alpha.id, alphaStudent.id]);
-      assert.equal(studentAudit.count, 3);
+      assert.equal(studentAudit.count, 4);
     } finally {
       await app?.close();
       await pool.end();

@@ -6,6 +6,10 @@ import { enumValue, fail, field, integer, uuid } from './security.mjs';
 const PAGE_SIZE = 50;
 const IDENTITY_KINDS = ['student', 'teacher'];
 const identityFields = 'id, kind, number, name, account_id AS "accountId", created_at AS "createdAt"';
+const identityClasses = `(SELECT coalesce(jsonb_agg(jsonb_build_object('id', c.id, 'name', c.name,
+  'archived', c.archived_at IS NOT NULL) ORDER BY c.name, c.id), '[]') FROM school_class_roster r
+  JOIN school_classes c ON c.school_id = r.school_id AND c.id = r.class_id
+  WHERE r.school_id = i.school_id AND r.identity_id = i.id) AS classes`;
 const assignedTeacher = `EXISTS (
   SELECT 1 FROM school_class_roster r
   JOIN school_identities i ON i.school_id = r.school_id AND i.id = r.identity_id
@@ -46,12 +50,25 @@ async function listIdentities(db, schoolId, url) {
   const pendingActivation = enumValue(url.searchParams.get('pendingActivation') ?? 'false', ['true', 'false'], '仅显示待激活身份') === 'true';
   const query = field(url.searchParams.get('q') ?? '', '搜索关键词', { min: 0, max: 100 });
   const { rows } = await db.query(`
-    SELECT ${identityFields} FROM school_identities
+    SELECT ${identityFields}, ${identityClasses} FROM school_identities i
     WHERE school_id = $1 AND archived_at IS NULL AND ($2::text IS NULL OR kind = $2)
       AND ($3 = '' OR strpos(lower(name), lower($3)) > 0 OR strpos(lower(number), lower($3)) > 0)
       AND (NOT $6::boolean OR (account_id IS NULL AND kind IN ('student','teacher')))
     ORDER BY name, id LIMIT $4 OFFSET $5`, [schoolId, kind, query, PAGE_SIZE + 1, (page - 1) * PAGE_SIZE, pendingActivation]);
   return pageResult(page, rows);
+}
+
+function readClassIds(value) {
+  if (!Array.isArray(value)) fail(400, 'VALIDATION', '班级须为列表');
+  return [...new Set(value.map(id => uuid(id, '班级 ID').toLowerCase()))];
+}
+
+async function requireActiveClasses(db, schoolId, classes) {
+  if (!classes.length) return;
+  const { rows } = await db.query(`SELECT archived_at FROM school_classes
+    WHERE school_id = $1 AND id = ANY($2::uuid[])`, [schoolId, classes]);
+  if (rows.length !== classes.length) fail(404, 'NOT_FOUND', '班级不存在或不可访问');
+  if (rows.some(row => row.archived_at)) fail(409, 'CLASS_ARCHIVED', '请选择使用中的班级');
 }
 
 async function createIdentity(db, schoolId, actorId, body) {
@@ -60,21 +77,39 @@ async function createIdentity(db, schoolId, actorId, body) {
   const name = field(body.name, '姓名', { max: 100 });
   const accountId = body.accountId == null ? null : uuid(body.accountId, '账号 ID');
   const { classIds = [] } = body;
-  if (!Array.isArray(classIds)) fail(400, 'VALIDATION', '班级须为列表');
-  const classes = [...new Set(classIds.map(id => uuid(id, '班级 ID').toLowerCase()))];
+  const classes = readClassIds(classIds);
   await requireMatchingMember(db, schoolId, accountId, kind);
-  if (classes.length) {
-    const { rows } = await db.query(`SELECT archived_at FROM school_classes
-      WHERE school_id = $1 AND id = ANY($2::uuid[])`, [schoolId, classes]);
-    if (rows.length !== classes.length) fail(404, 'NOT_FOUND', '班级不存在或不可访问');
-    if (rows.some(row => row.archived_at)) fail(409, 'CLASS_ARCHIVED', '请选择使用中的班级');
-  }
+  await requireActiveClasses(db, schoolId, classes);
   const { rows: [identity] } = await db.query(`
     INSERT INTO school_identities (school_id, kind, number, name, account_id)
     VALUES ($1, $2, $3, $4, $5) RETURNING ${identityFields}`, [schoolId, kind, number, name, accountId]);
   await auditSchool(db, schoolId, actorId, 'school.identity.create', identity.id);
   if (classes.length) await addToClassRosters(db, schoolId, actorId, identity.id, classes);
   return { status: 201, body: identity };
+}
+
+async function manageIdentityClasses(db, schoolId, actorId, identityId, method, body) {
+  const { rows: [identity] } = await db.query(`SELECT kind, name, number, ${identityClasses}
+    FROM school_identities i WHERE school_id=$1 AND id=$2 AND archived_at IS NULL
+    AND kind IN ('student','teacher')`, [schoolId, identityId]);
+  if (!identity) fail(404, 'NOT_FOUND', '未找到本校的师生身份档案');
+  if (method === 'GET') return { status: 200, body: identity };
+
+  const expected = readClassIds(body.expectedClassIds);
+  const desired = readClassIds(body.classIds);
+  const current = new Set(identity.classes.filter(c => !c.archived).map(c => c.id));
+  const additions = desired.filter(id => !current.has(id));
+  const selected = new Set(desired);
+  const removals = [...current].filter(id => !selected.has(id));
+  if (additions.length || removals.length) {
+    if (expected.length !== current.size || expected.some(id => !current.has(id))) {
+      fail(409, 'ROSTER_CHANGED', '班级名单已变更，请重新加载后确认');
+    }
+    await requireActiveClasses(db, schoolId, additions);
+    if (additions.length) await addToClassRosters(db, schoolId, actorId, identityId, additions);
+    if (removals.length) await removeFromClassRosters(db, schoolId, actorId, identityId, removals);
+  }
+  return { status: 200, body: { ok: true } };
 }
 
 async function setIdentityAccount(db, schoolId, actorId, identityId, body) {
@@ -267,16 +302,23 @@ async function addRosterIdentity(db, schoolId, actorId, role, classId, identityI
 async function removeRosterIdentity(db, schoolId, actorId, role, classId, identityId) {
   await requireSchoolClassManagement(db, schoolId, actorId, role, classId);
   await requireRosterIdentity(db, schoolId, role, identityId);
-  const { rowCount } = await db.query(`
-    DELETE FROM school_class_roster WHERE school_id = $1 AND class_id = $2 AND identity_id = $3`,
-  [schoolId, classId, identityId]);
+  const rowCount = await removeFromClassRosters(db, schoolId, actorId, identityId, [classId]);
   if (!rowCount) fail(404, 'NOT_FOUND', '班级名单中未找到该身份档案');
-  await auditSchool(db, schoolId, actorId, 'school.roster.remove', identityId);
   return { status: 200, body: { ok: true } };
 }
 
+async function removeFromClassRosters(db, schoolId, actorId, identityId, classIds) {
+  const { rowCount } = await db.query(`WITH removed AS (
+    DELETE FROM school_class_roster WHERE school_id=$1 AND identity_id=$3 AND class_id=ANY($4::uuid[])
+    RETURNING school_id, identity_id
+  )
+  INSERT INTO school_audit_events (school_id, actor_account_id, action, target_id)
+  SELECT school_id, $2, 'school.roster.remove', identity_id FROM removed`, [schoolId, actorId, identityId, classIds]);
+  return rowCount;
+}
+
 export async function handleSchoolTeaching({ pool, user, route, method, body, url }) {
-  const directory = route.match(/^\/schools\/([^/]+)\/identities(?:\/([^/]+)\/account)?$/);
+  const directory = route.match(/^\/schools\/([^/]+)\/identities(?:\/([^/]+)\/(account|classes))?$/);
   if (directory) {
     const schoolId = uuid(directory[1], '学校 ID');
     const identityId = directory[2];
@@ -285,7 +327,10 @@ export async function handleSchoolTeaching({ pool, user, route, method, body, ur
       await requireSchoolAdmin(db, schoolId, user.id);
       if (!identityId && method === 'GET') return listIdentities(db, schoolId, url);
       if (!identityId && method === 'POST') return createIdentity(db, schoolId, user.id, body);
-      if (identityId && method === 'PATCH') {
+      if (directory[3] === 'classes' && ['GET', 'PATCH'].includes(method)) {
+        return manageIdentityClasses(db, schoolId, user.id, uuid(identityId, '身份档案 ID'), method, body);
+      }
+      if (directory[3] === 'account' && method === 'PATCH') {
         return setIdentityAccount(db, schoolId, user.id, uuid(identityId, '身份档案 ID'), body);
       }
       return null;

@@ -21,6 +21,7 @@ import {
 import { productionApi } from "@/lib/production-api";
 import { cn } from "@/lib/utils";
 import { SchoolIdentityImport } from "./school-identity-import";
+import { SchoolIdentityClasses, type IdentityClass } from "./school-identity-classes";
 import { SchoolCourses } from "./school-courses";
 import { SchoolClassPicker } from "./school-class-picker";
 import { SchoolClasses } from "./school-classes";
@@ -40,7 +41,7 @@ type Identity = {
   number: string;
   kind: IdentityKind;
 };
-type DirectoryIdentity = Identity & { accountId: string | null };
+type DirectoryIdentity = Identity & { accountId: string | null; classes: IdentityClass[] };
 type MemberAccount = { accountId: string; name: string; username?: string };
 type ClassType = "administrative" | "training";
 type Page<T> = { items: T[]; page: number; hasMore: boolean };
@@ -140,6 +141,7 @@ function SchoolDirectory({
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<IdentityKind | "">("");
   const [edit, setEdit] = useState(false);
+  const [editingClasses, setEditingClasses] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [link, setLink] = useState<DirectoryIdentity | null>(null);
   const [unlink, setUnlink] = useState<DirectoryIdentity | null>(null);
@@ -148,6 +150,7 @@ function SchoolDirectory({
 
   function saved(nextMessage: string) {
     setEdit(false);
+    setEditingClasses(null);
     setImporting(false);
     setLink(null);
     setUnlink(null);
@@ -179,7 +182,8 @@ function SchoolDirectory({
       <IdentityFilter onQuery={setQuery} kind={kind} onKind={setKind} />
       <Feedback action={{ error: "", message }} />
       <SchoolTable<DirectoryIdentity>
-        key={`${kind}:${query}:${revision}:${refreshRevision}`}
+        key={`${kind}:${query}`}
+        refreshKey={`${revision}:${refreshRevision}`}
         path={identityPath(base, kind, query)}
         label={text("School identities", "校内身份档案")}
         empty={
@@ -195,6 +199,10 @@ function SchoolDirectory({
         columns={[
           ...identityColumns(text),
           {
+            title: text("Classes", "关联班级"),
+            cell: item => item.classes.filter(c => !c.archived).map(c => c.name).join("、") || "—",
+          },
+          {
             title: text("Account", "账号"),
             cell: (item) =>
               item.accountId
@@ -205,6 +213,11 @@ function SchoolDirectory({
             title: text("Actions", "操作"),
             cell: (item) => (
               <div className="flex flex-wrap gap-1">
+                {(item.kind === "student" || item.kind === "teacher") && (
+                  <Button size="sm" variant="ghost" onClick={() => setEditingClasses(item.id)}>
+                    {text("Adjust classes", "调整班级")}
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="ghost"
@@ -236,6 +249,9 @@ function SchoolDirectory({
           },
         ]}
       />
+      {editingClasses && <SchoolIdentityClasses key={editingClasses} school={school} identityId={editingClasses}
+        onClose={() => setEditingClasses(null)}
+        onSaved={() => saved(text("Class assignments saved.", "已保存班级调整。"))}/>}
       {importing && (
         <SchoolIdentityImport
           school={school}
@@ -384,6 +400,7 @@ export function IdentityFilter({
 }
 
 type SchoolTableProps<T> = {
+  refreshKey?: string;
   path: string;
   label: string;
   empty: string;
@@ -395,7 +412,7 @@ type SchoolTableProps<T> = {
 function SchoolTable<T>(props: SchoolTableProps<T>) {
   const [page, setPage] = useState(1);
   return (
-    <SchoolTablePage key={page} {...props} page={page} setPage={setPage} />
+    <SchoolTablePage key={`${page}:${props.refreshKey ?? ""}`} {...props} page={page} setPage={setPage} />
   );
 }
 

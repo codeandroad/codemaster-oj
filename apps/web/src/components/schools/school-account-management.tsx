@@ -9,6 +9,7 @@ import { genderLabel } from "@/lib/gender";
 import type { CampusGender } from "@/lib/production-api";
 import { RoleLabel, useSchoolText, type School, type SchoolRole } from "./school-ui";
 import { schoolWorkspaceHref } from "./school-workspace-location";
+import { SchoolIdentityClasses } from "./school-identity-classes";
 
 export type Member = {
   accountId: string; username: string; name: string; number: string | null;
@@ -51,17 +52,29 @@ export function SchoolAccountFilters({ filters, onChange }: { filters: AccountFi
   </form>;
 }
 
-export function SchoolAccountDetails({ school, accountId, onClose }: { school: School; accountId: string; onClose: () => void }) {
+export function SchoolAccountDetails({ school, accountId, onClose, onClassesSaved }: {
+  school: School; accountId: string; onClose: () => void; onClassesSaved: () => void;
+}) {
   const text = useSchoolText(), t = useAdminText();
   const resource = useData<Member & { events: { createdAt: string; action: string }[] }>(`schools/${school.id}/accounts/${accountId}`);
   const member = resource.data;
+  const [editingClasses, setEditingClasses] = useState(false);
+  if (editingClasses && member?.identityId) {
+    return <SchoolIdentityClasses school={school} identityId={member.identityId}
+      onClose={() => setEditingClasses(false)}
+      onSaved={() => { setEditingClasses(false); resource.reload(); onClassesSaved(); }}/>;
+  }
   return <Drawer title={member?.name ?? text("Account details", "账号详情")} eyebrow={member?.username} onClose={onClose}>
     <Loading resource={resource}>{member && <div className="space-y-5">
       <dl className="grid grid-cols-[auto_1fr] gap-x-5 gap-y-2 text-sm">
         <dt>{text("ID number", "身份编号")}</dt><dd>{member.number || "—"}</dd>
         <dt>{text("Gender", "性别")}</dt><dd>{t(genderLabel(member.gender))}</dd>
         <dt>{text("Role", "角色")}</dt><dd><RoleLabel role={member.role}/>{member.administrator && member.role !== "school_admin" && <> · <RoleLabel role="school_admin"/></>}</dd>
-        <dt>{text("Classes", "关联班级")}</dt><dd>{member.classes.join("、") || "—"}</dd>
+        <dt>{text("Classes", "关联班级")}</dt>
+        <dd className="flex flex-wrap items-center gap-2">{member.classes.join("、") || "—"}
+          {member.identityId && (member.role === "student" || member.role === "teacher") &&
+            <Button size="sm" variant="secondary" onClick={() => setEditingClasses(true)}>{text("Adjust classes", "调整班级")}</Button>}
+        </dd>
         <dt>{text("Joined", "加入日期")}</dt><dd>{new Date(member.joinedAt).toLocaleDateString()}</dd>
         <dt>{text("Platform login", "平台登录")}</dt><dd>{member.disabled ? text("Disabled","已禁用") : text("Enabled","已启用")}</dd>
         <dt>{text("School access", "本校访问")}</dt><dd>{member.suspended ? text("Suspended","已暂停") : text("Active","已开放")}</dd>

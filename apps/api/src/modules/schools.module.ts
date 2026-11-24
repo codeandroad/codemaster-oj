@@ -21,6 +21,7 @@ export class SchoolsController {
     'schools/:schoolId/exit-requests',
     'schools/:schoolId/student-exits',
     'schools/:schoolId/identities',
+    'schools/:schoolId/identities/:identityId/classes',
     'schools/:schoolId/classes',
     'schools/:schoolId/classes/:classId',
     'schools/:schoolId/classes/:classId/members',
@@ -66,6 +67,7 @@ export class SchoolsController {
   }
 
   @Patch([
+    'schools/:schoolId/identities/:identityId/classes',
     'schools/:schoolId/accounts/:accountId/roles',
     'schools/:schoolId/accounts/:accountId/access',
     'schools/:schoolId/problem-groups/:id','schools/:schoolId/learning-resources/:resourceId', 'schools/:schoolId/classes/:classId', 'schools/:schoolId/identities/:identityId/account', 'schools/:schoolId/courses/:courseId', 'schools/:schoolId/courses/:courseId/admission-settings'])

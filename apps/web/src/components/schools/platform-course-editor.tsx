@@ -12,7 +12,7 @@ import { PlatformProblemEditor } from "./platform-problems";
 
 // Platform and school authors share the full chapter editor; only transport
 // and publication capabilities differ.
-export function PlatformCourseEditor({ course, onClose, onSaved }: {course:PlatformCourse;onClose:()=>void;onSaved:(course:PlatformCourse)=>void}) {
+export function PlatformCourseEditor({ course, onClose, onSaved, showTopicEditor = true }: {course:PlatformCourse;showTopicEditor?:boolean;onClose:()=>void;onSaved:(course:PlatformCourse)=>void}) {
  const text=useSchoolText(),[created,setCreated]=useState<PlatformCourse|null>(null),[dirty,setDirty]=useState(false),[busy,setBusy]=useState(false),[refreshError,setRefreshError]=useState("");
  const [problemEditor, setProblemEditor] = useState<(CourseProblemEditorSelection & { tab?: ProblemEditorTab }) | null>(null);
  const problemView = useRef<HTMLDivElement>(null);
@@ -31,7 +31,7 @@ export function PlatformCourseEditor({ course, onClose, onSaved }: {course:Platf
      <h2 className="break-words text-lg font-semibold">{value.title}</h2>
      {refreshError&&<p role="alert" className="text-sm text-destructive">{refreshError}<Button type="button" size="sm" variant="ghost" onClick={refresh}>{text("Reload","重新加载")}</Button></p>}
      <LearningEditorForm key={value.id} initial={initial} onSaved={refresh} onDirtyChange={setDirty} onBusyChange={setBusy}
-       onEditPlatformProblem={setProblemEditor}/>
+       onEditPlatformProblem={setProblemEditor} showTopicEditor={showTopicEditor}/>
    </div>
    {problemEditor && <div ref={problemView} tabIndex={-1}>
      <PlatformProblemEditor id={problemEditor.exercise.problemId} editorKey={problemEditor.exercise.id} initialTab={problemEditor.tab}
@@ -45,7 +45,7 @@ export function PlatformCourseEditor({ course, onClose, onSaved }: {course:Platf
  </>;
 }
 
-export function PlatformCourseEditorLoader({id,onClose,onSaved}:{id:string;onClose:()=>void;onSaved:()=>void}) {
+export function PlatformCourseEditorLoader({id,onClose,onSaved,showTopicEditor}:{id:string;showTopicEditor:boolean;onClose:()=>void;onSaved:()=>void}) {
  const resource=useData<PlatformCourse>(`platform/courses/${encodeURIComponent(id)}`);
- return <Loading resource={resource}>{resource.data&&<PlatformCourseEditor course={resource.data} onClose={onClose} onSaved={onSaved}/>}</Loading>;
+ return <Loading resource={resource}>{resource.data&&<PlatformCourseEditor course={resource.data} showTopicEditor={showTopicEditor} onClose={onClose} onSaved={onSaved}/>}</Loading>;
 }

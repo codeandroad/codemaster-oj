@@ -57,11 +57,13 @@ import {
 export function SchoolCourses({
   school,
   refreshRevision = 0,
+  showTopicEditor = true,
   onRefresh,
   initialCourseId,
 }: {
   school: School;
   refreshRevision?: number;
+  showTopicEditor?: boolean;
   onRefresh?: () => void;
   initialCourseId?: string | null;
 }) {
@@ -125,9 +127,9 @@ export function SchoolCourses({
   const editBookmark = !!selected && canAuthor && location.get("courseEdit") === "1";
   const grants = useData<{items:{id:string}[]}>(editBookmark ? `platform/courses?schoolId=${school.id}&view=catalog` : null);
   if (editBookmark && selected) return <Loading resource={grants}>{grants.data?.items?.some(row=>row.id===selected.id)
-    ? <PlatformCourseEditorLoader id={selected.id} onClose={()=>selectCourse(null)} onSaved={()=>{onRefresh?.();}}/>
-    : <CourseEditorLoader base={base} id={selected.id} school={school} onClose={()=>selectCourse(null)} onSaved={()=>{selectCourse(null);onRefresh?.();}}/>}</Loading>;
-  if(edit?.startsWith("platform:"))return <PlatformCourseEditorLoader id={edit.slice(9)} onClose={()=>setEdit(null)} onSaved={()=>{setRevision(value=>value+1);onRefresh?.();}}/>;
+    ? <PlatformCourseEditorLoader showTopicEditor={showTopicEditor} id={selected.id} onClose={()=>selectCourse(null)} onSaved={()=>{onRefresh?.();}}/>
+    : <CourseEditorLoader showTopicEditor={showTopicEditor} base={base} id={selected.id} school={school} onClose={()=>selectCourse(null)} onSaved={()=>{selectCourse(null);onRefresh?.();}}/>}</Loading>;
+  if(edit?.startsWith("platform:"))return <PlatformCourseEditorLoader showTopicEditor={showTopicEditor} id={edit.slice(9)} onClose={()=>setEdit(null)} onSaved={()=>{setRevision(value=>value+1);onRefresh?.();}}/>;
   if (selected)
     return (
       <div className="mt-3 space-y-3">
@@ -224,6 +226,7 @@ export function SchoolCourses({
       {edit &&
         (edit === "new" ? (
           <SchoolCourseEditor
+            showTopicEditor={showTopicEditor}
             base={base}
             school={school}
             initialDraft={draft}
@@ -237,6 +240,7 @@ export function SchoolCourses({
           />
         ) : (
           <CourseEditorLoader
+            showTopicEditor={showTopicEditor}
             base={base}
             id={edit}
             school={school}
@@ -494,12 +498,14 @@ function CourseStatus({ course }: { course: SchoolCourse }) {
 }
 
 function CourseEditorLoader({
+  showTopicEditor,
   base,
   id,
   school,
   onClose,
   onSaved,
 }: {
+  showTopicEditor: boolean;
   base: string;
   id: string;
   school: School;
@@ -509,6 +515,7 @@ function CourseEditorLoader({
   if (id === "new")
     return (
       <SchoolCourseEditor
+        showTopicEditor={showTopicEditor}
         base={base}
         school={school}
         onClose={onClose}
@@ -517,6 +524,7 @@ function CourseEditorLoader({
     );
   return (
     <ExistingCourseEditor
+      showTopicEditor={showTopicEditor}
       base={base}
       id={id}
       school={school}
@@ -527,12 +535,14 @@ function CourseEditorLoader({
 }
 
 function ExistingCourseEditor({
+  showTopicEditor,
   base,
   id,
   school,
   onClose,
   onSaved,
 }: {
+  showTopicEditor: boolean;
   base: string;
   id: string;
   school: School;
@@ -549,6 +559,7 @@ function ExistingCourseEditor({
   )
     return (
       <SchoolCourseEditor
+        showTopicEditor={showTopicEditor}
         base={base}
         school={school}
         initial={resource.data}

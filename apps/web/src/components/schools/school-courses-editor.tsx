@@ -95,6 +95,7 @@ export function SchoolCourseEditor({
   school,
   initial,
   initialDraft,
+  showTopicEditor,
   onClose,
   onSaved,
 }: {
@@ -102,6 +103,7 @@ export function SchoolCourseEditor({
   school: School;
   initial?: CourseDetail;
   initialDraft?: CourseInput;
+  showTopicEditor: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -488,7 +490,7 @@ export function SchoolCourseEditor({
                   </Button>
                 )}
               </div>
-              <CourseSectionsEditor sections={form.sections ?? []} chapters={form.chapters} onChange={sections => setForm(previous => ({ ...previous, sections }))} disabled={mutation.busy}/>
+              {showTopicEditor && <CourseSectionsEditor sections={form.sections ?? []} chapters={form.chapters} onChange={sections => setForm(previous => ({ ...previous, sections }))} disabled={mutation.busy}/>}
               <CourseTranslationFields value={form.localizations} onChange={localizations => setForm(previous => ({ ...previous, localizations }))} disabled={mutation.busy}/>
               <div ref={classSection} tabIndex={-1}>
                 <SchoolAdmissionFields schoolId={school.id} courseId={initial?.id} value={form}

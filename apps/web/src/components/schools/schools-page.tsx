@@ -206,6 +206,7 @@ export function SchoolsPage({
   );
   const href = (section: string) => schoolWorkspaceHref(selected.id, section, workspaceRole);
   const courses = <SchoolCourses
+    showTopicEditor={workspaceRole === "admin"}
     school={selected}
     initialCourseId={search.get("courseId")}
     refreshRevision={refreshRevision}

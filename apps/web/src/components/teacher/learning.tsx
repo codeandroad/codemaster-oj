@@ -355,8 +355,10 @@ export function LearningEditorForm({
   onDirtyChange,
   onBusyChange,
   onEditPlatformProblem,
+  showTopicEditor = false,
 }: {
   initial: Path;
+  showTopicEditor?: boolean;
   onSaved: () => void;
   onDirtyChange?: (dirty: boolean) => void;
   onBusyChange?: (busy: boolean) => void;
@@ -637,7 +639,12 @@ export function LearningEditorForm({
         title={path.title}
         description={platform ? tr("CodeMaster 平台课程。章节、双语内容与练习在同一编辑器维护。", "CodeMaster course. Maintain chapters, bilingual content and practice in this editor.") : tr("课程草稿可先关联校内题库的草稿题；发布课程前，所有关联题须已发布并通过管理员公开审核。", "A course draft can link draft problems in school banks. Before publishing the course, every linked problem must be published and approved for school-wide access.")}
         action={
-          <div className="flex flex-wrap gap-2">
+          <>
+            {(action.message || action.error) && (
+              <div className="min-w-0 wrap-anywhere [&>p]:mt-0" data-od-id="course-save-feedback">
+                <Feedback action={action} />
+              </div>
+            )}
             {path.published && canPublish && <Button variant="secondary" disabled={action.busy} onClick={() => setWithdraw(true)}>{tr("下架课程", "Withdraw course")}</Button>}
             <Button variant="secondary" onClick={() => setPreview(true)}>
               <Eye size={15} />
@@ -661,10 +668,9 @@ export function LearningEditorForm({
             >
               {path.archived ? tr("已归档", "Archived") : path.published ? courseStatus(path,locale) : path.withdrawnAt ? tr("重新公开", "Republish") : t("发布")}
             </Button>}
-          </div>
+          </>
         }
       />
-      <div className="flow-root min-h-8" data-od-id="course-save-feedback"><Feedback action={action} /></div>
       {!batchPublishOpen && <Feedback action={batchAction} />}
       {path.archived && <p role="status" className="mt-4 rounded-md border border-border bg-surface-subtle px-4 py-3 text-sm text-muted-foreground">{tr("课程已归档，目前只可查看。若需继续修改、发布课程或关联题目，请先在课程列表中恢复。", "This course is archived and read-only. Restore it from the course list before editing or publishing.")}</p>}
       {!path.archived && !path.published && (
@@ -709,7 +715,7 @@ export function LearningEditorForm({
       </div>
       {progressOpen&&<LearningProgressDialog id={path.id} onClose={()=>setProgressOpen(false)}/>}
       {canEditCourse&&!platform&&canUseLegacyPythonPractice(path)&&<PythonPracticePanel id={path.id} bundle={path.practiceBundle??[]} disabled={dirty||action.busy} onRefreshStatus={async()=>{const fresh=await productionApi<Path>(`learning-paths/${path.id}`);setPath(current=>({...current,practiceBundle:fresh.practiceBundle}));}} onUpdated={async()=>{const fresh=await productionApi<Path>(`learning-paths/${path.id}`);setPath(fresh);setChapters(fresh.chapters??[]);}}/>}
-      <div className="mt-5"><CourseSectionsEditor sections={sections} chapters={chapters} onChange={setSections} disabled={!canEditCourse || action.busy}/></div>
+      {showTopicEditor && <div className="mt-5"><CourseSectionsEditor sections={sections} chapters={chapters} onChange={setSections} disabled={!canEditCourse || action.busy}/></div>}
       <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[320px_minmax(0,1fr)]">
         <aside className={`${panel} self-start lg:sticky lg:top-5`}>
           <div className="flex justify-between border-b border-border p-3">

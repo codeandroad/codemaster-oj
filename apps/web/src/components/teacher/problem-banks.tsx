@@ -970,6 +970,11 @@ export function ManageGroups({
     </Modal>
   );
 }
+type PickerProblem = Pick<ProductionProblem,
+  "id" | "title" | "mode" | "published" | "publishedTitle" | "versionId" | "publishedVersionId" |
+  "publishedDifficulty" | "difficulty" | "firstAcPoints" | "bankId" | "bankName" | "tags" |
+  "bankVisibility" | "canEdit" | "schoolVisibleAt" | "rankReviewStatus">;
+
 export function ProblemPicker({
   selected,
   onClose,
@@ -977,26 +982,28 @@ export function ProblemPicker({
   courseMode,
   forAssignment,
   orderedProblemIds,
-  sourcePath,
+  sourcePath, schoolId, schoolProblems,
 }: {
+  schoolId?: string;
+  schoolProblems?: PickerProblem[];
   sourcePath?: string;
   selected: string[];
   onClose: () => void;
-  onAdd: (items: ProductionProblem[]) => void;
+  onAdd: (items: PickerProblem[]) => void;
   courseMode?: "draft" | "published";
   forAssignment?: boolean;
   orderedProblemIds?: readonly string[];
 }) {
   const { locale } = useLocale();
   const tr = (zh: string, en: string) => localText(locale, zh, en);
-  const banks = useData<{ items: Bank[] }>(sourcePath ? null : "problem-banks"),
-    groups = useData<{ items: Group[] }>(sourcePath ? null : "problem-groups"),
-    problems = useData<{ items: ProductionProblem[] }>(sourcePath ?? (forAssignment ? "problems?purpose=assignment" : "problems")),
+  const banks = useData<{ items: Bank[] }>(sourcePath ? null : schoolId ? `schools/${schoolId}/problem-banks` : "problem-banks"),
+    groups = useData<{ items: Group[] }>(sourcePath ? null : schoolId ? `schools/${schoolId}/problem-groups` : "problem-groups"),
+    problems = useData<{ items: ProductionProblem[] }>(schoolId ? null : sourcePath ?? (forAssignment ? "problems?purpose=assignment" : "problems")),
     [bank, setBank] = useState(""),
     [group, setGroup] = useState(""),
     [query, setQuery] = useState(""),
     [picked, setPicked] = useState<string[]>([]);
-  const orderedProblems = courseProblemOrder(problems.data?.items ?? [], orderedProblemIds ?? [], problem => problem.id);
+  const orderedProblems = courseProblemOrder(schoolProblems ?? problems.data?.items ?? [], orderedProblemIds ?? [], problem => problem.id);
   const rows =
     orderedProblems.filter(
       (p) =>

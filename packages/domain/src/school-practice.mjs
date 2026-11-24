@@ -496,6 +496,8 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
     const job=(await db.query("SELECT * FROM school_judge_jobs WHERE school_id=$1 AND id=$2 AND account_id=$3 AND access_context NOT IN ('assignment_preview','acsl')",[schoolId,id,user.id])).rows[0];
     if(!job)fail(404,'NOT_FOUND','Submission not found.');
     record=await projectJob(db,job);
+    if(job.activity_id && job.kind==='submit' && record.resultsVisible) record.reviews=(await db.query(
+     'SELECT note,created_at AS "createdAt" FROM school_assignment_feedback WHERE school_id=$1 AND job_id=$2 ORDER BY created_at,id',[schoolId,job.id])).rows;
    }
    if(method==='PATCH'){
     if(!record.resultsVisible||record.state!=='completed')fail(409,'UNAVAILABLE','成绩公布后可订正');
@@ -523,10 +525,11 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
    const rows=(await db.query(`WITH records AS (
     SELECT j.id::text,j.problem_id,j.payload->'version'->>'title' AS title,j.payload->>'language' AS language,j.state,j.created_at,
      coalesce(j.result->>'status',CASE j.state WHEN 'failed' THEN 'System Error' WHEN 'leased' THEN 'Judging' ELSE 'Waiting' END) status,
-     j.result->>'score' score,coalesce(a.kind,'practice') context,n.updated_at note_at,NULL::text feedback,NULL::text correction,
-     (j.result->>'status' IN ('WA','CE','RE','TLE','MLE','OLE') OR n.note<>'') in_notebook
+     j.result->>'score' score,coalesce(a.kind,'practice') context,greatest(n.updated_at,f.created_at) note_at,f.note AS feedback,NULL::text correction,
+     (j.result->>'status' IN ('WA','CE','RE','TLE','MLE','OLE') OR n.note<>'' OR f.note IS NOT NULL) in_notebook
     FROM school_judge_jobs j LEFT JOIN school_activities a ON (a.school_id,a.id)=(j.school_id,j.activity_id)
     LEFT JOIN school_submission_notes n ON (n.school_id,n.job_id,n.account_id)=(j.school_id,j.id,j.account_id)
+    LEFT JOIN LATERAL (SELECT note,created_at FROM school_assignment_feedback WHERE $4 AND school_id=j.school_id AND job_id=j.id ORDER BY created_at DESC,id DESC LIMIT 1) f ON true
     WHERE ${schoolActivityJobVisibleSql('j')} AND j.school_id=$1 AND j.account_id=$2 AND j.access_context IN ('school','staff_practice') AND j.kind='submit'
     UNION ALL SELECT 'SUB'||s.id,s.problem_id,v.title,s.language,
      CASE s.status WHEN 'Waiting' THEN 'queued' WHEN 'Judging' THEN 'leased' ELSE 'completed' END,s.created_at,

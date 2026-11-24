@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { AppLink } from "@/components/navigation";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -24,10 +25,21 @@ const th = "whitespace-nowrap px-3 py-2.5 font-medium";
 const td = "px-3 py-3";
 const labels: Record<string, [string, string]> = { Draft: ["Draft", "草稿"], Published: ["Published", "已发布"], Archived: ["Archived", "已归档"], Cancelled: ["Cancelled", "已取消"], Upcoming: ["Upcoming", "未开始"], Open: ["Open", "进行中"], Ended: ["Ended", "已结束"] };
 
+const SchoolTeacherAssignments = dynamic(() => import("../teacher/assignments").then(module => module.SchoolTeacherAssignments));
+
 const timingCategories = ["Upcoming", "Available", "Completed"] as const;
 type SchoolTimingCategory = (typeof timingCategories)[number];
 
-export function SchoolActivities({ school, kind }: { school: School; kind: ActivityKind }) {
+export function SchoolActivities({ school, kind, teacherAccountId }: { school: School; kind: ActivityKind; teacherAccountId?: string }) {
+  const search = useSearchParams();
+  if (kind === "assignment" && teacherAccountId && !search.get("problemId") && search.get("activityPreview") !== "1") {
+    const id = search.get("activityEdit") === "new" ? "new" : search.get("activityId");
+    return <SchoolTeacherAssignments key={`${school.id}:${id ?? "list"}`} schoolId={school.id} userId={teacherAccountId} id={id} report={search.get("activityReport") === "1"}/>;
+  }
+  return <SchoolActivityWorkspace school={school} kind={kind} teaching={Boolean(teacherAccountId)}/>;
+}
+
+function SchoolActivityWorkspace({ school, kind, teaching }: { school: School; kind: ActivityKind; teaching: boolean }) {
   const text = useSchoolText(), { locale } = useLocale(), search = useSearchParams(), router = useRouter();
   const activityId = search.get("activityId"), problemId = search.get("problemId");
   const creating = search.get("activityEdit") === "new", editing = search.get("activityEdit") === "1", report = search.get("activityReport") === "1";
@@ -35,7 +47,7 @@ export function SchoolActivities({ school, kind }: { school: School; kind: Activ
   const page = Number.isInteger(rawPage) && rawPage >= 1 && rawPage <= 100000 ? rawPage : 1;
   const timing = timingCategories.find(item => item.toLowerCase() === search.get("activityTiming")) ?? "Available";
   const base = `schools/${school.id}/activities`;
-  const teaching = school.roles.some(r => r === "teacher" || r === "school_admin");
+
   const list = useData<{ items: SchoolActivity[]; page: number; hasMore: boolean; canCreate: boolean }>(teaching && !activityId && !creating ? `${base}?kind=${kind}&page=${page}&archived=${archived}` : "");
   const preview = search.get("activityPreview") === "1";
   const activityPath = activityId ? `${base}/${activityId}${preview ? "/preview" : ""}` : "";
@@ -46,6 +58,7 @@ export function SchoolActivities({ school, kind }: { school: School; kind: Activ
     for (const [key, value] of Object.entries(values)) if (value == null) params.delete(key); else params.set(key, value);
     router.push(`/schools?${params}`, { scroll: false });
   }
+  const exitPreview = () => go({ activityPreview: null, problemId: null, from: null, activityReport: search.get("from") === "progress" ? "1" : null });
   const back = () => go({ activityId: null, problemId: null, activityEdit: null, activityReport: null, activityPreview: null });
   if (teaching && (creating || editing && view?.canManage)) return <SchoolActivityEditor key={`${school.id}:${kind}:${activityId ?? "new"}`} schoolId={school.id} kind={kind} activity={creating ? null : view} onCancel={creating ? back : () => go({ activityEdit: null })} onSaved={activity => { go({ activityId: activity.id, activityEdit: null, problemId: null }); detail.reload(); list.reload(); }}/>;
   if (activityId) return <>
@@ -54,7 +67,7 @@ export function SchoolActivities({ school, kind }: { school: School; kind: Activ
         <p className="text-sm font-semibold">{text("Student view · Assignment preview", "学生视角 · 作业试做")}</p>
         <p className="mt-1 text-sm text-muted-foreground">{text("Your submissions and scores are private. You can try the saved assignment outside the student submission window.", "提交和得分仅本人可见，可在学生提交时段之外试做已保存的作业。")}</p>
       </div>
-      <Button size="sm" variant="secondary" onClick={() => go({ activityPreview: null, problemId: null })}>{text("Exit preview", "退出试做")}</Button>
+      <Button size="sm" variant="secondary" onClick={exitPreview}>{text("Exit preview", "退出试做")}</Button>
     </div>}
     <State data={{ ...detail, data: view }}>{view && (problemId ?
       <PracticeProblem key={`${activityPath}:${problemId}`} path={`${activityPath}/problems/${problemId}`}
@@ -63,7 +76,7 @@ export function SchoolActivities({ school, kind }: { school: School; kind: Activ
         backLabel={preview ? text("Back to preview", "返回试做") : text(kind === "timed" ? "Back to timed practice" : "Back to assignment", kind === "timed" ? "返回限时训练" : "返回作业")}
         navigation={{ currentId: problemId, items: view.problems, onSelect: id => go({ problemId: id }) }}/> :
       report && view.canManage ? <SchoolActivityReportView base={base} activityId={activityId} onBack={() => go({ activityReport: null })}/> :
-      <SchoolActivityDetails activity={view} base={base} onBack={preview ? () => go({ activityPreview: null }) : back}
+      <SchoolActivityDetails activity={view} base={base} onBack={preview ? exitPreview : back}
         onEdit={() => go({ activityEdit: "1" })} onReport={() => go({ activityReport: "1" })}
         onPreview={() => go({ activityPreview: "1", activityReport: null, activityEdit: null, problemId: null })}
         onProblem={id => go({ problemId: id })} reload={detail.reload}/>)}</State>

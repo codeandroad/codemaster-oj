@@ -22,6 +22,7 @@ interface ScholarshipNotification extends NotificationBase {
 interface FeedbackNotification extends NotificationBase {
   kind: "teacher_feedback";
   reviewId: string;
+  submissionId?: string;
   problemTitle: string;
 }
 interface CourseApplicationNotification extends NotificationBase {

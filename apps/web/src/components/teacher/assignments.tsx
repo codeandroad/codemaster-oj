@@ -34,9 +34,13 @@ import {
   type Submission,
   type SubmissionLanguage,
 } from "@/lib/production-api";
+import { assignmentHref, teacherAssignment, teacherAssignmentReport, type AssignmentReport, type ManagedActivity, type SchoolAssignmentOptions } from "./school-assignment-data";
+import { schoolWorkspaceHref } from "../schools/school-workspace-location";
+import { ActivityAssistanceFields, defaultActivityAssistance, type ActivityRule } from "../schools/school-scholarship";
 import { TeacherAssignment } from "./dashboard-classes";
 import { ProblemPicker } from "./problem-banks";
 import { AssignmentParticipantForm, CancelAssignment } from "./assignment-changes";
+import { SchoolAssignmentSubmissions } from "./school-assignment-submissions";
 import { AssignmentPreviewLink } from "./assignment-preview";
 import {
   area,
@@ -79,13 +83,30 @@ const assignmentTabLabel: Record<string, [string, string]> = {
   Preview: ["学生预览", "Preview"],
 };
 
-export function TeacherAssignments() {
+export function SchoolTeacherAssignments({schoolId,userId,id,report}: {schoolId:string;userId:string;id:string|null;report:boolean}) {
+  if (!id) return <TeacherAssignments schoolId={schoolId}/>;
+  if (report && id !== "new") return <TeacherAssignmentProgress id={id} schoolId={schoolId}/>;
+  return <TeacherAssignmentEditor id={id} schoolId={schoolId} userId={userId}/>;
+}
+
+export function TeacherAssignments({schoolId}: {schoolId?: string} = {}) {
   const { locale } = useLocale();
-  const [showArchived,setShowArchived]=useState(false);
+  const search=useSearchParams(), router=useRouter();
+  const [legacyArchived,setLegacyArchived]=useState(false);
+  const showArchived=schoolId ? search.get("activityArchived")==="1" : legacyArchived;
+  const requestedPage=Number(search.get("activityPage") ?? 1);
+  const page=schoolId && Number.isInteger(requestedPage) && requestedPage>=1 && requestedPage<=100000 ? requestedPage : 1;
+  const showPage=(archived:boolean,next=1)=>{
+    if (!schoolId) { setLegacyArchived(archived); return; }
+    router.push(schoolWorkspaceHref(schoolId,"assignments","teacher")+(archived?"&activityArchived=1":"")+(next>1?`&activityPage=${next}`:""),{scroll:false});
+  };
   const [confirm,setConfirm]=useState<TeacherAssignment|null>(null);
   const action=useAction();
-  const assignments = useData<{ items: TeacherAssignment[] }>(showArchived?"assignments?archived=true":"assignments"),
-    classes = useData<{ items: SchoolClass[] }>("classes");
+  const schoolList = useData<{ items: ManagedActivity[]; hasMore:boolean }>(schoolId ? `schools/${schoolId}/activities?kind=assignment&view=assignment&archived=${showArchived}&page=${page}` : null);
+  const legacy = useData<{ items: TeacherAssignment[] }>(schoolId ? null : showArchived?"assignments?archived=true":"assignments"),
+    classes = useData<{ items: SchoolClass[] }>(schoolId ? null : "classes");
+  const assignments = schoolId ? {...schoolList, data:schoolList.data && {items:schoolList.data.items.map(teacherAssignment)}} : legacy;
+  const activityPath = (id: string) => schoolId ? `schools/${schoolId}/activities/${id}` : `assignments/${id}`;
   return (
     <>
       <PageHeader
@@ -93,13 +114,13 @@ export function TeacherAssignments() {
         title={ui(locale, "作业管理", "Assignment Management")}
         description={ui(locale, "跨班级管理作业，维护适用学生名单，并查看学习进度。", "Manage assignments across classes, select students, and view progress.")}
         action={
-          <Link href="/teacher/assignments/new/edit" className={buttonVariants()}>
+          <Link href={assignmentHref(schoolId,"new","edit")} className={buttonVariants()}>
             <Plus size={15} />
             {ui(locale, "新建作业", "New assignment")}
           </Link>
         }
       />
-      <div className="mt-5 flex gap-2"><Button variant={showArchived?"secondary":"default"} aria-pressed={!showArchived} onClick={()=>setShowArchived(false)}>{ui(locale,"使用中","Active")}</Button><Button variant={showArchived?"default":"secondary"} aria-pressed={showArchived} onClick={()=>setShowArchived(true)}>{ui(locale,"已归档","Archived")}</Button></div>
+      <div className="mt-5 flex gap-2"><Button variant={showArchived?"secondary":"default"} aria-pressed={!showArchived} onClick={()=>showPage(false)}>{ui(locale,"使用中","Active")}</Button><Button variant={showArchived?"default":"secondary"} aria-pressed={showArchived} onClick={()=>showPage(true)}>{ui(locale,"已归档","Archived")}</Button></div>
       <State resource={assignments} />
       <Feedback action={action}/>
       <section className={`${panel} mt-4`}>
@@ -123,7 +144,7 @@ export function TeacherAssignments() {
             return <tr key={item.id}>
               <td>
                 <Link
-                  href={`/teacher/assignments/${item.id}/edit`}
+                  href={assignmentHref(schoolId,item.id,"edit")}
                   className={`${link} font-semibold`}
                 >
                   {item.title}
@@ -148,7 +169,7 @@ export function TeacherAssignments() {
               <td>
                 <StatusPill
                   status={
-                    item.cancelledAt ? ui(locale, "已取消", "Cancelled") : item.state === "Draft"
+                    item.phase && schoolId ? ({Open:ui(locale,"进行中","Open"),Ended:ui(locale,"已截止","Ended"),Upcoming:ui(locale,"未开始","Upcoming"),Draft:ui(locale,"草稿","Draft"),Archived:ui(locale,"已归档","Archived"),Cancelled:ui(locale,"已取消","Cancelled")}[item.phase] ?? item.phase) : item.cancelledAt ? ui(locale, "已取消", "Cancelled") : item.state === "Draft"
                       ? ui(locale, "草稿", "Draft")
                       : allCompleted
                         ? ui(locale, "全部完成", "All completed")
@@ -162,19 +183,19 @@ export function TeacherAssignments() {
               <td>
                 <div className="flex flex-wrap items-center gap-2">
                   <Link
-                    href={`/teacher/assignments/${item.id}/edit`}
+                    href={assignmentHref(schoolId,item.id,"edit")}
                     className={rowActionClassName}
                   >
                     {item.state === "Draft" ? ui(locale, "编辑", "Edit") : ui(locale, "查看 / 编辑", "View / edit")}
                   </Link>
                   <Link
-                    href={`/teacher/assignments/${item.id}/progress`}
+                    href={assignmentHref(schoolId,item.id,"progress")}
                     className={rowActionClassName}
                   >
                     {ui(locale, "进度", "Progress")} →
                   </Link>
                   {!item.cancelledAt && <RowActionButton disabled={action.busy} onClick={()=>setConfirm(item)}>{showArchived?ui(locale,"恢复","Restore"):ui(locale,"归档","Archive")}</RowActionButton>}
-                  {item.canManage && item.published && !item.archived && !allCompleted && <CancelAssignment path={`assignments/${item.id}`} title={item.title} onSaved={assignments.reload}/>}
+                  {item.canManage && item.published && !item.archived && !allCompleted && <CancelAssignment path={activityPath(item.id)} title={item.title} onSaved={assignments.reload}/>}
                 </div>
               </td>
             </tr>;
@@ -184,9 +205,14 @@ export function TeacherAssignments() {
           )}
         </Table>
       </section>
+      {schoolId && (page > 1 || schoolList.data?.hasMore) && <nav className="mt-4 flex items-center justify-end gap-2" aria-label={ui(locale,"作业分页","Assignment pages")}>
+        <Button variant="secondary" disabled={page === 1 || schoolList.loading} onClick={() => showPage(showArchived,page - 1)}>{ui(locale,"上一页","Previous")}</Button>
+        <span>{page}</span>
+        <Button variant="secondary" disabled={!schoolList.data?.hasMore || schoolList.loading} onClick={() => showPage(showArchived,page + 1)}>{ui(locale,"下一页","Next")}</Button>
+      </nav>}
       {confirm&&<Modal title={showArchived?ui(locale,"恢复作业","Restore assignment"):ui(locale,"归档作业","Archive assignment")} onClose={()=>setConfirm(null)}>
-        <p className="text-sm text-muted-foreground">{showArchived?ui(locale,`恢复「${confirm.title}」后，它会回到使用中列表。`,`Restore “${confirm.title}” to the active list.`):ui(locale,`归档「${confirm.title}」后，学生无法继续正式提交；已有成绩和提交记录保留。进行中的作业须等截止且判题完成。`,`Archive “${confirm.title}” after its deadline and pending judgments. Existing grades and submissions remain available.`)}</p>
-        <div className="mt-5 flex justify-end gap-2"><Button variant="secondary" onClick={()=>setConfirm(null)}>{ui(locale,"取消","Cancel")}</Button><Button disabled={action.busy} onClick={()=>void action.run(async()=>{await productionApi(`assignments/${confirm.id}/${showArchived?"restore":"archive"}`,{method:"POST",body:{}});setConfirm(null);assignments.reload();return showArchived?ui(locale,"作业已恢复。","Assignment restored."):ui(locale,"作业已归档。","Assignment archived.");})}>{showArchived?ui(locale,"恢复","Restore"):ui(locale,"归档","Archive")}</Button></div>
+        <p className="text-sm text-muted-foreground">{showArchived?ui(locale,`恢复「${confirm.title}」后，它会回到使用中列表。`,`Restore “${confirm.title}” to the active list.`):ui(locale,`归档「${confirm.title}」后，学生无法继续正式提交；已有成绩和提交记录保留。进行中的作业须等截止且判题完成。`,`Archive “${confirm.title}”? Existing grades and submissions remain available.`)}</p>
+        <div className="mt-5 flex justify-end gap-2"><Button variant="secondary" onClick={()=>setConfirm(null)}>{ui(locale,"取消","Cancel")}</Button><Button disabled={action.busy} onClick={()=>void action.run(async()=>{await productionApi(`${activityPath(confirm.id)}/${showArchived?"restore":"archive"}`,{method:"POST",body:{}});setConfirm(null);assignments.reload();return showArchived?ui(locale,"作业已恢复。","Assignment restored."):ui(locale,"作业已归档。","Assignment archived.");})}>{showArchived?ui(locale,"恢复","Restore"):ui(locale,"归档","Archive")}</Button></div>
       </Modal>}
     </>
   );
@@ -211,16 +237,16 @@ const assignmentTabs = [
   "Rules",
   "Preview",
 ];
-export function TeacherAssignmentEditor({ id,userId }: { id: string;userId:string }) {
-  const resource = useData<TeacherAssignment>(
-    id === "new" ? null : `assignments/${id}`,
-  );
+export function TeacherAssignmentEditor({ id,userId,schoolId }: { id: string;userId:string;schoolId?:string }) {
+  const original = useData<TeacherAssignment>(schoolId || id==="new" ? null : `assignments/${id}`);
+  const current = useData<ManagedActivity>(schoolId && id!=="new" ? `schools/${schoolId}/activities/${id}?view=assignment` : null);
+  const resource = schoolId ? {...current,data:current.data && teacherAssignment(current.data)} : original;
   return (
     <>
       <State resource={resource} />
       {(id === "new" || (!resource.loading && resource.data?.id === id)) && (
         <AssignmentEditorForm
-          userId={userId}
+          userId={userId} schoolId={schoolId}
           key={`${id}:${resource.data?.editRevision ?? 0}`}
           initial={id === "new" ? null : resource.data}
           onReload={resource.reload}
@@ -230,22 +256,27 @@ export function TeacherAssignmentEditor({ id,userId }: { id: string;userId:strin
   );
 }
 function AssignmentEditorForm({
-  initial,userId,onReload,
+  initial,userId,onReload,schoolId,
 }: {
-  userId:string;
+  userId:string; schoolId?:string;
   initial: TeacherAssignment | null;
   onReload: () => void;
 }) {
   const { locale } = useLocale();
+  const schoolBase = schoolId ? `schools/${schoolId}/activities` : "";
+  const options = useData<SchoolAssignmentOptions>(schoolId ? schoolBase+"/options?view=assignment" : null);
+  const requestId = useRef(crypto.randomUUID());
+  const [startsAt,setStartsAt] = useState(localInput(initial?.startsAt ?? ""));
   const [rewardEdit, setRewardEdit] = useState<RewardRule | null>(null);
+  const [assistanceEdit, setAssistanceEdit] = useState<ActivityRule["assistance"] | null>(null);
   const [rewardConflict, setRewardConflict] = useState(false);
   const rewardInput = useRef<HTMLInputElement>(null);
   const focusReward = useRef(false);
   const router = useRouter(),
     searchParams = useSearchParams(),
-    classes = useData<{ items: SchoolClass[] }>("classes"),
-    courses = useData<{ items: { id: string; title: string; published: boolean; requiredLanguage?: SubmissionLanguage | null }[] }>("learning-paths?purpose=assignment"),
-    audience = useData<AudienceDirectory>("teaching/audience"),
+    legacyClasses = useData<{ items: SchoolClass[] }>(schoolId ? null : "classes"),
+    legacyCourses = useData<{ items: { id: string; title: string; published: boolean; requiredLanguage?: SubmissionLanguage | null }[] }>(schoolId ? null : "learning-paths?purpose=assignment"),
+    legacyAudience = useData<AudienceDirectory>(schoolId ? null : "teaching/audience"),
     [tab, setTab] = useState(searchParams.get("tab") === "problems" ? "Problems" : assignmentTabs[0]!),
     [saved, setSaved] = useState(initial),
     [title, setTitle] = useState(initial?.title ?? ""),
@@ -275,9 +306,22 @@ function AssignmentEditorForm({
     [confirmUpdate, setConfirmUpdate] = useState(false),
     [stale, setStale] = useState(false),
     action = useAction();
-  const rewardResource = useData<RuleResponse>(`scholarship/reward-rules?activityType=assignment${saved ? `&activityId=${encodeURIComponent(saved.id)}` : ""}`);
-  const courseOutline = useData<{ id: string; requiredLanguage?: SubmissionLanguage | null; chapters: { problems: { problemId: string }[] }[] }>(coursePathId ? `learning-paths/${coursePathId}?purpose=assignment` : null);
-  const needsCourseOrder = problemOrder === "course" && Boolean(coursePathId);
+  const classes = schoolId ? {...options,data:options.data && {items:options.data.classes}} : legacyClasses;
+  const courses = schoolId ? {...options,data:options.data && {items:options.data.courses.map(c=>({...c,published:true}))}} : legacyCourses;
+  const audience = schoolId ? {...options,data:options.data && {items:options.data.students,classes:options.data.classes.map(c=>({...c,canAssociate:true}))}} : legacyAudience;
+  const schoolRule = useData<ActivityRule>(schoolId && saved ? `schools/${schoolId}/scholarship/activity-rule?activityId=${saved.id}` : null);
+  const legacyRule = useData<RuleResponse>(schoolId ? null : `scholarship/reward-rules?activityType=assignment${saved ? `&activityId=${encodeURIComponent(saved.id)}` : ""}`);
+  const rewardResource = schoolId ? { ...schoolRule,loading:schoolRule.loading||options.loading,error:schoolRule.error||options.error,
+    data:options.data && (!saved || schoolRule.data) ? {cap:options.data.activityRewardCap,canManage:true,frozen:!!saved?.published,
+      rule:{amount:schoolRule.data?.amount??0,minimumAc:schoolRule.data?.minimumAc??1,minimumScore:schoolRule.data?.minimumScore??0,
+        requireAll:schoolRule.data?.requireAll??true,taskKind:(schoolRule.data?.taskKind??"challenge") as RewardRule["taskKind"],
+        allowSolutionAssisted:schoolRule.data?.allowSolutionAssisted??false,version:schoolRule.data?.revision??0}} : null,
+    reload:()=>{schoolRule.reload();options.reload();},
+  } : legacyRule;
+  const legacyOutline = useData<{ id: string; requiredLanguage?: SubmissionLanguage | null; chapters: { problems: { problemId: string }[] }[] }>(!schoolId && coursePathId ? `learning-paths/${coursePathId}?purpose=assignment` : null);
+  const linked = options.data?.courses.find(c=>c.id===coursePathId);
+  const courseOutline = schoolId ? {...options,data:linked && {...linked, chapters:[{problems:linked.problemIds.map(problemId=>({problemId}))}]}} : legacyOutline;
+  const needsCourseOrder = problemOrder === "course" && Boolean(coursePathId) && (!schoolId || !!linked || options.loading);
   const matchingCourseOutline = courseOutline.data?.id === coursePathId;
   const courseOrderReady = !needsCourseOrder ||
     (matchingCourseOutline && !courseOutline.loading && !courseOutline.error);
@@ -335,6 +379,9 @@ function AssignmentEditorForm({
   const rewardCap = rewardResource.data?.cap;
   const rewardChanged = (value: RewardRule | null) =>
     !published && value !== null && JSON.stringify(value) !== JSON.stringify(baseReward);
+  const originalAssistance = schoolRule.data?.assistance ?? defaultActivityAssistance;
+  const assistanceChanged = (value: ActivityRule["assistance"] | null) => !!schoolId && !published && value!==null && JSON.stringify(value)!==JSON.stringify(originalAssistance);
+  const changedAssistance = assistanceChanged(assistanceEdit);
   const changedReward = rewardEdit !== null && rewardChanged(rewardEdit);
   const rewardAmountInvalid = changedReward && rewardCap !== undefined &&
     (!Number.isInteger(rewardEdit.amount) || rewardEdit.amount < 0 || rewardEdit.amount > rewardCap);
@@ -355,6 +402,8 @@ function AssignmentEditorForm({
     }
   }, [tab, rewardReady]);
   const problemEditorHref = (problem: SelectedProblem) => {
+    if (schoolId) return schoolWorkspaceHref(schoolId,"problems","teacher")+`&problemId=${encodeURIComponent(problem.problemId)}&problemEdit=1`;
+
     const query = new URLSearchParams({
       returnTo: saved
         ? `/teacher/assignments/${saved.id}/edit`
@@ -362,7 +411,7 @@ function AssignmentEditorForm({
     });
     return `/teacher/problems/${problem.problemId}/edit?${query.toString()}`;
   };
-  const snapshot = { title, description, course, coursePathId, problemOrder, due, problems: selected, participants, rewardEdit };
+  const snapshot = { title, startsAt, description, course, coursePathId, problemOrder, due, problems: selected, participants, rewardEdit, assistanceEdit };
   const savedProblems = savedProblemOrder(saved?.problems ?? []);
   const savedParticipants = activeParticipants(saved?.participantDetails, saved?.participants ?? []);
   const problemEdits = (problems: typeof savedProblems) => JSON.stringify(
@@ -371,6 +420,7 @@ function AssignmentEditorForm({
     })),
   );
   const changesFor = (value: typeof snapshot) => ({
+    changedStart: !!schoolId && value.startsAt!==localInput(saved?.startsAt??""),
     changedTitle: value.title.trim() !== (saved?.title ?? "").trim(),
     changedDescription: value.description.trim() !== (saved?.description ?? "").trim(),
     changedCourse: value.course.trim() !== (saved?.course ?? "Python").trim(),
@@ -380,6 +430,7 @@ function AssignmentEditorForm({
     changedProblems: problemEdits(value.problems) !== problemEdits(savedProblems),
     changedParticipants: JSON.stringify([...value.participants].sort()) !== JSON.stringify([...savedParticipants].sort()),
     changedReward: rewardChanged(value.rewardEdit),
+    changedAssistance:assistanceChanged(value.assistanceEdit),
   });
   const changes = changesFor(snapshot);
   const {
@@ -387,14 +438,15 @@ function AssignmentEditorForm({
     changedDue, changedProblems, changedParticipants,
   } = changes;
   const draft = useActivityDraft({
-    storageKey: `campus-judge:activity-draft:v1:${userId}:assignment:${initial?.id ?? "new"}`,
-    editable: true,
+    storageKey: `campus-judge:activity-draft:v1:${userId}:${schoolId ? schoolId+":" : ""}assignment:${initial?.id ?? "new"}`,
+    editable: !saved?.archived,
     published,
     snapshot,
     hasChanges: value => Object.values(changesFor(value)).some(Boolean),
-    recoveryDefaults: { coursePathId: "", problemOrder: "course", rewardEdit: null },
+    recoveryDefaults: { startsAt:localInput(saved?.startsAt??""),coursePathId: "", problemOrder: "course", rewardEdit: null, assistanceEdit:null },
     onRestore: (value) => {
       setTitle(value.title);
+      setStartsAt(value.startsAt??"");
       setDescription(value.description);
       setCourse(value.course);
       setCoursePathId(value.coursePathId ?? "");
@@ -417,7 +469,7 @@ function AssignmentEditorForm({
       setSelected(restored);
       // Browser drafts saved before this column have a version ID but no difficulty.
       for (const { problemId, versionId, difficulty } of restored) {
-        if (difficulty !== undefined || typeof versionId !== "string" || !versionId) continue;
+        if (schoolId || difficulty !== undefined || typeof versionId !== "string" || !versionId) continue;
         void getProblemVersion(problemId, versionId).then(
           (version) => setSelected((current) => current.map((item) =>
             item.problemId === problemId && item.versionId === versionId && item.difficulty === undefined
@@ -428,16 +480,17 @@ function AssignmentEditorForm({
         );
       }
       setParticipants(value.participants);
-      if (!published) setRewardEdit(value.rewardEdit);
+      if (!published) { setRewardEdit(value.rewardEdit); setAssistanceEdit(value.assistanceEdit); }
     },
   });
   const changedClass = JSON.stringify([...classIds].sort()) !== JSON.stringify([...(saved?.classIds ?? (saved?.classId ? [saved.classId] : []))].sort());
   const hasChanges = changedClass || Object.values(changes).some(Boolean);
   useDirty(hasChanges);
   const save = async (assign = false) => {
+    if (saved?.archived) throw new Error(ui(locale,"作业已归档。","Assignment archived."));
     if (published && !hasChanges)
       throw new Error("没有需要保存的修改。");
-    validateActivity({title,classId,problems:selected,participants,publish:assign});
+    validateActivity({title,classId,problems:selected,participants,publish:assign,...(schoolId && {problemLimit:100,studentLimit:2000})});
     if ((assign || changedReward) && (!rewardReady || !baseReward || rewardConflict))
       throw new Error(ui(locale, "请先重新加载完成奖学金规则。", "Reload the completion scholarship rule before continuing."));
     if (rewardAmountInvalid) throw new Error(rewardAmountError);
@@ -457,15 +510,15 @@ function AssignmentEditorForm({
       throw new Error("恢复已豁免学生请在作业进度页操作。");
     if (published && hasSubmissions && changedProblems)
       throw new Error("已有正式提交，题目、分值、顺序和单题奖学金不能修改。可修改说明、截止时间或适用学生。");
-    const dueAt=activityDate(due,'截止时间');
-    if (assign && Date.parse(dueAt) <= Date.now())
+    const dueAt=schoolId && !due ? null : activityDate(due,'截止时间');
+    if (assign && Date.parse(dueAt ?? "") <= Date.now())
       throw new Error(ui(locale, "发布前请设置晚于当前时间的截止时间。", "Choose a future deadline before assigning."));
-    if (published && changedParticipants && Date.parse(dueAt) <= Date.now())
+    if (published && changedParticipants && Date.parse(dueAt ?? "") <= Date.now())
       throw new Error("作业已截止。调整学生名单前，请先将截止时间延至未来。");
     if (published && changedDue) {
-      if (Date.parse(dueAt) <= Date.parse(saved!.dueAt))
+      if (Date.parse(dueAt ?? "") <= Date.parse(saved!.dueAt))
         throw new Error("已发布作业只能延长截止时间，不能提前截止。");
-      if (Date.parse(dueAt) <= Date.now())
+      if (Date.parse(dueAt ?? "") <= Date.now())
         throw new Error("新的截止时间须晚于当前时间。");
     }
     if (published && saved?.editRevision === undefined)
@@ -511,6 +564,33 @@ function AssignmentEditorForm({
     const endpoint = saved ? `assignments/${saved.id}${assign ? "/publish" : ""}` : "assignments";
     let result: TeacherAssignment & { completionReward?: RuleResponse };
     try {
+      if (schoolId) {
+        const problems=selected.map(p=>({problemId:p.problemId,versionId:p.versionId,points:p.points,rewardPoints:p.rewardPoints}));
+        const metadata={ subjectLabel:course,courseId:coursePathId || null,problemOrder };
+        const payload=published ? {expectedRevision:saved?.editRevision,title,description,...metadata,
+          ...(changedDue && {endsAt:dueAt}),...(changedProblems && {problems}),...(changedParticipants && {identityIds:participants,classIds})}
+          : {kind:"assignment",title,description,...metadata,problems,identityIds:participants,classIds,audienceMode:"selected",
+            startsAt:startsAt ? activityDate(startsAt,"开放时间") : null,endsAt:dueAt,requestId:requestId.current,expectedRevision:saved?.editRevision,
+            ...((changedReward || changedAssistance) && completionReward && {scholarshipRule:{...completionReward,expectedRevision:completionReward.version,...(changedAssistance && {assistance:assistanceEdit})}})};
+        const path=saved ? `${schoolBase}/${saved.id}${published?"/manage":""}` : schoolBase;
+        let value=await productionApi<ManagedActivity>(path,{method:saved?"PATCH":"POST",body:payload});
+        result=teacherAssignment(value);
+        setSaved(result);
+        draft.clear();
+        if (assign) {
+          try {
+            value=await productionApi<ManagedActivity>(`${schoolBase}/${value.id}/publish`,{method:"POST",body:{
+              expectedRevision:value.revision,expectedRuleRevision:(baseReward?.version??0)+((changedReward || changedAssistance)?1:0)}});
+          } catch (error) {
+            setRewardEdit(null); setAssistanceEdit(null); schoolRule.reload(); setPublish(false);
+            if (!initial) router.replace(assignmentHref(schoolId,value.id,"edit"));
+            throw error;
+          }
+          result=teacherAssignment(value);
+        }
+        schoolRule.reload();
+        if (initial && !assign) onReload();
+      } else {
       result = await productionApi<typeof result>(endpoint, {
         method: saved && !assign ? "PATCH" : "POST",
         body,
@@ -520,7 +600,7 @@ function AssignmentEditorForm({
         draft.clear();
         setSaved(result);
         setRewardEdit(null);
-        if (result.completionReward) rewardResource.setData(result.completionReward);
+        if (result.completionReward) legacyRule.setData(result.completionReward);
         result = await productionApi<typeof result>(`assignments/${result.id}/publish`, {
           method: "POST",
           body: {
@@ -529,13 +609,14 @@ function AssignmentEditorForm({
           },
         });
       }
+      }
     } catch (error) {
       if (error instanceof ApiError) {
-        if (error.code === "ASSIGNMENT_REVISION_CONFLICT" || error.code === "PUBLISHED_ASSIGNMENT") {
+        if (error.code === "REVISION_CONFLICT" || error.code === "ASSIGNMENT_REVISION_CONFLICT" || error.code === "PUBLISHED_ASSIGNMENT") {
           setStale(true);
           setPublish(false);
         }
-        if (error.code === "LUQ_RULE_CONFLICT" || error.code === "LUQ_RULE_FROZEN") {
+        if (error.code === "RULE_FROZEN" || error.code === "LUQ_RULE_CONFLICT" || error.code === "LUQ_RULE_FROZEN") {
           setRewardConflict(true);
           setPublish(false);
           showCompletionReward();
@@ -545,8 +626,9 @@ function AssignmentEditorForm({
     }
     draft.clear();
     setSaved(result);
-    if (result.completionReward) rewardResource.setData(result.completionReward);
+    if (result.completionReward) legacyRule.setData(result.completionReward);
     setRewardEdit(null);
+    setAssistanceEdit(null);
     setProblemOrder(result.problemOrder ?? "course");
     setSelected(savedProblemOrder(result.problems).map((problem) => ({
       ...problem,
@@ -556,7 +638,7 @@ function AssignmentEditorForm({
       difficulty: problem.difficulty ?? null,
       mode: selected.find((item) => item.problemId === problem.problemId)?.mode,
     })));
-    if (!initial && !assign) router.replace(`/teacher/assignments/${result.id}/edit`);
+    if (!initial && !assign) router.replace(assignmentHref(schoolId,result.id,"edit"));
     return result;
   };
   const rewardSummary = (
@@ -587,10 +669,11 @@ function AssignmentEditorForm({
         description={ui(locale, "基本信息、题目与分值、指定学生名单、规则与学生预览。", "Basic information, problems and scores, selected students, rules, and student preview.")}
         action={
           <div className="flex flex-wrap gap-2">
-            {saved?.canManage && !saved.archived && saved.problems.length > 0 && <AssignmentPreviewLink id={saved.id} from="edit"/>}
+            {schoolId && <Link className={buttonVariants({variant:"secondary"})} href={schoolWorkspaceHref(schoolId,"assignments","teacher")}>{ui(locale,"返回作业列表","Back to assignments")}</Link>}
+            {saved?.canManage && !saved.archived && saved.problems.length > 0 && <AssignmentPreviewLink id={saved.id} from="edit" schoolId={schoolId}/>}
             <Button
               variant="secondary"
-              disabled={action.busy || (published ? !hasChanges : stale)}
+              disabled={saved?.archived || action.busy || (schoolId && (!options.data || !rewardReady || !courseOrderReady)) || (published ? !hasChanges : stale)}
               onClick={() => {
                 if (published) {
                   setConfirmUpdate(true);
@@ -606,14 +689,14 @@ function AssignmentEditorForm({
             </Button>
             {published ? (
               <Link
-                href={`/teacher/assignments/${saved?.id}/progress`}
+                href={assignmentHref(schoolId,saved!.id,"progress")}
                 className={buttonVariants({ variant: "secondary" })}
               >
                 {ui(locale, "查看进度", "View progress")}
               </Link>
             ) : (
               <Button
-                disabled={action.busy || stale}
+                disabled={action.busy || stale || !courseOrderReady || !rewardReady}
                 onClick={() => setPublish(true)}
               >
                 <Send size={15} />
@@ -629,32 +712,33 @@ function AssignmentEditorForm({
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
           <p>{ui(locale, "作业已更新。请重新加载后核对。", "The assignment changed. Reload it to review the current version.")}</p>
           <Button type="button" variant="secondary" size="sm" onClick={() => {
-            if (!initial && saved) router.replace(`/teacher/assignments/${saved.id}/edit`);
+            if (!initial && saved) router.replace(assignmentHref(schoolId,saved.id,"edit"));
             else onReload();
           }}>{ui(locale, "重新加载作业", "Reload assignment")}</Button>
         </div>
       )}
-      {published && (
+      {saved?.archived && <p className="mt-3 text-sm">{ui(locale,"这份作业已归档，可查看原有设置和成绩。","This archived assignment is read-only.")}</p>}
+      {published && !saved?.archived && (
         <p className="mt-3 border border-info-soft bg-info-soft p-3 text-sm">
           {ui(locale, "作业已布置。可以修改标题、说明、截止时间和指定学生；截止时间只能延后。", "This work is assigned. You can update the title, description, selected students, and extend the deadline.")}
           {hasSubmissions
-            ? ui(locale, "已有正式提交，题目、分值、顺序和单题奖学金已固定。", "Formal submissions lock the problems, marks, order, and per-problem scholarships.")
-            : ui(locale, "尚无正式提交，可以调整题目、分值、顺序和单题奖学金。", "Before the first formal submission, you can edit the problems, marks, order, and per-problem scholarships.")}
+            ? ui(locale, "已有判题记录，题目、分值、顺序和单题奖学金已固定。", "Recorded runs lock the problems, marks, order, and per-problem scholarships.")
+            : ui(locale, "尚无判题记录，可以调整题目、分值、顺序和单题奖学金。", "Before the first recorded run, you can edit the problems, marks, order, and per-problem scholarships.")}
           {ui(locale, "题目内容与题解跟随题库更新，审核发布后自动同步；历史提交和成绩保留。", "Problem content and solutions follow the problem bank after publication and review. Historical submissions and grades are retained.")}
           {hasActivity && ui(locale, "有记录的学生不能从名单中移除。", "Students with activity records cannot be removed.")}
           <Link
             className={`${link} ml-2`}
-            href={`/teacher/assignments/${saved?.id}/progress`}
+            href={assignmentHref(schoolId,saved!.id,"progress")}
           >
             管理单人延期与豁免
           </Link>
         </p>
       )}
       <section className={`${panel} mt-5 overflow-hidden`}>
-        <div className="flex gap-1 overflow-x-auto border-b border-border bg-surface-subtle px-3 pt-3">
+        <div role="tablist" aria-label={ui(locale,"作业编辑","Assignment editor")} className="flex gap-1 overflow-x-auto border-b border-border bg-surface-subtle px-3 pt-3">
           {assignmentTabs.map((item) => (
             <button
-              key={item}
+              key={item} type="button" role="tab" aria-selected={tab===item}
               onClick={() => setTab(item)}
               className={`h-10 shrink-0 rounded-t-md border-x border-t px-4 text-sm font-semibold ${tab === item ? "border-border bg-surface text-primary" : "border-transparent text-muted-foreground hover:bg-muted"}`}
             >
@@ -662,7 +746,7 @@ function AssignmentEditorForm({
             </button>
           ))}
         </div>
-        <div className="min-h-[520px] p-5">
+        <fieldset disabled={saved?.archived} className="min-h-[520px] min-w-0 p-5">
           {tab === "Basic information" && (
             <div className="grid grid-cols-2 gap-5 max-md:grid-cols-1">
               <Field label={ui(locale, "标题", "Title")}>
@@ -697,7 +781,7 @@ function AssignmentEditorForm({
               </Field>
               <Field label={ui(locale, "截止时间", "Due time")}>
                 <input
-                  required
+                  required={!schoolId}
                   type="datetime-local"
                   min={published ? localInput(saved?.dueAt) : undefined}
                   disabled={action.busy}
@@ -741,6 +825,7 @@ function AssignmentEditorForm({
                     <Button type="button" variant="secondary" size="sm" className="mt-2" onClick={() => {
                       setRewardEdit(null);
                       setRewardConflict(false);
+                      setAssistanceEdit(null);
                       rewardResource.reload();
                     }}>
                       {ui(locale, "放弃奖学金改动并刷新", "Discard scholarship edits and reload")}
@@ -748,6 +833,9 @@ function AssignmentEditorForm({
                   </div>
                 )}
               </div>
+              {schoolId && <Field label={ui(locale,"开放时间（可选）","Opens at (optional)")}>
+                <input className={input} type="datetime-local" value={startsAt} disabled={published||action.busy} onChange={e=>setStartsAt(e.target.value)}/>
+              </Field>}
               <Field label={ui(locale, "教师说明", "Teacher note")}>
                 <textarea
                   disabled={action.busy}
@@ -797,7 +885,7 @@ function AssignmentEditorForm({
                     从题库与分组选择
                   </Button>
                   <Link
-                    href="/teacher/imports"
+                    href={schoolId ? schoolWorkspaceHref(schoolId,"imports","teacher") : "/teacher/imports"}
                     className={buttonVariants({ variant: "secondary" })}
                   >
                     <Upload size={15} />
@@ -953,7 +1041,7 @@ function AssignmentEditorForm({
               </Table>}
             </>
           )}
-          {tab === "Applicable list" && <StudentAudienceSelector students={students} classes={audienceClasses} selectedIds={participants} onChange={setParticipants} loading={audience.loading} error={audience.error} onReload={audience.reload} disabled={action.busy} lockedIds={lockedIds} exemptIds={exemptStudentIds}/>}
+          {tab === "Applicable list" && <StudentAudienceSelector limit={schoolId ? 2000 : 500} students={students} classes={audienceClasses} selectedIds={participants} onChange={setParticipants} loading={audience.loading} error={audience.error} onReload={audience.reload} disabled={action.busy} lockedIds={lockedIds} exemptIds={exemptStudentIds}/>}
           {tab === "Rules" && (
             <section className={`${panel} mb-4 space-y-3 p-4`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -984,6 +1072,9 @@ function AssignmentEditorForm({
               )}
             </section>
           )}
+          {schoolId && tab === "Rules" && rewardReady && <fieldset disabled={rewardLocked || action.busy} className="mb-5">
+            <ActivityAssistanceFields assistance={assistanceEdit ?? originalAssistance} onChange={setAssistanceEdit}/>
+          </fieldset>}
           {tab === "Rules" && (
             <div className="grid grid-cols-2 gap-4 max-sm:grid-cols-1">
               {[
@@ -1040,11 +1131,14 @@ function AssignmentEditorForm({
               </p>
             </div>
           )}
-        </div>
+        </fieldset>
       </section>
       {picker && courseOrderReady && (
         <ProblemPicker
-          forAssignment
+          forAssignment schoolId={schoolId} schoolProblems={schoolId ? options.data?.problems.map(p=>({
+            id:p.problemId,title:p.title,mode:p.mode,published:true,publishedVersionId:p.versionId,bankId:p.bankId,bankName:p.bankName,
+            firstAcPoints:options.data?.firstAcPoints,publishedDifficulty:p.difficulty,
+          })) : undefined}
           selected={selected.map((x) => x.problemId)}
           orderedProblemIds={problemOrder === "course" ? courseProblemIds : undefined}
           onClose={() => setPicker(false)}
@@ -1090,13 +1184,13 @@ function AssignmentEditorForm({
                 !participants.length ||
                 !selected.length ||
                 !title.trim() ||
-                !due
+                (!schoolId && !due)
               }
               onClick={() =>
                 void action.run(async () => {
                   const result = await save(true);
                   setPublish(false);
-                  router.push(`/teacher/assignments/${result.id}/progress`);
+                  router.push(assignmentHref(schoolId,result.id,"progress"));
                   return ui(locale, "作业已布置。", "Assignment created for the selected students.");
                 })
               }
@@ -1154,9 +1248,12 @@ function AssignmentEditorForm({
 }
 
 type Grade = NonNullable<Assignment["grades"]>[number];
-export function TeacherAssignmentProgress({ id }: { id: string }) {
+export function TeacherAssignmentProgress({ id, schoolId }: { id: string; schoolId?: string }) {
   const { locale } = useLocale();
-  const resource = useData<TeacherAssignment>(`assignments/${id}`),
+  const base = schoolId ? `schools/${schoolId}/activities/${id}` : `assignments/${id}`;
+  const current = useData<AssignmentReport>(schoolId ? base+"/report?view=assignment" : null);
+  const legacy = useData<TeacherAssignment>(schoolId ? null : base);
+  const resource = schoolId ? {...current, data:current.data && teacherAssignmentReport(current.data)} : legacy,
     [selected, setSelected] = useState<{
       student: Grade;
       problemId: string;
@@ -1167,10 +1264,10 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
   const assignment = resource.data,
     grades = assignment?.grades ?? [],
     complete = grades.filter((x) =>
-      x.problems.every((p) => p.status === "AC"),
+      x.problems.length > 0 && x.problems.every((p) => p.status === "AC"),
     ).length,
     started = grades.filter((x) =>
-      x.problems.some((p) => p.submissionId || p.completionSource === "other_entry"),
+      x.problems.some((p) => p.submissionId || p.assignmentAttempts || p.completionSource === "other_entry"),
     ).length,
     exempt =
       assignment?.participantDetails?.filter((x) => x.exempt).length ?? 0;
@@ -1186,13 +1283,17 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
         }
         action={
           <div className="flex flex-wrap gap-2">
-            {assignment?.canManage && !assignment.archived && assignment.problems.length > 0 && <AssignmentPreviewLink id={id} from="progress"/>}
+            {schoolId && <>
+              <Link href={schoolWorkspaceHref(schoolId,"assignments","teacher")} className={buttonVariants({variant:"secondary"})}>{ui(locale,"返回作业列表","Back to assignments")}</Link>
+              <Link href={schoolWorkspaceHref(schoolId,"reports","teacher")+`&activityId=${id}`} className={buttonVariants({variant:"secondary"})}>{ui(locale,"教学报告与导出","Report and export")}</Link>
+            </>}
+            {assignment?.canManage && !assignment.archived && assignment.problems.length > 0 && <AssignmentPreviewLink id={id} from="progress" schoolId={schoolId}/>}
             {assignment?.canManage && assignment.published && !assignment.archived && <>
               <Button variant="secondary" onClick={() => setManage(true)}>{ui(locale, "延期 / 豁免", "Extend / exempt")}</Button>
-              <CancelAssignment path={`assignments/${id}`} title={assignment.title} onSaved={resource.reload}/>
+              <CancelAssignment path={base} title={assignment.title} onSaved={resource.reload}/>
             </>}
             <Link
-              href={`/teacher/assignments/${id}/edit`}
+              href={assignmentHref(schoolId,id,"edit")}
               className={buttonVariants({ variant: "secondary" })}
             >
               {ui(locale, "编辑作业", "Edit assignment")}
@@ -1242,7 +1343,7 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
                       >
                         <Link
                           className={link}
-                          href={`/teacher/problems/${p.problemId}/edit?${new URLSearchParams({
+                          href={schoolId ? schoolWorkspaceHref(schoolId,"problems","teacher")+`&problemId=${p.problemId}&problemEdit=1` : `/teacher/problems/${p.problemId}/edit?${new URLSearchParams({
                             returnTo: `/teacher/assignments/${id}/progress`,
                             ...(p.versionId ? { versionId: p.versionId } : {}),
                           }).toString()}`}
@@ -1269,9 +1370,9 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
                       <td className="px-3 py-3">
                         <StatusPill
                           status={
-                            student.problems.every((p) => p.status === "AC")
+                            student.problems.length > 0 && student.problems.every((p) => p.status === "AC")
                               ? ui(locale, "完成", "Complete")
-                              : student.problems.some((p) => p.submissionId || p.completionSource === "other_entry")
+                              : student.problems.some((p) => p.submissionId || p.assignmentAttempts || p.completionSource === "other_entry")
                                 ? ui(locale, "进行中", "In progress")
                                 : ui(locale, "未开始", "Not started")
                           }
@@ -1292,7 +1393,7 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
                             className="border-l border-border text-center"
                           >
                             <button
-                              disabled={cell?.completionSource === "other_entry"}
+                              disabled={cell?.completionSource === "other_entry" && !(schoolId && cell.assignmentAttempts)}
                               onClick={() =>
                                 setSelected({
                                   student,
@@ -1326,7 +1427,8 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
           </section>
         </>
       )}
-      {selected && (
+      {selected && schoolId && <SchoolAssignmentSubmissions path={`${base}/report/${selected.student.identityId}?problemId=${selected.problemId}`} title={`${selected.student.name} · ${assignment?.problems.find(p=>p.problemId===selected.problemId)?.title ?? ""}`} onClose={()=>setSelected(null)}/>}
+      {selected && !schoolId && (
         <TeacherSubmissionDrawer
           id={selected.submissionId}
           title={`${selected.student.name} · ${assignment?.problems.find((x) => x.problemId === selected.problemId)?.title ?? "题目"}`}
@@ -1344,10 +1446,11 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
               e.preventDefault();
               const d = new FormData(e.currentTarget);
               void action.run(async () => {
-                await productionApi(`assignments/${id}/extend`, {
-                  method: "POST",
+                await productionApi(base+(schoolId?"/manage":"/extend"), {
+                  method: schoolId?"PATCH":"POST",
                   body: {
-                    dueAt: new Date(String(d.get("dueAt"))).toISOString(),
+                    [schoolId?"endsAt":"dueAt"]: new Date(String(d.get("dueAt"))).toISOString(),
+                    ...(schoolId && {expectedRevision:assignment.editRevision}),
                     reason: d.get("reason"),
                   },
                 });
@@ -1374,7 +1477,7 @@ export function TeacherAssignmentProgress({ id }: { id: string }) {
           <Feedback action={action} />
           <div className="mt-5 border-t border-border pt-4">
             <h3 className="mb-3 text-sm font-semibold">{ui(locale, "个人延期或豁免", "Individual deadline or exemption")}</h3>
-            <AssignmentParticipantForm path={`assignments/${id}`} participants={assignment.participantDetails ?? []}
+            <AssignmentParticipantForm path={base} participants={assignment.participantDetails ?? []}
               toDeadline={value => activityDate(value, ui(locale, "新的截止时间", "new deadline"))} onSaved={resource.reload}/>
           </div>
         </Modal>

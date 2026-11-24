@@ -10,7 +10,7 @@ import { addAudienceSelection, filterAudienceStudents, type AudienceStudent, typ
 const control = "min-h-10 min-w-0 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-primary";
 const emptySet = new Set<string>();
 
-export function StudentAudienceSelector({ students, classes, selectedIds, onChange, loading = false, error = "", onReload, disabled = false, lockedIds = emptySet, exemptIds = emptySet }: {
+export function StudentAudienceSelector({ students, classes, selectedIds, onChange, loading = false, error = "", onReload, disabled = false, limit = 500, lockedIds = emptySet, exemptIds = emptySet }: {
   students: AudienceStudent[];
   classes: AudienceClass[];
   selectedIds: string[];
@@ -19,6 +19,7 @@ export function StudentAudienceSelector({ students, classes, selectedIds, onChan
   error?: string;
   onReload?: () => void;
   disabled?: boolean;
+  limit?: number;
   lockedIds?: ReadonlySet<string>;
   exemptIds?: ReadonlySet<string>;
 }) {
@@ -28,13 +29,13 @@ export function StudentAudienceSelector({ students, classes, selectedIds, onChan
   const shown = filterAudienceStudents(students, scope, query, selectedIds);
   const selectable = shown.filter(student => !exemptIds.has(student.id));
   const selected = new Set(selectedIds);
-  const rowDisabled = (id: string) => disabled || (selected.has(id) && lockedIds.has(id)) || exemptIds.has(id) || (!selected.has(id) && selectedIds.length >= 500);
+  const rowDisabled = (id: string) => disabled || (selected.has(id) && lockedIds.has(id)) || exemptIds.has(id) || (!selected.has(id) && selectedIds.length >= limit);
   const { getRange, resetAnchor } = useRangeSelection(shown.map(({ id }) => ({ id, disabled: rowDisabled(id) })), JSON.stringify([scope, query, loading, disabled]));
   const classLabels = (student: AudienceStudent) => student.classNames?.length ? student.classNames.join(" / ") : student.classIds?.length ? student.classIds.map(id => classes.find(item => item.id === id)?.name ?? tx("班级", "Class")).join(" / ") : student.historical ? tx("历史名单成员", "Historical recipient") : tx("未分班", "No class");
   function add(ids: string[]) {
     setSelectionError("");
-    try { onChange(addAudienceSelection(selectedIds, ids, exemptIds)); }
-    catch { setSelectionError(tx("最多选择 500 名学生，请缩小筛选范围后选择。", "Select up to 500 students. Narrow the filter before selecting all.")); }
+    try { onChange(addAudienceSelection(selectedIds, ids, exemptIds, limit)); }
+    catch { setSelectionError(tx(`最多选择 ${limit} 名学生，请缩小筛选范围后选择。`, `Select up to ${limit} students. Narrow the filter before selecting all.`)); }
   }
   return <section aria-label={tx("选择布置学生", "Select recipients")} className="space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-3">

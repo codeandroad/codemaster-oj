@@ -107,6 +107,90 @@ export type ActivityRule = {
     solution: ActivityAssistancePolicy;
   };
 };
+export const defaultActivityAssistance: ActivityRule["assistance"] = {translation:{mode:"paid",opensAt:null},solution:{mode:"paid",opensAt:null}};
+
+export function ActivityAssistanceFields({assistance,onChange}: {assistance:ActivityRule["assistance"];onChange:(value:ActivityRule["assistance"])=>void}) {
+  const tx=useText();
+  return <fieldset className="space-y-2 border-t border-border pt-3">
+      <legend className="text-sm font-semibold">
+        {tx("辅助内容开放", "Assistance access")}
+      </legend>
+      {(
+        [
+          ["translation", tx("中文题面", "Translation")],
+          ["solution", tx("参考答案", "Solution")],
+        ] as const
+      ).map(([key, label]) => (
+        <div key={key} className="grid gap-2 sm:grid-cols-2">
+          <label className="text-sm">
+            {label}
+            <select
+              className={inputClass}
+              value={assistance[key].mode}
+              onChange={(e) =>
+                onChange({
+                    ...assistance,
+                    [key]: {
+                      ...assistance[key],
+                      mode: e.target
+                        .value as ActivityAssistancePolicy["mode"],
+                    },
+                })
+              }
+            >
+              <option value="disabled">{tx("禁用", "Disabled")}</option>
+              <option value="paid">
+                {tx("付费解锁", "Paid unlock")}
+              </option>
+              <option value="free">
+                {tx("活动内免费", "Free in this activity")}
+              </option>
+            </select>
+          </label>
+          <label className="text-sm">
+            {tx("开放时间（可选）", "Opens at (optional)")}
+            <input
+              type="datetime-local"
+              className={inputClass}
+              value={
+                assistance[key].opensAt
+                  ? new Date(
+                      new Date(
+                        assistance[key].opensAt!,
+                      ).getTime() -
+                        new Date(
+                          assistance[key].opensAt!,
+                        ).getTimezoneOffset() *
+                          60000,
+                    )
+                      .toISOString()
+                      .slice(0, 16)
+                  : ""
+              }
+              onChange={(e) =>
+                onChange({
+                    ...assistance,
+                    [key]: {
+                      ...assistance[key],
+                      opensAt: e.target.value
+                        ? new Date(e.target.value).toISOString()
+                        : null,
+                    },
+                })
+              }
+            />
+          </label>
+        </div>
+      ))}
+      <p className="text-xs text-muted-foreground">
+        {tx(
+          "考核成绩公布前，辅助内容始终关闭。禁用和未到开放时间的限制在其他入口同样生效。",
+          "Assessment assistance stays closed until results are released. Disabled and opening-time restrictions also apply through other entrances.",
+        )}
+      </p>
+    </fieldset>;
+}
+
 export function ActivityRuleFields({ draft, setDraft, cap = 1000 }: {
   draft: ActivityRule; setDraft: (rule: ActivityRule) => void; cap?: number;
 }) {
@@ -180,90 +264,7 @@ export function ActivityRuleFields({ draft, setDraft, cap = 1000 }: {
         "Allow solution-assisted submissions toward this activity reward",
       )}
     </label>
-    <fieldset className="space-y-2 border-t border-border pt-3">
-      <legend className="text-sm font-semibold">
-        {tx("辅助内容开放", "Assistance access")}
-      </legend>
-      {(
-        [
-          ["translation", tx("中文题面", "Translation")],
-          ["solution", tx("参考答案", "Solution")],
-        ] as const
-      ).map(([key, label]) => (
-        <div key={key} className="grid gap-2 sm:grid-cols-2">
-          <label className="text-sm">
-            {label}
-            <select
-              className={inputClass}
-              value={draft.assistance[key].mode}
-              onChange={(e) =>
-                setDraft({
-                  ...draft,
-                  assistance: {
-                    ...draft.assistance,
-                    [key]: {
-                      ...draft.assistance[key],
-                      mode: e.target
-                        .value as ActivityAssistancePolicy["mode"],
-                    },
-                  },
-                })
-              }
-            >
-              <option value="disabled">{tx("禁用", "Disabled")}</option>
-              <option value="paid">
-                {tx("付费解锁", "Paid unlock")}
-              </option>
-              <option value="free">
-                {tx("活动内免费", "Free in this activity")}
-              </option>
-            </select>
-          </label>
-          <label className="text-sm">
-            {tx("开放时间（可选）", "Opens at (optional)")}
-            <input
-              type="datetime-local"
-              className={inputClass}
-              value={
-                draft.assistance[key].opensAt
-                  ? new Date(
-                      new Date(
-                        draft.assistance[key].opensAt!,
-                      ).getTime() -
-                        new Date(
-                          draft.assistance[key].opensAt!,
-                        ).getTimezoneOffset() *
-                          60000,
-                    )
-                      .toISOString()
-                      .slice(0, 16)
-                  : ""
-              }
-              onChange={(e) =>
-                setDraft({
-                  ...draft,
-                  assistance: {
-                    ...draft.assistance,
-                    [key]: {
-                      ...draft.assistance[key],
-                      opensAt: e.target.value
-                        ? new Date(e.target.value).toISOString()
-                        : null,
-                    },
-                  },
-                })
-              }
-            />
-          </label>
-        </div>
-      ))}
-      <p className="text-xs text-muted-foreground">
-        {tx(
-          "考核成绩公布前，辅助内容始终关闭。禁用和未到开放时间的限制在其他入口同样生效。",
-          "Assessment assistance stays closed until results are released. Disabled and opening-time restrictions also apply through other entrances.",
-        )}
-      </p>
-    </fieldset>
+    <ActivityAssistanceFields assistance={draft.assistance} onChange={assistance=>setDraft({...draft,assistance})}/>
     {draft.completionAvailable && (
       <p className="text-xs text-muted-foreground">
         {tx("奖励按本作业的有效正式提交计算。达标后自动发放，并通过站内通知告知学生。", "Eligible formal submissions in this assignment count toward the reward. Qualifying students receive it automatically with an in-app notification.")}

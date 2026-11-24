@@ -456,6 +456,65 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       await pool.query('UPDATE chapter_problems SET version_id=$2 WHERE chapter_id=$1', [chapter.id,other]);
       assert.equal((await get('student', '?versionId=' + other)).tutorial, undefined);
     });
+    await t.test('school assignment editor keeps an exact roster, authorized course, marks, award and feedback', async () => {
+      const staff = {auth:auth.teacher}, post = {...staff,method:'POST'}, patch = {...staff,method:'PATCH'};
+      const {rows:[group]} = await pool.query("INSERT INTO school_classes(school_id,name) VALUES($1,'Editor class') RETURNING id",[school.id]);
+      await pool.query('INSERT INTO school_class_roster(school_id,class_id,identity_id) VALUES($1,$2,$3),($1,$2,$4)',[school.id,group.id,ids.fresh,ids.peer]);
+      const {rows:[course]} = await pool.query(`INSERT INTO learning_paths(owner_account_id,title,owner_scope,platform_audience_scope,published_at,required_language)
+        VALUES($1,'Authorized assignment course','platform','custom',now(),'python') RETURNING id`,[users.admin.id]);
+      const selector=activities+'/options?view=assignment';
+      assert.equal((await request(selector,staff)).data.courses.some(c=>c.id===course.id),false);
+      await pool.query(`INSERT INTO platform_content_editors(resource_kind,resource_id,account_id,school_id,granted_by)
+        VALUES('course',$1,$2,$3,$4)`,[course.id,users.teacher.id,school.id,users.admin.id]);
+      assert.equal((await request(selector,staff)).data.courses.find(c=>c.id===course.id).requiredLanguage,'python');
+      const body={...config,kind:'assignment',requestId:randomUUID(),title:'Scoped assignment',audienceMode:'selected',
+        classIds:[group.id],identityIds:[ids.fresh],problems:[{problemId:p.id,versionId:published.versionId,points:37.25,rewardPoints:7}],
+        subjectLabel:'Computing',courseId:course.id,problemOrder:'course',scholarshipRule:{amount:9,requireAll:true,expectedRevision:0}};
+      await request(activities,{...post,body:{...body,problems:[{...body.problems[0],rewardPoints:21}]},status:400});
+      const draft=(await request(activities,{...post,body,status:201})).data, path=activities+'/'+draft.id;
+      assert.deepEqual(draft.identityIds,[ids.fresh]); assert.equal(draft.subjectLabel,'Computing');
+      assert.equal(draft.courseTitle,'Authorized assignment course'); assert.equal(draft.requiredLanguage,'python');
+      assert.equal(draft.problems[0].points,37.25); assert.equal((await request(activities,{...post,body})).data.id,draft.id);
+      await request(path+'/archive',{...post,body:{}});
+      const restored=(await request(path+'/restore',{...post,body:{}})).data;
+      assert.equal(restored.state,'Draft');
+      const publish={...post,body:{expectedRevision:restored.revision,expectedRuleRevision:1}};
+      await request(path+'/publish',{...publish,body:{...publish.body,expectedRuleRevision:0},status:409});
+      await pool.query("UPDATE platform_content_editors SET revoked_at=now() WHERE resource_id=$1",[course.id]);
+      await request(path+'/publish',{...publish,status:409});
+      await pool.query("UPDATE platform_content_editors SET revoked_at=NULL WHERE resource_id=$1",[course.id]);
+      const assigned=(await request(path+'/publish',publish)).data;
+      await request(path,{auth:auth.peer,status:404});
+      const extended=(await request(path+'/manage',{...patch,body:{expectedRevision:assigned.revision,endsAt:new Date(Date.parse(assigned.endsAt)+3600000).toISOString()}})).data;
+      await request(path+'/manage',{...patch,auth:auth.outside,body:{expectedRevision:extended.revision,title:'unavailable'},status:404});
+      const problemPath=path+'/problems/'+p.id+'/submissions';
+      const judge=process.env.GO_JUDGE_TEST_URL ? new GoJudge({url:process.env.GO_JUDGE_TEST_URL,token:process.env.GO_JUDGE_TEST_TOKEN,environmentVersion:'assignment-editor-qa'}) : {judge:async()=>completed};
+      const submit=async()=> {
+        const {data}=await request(problemPath,{auth:auth.fresh,method:'POST',status:202,body:{kind:'submit',code:'def solve(data): return data*2',requestId:randomUUID()}});
+        await processSchoolOne({pool:worker,judge}); return data.id;
+      };
+      const job=await submit(); await submit();
+      const grade=(await request(path+'/report',staff)).data.items[0].grade;
+      assert.equal(grade.score,37.25); assert.equal(grade.items[0].activityAttempts,2); assert.equal(grade.items[0].matrixStatus,'AC');
+      assert.equal((await request(activities+'?kind=assignment&view=assignment',staff)).data.items.find(a=>a.id===draft.id).completedStudents,1);
+      const ledger=(await pool.query("SELECT delta FROM school_scholarship_ledger WHERE school_id=$1 AND identity_id=$2 AND kind='activity' AND metadata->>'activityId'=$3 ORDER BY delta",[school.id,ids.fresh,draft.id])).rows;
+      assert.deepEqual(ledger.map(r=>r.delta),[7,9]);
+      const history=path+'/report/'+ids.fresh+'?problemId='+p.id;
+      const records=(await request(history,staff)).data.items;
+      assert.equal(records.length,2); assert.equal(records[0].status,'AC'); assert.doesNotMatch(JSON.stringify(records),/PRIVATE_/);
+      await request(history,{auth:auth.peer,status:404});
+      await request(history,{auth:auth.outside,status:404});
+      await request(history,{...post,body:{submissionId:job,note:'Feedback on this submission'},status:201});
+      assert.equal((await request(prefix+'/judge-jobs/'+job,{auth:auth.fresh})).data.reviews[0].note,'Feedback on this submission');
+      await request(prefix+'/judge-jobs/'+job,{auth:auth.peer,status:404});
+      const managed=(await request(path+'?view=assignment',staff)).data;
+      assert.deepEqual(managed.protectedParticipantIds,[ids.fresh]);
+      await request(path+'/manage',{...patch,body:{expectedRevision:managed.revision,identityIds:[ids.peer]},status:409});
+      await request(path+'/manage',{...patch,body:{expectedRevision:managed.revision,problems:body.problems},status:409});
+      assert.equal((await request(path+'/manage',{...patch,body:{expectedRevision:managed.revision,title:'Renamed'}})).data.title,'Renamed');
+      await request(path+'/archive',{...post,body:{}}); assert.equal((await request(path+'/restore',{...post,body:{}})).data.state,'Published');
+      await request(path+'/cancel',{...post,body:{}}); await request(path+'/restore',{...post,body:{},status:409});
+    });
     await t.test('bank controls and scholarship review track the exact bank, problem and published version', async () => {
       const staff = { auth: auth.teacher }, targets = prefix + '/scholarship/targets';
       const listed = async () => (await request(targets, staff)).data.items;

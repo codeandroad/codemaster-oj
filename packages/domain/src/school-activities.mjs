@@ -1,3 +1,4 @@
+import { addAssignmentFeedback, assignmentCompletionCounts, assignmentCourses, assignmentHasRuns, assignmentMetadata, assignmentSubmissions, orderAssignmentProblems, recordedParticipants } from './school-assignment-authoring.mjs';
 import { readableClassCourse } from './school-courses.mjs';
 import { assignmentChange, notifySchoolAssignmentChange } from './assignment-changes.mjs';
 import { schoolAssignmentReceiptGrades } from './assignment-grades.mjs';
@@ -111,19 +112,26 @@ function canSubmitActivityWork(a, attempt, now = Date.now()) {
     Boolean(attempt && (!attempt.deadlineAt || now < +new Date(attempt.deadlineAt))));
 }
 async function problems(db, a) {
-  return (await db.query(`SELECT p.problem_id AS id,p.version_id AS "versionId",p.position,p.points,p.reward_points AS "rewardPoints",
-    v.definition->>'title' AS title FROM school_activity_problems p
+  const pins = (await db.query(`SELECT p.problem_id AS id,p.version_id AS "versionId",p.position,p.points::float8 AS points,p.reward_points AS "rewardPoints",
+    v.definition->>'title' AS title,v.definition->>'mode' AS mode,v.definition#>>'{metadata,difficulty}' AS difficulty FROM school_activity_problems p
     JOIN school_problem_versions v ON v.school_id=p.school_id AND v.problem_id=p.problem_id AND v.id=p.version_id
     WHERE p.school_id=$1 AND p.activity_id=$2 ORDER BY p.position,p.problem_id`, [a.school_id, a.id])).rows;
+  return orderAssignmentProblems(db,a,pins);
 }
 async function attempt(db, a, studentId) {
   return (await db.query('SELECT * FROM school_activity_attempts WHERE school_id=$1 AND activity_id=$2 AND identity_id=$3', [a.school_id, a.id, studentId])).rows[0] ?? null;
 }
 const publicAttempt = t => t ? { id: t.id, startedAt: t.started_at, deadlineAt: t.deadline_at, finishedAt: t.finished_at } : null;
 
-export async function calculateSchoolActivityGrade(db, a, studentId, { includeLate = false } = {}) {
+export async function calculateSchoolActivityGrade(db, a, studentId, { includeLate = false, staffMatrix = false } = {}) {
   const entries = await problems(db, a);
+  const formal = "j.activity_id=a.id AND j.created_at<=coalesce(j.activity_deadline_at,'infinity')";
   const rows = (await db.query(`SELECT p.problem_id,
+    ${staffMatrix ? `(array_agg(j.result->>'status' ORDER BY (j.result->>'score')::numeric DESC NULLS LAST,j.created_at,j.id)
+      FILTER (WHERE ${formal} AND j.state='completed' AND j.result->>'status'<>'System Error'))[1] AS best_status,
+      (array_agg(coalesce(j.result->>'status',CASE j.state WHEN 'leased' THEN 'Judging' WHEN 'failed' THEN 'System Error' ELSE 'Waiting' END) ORDER BY j.created_at DESC)
+      FILTER (WHERE ${formal} AND (j.state<>'completed' OR j.result->>'status'='System Error')))[1] AS pending_status,` : ''}
+
     count(j.id) FILTER(WHERE j.activity_id=a.id AND ($4::boolean OR j.created_at<=coalesce(j.activity_deadline_at,'infinity')))::int AS activity_attempts,
     count(j.id) FILTER(WHERE ($4::boolean OR j.created_at<=coalesce(greatest(a.ends_at,part.extended_due_at),'infinity'))
       AND (a.cancelled_at IS NULL OR j.created_at<=a.cancelled_at) AND ${schoolActivityJobVisibleSql('j')})::int AS all_attempts,
@@ -146,7 +154,11 @@ export async function calculateSchoolActivityGrade(db, a, studentId, { includeLa
       if (!prior) continue;
       row.activity_attempts += prior.eligible_attempts;
       row.all_attempts += prior.eligible_attempts;
-      row.best = Math.max(Number(row.best ?? 0), Number(prior.score ?? 0));
+      if (staffMatrix) {
+        if (prior.score != null && (row.best==null || Number(prior.score)>Number(row.best))) row.best_status=prior.status;
+        row.pending_status ??= prior.pending_status;
+      }
+      if (prior.score != null) row.best = Math.max(Number(row.best ?? 0), Number(prior.score));
       row.accepted ||= prior.status === 'AC' && !prior.credited_ac;
       row.inherited ||= prior.credited_ac;
     }
@@ -158,7 +170,8 @@ function activityGrade(entries, rows, kind) {
     const r = rows.find(item => item.problem_id === p.id);
     const solved = Boolean(r?.accepted || r?.inherited);
     const percentage = solved ? 100 : Math.max(0, Math.min(100, Number(r?.best ?? 0)));
-    return { ...p, status: solved ? 'AC' : r?.activity_attempts ? 'NotPassed' : 'NotStarted', solved,
+    return { ...p, ...(r && 'best_status' in r && {matrixStatus:solved?'AC':r.best_status??r.pending_status??'NotSubmitted', awaitingScore:!solved && !r.best_status && !!r.pending_status}),
+      status: solved ? 'AC' : r?.activity_attempts ? 'NotPassed' : 'NotStarted', solved,
       score: Math.round(percentage * p.points) / 100, attempts: kind === 'assignment' ? r?.all_attempts ?? 0 : r?.activity_attempts ?? 0,
       activityAttempts: r?.activity_attempts ?? 0, inherited: Boolean(r?.inherited && !r?.accepted) };
   });
@@ -175,14 +188,16 @@ async function detail(db, loaded, user) {
   }
   const progress = student && a.kind === 'assignment'
     ? await calculateSchoolActivityGrade(db, a, student.id, { includeLate:true }) : null;
-  const participantCount = (await db.query('SELECT count(*)::int AS n FROM school_activity_participants WHERE school_id=$1 AND activity_id=$2', [a.school_id, a.id])).rows[0].n;
+  const { n: participantCount, exempt } = (await db.query('SELECT count(*)::int AS n,count(*) FILTER(WHERE exempt)::int AS exempt FROM school_activity_participants WHERE school_id=$1 AND activity_id=$2', [a.school_id, a.id])).rows[0];
   const personalActivity = student && a.kind === 'assignment' && participation ? { ...a, ends_at: participation.due_at } : a;
   const now = Date.now(), attemptView = publicAttempt(ownAttempt);
   const courseId = a.school_course_id ?? a.platform_course_id;
   const courseScope = a.school_course_id ? 'school' : 'platform';
   const course = student ? await readableClassCourse(db,a.school_id,user,courseId,courseScope)
-    : courseId && {id:courseId,scope:courseScope};
-  const classNames = student && a.kind === 'assignment' ? (await db.query(`SELECT c.name FROM school_activity_classes ac
+    : courseId && {id:courseId,scope:courseScope,title:(await db.query(a.school_course_id
+      ? 'SELECT title FROM school_courses WHERE school_id=$1 AND id=$2'
+      : "SELECT title FROM learning_paths WHERE owner_scope='platform' AND id=$2 AND $1::uuid IS NOT NULL",[a.school_id,courseId])).rows[0]?.title};
+  const classNames = (student || canManage) && a.kind === 'assignment' ? (await db.query(`SELECT c.name FROM school_activity_classes ac
     JOIN school_classes c ON (c.school_id,c.id)=(ac.school_id,ac.class_id)
     WHERE ac.school_id=$1 AND ac.activity_id=$2 ORDER BY c.name,c.id`, [a.school_id,a.id])).rows.map(c=>c.name) : [];
   return { id: a.id, schoolId: a.school_id, kind: a.kind, title: a.title, description: a.description,
@@ -191,7 +206,7 @@ async function detail(db, loaded, user) {
     publishedAt: a.published_at, resultsPublishedAt: a.results_published_at, canManage,
     canPreview: canManage && canPreview(a) && items.length > 0, participantCount, problems: items,
     attempt: attemptView, canSubmit: Boolean(student) && canSubmitActivityWork(personalActivity, attemptView, now), grade, progress,
-    ...(canManage ? { identityIds: (await db.query('SELECT identity_id FROM school_activity_participants WHERE school_id=$1 AND activity_id=$2 ORDER BY identity_id', [a.school_id, a.id])).rows.map(r => r.identity_id),
+    ...(canManage ? { exemptCount:exempt,subjectLabel:a.subject_label,problemOrder:a.problem_order,requiredLanguage:a.required_language, identityIds: (await db.query('SELECT identity_id FROM school_activity_participants WHERE school_id=$1 AND activity_id=$2 ORDER BY identity_id', [a.school_id, a.id])).rows.map(r => r.identity_id),
       classIds: (await db.query('SELECT class_id FROM school_activity_classes WHERE school_id=$1 AND activity_id=$2 ORDER BY class_id', [a.school_id, a.id])).rows.map(r => r.class_id) } : {}) };
 }
 function normalize(body, kind) {
@@ -199,7 +214,10 @@ function normalize(body, kind) {
   const durationMinutes = kind === 'timed' ? integer(Number(body.durationMinutes), 1, 1440, 'Duration') : null;
   if (startsAt && endsAt && startsAt >= endsAt) fail(400, 'VALIDATION', 'Timed practice needs an opening time, later closing time and duration.');
   if (!Array.isArray(body.problems) || body.problems.length > 100) fail(400, 'VALIDATION', 'Select at most 100 problems.');
-  const entries = body.problems.map((p, i) => ({ problemId: uuid(p.problemId), versionId: uuid(p.versionId), points: integer(Number(p.points ?? 100), 1, 1000, 'Points'), position: i + 1 }));
+  const entries = body.problems.map((p, i) => ({ problemId: uuid(p.problemId), versionId: uuid(p.versionId), points: Number(p.points ?? 100),
+    ...(kind==='assignment' && p.rewardPoints !== undefined && {rewardPoints:integer(p.rewardPoints,0,20,'Problem scholarship')}), position: i + 1 }));
+  if (entries.some(p => !Number.isFinite(p.points) || p.points<=0 || p.points>1000 || Math.abs(p.points*100-Math.round(p.points*100))>1e-7 || (kind==='timed' && !Number.isInteger(p.points)))) fail(400,'VALIDATION','Invalid problem marks.');
+  if (entries.reduce((sum,p)=>sum+(p.rewardPoints??0),0)>100) fail(400,'REWARD_BUDGET','Problem scholarships total at most 100.');
   if (new Set(entries.map(p => p.problemId)).size !== entries.length) fail(400, 'VALIDATION', 'A problem can appear only once.');
   return { title: field(body.title, 'Title', { max: 200 }), description: field(body.description ?? '', 'Description', { min: 0, max: 10000 }),
     startsAt, endsAt, durationMinutes, problems: entries, identityIds: ids(body.identityIds ?? [], 'Students'), classIds: ids(body.classIds ?? [], 'Classes', 100) };
@@ -208,7 +226,7 @@ async function saveDraftRule(db, schoolId, user, role, activityId, rule) {
   if (!rule || typeof rule !== 'object' || Array.isArray(rule)) fail(400, 'VALIDATION', 'Invalid scholarship rule.');
   return configureSchoolActivityScholarshipRule(db, schoolId, user, role, activityId, 'activity', rule);
 }
-async function validateSelections(db, schoolId, data) {
+async function validateSelections(db, schoolId, data, expandClasses = true) {
   for (const p of data.problems) {
     const valid = (await db.query(`SELECT 1 FROM school_problems p JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id
       WHERE p.school_id=$1 AND p.id=$2 AND p.published_version_id=$3 AND b.resource_kind='ordinary' AND p.published AND NOT b.archived`, [schoolId, p.problemId, p.versionId])).rowCount;
@@ -219,15 +237,25 @@ async function validateSelections(db, schoolId, data) {
     if (selected.length !== data.classIds.length) fail(404, 'NOT_FOUND', 'A selected class is unavailable.');
     const members = (await db.query(`SELECT r.identity_id FROM school_class_roster r JOIN school_identities i ON i.school_id=r.school_id AND i.id=r.identity_id
       WHERE r.school_id=$1 AND r.class_id=ANY($2::uuid[]) AND i.kind='student' AND i.archived_at IS NULL`, [schoolId, data.classIds])).rows;
-    data.identityIds = [...new Set([...data.identityIds, ...members.map(r => r.identity_id)])];
+    if (expandClasses) data.identityIds = [...new Set([...data.identityIds, ...members.map(r => r.identity_id)])];
   }
   if (data.identityIds.length > 2000) fail(400, 'VALIDATION', 'Select at most 2000 students.');
   if (data.identityIds.length && (await db.query("SELECT id FROM school_identities WHERE school_id=$1 AND id=ANY($2::uuid[]) AND kind='student' AND archived_at IS NULL", [schoolId, data.identityIds])).rowCount !== data.identityIds.length) fail(404, 'NOT_FOUND', 'A selected student is unavailable.');
 }
+async function replaceProblemSelections(db, schoolId, activityId, problems, previousProblems) {
+  const previous=new Map(previousProblems.map(p=>[p.problem_id,p]));
+  await db.query('DELETE FROM school_activity_problems WHERE school_id=$1 AND activity_id=$2',[schoolId,activityId]);
+  for (const p of problems) {
+    const old=previous.get(p.problemId), pin=old?.version_id===p.versionId ? old : undefined;
+    await db.query(`INSERT INTO school_activity_problems(school_id,activity_id,problem_id,version_id,position,points,reward_points,
+      prior_version_id,original_problem_version_id,original_prior_problem_version_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+    [schoolId,activityId,p.problemId,p.versionId,p.position,p.points,p.rewardPoints??old?.reward_points??null,
+      pin?.prior_version_id??null,pin?.original_problem_version_id??null,pin?.original_prior_problem_version_id??null]);
+  }
+}
 async function storeSelections(db, schoolId, activityId, data, previousProblems = []) {
-  const rewards = new Map(previousProblems.map(p => [p.problem_id, p.reward_points]));
-  for (const table of ['school_activity_problems', 'school_activity_participants', 'school_activity_classes']) await db.query(`DELETE FROM ${table} WHERE school_id=$1 AND activity_id=$2`, [schoolId, activityId]);
-  for (const p of data.problems) await db.query('INSERT INTO school_activity_problems(school_id,activity_id,problem_id,version_id,position,points,reward_points) VALUES($1,$2,$3,$4,$5,$6,$7)', [schoolId, activityId, p.problemId, p.versionId, p.position, p.points, rewards.get(p.problemId) ?? null]);
+  await replaceProblemSelections(db,schoolId,activityId,data.problems,previousProblems);
+  for (const table of ['school_activity_participants', 'school_activity_classes']) await db.query(`DELETE FROM ${table} WHERE school_id=$1 AND activity_id=$2`, [schoolId, activityId]);
   for (const id of data.identityIds) await db.query('INSERT INTO school_activity_participants(school_id,activity_id,identity_id) VALUES($1,$2,$3)', [schoolId, activityId, id]);
   for (const id of data.classIds) await db.query('INSERT INTO school_activity_classes(school_id,activity_id,class_id) VALUES($1,$2,$3)', [schoolId, activityId, id]);
 }
@@ -373,8 +401,8 @@ async function assignmentPreview(db, { a, user, method, action, id, submissions,
       resultsPublishedAt: null, canSubmit: true, preview: true, revision: a.revision },
   });
 }
-async function options(db, schoolId) {
-  const items = (await db.query(`SELECT p.id AS "problemId",p.published_version_id AS "versionId",v.definition->>'title' AS title,b.name AS "bankName",b.id AS "bankId"
+async function options(db, schoolId, user, assignmentEditor) {
+  const items = (await db.query(`SELECT p.id AS "problemId",p.published_version_id AS "versionId",v.definition->>'title' AS title,v.definition->>'mode' AS mode,v.definition#>>'{metadata,difficulty}' AS difficulty,b.name AS "bankName",b.id AS "bankId"
     FROM school_problems p JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id
     JOIN school_problem_versions v ON v.school_id=p.school_id AND v.id=p.published_version_id
     WHERE p.school_id=$1 AND b.resource_kind='ordinary' AND p.published AND NOT b.archived ORDER BY b.name,v.definition->>'title',p.id LIMIT 2000`, [schoolId])).rows;
@@ -383,7 +411,9 @@ async function options(db, schoolId) {
       WHERE r.school_id=i.school_id AND r.identity_id=i.id AND c.archived_at IS NULL),'[]') AS "classIds"
     FROM school_identities i WHERE i.school_id=$1 AND i.kind='student' AND i.archived_at IS NULL ORDER BY i.name,i.number,i.id LIMIT 2001`, [schoolId])).rows;
   if (students.length > 2000) fail(409, 'AUDIENCE_TOO_LARGE', 'This activity selector supports schools with up to 2000 student identities.');
-  return { activityRewardCap: (await schoolScholarshipSettings(db, schoolId)).activityRewardCap, problems: items, students, classes: (await db.query('SELECT id,name FROM school_classes WHERE school_id=$1 AND archived_at IS NULL ORDER BY name,id', [schoolId])).rows };
+  const settings = await schoolScholarshipSettings(db, schoolId);
+  return { ...(assignmentEditor && {courses:await assignmentCourses(db,schoolId,user),firstAcPoints:settings.firstAcPoints}),
+    activityRewardCap: settings.activityRewardCap, problems: items, students, classes: (await db.query('SELECT id,name FROM school_classes WHERE school_id=$1 AND archived_at IS NULL ORDER BY name,id', [schoolId])).rows };
 }
 async function publishResults(db, loaded, user) {
   const { a } = loaded;
@@ -402,7 +432,7 @@ async function publishResults(db, loaded, user) {
 export async function schoolActivitiesOperation({ pool, user, route, url, method, body = {} }) {
   route ??= url.pathname.replace(/^\/api\/v1/, '');
   const preview = route.match(/^\/schools\/([^/]+)\/activities\/([^/]+)\/preview(?:\/(problems|jobs)\/([^/]+)(?:\/(submissions))?)?$/);
-  const match = preview ?? route.match(/^\/schools\/([^/]+)\/activities(?:\/(options|[^/]+)(?:\/(publish|archive|cancel|participants|start|finish|end|publish-results|report|problems|jobs)(?:\/([^/]+)(?:\/(submissions))?)?)?)?$/);
+  const match = preview ?? route.match(/^\/schools\/([^/]+)\/activities(?:\/(options|[^/]+)(?:\/(publish|archive|restore|manage|cancel|participants|start|finish|end|publish-results|report|problems|jobs)(?:\/([^/]+)(?:\/(submissions))?)?)?)?$/);
   if (!match) return null;
   const schoolId = uuid(match[1]);
   return transaction(pool, async db => {
@@ -417,7 +447,7 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
     const staff = role === 'school_admin' || role === 'teacher';
     if (match[2] === 'options' && method === 'GET') {
       if (!staff) fail(403, 'FORBIDDEN', 'Teaching role required.');
-      return reply(await options(db, schoolId));
+      return reply(await options(db, schoolId,user,url.searchParams.get('view')==='assignment'));
     }
     if (!match[2] && method === 'GET') {
       const kind = enumValue(url.searchParams.get('kind') ?? 'assignment', ['assignment', 'timed'], 'Activity type');
@@ -440,10 +470,15 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
           ELSE 'available'
         END=$8)
         ORDER BY a.created_at DESC,a.id LIMIT 26 OFFSET $7`, [schoolId, kind, role, user.id, student?.id ?? null, archived, (page - 1) * 25, category])).rows;
+      const visibleRows = rows.slice(0,25);
+      const counts = staff && kind==='assignment' && url.searchParams.get('view')==='assignment'
+        ? await assignmentCompletionCounts(db,schoolId,visibleRows.map(a=>a.id),schoolActivityJobVisibleSql('j')) : null;
       const items = [];
-      for (const a of rows.slice(0, 25)) {
+      for (const a of visibleRows) {
         const participation = student && kind === 'assignment' ? await assignmentParticipant(db, a, student.id) : null;
-        items.push(await detail(db, { a, student, participation, canManage: manages(a, user, role) }, user));
+        const item=await detail(db, { a, student, participation, canManage: manages(a, user, role) }, user);
+        if (counts) item.completedStudents=counts.get(a.id)??0;
+        items.push(item);
       }
       return reply({ items, page, hasMore: rows.length > 25, canCreate: staff });
     }
@@ -451,40 +486,95 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
       if (!staff) fail(403, 'FORBIDDEN', 'Teaching role required.');
       const kind = enumValue(body.kind, ['assignment', 'timed'], 'Activity type'), data = normalize(body, kind), requestId = uuid(body.requestId);
       const rule = body.scholarshipRule;
-      const hash = canonicalHash({ kind, ...data, ...(rule !== undefined && { scholarshipRule: rule }) });
+      const editor = kind==='assignment' && body.audienceMode==='selected';
+      const hash = canonicalHash({ kind, ...data, ...(editor && {subjectLabel:body.subjectLabel,problemOrder:body.problemOrder,courseId:body.courseId,audienceMode:'selected'}), ...(rule !== undefined && { scholarshipRule: rule }) });
       const old = (await db.query('SELECT * FROM school_activities WHERE school_id=$1 AND owner_account_id=$2 AND request_id=$3', [schoolId, user.id, requestId])).rows[0];
       if (old) { if (old.request_hash !== hash) fail(409, 'REQUEST_CONFLICT', 'Request ID already used.'); return reply(await detail(db, { a: old, canManage: true, student: null }, user)); }
-      await validateSelections(db, schoolId, data);
+      await validateSelections(db, schoolId, data, !(kind==='assignment' && body.audienceMode==='selected'));
       const a = (await db.query(`INSERT INTO school_activities(school_id,owner_account_id,kind,title,description,starts_at,ends_at,duration_minutes,request_id,request_hash)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`, [schoolId, user.id, kind, data.title, data.description, data.startsAt, data.endsAt, data.durationMinutes, requestId, hash])).rows[0];
       await storeSelections(db, schoolId, a.id, data);
+      if (editor) await assignmentMetadata(db,a,user,body);
       if (rule !== undefined) await saveDraftRule(db, schoolId, user, role, a.id, rule);
       await auditSchool(db, schoolId, user.id, 'school.activity.create', a.id);
-      return reply(await detail(db, { a, canManage: true, student: null }, user), 201);
+      return reply(await detail(db, editor ? await load(db,schoolId,a.id,user,role) : { a, canManage: true, student: null }, user), 201);
     }
     if (!match[2]) return null;
     const activityId = uuid(match[2]), action = match[3];
     const loaded = await load(db, schoolId, activityId, user, role, {
-      management: ['publish', 'archive', 'cancel', 'participants', 'end', 'publish-results', 'report'].includes(action) || method === 'PATCH',
+      management: ['publish','restore','manage', 'archive', 'cancel', 'participants', 'end', 'publish-results', 'report'].includes(action) || method === 'PATCH',
       archiveRead: method === 'GET' && (!action || action === 'problems'),
       ownJob: action === 'jobs' && method === 'GET' && Boolean(match[4]),
     });
     const { a, canManage, student, participation } = loaded;
+    const authoringView = url.searchParams.get('view')==='assignment';
+    if (authoringView && (!canManage || a.kind!=='assignment')) fail(404,'NOT_FOUND','Assignment not found.');
+    if (!action && method==='GET' && authoringView) {
+      const info = await detail(db,loaded,user);
+      const participants=(await db.query(`SELECT p.identity_id AS "identityId",i.name,p.exempt,greatest(p.extended_due_at,$3::timestamptz) AS "dueAt"
+        FROM school_activity_participants p JOIN school_identities i ON (i.school_id,i.id)=(p.school_id,p.identity_id)
+        WHERE p.school_id=$1 AND p.activity_id=$2`,[schoolId,a.id,a.ends_at])).rows;
+      return reply({...info,participantDetails:participants,hasProblemRuns:await assignmentHasRuns(db,a),protectedParticipantIds:await recordedParticipants(db,a)});
+    }
     if (!action && method === 'GET') return reply(await detail(db, loaded, user));
     if (!action && method === 'PATCH') {
       if (a.state !== 'Draft') fail(409, 'ACTIVITY_FROZEN', 'Published activity rules, recipients and problem versions are frozen.');
       if (integer(body.expectedRevision, 1, 2147483646, 'Revision') !== a.revision) fail(409, 'REVISION_CONFLICT', 'Activity changed. Refresh first.');
-      const data = normalize(body, a.kind); await validateSelections(db, schoolId, data);
+      const data = normalize(body, a.kind); await validateSelections(db, schoolId, data, !(a.kind==='assignment' && body.audienceMode==='selected'));
       await db.query(`UPDATE school_activities SET title=$3,description=$4,starts_at=$5,ends_at=$6,duration_minutes=$7,revision=revision+1,updated_at=clock_timestamp() WHERE school_id=$1 AND id=$2`, [schoolId, a.id, data.title, data.description, data.startsAt, data.endsAt, data.durationMinutes]);
-      const previous = await db.query('SELECT problem_id,reward_points FROM school_activity_problems WHERE school_id=$1 AND activity_id=$2 AND reward_points IS NOT NULL', [schoolId, a.id]);
+      const previous = await db.query('SELECT * FROM school_activity_problems WHERE school_id=$1 AND activity_id=$2', [schoolId, a.id]);
       await storeSelections(db, schoolId, a.id, data, previous.rows);
+      if (a.kind==='assignment' && body.audienceMode==='selected') await assignmentMetadata(db,a,user,body);
       if (body.scholarshipRule !== undefined) await saveDraftRule(db, schoolId, user, role, a.id, body.scholarshipRule);
       await auditSchool(db, schoolId, user.id, 'school.activity.update', a.id);
       return reply(await detail(db, await load(db, schoolId, activityId, user, role), user));
     }
+    if (action==='manage' && method==='PATCH') {
+      if (a.kind!=='assignment' || a.state!=='Published' || a.cancelled_at) fail(409,'ACTIVITY_FROZEN','Only an active assignment can be edited.');
+      if (integer(body.expectedRevision,1,2147483646,'Revision')!==a.revision) fail(409,'REVISION_CONFLICT','Refresh the assignment before editing.');
+      if (body.scholarshipRule!==undefined) fail(409,'RULE_FROZEN','Published scholarship rules are frozen.');
+      const title=field(body.title??a.title,'Title',{max:200}),description=field(body.description??a.description,'Description',{min:0,max:10000});
+      const due=body.endsAt===undefined?a.ends_at:instant(body.endsAt);
+      const extend=body.endsAt!==undefined && +new Date(due)!==+new Date(a.ends_at);
+      if (extend && (!a.ends_at || !due || +new Date(due)<=Math.max(Date.now(),+a.ends_at))) fail(400,'VALIDATION','The new deadline must be later and in the future.');
+      if (body.problems!==undefined) {
+        if (await assignmentHasRuns(db,a)) fail(409,'ACTIVITY_FROZEN','Problems with submission history are fixed.');
+        const next=normalize({...body,title,description},'assignment');
+        if (!next.problems.length) fail(400,'VALIDATION','Select at least one problem.');
+        await validateSelections(db,schoolId,next,false);
+        const previous=await db.query('SELECT * FROM school_activity_problems WHERE school_id=$1 AND activity_id=$2',[schoolId,a.id]);
+        await replaceProblemSelections(db,schoolId,a.id,next.problems,previous.rows);
+      }
+      let added=[];
+      if (body.identityIds!==undefined) {
+        const students=ids(body.identityIds,'Students'),classes=ids(body.classIds??[],'Classes',100);
+        if (!students.length || due && +new Date(due)<=Date.now()) fail(400,'VALIDATION','Select students before the deadline.');
+        await validateSelections(db,schoolId,{problems:[],identityIds:students,classIds:classes},false);
+        const old=(await db.query('SELECT identity_id,exempt FROM school_activity_participants WHERE school_id=$1 AND activity_id=$2',[schoolId,a.id])).rows;
+        const protectedIds=await recordedParticipants(db,a);
+        if (old.some(p=>p.exempt ? students.includes(p.identity_id) : protectedIds.includes(p.identity_id) && !students.includes(p.identity_id)))
+          fail(409,'ROSTER_FROZEN','Preserve student records. Use extensions and exemptions for existing participants.');
+        await db.query('DELETE FROM school_activity_participants WHERE school_id=$1 AND activity_id=$2 AND NOT exempt AND NOT(identity_id=ANY($3::uuid[]))',[schoolId,a.id,students]);
+        added=students.filter(id=>!old.some(p=>p.identity_id===id));
+        await db.query('INSERT INTO school_activity_participants(school_id,activity_id,identity_id) SELECT $1,$2,unnest($3::uuid[])',[schoolId,a.id,added]);
+        await db.query('DELETE FROM school_activity_classes WHERE school_id=$1 AND activity_id=$2',[schoolId,a.id]);
+        await db.query('INSERT INTO school_activity_classes(school_id,activity_id,class_id) SELECT $1,$2,unnest($3::uuid[])',[schoolId,a.id,classes]);
+      }
+      await assignmentMetadata(db,a,user,body);
+      await db.query('UPDATE school_activities SET title=$3,description=$4,ends_at=$5,revision=revision+1,updated_at=now() WHERE school_id=$1 AND id=$2',[schoolId,a.id,title,description,due]);
+      for (const identityId of added) await notifySchoolAssignmentChange(db,a,'assigned',{identityId});
+      if (extend) await notifySchoolAssignmentChange(db,a,'extended',{reason:body.reason?field(body.reason,'Reason',{max:2000}):null});
+      await auditSchool(db,schoolId,user.id,'school.assignment.edit',a.id);
+      return reply(await detail(db,await load(db,schoolId,a.id,user,role),user));
+    }
     if (action === 'publish' && method === 'POST') {
       if (a.state === 'Published') return reply(await detail(db, loaded, user));
       if (a.state !== 'Draft' || integer(body.expectedRevision, 1, 2147483646, 'Revision') !== a.revision) fail(409, 'REVISION_CONFLICT', 'Refresh the draft before publishing.');
+      if (a.kind==='assignment' && body.expectedRuleRevision!==undefined) {
+        const revision=(await db.query("SELECT coalesce(max(revision),0) AS n FROM school_scholarship_activity_rules WHERE school_id=$1 AND activity_type='activity' AND activity_id=$2",[schoolId,a.id])).rows[0].n;
+        if (revision!==body.expectedRuleRevision) fail(409,'REVISION_CONFLICT','Refresh the scholarship rule before assigning.');
+      }
+      if (a.kind==='assignment' && (a.school_course_id||a.platform_course_id)) await assignmentMetadata(db,a,user,{});
       const data = await detail(db, loaded, user);
       if (a.kind === 'timed' && (!a.starts_at || !a.ends_at || !a.duration_minutes)) fail(400, 'VALIDATION', 'Set an opening time, closing time and duration before publishing timed practice.');
       await validateSelections(db, schoolId, { problems: data.problems.map(p => ({ problemId: p.id, versionId: p.versionId })), identityIds: data.identityIds, classIds: [] });
@@ -493,6 +583,12 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
       await db.query("UPDATE school_activities SET state='Published',published_at=clock_timestamp(),revision=revision+1 WHERE school_id=$1 AND id=$2", [schoolId, a.id]);
       if (a.kind === 'assignment') await notifySchoolAssignmentChange(db, a, 'assigned');
       await auditSchool(db, schoolId, user.id, 'school.activity.publish', a.id);
+    } else if (action==='restore' && method==='POST') {
+      if (a.kind!=='assignment' || a.cancelled_at) fail(409,'ACTIVITY_FROZEN','A cancelled assignment cannot be restored.');
+      if (a.state==='Archived') {
+        await db.query("UPDATE school_activities SET state=CASE WHEN published_at IS NULL THEN 'Draft' ELSE 'Published' END,revision=revision+1 WHERE school_id=$1 AND id=$2",[schoolId,a.id]);
+        await auditSchool(db,schoolId,user.id,'school.assignment.restore',a.id);
+      }
     } else if (action === 'cancel' && method === 'POST') {
       if (a.cancelled_at) return reply(await detail(db, loaded, user));
       if (a.kind !== 'assignment' || a.state !== 'Published') fail(409, 'NOT_ACTIVE', 'Only a published assignment can be cancelled.');
@@ -536,7 +632,12 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
       await auditSchool(db, schoolId, user.id, 'school.activity.end', a.id);
     } else if (action === 'publish-results' && method === 'POST') {
       await publishResults(db, loaded, user);
-    } else if (action === 'report' && method === 'GET') {
+    } else if (action === 'report' && match[4] && a.kind === 'assignment') {
+      const identityId=uuid(match[4]), problemId=uuid(url.searchParams.get('problemId'));
+      if (!await assignmentParticipant(db,a,identityId)) fail(404,'NOT_FOUND','Student not assigned.');
+      if (method==='GET') return reply(await assignmentSubmissions(db,a,identityId,problemId,integer(Number(url.searchParams.get('page')??1),1,100000,'Page')));
+      if (method==='POST') return reply(await addAssignmentFeedback(db,a,user,identityId,problemId,body),201);
+    } else if (action === 'report' && !match[4] && method === 'GET') {
       const rows = (await db.query(`SELECT i.id,i.number,i.name,p.exempt,greatest($3::timestamptz,p.extended_due_at) AS "dueAt",
         coalesce((SELECT jsonb_agg(jsonb_build_object('id',c.id,'name',c.name) ORDER BY c.name,c.id)
           FROM school_class_roster r JOIN school_classes c ON (c.school_id,c.id)=(r.school_id,r.class_id)
@@ -544,7 +645,7 @@ export async function schoolActivitiesOperation({ pool, user, route, url, method
         FROM school_activity_participants p JOIN school_identities i ON i.school_id=p.school_id AND i.id=p.identity_id
         WHERE p.school_id=$1 AND p.activity_id=$2 ORDER BY i.name,i.number,i.id`, [schoolId, a.id, a.ends_at])).rows;
       const items = [];
-      for (const row of rows) items.push({ ...row, attempt: publicAttempt(await attempt(db, a, row.id)), grade: a.results_published_at ? (await db.query('SELECT grade FROM school_activity_results WHERE school_id=$1 AND activity_id=$2 AND identity_id=$3', [schoolId, a.id, row.id])).rows[0]?.grade : await calculateSchoolActivityGrade(db, a, row.id) });
+      for (const row of rows) items.push({ ...row, attempt: publicAttempt(await attempt(db, a, row.id)), grade: a.results_published_at ? (await db.query('SELECT grade FROM school_activity_results WHERE school_id=$1 AND activity_id=$2 AND identity_id=$3', [schoolId, a.id, row.id])).rows[0]?.grade : await calculateSchoolActivityGrade(db, a, row.id, {staffMatrix:a.kind==='assignment'}) });
       const revisions=(await db.query('SELECT id,revision,reason,created_at AS "createdAt",grades FROM school_activity_result_revisions WHERE school_id=$1 AND activity_id=$2 ORDER BY revision DESC',[schoolId,a.id])).rows;
       return reply({ activity: await detail(db, loaded, user), items,revisions });
     } else if (action === 'problems' && match[4]) {

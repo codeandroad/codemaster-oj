@@ -44,7 +44,7 @@ function notificationContent(item: Notification, locale: AppLocale, scholarshipH
     case "teacher_feedback":
       return {
         title: ui(locale, "收到教师反馈", "New teacher feedback"), body: item.problemTitle,
-        href: `/student/review-notebook/${encodeURIComponent(item.reviewId)}`, icon: MessageSquareText,
+        href: schoolId && item.submissionId ? `/schools?${new URLSearchParams({schoolId,section:"submissions",submissionId:item.submissionId})}` : `/student/review-notebook/${encodeURIComponent(item.reviewId)}`, icon: MessageSquareText,
       };
     case "assignment_change": {
       const labels = {

@@ -8,11 +8,11 @@ import { DomainService } from '../domain.service.js';
 @UseGuards(DomainGuard)
 export class SchoolActivitiesController {
  constructor(private readonly domain: DomainService) {}
- @Get(['','options',':activityId',':activityId/report',':activityId/problems/:problemId', ':activityId/problems/:problemId/submissions',':activityId/jobs/:jobId',':activityId/preview',':activityId/preview/problems/:problemId',':activityId/preview/problems/:problemId/submissions',':activityId/preview/jobs/:jobId'])
+ @Get(['','options',':activityId',':activityId/report',':activityId/report/:identityId',':activityId/problems/:problemId', ':activityId/problems/:problemId/submissions',':activityId/jobs/:jobId',':activityId/preview',':activityId/preview/problems/:problemId',':activityId/preview/problems/:problemId/submissions',':activityId/preview/jobs/:jobId'])
  async read(@Req() request: DomainRequest,@Res({passthrough:true}) response: Response){return applyResponse(response,await this.domain.execute('schoolActivities',request.domainContext));}
- @Post(['',':activityId/publish',':activityId/archive',':activityId/cancel',':activityId/start',':activityId/finish',':activityId/end',':activityId/publish-results',':activityId/problems/:problemId/submissions',':activityId/preview/problems/:problemId/submissions'])
+ @Post(['',':activityId/report/:identityId',':activityId/publish',':activityId/archive',':activityId/restore',':activityId/cancel',':activityId/start',':activityId/finish',':activityId/end',':activityId/publish-results',':activityId/problems/:problemId/submissions',':activityId/preview/problems/:problemId/submissions'])
  async create(@Req() request: DomainRequest,@Res({passthrough:true}) response: Response){return applyResponse(response,await this.domain.execute('schoolActivities',request.domainContext));}
- @Patch([':activityId', ':activityId/participants/:identityId'])
+ @Patch([':activityId', ':activityId/manage', ':activityId/participants/:identityId'])
  async update(@Req() request: DomainRequest,@Res({passthrough:true}) response: Response){return applyResponse(response,await this.domain.execute('schoolActivities',request.domainContext));}
 }
 @Module({controllers:[SchoolActivitiesController]})

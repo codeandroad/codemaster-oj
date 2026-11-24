@@ -333,7 +333,7 @@ export function SchoolsPage({
                 {active.section === "home" ? (
                   admin ? <AdminDashboard schoolId={selected.id}/> : <TeacherDashboard schoolId={selected.id}/>
                 ) : active.section === "assignments" || active.section === "timed" ? (
-                  <SchoolActivities school={selected} kind={active.section === "timed" ? "timed" : "assignment"} />
+                  <SchoolActivities school={selected} teacherAccountId={user.id} kind={active.section === "timed" ? "timed" : "assignment"} />
                 ) : active.section === "exam-preparation" ? (
                   <PreparationRouter schoolId={selected.id} rootHref={href("exam-preparation")} staff={teaching} paper4Href={!admin ? href("paper4") : undefined} acslHref={acslEnabled ? href("acsl") : undefined} />
                 ) : active.section === "acsl" ? (

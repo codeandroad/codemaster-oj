@@ -49,6 +49,10 @@ export function schoolBookmarkQuery(pathname: string, search: URLSearchParams, s
     const actions:Record<string,string> = {edit:"activityEdit",preview:"activityPreview",progress:"activityReport"};
     if (actions[child]) query.set(actions[child],"1");
   }
+  if (role === "teacher" && target === "assignments" && id === "new") {
+    query.delete("activityId");
+    query.set("activityEdit", "new");
+  }
   if (target === "problems" && id === "banks" && child) {
     query.delete("problemId"); query.set("bankId",child); query.set("problemTab","problems");
   }

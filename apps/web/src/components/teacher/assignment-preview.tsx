@@ -27,9 +27,9 @@ function previewHref(id: string, from: "edit" | "progress", problemId?: string) 
   return `/teacher/assignments/${encodeURIComponent(id)}/preview?${query}`;
 }
 
-export function AssignmentPreviewLink({ id, from }: { id: string; from: "edit" | "progress" }) {
+export function AssignmentPreviewLink({ id, from, schoolId }: { id: string; from: "edit" | "progress"; schoolId?:string }) {
   const { locale } = useLocale();
-  return <AppLink href={previewHref(id, from)} className={buttonVariants({ variant: "secondary" })}>
+  return <AppLink href={schoolId ? `/schools?schoolId=${schoolId}&section=assignments&schoolRole=teacher&activityId=${id}&activityPreview=1&from=${from}` : previewHref(id, from)} className={buttonVariants({ variant: "secondary" })}>
     {locale === "en" ? "Try as a student" : "以学生视角试做"}
   </AppLink>;
 }

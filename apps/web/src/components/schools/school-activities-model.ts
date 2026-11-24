@@ -1,6 +1,6 @@
 export type ActivityKind = "assignment" | "timed";
 export type ActivityProblem = { id: string; versionId: string; title: string; position: number; rewardPoints?:number|null; points: number };
-export type ActivityGradeItem = ActivityProblem & { status: string; solved: boolean; score: number; attempts: number; activityAttempts: number; inherited: boolean };
+export type ActivityGradeItem = ActivityProblem & { matrixStatus?:string; awaitingScore?:boolean; status: string; solved: boolean; score: number; attempts: number; activityAttempts: number; inherited: boolean };
 export type ActivityGrade = { items: ActivityGradeItem[]; score: number; total: number; solved: number; attempted: number };
 export type ActivityAttempt = { id: string; startedAt: string; deadlineAt: string | null; finishedAt: string | null };
 export type SchoolActivity = {
@@ -16,7 +16,7 @@ export type SchoolActivity = {
 };
 export type ActivityOptions = {
   activityRewardCap: number;
-  problems: { problemId: string; versionId: string; title: string; bankName: string; bankId: string }[];
+  problems: { problemId: string; versionId: string; title: string; mode: "function" | "stdio"; difficulty?: string | null; bankName: string; bankId: string }[];
   students: { id: string; name: string; number: string; activated: boolean; classIds: string[] }[];
   classes: { id: string; name: string }[];
 };

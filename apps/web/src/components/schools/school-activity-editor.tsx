@@ -7,14 +7,14 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { useRangeSelection } from "@/components/ui/use-range-selection";
 import { Feedback, State, input, textarea, useData, useMutation } from "@/components/student/shared";
 import { productionApi } from "@/lib/production-api";
-import { ActivityRuleFields, type ActivityRule } from "./school-scholarship";
+import { defaultActivityAssistance, ActivityRuleFields, type ActivityRule } from "./school-scholarship";
 import { useSchoolText } from "./school-ui";
 import { activityDateInput, activityDateValue, moveActivityProblem, type ActivityKind, type ActivityOptions, type SchoolActivity } from "./school-activities-model";
 
 const newAssignmentRule: ActivityRule = {
   amount: 0, minimumAc: 1, minimumScore: 0, requireAll: true, completionAvailable: true,
   taskKind: "challenge", allowSolutionAssisted: false, revision: 0,
-  assistance: { translation: { mode: "paid", opensAt: null }, solution: { mode: "paid", opensAt: null } },
+  assistance: defaultActivityAssistance,
 };
 
 export function SchoolActivityEditor({ schoolId, kind, activity, onSaved, onCancel }: {

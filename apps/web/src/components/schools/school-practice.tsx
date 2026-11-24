@@ -80,6 +80,7 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
   const navigationProblems = (allProblems.data?.courseId ?? "") === courseId ? allProblems.data?.items ?? [] : [];
   const [editing, setEditing] = useState<EditableProblem | "new" | null>(null);
   const [bankEdit, setBankEdit] = useState<Bank | "new" | null>(null);
+  const [archiveBank, setArchiveBank] = useState<Bank | null>(null);
   const [bankName, setBankName] = useState("");
   const bankRequest = useRef("");
   const bankPending = useRef(false);
@@ -165,6 +166,7 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
     busy={action.busy}
     onRefresh={refresh}
     onEditBank={editBank}
+    onArchiveBank={bank => { action.reset(); setArchiveBank(bank); }}
     onNewProblem={() => setEditing("new")}
     onOpen={id => {
       const problem = catalogProblems.find(item => item.id === id);
@@ -212,6 +214,27 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
     {staff && <><CatalogGroups base={base}/><SchoolImportHistory schoolId={schoolId}/></>}
     {staff && <State data={platformSources}>{null}</State>}
     <State data={banks}>{staff ? <State data={problems}>{catalogView}</State> : catalogView}</State>
+    <Dialog open={!!archiveBank} onOpenChange={open => { if (!open && !bankPending.current) setArchiveBank(null); }}>
+      {archiveBank && <DialogContent>
+        <DialogTitle>{archiveBank.archived ? tx("恢复题库", "Restore bank") : tx("归档题库", "Archive bank")}</DialogTitle>
+        <DialogDescription>{archiveBank.archived
+          ? tx(`恢复「${archiveBank.name}」后，已发布题目会重新出现在本校题库。`, `Published problems in “${archiveBank.name}” will appear in the school catalog again.`)
+          : tx(`归档「${archiveBank.name}」后，学生将无法从本校题库打开其中的题目。已有提交会保留。`, `Students will no longer be able to open problems in “${archiveBank.name}” from the school catalog. Existing submissions are retained.`)}</DialogDescription>
+        <Feedback action={action}/>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" disabled={action.busy} onClick={() => setArchiveBank(null)}>{tx("取消", "Cancel")}</Button>
+          <Button disabled={action.busy} onClick={() => {
+            if (bankPending.current) return;
+            bankPending.current = true;
+            void action.run(async () => {
+              await productionApi(`${base}/problem-banks/${archiveBank.id}`, { method: "PATCH", body: { expectedRevision: archiveBank.revision, archived: !archiveBank.archived } });
+              setArchiveBank(null);
+              refresh();
+            }).finally(() => { bankPending.current = false; });
+          }}>{archiveBank.archived ? tx("恢复", "Restore") : tx("归档", "Archive")}</Button>
+        </div>
+      </DialogContent>}
+    </Dialog>
     <Dialog open={bankEdit !== null} onOpenChange={open => { if (!open && !bankPending.current) setBankEdit(null); }}>
       <DialogContent>
         <DialogTitle>{bankEdit === "new" ? tx("新建题库", "New bank") : tx("编辑题库", "Edit bank")}</DialogTitle>

@@ -224,8 +224,19 @@ export async function handleSchoolScholarship({pool,user,route,method,body={},ur
   }
   if(path==='targets'&&method==='GET'){
    if(!['teacher','school_admin'].includes(role))fail(403,'FORBIDDEN','Teaching permission required.');const items=[];
-   const problems=(await db.query(`SELECT p.id,p.published_version_id AS version_id,v.definition->>'title' AS title FROM school_problems p JOIN school_problem_banks b ON b.school_id=p.school_id AND b.id=p.bank_id AND b.resource_kind='ordinary' JOIN school_problem_versions v ON v.school_id=p.school_id AND v.id=p.published_version_id WHERE p.school_id=$1 AND ($2='school_admin' OR p.owner_account_id=$3) ORDER BY p.created_at DESC,p.id`,[s,role,user.id])).rows;
-   for(const p of problems)items.push({type:'problem',problemId:p.id,versionId:p.version_id,title:p.title,subjectKey:`problem:${p.id}`});
+   const problems=(await db.query(`SELECT p.id AS "problemId",v.id AS "versionId",v.definition->>'title' AS title,b.name AS "bankName",b.id AS "bankId",
+     (coalesce(v.definition->>'reference_code','') ~ '[^[:space:]]' OR
+      coalesce(v.definition->>'editorial',v.definition#>>'{metadata,editorial}','') ~ '[^[:space:]]') AS "hasOriginalSolution",
+     EXISTS(SELECT 1 FROM school_scholarship_contents c JOIN school_problem_versions previous
+       ON (previous.school_id,previous.id)=(c.school_id,c.version_id)
+       WHERE c.school_id=p.school_id AND c.subject_key='problem:'||p.id AND c.kind='FULL_SOLUTION'
+       AND c.language='' AND c.status='published' AND c.published_at IS NOT NULL
+       AND previous.problem_id=p.id AND previous.id<>v.id AND previous.created_at<=v.created_at) AS "hasPreviousSolution"
+     FROM school_problems p JOIN school_problem_banks b ON (b.school_id,b.id)=(p.school_id,p.bank_id) AND b.resource_kind='ordinary'
+     JOIN school_problem_versions v ON (v.school_id,v.problem_id,v.id)=(p.school_id,p.id,p.published_version_id)
+     WHERE p.school_id=$1 AND ($2='school_admin' OR p.owner_account_id=$3)
+     ORDER BY b.name,v.definition->>'title',p.id`,[s,role,user.id])).rows;
+   for(const p of problems)items.push({type:'problem',...p,subjectKey:`problem:${p.problemId}`});
    const papers=(await db.query(`SELECT p.id,p.published_version_id AS version_id,v.content FROM school_paper4_papers p JOIN school_paper4_versions v ON v.school_id=p.school_id AND v.id=p.published_version_id WHERE p.school_id=$1 AND ($2='school_admin' OR p.owner_account_id=$3) ORDER BY p.created_at DESC,p.id`,[s,role,user.id])).rows;
    for(const p of papers)for(const q of p.content.definition?.questions??[])items.push({type:'paper4',paperId:p.id,questionKey:q.key,versionId:p.version_id,title:`${p.content.shortTitle||p.content.title} · ${q.title}`,subjectKey:`paper4:${p.id}:${q.key}`});
    const contents=(await db.query('SELECT id,subject_key,version_id,kind,status,revision,pending_solution IS NOT NULL has_pending FROM school_scholarship_contents WHERE school_id=$1',[s])).rows;const policies=(await db.query("SELECT * FROM school_scholarship_policies WHERE school_id=$1 AND target_type='subject'",[s])).rows;
@@ -288,7 +299,7 @@ export async function handleSchoolScholarship({pool,user,route,method,body={},ur
    if(method==='GET'){
     const policies=(await db.query('SELECT kind,mode,opens_at FROM school_scholarship_policies WHERE school_id=$1 AND target_type=$2 AND target_key=$3',[s,type,id])).rows;
     const policy=k=>{const p=policies.find(p=>p.kind===k);return {mode:p?.mode??'paid',opensAt:p?.opens_at??null};};
-    return reply({...shape(old),completionAvailable:type==='activity'&&targetActivity.kind==='assignment',assistance:{translation:policy('FULL_TRANSLATION'),solution:policy('FULL_SOLUTION')}});
+    return reply({...shape(old),activityRewardCap:cfg.activityRewardCap,completionAvailable:type==='activity'&&targetActivity.kind==='assignment',assistance:{translation:policy('FULL_TRANSLATION'),solution:policy('FULL_SOLUTION')}});
    }
    return reply(await configureSchoolActivityScholarshipRule(db,s,user,role,id,type,b));
   }

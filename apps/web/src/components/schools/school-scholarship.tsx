@@ -39,6 +39,10 @@ type Content = SolutionDraft & { id?: string; revision: number; status: string; 
 type Target = SchoolAssistanceTarget & {
   subjectKey: string;
   title: string;
+  bankId?: string;
+  bankName?: string;
+  hasOriginalSolution?: boolean;
+  hasPreviousSolution?: boolean;
   contents: { id: string; kind: Kind; revision: number; status: string; hasPendingSolutions?: boolean }[];
   policies: {
     kind: Kind;
@@ -88,12 +92,13 @@ type ActivityAssistancePolicy = {
   mode: "disabled" | "paid" | "free";
   opensAt: string | null;
 };
-type Rule = {
+export type ActivityRule = {
   amount: number;
   minimumAc: number;
   minimumScore: number;
   requireAll: boolean;
   completionAvailable: boolean;
+  activityRewardCap?: number;
   taskKind: string;
   allowSolutionAssisted: boolean;
   revision: number;
@@ -102,6 +107,171 @@ type Rule = {
     solution: ActivityAssistancePolicy;
   };
 };
+export function ActivityRuleFields({ draft, setDraft, cap = 1000 }: {
+  draft: ActivityRule; setDraft: (rule: ActivityRule) => void; cap?: number;
+}) {
+  const tx = useText();
+  return <div className="grid gap-3 sm:grid-cols-2 sm:[&>fieldset]:col-span-2 sm:[&>p]:col-span-2">
+    {draft.completionAvailable && (
+      <label className="block text-sm">
+        {tx("发放条件", "Award condition")}
+        <select className={inputClass} value={draft.requireAll ? "complete" : "threshold"} onChange={event => setDraft({ ...draft, requireAll: event.target.value === "complete" })}>
+          <option value="complete">{tx("通过全部必做题", "Pass every required problem")}</option>
+          <option value="threshold">{tx("达到指定题数和得分", "Meet a problem and score threshold")}</option>
+        </select>
+      </label>
+    )}
+    {(
+      [
+        ["amount", tx("奖学金金额", "Scholarship amount")],
+        ["minimumAc", tx("至少通过题数", "Minimum accepted problems")],
+        ["minimumScore", tx("最低得分百分比", "Minimum score percent")],
+      ] as const
+    ).filter(([field]) => field === "amount" || !draft.requireAll).map(([k, label]) => (
+      <label key={k} className="block text-sm">
+        {label}
+        <input
+          type="number"
+          min={k === "minimumAc" ? 1 : 0}
+          max={k === "amount" ? cap : 100}
+          className={inputClass}
+          value={draft[k]}
+          onChange={(e) =>
+            setDraft({ ...draft, [k]: Number(e.target.value) })
+          }
+        />
+      </label>
+    ))}
+    <label className="block text-sm">
+      {tx("任务类型", "Task type")}
+      <select
+        className={inputClass}
+        value={draft.taskKind}
+        onChange={(e) =>
+          setDraft({
+            ...draft,
+            taskKind: e.target.value,
+            allowSolutionAssisted:
+              e.target.value === "challenge"
+                ? false
+                : draft.allowSolutionAssisted,
+          })
+        }
+      >
+        <option value="challenge">{tx("挑战", "Challenge")}</option>
+        <option value="learning">{tx("学习", "Learning")}</option>
+        <option value="correction">{tx("订正", "Correction")}</option>
+      </select>
+    </label>
+    <label className="flex items-center gap-2 text-sm">
+      <input
+        type="checkbox"
+        checked={draft.allowSolutionAssisted}
+        disabled={draft.taskKind === "challenge"}
+        onChange={(e) =>
+          setDraft({
+            ...draft,
+            allowSolutionAssisted: e.target.checked,
+          })
+        }
+      />
+      {tx(
+        "允许查看题解后的提交计入活动奖励",
+        "Allow solution-assisted submissions toward this activity reward",
+      )}
+    </label>
+    <fieldset className="space-y-2 border-t border-border pt-3">
+      <legend className="text-sm font-semibold">
+        {tx("辅助内容开放", "Assistance access")}
+      </legend>
+      {(
+        [
+          ["translation", tx("中文题面", "Translation")],
+          ["solution", tx("参考答案", "Solution")],
+        ] as const
+      ).map(([key, label]) => (
+        <div key={key} className="grid gap-2 sm:grid-cols-2">
+          <label className="text-sm">
+            {label}
+            <select
+              className={inputClass}
+              value={draft.assistance[key].mode}
+              onChange={(e) =>
+                setDraft({
+                  ...draft,
+                  assistance: {
+                    ...draft.assistance,
+                    [key]: {
+                      ...draft.assistance[key],
+                      mode: e.target
+                        .value as ActivityAssistancePolicy["mode"],
+                    },
+                  },
+                })
+              }
+            >
+              <option value="disabled">{tx("禁用", "Disabled")}</option>
+              <option value="paid">
+                {tx("付费解锁", "Paid unlock")}
+              </option>
+              <option value="free">
+                {tx("活动内免费", "Free in this activity")}
+              </option>
+            </select>
+          </label>
+          <label className="text-sm">
+            {tx("开放时间（可选）", "Opens at (optional)")}
+            <input
+              type="datetime-local"
+              className={inputClass}
+              value={
+                draft.assistance[key].opensAt
+                  ? new Date(
+                      new Date(
+                        draft.assistance[key].opensAt!,
+                      ).getTime() -
+                        new Date(
+                          draft.assistance[key].opensAt!,
+                        ).getTimezoneOffset() *
+                          60000,
+                    )
+                      .toISOString()
+                      .slice(0, 16)
+                  : ""
+              }
+              onChange={(e) =>
+                setDraft({
+                  ...draft,
+                  assistance: {
+                    ...draft.assistance,
+                    [key]: {
+                      ...draft.assistance[key],
+                      opensAt: e.target.value
+                        ? new Date(e.target.value).toISOString()
+                        : null,
+                    },
+                  },
+                })
+              }
+            />
+          </label>
+        </div>
+      ))}
+      <p className="text-xs text-muted-foreground">
+        {tx(
+          "考核成绩公布前，辅助内容始终关闭。禁用和未到开放时间的限制在其他入口同样生效。",
+          "Assessment assistance stays closed until results are released. Disabled and opening-time restrictions also apply through other entrances.",
+        )}
+      </p>
+    </fieldset>
+    {draft.completionAvailable && (
+      <p className="text-xs text-muted-foreground">
+        {tx("奖励按本作业的有效正式提交计算。达标后自动发放，并通过站内通知告知学生。", "Eligible formal submissions in this assignment count toward the reward. Qualifying students receive it automatically with an in-app notification.")}
+      </p>
+    )}
+  </div>;
+}
+
 export function SchoolActivityScholarshipRule({
   schoolId,
   activityId,
@@ -114,11 +284,11 @@ export function SchoolActivityScholarshipRule({
   editable?: boolean;
 }) {
   const tx = useText(),
-    data = useData<Rule>(
+    data = useData<ActivityRule>(
       `${prefix(schoolId)}/activity-rule?${new URLSearchParams({ activityId, type })}`,
     ),
     [editing, setEditing] = useState(false),
-    [draft, setDraft] = useState<Rule | null>(null),
+    [draft, setDraft] = useState<ActivityRule | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   if (data.loading) return null;
@@ -186,163 +356,7 @@ export function SchoolActivityScholarshipRule({
                 "Published before the activity and then frozen. Awarded once per student and activity.",
               )}
             </p>
-            {r.completionAvailable && (
-              <label className="block text-sm">
-                {tx("发放条件", "Award condition")}
-                <select className={inputClass} value={draft.requireAll ? "complete" : "threshold"} onChange={event => setDraft({ ...draft, requireAll: event.target.value === "complete" })}>
-                  <option value="complete">{tx("通过全部必做题", "Pass every required problem")}</option>
-                  <option value="threshold">{tx("达到指定题数和得分", "Meet a problem and score threshold")}</option>
-                </select>
-              </label>
-            )}
-            {(
-              [
-                ["amount", tx("额外奖学金", "Extra scholarship")],
-                ["minimumAc", tx("至少通过题数", "Minimum accepted problems")],
-                ["minimumScore", tx("最低得分百分比", "Minimum score percent")],
-              ] as const
-            ).filter(([field]) => field === "amount" || !draft.requireAll).map(([k, label]) => (
-              <label key={k} className="block text-sm">
-                {label}
-                <input
-                  type="number"
-                  min={k === "minimumAc" ? 1 : 0}
-                  max={k === "amount" ? 1000 : 100}
-                  className={inputClass}
-                  value={draft[k]}
-                  onChange={(e) =>
-                    setDraft({ ...draft, [k]: Number(e.target.value) })
-                  }
-                />
-              </label>
-            ))}
-            <label className="block text-sm">
-              {tx("任务类型", "Task type")}
-              <select
-                className={inputClass}
-                value={draft.taskKind}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    taskKind: e.target.value,
-                    allowSolutionAssisted:
-                      e.target.value === "challenge"
-                        ? false
-                        : draft.allowSolutionAssisted,
-                  })
-                }
-              >
-                <option value="challenge">{tx("挑战", "Challenge")}</option>
-                <option value="learning">{tx("学习", "Learning")}</option>
-                <option value="correction">{tx("订正", "Correction")}</option>
-              </select>
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={draft.allowSolutionAssisted}
-                disabled={draft.taskKind === "challenge"}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    allowSolutionAssisted: e.target.checked,
-                  })
-                }
-              />
-              {tx(
-                "允许查看题解后的提交计入活动奖励",
-                "Allow solution-assisted submissions toward this activity reward",
-              )}
-            </label>
-            <fieldset className="space-y-2 border-t border-border pt-3">
-              <legend className="text-sm font-semibold">
-                {tx("辅助内容开放", "Assistance access")}
-              </legend>
-              {(
-                [
-                  ["translation", tx("中文题面", "Translation")],
-                  ["solution", tx("参考答案", "Solution")],
-                ] as const
-              ).map(([key, label]) => (
-                <div key={key} className="grid gap-2 sm:grid-cols-2">
-                  <label className="text-sm">
-                    {label}
-                    <select
-                      className={inputClass}
-                      value={draft.assistance[key].mode}
-                      onChange={(e) =>
-                        setDraft({
-                          ...draft,
-                          assistance: {
-                            ...draft.assistance,
-                            [key]: {
-                              ...draft.assistance[key],
-                              mode: e.target
-                                .value as ActivityAssistancePolicy["mode"],
-                            },
-                          },
-                        })
-                      }
-                    >
-                      <option value="disabled">{tx("禁用", "Disabled")}</option>
-                      <option value="paid">
-                        {tx("付费解锁", "Paid unlock")}
-                      </option>
-                      <option value="free">
-                        {tx("活动内免费", "Free in this activity")}
-                      </option>
-                    </select>
-                  </label>
-                  <label className="text-sm">
-                    {tx("开放时间（可选）", "Opens at (optional)")}
-                    <input
-                      type="datetime-local"
-                      className={inputClass}
-                      value={
-                        draft.assistance[key].opensAt
-                          ? new Date(
-                              new Date(
-                                draft.assistance[key].opensAt!,
-                              ).getTime() -
-                                new Date(
-                                  draft.assistance[key].opensAt!,
-                                ).getTimezoneOffset() *
-                                  60000,
-                            )
-                              .toISOString()
-                              .slice(0, 16)
-                          : ""
-                      }
-                      onChange={(e) =>
-                        setDraft({
-                          ...draft,
-                          assistance: {
-                            ...draft.assistance,
-                            [key]: {
-                              ...draft.assistance[key],
-                              opensAt: e.target.value
-                                ? new Date(e.target.value).toISOString()
-                                : null,
-                            },
-                          },
-                        })
-                      }
-                    />
-                  </label>
-                </div>
-              ))}
-              <p className="text-xs text-muted-foreground">
-                {tx(
-                  "考核成绩公布前，辅助内容始终关闭。禁用和未到开放时间的限制在其他入口同样生效。",
-                  "Assessment assistance stays closed until results are released. Disabled and opening-time restrictions also apply through other entrances.",
-                )}
-              </p>
-            </fieldset>
-            {r.completionAvailable && (
-              <p className="text-xs text-muted-foreground">
-                {tx("奖励按本作业的有效正式提交计算。达标后自动发放，并通过站内通知告知学生。", "Eligible formal submissions in this assignment count toward the reward. Qualifying students receive it automatically with an in-app notification.")}
-              </p>
-            )}
+            <ActivityRuleFields draft={draft} setDraft={setDraft} cap={r.activityRewardCap}/>
             <Button disabled={busy} onClick={() => void save()}>
               {tx("保存", "Save")}
             </Button>
@@ -932,6 +946,7 @@ function ScholarshipContents({
     [kind, setKind] = useState<Kind>("FULL_SOLUTION"),
     [q, setQ] = useState(""),
     [status, setStatus] = useState("all"),
+    [bankId, setBankId] = useState(""),
     [selected, setSelected] = useState<string[]>([]),
     [editing, setEditing] = useState<Target | null>(null),
     [prices, setPrices] = useState(false),
@@ -944,9 +959,12 @@ function ScholarshipContents({
     [error, setError] = useState(""),
     anchor = useRef<string | null>(null);
   const state = (i: Target) => i.contents.find((c) => c.kind === kind),
-    reviewStatus = (i: Target) => state(i)?.hasPendingSolutions ? "draft" : state(i)?.status ?? "missing",
+    reviewStatus = (i: Target) => state(i)?.hasPendingSolutions ? "draft" : state(i)?.status ??
+      (kind === "FULL_SOLUTION" && i.hasPreviousSolution ? "previous" :
+        kind === "FULL_SOLUTION" && i.hasOriginalSolution ? "reference" : "missing"),
     items = (data.data?.items ?? []).filter(
       (i) =>
+        (!bankId || (i.bankId ?? "paper4") === bankId) &&
         (status === "all" || reviewStatus(i) === status) &&
         i.title.toLowerCase().includes(q.toLowerCase()),
     ),
@@ -958,6 +976,8 @@ function ScholarshipContents({
       published: tx("已发布", "Published"),
       draft: tx("待审核", "Awaiting review"),
       missing: tx("缺少内容", "Missing content"),
+      reference: tx("有参考题解，可建草稿", "Reference available for draft"),
+      previous: tx("有已审核旧版，可建草稿", "Reviewed earlier version available"),
       withdrawn: tx("已撤回", "Withdrawn"),
     })[s] ?? s;
   function toggle(id: string, checked: boolean, shift: boolean) {
@@ -1042,6 +1062,7 @@ function ScholarshipContents({
           value={kind}
           onChange={(e) => {
             setKind(e.target.value as Kind);
+            setStatus("all");
             setSelected([]);
           }}
         >
@@ -1052,14 +1073,20 @@ function ScholarshipContents({
             {tx("中文题面", "Chinese translation")}
           </option>
         </select>
+        <select aria-label={tx("题库", "Bank")} className={`${inputClass} max-w-56`} value={bankId}
+          onChange={event => { setBankId(event.target.value); setSelected([]); }}>
+          <option value="">{tx("全部题库", "All banks")}</option>
+          {[...new Map(data.data?.items.map(item => [item.bankId ?? "paper4", item.bankName ?? "Paper 4"])).entries()].map(([id, name]) =>
+            <option key={id} value={id}>{name}</option>)}
+        </select>
         <select
           aria-label={tx("审核状态", "Review status")}
           className={`${inputClass} max-w-44`}
           value={status}
-          onChange={(e) => setStatus(e.target.value)}
+          onChange={(e) => { setStatus(e.target.value); setSelected([]); }}
         >
           <option value="all">{tx("全部状态", "All statuses")}</option>
-          {["missing", "draft", "published", "withdrawn"].map((s) => (
+          {[...(kind === "FULL_SOLUTION" ? ["previous", "reference"] : []), "missing", "draft", "published", "withdrawn"].map((s) => (
             <option key={s} value={s}>
               {label(s)}
             </option>
@@ -1070,7 +1097,7 @@ function ScholarshipContents({
           className={`${inputClass} max-w-72`}
           placeholder={tx("搜索题目", "Search problems")}
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => { setQ(e.target.value); setSelected([]); }}
         />
         <span className="text-xs text-muted-foreground">
           {selected.length} {tx("项已选", "selected")}
@@ -1086,7 +1113,7 @@ function ScholarshipContents({
           <Button
             disabled={
               !selected.length ||
-              chosen.some((i) => ["missing", "published"].includes(reviewStatus(i)))
+              chosen.some((i) => !state(i) || reviewStatus(i) === "published")
             }
             onClick={() => {
               setConfirmed(false);
@@ -1158,6 +1185,7 @@ function ScholarshipContents({
                     </td>
                     <td className="max-w-96 px-3 py-2 font-medium">
                       {i.title}
+                      <span className="block text-xs font-normal text-muted-foreground">{i.bankName ?? "Paper 4"}</span>
                     </td>
                     <td className="px-3 py-2">
                       <span

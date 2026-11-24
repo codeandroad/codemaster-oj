@@ -86,6 +86,31 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
     const published = (await request(prefix + '/problems/' + p.id + '/publish', { auth: auth.admin, method: 'POST', body: { expectedRevision: 1 } })).data;
     await request('/platform/problem-publications', { auth: auth.admin, method: 'POST', body: { schoolId: school.id, problemId: p.id, versionId: published.versionId } });
     const config = { kind: 'timed', title: 'Timed assessment', description: '', startsAt: new Date(Date.now() - 60000).toISOString(), endsAt: new Date(Date.now() + 3600000).toISOString(), durationMinutes: 30, problems: [{ problemId: p.id, versionId: published.versionId, points: 50 }], identityIds: [ids.student, ids.peer], requestId: randomUUID() };
+    await t.test('assignment reward and draft save atomically with retry and revision protection', async () => {
+      const post = { auth: auth.teacher, method: 'POST' };
+      const body = { ...config, kind: 'assignment', title: 'Reward draft', requestId: randomUUID(), scholarshipRule: { amount: 10, requireAll: true } };
+      const cap = (await request(activities + '/options', { auth: auth.teacher })).data.activityRewardCap;
+      await request(activities, { ...post, body: { ...body, scholarshipRule: { amount: cap + 1 } }, status: 400 });
+      await request(activities, { ...post, auth: auth.student, body, status: 403 });
+      await request(activities, { ...post, auth: auth.outside, body, status: 404 });
+      const { data: draft } = await request(activities, { ...post, body, status: 201 });
+      assert.equal((await request(activities, { ...post, body })).data.id, draft.id);
+      await request(activities, { ...post, body: { ...body, scholarshipRule: { amount: 9 } }, status: 409 });
+      const rulePath = prefix + '/scholarship/activity-rule?activityId=' + draft.id;
+      const readRule = async () => (await request(rulePath, { auth: auth.teacher })).data;
+      assert.equal((await readRule()).revision, 1);
+      assert.equal((await readRule()).requireAll, true);
+      const path = activities + '/' + draft.id;
+      await pool.query('UPDATE school_activity_problems SET reward_points=3 WHERE school_id=$1 AND activity_id=$2', [school.id, draft.id]);
+      const patch = { ...body, title: 'Changed draft', expectedRevision: 1, scholarshipRule: { amount: 8, requireAll: true, expectedRevision: 1 } };
+      await request(path, { auth: auth.teacher, method: 'PATCH', body: { ...patch, scholarshipRule: { ...patch.scholarshipRule, expectedRevision: 0 } }, status: 409 });
+      assert.equal((await request(path, { auth: auth.teacher })).data.title, body.title);
+      const updated = (await request(path, { auth: auth.teacher, method: 'PATCH', body: patch })).data;
+      assert.equal(updated.problems[0].rewardPoints, 3);
+      assert.equal((await readRule()).amount, 8);
+      await request(path + '/publish', { ...post, body: { expectedRevision: updated.revision } });
+      await request(path, { auth: auth.teacher, method: 'PATCH', body: patch, status: 409 });
+    });
     await t.test('teacher practice and assignment previews are isolated from formal student outcomes', async () => {
       const teacher = { auth: auth.teacher };
       const judge = process.env.GO_JUDGE_TEST_URL
@@ -314,16 +339,13 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
         ? new GoJudge({ url: process.env.GO_JUDGE_TEST_URL, token: process.env.GO_JUDGE_TEST_TOKEN, environmentVersion: 'assignment-change-qa' })
         : { judge: async () => completed };
       const { data: a } = await request(activities, { ...teacher, method: 'POST', status: 201, body: {
-        ...config, kind: 'assignment', title: 'Adjusted homework', requestId: randomUUID(),
+        ...config, kind: 'assignment', title: 'Adjusted homework', requestId: randomUUID(), scholarshipRule: { amount: 12, requireAll: true },
       } });
       const path = activities + '/' + a.id, submit = path + '/problems/' + p.id + '/submissions';
       const studentPath = path + '/participants/' + ids.student;
       const peerPath = path + '/participants/' + ids.peer;
       const notices = async auth => (await request(prefix + '/student-notifications', auth)).data.items
         .filter(item => item.kind === 'assignment_change' && item.assignmentId === a.id);
-      await request(prefix + '/scholarship/activity-rule', { ...teacher, method: 'POST', body: {
-        activityId: a.id, amount: 12, requireAll: true, expectedRevision: 0,
-      } });
       await request(path + '/publish', { ...teacher, method: 'POST', body: { expectedRevision: 1 } });
       await pool.query('UPDATE school_activities SET ends_at=clock_timestamp() WHERE school_id=$1 AND id=$2', [school.id, a.id]);
       const dueAt = new Date(Date.now() + 7200000).toISOString();
@@ -433,6 +455,51 @@ test('school activity HTTP transport and alternate-entry assessment isolation', 
       await pool.query("UPDATE problems SET tutorial_mode='course' WHERE id=$1", [source.id]);
       await pool.query('UPDATE chapter_problems SET version_id=$2 WHERE chapter_id=$1', [chapter.id,other]);
       assert.equal((await get('student', '?versionId=' + other)).tutorial, undefined);
+    });
+    await t.test('bank controls and scholarship review track the exact bank, problem and published version', async () => {
+      const staff = { auth: auth.teacher }, targets = prefix + '/scholarship/targets';
+      const listed = async () => (await request(targets, staff)).data.items;
+      const find = async () => (await listed()).find(row => row.problemId === p.id);
+      const row = await find();
+      assert.equal(row.bankId, bank.id);
+      assert.equal(row.bankName, bank.name);
+      assert.equal(row.hasOriginalSolution, true);
+      assert.equal(row.hasPreviousSolution, false);
+      assert.deepEqual(row.contents, []);
+      assert.doesNotMatch(JSON.stringify(row), /PRIVATE_REFERENCE|1874/);
+      await request(targets, { auth: auth.student, status: 403 });
+      await request(targets, { auth: auth.outside, status: 404 });
+      const target = { problemId: p.id, versionId: published.versionId, kind: 'FULL_SOLUTION' };
+      const editor = prefix + '/scholarship/content';
+      const content = (await request(editor + '?' + new URLSearchParams(target), staff)).data;
+      assert.match(content.originalSolution.body, /PRIVATE_REFERENCE/);
+      const saved = (await request(editor, { ...staff, method: 'POST', body: { ...target, body: 'Reviewed worked solution' } })).data;
+      assert.equal((await find()).contents[0].status, 'draft');
+      await request(prefix + '/scholarship/contents/review', { auth: auth.admin, method: 'POST', body: { confirmReviewed: true, items: [saved] } });
+      assert.equal((await find()).contents[0].status, 'published');
+      const duplicate = randomUUID(), version = randomUUID();
+      await pool.query(`INSERT INTO school_problems(school_id,id,bank_id,owner_account_id,draft,request_id)
+        VALUES($1,$2,$3,$4,'{}',$2)`, [school.id, duplicate, bank.id, users.teacher.id]);
+      await pool.query(`INSERT INTO school_problem_versions(school_id,id,problem_id,draft_revision,definition)
+        VALUES($1,$2,$3,1,$4)`, [school.id, version, duplicate, JSON.stringify({ title: row.title })]);
+      await pool.query('UPDATE school_problems SET published_version_id=$2,published=true WHERE school_id=$1 AND id=$3', [school.id, version, duplicate]);
+      const other = (await listed()).find(item => item.problemId === duplicate);
+      assert.equal(other.hasOriginalSolution, false);
+      assert.equal(other.hasPreviousSolution, false);
+      assert.deepEqual(other.contents, []);
+      const newer = randomUUID();
+      await pool.query(`INSERT INTO school_problem_versions(school_id,id,problem_id,draft_revision,definition)
+        SELECT school_id,$2,problem_id,draft_revision+1,definition FROM school_problem_versions WHERE school_id=$1 AND id=$3`, [school.id, newer, published.versionId]);
+      await pool.query('UPDATE school_problems SET published_version_id=$2 WHERE school_id=$1 AND id=$3', [school.id, newer, p.id]);
+      assert.equal((await find()).hasPreviousSolution, true);
+      assert.deepEqual((await find()).contents, []);
+      const changeBank = (auth, archived, expectedRevision, status = 200) => request(prefix + '/problem-banks/' + bank.id,
+        { auth, method: 'PATCH', body: { archived, expectedRevision }, status });
+      await changeBank(auth.student, true, 1, 403);
+      await changeBank(auth.teacher, true, 1);
+      assert.ok(!(await request(prefix + '/problem-banks', { auth: auth.student })).data.items.some(b => b.id === bank.id));
+      await changeBank(auth.teacher, false, 2);
+      assert.ok((await request(prefix + '/problem-banks', { auth: auth.student })).data.items.some(b => b.id === bank.id));
     });
   } finally {
     await server?.close(); await worker?.end(); await pool.end(); await owner.query('DROP SCHEMA IF EXISTS ' + schema + ' CASCADE'); await owner.end();

@@ -10,14 +10,14 @@ import { StatusPill } from "@/components/page-chrome";
 import { useLocale } from "@/components/locale-context";
 import { AssignmentArchiveTabs, AssignmentCompletedStatus, StudentAssignmentCard, StudentTimedPracticeCard, StudentTimedPracticeTabs, timedPracticeCategoryLabel } from "@/components/student/activity-cards";
 import { Progress } from "@/components/student/dashboard-view";
-import { date, Empty, Feedback, State, useData, useMutation } from "@/components/student/shared";
+import { date, input, Empty, Feedback, State, useData, useMutation } from "@/components/student/shared";
 import { AssignmentParticipantForm, CancelAssignment } from "@/components/teacher/assignment-changes";
 import { productionApi } from "@/lib/production-api";
 import { PracticeProblem } from "./school-practice";
 import { SchoolActivityScholarshipRule } from "./school-scholarship";
 import { SchoolActivityEditor } from "./school-activity-editor";
 import { useSchoolText, type School } from "./school-ui";
-import { activityCsvCell, activityDateValue, type ActivityKind, type ActivityReport, type SchoolActivity } from "./school-activities-model";
+import { activityCsvCell, activityDateValue, summarizeActivityReport, type ActivityKind, type ActivityReport, type SchoolActivity } from "./school-activities-model";
 
 const panel = "overflow-hidden rounded-lg border border-border bg-surface";
 const th = "whitespace-nowrap px-3 py-2.5 font-medium";
@@ -218,17 +218,76 @@ function SchoolActivityDetails({ activity: a, base, onBack, onEdit, onReport, on
 }
 const kindLabel = (kind: ActivityKind) => kind === "timed" ? "Timed practice" : "Assignments";
 
-export function SchoolActivityReportView({ base, activityId, onBack }: { base: string; activityId: string; onBack: () => void }) {
-  const text = useSchoolText(), { locale } = useLocale(), data = useData<ActivityReport>(`${base}/${encodeURIComponent(activityId)}/report`);
+export function SchoolActivityReportView({ base, activityId, onBack, fromReports = false }: {
+  base: string; activityId: string; onBack: () => void; fromReports?: boolean;
+}) {
+  const text = useSchoolText(), { locale } = useLocale();
+  const data = useData<ActivityReport>(`${base}/${encodeURIComponent(activityId)}/report`);
+  const [classId, setClassId] = useState("");
+  const report = data.data;
+  const classes = new Map(report?.items.flatMap(row => row.classes.map(c => [c.id, c.name] as const)));
+  const items = (report?.items ?? []).filter(row => !classId || row.classes.some(c => c.id === classId));
+  const problems = report?.activity.problems ?? [];
+  const summary = summarizeActivityReport(items, problems);
   function download() {
-    if (!data.data) return;
-    const rows = [["Student ID", "Name", "Score", "Total", "Solved", "Attempted"], ...data.data.items.map(item => [item.number, item.name, item.grade.score, item.grade.total, item.grade.solved, item.grade.attempted])];
+    const rows = [[text("Student ID", "学号"), text("Name", "姓名"), text("Exempt", "已豁免"), text("Score", "成绩"),
+      text("Total", "总分"), text("Solved", "通过题数"), text("Attempted", "已尝试题数"), ...problems.map(p => p.title)],
+      ...items.map(item => [item.number, item.name, item.exempt ? text("Yes", "是") : text("No", "否"),
+        item.grade.score, item.grade.total, item.grade.solved, item.grade.attempted,
+        ...problems.map(p => item.grade.items.find(grade => grade.id === p.id)?.score ?? "")])];
     const url = URL.createObjectURL(new Blob(["\ufeff" + rows.map(row => row.map(activityCsvCell).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a"); a.href = url; a.download = `activity-${activityId.slice(0, 8)}.csv`; a.click(); URL.revokeObjectURL(url);
   }
-  return <div className="space-y-3"><div className="flex justify-between gap-2"><Button size="sm" variant="ghost" onClick={onBack}><ArrowLeft size={15}/>{text("Back to activity", "返回活动")}</Button><Button size="sm" variant="secondary" disabled={!data.data} onClick={download}><Download size={15}/>{text("Export CSV", "导出 CSV")}</Button></div><State data={data}>{data.data && <><h1 className="text-lg font-bold">{data.data.activity.title} · {text("Report", "报告")}</h1>{data.data.activity.kind === "assignment" && data.data.activity.state === "Published" && <section className={`${panel} p-4`}>
-    <h2 className="mb-3 text-sm font-semibold">{text("Individual deadline or exemption", "个人延期或豁免")}</h2>
-    <AssignmentParticipantForm path={`${base}/${activityId}`} participants={data.data.items.map(item => ({ ...item, identityId: item.id }))}
-      toDeadline={activityDateValue} onSaved={data.reload}/>
-  </section>}<section className={panel}><div className="overflow-auto"><table className="w-full text-left text-sm"><thead className="bg-surface-subtle text-muted-foreground"><tr>{[text("Student ID", "学号"), text("Name", "姓名"), text("Score", "成绩"), text("Solved", "通过"), text("Started", "开始时间"), text("Deadline", "个人截止")].map(label => <th key={label} className={th}>{label}</th>)}</tr></thead><tbody>{data.data.items.map(item => <tr key={item.id} className="border-t border-border"><td className={`${td} font-mono text-xs`}>{item.number}</td><td className={td}>{item.name}{item.exempt && <span className="ml-2 text-xs text-muted-foreground">{text("Exempt", "已豁免")}</span>}</td><td className={td}>{item.grade.score}/{item.grade.total}</td><td className={td}>{item.grade.solved}/{item.grade.items.length}</td><td className={`${td} text-muted-foreground`}>{date(item.attempt?.startedAt, locale)}</td><td className={`${td} text-muted-foreground`}>{date(data.data?.activity.kind === "assignment" ? item.dueAt : item.attempt?.deadlineAt, locale)}</td></tr>)}</tbody></table></div></section></>}</State></div>;
+  return <div className="space-y-3">
+    <div className="flex justify-between gap-2">
+      <Button size="sm" variant="ghost" onClick={onBack}><ArrowLeft size={15}/>{fromReports ? text("Back to reports", "返回教学报告") : text("Back to activity", "返回活动")}</Button>
+      <Button size="sm" variant="secondary" disabled={!report} onClick={download}><Download size={15}/>{text("Export CSV", "导出 CSV")}</Button>
+    </div>
+    <State data={data}>{report && <>
+      <h1 className="text-lg font-bold">{report.activity.title} · {text("Report", "报告")}</h1>
+      <section className={`${panel} space-y-3 p-4`}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-semibold">{text("Completion overview", "完成情况")}</h2>
+          <label className="flex items-center gap-2 text-sm">{text("Class", "班级")}
+            <select className={`${input} w-auto`} value={classId} onChange={event => setClassId(event.target.value)}>
+              <option value="">{text("All classes", "全部班级")}</option>
+              {[...classes].map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            </select>
+          </label>
+        </div>
+        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[[text("Required students", "应完成人数"), summary.required], [text("Completed", "已完成"), summary.completed],
+            [text("In progress", "进行中"), summary.inProgress], [text("Not started", "未开始"), summary.unstarted]].map(([label, value]) =>
+            <div key={label}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="font-semibold tabular-nums">{value}</dd></div>)}
+        </dl>
+      </section>
+      {!!problems.length && <section className={panel}>
+        <h2 className="px-3 py-2 font-semibold">{text("Results by problem", "分题统计")}</h2>
+        <table className="w-full text-left text-sm"><thead className="bg-surface-subtle text-muted-foreground"><tr>
+          {[text("Problem", "题目"), text("Attempted or credited", "已尝试或获分人数"), text("Solved", "通过人数")].map(label => <th key={label} className={th}>{label}</th>)}
+        </tr></thead><tbody>{summary.problems.map(p => <tr className="border-t border-border" key={p.id}>
+          <td className={td}>{p.title}</td><td className={td}>{p.attempted}</td><td className={td}>{p.solved} / {summary.required}</td>
+        </tr>)}</tbody></table>
+      </section>}
+      <section className={panel}>
+        <h2 className="px-3 py-2 font-semibold">{text("Student results", "学生成绩")}</h2>
+        <div className="overflow-auto"><table className="w-full text-left text-sm"><thead className="bg-surface-subtle text-muted-foreground"><tr>
+          {[text("Student ID", "学号"), text("Name", "姓名"), text("Score", "成绩"), text("Solved", "通过"), text("Started", "开始时间"), text("Deadline", "个人截止")].map(label => <th key={label} className={th}>{label}</th>)}
+        </tr></thead><tbody>{items.map(item => <tr key={item.id} className="border-t border-border">
+          <td className={`${td} font-mono text-xs`}>{item.number}</td>
+          <td className={td}>{item.name}{item.exempt && <span className="ml-2 text-xs text-muted-foreground">{text("Exempt", "已豁免")}</span>}</td>
+          <td className={td}>{item.grade.score}/{item.grade.total}</td><td className={td}>{item.grade.solved}/{problems.length}</td>
+          <td className={td}>{date(item.attempt?.startedAt, locale)}</td>
+          <td className={td}>{date(report.activity.kind === "assignment" ? item.dueAt : item.attempt?.deadlineAt, locale)}</td>
+        </tr>)}
+        {!items.length && <tr><td className={td} colSpan={6}>{text("No students in this selection.", "当前范围内没有学生。")}</td></tr>}
+        </tbody></table></div>
+      </section>
+      {report.activity.kind === "assignment" && report.activity.state === "Published" && <section className={`${panel} p-4`}>
+        <h2 className="mb-3 text-sm font-semibold">{text("Individual deadline or exemption", "个人延期或豁免")}</h2>
+        <AssignmentParticipantForm path={`${base}/${activityId}`} participants={items.map(item => ({ ...item, identityId: item.id }))}
+          toDeadline={activityDateValue} onSaved={data.reload}/>
+      </section>}
+    </>}</State>
+  </div>;
 }

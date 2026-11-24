@@ -61,7 +61,7 @@ export function SchoolTeachingReports({ schoolId }: { schoolId: string }) {
     if (activityId) params.set("activityId", activityId);
     return `${schoolWorkspaceHref(schoolId, "reports", "teacher")}&${params}`;
   };
-  if (activityId) return <SchoolActivityReportView key={activityId} base={base} activityId={activityId} onBack={() => router.push(href(kind, archived, page))} />;
+  if (activityId) return <SchoolActivityReportView fromReports key={activityId} base={base} activityId={activityId} onBack={() => router.push(href(kind, archived, page))} />;
   return <SchoolReportDirectory key={`${schoolId}:${kind}:${archived}:${page}`} base={base} kind={kind} archived={archived} page={page} href={href} />;
 }
 

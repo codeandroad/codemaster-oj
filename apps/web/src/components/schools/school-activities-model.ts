@@ -15,11 +15,12 @@ export type SchoolActivity = {
   problems: ActivityProblem[]; attempt: ActivityAttempt | null; grade: ActivityGrade | null; progress?: ActivityGrade | null; identityIds?: string[]; classIds?: string[];
 };
 export type ActivityOptions = {
+  activityRewardCap: number;
   problems: { problemId: string; versionId: string; title: string; bankName: string; bankId: string }[];
   students: { id: string; name: string; number: string; activated: boolean; classIds: string[] }[];
   classes: { id: string; name: string }[];
 };
-export type ActivityReport = { activity: SchoolActivity; items: { id: string; name: string; number: string; exempt: boolean; dueAt: string | null; attempt: ActivityAttempt | null; grade: ActivityGrade }[] };
+export type ActivityReport = { activity: SchoolActivity; items: { id: string; name: string; number: string; classes: { id: string; name: string }[]; exempt: boolean; dueAt: string | null; attempt: ActivityAttempt | null; grade: ActivityGrade }[] };
 export function activityDateInput(value: string | null) {
   return value ? new Date(new Date(value).getTime() + 8 * 3600000).toISOString().slice(0, 16) : "";
 }
@@ -39,4 +40,21 @@ export function activityCsvCell(value: unknown) {
   const raw = String(value ?? "");
   const safe = /^[\s]*[=+@-]|^[\t\r]/.test(raw) ? "'" + raw : raw;
   return `"${safe.replaceAll('"', '""')}"`;
+}
+
+export function summarizeActivityReport(items: ActivityReport["items"], problems: ActivityProblem[]) {
+  const required = items.filter(item => !item.exempt);
+  const byProblem = new Map(problems.map(p => [p.id, { id: p.id, title: p.title, attempted: 0, solved: 0 }]));
+  let completed = 0, unstarted = 0;
+  for (const { grade } of required) {
+    if (problems.length && grade.solved === problems.length) completed++;
+    if (!grade.attempted) unstarted++;
+    for (const result of grade.items) {
+      const counts = byProblem.get(result.id);
+      if (!counts) continue;
+      if (result.attempts || result.solved) counts.attempted++;
+      if (result.solved) counts.solved++;
+    }
+  }
+  return { required: required.length, completed, unstarted, inProgress: required.length - completed - unstarted, problems: [...byProblem.values()] };
 }

@@ -25,6 +25,7 @@ export class PokerController {
     'practice/poker/tables/:tableId/rebuy',
     'practice/poker/tables/:tableId/leave',
     'practice/poker/tables/:tableId/action',
+    'practice/poker/tables/:tableId/bots',
     'platform/poker/tables',
   ])
   async create(@Req() req: DomainRequest, @Res({ passthrough: true }) res: Response) {

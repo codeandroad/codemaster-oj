@@ -432,8 +432,10 @@ export function startHand({
 
   const players = sorted.map(p => ({
     seatIndex: p.seatIndex,
-    accountId: p.accountId,
-    identityId: p.identityId,
+    accountId: p.accountId ?? null,
+    identityId: p.identityId ?? null,
+    isBot: Boolean(p.isBot),
+    botStyle: p.botStyle ?? null,
     displayName: p.displayName,
     avatar: p.avatar,
     initialStackCents: p.stackCents,
@@ -836,6 +838,8 @@ export function projectHandForViewer(state, viewerAccountId) {
     players: state.players.map(p => ({
       seatIndex: p.seatIndex,
       accountId: p.accountId,
+      isBot: Boolean(p.isBot),
+      botStyle: p.botStyle ?? null,
       displayName: p.displayName,
       avatar: p.avatar,
       stackCents: p.stackCents,
@@ -844,7 +848,7 @@ export function projectHandForViewer(state, viewerAccountId) {
       folded: p.folded,
       allIn: p.allIn,
       lastAction: p.lastAction,
-      holeCards: p.accountId === viewerAccountId || revealedSet.has(p.seatIndex)
+      holeCards: (p.accountId !== null && p.accountId === viewerAccountId) || revealedSet.has(p.seatIndex)
         ? [...p.holeCards]
         : null,
       cardCount: p.folded ? 0 : 2,

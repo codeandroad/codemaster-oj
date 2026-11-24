@@ -3,27 +3,66 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ArrowRight,
+  Bot,
   Coins,
   History,
   Lock,
   RefreshCw,
   ShieldCheck,
   Spade,
+  Sparkles,
   Ticket,
   Users,
 } from "lucide-react";
 import { useLocale } from "@/components/locale-context";
 import { AppLink } from "@/components/navigation";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { apiMessage, productionApi } from "@/lib/production-api";
+import { PokerChip } from "./poker-cards";
 import { PokerTable } from "./poker-table";
+import styles from "./poker-table.module.css";
 import {
   formatChips,
   formatSignedChips,
   notifyScholarshipChanged,
   type PokerLedgerEntry,
   type PokerStatusResponse,
+  type PokerTableSummary,
 } from "./poker-types";
+
+function MiniTablePreview({ table }: { table: PokerTableSummary }) {
+  const dots = Array.from({ length: table.maxSeats }, (_, i) => {
+    const angle = (Math.PI * 2 * i) / table.maxSeats + Math.PI / 2;
+    const x = 50 + Math.cos(angle) * 40;
+    const y = 50 + Math.sin(angle) * 35;
+    const kind = i < table.humanCount ? "human" : i < table.humanCount + table.botCount ? "bot" : "empty";
+    return { x, y, kind };
+  });
+
+  return (
+    <div className="relative flex h-24 w-full items-center justify-center rounded-xl bg-gradient-to-b from-slate-900 to-slate-950 p-2">
+      <div className="relative h-14 w-36 rounded-full border-[3px] border-amber-950/90 bg-[radial-gradient(ellipse_at_center,#14754d_0%,#083c26_100%)] shadow-inner">
+        <div className="absolute inset-1 rounded-full border border-amber-200/20" />
+        <div className="flex h-full items-center justify-center text-[10px] font-extrabold tracking-wider text-amber-200/80 tabular-nums">
+          {formatChips(table.smallBlindCents)}/{formatChips(table.bigBlindCents)}
+        </div>
+      </div>
+      {dots.map((d, idx) => (
+        <span
+          key={idx}
+          style={{ left: `${d.x}%`, top: `${d.y}%` }}
+          className={`absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border ${
+            d.kind === "human"
+              ? "border-sky-200 bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.8)]"
+              : d.kind === "bot"
+                ? "border-amber-200 bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.7)]"
+                : "border-white/15 bg-white/10"
+          }`}
+        />
+      ))}
+    </div>
+  );
+}
 
 export function OpenPlatformPoker() {
   const { locale } = useLocale();
@@ -112,15 +151,15 @@ export function OpenPlatformPoker() {
 
   if (loading && !status) {
     return (
-      <p role="status" className="rounded-lg border border-border bg-surface p-6 text-sm text-muted-foreground">
-        {tx("正在加载德州扑克大厅…", "Loading Texas Hold'em lobby…")}
-      </p>
+      <div role="status" className={`${styles.heroBanner} flex h-56 items-center justify-center rounded-2xl text-sm text-emerald-100/80`}>
+        {tx("正在加载德州扑克俱乐部…", "Loading Texas Hold'em Club…")}
+      </div>
     );
   }
 
   if (!status) {
     return (
-      <div role="alert" className="rounded-lg border border-danger/30 bg-danger/10 p-4 text-sm text-danger">
+      <div role="alert" className="rounded-xl border border-danger/30 bg-danger/10 p-4 text-sm text-danger">
         {error || tx("无法加载德州扑克状态", "Could not load Texas Hold'em status")}
       </div>
     );
@@ -128,118 +167,125 @@ export function OpenPlatformPoker() {
 
   const { allowance, settings, wallet, daily } = status;
 
-  // Locked view: either globally disabled or below initial AC milestone (default 32 ACs)
+  // Locked view with high-craft club invitation aesthetic + SVG progress ring
   if (!status.enabled || !status.unlocked) {
     const progressPct = allowance.initialUnlockAcProblems > 0
       ? Math.min(100, Math.round((allowance.acCount / allowance.initialUnlockAcProblems) * 100))
       : 100;
+    const radius = 44;
+    const circumference = 2 * Math.PI * radius;
+    const dashOffset = circumference * (1 - progressPct / 100);
 
     return (
-      <div className="mx-auto max-w-2xl space-y-5">
-        <section className="rounded-xl border border-border bg-surface p-6 shadow-xs">
-          <div className="flex items-start gap-4">
-            <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-              <Lock size={22} />
-            </div>
-            <div className="min-w-0 flex-1 space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-lg font-semibold">
-                  {tx("开放平台 · 德州扑克", "Open Platform · Texas Hold'em")}
-                </h2>
-                <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                  {!status.enabled ? tx("暂未开放", "Closed") : tx("尚未解锁", "Locked")}
-                </span>
+      <div className="mx-auto max-w-3xl space-y-5">
+        <section className={`${styles.heroBanner} relative overflow-hidden rounded-2xl border border-amber-300/20 p-6 text-white sm:p-8`}>
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 flex-1 space-y-3">
+              <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-200">
+                <Lock size={13} />
+                {!status.enabled ? tx("管理员暂未开放", "Currently Closed") : tx("解题达标解锁", "AC Milestone Unlock")}
               </div>
+              <h2 className="flex items-center gap-2.5 text-2xl font-bold tracking-tight">
+                <Spade size={24} className="text-amber-300" />
+                {tx("开放平台 · 德州扑克俱乐部", "Open Platform · Hold'em Club")}
+              </h2>
+              <p className="text-sm leading-relaxed text-slate-300">
+                {!status.enabled
+                  ? tx(
+                      "德州扑克默认关闭，暂未对用户开放。管理员开启后，达成解题里程碑即可使用平台奖学金进入无限注德州牌桌，支持 2–6 人弹性对局与 AI 随时补位。",
+                      "Texas Hold'em is closed by default. Once opened by a platform admin, reach the AC milestone to play No-Limit Hold'em with flexible 2–6 player seating and instant AI opponents.",
+                    )
+                  : tx(
+                      `初次解锁需全站去重 AC 达到 ${allowance.initialUnlockAcProblems} 题（包含校内练习与开放平台 AC），解锁即赠 ${allowance.buyinsPerBatch} 次买入机会；此后每再 AC ${allowance.acPerBuyinBatch} 道新题再解锁 ${allowance.buyinsPerBatch} 次。`,
+                      `Initial unlock requires ${allowance.initialUnlockAcProblems} site-wide distinct ACs (school + Open Platform), granting ${allowance.buyinsPerBatch} buy-ins — plus ${allowance.buyinsPerBatch} more for every ${allowance.acPerBuyinBatch} additional ACs.`,
+                    )}
+              </p>
 
-              {!status.enabled ? (
-                <p className="text-sm text-muted-foreground">
-                  {tx(
-                    "德州扑克功能默认关闭，当前暂未向用户开放。管理员开启后，达到解题门槛即可使用平台奖学金参与公开桌对局。",
-                    "Texas Hold'em is closed by default. Once enabled by a platform administrator, learners who reach the AC milestone can join public tables using platform scholarship.",
-                  )}
-                </p>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  {tx(
-                    `初次解锁需要全站去重 AC 达到 ${allowance.initialUnlockAcProblems} 题（包含校内练习与开放平台 AC）。解锁后立即获得 ${allowance.buyinsPerBatch} 次买入机会，之后每再 AC ${allowance.acPerBuyinBatch} 道新题再解锁 ${allowance.buyinsPerBatch} 次买入机会。`,
-                    `Initial unlock requires ${allowance.initialUnlockAcProblems} distinct AC problems across the site (school + Open Platform). Unlocking grants ${allowance.buyinsPerBatch} buy-in allowances, plus ${allowance.buyinsPerBatch} more for every ${allowance.acPerBuyinBatch} additional AC problems.`,
-                  )}
-                </p>
-              )}
+              <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                <AppLink
+                  href="/practice/problems"
+                  className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-b from-amber-400 to-amber-500 px-4 text-sm font-bold text-slate-950 shadow-lg shadow-amber-500/20 transition hover:from-amber-300 hover:to-amber-400"
+                >
+                  {tx("前往题库刷题解锁", "Solve Problems to Unlock")} <ArrowRight size={15} />
+                </AppLink>
+                {status.activeTableId && (
+                  <Button size="sm" variant="secondary" onClick={() => setSelectedTableId(status.activeTableId)}>
+                    {tx("返回已入座牌桌", "Return to seated table")}
+                  </Button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void loadStatus()}
+                  className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3.5 text-xs font-semibold text-slate-200 transition hover:bg-white/15"
+                >
+                  <RefreshCw size={14} /> {tx("刷新进度", "Refresh")}
+                </button>
+              </div>
+            </div>
+
+            {/* Circular AC Progress Ring */}
+            <div className="flex shrink-0 flex-col items-center justify-center rounded-2xl border border-white/10 bg-black/35 px-6 py-5 backdrop-blur-xs">
+              <div className="relative flex size-28 items-center justify-center">
+                <svg className="size-full -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
+                  <circle cx="50" cy="50" r={radius} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="7" />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r={radius}
+                    fill="none"
+                    stroke="#fbbf24"
+                    strokeWidth="7"
+                    strokeLinecap="round"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={dashOffset}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                  <span className="text-xl font-black tabular-nums text-white">{allowance.acCount}</span>
+                  <span className="text-[11px] font-medium text-amber-200/80">
+                    / {allowance.initialUnlockAcProblems} AC
+                  </span>
+                </div>
+              </div>
+              <p className="mt-2.5 text-xs font-medium text-slate-300">
+                {allowance.missingForInitialUnlock > 0
+                  ? tx(`还差 ${allowance.missingForInitialUnlock} 题解锁`, `${allowance.missingForInitialUnlock} more to unlock`)
+                  : tx("AC 条件已达成", "AC goal reached")}
+              </p>
             </div>
           </div>
 
-          {/* Unlock progress bar */}
-          <div className="mt-6 space-y-2 rounded-lg border border-border bg-muted/30 p-4">
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-medium">
-                {tx("全站去重 AC 题目进度", "Site-wide distinct AC progress")}
-              </span>
-              <span className="font-bold tabular-nums">
-                {allowance.acCount} / {allowance.initialUnlockAcProblems}
-              </span>
-            </div>
-            <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-primary transition-all"
-                style={{ width: `${progressPct}%` }}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {allowance.missingForInitialUnlock > 0
-                ? tx(
-                    `还差 ${allowance.missingForInitialUnlock} 道去重 AC 题目即可达成初次解锁条件。`,
-                    `${allowance.missingForInitialUnlock} more distinct AC problem(s) needed for initial unlock.`,
-                  )
-                : tx(
-                    "你已满足初次解题门槛，等待管理员开启德州扑克功能后即可进入大厅。",
-                    "You meet the AC requirement; access opens once an administrator enables Texas Hold'em.",
-                  )}
-            </p>
-          </div>
-
-          {/* Rules preview */}
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border border-border p-3 text-xs">
-              <p className="text-muted-foreground">{tx("默认盲注 (SB / BB)", "Default blinds (SB / BB)")}</p>
-              <p className="mt-1 text-sm font-semibold tabular-nums">
+          {/* Rule Highlights */}
+          <div className="mt-6 grid gap-3 border-t border-white/10 pt-5 sm:grid-cols-3">
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 text-xs">
+              <p className="text-slate-400">{tx("默认盲注 (SB / BB)", "Default Blinds")}</p>
+              <p className="mt-1 flex items-center gap-1.5 text-sm font-bold tabular-nums text-amber-200">
+                <PokerChip tone="gold" size={14} />
                 {formatChips(settings.defaultSmallBlindCents)} / {formatChips(settings.defaultBigBlindCents)} {tx("奖学金", "sch.")}
               </p>
             </div>
-            <div className="rounded-lg border border-border p-3 text-xs">
-              <p className="text-muted-foreground">{tx("买入机会规则", "Buy-in allowance")}</p>
-              <p className="mt-1 text-sm font-semibold">
-                {tx(`首次 ${allowance.initialUnlockAcProblems} AC，后每 ${allowance.acPerBuyinBatch} AC +${allowance.buyinsPerBatch} 次`,
-                  `${allowance.initialUnlockAcProblems} AC first, +${allowance.buyinsPerBatch} per ${allowance.acPerBuyinBatch} AC`)}
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 text-xs">
+              <p className="text-slate-400">{tx("分批买入机会", "Buy-in Allowances")}</p>
+              <p className="mt-1 text-sm font-bold text-white">
+                {tx(
+                  `首解 ${allowance.initialUnlockAcProblems} 题 · 后每 ${allowance.acPerBuyinBatch} 题 +${allowance.buyinsPerBatch} 次`,
+                  `${allowance.initialUnlockAcProblems} AC first · +${allowance.buyinsPerBatch} / ${allowance.acPerBuyinBatch} AC`,
+                )}
               </p>
             </div>
-            <div className="rounded-lg border border-border p-3 text-xs">
-              <p className="text-muted-foreground">{tx("抽水与买入范围", "Rake & buy-in")}</p>
-              <p className="mt-1 text-sm font-semibold tabular-nums">
-                0% · {settings.minBuyInBb}–{settings.maxBuyInBb} BB
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 text-xs">
+              <p className="text-slate-400">{tx("弹性桌台与抽水", "Flexible Play & Rake")}</p>
+              <p className="mt-1 text-sm font-bold text-emerald-300">
+                {tx("2–6 人秒开 · 0% 抽水", "2–6 Players · 0% Rake")}
               </p>
             </div>
-          </div>
-
-          <div className="mt-5 flex flex-wrap items-center gap-2">
-            <AppLink href="/practice/problems" className={buttonVariants({ variant: "primary", size: "sm" })}>
-              {tx("前往题库刷题", "Go solve problems")} <ArrowRight size={14} />
-            </AppLink>
-            {status.activeTableId && (
-              <Button size="sm" variant="secondary" onClick={() => setSelectedTableId(status.activeTableId)}>
-                {tx("返回已入座牌桌", "Return to seated table")}
-              </Button>
-            )}
-            <Button size="sm" variant="ghost" onClick={() => void loadStatus()}>
-              <RefreshCw size={14} /> {tx("刷新状态", "Refresh")}
-            </Button>
           </div>
         </section>
       </div>
     );
   }
 
-  // Unlocked Lobby
+  // Unlocked Club Lobby
   const ledgerKindLabel: Record<PokerLedgerEntry["kind"], [string, string]> = {
     scholarship_deposit: ["平台钱包转入", "Wallet deposit"],
     scholarship_withdraw: ["自动兑回平台钱包", "Wallet cash-out"],
@@ -248,131 +294,131 @@ export function OpenPlatformPoker() {
     table_cashout: ["离桌筹码结算", "Table cash-out"],
   };
 
+  const primaryTableId = status.activeTableId ?? status.tables[0]?.id ?? null;
+
   return (
     <div className="space-y-5">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="flex items-center gap-2 text-lg font-semibold">
-            <Spade size={20} className="text-primary" />
-            {tx("开放平台 · 德州扑克大厅", "Open Platform · Texas Hold'em Lobby")}
-          </h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {tx(
-              "无限注德州扑克（NLHE）· 0% 抽水 · 1 奖学金 = 100 筹码（支持 0.10/0.20 小数盲注，离桌整数自动兑回平台钱包）",
-              "No-Limit Hold'em · 0% rake · 1 scholarship = 100 chips (fractional blinds supported; whole scholarships auto-return on leave)",
+      {/* Club Hero Banner */}
+      <section className={`${styles.heroBanner} rounded-2xl border border-amber-300/20 p-5 text-white sm:p-6`}>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-200">
+              <Spade size={12} /> {tx("开放平台 · 无限注德州扑克", "Open Platform · No-Limit Hold'em")}
+            </div>
+            <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
+              {tx("德州扑克俱乐部大厅", "Texas Hold'em Club")}
+            </h2>
+            <p className="text-xs text-slate-300">
+              {tx(
+                "0% 抽水 · 1 奖学金 = 100 筹码 · 弹性 2–6 人对局，人数不够时可一键召唤 AI 对手立即开玩",
+                "0% rake · 1 scholarship = 100 chips · Flexible 2–6 player seating with instant AI opponents anytime",
+              )}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {primaryTableId && (
+              <button
+                type="button"
+                onClick={() => setSelectedTableId(primaryTableId)}
+                className="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-b from-amber-400 to-amber-500 px-5 text-sm font-bold text-slate-950 shadow-lg shadow-amber-500/25 transition hover:from-amber-300 hover:to-amber-400"
+              >
+                <Sparkles size={15} />
+                {status.activeTableId ? tx("回到当前牌桌", "Resume Table") : tx("快速入桌开玩", "Quick Play")}
+              </button>
             )}
-          </p>
+            <button
+              type="button"
+              onClick={() => void loadStatus()}
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3.5 text-xs font-semibold text-slate-200 transition hover:bg-white/15"
+            >
+              <RefreshCw size={14} /> {tx("刷新", "Refresh")}
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {status.activeTableId && (
-            <Button size="sm" onClick={() => setSelectedTableId(status.activeTableId)}>
-              {tx("回到当前牌桌", "Resume active table")} <ArrowRight size={14} />
-            </Button>
-          )}
-          <Button size="sm" variant="secondary" onClick={() => void loadStatus()}>
-            <RefreshCw size={14} /> {tx("刷新", "Refresh")}
-          </Button>
+
+        {/* Sleek Glass Stat Strip */}
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 backdrop-blur-xs">
+            <div className="flex items-center justify-between text-xs text-slate-300">
+              <span>{tx("平台钱包与筹码零头", "Wallet & Chip Balance")}</span>
+              <Coins size={14} className="text-amber-400" />
+            </div>
+            <div className="mt-1.5 flex items-baseline justify-between gap-2">
+              <p className="text-lg font-extrabold tabular-nums text-white">
+                {wallet.scholarshipBalance}{" "}
+                <span className="text-xs font-normal text-slate-400">{tx("奖学金", "sch.")}</span>
+              </p>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="tabular-nums text-amber-200">
+                  {tx("零头", "Chips")} {formatChips(wallet.pokerBalanceCents)}
+                </span>
+                {wallet.pokerBalanceCents >= 100 && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void handleWithdraw()}
+                    className="rounded bg-amber-400/20 px-1.5 py-0.5 text-[11px] font-bold text-amber-200 hover:bg-amber-400/30"
+                  >
+                    {tx("兑回", "Withdraw")}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 backdrop-blur-xs">
+            <div className="flex items-center justify-between text-xs text-slate-300">
+              <span>{tx("剩余买入机会", "Buy-in Allowances")}</span>
+              <Ticket size={14} className="text-amber-300" />
+            </div>
+            <div className="mt-1.5 flex items-baseline justify-between gap-2">
+              <p className="text-lg font-extrabold tabular-nums text-white">
+                {allowance.remainingBuyIns}
+                <span className="ml-1.5 text-xs font-normal text-slate-400">
+                  / {allowance.totalUnlockedBuyIns} {tx("次", "total")}
+                </span>
+              </p>
+              <span className="text-[11px] text-emerald-200/90 tabular-nums">
+                {tx(`再 AC ${allowance.missingForNextBatch} 题 +${allowance.buyinsPerBatch}`, `${allowance.missingForNextBatch} AC → +${allowance.buyinsPerBatch}`)}
+              </span>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 backdrop-blur-xs">
+            <div className="flex items-center justify-between text-xs text-slate-300">
+              <span>{tx("今日牌局表现", "Today's Session")}</span>
+              <ShieldCheck size={14} className="text-emerald-400" />
+            </div>
+            <div className="mt-1.5 flex items-baseline justify-between gap-2">
+              <p className="text-lg font-extrabold tabular-nums">
+                <span className={daily.netCents > 0 ? "text-emerald-300" : daily.netCents < 0 ? "text-rose-300" : "text-white"}>
+                  {formatSignedChips(daily.netCents)}
+                </span>
+                <span className="ml-1.5 text-xs font-normal text-slate-400">
+                  ({daily.handsPlayed} {tx("手", "hands")})
+                </span>
+              </p>
+              <span className="text-[11px] text-slate-300 tabular-nums">
+                {tx("已买", "In")} {formatChips(daily.buyInCents)}
+                {settings.dailyBuyInLimitCents > 0 && `/${formatChips(settings.dailyBuyInLimitCents)}`}
+              </span>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
       {error && (
-        <div role="alert" className="rounded-lg border border-danger/30 bg-danger/10 px-4 py-2.5 text-sm text-danger">
+        <div role="alert" className="rounded-xl border border-danger/30 bg-danger/10 px-4 py-2.5 text-sm text-danger">
           {error}
         </div>
       )}
       {notice && (
-        <div role="status" className="rounded-lg border border-success/30 bg-success/10 px-4 py-2.5 text-sm text-success">
+        <div role="status" className="rounded-xl border border-success/30 bg-success/10 px-4 py-2.5 text-sm text-success">
           {notice}
         </div>
       )}
 
-      {/* Top Metrics Strip */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-border bg-surface p-4">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{tx("可用资金", "Available funds")}</span>
-            <Coins size={15} className="text-amber-500" />
-          </div>
-          <p className="mt-1.5 text-xl font-bold tabular-nums">
-            {wallet.scholarshipBalance} <span className="text-xs font-normal text-muted-foreground">{tx("奖学金", "sch.")}</span>
-          </p>
-          <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span className="tabular-nums">
-              {tx("扑克零头：", "Chip remainder: ")}
-              <strong className="text-foreground">{formatChips(wallet.pokerBalanceCents)}</strong>
-            </span>
-            {wallet.pokerBalanceCents >= 100 && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void handleWithdraw()}
-                className="font-semibold text-primary hover:underline"
-              >
-                {tx("兑回整数", "Withdraw")}
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-border bg-surface p-4">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{tx("剩余买入机会", "Buy-in allowances")}</span>
-            <Ticket size={15} className="text-primary" />
-          </div>
-          <p className="mt-1.5 text-xl font-bold tabular-nums">
-            {allowance.remainingBuyIns}
-            <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-              / {allowance.totalUnlockedBuyIns} {tx("次累计", "total")}
-            </span>
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {tx(
-              `全站 AC ${allowance.acCount} 题 · 再 AC ${allowance.missingForNextBatch} 题 +${allowance.buyinsPerBatch} 次`,
-              `${allowance.acCount} ACs · ${allowance.missingForNextBatch} more for +${allowance.buyinsPerBatch}`,
-            )}
-          </p>
-        </div>
-
-        <div className="rounded-xl border border-border bg-surface p-4">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{tx("今日牌局风控", "Daily risk limits")}</span>
-            <ShieldCheck size={15} className="text-emerald-600" />
-          </div>
-          <p className="mt-1.5 text-xl font-bold tabular-nums">
-            <span className={daily.netCents > 0 ? "text-success" : daily.netCents < 0 ? "text-danger" : ""}>
-              {formatSignedChips(daily.netCents)}
-            </span>
-            <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-              {tx(`今日净输赢 (${daily.handsPlayed}局)`, `today net (${daily.handsPlayed} hands)`)}
-            </span>
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground tabular-nums">
-            {tx("今日已买入：", "Bought in: ")}
-            {formatChips(daily.buyInCents)}
-            {settings.dailyBuyInLimitCents > 0 && ` / ${formatChips(settings.dailyBuyInLimitCents)}`}
-          </p>
-        </div>
-
-        <div className="rounded-xl border border-border bg-surface p-4">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{tx("牌局规则", "Table rules")}</span>
-            <Spade size={15} className="text-muted-foreground" />
-          </div>
-          <p className="mt-1.5 text-sm font-semibold tabular-nums">
-            {tx(`买入 ${settings.minBuyInBb}–${settings.maxBuyInBb} BB · 超时 ${settings.turnTimeoutSeconds}s`,
-              `Buy-in ${settings.minBuyInBb}–${settings.maxBuyInBb} BB · ${settings.turnTimeoutSeconds}s timer`)}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {tx(
-              `每日净输/净赢上限：${settings.dailyNetLossLimitCents > 0 ? formatChips(settings.dailyNetLossLimitCents) : "不限"} / ${settings.dailyNetWinLimitCents > 0 ? formatChips(settings.dailyNetWinLimitCents) : "不限"}`,
-              `Daily loss/win cap: ${settings.dailyNetLossLimitCents > 0 ? formatChips(settings.dailyNetLossLimitCents) : "None"} / ${settings.dailyNetWinLimitCents > 0 ? formatChips(settings.dailyNetWinLimitCents) : "None"}`,
-            )}
-          </p>
-        </div>
-      </div>
-
-      {/* Tabs: Public Tables vs Wallet Ledger */}
+      {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-border">
         <button
           type="button"
@@ -381,7 +427,7 @@ export function OpenPlatformPoker() {
             activeTab === "tables" ? "border-b-2 border-primary text-primary" : "text-muted-foreground"
           }`}
         >
-          <Users size={15} /> {tx("公共牌桌", "Public tables")} ({status.tables.length})
+          <Users size={15} /> {tx("公共牌桌", "Public Tables")} ({status.tables.length})
         </button>
         <button
           type="button"
@@ -390,7 +436,7 @@ export function OpenPlatformPoker() {
             activeTab === "ledger" ? "border-b-2 border-primary text-primary" : "text-muted-foreground"
           }`}
         >
-          <History size={15} /> {tx("筹码流水", "Chip ledger")}
+          <History size={15} /> {tx("筹码流水", "Chip Ledger")}
         </button>
       </div>
 
@@ -402,69 +448,73 @@ export function OpenPlatformPoker() {
               return (
                 <article
                   key={table.id}
-                  className={`flex flex-col justify-between rounded-xl border bg-surface p-4 shadow-xs transition hover:border-primary/50 ${
+                  className={`group flex flex-col justify-between overflow-hidden rounded-2xl border bg-surface p-4 shadow-xs transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md ${
                     isMine ? "border-primary ring-1 ring-primary/30" : "border-border"
                   }`}
                 >
-                  <div>
+                  <div className="space-y-3">
                     <div className="flex items-start justify-between gap-2">
-                      <h3 className="text-base font-semibold">{table.name}</h3>
+                      <div>
+                        <h3 className="text-base font-bold">{table.name}</h3>
+                        <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                          {tx("买入", "Buy-in")} {formatChips(table.minBuyInCents)} – {formatChips(table.maxBuyInCents)} {tx("奖学金", "sch.")}
+                        </p>
+                      </div>
                       <span
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                        className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
                           table.status === "playing"
                             ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
                             : "bg-muted text-muted-foreground"
                         }`}
                       >
-                        {table.status === "playing" ? tx("对局中", "Playing") : tx("等待中", "Waiting")}
+                        {table.status === "playing" ? tx("激战中", "Live") : tx("随时开局", "Open")}
                       </span>
                     </div>
 
-                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                      <div className="rounded-lg bg-muted/40 p-2">
-                        <p className="text-muted-foreground">{tx("盲注 (SB / BB)", "Blinds (SB / BB)")}</p>
-                        <p className="mt-0.5 font-bold tabular-nums text-foreground">
-                          {formatChips(table.smallBlindCents)} / {formatChips(table.bigBlindCents)}
-                        </p>
-                      </div>
-                      <div className="rounded-lg bg-muted/40 p-2">
-                        <p className="text-muted-foreground">{tx("人数", "Players")}</p>
-                        <p className="mt-0.5 font-bold tabular-nums text-foreground">
-                          {table.seatedCount} / {table.maxSeats}
-                        </p>
-                      </div>
-                    </div>
+                    <MiniTablePreview table={table} />
 
-                    <p className="mt-2.5 text-xs text-muted-foreground tabular-nums">
-                      {tx("买入范围：", "Buy-in: ")}
-                      {formatChips(table.minBuyInCents)} – {formatChips(table.maxBuyInCents)} {tx("奖学金", "scholarship")}
-                    </p>
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5 tabular-nums">
+                        <Users size={13} />
+                        {table.humanCount} {tx("真人", "human")}
+                        {table.botCount > 0 && (
+                          <span className="inline-flex items-center gap-0.5 text-amber-600 dark:text-amber-400">
+                            · <Bot size={12} /> {table.botCount} AI
+                          </span>
+                        )}
+                      </span>
+                      <span className="tabular-nums">
+                        {tx(`最多 ${table.maxSeats} 人`, `Up to ${table.maxSeats}`)} ·{" "}
+                        {table.handNumber > 0 ? `#${table.handNumber}` : tx("新桌", "Fresh")}
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="mt-4 flex items-center justify-between gap-2">
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {table.handNumber > 0 ? tx(`已进行 ${table.handNumber} 局`, `${table.handNumber} hands played`) : tx("新开牌桌", "Fresh table")}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant={isMine ? "primary" : "secondary"}
+                  <div className="mt-4">
+                    <button
+                      type="button"
                       onClick={() => setSelectedTableId(table.id)}
+                      className={`inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold transition ${
+                        isMine
+                          ? "bg-gradient-to-b from-amber-400 to-amber-500 text-slate-950 shadow-sm hover:from-amber-300 hover:to-amber-400"
+                          : "bg-primary text-primary-foreground hover:opacity-95"
+                      }`}
                     >
-                      {isMine ? tx("回到牌桌", "Resume") : tx("进入牌桌", "Open table")}
-                      <ArrowRight size={14} />
-                    </Button>
+                      {isMine ? tx("回到牌桌", "Resume Table") : tx("进入牌桌", "Enter Table")}
+                      <ArrowRight size={15} />
+                    </button>
                   </div>
                 </article>
               );
             })}
           </div>
         ) : (
-          <p className="rounded-lg border border-border bg-surface p-6 text-center text-sm text-muted-foreground">
+          <p className="rounded-xl border border-border bg-surface p-8 text-center text-sm text-muted-foreground">
             {tx("当前暂无可用公共牌桌，请等待平台管理员创建。", "No public tables available yet.")}
           </p>
         )
       ) : (
-        <section className="overflow-x-auto rounded-xl border border-border bg-surface">
+        <section className="overflow-x-auto rounded-2xl border border-border bg-surface">
           {ledger === null ? (
             <p className="p-6 text-center text-sm text-muted-foreground">{tx("正在加载流水…", "Loading ledger…")}</p>
           ) : ledger.length === 0 ? (

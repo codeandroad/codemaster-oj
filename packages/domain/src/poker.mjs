@@ -12,8 +12,10 @@ import {
   sanitizeHandSummary,
   startHand,
 } from './poker-engine.mjs';
+import { BOT_ROSTER, decideBotAction } from './poker-bot.mjs';
 
-const SHOWDOWN_DELAY_MS = 5000;
+const SHOWDOWN_DELAY_MS = 4500;
+const BOT_ACTION_DELAY_MS = 650;
 const BUSTED_CLEANUP_SECONDS = 120;
 
 const DISPLAY_NAME_SQL = `COALESCE(
@@ -40,7 +42,7 @@ async function auditPlatform(db, actorId, action, detail = {}) {
   );
 }
 
-function settingsShape(row) {
+function settingsShape(row, botRow) {
   return {
     enabled: Boolean(row.enabled),
     initialUnlockAcProblems: Number(row.initial_unlock_ac_problems),
@@ -54,6 +56,8 @@ function settingsShape(row) {
     dailyBuyInLimitCents: Number(row.daily_buy_in_limit_cents),
     dailyNetLossLimitCents: Number(row.daily_net_loss_limit_cents),
     dailyNetWinLimitCents: Number(row.daily_net_win_limit_cents),
+    allowBots: botRow ? Boolean(botRow.allow_bots) : true,
+    maxBotsPerTable: botRow ? Number(botRow.max_bots_per_table) : 5,
     updatedAt: row.updated_at,
   };
 }
@@ -98,7 +102,8 @@ export function computeBuyInAllowance(acCount, usedBuyIns, settings) {
 
 async function loadSettings(db) {
   const { rows: [row] } = await db.query('SELECT * FROM poker_settings WHERE singleton');
-  return settingsShape(row);
+  const { rows: [botRow] } = await db.query('SELECT * FROM poker_bot_settings WHERE singleton');
+  return settingsShape(row, botRow);
 }
 
 async function todayDate(db) {
@@ -341,15 +346,85 @@ async function loadTableSeats(db, tableId) {
     lastSeenAt: r.last_seen_at,
     displayName: r.display_name,
     avatar: avatarForIdentity(r.avatar, r.display_name),
+    isBot: false,
+    botStyle: null,
   }));
 }
 
+async function loadTableBotSeats(db, tableId) {
+  const { rows } = await db.query(`
+    SELECT table_id, seat_index, bot_id, bot_name, bot_style, avatar, stack_cents, leave_after_hand, joined_at
+    FROM poker_bot_seats
+    WHERE table_id = $1
+    ORDER BY seat_index ASC
+  `, [tableId]);
+  return rows.map(r => ({
+    tableId: r.table_id,
+    seatIndex: Number(r.seat_index),
+    accountId: null,
+    identityId: null,
+    botId: r.bot_id,
+    displayName: r.bot_name,
+    avatar: avatarForIdentity(r.avatar, r.bot_name),
+    isBot: true,
+    botStyle: r.bot_style,
+    stackCents: Number(r.stack_cents),
+    leaveAfterHand: Boolean(r.leave_after_hand),
+    sittingOut: false,
+    joinedAt: r.joined_at,
+  }));
+}
+
+function scheduleBotPace(state, nowMs) {
+  if (!state || state.finished || state.actingSeat === null) {
+    if (state) state.nextBotActionAt = null;
+    return;
+  }
+  const actor = state.players.find(p => p.seatIndex === state.actingSeat);
+  state.nextBotActionAt = actor?.isBot ? new Date(nowMs + BOT_ACTION_DELAY_MS).toISOString() : null;
+}
+
+async function addBotsToTable(db, table, settings, count) {
+  if (!settings.allowBots || settings.maxBotsPerTable <= 0) {
+    fail(409, 'BOTS_DISABLED', '管理员当前未开启 AI 对手补位');
+  }
+  const humanSeats = await loadTableSeats(db, table.id);
+  const botSeats = await loadTableBotSeats(db, table.id);
+  const occupied = new Set([...humanSeats.map(s => s.seatIndex), ...botSeats.map(s => s.seatIndex)]);
+  const usedBotIds = new Set(botSeats.map(s => s.botId));
+
+  const maxSeats = Number(table.max_seats);
+  const maxAddBySeats = Math.max(0, maxSeats - occupied.size);
+  const maxAddByPolicy = Math.max(0, settings.maxBotsPerTable - botSeats.length);
+  const toAdd = Math.min(count, maxAddBySeats, maxAddByPolicy);
+  if (toAdd <= 0) return 0;
+
+  const botStackCents = Math.min(settings.maxBuyInBb, 100) * Number(table.big_blind_cents);
+  const freeSeats = Array.from({ length: maxSeats }, (_, i) => i).filter(i => !occupied.has(i));
+  const candidates = BOT_ROSTER.filter(b => !usedBotIds.has(b.botId));
+
+  let added = 0;
+  for (let i = 0; i < toAdd && i < freeSeats.length && i < candidates.length; i++) {
+    const persona = candidates[i];
+    await db.query(
+      `INSERT INTO poker_bot_seats(table_id, seat_index, bot_id, bot_name, bot_style, avatar, stack_cents)
+       VALUES($1, $2, $3, $4, $5, $6, $7)`,
+      [table.id, freeSeats[i], persona.botId, persona.name, persona.style, persona.avatar, botStackCents],
+    );
+    added++;
+  }
+  return added;
+}
+
 async function finalizeCompletedHand(db, table, state, settings, { date: statDate, nowMs }) {
-  // Update seated stacks and daily net stats deterministically by identityId.
-  const participants = [...state.players].sort((a, b) => a.identityId.localeCompare(b.identityId));
+  // Update seated stacks and daily net stats deterministically by identityId (humans only).
+  const humanParticipants = state.players
+    .filter(p => !p.isBot && p.identityId)
+    .sort((a, b) => a.identityId.localeCompare(b.identityId));
+  const botParticipants = state.players.filter(p => p.isBot);
   const dailyMap = new Map();
 
-  for (const p of participants) {
+  for (const p of humanParticipants) {
     if (!p.cashedOutOnLeave) {
       await db.query(
         `UPDATE poker_seats SET stack_cents=$3::bigint, sitting_out=(sitting_out OR $3::bigint=0)
@@ -376,7 +451,15 @@ async function finalizeCompletedHand(db, table, state, settings, { date: statDat
     });
   }
 
+  for (const b of botParticipants) {
+    await db.query(
+      'UPDATE poker_bot_seats SET stack_cents=$3::bigint WHERE table_id=$1 AND seat_index=$2',
+      [table.id, b.seatIndex, b.stackCents],
+    );
+  }
+
   const summary = sanitizeHandSummary(state);
+  summary.hasBots = botParticipants.length > 0;
   await db.query(
     `UPDATE poker_hands
      SET community_cards=$2::jsonb, pot_cents=$3, summary=$4::jsonb, ended_at=clock_timestamp()
@@ -384,7 +467,7 @@ async function finalizeCompletedHand(db, table, state, settings, { date: statDat
     [state.handId, JSON.stringify(state.communityCards), summary.potCents, JSON.stringify(summary)],
   );
 
-  // Cash out any seat that requested leave_after_hand, disabled table/feature, or hit daily net caps.
+  // Cash out any human seat that requested leave_after_hand, disabled table/feature, or hit daily net caps.
   const seats = await loadTableSeats(db, table.id);
   const toCashout = seats
     .filter(seat => {
@@ -408,6 +491,20 @@ async function finalizeCompletedHand(db, table, state, settings, { date: statDat
     });
   }
 
+  // Clean up bots that should leave or if no humans remain; top up busted bots automatically.
+  const remainingHumanCount = seats.length - toCashout.length;
+  if (remainingHumanCount <= 0 || !settings.enabled || !table.enabled || !settings.allowBots) {
+    await db.query('DELETE FROM poker_bot_seats WHERE table_id=$1', [table.id]);
+  } else {
+    await db.query('DELETE FROM poker_bot_seats WHERE table_id=$1 AND leave_after_hand=true', [table.id]);
+    const reloadStack = Math.min(settings.maxBuyInBb, 100) * Number(table.big_blind_cents);
+    await db.query(
+      'UPDATE poker_bot_seats SET stack_cents=$2::bigint WHERE table_id=$1 AND stack_cents < $3::bigint',
+      [table.id, reloadStack, Number(table.big_blind_cents)],
+    );
+  }
+
+  state.nextBotActionAt = null;
   const nextHandAt = new Date(nowMs + SHOWDOWN_DELAY_MS).toISOString();
   const { rows: [saved] } = await db.query(
     `UPDATE poker_tables
@@ -422,29 +519,57 @@ async function advanceTableLifecycle(db, tableRow, settings, clock) {
   let table = tableRow;
   const { date: statDate, nowMs } = clock;
 
-  // 1. Enforce turn timeout(s) on an active hand.
+  // 1. Advance bot turns (paced cleanly) and enforce human turn timeouts on an active hand.
   if (table.status === 'playing' && table.state && !table.state.finished) {
     const state = structuredClone(table.state);
     let mutated = false;
     let guard = 0;
-    while (!state.finished && state.turnDeadlineAt && Date.parse(state.turnDeadlineAt) <= nowMs && guard < 12) {
+    while (!state.finished && state.actingSeat !== null && guard < 12) {
       guard++;
-      const timed = applyTimeoutAction(state, nowMs);
-      if (!timed) break;
-      mutated = true;
-      const { rows: [seatRow] } = await db.query(
-        `UPDATE poker_seats
-         SET consecutive_timeouts=consecutive_timeouts+1,
-             leave_after_hand=(leave_after_hand OR consecutive_timeouts+1 >= 2)
-         WHERE table_id=$1 AND seat_index=$2
-         RETURNING consecutive_timeouts`,
-        [table.id, timed.seatIndex],
-      );
-      if (seatRow && seatRow.consecutive_timeouts >= 2) {
-        const p = state.players.find(item => item.seatIndex === timed.seatIndex);
-        if (p) p.lastAction = '连续超时将离桌';
+      const actor = state.players.find(p => p.seatIndex === state.actingSeat);
+      if (!actor) break;
+
+      if (actor.isBot) {
+        if (state.nextBotActionAt && Date.parse(state.nextBotActionAt) > nowMs) {
+          break;
+        }
+        const decision = decideBotAction(state, actor.seatIndex, actor.botStyle ?? 'balanced');
+        if (!decision) break;
+        applyAction(state, {
+          seatIndex: actor.seatIndex,
+          action: decision.action,
+          amountCents: decision.amountCents ?? null,
+          nowMs,
+        });
+        mutated = true;
+        scheduleBotPace(state, nowMs);
+        // Perform at most one paced bot action per lifecycle tick so the table feels rhythmic.
+        break;
       }
+
+      if (state.turnDeadlineAt && Date.parse(state.turnDeadlineAt) <= nowMs) {
+        const timed = applyTimeoutAction(state, nowMs);
+        if (!timed) break;
+        mutated = true;
+        const { rows: [seatRow] } = await db.query(
+          `UPDATE poker_seats
+           SET consecutive_timeouts=consecutive_timeouts+1,
+               leave_after_hand=(leave_after_hand OR consecutive_timeouts+1 >= 2)
+           WHERE table_id=$1 AND seat_index=$2
+           RETURNING consecutive_timeouts`,
+          [table.id, timed.seatIndex],
+        );
+        if (seatRow && seatRow.consecutive_timeouts >= 2) {
+          const p = state.players.find(item => item.seatIndex === timed.seatIndex);
+          if (p) p.lastAction = '连续超时将离桌';
+        }
+        scheduleBotPace(state, nowMs);
+        continue;
+      }
+
+      break;
     }
+
     if (mutated) {
       if (state.finished) {
         table = await finalizeCompletedHand(db, table, state, settings, clock);
@@ -459,18 +584,30 @@ async function advanceTableLifecycle(db, tableRow, settings, clock) {
     }
   }
 
-  // 2. Transition showdown -> waiting after reveal delay.
-  if (table.status === 'showdown' && table.next_hand_at && Date.parse(table.next_hand_at) <= nowMs) {
-    const { rows: [saved] } = await db.query(
-      `UPDATE poker_tables
-       SET status='waiting', current_hand_id=NULL, next_hand_at=NULL, state=NULL, revision=revision+1, updated_at=clock_timestamp()
-       WHERE id=$1 RETURNING *`,
-      [table.id],
-    );
-    table = saved;
+  // 2. Transition showdown -> waiting after reveal delay, or immediately if the previous showdown has no humans left seated.
+  if (table.status === 'showdown') {
+    const showdownExpired = !table.next_hand_at || Date.parse(table.next_hand_at) <= nowMs;
+    const prevHumanIds = new Set((table.state?.players ?? []).filter(p => !p.isBot && p.accountId).map(p => p.accountId));
+    let anyPrevHumanSeated = false;
+    if (!showdownExpired && prevHumanIds.size > 0) {
+      const { rowCount } = await db.query(
+        'SELECT 1 FROM poker_seats WHERE table_id=$1 AND account_id=ANY($2::uuid[]) LIMIT 1',
+        [table.id, [...prevHumanIds]],
+      );
+      anyPrevHumanSeated = rowCount > 0;
+    }
+    if (showdownExpired || !anyPrevHumanSeated) {
+      const { rows: [saved] } = await db.query(
+        `UPDATE poker_tables
+         SET status='waiting', current_hand_id=NULL, next_hand_at=NULL, state=NULL, revision=revision+1, updated_at=clock_timestamp()
+         WHERE id=$1 RETURNING *`,
+        [table.id],
+      );
+      table = saved;
+    }
   }
 
-  // 3. In waiting state, sync default blinds, clean up leaving/ineligible seats, and auto-deal if >= 2 ready.
+  // 3. In waiting state, sync default blinds, clean up leaving/ineligible seats, and auto-deal if >= 2 ready (with >= 1 human).
   if (table.status === 'waiting') {
     if (
       table.use_default_blinds &&
@@ -488,7 +625,7 @@ async function advanceTableLifecycle(db, tableRow, settings, clock) {
 
     const seats = await loadTableSeats(db, table.id);
     const cleanup = [];
-    const ready = [];
+    const readyHumans = [];
 
     for (const seat of seats) {
       const staleBusted = seat.stackCents === 0 && (nowMs - new Date(seat.lastSeenAt).getTime()) > BUSTED_CLEANUP_SECONDS * 1000;
@@ -497,7 +634,7 @@ async function advanceTableLifecycle(db, tableRow, settings, clock) {
       if (seat.leaveAfterHand || !settings.enabled || !table.enabled || lim.hitLossLimit || lim.hitWinLimit || staleBusted) {
         cleanup.push(seat);
       } else if (seat.stackCents > 0 && !seat.sittingOut) {
-        ready.push(seat);
+        readyHumans.push(seat);
       }
     }
 
@@ -519,16 +656,46 @@ async function advanceTableLifecycle(db, tableRow, settings, clock) {
       table = saved;
     }
 
-    if (settings.enabled && table.enabled && ready.length >= 2) {
+    const remainingHumansCount = seats.length - cleanup.length;
+    let botSeats = await loadTableBotSeats(db, table.id);
+    if (remainingHumansCount <= 0 || !settings.enabled || !table.enabled || !settings.allowBots) {
+      if (botSeats.length) {
+        await db.query('DELETE FROM poker_bot_seats WHERE table_id=$1', [table.id]);
+        botSeats = [];
+        const { rows: [saved] } = await db.query(
+          'UPDATE poker_tables SET revision=revision+1, updated_at=clock_timestamp() WHERE id=$1 RETURNING *',
+          [table.id],
+        );
+        table = saved;
+      }
+    } else {
+      const leavingBots = botSeats.filter(b => b.leaveAfterHand);
+      if (leavingBots.length) {
+        await db.query('DELETE FROM poker_bot_seats WHERE table_id=$1 AND leave_after_hand=true', [table.id]);
+        botSeats = botSeats.filter(b => !b.leaveAfterHand);
+      }
+      const reloadStack = Math.min(settings.maxBuyInBb, 100) * Number(table.big_blind_cents);
+      for (const b of botSeats) {
+        if (b.stackCents < Number(table.big_blind_cents)) {
+          await db.query('UPDATE poker_bot_seats SET stack_cents=$3::bigint WHERE table_id=$1 AND seat_index=$2', [table.id, b.seatIndex, reloadStack]);
+          b.stackCents = reloadStack;
+        }
+      }
+    }
+
+    const readyAll = [...readyHumans, ...botSeats.filter(b => b.stackCents > 0)];
+    if (settings.enabled && table.enabled && readyHumans.length >= 1 && readyAll.length >= 2) {
       const handId = randomUUID();
       const handNumber = Number(table.hand_number) + 1;
       const state = startHand({
         handId,
         handNumber,
-        players: ready.map(s => ({
+        players: readyAll.map(s => ({
           seatIndex: s.seatIndex,
           accountId: s.accountId,
           identityId: s.identityId,
+          isBot: s.isBot,
+          botStyle: s.botStyle,
           displayName: s.displayName,
           avatar: s.avatar,
           stackCents: s.stackCents,
@@ -539,6 +706,7 @@ async function advanceTableLifecycle(db, tableRow, settings, clock) {
         turnTimeoutSeconds: settings.turnTimeoutSeconds,
         nowMs,
       });
+      scheduleBotPace(state, nowMs);
 
       await db.query(
         `INSERT INTO poker_hands(id, table_id, hand_number, small_blind_cents, big_blind_cents, dealer_seat)
@@ -566,6 +734,8 @@ async function advanceTableLifecycle(db, tableRow, settings, clock) {
 
 function tableSummaryShape(row, settings) {
   const bigBlindCents = Number(row.big_blind_cents);
+  const humanCount = Number(row.seated_count ?? 0);
+  const botCount = Number(row.bot_count ?? 0);
   return {
     id: row.id,
     name: row.name,
@@ -577,20 +747,24 @@ function tableSummaryShape(row, settings) {
     revision: Number(row.revision),
     handNumber: Number(row.hand_number),
     status: row.status,
-    seatedCount: Number(row.seated_count ?? 0),
+    humanCount,
+    botCount,
+    seatedCount: humanCount + botCount,
     minBuyInCents: settings.minBuyInBb * bigBlindCents,
     maxBuyInCents: settings.maxBuyInBb * bigBlindCents,
   };
 }
 
 async function buildTableView(db, table, user, settings, clock) {
-  const seats = await loadTableSeats(db, table.id);
+  const humanSeats = await loadTableSeats(db, table.id);
+  const botSeats = await loadTableBotSeats(db, table.id);
+  const allSeats = [...humanSeats, ...botSeats];
   const handView = projectHandForViewer(table.state, user.id);
   const handPlayerBySeat = new Map((handView?.players ?? []).map(p => [p.seatIndex, p]));
 
   const seatSlots = [];
   for (let i = 0; i < Number(table.max_seats); i++) {
-    const seat = seats.find(s => s.seatIndex === i) ?? null;
+    const seat = allSeats.find(s => s.seatIndex === i) ?? null;
     const hp = handPlayerBySeat.get(i) ?? null;
     if (!seat && !hp) {
       seatSlots.push({ seatIndex: i, occupied: false });
@@ -600,6 +774,8 @@ async function buildTableView(db, table, user, settings, clock) {
         seatIndex: i,
         occupied: false,
         leftMidHand: true,
+        isBot: Boolean(hp.isBot),
+        botStyle: hp.botStyle ?? null,
         displayName: hp.displayName,
         avatar: hp.avatar,
         folded: true,
@@ -610,10 +786,12 @@ async function buildTableView(db, table, user, settings, clock) {
       seatSlots.push({
         seatIndex: i,
         occupied: true,
+        isBot: Boolean(seat.isBot),
+        botStyle: seat.botStyle ?? null,
         accountId: seat.accountId,
         displayName: seat.displayName,
         avatar: seat.avatar,
-        isMe: seat.accountId === user.id,
+        isMe: !seat.isBot && seat.accountId === user.id,
         stackCents: hp && !handView.finished ? hp.stackCents : seat.stackCents,
         sittingOut: seat.sittingOut,
         leaveAfterHand: seat.leaveAfterHand,
@@ -638,7 +816,7 @@ async function buildTableView(db, table, user, settings, clock) {
   const acCount = await loadAccountAcCount(db, user.id);
   const allowance = computeBuyInAllowance(acCount, wallet.usedBuyIns, settings);
   const daily = dailyLimitsSummary(await loadDailyStats(db, user.identityId, clock.date), settings);
-  const mySeat = seats.find(s => s.accountId === user.id) ?? null;
+  const mySeat = humanSeats.find(s => s.accountId === user.id) ?? null;
   const myHandPlayer = mySeat ? handPlayerBySeat.get(mySeat.seatIndex) ?? null : null;
   const bigBlindCents = Number(table.big_blind_cents);
 
@@ -669,6 +847,10 @@ async function buildTableView(db, table, user, settings, clock) {
       minBuyInCents: settings.minBuyInBb * bigBlindCents,
       maxBuyInCents: settings.maxBuyInBb * bigBlindCents,
       turnTimeoutSeconds: settings.turnTimeoutSeconds,
+      allowBots: settings.allowBots,
+      maxBotsPerTable: settings.maxBotsPerTable,
+      humanCount: humanSeats.length,
+      botCount: botSeats.length,
     },
     seats: seatSlots,
     hand: handView,
@@ -749,7 +931,9 @@ async function handlePlatformPoker(ctx) {
       const settings = await loadSettings(db);
       const clock = await todayDate(db);
       const { rows: tables } = await db.query(`
-        SELECT t.*, (SELECT count(*)::integer FROM poker_seats s WHERE s.table_id=t.id) AS seated_count
+        SELECT t.*,
+          (SELECT count(*)::integer FROM poker_seats s WHERE s.table_id=t.id) AS seated_count,
+          (SELECT count(*)::integer FROM poker_bot_seats b WHERE b.table_id=t.id) AS bot_count
         FROM poker_tables t
         ORDER BY t.created_at ASC, t.id ASC
       `);
@@ -788,6 +972,8 @@ async function handlePlatformPoker(ctx) {
         dailyBuyInLimitCents: body.dailyBuyInLimitCents === undefined ? current.dailyBuyInLimitCents : integer(Number(body.dailyBuyInLimitCents), 0, 100000000, '每日买入上限（分）'),
         dailyNetLossLimitCents: body.dailyNetLossLimitCents === undefined ? current.dailyNetLossLimitCents : integer(Number(body.dailyNetLossLimitCents), 0, 100000000, '每日净输上限（分）'),
         dailyNetWinLimitCents: body.dailyNetWinLimitCents === undefined ? current.dailyNetWinLimitCents : integer(Number(body.dailyNetWinLimitCents), 0, 100000000, '每日净赢上限（分）'),
+        allowBots: body.allowBots === undefined ? current.allowBots : typeof body.allowBots === 'boolean' ? body.allowBots : fail(400, 'VALIDATION', 'AI 补位开关无效'),
+        maxBotsPerTable: body.maxBotsPerTable === undefined ? current.maxBotsPerTable : integer(Number(body.maxBotsPerTable), 0, 5, '单桌最大 AI 数量'),
       };
       if (next.defaultBigBlindCents < next.defaultSmallBlindCents * 2) {
         fail(400, 'VALIDATION', '默认大盲金额至少为小盲金额的 2 倍');
@@ -851,8 +1037,20 @@ async function handlePlatformPoker(ctx) {
         }
       }
 
+      const { rows: [savedBot] } = await db.query(
+        `UPDATE poker_bot_settings
+         SET allow_bots=$1, max_bots_per_table=$2, updated_at=clock_timestamp(), updated_by=$3
+         WHERE singleton RETURNING *`,
+        [next.allowBots, next.maxBotsPerTable, user.id],
+      );
+      if (!next.allowBots) {
+        await db.query(
+          "DELETE FROM poker_bot_seats WHERE table_id IN (SELECT id FROM poker_tables WHERE status='waiting')",
+        );
+      }
+
       await auditPlatform(db, user.id, 'platform.poker.settings_update', next);
-      return respond({ settings: settingsShape(saved) });
+      return respond({ settings: settingsShape(saved, savedBot) });
     });
   }
 
@@ -952,7 +1150,9 @@ export async function handlePoker(ctx) {
       let tables = [];
       if (unlocked) {
         const { rows } = await db.query(`
-          SELECT t.*, (SELECT count(*)::integer FROM poker_seats s WHERE s.table_id=t.id) AS seated_count
+          SELECT t.*,
+            (SELECT count(*)::integer FROM poker_seats s WHERE s.table_id=t.id) AS seated_count,
+            (SELECT count(*)::integer FROM poker_bot_seats b WHERE b.table_id=t.id) AS bot_count
           FROM poker_tables t
           WHERE t.enabled = true OR t.id = $1
           ORDER BY t.big_blind_cents ASC, t.created_at ASC
@@ -1024,7 +1224,7 @@ export async function handlePoker(ctx) {
     });
   }
 
-  const tableRoute = route.match(/^\/practice\/poker\/tables\/([^/]+)(?:\/(join|rebuy|leave|action))?$/);
+  const tableRoute = route.match(/^\/practice\/poker\/tables\/([^/]+)(?:\/(join|rebuy|leave|action|bots))?$/);
   if (!tableRoute) return null;
   const tableId = uuid(tableRoute[1], '牌桌 ID');
   const subAction = tableRoute[2] ?? null;
@@ -1059,10 +1259,17 @@ export async function handlePoker(ctx) {
         );
         if (!peek) fail(404, 'NOT_FOUND', '牌桌不存在');
         const deadlineDue = peek.status === 'playing' && peek.state?.turnDeadlineAt && Date.parse(peek.state.turnDeadlineAt) <= clock.nowMs;
+        const actingPlayer = peek.status === 'playing' && peek.state?.actingSeat !== null
+          ? peek.state?.players?.find(p => p.seatIndex === peek.state.actingSeat)
+          : null;
+        const botActionDue = Boolean(
+          actingPlayer?.isBot &&
+          (!peek.state?.nextBotActionAt || Date.parse(peek.state.nextBotActionAt) <= clock.nowMs),
+        );
         const showdownDue = peek.status === 'showdown' && peek.next_hand_at && Date.parse(peek.next_hand_at) <= clock.nowMs;
         const blindsDrift = peek.status === 'waiting' && peek.use_default_blinds &&
           (Number(peek.small_blind_cents) !== settings.defaultSmallBlindCents || Number(peek.big_blind_cents) !== settings.defaultBigBlindCents);
-        if (Number(peek.revision) === sinceRevision && !deadlineDue && !showdownDue && !blindsDrift) {
+        if (Number(peek.revision) === sinceRevision && !deadlineDue && !botActionDue && !showdownDue && !blindsDrift) {
           if (isSeatedHere) {
             await db.query(
               "UPDATE poker_seats SET last_seen_at=clock_timestamp() WHERE table_id=$1 AND account_id=$2 AND last_seen_at < clock_timestamp() - interval '10 seconds'",
@@ -1106,14 +1313,25 @@ export async function handlePoker(ctx) {
         fail(409, 'ALREADY_SEATED', existingSeat.table_id === tableId ? '你已经在这张牌桌入座' : '你已在另一张牌桌入座，请先离桌');
       }
 
-      const seats = await loadTableSeats(db, tableId);
-      const occupied = new Set(seats.map(s => s.seatIndex));
+      const humanSeats = await loadTableSeats(db, tableId);
+      const botSeats = await loadTableBotSeats(db, tableId);
+      const humanOccupied = new Set(humanSeats.map(s => s.seatIndex));
+      const botOccupied = new Set(botSeats.map(s => s.seatIndex));
+      const occupied = new Set([...humanOccupied, ...botOccupied]);
       let seatIndex;
       if (body.seatIndex !== undefined && body.seatIndex !== null) {
         seatIndex = integer(Number(body.seatIndex), 0, Number(table.max_seats) - 1, '座位号');
-        if (occupied.has(seatIndex)) fail(409, 'SEAT_TAKEN', '该座位已被占用');
+        if (humanOccupied.has(seatIndex)) fail(409, 'SEAT_TAKEN', '该座位已被占用');
+        if (botOccupied.has(seatIndex)) {
+          if (table.status === 'playing') fail(409, 'SEAT_TAKEN', '该座位当前正在对局中');
+          await db.query('DELETE FROM poker_bot_seats WHERE table_id=$1 AND seat_index=$2', [tableId, seatIndex]);
+        }
       } else {
         seatIndex = Array.from({ length: Number(table.max_seats) }, (_, i) => i).find(i => !occupied.has(i));
+        if (seatIndex === undefined && table.status !== 'playing' && botSeats.length > 0) {
+          seatIndex = botSeats[botSeats.length - 1].seatIndex;
+          await db.query('DELETE FROM poker_bot_seats WHERE table_id=$1 AND seat_index=$2', [tableId, seatIndex]);
+        }
         if (seatIndex === undefined) fail(409, 'TABLE_FULL', '牌桌已满');
       }
 
@@ -1121,6 +1339,9 @@ export async function handlePoker(ctx) {
       const minBuyIn = settings.minBuyInBb * bigBlindCents;
       const maxBuyIn = settings.maxBuyInBb * bigBlindCents;
       const buyInCents = integer(Number(body.buyInCents), minBuyIn, maxBuyIn, '买入金额（分）');
+      const fillBots = body.fillBots === undefined || body.fillBots === null
+        ? 0
+        : integer(Number(body.fillBots), 0, 5, 'AI 对手数量');
 
       await debitForBuyIn(db, {
         identityId: user.identityId,
@@ -1138,6 +1359,10 @@ export async function handlePoker(ctx) {
          VALUES($1, $2, $3, $4, $5)`,
         [tableId, seatIndex, user.id, user.identityId, buyInCents],
       );
+
+      if (fillBots > 0 && settings.allowBots) {
+        await addBotsToTable(db, table, settings, fillBots);
+      }
 
       const { rows: [bumped] } = await db.query(
         'UPDATE poker_tables SET revision=revision+1, updated_at=clock_timestamp() WHERE id=$1 RETURNING *',
@@ -1258,6 +1483,7 @@ export async function handlePoker(ctx) {
       if (state.finished) {
         table = await finalizeCompletedHand(db, table, state, settings, clock);
       } else {
+        scheduleBotPace(state, clock.nowMs);
         const { rows: [saved] } = await db.query(
           `UPDATE poker_tables SET state=$2::jsonb, revision=revision+1, updated_at=clock_timestamp()
            WHERE id=$1 RETURNING *`,
@@ -1266,6 +1492,61 @@ export async function handlePoker(ctx) {
         table = saved;
       }
 
+      return respond(await buildTableView(db, table, user, settings, clock));
+    });
+  }
+
+  if (subAction === 'bots' && method === 'POST') {
+    return transaction(pool, async db => {
+      await activeAccount(db, user.id);
+      const settings = await loadSettings(db);
+      if (!settings.enabled) fail(403, 'POKER_DISABLED', '开放平台德州扑克暂未开启');
+      const clock = await todayDate(db);
+
+      const { rows: [locked] } = await db.query('SELECT * FROM poker_tables WHERE id=$1 FOR UPDATE', [tableId]);
+      if (!locked) fail(404, 'NOT_FOUND', '牌桌不存在');
+      let table = await advanceTableLifecycle(db, locked, settings, clock);
+      if (!table.enabled) fail(409, 'TABLE_DISABLED', '该牌桌已关闭');
+
+      const { rows: [mySeat] } = await db.query(
+        'SELECT seat_index FROM poker_seats WHERE table_id=$1 AND account_id=$2',
+        [tableId, user.id],
+      );
+      if (!mySeat) fail(403, 'NOT_SEATED', '请先入座牌桌再管理 AI 对手');
+
+      const action = enumValue(body.action ?? 'add', ['add', 'remove', 'clear'], '操作类型');
+      if (action === 'add') {
+        const count = integer(Number(body.count ?? 1), 1, 5, 'AI 对手数量');
+        const added = await addBotsToTable(db, table, settings, count);
+        if (added === 0) fail(409, 'NO_BOT_SEAT_AVAILABLE', '当前牌桌没有可添加 AI 对手的空位或已达上限');
+      } else if (action === 'clear') {
+        if (table.status === 'playing') {
+          await db.query('UPDATE poker_bot_seats SET leave_after_hand=true WHERE table_id=$1', [tableId]);
+        } else {
+          await db.query('DELETE FROM poker_bot_seats WHERE table_id=$1', [tableId]);
+        }
+      } else if (action === 'remove') {
+        const botSeats = await loadTableBotSeats(db, tableId);
+        const targetSeat = body.seatIndex !== undefined && body.seatIndex !== null
+          ? integer(Number(body.seatIndex), 0, Number(table.max_seats) - 1, '座位号')
+          : botSeats.at(-1)?.seatIndex;
+        if (targetSeat !== undefined) {
+          if (table.status === 'playing') {
+            await db.query(
+              'UPDATE poker_bot_seats SET leave_after_hand=true WHERE table_id=$1 AND seat_index=$2',
+              [tableId, targetSeat],
+            );
+          } else {
+            await db.query('DELETE FROM poker_bot_seats WHERE table_id=$1 AND seat_index=$2', [tableId, targetSeat]);
+          }
+        }
+      }
+
+      const { rows: [bumped] } = await db.query(
+        'UPDATE poker_tables SET revision=revision+1, updated_at=clock_timestamp() WHERE id=$1 RETURNING *',
+        [tableId],
+      );
+      table = await advanceTableLifecycle(db, bumped, settings, clock);
       return respond(await buildTableView(db, table, user, settings, clock));
     });
   }
@@ -1322,6 +1603,7 @@ export async function handlePoker(ctx) {
           // Cash out remaining stack immediately and mark cashedOutOnLeave so finalizeCompletedHand skips double credit.
           const cashoutCents = p.stackCents;
           p.cashedOutOnLeave = true;
+          scheduleBotPace(state, clock.nowMs);
           await db.query('DELETE FROM poker_seats WHERE table_id=$1 AND seat_index=$2', [tableId, Number(seat.seat_index)]);
           await creditCashoutAndSettle(db, {
             identityId: user.identityId,

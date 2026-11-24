@@ -11,6 +11,8 @@ export interface PokerSettings {
   dailyBuyInLimitCents: number;
   dailyNetLossLimitCents: number;
   dailyNetWinLimitCents: number;
+  allowBots: boolean;
+  maxBotsPerTable: number;
   updatedAt?: string;
 }
 
@@ -57,6 +59,8 @@ export interface PokerTableSummary {
   revision: number;
   handNumber: number;
   status: "waiting" | "playing" | "showdown";
+  humanCount: number;
+  botCount: number;
   seatedCount: number;
   minBuyInCents: number;
   maxBuyInCents: number;
@@ -77,7 +81,9 @@ export interface PokerSeatSlot {
   seatIndex: number;
   occupied: boolean;
   leftMidHand?: boolean;
-  accountId?: string;
+  isBot?: boolean;
+  botStyle?: "tight" | "balanced" | "loose" | "aggressive" | null;
+  accountId?: string | null;
   displayName?: string;
   avatar?: string;
   isMe?: boolean;
@@ -115,7 +121,7 @@ export interface PokerLegalActions {
 
 export interface PokerShowdownAward {
   seatIndex: number;
-  accountId: string;
+  accountId: string | null;
   displayName: string;
   amountCents: number;
   handLabelEn: string | null;
@@ -129,7 +135,7 @@ export interface PokerShowdownResult {
   awards: PokerShowdownAward[];
   revealedHands: Array<{
     seatIndex: number;
-    accountId: string;
+    accountId: string | null;
     displayName: string;
     holeCards: string[];
     bestCards: string[];
@@ -202,6 +208,10 @@ export interface PokerTableView {
     minBuyInCents: number;
     maxBuyInCents: number;
     turnTimeoutSeconds: number;
+    allowBots: boolean;
+    maxBotsPerTable: number;
+    humanCount: number;
+    botCount: number;
   };
   seats: PokerSeatSlot[];
   hand: PokerHandView | null;

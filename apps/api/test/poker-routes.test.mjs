@@ -18,6 +18,7 @@ test('Poker Nest routes preserve method, body, query, and route for the poker do
     ['POST', `/practice/poker/tables/${id}/rebuy`, { amountCents: 200 }],
     ['POST', `/practice/poker/tables/${id}/leave`, { immediate: false }],
     ['POST', `/practice/poker/tables/${id}/action`, { handId: id, action: 'call' }],
+    ['POST', `/practice/poker/tables/${id}/bots`, { action: 'add', count: 1 }],
     ['GET', '/platform/poker'],
     ['PATCH', '/platform/poker/settings', { enabled: true, defaultSmallBlindCents: 10, defaultBigBlindCents: 20 }],
     ['POST', '/platform/poker/tables', { name: 'Table 2', smallBlindCents: 25, bigBlindCents: 50, maxSeats: 6, enabled: true }],

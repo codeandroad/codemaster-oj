@@ -245,13 +245,33 @@ test('open platform texas holdem poker end-to-end rules, wallet, buy-in allowanc
       assert.equal(refilled.allowance.totalUnlockedBuyIns, 6);
       assert.equal(refilled.allowance.remainingBuyIns, 3);
 
-      // 4th buy-in now succeeds!
-      await call(alice, `/practice/poker/tables/${defaultTableId}/join`, { seatIndex: 0, buyInCents: 400 });
-      await call(alice, `/practice/poker/tables/${defaultTableId}/leave`, {});
+      // 4th buy-in now succeeds with 1 AI opponent -> immediately deals Hand #2 without needing a 2nd human!
+      const soloStart = await call(alice, `/practice/poker/tables/${defaultTableId}/join`, {
+        seatIndex: 0,
+        buyInCents: 400,
+        fillBots: 1,
+      });
+      assert.equal(soloStart.table.status, 'playing');
+      assert.equal(soloStart.table.humanCount, 1);
+      assert.equal(soloStart.table.botCount, 1);
+      assert.ok(soloStart.seats.some(s => s.isBot && s.occupied));
+
+      // Add 2 more AI bots mid-table via /bots endpoint -> now 3 bots seated!
+      const withMoreBots = await call(alice, `/practice/poker/tables/${defaultTableId}/bots`, {
+        action: 'add',
+        count: 2,
+      });
+      assert.equal(withMoreBots.table.botCount, 3);
+
+      // Immediate leave cashes Alice out and clears bots once no humans remain!
+      await call(alice, `/practice/poker/tables/${defaultTableId}/leave`, { immediate: true });
+      const afterSoloLeave = await call(alice, `/practice/poker/tables/${defaultTableId}`);
+      assert.equal(afterSoloLeave.table.humanCount, 0);
+      assert.equal(afterSoloLeave.table.botCount, 0);
     });
 
     await t.test('campus_worker is denied access to all poker tables and AC count function', async () => {
-      for (const table of ['poker_settings', 'poker_wallets', 'poker_wallet_ledger', 'poker_daily_stats', 'poker_tables', 'poker_seats', 'poker_hands']) {
+      for (const table of ['poker_settings', 'poker_wallets', 'poker_wallet_ledger', 'poker_daily_stats', 'poker_tables', 'poker_seats', 'poker_hands', 'poker_bot_settings', 'poker_bot_seats']) {
         await assert.rejects(worker.query(`SELECT * FROM ${table}`), e => e.code === '42501');
       }
       await assert.rejects(worker.query('SELECT poker_account_ac_count($1)', [alice.id]), e => e.code === '42501');

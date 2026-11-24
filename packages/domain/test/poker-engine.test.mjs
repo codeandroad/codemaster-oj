@@ -11,6 +11,7 @@ import {
   startHand,
 } from '../src/poker-engine.mjs';
 import { computeBuyInAllowance } from '../src/poker.mjs';
+import { decideBotAction, preflopStrength, postflopStrength } from '../src/poker-bot.mjs';
 
 test('evaluateHand ranks all standard poker hand categories accurately', () => {
   const royal = evaluateHand(['As', 'Ks', 'Qs', 'Js', 'Ts', '2c', '3d']);
@@ -258,4 +259,29 @@ test('computeBuyInAllowance requires 32 ACs for initial unlock and grants 3 buy-
   assert.equal(at37.totalUnlockedBuyIns, 6);
   assert.equal(at37.remainingBuyIns, 3);
   assert.equal(at37.nextBatchAtAc, 42);
+});
+
+test('AI bot strategy scores hands sensibly and always returns legal actions', () => {
+  assert.ok(preflopStrength(['As', 'Ah']) > preflopStrength(['As', 'Ks']));
+  assert.ok(preflopStrength(['As', 'Ks']) > preflopStrength(['7c', '2d']));
+  assert.ok(postflopStrength(['As', 'Ks'], ['Qs', 'Js', 'Ts']) > postflopStrength(['7c', '2d'], ['Qs', 'Js', '9h']));
+
+  const state = startHand({
+    handId: '00000000-0000-4000-8000-000000000099',
+    handNumber: 9,
+    players: [
+      { seatIndex: 0, accountId: 'a0', identityId: 'i0', displayName: 'Human', avatar: 'a', stackCents: 1000 },
+      { seatIndex: 1, accountId: null, identityId: null, isBot: true, botStyle: 'balanced', displayName: 'Sora (AI)', avatar: 'b', stackCents: 1000 },
+    ],
+    previousDealerSeat: 0,
+    smallBlindCents: 10,
+    bigBlindCents: 20,
+    nowMs: 1000,
+  });
+
+  // Bot is seat 1 (dealer/SB in heads-up when previousDealerSeat was 0) -> acts first preflop
+  assert.equal(state.actingSeat, 1);
+  const decision = decideBotAction(state, 1, 'balanced');
+  assert.ok(['fold', 'check', 'call', 'bet', 'raise', 'all_in'].includes(decision.action));
+  applyAction(state, { seatIndex: 1, action: decision.action, amountCents: decision.amountCents ?? null, nowMs: 2000 });
 });

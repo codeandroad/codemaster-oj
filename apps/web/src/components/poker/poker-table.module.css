@@ -1,0 +1,122 @@
+.stage {
+  position: relative;
+  border-radius: 1.5rem;
+  background:
+    radial-gradient(ellipse 85% 65% at 50% 35%, rgba(16, 110, 74, 0.24) 0%, rgba(10, 15, 24, 0.96) 62%, #060911 100%);
+  box-shadow:
+    0 24px 60px -18px rgba(0, 0, 0, 0.65),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.rail {
+  position: absolute;
+  inset: 3.25rem 2.25rem 3.5rem;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #27201c 0%, #161210 52%, #0e0b0a 100%);
+  padding: 13px;
+  box-shadow:
+    0 22px 44px rgba(0, 0, 0, 0.72),
+    0 0 0 1px rgba(212, 175, 55, 0.28),
+    inset 0 2px 6px rgba(255, 232, 180, 0.14),
+    inset 0 -8px 18px rgba(0, 0, 0, 0.85);
+}
+
+@media (min-width: 640px) {
+  .rail {
+    inset: 3.75rem 4.25rem 4rem;
+    padding: 16px;
+  }
+}
+
+.felt {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  background:
+    radial-gradient(ellipse 74% 68% at 50% 44%, #157a51 0%, #0d5b3b 52%, #073824 92%, #042618 100%);
+  box-shadow:
+    inset 0 0 55px rgba(0, 0, 0, 0.62),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+  overflow: hidden;
+}
+
+.felt::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 0),
+    radial-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 0);
+  background-size: 6px 6px;
+  background-position: 0 0, 3px 3px;
+  pointer-events: none;
+}
+
+.felt::after {
+  content: "";
+  position: absolute;
+  inset: 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(235, 207, 134, 0.22);
+  box-shadow: inset 0 0 0 4px rgba(0, 0, 0, 0.08);
+  pointer-events: none;
+}
+
+.watermark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  user-select: none;
+  letter-spacing: 0.28em;
+  color: rgba(235, 207, 134, 0.11);
+}
+
+@keyframes dealCard {
+  0% {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.cardDeal {
+  animation: dealCard 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes actionPop {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.actionBubble {
+  animation: actionPop 200ms ease-out both;
+}
+
+.heroBanner {
+  background:
+    radial-gradient(circle at 86% 18%, rgba(212, 175, 55, 0.22) 0%, transparent 44%),
+    radial-gradient(circle at 12% 90%, rgba(16, 125, 82, 0.35) 0%, transparent 50%),
+    linear-gradient(135deg, #0b1320 0%, #0d1d1a 52%, #0a1019 100%);
+  box-shadow:
+    0 18px 42px -18px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.rangeGold {
+  accent-color: #eab308;
+}

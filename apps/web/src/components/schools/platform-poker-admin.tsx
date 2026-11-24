@@ -73,6 +73,8 @@ export function PlatformPokerAdmin() {
   const [dailyBuyIn, setDailyBuyIn] = useState("50.00");
   const [dailyLoss, setDailyLoss] = useState("20.00");
   const [dailyWin, setDailyWin] = useState("20.00");
+  const [allowBots, setAllowBots] = useState(true);
+  const [maxBotsPerTable, setMaxBotsPerTable] = useState("5");
 
   // Table dialog state
   const [tableForm, setTableForm] = useState<TableFormState | null>(null);
@@ -90,6 +92,8 @@ export function PlatformPokerAdmin() {
     setDailyBuyIn(centsToInput(s.dailyBuyInLimitCents));
     setDailyLoss(centsToInput(s.dailyNetLossLimitCents));
     setDailyWin(centsToInput(s.dailyNetWinLimitCents));
+    setAllowBots(s.allowBots);
+    setMaxBotsPerTable(String(s.maxBotsPerTable));
   }, []);
 
   const load = useCallback(async () => {
@@ -145,6 +149,8 @@ export function PlatformPokerAdmin() {
           dailyBuyInLimitCents: dailyBuyInCents,
           dailyNetLossLimitCents: dailyLossCents,
           dailyNetWinLimitCents: dailyWinCents,
+          allowBots,
+          maxBotsPerTable: Number(maxBotsPerTable),
         },
       });
       await load();
@@ -321,7 +327,10 @@ export function PlatformPokerAdmin() {
             <span className="font-medium">{text("Max buy-in (BB)", "最大买入（BB 倍数）")}</span>
             <input type="number" min={20} max={1000} value={maxBuyInBb} onChange={e => setMaxBuyInBb(e.target.value)} className={inputCls} />
           </label>
-          <div className="hidden lg:block" />
+          <label className="space-y-1 text-xs">
+            <span className="font-medium">{text("Max AI bots per table (0–5)", "单桌最多可召唤 AI 数（0–5）")}</span>
+            <input type="number" min={0} max={5} value={maxBotsPerTable} onChange={e => setMaxBotsPerTable(e.target.value)} className={inputCls} />
+          </label>
 
           <label className="space-y-1 text-xs">
             <span className="font-medium">{text("Daily buy-in cap (0 = none)", "每日总买入上限（奖学金，0 不限）")}</span>
@@ -336,6 +345,16 @@ export function PlatformPokerAdmin() {
             <input type="number" step="0.1" min="0" value={dailyWin} onChange={e => setDailyWin(e.target.value)} className={inputCls} />
           </label>
         </div>
+
+        <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium">
+          <input
+            type="checkbox"
+            checked={allowBots}
+            onChange={e => setAllowBots(e.target.checked)}
+            className="size-4 accent-primary"
+          />
+          {text("Allow learners to summon AI opponents when fewer players are online", "允许人数不足时召唤 AI 对手补位（1 人即可开玩）")}
+        </label>
 
         <div className="flex justify-end">
           <Button type="submit" size="sm" disabled={saving}>

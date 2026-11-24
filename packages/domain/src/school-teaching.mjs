@@ -44,18 +44,61 @@ async function requireMatchingMember(db, schoolId, accountId, kind) {
   if (member.role !== kind) fail(400, 'VALIDATION', '成员角色须与身份类型一致');
 }
 
+// Unlinking a credential must not turn a previously activated dossier into
+// a deletable record. The original school also has pre-migration accounts.
+const archivedByExit = `EXISTS (SELECT 1 FROM school_exit_requests e WHERE e.school_id=i.school_id
+  AND e.identity_id=i.id AND e.status='approved')`;
+const canArchiveIdentity = `i.kind IN ('student','teacher') AND i.account_id IS NULL
+  AND NOT i.has_account_history
+  AND NOT (${archivedByExit})`;
+const directoryFields = `i.id,i.kind,i.number,i.name,i.gender,i.account_id AS "accountId",i.created_at AS "createdAt",
+  (SELECT username FROM accounts a WHERE a.id=i.account_id) AS username,${identityClasses},
+  i.archived_at AS "archivedAt",(${canArchiveIdentity}) AS "canArchive",${archivedByExit} AS "archivedByExit"`;
+
 async function listIdentities(db, schoolId, url) {
+  const params=url.searchParams;
+  const archived=params.get('archived')==='true';
+  if (params.get('view')==='filters') {
+    const classes=(await db.query('SELECT id,name FROM school_classes WHERE school_id=$1 AND archived_at IS NULL ORDER BY name,id',[schoolId])).rows;
+    const counts=(await db.query('SELECT kind,count(*)::int n FROM school_identities WHERE school_id=$1 AND (archived_at IS NOT NULL)=$2 GROUP BY kind',[schoolId,archived])).rows;
+    return {status:200,body:{classes,counts:Object.fromEntries(counts.map(row=>[row.kind,row.n]))}};
+  }
   const page = requestedPage(url);
-  const kind = requestedKind(url);
-  const pendingActivation = enumValue(url.searchParams.get('pendingActivation') ?? 'false', ['true', 'false'], '仅显示待激活身份') === 'true';
-  const query = field(url.searchParams.get('q') ?? '', '搜索关键词', { min: 0, max: 100 });
+  const kind = params.has('kind') ? enumValue(params.get('kind'), [...IDENTITY_KINDS,'school_admin'], '身份类型') : null;
+  const pendingActivation = enumValue(params.get('pendingActivation') ?? 'false', ['true','false'], '仅显示待激活身份')==='true';
+  const status=enumValue(params.get('status') ?? 'all',['all','pending','active'],'激活状态');
+  const classId=params.has('classId') ? uuid(params.get('classId'),'班级') : null;
+  const query = field(params.get('q') ?? '', '搜索关键词', { min: 0, max: 100 });
   const { rows } = await db.query(`
-    SELECT ${identityFields}, ${identityClasses} FROM school_identities i
-    WHERE school_id = $1 AND archived_at IS NULL AND ($2::text IS NULL OR kind = $2)
-      AND ($3 = '' OR strpos(lower(name), lower($3)) > 0 OR strpos(lower(number), lower($3)) > 0)
-      AND (NOT $6::boolean OR (account_id IS NULL AND kind IN ('student','teacher')))
-    ORDER BY name, id LIMIT $4 OFFSET $5`, [schoolId, kind, query, PAGE_SIZE + 1, (page - 1) * PAGE_SIZE, pendingActivation]);
+    SELECT ${directoryFields} FROM school_identities i
+    WHERE i.school_id=$1 AND (i.archived_at IS NOT NULL)=$7 AND ($2::text IS NULL OR i.kind=$2)
+      AND ($3='' OR strpos(lower(i.name),lower($3))>0 OR strpos(lower(i.number),lower($3))>0
+        OR EXISTS(SELECT 1 FROM accounts a WHERE a.id=i.account_id AND strpos(lower(a.username),lower($3))>0))
+      AND (NOT $6 OR (i.account_id IS NULL AND i.archived_at IS NULL AND i.kind IN ('student','teacher')))
+      AND ($8='all' OR (i.account_id IS NULL)=($8='pending'))
+      AND ($9::uuid IS NULL OR EXISTS(SELECT 1 FROM school_class_roster r JOIN school_classes c
+        ON (c.school_id,c.id)=(r.school_id,r.class_id) WHERE r.school_id=i.school_id AND r.identity_id=i.id
+        AND r.class_id=$9 AND c.archived_at IS NULL))
+    ORDER BY i.number,i.id LIMIT $4 OFFSET $5`, [schoolId,kind,query,PAGE_SIZE+1,(page-1)*PAGE_SIZE,pendingActivation,archived,status,classId]);
   return pageResult(page, rows);
+}
+
+async function identityRecord(db,schoolId,id) {
+  const {rows:[person]}=await db.query(`SELECT ${directoryFields},i.notes FROM school_identities i
+    WHERE i.school_id=$1 AND i.id=$2`,[schoolId,id]);
+  if (!person) fail(404,'NOT_FOUND','本校身份档案不存在');
+  return person;
+}
+
+async function archiveIdentity(db,schoolId,actorId,id,archive) {
+  const person=await identityRecord(db,schoolId,id);
+  if (!person.canArchive) fail(409,'IDENTITY_PROTECTED','此档案有账号历史、管理身份或退校记录，须保留');
+  if (archive!==Boolean(person.archivedAt)) {
+    await db.query('UPDATE school_identities SET archived_at=CASE WHEN $3 THEN now() END WHERE school_id=$1 AND id=$2',[schoolId,id,archive]);
+    if (archive) await db.query('UPDATE school_activation_tokens SET expires_at=least(expires_at,now()) WHERE school_id=$1 AND identity_id=$2 AND consumed_at IS NULL',[schoolId,id]);
+    await auditSchool(db,schoolId,actorId,archive?'school.identity.archive':'school.identity.restore',id);
+  }
+  return {status:200,body:{ok:true}};
 }
 
 function readClassIds(value) {
@@ -346,7 +389,7 @@ async function removeFromClassRosters(db, schoolId, actorId, identityId, classId
 }
 
 export async function handleSchoolTeaching({ pool, user, route, method, body, url }) {
-  const directory = route.match(/^\/schools\/([^/]+)\/identities(?:\/([^/]+)\/(account|classes|profile))?$/);
+  const directory = route.match(/^\/schools\/([^/]+)\/identities(?:\/([^/]+)\/(account|classes|profile|details|archive|restore))?$/);
   if (directory) {
     const schoolId = uuid(directory[1], '学校 ID');
     const identityId = directory[2];
@@ -355,6 +398,9 @@ export async function handleSchoolTeaching({ pool, user, route, method, body, ur
       await requireSchoolAdmin(db, schoolId, user.id);
       if (!identityId && method === 'GET') return listIdentities(db, schoolId, url);
       if (!identityId && method === 'POST') return createIdentity(db, schoolId, user.id, body);
+      if (directory[3]==='details' && method==='GET') return {status:200,body:await identityRecord(db,schoolId,uuid(identityId))};
+      if (['archive','restore'].includes(directory[3]) && method==='POST')
+        return archiveIdentity(db,schoolId,user.id,uuid(identityId),directory[3]==='archive');
       if (directory[3] === 'profile' && ['GET', 'PATCH'].includes(method)) {
         return manageIdentityProfile(db, schoolId, user.id, uuid(identityId, '身份档案 ID'), method, body);
       }

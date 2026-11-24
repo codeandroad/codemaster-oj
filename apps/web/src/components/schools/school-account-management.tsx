@@ -10,6 +10,8 @@ import type { CampusGender } from "@/lib/production-api";
 import { RoleLabel, useSchoolText, type School, type SchoolRole } from "./school-ui";
 import { schoolWorkspaceHref } from "./school-workspace-location";
 import { SchoolIdentityClasses } from "./school-identity-classes";
+import { AccountAccessAction } from "./account-access-action";
+import { SchoolClassFilter, useSchoolDirectoryOptions } from "./school-directory-filters";
 import { SchoolIdentityProfile } from "./school-identity-profile";
 
 export type Member = {
@@ -19,33 +21,33 @@ export type Member = {
   canEditRoles: boolean; canResetPassword: boolean; identityId: string | null; gender: CampusGender | null;
 };
 
-export type AccountFilters = { q: string; className: string; role: string; status: string; access: string };
+export type AccountFilters = { q: string; classId: string; role: string; status: string; access: string };
 
-export function SchoolAccountFilters({ filters, onChange }: { filters: AccountFilters; onChange: (next: AccountFilters) => void }) {
+export function SchoolAccountFilters({ schoolId, filters, onChange }: { schoolId:string; filters: AccountFilters; onChange: (next: AccountFilters) => void }) {
   const text = useSchoolText();
   const [query, setQuery] = useState(filters.q);
-  const [className, setClassName] = useState(filters.className);
+  const options = useSchoolDirectoryOptions(schoolId);
   return <form className="mb-3 flex flex-wrap items-end gap-2" onSubmit={event => {
     event.preventDefault();
-    onChange({ ...filters, q: query.trim(), className: className.trim() });
+    onChange({ ...filters, q: query.trim() });
   }}>
     <label className="min-w-44 flex-1 text-xs">{text("Name, username or ID", "姓名、用户名或学工号")}
       <input type="search" className={inputClass} maxLength={100} value={query} onChange={e => setQuery(e.target.value)}/></label>
-    <label className="text-xs">{text("Class name", "班级名称")}
-      <input type="search" className={inputClass} value={className} maxLength={100} onChange={e => setClassName(e.target.value)}/></label>
+    <SchoolClassFilter classes={options.data?.classes ?? []} value={filters.classId} onChange={classId=>onChange({...filters,q:query.trim(),classId})}/>
+    {options.error && <span role="alert">{options.error}</span>}
     <label className="text-xs">{text("Role", "角色")}
-      <select className={inputClass} value={filters.role} onChange={e => onChange({ ...filters, q:query.trim(), className:className.trim(), role:e.target.value })}>
+      <select className={inputClass} value={filters.role} onChange={e => onChange({ ...filters, q:query.trim(), role:e.target.value })}>
         <option value="all">{text("All roles", "全部角色")}</option>
         <option value="student">{text("Student", "学生")}</option><option value="teacher">{text("Teacher", "教师")}</option>
         <option value="school_admin">{text("School administrator", "学校管理员")}</option>
       </select></label>
     <label className="text-xs">{text("Platform login", "平台登录")}
-      <select className={inputClass} value={filters.status} onChange={e => onChange({ ...filters, q:query.trim(), className:className.trim(), status:e.target.value })}>
+      <select className={inputClass} value={filters.status} onChange={e => onChange({ ...filters, q:query.trim(), status:e.target.value })}>
         <option value="all">{text("All statuses", "全部状态")}</option>
         <option value="enabled">{text("Enabled", "已启用")}</option><option value="disabled">{text("Disabled", "已禁用")}</option>
       </select></label>
     <label className="text-xs">{text("School access", "本校访问")}
-      <select className={inputClass} value={filters.access} onChange={e => onChange({ ...filters, q:query.trim(), className:className.trim(), access:e.target.value })}>
+      <select className={inputClass} value={filters.access} onChange={e => onChange({ ...filters, q:query.trim(), access:e.target.value })}>
         <option value="all">{text("All statuses", "全部状态")}</option>
         <option value="active">{text("Active", "已开放")}</option><option value="suspended">{text("Suspended", "已暂停")}</option>
       </select></label>
@@ -59,7 +61,9 @@ export function SchoolAccountDetails({ school, accountId, onClose, onIdentitySav
   const text = useSchoolText(), t = useAdminText();
   const resource = useData<Member & { events: { createdAt: string; action: string }[] }>(`schools/${school.id}/accounts/${accountId}`);
   const member = resource.data;
-  const [editing, setEditing] = useState<"classes" | "profile" | null>(null);
+  const [editing, setEditing] = useState<"classes" | "profile" | "roles" | null>(null);
+  if (editing==="roles" && member) return <SchoolRoleEditor school={school} member={member} onClose={()=>setEditing(null)}
+    onSaved={()=>{setEditing(null); resource.reload(); onIdentitySaved();}}/>;
   if (editing && member?.identityId) {
     const Editor = editing === "profile" ? SchoolIdentityProfile : SchoolIdentityClasses;
     return <Editor school={school} identityId={member.identityId} onClose={() => setEditing(null)}
@@ -80,6 +84,10 @@ export function SchoolAccountDetails({ school, accountId, onClose, onIdentitySav
         <dt>{text("Platform login", "平台登录")}</dt><dd>{member.disabled ? text("Disabled","已禁用") : text("Enabled","已启用")}</dd>
         <dt>{text("School access", "本校访问")}</dt><dd>{member.suspended ? text("Suspended","已暂停") : text("Active","已开放")}</dd>
       </dl>
+      <div className="flex flex-wrap items-center gap-2">
+        {member.canEditRoles && <Button size="sm" variant="secondary" onClick={()=>setEditing("roles")}>{text("Edit roles","编辑角色")}</Button>}
+        {member.canManageAccess && <AccountAccessAction account={member} access={{scope:"school",school,suspended:member.suspended}} onSaved={()=>{resource.reload();onIdentitySaved();}}/>}
+      </div>
       {member.identityId && <div className="flex flex-wrap items-center gap-3">
         <Button size="sm" variant="secondary" onClick={() => setEditing("profile")}>{text("Edit profile", "编辑资料")}</Button>
         <AppLink className="text-sm font-semibold text-primary" href={schoolWorkspaceHref(school.id,"identities")+"&identityId="+member.identityId}>

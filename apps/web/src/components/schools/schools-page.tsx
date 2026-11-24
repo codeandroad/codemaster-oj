@@ -420,12 +420,13 @@ function SchoolMembers({
         </AppLink>
       </div>
       {activating && <SchoolActivationBatch school={school} onClose={() => setActivating(false)} />}
+      <details className="rounded-md border border-border p-3"><summary className="cursor-pointer text-sm font-semibold">{text("Invite a member","邀请成员")}</summary>
       <IssueInvitation
         school={school}
         invitation={invitation}
         onInvitation={onInvitation}
         onIssuing={onIssuing}
-      />
+      /></details>
       {removed && (
         <p role="status" className="text-sm text-success">
           {text("School membership removed.", "已移除本校成员关系。")}
@@ -481,17 +482,18 @@ function MemberList({
   const localError = useSchoolError();
   const [resetTarget, setResetTarget] = useState<Member | null>(null);
   const [credential, setCredential] = useState<{ username: string; resetCode: string; resetUrl: string } | null>(null);
-  const [detail, setDetail] = useState<Member | null>(null);
+  const linkedAccount = useSearchParams().get("accountId");
+  const [detail, setDetail] = useState<string | null>(linkedAccount);
   const [editingRoles, setEditingRoles] = useState<Member | null>(null);
-  const [filters, setFilters] = useState<AccountFilters>({ q:"", className:"", role:"all", status:"all", access:"all" });
+  const [filters, setFilters] = useState<AccountFilters>({ q:"", classId:"", role:"all", status:"all", access:"all" });
   const params = new URLSearchParams({ ...filters, page: String(page) });
   const members = useData<{ items: Member[]; page: number; hasMore: boolean }>(`schools/${school.id}/accounts?${params}`);
   return (
     <div className="min-h-48">
-      <SchoolAccountFilters filters={filters} onChange={next => { onPage(1); setFilters(next); }}/>
+      <SchoolAccountFilters schoolId={school.id} filters={filters} onChange={next => { onPage(1); setFilters(next); }}/>
       {editingRoles && <SchoolRoleEditor school={school} member={editingRoles} onClose={() => setEditingRoles(null)}
         onSaved={() => { setEditingRoles(null); members.reload(); }}/>}
-      {detail && <SchoolAccountDetails school={school} accountId={detail.accountId} onClose={() => setDetail(null)} onIdentitySaved={members.reload} />}
+      {detail && <SchoolAccountDetails school={school} accountId={detail} onClose={() => setDetail(null)} onIdentitySaved={members.reload} />}
       <Loading resource={{ ...members, loading: members.pending || members.loading }}>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -501,6 +503,7 @@ function MemberList({
             <thead className="border-b border-border text-muted-foreground">
               <tr>
                 <th className="py-2 pr-3">{text("Name", "姓名")}</th>
+                <th className="py-2 pr-3">{text("Username", "用户名")}</th>
                 <th className="py-2 pr-3">{text("Role", "角色")}</th>
                 <th className="py-2 pr-3">{text("Classes", "关联班级")}</th>
                 <th className="py-2 pr-3">{text("Platform login", "平台登录")}</th>
@@ -516,9 +519,10 @@ function MemberList({
                   className="border-b border-border last:border-0"
                 >
                   <td className="py-2 pr-3 break-words">
-                    <button type="button" className="font-semibold text-primary hover:underline" onClick={() => setDetail(member)}>{member.name}</button>
-                    <span className="block text-xs text-muted-foreground">{member.username} {member.number && `· ${member.number}`}</span>
+                    <button type="button" className="font-semibold text-primary hover:underline" onClick={() => setDetail(member.accountId)}>{member.name}</button>
+                    <span className="block text-xs text-muted-foreground">{member.number}</span>
                   </td>
+                  <td className="py-2 pr-3 font-mono">{member.username}</td>
                   <td className="py-2 pr-3">
                     <RoleLabel role={member.role} />
                     {member.administrator && member.role !== "school_admin" && (
@@ -563,7 +567,7 @@ function MemberList({
               {!members.data?.items.length && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="py-6 text-center text-muted-foreground"
                   >
                     {text("No members on this page.", "本页没有成员。")}

@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { CopyCode, Loading, Modal, useData } from "@/components/admin/common";
 import { Button } from "@/components/ui/button";
 import { ApiError, productionApi } from "@/lib/production-api";
+import { SchoolClassFilter, useSchoolDirectoryOptions } from "./school-directory-filters";
 import { IdentityFilter } from "./school-administration";
 import { RoleLabel, useSchoolError, useSchoolText, type School } from "./school-ui";
 
@@ -17,6 +18,8 @@ export function SchoolActivationBatch({ school, onClose }: { school: School; onC
   const text = useSchoolText();
   const explain = useSchoolError();
   const [kind, setKind] = useState<Person["kind"] | "">("");
+  const [classId,setClassId] = useState("");
+  const options = useSchoolDirectoryOptions(school.id);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [selection, setSelection] = useState(new Set<string>());
@@ -25,9 +28,10 @@ export function SchoolActivationBatch({ school, onClose }: { school: School; onC
   const [busy, setBusy] = useState(false);
   const issuing = useRef(false);
   const params = new URLSearchParams({ pendingActivation: "true", page: String(page), q: query });
+  if (classId) params.set("classId",classId);
   if (kind) params.set("kind", kind);
   const path = `schools/${school.id}/identities`;
-  const resource = useData<{ items: (Person & { id: string })[]; hasMore: boolean }>(result ? null : `${path}?${params}`);
+  const resource = useData<{ items: (Person & { id: string; classes:{id:string;name:string;archived:boolean}[] })[]; hasMore: boolean }>(result ? null : `${path}?${params}`);
   const rows = !resource.pending && !resource.error ? resource.data?.items ?? [] : [];
   const all = rows.length > 0 && rows.every(row => selection.has(row.id));
   const some = rows.some(row => selection.has(row.id));
@@ -104,6 +108,8 @@ export function SchoolActivationBatch({ school, onClose }: { school: School; onC
         <IdentityFilter kind={kind}
           onKind={next => { if (next !== kind) { setKind(next); resetFilter(); } }}
           onQuery={next => { if (next !== query) { setQuery(next); resetFilter(); } }} />
+        <SchoolClassFilter classes={options.data?.classes ?? []} value={classId} onChange={next=>{setClassId(next); resetFilter();}}/>
+        {options.error && <p role="alert">{options.error}</p>}
         <Loading resource={{ ...resource, loading: resource.pending || resource.loading }}>
           <label className="flex min-h-11 items-center gap-2 text-sm font-semibold">
             <input type="checkbox" disabled={!rows.length} checked={all}
@@ -111,12 +117,15 @@ export function SchoolActivationBatch({ school, onClose }: { school: School; onC
               onChange={e => select(rows.map(row => row.id), e.target.checked)} />
             {text("Select this page", "全选本页")}
           </label>
-          <div className="max-h-[36vh] divide-y divide-border overflow-auto border-y border-border">
-            {rows.map(row => <label key={row.id} className="flex min-h-11 cursor-pointer items-center gap-2 px-1 text-sm">
-              <input type="checkbox" checked={selection.has(row.id)} onChange={e => select([row.id], e.target.checked)} />
-              <span className="font-semibold">{row.name}</span>
-              <span className="text-muted-foreground">{row.number} · <RoleLabel role={row.kind}/></span>
-            </label>)}
+          <div className="max-h-[36vh] overflow-auto border-y border-border">
+            <table className="w-full min-w-[28rem] text-left text-sm">
+              <thead className="sticky top-0 bg-surface-subtle"><tr>{[text("Select","选择"),text("ID","编号"),text("Name","姓名"),text("Type","类型"),text("Class","班级")].map(title=><th scope="col" key={title} className="p-2">{title}</th>)}</tr></thead>
+              <tbody>{rows.map(row=><tr key={row.id} className="border-t border-border">
+                <td className="p-2"><input type="checkbox" aria-label={text("Select "+row.name,"选择 "+row.name)} checked={selection.has(row.id)} onChange={e=>select([row.id],e.target.checked)}/></td>
+                <td className="p-2 font-mono">{row.number}</td><td className="p-2 font-semibold">{row.name}</td>
+                <td className="p-2"><RoleLabel role={row.kind}/></td><td className="p-2">{row.classes.filter(c=>!c.archived).map(c=>c.name).join("、")||"—"}</td>
+              </tr>)}</tbody>
+            </table>
             {!rows.length && <p className="py-4 text-sm text-muted-foreground">{text("No unlinked identities match.", "没有符合条件的待激活身份。")}</p>}
           </div>
           <div className="flex items-center justify-end gap-2 py-1 text-sm">

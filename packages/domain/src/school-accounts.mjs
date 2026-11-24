@@ -21,6 +21,7 @@ async function readAccounts(db, schoolId, accountId, url, actorId) {
   const role = enumValue(params.get('role') ?? 'all', ['all','student','teacher','school_admin'], '角色');
   const status = enumValue(params.get('status') ?? 'all', ['all','enabled','disabled'], '状态');
   const access = enumValue(params.get('access') ?? 'all', ['all','active','suspended'], '本校访问');
+  const classId = params.get('classId') ? uuid(params.get('classId'), '班级 ID') : null;
   const className = field(params.get('className') ?? '', '班级名称', { min:0, max:100 });
   const {rows} = await db.query(`SELECT a.id AS "accountId", a.username, coalesce(si.name,i.name) AS name, si.number,
     si.id AS "identityId", si.gender, m.role, m.joined_at AS "joinedAt",
@@ -38,10 +39,10 @@ async function readAccounts(db, schoolId, accountId, url, actorId) {
       AND ($3='' OR strpos(lower(coalesce(si.name,i.name)),lower($3))>0 OR strpos(a.username,lower($3))>0 OR strpos(lower(si.number),lower($3))>0)
       AND ($4='all' OR m.role=$4 OR ($4 IN ('school_admin','teacher') AND (m.role='school_admin' OR g.account_id IS NOT NULL)))
       AND ($5='all' OR (a.disabled_at IS NOT NULL)=($5='disabled'))
-      AND ($6='' OR EXISTS (SELECT 1 FROM school_class_roster r JOIN school_classes c
+      AND (($6='' AND $10::uuid IS NULL) OR EXISTS (SELECT 1 FROM school_class_roster r JOIN school_classes c
         ON c.school_id=r.school_id AND c.id=r.class_id WHERE r.school_id=m.school_id AND r.identity_id=si.id
-        AND c.archived_at IS NULL AND strpos(lower(c.name),lower($6))>0))
-    ORDER BY coalesce(si.name,i.name),a.id LIMIT 51 OFFSET $7`, [schoolId,accountId,q,role,status,className,(page-1)*50,actorId,access]);
+        AND c.archived_at IS NULL AND ($10::uuid IS NULL OR c.id=$10) AND strpos(lower(c.name),lower($6))>0))
+    ORDER BY coalesce(si.name,i.name),a.id LIMIT 51 OFFSET $7`, [schoolId,accountId,q,role,status,className,(page-1)*50,actorId,access,classId]);
   if (!accountId) return { items:rows.slice(0,50), page, hasMore:rows.length>50 };
   if (!rows.length) fail(404,'NOT_FOUND','本校账号不存在');
   const { rows: events } = await db.query(`SELECT action,created_at AS "createdAt" FROM audit_events

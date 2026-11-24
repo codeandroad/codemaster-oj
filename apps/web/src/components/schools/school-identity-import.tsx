@@ -63,19 +63,19 @@ const PREVIEW_PAGE_SIZE = 20;
 export function SchoolIdentityImport({
   school,
   initialClass = null,
-  studentClassOnly = false,
+  studentClassOnly = false, initialKind = "student",
   onClose,
   onSaved,
 }: {
   school: School;
   initialClass?: ClassChoice | null;
-  studentClassOnly?: boolean;
+  studentClassOnly?: boolean; initialKind?: IdentityKind;
   onClose: () => void;
   onSaved: (message: string) => void;
 }) {
   const text = useSchoolText();
   const schoolError = useSchoolError();
-  const [kind, setKind] = useState<IdentityKind>("student");
+  const [kind, setKind] = useState<IdentityKind>(initialKind);
   const [selectedClass, setSelectedClass] = useState<ClassChoice | null>(
     initialClass,
   );

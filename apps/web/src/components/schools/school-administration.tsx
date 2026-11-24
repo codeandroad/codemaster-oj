@@ -4,13 +4,17 @@ import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { Plus, X } from "lucide-react";
 import {
-  Feedback,
+  Drawer, useAdminText, Feedback,
   inputClass,
   Loading,
   Modal,
   useData,
   useMutation,
 } from "@/components/admin/common";
+import { genderLabel } from "@/lib/gender";
+import { AppLink } from "@/components/navigation";
+import { schoolWorkspaceHref } from "./school-workspace-location";
+import { SchoolClassFilter, useSchoolDirectoryOptions } from "./school-directory-filters";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -42,7 +46,9 @@ type Identity = {
   number: string;
   kind: IdentityKind;
 };
-type DirectoryIdentity = Identity & { accountId: string | null; classes: IdentityClass[] };
+type DirectoryIdentity = Omit<Identity,"kind"> & { kind: IdentityKind | "school_admin"; accountId: string | null;
+  username: string | null; gender: CampusGender | null; notes?:string | null; classes: IdentityClass[];
+  archivedAt: string | null; archivedByExit: boolean; canArchive:boolean };
 type MemberAccount = { accountId: string; name: string; username?: string };
 type ClassType = "administrative" | "training";
 type Page<T> = { items: T[]; page: number; hasMore: boolean };
@@ -140,7 +146,18 @@ function SchoolDirectory({
 }) {
   const text = useSchoolText();
   const [query, setQuery] = useState("");
-  const [kind, setKind] = useState<IdentityKind | "">("");
+  const t = useAdminText();
+  const [kind, setKind] = useState<DirectoryIdentity["kind"]>("student");
+  const [archived,setArchived] = useState(false);
+  const [status,setStatus] = useState("all");
+  const [classId,setClassId] = useState("");
+  const [viewId,setViewId] = useState(highlightedIdentityId);
+  const [archiving,setArchiving] = useState<DirectoryIdentity|null>(null);
+  const options = useSchoolDirectoryOptions(school.id,archived);
+  const details = useData<DirectoryIdentity>(viewId ? base + "/identities/" + viewId + "/details" : null);
+  const person = details.data?.id === viewId ? details.data : null;
+  const params = new URLSearchParams({kind,status,q:query,archived:String(archived)});
+  if(classId) params.set("classId",classId);
   const [edit, setEdit] = useState(false);
   const [editingClasses, setEditingClasses] = useState<string | null>(null);
   const [editingProfile, setEditingProfile] = useState<string | null>(null);
@@ -157,6 +174,7 @@ function SchoolDirectory({
     setImporting(false);
     setLink(null);
     setUnlink(null);
+    setArchiving(null); details.reload(); options.reload();
     setRevision((value) => value + 1);
     setMessage(nextMessage);
   }
@@ -164,97 +182,73 @@ function SchoolDirectory({
   return (
     <div className="mt-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold">
-          {text("School identities", "校内身份档案")}
-        </h3>
+        <div className="flex flex-wrap items-center gap-2">{(["student","teacher","school_admin"] as const).map(value=><Button
+          key={value} size="sm" aria-pressed={kind===value} variant={kind===value ? "primary" : "secondary"} onClick={()=>setKind(value)}>
+          <RoleLabel role={value}/> · {options.data?.counts[value] ?? 0}</Button>)}</div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            onClick={() => setImporting(true)}
-          >
-            {text("Import identities", "导入身份")}
-          </Button>
-          <Button type="button" size="sm" onClick={() => setEdit(true)}>
-            <Plus size={14} />
-            {text("Create identity", "新建身份")}
-          </Button>
+          {!archived && kind!=="school_admin" && <>
+            <Button size="sm" variant="secondary" onClick={() => setImporting(true)}>{text("Import roster","导入名单")}</Button>
+            <Button size="sm" onClick={() => setEdit(true)}><Plus size={14}/>{kind==="teacher" ? text("Create teacher identity","新建教师身份") : text("Create student identity","新建学生身份")}</Button>
+          </>}
         </div>
       </div>
-      <IdentityFilter onQuery={setQuery} kind={kind} onKind={setKind} />
-      <Feedback action={{ error: "", message }} />
-      <SchoolTable<DirectoryIdentity>
-        key={`${kind}:${query}`}
-        refreshKey={`${revision}:${refreshRevision}`}
-        path={identityPath(base, kind, query)}
-        label={text("School identities", "校内身份档案")}
-        empty={
-          query
-            ? text(
-                "No identities match this search.",
-                "没有符合搜索条件的身份档案。",
-              )
-            : text("No identities on this page.", "本页没有身份档案。")
-        }
-        rowKey={(item) => item.id}
-        highlightedRowKey={highlightedIdentityId}
-        columns={[
-          ...identityColumns(text),
-          {
-            title: text("Classes", "关联班级"),
-            cell: item => item.classes.filter(c => !c.archived).map(c => c.name).join("、") || "—",
-          },
-          {
-            title: text("Account", "账号"),
-            cell: (item) =>
-              item.accountId
-                ? text("Linked", "已关联")
-                : text("Unlinked", "未关联"),
-          },
-          {
-            title: text("Actions", "操作"),
-            cell: (item) => (
-              <div className="flex flex-wrap gap-1">
-                <Button size="sm" variant="ghost" onClick={() => setEditingProfile(item.id)}>
-                  {text("Edit profile", "编辑资料")}
-                </Button>
-                {(item.kind === "student" || item.kind === "teacher") && (
-                  <Button size="sm" variant="ghost" onClick={() => setEditingClasses(item.id)}>
-                    {text("Adjust classes", "调整班级")}
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  aria-label={
-                    item.accountId
-                      ? text(
-                          `Unlink account for ${item.name}`,
-                          `解除 ${item.name} 的账号关联`,
-                        )
-                      : text(
-                          `Link account for ${item.name}`,
-                          `为 ${item.name} 关联账号`,
-                        )
-                  }
-                  onClick={() =>
-                    item.accountId ? setUnlink(item) : setLink(item)
-                  }
-                >
-                  {item.accountId
-                    ? text("Unlink", "解除关联")
-                    : text("Link account", "关联账号")}
-                </Button>
-
-                {!item.accountId && (item.kind === "student" || item.kind === "teacher") && (
-                  <SchoolActivationButton school={school} identity={item} />
-                )}
-              </div>
-            ),
-          },
-        ]}
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        {[false,true].map(value=><Button key={String(value)} size="sm" aria-pressed={archived===value} variant={archived===value?"secondary":"ghost"}
+          onClick={()=>{setArchived(value);setStatus("all");}}>{value ? text("Deleted","已删除") : text("Active records","正常档案")}</Button>)}
+      </div>
+      <div className="flex flex-wrap items-center gap-2"><div className="min-w-48 flex-1">
+        <IdentityFilter onQuery={setQuery} kind="" onKind={()=>{}} fixedKind searchAccount/></div>
+        {!archived && <select aria-label={text("Activation status","激活状态")} className={inputClass+" !w-auto"} value={status} onChange={e=>setStatus(e.target.value)}>
+          <option value="all">{text("All statuses","全部状态")}</option><option value="active">{text("Activated","已激活")}</option>
+          <option value="pending">{text("Pending activation","待激活")}</option></select>}
+        <SchoolClassFilter classes={options.data?.classes ?? []} value={classId} onChange={setClassId}/>
+      </div>
+      <Feedback action={{ error: options.error, message }} />
+      <SchoolTable<DirectoryIdentity> key={params.toString()} refreshKey={`${revision}:${refreshRevision}`}
+        path={`${base}/identities?${params}`} label={text("School identities","校内身份档案")}
+        empty={text("No matching identities.","没有符合条件的身份档案。")} rowKey={item=>item.id}
+        highlightedRowKey={viewId} columns={[
+          {title:kind==="student"?text("Student ID","学号"):kind==="teacher"?text("Staff ID","工号"):text("Identity ID","身份编号"),cell:item=><code>{item.number}</code>},
+          {title:text("Name","姓名"),cell:item=><button className="font-semibold text-primary hover:underline" onClick={()=>setViewId(item.id)}>{item.name}</button>},
+          {title:text("Gender","性别"),cell:item=>t(genderLabel(item.gender))},
+          {title:text("Classes","关联班级"),cell:item=>item.classes.filter(c=>!c.archived).map(c=>c.name).join("、")||"—"},
+          {title:text("Linked account","关联账号"),cell:item=>item.username ?? "—"},
+          {title:text("Status","状态"),cell:item=>item.archivedByExit ? text("Left school","已退校") : archived ? text("Deleted","已删除") : item.accountId ? text("Activated","已激活") : text("Pending activation","待激活")},
+          {title:text("Actions","操作"),cell:item=><div className="flex gap-2">
+            <Button size="sm" variant="secondary" onClick={()=>setViewId(item.id)}>{text("View","查看")}</Button>
+            {item.canArchive && <Button size="sm" variant="secondary" onClick={()=>setArchiving(item)}>{archived?text("Restore","恢复"):text("Delete","删除")}</Button>}
+          </div>}
+        ]}/>
+      {viewId && !editingClasses && !editingProfile && !link && !unlink && !archiving && <Drawer title={person?.name ?? text("Identity details","身份详情")}
+        eyebrow={person?.number} onClose={()=>setViewId(null)}>
+        <Loading resource={details}>{person && <div className="space-y-4 text-sm">
+          <section className="space-y-3 rounded-md border border-border p-4">
+            <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">{text("Identity details","身份资料")}</h3>
+              {!person.archivedAt && <Button size="sm" variant="secondary" onClick={()=>setEditingProfile(person.id)}>{text("Edit profile","编辑资料")}</Button>}</div>
+            <dl className="grid grid-cols-2 gap-3"><div><dt>{text("Gender","性别")}</dt><dd>{t(genderLabel(person.gender))}</dd></div>
+              <div><dt>{text("Classes","关联班级")}</dt><dd>{person.classes.filter(c=>!c.archived).map(c=>c.name).join("、")||"—"}</dd></div>
+              <div><dt>{text("Notes","备注")}</dt><dd className="whitespace-pre-wrap">{person.notes||"—"}</dd></div></dl>
+            {!person.archivedAt && person.kind!=="school_admin" && <Button size="sm" variant="secondary" onClick={()=>setEditingClasses(person.id)}>{text("Adjust classes","调整班级")}</Button>}
+          </section>
+          <section className="space-y-3 rounded-md border border-border p-4"><h3 className="font-semibold">{text("Login account","登录账号")}</h3>
+            <p>{person.username || (person.archivedAt ? "—" : text("Pending activation","待激活"))}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              {person.accountId && <AppLink className="text-primary underline" href={schoolWorkspaceHref(school.id,"members")+"&accountId="+person.accountId}>{text("View in accounts","在账号与角色中查看")}</AppLink>}
+              {!person.archivedAt && person.kind!=="school_admin" && <>
+                <Button size="sm" variant="secondary" onClick={()=>person.accountId ? setUnlink(person) : setLink(person)}>{person.accountId ? text("Unlink","解除关联") : text("Link account","关联账号")}</Button>
+                {!person.accountId && <SchoolActivationButton school={school} identity={{...person,kind:person.kind}}/>}
+              </>}
+            </div>
+          </section>
+          <section className="rounded-md border border-border p-4"><h3 className="mb-1 font-semibold">{text("Record history","历史记录")}</h3>
+            {text("Updating the profile or changing its account link preserves classes, assignments and submission history.","编辑资料或变更账号关联后，原有班级、作业和提交记录会保留。")}</section>
+        </div>}</Loading></Drawer>}
+      {archiving && <ConfirmSchoolAction title={archiving.archivedAt ? text("Restore identity?","恢复身份档案？") : text("Delete identity?","删除身份档案？")}
+        description={archiving.name+" · "+text("The ID and class assignments are retained.","原编号与班级关联会保留。")}
+        actionLabel={archiving.archivedAt?text("Restore","恢复"):text("Delete","删除")} onClose={()=>setArchiving(null)} onConfirm={async()=>{
+          await productionApi(`${base}/identities/${archiving.id}/${archiving.archivedAt?"restore":"archive"}`,{method:"POST",body:{}});
+          setViewId(null);saved(archiving.archivedAt?text("Identity restored.","已恢复档案。"):text("Identity deleted.","已删除档案。"));
+        }}/>}
       {editingClasses && <SchoolIdentityClasses key={editingClasses} school={school} identityId={editingClasses}
         onClose={() => setEditingClasses(null)}
         onSaved={() => saved(text("Class assignments saved.", "已保存班级调整。"))}/>}
@@ -263,6 +257,7 @@ function SchoolDirectory({
         onSaved={() => saved(text("Identity profile saved.", "已保存身份资料。"))}/>}
       {importing && (
         <SchoolIdentityImport
+          initialKind={kind==="teacher" ? "teacher" : "student"}
           school={school}
           onClose={() => setImporting(false)}
           onSaved={saved}
@@ -270,6 +265,7 @@ function SchoolDirectory({
       )}
       {edit && (
         <CreateSchoolRecord
+          initialKind={kind==="teacher" ? "teacher" : "student"}
           endpoint={`${base}/identities`}
           type="identity"
           school={school}
@@ -307,39 +303,16 @@ function SchoolDirectory({
   );
 }
 
-function identityPath(base: string, kind: IdentityKind | "", query: string) {
-  const params = new URLSearchParams();
-  if (kind) params.set("kind", kind);
-  if (query) params.set("q", query);
-  return params.size ? `${base}/identities?${params}` : `${base}/identities`;
-}
-
-function identityColumns<T extends Identity>(
-  text: ReturnType<typeof useSchoolText>,
-): Column<T>[] {
-  return [
-    {
-      title: text("ID number", "身份编号"),
-      cell: (item) => <span className="font-mono text-xs">{item.number}</span>,
-    },
-    { title: text("Name", "姓名"), cell: (item) => item.name },
-    {
-      title: text("Role", "角色"),
-      cell: (item) => <RoleLabel role={item.kind} />,
-    },
-  ];
-}
-
 export function IdentityFilter({
   onQuery,
   kind,
   onKind,
-  fixedKind = false,
+  fixedKind = false, searchAccount = false,
 }: {
   onQuery: (query: string) => void;
   kind: IdentityKind | "";
   onKind: (kind: IdentityKind | "") => void;
-  fixedKind?: boolean;
+  fixedKind?: boolean; searchAccount?: boolean;
 }) {
   const text = useSchoolText();
   const [value, setValue] = useState("");
@@ -359,8 +332,8 @@ export function IdentityFilter({
           ref={input}
           type="text"
           className={`${inputClass} pr-10`}
-          aria-label={text("Search name or ID number", "搜索姓名或身份编号")}
-          placeholder={text("Search name or ID number", "搜索姓名或身份编号")}
+          aria-label={searchAccount ? text("Search ID, name or account","搜索编号、姓名或账号") : text("Search name or ID number", "搜索姓名或身份编号")}
+          placeholder={searchAccount ? text("Search ID, name or account","搜索编号、姓名或账号") : text("Search name or ID number", "搜索姓名或身份编号")}
           maxLength={100}
           value={value}
           onChange={(event) => setValue(event.target.value)}
@@ -517,12 +490,13 @@ function SchoolTablePage<T>({
 }
 
 function CreateSchoolRecord({
-  endpoint,
+  initialKind = "student", endpoint,
   type,
   school,
   onClose,
   onSaved,
 }: {
+  initialKind?: IdentityKind;
   endpoint: string;
   type: "identity" | "class";
   school: School;
@@ -534,7 +508,7 @@ function CreateSchoolRecord({
   const localError = useSchoolError();
   const [name, setName] = useState("");
   const [number, setNumber] = useState("");
-  const [kind, setKind] = useState<IdentityKind>("student");
+  const [kind, setKind] = useState<IdentityKind>(initialKind);
   const [classIds, setClassIds] = useState<string[]>([]);
   const [optionalFields, setOptionalFields] = useState<{ gender: CampusGender | null; notes: string }>({ gender: null, notes: "" });
   const [classType, setClassType] = useState<ClassType>("administrative");

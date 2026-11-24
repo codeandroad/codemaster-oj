@@ -145,6 +145,61 @@ test('old bookmarks resolve through the current school membership and role on th
         assert.equal((await request('/admin/problem-banks/'+bankId+'/problems?groupId='+group,{auth:admin})).status,410);
       });
 
+      await t.test('bank inventory and group management use school records and retain pinned editions', async () => {
+        const path=prefix+'/problem-groups';
+        const create={bankId,name:'Revision exercises',requestId:randomUUID(),problemIds:links.slice(0,2).map(p=>p.problemId)};
+        const other=await publishedSchoolProblems(pool,original.id,legacyAccountId,1);
+        const source=(await request(path,{auth:teacher,method:'POST',body:create}));
+        assert.equal(source.status,201,JSON.stringify(source.data));
+        assert.equal((await request(path,{auth:teacher,method:'POST',body:create})).status,200);
+        const target=(await request(path,{auth:teacher,method:'POST',body:{...create,name:'Another group',requestId:randomUUID(),problemIds:[create.problemIds[1]]}})).data;
+        const edit=path+'/'+source.data.id;
+        for (const auth of [student,newSchool,platform]) {
+          assert.ok([403,404].includes((await request(path,{auth,method:'POST',body:create})).status));
+        }
+        assert.equal((await request(path,{auth:teacher,method:'POST',body:{...create,bankId:other.bankId}})).status,404);
+        const manager=await request(path+'?view=manage&bankId='+bankId,{auth:teacher});
+        assert.equal(manager.data.problems.length,links.length);
+        assert.deepEqual(Object.keys(manager.data.problems[0]).sort(),['id','title']);
+        const body={expectedRevision:source.data.revision,name:'Revised'};
+        assert.equal((await request(edit,{auth:teacher,method:'PATCH',body:{...body,problemIds:[other.links[0].problemId]}})).status,404);
+        const updated=(await request(edit,{auth:teacher,method:'PATCH',body})).data;
+        assert.deepEqual(updated.problemIds,create.problemIds);
+        const move={expectedRevision:updated.revision,targetGroupId:target.id,targetRevision:target.revision,problemIds:create.problemIds};
+        assert.equal((await request(edit+'/move',{auth:teacher,method:'POST',body:{...move,targetRevision:'stale'}})).status,409);
+        assert.deepEqual((await request(edit,{auth:teacher})).data.problemIds,create.problemIds);
+        assert.equal((await request(edit+'/move',{auth:teacher,method:'POST',body:move})).status,200);
+        assert.deepEqual((await request(path+'/'+target.id,{auth:teacher})).data.problemIds,[create.problemIds[1],create.problemIds[0]]);
+        const empty=(await request(edit,{auth:teacher})).data;
+        assert.deepEqual(empty.problemIds,[]);
+        assert.equal((await request(edit,{auth:teacher,method:'DELETE',body:{expectedRevision:empty.revision}})).status,200);
+        assert.equal((await request(edit,{auth:teacher})).status,404);
+        const foreign=await request(path,{auth:admin,method:'POST',body:{bankId:other.bankId,name:'Other bank',requestId:randomUUID()}});
+        assert.equal(foreign.status,201);
+        const targetAfterMove=(await request(path+'/'+target.id,{auth:admin})).data;
+        assert.equal((await request(path+'/'+target.id+'/move',{auth:admin,method:'POST',body:{
+          expectedRevision:targetAfterMove.revision,targetGroupId:foreign.data.id,targetRevision:foreign.data.revision,problemIds:create.problemIds,
+        }})).status,404);
+        assert.equal((await request(prefix+'/problem-banks/'+other.bankId,{auth:admin,method:'PATCH',body:{archived:true,expectedRevision:1}})).status,200);
+        assert.equal((await request(path+'/'+foreign.data.id,{auth:admin,method:'PATCH',body:{name:'Retired',expectedRevision:foreign.data.revision}})).status,409);
+        const inventory=()=>request(prefix+'/problems?view=management',{auth:admin});
+        const catalog=await inventory();
+        assert.equal(catalog.status,200,JSON.stringify(catalog.data?.error));
+        const row=catalog.data.items.find(p=>p.id===problem.problemId);
+        assert.equal(row.ownerName,'Original teacher');
+        assert.equal(row.versionId,problem.versionId);
+        assert.equal(row.submissionCount,0);
+        const problemPath=prefix+'/problems/'+row.id;
+        assert.equal((await request(problemPath+'/archive',{auth:teacher,method:'POST',body:{expectedRevision:row.revision}})).status,403);
+        assert.equal((await request(problemPath+'/archive',{auth:admin,method:'POST',body:{expectedRevision:row.revision}})).status,200);
+        assert.equal((await request(problemPath,{auth:student})).status,404);
+        const archived=(await inventory()).data.items.find(p=>p.id===row.id);
+        assert.equal(archived.archived,true);
+        assert.equal(archived.versionId,row.versionId);
+        assert.equal((await request(problemPath+'/restore',{auth:admin,method:'POST',body:{expectedRevision:archived.revision}})).status,200);
+        assert.equal((await inventory()).data.items.find(p=>p.id===row.id).published,false);
+      });
+
       await t.test('shared login, self profile, anonymous site info and school governance remain available', async () => {
         assert.equal((await request('/site-info')).status, 200);
         assert.equal((await request('/problems')).status, 401);

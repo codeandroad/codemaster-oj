@@ -40,6 +40,8 @@ export class SchoolsController {
   }
 
   @Post([
+    'schools/:schoolId/problem-groups',
+    'schools/:schoolId/problem-groups/:id/move',
     'schools/:schoolId/invitations',
     'schools/:schoolId/exit-request',
     'schools/:schoolId/exit-requests/:requestId/decision',
@@ -77,7 +79,7 @@ export class SchoolsController {
     return applyResponse(response, await this.domain.execute('schools', request.domainContext));
   }
 
-  @Delete(['schools/:schoolId/learning-resources/:resourceId', 'schools/:schoolId/members/:accountId', 'schools/:schoolId/classes/:classId/roster/:identityId'])
+  @Delete(['schools/:schoolId/problem-groups/:id', 'schools/:schoolId/learning-resources/:resourceId', 'schools/:schoolId/members/:accountId', 'schools/:schoolId/classes/:classId/roster/:identityId'])
   async remove(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
     return applyResponse(response, await this.domain.execute('schools', request.domainContext));
   }

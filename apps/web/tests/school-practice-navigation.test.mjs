@@ -29,8 +29,9 @@ test('public practice navigation remains inside its own route and does not add a
 });
 
 test('catalog URL filters validate role-specific status and restore staff tab/archive/search settings', () => {
-  const params = new URLSearchParams('bankId=b&problemQuery=loop&problemStatus=draft&problemTab=problems&bankQuery=archive&bankArchived=1');
-  assert.deepEqual(practiceCatalogFilters(params, true), {bankId: 'b', query: 'loop', status: 'draft', tab: 'problems', bankQuery: 'archive', archived: true});
+  const params = new URLSearchParams('bankId=b&problemGroupId=g&problemQuery=loop&problemStatus=draft&problemTab=problems&bankQuery=archive&bankArchived=1');
+  assert.deepEqual(practiceCatalogFilters(params, true), {bankId: 'b', groupId: 'g', query: 'loop', status: 'draft', tab: 'problems', bankQuery: 'archive', archived: true});
+  assert.equal(practiceCatalogFilters(params, false).groupId, '');
   assert.equal(practiceCatalogFilters(params, false).status, '');
   assert.equal(practiceCatalogFilters(new URLSearchParams(), true).tab, 'banks');
   assert.equal(practiceCatalogFilters(new URLSearchParams('problemTab=banks'), false).tab, 'problems');

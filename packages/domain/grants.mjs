@@ -163,7 +163,7 @@ GRANT UPDATE(answers,revision,save_request_id,save_hash,state,updated_at,submitt
 REVOKE ALL ON practice_problem_groups,practice_problem_group_members,school_import_history FROM PUBLIC,campus_app,campus_worker;
 REVOKE ALL ON school_submission_notes FROM PUBLIC,campus_app,campus_worker;
 GRANT SELECT,INSERT,UPDATE(note,updated_at) ON school_submission_notes TO campus_app;
-GRANT UPDATE(name) ON practice_problem_groups TO campus_app;
+GRANT INSERT(scope_id,id,name,bank_id,owner_account_id,created_at), UPDATE(name,archived_at) ON practice_problem_groups TO campus_app;
 GRANT INSERT,DELETE ON practice_problem_group_members TO campus_app;
 GRANT SELECT ON practice_problem_groups,practice_problem_group_members,school_import_history TO campus_app;
 GRANT INSERT ON school_import_history TO campus_app;

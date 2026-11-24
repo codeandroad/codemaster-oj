@@ -1,14 +1,15 @@
+import { listPracticeGroups, schoolProblemGroups } from './school-problem-groups.mjs';
 import { transaction } from './db.mjs';
 import { lockPlatformContent } from './platform-content-access.mjs';
 import { isPlatformAdministrator } from './platform-governance.mjs';
-import { auditSchool, lockSchoolTeaching, schoolRole } from './schools.mjs';
+import { lockSchoolTeaching, schoolRole } from './schools.mjs';
 import { canonicalHash, fail, field, uuid } from './security.mjs';
 
-export async function handleWorkspaceCatalog({pool,user,route,method,body={}}) {
- const match=route.match(/^\/(?:schools\/([^/]+)|platform)\/(problem-groups|import-history)(?:\/([^/]+))?$/);
+export async function handleWorkspaceCatalog({pool,user,route,method,url,body={}}) {
+ const match=route.match(/^\/(?:schools\/([^/]+)|platform)\/(problem-groups|import-history)(?:\/([^/]+))?(\/move)?$/);
  if(!match)return null;
  const schoolId=match[1]?uuid(match[1]):null;
- const [, ,section,groupParam]=match;
+ const [, ,section,groupParam,move]=match;
  return transaction(pool,async db=>{
   let role;
   if(schoolId){
@@ -30,14 +31,8 @@ export async function handleWorkspaceCatalog({pool,user,route,method,body={}}) {
    return {status:200,body:{items:rows}};
   }
   const groupId=groupParam?uuid(groupParam):null;
-  const {rows}=await db.query(`SELECT g.id,g.name,g.bank_id AS "bankId",g.owner_account_id,
-   COALESCE((SELECT array_agg(m.problem_id ORDER BY m.position,m.problem_id) FROM practice_problem_group_members m
-    WHERE (m.scope_id,m.group_id)=(g.scope_id,g.id)),'{}') AS "problemIds"
-   FROM practice_problem_groups g WHERE g.scope_id=$1 AND g.archived_at IS NULL AND ($2::uuid IS NULL OR g.id=$2)
-   AND ($3::boolean OR g.owner_account_id=$4) ORDER BY g.name,g.id`,
-   [scope,groupId,!schoolId||role==='school_admin',user.id]);
-  if(groupId&&!rows.length)fail(404,'NOT_FOUND','题组不存在');
-  const items=rows.map(({owner_account_id,...group})=>({...group,revision:canonicalHash(group)}));
+  if(schoolId)return schoolProblemGroups(db,{schoolId,userId:user.id,role,groupId,move,method,body,url});
+  const items=await listPracticeGroups(db,scope,user.id,true,{groupId});
   if(method==='GET')return {status:200,body:groupId?items[0]:{items}};
   if(method!=='PATCH'||!groupId)return null;
   const group=items[0];
@@ -47,10 +42,7 @@ export async function handleWorkspaceCatalog({pool,user,route,method,body={}}) {
    if(!Array.isArray(body.problemIds)||body.problemIds.length>2000)fail(400,'VALIDATION','题目列表无效');
    const ids=body.problemIds.map(id=>uuid(id).toLowerCase());
    if(new Set(ids).size!==ids.length)fail(400,'VALIDATION','题目重复');
-   const sql=schoolId?`SELECT p.id FROM school_problems p JOIN school_problem_banks b ON (b.school_id,b.id)=(p.school_id,p.bank_id)
-    WHERE b.resource_kind='ordinary' AND p.school_id=$2 AND p.id=ANY($1) AND (p.published OR p.owner_account_id=$3 OR $4::boolean)`
-    :"SELECT id FROM problems WHERE owner_scope='platform' AND id=ANY($1)";
-   const valid=await db.query(sql,schoolId?[ids,schoolId,user.id,role==='school_admin']:[ids]);
+   const valid=await db.query("SELECT id FROM problems WHERE owner_scope='platform' AND id=ANY($1)",[ids]);
    if(valid.rowCount!==ids.length)fail(404,'NOT_FOUND','题目不在可用题库中');
    await db.query('DELETE FROM practice_problem_group_members WHERE scope_id=$1 AND group_id=$2',[scope,groupId]);
    await db.query(`INSERT INTO practice_problem_group_members(scope_id,group_id,problem_id,position)
@@ -58,8 +50,7 @@ export async function handleWorkspaceCatalog({pool,user,route,method,body={}}) {
    group.problemIds=ids;
   }
   await db.query('UPDATE practice_problem_groups SET name=$3 WHERE scope_id=$1 AND id=$2',[scope,groupId,name]);
-  if(schoolId)await auditSchool(db,scope,user.id,'school.problem_group.update',groupId);
-  else await db.query("INSERT INTO platform_audit_events(actor_account_id,action,detail) VALUES($1,'platform.problem_group.update',$2)",[user.id,{groupId}]);
+  await db.query("INSERT INTO platform_audit_events(actor_account_id,action,detail) VALUES($1,'platform.problem_group.update',$2)",[user.id,{groupId}]);
   const updated={id:groupId,name,bankId:group.bankId,problemIds:group.problemIds};
   return {status:200,body:{...updated,revision:canonicalHash(updated)}};
  });

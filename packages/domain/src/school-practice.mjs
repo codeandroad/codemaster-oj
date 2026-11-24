@@ -1,3 +1,4 @@
+import { schoolBankDirectory } from './school-bank-directory.mjs';
 import { ownSchoolReceipt, receiptActivityJoin, receiptVisible } from './school-submission-history.mjs';
 import { problemProgress } from './problem-progress.mjs';
 import { assertLiveProblemVersion, assertPublishedRevision } from './live-problem-version.mjs';
@@ -517,7 +518,7 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
    return reply({ok:true});
   }return null;
  });
- const m=route.match(/^\/schools\/([^/]+)\/(problem-banks|problems|judge-status|judge-jobs|submissions|review-notebook)(?:\/([^/]+)(?:\/(validate|publish|unpublish|submissions|public-request|tutorial|note))?)?$/);
+ const m=route.match(/^\/schools\/([^/]+)\/(problem-banks|problems|judge-status|judge-jobs|submissions|review-notebook)(?:\/([^/]+)(?:\/(validate|publish|unpublish|archive|restore|submissions|public-request|tutorial|note))?)?$/);
  if(!m)return null;const schoolId=uuid(m[1]);
  return transaction(pool,async db=>{
   await lockSchoolTeaching(db,schoolId,{shared:method==='GET'});const role=await schoolRole(db,schoolId,user.id);await scope(db,schoolId);
@@ -604,6 +605,7 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
   }
   if(m[2]!=='problems')return null;
   if(method==='GET'&&!id){
+   if (role !== 'student' && url.searchParams.get('view') === 'management') return reply(await schoolBankDirectory(db,schoolId,user.id,role));
    const bankId = url.searchParams.get('bankId');
    if (bankId) uuid(bankId);
    const { courseId, includeCourses } = problemCatalogCourseRequest(url);
@@ -687,6 +689,28 @@ export async function schoolPracticeOperation({pool,user,route,url,method,body={
    const version=(await db.query('SELECT * FROM school_problem_versions WHERE school_id=$1 AND id=$2',[schoolId,p.published_version_id])).rows[0];return reply(await enqueue(db,{schoolId,p,version,user,role,kind:enumValue(body.kind,['samples','custom','submit'],'Run type'),body,accessContext:practiceContext(role)}),202);
   }
   if(!canManage(p,user,role))fail(403,'FORBIDDEN','You cannot manage this problem.');revision(body,p);
+  if (method==='POST' && ['archive','restore'].includes(m[4])) {
+   if (role!=='school_admin') fail(403,'FORBIDDEN','需要本校管理员权限');
+   const archive=m[4]==='archive';
+   if (archive===Boolean(p.archived_at)) return reply({id,archived:archive});
+   if (p.archived) fail(409,'BANK_ARCHIVED','请先恢复题库');
+   if (archive) {
+    const {rows:[refs]}=await db.query(`SELECT
+     EXISTS(SELECT 1 FROM school_activity_problems l JOIN school_activities a ON (a.school_id,a.id)=(l.school_id,l.activity_id)
+      WHERE l.school_id=$1 AND l.problem_id=$2 AND a.kind='timed' AND a.state<>'Archived')
+     OR EXISTS(SELECT 1 FROM school_courses c JOIN school_course_publications v
+      ON (v.school_id,v.course_id,v.revision)=(c.school_id,c.id,c.published_revision)
+      WHERE c.school_id=$1 AND c.published AND c.archived_at IS NULL AND v.chapters @> $3::jsonb)
+     OR EXISTS(SELECT 1 FROM school_problem_publications WHERE school_id=$1 AND problem_id=$2 AND withdrawn_at IS NULL) AS blocked`,
+     [schoolId,id,JSON.stringify([{problems:[{problemId:id}]}])]);
+    if(refs.blocked) fail(409,'PROBLEM_IN_USE','请先处理引用此题的已发布课程、有效限时训练或平台公开版本');
+   }
+   await db.query(`UPDATE school_problems SET published=false,archived_at=CASE WHEN $3 THEN now() END,
+    revision=revision+1 WHERE school_id=$1 AND id=$2`,[schoolId,id,archive]);
+   await auditSchool(db,schoolId,user.id,'school.problem.'+m[4],id);
+   return reply({id,archived:archive});
+  }
+  if(p.archived_at)fail(409,'PROBLEM_ARCHIVED','请先恢复已归档题目');
   if(method==='PATCH'&&!m[4]){const definition=normalizeSchoolProblem(body);await db.query('UPDATE school_problems SET draft=$3,revision=revision+1,updated_at=clock_timestamp() WHERE school_id=$1 AND id=$2',[schoolId,id,JSON.stringify(definition)]);await auditSchool(db,schoolId,user.id,'school.problem.update',id);return reply(await shapeProblem(db,await loadProblem(db,schoolId,id,user,role),user,role,{detail:true}));}
   if(method==='POST'&&m[4]==='validate'){
    const previous=(await db.query('SELECT id FROM school_problem_versions WHERE school_id=$1 AND problem_id=$2 ORDER BY (id=$3) DESC NULLS LAST,draft_revision DESC LIMIT 1',[schoolId,id,p.published_version_id])).rows[0];

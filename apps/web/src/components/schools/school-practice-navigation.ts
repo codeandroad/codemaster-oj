@@ -2,6 +2,7 @@ import type { Problem } from "./school-practice-types";
 
 export type PracticeCatalogFilters = {
   bankId: string;
+  groupId: string;
   query: string;
   status: string;
   tab: "banks" | "problems";
@@ -10,7 +11,7 @@ export type PracticeCatalogFilters = {
 };
 
 export const practiceFilterKeys = {
-  bankId: "bankId", query: "problemQuery", status: "problemStatus", tab: "problemTab",
+  bankId: "bankId", groupId: "problemGroupId", query: "problemQuery", status: "problemStatus", tab: "problemTab",
   bankQuery: "bankQuery", archived: "bankArchived",
 } as const;
 
@@ -19,6 +20,7 @@ export function practiceCatalogFilters(search: Pick<URLSearchParams, "get">, sta
   const status = search.get(practiceFilterKeys.status) ?? "";
   return {
     bankId: search.get(practiceFilterKeys.bankId) ?? "",
+    groupId: staff ? search.get(practiceFilterKeys.groupId) ?? "" : "",
     query: search.get(practiceFilterKeys.query) ?? "",
     status: statuses.includes(status) ? status : "",
     tab: staff && search.get(practiceFilterKeys.tab) !== "problems" ? "banks" : "problems",

@@ -1,6 +1,7 @@
 "use client";
 
-import { CatalogGroups, SchoolImportHistory } from "./catalog-groups";
+import { SchoolGroupManager, type SchoolGroup } from "./school-group-manager";
+import { SchoolImportHistory } from "./catalog-groups";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useCatalogFilterUrl } from "@/components/use-catalog-filter-preferences";
@@ -53,15 +54,21 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
   );
   const staff = role === "teacher" || role === "school_admin";
   const filters = practiceCatalogFilters(search, staff);
-  const { bankId } = filters;
+
   const courseId = staff ? "" : search.get(problemCourseFilterKey)?.toLowerCase() ?? "";
   const banks = useData<{ items: Bank[] }>(`${base}/problem-banks`);
-  const catalogQuery = new URLSearchParams(staff ? {} : { includeCourseFilters: "1", ...(courseId && { courseId }) });
+  const bankId = role === "school_admin" && filters.tab === "banks"
+    ? (banks.data?.items.find(bank => bank.id === filters.bankId)?.id ?? banks.data?.items.find(bank => !bank.archived)?.id ?? banks.data?.items[0]?.id ?? "")
+    : filters.bankId;
+  const groups = useData<{items: SchoolGroup[]}>(staff ? base + "/problem-groups" : "");
+  const bankGroups = (groups.data?.items ?? []).filter(group => group.bankId === bankId);
+  const [groupBank,setGroupBank] = useState<Bank | null>(null);
+  const catalogQuery = new URLSearchParams(staff ? {view:"management"} : { includeCourseFilters: "1", ...(courseId && { courseId }) });
   const allProblems = useData<ProblemCatalogResult<Problem>>(ready ? `${base}/problems${catalogQuery.size ? `?${catalogQuery}` : ""}` : "");
   const bankQuery = new URLSearchParams(catalogQuery);
   if (bankId) bankQuery.set("bankId", bankId);
-  const bankProblems = useData<ProblemCatalogResult<Problem>>(ready && bankId && bankId !== "platform" ? `${base}/problems?${bankQuery}` : "");
-  const problems = bankId && bankId !== "platform" ? bankProblems : allProblems;
+  const bankProblems = useData<ProblemCatalogResult<Problem>>(ready && !staff && bankId && bankId !== "platform" ? `${base}/problems?${bankQuery}` : "");
+  const problems = !staff && bankId && bankId !== "platform" ? bankProblems : allProblems;
   const platformSources = useData<{ items: PlatformSourceProblem[] }>(staff ? `platform/source-problems?schoolId=${schoolId}` : "");
   const sourceProblems: Problem[] = (platformSources.data?.items ?? []).map(problem => ({
     id: problem.id, title: problem.title, schoolId, bankId: "platform", bankName: "CodeMaster",
@@ -76,10 +83,15 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
   const catalogBanks = [...(banks.data?.items ?? []), ...(sourceProblems.length ? [{ id: "platform", name: "CodeMaster", revision: 1, archived: false, canManage: false }] : [])];
   const catalogMatches = staff || (problems.data?.courseId ?? "") === courseId;
   const catalog = { ...problems, loading: !problems.error && (!ready || problems.loading || !catalogMatches), data: catalogMatches ? problems.data : null };
-  const catalogProblems = staff ? withSources(catalog.data?.items ?? []) : catalog.data?.items ?? [];
+  const inventory = staff ? withSources(catalog.data?.items ?? []) : catalog.data?.items ?? [];
+  const groupedIds = new Set((filters.groupId === "ungrouped" ? bankGroups : bankGroups.filter(g => g.id === filters.groupId)).flatMap(g => g.problemIds));
+  const catalogProblems = staff && bankId && bankId !== "platform" && filters.groupId
+    ? inventory.filter(p => p.bankId === bankId && (filters.groupId === "ungrouped" ? !groupedIds.has(p.id) : groupedIds.has(p.id)))
+    : inventory;
   const navigationProblems = (allProblems.data?.courseId ?? "") === courseId ? allProblems.data?.items ?? [] : [];
   const [editing, setEditing] = useState<EditableProblem | "new" | null>(null);
   const [bankEdit, setBankEdit] = useState<Bank | "new" | null>(null);
+  const [archiveProblem,setArchiveProblem] = useState<Problem | null>(null);
   const [archiveBank, setArchiveBank] = useState<Bank | null>(null);
   const [bankName, setBankName] = useState("");
   const bankRequest = useRef("");
@@ -89,7 +101,7 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
   const bookmarked = useData<Problem>(editBookmark && !sourceBookmark && platformSources.data ? `${base}/problems/${encodeURIComponent(editBookmark)}` : "");
   const closeBookmark = () => updatePracticeLocation({problemId:null,problemEdit:null,source:null});
   const action = useMutation();
-  function refresh() { banks.reload(); allProblems.reload(); bankProblems.reload(); platformSources.reload(); }
+  function refresh() { groups.reload(); banks.reload(); allProblems.reload(); bankProblems.reload(); platformSources.reload(); }
   function closeProblemEditor() { setEditing(null); refresh(); }
   function problemLocation(id: string) {
     const row = navigationProblems.find(problem => problem.id === id) ?? catalogProblems.find(problem => problem.id === id);
@@ -97,6 +109,7 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
   }
   function selectProblem(problemId: string | null) { updatePracticeLocation(problemId ? problemLocation(problemId) : { problemId }); }
   function changeFilters(patch: Partial<PracticeCatalogFilters>) {
+    if (patch.bankId !== undefined && patch.bankId !== bankId) patch = {...patch, groupId:""};
     const fields = Object.fromEntries(Object.entries(patch).map(([key, value]) => [practiceFilterKeys[key as keyof PracticeCatalogFilters], typeof value === "boolean" ? value ? "1" : null : value]));
     changeUrlFilters(fields);
   }
@@ -128,7 +141,7 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
   if (editing && editing !== "new") {
     const currentId = editing.scope === "platform" ? editing.id : editing.problem.id;
     const rows = catalogProblems.filter(problem => problem.canManage
-      && (problem.id === currentId || practiceProblemMatches(problem, filters, staff)));
+      && (problem.id === currentId || practiceProblemMatches(problem, {...filters,bankId}, staff)));
     const { previous, next } = adjacentProblemRows(rows, currentId);
     const target = (problem?: Problem) => problem && ({
       title: problem.title,
@@ -149,7 +162,7 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
   if (!staff && selected && params.has("publicCourseId")) {
     return <PublicProblemWorkspace id={selected} workspaceSchoolId={schoolId} catalog={catalog}/>;
   }
-  if (selected) return <PracticeProblem key={`${schoolId}:${selected}`} path={`${base}/problems/${encodeURIComponent(selected)}`} jobPath={id => `${base}/judge-jobs/${id}`} onBack={() => { selectProblem(null); refresh(); }} navigation={{ currentId: selected, items: practiceNavigationItems(navigationProblems, filters, staff, selected, banks.data?.items.filter(bank => bank.archived).map(bank => bank.id)), onSelect: selectProblem, href: id => practiceLocation(pathname, params.toString(), problemLocation(id)) }} />;
+  if (selected) return <PracticeProblem key={`${schoolId}:${selected}`} path={`${base}/problems/${encodeURIComponent(selected)}`} jobPath={id => `${base}/judge-jobs/${id}`} onBack={() => { selectProblem(null); refresh(); }} navigation={{ currentId: selected, items: practiceNavigationItems(staff ? catalogProblems : navigationProblems, {...filters,bankId}, staff, selected, banks.data?.items.filter(bank => bank.archived).map(bank => bank.id)), onSelect: selectProblem, href: id => practiceLocation(pathname, params.toString(), problemLocation(id)) }} />;
 
   const catalogView = <SchoolPracticeCatalog
     banks={catalogBanks}
@@ -161,7 +174,10 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
     }}
     allProblems={staff ? withSources(allProblems.data?.items ?? []) : allProblems.data?.items ?? []}
     role={role}
-    filters={filters}
+    filters={{...filters,bankId}}
+    groups={groups.data?.items ?? []}
+    onManageGroups={setGroupBank}
+    onArchiveProblem={p => {action.reset(); setArchiveProblem(p);}}
     onFiltersChange={changeFilters}
     busy={action.busy}
     onRefresh={refresh}
@@ -173,7 +189,7 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
       if (staff && problem?.canManage) editProblem(problem);
       else selectProblem(id);
     }}
-    renderActions={problem => <>
+    renderActions={problem => problem.archived ? <span className="text-sm">{tx("已归档","Archived")}</span> : <>
       {problem.canManage && <Button size="sm" variant="ghost" disabled={action.busy} onClick={() => editProblem(problem)}>{tx("编辑", "Edit")}</Button>}
       {problem.ownerScope !== "platform" && problem.canManageTutorial && <ProblemTutorialEditor
         endpoint={`${base}/problems/${encodeURIComponent(problem.id)}/tutorial`}
@@ -211,9 +227,20 @@ function SchoolPracticeContents({ accountId, schoolId, role, initialProblemId }:
   />;
   return <div className="space-y-3">
     <Feedback action={action} />
-    {staff && <><CatalogGroups base={base}/><SchoolImportHistory schoolId={schoolId}/></>}
+    {staff && <SchoolImportHistory schoolId={schoolId}/>}
+    {staff && groups.error && <State data={groups}>{null}</State>}
+    {groupBank && <SchoolGroupManager base={base} bank={groupBank} onClose={() => setGroupBank(null)}
+      onChanged={removed => {groups.reload(); if (removed && removed === filters.groupId) changeFilters({groupId:""});}}/>}
     {staff && <State data={platformSources}>{null}</State>}
     <State data={banks}>{staff ? <State data={problems}>{catalogView}</State> : catalogView}</State>
+    {archiveProblem && <Dialog open onOpenChange={open => {if (!open && !action.busy) setArchiveProblem(null);}}><DialogContent>
+      <DialogTitle>{archiveProblem.archived ? tx("恢复题目","Restore problem") : tx("归档题目","Archive problem")}</DialogTitle>
+      <DialogDescription>{archiveProblem.title} · {archiveProblem.archived ? tx("恢复后可编辑并重新提交审核。","Restore editing and submit for review again.") : tx("归档将停止新的自由练习，保留作业、题目版本和提交记录。","Archiving stops new free practice and preserves assignments, versions and submissions.")}</DialogDescription>
+      <Feedback action={action}/><div className="flex justify-end gap-2"><Button variant="secondary" disabled={action.busy} onClick={() => setArchiveProblem(null)}>{tx("取消","Cancel")}</Button>
+      <Button disabled={action.busy} onClick={() => void action.run(async () => {
+        await productionApi(`${base}/problems/${archiveProblem.id}/${archiveProblem.archived ? "restore" : "archive"}`,{method:"POST",body:{expectedRevision:archiveProblem.revision}});
+        setArchiveProblem(null); refresh();
+      })}>{tx("确认","Confirm")}</Button></div></DialogContent></Dialog>}
     <Dialog open={!!archiveBank} onOpenChange={open => { if (!open && !bankPending.current) setArchiveBank(null); }}>
       {archiveBank && <DialogContent>
         <DialogTitle>{archiveBank.archived ? tx("恢复题库", "Restore bank") : tx("归档题库", "Archive bank")}</DialogTitle>

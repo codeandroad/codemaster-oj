@@ -39,18 +39,13 @@ export function PersonalRegisterPage({
     if (inFlight.current) return;
     const values = new FormData(event.currentTarget);
     const username = String(values.get("username") ?? "").trim();
-    const displayName = String(values.get("displayName") ?? "").trim();
-    const email = String(values.get("email") ?? "").trim();
     const password = String(values.get("password") ?? "");
-    const invalidField = displayName
-      ? invalidAccountField({username, password, confirmation:String(values.get("confirmation") ?? ""), email})
-      : "displayName";
+    const confirmation = String(values.get("confirmation") ?? "");
+    const invalidField = invalidAccountField({username, password, confirmation});
     const messages = {
-      displayName: text("Enter your name.", "请输入姓名。"),
       username: text("Use 3–40 letters, numbers, underscores, dots or hyphens. Start with a letter or number.", "用户名使用 3–40 位字母、数字、下划线、点或连字符，首位为字母或数字。"),
       password: text("Use 8–128 characters for your password.", "密码需为 8–128 位。"),
       confirmation: text("Passwords do not match.", "两次输入的密码不一致。"),
-      email: text("Enter a valid email, or leave it blank.", "请输入有效邮箱，或留空。"),
     };
     const invalid = invalidField ? {field: invalidField, message: messages[invalidField]} : null;
     setIssue(invalid);
@@ -67,12 +62,7 @@ export function PersonalRegisterPage({
         "auth/register-personal",
         {
           method: "POST",
-          body: {
-            username,
-            displayName,
-            password,
-            ...(email ? { email } : {}),
-          },
+          body: {username, password},
         },
       );
       onRegistered(result.user);
@@ -122,41 +112,24 @@ export function PersonalRegisterPage({
         onChange={() => setIssue(null)}
       >
         <fieldset disabled={busy} className={styles.fields}>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {[
-              {
-                name: "displayName",
-                label: text("Name", "姓名"),
-                auto: "name",
-              },
-              {
-                name: "username",
-                label: text("Username", "用户名"),
-                auto: "username",
-              },
-            ].map((field) => (
-              <div key={field.name}>
-                <label
-                  htmlFor={`personal-${field.name}`}
-                  className={styles.label}
-                >
-                  {field.label}
-                </label>
-                <input
-                  id={`personal-${field.name}`}
-                  name={field.name}
-                  autoComplete={field.auto}
-                  autoCapitalize="none"
-                  maxLength={field.name === "username" ? 40 : 80}
-                  required
-                  aria-invalid={fieldError(field.name)}
-                  aria-describedby={
-                    fieldError(field.name) ? "register-error" : undefined
-                  }
-                  className={styles.input}
-                />
-              </div>
-            ))}
+          <div>
+            <label htmlFor="personal-username" className={styles.label}>
+              {text("Username", "用户名")}
+            </label>
+            <input
+              id="personal-username"
+              name="username"
+              autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              minLength={3}
+              maxLength={40}
+              required
+              aria-invalid={fieldError("username")}
+              aria-describedby={fieldError("username") ? "register-error" : undefined}
+              className={styles.input}
+            />
           </div>
           <div>
             <label htmlFor="personal-password" className={styles.label}>
@@ -215,23 +188,6 @@ export function PersonalRegisterPage({
               aria-invalid={fieldError("confirmation")}
               aria-describedby={
                 fieldError("confirmation") ? "register-error" : undefined
-              }
-              className={styles.input}
-            />
-          </div>
-          <div>
-            <label htmlFor="personal-email" className={styles.label}>
-              {text("Email (optional)", "邮箱（选填）")}
-            </label>
-            <input
-              id="personal-email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              maxLength={254}
-              aria-invalid={fieldError("email")}
-              aria-describedby={
-                fieldError("email") ? "register-error" : undefined
               }
               className={styles.input}
             />

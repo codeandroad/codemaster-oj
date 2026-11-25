@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {activationSchoolLabel,activationSchoolName,invalidAccountField} from '../src/components/auth/registration-fields.ts';
 
-const values={username:'student.name',password:' passphrase ',confirmation:' passphrase ',email:''};
+const values={username:'student.name',password:' passphrase ',confirmation:' passphrase '};
 test('activation school options use localized names and disambiguate identical school names',()=>{
  const alpha={id:'a',slug:'alpha',name:'Alpha',nameEn:'Alpha School',nameZh:'甲学校'};
  const beta={id:'b',slug:'beta',name:'Beta',nameEn:'Alpha School',nameZh:'乙学校'};
@@ -14,9 +14,8 @@ test('activation school options use localized names and disambiguate identical s
  assert.equal(activationSchoolName({...alpha,nameEn:''},'en'),'甲学校');
  assert.equal(activationSchoolName({...alpha,nameEn:'',nameZh:''},'en'),'Alpha');
 });
-test('optional email remains optional; only a supplied invalid email is rejected',()=>{
- for(const email of ['', '   ', 'student@example.test',' student@example.test '])assert.equal(invalidAccountField({...values,email}),null);
- for(const email of ['invalid','student @example.test','student@example'])assert.deepEqual(invalidAccountField({...values,email}),'email');
+test('personal registration accepts just a username and confirmed password',()=>{
+ assert.equal(invalidAccountField(values), null);
 });
 test('account format matches existing username and password bounds, without trimming passwords',()=>{
  for(const username of ['Ab1', 'a'.repeat(40),' Student.Name '])assert.equal(invalidAccountField({...values,username}),null);

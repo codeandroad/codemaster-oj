@@ -146,7 +146,8 @@ export async function createDomainServices(pool,config) {
    }
    if(route==='/auth/register-personal'&&method==='POST') {
     ipLimiter.check(`personal-register:${ip}`);
-    const login=username(body.username),name=field(body.displayName,'显示名称',{max:100});
+    const login=username(body.username);
+    const name=field(body.displayName??'','显示名称',{min:0,max:100})||login;
     authLimiter.check(`personal-register:${login}`);
     if(body.role!==undefined||body.roles!==undefined||body.kind!==undefined||body.schoolId!==undefined)fail(400,'VALIDATION','个人注册不授予学校身份或管理员权限');
     const email=body.email==null||(typeof body.email==='string'&&!body.email.trim())?null:field(body.email,'邮箱',{max:254});

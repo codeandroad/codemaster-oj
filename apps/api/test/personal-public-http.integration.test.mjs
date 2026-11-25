@@ -49,9 +49,11 @@ test('personal registration and reviewed public learning use real grants without
    await request('/auth/register-personal',{method:'POST',body:{username:'invalid-user',displayName:'Test',password},requestOrigin:'https://evil.test',status:403});
    await request('/auth/register-personal',{method:'POST',body:{username:'invalid-user',displayName:'Test',password,roles:['admin']},status:400});
    await request('/auth/register-personal',{method:'POST',body:{username:'invalid-user',displayName:'Test',password,email:'bad'},status:400});
-   const results=await Promise.all([1,2].map(()=>request('/auth/register-personal',{method:'POST',body:{username:'personal-student',displayName:'Independent learner',password,email:''},status:[201,409]})));
+   const results=await Promise.all([1,2].map(()=>request('/auth/register-personal',{method:'POST',body:{username:'Personal-Student',password},status:[201,409]})));
    assert.deepEqual(results.map(r=>r.status).sort(),[201,409]);
    const created=results.find(r=>r.status===201);personal=session(created);assert.deepEqual(created.data.user.roles,[]);assert.equal(created.data.user.platformAdmin,false);
+   assert.equal(created.data.user.name,'personal-student');
+   assert.equal(created.data.user.email,null);
    assert.equal((await owner.query("SELECT count(*)::int count FROM identities WHERE kind='personal'")).rows[0].count,1);
    assert.equal((await owner.query('SELECT count(*)::int count FROM school_memberships WHERE account_id=$1',[personal.id])).rows[0].count,0);
    assert.equal((await request('/schools',{auth:personal})).data.items.length,0);
@@ -60,7 +62,8 @@ test('personal registration and reviewed public learning use real grants without
     await request(schoolPath+path,{auth:personal,status:404});
    await request('/platform/schools',{auth:personal,status:403});
    await request('/auth/profile',{auth:personal,method:'PATCH',body:{nickname:'Learner'},csrf:false,status:403});
-   await request('/auth/profile',{auth:personal,method:'PATCH',body:{nickname:'Learner'}});
+   const updated=await request('/auth/profile',{auth:personal,method:'PATCH',body:{nickname:'Learner',email:'learner@example.test'}});
+   assert.equal(updated.data.user.email,'learner@example.test');
    const people=await request(schoolPath+'/identities',{auth:legacy});assert.ok(!people.data.items.some(i=>i.id===personal.identityId));
    const accounts=await request(schoolPath+'/accounts',{auth:legacy});assert.ok(!accounts.data.items.some(i=>i.accountId===personal.id));
    const profile=schoolPath+'/identities/'+personal.identityId+'/profile';

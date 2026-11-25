@@ -40,7 +40,7 @@ export const sitePolicyContent: Record<AppLocale, Record<SitePolicySlug, SitePol
         {
           heading: "Information used to provide the service",
           items: [
-            "Account details include your username, display name and a password hash. An email address is optional at personal registration. Profile settings can include a nickname, avatar and bio. School records may include your name, student or staff number, gender, class membership and role. Schools may supply identity and class lists.",
+            "The registration form asks for a username and password. We store a password hash and use your username as your initial display name. After signing in, you can add an email address, nickname, avatar or bio. School records may include your name, student or staff number, gender, class membership and role. Schools may supply identity and class lists.",
             "Learning and judging records include course progress, submitted code, run inputs, judging results, assignments, assessment answers and grades, as well as related points and rewards. These records support judging, progress tracking and teaching review.",
             "The service uses session and recent activity information to maintain sign-in and show online status. It uses IP addresses to limit repeated requests and keeps audit records for certain administrative actions. It processes profile messages and related reports for display and moderation.",
           ],
@@ -174,7 +174,7 @@ export const sitePolicyContent: Record<AppLocale, Record<SitePolicySlug, SitePol
         {
           heading: "提供服务所使用的信息",
           items: [
-            "账号信息包括用户名、显示名称和密码哈希。个人注册时可选填邮箱，也可在个人资料中设置昵称、头像和简介。学校档案可能包含姓名、学号或工号、性别、班级及角色。身份和班级名单可由学校提供。",
+            "个人注册表单只收集用户名和密码。平台保存密码哈希，初始显示名称使用用户名。登录后可自行补充邮箱、昵称、头像和简介。学校档案可能包含姓名、学号或工号、性别、班级及角色。身份和班级名单可由学校提供。",
             "学习和判题记录包括课程进度、提交代码、运行输入、判题结果、作业、考核作答、成绩及相关积分或奖励，用于评测、记录进度和教学复核。",
             "网站使用会话和最近活动信息维持登录、显示在线状态。IP 地址用于限制短时间内的重复请求，部分管理操作会记入审计记录。网站会处理主页留言和相关举报，用于展示和管理。",
           ],

@@ -201,11 +201,11 @@ test('platform administrators recover member logins while school administrators 
       assert.equal(prior.status,200);
       await pool.query('INSERT INTO school_administrators(school_id,account_id,granted_by) VALUES($1,$2,$3)', [schoolId,memberId,admin.data.user.id]);
       assert.equal((await redeem(prior.data.resetCode)).status, 400);
-      assert.equal((await issue(memberId)).status, 403);
+      assert.equal((await issue(memberId)).status, 200);
       await pool.query('DELETE FROM school_administrators WHERE school_id=$1 AND account_id=$2', [schoolId,memberId]);
       await provisionSchool(pool, {slug:'second-school',name:'Second School',adminUsername:'reset-member'});
       assert.equal((await redeem(prior.data.resetCode)).status, 400);
-      assert.equal((await issue(memberId)).status, 403);
+      assert.equal((await issue(memberId)).status, 200);
 
       await t.test('batch activation uses the school roster, rejects mixed batches atomically and issues usable codes', async () => {
         const path = `/schools/${schoolId}/identities`;

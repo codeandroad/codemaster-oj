@@ -13,6 +13,7 @@ export class SchoolsController {
     'schools',
     'schools/join-requests',
     'schools/:schoolId/join-requests',
+    'schools/:schoolId/join-requests/:requestId/candidates',
     'schools/:schoolId/problem-groups',
     'schools/:schoolId/problem-groups/:id',
     'schools/:schoolId/import-history',

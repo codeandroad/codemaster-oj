@@ -22,6 +22,9 @@ export function JoinSchoolForm({
   const directory = useData<{ items: ActivationSchool[] }>("auth/activation-schools");
   const [mode, setMode] = useState("claim");
   const [kind, setKind] = useState("student");
+  const [number, setNumber] = useState("");
+  const studentApplication = mode === "apply" && kind === "student";
+  const needsHint = studentApplication && !number.trim();
   const pending = useRef(false);
   const schools = directory.data?.items ?? [];
   return (
@@ -36,7 +39,7 @@ export function JoinSchoolForm({
           if (!school) return;
           const identity = {
             kind,
-            number: String(data.get("number")).trim(),
+            number: number.trim(),
             name: String(data.get("name")).trim(),
           };
           pending.current = true;
@@ -52,7 +55,7 @@ export function JoinSchoolForm({
                   },
                 });
               } else {
-                await productionApi(`schools/${school.id}/join-requests`, { method: "POST", body: identity });
+                await productionApi(`schools/${school.id}/join-requests`, { method: "POST", body: { ...identity, ...(needsHint && { rosterHint: data.get("rosterHint") }) } });
               }
               onComplete(school.id, mode === "apply");
             })
@@ -101,13 +104,22 @@ export function JoinSchoolForm({
             </select>
           </label>
           <label className="block">
-            {kind === "student" ? text("Student ID", "学号") : text("Staff ID", "工号")}
-            <input name="number" required maxLength={64} className={inputClass} />
+            {studentApplication ? text("Student ID (if known)", "学号（选填）") : kind === "student" ? text("Student ID", "学号") : text("Staff ID", "工号")}
+            <input name="number" value={number} onChange={e => setNumber(e.target.value)} required={!studentApplication} maxLength={64} className={inputClass} />
           </label>
           <label className="block">
             {text("Name on school record", "校内档案姓名")}
             <input name="name" required maxLength={100} className={inputClass} />
           </label>
+          {needsHint && (
+            <label className="block">
+              {text("Class, homeroom teacher or school contact", "所在班级、班主任或校内联系人")}
+              <input name="rosterHint" required maxLength={160} className={inputClass} aria-describedby="roster-hint-help" />
+              <span id="roster-hint-help" className="text-sm text-muted-foreground">
+                {text("Give one detail the school can check. The school will verify your identity before linking your record.", "不知道学号时，填写一项学校可核对的信息。校方核实本人后才会关联档案。")}
+              </span>
+            </label>
+          )}
           {mode === "claim" && (
             <label className="block">
               {text("Identity claim code", "身份认领码")}
@@ -142,7 +154,7 @@ export function JoinSchoolForm({
 
 export function MySchoolRequests({ onRefresh }: { onRefresh: () => void }) {
   const text = useSchoolText();
-  const requests = useData<{ items: { id: string; schoolName: string; number: string; status: string }[] }>(
+  const requests = useData<{ items: { id: string; schoolName: string; number: string | null; name: string; status: string }[] }>(
     "schools/join-requests",
   );
   const labels: Record<string, string> = {
@@ -171,7 +183,7 @@ export function MySchoolRequests({ onRefresh }: { onRefresh: () => void }) {
           <ul>
             {requests.data.items.map((item) => (
               <li className="py-1 text-sm" key={item.id}>
-                {item.schoolName} · {item.number} · {labels[item.status]}
+                {item.schoolName} · {item.number ?? item.name} · {labels[item.status]}
               </li>
             ))}
           </ul>

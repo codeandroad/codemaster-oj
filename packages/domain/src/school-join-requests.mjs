@@ -58,49 +58,50 @@ export async function closePendingSchoolRequests(db, schoolId, accountId, actorI
 export async function handleSchoolJoinRequests({ pool, route, method, user, body }) {
   if (method === 'GET' && route === '/schools/join-requests') {
     const { rows } = await pool.query(
-      `SELECT r.id,s.name AS "schoolName",r.status,r.number,r.kind FROM school_join_requests r
+      `SELECT r.id,s.name AS "schoolName",r.status,r.number,r.name,r.kind FROM school_join_requests r
       JOIN schools s ON s.id=r.school_id WHERE r.account_id=$1 ORDER BY r.created_at DESC`,
       [user.id],
     );
     return result({ items: rows });
   }
-  const match = route.match(/^\/schools\/([^/]+)\/join-requests(?:\/([^/]+)\/decision)?$/);
+  const match = route.match(/^\/schools\/([^/]+)\/join-requests(?:\/([^/]+)\/(decision|candidates))?$/);
   if (!match) return null;
   const schoolId = uuid(match[1]);
   return transaction(pool, async (db) => {
     await lockSchoolTeaching(db, schoolId, { shared: method === 'GET' });
     if (!match[2] && method === 'POST') {
       const kind = enumValue(body.kind, ['student', 'teacher'], '身份类型');
-      const number = field(body.number, '学号或工号', { max: 64 }),
-        name = field(body.name, '姓名', { max: 100 });
+      const number = field(body.number ?? '', '学号或工号', { min:kind === 'student' ? 0 : 1, max:64 }) || null;
+      const name = field(body.name, '姓名', { max:100 });
+      const hint = number ? null : field(body.rosterHint, '班级或核验线索', { max:160 });
       if (!(await db.query('SELECT 1 FROM schools WHERE id=$1', [schoolId])).rowCount)
         fail(404, 'NOT_FOUND', '学校不存在');
       await checkApplicant(db, schoolId, user.id, kind);
       const {
         rows: [pending],
       } = await db.query(
-        `SELECT id,kind,number,name FROM school_join_requests
+        `SELECT id,kind,number,name,roster_hint FROM school_join_requests
         WHERE school_id=$1 AND account_id=$2 AND status='pending'`,
         [schoolId, user.id],
       );
       if (pending) {
-        if (pending.kind !== kind || pending.number !== number || pending.name !== name)
+        if (pending.kind !== kind || pending.number !== number || pending.name !== name || pending.roster_hint !== hint)
           fail(409, 'REQUEST_PENDING', '已有待审核申请，请联系学校管理员');
         return result({ id: pending.id, status: 'pending' });
       }
       const {
         rows: [created],
       } = await db.query(
-        `INSERT INTO school_join_requests(school_id,account_id,kind,number,name)
-        VALUES($1,$2,$3,$4,$5) RETURNING id,status`,
-        [schoolId, user.id, kind, number, name],
+        `INSERT INTO school_join_requests(school_id,account_id,kind,number,name,roster_hint)
+        VALUES($1,$2,$3,$4,$5,$6) RETURNING id,status`,
+        [schoolId, user.id, kind, number, name, hint],
       );
       return result(created, 201);
     }
     await requireSchoolAdmin(db, schoolId, user.id);
     if (method === 'GET' && !match[2]) {
       const { rows } = await db.query(
-        `SELECT r.id,r.name,r.number,r.kind,a.username,i.id AS "identityId"
+        `SELECT r.id,r.name,r.number,r.kind,r.roster_hint AS "rosterHint",a.username,i.id AS "identityId"
         FROM school_join_requests r JOIN accounts a ON a.id=r.account_id LEFT JOIN school_identities i
         ON i.school_id=r.school_id AND i.kind=r.kind AND i.number=r.number AND i.name=r.name
         AND i.archived_at IS NULL AND i.account_id IS NULL
@@ -109,7 +110,18 @@ export async function handleSchoolJoinRequests({ pool, route, method, user, body
       );
       return result({ items: rows });
     }
-    if (method !== 'POST' || !match[2]) return null;
+    if (method === 'GET' && match[3] === 'candidates') {
+      const { rows } = await db.query(`SELECT i.id,i.number,ARRAY(
+        SELECT c.name FROM school_class_roster roster JOIN school_classes c
+          ON c.school_id=roster.school_id AND c.id=roster.class_id
+        WHERE roster.school_id=i.school_id AND roster.identity_id=i.id AND c.archived_at IS NULL ORDER BY c.name,c.id
+      ) AS classes FROM school_join_requests r JOIN school_identities i
+        ON i.school_id=r.school_id AND i.kind=r.kind AND i.name=r.name
+        WHERE r.school_id=$1 AND r.id=$2 AND r.status='pending' AND r.number IS NULL
+          AND i.archived_at IS NULL AND i.account_id IS NULL ORDER BY i.number,i.id`,[schoolId,uuid(match[2])]);
+      return result({items:rows});
+    }
+    if (method !== 'POST' || match[3] !== 'decision') return null;
     const id = uuid(match[2]),
       decision = enumValue(body.decision, ['approved', 'rejected'], '审核结果');
     const identityId = decision === 'approved' ? uuid(body.identityId, '身份档案') : null;
@@ -125,22 +137,24 @@ export async function handleSchoolJoinRequests({ pool, route, method, user, body
         return result({ id, status: decision });
       fail(409, 'ALREADY_REVIEWED', '申请状态已变更，请刷新');
     }
+    const verification = identityId && request.number === null
+      ? enumValue(body.verificationMethod, ['in_person','school_contact'], '独立核验方式') : null;
     if (identityId) {
       const {
         rows: [identity],
       } = await db.query(
         `SELECT id,kind FROM school_identities WHERE school_id=$1 AND id=$2 AND kind=$3
-        AND number=$4 AND name=$5 AND account_id IS NULL AND archived_at IS NULL FOR UPDATE`,
+        AND ($4::text IS NULL OR number=$4) AND name=$5 AND account_id IS NULL AND archived_at IS NULL FOR UPDATE`,
         [schoolId, identityId, request.kind, request.number, request.name],
       );
-      if (!identity) fail(409, 'IDENTITY_UNAVAILABLE', '请核对本校未关联档案的姓名和学号或工号');
+      if (!identity) fail(409, 'IDENTITY_UNAVAILABLE', '请重新核对本校未关联的身份档案');
       await bindSchoolIdentity(db, schoolId, request.account_id, identity, user.id, id);
       await auditSchool(db, schoolId, user.id, 'school.identity.link', identityId);
     }
     await db.query(
-      `UPDATE school_join_requests SET status=$2,identity_id=$3,decided_at=clock_timestamp(),decided_by=$4
+      `UPDATE school_join_requests SET status=$2,identity_id=$3,decided_at=clock_timestamp(),decided_by=$4,verification_method=$5
       WHERE id=$1`,
-      [id, decision, identityId, user.id],
+      [id, decision, identityId, user.id, verification],
     );
     await auditSchool(db, schoolId, user.id, 'school.join_request.' + decision, id);
     return result({ id, status: decision });

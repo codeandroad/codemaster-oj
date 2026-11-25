@@ -2,6 +2,8 @@ import { enrollWithClaim } from './support/workspace-accounts.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { applicationDatabaseUrl, registerPersonal } from './support/workspace-accounts.mjs';
 import { createApiApplication } from '../dist/application.js';
 import { createPool } from '../../../packages/domain/src/db.mjs';
@@ -253,12 +255,10 @@ test('explicit platform governance preserves teaching roles and enforces authori
         for (const note of [undefined,'   ','x'.repeat(301)]) {
           assert.equal((await post(path,platform,{verificationNote:note})).status,400);
         }
-        for (const account of [platform,firstAdmin,legacy]) {
-          assert.equal((await post(issuePath(account),platform,review)).status,403);
-        }
+        assert.equal((await post(issuePath(platform),platform,review)).status,403);
         const accounts = (await request('/platform/accounts',{auth:platform})).data.items;
         assert.equal(accounts.find(row=>row.accountId===personal.data.user.id).canResetPassword,true);
-        for (const account of [teacher,learner]) {
+        for (const account of [firstAdmin,legacy,teacher,learner]) {
           assert.equal(accounts.find(row=>row.accountId===account.data.user.id).canResetPassword,true);
           assert.equal((await post(issuePath(account),platform,review)).status,200);
         }
@@ -358,6 +358,77 @@ test('explicit platform governance preserves teaching roles and enforces authori
         await provisionPlatformAdministrator(pool,{username:promoted.data.user.username});
         assert.equal((await post(issuePath(promoted),platform,review)).status,403);
         assert.equal((await redeem(promoted,beforeGrant.data.resetCode)).status,400);
+      });
+      await t.test('platform review recovers original, newly appointed and dual-role school administrators in place', async () => {
+        assert.equal((await post(appointPath,platform,{username:teacher.data.user.username})).status,200);
+        for (const account of [legacy,firstAdmin,teacher]) {
+          const schoolsBefore = (await request('/schools',{auth:account})).data;
+          const issued = await post(issuePath(account),platform,review);
+          assert.equal(issued.status,200);
+          assert.equal((await redeem(account,issued.data.resetCode)).status,200);
+          assert.equal((await request('/auth/me',{auth:account})).status,401);
+          const username = account.data.user.username;
+          assert.equal((await post('/auth/login',undefined,{username,password})).status,401);
+          const recovered = await post('/auth/login',undefined,{username,password:newPassword});
+          assert.equal(recovered.status,200);
+          assert.equal(recovered.data.user.id,account.data.user.id);
+          assert.equal(recovered.data.user.identityId,account.data.user.identityId);
+          assert.deepEqual((await request('/schools',{auth:recovered})).data,schoolsBefore);
+          assert.equal((await request('/platform/accounts',{auth:recovered})).status,403);
+        }
+      });
+      await t.test('only the deployment operator can issue a one-time code for the original platform administrator', async () => {
+        const username = 'recovery-operator';
+        const target = await registerPersonal(request,username,password);
+        const id = target.data.user.id;
+        await provisionPlatformAdministrator(pool,{username});
+        const cli = (connection, targetUsername=username, note='Ownership verified in person.') => spawnSync(process.execPath,[
+          fileURLToPath(new URL('../../../packages/domain/src/recover-platform-admin.mjs',import.meta.url)),targetUsername,
+        ],{env:{...process.env,DATABASE_URL:connection},input:note+'\n',encoding:'utf8',timeout:7000});
+        const issue = () => {
+          const result = cli(url.href);
+          assert.equal(result.status,0,result.stderr);
+          const code = result.stdout.trim().split('\n').at(-1);
+          assert.ok(/^[A-Za-z0-9_-]{32}$/.test(code));
+          return code;
+        };
+        const grant = async () => (await pool.query('SELECT * FROM platform_admins WHERE account_id=$1',[id])).rows[0];
+        const initial = await grant();
+        assert.equal((await post(issuePath(target),platform,review)).status,403);
+        const runtimeUrl = new URL(url);
+        runtimeUrl.searchParams.set('options','-crole=campus_app -csearch_path='+schema);
+        const denied = cli(runtimeUrl.href);
+        assert.equal(denied.status,1);
+        assert.match(denied.stderr,/42501/);
+        const permissions = await pool.query(`SELECT
+          has_table_privilege('campus_app','platform_admin_recovery_issues','INSERT,UPDATE,DELETE') AS writable,
+          has_table_privilege('campus_worker','platform_admin_recovery_issues','SELECT,INSERT,UPDATE,DELETE') AS worker`);
+        assert.deepEqual(permissions.rows[0],{writable:false,worker:false});
+        assert.notEqual(cli(url.href,personal.data.user.username).status,0);
+        assert.notEqual(cli(url.href,username,' ').status,0);
+        assert.equal((await pool.query('SELECT count(*)::int n FROM reset_tokens WHERE account_id=$1',[id])).rows[0].n,0);
+        const old = issue();
+        const expired = issue();
+        assert.equal((await redeem(target,old)).status,400);
+        await pool.query("UPDATE reset_tokens SET expires_at=now()-interval '1 minute' WHERE account_id=$1",[id]);
+        assert.equal((await redeem(target,expired)).status,400);
+        const latest = issue();
+        assert.deepEqual((await Promise.all([redeem(target,latest),redeem(target,latest)])).map(r=>r.status).sort(),[200,400]);
+        assert.equal((await request('/auth/me',{auth:target})).status,401);
+        assert.equal((await post('/auth/login',undefined,{username,password})).status,401);
+        const recovered = await post('/auth/login',undefined,{username,password:newPassword});
+        assert.equal(recovered.status,200);
+        assert.equal(recovered.data.user.id,id);
+        assert.equal((await request('/platform/accounts',{auth:recovered})).status,200);
+        assert.deepEqual(await grant(),initial);
+        const {rows} = await pool.query("SELECT detail FROM platform_audit_events WHERE action='deployment.password_reset.issue' AND target_account_id=$1",[id]);
+        assert.equal(rows.length,3);
+        assert.ok(rows.every(event=>event.detail.verificationNote==='Ownership verified in person.' && event.detail.operator));
+        const revoked = issue();
+        await pool.query('UPDATE platform_admins SET revoked_at=clock_timestamp() WHERE account_id=$1',[id]);
+        assert.equal((await redeem(target,revoked)).status,400);
+        await provisionPlatformAdministrator(pool,{username});
+        assert.equal((await redeem(target,revoked)).status,400);
       });
       const pendingReset = await post(issuePath(personal),platform,review);
       assert.equal(pendingReset.status,200);

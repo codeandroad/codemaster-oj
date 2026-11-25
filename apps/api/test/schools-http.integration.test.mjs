@@ -11,7 +11,7 @@ import { applicationDatabaseUrl, registerPersonal, seedUnlinkedMembership } from
 import { provisionPlatformAdministrator } from '../../../packages/domain/src/platform-governance.mjs';
 
 test('school claims and reviewed applications stay within each school on the real Nest API',
-  { skip: !process.env.TEST_DATABASE_URL, timeout: 60000 }, async () => {
+  { skip: !process.env.TEST_DATABASE_URL, timeout: 60000 }, async t => {
     const manager = createPool(process.env.TEST_DATABASE_URL);
     const schema = 'schools_' + randomBytes(6).toString('hex');
     await manager.query(`CREATE SCHEMA ${schema}`);
@@ -118,6 +118,51 @@ test('school claims and reviewed applications stay within each school on the rea
       assert.equal((await request('/auth/me',{auth:learner})).data.user.id,learner.data.user.id);
       assert.equal((await post('/auth/claim-identity',another,claim)).status,400);
       assert.equal((await request('/platform/accounts',{auth:learner})).status,403);
+
+      await t.test('students without a number require an independently verified choice of school record', async () => {
+        const applicant = await registerPersonal(request,'unknown-number',password);
+        const info = {kind:'student',name:'Same Name',rosterHint:'Year 8, homeroom Lee'};
+        for (const body of [{...info,kind:'teacher'},{...info,rosterHint:' '},{...info,rosterHint:'x'.repeat(161)}]) {
+          assert.equal((await post(path(alpha),applicant,body)).status,400);
+        }
+        const a = await make(alpha,alphaAdmin,{...info,number:'N01'});
+        const b = await make(alpha,alphaAdmin,{...info,number:'N02'});
+        const outside = await make(beta,betaAdmin,{...info,number:'N02'});
+        const teacher = await make(alpha,alphaAdmin,{...info,kind:'teacher',number:'T02'});
+        const submission = await post(path(alpha),applicant,info);
+        assert.equal(submission.status,201);
+        const requestId = submission.data.id;
+        assert.equal((await post(path(alpha),applicant,{...info,number:' '})).data.id,requestId);
+        assert.equal((await post(path(alpha),applicant,{...info,rosterHint:'Other'})).status,409);
+        assert.deepEqual((await request('/schools',{auth:applicant})).data.items,[]);
+        assert.deepEqual(Object.keys(submission.data).sort(),['id','status']);
+        const item = (await list()).find(r=>r.id===requestId);
+        assert.equal(item.identityId,null);
+        assert.equal(item.rosterHint,info.rosterHint);
+        const candidates = path(alpha)+'/'+requestId+'/candidates';
+        assert.equal((await request(candidates,{auth:applicant})).status,404);
+        assert.equal((await request(candidates,{auth:betaAdmin})).status,404);
+        assert.deepEqual((await request(candidates,{auth:alphaAdmin})).data.items.map(r=>r.id),[a.id,b.id]);
+        const approve = (identityId,verificationMethod) => post(path(alpha)+'/'+requestId+'/decision',alphaAdmin,{decision:'approved',identityId,verificationMethod});
+        assert.equal((await approve(b.id)).status,400);
+        assert.equal((await approve(b.id,'same_name')).status,400);
+        for (const wrong of [teacher,local,outside]) assert.equal((await approve(wrong.id,'in_person')).status,409);
+        assert.equal((await approve(b.id,'school_contact')).status,200);
+        assert.equal((await approve(b.id,'school_contact')).status,200);
+        assert.equal((await request(path(alpha)+'/'+requestId+'/candidates',{auth:alphaAdmin})).data.items.length,0);
+        const own = await request('/schools/join-requests',{auth:applicant});
+        assert.equal(own.data.items[0].status,'approved');
+        assert.equal(own.data.items[0].number,null);
+        const checked = await pool.query('SELECT identity_id,decided_by,verification_method FROM school_join_requests WHERE id=$1',[requestId]);
+        assert.deepEqual(checked.rows[0],{identity_id:b.id,decided_by:alphaAdmin.data.user.id,verification_method:'school_contact'});
+        const sibling = await registerPersonal(request,'other-same-name',password);
+        const next = await post(path(alpha),sibling,info);
+        assert.deepEqual((await request(path(alpha)+'/'+next.data.id+'/candidates',{auth:alphaAdmin})).data.items.map(r=>r.id),[a.id]);
+        const used = await post(path(alpha)+'/'+next.data.id+'/decision',alphaAdmin,{decision:'approved',identityId:b.id,verificationMethod:'in_person'});
+        assert.equal(used.status,409);
+        assert.equal((await decide(alpha,next.data.id,alphaAdmin,'rejected')).status,200);
+        assert.deepEqual((await request('/schools',{auth:sibling})).data.items,[]);
+      });
 
       // Members who previously used a general invitation can finish linking their original dossier.
       await seedUnlinkedMembership(pool,beta.id,another.data.user.id,'student');

@@ -1,6 +1,6 @@
 import { transaction } from './db.mjs';
 import { issuePasswordResetCode } from './password-reset-tokens.mjs';
-import { enumValue, fail, field, integer, username, uuid } from './security.mjs';
+import { enumValue, fail, field, integer, tokenHash, username, uuid } from './security.mjs';
 import { activeAccount, auditSchool, lockSchoolTeaching } from './schools.mjs';
 
 const result = (body, status = 200) => ({ status, body });
@@ -125,12 +125,13 @@ async function searchSchoolAdminCandidates(db, url) {
 const loginAccount = `FROM accounts a JOIN identities i ON i.id=a.identity_id
   WHERE a.binding_released_at IS NULL AND i.archived_at IS NULL`;
 const platformGrant = 'EXISTS (SELECT 1 FROM platform_admins p WHERE p.account_id=a.id AND p.revoked_at IS NULL)';
-const canResetPassword = `i.kind IN ('personal','student','teacher') AND a.disabled_at IS NULL AND NOT ${platformGrant}
-  AND NOT EXISTS (SELECT 1 FROM school_memberships m WHERE m.account_id=a.id AND m.role='school_admin' AND (m.revoked_at IS NULL OR m.suspended))
-  AND NOT EXISTS (SELECT 1 FROM school_administrators g WHERE g.account_id=a.id AND g.revoked_at IS NULL)`;
+const canResetPassword = `a.disabled_at IS NULL AND NOT ${platformGrant}`;
+const schoolAdmin = `i.kind='admin' OR EXISTS (SELECT 1 FROM school_memberships m
+  WHERE m.account_id=a.id AND m.role='school_admin' AND (m.revoked_at IS NULL OR m.suspended))
+  OR EXISTS (SELECT 1 FROM school_administrators g WHERE g.account_id=a.id AND g.revoked_at IS NULL)`;
 
 export async function lockPlatformResetTarget(db, accountId) {
-  const query = `SELECT a.username ${loginAccount} AND a.id=$1 AND ${canResetPassword}`;
+  const query = `SELECT a.username,(${schoolAdmin}) AS "schoolAdmin" ${loginAccount} AND a.id=$1 AND ${canResetPassword}`;
   if (!(await db.query(query+' FOR UPDATE OF a',[accountId])).rowCount) return null;
   // An enrollment or grant could have committed while we waited for the account.
   return (await db.query(query,[accountId])).rows[0];
@@ -139,10 +140,32 @@ export async function lockPlatformResetTarget(db, accountId) {
 async function issuePlatformReset(db, actorId, accountId, body) {
   const note = field(body.verificationNote, '人工核验记录', {max:300});
   const account = await lockPlatformResetTarget(db, accountId);
-  if (!account) fail(403,'ACCOUNT_RESET_UNAVAILABLE','只可为登录正常的普通用户签发重置码');
-  const resetCode = await issuePasswordResetCode(db, accountId, actorId);
+  if (!account) fail(403,'ACCOUNT_RESET_UNAVAILABLE','此账号无法通过平台管理页面重置密码');
+  const resetCode = await issuePasswordResetCode(db, accountId, actorId, account.schoolAdmin ? 'platform-school-admin' : 'platform');
   await auditPlatform(db,actorId,'platform.password_reset.issue',{accountId,detail:{verificationNote:note}});
   return result({username:account.username,resetCode});
+}
+
+// The migration owner runs this from the deployment CLI. Runtime grants allow
+// checking the proof on redemption but never creating or replacing one.
+export async function issueDeploymentReset(pool, rawUsername, verificationNote) {
+  const note = field(verificationNote, '人工核验记录', {max:300});
+  return transaction(pool, async db => {
+    const account = await findActiveAccount(db, rawUsername, {exclusive:true});
+    await requirePlatformAdministrator(db, account.accountId);
+    const code = await issuePasswordResetCode(db, account.accountId, null, 'deployment');
+    const {rows:[operator]} = await db.query(`INSERT INTO platform_admin_recovery_issues(account_id,token_hash,granted_at,expires_at)
+      SELECT p.account_id,t.token_hash,p.granted_at,t.expires_at
+      FROM platform_admins p JOIN reset_tokens t USING(account_id)
+      WHERE p.account_id=$1 AND p.revoked_at IS NULL AND t.token_hash=$2
+      ON CONFLICT(account_id) DO UPDATE SET token_hash=excluded.token_hash,granted_at=excluded.granted_at,expires_at=excluded.expires_at
+      RETURNING current_user AS name`,[account.accountId,tokenHash(code)]);
+    if (!operator) fail(409,'GRANT_CHANGED','平台授权已变更，请重新核验');
+    await auditPlatform(db,null,'deployment.password_reset.issue',{
+      accountId:account.accountId,detail:{operator:operator.name,verificationNote:note},
+    });
+    return {username:account.username,resetCode:code};
+  });
 }
 
 async function listLoginAccounts(db, url) {
@@ -150,7 +173,7 @@ async function listLoginAccounts(db, url) {
   const term = field(url.searchParams.get('q') ?? '', '关键词', {min:0,max:100}).toLowerCase();
   const status = enumValue(url.searchParams.get('status') ?? 'all', ['all','enabled','disabled'], '平台登录状态');
   const {rows} = await db.query(`SELECT a.id AS "accountId",a.username,i.name,a.disabled_at IS NOT NULL AS disabled,
-    ${platformGrant} AS "platformAdmin", (${canResetPassword}) AS "canResetPassword" ${loginAccount}
+    ${platformGrant} AS "platformAdmin", (${schoolAdmin}) AS "schoolAdmin", (${canResetPassword}) AS "canResetPassword" ${loginAccount}
     AND ($1='' OR strpos(lower(a.username),$1)>0 OR strpos(lower(i.name),$1)>0)
     AND ($2='all' OR (a.disabled_at IS NOT NULL)=($2='disabled'))
     ORDER BY a.username,a.id LIMIT 51 OFFSET $3`, [term,status,(page-1)*50]);

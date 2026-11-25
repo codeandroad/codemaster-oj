@@ -12,15 +12,27 @@ export async function redeemPasswordReset(db, login, code, passwordHash) {
       WHERE action='account.reset_issue' AND resource_type='account' AND resource_id=a.id::text
       ORDER BY id DESC LIMIT 1) issue ON true
     WHERE a.username=$1 AND t.token_hash=$2 AND t.consumed_at IS NULL AND t.expires_at>clock_timestamp()`, [login,digest]);
-  // Older platform-issued codes remain valid until their original expiry.
-  if (!credential || !['platform','platform-personal'].includes(credential.scope)) invalid();
-  try {
-    await requirePlatformAdministrator(db, credential.issuer, credential.issued_at);
-  } catch (error) {
-    if ([401,403,404].includes(error.status)) invalid();
-    throw error;
+  if (!credential) invalid();
+  if (credential.scope === 'deployment') {
+    await db.query('SELECT id FROM accounts WHERE id=$1 FOR UPDATE',[credential.id]);
+    const approved = await db.query(`SELECT 1 FROM platform_admin_recovery_issues r
+      JOIN platform_admins p USING(account_id) JOIN accounts a ON a.id=r.account_id
+      JOIN identities i ON i.id=a.identity_id
+      WHERE r.account_id=$1 AND r.token_hash=$2 AND r.expires_at>clock_timestamp()
+        AND r.granted_at=p.granted_at AND p.revoked_at IS NULL AND a.disabled_at IS NULL
+        AND a.binding_released_at IS NULL AND i.archived_at IS NULL`, [credential.id,digest]);
+    if (!approved.rowCount) invalid();
+  } else {
+    if (!['platform','platform-personal','platform-school-admin'].includes(credential.scope)) invalid();
+    try {
+      await requirePlatformAdministrator(db, credential.issuer, credential.issued_at);
+    } catch (error) {
+      if ([401,403,404].includes(error.status)) invalid();
+      throw error;
+    }
+    const target = await lockPlatformResetTarget(db, credential.id);
+    if (!target || target.schoolAdmin !== (credential.scope === 'platform-school-admin')) invalid();
   }
-  if (!await lockPlatformResetTarget(db, credential.id)) invalid();
   const consumed = await db.query(`UPDATE reset_tokens SET consumed_at=clock_timestamp()
     WHERE account_id=$1 AND token_hash=$2 AND consumed_at IS NULL AND expires_at>clock_timestamp()`,
     [credential.id,digest]);

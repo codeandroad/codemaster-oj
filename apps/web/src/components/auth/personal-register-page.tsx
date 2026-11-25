@@ -16,6 +16,11 @@ import { invalidAccountField } from "./registration-fields";
 import { AuthShell } from "./auth-shell";
 import styles from "./auth-shell.module.css";
 
+type RegistrationIssue =
+  | { kind: "field"; field: NonNullable<ReturnType<typeof invalidAccountField>> }
+  | { kind: "taken" }
+  | { kind: "server"; message: string };
+
 export function PersonalRegisterPage({
   onRegistered,
   joinIntent = false,
@@ -23,17 +28,19 @@ export function PersonalRegisterPage({
   onRegistered: (user: CampusUser) => void;
   joinIntent?: boolean;
 }) {
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const text = (en: string, zh: string) => (locale === "en" ? en : zh);
   const [busy, setBusy] = useState(false);
   const [visible, setVisible] = useState(false);
-  const [issue, setIssue] = useState<{
-    field?: string;
-    message: string;
-  } | null>(null);
+  const [issue, setIssue] = useState<RegistrationIssue | null>(null);
   const inFlight = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
-  const fieldError = (field: string) => issue?.field === field;
+  const fieldError = (field: string) => issue?.kind === "field" && issue.field === field;
+  const messages = {
+    username: text("Use 3–40 letters, numbers, underscores, dots or hyphens. Start with a letter or number.", "用户名使用 3–40 位字母、数字、下划线、点或连字符，首位为字母或数字。"),
+    password: text("Use 8–128 characters for your password.", "密码需为 8–128 位。"),
+    confirmation: text("Passwords do not match.", "两次输入的密码不一致。"),
+  };
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (inFlight.current) return;
@@ -42,19 +49,12 @@ export function PersonalRegisterPage({
     const password = String(values.get("password") ?? "");
     const confirmation = String(values.get("confirmation") ?? "");
     const invalidField = invalidAccountField({username, password, confirmation});
-    const messages = {
-      username: text("Use 3–40 letters, numbers, underscores, dots or hyphens. Start with a letter or number.", "用户名使用 3–40 位字母、数字、下划线、点或连字符，首位为字母或数字。"),
-      password: text("Use 8–128 characters for your password.", "密码需为 8–128 位。"),
-      confirmation: text("Passwords do not match.", "两次输入的密码不一致。"),
-    };
-    const invalid = invalidField ? {field: invalidField, message: messages[invalidField]} : null;
-    setIssue(invalid);
-    if (invalid) {
-      (
-        formRef.current?.elements.namedItem(invalid.field) as HTMLInputElement
-      )?.focus();
+    if (invalidField) {
+      setIssue({kind: "field", field: invalidField});
+      (formRef.current?.elements.namedItem(invalidField) as HTMLInputElement)?.focus();
       return;
     }
+    setIssue(null);
     inFlight.current = true;
     setBusy(true);
     try {
@@ -67,16 +67,8 @@ export function PersonalRegisterPage({
       );
       onRegistered(result.user);
     } catch (error) {
-      setIssue({
-        message:
-          error instanceof ApiError &&
-          ["USERNAME_TAKEN", "CONFLICT"].includes(error.code)
-            ? text(
-                "This username is already in use. Choose another.",
-                "用户名已被使用，请换一个。",
-              )
-            : apiMessage(error),
-      });
+      const taken = error instanceof ApiError && ["USERNAME_IN_USE", "USERNAME_TAKEN", "CONFLICT"].includes(error.code);
+      setIssue(taken ? { kind: "taken" } : { kind: "server", message: apiMessage(error) });
       requestAnimationFrame(() =>
         document.getElementById("register-error")?.focus(),
       );
@@ -200,7 +192,9 @@ export function PersonalRegisterPage({
             tabIndex={-1}
             className={styles.error}
           >
-            {issue.message}
+            {issue.kind === "field" ? messages[issue.field] : issue.kind === "taken"
+              ? text("This username is already in use. Choose another.", "用户名已被使用，请换一个。")
+              : t(issue.message)}
           </p>
         )}
         <Button

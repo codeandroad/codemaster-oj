@@ -1,7 +1,6 @@
 "use client";
 
 import { Languages } from "lucide-react";
-import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { BrandLogo } from "@/components/brand-logo";
 import { useLocale } from "@/components/locale-context";
@@ -12,8 +11,6 @@ import styles from "./auth-shell.module.css";
 /** Public authentication uses the system's light palette, outside workspace themes. */
 export function AuthShell({ children, titleId = "login-title" }: { children: ReactNode; titleId?: string }) {
   const { locale, setLocale } = useLocale();
-  const pathname = usePathname();
-  const showLanguageToggle = pathname === "/" || pathname === "/login";
   const nextLocale = locale === "zh" ? "en" : "zh";
   const tx = (zh: string, en: string) => locale === "en" ? en : zh;
   const roles = [
@@ -35,11 +32,11 @@ export function AuthShell({ children, titleId = "login-title" }: { children: Rea
           </ul>
         </aside>
         <div className="flex min-w-0 flex-col">
-          {showLanguageToggle && <Button type="button" variant="outline" size="icon" className="mb-2 self-end"
+          <Button type="button" variant="outline" size="icon" className="mb-2 self-end"
             lang={nextLocale === "zh" ? "zh-CN" : "en"} aria-label={nextLocale === "zh" ? "切换到简体中文" : "Switch to English"}
             onClick={() => setLocale(nextLocale)}>
             <Languages size={18} aria-hidden="true" />
-          </Button>}
+          </Button>
           <section className={styles.formPanel} aria-labelledby={titleId}>
             <BrandLogo className={styles.mobileLogo} />
             {children}
@@ -56,10 +53,10 @@ export function AuthConnectionNotice({ register, error, onRetry }: { register: b
   const connecting = locale === "zh" ? "正在连接 CodeMaster…" : "Connecting to CodeMaster…";
   const title = error
     ? locale === "zh" ? "无法连接" : "Unable to connect"
-    : register ? "Create account" : t("登录");
+    : register ? (locale === "zh" ? "创建账号" : "Create account") : t("登录");
   return <AuthShell>
     <h2 id="login-title" className={styles.title}>{title}</h2>
-    <p className={styles.description} role={error ? "alert" : "status"}>{error || connecting}</p>
+    <p className={styles.description} role={error ? "alert" : "status"}>{error ? t(error) : connecting}</p>
     {error && <div className="mt-5 flex flex-wrap gap-2">
       <Button className="w-fit" onClick={onRetry}>{locale === "zh" ? "重试" : "Retry"}</Button>
       <Button type="button" variant="secondary" className="w-fit" onClick={() => window.location.reload()}>{locale === "zh" ? "刷新整个页面" : "Refresh page"}</Button>

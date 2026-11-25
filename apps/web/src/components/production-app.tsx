@@ -122,11 +122,10 @@ export function ProductionApp() {
   };
   if (!isCampusRoute(pathname)) return null;
   const authPage = pathname === "/" || isCampusAuthRoute(pathname);
-  const publicSignIn = pathname === "/login" || (pathname === "/" && !user);
   const retryConnection = () => { setLoading(true); setError(""); setCheck(value => value + 1); };
   if (authPage && (loading || error)) {
     const notice = <AuthConnectionNotice register={pathname === "/register"} error={loading ? "" : error} onRetry={retryConnection} />;
-    return publicSignIn ? <HomeLocaleProvider>{notice}</HomeLocaleProvider> : notice;
+    return <HomeLocaleProvider>{notice}</HomeLocaleProvider>;
   }
   if (loading)
     return (
@@ -148,10 +147,10 @@ export function ProductionApp() {
       </main>
     );
   if (pathname === "/activate") redirect(user ? "/schools?join=1" : "/login?join=1");
-  if (pathname === "/register") return <PersonalRegisterPage onRegistered={loggedIn} joinIntent={joinIntent}/>;
+  if (pathname === "/register") return <HomeLocaleProvider><PersonalRegisterPage onRegistered={loggedIn} joinIntent={joinIntent}/></HomeLocaleProvider>;
   if (!user || pathname === "/login") {
     const login = <ProductionLoginPage key={resetIntent ? "reset" : "login"} onLogin={loggedIn} joinIntent={joinIntent} resetIntent={resetIntent} />;
-    return publicSignIn ? <HomeLocaleProvider>{login}</HomeLocaleProvider> : login;
+    return <HomeLocaleProvider>{login}</HomeLocaleProvider>;
   }
   const logout = () => {
     setUser(null);

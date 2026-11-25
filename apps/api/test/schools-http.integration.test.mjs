@@ -164,6 +164,89 @@ test('school claims and reviewed applications stay within each school on the rea
         assert.deepEqual((await request('/schools',{auth:sibling})).data.items,[]);
       });
 
+      await t.test('school admins can create a verified student record and approve exactly once', async () => {
+        const secondAdmin = await registerPersonal(request, 'alpha-reviewer', password);
+        assert.ok((await post('/platform/schools/'+alpha.id+'/administrators', platform, {username:'alpha-reviewer'})).status < 300);
+        const name = 'Unlisted Student';
+        const facts = {kind:'student', name, rosterHint:'Class 8A'};
+        async function apply(username, details = facts) {
+          const account = await registerPersonal(request, username, password);
+          const response = await post(path(alpha), account, details);
+          assert.equal(response.status, 201);
+          const review = path(alpha)+'/'+response.data.id;
+          return {
+            account, id:response.data.id,
+            records: async () => (await request(review+'/candidates', {auth:alphaAdmin})).data,
+            approve: (body, admin = alphaAdmin) => post(review+'/decision', admin, {decision:'approved', ...body}),
+          };
+        }
+        const first = await apply('new-student');
+        const empty = await first.records();
+        assert.deepEqual(empty.records, []);
+        const body = {createNumber:'NEW01', verificationMethod:'in_person', recordsVersion:empty.version};
+        for (const invalid of [{createNumber:' '}, {verificationMethod:undefined}, {identityId:local.id}, {decision:'rejected'}]) {
+          assert.equal((await first.approve({...body, ...invalid})).status, 400);
+        }
+        assert.equal((await first.approve(body, first.account)).status, 404);
+        assert.equal((await first.approve(body, betaAdmin)).status, 404);
+        const concurrent = await Promise.all([first.approve(body), first.approve(body, secondAdmin)]);
+        assert.deepEqual(concurrent.map(r => r.status), [200,200]);
+        assert.equal((await first.approve({...body,createNumber:'NEW02'})).status, 409);
+        const {rows:[created]} = await pool.query(`SELECT i.id,i.name,i.number,i.account_id,r.number AS requested_number,
+          r.roster_hint,r.created_student_number,r.verification_method,m.role
+          FROM school_join_requests r JOIN school_identities i ON i.id=r.identity_id
+          JOIN school_memberships m ON m.school_id=i.school_id AND m.account_id=i.account_id
+          WHERE r.id=$1 AND r.status='approved'`, [first.id]);
+        assert.deepEqual(created, {id:created.id,name,number:'NEW01',account_id:first.account.data.user.id,
+          requested_number:null,roster_hint:'Class 8A',created_student_number:'NEW01',verification_method:'in_person',role:'student'});
+        const audit = await pool.query('SELECT action FROM school_audit_events WHERE school_id=$1 AND target_id IN ($2,$3) ORDER BY action',
+          [alpha.id,created.id,first.id]);
+        assert.deepEqual(audit.rows.map(row => row.action), ['school.identity.create','school.identity.link','school.join_request.approved']);
+        assert.deepEqual((await request('/schools',{auth:first.account})).data.items.map(s=>s.id), [alpha.id]);
+
+        const same = await apply('namesake');
+        const before = await same.records();
+        assert.deepEqual(before.records.map(r=>[r.number,r.status]), [['NEW01','linked']]);
+        assert.deepEqual(before.items, []);
+        const archived = await make(alpha,alphaAdmin,{kind:'student',name,number:'OLD01'});
+        assert.equal((await post('/schools/'+alpha.id+'/identities/'+archived.id+'/archive',alphaAdmin,{})).status,200);
+        const create = {...body,createNumber:'NEW02',recordsVersion:before.version,distinctStudent:true};
+        assert.equal((await same.approve(create)).data.error.code, 'ROSTER_CHANGED');
+        const after = await same.records();
+        assert.deepEqual(after.records.map(r=>[r.number,r.status]), [['NEW01','linked'],['OLD01','archived']]);
+        create.recordsVersion = after.version;
+        assert.equal((await same.approve({...create,distinctStudent:false})).data.error.code, 'REVIEW_SAME_NAME');
+        for (const used of ['NEW01','OLD01','S002']) {
+          assert.equal((await same.approve({...create,createNumber:used})).data.error.code, 'NUMBER_IN_USE');
+        }
+        assert.equal((await same.approve(create)).status,200);
+
+        const numbered = await apply('prior-number',{kind:'student',name:'Another Learner',number:'N-GIVEN'});
+        const given = {...body, recordsVersion:(await numbered.records()).version, verificationMethod:'school_contact'};
+        assert.equal((await numbered.approve({...given,createNumber:'N-OTHER'})).status,400);
+        assert.equal((await numbered.approve({...given,createNumber:'N-GIVEN'})).status,200);
+        const teacher = await apply('new-teacher',{kind:'teacher',name:'Faculty',number:'T101'});
+        assert.equal((await teacher.approve({...body,createNumber:'T101',recordsVersion:(await teacher.records()).version})).status,400);
+
+        const contenders = await Promise.all(['east','west'].map(suffix =>
+          apply('racing-'+suffix,{...facts,name:'Learner '+suffix})));
+        const snapshots = await Promise.all(contenders.map(candidate => candidate.records()));
+        const race = await Promise.all(contenders.map((candidate, index) => candidate.approve(
+          {...body,createNumber:'SHARED',recordsVersion:snapshots[index].version}, index ? secondAdmin : alphaAdmin)));
+        assert.deepEqual(race.map(result => result.status).sort(), [200,409]);
+        assert.equal(race.find(result => result.status === 409).data.error.code, 'NUMBER_IN_USE');
+        assert.equal((await pool.query("SELECT id FROM school_identities WHERE school_id=$1 AND number='SHARED'",[alpha.id])).rowCount,1);
+
+        const paused = await apply('paused-student',{kind:'student',name:'Paused Student',number:'PAUSED'});
+        await seedUnlinkedMembership(pool,alpha.id,paused.account.data.user.id,'student');
+        const suspend = await request('/schools/'+alpha.id+'/accounts/'+paused.account.data.user.id+'/access',
+          {method:'PATCH',auth:alphaAdmin,body:{suspended:true}});
+        assert.equal(suspend.status,200);
+        assert.equal((await paused.approve({...body,createNumber:'PAUSED',recordsVersion:(await paused.records()).version})).data.error.code, 'SCHOOL_ACCESS_SUSPENDED');
+        assert.equal((await pool.query("SELECT id FROM school_identities WHERE school_id=$1 AND number='PAUSED'",[alpha.id])).rowCount,0);
+        assert.equal((await pool.query("SELECT status FROM school_join_requests WHERE id=$1",[paused.id])).rows[0].status,'pending');
+      });
+
       // Members who previously used a general invitation can finish linking their original dossier.
       await seedUnlinkedMembership(pool,beta.id,another.data.user.id,'student');
       const memberFacts={kind:'student',name:'Previous member',number:'S003'};

@@ -36,7 +36,7 @@ export function ProductionLoginPage({ onLogin, joinIntent = false, resetIntent =
     login: t("用户名或密码不正确"),
     disabled: t("账号已禁用"),
     resetFailed: tx("重置凭据无效或已过期。请打开管理员提供的重置入口，并使用最新的一次性凭据。", "The reset code is invalid or expired. Open the reset link from your administrator and use the newest code."),
-    server: issue.message ?? "",
+    server: t(issue.message ?? ""),
   }[issue.kind] : "";
 
   function focusField(field: Field) {

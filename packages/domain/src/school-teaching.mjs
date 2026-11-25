@@ -1,3 +1,4 @@
+import { identityFields, insertSchoolIdentity } from './school-identity-record.mjs';
 import { closePendingSchoolRequests } from './school-join-requests.mjs';
 import { studentClassroom } from './student-classroom.mjs';
 import { transaction } from './db.mjs';
@@ -6,7 +7,6 @@ import { canonicalHash, enumValue, fail, field, genderValue, integer, uuid } fro
 
 const PAGE_SIZE = 50;
 const IDENTITY_KINDS = ['student', 'teacher'];
-const identityFields = 'id, kind, number, name, account_id AS "accountId", created_at AS "createdAt"';
 const identityClasses = `(SELECT coalesce(jsonb_agg(jsonb_build_object('id', c.id, 'name', c.name,
   'archived', c.archived_at IS NOT NULL) ORDER BY c.name, c.id), '[]') FROM school_class_roster r
   JOIN school_classes c ON c.school_id = r.school_id AND c.id = r.class_id
@@ -126,11 +126,8 @@ async function createIdentity(db, schoolId, actorId, body) {
   const classes = readClassIds(classIds);
   await requireMatchingMember(db, schoolId, accountId, kind);
   await requireActiveClasses(db, schoolId, classes);
-  const { rows: [identity] } = await db.query(`
-    INSERT INTO school_identities (school_id, kind, number, name, account_id, gender, notes)
-    VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING ${identityFields}`, [schoolId, kind, number, name, accountId, gender, notes]);
+  const identity = await insertSchoolIdentity(db, schoolId, actorId, { kind, number, name, accountId, gender, notes });
   if (accountId) await closePendingSchoolRequests(db, schoolId, accountId, actorId);
-  await auditSchool(db, schoolId, actorId, 'school.identity.create', identity.id);
   if (classes.length) await addToClassRosters(db, schoolId, actorId, identity.id, classes);
   return { status: 201, body: identity };
 }

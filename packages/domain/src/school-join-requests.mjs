@@ -1,6 +1,7 @@
 import { transaction } from './db.mjs';
 import { activeAccount, auditSchool, lockSchoolTeaching, requireSchoolAdmin } from './schools.mjs';
-import { enumValue, fail, field, uuid } from './security.mjs';
+import { insertSchoolIdentity } from './school-identity-record.mjs';
+import { canonicalHash, enumValue, fail, field, uuid } from './security.mjs';
 
 const result = (body, status = 200) => ({ status, body });
 
@@ -53,6 +54,37 @@ export async function closePendingSchoolRequests(db, schoolId, accountId, actorI
     WHERE school_id=$1 AND account_id=$2 AND status='pending'`,
     [schoolId, accountId, actorId],
   );
+}
+
+// Include bound and archived records during duplicate review, but never offer
+// either as a link target. The version covers the facts the reviewer saw.
+async function reviewMatches(db, schoolId, request) {
+  const { rows: records } = await db.query(
+    `SELECT i.id,i.name,i.number,
+      CASE WHEN i.archived_at IS NOT NULL THEN 'archived' WHEN i.account_id IS NOT NULL THEN 'linked' ELSE 'available' END AS status,
+      ARRAY(SELECT c.name FROM school_class_roster r JOIN school_classes c ON c.school_id=r.school_id AND c.id=r.class_id
+        WHERE r.school_id=i.school_id AND r.identity_id=i.id AND c.archived_at IS NULL ORDER BY c.name,c.id) AS classes
+      FROM school_identities i WHERE i.school_id=$1 AND i.kind=$2 AND (i.name=$3 OR i.number=$4)
+      ORDER BY i.number,i.id`,
+    [schoolId, request.kind, request.name, request.number],
+  );
+  const items = records
+    .filter(r => r.status === 'available' && r.name === request.name && (!request.number || r.number === request.number))
+    .map(({ id, number, classes }) => ({ id, number, classes }));
+  return { items, records, version: canonicalHash(records) };
+}
+
+async function createReviewedStudent(db, schoolId, actorId, request, number, body) {
+  if (request.kind !== 'student' || (request.number && request.number !== number))
+    fail(400, 'VALIDATION', '建档须使用学生申请中的身份和学号');
+  const { records, version } = await reviewMatches(db, schoolId, request);
+  if (version !== body.recordsVersion) fail(409, 'ROSTER_CHANGED', '档案已变更，请重新核对');
+  const used = await db.query(
+    "SELECT 1 FROM school_identities WHERE school_id=$1 AND kind='student' AND number=$2", [schoolId, number],
+  );
+  if (used.rowCount) fail(409, 'NUMBER_IN_USE', '此学号已有档案，请核对原档案');
+  if (records.length && body.distinctStudent !== true) fail(409, 'REVIEW_SAME_NAME', '请先核对已有同名档案');
+  return insertSchoolIdentity(db, schoolId, actorId, { kind: 'student', number, name: request.name });
 }
 
 export async function handleSchoolJoinRequests({ pool, route, method, user, body }) {
@@ -111,20 +143,19 @@ export async function handleSchoolJoinRequests({ pool, route, method, user, body
       return result({ items: rows });
     }
     if (method === 'GET' && match[3] === 'candidates') {
-      const { rows } = await db.query(`SELECT i.id,i.number,ARRAY(
-        SELECT c.name FROM school_class_roster roster JOIN school_classes c
-          ON c.school_id=roster.school_id AND c.id=roster.class_id
-        WHERE roster.school_id=i.school_id AND roster.identity_id=i.id AND c.archived_at IS NULL ORDER BY c.name,c.id
-      ) AS classes FROM school_join_requests r JOIN school_identities i
-        ON i.school_id=r.school_id AND i.kind=r.kind AND i.name=r.name
-        WHERE r.school_id=$1 AND r.id=$2 AND r.status='pending' AND r.number IS NULL
-          AND i.archived_at IS NULL AND i.account_id IS NULL ORDER BY i.number,i.id`,[schoolId,uuid(match[2])]);
-      return result({items:rows});
+      const { rows: [request] } = await db.query(
+        "SELECT kind,name,number FROM school_join_requests WHERE school_id=$1 AND id=$2 AND status='pending'",
+        [schoolId, uuid(match[2])],
+      );
+      return result(request ? await reviewMatches(db, schoolId, request) : { items: [], records: [], version: null });
     }
     if (method !== 'POST' || match[3] !== 'decision') return null;
     const id = uuid(match[2]),
       decision = enumValue(body.decision, ['approved', 'rejected'], '审核结果');
-    const identityId = decision === 'approved' ? uuid(body.identityId, '身份档案') : null;
+    const createNumber = body.createNumber === undefined ? null : field(body.createNumber, '校内学号', { max:64 });
+    if (createNumber && (decision !== 'approved' || body.identityId != null))
+      fail(400, 'VALIDATION', '请选择关联已有档案或新建学生档案');
+    let identityId = decision === 'approved' && !createNumber ? uuid(body.identityId, '身份档案') : null;
     const {
       rows: [request],
     } = await db.query('SELECT * FROM school_join_requests WHERE school_id=$1 AND id=$2 FOR UPDATE', [
@@ -133,28 +164,36 @@ export async function handleSchoolJoinRequests({ pool, route, method, user, body
     ]);
     if (!request) fail(404, 'NOT_FOUND', '入校申请不存在');
     if (request.status !== 'pending') {
-      if (request.status === decision && request.identity_id === identityId)
+      const sameTarget = createNumber ? request.created_student_number === createNumber && request.verification_method === body.verificationMethod
+        : request.identity_id === identityId;
+      if (request.status === decision && sameTarget)
         return result({ id, status: decision });
       fail(409, 'ALREADY_REVIEWED', '申请状态已变更，请刷新');
     }
-    const verification = identityId && request.number === null
-      ? enumValue(body.verificationMethod, ['in_person','school_contact'], '独立核验方式') : null;
-    if (identityId) {
-      const {
-        rows: [identity],
-      } = await db.query(
+    const needsVerification = createNumber !== null || (identityId !== null && request.number === null);
+    const verification = needsVerification
+      ? enumValue(body.verificationMethod, ['in_person', 'school_contact'], '独立核验方式') : null;
+    let identity;
+    if (createNumber) {
+      identity = await createReviewedStudent(db, schoolId, user.id, request, createNumber, body);
+      identityId = identity.id;
+    } else if (identityId) {
+      const match = await db.query(
         `SELECT id,kind FROM school_identities WHERE school_id=$1 AND id=$2 AND kind=$3
         AND ($4::text IS NULL OR number=$4) AND name=$5 AND account_id IS NULL AND archived_at IS NULL FOR UPDATE`,
         [schoolId, identityId, request.kind, request.number, request.name],
       );
+      identity = match.rows[0];
       if (!identity) fail(409, 'IDENTITY_UNAVAILABLE', '请重新核对本校未关联的身份档案');
+    }
+    if (identity) {
       await bindSchoolIdentity(db, schoolId, request.account_id, identity, user.id, id);
       await auditSchool(db, schoolId, user.id, 'school.identity.link', identityId);
     }
     await db.query(
-      `UPDATE school_join_requests SET status=$2,identity_id=$3,decided_at=clock_timestamp(),decided_by=$4,verification_method=$5
+      `UPDATE school_join_requests SET status=$2,identity_id=$3,decided_at=clock_timestamp(),decided_by=$4,verification_method=$5,created_student_number=$6
       WHERE id=$1`,
-      [id, decision, identityId, user.id, verification],
+      [id, decision, identityId, user.id, verification, createNumber],
     );
     await auditSchool(db, schoolId, user.id, 'school.join_request.' + decision, id);
     return result({ id, status: decision });

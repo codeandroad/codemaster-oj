@@ -1,22 +1,33 @@
 import { processSchoolOne } from '../../../packages/domain/school-worker.mjs';
-import { processOne } from '../../../packages/domain/worker.mjs';
 import { GoJudge } from '../../../packages/domain/judge.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { applicationDatabaseUrl } from './support/workspace-accounts.mjs';
 import { createApiApplication } from '../dist/application.js';
 import { createPool } from '../../../packages/domain/src/db.mjs';
 import { migrate } from '../../../packages/domain/src/migrate.mjs';
-import { bootstrap } from '../../../packages/domain/src/bootstrap.mjs';
 import { hashPassword } from '../../../packages/domain/src/security.mjs';
 import { loadConfig } from '../../../packages/domain/src/application.mjs';
 import { provisionSchool } from '../../../packages/domain/src/schools.mjs';
 import { LEGACY_SCHOOL_ID } from '../../../packages/domain/test/fixtures/pre-workspace/legacy-school.mjs';
 import { provisionPlatformAdministrator } from '../../../packages/domain/src/platform-governance.mjs';
 
-const migration='102_platform_courses.sql';
-const deferredMigrations=[migration,'105_acsl_platform_course.sql','106_platform_course_admissions.sql','108_platform_points_and_requirement_modes.sql','109_python_practice_problem_metadata.sql','110_platform_content_ownership.sql','111_platform_problem_banks.sql','112_platform_editor_account_lookup.sql','116_platform_course_problem_review.sql','117_platform_problem_publication_scope.sql'];
+// Create an approved school edition using the schema that existed before platform ownership.
+async function approvedExercise(db, bankId, ownerId, title, hiddenInput) {
+  const { rows: [problem] } = await db.query(
+    'INSERT INTO problems(bank_id,owner_account_id) VALUES($1,$2) RETURNING *', [bankId, ownerId]);
+  const { rows: [draft] } = await db.query(`
+    INSERT INTO problem_versions(problem_id,title,statement,mode,comparator,reference_code,samples,
+      time_limit_ms,memory_limit_mb,validation_status,school_visible_at,rank_review_status,rank_approved_at)
+    VALUES($1,$2,'Read a value and print it.','stdio','tokens','print(input())',$3,1000,128,'AC',now(),'approved',now())
+    RETURNING id`, [problem.id, title, JSON.stringify([{input:'7',expected:'7'}])]);
+  await db.query('INSERT INTO test_cases(version_id,position,input,expected,weight) VALUES($1,0,$2,$2,100)', [draft.id, hiddenInput]);
+  const { rows: [version] } = await db.query('UPDATE problem_versions SET published_at=now() WHERE id=$1 RETURNING *', [draft.id]);
+  await db.query('UPDATE problems SET current_version_id=$2 WHERE id=$1', [problem.id, version.id]);
+  return { problem, version };
+}
+
 test('platform courses retain original data and enforce audiences through NestJS and real runtime grants',
  {skip:!process.env.TEST_DATABASE_URL,timeout:90000},async t=>{
  const base=new URL(process.env.TEST_DATABASE_URL);assert.equal(base.pathname,'/campus_qa');assert.ok(['localhost','127.0.0.1'].includes(base.hostname));
@@ -26,16 +37,16 @@ test('platform courses retain original data and enforce audiences through NestJS
  const pool=createPool(connection.href);let app;
  const password=randomBytes(24).toString('base64url'),origin='http://platform-course.test';
  try{
-  await pool.query('CREATE TABLE schema_migrations(name text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())');
-  await pool.query('INSERT INTO schema_migrations(name) SELECT unnest($1::text[])',[deferredMigrations]);await migrate(pool);
-  await bootstrap(pool,{schoolSlug:'tianxing-chuangshiji',name:'Original school administrator',number:'A',username:'school-admin',password});
-  const admin=(await pool.query("SELECT id,identity_id FROM accounts WHERE username='school-admin'")).rows[0];
+  // Insert the original records while the pre-ownership schema is still in effect.
+  await migrate(pool,{through:'101_course_required_language.sql'});
   const hash=await hashPassword(password),actors={};
-  for(const name of ['platform','student-a','student-b','personal','school-teacher']){
-   const i=(await pool.query("INSERT INTO identities(kind,number,name) VALUES('student',$1,$1) RETURNING id",[name])).rows[0];
+  for(const [name,kind] of [['school-admin','admin'],['platform','personal'],['student-a','student'],['student-b','student'],['personal','personal'],['school-teacher','teacher']]){
+   const i=(await pool.query('INSERT INTO identities(kind,number,name) VALUES($1,$2,$2) RETURNING id',[kind,name])).rows[0];
    const a=(await pool.query('INSERT INTO accounts(identity_id,username,password_hash) VALUES($1,$2,$3) RETURNING id',[i.id,name,hash])).rows[0];
-   await pool.query("INSERT INTO account_roles(account_id,role) VALUES($1,'student')",[a.id]);actors[name]={id:a.id,identityId:i.id};
+   if(kind!=='personal')await pool.query('INSERT INTO account_roles(account_id,role) VALUES($1,$2)',[a.id,kind]);
+   actors[name]={id:a.id,identityId:i.id};
   }
+  const admin=actors['school-admin'];
   const originals=[];
   for(const title of ['Python 专项训练 · 全目录学习路线','9618 Paper 4 Practical Programming with Python','Unrelated school course']){
    const p=(await pool.query('INSERT INTO learning_paths(owner_account_id,title,published_at) VALUES($1,$2,now()) RETURNING *',[admin.id,title])).rows[0];
@@ -45,20 +56,23 @@ test('platform courses retain original data and enforce audiences through NestJS
   }
   await pool.query("SELECT set_config('campus.school_id',$1,false)",[LEGACY_SCHOOL_ID]);
   const first=originals[0];
-  const problem=(await pool.query("INSERT INTO problems(bank_id,owner_account_id) VALUES('00000000-0000-4000-8000-000000000001',$1) RETURNING *",[admin.id])).rows[0];
-  const version=(await pool.query(`INSERT INTO problem_versions(problem_id,title,statement,mode,comparator,reference_code,samples,time_limit_ms,memory_limit_mb,validation_status,
-   published_at,school_visible_at,rank_review_status,rank_approved_at)
-   VALUES($1,'Platform linked exercise','Read a value and print it.','stdio','tokens','print(input())',$2,1000,128,'AC',NULL,now(),'approved',now()) RETURNING *`,
-   [problem.id,JSON.stringify([{input:'7',expected:'7'}])])).rows[0];
-  await pool.query('UPDATE problems SET current_version_id=$2 WHERE id=$1',[problem.id,version.id]);
-  await pool.query("INSERT INTO test_cases(version_id,position,input,expected,weight) VALUES($1,0,'secret-case','secret-case',100)",[version.id]);
-  version.published_at=(await pool.query('UPDATE problem_versions SET published_at=now() WHERE id=$1 RETURNING published_at',[version.id])).rows[0].published_at;
-  await pool.query('INSERT INTO chapter_problems(chapter_id,problem_id,version_id,position) VALUES($1,$2,$3,0)',[first.c.id,problem.id,version.id]);
+  const schoolBank='00000000-0000-4000-8000-000000000001';
+  const {problem,version}=await approvedExercise(pool,schoolBank,admin.id,'Platform linked exercise','secret-case');
+  const historical=await approvedExercise(pool,schoolBank,admin.id,'Historical assignment exercise','prior-case');
+  const bank=(await pool.query("INSERT INTO problem_banks(owner_account_id,name,visibility) VALUES($1,'School exercises','school') RETURNING id",[admin.id])).rows[0];
+  const {problem:localProblem,version:localVersion}=await approvedExercise(pool,bank.id,admin.id,'School echo','training');
+  const pinChapter='INSERT INTO chapter_problems(chapter_id,problem_id,version_id,position) VALUES($1,$2,$3,$4)';
+  await pool.query(pinChapter,[first.c.id,problem.id,version.id,0]);
+  await pool.query(pinChapter,[originals[1].c.id,historical.problem.id,historical.version.id,0]);
+  const {rows:[priorAssignment]}=await pool.query(`INSERT INTO assignments(title,owner_account_id,due_at,state,published_at,course_path_id)
+    VALUES('Before migration',$1,now()+interval '1 day','Published',now(),$2) RETURNING id`,[admin.id,originals[1].p.id]);
+  await pool.query('INSERT INTO assignment_problems(assignment_id,problem_id,version_id,points,position) VALUES($1,$2,$3,20,0)',[priorAssignment.id,historical.problem.id,historical.version.id]);
+  await pool.query('INSERT INTO assignment_participants(assignment_id,identity_id) VALUES($1,$2)',[priorAssignment.id,actors['student-a'].identityId]);
   await pool.query(`INSERT INTO legacy_course_publication_versions(school_id,course_id,revision,source_version,title,description,access_scope,chapters)
    SELECT school_id,id,1,extract(epoch FROM updated_at)::text,title,description,access_scope,$2 FROM learning_paths WHERE id=$1`,[first.p.id,JSON.stringify([{id:first.c.id,title:first.c.title,body:first.c.content,problems:[]}])]);
   const listing=(await pool.query('INSERT INTO public_course_listings(school_id,course_id,revision,approved_by) VALUES($1,$2,1,$3) RETURNING id',[LEGACY_SCHOOL_ID,first.p.id,admin.id])).rows[0];
   await provisionPlatformAdministrator(pool,{username:'platform'});
-  await pool.query('DELETE FROM schema_migrations WHERE name=ANY($1::text[])',[deferredMigrations]);await migrate(pool);
+  await migrate(pool,{through:'102_platform_courses.sql'});
   await t.test('migration changes only ownership fields of the two named courses',async()=>{
    for(const [index,{p,c}] of originals.entries()){
     const after=(await pool.query('SELECT * FROM learning_paths WHERE id=$1',[p.id])).rows[0];
@@ -67,27 +81,55 @@ test('platform courses retain original data and enforce audiences through NestJS
     assert.deepEqual((await pool.query('SELECT * FROM learning_chapters WHERE id=$1',[c.id])).rows[0],c);
    }
    assert.equal((await pool.query('SELECT count(*)::int n FROM learning_progress WHERE completed')).rows[0].n,3);
-   await migrate(pool);assert.equal((await pool.query("SELECT count(*)::int n FROM platform_audit_events WHERE action='platform.course.source_migrated'")).rows[0].n,2);
+   assert.equal((await pool.query("SELECT count(*)::int n FROM platform_audit_events WHERE action='platform.course.source_migrated'")).rows[0].n,2);
+  });
+  // A later course reference keeps the edition's established school ownership.
+  await migrate(pool,{through:'110_platform_content_ownership.sql'});
+  await pool.query(pinChapter,[originals[1].c.id,localProblem.id,localVersion.id,1]);
+  await migrate(pool);
+  await t.test('current workspaces preserve migrated chapters, pinned editions and student reading history',async()=>{
+   for(const {p,c} of originals.slice(0,2)){
+    const migrated=(await pool.query('SELECT p.owner_scope,c.id,c.content FROM learning_paths p JOIN learning_chapters c ON c.path_id=p.id WHERE p.id=$1',[p.id])).rows;
+    assert.deepEqual(migrated,[{owner_scope:'platform',id:c.id,content:c.content}]);
+    assert.equal((await pool.query('SELECT completed FROM learning_progress WHERE chapter_id=$1 AND identity_id=$2',[c.id,actors['student-a'].identityId])).rows[0].completed,true);
+   }
+   for(const [chapter,editions] of [
+    [first.c,[[problem.id,version.id]]],
+    [originals[1].c,[[historical.problem.id,historical.version.id],[localProblem.id,localVersion.id]]],
+   ]){
+    const pins=await pool.query('SELECT problem_id,version_id FROM chapter_problems WHERE chapter_id=$1 ORDER BY position',[chapter.id]);
+    assert.deepEqual(pins.rows.map(pin=>[pin.problem_id,pin.version_id]),editions);
+   }
+   assert.equal((await pool.query('SELECT owner_scope FROM problems WHERE id=$1',[localProblem.id])).rows[0].owner_scope,'school');
+   const unchanged=originals[2];
+   const local=(await pool.query('SELECT title,chapters FROM school_courses WHERE school_id=$1 AND id=$2',[LEGACY_SCHOOL_ID,unchanged.p.id])).rows[0];
+   assert.equal(local.title,unchanged.p.title);assert.equal(local.chapters[0].id,unchanged.c.id);assert.equal(local.chapters[0].body,unchanged.c.content);
+   assert.equal((await pool.query('SELECT read FROM school_course_progress WHERE school_id=$1 AND course_id=$2 AND chapter_id=$3 AND identity_id=$4',[LEGACY_SCHOOL_ID,unchanged.p.id,unchanged.c.id,actors['student-a'].identityId])).rows[0].read,true);
+   await migrate(pool);
+   assert.equal((await pool.query("SELECT count(*)::int n FROM platform_audit_events WHERE action='platform.course.source_migrated'")).rows[0].n,2);
   });
   const alpha=await provisionSchool(pool,{slug:'platform-alpha',name:'Alpha school',adminUsername:'student-a'});
   const beta=await provisionSchool(pool,{slug:'platform-beta',name:'Beta school',adminUsername:'student-b'});
   await pool.query("INSERT INTO school_memberships(school_id,account_id,role) VALUES($1,$2,'teacher')",[alpha.id,actors['school-teacher'].id]);
-  const grants=(await readFile(new URL('../../../packages/domain/grants.mjs',import.meta.url),'utf8')).match(/await pool\.query\(`([\s\S]*?)`\);/)[1];
-  await pool.query(grants.replaceAll('SCHEMA public',`SCHEMA ${schema}`));
-  const runtime=new URL(connection);runtime.searchParams.set('options',`-crole=campus_app -csearch_path=${schema}`);
-  app=await createApiApplication({databaseUrl:runtime.href,logger:false,config:loadConfig({SESSION_SECRET:randomBytes(32).toString('hex'),APP_ORIGIN:origin,COOKIE_SECURE:'false'})});
+  const databaseUrl=await applicationDatabaseUrl(pool,connection,schema);
+  app=await createApiApplication({databaseUrl,logger:false,config:loadConfig({SESSION_SECRET:randomBytes(32).toString('hex'),APP_ORIGIN:origin,COOKIE_SECURE:'false'})});
   await app.listen(0,'127.0.0.1');const endpoint=await app.getUrl();
-  async function client(name,registration){
+  async function client(name,registerPersonal=false){
    let cookie='',csrf='';
    const send=async(path,body,method=body===undefined?'GET':'POST',status=200,validCsrf=true)=>{
     const response=await fetch(endpoint+'/api/v1'+path,{method,headers:{Origin:origin,...(cookie?{Cookie:cookie,'X-CSRF-Token':validCsrf?csrf:'invalid'}:{}),...(body!==undefined?{'Content-Type':'application/json'}:{})},body:body===undefined?undefined:JSON.stringify(body)});
-    const data=await response.json();assert.equal(response.status,status,`${method} ${path}: ${JSON.stringify(data.error??data)}`);
+    const data=await response.json();assert.equal(response.status,status,`${method} ${path}: ${JSON.stringify(data.error??{})}`);
     if(response.headers.get('set-cookie'))cookie=response.headers.get('set-cookie').split(';')[0];if(data.csrfToken)csrf=data.csrfToken;return data;
    };
-   const {user}=registration
-    ? await send('/auth/register',{...registration,username:name,password},'POST',201)
+   const {user}=registerPersonal
+    ? await send('/auth/register-personal',{username:name,displayName:name,password},'POST',201)
     : await send('/auth/login',{username:name,password});
    return {send,user};
+  }
+  async function gradeNext(){
+   const workerUrl=new URL(connection);workerUrl.searchParams.set('options',`-crole=campus_worker -csearch_path=${schema}`);
+   const worker=createPool(workerUrl.href),judge=new GoJudge({url:process.env.GO_JUDGE_TEST_URL,token:process.env.GO_JUDGE_TEST_TOKEN,environmentVersion:'platform-course-qa'});
+   try{assert.equal(await processSchoolOne({pool:worker,judge}),true);}finally{await worker.end();}
   }
   const platform=await client('platform'),school=await client('school-admin'),a=await client('student-a'),b=await client('student-b'),personal=await client('personal'),teacher=await client('school-teacher');
   const list=async api=>(await api.send('/practice/courses')).courses;
@@ -108,18 +150,25 @@ test('platform courses retain original data and enforce audiences through NestJS
    const entry=(await list(personal)).find(c=>c.id===listing.id);assert.equal(entry.sourceSchool,'平台管理员');
    assert.equal((await a.send('/practice/courses/'+listing.id)).completedChapters,1);
    assert.ok(!(await school.send('/learning-paths')).items.some(c=>c.id===first.p.id));
-   for(const operation of ['publish','unpublish','restore'])await school.send(`/learning-paths/${first.p.id}/${operation}`,{},'POST',403);
-   await school.send('/learning-paths/'+first.p.id,{title:'steal'},'PATCH',403);
-   await school.send('/chapters/'+first.c.id,{content:'steal'},'PATCH',403);
+   for(const operation of ['publish','unpublish','restore']){
+    assert.equal((await school.send(`/learning-paths/${first.p.id}/${operation}`,{},'POST',410)).error.code,'SCHOOL_WORKSPACE_REQUIRED');
+    await school.send(`/platform/courses/${first.p.id}/${operation}`,{},'POST',403);
+    await school.send(`/schools/${LEGACY_SCHOOL_ID}/courses/${first.p.id}/${operation}`,{},'POST',404);
+   }
+   await school.send('/learning-paths/'+first.p.id,{title:'unauthorized'},'PATCH',410);
+   await school.send('/chapters/'+first.c.id,{content:'unauthorized'},'PATCH',410);
+   await school.send('/platform/courses/'+first.p.id,{title:'unauthorized'},'PATCH',403);
    assert.deepEqual((await school.send('/platform/courses')).items,[]);
    await personal.send('/platform/courses',{},'POST',403);
    assert.ok(!(await platform.send('/platform/course-publications')).items.some(c=>c.courseId===first.p.id));
    await school.send(`/schools/${LEGACY_SCHOOL_ID}/course-admissions/${first.p.id}`,undefined,'GET',404);
    await platform.send('/platform/courses',{requestId:randomUUID(),title:'CSRF'},'POST',403,false);
   });
-  await t.test('linked problem ownership, learner access and private judge data survive migration',async()=>{
+  await t.test('linked problem ownership, learner access and private judge data survive migration',async t=>{
    assert.equal((await pool.query('SELECT owner_scope FROM problems WHERE id=$1',[problem.id])).rows[0].owner_scope,'platform');
-   assert.deepEqual((await pool.query('SELECT * FROM problem_versions WHERE id=$1',[version.id])).rows[0],{...version,course_only_published:false});
+   const migratedVersion=(await pool.query('SELECT * FROM problem_versions WHERE id=$1',[version.id])).rows[0];
+   for(const [key,value] of Object.entries(version))assert.deepEqual(migratedVersion[key],value,key);
+   assert.equal(migratedVersion.course_only_published,false);
    assert.equal((await pool.query('SELECT count(*)::int n FROM school_problem_publications WHERE problem_id=$1',[problem.id])).rows[0].n,0);
    const reader=await personal.send('/practice/courses/'+listing.id);
    assert.equal(reader.totalExercises,1);assert.equal(reader.chapters[0].problems[0].problemId,problem.id);
@@ -127,16 +176,15 @@ test('platform courses retain original data and enforce audiences through NestJS
    assert.equal(detail.definition.title,version.title);assert.ok(!JSON.stringify(detail).includes('secret-case'));
    assert.equal(detail.definition.tests,undefined);assert.equal(detail.definition.referenceCode,undefined);
    const job=await personal.send(`/practice/problems/${problem.id}/submissions`,{requestId:randomUUID(),kind:'submit',language:'python',code:'print(input())',versionId:version.id,courseId:listing.id,chapterId:first.c.id},'POST',202);
-   if(process.env.GO_JUDGE_TEST_URL){
-    const workerUrl=new URL(connection);workerUrl.searchParams.set('options',`-crole=campus_worker -csearch_path=${schema}`);
-    const worker=createPool(workerUrl.href),judge=new GoJudge({url:process.env.GO_JUDGE_TEST_URL,token:process.env.GO_JUDGE_TEST_TOKEN,environmentVersion:'platform-course-qa'});
-    try{assert.equal(await processSchoolOne({pool:worker,judge}),true);}finally{await worker.end();}
+   await t.test('the isolated judge credits the migrated course exercise',{skip:!process.env.GO_JUDGE_TEST_URL},async()=>{
+    await gradeNext();
     const result=await personal.send(`/practice/problems/${problem.id}/submissions/${job.id}`);assert.equal(result.status,'AC');
     assert.ok(!JSON.stringify(result).includes('secret-case'));
     assert.equal((await personal.send('/practice/courses/'+listing.id)).completedExercises,1);
-   }
-   await school.send(`/problems/${problem.id}/versions`,{title:'steal'},'POST',403);
-   await school.send(`/admin/problems/${problem.id}`,{archived:true},'PATCH',403);
+   });
+   await school.send(`/problems/${problem.id}/versions`,{title:'unauthorized'},'POST',410);
+   await school.send(`/admin/problems/${problem.id}`,{archived:true},'PATCH',410);
+   await school.send(`/platform/source-problems/${problem.id}/versions`,{title:'unauthorized'},'POST',403);
    const source=await platform.send('/platform/courses/'+first.p.id);
    await platform.send('/platform/courses/'+source.id,{expectedRevision:source.revision,sourceVersion:source.sourceVersion,audienceScope:'schools',schoolIds:[alpha.id]},'PATCH');
    await personal.send(`/practice/problems/${problem.id}?versionId=${version.id}`,undefined,'GET',404);
@@ -166,8 +214,11 @@ test('platform courses retain original data and enforce audiences through NestJS
    await a.send('/platform/source-problems/'+problem.id+'/publish',{expectedVersionId:revised.versionId},'POST',403);
    await platform.send('/platform/source-problems/'+problem.id+'/publish',{expectedVersionId:revised.versionId},'POST',409);
    const reader=await personal.send('/practice/courses/'+listing.id);assert.equal(reader.chapters[0].problems[0].versionId,version.id);
-   const oldSchoolView=await school.send('/problems/'+problem.id);assert.equal(oldSchoolView.canEdit,false);assert.equal(oldSchoolView.versionId,version.id);
-   assert.equal((await school.send('/problems')).items.find(item=>item.id===problem.id)?.canEdit,false);
+   const bookmark=await school.send('/problems/'+problem.id);
+   assert.equal(bookmark.versionId,version.id);assert.equal(bookmark.definition.referenceCode,undefined);
+   assert.ok(!JSON.stringify(bookmark).includes('secret-case'));
+   await school.send('/platform/source-problems/'+problem.id,undefined,'GET',403);
+   assert.ok(!(await school.send(`/schools/${LEGACY_SCHOOL_ID}/problems?view=management`)).items.some(item=>item.id===problem.id));
    const teacherGrant={accountId:actors['school-teacher'].id,schoolId:alpha.id};
    await platform.send(problemGrant,teacherGrant);
    assert.equal((await teacher.send('/platform/source-problems/'+problem.id)).canEdit,true);
@@ -181,76 +232,92 @@ test('platform courses retain original data and enforce audiences through NestJS
    await b.send('/platform/courses/'+source.id,undefined,'GET',403);
    await pool.query('UPDATE school_memberships SET revoked_at=NULL WHERE school_id=$1 AND account_id=$2',[beta.id,actors['student-b'].id]);
   });
-  await t.test('a legacy school administrator can assign a granted platform course without changing its learner audience',async()=>{
+  await t.test('an existing school assignment keeps its platform-owned problem and original version',async t=>{
+   const path=`/schools/${LEGACY_SCHOOL_ID}/activities/${priorAssignment.id}`;
+   const assignment=await a.send(path);
+   assert.equal(assignment.courseId,originals[1].p.id);
+   assert.equal(assignment.problems[0].id,historical.problem.id);
+   assert.equal(assignment.problems[0].versionId,historical.version.id);
+   assert.equal((await pool.query('SELECT owner_scope FROM problems WHERE id=$1',[historical.problem.id])).rows[0].owner_scope,'platform');
+   await b.send(path,undefined,'GET',404);
+   await t.test('the isolated judge grades the pre-migration assignment',{skip:!process.env.GO_JUDGE_TEST_URL},async()=>{
+    const job=await a.send(`${path}/problems/${historical.problem.id}/submissions`,{kind:'submit',language:'python',code:'print(input())',requestId:randomUUID()},'POST',202);
+    await gradeNext();
+    assert.equal((await a.send(path+'/jobs/'+job.id)).status,'AC');
+    assert.equal((await a.send(path)).grade.score,20);
+   });
+  });
+  await t.test('a legacy school administrator can assign a granted platform course without changing its learner audience',async t=>{
+   const root=`/schools/${LEGACY_SCHOOL_ID}`;
    async function register(name){
-    const identity={kind:'student',number:name,name};
-    const {activationCode}=await school.send('/people',identity,'POST',201);
-    return client(name,{...identity,activationCode});
+    const account=await client(name,true);
+    const identity=await school.send(root+'/identities',{kind:'student',number:name,name},'POST',201);
+    const {activationCode}=await school.send(`${root}/identities/${identity.id}/activation-code`,{},'POST',201);
+    const claim=await account.send('/auth/claim-identity',{schoolSlug:'tianxing-chuangshiji',kind:'student',number:name,name,activationCode});
+    assert.equal(claim.identityId,identity.id);
+    return {...account,schoolIdentityId:identity.id};
    }
    const student=await register('assignment-learner'),other=await register('assignment-outside-course');
-   const courseId=first.p.id,sourcePath='/platform/courses/'+courseId;
-   const options='/learning-paths?purpose=assignment',outline=`/learning-paths/${courseId}?purpose=assignment`;
+   const courseId=originals[1].p.id,sourcePath='/platform/courses/'+courseId;
+   const activities=root+'/activities',options=activities+'/options?view=assignment';
    const editorPath=`/platform/content-editors/course/${courseId}`,editor={accountId:admin.id,schoolId:LEGACY_SCHOOL_ID};
-   const visible=async()=> (await school.send(options)).items.some(item=>item.id===courseId);
-   const homework={title:'Platform Python homework',dueAt:new Date(Date.now()+86400000).toISOString(),
-    participants:[student.user.identityId,other.user.identityId],coursePathId:courseId,
-    problems:[{problemId:problem.id,points:20}]};
-   assert.equal(await visible(),false);
-   assert.ok((await school.send(options)).items.some(item=>item.id===originals[2].p.id));
-   await school.send(outline,undefined,'GET',404);
+   const initial=await school.send(options);
+   assert.ok(!initial.courses.some(item=>item.id===courseId));
+   assert.ok(initial.courses.some(item=>item.id===originals[2].p.id && item.scope==='school'));
    await student.send(options,undefined,'GET',403);
-   assert.equal((await school.send('/assignments',homework,'POST',409)).error.code,'COURSE_UNAVAILABLE');
+   const pin={problemId:localProblem.id,versionId:localVersion.id,points:20};
+   const homework={kind:'assignment',audienceMode:'selected',courseId,title:'Platform Python homework',
+    endsAt:new Date(Date.now()+86400000).toISOString(),identityIds:[student.schoolIdentityId,other.schoolIdentityId],problems:[pin]};
+   assert.equal((await school.send(activities,{...homework,requestId:randomUUID()},'POST',409)).error.code,'COURSE_UNAVAILABLE');
 
    const source=await platform.send(sourcePath);
    const restricted=await platform.send(sourcePath,{expectedRevision:source.revision,sourceVersion:source.sourceVersion,
     audienceScope:'students',studentIds:[student.user.identityId],requiredLanguage:'python'},'PATCH');
    await platform.send(editorPath,editor);
-   assert.equal(await visible(),true);
-   assert.ok(!(await school.send('/learning-paths')).items.some(item=>item.id===courseId));
-   assert.deepEqual(await school.send(outline),{id:courseId,title:first.p.title,requiredLanguage:'python',published:true,
-    chapters:[{id:first.c.id,problems:[{problemId:problem.id}]}]});
-   await student.send(outline,undefined,'GET',403);
-   const picker='/problems?purpose=assignment&view=summary';
-   assert.equal((await school.send(picker)).items.find(item=>item.id===problem.id)?.versionId,version.id);
+   const choices=await school.send(options);
+   assert.deepEqual(choices.courses.find(item=>item.id===courseId),{id:courseId,title:source.title,requiredLanguage:'python',scope:'platform',problemIds:[historical.problem.id,pin.problemId]});
+   assert.equal(choices.problems.find(item=>item.problemId===pin.problemId)?.versionId,pin.versionId);
+   assert.ok(!(await school.send(root+'/courses')).items.some(item=>item.id===courseId));
+   await student.send('/practice/courses/'+courseId);
+   await other.send('/practice/courses/'+courseId,undefined,'GET',404);
 
-   const privateProblem=(await pool.query("INSERT INTO problems(owner_account_id,owner_scope) VALUES($1,'platform') RETURNING id",[admin.id])).rows[0];
-   await pool.query(`INSERT INTO problem_versions(problem_id,title,statement,mode,time_limit_ms,memory_limit_mb,
+   const privateProblem=(await pool.query("INSERT INTO problems(bank_id,owner_account_id,owner_scope) VALUES($1,$2,'platform') RETURNING id",[problem.bank_id,actors.platform.id])).rows[0];
+   const privateVersion=(await pool.query(`INSERT INTO problem_versions(problem_id,title,statement,mode,time_limit_ms,memory_limit_mb,
     reference_code,validation_status,published_at,course_only_published)
-    VALUES($1,'Restricted exercise','Private prompt','stdio',1000,128,'print(input())','AC',now(),true)`,[privateProblem.id]);
+    VALUES($1,'Restricted exercise','Private prompt','stdio',1000,128,'print(input())','AC',now(),true) RETURNING id`,[privateProblem.id])).rows[0];
+   await pool.query('UPDATE problems SET current_version_id=$2 WHERE id=$1',[privateProblem.id,privateVersion.id]);
    await platform.send(`/platform/content-editors/problem/${privateProblem.id}`,editor);
-   assert.ok(!(await school.send(picker)).items.some(item=>item.id===privateProblem.id));
-   assert.equal((await school.send('/assignments',{...homework,problems:[{problemId:privateProblem.id,points:20}]},'POST',409)).error.code,'PROBLEM_UNAVAILABLE');
+   assert.ok(!(await school.send(options)).problems.some(item=>item.problemId===privateProblem.id));
+   assert.equal((await school.send(activities,{...homework,requestId:randomUUID(),problems:[{...pin,problemId:privateProblem.id,versionId:privateVersion.id}]},'POST',404)).error.code,'PROBLEM_UNAVAILABLE');
 
-   const draft=await school.send('/assignments',{...homework,state:'Draft'},'POST',201);
-   assert.equal(draft.coursePathId,courseId);
-   assert.equal(draft.requiredLanguage,'python');
+   const draft=await school.send(activities,{...homework,requestId:randomUUID()},'POST',201);
+   assert.equal(draft.courseId,courseId);assert.equal(draft.requiredLanguage,'python');
+   const draftPath=activities+'/'+draft.id,publish={expectedRevision:draft.revision};
    await platform.send(editorPath,editor,'DELETE');
-   assert.equal(await visible(),false);
-   await school.send(outline,undefined,'GET',404);
-   const draftPath='/assignments/'+draft.id;
-   assert.equal((await school.send(draftPath+'/publish',{},'POST',409)).error.code,'COURSE_UNAVAILABLE');
+   assert.ok(!(await school.send(options)).courses.some(item=>item.id===courseId));
+   assert.equal((await school.send(draftPath+'/publish',publish,'POST',409)).error.code,'COURSE_UNAVAILABLE');
    await platform.send(editorPath,editor);
-   const assigned=await school.send(draftPath+'/publish',{});
-   assert.equal(assigned.coursePathId,courseId);
-   assert.equal(assigned.requiredLanguage,'python');
-   assert.equal(assigned.problems[0].versionId,version.id);
-   assert.equal((await student.send(draftPath)).coursePathId,courseId);
-   assert.equal((await other.send(draftPath)).coursePathId,null);
-   await other.send('/learning-paths/'+courseId,undefined,'GET',404);
-   const submission=await student.send('/submissions',{assignmentId:draft.id,problemId:problem.id,versionId:version.id,
-    kind:'submit',language:'python',code:'print(input())',idempotencyKey:randomUUID()},'POST',201);
-   assert.equal(submission.requiredLanguage,'python');
-   if(process.env.GO_JUDGE_TEST_URL){
-    const workerUrl=new URL(connection);workerUrl.searchParams.set('options',`-crole=campus_worker -csearch_path=${schema}`);
-    const worker=createPool(workerUrl.href),judge=new GoJudge({url:process.env.GO_JUDGE_TEST_URL,token:process.env.GO_JUDGE_TEST_TOKEN,environmentVersion:'platform-course-qa'});
-    try{assert.equal(await processOne({pool:worker,judge,logger:{}}),true);}finally{await worker.end();}
-    const graded=await student.send(draftPath);
-    assert.equal(graded.grades[0].problems[0].status,'AC');
-    assert.equal(graded.grades[0].score,20);
-   }
+   const assigned=await school.send(draftPath+'/publish',publish);
+   assert.equal(assigned.courseId,courseId);assert.equal(assigned.courseScope,'platform');
+   assert.equal(assigned.requiredLanguage,'python');assert.equal(assigned.participantCount,2);
+   assert.equal(assigned.problems[0].versionId,pin.versionId);
+   assert.equal((await student.send(draftPath)).courseId,courseId);
+   assert.equal((await other.send(draftPath)).courseId,null);
+   await other.send('/practice/courses/'+courseId,undefined,'GET',404);
+   const submissions=`${draftPath}/problems/${pin.problemId}/submissions`;
+   const wrongLanguage=await student.send(submissions,{kind:'submit',language:'cpp',code:'int main(){}',requestId:randomUUID()},'POST',400);
+   assert.equal(wrongLanguage.error.code,'COURSE_LANGUAGE_REQUIRED');
+   const job=await student.send(submissions,{kind:'submit',language:'python',code:'print(input())',requestId:randomUUID()},'POST',202);
    await platform.send(editorPath,editor,'DELETE');
-   assert.equal((await school.send(draftPath)).coursePathId,courseId,'revocation retains the published assignment link');
-   assert.equal((await student.send(draftPath)).coursePathId,courseId);
+   assert.equal((await school.send(draftPath)).courseId,courseId,'revocation retains the published assignment link');
+   assert.equal((await student.send(draftPath)).courseId,courseId);
+   assert.equal((await other.send(draftPath)).courseId,null);
+   await t.test('the isolated judge awards 20 points for the assigned edition after revocation',{skip:!process.env.GO_JUDGE_TEST_URL},async()=>{
+    await gradeNext();
+    assert.equal((await student.send(draftPath+'/jobs/'+job.id)).status,'AC');
+    assert.equal((await student.send(draftPath)).grade.score,20);
+    assert.equal((await other.send(draftPath)).grade.score,0);
+   });
    await platform.send(sourcePath,{expectedRevision:restricted.revision,sourceVersion:restricted.sourceVersion,audienceScope:'all',requiredLanguage:null},'PATCH');
   });
   await t.test('create, edit and publish use stale-write checks and retain chapter IDs',async()=>{
@@ -283,12 +350,12 @@ test('platform courses retain original data and enforce audiences through NestJS
    for(const key of ['objective','checkpoint','checkpointAnswer','localizations'])assert.deepEqual(reader[key],saved[key],key);
   });
   await t.test('the shared course editor offers only public Paper 4 metadata and preserves pinned references',async()=>{
-   const paper=(await pool.query("INSERT INTO paper4_papers(owner_account_id,title,status,published_at,delivery_kind) VALUES($1,'Shared editor Paper 4','published',now(),'catalog') RETURNING id",[admin.id])).rows[0];
+   const paper=(await pool.query("INSERT INTO paper4_papers(owner_account_id,school_id,title,status,published_at,delivery_kind) VALUES($1,$2,'Shared editor Paper 4','published',now(),'catalog') RETURNING id",[admin.id,LEGACY_SCHOOL_ID])).rows[0];
    const definition={exam:{examYear:2026},questions:[{key:'Q1',title:'Visible question title',stages:[{id:'s1',judgeMode:'auto',markingScheme:'PRIVATE_PAPER4_MARKSCHEME'}]}]};
    const runnerCases={s1:[{id:'hidden-case',input:'PRIVATE_PAPER4_INPUT',expected:'PRIVATE_PAPER4_OUTPUT'}]};
    const paperVersion=(await pool.query("INSERT INTO paper4_versions(paper_id,title,description,definition,runner_cases,reference_solutions,published_at) VALUES($1,'Shared editor Paper 4','',$2,$3,$4,now()) RETURNING id",[paper.id,definition,runnerCases,{s1:'PRIVATE_PAPER4_SOLUTION'}])).rows[0];
    await pool.query('UPDATE paper4_papers SET current_version_id=$2 WHERE id=$1',[paper.id,paperVersion.id]);
-   const hidden=(await pool.query("INSERT INTO paper4_papers(owner_account_id,title) VALUES($1,'PRIVATE_PAPER4_DRAFT') RETURNING id",[admin.id])).rows[0];
+   const hidden=(await pool.query("INSERT INTO paper4_papers(owner_account_id,school_id,title) VALUES($1,$2,'PRIVATE_PAPER4_DRAFT') RETURNING id",[admin.id,LEGACY_SCHOOL_ID])).rows[0];
    const grantPath=`/platform/content-editors/course/${course.id}`,grant={accountId:actors['school-teacher'].id,schoolId:alpha.id};
    await teacher.send(`/platform/courses/paper4-options?courseId=${course.id}`,undefined,'GET',403);
    await platform.send(grantPath,grant);
@@ -332,9 +399,11 @@ test('platform courses retain original data and enforce audiences through NestJS
    await change({audienceScope:'students',studentIds:[actors.personal.identityId]});
    await personal.send('/practice/courses/'+course.id);
    await b.send('/practice/courses/'+course.id,undefined,'GET',404);
-   await school.send('/learning-paths/'+course.id,undefined,'GET',404);
-   await school.send('/chapters/'+course.chapters[0].id+'/progress',{completed:true},'POST',403);
-   await change({audienceScope:'students',studentIds:[admin.identity_id]},400);
+   await school.send('/learning-paths/'+course.id,undefined,'GET',410);
+   await school.send('/practice/courses/'+course.id,undefined,'GET',404);
+   await school.send('/chapters/'+course.chapters[0].id+'/progress',{completed:true},'POST',410);
+   await school.send(`/practice/courses/${course.id}/chapters/${course.chapters[0].id}/read`,{read:true,expectedRevision:course.revision},'POST',404);
+   await change({audienceScope:'students',studentIds:[admin.identityId]},400);
    const candidates=await platform.send('/platform/courses/audience?kind=students&q=personal');
    assert.ok(candidates.items.some(c=>c.id===actors.personal.identityId));
    await personal.send('/platform/courses/audience?kind=students&q=personal',undefined,'GET',403);

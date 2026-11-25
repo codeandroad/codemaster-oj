@@ -9,12 +9,14 @@ export const receiptActivityJoin = `LEFT JOIN LATERAL submission_activity_contex
 export const receiptVisible = '((s.original_submission_id IS NULL OR original_context.resolved) AND (COALESCE(s.timed_attempt_id,original_context.timed_attempt_id) IS NULL OR activity.results_published_at IS NOT NULL))';
 
 export async function ownSchoolReceipt(db, schoolId, accountId, id) {
- const row=(await db.query(`SELECT s.*,ta.id AS receipt_timed_attempt_id,v.title,v.mode AS problem_mode,${receiptVisible} results_visible
+ const row=(await db.query(`SELECT s.*,v.title,v.mode AS problem_mode,${receiptVisible} results_visible,
+  (s.original_submission_id IS NULL OR original_context.resolved) AS context_resolved,
+  original_context.timed_attempt_id AS access_timed_attempt_id
   FROM submissions s JOIN problem_versions v ON v.id=s.version_id ${receiptActivityJoin}
   WHERE s.school_id=$1 AND s.account_id=$2 AND s.id=$3`,[schoolId,accountId,id])).rows[0];
  if(!row)fail(404,'NOT_FOUND','Submission not found.');
  const status=row.results_visible?row.status:'Submitted';
- const feedback=await loadSubmissionResult(db,row,{...row,status},{revealFormalFailure:row.results_visible&&!row.receipt_timed_attempt_id});
+ const feedback=await loadSubmissionResult(db,row,{...row,status},{revealFormalFailure:true});
  const reviews=row.results_visible?(await db.query('SELECT note,created_at AS "createdAt" FROM review_entries WHERE submission_id=$1 ORDER BY created_at,id',[id])).rows:[];
  return {id:'SUB'+row.id,problemId:row.problem_id,versionId:row.version_id,problemTitle:row.title,code:row.code,language:row.language,
   kind:row.kind,state:status==='Waiting'?'queued':status==='Judging'?'leased':'completed',createdAt:row.created_at,status,

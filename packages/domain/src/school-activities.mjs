@@ -53,11 +53,11 @@ export async function schoolJobFeedback(db, job, activity) {
   const resultsVisible = jobResultsVisible(job, context);
   if (!resultsVisible) return { resultsVisible, caseFeedback: [] };
   const r = job.result;
-  const showWrongAnswer = job.kind === 'submit' && job.state === 'completed' && r?.status === 'WA' &&
+  const ordinarySubmission = job.kind === 'submit' && job.state === 'completed' &&
     (!job.activity_id || context?.kind === 'assignment');
-  const caseFeedback = submissionCaseFeedback({ kind: job.kind, status: r?.status, context_resolved: showWrongAnswer,
+  const caseFeedback = submissionCaseFeedback({ kind: job.kind, status: r?.status, context_resolved: ordinarySubmission,
     custom_input: job.payload.tests?.[0]?.input }, job.payload.version, r?.privateResults,
-  { formalTests: showWrongAnswer ? job.payload.tests : [] });
+  { formalTests: ordinarySubmission ? job.payload.tests : [] });
   return { resultsVisible, caseFeedback };
 }
 /** A live timed attempt cannot be bypassed through a course/public/practice URL. */

@@ -1,9 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { submissionCaseFeedback } from '../src/submission-feedback.mjs';
+import { schoolJobFeedback } from '../src/school-activities.mjs';
 
 const version={mode:'function',comparator:'json',samples:[{input:'DISABLED',expected:'SECRET',enabled:false},{input:'[[1,2]]',expected:'[2,3]'}],reference_code:'PRIVATE_REFERENCE'};
 const logs=[{position:1,status:'WA',cpuMs:3,memoryBytes:1025,stdout:'debug',stderr:'Error',returned:'[2,4]',testId:'PRIVATE_ID',secret:'PRIVATE_OTHER'}];
+test('school job context controls formal exception details independently of the verdict',async()=>{
+ const job={kind:'submit',state:'completed',payload:{version,tests:[{input:'PRIVATE_INPUT',expected:'PRIVATE_EXPECTED'}]},
+  result:{status:'RE',privateResults:[{position:1,status:'AC'},{position:2,status:'RE',stderr:'ValueError: empty'},{position:3,status:'NotRun'}]}};
+ const ordinary=await schoolJobFeedback(null,job);
+ assert.deepEqual(ordinary.caseFeedback[1],{position:2,status:'RE',mode:'function',runtimeError:'ValueError: empty'});
+ const activityJob={...job,activity_id:'activity'};
+ assert.deepEqual(await schoolJobFeedback(null,activityJob,{kind:'assignment'}),ordinary);
+ assert.deepEqual(await schoolJobFeedback(null,activityJob,{kind:'timed'}),{resultsVisible:false,caseFeedback:[]});
+ const released=await schoolJobFeedback(null,activityJob,{kind:'timed',results_published_at:new Date()});
+ assert.deepEqual(released.caseFeedback[1],{position:2,status:'RE'});
+});
 test('unresolved formal and correction logs omit output and protect unresolved or timed runtime errors',()=>{
  for(const kind of ['submit','correction','unknown'])assert.deepEqual(submissionCaseFeedback({kind},version,logs),[{position:1,status:'WA',timeMs:3,memoryKb:2}]);
  const runtime=[{...logs[0],status:'RE'}];

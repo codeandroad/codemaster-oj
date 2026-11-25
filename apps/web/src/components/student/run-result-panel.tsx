@@ -18,7 +18,7 @@ const titles: Record<string, [string, string]> = {
 };
 const hints: Record<string, [string, string]> = {
   WA: ["程序输出与预期结果不一致。", "Your output does not match the expected result."],
-  RE: ["程序在运行过程中发生异常。请检查错误信息和对应代码。", "Your program stopped with an exception. Check the error and the corresponding code."],
+  RE: ["程序在运行过程中发生异常。", "Your program stopped with a runtime error."],
   CE: ["代码未通过编译或函数接口检查，请检查语法、函数名称和参数。", "Compilation or function interface checks failed. Check syntax, the function name and parameters."],
   TLE: ["程序未在时间限制内完成，请检查循环终止条件和算法复杂度。", "The program did not finish in time. Check loop termination and algorithm complexity."],
   MLE: ["程序使用的内存超过限制，请检查数据规模和重复分配。", "Memory usage exceeded the limit. Check data size and repeated allocations."],
@@ -98,7 +98,7 @@ function ResultContent({ result, error, reload, currentCode, currentLanguage, on
       {active && cases.length > 1 && (active.timeMs != null || active.memoryKb != null) && <p className={styles.summary}>
         {tx(`用例 ${active.position}`, `Case ${active.position}`)} · {tx("用时", "Runtime")}: {submissionMeasurement(active.timeMs, "ms", locale)} · {tx("内存", "Memory")}: {submissionMeasurement(active.memoryKb, "KiB", locale)}
       </p>}
-      {hint && !pending && <p className={styles.hint} data-tone={status === "WA" || status === "RE" ? "error" : undefined}>{hint}</p>}
+      {hint && !pending && <p className={styles.hint} data-tone={status === "WA" || status === "RE" ? "error" : undefined}>{hint}{status === "RE" && active?.mode === "function" && tx("函数在返回结果前中断。", " The function stopped before returning a value.")}</p>}
       {diagnostic.text && <div className={styles.diagnostic}><div className={styles.diagnosticHeader}><strong>{tx("错误详情", "Error details")}</strong>{location && (onLocate ? <button type="button" disabled={stale} title={stale ? tx("代码已修改，请重新运行后定位", "Run the changed code again before locating the error") : undefined} onClick={() => onLocate(location)}><MapPin size={14}/>{location.file}:{location.line}{location.column ? `:${location.column}` : ""}</button> : <span>{location.file}:{location.line}</span>)}</div><pre>{diagnostic.text}</pre></div>}
       {publicCase && <>
         {onUseCase && reusableInput !== null && <Button type="button" variant="secondary" size="sm" onClick={() => onUseCase(reusableInput)}>{tx("用此输入自测", "Use as custom input")}</Button>}

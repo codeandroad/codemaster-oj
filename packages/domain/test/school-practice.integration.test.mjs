@@ -27,6 +27,18 @@ test('isolated school and public practice lifecycle, authorization, queue and fe
     school_visible_at=now(),rank_approved_at=now() WHERE id=$1`,[versionId]);
    await pool.query('UPDATE problems SET current_version_id=$1 WHERE id=$2',[versionId,problemId]);
 
+  const receipts={};
+  for(const status of ['WA','RE']){
+   const {rows:[receipt]}=await pool.query(`INSERT INTO submissions(account_id,identity_id,problem_id,version_id,kind,code,idempotency_key,request_hash,status,score)
+    SELECT id,identity_id,$2,$3,'submit','print(0)',$4,'feedback',$5,0 FROM accounts WHERE id=$1 RETURNING id`,
+   [users.admin.id,problemId,versionId,randomUUID(),status]);
+   const {rows:[task]}=await pool.query("INSERT INTO judge_tasks(submission_id,version_id,purpose,state) VALUES($1,$2,'submission','completed') RETURNING id",[receipt.id,versionId]);
+   await pool.query(`INSERT INTO judge_runs(task_id,lease_id,submission_id,version_id,status,score,private_results,environment_version)
+    SELECT $1,gen_random_uuid(),$2,$3,$4,0,jsonb_build_array(jsonb_build_object('position',1,'testId',id,'status',$4::text,
+     'stdout','0','stderr','ValueError: retained error')),'feedback-test' FROM test_cases WHERE version_id=$3`,[task.id,receipt.id,versionId,status]);
+   receipts[status]=receipt.id;
+  }
+
   await migrate(pool);
   const grants=(await readFile(new URL('../grants.mjs',import.meta.url),'utf8')).match(/await pool\.query\(`([\s\S]*?)`\);/)?.[1];assert.ok(grants);await pool.query(grants.replaceAll('SCHEMA public',`SCHEMA ${schema}`));
   const asRole=role=>{const url=new URL(scoped);url.searchParams.set('options',`-crole=${role} -csearch_path=${schema}`);return createPool(url.href);};app=asRole('campus_app');worker=asRole('campus_worker');
@@ -35,6 +47,14 @@ test('isolated school and public practice lifecycle, authorization, queue and fe
   for(const role of ['teacher','student']){await pool.query('INSERT INTO school_memberships(school_id,account_id,role) VALUES($1,$2,$3)',[alpha.id,users[role].id,role]);await pool.query('INSERT INTO school_identities(school_id,kind,number,name,account_id) VALUES($1,$2,$2,$2,$3)',[alpha.id,role,users[role].id]);}
   const call=async(user,route,method='GET',body={})=>(await schoolPracticeOperation({pool:app,user:users[user],route:route.split('?')[0],url:new URL('http://unit.test'+route),method,body}))?.body;
   const prefix=`/schools/${alpha.id}`;
+  await t.test('migrated ordinary receipts restore the original comparison or exception for the owner',async()=>{
+   const path=status=>`/schools/${LEGACY_SCHOOL_ID}/judge-jobs/SUB${receipts[status]}`;
+   const [wrong]=(await call('admin',path('WA'))).caseFeedback;
+   assert.deepEqual([wrong.input,wrong.output,wrong.expected],['PRIVATE_HIDDEN_INPUT','0','17']);
+   const [crash]=(await call('admin',path('RE'))).caseFeedback;
+   assert.deepEqual(crash,{position:1,status:'RE',mode:'stdio',runtimeError:'ValueError: retained error'});
+   await assert.rejects(call('teacher',path('RE')),error=>error.status===404);
+  });
   const baseline=(await pool.query('SELECT (SELECT count(*) FROM submissions)::int submissions,(SELECT count(*) FROM luq_ledger)::int luq')).rows[0];
   let p,bank,request;
   const definition={title:'Sum pair',statement:'Read two numbers and print their sum.',mode:'stdio',referenceCode:'a,b=map(int,input().split())\nprint(a+b)',samples:[{input:'2 3',expected:'5'}],tests:[{input:'999 10',expected:'1009',weight:100}]};

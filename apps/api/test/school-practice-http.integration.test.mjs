@@ -398,6 +398,16 @@ test('school and public practice Nest transport requires scoped membership, CSRF
     assert.equal(custom.caseFeedback[0].expected,undefined);assert.match(custom.caseFeedback[0].output,/22/);
     const runtimeError=await run('samples',`${fixture.mode==='function'?'def solve(data):\n    ':''}raise ValueError("public diagnostic fixture")`);
     assert.equal(runtimeError.status,'RE');assert.match(runtimeError.caseFeedback[0].stderr,/ValueError/);
+    const crash=await run('submit',fixture.mode==='function'?'def solve(data):\n    return max([])':'value = input()\nprint(max([]))');
+    assert.equal(crash.status,'RE');
+    const [exception]=crash.caseFeedback;
+    assert.match(exception.runtimeError,/File "(?:\/w\/)?main\.py", line 2/);
+    assert.match(exception.runtimeError,/ValueError:.*empty/);
+    assert.equal(exception.mode,fixture.mode);
+    for(const field of ['input','expected','output','stdout','stderr','testId'])assert.equal(exception[field],undefined);
+    const receiptPath=`/practice/submissions/${school.id}/${crash.id}`;
+    assert.deepEqual((await request(receiptPath,{auth:auth.personal})).data.caseFeedback,crash.caseFeedback);
+    await request(receiptPath,{auth:auth.student,status:404});
     const mismatch=await run('submit',fixture.mode==='function'?'def solve(data): return 0':'print(0)');
     assert.equal(mismatch.status,'WA');
     assert.equal(mismatch.caseFeedback[0].input,fixture.hidden);
@@ -411,7 +421,7 @@ test('school and public practice Nest transport requires scoped membership, CSRF
     assert.equal(latest.id,formal.id);
     assert.deepEqual([latest.runtimeMs,latest.memoryKb],[formal.runtimeMs,formal.memoryKb]);
     const progress=(await request(`/practice/problems/${p.id}`,{auth:auth.personal})).data;
-    assert.equal(progress.solved,true);assert.equal(progress.attempts,2);
+    assert.equal(progress.solved,true);assert.equal(progress.attempts,3);
     assert.equal((await request(`/practice/problems/${p.id}`,{auth:auth.student})).data.solved,false);
    }
   });

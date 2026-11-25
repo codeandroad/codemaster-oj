@@ -34,7 +34,7 @@ export async function enrollWithClaim(post, school, admin, applicant, facts) {
   const issued = await post(path+'/'+identity.data.id+'/activation-code',admin,{},201);
   assert.equal(issued.status,201);
   const claimed = await post('/auth/claim-identity',applicant,{
-    ...facts, schoolSlug:school.slug, activationCode:issued.data.activationCode,
+    schoolSlug:school.slug, activationCode:issued.data.activationCode,
   },200);
   assert.equal(claimed.status,200);
   assert.equal(claimed.data.identityId,identity.data.id);

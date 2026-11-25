@@ -1,8 +1,8 @@
 import { transaction } from './db.mjs';
 import { auditSchool, lockSchoolTeaching, requireSchoolAdmin } from './schools.mjs';
-import { fail, field, randomToken, safeEqual, tokenHash, uuid } from './security.mjs';
+import { fail, field, randomToken, tokenHash, uuid } from './security.mjs';
 
-const claimFailed = () => fail(400, 'CLAIM_FAILED', '学校、身份信息或认领码无效，请联系本校管理员');
+const claimFailed = () => fail(400, 'CLAIM_FAILED', '学校或认领码无效，请联系本校管理员');
 
 // The activation selector is public; identity directories and claim codes
 // remain authenticated. Return an explicit display-only projection.
@@ -16,18 +16,24 @@ export function activationSchoolSlug(body) {
   return field(body.schoolSlug, '学校', { max: 50 }).toLowerCase();
 }
 
-export async function verifySchoolIdentity(db, { schoolSlug, kind, number, name, code }) {
+export async function verifySchoolIdentity(db, schoolSlug, code, legacyDetails) {
   const school = (await db.query(`SELECT id,slug,name,name_zh AS "nameZh",name_en AS "nameEn" FROM schools
     WHERE slug=$1`, [schoolSlug])).rows[0];
   if (!school) claimFailed();
   await lockSchoolTeaching(db, school.id);
-  const identity = (await db.query(`SELECT * FROM school_identities WHERE school_id=$1 AND kind=$2 AND number=$3
-    AND archived_at IS NULL FOR UPDATE`, [school.id, kind, number])).rows[0];
-  const token = identity && (await db.query(`SELECT * FROM school_activation_tokens WHERE school_id=$1 AND identity_id=$2
-    AND consumed_at IS NULL AND expires_at>clock_timestamp() FOR UPDATE`, [school.id, identity.id])).rows[0];
-  const claimed = identity?.account_id != null;
-  if (!identity || identity.name !== name || !token || claimed || !safeEqual(tokenHash(code), token.token_hash)) claimFailed();
-  try { await requireSchoolAdmin(db, school.id, token.issued_by); }
+  const { rows: [identity] } = await db.query(`
+    SELECT i.id,i.kind,i.number,i.name,i.gender,t.issued_by
+    FROM school_activation_tokens t JOIN school_identities i ON (i.school_id,i.id)=(t.school_id,t.identity_id)
+    WHERE t.school_id=$1 AND t.token_hash=$2 AND t.consumed_at IS NULL AND t.expires_at>clock_timestamp()
+      AND i.kind IN ('student','teacher') AND i.archived_at IS NULL AND i.account_id IS NULL
+    FOR UPDATE OF i,t`, [school.id, tokenHash(code)]);
+  if (!identity) claimFailed();
+  // Older clients send these fields as an additional check on the selected dossier.
+  for (const key of ['kind', 'number', 'name']) {
+    const value = legacyDetails[key];
+    if (value !== undefined && (typeof value !== 'string' || value.trim() !== identity[key])) claimFailed();
+  }
+  try { await requireSchoolAdmin(db, school.id, identity.issued_by); }
   catch (error) { if ([401,403,404].includes(error.status)) claimFailed(); throw error; }
   return { school, identity };
 }

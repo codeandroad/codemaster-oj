@@ -512,7 +512,7 @@ export function TeacherClasses({ user }: { user: CampusUser }) {
         <Modal title={`${code.name} · ${tx("认领码", "Claim code")}`} onClose={() => setCode(null)}>
           <ActivationSchoolHint school={code.school}/>
           <p className="text-sm text-muted-foreground">
-            {tx("请将学号和认领码私下交给学生，由本人登录后关联校内档案。", "Give the student their ID and claim code privately. They can sign in to link their school record.")}
+            {tx("请将认领码私下交给学生。学生登录后选择本校，输入认领码即可关联档案。", "Give the student their claim code privately. They can sign in, select this school and enter the code to link their record.")}
           </p>
           <p className="mt-4 break-all rounded border border-border bg-surface-subtle p-4 font-mono font-semibold">
             {code.activationCode}

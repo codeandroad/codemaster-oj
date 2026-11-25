@@ -38,8 +38,8 @@ export function SchoolActivationButton({ school, identity }: { school: School; i
           <div><dt className="text-muted-foreground">{text("School code", "学校标识")}</dt><dd className="select-all font-mono">{credential.school.slug}</dd></div>
           <div><dt className="text-muted-foreground">{text("Identity claim code", "认领码")}</dt><dd className="select-all break-all font-mono">{credential.activationCode}</dd></div>
         </dl>
-        <p className="text-sm text-muted-foreground">{text("Share the school code, student/staff ID, name and claim code privately with this person. Ask them to sign in and select “Join a school” in Settings → Schools. Copy the code before closing.", "请将学校标识、学号或工号、姓名与认领码私下交给本人，登录后进入“设置 → 学校”，选择“加入学校”。关闭此窗口后不能再次查看明文。")}</p>
-        <div className="flex justify-end gap-2"><CopyCode label={text("Copy activation details", "复制认领信息")} text={`${credential.school.name}\n${text("School code", "学校标识")}: ${credential.school.slug}\n${identity.kind === "student" ? text("Student ID", "学号") : text("Staff ID", "工号")}: ${identity.number}\n${text("Name", "姓名")}: ${identity.name}\n${text("Identity claim code", "认领码")}: ${credential.activationCode}`} /><Button onClick={close}>{text("Done, close", "已记录，关闭")}</Button></div>
+        <p className="text-sm text-muted-foreground">{text("Give this code privately to its recipient. After signing in, they can select this school in Settings → Schools → Join a school and enter the code. Copy the code before closing.", "请将认领码私下交给本人。对方登录后，在“设置 → 学校 → 加入学校”中选择本校，输入认领码即可。关闭前请复制留存。")}</p>
+        <div className="flex justify-end gap-2"><CopyCode label={text("Copy activation details", "复制认领信息")} text={`${credential.school.name}\n${text("School code", "学校标识")}: ${credential.school.slug}\n${text("Identity claim code", "认领码")}: ${credential.activationCode}`} /><Button onClick={close}>{text("Done, close", "已记录，关闭")}</Button></div>
       </>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     </Modal>}

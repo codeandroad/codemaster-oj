@@ -135,9 +135,12 @@ export async function createDomainServices(pool,config) {
     const result=await transaction(pool,async db=>{const locked=(await db.query('SELECT * FROM accounts WHERE id=$1 AND binding_released_at IS NULL FOR UPDATE',[a.id])).rows[0];if(!locked||!safeEqual(locked.password_hash,a.password_hash))fail(401,'LOGIN_FAILED','用户名或密码不正确');if(locked.disabled_at)fail(403,'ACCOUNT_DISABLED','账号已禁用');if(!await findUser(db,a.id))fail(401,'LOGIN_FAILED','用户名或密码不正确');if(sess)await db.query('DELETE FROM sessions WHERE token_hash=$1',[sess.token_hash]);await db.query('UPDATE accounts SET last_login_at=now() WHERE id=$1',[a.id]);await audit(db,a.id,'auth.login','account',a.id);return session(db,a.id);});return respond(200,result.body,result.cookie);
    }
    if((route==='/auth/verify-identity'||route==='/auth/claim-identity')&&method==='POST') {
-    ipLimiter.check(`claim:${ip}`);const kind=enumValue(body.kind,['student','teacher'],'身份类型'),number=field(body.number,'编号'),name=field(body.name,'姓名'),code=field(body.activationCode,'身份认领码',{max:100}),schoolSlug=activationSchoolSlug(body);authLimiter.check(`claim:${schoolSlug}:${kind}:${number}`);
+    ipLimiter.check(`claim:${ip}`);
+    const schoolSlug = activationSchoolSlug(body);
+    const code = field(body.activationCode, '身份认领码', {max:100});
+    authLimiter.check(`claim:${user.id}`);
     return transaction(pool,async db=>{
-     const claim=await verifySchoolIdentity(db,{schoolSlug,kind,number,name,code});
+     const claim = await verifySchoolIdentity(db, schoolSlug, code, body);
      if(route==='/auth/verify-identity')return respond(200,await schoolClaimPreview(db,claim));
      await bindSchoolIdentity(db,claim.school.id,user.id,claim.identity,user.id);
      await auditSchool(db,claim.school.id,user.id,'school.identity.claim',claim.identity.id);

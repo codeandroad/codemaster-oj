@@ -9,7 +9,7 @@ import { DomainService } from '../domain.service.js';
 export class PlatformController {
   constructor(private readonly domain: DomainService) {}
 
-  @Get(['problem-groups','problem-groups/:id','schools', 'school-admin-candidates', 'accounts'])
+  @Get(['problem-groups','problem-groups/:id','schools', 'school-admin-candidates', 'accounts', 'accounts/:accountId'])
   async read(@Req() request: DomainRequest, @Res({ passthrough: true }) response: Response) {
     return applyResponse(response, await this.domain.execute('platform', request.domainContext));
   }

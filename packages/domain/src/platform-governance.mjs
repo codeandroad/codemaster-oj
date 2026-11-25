@@ -168,16 +168,92 @@ export async function issueDeploymentReset(pool, rawUsername, verificationNote) 
   });
 }
 
+const accountFields = `a.id AS "accountId",a.username,i.name,a.created_at AS "createdAt",
+  a.last_login_at AS "lastLoginAt",a.disabled_at AS "disabledAt",a.disabled_at IS NOT NULL AS disabled,
+  ${platformGrant} AS "platformAdmin",(${schoolAdmin}) AS "schoolAdmin",(${canResetPassword}) AS "canResetPassword"`;
+const directoryMembership = 'm.account_id=a.id AND (m.revoked_at IS NULL OR m.suspended)';
+const additionalSchoolAdmin = `EXISTS (SELECT 1 FROM school_administrators g
+  WHERE g.school_id=m.school_id AND g.account_id=m.account_id AND g.revoked_at IS NULL)`;
+
+function accountSchools({details = false} = {}) {
+  return `(SELECT coalesce(jsonb_agg(jsonb_build_object(
+      'id',s.id,'name',s.name,'nameZh',s.name_zh,'nameEn',s.name_en,'slug',s.slug,
+      'roles',CASE WHEN m.role<>'school_admin' AND ${additionalSchoolAdmin}
+        THEN ARRAY[m.role,'school_admin'] ELSE ARRAY[m.role] END,
+      'suspended',m.suspended
+      ${details ? `, 'joinedAt',m.joined_at, 'identity',
+        CASE WHEN dossier.id IS NOT NULL THEN jsonb_build_object('name',dossier.name,'number',dossier.number) END` : ''}
+    ) ORDER BY s.name,s.id),'[]'::jsonb)
+    FROM school_memberships m JOIN schools s ON s.id=m.school_id
+    ${details ? `LEFT JOIN school_identities dossier ON dossier.school_id=m.school_id
+      AND dossier.account_id=m.account_id AND dossier.archived_at IS NULL` : ''}
+    WHERE ${directoryMembership}) AS schools`;
+}
+
+const accountOrders = {
+  username: 'a.username,a."accountId"',
+  recent: 'a."lastLoginAt" DESC NULLS LAST,a.username,a."accountId"',
+  newest: 'a."createdAt" DESC,a.username,a."accountId"',
+};
+const ACCOUNT_PAGE_SIZE = 50;
+
 async function listLoginAccounts(db, url) {
   const page = integer(Number(url.searchParams.get('page') ?? 1),1,100000,'页码');
   const term = field(url.searchParams.get('q') ?? '', '关键词', {min:0,max:100}).toLowerCase();
   const status = enumValue(url.searchParams.get('status') ?? 'all', ['all','enabled','disabled'], '平台登录状态');
-  const {rows} = await db.query(`SELECT a.id AS "accountId",a.username,i.name,a.disabled_at IS NOT NULL AS disabled,
-    ${platformGrant} AS "platformAdmin", (${schoolAdmin}) AS "schoolAdmin", (${canResetPassword}) AS "canResetPassword" ${loginAccount}
-    AND ($1='' OR strpos(lower(a.username),$1)>0 OR strpos(lower(i.name),$1)>0)
-    AND ($2='all' OR (a.disabled_at IS NOT NULL)=($2='disabled'))
-    ORDER BY a.username,a.id LIMIT 51 OFFSET $3`, [term,status,(page-1)*50]);
-  return result({items:rows.slice(0,50),page,hasMore:rows.length>50});
+  const role = enumValue(url.searchParams.get('role') ?? 'all',
+    ['all','platform_admin','school_admin','teacher','student'], '角色');
+  const school = url.searchParams.get('schoolId') ?? 'all';
+  const schoolId = school === 'all' || school === 'none' ? null : uuid(school,'学校 ID');
+  const sort = enumValue(url.searchParams.get('sort') ?? 'username', Object.keys(accountOrders), '排序');
+  const order = accountOrders[sort];
+  // A school role and school filter must match the same membership.
+  const {rows:[directory]} = await db.query(`
+    WITH filtered AS (
+      SELECT a.id AS "accountId",a.username,a.created_at AS "createdAt",a.last_login_at AS "lastLoginAt" ${loginAccount}
+      AND ($1='' OR strpos(lower(a.username),$1)>0 OR strpos(lower(i.name),$1)>0
+        OR EXISTS (SELECT 1 FROM school_identities dossier JOIN school_memberships m
+          ON (m.school_id,m.account_id)=(dossier.school_id,dossier.account_id)
+          WHERE ${directoryMembership} AND dossier.archived_at IS NULL
+            AND ($4::uuid IS NULL OR dossier.school_id=$4)
+            AND (strpos(lower(dossier.number),$1)>0 OR strpos(lower(dossier.name),$1)>0)))
+      AND ($2='all' OR (a.disabled_at IS NOT NULL)=($2='disabled'))
+      AND ($3<>'platform_admin' OR ${platformGrant})
+      AND (NOT $5::boolean OR NOT EXISTS (SELECT 1 FROM school_memberships m WHERE ${directoryMembership}))
+      AND (($4::uuid IS NULL AND $3 IN ('all','platform_admin')) OR EXISTS (
+        SELECT 1 FROM school_memberships m WHERE ${directoryMembership}
+          AND ($4::uuid IS NULL OR m.school_id=$4)
+          AND ($3 IN ('all','platform_admin') OR m.role=$3 OR ($3='school_admin' AND ${additionalSchoolAdmin}))))
+    ), paginated AS (
+      SELECT * FROM filtered a ORDER BY ${order} LIMIT $6 OFFSET $7
+    ), enriched AS (
+      SELECT ${accountFields}, ${accountSchools()}
+      FROM paginated p JOIN accounts a ON a.id=p."accountId" JOIN identities i ON i.id=a.identity_id
+    )
+    SELECT (SELECT count(*)::int FROM filtered) AS total, coalesce((
+      SELECT jsonb_agg(to_jsonb(a) ORDER BY ${order}) FROM enriched a
+    ),'[]'::jsonb) AS items`, [term,status,role,schoolId,school==='none',ACCOUNT_PAGE_SIZE,(page-1)*ACCOUNT_PAGE_SIZE]);
+  return result({...directory,page,hasMore:page*ACCOUNT_PAGE_SIZE<directory.total});
+}
+
+async function accountFilterSchools(db) {
+  const {rows} = await db.query(`SELECT id,name,slug,name_zh AS "nameZh",name_en AS "nameEn"
+    FROM schools ORDER BY name,id`);
+  return result({schools:rows});
+}
+
+async function loginAccountDetail(db, accountId) {
+  const {rows:[account]} = await db.query(`SELECT ${accountFields}, ${accountSchools({details:true})}
+    ${loginAccount} AND a.id=$1`, [accountId]);
+  if (!account) fail(404,'NOT_FOUND','账号不存在');
+  const {rows: events} = await db.query(`
+    SELECT e.id,e.action,e.created_at AS "createdAt",actor.username AS "actorUsername"
+    FROM platform_audit_events e LEFT JOIN accounts actor ON actor.id=e.actor_account_id
+    WHERE e.target_account_id=$1 AND e.action IN (
+      'platform.administrator.provision','platform.password_reset.issue','deployment.password_reset.issue',
+      'platform.login.disable','platform.login.restore')
+    ORDER BY e.created_at DESC,e.id DESC LIMIT 12`, [accountId]);
+  return result({...account,events});
 }
 
 async function setPlatformLogin(db, actorId, accountId, disabled) {
@@ -276,14 +352,16 @@ async function appointAdministrator(db, actorId, schoolId, body) {
 export async function handlePlatformGovernance({ pool,user,route,method,body,url }) {
   const searching = route === '/platform/school-admin-candidates' && method === 'GET';
   const accounts = route === '/platform/accounts' && method === 'GET';
+  const account = method === 'GET' && route.match(/^\/platform\/accounts\/([^/]+)$/);
   const login = method === 'PATCH' && route.match(/^\/platform\/accounts\/([^/]+)\/login$/);
   const reset = method === 'POST' && route.match(/^\/platform\/accounts\/([^/]+)\/reset$/);
   const match = route.match(/^\/platform\/schools(?:\/([^/]+)(?:\/(administrators))?)?$/);
-  if (!searching && !match && !accounts && !login && !reset) return null;
+  if (!searching && !match && !accounts && !account && !login && !reset) return null;
   const schoolId = match?.[1] ? uuid(match[1], '学校 ID') : null;
   return transaction(pool, async db => {
     await requirePlatformAdministrator(db, user.id);
     if (accounts) return listLoginAccounts(db,url);
+    if (account) return account[1] === 'filters' ? accountFilterSchools(db) : loginAccountDetail(db,uuid(account[1],'账号 ID'));
     if (reset) return issuePlatformReset(db,user.id,uuid(reset[1],'账号 ID'),body);
     if (login) return setPlatformLogin(db,user.id,uuid(login[1],'账号 ID'),body.disabled);
     if (searching) return searchSchoolAdminCandidates(db,url);

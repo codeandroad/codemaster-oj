@@ -9,7 +9,7 @@ import { ResetCodeDialog, type IssuedResetCode } from "./reset-code-dialog";
 import { usePlatformError } from "./platform-ui";
 import { useSchoolText } from "./school-ui";
 
-export function PlatformPasswordReset({account}: {account: {accountId: string; username: string}}) {
+export function PlatformPasswordReset({account,onIssued}: {account: {accountId: string; username: string}; onIssued?: () => void}) {
   const text = useSchoolText();
   const localError = usePlatformError();
   const action = useMutation();
@@ -29,6 +29,7 @@ export function PlatformPasswordReset({account}: {account: {accountId: string; u
           setOpen(false);
           setNote("");
           setCredential(issued);
+          onIssued?.();
         } catch (error) { throw localError(error); }
       });
     } finally { pending.current = false; }

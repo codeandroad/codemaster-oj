@@ -247,6 +247,42 @@ test('explicit platform governance preserves teaching roles and enforces authori
       });
       const personal = await request('/auth/register-personal', {method:'POST',body:{username:'personal-recovery',password}});
       assert.equal(personal.status,201);
+      await t.test('platform account directory exposes filtered login metadata only to platform administrators', async () => {
+        const directory = '/platform/accounts';
+        const id = personal.data.user.id;
+        for (const route of [directory+'/filters', directory+'/'+id]) {
+          assert.equal((await request(route)).status,401);
+          assert.equal((await request(route,{auth:firstAdmin})).status,403);
+        }
+        const options = await request(directory+'/filters',{auth:platform});
+        assert.equal(options.status,200);
+        assert.ok(options.data.schools.some(item=>item.id===school.id));
+        const detail = await request(directory+'/'+id,{auth:platform});
+        assert.equal(detail.status,200);
+        assert.equal(detail.data.username,'personal-recovery');
+        assert.ok(Date.parse(detail.data.createdAt));
+        assert.ok(Date.parse(detail.data.lastLoginAt));
+        assert.deepEqual(detail.data.schools,[]);
+        assert.deepEqual(detail.data.events,[]);
+        for (const sort of ['username','recent','newest']) {
+          const found = await request(directory+'?schoolId=none&status=enabled&q=PERSONAL-RECOVERY&sort='+sort,{auth:platform});
+          assert.equal(found.status,200);
+          assert.equal(found.data.total,1);
+          assert.deepEqual(found.data.items.map(item=>item.accountId),[id]);
+          assert.equal(found.data.hasMore,false);
+        }
+        const privileged = await request(directory+'?role=platform_admin',{auth:platform});
+        assert.deepEqual(privileged.data.items.map(item=>item.username),['platform-operator']);
+        const newest = await request(directory+'?sort=newest',{auth:platform});
+        assert.equal(newest.status,200);
+        assert.equal(newest.data.items[0].accountId,id);
+        const laterPage = await request(directory+'?sort=newest&page=2',{auth:platform});
+        assert.deepEqual(laterPage.data.items,[]);
+        assert.equal(laterPage.data.total,newest.data.total);
+        assert.equal((await request(directory+'?sort=invalid',{auth:platform})).status,400);
+        assert.equal((await request(directory+'/'+randomUUID(),{auth:platform})).status,404);
+        assert.ok(Object.keys(detail.data).every(key=>!/(passwordHash|password_hash|token)/i.test(key)));
+      });
       await t.test('manual review permits only a platform admin to issue a code for an eligible personal login', async () => {
         const path = issuePath(personal);
         assert.equal((await post(path,undefined,review)).status,401);
@@ -267,6 +303,9 @@ test('explicit platform governance preserves teaching roles and enforces authori
         assert.equal((await setDisabled(true)).status,200);
         assert.equal((await post(path,platform,review)).status,403);
         assert.equal((await setDisabled(false)).status,200);
+        const {data:detail} = await request('/platform/accounts/'+personal.data.user.id,{auth:platform});
+        assert.deepEqual(new Set(detail.events.map(event=>event.action)), new Set(['platform.login.restore','platform.login.disable']));
+        assert.ok(detail.events.every(event=>event.actorUsername==='platform-operator' && Date.parse(event.createdAt)));
       });
       await t.test('a personal code expires, supersedes older codes, and changes the password and sessions exactly once', async () => {
         const path = issuePath(personal);
@@ -287,6 +326,9 @@ test('explicit platform governance preserves teaching roles and enforces authori
           WHERE target_account_id=$1 AND action='platform.password_reset.issue'`,[accountId]);
         assert.equal(event.actor_account_id,platform.data.user.id);
         assert.deepEqual(event.detail,review);
+        const history = (await request('/platform/accounts/'+accountId,{auth:platform})).data.events;
+        assert.ok(history.some(event=>event.action==='platform.password_reset.issue'));
+        assert.ok(history.every(event=>!('detail' in event) && !('resetCode' in event)));
         await pool.query("UPDATE reset_tokens SET expires_at=now()-interval '1 minute' WHERE account_id=$1",[accountId]);
         assert.equal((await redeem(personal,first)).status,400);
         const second = await issue();
@@ -335,6 +377,14 @@ test('explicit platform governance preserves teaching roles and enforces authori
         assert.equal(decision.status,200);
         const second = await recover(first.session,first.password);
         assert.deepEqual((await schools(second.session)).sort(),[originalSchool.id,school.id].sort());
+        const found = async query => {
+          const response = await request('/platform/accounts?'+new URLSearchParams(query),{auth:platform});
+          assert.equal(response.status,200);
+          return response.data.items;
+        };
+        assert.deepEqual((await found({q:'PR1',schoolId:originalSchool.id,role:'student'})).map(account=>account.accountId),[id]);
+        assert.deepEqual(await found({q:username,schoolId:school.id,role:'student'}),[]);
+        assert.deepEqual((await found({q:username,schoolId:school.id,role:'teacher'})).map(account=>account.accountId),[id]);
         for (const [schoolId,admin,identityId,role] of [
           [originalSchool.id,legacy,student.id,'student'],[school.id,firstAdmin,teacher.data.id,'teacher'],
         ]) {
@@ -347,6 +397,13 @@ test('explicit platform governance preserves teaching roles and enforces authori
         }
         const suspended = await request(directory+'/accounts/'+id+'/access',{method:'PATCH',auth:firstAdmin,body:{suspended:true}});
         assert.equal(suspended.status,200);
+        const directoryDetail = (await request('/platform/accounts/'+id,{auth:platform})).data;
+        assert.equal(directoryDetail.disabled,false);
+        const affiliations = new Map(directoryDetail.schools.map(affiliation=>[affiliation.id,affiliation]));
+        assert.equal(affiliations.get(originalSchool.id).identity.number,'PR1');
+        assert.deepEqual(affiliations.get(school.id).roles,['teacher']);
+        assert.equal(affiliations.get(school.id).identity.number,'PR2');
+        assert.equal(affiliations.get(school.id).suspended,true);
         const third = await recover(second.session,second.password);
         assert.equal((await request(directory+'/courses',{auth:third.session})).status,404);
         assert.deepEqual(await schools(third.session),[originalSchool.id]);
